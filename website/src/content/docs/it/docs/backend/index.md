@@ -1,5 +1,5 @@
 ---
-sourceHash: a6b7f50250fe821b
+sourceHash: 627e02641d926641
 title: Panoramica del backend
 sidebar_label: Backend
 description: Il backend di Rebase fornisce un server completo con API REST, autenticazione, storage, WebSocket in tempo reale e cronologia delle entità — tutto inizializzato con una singola chiamata di funzione.
@@ -101,7 +101,7 @@ Dopo l'inizializzazione, vengono montate queste route:
 | `/api/meta/contract` | Lo schema delle collection del progetto (richiede `schema:read`) |
 | `/api/meta/schema-version` | Una stringa di versione per tale schema (non autenticato) |
 | `/api/functions/*` | Route di funzioni personalizzate (quando `functionsDir` è impostato) |
-| `/api/cron/*` | Gestione dei cron job (`cron:read` / `cron:write`, quando `cronsDir` è impostato) |
+| `/api/admin/cron/*` | Gestione dei cron job (`cron:read` / `cron:write`, quando `cronsDir` è impostato) |
 | WebSocket su richiesta di upgrade | Sottoscrizioni in tempo reale |
 
 ---
@@ -294,7 +294,7 @@ Ogni errore — proveniente da qualsiasi route o sottosistema — viene restitui
 
 Lo stato HTTP è presente nella risposta, non nel corpo. Gestisci la logica basandoti su `code` e non su `message` — i messaggi sono scritti per gli utenti e possono variare.
 
-L'SDK tipizzato converte ciascuno di questi errori in un `RebaseApiError` contenente `status`, `code` e `details` — inclusi i fallimenti che non hanno mai raggiunto il server. Una connessione rifiutata, un errore DNS, problemi di CORS o un'interruzione (abort) vengono restituiti come `status: 0`, `code: "NETWORK_ERROR"`, con l'errore del runtime associato a `cause`, anziché con l'eccezione generica restituita da `fetch`. In questo modo il codice applicativo gestisce un'unica classe di errore:
+L'SDK tipizzato converte ciascuno di questi errori in un `RebaseApiError` contenente `status`, `code` e `details` — inclusi i fallimenti che non hanno mai raggiunto il server. Una connessione rifiutata, un errore DNS, problemi di CORS o un'interruzione (abort) vengono restituiti come `status: 0`, `code: "NETWORK_ERROR"`, con l'errore del runtime associato a `cause`, anziché con l'eccezione generica restituita da `fetch`. Una risposta senza envelope — un 413 di un proxy, un 502 di un load balancer — riceve comunque un `code` dal suo status (`PAYLOAD_TOO_LARGE`, `SERVICE_UNAVAILABLE`, `INTERNAL_ERROR`, …), e un client costruito fuori da un browser senza `baseUrl` fallisce con `BASE_URL_REQUIRED` anziché con un errore di rete. In questo modo il codice applicativo gestisce un'unica classe di errore:
 
 ```typescript
 async function setPrice(id: string, price: number) {

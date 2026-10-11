@@ -1,5 +1,5 @@
 ---
-sourceHash: 15505bc41ba0e8f2
+sourceHash: 06f83add20038a66
 title: Aggregazioni e ricerca
 sidebar_label: Aggregazioni e ricerca
 description: "Conta, somma e raggruppa con l'SDK, filtra all'interno delle colonne JSON ed esegui ricerche full-text e vettoriali dal client."
@@ -144,7 +144,9 @@ blocco `search`, che rende inoltre i risultati ordinabili per `_score`. Consulta
 ## Ricerca vettoriale
 
 Per le collezioni con una proprietà `vector`, ordina le righe per similarità rispetto a un
-embedding di query. Le righe vengono restituite a partire dalle più vicine, ciascuna corredata da una `_distance`.
+embedding di query. Le righe vengono restituite a partire dalle più vicine, ciascuna corredata da una `_distance`. La
+distanza è l'ordinamento: un `orderBy` sulla stessa query viene ignorato. Senza un
+`limit` una ricerca vettoriale restituisce 10 righe, non le 50 di un elenco.
 
 ```typescript
 const { data } = await client.data.docs
@@ -154,10 +156,25 @@ const { data } = await client.data.docs
     .find();
 ```
 
-`where` e `orderBy` sulla stessa query agiscono come filtri applicati *prima*
-dell'ordinamento — questo restituisce le righe più vicine che soddisfano anche i criteri, non le righe più vicine
-filtrate a posteriori. Generare `queryVector` è compito tuo: Rebase memorizza e
+`where` sulla stessa query è un filtro su quali righe sono candidate — questo
+restituisce le righe più vicine che soddisfano anche i criteri, non le righe più vicine
+filtrate a posteriori. Sull'indice HNSW questo vale da pgvector 0.8.0 (vedi
+[Filtri su un indice approssimato](/docs/backend/vector-search/#filters-on-an-approximate-index));
+su un pgvector più vecchio un filtro che poche delle righe più vicine superano restituisce una
+pagina corta. Generare `queryVector` è compito tuo: Rebase memorizza e
 cerca gli embedding, non li calcola.
+
+<span class="since-badge" data-since="0.25">Da 0.25</span> L'SDK invia una
+ricerca vettoriale come `POST /api/data/<collection>/query`, con l'embedding nel
+body: nell'URL, 768 dimensioni sono circa 17 KB, oltre ciò che accettano Node (16 KB) e la maggior parte dei
+proxy (nginx: 8 KB). `count()` con una ricerca vettoriale segue la stessa strada,
+come `POST /api/data/<collection>/count`. Contro un server precedente alla 0.24, che
+non ha una route del genere, entrambi ripiegano sulla `GET` — e un embedding lungo lì
+può comunque essere rifiutato con un 431 o un 414.
+
+<span class="since-badge" data-since="0.25">Da 0.25</span> Con un `threshold`,
+il risultato non ha `meta.total` — contare le righe entro una distanza lo calcola
+per ogni riga della tabella. Pagina con `meta.hasMore`, che resta esatto.
 
 ### Cosa devi fornire
 

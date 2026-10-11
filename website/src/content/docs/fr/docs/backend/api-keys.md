@@ -1,5 +1,5 @@
 ---
-sourceHash: 7c51c9877d9d0803
+sourceHash: 376a90002cda8008
 title: Clés API
 sidebar_label: Clés API
 description: "Des clés de longue durée pour les scripts, la CI, les agents et les intégrations : clés de service et clés personnelles, les portées qu'elles détiennent, leur articulation avec la sécurité au niveau des lignes, et les routes qui les gèrent."
@@ -156,7 +156,9 @@ Le `rate_limit` d'une clé est le nombre de requêtes qu'elle peut faire dans un
 15 minutes, et chaque porte d'entrée est décomptée dans un seul compartiment, `api-key:<id>` :
 
 - ses requêtes HTTP vers les API de données, de stockage et de fonctions ;
-- ses trames de données sur le socket temps réel : lectures, comptages, enregistrements et suppressions ;
+- ses trames de données sur le socket temps réel : lectures, comptages, enregistrements et suppressions,
+  ainsi que les abonnements et les demandes d'historique de canal au-delà de
+  l'[allocation](/docs/backend/realtime/#what-a-write-costs-and-the-limits) de chaque socket ;
 - ses requêtes vers [`/mcp`](/docs/ai/mcp/#the-remote-endpoint).
 
 Sans `rate_limit`, le compartiment reçoit la valeur par défaut du serveur pour les clés API, 1000.

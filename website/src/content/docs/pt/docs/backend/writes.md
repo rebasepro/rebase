@@ -1,5 +1,5 @@
 ---
-sourceHash: aaa2fdfbd560c4cc
+sourceHash: c633bea42c0d4aa9
 title: Escrita via REST
 sidebar_label: Escrita via REST
 description: Chaves de idempotência, escritas condicionais com ETag e If-Match, operações de campo, upserts em chave natural, return=minimal e lotes entre coleções.
@@ -93,6 +93,10 @@ A tag é derivada de uma propriedade `date` com `autoValue: "on_update"` quando 
 declara uma — essa coluna já *é* uma versão — e a partir de um hash estável da linha caso
 contrário. `If-Match: *` afirma apenas que a linha existe. Nada é escrito quando a pré-condição
 falha.
+
+A tag é comparada dentro da própria transação da escrita, depois que a linha é bloqueada.
+Duas escritas com a mesma tag não podem passar ambas: a segunda espera a primeira
+ser confirmada, lê o que ela escreveu e é recusada com `412`.
 
 A tag é comparada dentro da própria transação da gravação, depois de a linha ser
 bloqueada. Duas gravações com a mesma tag não podem passar ambas: a segunda espera
@@ -258,7 +262,11 @@ transação. Um lote é tudo-ou-nada, e encontrar um erro de digitação na oper
 forma, custaria o rollback das 39 operações anteriores.
 
 Limitado ao mesmo número de operações de uma escrita em lote (1000 por padrão), já que um lote
-retém seus bloqueios durante toda a transação. Um driver incapaz de tornar o lote atômico
+retém seus bloqueios durante toda a transação. Os callbacks de cada operação
+rodam dentro dela, um após o outro, de modo que um hook lento é pago uma vez por linha
+com a transação aberta: 100 linhas cujo `beforeSave` aguarda 50 ms seguram uma conexão,
+e os bloqueios de todas as linhas escritas até então, por 5,3 s. O mesmo vale para uma
+escrita em `/bulk`. Veja [Um callback segura uma conexão](/docs/collections/callbacks/#um-callback-segura-uma-conexão). Um driver incapaz de tornar o lote atômico
 responde com `BATCH_UNSUPPORTED` em vez de recorrer a um loop de escritas individuais — o que
 não ofereceria nem a atomicidade nem o round trip único buscados ao usar um lote.
 

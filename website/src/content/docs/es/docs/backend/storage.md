@@ -1,5 +1,5 @@
 ---
-sourceHash: 15c8b3bdbf304f1c
+sourceHash: 439048db8ee5b538
 title: Configuración de almacenamiento
 sidebar_label: Configuración de almacenamiento
 description: Configure backends de sistema de archivos local, compatibles con S3 o GCS/Firebase Storage para la subida de archivos, imágenes y contenido multimedia.
@@ -36,6 +36,8 @@ const backend = await initializeRebaseBackend({
     }
 });
 ```
+
+El almacenamiento local guarda los metadatos de cada objeto a su lado, como `<key>.metadata.json`, así que una clave cuyo último segmento termina en `.metadata.json` se rechaza con `400 INVALID_STORAGE_KEY` en todas las rutas. S3 y GCS guardan los metadatos en el objeto y almacenan cualquier clave.
 
 ### Almacenamiento S3
 
@@ -101,7 +103,8 @@ image: {
 | `POST` | `/api/storage/upload?storageId=<key>` | Subir a un backend con nombre específico |
 | `GET` | `/api/storage/file/*` | Recuperar un archivo — todo lo que va después de `/file/` es la clave del objeto |
 | `GET` | `/api/storage/file/*?storageId=<key>` | Recuperar un archivo de un backend específico |
-| `GET` | `/api/storage/metadata/*` | Tamaño, tipo de contenido y última modificación de un objeto, sin sus bytes |
+| `GET` | `/api/storage/metadata/*` | Tamaño, tipo de contenido y metadatos personalizados de un objeto, sin sus bytes, más un token de descarga de corta duración cuando es privado |
+| `POST` | `/api/storage/metadata` | <span class="since-badge" data-since="0.25">Desde 0.25</span> Lo mismo para hasta 100 objetos de un origen: cuerpo `{ keys, storageId? }` |
 | `DELETE` | `/api/storage/file/*` | Eliminar un archivo |
 | `GET` | `/api/storage/list` | Listar objetos bajo un prefijo (`prefix`, `bucket`, `maxResults`, `pageToken`, `storageId`). Un `maxResults` menor que 1, o un `pageToken` que el origen nunca emitió, es `400 INVALID_LIST_OPTIONS` |
 | `POST` | `/api/storage/folder` | Crear un marcador de carpeta vacía |
@@ -120,12 +123,22 @@ es la excepción, porque su carga útil es el archivo en sí: responde con los b
 
 ```json
 // GET /api/storage/list?prefix=products/images/
-{ "data": { "items": [ { "bucket": "default", "fullPath": "products/images/a.jpg", "name": "a.jpg" } ], "prefixes": [] } }
+{ "data": { "items": [ { "bucket": "default", "fullPath": "products/images/a.jpg", "name": "a.jpg",
+  "size": 48213, "updated": "2026-10-01T12:00:00.000Z", "contentType": "image/jpeg" } ], "prefixes": [] } }
 ```
+
+<span class="since-badge" data-since="0.25">Desde 0.25</span> Un listado describe cada archivo que devuelve: su `size` en bytes y
+`updated`, cuándo se escribió por última vez, en almacenamiento local, S3 y GCS, y su
+`contentType` en almacenamiento local y GCS. Un listado de S3 no lleva el tipo,
+así que en S3 está ausente y `/api/storage/metadata/*` sigue indicándolo. Una carpeta en
+`prefixes` no lleva ninguno de ellos, ni tampoco un `StorageController` personalizado que
+no los establezca.
 
 `POST /api/storage/upload` responde `201` con `{ key, bucket, storageUrl }`
 del objeto almacenado bajo `data`; `GET /api/storage/metadata/*` devuelve los metadatos
 del objeto y, para un objeto privado, el `token` de corta duración;
+`POST /api/storage/metadata` un objeto indexado por las rutas que se enviaron, cada una
+con lo que habría respondido el `GET` para ella (véase más abajo);
 `GET /api/storage/sources` devuelve el array de orígenes configurados, con `configured: true`. En un despliegue sin ningún almacenamiento, responde `200 {"data": [], "configured": false}`, mientras que todas las demás rutas responden `501 STORAGE_NOT_CONFIGURED`. `GET /api/auth/config` informa de lo mismo como `storage: false`, así que un cliente puede ahorrarse la pregunta.
 `DELETE /api/storage/file/*` y `POST /api/storage/folder` solo contienen un
 `message`, ya que no hay nada que devolver.
@@ -135,6 +148,29 @@ escrituras como en lecturas: una subida, un `POST /api/storage/folder` o una
 subida TUS que nombre cualquier otro bucket responde
 `404 UNKNOWN_STORAGE_SOURCE`, igual que el listado. El almacenamiento local
 sigue creando un bucket en su primera escritura.
+
+**Muchos objetos a la vez.** <span class="since-badge" data-since="0.25">Desde 0.25</span> `POST /api/storage/metadata` acepta
+`{ "keys": ["photos/a.png", "photos/b.png"], "storageId": "media" }` — hasta 100
+rutas de objeto de un origen, cada una escrita como la acepta `GET /api/storage/metadata/<key>`
+— y responde una entrada por clave:
+
+```json
+{ "data": {
+  "photos/a.png": { "fullPath": "photos/a.png", "size": 48213, "contentType": "image/png", "token": "…", "tokenExpiresIn": 300 },
+  "photos/b.png": { "error": { "code": "FORBIDDEN", "message": "Not authorized for this object", "status": 403 } }
+} }
+```
+
+Cada clave se juzga exactamente como la juzga el `GET` — el mismo hook `storageAuthorize`
+y el mismo alcance de almacenamiento, la misma regla de públicos, un token de descarga propio — y una
+clave rechazada, inexistente o malformada responde con su propio `error` sin hacer fallar
+a las demás ni revelarlas. Quien llama sin sesión en un despliegue que la exige
+recibe el `401` que respondería el `GET`, salvo que todas las claves sean públicas. Más de
+100 claves, o un cuerpo sin `keys`, es `400 BAD_REQUEST`. El limitador de tasa cuenta
+la solicitud como ⌈N/10⌉ solicitudes para N claves, así que una página de 100 miniaturas cuesta 10.
+`client.storage.getSignedUrl()` y el panel de administración envían así las consultas que
+hace una página a la vez, y recurren a un `GET` por archivo en un servidor sin
+la ruta.
 
 **Cómo se autoriza la lectura de un archivo.** Las rutas de lectura — `/api/storage/file/*` y
 `/api/storage/metadata/*` — aceptan el token firmado de corta duración que
@@ -240,11 +276,7 @@ descarga. Abierto directamente, se renderiza con los scripts deshabilitados y
 un origen opaco, por lo que no puede llegar a las cookies ni a los endpoints
 de la API.
 
-## Protocolo de subidas reanudables TUS
-
-Para subir archivos grandes o manejar condiciones de red inestables, Rebase implementa el protocolo abierto **TUS v1.0.0**, incluidas las extensiones `Creation` y `Termination`.
-
-### Cuán grande puede ser un archivo
+## Cuán grande puede ser un archivo
 
 Cada origen de almacenamiento acepta archivos hasta su propio límite: **50 MB**
 salvo que `STORAGE_MAX_FILE_SIZE` (bytes, con el sufijo `__<KEY>` para un
@@ -263,30 +295,13 @@ STORAGE_MAX_FILE_SIZE=209715200          # (por defecto): 200 MB
 STORAGE_MAX_FILE_SIZE__MEDIA=1073741824  # media: 1 GB
 ```
 
-Un archivo completo se mantiene en la memoria del servidor mientras se
-escribe en el store, en todas las vías de subida, así que ajusta el límite a
-la memoria que tenga el servidor.
-
-```
-Client                                                   Rebase Server
-  │                                                           │
-  │─── POST /api/storage/tus (Upload-Length: 50000000) ──────>│ (Generates session ID)
-  │<── 201 Created (Location: /api/storage/tus/uuid-abc) ────│
-  │                                                           │
-  │─── PATCH /api/storage/tus/uuid-abc (Upload-Offset: 0) ───>│ (Appends chunk via open/write)
-  │<── 204 No Content (Upload-Offset: 1500000) ───────────────│
-  │                                                           │
-  │─── PATCH /api/storage/tus/uuid-abc (Upload-Offset: 1.5M) ─>│ (Upload finishes)
-  │<── 204 No Content (Upload-Offset: 50000000) ──────────────│ (Copies to storage, unlinks temp)
-```
-
-### Mecánica del ciclo de vida de la subida
-
-1. **Inicialización de la sesión (`POST`)**: El cliente envía el tamaño total del archivo en la cabecera `Upload-Length` y metadatos en base64 mediante `Upload-Metadata`. El servidor crea un archivo marcador de posición vacío en un directorio temporal oculto `.tus-uploads/` y devuelve la URL de subida.
-2. **Consultas de progreso (`HEAD`)**: Si una subida se interrumpe, el cliente consulta la URL de subida mediante una solicitud `HEAD`. El servidor devuelve la posición actual en bytes en la cabecera `Upload-Offset`.
-3. **Anexión de datos (`PATCH`)**: El cliente reanuda el envío de datos binarios comenzando en el desplazamiento devuelto con `Content-Type: application/offset+octet-stream`. El servidor escribe cada fragmento en el archivo temporal en el desplazamiento de bytes que declara la solicitud, que debe ser el desplazamiento que tiene el servidor (`409` en caso contrario). Se recibe un fragmento a la vez: un `PATCH` que llega mientras otro de la misma subida aún se está recibiendo — normalmente un cliente reenviando un fragmento que se estancó — se responde con `423 UPLOAD_LOCKED`, y el cliente reanuda desde el desplazamiento que reporta `HEAD`.
-4. **Finalización**: Cuando el `Upload-Offset` acumulado coincide con el `Upload-Length` declarado, Rebase lee el archivo temporal completado, lo envuelve como un objeto estándar `File` de JavaScript y lo guarda en el backend de almacenamiento configurado (disco local o S3). A continuación, se elimina el archivo temporal.
-5. **Limpieza periódica**: Un limpiador en segundo plano se ejecuta cada **60 segundos** para eliminar subidas temporales huérfanas e incompletas que hayan superado el umbral de retención de **24 horas**.
+Cuánto de un archivo mantiene el servidor a la vez depende de la puerta.
+`POST /api/storage/upload` es un cuerpo multipart único, que el servidor analiza completo:
+de tres a cinco veces el archivo en su memoria. Una subida reanudable (TUS) mantiene un
+fragmento a la vez. <span class="since-badge" data-since="0.25">Desde 0.25</span> `client.storage.putObject()` y el panel de administración envían un archivo
+de más de 8 MiB de forma reanudable. Consulta
+[Subidas reanudables (TUS)](/docs/backend/storage-resumable-uploads/) para el
+protocolo, lo que responde y cómo se comporta entre instancias.
 
 ## Variables de entorno
 
@@ -469,7 +484,6 @@ hace fallar el arranque en lugar de la primera subida.
 
 ### El hook
 
-
 `requireAuth` y `publicRead` son modificadores *globales*: deciden si quien llama debe haber iniciado sesión, no qué puede tocar. Sin un hook de autorización, **cualquier usuario autenticado puede leer cualquier clave que pueda nombrar** — lo único que separa los archivos de dos inquilinos es la imposibilidad de adivinar la clave, lo cual no es un modelo de control de acceso. Peor aún, pueden ejecutar `GET /storage/list?prefix=` primero, de modo que ni siquiera necesitan adivinar las claves.
 
 :::caution[El almacenamiento no arrancará en producción sin uno]
@@ -516,7 +530,8 @@ Devuelva `false` para denegar con un **403**. Lanzar una excepción también den
 
 Conviene saber:
 
-- **La ruta de metadatos es donde realmente se decide el acceso de lectura.** Esta emite el token de descarga de corta duración y delimitado a la ruta en el que confía la ruta del archivo, por lo que el hook lo restringe allí. Las solicitudes que ya llevan dicho token, o que acceden a una ruta declarada pública, omiten el hook: el token se emitió bajo su control y solo es válido para su propia ruta.
+- **La ruta de metadatos es donde realmente se decide el acceso de lectura.** Esta emite el token de descarga de corta duración y delimitado a la ruta en el que confía la ruta del archivo, por lo que el hook lo restringe allí. Las solicitudes que ya llevan dicho token, o que acceden a una ruta declarada pública, omiten el hook: el token se emitió bajo su control y solo es válido para su propia ruta. Solo esas dos lecturas lo omiten: a un usuario que tu adaptador de autenticación llame `public` se le pregunta como a cualquier otro.
+- **Un bucket, un nombre.** En S3 y GCS el `bucket` del hook es siempre `"default"`, también cuando una solicitud nombra el bucket del proveedor, que llega a los mismos objetos.
 - **Una ruta es pública cuando lo es la clave que nombra.** El prefijo `public/` se comprueba sobre la clave canónica que sirve la ruta —después de leer un segmento de bucket `default/` inicial y de plegar `//`, `./` y una `/` inicial—, nunca sobre la URL tal como se escribió. `/api/storage/file/notes://public/x.txt` nombra la clave privada `notes:/public/x.txt`, y la clave `default/public/x.txt` (a la que se llega como `/api/storage/file/default/default/public/x.txt`) está en una carpeta llamada `default`; ninguna de las dos es pública. En un hook, compruebe la `key` que recibe con `isPublicStorageKey` de `@rebasepro/types`: `isPublicStoragePath` lee una ruta o URL del lado del cliente, y considera públicas a ambas.
 - **`list` se restringe en función del prefijo.** Listar es la forma de descubrir claves de las que nadie le informó.
 - **Las subidas reanudables (TUS) se restringen en el momento de la creación**, de modo que una subida denegada no deja ningún archivo temporal atrás.
@@ -547,7 +562,7 @@ storageTriggers: [
         path: "uploads/:uid/**",
         events: ["finalize"],
         handler: async ({ key, params, size, user }) => {
-            await jobs.enqueue("index-upload", { key, uid: params.uid, size });
+            await indexUpload.enqueue({ key, uid: params.uid, size }); // a `queue()` in config/resources.ts
         }
     }
 ]

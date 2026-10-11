@@ -1,5 +1,5 @@
 ---
-sourceHash: c1478b42d3c890a5
+sourceHash: 941bbd72bbc3e338
 title: Callback delle Entità
 sidebar_label: Callback
 description: Usa i callback del ciclo di vita per eseguire logica personalizzata quando le entità vengono create, aggiornate, lette o eliminate. Include l'API context.data per operazioni tra collezioni.
@@ -60,6 +60,11 @@ Due regole derivano dal fatto che "viene inviato a ogni visitatore", e nessuna d
 
 Su una collezione con trasporto server — l'impostazione predefinita, e quasi certamente la tua — il server ha già eseguito `callbacks` prima che la riga raggiunga il pannello, quindi un `browserCallbacks.afterRead` viene eseguito *in aggiunta* ad esso. Scrivilo in modo che sia idempotente, oppure non scriverlo affatto.
 
+Un `browserCallbacks.afterSave` viene eseguito dopo che la scrittura è stata memorizzata, e
+nulla nel browser può annullarla. Un'eccezione lanciata da esso viene mostrata come avviso;
+il salvataggio stesso viene segnalato come completato, così il modulo non propone di creare
+di nuovo il record una seconda volta.
+
 ## Definizione dei Callback
 
 ```typescript
@@ -103,7 +108,7 @@ const articlesCollection = defineCollection({
 
         beforeDelete: async ({ id }) => {
             // Prevent deletion of published articles
-            // Throw to block the deletion
+            // Throw (or return false) to block the deletion
         },
 
         afterRead: async ({ row }) => {
@@ -149,6 +154,9 @@ Una lettura è deliberatamente non ristretta: il controllo di unicità alla base
 ### `beforeSave`
 
 Chiamato prima che un record venga scritto nel database. Restituisce i valori modificati.
+Su Postgres viene eseguito all'interno della transazione della scrittura, che è già iniziata,
+quindi tiene impegnata una connessione del pool per tutto il tempo in cui è in esecuzione — vedi [Un callback tiene
+una connessione](#un-callback-tiene-una-connessione).
 
 ```typescript
 beforeSave: async ({
@@ -253,7 +261,7 @@ afterRead: async ({
 
 ### `beforeDelete`
 
-Chiamato prima che un record venga eliminato. Lancia un errore per bloccare l'eliminazione.
+Chiamato prima che un record venga eliminato. Lancia un errore per bloccare l'eliminazione, e il chiamante riceve `400 CALLBACK_REJECTED` con il tuo messaggio. Anche restituire `false` la blocca, come `403 CALLBACK_REJECTED` senza alcun messaggio tuo.
 
 ```typescript
 beforeDelete: async ({
@@ -414,7 +422,7 @@ Di conseguenza, la scrittura scatenante e tutto ciò che i suoi callback hanno s
 
 - Un errore lanciato da `afterSave` o `afterDelete` annulla la scrittura scatenante, insieme a ogni scrittura di `context.data` effettuata dai callback. Al chiamante viene restituito **400 `CALLBACK_REJECTED`** con `details.stage` che indica il nome dell'hook — o con lo stato stesso dell'errore quando ne include uno: un `RebaseApiError` che hai lanciato, il 409 per violazione di unicità.
 - I sottoscrittori realtime ricevono la notifica della riga solo dopo il commit, pertanto una scrittura che ha subito un rollback non viene mai annunciata.
-- Un callback mantiene aperta la transazione durante la sua esecuzione, quindi un callback lento equivale a un blocco trattenuto e a una connessione del pool impegnata.
+- Un callback mantiene aperta la transazione durante la sua esecuzione, quindi un callback lento equivale a un blocco trattenuto e a una connessione del pool impegnata — `beforeSave` e `beforeDelete` tanto quanto gli hook `after`. Vedi [Un callback tiene una connessione](#un-callback-tiene-una-connessione).
 - Una scrittura di `context.data` esegue anche i callback della collezione di destinazione, quindi un `afterSave` che aggiorna la propria riga esegue nuovamente se stesso. Le scritture annidate per più di 16 livelli vengono rifiutate con **500 `CALLBACK_RECURSION`**, indicando l'hook e la collezione, e l'intera scrittura subisce un rollback. Rendi condizionale una scrittura di questo tipo, come fa l'esempio sotto.
 
 Lascia che un fallimento generi un'eccezione quando la scrittura scatenante non deve sopravvivere ad esso. Intercettalo quando invece deve sopravvivere, ma solo attorno a una **scrittura** di `context.data`: una creazione, un aggiornamento o un'eliminazione che il database rifiuta (una violazione di unicità o di chiave esterna, un trigger) viene annullata da sola, e il resto viene salvato tramite commit.
@@ -441,6 +449,40 @@ afterSave: async ({ values, id, status, context }) => {
 Le operazioni che devono uscire dal database — un'email, un webhook, una chiamata a un'API di terze parti — non appartengono al corpo del callback. Manterrebbero la transazione aperta per un tempo di andata e ritorno sulla rete, e nulla potrebbe annullarle in caso di rollback della scrittura. Accoda un [job](/docs/backend/jobs) a questo scopo, oppure eseguile dopo che la scrittura ha restituito la risposta: pubblica su un [canale realtime](/docs/backend/realtime), oppure usa `waitUntil` in una [funzione personalizzata](/docs/backend/custom-functions). La sezione [Hook](/docs/backend/hooks#side-effects-that-must-not-hold-the-transaction) descrive quale soluzione sia più adatta.
 
 Su MongoDB nulla di tutto questo è valido. Quel driver esegue gli stessi callback senza una transazione, pertanto la scrittura è già archiviata quando viene eseguito `afterSave`, e un'eccezione generata lì segnala il fallimento senza annullarla.
+
+### Un callback tiene una connessione
+
+Su Postgres una scrittura viene eseguita su una connessione prelevata dal pool del database,
+e ogni callback viene eseguito su di essa: `beforeSave` e `beforeDelete` dopo che la
+transazione è iniziata, `afterSave` e `afterDelete` prima del suo commit. Per tutto il
+tempo in cui un callback è in esecuzione — in attesa di una ricerca, di un calcolo, di qualsiasi cosa — quella
+connessione non serve nient'altro, e i lock che la scrittura ha preso restano presi:
+in `afterSave`, la riga appena scritta; in una scrittura bulk o [`_batch`](/docs/backend/writes/#cross-collection-batches),
+ogni riga che la transazione ha scritto prima.
+
+Il costo è la durata propria del callback, e le scritture concorrenti la sommano:
+
+- Il pool contiene 20 connessioni per impostazione predefinita (`DB_POOL_MAX`). 25 salvataggi
+  contemporanei il cui `beforeSave` attendeva 300 ms hanno fatto durare 290 ms una lettura
+  di una riga non correlata, quasi tutti spesi ad attendere una connessione.
+- Una creazione bulk di 100 righe il cui `beforeSave` attende 50 ms è una transazione
+  aperta per 5,3 s, che tiene la sua connessione e i lock di ogni riga scritta
+  finora per tutto quel tempo.
+
+Quindi:
+
+- Tieni fuori dai callback tutto ciò che è lento. Una chiamata a un altro servizio appartiene a un
+  [job](/docs/backend/jobs), o a dopo il ritorno della scrittura.
+- Cerca ciò di cui un hook ha bisogno prima della scrittura quando puoi — nel client, o
+  in una [funzione personalizzata](/docs/backend/custom-functions) che poi scrive.
+- Invia le righe i cui hook sono lenti in bulk più piccoli.
+- Se molti hook lenti sono eseguiti insieme per progetto, alza `DB_POOL_MAX`, entro quanto
+  il `max_connections` del database consente per ogni istanza.
+- <span class="since-badge" data-since="0.25">Da 0.25</span> Con
+  `REBASE_METRICS=true`, `/metrics` riporta `rebase_db_pool_wait_ms`: quanto
+  ha atteso ogni query per una connessione. Un pool sano lo tiene vicino a zero; una
+  coda che cresce con il traffico sono richieste in attesa di connessioni che i callback
+  tengono. Vedi [Metriche](/docs/deployment/self-hosting/#metrics).
 
 ## Sincronizzazione dei Dati Tra le Collezioni
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: 37805343f12779ab
+sourceHash: 781657121510be7a
 title: Tâches Cron
 sidebar_label: Tâches Cron
 description: Planifiez des tâches d'arrière-plan récurrentes grâce au système intégré de tâches cron de Rebase. Définissez des tâches sous forme de fichiers TypeScript, surveillez-les dans Studio et gérez-les via l'API REST.
@@ -181,6 +181,8 @@ interface CronJobContext {
 
 Utilisez `ctx.log()` pour émettre une sortie structurée. Ces lignes sont capturées dans le journal d'exécution et visibles dans Studio ainsi que via l'API REST. Chaque ligne est aussi écrite dans le journal du serveur au niveau `info`, avec un champ `cron` contenant l'ID du job : elle apparaît donc partout où la sortie de votre conteneur est collectée, y compris dans les journaux de débogage de Rebase Cloud. Cette copie est masquée comme les lignes de journal du serveur lui-même : les valeurs de clés comme `password` ou `apiKey`, ainsi que le SQL et les paramètres d'une requête en échec, sont remplacés. Le journal d'exécution conserve la ligne sans ce masquage.
 
+<span class="since-badge" data-since="0.25">Depuis 0.25</span> Le journal d'exécution conserve les 500 premières lignes d'une exécution ou 64 Ko d'entre elles, selon ce qui survient en premier, puis une ligne indiquant combien d'autres il y en avait : `… 9500 more lines not kept — see the server log`. Le journal du serveur reçoit toutes les lignes. Une tâche qui journalise une ligne par élément traité doit s'attendre à ce que son historique montre le début de l'exécution.
+
 ### `ctx.signal` — interrompre le travail lorsque l'exécution s'arrête
 
 Le timeout met fin à l'*exécution* : le planificateur cesse d'attendre et enregistre un échec.
@@ -300,7 +302,7 @@ Voir [Rôles et portées](/docs/backend/roles-and-scopes/).
 | `GET` | `/api/admin/cron` | Lister toutes les tâches cron enregistrées |
 | `GET` | `/api/admin/cron/:id` | Obtenir le statut d'une tâche individuelle |
 | `POST` | `/api/admin/cron/:id/trigger` | Déclencher manuellement une tâche — `409` tant qu'elle est déjà en cours |
-| `GET` | `/api/admin/cron/:id/logs` | Obtenir l'historique d'exécution (`?limit=N`). `503` lorsque `rebase.cron_logs` ne peut pas être lu, plutôt qu'un historique vide |
+| `GET` | `/api/admin/cron/:id/logs` | Obtenir l'historique d'exécution (`?limit=N`), sur les 30 derniers jours. `503` lorsque `rebase.cron_logs` ne peut pas être lu, plutôt qu'un historique vide |
 | `PUT` | `/api/admin/cron/:id` | Mettre en pause ou reprendre une tâche partout (`{ "enabled": false }`) ; `null` suit de nouveau le code |
 
 ### Exemple : Lister toutes les tâches
@@ -427,14 +429,9 @@ Le tableau de bord s'actualise automatiquement toutes les 15 secondes.
 
 Le panneau affiche la même chose quel que soit le processus qui le sert. Une
 tâche qu'un autre processus exécute apparaît comme en cours.
-Sur chaque processus qui dispose d'un magasin, le nombre d'exécutions, le
-nombre d'échecs et la dernière exécution sont lus dans `rebase.cron_logs`, par une
-requête limitée aux lignes de chaque tâche. Les compteurs propres d'un processus ne
-contiennent que les exécutions qu'il a faites : le rôle `api` à côté d'un worker
-n'exécute rien, et de deux répliques qui planifient toutes deux, aucune ne voit les
-créneaux que l'autre a réservés. Ce n'est que lorsque `cron_logs` ne peut pas être lu
-que la carte se rabat sur les compteurs propres de ce processus, avec un
-avertissement dans le journal du serveur.
+Sur chaque processus qui dispose d'un magasin, le nombre d'exécutions, le nombre d'échecs et la dernière exécution sont lus dans la base de données, où sont comptées les exécutions de tous les processus. Les compteurs propres d'un processus ne contiennent que les exécutions qu'il a faites : le rôle `api` à côté d'un worker n'exécute rien, et de deux répliques qui planifient toutes deux, aucune ne voit les créneaux que l'autre a réservés. Ce n'est que lorsque la base de données ne peut pas être lue que la carte se rabat sur les compteurs propres de ce processus, avec un avertissement dans le journal du serveur.
+
+<span class="since-badge" data-since="0.25">Depuis 0.25</span> Les compteurs couvrent toute la durée de vie ; l'historique couvre les 30 derniers jours. La ligne de chaque exécution dans `rebase.cron_logs` est supprimée 30 jours après son début, par un balayage horaire, tandis que les compteurs d'exécutions et d'échecs continuent de la compter. Une exécution ignorée compte comme une exécution, comme toujours : c'est une ligne de l'historique.
 
 ## Validation des planifications et parsing AST
 
@@ -472,7 +469,7 @@ décrit dans [Cron entre plusieurs instances](/docs/backend/cron-across-instance
   `Error: Cron job "<id>" timed out after <N>ms`
   L'annulation est la partie qui interrompt le *travail* ; le rejet empêche seulement le planificateur de continuer à attendre. Un gestionnaire qui ignore `ctx.signal` continue de tourner au-delà de sa propre exécution.
 - **Arrêt** : `backend.shutdown()` attend une exécution en cours, dans le même budget que la file de jobs (les deux tiers du timeout d'arrêt). Si l'exécution tourne encore quand il est épuisé, `ctx.signal` est annulé et elle est enregistrée comme échouée, avec la raison. Son créneau reste réservé, donc aucune autre instance ne la réexécute.
-- **Try/Catch sécurisé** : Chaque gestionnaire de tâche s'exécute au sein d'une enveloppe isolée. Toute exception non interceptée est capturée, formatant la trace d'erreur en une chaîne, définissant le statut de la tâche sur `"error"` et mettant à jour les compteurs d'échecs de `rebase.cron_logs`. Un plantage au sein d'une tâche cron individuelle ne fera jamais planter la boucle du planificateur ni le serveur web HTTP principal sous Hono.
+- **Try/Catch sécurisé** : Chaque gestionnaire de tâche s'exécute au sein d'une enveloppe isolée. Toute exception non interceptée est capturée, formatant la trace d'erreur en une chaîne, définissant le statut de la tâche sur `"error"` et mettant à jour le compteur d'échecs de la tâche. Un plantage au sein d'une tâche cron individuelle ne fera jamais planter la boucle du planificateur ni le serveur web HTTP principal sous Hono.
 - **Mémoire tampon circulaire en mémoire** : Le planificateur maintient un ring buffer contenant les **50 dernières exécutions** par tâche. Cette mémoire tampon est conservée en mémoire vive pour permettre des lectures quasi instantanées depuis Rebase Studio.
 
 ---
@@ -497,16 +494,25 @@ CREATE TABLE IF NOT EXISTS rebase.cron_logs (
     manual       BOOLEAN NOT NULL DEFAULT false        -- True if triggered from Studio/REST
 );
 
+ALTER TABLE rebase.cron_logs ADD COLUMN IF NOT EXISTS counted BOOLEAN;  -- the run is in the counters below
+
 CREATE INDEX IF NOT EXISTS idx_cron_logs_job ON rebase.cron_logs(job_id, started_at DESC);
-CREATE INDEX IF NOT EXISTS idx_cron_logs_job_failures ON rebase.cron_logs(job_id) WHERE NOT success;
+CREATE INDEX IF NOT EXISTS idx_cron_logs_started ON rebase.cron_logs(started_at);
+CREATE INDEX IF NOT EXISTS idx_cron_logs_uncounted ON rebase.cron_logs(job_id, started_at DESC) WHERE counted IS NULL;
 
 CREATE TABLE IF NOT EXISTS rebase.cron_job_state (
-    job_id         TEXT PRIMARY KEY,
-    enabled        BOOLEAN,       -- NULL: follow the job's own `enabled`
-    updated_at     TIMESTAMPTZ,   -- when `enabled` was last set, and by whom
-    updated_by     TEXT,
-    running_until  TIMESTAMPTZ,   -- the run lease: live while in the future
-    running_by     TEXT
+    job_id            TEXT PRIMARY KEY,
+    enabled           BOOLEAN,       -- NULL: follow the job's own `enabled`
+    updated_at        TIMESTAMPTZ,   -- when `enabled` was last set, and by whom
+    updated_by        TEXT,
+    running_until     TIMESTAMPTZ,   -- the run lease: live while in the future
+    running_by        TEXT,
+    total_runs        BIGINT NOT NULL DEFAULT 0,   -- all-time, skips included
+    total_failures    BIGINT NOT NULL DEFAULT 0,
+    last_run_at       TIMESTAMPTZ,                 -- the most recently started run
+    last_duration_ms  INTEGER,
+    last_success      BOOLEAN,
+    last_error        TEXT
 );
 ```
 
@@ -517,7 +523,9 @@ le rôle d'utilisateur final `rebase_user` n'a aucun privilège sur elles : un
 mettre une tâche en pause pour tout le monde, ou de retenir son bail pour que
 rien ne l'exécute.
 
-Au démarrage, le planificateur lit les statistiques de cette table via des requêtes d'agrégation (`COUNT(*)`, `SUM(CASE WHEN success = false THEN 1 ELSE 0 END)`) pour renseigner l'historique de `totalRuns` et `totalFailures`. Les insertions de journaux sont exécutées lors d'un passage asynchrone non bloquant ; si une écriture en base échoue, le planificateur enregistre l'erreur et poursuit son exécution normale en utilisant la mémoire tampon circulaire en mémoire comme solution de repli.
+<span class="since-badge" data-since="0.25">Depuis 0.25</span> La ligne d'une exécution et son décompte sont écrits en une seule instruction : l'insertion dans `cron_logs` et un upsert des compteurs de la tâche dans `cron_job_state`. Une liste lit une ligne de `cron_job_state` par tâche, quelle que soit la longueur de l'historique, et le planificateur fait de même lorsqu'il initialise `totalRuns` et `totalFailures` au démarrage. Les écritures de journal ne retardent pas l'exécution ; si l'une échoue, le planificateur enregistre l'erreur et poursuit, l'exécution restant dans la mémoire tampon circulaire en mémoire.
+
+Une fois par heure, et au démarrage, le planificateur supprime les lignes d'historique de plus de 30 jours et compte toute exécution pas encore comptée, le tout par lots de 5 000 lignes. Un historique écrit avant la 0.24 est compté par le premier de ces balayages, hors du chemin de démarrage. Tant qu'il n'est pas terminé, une liste ajoute aux compteurs les exécutions pas encore comptées, de sorte que les chiffres ne changent pas à la mise à niveau. Il en va de même pour une exécution qu'un ancien serveur journalise pendant un déploiement progressif.
 
 ## Exemple : Tâche de nettoyage quotidien
 

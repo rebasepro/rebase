@@ -1,5 +1,5 @@
 ---
-sourceHash: 1a6f27afc2ce649a
+sourceHash: 7f4db751ce80395f
 title: Speicher & Dateien
 sidebar_label: Speicher
 description: Dateien mit dem Speichermodul des typisierten SDK von Rebase hochladen, herunterladen, auflisten und löschen.
@@ -29,6 +29,16 @@ const result = await client.storage.putObject({
 
 // result: { key: string; bucket: string; storageUrl: string }
 ```
+
+<span class="since-badge" data-since="0.25">Seit 0.25</span> Eine Datei über 8 MiB wird über den fortsetzbaren (TUS-)
+Endpunkt des Servers hochgeladen, 8 MiB pro Anfrage, statt als eine Multipart-Anfrage, die der Server
+vollständig parst — ein großer Upload kostet den Server so einen Chunk an Arbeitsspeicher, nicht das Drei-
+bis Fünffache der Datei. Ein Chunk, der unterwegs scheitert, wird ab dem Punkt erneut gesendet, bis zu dem
+der Server gekommen ist. Das Ergebnis, das gespeicherte Objekt und die Prüfungen des Servers sind
+in beiden Fällen dieselben. Kann der fortsetzbare Endpunkt die Datei nicht annehmen (ein älterer
+Server oder mehrere Instanzen, die Uploads nicht teilen), geht sie als ein
+`POST /api/storage/upload`, ebenso jede spätere Datei desselben Clients. Siehe
+[Fortsetzbare Uploads (TUS)](/docs/backend/storage-resumable-uploads/).
 
 ### Aus einem Datei-Input
 
@@ -156,7 +166,7 @@ const result = await client.storage.listObjects("products/images/", {
 });
 
 for (const item of result.items) {
-    console.log(item.fullPath, item.name);
+    console.log(item.fullPath, item.name, item.size, item.updated, item.contentType);
 }
 
 // Paginate
@@ -166,6 +176,12 @@ if (result.nextPageToken) {
     });
 }
 ```
+
+<span class="since-badge" data-since="0.25">Seit 0.25</span> Jeder Eintrag trägt seine `size` in Bytes und `updated` (einen ISO-8601-
+Zeitstempel) bei lokalem Speicher, S3 und GCS und seinen `contentType` bei lokalem Speicher
+und GCS — genug, um einen Ordner ohne ein `getSignedUrl()` pro Datei anzuzeigen. Eine S3-
+Auflistung hat keinen Content-Type; Ordner (`result.prefixes`) tragen keines der
+drei.
 
 ## Formate von Speicherschlüsseln
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: 0b7bd3b233513344
+sourceHash: 06e95610513a9c52
 title: Habilidades del agente
 sidebar_label: Habilidades del agente
 description: rebase skills install escribe 21 habilidades de referencia de Rebase en tu repositorio, en el formato que espera tu asistente de IA — Cursor, Claude Code, Windsurf, Gemini CLI y Antigravity.
@@ -97,13 +97,25 @@ Las habilidades se escriben **de forma relativa a la raíz de tu proyecto** (el 
 
 Haz commit de ellas. Forman parte del repositorio de la misma manera que una configuración de linter: así, el asistente de cada colaborador trabaja a partir del mismo entendimiento de la base de código, incluidos los colaboradores que nunca ejecutaron el comando.
 
-**Vuelve a ejecutar el comando para actualizar.** Los archivos se sobrescriben de forma incondicional, por lo que tras una actualización de Rebase:
+**Vuelve a ejecutar el comando para actualizar** tras una actualización de Rebase:
 
 ```bash
 rebase skills install --agent all
 ```
 
-Dos consecuencias de que sea «incondicional»: las modificaciones locales en una habilidad instalada se perderán en la siguiente ejecución; en su lugar, mantén las directrices específicas del proyecto en [`ai-instructions.md`](/docs/ai/instruction-files), que es tuyo y nunca se sobrescribe. Además, las habilidades eliminadas en una versión más reciente no se borran de tu repositorio; solo se reescriben los archivos que aún existen.
+Cada directorio de destino contiene un manifiesto `.rebase-skills.json` con lo que escribió
+el comando, de modo que una nueva ejecución distingue una edición de la copia de una
+versión anterior. Haz commit de él junto con las habilidades.
+
+- Un archivo que nadie editó se reemplaza por la copia de la nueva versión.
+- Un archivo que editaste se conserva, y el comando lo lista. `--force` lo reemplaza.
+- Una habilidad que una versión más reciente ya no incluye se elimina, salvo que la hayas
+  editado. En ese caso se conserva y se lista.
+- Los archivos que el comando nunca escribió no se tocan.
+
+Las directrices específicas del proyecto siguen perteneciendo a
+[`ai-instructions.md`](/docs/ai/instruction-files), que es tuyo. Una habilidad editada
+deja de recibir actualizaciones hasta que la fuerces con `--force`.
 
 El comando también funciona fuera de un proyecto de Rebase, recurriendo al directorio de trabajo actual; esto resulta útil para un repositorio frontend independiente que se comunica con un backend de Rebase.
 

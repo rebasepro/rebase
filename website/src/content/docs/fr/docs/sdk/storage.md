@@ -1,5 +1,5 @@
 ---
-sourceHash: 1a6f27afc2ce649a
+sourceHash: 7f4db751ce80395f
 title: Stockage et fichiers
 sidebar_label: Stockage
 description: Téléverser, télécharger, lister et supprimer des fichiers à l'aide du module de stockage du SDK typé de Rebase.
@@ -29,6 +29,15 @@ const result = await client.storage.putObject({
 
 // result: { key: string; bucket: string; storageUrl: string }
 ```
+
+<span class="since-badge" data-since="0.25">Depuis 0.25</span> Un fichier de plus de 8 Mio est envoyé par le point de terminaison reprenable (TUS) du serveur, à raison de
+8 Mio par requête, au lieu d'une seule requête multipart que le serveur analyse en entier — un gros
+téléversement coûte donc au serveur un fragment de mémoire, et non trois à cinq fois le fichier. Un fragment
+qui échoue en route est renvoyé à partir de l'endroit où le serveur s'était arrêté. Le résultat, l'objet
+stocké et les vérifications du serveur sont les mêmes dans les deux cas. Lorsque le point de terminaison
+reprenable ne peut pas accepter le fichier (un serveur plus ancien, ou plusieurs instances qui ne partagent
+pas les téléversements), il part en un seul `POST /api/storage/upload`, et il en va de même pour chaque
+fichier suivant de ce client. Voir [Téléversements reprenables (TUS)](/docs/backend/storage-resumable-uploads/).
 
 ### Depuis un champ de fichier
 
@@ -76,7 +85,7 @@ const { url } = await client.storage.getSignedUrl(
 ```
 
 Le SDK met en cache les URL signées pour éviter les appels serveur redondants, jusqu'à l'expiration du
-jeton de téléchargement de chacune. Le cache appartient à l'identifiant qui l'a demandé : lorsque le jeton
+jeton de téléchargement de chacune. <span class="since-badge" data-since="0.25">Depuis 0.25</span> Les recherches faites ensemble — une page d'aperçus qui appelle `getSignedUrl()` au même tick — partent vers le serveur sous la forme d'un seul `POST /api/storage/metadata` par tranche de 100 fichiers, que le limiteur de débit compte pour un dixième des requêtes qu'il remplace ; un fichier qu'un appelant n'a pas le droit de lire fait échouer cet appel seul. Le cache appartient à l'identifiant qui l'a demandé : lorsque le jeton
 d'accès change — une déconnexion, un autre utilisateur qui se connecte, une actualisation — il repart de zéro,
 de sorte qu'un utilisateur ne reçoit jamais une URL émise pour un autre.
 
@@ -148,7 +157,7 @@ const result = await client.storage.listObjects("products/images/", {
 });
 
 for (const item of result.items) {
-    console.log(item.fullPath, item.name);
+    console.log(item.fullPath, item.name, item.size, item.updated, item.contentType);
 }
 
 // Paginate
@@ -158,6 +167,11 @@ if (result.nextPageToken) {
     });
 }
 ```
+
+<span class="since-badge" data-since="0.25">Depuis 0.25</span> Chaque élément porte sa `size` en octets et `updated` (un horodatage ISO 8601) sur le stockage local, S3 et
+GCS, et son `contentType` sur le stockage local et GCS — de quoi afficher un dossier sans un `getSignedUrl()`
+par fichier. Une liste S3 n'a pas de type de contenu ; les dossiers (`result.prefixes`) ne portent aucun des
+trois.
 
 ## Formats de clé de stockage
 

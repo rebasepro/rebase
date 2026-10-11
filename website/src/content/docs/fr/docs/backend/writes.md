@@ -1,5 +1,5 @@
 ---
-sourceHash: aaa2fdfbd560c4cc
+sourceHash: c633bea42c0d4aa9
 title: Écriture via REST
 sidebar_label: Écriture via REST
 description: Clés d'idempotence, écritures conditionnelles avec ETag et If-Match, opérations sur les champs, upserts sur clé naturelle, return=minimal et lots multi-collections.
@@ -163,6 +163,6 @@ C'est la raison d'être de ce point de terminaison par rapport à une simple bou
 
 Le format, les collections inconnues, les champs inconnus, les contraintes sur les valeurs, les opérations sur les champs, les cibles de conflit et la portée de `$ref` sont tous vérifiés avant l'ouverture de la transaction. Un lot s'exécute selon le principe du tout-ou-rien, et constater une faute de frappe à la 40e opération obligerait autrement à annuler (rollback) les 39 écritures précédentes.
 
-Le volume est plafonné au même nombre d'opérations qu'une écriture en masse (1000 par défaut), car un lot conserve ses verrous pendant toute la durée de la transaction. Un pilote incapable de rendre le lot atomique répond `BATCH_UNSUPPORTED` plutôt que de se rabattre sur une boucle d'écritures unitaires — ce qui n'assurerait ni l'atomicité ni l'aller-retour unique pour lesquels un lot est utilisé.
+Le volume est plafonné au même nombre d'opérations qu'une écriture en masse (1000 par défaut), car un lot conserve ses verrous pendant toute la durée de la transaction. Les callbacks de chaque opération s'exécutent à l'intérieur, l'un après l'autre : un hook lent est donc payé une fois par ligne avec la transaction ouverte — 100 lignes dont le `beforeSave` attend 50 ms retiennent une connexion, et les verrous de chaque ligne déjà écrite, pendant 5,3 s. Il en va de même pour une écriture `/bulk`. Voir [Un callback retient une connexion](/docs/collections/callbacks/#un-callback-retient-une-connexion). Un pilote incapable de rendre le lot atomique répond `BATCH_UNSUPPORTED` plutôt que de se rabattre sur une boucle d'écritures unitaires — ce qui n'assurerait ni l'atomicité ni l'aller-retour unique pour lesquels un lot est utilisé.
 
 Un `update` ou un `delete` ciblant une ligne inexistante fait échouer l'ensemble du lot avec un code `404`, pour la même raison qu'une écriture partielle est rejetée partout ailleurs : une application partielle est un état pour lequel il n'existe aucune reprise satisfaisante.

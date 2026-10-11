@@ -1,5 +1,5 @@
 ---
-sourceHash: 7db64266e1a6960b
+sourceHash: 0fc23adc81af9f41
 title: Fonctions personnalisées
 sidebar_label: Fonctions personnalisées
 description: Ajoutez des points de terminaison d'API Hono personnalisés aux côtés de vos routes CRUD Rebase. Découverte automatique à partir d'un répertoire, avec un accès complet à l'instance backend.
@@ -59,7 +59,7 @@ const { message } = await client.functions.invoke<{ message: string }>(
 `RebaseApiError` en cas de réponse non-2xx — ainsi, le format d'erreur propre à la fonction
 parvient à l'appelant au lieu d'un simple rejet de `fetch`.
 
-Trois éléments qu'il accepte en plus du nom :
+Quatre éléments qu'il accepte en plus du nom :
 
 ```typescript
 // A different method. The payload is dropped for GET, since GET has no body.
@@ -71,13 +71,19 @@ await client.functions.invoke("hello", undefined, { method: "GET", path: "stats"
 
 // A query string. Passed as `path`, with no separator inserted before `?`.
 await client.functions.invoke("reports", undefined, { method: "GET", path: "?days=30" });
+
+// A function that answers text or a file (`c.text(csv)`, `c.body(pdf)`).
+// The answer is read as JSON unless you say otherwise: "text" gives a string,
+// "blob" a Blob, "response" the Response itself with its body unread.
+const csv = await client.functions.invoke<string>("export-orders", undefined, { method: "GET", responseType: "text" });
 ```
 
 :::note
-`client.call("functions/hello", …)` permet également d'atteindre une fonction, et fait quelque
-chose de subtilement différent : il désencapsule `res.data` lorsque la réponse en contient un. Avoir deux
-façons d'accéder avec deux contrats de réponse est un piège — utilisez `functions.invoke`. `call` existe
-pour les routes montées en dehors de `/api/functions`, ce que `invoke` ne peut pas exprimer.
+`client.call("functions/hello", payload)` permet également d'atteindre une fonction. Il envoie
+toujours un `POST` et, comme `invoke`, renvoie le corps tel quel — ni l'un ni l'autre n'ira chercher
+une clé `data`. Préférez `functions.invoke`, qui accepte une méthode, un sous-chemin et un
+`responseType` ; `call` existe pour les routes montées en dehors de `/api/functions`, ce que
+`invoke` ne peut pas exprimer.
 :::
 
 :::important
@@ -497,7 +503,7 @@ Les fonctions personnalisées sont chargées et montées **après** que `initial
 3. **Routes de stockage** — `/api/storage/*`
 4. **Routes de données** — `/api/data/*` (CRUD pour les collections)
 5. **Fonctions personnalisées** ← `/api/functions/*`
-6. **Tâches cron** — `/api/cron/*`
+6. **Tâches cron** — `/api/admin/cron/*`
 7. **WebSocket** — Abonnements temps réel
 
 Cela signifie que vos fonctions personnalisées ont accès à tous les services initialisés. Enregistrez toutes les routes qui doivent s'exécuter **avant** Rebase directement sur l'application Hono, avant d'appeler `initializeRebaseBackend()` :
@@ -579,7 +585,7 @@ Le routeur est monté pour le **répertoire**, et non pour les fonctions qu'il c
 
 Deux plafonds s'appliquent à `/api/functions/*` :
 
-- **Délai d'expiration de la requête (timeout)** — 30 secondes par défaut, renvoyant un code `504` avec le code `FUNCTION_TIMEOUT`. Se configure via `functionsTimeoutMs` (ou `REBASE_FUNCTIONS_TIMEOUT_MS`) ; `0` le désactive. Le gestionnaire ne peut pas être annulé depuis l'extérieur, fournissez donc un `AbortSignal` aux appels HTTP sortants — le timeout libère le client et le socket, pas le travail en cours. Le fait que le gestionnaire *continue de s'exécuter* après l'erreur 504 est une propriété inhérente à un processus Node de longue durée, et non une garantie contractuelle ; tout ce qui doit impérativement aller à son terme doit être placé dans [`waitUntil`](#tâches-en-arrière-plan).
+- **Délai d'expiration de la requête (timeout)** — 30 secondes par défaut, renvoyant un code `504` avec le code `FUNCTION_TIMEOUT`. Se configure via `functionsTimeoutMs` (ou `REBASE_FUNCTIONS_TIMEOUT_MS`) ; `0` le désactive. Le gestionnaire ne peut pas être arrêté depuis l'extérieur, mais il en est informé : <span class="since-badge" data-since="0.25">Depuis 0.25</span> `getSignal(c)`, exporté par `@rebasepro/server/functions`, est interrompu au moment du 504 ; passez-le à `fetch` et à tout ce qui accepte un signal (`fetch(url, { signal: getSignal(c) })`). Le travail auquel le signal n'est pas transmis se poursuit — le timeout libère le client et le socket, pas le travail en cours. Le fait que le gestionnaire *continue de s'exécuter* après l'erreur 504 est une propriété inhérente à un processus Node de longue durée, et non une garantie contractuelle ; tout ce qui doit impérativement aller à son terme doit être placé dans [`waitUntil`](#tâches-en-arrière-plan).
 - **Limite de débit (rate limit)** — Les appelants avec clé d'API et les appelants connectés partagent les quotas de l'API de données. Les appelants anonymes disposent de leur propre quota, bien plus large (3000 par fenêtre), car ce routeur est public par défaut pour les récepteurs de webhooks. Modifiez cela avec `rateLimit.anonymousFunctions` ; `null` le désactive.
 
 Les rejets de promesses non gérés sont consignés dans les logs plutôt que fatals : un appel non attendu (fire-and-forget) dans une fonction interromprait sinon l'intégralité du processus. Définissez `REBASE_EXIT_ON_UNHANDLED_REJECTION=1` pour rétablir le comportement par défaut de Node.

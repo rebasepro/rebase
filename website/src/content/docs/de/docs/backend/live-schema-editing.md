@@ -1,5 +1,5 @@
 ---
-sourceHash: 564c58f7bc002c6f
+sourceHash: 1437a2b48ddb6d7b
 title: Live-Schema-Bearbeitung
 description: Erstellen und Ändern von Collections auf einem laufenden Backend – zuerst in Ihr Repository committet, dann angewendet.
 ---
@@ -294,8 +294,11 @@ Ein fehlgeschlagenes Apply ist also **kein Fehler**. Die Antwort besagt:
 
 ## Wo dies funktioniert
 
-Die Trennlinie ist, ob der laufende Server Ihren **Quellcode auf der Festplatte** hat –
-nicht, ob es sich um eine Produktionsumgebung handelt.
+Live Schema Editing schreibt Ihren Collection-Quellcode mit demselben Editor neu, den auch
+die reinen Quellcode-Speichervorgänge des Panels verwenden, und läuft daher dort, wo dieser Editor läuft: auf einem Server mit
+Ihrem **Collection-Quellcode auf der Festplatte** (`collectionsDir`) und eingeschaltetem Schema-Editor.
+Der Schema-Editor ist unter `NODE_ENV=production` ausgeschaltet, sofern der Server nicht
+`schemaEditor: true` setzt, und er benötigt eine installierte `ts-morph`.
 
 ### MongoDB
 
@@ -315,19 +318,20 @@ dies explizit, anstatt Sie die relationale Antwort vermuten zu lassen.
 | Deployment | Funktioniert |
 |---|---|
 | `rebase dev` auf Ihrem Rechner | ja |
-| Self-Hosting mit gemountetem Projekt | ja |
-| Self-Hosting aus einem gebauten Bundle | ja, mit `liveSchema.repository` |
-| Rebase Cloud oder jedes Bundle | ja, mit `liveSchema.repository` |
+| Self-Hosting mit gemountetem Projekt und seinem Git-Arbeitsverzeichnis | ja, wenn `NODE_ENV` nicht `production` ist, oder mit `schemaEditor: true` |
+| Ein gebautes Bundle: ein Self-Hosting, das einen Build ausliefert, oder Rebase Cloud | nein |
 
-Ein Bundle ist kompilierte Ausgabe, daher befindet sich darin kein Collection-Quellcode. Konfigurieren
-Sie `liveSchema.repository`, wird der Quellcode stattdessen aus Ihrem Repository abgerufen;
-ohne dies antworten die Routen mit `SCHEMA_EDITING_NO_REPOSITORY` und nennen den Grund.
+Ein Bundle ist kompilierte Ausgabe, daher befindet sich darin kein Collection-Quellcode, und die
+Runtime, die es ausliefert, schaltet den Schema-Editor aus. `/api/admin/schema/status`
+antwortet mit `enabled: false` und dem Code `SCHEMA_EDITOR_DISABLED`. Bearbeiten Sie
+Collections in der Entwicklung, committen Sie und deployen Sie.
 
-### Ein Deployment ohne Quellcode auf der Festplatte
+### In ein Remote-Repository committen
 
-Ein Bundle ist kompilierte Ausgabe – jeder Cloud-Tenant und jedes Self-Hosting, das einen
-Build ausliefert. Es gibt keinen Collection-Quellcode, den der Editor neu schreiben könnte; verweisen Sie ihn
-daher auf das Repository, in dem der Quellcode tatsächlich liegt:
+`liveSchema.repository` lässt den Server jede Änderung über die Git Data API in ein GitHub-Repository
+committen, statt `git commit` in einem Arbeitsverzeichnis auszuführen. Es greift nur auf einem Server, dessen
+Schema-Editor eingeschaltet ist, also einem Server mit `collectionsDir` auf der Festplatte (siehe die Tabelle oben). Ein
+gebautes Bundle liest es nicht.
 
 ```typescript no-verify
 initializeRebaseBackend({
@@ -347,9 +351,11 @@ initializeRebaseBackend({
 })
 ```
 
-Die Änderung wird dann aus dem Repository gelesen, mit demselben Editor neu geschrieben, der
-auch lokal ausgeführt wird, und über die Git Data API zurückgecommittet – ein Blob, ein Tree, ein
-Commit und ein Ref-Update. Nichts wird geklont und nichts verbleibt auf der Festplatte.
+Die geänderte Collection-Datei wird dann aus dem Repository gelesen, mit demselben Editor neu geschrieben, der
+auch lokal ausgeführt wird, und über die Git Data API zurückgecommittet: ein Blob, ein Tree, ein
+Commit und ein Ref-Update. Nichts wird geklont und nichts verbleibt auf der Festplatte. Es wird nur diese eine Datei
+abgerufen, daher sind in diesem Modus zwei Änderungen nicht möglich: das Hinzufügen einer Relation, die auf eine andere
+Collection zielt, und das Löschen einer Collection.
 
 `auth` akzeptiert ein Token oder eine GitHub-App-Installation:
 
@@ -370,10 +376,9 @@ Projekt und kein Secret pro Kunde, das rotiert werden müsste.
 
 Das Token benötigt `contents: read and write` für dieses Repository und sonst nichts.
 
-Auf einem Rechner, der das Repository besitzt, ist der Commit ein einfaches `git commit` –
-nichts zu authentifizieren, kein Token, kein Netzwerk. Ein Deployment ohne dieses committet
-stattdessen über die Git Data API, ohne Klonen – siehe
-[Ein Deployment ohne Quellcode auf der Festplatte](#ein-deployment-ohne-quellcode-auf-der-festplatte).
+Ohne `liveSchema.repository` ist der Commit ein einfaches `git commit` im
+Arbeitsverzeichnis, das `collectionsDir` enthält: nichts zu authentifizieren, kein Token, kein
+Netzwerk.
 
 Zwei Dinge sorgen dafür, dass die Ausführung gegen ein Repository sicher ist, in dem auch andere
 Personen arbeiten:

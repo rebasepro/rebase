@@ -1,5 +1,5 @@
 ---
-sourceHash: 564c58f7bc002c6f
+sourceHash: 1437a2b48ddb6d7b
 title: Edição de schema ao vivo
 description: Crie e altere coleções em um backend em execução — comitadas primeiro no seu repositório, depois aplicadas.
 ---
@@ -297,8 +297,11 @@ Portanto, uma aplicação que falha **não é um erro**. A resposta diz isso:
 
 ## Onde isso funciona
 
-A linha divisória é se o servidor em execução tem o seu **código-fonte em
-disco** — não se ele é de produção.
+A edição ao vivo do schema reescreve o código-fonte das suas coleções com o mesmo editor
+que os salvamentos somente de código-fonte do painel usam, portanto ela roda onde esse
+editor roda: um servidor com o **código-fonte das coleções em disco** (`collectionsDir`) e
+o editor de schema ligado. O editor de schema fica desligado sob `NODE_ENV=production`, a
+menos que o servidor defina `schemaEditor: true`, e precisa do `ts-morph` instalado.
 
 ### MongoDB
 
@@ -320,20 +323,21 @@ relacional.
 | Implantação | Funciona |
 |---|---|
 | `rebase dev` na sua máquina | sim |
-| Self-host com o projeto montado | sim |
-| Self-host a partir de um bundle compilado | sim, com `liveSchema.repository` |
-| Rebase Cloud, ou qualquer bundle | sim, com `liveSchema.repository` |
+| Self-host com o projeto e sua árvore de trabalho do git montados | sim, quando `NODE_ENV` não é `production`, ou com `schemaEditor: true` |
+| Um bundle compilado: um self-host servindo uma build, ou o Rebase Cloud | não |
 
-Um bundle é uma saída compilada, portanto não há código-fonte de coleções nele.
-Configure `liveSchema.repository` e o código-fonte será buscado no seu
-repositório; sem isso, as rotas respondem `SCHEMA_EDITING_NO_REPOSITORY` e
-explicam o motivo.
+Um bundle é uma saída compilada, portanto não há código-fonte de coleções nele, e o
+runtime que o serve desliga o editor de schema. `/api/admin/schema/status`
+responde `enabled: false` com o código `SCHEMA_EDITOR_DISABLED`. Edite as
+coleções em desenvolvimento, faça o commit e o deploy.
 
-### Uma implantação sem código-fonte em disco
+### Fazendo commit em um repositório remoto
 
-Um bundle é uma saída compilada — todo tenant da Cloud e qualquer self-host
-servindo uma build. Não há código-fonte de coleções para o editor reescrever,
-então aponte-o para o repositório onde o código-fonte realmente reside:
+`liveSchema.repository` faz o servidor comitar cada alteração em um repositório do
+GitHub através da Git Data API, em vez de executar `git commit` em uma árvore de
+trabalho. Ele só tem efeito em um servidor com o editor de schema ligado,
+ou seja, um servidor com `collectionsDir` em disco (veja a tabela acima). Um
+bundle compilado não o lê.
 
 ```typescript no-verify
 initializeRebaseBackend({
@@ -353,9 +357,12 @@ initializeRebaseBackend({
 })
 ```
 
-A alteração é então lida do repositório, reescrita com o mesmo editor executado
-localmente e comitada de volta através da Git Data API — um blob, uma tree, um
-commit e uma atualização de ref. Nada é clonado e nada é deixado em disco.
+O arquivo da coleção alterada é então lido do repositório, reescrito com
+o mesmo editor executado localmente e comitado de volta através da Git Data API:
+um blob, uma tree, um commit e uma atualização de ref. Nada é clonado e nada é
+deixado em disco. Apenas esse arquivo é buscado, portanto duas alterações não podem ser
+feitas neste modo: adicionar uma relação que aponta para outra coleção e excluir uma
+coleção.
 
 `auth` aceita um token ou uma instalação de GitHub App:
 
@@ -377,10 +384,9 @@ um App, uma instalação por projeto e nenhum segredo por cliente para rotaciona
 O token precisa da permissão `contents: read and write` nesse repositório, e
 nada mais.
 
-Em uma máquina que possui o repositório, o commit é um simples `git commit` —
-nada para autenticar, sem token, sem rede. Uma implantação sem ele comita
-através da Git Data API, sem clonagem — consulte
-[Uma implantação sem código-fonte em disco](#uma-implantação-sem-código-fonte-em-disco).
+Sem `liveSchema.repository`, o commit é um simples `git commit` na árvore de
+trabalho que contém `collectionsDir`: nada para autenticar, sem token, sem
+rede.
 
 Duas coisas que tornam seguro executá-lo contra um repositório em que outra
 pessoa está trabalhando:

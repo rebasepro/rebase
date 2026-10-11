@@ -1,5 +1,5 @@
 ---
-sourceHash: 60c797ac2e9a363f
+sourceHash: 8a336726f6416a25
 title: Eigenschaften
 sidebar_label: Eigenschaften
 description: Eigenschaftstypen definieren den Datentyp, die Validierung und das UI-Rendering für jedes Feld in einer Collection. Rebase unterstützt die Typen String, Number, Boolean, Date, Array, Map, Reference, Relation und Geopoint.
@@ -20,14 +20,14 @@ Eigenschaften definieren die Spalten in Ihrer Datenbanktabelle und wie sie in de
 
 | Typ | Beschreibung | PostgreSQL-Spalte |
 |------|-------------|-------------------|
-| `string` | Text, Select, Markdown, Datei-Upload, URL, E-Mail | `varchar`, `text`, `jsonb` |
+| `string` | Text, Select, Markdown, Datei-Upload, URL, E-Mail | standardmäßig `text`; `varchar`, `char` oder `uuid` mit `columnType` |
 | `number` | Ganzzahl, Dezimalzahl, Währung | `integer`, `numeric`, `bigint`, `serial` |
 | `boolean` | True/False-Umschalter | `boolean` |
 | `date` | Datum, Datum/Uhrzeit, Zeitstempel | `timestamp`, `date` |
-| `array` | Geordnete Liste von Werten | `jsonb` |
+| `array` | Geordnete Liste von Werten | Ein natives Array (`text[]`, `integer[]`, `numeric[]`, `boolean[]`), wenn `of` eine einzelne String-, Number- oder Boolean-Property ist; sonst `jsonb` |
 | `map` | Schlüssel-Wert-Objekt | `jsonb` |
 | `geopoint` | Breitengrad/Längengrad-Paar | `jsonb` |
-| `reference` | Eingebettete Referenz auf eine andere Entität | `varchar` (speichert ID) |
+| `reference` | Eingebettete Referenz auf eine andere Entität | Der Primärschlüsseltyp des Ziels (speichert dessen ID) |
 | `relation` | SQL-Fremdschlüssel-Beziehung | Verwendet das `relations`-Array |
 | `vector` | Embedding, für Nearest-Neighbour-Suche | `VECTOR(n)` (pgvector) |
 | `binary` | Rohdaten-Bytes, gelesen und geschrieben als Base64 | `bytea` |
@@ -220,8 +220,9 @@ category: {
 
 Mehrere Werte aus einer festen Menge sind ein **Array eines Enum-Strings**, kein Flag
 auf einem einzelnen Wert: Die Spalte enthält mehrere Werte, daher ist die Eigenschaft,
-die sie beschreibt, das Array. `columnType: "text[]"` sorgt dafür, dass es eine einzelne
-Postgres-Spalte statt eines Joins wird.
+die sie beschreibt, das Array. Es ist eine einzelne Postgres-Spalte, ein `text[]`, statt eines Joins: Ein Array,
+dessen `of` eine einzelne String-Property ist, erhält standardmäßig ein natives Array, und das
+`columnType` unten sagt es nur ausdrücklich.
 
 ```typescript no-verify
 locales: {
@@ -252,7 +253,7 @@ locales: {
 | `url` | `boolean` | Validierung des URL-Formats |
 | `storage` | `StorageConfig` | Datei-Upload aktivieren – siehe [Datei-Uploads](/docs/collections/file-uploads) |
 | `enum` | `EnumValues` | Als Auswahl-Dropdown rendern |
-| `columnType` | `"varchar" \| "text" \| "char" \| "uuid"` | Die Datenbankspalte. Standardmäßig `varchar` oder `uuid`, wenn `isId` dies vorgibt. `text` für unbegrenzte Strings, `char` für feste Breite |
+| `columnType` | `"varchar" \| "text" \| "char" \| "uuid"` | Die Datenbankspalte. Standardmäßig `text` oder `uuid`, wenn `isId` dies vorgibt. `text` für unbegrenzte Strings, `char` für feste Breite |
 | `isId` | `boolean \| string` | Markiert die Eigenschaft als Primärschlüssel und bestimmt, wer ihn befüllt: `"manual"` (Sie selbst), `"uuid"` (`gen_random_uuid()`) oder jeder andere String, der unverändert als SQL-Standardausdruck der Spalte verwendet wird – direkt (`nanoid()`) oder in Template-Form (``"sql`nanoid()`"``). Die Funktion muss existieren; hier wird nichts erstellt. `"increment"` ist eine **Number**-Strategie und bewirkt hier nichts, und `"cuid"` wird beim Laden der Konfiguration abgelehnt |
 | `autoValue` | `"user_on_create" \| "user_on_update"` | Stempelt die Spalte mit der **uid des ausführenden Benutzers** – nur beim Erstellen oder bei jedem Schreibvorgang. Siehe [Audit-Spalten](#audit-spalten) |
 | `userSelect` | `boolean` | Als Benutzerauswahl rendern. Der Wert ist eine einfache String-Spalte, die die Benutzer-ID enthält – beim Eingang wird nichts aufgelöst oder geprüft. **Nur Admin-Formular – wird von der API oder der Datenbank nicht erzwungen.** |

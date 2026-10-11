@@ -1,5 +1,5 @@
 ---
-sourceHash: bc550d505d122629
+sourceHash: 6c16b3e7b3784d47
 title: Sincronización Offline y Local-First
 sidebar_label: Offline
 description: Active el motor de sincronización local-first del SDK tipado de Rebase — una base de datos local de filas, escrituras offline instantáneas con reversión y consultas en vivo reactivas.
@@ -61,7 +61,7 @@ try {
 Mientras se sabe que la conexión está caída, ni siquiera se intenta la escritura — se aplica localmente y se pone en cola, de modo que no cuesta nada en vez de un tiempo de espera agotado:
 
 ```typescript
-// Returns immediately, offline or not.
+// While offline, returns at once with the locally applied row.
 const post = await client.data.posts.create({ title: "Draft", status: "draft" });
 
 // Shows up in every matching list, right away.
@@ -70,7 +70,7 @@ const drafts = await client.data.posts.where("status", "==", "draft").find();
 
 Las filas creadas offline reciben un id generado por el cliente, del tipo que ya tienen los ids de la colección: un **entero negativo** donde son números, una cadena UUID donde son cadenas. El signo es la señal — una clave real nunca es negativa —, así que una fila que aún no ha llegado al servidor se reconoce sin consultar nada, e `id` sigue siendo lo que dice el tipo `Row` generado. En una colección que este dispositivo nunca ha leído no hay nada local de donde deducir el tipo, y el id es un UUID.
 
-Si el servidor asigna el suyo al reproducirlas, la fila local y cualquier escritura en cola que aún apunte al id temporal se trasladan al id real. Hasta entonces, no guarde un id temporal fuera de la base de datos offline: una clave foránea o una URL guardada que lo contenga apunta a una fila que está a punto de renumerarse.
+Si el servidor asigna el suyo al reproducirlas, la fila local y cualquier escritura en cola que aún apunte al id temporal se trasladan al id real, en todas las colecciones: un post en cola con `author_id` apuntando a un autor creado offline se envía con el id que el servidor dio al autor. Si el servidor rechaza al autor, las escrituras que lo referencian se descartan con él y se informan como `DEPENDENCY_REJECTED` (consulte [Cuando el servidor dice que no](#cuando-el-servidor-dice-que-no)). Hasta entonces, no guarde un id temporal fuera de la base de datos offline: una clave foránea o una URL guardada que lo contenga apunta a una fila que está a punto de renumerarse.
 
 Las escrituras se reproducen en el orden en que las hizo, entre colecciones — así que una creación en una colección sigue llegando antes que la fila de otra que la referencia.
 
@@ -123,7 +123,7 @@ const { online, pending, syncing, lastSyncedAt, lastError } = client.offline!.st
 
 | Método | Propósito |
 |--------|-----------|
-| `status()` | Conectividad actual, profundidad de la cola, actividad de sincronización, último error |
+| `status()` | Conectividad actual, profundidad de la cola, actividad de sincronización, último error, y `persisted`: si el navegador aceptó conservar la base de datos offline (se pregunta cuando se pone en cola la primera escritura; `false` significa que puede ser desalojada bajo presión de almacenamiento, incluidas las escrituras sin enviar) |
 | `onStatusChange(fn)` | Suscribirse a lo anterior |
 | `onQueueChange(fn)` | Solo el número de escrituras sin enviar, para un indicador |
 | `pending()` | Las mutaciones en cola en sí, de la más antigua a la más reciente. `pending({ orphaned: true })`: las que se pusieron en cola sin sesión iniciada — véase [Usuarios](#usuarios) |
@@ -147,7 +147,9 @@ const client = createRebaseClient({
 });
 ```
 
-La cascada es estrecha: un `update` se descarta junto con la escritura que editaba, porque solo puede fallar de la misma manera. Un `create` o `delete` posterior sobre la misma fila se sostiene por sí mismo y se conserva. Una escritura descartada nunca se envió. Se informa con un `RebaseApiError` cuyo `code` es `DEPENDENCY_REJECTED` y cuyo `cause` es el rechazo que la condenó, para que puedas distinguirla de la escritura que el servidor realmente rechazó. En 0.23 lleva en cambio el propio error de la escritura rechazada.
+Una fila que otra persona eliminó es el único caso que no se revierte. Un `delete` en cola de ella hizo aquello para lo que servía, así que cuenta como sincronizado y no se informa. Una edición en cola de ella se informa, y la fila se elimina de la base de datos local en lugar de restaurarse, porque el servidor ya no la tiene.
+
+La cascada es estrecha: un `update` se descarta junto con la escritura que editaba, porque solo puede fallar de la misma manera. Un `create` o `delete` posterior sobre la misma fila se sostiene por sí mismo y se conserva. Un `create` rechazado de una fila creada offline arrastra además consigo toda escritura en cola, en cualquier colección, cuyos valores referencien el id temporal de la fila. Una escritura descartada nunca se envió. Se informa con un `RebaseApiError` cuyo `code` es `DEPENDENCY_REJECTED` y cuyo `cause` es el rechazo que la condenó, para que puedas distinguirla de la escritura que el servidor realmente rechazó. En 0.23 lleva en cambio el propio error de la escritura rechazada.
 
 Las ediciones consecutivas sobre una misma fila mientras está sin conexión se fusionan en una única escritura en cola, de modo que un formulario en el que se está escribiendo no hace crecer la cola. Si el servidor rechaza la escritura fusionada por su contenido (un 400, 403 o 422 — por ejemplo, un campo eliminado por un cambio de esquema mientras el usuario estaba sin conexión), el motor la divide de nuevo en las ediciones separadas y reproduce cada una. Solo se revierte y se informa la edición que el servidor rechaza; las demás se conservan.
 
@@ -156,6 +158,8 @@ Un fallo que es meramente temporal — un 429, un 503, una conexión caída — 
 ## Múltiples pestañas
 
 Las pestañas de la misma aplicación comparten una única base de datos IndexedDB, así que comparten las filas locales y la cola de salida (outbox). Una escritura en una aparece en las demás, y solo una pestaña a la vez reproduce la cola. No hay nada que configurar.
+
+Esa última garantía proviene de la [API Web Locks](https://developer.mozilla.org/en-US/docs/Web/API/Web_Locks_API) del navegador, que solo existe en un contexto seguro (HTTPS, o `localhost`) y no en Safari anterior a la 15.4 ni en algunos webviews integrados. Sin ella, todas las pestañas abiertas reproducen la cola cuando sincronizan. Los creates, las escrituras masivas, los updates y los deletes se reproducen todos con una clave de idempotencia, así que un servidor que almacena claves aplica cada uno una sola vez; lo que puede verse es la misma escritura enviada desde dos pestañas.
 
 ## Usuarios
 
@@ -225,8 +229,11 @@ El único contrato más allá de lo evidente es que los listados por prefijo vue
 El cliente no es una réplica de su base de datos, y no pretende serlo:
 
 - **Solo son locales las filas que la aplicación ha leído o escrito.** Una consulta que el cliente nunca ha enviado aún puede responderse con lo que tiene, pero a la respuesta pueden faltarle filas que el servidor habría devuelto. Los resultados en vivo lo indican mediante `partial`.
+- **`findAll()` e `iterate()` leen solo páginas que el servidor respondió en este dispositivo.** Un recorrido continúa mientras cada página diga que hay más, y solo el servidor puede decirlo. Sin conexión, un recorrido que necesita una página que este dispositivo nunca obtuvo falla con el error `OFFLINE` (`isOfflineError`) en lugar de devolver parte de la colección como si fuera toda. En 0.24 se detenía en esa página y devolvía lo que tenía.
+- **`count()` sin conexión necesita un conteo que el servidor dio a este dispositivo para la misma consulta.** Las escrituras en cola desde entonces lo mueven: creates, ediciones que llevan una fila dentro o fuera del filtro, y deletes. Sin uno, falla con el error `OFFLINE` en lugar de contar las filas que este dispositivo casualmente tiene. En 0.24 devolvía ese número.
 - **`searchString` se aproxima** como un escaneo de subcadena sin distinción de mayúsculas sobre los campos de texto en caché. El servidor ejecuta una búsqueda de texto completo real sobre las columnas configuradas de la colección.
 - **Las relaciones incluidas con `include` no se pueden evaluar localmente** — las filas relacionadas viven en colecciones que la consulta nunca cargó. Una consulta así siempre se marca como `partial` cuando se responde desde la caché.
+- **Los conflictos son de último escritor gana, por campo, sin detección.** Un `update` reproducido envía los campos que el usuario cambió y nada más, así que los campos que no tocó conservan lo que tenga el servidor. Para un campo que *sí* cambió, un cambio que otra persona hizo en el servidor mientras estaba sin conexión se sobrescribe cuando se reproduce la cola, y ninguno de los dos usuarios es avisado. Nada compara versiones al reproducir.
 - **La reproducción es al menos una vez.** Una escritura que llega al servidor pero cuya respuesta se pierde puede enviarse de nuevo. Prefiera escrituras idempotentes (`createMany` con `upsert`) allí donde los duplicados importen.
 - **Un upsert sobre una clave natural necesita el servidor.** Qué fila nombra un destino `onConflict` solo lo puede averiguar el servidor, así que `upsert()` sobre una clave natural (o sin el id de la fila), y un `createMany()` con `onConflict` que nunca se envió, se rechazan sin conexión con `OFFLINE_UPSERT_UNSUPPORTED`. Un upsert sobre la clave primaria, con la clave en cada fila, se pone en cola.
 - **Las lecturas locales aplican la semántica de Postgres, no los datos de la base de datos.** Los filtros se evalúan como lo haría SQL — las comparaciones contra `NULL` son desconocidas, `ORDER BY` coloca los nulos al final en orden ascendente — pero contra la copia de las filas que tiene el cliente, que puede estar desactualizada.

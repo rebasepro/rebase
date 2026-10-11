@@ -1,5 +1,5 @@
 ---
-sourceHash: 7c51c9877d9d0803
+sourceHash: 376a90002cda8008
 title: Claves de API
 sidebar_label: Claves de API
 description: "Claves de larga duración para scripts, CI, agentes e integraciones: claves de servicio y claves personales, los alcances que tienen, cómo se combinan con la seguridad a nivel de fila y las rutas que las gestionan."
@@ -161,7 +161,8 @@ de 15 minutos, y todas las vías cuentan contra él en un mismo contador, `api-k
 
 - sus solicitudes HTTP a las API de datos, almacenamiento y funciones;
 - sus tramas de datos en el socket de tiempo real: lecturas, conteos, guardados y
-  eliminaciones;
+  eliminaciones, y las suscripciones y las solicitudes de historial de canal que superan la
+  [asignación](/docs/backend/realtime/#what-a-write-costs-and-the-limits) de cada socket;
 - sus solicitudes a [`/mcp`](/docs/ai/mcp/#the-remote-endpoint).
 
 Sin `rate_limit`, el contador tiene el valor predeterminado del servidor para claves

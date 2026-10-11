@@ -1,5 +1,5 @@
 ---
-sourceHash: 37805343f12779ab
+sourceHash: 781657121510be7a
 title: Cron Jobs
 sidebar_label: Cron Jobs
 description: Programa tareas recurrentes en segundo plano con el sistema integrado de cron jobs de Rebase. Define tareas como archivos TypeScript, monitorízalas en Studio y gestiónalas a través de la API REST.
@@ -178,6 +178,8 @@ interface CronJobContext {
 
 Usa `ctx.log()` para emitir salida estructurada. Estas líneas se capturan en el registro de ejecución y son visibles en Studio y a través de la API REST. Cada línea también se escribe en el registro del servidor con nivel `info` y un campo `cron` que contiene el ID del job, así que aparece en cualquier sistema que recoja la salida de tu contenedor, incluidos los registros de depuración de Rebase Cloud. En esa copia se ocultan los mismos datos que en las líneas de registro del propio servidor: se sustituyen los valores de claves como `password` o `apiKey`, y el SQL y los parámetros de una consulta fallida. El registro de ejecución guarda la línea sin ocultar nada.
 
+<span class="since-badge" data-since="0.25">Desde 0.25</span> El registro de ejecución conserva las primeras 500 líneas de una ejecución o 64 KB de ellas, lo que ocurra primero, y después una línea que dice cuántas más hubo: `… 9500 more lines not kept — see the server log`. El registro del servidor recibe todas las líneas. Un job que registra una línea por cada elemento que procesa debe esperar que su historial muestre el comienzo de la ejecución.
+
 ### `ctx.signal` — detén el trabajo cuando la ejecución se detenga
 
 El tiempo de espera (timeout) finaliza la *ejecución*: el programador deja de esperar y registra un fallo. No finaliza el handler. Pasa `ctx.signal` a cualquier cosa que acepte una señal, y el trabajo se detendrá con ella:
@@ -281,7 +283,7 @@ Consulta [Roles y alcances](/docs/backend/roles-and-scopes/).
 | `GET` | `/api/admin/cron` | Listar todos los cron jobs registrados |
 | `GET` | `/api/admin/cron/:id` | Obtener el estado de una tarea individual |
 | `POST` | `/api/admin/cron/:id/trigger` | Activar manualmente una tarea — `409` mientras ya se está ejecutando |
-| `GET` | `/api/admin/cron/:id/logs` | Obtener el historial de ejecución (`?limit=N`). `503` cuando no se puede leer `rebase.cron_logs`, en lugar de un historial vacío |
+| `GET` | `/api/admin/cron/:id/logs` | Obtener el historial de ejecución (`?limit=N`), de los últimos 30 días. `503` cuando no se puede leer `rebase.cron_logs`, en lugar de un historial vacío |
 | `PUT` | `/api/admin/cron/:id` | Pausar o reanudar una tarea en todos los procesos (`{ "enabled": false }`); `null` vuelve a seguir el código |
 
 ### Ejemplo: Listar todas las tareas
@@ -398,13 +400,9 @@ El panel se actualiza automáticamente cada 15 segundos.
 
 El panel muestra lo mismo sea cual sea el proceso que lo sirve. Una tarea que
 otro proceso está ejecutando aparece como en ejecución.
-En todo proceso que tiene un almacén, el número de ejecuciones, el número de
-fallos y la última ejecución se leen de `rebase.cron_logs`, con una consulta
-limitada a las filas de cada tarea. Los contadores propios de un proceso solo
-recogen las ejecuciones que hizo él: el rol `api` junto a un worker no ejecuta
-nada, y de dos réplicas que programan ambas, ninguna ve los turnos que reclamó la
-otra. Solo cuando no se puede leer `cron_logs` recurre la tarjeta a los contadores
-propios de este proceso, con una advertencia en el registro del servidor.
+En todo proceso que tiene un almacén, el número de ejecuciones, el número de fallos y la última ejecución se leen de la base de datos, donde se cuentan las ejecuciones de todos los procesos. Los contadores propios de un proceso solo recogen las ejecuciones que hizo él: el rol `api` junto a un worker no ejecuta nada, y de dos réplicas que programan ambas, ninguna ve los turnos que reclamó la otra. Solo cuando no se puede leer la base de datos recurre la tarjeta a los contadores propios de este proceso, con una advertencia en el registro del servidor.
+
+<span class="since-badge" data-since="0.25">Desde 0.25</span> Los recuentos son de toda la vida; el historial son los últimos 30 días. La fila de cada ejecución en `rebase.cron_logs` se elimina 30 días después de que empezó, mediante un barrido cada hora, mientras que los recuentos de ejecuciones y fallos siguen contándola. Una ejecución omitida cuenta como ejecución, como siempre: es una fila del historial.
 
 ## Validación de programación y análisis AST
 
@@ -441,7 +439,7 @@ ejecuta junto a una programada se explica en [Cron entre instancias](/docs/backe
   `Error: Cron job "<id>" timed out after <N>ms`
   El aborto es la parte que detiene el *trabajo*; el rechazo solo detiene la espera del programador. Un handler que ignore `ctx.signal` seguirá ejecutándose más allá de su propia ejecución.
 - **Apagado**: `backend.shutdown()` espera a una ejecución en curso, dentro del mismo presupuesto que la cola de trabajos (dos tercios del tiempo de espera de apagado). Si la ejecución sigue en marcha cuando se agota, `ctx.signal` se aborta y se registra como fallida, con el motivo. Su intervalo sigue reclamado, así que ninguna otra instancia lo vuelve a ejecutar.
-- **Try/Catch a prueba de fallos**: El handler de cada tarea se ejecuta dentro de un contenedor aislado. Cualquier excepción no capturada es interceptada, formateando el seguimiento de errores (traceback) en una cadena, estableciendo el estado de la tarea en `"error"` y actualizando los contadores de fallos de `rebase.cron_logs`. Un fallo dentro de una sola tarea cron nunca hará caer el bucle del programador ni el servidor web HTTP principal de Hono.
+- **Try/Catch a prueba de fallos**: El handler de cada tarea se ejecuta dentro de un contenedor aislado. Cualquier excepción no capturada es interceptada, formateando el seguimiento de errores (traceback) en una cadena, estableciendo el estado de la tarea en `"error"` y actualizando el contador de fallos de la tarea. Un fallo dentro de una sola tarea cron nunca hará caer el bucle del programador ni el servidor web HTTP principal de Hono.
 - **Búfer circular en memoria**: El programador mantiene un búfer circular que contiene las últimas **50 ejecuciones** por tarea. Este búfer se mantiene en memoria para permitir lecturas casi instantáneas desde Rebase Studio.
 
 ---
@@ -466,16 +464,25 @@ CREATE TABLE IF NOT EXISTS rebase.cron_logs (
     manual       BOOLEAN NOT NULL DEFAULT false        -- True if triggered from Studio/REST
 );
 
+ALTER TABLE rebase.cron_logs ADD COLUMN IF NOT EXISTS counted BOOLEAN;  -- the run is in the counters below
+
 CREATE INDEX IF NOT EXISTS idx_cron_logs_job ON rebase.cron_logs(job_id, started_at DESC);
-CREATE INDEX IF NOT EXISTS idx_cron_logs_job_failures ON rebase.cron_logs(job_id) WHERE NOT success;
+CREATE INDEX IF NOT EXISTS idx_cron_logs_started ON rebase.cron_logs(started_at);
+CREATE INDEX IF NOT EXISTS idx_cron_logs_uncounted ON rebase.cron_logs(job_id, started_at DESC) WHERE counted IS NULL;
 
 CREATE TABLE IF NOT EXISTS rebase.cron_job_state (
-    job_id         TEXT PRIMARY KEY,
-    enabled        BOOLEAN,       -- NULL: follow the job's own `enabled`
-    updated_at     TIMESTAMPTZ,   -- when `enabled` was last set, and by whom
-    updated_by     TEXT,
-    running_until  TIMESTAMPTZ,   -- the run lease: live while in the future
-    running_by     TEXT
+    job_id            TEXT PRIMARY KEY,
+    enabled           BOOLEAN,       -- NULL: follow the job's own `enabled`
+    updated_at        TIMESTAMPTZ,   -- when `enabled` was last set, and by whom
+    updated_by        TEXT,
+    running_until     TIMESTAMPTZ,   -- the run lease: live while in the future
+    running_by        TEXT,
+    total_runs        BIGINT NOT NULL DEFAULT 0,   -- all-time, skips included
+    total_failures    BIGINT NOT NULL DEFAULT 0,
+    last_run_at       TIMESTAMPTZ,                 -- the most recently started run
+    last_duration_ms  INTEGER,
+    last_success      BOOLEAN,
+    last_error        TEXT
 );
 ```
 
@@ -485,7 +492,9 @@ usuario final `rebase_user` no tiene ningún privilegio sobre ellas: un
 `cron_job_state` escribible permitiría a un usuario autenticado pausar una tarea
 para todos, o retener su lease para que nada la ejecute.
 
-Al arrancar, el programador lee las estadísticas de esta tabla mediante consultas de agregación (`COUNT(*)`, `SUM(CASE WHEN success = false THEN 1 ELSE 0 END)`) para completar el historial de `totalRuns` y `totalFailures`. Las inserciones de registros se ejecutan en un barrido asíncrono no bloqueante; si falla el volcado a la base de datos, el programador registra el error y continúa la ejecución normal utilizando el búfer circular en memoria como alternativa de respaldo.
+<span class="since-badge" data-since="0.25">Desde 0.25</span> La fila de una ejecución y su recuento se escriben en una sola sentencia: la inserción en `cron_logs` y un upsert de los contadores de la tarea en `cron_job_state`. Un listado lee una fila de `cron_job_state` por tarea, por largo que sea el historial, y lo mismo hace el programador cuando inicializa `totalRuns` y `totalFailures` al arrancar. Las escrituras del registro no retienen la ejecución; si una falla, el programador registra el error y continúa, con la ejecución todavía en el búfer circular en memoria.
+
+Una vez por hora, y al arrancar, el programador elimina las filas del historial de más de 30 días y cuenta las ejecuciones que aún no están contadas, ambas cosas en lotes de 5.000 filas. Un historial escrito antes de la 0.24 lo cuenta el primero de estos barridos, fuera de la ruta de arranque. Hasta que termina, un listado suma a los contadores las ejecuciones que todavía no ha contado, de modo que las cifras no cambian al actualizar. Lo mismo vale para una ejecución que un servidor más antiguo registra durante un despliegue progresivo.
 
 ## Ejemplo: Tarea de limpieza diaria
 

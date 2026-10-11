@@ -1,5 +1,5 @@
 ---
-sourceHash: 37805343f12779ab
+sourceHash: 781657121510be7a
 title: Cron Jobs
 sidebar_label: Cron Jobs
 description: Agende tarefas em segundo plano recorrentes com o sistema integrado de cron jobs do Rebase. Defina jobs como arquivos TypeScript, monitore-os no Studio e gerencie-os via REST API.
@@ -178,6 +178,8 @@ interface CronJobContext {
 
 Use `ctx.log()` para gerar saídas estruturadas. Essas linhas são capturadas no log de execução e ficam visíveis no Studio e por meio da REST API. Cada linha também é gravada no log do servidor no nível `info`, com um campo `cron` contendo o ID do job, então ela aparece em qualquer lugar que colete a saída do seu contêiner, inclusive nos logs de depuração do Rebase Cloud. Essa cópia é mascarada como as próprias linhas de log do servidor: os valores de chaves como `password` ou `apiKey`, e o SQL e os parâmetros de uma consulta que falhou, são substituídos. O log de execução armazena a linha sem esse mascaramento.
 
+<span class="since-badge" data-since="0.25">Desde 0.25</span> O log de execução guarda as primeiras 500 linhas de uma execução ou 64 KB delas, o que vier primeiro, e depois uma linha dizendo quantas houve além disso: `… 9500 more lines not kept — see the server log`. O log do servidor recebe todas as linhas. Um job que registra uma linha por item processado deve esperar que seu histórico mostre o início da execução.
+
 ### `ctx.signal` — interrompa o trabalho quando a execução parar
 
 O timeout encerra a *execução*: o agendador para de esperar e registra uma falha. Ele não encerra o handler. Passe `ctx.signal` para qualquer chamada que o aceite, e o trabalho será interrompido junto com ele:
@@ -280,7 +282,7 @@ Consulte [Papéis e escopos](/docs/backend/roles-and-scopes/).
 | `GET` | `/api/admin/cron` | Lista todos os cron jobs registrados |
 | `GET` | `/api/admin/cron/:id` | Obtém o status de um job individual |
 | `POST` | `/api/admin/cron/:id/trigger` | Dispara um job manualmente — `409` enquanto ele já está em execução |
-| `GET` | `/api/admin/cron/:id/logs` | Obtém o histórico de execução (`?limit=N`). `503` quando `rebase.cron_logs` não pode ser lida, em vez de um histórico vazio |
+| `GET` | `/api/admin/cron/:id/logs` | Obtém o histórico de execução (`?limit=N`), dos últimos 30 dias. `503` quando `rebase.cron_logs` não pode ser lida, em vez de um histórico vazio |
 | `PUT` | `/api/admin/cron/:id` | Pausa ou retoma um job em todos os processos (`{ "enabled": false }`); `null` volta a seguir o código |
 
 ### Exemplo: Listar Todos os Jobs
@@ -399,12 +401,13 @@ O painel é atualizado automaticamente a cada 15 segundos.
 O painel mostra a mesma coisa, seja qual for o processo que o serve. Um job que
 outro processo está executando aparece como em execução.
 Em todo processo que tem um armazenamento persistente, o número de execuções, o
-número de falhas e a última execução são lidos de `rebase.cron_logs`, com uma consulta
-limitada às linhas de cada job. Os contadores do próprio processo guardam apenas as
+número de falhas e a última execução são lidos do banco de dados, onde as execuções de todos os processos são contadas. Os contadores do próprio processo guardam apenas as
 execuções que ele fez: o papel `api` ao lado de um worker não executa nada, e, de duas
 réplicas que agendam, nenhuma vê os slots que a outra reivindicou. Só quando
-`cron_logs` não pode ser lida o card recorre aos contadores do próprio processo, com um
+o banco de dados não pode ser lido o card recorre aos contadores do próprio processo, com um
 aviso no log do servidor.
+
+<span class="since-badge" data-since="0.25">Desde 0.25</span> As contagens são de toda a vida; o histórico são os últimos 30 dias. A linha de cada execução em `rebase.cron_logs` é excluída 30 dias depois de iniciada, por uma varredura a cada hora, enquanto as contagens de execuções e de falhas continuam a contá-la. Uma execução ignorada conta como execução, como sempre contou: é uma linha do histórico.
 
 ## Validação de Agendamento e Análise AST
 
@@ -441,7 +444,7 @@ está em [Cron entre instâncias](/docs/backend/cron-across-instances).
   `Error: Cron job "<id>" timed out after <N>ms`
   A ação de abortar é a parte que realmente interrompe o *trabalho*; a rejeição apenas faz o agendador parar de esperar. Um handler que ignora `ctx.signal` continua sendo executado além de sua própria execução.
 - **Encerramento**: `backend.shutdown()` aguarda uma execução em andamento, dentro do mesmo orçamento da fila de jobs (dois terços do timeout de encerramento). Uma execução que ainda esteja rodando quando ele se esgota tem `ctx.signal` abortado e é registrada como falha, com o motivo. Seu slot continua reivindicado, então nenhuma outra instância a executa de novo.
-- **Try/Catch com Proteção contra Falhas**: Cada handler de job roda dentro de um wrapper isolado. Quaisquer exceções não tratadas são interceptadas, formatando o rastreamento do erro (traceback) em uma string, alterando o status do job para `"error"` e atualizando os contadores de falhas em `rebase.cron_logs`. Uma pane dentro de uma tarefa de cron específica nunca derrubará o loop do agendador ou o servidor web HTTP Hono principal.
+- **Try/Catch com Proteção contra Falhas**: Cada handler de job roda dentro de um wrapper isolado. Quaisquer exceções não tratadas são interceptadas, formatando o rastreamento do erro (traceback) em uma string, alterando o status do job para `"error"` e atualizando o contador de falhas do job. Uma pane dentro de uma tarefa de cron específica nunca derrubará o loop do agendador ou o servidor web HTTP Hono principal.
 - **Ring Buffer em Memória**: O agendador mantém um ring buffer contendo as últimas **50 execuções** de cada job. Esse buffer permanece em memória para viabilizar leituras quase instantâneas a partir do Rebase Studio.
 
 ---
@@ -466,16 +469,25 @@ CREATE TABLE IF NOT EXISTS rebase.cron_logs (
     manual       BOOLEAN NOT NULL DEFAULT false        -- True if triggered from Studio/REST
 );
 
+ALTER TABLE rebase.cron_logs ADD COLUMN IF NOT EXISTS counted BOOLEAN;  -- the run is in the counters below
+
 CREATE INDEX IF NOT EXISTS idx_cron_logs_job ON rebase.cron_logs(job_id, started_at DESC);
-CREATE INDEX IF NOT EXISTS idx_cron_logs_job_failures ON rebase.cron_logs(job_id) WHERE NOT success;
+CREATE INDEX IF NOT EXISTS idx_cron_logs_started ON rebase.cron_logs(started_at);
+CREATE INDEX IF NOT EXISTS idx_cron_logs_uncounted ON rebase.cron_logs(job_id, started_at DESC) WHERE counted IS NULL;
 
 CREATE TABLE IF NOT EXISTS rebase.cron_job_state (
-    job_id         TEXT PRIMARY KEY,
-    enabled        BOOLEAN,       -- NULL: follow the job's own `enabled`
-    updated_at     TIMESTAMPTZ,   -- when `enabled` was last set, and by whom
-    updated_by     TEXT,
-    running_until  TIMESTAMPTZ,   -- the run lease: live while in the future
-    running_by     TEXT
+    job_id            TEXT PRIMARY KEY,
+    enabled           BOOLEAN,       -- NULL: follow the job's own `enabled`
+    updated_at        TIMESTAMPTZ,   -- when `enabled` was last set, and by whom
+    updated_by        TEXT,
+    running_until     TIMESTAMPTZ,   -- the run lease: live while in the future
+    running_by        TEXT,
+    total_runs        BIGINT NOT NULL DEFAULT 0,   -- all-time, skips included
+    total_failures    BIGINT NOT NULL DEFAULT 0,
+    last_run_at       TIMESTAMPTZ,                 -- the most recently started run
+    last_duration_ms  INTEGER,
+    last_success      BOOLEAN,
+    last_error        TEXT
 );
 ```
 
@@ -485,7 +497,9 @@ de usuário final `rebase_user` não tem nenhum privilégio sobre elas: um
 `cron_job_state` gravável permitiria que um usuário autenticado pausasse um job
 para todos, ou segurasse seu lease para que nada o execute.
 
-Na inicialização, o agendador lê as estatísticas dessa tabela por meio de consultas agregadas (`COUNT(*)`, `SUM(CASE WHEN success = false THEN 1 ELSE 0 END)`) para preencher o histórico de `totalRuns` e `totalFailures`. As inserções de log são executadas em um fluxo assíncrono não bloqueante; se a gravação no banco de dados falhar, o agendador registra o erro e continua a operação normal usando o ring buffer em memória como contingência.
+<span class="since-badge" data-since="0.25">Desde 0.25</span> A linha de uma execução e sua contagem são gravadas em uma única instrução: o insert em `cron_logs` e um upsert dos contadores do job em `cron_job_state`. Uma listagem lê uma linha de `cron_job_state` por job, por mais longo que seja o histórico, e o agendador também, ao preencher `totalRuns` e `totalFailures` na inicialização. As gravações de log não seguram a execução; se uma falhar, o agendador registra o erro e segue em frente, com a execução ainda no ring buffer em memória.
+
+A cada hora, e quando inicia, o agendador exclui as linhas do histórico com mais de 30 dias e conta as execuções ainda não contadas, ambos em lotes de 5.000 linhas. Um histórico gravado antes da 0.24 é contado pela primeira dessas varreduras, fora do caminho de inicialização. Até ela terminar, uma listagem soma aos contadores as execuções que ainda não contou, de modo que os números não mudam na atualização. O mesmo vale para uma execução que um servidor mais antigo registra durante um deploy gradual.
 
 ## Exemplo: Job Diário de Limpeza
 

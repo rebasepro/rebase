@@ -1,5 +1,5 @@
 ---
-sourceHash: 259c5bd1a0583132
+sourceHash: 1fc6cf953cae9632
 title: Tempo Real & WebSocket
 sidebar_label: Tempo Real
 description: Sincronização de dados em tempo real, canais de broadcast e rastreamento de presença via WebSocket.
@@ -23,7 +23,7 @@ O pipeline de tempo real possui três etapas:
 └──────────────┘      └────────────────────┘      └──────────────┘
 ```
 
-Para implantações multi-instância, o Rebase usa o `LISTEN/NOTIFY` do PostgreSQL para transmitir alterações entre instâncias de servidor. Isso é gerenciado automaticamente — uma conexão dedicada do PostgreSQL escuta no canal `rebase_entity_changes` e repassa as atualizações para os assinantes locais.
+Para implantações multi-instância, o Rebase usa o `LISTEN/NOTIFY` do PostgreSQL para levar as alterações entre instâncias de servidor. Isso é gerenciado automaticamente. Com a [captura de alterações no nível do banco de dados](#captura-de-alterações-a-nível-de-banco-de-dados-cdc) ligada (o padrão onde quer que a role do banco de dados possa criar triggers), toda instância escuta no canal `rebase_cdc` em que os triggers de captura publicam, de modo que uma gravação é ouvida seja qual for o processo ou a ferramenta que a fez. Sem a captura, cada instância anuncia suas próprias gravações no canal `rebase_entity_changes`, e uma conexão dedicada em cada uma das outras instâncias as repassa para seus assinantes locais.
 
 ### Zero Configuração
 
@@ -153,6 +153,11 @@ uma nova alteração, mas nunca mais de **1 s** (`REFETCH_MAX_WAIT_MS`) depois d
 primeira, de modo que uma coleção gravada várias vezes por segundo ainda envia
 aos seus assinantes um frame pelo menos uma vez por segundo.
 
+   <span class="since-badge" data-since="0.25">Desde 0.25</span> Um refetch que lê exatamente o que um assinante recebeu por último não envia nada
+   a esse assinante: uma gravação na linha 9.000 de uma lista que mostra as primeiras 50 custa
+   a leitura, não um frame para cada espectador. Depois de um frame de erro, as próximas linhas
+   são enviadas de novo, mesmo que sejam as mesmas.
+
 Versões anteriores enviavam um `collection_patch` imediato contendo a linha gravada antes desse refetch, para feedback cross-tab em submilissegundos. Essa linha havia sido lida sob o escopo de quem realizou a gravação, portanto podia — e conseguia — alcançar assinantes cujas próprias políticas teriam negado o acesso, e o próprio filtro `where` da assinatura também não havia sido aplicado a ela. O patch foi removido: a latência percebida para uma atualização agora é a janela do debounce.
 
 ### O refetch é a leitura REST
@@ -232,6 +237,8 @@ Um id de assinatura é próprio do socket: dois clientes que ambos nomeiam uma
 assinatura `"sub-1"` mantêm cada um a sua, e um `unsubscribe` encerra apenas a
 do remetente.
 
+<span class="since-badge" data-since="0.25">Desde 0.25</span> **Assinar conta para o limite de taxa de dados.** O primeiro frame de uma assinatura é uma leitura, executada como o assinante, e o mesmo vale para a requisição de histórico de um canal. Por isso `subscribe_collection`, `subscribe_one` e `channel_history` contam como requisições de dados no bucket de limite de taxa do chamador (o mesmo que suas requisições HTTP e seus outros sockets compartilham) depois que a cota do próprio socket se esgota. Cada socket pode enviar 1.000 delas sem que sejam contadas, ou tantas quanto o seu teto de assinaturas, quando este for maior, e a cota volta ao longo de 15 minutos. Isso é tudo o que um socket pode manter, de modo que a reassinatura após uma reconexão nunca é recusada e nunca gasta o orçamento da pessoa. Passada a cota, um frame acima do limite é recusado com um frame de erro codificado `RATE_LIMITED`, que o SDK entrega ao `onError` dessa assinatura, ou ao do canal. Na 0.23 esses frames contam apenas para o orçamento próprio do socket, de 2.000 frames por minuto.
+
 ### Sockets que param de responder
 
 Um cliente pode sumir sem fechar seu socket: um celular perde o
@@ -245,7 +252,10 @@ bibliotecas de WebSocket.
 
 Um socket também é encerrado quando mais de 16&nbsp;MiB de frames enviados a ele
 continuam sem ser lidos. É um cliente que não lê o que recebe, ou um tão
-atrasado que o que ele leria já está desatualizado.
+atrasado que o que ele leria já está desatualizado. E quando os sockets de um servidor
+juntos mantêm mais de 256&nbsp;MiB sem leitura (ou um quarto do limite de memória sob o
+qual o servidor roda, quando este for menor), aqueles com mais dados sem leitura são
+encerrados primeiro, até que o restante caiba.
 
 Um socket encerrado é limpo como um fechado. Suas assinaturas terminam, ele sai
 dos seus canais e sua presença é removida, com a saída anunciada aos outros
@@ -408,9 +418,9 @@ Presenças inativas são limpas automaticamente após 30 segundos de inatividade
 
 O SDK tipado se reconecta automaticamente quando a conexão WebSocket cai:
 
-- **Backoff exponencial** — A primeira nova tentativa ocorre cerca de 2 segundos após a queda, e cada uma das seguintes espera o dobro do tempo, até um limite de 30 segundos. Cada atraso é reduzido em até um quinto, de forma aleatória, para que clientes derrubados juntos por um deploy não voltem todos no mesmo instante.
+- **Backoff exponencial** — Cada nova tentativa espera por um degrau que começa em 2 segundos e dobra a cada vez, até 30 segundos. O atraso é sorteado ao acaso em qualquer ponto do seu degrau, mas nunca abaixo de um quarto de segundo, de modo que clientes derrubados juntos por um deploy voltam espalhados por todo o degrau em vez de no mesmo instante.
 - **Sem desistência enquanto algo estiver ativo** — Enquanto existir uma assinatura ou um canal associado, o cliente continua tentando reconectar no teto de 30 segundos por todo o tempo que a interrupção durar. Sem nada registrado, ele para após 5 tentativas com falha, e a próxima assinatura disca de novo. Em um navegador, o evento `online` e a aba se tornando visível novamente disparam uma nova tentativa imediatamente, em vez de esperar o backoff.
-- **Interrupções são reportadas uma vez** — Quando a conexão está fora do ar por cerca de 15 segundos (três tentativas com falha), o `onError` de toda assinatura ativa e o `onError` de todo canal associado recebe um `RebaseApiError` com o código `CONNECTION_LOST`. A assinatura é **mantida**: o erro diz que seus dados não estão sendo atualizados, não que ela terminou.
+- **Interrupções são reportadas uma vez** — Quando a conexão está fora do ar por 14 segundos, não importa quantas novas tentativas isso tenha levado, o `onError` de toda assinatura ativa e o `onError` de todo canal associado recebe um `RebaseApiError` com o código `CONNECTION_LOST`. A assinatura é **mantida**: o erro diz que seus dados não estão sendo atualizados, não que ela terminou.
 - **Re-assinatura automática** — Após uma reconexão bem-sucedida, todas as assinaturas ativas são registradas novamente no servidor, e o próximo `onUpdate` de cada uma carrega tudo o que foi gravado enquanto o cliente estava fora. Essa atualização é o sinal de recuperação. Nenhuma intervenção manual é necessária.
 - **Requisições são no máximo uma vez (at-most-once)** — Uma requisição feita enquanto o socket está fora do ar espera por ele, por até 30 segundos a partir da chamada, e então falha com `REQUEST_TIMEOUT` sem nunca ter sido enviada. Uma requisição que já havia sido enviada quando a conexão caiu falha com `CONNECTION_LOST` e **não** é enviada novamente: o servidor pode ou não tê-la executado, e só o chamador sabe se executá-la duas vezes é seguro.
 
@@ -449,7 +459,7 @@ As assinaturas WebSocket respeitam automaticamente as políticas de Segurança e
 
 1. A conexão WebSocket se autentica usando o mesmo token JWT que a API REST.
 2. Cada refetch de assinatura é executado dentro de uma transação PostgreSQL com `set_config('app.user_id', ...)` e `set_config('app.user_roles', ...)` — garantindo que as políticas de RLS sejam aplicadas.
-3. A identidade é verificada novamente durante todo o tempo em que o socket está aberto, não apenas quando se autentica. Antes de cada frame o servidor pergunta o que uma requisição HTTP perguntaria: o token ainda é válido, sua sessão foi desconectada ou revogada, a conta ainda existe, e quais roles ela possui agora. Frames de canal são consultados no máximo uma vez por segundo. Um socket que só escuta é consultado pelo menos a cada 30 segundos, e um token deixa de ser aceito no instante em que expira. Uma role removida se aplica a partir do próximo frame, tanto para leituras quanto para gravações e assinaturas abertas. Um socket cuja identidade terminou recebe um frame `AUTH_ERROR` com o código `SESSION_ENDED` ou `TOKEN_EXPIRED` e é encerrado com o código `4001`. O SDK reautentica seu socket a cada vez que atualiza seu token, e depois de um `4001` ele se reconecta com a sessão que possui naquele momento, ou sem nenhuma. Um cliente que se comunica diretamente com o protocolo precisa enviar um token novo em `AUTHENTICATE` antes que o antigo expire.
+3. A identidade é verificada novamente durante todo o tempo em que o socket está aberto, não apenas quando se autentica. Antes de cada frame o servidor pergunta o que uma requisição HTTP perguntaria: o token ainda é válido, sua sessão foi desconectada ou revogada, a conta ainda existe, e quais roles ela possui agora. Frames de canal são consultados no máximo uma vez por segundo. Um socket que só escuta é consultado pelo menos a cada 30 segundos, e um token deixa de ser aceito no instante em que expira. Uma role removida se aplica a partir do próximo frame, tanto para leituras quanto para gravações e assinaturas abertas. Um socket cuja identidade terminou recebe um frame `AUTH_ERROR` com o código `SESSION_ENDED` ou `TOKEN_EXPIRED` e é encerrado com o código `4001`. O SDK reautentica seu socket a cada vez que atualiza seu token; um token novo para a mesma identidade (o mesmo id de usuário, roles, flag de convidado e claims) mantém as assinaturas abertas como estão, e um para uma identidade diferente refaz a busca de cada uma delas como essa identidade. Depois de um `4001` ele se reconecta com a sessão que possui naquele momento, ou sem nenhuma. Um cliente que se comunica diretamente com o protocolo precisa enviar um token novo em `AUTHENTICATE` antes que o antigo expire.
 
 Isso significa que cada socket recebe apenas atualizações de registros que sua identidade autenticada tem permissão para ver.
 
@@ -498,11 +508,13 @@ Se a conexão não puder dar suporte, `auto` registra uma linha informativa em v
 
 ### Como Funciona
 
-1. **Autoprovisionamento** — Na inicialização (contexto de servidor/proprietário), o Rebase instala um trigger idempotente `AFTER INSERT/UPDATE/DELETE` em cada tabela gerenciada. O trigger emite uma notificação de alteração no canal `rebase_cdc` que nomeia a linha alterada pela sua chave — a chave primária, mais as duas colunas de id para uma tabela de junção muitos-para-muitos — e não carrega **nenhuma outra coluna**. O PostgreSQL não impõe nenhum privilégio sobre `LISTEN`, então qualquer role que possa se conectar ao banco de dados pode ler esse canal; ela aprende quais chaves mudaram, nunca o que elas contêm. Uma chave grande demais para o limite de 8&nbsp;KB do `NOTIFY` do PostgreSQL é enviada como nenhuma chave (uma alteração na coleção inteira), garantindo que o CDC nunca aborte a gravação que disparou o trigger. A função é substituída em toda inicialização que provisiona, então um banco de dados instrumentado por uma versão mais antiga — cujo trigger enviava linhas inteiras — é atualizado pela próxima inicialização, mesmo com `REALTIME_CDC=off`.
+1. **Autoprovisionamento** — Na inicialização (contexto de servidor/proprietário), o Rebase instala triggers idempotentes `AFTER INSERT/UPDATE/DELETE/TRUNCATE` em cada tabela gerenciada. Eles disparam uma vez por instrução e emitem notificações de alteração no canal `rebase_cdc` que nomeiam as linhas alteradas pela sua chave — a chave primária, mais as duas colunas de id para uma tabela de junção muitos-para-muitos — e não carregam **nenhuma outra coluna**. Uma instrução que alterou muitas linhas as nomeia em lotes de cerca de mil chaves, de modo que um `UPDATE` de 1M de linhas envia cerca de 1.000 notificações em vez de um milhão; uma instrução que alterou uma linha envia uma notificação, e uma que não alterou nenhuma não envia nada. Um `TRUNCATE` é anunciado como uma alteração em todas as linhas da coleção. Uma tabela particionada mantém um trigger por linha, porque o PostgreSQL copia um trigger de linha para cada partição e uma gravação feita direto em uma partição ainda é vista. O PostgreSQL não impõe nenhum privilégio sobre `LISTEN`, então qualquer role que possa se conectar ao banco de dados pode ler esse canal; ela aprende quais chaves mudaram, nunca o que elas contêm. Uma chave grande demais para o limite de 8&nbsp;KB do `NOTIFY` do PostgreSQL é enviada como nenhuma chave (uma alteração na coleção inteira, que toda assinatura de lista e de linha única sobre ela busca de novo), garantindo que o CDC nunca aborte a gravação que disparou o trigger. As funções são substituídas em toda inicialização que provisiona, então um banco de dados instrumentado por uma versão mais antiga — cujo trigger enviava linhas inteiras — é atualizado pela próxima inicialização, mesmo com `REALTIME_CDC=off`.
+
+   <span class="since-badge" data-since="0.25">Desde 0.25</span> **Atualização.** Um banco de dados instrumentado por uma versão anterior ao agrupamento em lotes tem um trigger por linha; a primeira inicialização de uma versão mais nova o substitui pelos triggers por instrução. Durante 24 horas depois disso, os novos triggers ainda enviam uma notificação por linha, como faziam os antigos, de modo que as instâncias da versão mais antiga ainda em execução durante um deploy gradual (ou depois de um rollback) ouvem todas as linhas. Passada a janela, eles agrupam em lotes. Toda versão que agrupa em lotes lê os dois formatos.
 2. **Captura** — Um cliente `LISTEN` dedicado e fora do pool por instância consome o `rebase_cdc`, mapeia a tabela alterada de volta para sua coleção e encaminha a alteração para o mesmo pipeline de `RealtimeService` usado pelas mutações da API. Assim como o listener entre instâncias, ele prioriza `DATABASE_DIRECT_URL` e se reconecta automaticamente.
 3. **Entrega segura com RLS** — A linha bruta do fluxo de alterações **nunca** é encaminhada aos assinantes. A alteração é marcada como invalidada, e cada assinatura relê a linha sob seu **próprio** contexto de autenticação. A filtragem é, portanto, por assinante, nunca por publicador: um cliente só recebe linhas que suas políticas de RLS permitem.
 4. **Entre instâncias** — Como cada instância observa cada commit através do fluxo de alterações, o CDC também *é* o canal entre instâncias; a transmissão legada `rebase_entity_changes` por mutação não é utilizada enquanto o CDC estiver ativo.
-5. **Desduplicação** — Uma mutação feita por meio da API do Rebase é entregue localmente no instante em que é confirmada e também é refletida de volta pelo fluxo de alterações. A instância de origem suprime esse eco (um registro de curta duração de suas próprias emissões), de modo que os assinantes nunca vejam uma gravação da API duas vezes.
+5. **Desduplicação** — Uma mutação feita por meio da API do Rebase é entregue localmente no instante em que é confirmada e também é refletida de volta pelo fluxo de alterações. A instância de origem suprime um eco que chega dentro da janela de debounce do refetch (um registro de curta duração de suas próprias emissões), de modo que uma gravação da API normalmente produz um único frame. Um eco que chega depois disso dispara mais um refetch, que entrega as mesmas linhas de novo: inofensivo, mas um assinante pode ver um frame idêntico duas vezes.
 
 ### Requisitos & Observações
 
@@ -537,7 +549,7 @@ channel.onError((error) => {
 | Código | Significado |
 |--------|-------------|
 | `CHANNEL_FORBIDDEN` | Você não é membro do canal — entre nele antes de transmitir ou ler seu histórico |
-| `RATE_LIMITED` | Ultrapassou o limite de frames do canal mencionado acima |
+| `RATE_LIMITED` | Ultrapassou o limite de frames do canal mencionado acima, ou, para uma requisição de histórico, o [limite de taxa de dados](#o-que-uma-gravação-custa-e-os-limites) |
 | `CHANNEL_HISTORY_WRITE_FAILED` | Um broadcast retido não pôde ser persistido, então foi descartado |
 | `CHANNEL_HISTORY_READ_FAILED` | Uma solicitação de recuperação (catch-up) não pôde ser atendida |
 | `CHANNEL_HISTORY_GAP` | Emitido pelo cliente: uma recuperação (catch-up) descobriu que o servidor não retém mais mensagens que este cliente nunca recebeu. `details` é `{ from, to }`, os números de sequência perdidos. Ressincronize o estado do canal a partir de sua fonte da verdade |

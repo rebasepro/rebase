@@ -1,5 +1,5 @@
 ---
-sourceHash: aaa2fdfbd560c4cc
+sourceHash: c633bea42c0d4aa9
 title: Schreiben über REST
 sidebar_label: Schreiben über REST
 description: Idempotenz-Schlüssel, bedingte Schreibvorgänge mit ETag und If-Match, Feldoperationen, Upserts über natürliche Schlüssel, return=minimal und sammlungsübergreifende Batches.
@@ -156,6 +156,6 @@ Dies ist der Grund, warum der Endpunkt existiert, anstatt eine Schleife zu sein:
 
 Struktur, unbekannte Sammlungen, unbekannte Felder, Wertebeschränkungen, Feldoperationen, Konfliktziele und die Erreichbarkeit von `$ref` werden alle geprüft, bevor die Transaktion geöffnet wird. Ein Batch ist ein Alles-oder-Nichts-Vorgang, und das Auffinden eines Tippfehlers bei Operation 40 würde andernfalls das Rollback der 39 vorangegangenen Schreibvorgänge erfordern.
 
-Begrenzt auf dieselbe Anzahl von Operationen wie ein Bulk-Schreibvorgang (standardmäßig 1000), da ein Batch seine Sperren für die gesamte Transaktion hält. Ein Treiber, der den Batch nicht atomar ausführen kann, antwortet mit `BATCH_UNSUPPORTED`, anstatt auf eine Schleife von Einzelschreibvorgängen zurückzugreifen – was weder die Atomizität noch den einzelnen Roundtrip bieten würde, für die ein Batch gedacht ist.
+Begrenzt auf dieselbe Anzahl von Operationen wie ein Bulk-Schreibvorgang (standardmäßig 1000), da ein Batch seine Sperren für die gesamte Transaktion hält. Die Callbacks jeder Operation laufen darin, nacheinander, sodass ein langsamer Hook pro Zeile bei offener Transaktion bezahlt wird: 100 Zeilen, deren `beforeSave` 50 ms abwartet, halten eine Verbindung und die Sperren jeder bisher geschriebenen Zeile 5,3 s lang. Dasselbe gilt für einen `/bulk`-Schreibvorgang. Siehe [Ein Callback hält eine Verbindung](/docs/collections/callbacks/#a-callback-holds-a-connection). Ein Treiber, der den Batch nicht atomar ausführen kann, antwortet mit `BATCH_UNSUPPORTED`, anstatt auf eine Schleife von Einzelschreibvorgängen zurückzugreifen – was weder die Atomizität noch den einzelnen Roundtrip bieten würde, für die ein Batch gedacht ist.
 
 Ein `update` oder `delete`, das eine nicht existierende Zeile benennt, lässt den gesamten Batch mit einem `404` fehlschlagen – aus demselben Grund, aus dem partielle Schreibvorgänge überall sonst abgelehnt werden: Ein halb angewendeter Zustand bietet keine verlässliche Wiederherstellung.

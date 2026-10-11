@@ -1,5 +1,5 @@
 ---
-sourceHash: 1214584ea35bf933
+sourceHash: a46a7358b856be2f
 title: División en varios procesos
 sidebar_label: Procesos divididos
 description: Ejecute un bundle como varios procesos cooperativos —una API, una capa de funciones, un worker— desde la misma imagen de runtime publicada, para que una función personalizada pesada deje de competir con la API de datos.
@@ -31,9 +31,9 @@ REBASE_ROLE=all        # the default: everything, one process
 | | `all` | `api` | `functions` | `worker` |
 | --- | :---: | :---: | :---: | :---: |
 | `/api/auth`, `/api/data`, `/api/storage`, `/api/meta` | ✅ | ✅ | — | — |
-| `/api/admin`, `/api/logs`, el editor de esquemas | ✅ | ✅ | — | — |
+| `/api/admin` (con los registros y el editor de esquemas dentro) | ✅ | ✅ | — | — |
 | `/api/functions/*` | ✅ | reenvía (ver abajo) | ✅ | — |
-| `/api/cron` (la superficie de administración) | ✅ | ✅ | — | — |
+| `/api/admin/cron` (la superficie de administración) | ✅ | ✅ | — | — |
 | `/health`, `/livez`, `/metrics` | ✅ | ✅ | ✅ | ✅ |
 | Sirve websockets, consume eventos de cambio | ✅ | ✅ | — | — |
 | Crea el esquema en el arranque | ✅ | ✅ | — | — |
@@ -47,10 +47,14 @@ Realtime está en la lista porque tiene un coste, lo use alguien o no:
 un proceso que consume eventos de cambio mantiene una conexión `LISTEN` fuera
 del pool durante todo el tiempo que se ejecuta, e instala los disparadores de captura en el arranque. Solo
 un proceso que sirve websockets tiene a quién entregarle eventos, por lo que los dos roles que
-no sirven ninguno no hacen ninguna de las dos cosas. **Las escrituras realizadas por esos procesos aún se detectan**:
-la captura se realiza mediante disparadores en la base de datos, por lo que el cambio lo publica la base de datos
-en lugar del proceso que lo realizó. Una función que escribe una fila sigue despertando a
-cada suscriptor en la `api`.
+no sirven ninguno no hacen ninguna de las dos cosas. **Las escrituras realizadas por esos procesos aún se detectan.** Con
+la captura de cambios activada, la captura se realiza mediante disparadores en la base de datos, por lo que el cambio lo publica
+la base de datos en lugar del proceso que lo realizó. Con la captura desactivada
+(`REALTIME_CDC=off`, o `auto` recurriendo a ello porque el rol de la base de datos no puede
+crear disparadores), un proceso `worker` o `functions` anuncia cada una de sus propias
+escrituras en el canal entre instancias, sin mantener una conexión
+`LISTEN`. En ambos casos, una función que escribe una fila sigue despertando a todos los
+suscriptores en la `api`.
 
 ## Docker Compose
 
@@ -184,8 +188,9 @@ Un proceso `functions` nunca ejecuta ninguno de los dos. Se escala según la car
 se reemplaza a voluntad, y darle trabajo programado haría que su número de réplicas signifique
 algo que no debería.
 
-Tenga en cuenta que `rebase.jobs.enqueue` sigue funcionando en todas partes, incluso en un proceso
-que no ejecuta ningún worker: encolar es una escritura, ejecutar es un bucle de sondeo (poll loop), y solo
+Tenga en cuenta que encolar — `jobQueue.enqueue`, el `enqueue` de una cola declarada, el
+`publish` de un tema — sigue funcionando en todas partes, incluso en un proceso que
+no ejecuta ningún worker: encolar es una escritura, ejecutar es un bucle de sondeo (poll loop), y solo
 lo segundo es lo que un rol desactiva.
 
 ## Lo que la división no le proporciona

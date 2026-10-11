@@ -1,5 +1,5 @@
 ---
-sourceHash: 83e2d04a56801ab8
+sourceHash: 5f6462b96e4cf1be
 title: Endpoints d'authentification et jetons
 sidebar_label: Endpoints d'authentification
 description: Les routes d'authentification montées par le backend Rebase, le format de leurs réponses, l'authentification multifacteur, le contexte de base de données vu par une politique, JWKS et clés de service.
@@ -72,6 +72,18 @@ Voir [Rôles et portées](/docs/backend/roles-and-scopes/).
 | `POST` | `/api/admin/bootstrap` | Permettre au premier utilisateur inscrit de revendiquer le rôle admin tant qu'aucun n'existe. Refusé en production — voir [Amorçage du premier utilisateur](/docs/backend/authentication/#first-user-bootstrap) |
 
 Tous les endpoints de l'API de données nécessitent un en-tête `Authorization: Bearer <token>` valide lorsque `requireAuth: true` (valeur par défaut).
+
+### Politique de mot de passe
+
+Un nouveau mot de passe doit comporter au moins 8 caractères, avec une majuscule, une
+minuscule et un chiffre. L'inscription, la réinitialisation et le changement refusent
+un mot de passe qui ne respecte pas ces règles avec `400 WEAK_PASSWORD`, en listant chaque règle enfreinte, et
+il en va de même pour un administrateur qui définit un mot de passe avec `PUT /api/admin/users/:uid` (sous la forme
+d'un simple `400`). `POST /api/admin/users` ne vérifie pas le mot de passe qu'on lui fournit. La connexion
+ne vérifie jamais la politique, de sorte qu'un ancien mot de passe continue de fonctionner. Pour définir vos propres règles, passez
+`auth.hooks.validatePasswordStrength` depuis un backend [éjecté](/docs/backend/authentication/#configuration).
+Le premier administrateur créé à partir de `REBASE_ADMIN_PASSWORD` est soumis à une
+autre règle : au moins 12 caractères, et rien d'autre.
 
 ### Format de réponse
 

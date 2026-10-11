@@ -1,5 +1,5 @@
 ---
-sourceHash: 589741179a41eb37
+sourceHash: a85dec5a1dd5e6ed
 title: Rebase unterstützt X nicht
 sidebar_label: Server erweitern
 description: Die serverseitige Erweiterungsleiter – Deklaration, Collection-Callback, benutzerdefinierte Funktion, eigene Routen, eigener Server, Eject – und was die einzelnen Stufen erreichen können und was nicht.
@@ -265,6 +265,13 @@ bzw. `context.driver` innerhalb eines Callbacks. Grenzen Sie den Typ mit `isSQLA
 einen Type-Cast zu verwenden: Dieser Type-Guard macht den Unterschied aus zwischen einem Treiber, der
 explizit meldet, dass er kein SQL ausführen kann, und einem Fehler `admin.executeSql is not a function`
 am Aufrufort.
+
+<span class="since-badge" data-since="0.25">Seit 0.25</span> `executeSql` liefert
+jede Zeile, die es liest. Übergeben Sie bei SQL, dessen Größe Sie nicht kontrollieren,
+`maxResultBytes`: Ein Ergebnis, dessen Zeilen mehr Bytes belegen, wird mit einem Fehler
+abgelehnt, dessen `code` `RESULT_TOO_LARGE` ist, und nie teilweise zurückgegeben. Das
+`EXECUTE_SQL` des Realtime-Sockets, über das das `executeSql` eines Admin-Clients läuft,
+setzt für jeden Aufrufer 128 MB.
 
 **Etwas, das das Framework können sollte, aber nicht tut.** Wenn Sie feststellen, dass Sie
 `@rebasepro/server-postgres` patchen oder für ein bestimmtes Verhalten einen Eject durchführen müssen,

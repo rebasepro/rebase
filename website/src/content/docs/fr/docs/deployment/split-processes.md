@@ -1,5 +1,5 @@
 ---
-sourceHash: 1214584ea35bf933
+sourceHash: a46a7358b856be2f
 title: Séparation en plusieurs processus
 sidebar_label: Processus séparés
 description: Exécutez un seul bundle sous forme de plusieurs processus coopérants — une API, un niveau de fonctions, un worker — à partir de la même image d'exécution publiée, afin qu'une fonction personnalisée lourde ne vienne plus concurrencer l'API de données.
@@ -31,9 +31,9 @@ REBASE_ROLE=all        # the default: everything, one process
 | | `all` | `api` | `functions` | `worker` |
 | --- | :---: | :---: | :---: | :---: |
 | `/api/auth`, `/api/data`, `/api/storage`, `/api/meta` | ✅ | ✅ | — | — |
-| `/api/admin`, `/api/logs`, l'éditeur de schéma | ✅ | ✅ | — | — |
+| `/api/admin` (dont les journaux et l'éditeur de schéma) | ✅ | ✅ | — | — |
 | `/api/functions/*` | ✅ | redirige (voir ci-dessous) | ✅ | — |
-| `/api/cron` (la surface d'administration) | ✅ | ✅ | — | — |
+| `/api/admin/cron` (la surface d'administration) | ✅ | ✅ | — | — |
 | `/health`, `/livez`, `/metrics` | ✅ | ✅ | ✅ | ✅ |
 | Gère les websockets, consomme les événements de changement | ✅ | ✅ | — | — |
 | Crée le schéma au démarrage | ✅ | ✅ | — | — |
@@ -47,9 +47,12 @@ Le temps réel figure sur cette liste car il a un coût, que quelqu'un l'utilise
 ou non : un processus qui consomme des événements de changement conserve une connexion `LISTEN` en dehors
 du pool tant qu'il est en cours d'exécution, et installe les déclencheurs (triggers) de capture au démarrage. Seul
 un processus desservant des websockets a des destinataires à qui livrer des événements, les deux rôles qui n'en
-gèrent aucun ne font donc ni l'un ni l'autre. **Les écritures effectuées par ces processus sont toujours détectées** — la
-capture repose sur des déclencheurs de base de données, un changement est donc publié par la base de données plutôt
-que par le processus qui l'a effectué. Une fonction qui écrit une ligne réveille tout de même
+gèrent aucun ne font donc ni l'un ni l'autre. **Les écritures effectuées par ces processus sont toujours détectées.** Avec la
+capture des changements activée, elle repose sur des déclencheurs de base de données : un changement est donc publié par la base de données plutôt
+que par le processus qui l'a effectué. Avec la capture désactivée (`REALTIME_CDC=off`, ou `auto` qui se
+rabat parce que le rôle de base de données ne peut pas créer de déclencheurs), un processus `worker` ou
+`functions` annonce plutôt chacune de ses propres écritures sur le canal inter-instances, sans conserver de
+connexion `LISTEN`. Dans les deux cas, une fonction qui écrit une ligne réveille tout de même
 chaque abonné sur l'`api`.
 
 ## Docker Compose
@@ -184,7 +187,8 @@ Un processus `functions` n'exécute jamais aucun des deux. Il est mis à l'éche
 remplacé à volonté ; lui attribuer du travail planifié fausserait la signification
 de son nombre de réplicas.
 
-Notez que `rebase.jobs.enqueue` continue de fonctionner partout, y compris sur un processus
+Notez que la mise en file d'attente — `jobQueue.enqueue`, l'`enqueue` d'une file déclarée, le `publish` d'un
+topic — continue de fonctionner partout, y compris sur un processus
 qui n'exécute aucun worker — l'enfilement est une écriture, l'exécution est une boucle d'interrogation (poll loop), et seul
 ce second aspect est désactivé par un rôle.
 

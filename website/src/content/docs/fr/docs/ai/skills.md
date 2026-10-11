@@ -1,5 +1,5 @@
 ---
-sourceHash: 0b7bd3b233513344
+sourceHash: 06e95610513a9c52
 title: Compétences d'agent
 sidebar_label: Compétences d'agent
 description: rebase skills install écrit 21 compétences de référence Rebase dans votre dépôt, selon l'organisation attendue par votre assistant IA — Cursor, Claude Code, Windsurf, Gemini CLI et Antigravity.
@@ -125,18 +125,25 @@ Commitez-les. Elles font partie du dépôt au même titre qu'une configuration d
 assistant de chaque contributeur travaille ainsi à partir de la même compréhension de la base de code,
 y compris les contributeurs qui n'ont jamais exécuté la commande.
 
-**Réexécutez la commande pour mettre à jour.** Les fichiers sont écrasés sans condition, donc
-après une mise à niveau de Rebase :
+**Réexécutez la commande pour mettre à jour** après une mise à niveau de Rebase :
 
 ```bash
 rebase skills install --agent all
 ```
 
-Deux conséquences à cet écrasement inconditionnel : les modifications locales apportées à une compétence installée sont
-perdues lors de la prochaine exécution — conservez plutôt les instructions spécifiques au projet dans
-[`ai-instructions.md`](/docs/ai/instruction-files), qui vous appartient et n'est
-jamais écrasé. De plus, les compétences supprimées dans une version plus récente ne sont pas supprimées de
-votre dépôt ; seuls les fichiers existant toujours sont réécrits.
+Chaque répertoire cible contient un manifeste `.rebase-skills.json` de ce que la commande a écrit, si bien
+qu'une nouvelle exécution sait distinguer une modification de la copie d'une version antérieure. Versionnez-le
+avec les compétences.
+
+- Un fichier que personne n'a modifié est remplacé par la copie de la nouvelle version.
+- Un fichier que vous avez modifié est conservé, et la commande le liste. `--force` le remplace.
+- Une compétence qu'une version plus récente ne livre plus est supprimée, sauf si vous l'avez modifiée.
+  Elle est alors conservée et listée.
+- Les fichiers que la commande n'a jamais écrits ne sont pas touchés.
+
+Les instructions spécifiques au projet ont toujours leur place dans
+[`ai-instructions.md`](/docs/ai/instruction-files), qui vous appartient. Une compétence modifiée cesse
+de recevoir des mises à jour tant que vous ne la remplacez pas avec `--force`.
 
 La commande fonctionne également en dehors d'un projet Rebase, en se rabattant sur le répertoire de
 travail — ce qui est utile pour un dépôt frontend distinct qui communique avec un backend Rebase.

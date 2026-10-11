@@ -1,5 +1,5 @@
 ---
-sourceHash: 4efc850ec3b2c417
+sourceHash: bd7b49238143886e
 slug: es/docs/rls-check
 title: rls-check
 description: Audita la seguridad a nivel de fila (RLS) en cualquier base de datos PostgreSQL — Supabase, Neon, RDS o tu propio servidor. De solo lectura, sin registro y sin requerir Rebase.
@@ -92,7 +92,7 @@ el rol propio de tu aplicación es lo más cercano a preguntarle a la base de da
 | --- | --- |
 | `0` | Sin hallazgos en o por encima del umbral de `--fail-on` |
 | `1` | Al menos un hallazgo en o por encima del umbral |
-| `2` | El escaneo no pudo ejecutarse — argumentos incorrectos, conexión rechazada, fallo de autenticación, tiempo de espera agotado |
+| `2` | El escaneo no pudo ejecutarse — argumentos incorrectos, conexión rechazada, fallo de autenticación, tiempo de espera agotado — o quedó incompleto: falló una lectura del catálogo o se interrumpió una comprobación (`diagnostics.degraded`). Esto vale incluso con `--fail-on none` |
 
 `1` y `2` son deliberadamente distintos: una conexión rota nunca debe parecer una base de datos limpia.
 
@@ -219,8 +219,9 @@ conexión específica. Los hallazgos se refieren a lo que obtienen los demás ro
 ### En una base de datos Rebase, cambia la regla, no la política
 
 Cada política en un despliegue de Rebase se compila a partir de las `securityRules` de una colección, y el
-entorno de ejecución **las vuelve a aplicar en cada inicio**: elimina cada política generada y la crea
-nuevamente a partir de la configuración. Por lo tanto, un `ALTER POLICY` ejecutado directamente sobre una de ellas sobrevive exactamente
+entorno de ejecución **las comprueba en cada inicio**: cada política generada lleva un sello (un
+comentario `rebase:<hash>`) de lo que se compiló y de lo que Postgres almacenó, y una tabla cuyas
+políticas ya no coinciden con él se vuelve a aplicar a partir de la configuración. Por lo tanto, un `ALTER POLICY` ejecutado directamente sobre una de ellas sobrevive exactamente
 hasta el siguiente reinicio, y el hallazgo reaparecerá con él, después de haberlo visto desaparecer.
 
 `rls-check` reconoce esas políticas (un nombre con formato `<table>_<operation>_<hash>`, o una llamada a
@@ -270,7 +271,8 @@ interrupción silenciosa del servicio. Consulta [rls-enabled-no-policies](#rls-e
 **La política otorga acceso incondicional.** Crítica.
 
 Una política permisiva cuya expresión `USING` o `WITH CHECK` es una verdad constante: `true`,
-`(true)`, `1 = 1`. Las políticas permisivas se combinan con el operador OR, por lo que una sola de estas satisface
+`(true)`, `1 = 1`, `1 > 0`, `NOT false`, `true OR <anything>`, o una constante comparada consigo
+misma mediante un cast. Las políticas permisivas se combinan con el operador OR, por lo que una sola de estas satisface
 el filtro de filas de la tabla sin importar cuán estrictas sean todas las demás políticas.
 
 Como toda comprobación, solo reporta la política cuando un rol al que se aplica puede alcanzar la
@@ -320,6 +322,10 @@ La severidad depende de la plataforma, y esta distinción es importante:
 - **En una plataforma no reconocida**, se reporta como **media**, ya que determinar si es una brecha
   depende de si tu infraestructura utiliza dicho centinela.
 
+Una base de datos cuenta como Rebase cuando tiene el esquema `rebase`. El rol `rebase_user`
+no lo decide, porque los roles pertenecen a todo el servidor, y un servidor que aloja una
+aplicación Rebase puede contener otras bases de datos.
+
 ```sql
 -- Scope to the row's owner rather than to the existence of an id
 ALTER POLICY "your_policy" ON "public"."your_table"
@@ -344,6 +350,10 @@ lo que no hace es delimitar las filas: lo que queda es que *toda cuenta registra
 esta tabla*, lo cual difiere bastante de lo que suele pretenderse. En un proyecto de Rebase esto es una regla cuyo
 `condition` es `policy.authenticated()` y nada más, que la base de datos almacena como
 `rebase.uid() <> ALL (ARRAY['anonymous', 'anon'])`.
+<span class="since-badge" data-since="0.25">Desde 0.25</span> También se reporta una regla cuya condición es
+solo `policy.registered()`: su `NOT rebase.is_anonymous()` adicional deja fuera a los
+invitados y tampoco delimita ninguna fila, por lo que toda cuenta que no sea de invitado lee todas las
+filas. Con el `--fail-on high` por defecto, una ejecución de CI que escanee una política así ahora falla.
 
 Ese es el patrón que convierte una tabla `users` en un directorio de todas las direcciones de la
 plataforma, legible por cualquiera que se haya registrado; y cuando el registro es abierto, "cualquiera que

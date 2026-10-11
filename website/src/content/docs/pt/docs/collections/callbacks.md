@@ -1,5 +1,5 @@
 ---
-sourceHash: c1478b42d3c890a5
+sourceHash: 941bbd72bbc3e338
 title: Callbacks de Entidade
 sidebar_label: Callbacks
 description: Use callbacks de ciclo de vida para executar lógica personalizada quando entidades forem criadas, atualizadas, lidas ou excluídas. Inclui a API context.data para operações entre coleções.
@@ -67,6 +67,11 @@ Duas regras decorrem de "enviado para cada visitante", e nenhuma delas é apenas
 
 Em uma coleção com transporte via servidor — o padrão, e quase certamente a sua —, o servidor já executou `callbacks` antes de a linha chegar ao painel, portanto, um `browserCallbacks.afterRead` é executado *além* dele. Escreva-o para ser idempotente, ou não o escreva.
 
+Um `browserCallbacks.afterSave` é executado depois que a gravação já foi armazenada, e
+nada no navegador pode desfazê-la. Um erro lançado por ele é exibido como um aviso;
+o salvamento em si é reportado como concluído, de modo que o formulário não se oferece para criar o
+registro uma segunda vez.
+
 ## Definindo Callbacks
 
 ```typescript
@@ -110,7 +115,7 @@ const articlesCollection = defineCollection({
 
         beforeDelete: async ({ id }) => {
             // Prevent deletion of published articles
-            // Throw to block the deletion
+            // Throw (or return false) to block the deletion
         },
 
         afterRead: async ({ row }) => {
@@ -156,6 +161,9 @@ O `beforeQuery` é implementado por `@rebasepro/server-postgres`. Uma coleção 
 ### `beforeSave`
 
 Chamado antes que um registro seja gravado no banco de dados. Retorne os valores modificados.
+No Postgres, ele é executado dentro da transação da gravação, que já começou, de modo que
+mantém uma conexão do pool pelo tempo em que executa — veja [Um callback segura uma
+conexão](#um-callback-segura-uma-conexão).
 
 ```typescript
 beforeSave: async ({
@@ -268,7 +276,7 @@ afterRead: async ({
 
 ### `beforeDelete`
 
-Chamado antes que um registro seja excluído. Lance um erro para bloquear a exclusão.
+Chamado antes que um registro seja excluído. Lance um erro para bloquear a exclusão, e quem chamou recebe `400 CALLBACK_REJECTED` com a sua mensagem. Retornar `false` também a bloqueia, como `403 CALLBACK_REJECTED` sem nenhuma mensagem sua.
 
 ```typescript
 beforeDelete: async ({
@@ -433,7 +441,7 @@ Portanto, a gravação que disparou o evento e tudo o que seus callbacks gravara
 
 - Um erro lançado em `afterSave` ou `afterDelete` reverte (rollback) a gravação acionadora, junto com todas as gravações de `context.data` feitas pelos callbacks. O chamador recebe a resposta **400 `CALLBACK_REJECTED`** com `details.stage` indicando o hook — ou com o próprio status do erro quando este o contiver: um `RebaseApiError` que você lançou, o 409 de uma violação de unicidade.
 - Assinantes em tempo real são notificados sobre a linha apenas após o commit, portanto, uma gravação revertida nunca é anunciada.
-- Um callback mantém a transação aberta enquanto executa; portanto, um callback lento significa um lock retido e uma conexão do pool ocupada.
+- Um callback mantém a transação aberta enquanto executa; portanto, um callback lento significa um lock retido e uma conexão do pool ocupada — `beforeSave` e `beforeDelete` tanto quanto os hooks `after`. Veja [Um callback segura uma conexão](#um-callback-segura-uma-conexão).
 - Uma gravação de `context.data` também executa os callbacks da coleção de destino, então um `afterSave` que atualiza sua própria linha executa a si mesmo novamente. Gravações aninhadas em mais de 16 níveis são recusadas com **500 `CALLBACK_RECURSION`**, nomeando o hook e a coleção, e toda a gravação sofre rollback. Torne essa gravação condicional, como faz o exemplo abaixo.
 
 Permita que uma falha lance um erro quando a gravação de origem não deva sobreviver a ela. Trate-a com catch quando ela dever, mas apenas em torno de uma **gravação** de `context.data`: um create, update ou delete que o banco de dados recusa (uma violação de chave única ou estrangeira, um trigger) é desfeito isoladamente, e o restante realiza o commit.
@@ -460,6 +468,40 @@ afterSave: async ({ values, id, status, context }) => {
 Tarefas que precisam sair do banco de dados — um e-mail, um webhook, uma chamada a uma API de terceiros — não pertencem ao corpo do callback. Elas manteriam a transação aberta durante uma viagem de ida e volta de rede (network round trip), e nada poderá desfazê-las caso a gravação sofra rollback. Enfileire um [job](/docs/backend/jobs) para isso, ou execute após o retorno da gravação: publique em um [canal de tempo real](/docs/backend/realtime), ou use `waitUntil` em uma [função customizada](/docs/backend/custom-functions). A documentação de [Hooks](/docs/backend/hooks#side-effects-that-must-not-hold-the-transaction) explica qual abordagem se adequa melhor.
 
 No MongoDB, nada disso se aplica. Esse driver executa os mesmos callbacks sem uma transação, de modo que a gravação já está armazenada quando `afterSave` é executado, e um throw ali apenas reporta a falha sem desfazê-la.
+
+### Um callback segura uma conexão
+
+No Postgres, uma gravação roda em uma conexão retirada do pool do banco de dados,
+e todo callback roda nela: `beforeSave` e `beforeDelete` depois que a
+transação começou, `afterSave` e `afterDelete` antes de ela ser confirmada. Pelo
+tempo em que um callback executa — aguardando uma consulta, um cálculo, qualquer coisa — essa
+conexão não atende mais nada, e os locks que a gravação tomou continuam tomados:
+no `afterSave`, a linha recém-gravada; em uma gravação em lote ou [`_batch`](/docs/backend/writes/#cross-collection-batches),
+toda linha que a transação gravou antes dele.
+
+O custo é a duração do próprio callback, e as gravações concorrentes o somam:
+
+- O pool tem 20 conexões por padrão (`DB_POOL_MAX`). 25 salvamentos simultâneos
+  cujo `beforeSave` aguardava 300 ms fizeram uma leitura de uma linha sem relação levar 290 ms,
+  quase tudo esperando por uma conexão.
+- Uma criação em lote de 100 linhas cujo `beforeSave` aguarda 50 ms é uma transação
+  aberta por 5,3 s, segurando sua conexão e os locks de toda linha gravada até
+  então durante todo esse tempo.
+
+Portanto:
+
+- Mantenha qualquer coisa lenta fora dos callbacks. Uma chamada a outro serviço pertence a um
+  [job](/docs/backend/jobs), ou ao momento depois que a gravação retorna.
+- Busque o que um hook precisa antes da gravação, quando puder — no cliente, ou
+  em uma [função customizada](/docs/backend/custom-functions) que então grava.
+- Envie linhas cujos hooks são lentos em lotes menores.
+- Se muitos hooks lentos rodam ao mesmo tempo por projeto, aumente `DB_POOL_MAX`, dentro do que
+  o `max_connections` do banco de dados permite para todas as instâncias.
+- <span class="since-badge" data-since="0.25">Desde 0.25</span> Com
+  `REBASE_METRICS=true`, `/metrics` informa `rebase_db_pool_wait_ms`: quanto tempo
+  cada consulta esperou por uma conexão. Um pool saudável o mantém perto de zero; uma cauda
+  que cresce com o tráfego são requisições na fila por conexões que os callbacks
+  seguram. Veja [Métricas](/docs/deployment/self-hosting/#métricas).
 
 ## Sincronizando Dados Entre Coleções
 

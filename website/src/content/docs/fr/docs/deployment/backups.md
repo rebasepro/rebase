@@ -1,5 +1,5 @@
 ---
-sourceHash: 0007bd5679d9971e
+sourceHash: 224692816eecfaad
 title: Sauvegardes et restauration
 sidebar_label: Sauvegardes
 description: Prenez, planifiez, listez et restaurez des sauvegardes de base de données avec pg_dump — ce que contient une sauvegarde, le fichier de rôles qui l'accompagne, et la seule chose qu'elle ne couvre pas, vos fichiers téléversés.
@@ -308,6 +308,38 @@ Les téléchargements transitent par `GET /api/admin/backups/download?key=…`, 
 aux administrateurs, de sorte que le bucket n'a jamais besoin d'être public ; une clé
 hors du préfixe de la destination est refusée. Avec `BACKUP_DESTINATION` non définie,
 le panneau indique que les sauvegardes ne sont pas configurées.
+
+### Télécharger une sauvegarde
+
+<span class="since-badge" data-since="0.25">Depuis 0.25</span> Un navigateur ne peut pas placer d'en-tête `Authorization` sur un téléchargement ; Studio et le SDK
+demandent donc d'abord un lien. `POST /api/admin/backups/download-url` avec `{ "key": "…" }` (même portée
+d'administration et mêmes vérifications de clé que le téléchargement) répond
+`{ url, token, expiresIn }` : une URL dont le jeton tient lieu d'en-tête, pour cette seule sauvegarde à la
+destination actuelle, pendant 60 secondes. Le jeton est refusé partout ailleurs — comme session, comme
+jeton de téléchargement de stockage, pour une autre sauvegarde — et une fois expiré. Le navigateur diffuse
+alors le dump directement sur le disque, si bien qu'une sauvegarde de la taille de votre base de données
+n'a jamais besoin de tenir dans un onglet.
+
+```ts
+// In a browser: the browser saves the file.
+await client.backups.download(key);
+
+// Anywhere: a link that needs no header, for 60 seconds.
+const { url } = await client.backups.downloadUrl(key);
+
+// In Node: stream the bytes to a file.
+import { createWriteStream } from "node:fs";
+import { Readable } from "node:stream";
+import { pipeline } from "node:stream/promises";
+
+const { stream, name } = await client.backups.stream(key);
+await pipeline(Readable.fromWeb(stream), createWriteStream(name));
+```
+
+Avant la 0.24, `backups.download(key)` répondait un `Blob` contenant tout le dump. Il enregistre
+désormais le fichier dans un navigateur et lève une exception ailleurs ; utilisez `stream(key)` dans Node.
+Face à un serveur sans liens de téléchargement (antérieur à la 0.24, ou sans secret JWT pour les signer),
+`download()` se rabat sur la lecture des octets lui-même.
 
 ## Gardez les sauvegardes privées
 

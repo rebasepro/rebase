@@ -1,5 +1,5 @@
 ---
-sourceHash: 29c6fa4cf5af64a8
+sourceHash: 3b804a4a444623d1
 title: Collezioni
 sidebar_label: Collezioni
 description: Le collezioni sono l'elemento fondamentale di Rebase — ogni collezione mappa una tabella di database e ne definisce schema, relazioni, sicurezza e comportamento dell'interfaccia utente.
@@ -234,7 +234,7 @@ export const productsCollection = defineCollection({
         }
     },
     admin: {
-        icon: "inventory_2"           // Material icon key
+        icon: "Package"               // Lucide icon name
     }
 });
 
@@ -275,13 +275,13 @@ Tutti i seguenti parametri vanno all'interno di `admin`.
 | Proprietà | Tipo | Predefinito | Descrizione |
 |----------|------|---------|-------------|
 | `defaultViewMode` | `"list" \| "table" \| "cards" \| "kanban"` | `"list"` | Modalità di visualizzazione predefinita |
-| `enabledViews` | `ViewMode[]` | Tutte e quattro | Modalità di visualizzazione disponibili |
+| `enabledViews` | `ViewMode[]` | Le quattro integrate più ogni vista personalizzata dichiarata (kanban solo quando esiste una proprietà `enum`) | Modalità di visualizzazione disponibili |
 | `kanban` | `KanbanConfig` | — | Configurazione Kanban (proprietà della colonna). Da abbinare sempre a `orderProperty` — vedi [Modalità di Visualizzazione](/docs/frontend/view-modes) |
 | `orderProperty` | `string` | — | Chiave della proprietà di tipo **string** che memorizza la chiave di ordinamento drag-and-drop. Obbligatoria per il corretto funzionamento di una bacheca Kanban |
-| `openEntityMode` | `"side_panel" \| "full_screen" \| "split" \| "dialog"` | `"full_screen"` | Modalità di apertura delle entità per la modifica |
+| `openEntityMode` | `"side_panel" \| "full_screen" \| "split" \| "dialog"` | Dipende dalla vista: `"split"` per list, `"full_screen"` per table e cards, `"side_panel"` per kanban e viste personalizzate | Modalità di apertura delle entità per la modifica |
 | `sideDialogWidth` | `number \| string` | — | Larghezza del pannello laterale (side dialog) |
 | `inlineEditing` | `boolean` | `true` | Abilita la modifica inline nella vista a foglio di calcolo |
-| `defaultSize` | `"xs" \| "s" \| "m" \| "l" \| "xl"` | `"m"` | Altezza riga predefinita nella tabella |
+| `defaultSize` | `"xs" \| "s" \| "m" \| "l" \| "xl"` | `"m"` | Densità predefinita delle viste list, table e card (l'altezza delle righe della tabella) |
 | `pagination` | `boolean \| number` | `true` (50) | Abilita la paginazione e/o imposta la dimensione della pagina |
 | `listProperties` | `string[]` | — | Proprietà da mostrare nella vista a elenco |
 | `propertiesOrder` | `string[]` | — | Ordine delle colonne nella vista a tabella |
@@ -295,7 +295,7 @@ All'interno di `admin`, tranne `history`, che è una funzionalità di backend e 
 
 | Proprietà | Tipo | Predefinito | Descrizione |
 |----------|------|---------|-------------|
-| `formAutoSave` | `boolean` | `false` | Salvataggio automatico alla modifica del campo |
+| `formAutoSave` | `boolean` | `false` | Salvataggio automatico due secondi dopo una modifica, una volta che il modulo supera la validazione. Un modulo New non viene salvato finché non viene inserito qualcosa. |
 | `localChangesBackup` | `"manual_apply" \| "auto_apply" \| false` | `"manual_apply"` | Backup delle modifiche non salvate |
 | `hideIdFromForm` | `boolean` | `false` | Nasconde l'ID dell'entità dal form |
 | `hideIdFromCollection` | `boolean` | `false` | Nasconde la colonna ID dalla tabella |
@@ -483,6 +483,19 @@ restano bloccati.
 Un `fixedFilter` restringe ciò che il pannello *richiede*; non è una barriera di sicurezza. Ciò che un
 chiamante è autorizzato a leggere è una [regola di sicurezza](/docs/collections/security-rules),
 che il database applica per ogni chiamante, che utilizzi il pannello o meno.
+
+## Molte collection
+
+Nulla in Rebase limita il numero di collection, ma due costi crescono con esso:
+
+- **Il primo download dell'admin.** Il pannello ha bisogno della propria navigazione nel momento
+  in cui qualcuno accede, quindi la configurazione di ogni collection è inclusa in ciò che il
+  browser scarica per la schermata di login — circa 2,4 KB minificati ciascuna, quindi 200
+  collection aggiungono circa 480 KB, intorno a 80 KB con gzip. Ciò che serve per aprire una
+  collection (la tabella, le viste dei record, il modulo) viene caricato solo allora.
+- **`rebase db push`.** Atlas pianifica un push confrontando l'intero schema, e questo
+  cresce più in fretta del numero di tabelle: con 400 o più tabelle un push richiede decine di
+  secondi — vedi [quanto richiede un push](/docs/cli/schema#rebase-db-push).
 
 ## Passaggi Successivi
 

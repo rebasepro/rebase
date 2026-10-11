@@ -1,5 +1,5 @@
 ---
-sourceHash: 60c797ac2e9a363f
+sourceHash: 8a336726f6416a25
 title: Propriedades
 sidebar_label: Propriedades
 description: Os tipos de propriedade definem o tipo de dados, a validação e a renderização de interface do usuário para cada campo em uma coleção. O Rebase suporta os tipos string, number, boolean, date, array, map, reference, relation e geopoint.
@@ -20,14 +20,14 @@ As propriedades definem as colunas na tabela do seu banco de dados e como elas s
 
 | Tipo | Descrição | Coluna PostgreSQL |
 |------|-----------|-------------------|
-| `string` | Texto, select, markdown, upload de arquivo, URL, e-mail | `varchar`, `text`, `jsonb` |
+| `string` | Texto, select, markdown, upload de arquivo, URL, e-mail | `text` por padrão; `varchar`, `char` ou `uuid` com `columnType` |
 | `number` | Inteiro, decimal, moeda | `integer`, `numeric`, `bigint`, `serial` |
 | `boolean` | Alternador verdadeiro/falso (toggle) | `boolean` |
 | `date` | Data, data e hora (datetime), timestamp | `timestamp`, `date` |
-| `array` | Lista ordenada de valores | `jsonb` |
+| `array` | Lista ordenada de valores | Um array nativo (`text[]`, `integer[]`, `numeric[]`, `boolean[]`) quando `of` é uma única propriedade string, number ou boolean; `jsonb` caso contrário |
 | `map` | Objeto chave-valor | `jsonb` |
 | `geopoint` | Par de latitude/longitude | `jsonb` |
-| `reference` | Referência incorporada a outra entidade | `varchar` (armazena ID) |
+| `reference` | Referência incorporada a outra entidade | O tipo da chave primária do alvo (armazena seu ID) |
 | `relation` | Relação de chave estrangeira SQL | Usa o array `relations` |
 | `vector` | Embedding, para busca de vizinho mais próximo | `VECTOR(n)` (pgvector) |
 | `binary` | Bytes brutos, lidos e gravados como base64 | `bytea` |
@@ -220,8 +220,9 @@ category: {
 
 Vários valores de um conjunto fixo são representados como um **array de uma string enum**,
 e não uma flag em um único valor: a coluna armazena vários valores, portanto, a propriedade
-que a descreve é o array. `columnType: "text[]"` é o que a torna uma única coluna do Postgres
-em vez de um join.
+que a descreve é o array. É uma única coluna do Postgres, um `text[]`, em vez de um join: um array
+cujo `of` é uma única propriedade string recebe um array nativo por padrão, e o
+`columnType` abaixo apenas diz isso explicitamente.
 
 ```typescript no-verify
 locales: {
@@ -252,7 +253,7 @@ locales: {
 | `url` | `boolean` | Validação de formato de URL |
 | `storage` | `StorageConfig` | Habilita o upload de arquivos — consulte [Uploads de arquivos](/docs/collections/file-uploads) |
 | `enum` | `EnumValues` | Renderiza como menu suspenso (select dropdown) |
-| `columnType` | `"varchar" \| "text" \| "char" \| "uuid"` | A coluna do banco de dados. O padrão é `varchar`, ou `uuid` quando `isId` assim definir. `text` para strings sem limite, `char` para tamanho fixo |
+| `columnType` | `"varchar" \| "text" \| "char" \| "uuid"` | A coluna do banco de dados. O padrão é `text`, ou `uuid` quando `isId` assim definir. `text` para strings sem limite, `char` para tamanho fixo |
 | `isId` | `boolean \| string` | Marca a propriedade como a chave primária e especifica quem a preenche: `"manual"` (você), `"uuid"` (`gen_random_uuid()`) ou qualquer outra string, usada textualmente como a expressão padrão SQL da coluna — simples (`nanoid()`) ou em formato de template (``"sql`nanoid()`"``). A função precisa existir; nada aqui a cria. `"increment"` é uma estratégia de **number** e não faz nada aqui, e `"cuid"` é recusado no carregamento da configuração |
 | `autoValue` | `"user_on_create" \| "user_on_update"` | Grava na coluna o **uid do usuário atuante** — apenas na criação ou a cada gravação. Consulte [Colunas de auditoria](#colunas-de-auditoria) |
 | `userSelect` | `boolean` | Renderiza como um seletor de usuário. O valor é uma coluna de string simples contendo o ID do usuário — nada o resolve ou verifica na entrada. **Apenas formulário administrativo — não imposto pela API ou pelo banco de dados.** |

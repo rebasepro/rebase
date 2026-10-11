@@ -1,5 +1,5 @@
 ---
-sourceHash: b8aea50207626bc4
+sourceHash: e06718f3afc5cad4
 title: Interrogare i dati
 sidebar_label: Interrogare i dati
 description: Operazioni CRUD, fluent query builder, operatori di filtro, ordinamento, selezione delle colonne e aggregazioni con l'SDK tipizzato di Rebase.
@@ -70,6 +70,9 @@ async function loadProduct(id: string) {
 const maybe = await client.data.products.findById(42);
 // Row | undefined
 ```
+
+`findById` accetta le relazioni da caricare, come `find`:
+`findById(1, { include: ["tags"] })`.
 
 :::note
 La sicurezza a livello di riga (Row-level security) fa sì che "riga inesistente" e "non hai i permessi di lettura" restituiscano deliberatamente la stessa risposta: un 404 che facesse distinzione tra i due casi confermerebbe l'esistenza della riga.
@@ -149,6 +152,11 @@ const { data } = await client.data.products
 | `"is-not-null"` | `"notnull"` | La colonna non è `NULL`. Non accetta valori |
 
 La colonna alias indica la grafia utilizzata a livello di **trasmissione (wire)**, impiegata nelle query string REST. Non compare mai nel codice dell'applicazione: sia l'SDK che il pannello di amministrazione utilizzano l'operatore canonico a sinistra.
+
+I quattro operatori di pattern confrontano testo. Un campo `enum` viene confrontato per valore,
+quindi `{ status: ["like", "draft%"] }` funziona su uno stato memorizzato come enum Postgres.
+Su un numero, una data o qualsiasi altro campo che non sia testo vengono rifiutati con un
+400 `INVALID_FILTER_OPERATOR`.
 
 ### Sintassi della clausola Where
 

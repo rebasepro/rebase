@@ -1,5 +1,5 @@
 ---
-sourceHash: 373a79f1c328f730
+sourceHash: 679087dc4cea0cbb
 title: Serveur MCP
 sidebar_label: Serveur MCP
 description: Connectez Claude Code, Cursor, Gemini CLI ou n'importe quel client MCP à un projet Rebase — les 42 outils exposés, l'identifiant avec lequel il s'authentifie et le verrou loopback qui s'interpose entre un agent et la production.
@@ -322,12 +322,17 @@ https://api.example.com/, which is not local. Set REBASE_MCP_ALLOW_REMOTE_WRITES
 to allow destructive tools against remote environments.
 ```
 
-**Si aucune chaîne de connexion ne peut être résolue, les outils de base de données sont refusés** —
-une cible invérifiable n'est pas une cible sûre :
+**Si aucune chaîne de connexion ne peut être résolue, les outils de base de données soumis au verrou sont refusés.**
+Sans `DATABASE_URL`, la CLI utilise la base de développement gérée, qui est la valeur par défaut d'un
+nouveau projet, et la CLI y refuse elle-même `db push`, `db migrate` et `db branch`. Le refus l'indique
+et nomme ce qui fonctionne à la place. Il ne suggère pas la désactivation du verrou :
 
 ```text
-Error: Refusing to run "rebase_db_push": no DATABASE_URL could be resolved for
-project "default", so the database it would connect to cannot be verified as local.
+Error: Refusing to run "rebase_db_push": project "default" sets no DATABASE_URL, so the
+CLI would use the managed development database (PGlite, started by `rebase dev`). You
+most likely do not need this tool: the dev server applies the collections to that
+database at boot, additively. After changing a collection, restart it with
+rebase_dev_stop and rebase_dev_start. …
 ```
 
 Seule l'interface loopback est considérée comme locale : `localhost`, `*.localhost`, `127.0.0.0/8`, `::1`.
@@ -361,8 +366,9 @@ scindé par une espace sans chasse (zero-width space), de sorte qu'une ligne qui
 
 Le [point de terminaison distant](#le-point-de-terminaison-distant) clôture ses résultats d'outils
 de la même façon et le signale au client ; son `structuredContent` porte le résultat brut.
-<span class="since-badge" data-since="0.25">Depuis 0.25</span> `list_collections` fait exception : seul un modèle lit sa liste,
-elle n'est donc envoyée qu'une fois, dans le texte. Avant la 0.24, elle portait aussi une copie dans `structuredContent`.
+<span class="since-badge" data-since="0.25">Depuis 0.25</span> `list_collections` et
+`describe_collection` font exception : seul un modèle les lit, elles ne sont donc envoyées qu'une fois,
+dans le texte. Avant la 0.24, la liste portait aussi une copie dans `structuredContent`.
 
 Il s'agit d'un marqueur, pas d'un bac à sable (sandbox). Un assistant disposant de ces outils n'est sûr
 qu'à hauteur de la fiabilité du contenu que vous lui permettez de lire.
@@ -448,12 +454,12 @@ Aucun `REBASE_ROLE` ne permet de l'activer.
   dynamique est activé par défaut ; `REBASE_MCP_OPEN_REGISTRATION=false` le limite
   aux clients que vous enregistrez), et redirige la personne vers un écran de consentement qui
   la connecte via votre `/auth/login` existant.
-- **Sept outils, trois portées (scopes).** Les mêmes [portées](/docs/backend/roles-and-scopes/)
-  que celles de tous les identifiants. `data:read` propose `list_collections`,
+- **Huit outils, trois portées (scopes).** Les mêmes [portées](/docs/backend/roles-and-scopes/)
+  que celles de tous les identifiants. `data:read` propose `list_collections`, `describe_collection`,
   `query_collection`, `count_documents` et `get_document` ; `data:write` ajoute `create_document` et
   `update_document` ; `data:delete` ajoute `delete_document`. Un client qui ne demande
   rien obtient `data:read`. Chacune se restreint à une collection : `data:read:posts`
-  liste et lit `posts` et rien d'autre. Une portée détermine les outils proposés et les
+  liste, décrit et lit `posts` et rien d'autre. Une portée détermine les outils proposés et les
   collections qu'ils atteignent, pas les lignes accessibles : une liste vide peut simplement
   être le résultat du RLS, et `data:write` ne peut toujours pas écrire une ligne à laquelle
   la personne n'a pas accès.
@@ -471,11 +477,17 @@ Aucun `REBASE_ROLE` ne permet de l'activer.
   écriture — et lisent à travers le chemin de `GET /api/data/<collection>`, si bien qu'une ligne
   revient comme REST la sert (dates ISO, un `belongsTo` sous forme de clé étrangère, par ex.
   `authorId`) et peut être renvoyée telle quelle dans une mise à jour. `query_collection`
-  répond `{ data, meta }` avec `meta.total` et `meta.hasMore`, `count_documents`
-  répond `{ count }`, et `list_collections` les schémas OpenAPI `row` et `create` de chaque
-  collection, plus `softDeleteField` quand les lignes vont dans une corbeille. Comme sur REST,
-  un `limit` au-delà de 1000, un argument non déclaré et une modification ou suppression d'une
-  ligne dans la corbeille (404) sont refusés ; remettre le champ de soft delete à `null` la restaure.
+  répond `{ data, meta }` avec `meta.total` et `meta.hasMore`, et `count_documents`
+  répond `{ count }`. Comme sur REST, un `limit` au-delà de 1000, un argument non déclaré et une
+  modification ou suppression d'une ligne dans la corbeille (404) sont refusés ; remettre le champ
+  de soft delete à `null` la restaure.
+- <span class="since-badge" data-since="0.25">Depuis 0.25</span> **La liste nomme les collections ; `describe_collection` donne le schéma de l'une d'elles.**
+  `list_collections` répond `name`, `title` et `description` de chaque collection, et
+  `describe_collection { collection }` les schémas OpenAPI `row` et `create` de cette collection,
+  plus `softDeleteField` quand les lignes vont dans une corbeille. Les descriptions des outils
+  demandent au modèle de décrire une collection avant d'y écrire. La liste d'un projet de
+  200 collections pèse environ 5k jetons, et chaque description moins de 1k ; avec tous les
+  schémas dans la liste, elle en pesait environ 150k.
 - **Un jeton réservé à ce point de terminaison.** Un jeton d'accès MCP est refusé par
   `/api/data`, `/api/admin` et le WebSocket, de sorte que connecter un assistant ne lui
   confère pas une session complète.

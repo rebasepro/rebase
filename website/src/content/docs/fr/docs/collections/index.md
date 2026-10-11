@@ -1,5 +1,5 @@
 ---
-sourceHash: 29c6fa4cf5af64a8
+sourceHash: 3b804a4a444623d1
 title: Collections
 sidebar_label: Collections
 description: Les collections sont la brique de base de Rebase — chaque collection correspond à une table de base de données et définit son schéma, ses relations, sa sécurité et son comportement d'interface utilisateur.
@@ -204,7 +204,7 @@ export const productsCollection = defineCollection({
         }
     },
     admin: {
-        icon: "inventory_2"           // Material icon key
+        icon: "Package"               // Lucide icon name
     }
 });
 
@@ -245,13 +245,13 @@ Tous les éléments suivants vont dans `admin`.
 | Propriété | Type | Par défaut | Description |
 |----------|------|---------|-------------|
 | `defaultViewMode` | `"list" \| "table" \| "cards" \| "kanban"` | `"list"` | Mode d'affichage par défaut |
-| `enabledViews` | `ViewMode[]` | Les quatre | Modes d'affichage disponibles |
+| `enabledViews` | `ViewMode[]` | Les quatre intégrés plus chaque vue personnalisée déclarée (kanban seulement lorsqu'une propriété `enum` existe) | Modes d'affichage disponibles |
 | `kanban` | `KanbanConfig` | — | Configuration Kanban (propriété de colonne). À toujours associer avec `orderProperty` — voir [Modes d'affichage](/docs/frontend/view-modes) |
 | `orderProperty` | `string` | — | Clé de la propriété de type **string** contenant la clé d'ordre de glisser-déposer. Requis pour un tableau Kanban fonctionnel |
-| `openEntityMode` | `"side_panel" \| "full_screen" \| "split" \| "dialog"` | `"full_screen"` | Mode d'ouverture des entités pour modification |
+| `openEntityMode` | `"side_panel" \| "full_screen" \| "split" \| "dialog"` | Selon la vue : `"split"` pour la liste, `"full_screen"` pour le tableau et les cartes, `"side_panel"` pour le kanban et les vues personnalisées | Mode d'ouverture des entités pour modification |
 | `sideDialogWidth` | `number \| string` | — | Largeur du panneau latéral (side dialog) |
 | `inlineEditing` | `boolean` | `true` | Activer l'édition en ligne dans la vue feuille de calcul |
-| `defaultSize` | `"xs" \| "s" \| "m" \| "l" \| "xl"` | `"m"` | Hauteur de ligne par défaut dans le tableau |
+| `defaultSize` | `"xs" \| "s" \| "m" \| "l" \| "xl"` | `"m"` | Densité par défaut des vues liste, tableau et cartes (la hauteur de ligne du tableau) |
 | `pagination` | `boolean \| number` | `true` (50) | Activer la pagination et/ou définir la taille de la page |
 | `listProperties` | `string[]` | — | Propriétés à afficher dans la vue en liste |
 | `propertiesOrder` | `string[]` | — | Ordre des colonnes dans la vue tableau |
@@ -265,7 +265,7 @@ Dans `admin`, à l'exception de `history`, qui est une fonctionnalité backend e
 
 | Propriété | Type | Par défaut | Description |
 |----------|------|---------|-------------|
-| `formAutoSave` | `boolean` | `false` | Sauvegarde automatique lors de la modification d'un champ |
+| `formAutoSave` | `boolean` | `false` | Sauvegarde automatique deux secondes après une modification, une fois le formulaire valide. Un nouveau formulaire n'est pas enregistré tant que rien n'y est saisi. |
 | `localChangesBackup` | `"manual_apply" \| "auto_apply" \| false` | `"manual_apply"` | Sauvegarde locale des modifications non enregistrées |
 | `hideIdFromForm` | `boolean` | `false` | Masquer l'ID de l'entité dans le formulaire |
 | `hideIdFromCollection` | `boolean` | `false` | Masquer la colonne ID dans le tableau |
@@ -427,6 +427,19 @@ const invoices = defineCollection({
 L'utilisateur peut tout de même filtrer une collection dotée d'un `fixedFilter` : ce qu'il applique sur d'autres champs s'y combine (ET), et les champs fixes restent verrouillés.
 
 Un `fixedFilter` restreint ce que le panneau *demande* ; ce n'est pas une barrière de sécurité. Ce qu'un appelant est autorisé à lire est régi par une [règle de sécurité](/docs/collections/security-rules), que la base de données applique à chaque appelant, qu'il s'agisse du panneau ou non.
+
+## Nombreuses collections
+
+Rien dans Rebase ne plafonne le nombre de collections, mais deux coûts augmentent avec lui :
+
+- **Le premier téléchargement de l'admin.** Le panneau a besoin de sa navigation dès que quelqu'un se
+  connecte ; la configuration de chaque collection est donc incluse dans ce que le navigateur récupère
+  pour l'écran de connexion — environ 2,4 Ko minifiés chacune, si bien que 200 collections ajoutent
+  environ 480 Ko, soit environ 80 Ko en gzip. Ce dont l'ouverture d'une collection a besoin (le tableau, les
+  vues d'enregistrement, le formulaire) ne se charge qu'à ce moment-là.
+- **`rebase db push`.** Atlas planifie un push en comparant le schéma entier, et cela croît plus vite que le
+  nombre de tables : à 400 tables ou plus, un push prend des dizaines de secondes — voir
+  [combien de temps prend un push](/docs/cli/schema#rebase-db-push).
 
 ## Prochaines étapes
 

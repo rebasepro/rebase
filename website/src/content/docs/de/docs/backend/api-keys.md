@@ -1,5 +1,5 @@
 ---
-sourceHash: 7c51c9877d9d0803
+sourceHash: 376a90002cda8008
 title: API-Schlüssel
 sidebar_label: API-Schlüssel
 description: "Langlebige Schlüssel für Skripte, CI, Agents und Integrationen: Service-Schlüssel und persönliche Schlüssel, die Scopes, die sie halten, wie sie mit Row-Level Security zusammenwirken, und die Routen, die sie verwalten."
@@ -156,7 +156,9 @@ Das `rate_limit` eines Schlüssels gibt an, wie viele Anfragen er in einem 15-Mi
 stellen darf, und jeder Zugangsweg zählt in einem gemeinsamen Bucket dagegen, `api-key:<id>`:
 
 - seine HTTP-Anfragen an die Daten-, Storage- und Funktions-APIs;
-- seine Daten-Frames auf dem Realtime-Socket: Abrufe, Zählungen, Speichervorgänge und Löschungen;
+- seine Daten-Frames auf dem Realtime-Socket: Abrufe, Zählungen, Speichervorgänge und Löschungen,
+  sowie Subscriptions und Channel-History-Anfragen jenseits des
+  [Kontingents](/docs/backend/realtime/#what-a-write-costs-and-the-limits) jedes Sockets;
 - seine Anfragen an [`/mcp`](/docs/ai/mcp/#the-remote-endpoint).
 
 Ohne `rate_limit` fasst der Bucket den API-Schlüssel-Standard des Servers, 1000. Ein

@@ -1,5 +1,5 @@
 ---
-sourceHash: 1e8fb1164e9af606
+sourceHash: 7334975536857911
 title: API REST
 sidebar_label: API REST
 description: Points de terminaison d'API REST générés automatiquement pour chaque collection, avec filtrage, tri, pagination et inclusion de relations.
@@ -22,6 +22,7 @@ Pour chaque collection, les points de terminaison suivants sont générés. Tout
 | Méthode | Chemin | Description |
 |--------|------|-------------|
 | `GET` | `/api/data/:slug` | Lister les entités |
+| `POST` | `/api/data/:slug/query` | <span class="since-badge" data-since="0.25">Depuis 0.25</span> La même liste, avec ses paramètres de requête dans un corps JSON — pour une requête trop longue pour une URL. Voir [Requêtes trop longues pour une URL](/docs/backend/vector-search/#queries-too-long-for-a-url) |
 | `GET` | `/api/data/:slug/count` | Compter les entités |
 | `GET` | `/api/data/:slug/aggregate` | `count()`, `sum()`, `avg()`, `min()`, `max()`, optionnellement groupés. Accepte les mêmes filtres que le point de terminaison de liste, et le RLS s'applique aux lignes agrégées — voir [Requêtage](/docs/sdk/querying/) |
 | `GET` | `/api/data/:slug/:id` | Obtenir une seule entité |
@@ -39,6 +40,8 @@ Les relations imbriquées sont accessibles via les chemins d'URL :
 
 ```
 GET    /api/data/authors/42/posts         → list author's posts
+POST   /api/data/authors/42/posts/query   → the same listing, parameters in the body (0.24+)
+POST   /api/data/authors/42/posts/count   → the same count, parameters in the body (0.24+)
 GET    /api/data/authors/42/posts/7       → get a specific post by author
 POST   /api/data/authors/42/posts         → create a post for author
 PATCH  /api/data/authors/42/posts/7       → update the post
@@ -118,6 +121,10 @@ GET /api/data/products?tags=csa.(electronics,books)
 | `isnull` | La colonne est `NULL` (`is-null`) | `?deleted_at=isnull.null` |
 | `notnull` | La colonne n'est pas `NULL` (`is-not-null`) | `?deleted_at=notnull.null` |
 
+Les quatre opérateurs de motif comparent du texte. Une colonne enum se compare par sa valeur
+(`?status=like.draft%25`) ; sur un nombre, une date ou toute autre colonne qui n'est pas du
+texte, ils renvoient une erreur 400 `INVALID_FILTER_OPERATOR`.
+
 `isnull` et `notnull` ignorent leur valeur — l'opérateur constitue toute la condition, et tout ce qui suit le point est ignoré. Le SDK écrit `.null`, c'est donc la syntaxe que vous verrez passer sur le réseau.
 
 :::caution[`eq.null` est la chaîne de quatre caractères, pas `IS NULL`]
@@ -149,6 +156,11 @@ GET /api/data/products?not=(or(status.eq.draft,status.eq.archived))
 ```
 
 Les groupes peuvent être imbriqués jusqu'à 32 niveaux de profondeur ; au-delà, la requête est rejetée avec `INVALID_LOGICAL_GROUP`.
+
+Une condition à l'intérieur d'un groupe dont l'opérateur n'existe pas dans le dialecte —
+`?not=(title.contains.x)` — renvoie une erreur 400 `UNKNOWN_FILTER_OPERATOR`, comme dans un `where`
+JSON. Elle n'est pas lue comme une égalité sur `contains.x`, ce qui, dans un `not`, aurait
+correspondu à toutes les lignes.
 
 Un groupe vient **restreindre** les filtres de champ plutôt que de les remplacer — voir [Comment les filtres se combinent](#comment-les-filtres-se-combinent).
 
@@ -243,7 +255,8 @@ Ces trois paramètres de fenêtre sont rejetés plutôt que corrigés automatiqu
 <span class="since-badge" data-since="0.25">Depuis 0.25</span> `meta.total` est un `COUNT(*)` sur toutes les lignes correspondantes — sur une grande table, l'essentiel du coût
 d'une requête de liste. `?count=none` (`GET /api/data/orders?count=none`) l'ignore : pas de `meta.total`, tandis que
 `meta.hasMore` reste exact (la lecture demande une ligne de plus que la page). `?count=exact` est la valeur par
-défaut ; toute autre valeur renvoie une erreur 400 `INVALID_COUNT`. Une lecture `?distinct=true` n'est jamais comptée.
+défaut ; toute autre valeur renvoie une erreur 400 `INVALID_COUNT`. Une lecture `?distinct=true` n'est jamais comptée, ni une recherche vectorielle avec un
+`vector_threshold` (voir [Recherche vectorielle](/docs/backend/vector-search/)).
 
 ### Pagination par curseur
 
@@ -371,20 +384,16 @@ GET /api/data/products?searchString=wireless%20keyboard
 
 ## Recherche vectorielle
 
-Si une collection définit une propriété de type `vector`, vous pouvez effectuer des recherches de similarité à grande vitesse à l'aide des opérations de distance pgvector compilées directement dans la requête en base de données.
+Une collection dotée d'une propriété `vector` accepte une recherche du plus proche voisin sur la
+liste : `?vector_search=embedding&vector=[0.15,0.22,-0.05]`, avec en option un
+`vector_distance` et un `vector_threshold`. Les paramètres, les seuils et le comportement des
+filtres sur l'index sont décrits dans [Recherche vectorielle](/docs/backend/vector-search/).
 
-```bash
-GET /api/data/products?vector_search=embedding&vector=[0.15,0.22,-0.05]&vector_distance=cosine&vector_threshold=0.8
-```
+## Requêtes trop longues pour une URL
 
-### Paramètres de requête vectorielle
-
-| Paramètre | Type | Description |
-|-----------|------|-------------|
-| `vector_search` | `string` | Le nom de la propriété vectorielle sur laquelle effectuer la requête. |
-| `vector` | `string` | Un tableau de flottants sérialisé en JSON représentant le vecteur de requête. |
-| `vector_distance` | `string` | La métrique de distance à évaluer. Valeurs prises en charge : `cosine` (par défaut, `<=>`), `l2` (`<->`), `inner_product` (`<#>`). |
-| `vector_threshold` | `number` | Seuil de distance maximal. Seuls les enregistrements ayant une distance inférieure à ce seuil sont retournés. |
+<span class="since-badge" data-since="0.25">Depuis 0.25</span> `POST /api/data/:slug/query` (cette liste) et `POST /api/data/:slug/count`
+prennent les paramètres de requête dans un corps JSON, pour une requête dont l'URL ne tiendrait pas — un embedding, une longue liste `in`.
+Voir [Requêtes trop longues pour une URL](/docs/backend/vector-search/#queries-too-long-for-a-url).
 
 ## Inclusion de relations
 
@@ -419,6 +428,7 @@ GET /api/data/posts?include={"comments":{"limit":5,"where":{"published":["==",tr
 | `orderBy` | La même syntaxe de tri, y compris le positionnement des NULL. En cas d'égalité, ou pour une `limit` sans `orderBy`, l'ordre suit la clé de la ligne liée, croissante |
 | `fields` | Colonnes de la ligne *liée* ; sa clé primaire est toujours conservée |
 | `include` | Relations de la ligne liée, à leur tour |
+| `count` | <span class="since-badge" data-since="0.25">Depuis 0.25</span> `true` renvoie aussi le total de chaque parent sous `_count` (`"_count":{"comments":37}`), compté par la même instruction. Relations vers plusieurs lignes uniquement. Voir [Compter ce qu'une limite laisse de côté](/docs/sdk/relations#compter-ce-quune-limite-laisse-de-côté) |
 
 `true` signifie « charger en totalité », de sorte que `{"author":true}` et `author` correspondent à la même requête. Les deux syntaxes fonctionnent sur la route de liste, la route d'obtention par ID et les routes de sous-collections imbriquées.
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: 4efc850ec3b2c417
+sourceHash: bd7b49238143886e
 slug: fr/docs/rls-check
 title: rls-check
 description: Auditez la sécurité au niveau des lignes (RLS) sur n'importe quelle base de données PostgreSQL — Supabase, Neon, RDS ou votre propre serveur. En lecture seule, sans inscription, sans Rebase requis.
@@ -92,7 +92,7 @@ avec le propre rôle de votre application est ce qui se rapproche le plus de dem
 | --- | --- |
 | `0` | Aucun constat atteignant ou dépassant le seuil de `--fail-on` |
 | `1` | Au moins un constat atteignant ou dépassant le seuil |
-| `2` | L'analyse n'a pas pu s'exécuter — arguments invalides, connexion refusée, échec d'authentification, délai dépassé |
+| `2` | L'analyse n'a pas pu s'exécuter — arguments invalides, connexion refusée, échec d'authentification, délai dépassé — ou était incomplète : une lecture du catalogue a échoué ou une vérification a planté (`diagnostics.degraded`). Cela vaut même avec `--fail-on none` |
 
 `1` et `2` sont délibérément distincts : une connexion défaillante ne doit jamais donner l'illusion d'une base de données saine.
 
@@ -218,8 +218,9 @@ fait l'expérience. Les constats portent sur ce à quoi les autres rôles ont ac
 ### Sur une base de données Rebase, modifiez la règle, pas la stratégie
 
 Chaque stratégie sur un déploiement Rebase est compilée à partir des `securityRules` d'une collection, et le
-runtime **les réapplique à chaque démarrage** : il supprime chaque stratégie générée et la recrée à partir de la
-configuration. Un `ALTER POLICY` exécuté sur l'une d'elles ne survit donc que jusqu'au prochain redémarrage, et le
+runtime **les vérifie à chaque démarrage** : chaque stratégie générée porte une estampille (un commentaire
+`rebase:<hash>`) de ce qui a été compilé et de ce que Postgres a stocké, et une table dont les stratégies
+ne correspondent plus est réappliquée à partir de la configuration. Un `ALTER POLICY` exécuté sur l'une d'elles ne survit donc que jusqu'au prochain redémarrage, et le
 constat réapparaît aussitôt — après l'avoir pourtant vu disparaître.
 
 `rls-check` reconnaît ces stratégies (un nom du type `<table>_<operation>_<hash>`, ou un appel à `rebase.uid()` /
@@ -269,8 +270,9 @@ Voir [rls-enabled-no-policies](#rls-enabled-no-policies).
 
 **La stratégie accorde un accès inconditionnel.** Critique.
 
-Une stratégie permissive dont l'expression `USING` ou `WITH CHECK` est une constante vraie — `true`,
-`(true)`, `1 = 1`. Les stratégies permissives sont combinées avec un opérateur OU (OR), de sorte qu'une seule d'entre
+Une stratégie permissive dont l'expression `USING` ou `WITH CHECK` est une constante vraie : `true`,
+`(true)`, `1 = 1`, `1 > 0`, `NOT false`, `true OR <anything>`, ou une constante comparée à
+elle-même à travers un cast. Les stratégies permissives sont combinées avec un opérateur OU (OR), de sorte qu'une seule d'entre
 elles suffit à satisfaire le filtre de ligne de la table, quelle que soit la rigueur de toutes les autres stratégies.
 
 Comme pour chaque vérification, la stratégie n'est signalée que lorsqu'un rôle auquel elle s'applique peut
@@ -320,6 +322,10 @@ La gravité dépend de la plateforme, et cette distinction a son importance :
 - **Sur une plateforme non reconnue**, signalé comme **moyen** (medium), car le fait qu'il s'agisse d'une faille
   dépend de l'utilisation ou non d'une telle sentinelle par votre pile.
 
+Une base de données compte comme Rebase lorsqu'elle possède le schéma `rebase`. Le rôle `rebase_user`
+n'en décide pas, car les rôles appartiennent au serveur entier, et un serveur qui héberge une application
+Rebase peut contenir d'autres bases de données.
+
 ```sql
 -- Scope to the row's owner rather than to the existence of an id
 ALTER POLICY "your_policy" ON "public"."your_table"
@@ -342,6 +348,10 @@ La forme corrigée de la vérification précédente — `rebase.uid() IS NOT NUL
 et l'endroit où l'on s'arrête souvent par erreur. Elle exclut effectivement les appelants déconnectés. Ce qu'elle
 ne fait pas, en revanche, c'est restreindre les lignes : ce qui reste revient à dire que *chaque compte enregistré
 peut lire chaque ligne de cette table*, ce qui est une affirmation bien différente de celle généralement visée. Sur un projet Rebase, c'est une règle dont la `condition` est `policy.authenticated()` et rien d'autre, que la base de données stocke sous la forme `rebase.uid() <> ALL (ARRAY['anonymous', 'anon'])`.
+<span class="since-badge" data-since="0.25">Depuis 0.25</span> Une règle dont la condition est seulement `policy.registered()` est signalée aussi : son
+`NOT rebase.is_anonymous()` supplémentaire écarte les invités et ne restreint aucune ligne non plus, si bien
+que chaque compte qui n'est pas un invité lit chaque ligne. Avec `--fail-on high` par défaut, une exécution
+CI qui analyse une telle stratégie échoue désormais.
 
 C'est cette structure qui transforme une table `users` en un annuaire de toutes les adresses de la plateforme,
 lisible par quiconque s'inscrit — et là où l'inscription est ouverte, « quiconque s'inscrit » désigne n'importe qui.

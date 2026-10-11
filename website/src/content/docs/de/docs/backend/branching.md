@@ -1,5 +1,5 @@
 ---
-sourceHash: 6e23ad27a4c203f4
+sourceHash: 1ae19e3e555334a4
 title: Datenbank-Branching
 sidebar_label: Branching
 description: Erstellen Sie isolierte Datenbank-Branches für Entwicklung, Staging und Tests mit PostgreSQLs CREATE DATABASE ... TEMPLATE – sofortige, originalgetreue Kopien ohne Ausfallzeiten.
@@ -210,6 +210,14 @@ In der Auflösungsreihenfolge steht es zwischen der Shell und der Projektdatei:
 Ein Branch muss Vorrang vor `.env` haben, da das Umschalten sonst bei keinem Projekt Wirkung zeigen würde, das `DATABASE_URL` setzt; er darf jedoch keinen Vorrang vor den beiden darüber liegenden haben, da ein Flag auf der aktuellen Befehlszeile eine unmittelbarere Anweisung ist als ein Wechsel am Vortag.
 
 `.rebase/` wird von Git ignoriert (gitignored), sodass der Branch, auf dem Sie sich befinden, nur für Ihren Rechner gilt und niemals für das gesamte Projekt.
+
+<span class="since-badge" data-since="0.25">Seit 0.25</span> In einem umgeschalteten
+Checkout arbeiten `rebase db branch create`, `list`, `info`, `delete` und `prune` auf der
+Hauptdatenbank, in der das Register liegt, und sagen das auch. `create` kopiert weiterhin
+den Branch, auf dem du bist, außer du übergibst `--from`; er wird in der Hauptdatenbank
+erfasst, sodass `list` ihn aus jedem Checkout anzeigt. Vor 0.25 tat das nur `list`, und
+ein aus einem umgeschalteten Checkout erstellter Branch wurde allein im Snapshot des
+Branches erfasst.
 
 Branches sind ganz gewöhnliche PostgreSQL-Datenbanken, die nach dem Branch mit dem Präfix `rb_` benannt sind. So entspricht `dev_sandbox` oben der Datenbank `rb_dev_sandbox` auf demselben Server.
 

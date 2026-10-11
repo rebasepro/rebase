@@ -1,5 +1,5 @@
 ---
-sourceHash: bc550d505d122629
+sourceHash: 6c16b3e7b3784d47
 title: Offline e sincronizzazione local-first
 sidebar_label: Offline
 description: Attiva il motore di sincronizzazione local-first dell'SDK tipizzato di Rebase — un database locale di righe, scritture offline istantanee con rollback e query live reattive.
@@ -61,7 +61,7 @@ try {
 Finché si sa che la connessione è caduta, una scrittura non viene nemmeno tentata — si applica localmente e va in coda, così non costa nulla invece di un timeout:
 
 ```typescript
-// Returns immediately, offline or not.
+// While offline, returns at once with the locally applied row.
 const post = await client.data.posts.create({ title: "Draft", status: "draft" });
 
 // Shows up in every matching list, right away.
@@ -70,7 +70,7 @@ const drafts = await client.data.posts.where("status", "==", "draft").find();
 
 Le righe create offline ricevono un id generato dal client, nel tipo che gli id della collezione hanno già: un **intero negativo** dove sono numeri, una stringa UUID dove sono stringhe. Il segno è l'indizio — una chiave reale non è mai negativa —, così una riga che non ha ancora raggiunto il server si riconosce senza consultare nulla, e `id` resta ciò che dichiara il tipo `Row` generato. Su una collezione che questo dispositivo non ha mai letto non c'è nulla in locale da cui dedurre il tipo, e l'id è un UUID.
 
-Se il server ne assegna uno proprio in fase di ritrasmissione, la riga locale e tutte le scritture in coda che puntano ancora all'id temporaneo vengono spostate su quello reale. Fino ad allora, non conservare un id temporaneo fuori dal database offline: una chiave esterna o un URL salvato che ne contenga uno punta a una riga che sta per essere rinumerata.
+Se il server ne assegna uno proprio in fase di ritrasmissione, la riga locale e tutte le scritture in coda che puntano ancora all'id temporaneo vengono spostate su quello reale, in ogni collezione: un post in coda con `author_id` impostato su un autore creato offline viene inviato con l'id che il server ha dato all'autore. Se invece il server rifiuta l'autore, le scritture che lo referenziano vengono scartate insieme a esso e segnalate come `DEPENDENCY_REJECTED` (vedi [Quando il server dice di no](#quando-il-server-dice-di-no)). Fino ad allora, non conservare un id temporaneo fuori dal database offline: una chiave esterna o un URL salvato che ne contenga uno punta a una riga che sta per essere rinumerata.
 
 Le scritture vengono ritrasmesse nell'ordine in cui le hai eseguite, attraverso le collezioni — così una create in una collezione arriva comunque prima della riga in un'altra che vi fa riferimento.
 
@@ -123,7 +123,7 @@ const { online, pending, syncing, lastSyncedAt, lastError } = client.offline!.st
 
 | Metodo | Scopo |
 |--------|-------|
-| `status()` | Connettività attuale, profondità della coda, attività di sincronizzazione, ultimo errore |
+| `status()` | Connettività attuale, profondità della coda, attività di sincronizzazione, ultimo errore, e `persisted`: se il browser ha accettato di conservare il database offline (richiesto quando viene messa in coda la prima scrittura; `false` significa che può essere eliminato in caso di scarsità di spazio, comprese le scritture non inviate) |
 | `onStatusChange(fn)` | Sottoscrivi a quanto sopra |
 | `onQueueChange(fn)` | Solo il numero di scritture non inviate, per un badge |
 | `pending()` | Le mutazioni in coda stesse, dalla più vecchia. `pending({ orphaned: true })`: quelle messe in coda senza un accesso — vedi [Utenti](#utenti) |
@@ -147,7 +147,9 @@ const client = createRebaseClient({
 });
 ```
 
-La cascata è ristretta: un `update` viene scartato insieme alla scrittura che modificava, perché può fallire solo allo stesso modo. Un `create` o un `delete` successivo per la stessa riga sta in piedi da solo e viene mantenuto. Una scrittura scartata non è mai stata inviata. Viene segnalata con un `RebaseApiError` il cui `code` è `DEPENDENCY_REJECTED` e il cui `cause` è il rifiuto che l'ha condannata, così puoi distinguerla dalla scrittura che il server ha effettivamente rifiutato. Sulla 0.23 porta invece l'errore della scrittura rifiutata stessa.
+Una riga che qualcun altro ha eliminato è l'unico caso che non viene annullato. Un `delete` in coda di essa ha fatto ciò per cui era stato scritto, quindi conta come sincronizzato e non viene segnalato. Una modifica in coda di essa viene segnalata, e la riga viene rimossa dal database locale invece di essere ripristinata, perché il server non la ha più.
+
+La cascata è ristretta: un `update` viene scartato insieme alla scrittura che modificava, perché può fallire solo allo stesso modo. Un `create` o un `delete` successivo per la stessa riga sta in piedi da solo e viene mantenuto. Un `create` rifiutato di una riga creata offline porta con sé anche ogni scrittura in coda, in qualsiasi collezione, i cui valori referenziano l'id temporaneo della riga. Una scrittura scartata non è mai stata inviata. Viene segnalata con un `RebaseApiError` il cui `code` è `DEPENDENCY_REJECTED` e il cui `cause` è il rifiuto che l'ha condannata, così puoi distinguerla dalla scrittura che il server ha effettivamente rifiutato. Sulla 0.23 porta invece l'errore della scrittura rifiutata stessa.
 
 Modifiche consecutive a una stessa riga mentre si è offline vengono unite in un'unica scrittura in coda, così un form in cui si sta digitando non fa crescere la coda. Se il server rifiuta la scrittura unita per il suo contenuto (un 400, 403 o 422 — ad esempio un campo rimosso da una modifica dello schema mentre l'utente era offline), il motore la scompone di nuovo nelle modifiche separate e le riapplica una per una. Viene annullata e segnalata solo la modifica che il server rifiuta; le altre vengono mantenute.
 
@@ -156,6 +158,8 @@ Un fallimento che è soltanto temporaneo — un 429, un 503, una connessione cad
 ## Schede multiple
 
 Le schede della stessa app condividono un unico database IndexedDB, quindi condividono le righe locali e l'outbox. Una scrittura in una compare nelle altre, e una sola scheda alla volta ritrasmette la coda. Non c'è nulla da configurare.
+
+Quest'ultima garanzia viene dalla [Web Locks API](https://developer.mozilla.org/en-US/docs/Web/API/Web_Locks_API) del browser, che esiste solo in un contesto sicuro (HTTPS, o `localhost`) e non in Safari prima della 15.4 né in alcune webview incorporate. Senza di essa, ogni scheda aperta ritrasmette la coda quando sincronizza. Create, scritture bulk, aggiornamenti ed eliminazioni vengono tutti ritrasmessi con una chiave di idempotenza, quindi un server che memorizza le chiavi applica ciascuno di essi una sola volta; ciò che puoi vedere è la stessa scrittura inviata da due schede.
 
 ## Utenti
 
@@ -225,8 +229,11 @@ L'unico contratto oltre all'ovvio è che gli elenchi per prefisso tornano in ord
 Il client non è una replica del tuo database, e non finge di esserlo:
 
 - **Sono locali solo le righe che l'app ha letto o scritto.** A una query che il client non ha mai inviato si può comunque rispondere con ciò che possiede, ma la risposta potrebbe non contenere righe che il server avrebbe restituito. I risultati live lo dichiarano tramite `partial`.
+- **`findAll()` e `iterate()` leggono solo pagine a cui il server ha risposto su questo dispositivo.** Uno scorrimento prosegue finché ogni pagina dice che ce n'è altra, e solo il server può dirlo. Offline, uno scorrimento che ha bisogno di una pagina che questo dispositivo non ha mai recuperato fallisce con l'errore `OFFLINE` (`isOfflineError`) invece di restituire parte della collezione come se fosse tutta. Sulla 0.24 si fermava a quella pagina e restituiva ciò che aveva.
+- **`count()` offline ha bisogno di un conteggio che il server ha dato a questo dispositivo per la stessa query.** Lo spostano le scritture messe in coda da allora: create, modifiche che portano una riga dentro o fuori dal filtro, ed eliminazioni. Senza di esso fallisce con l'errore `OFFLINE` invece di contare le righe che questo dispositivo si trova ad avere. Sulla 0.24 restituiva quel numero.
 - **`searchString` è approssimato** come una scansione di sottostringhe senza distinzione tra maiuscole e minuscole sui campi stringa in cache. Il server esegue una vera ricerca full-text sulle colonne configurate della collezione.
 - **Le relazioni caricate con `include` non possono essere valutate localmente** — le righe correlate vivono in collezioni che la query non ha mai caricato. Una query di questo tipo è sempre contrassegnata come `partial` quando riceve risposta dalla cache.
+- **I conflitti sono last-writer-wins, per campo, senza rilevamento.** Un `update` ritrasmesso invia i campi che l'utente ha modificato e nient'altro, quindi i campi che non ha toccato mantengono ciò che ha il server. Per un campo che *ha* modificato, una modifica fatta da qualcun altro sul server mentre era offline viene sovrascritta quando la coda viene ritrasmessa, e nessuno dei due utenti ne viene informato. Nulla confronta le versioni durante la ritrasmissione.
 - **La ritrasmissione è at-least-once.** Una scrittura che raggiunge il server ma la cui risposta va persa può essere inviata di nuovo. Preferisci scritture idempotenti (`createMany` con `upsert`) dove i duplicati sarebbero un problema.
 - **Un upsert su una chiave naturale ha bisogno del server.** Quale riga indichi un target `onConflict` può scoprirlo solo il server, quindi `upsert()` su una chiave naturale (o senza l'id della riga), e un `createMany()` con `onConflict` mai inviato, vengono rifiutati offline con `OFFLINE_UPSERT_UNSUPPORTED`. Un upsert sulla chiave primaria, con la chiave in ogni riga, viene messo in coda.
 - **Le letture locali applicano la semantica di Postgres, non i dati del database.** I filtri vengono valutati come farebbe SQL — i confronti con `NULL` sono ignoti, `ORDER BY` mette i null per ultimi in ordine crescente — ma sulla copia delle righe che ha il client, che può essere obsoleta.

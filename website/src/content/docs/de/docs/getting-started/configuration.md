@@ -1,5 +1,5 @@
 ---
-sourceHash: 37408b06e86d1ddb
+sourceHash: 9793c6efe5a375a7
 title: Umgebung & Konfiguration
 sidebar_label: Konfiguration
 description: Alle Umgebungsvariablen und Konfigurationsoptionen für Rebase-Projekte.
@@ -206,7 +206,7 @@ mitliefert), `STORAGE_PUBLIC_READ` oder `STORAGE_ALLOW_ANY_AUTHENTICATED`.
 | `DB_POOL_MAX` | Maximale Anzahl an gepoolten Verbindungen | `20` |
 | `DB_POOL_IDLE_TIMEOUT` | Millisekunden, die eine inaktive Verbindung aufrechterhalten wird | `30000` |
 | `DB_POOL_CONNECT_TIMEOUT` | Millisekunden, die auf eine Verbindung gewartet wird | `10000` |
-| `DATABASE_DIRECT_URL` | Direkte (nicht gepoolte) Verbindung. [Realtime](/docs/backend/realtime) benötigt eine solche: `LISTEN`/`NOTIFY` funktioniert nicht über einen Transaktions-Pooler wie PgBouncer; ohne sie werden Änderungsbenachrichtigungen mit einer Warnung deaktiviert, statt lautlos verloren zu gehen. | — |
+| `DATABASE_DIRECT_URL` | Direkte (nicht gepoolte) Verbindung. [Realtime](/docs/backend/realtime) benötigt eine solche: `LISTEN`/`NOTIFY` funktioniert nicht über einen Transaktions-Pooler wie PgBouncer; ohne sie werden Änderungsbenachrichtigungen mit einer Warnung deaktiviert, statt lautlos verloren zu gehen. Auch der [Job-Worker](/docs/backend/jobs) hält seinen Wake-up-`LISTEN` darauf. | — |
 | `DATABASE_READ_URL` | Read-Replikat. Lesezugriffe gehen dorthin, wenn gesetzt und abweichend von `DATABASE_URL`; schlägt die Verbindung fehl, fällt alles mit einer Warnung auf die primäre Datenbank zurück. | — |
 | `REBASE_DB_POOL_MAX` | Eine Obergrenze für jeden Pool im Prozess, unabhängig davon, was der jeweilige Pool angefordert hat. Nur reine Ziffern: Ein fehlerhafter Wert wird ignoriert, anstatt den Server lautlos zu serialisieren. | — |
 

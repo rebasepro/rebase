@@ -1,5 +1,5 @@
 ---
-sourceHash: 1214584ea35bf933
+sourceHash: a46a7358b856be2f
 title: Aufteilen in mehrere Prozesse
 sidebar_label: Prozesse aufteilen
 description: Führen Sie ein Bundle als mehrere zusammenarbeitende Prozesse aus – eine API, eine Functions-Ebene, ein Worker – aus demselben veröffentlichten Runtime-Image, damit eine rechenintensive benutzerdefinierte Funktion nicht mehr mit der Daten-API konkurriert.
@@ -30,9 +30,9 @@ REBASE_ROLE=all        # the default: everything, one process
 | | `all` | `api` | `functions` | `worker` |
 | --- | :---: | :---: | :---: | :---: |
 | `/api/auth`, `/api/data`, `/api/storage`, `/api/meta` | ✅ | ✅ | — | — |
-| `/api/admin`, `/api/logs`, der Schema-Editor | ✅ | ✅ | — | — |
+| `/api/admin` (Logs und der Schema-Editor darunter) | ✅ | ✅ | — | — |
 | `/api/functions/*` | ✅ | leitet weiter (siehe unten) | ✅ | — |
-| `/api/cron` (die Admin-Oberfläche) | ✅ | ✅ | — | — |
+| `/api/admin/cron` (die Admin-Oberfläche) | ✅ | ✅ | — | — |
 | `/health`, `/livez`, `/metrics` | ✅ | ✅ | ✅ | ✅ |
 | Stellt WebSockets bereit, konsumiert Änderungsereignisse | ✅ | ✅ | — | — |
 | Erstellt das Schema beim Start | ✅ | ✅ | — | — |
@@ -46,9 +46,14 @@ Echtzeit steht auf der Liste, weil sie Ressourcen kostet, unabhängig davon, ob 
 Ein Prozess, der Änderungsereignisse konsumiert, hält während seiner gesamten Laufzeit eine `LISTEN`-Verbindung
 außerhalb des Pools aufrecht und installiert beim Start die Erfassungstrigger. Nur ein Prozess, der
 WebSockets bereitstellt, hat Abnehmer, an die er liefern kann, weshalb die beiden Rollen, die keine bereitstellen,
-beides nicht tun. **Schreibvorgänge dieser Prozesse werden dennoch erfasst** – die Erfassung erfolgt über
-Datenbanktrigger, sodass eine Änderung von der Datenbank veröffentlicht wird und nicht von dem Prozess,
-der sie vorgenommen hat. Eine Funktion, die eine Zeile schreibt, weckt weiterhin jeden Abonnenten auf der `api` auf.
+beides nicht tun. **Schreibvorgänge dieser Prozesse werden dennoch erfasst.** Bei eingeschalteter
+Change Capture erfolgt die Erfassung über Datenbanktrigger, sodass eine Änderung von der Datenbank veröffentlicht wird und
+nicht von dem Prozess, der sie vorgenommen hat. Bei ausgeschalteter Capture
+(`REALTIME_CDC=off` oder `auto`, das zurückfällt, weil die Datenbankrolle keine Trigger
+anlegen darf) meldet ein `worker`- oder `functions`-Prozess jeden seiner eigenen
+Schreibvorgänge stattdessen auf dem instanzübergreifenden Kanal, ohne eine `LISTEN`-Verbindung
+zu halten. In beiden Fällen weckt eine Funktion, die eine Zeile schreibt, weiterhin
+jeden Abonnenten auf der `api` auf.
 
 ## Docker Compose
 
@@ -180,7 +185,8 @@ Ein `functions`-Prozess führt keines von beiden aus. Er wird anhand der Anfrage
 Belieben ersetzt; würde man ihm geplante Aufgaben zuweisen, bekäme seine Replika-Anzahl eine Bedeutung,
 die sie nicht haben sollte.
 
-Beachten Sie, dass `rebase.jobs.enqueue` überall weiterhin funktioniert, auch auf einem Prozess, der
+Beachten Sie, dass das Einreihen — `jobQueue.enqueue`, das `enqueue` einer deklarierten Queue, das `publish`
+eines Topics — überall weiterhin funktioniert, auch auf einem Prozess, der
 keine Worker ausführt – das Einreihen in die Warteschlange ist ein Schreibvorgang, das Ausführen eine
 Polling-Schleife, und nur Letzteres wird durch eine Rolle deaktiviert.
 

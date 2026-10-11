@@ -1,5 +1,5 @@
 ---
-sourceHash: 32fc3b3ccab733ad
+sourceHash: 536427d653beb637
 title: Schnellstart
 sidebar_label: Schnellstart
 description: Erstellen Sie ein neues Rebase-Projekt und führen Sie es in weniger als 2 Minuten lokal aus.
@@ -121,8 +121,8 @@ Dadurch werden Ihre Datenbanktabellen analysiert und entsprechende TypeScript-Da
 
 Wenn Sie die Frontend-URL öffnen, die `rebase dev` ausgegeben hat, sehen Sie den Anmeldebildschirm. Der **erste Benutzer**, der sich registriert, wird automatisch Administrator — das ist der Bootstrap-Ablauf.
 
-1. Klicken Sie auf **Sign Up**
-2. Geben Sie Ihre E-Mail-Adresse und ein Passwort ein
+1. Der Bildschirm öffnet sich mit **Welcome!**, dem Formular für dieses erste Konto
+2. Geben Sie Ihre E-Mail-Adresse und ein Passwort ein und klicken Sie auf **Create account**
 3. Sie sind eingeloggt — mit vollen Administratorrechten
 
 `rebase init` hat außerdem `REBASE_ADMIN_EMAIL` und ein generiertes `REBASE_ADMIN_PASSWORD` in die `.env` geschrieben. Das sind hier nicht Ihre Zugangsdaten: `rebase dev` ignoriert sie und weist beim Booten darauf hin. Sie gehören zu einem Produktionsstart — `docker compose up` oder allem mit `NODE_ENV=production` —, bei dem dieses Bootstrap-Zeitfenster geschlossen ist, da der Server bereits auf einem Hostnamen antwortet, bevor Sie etwas eingegeben haben. Siehe [Ihr erster Administrator](/docs/getting-started/deployment#your-first-admin).

@@ -1,5 +1,5 @@
 ---
-sourceHash: 1214584ea35bf933
+sourceHash: a46a7358b856be2f
 title: Suddivisione in più processi
 sidebar_label: Processi separati
 description: Esegui un unico bundle suddiviso in vari processi cooperanti — un'API, un livello per le funzioni, un worker — a partire dalla stessa immagine di runtime pubblicata, evitando che una funzione custom pesante competa con l'API dati.
@@ -31,9 +31,9 @@ REBASE_ROLE=all        # the default: everything, one process
 | | `all` | `api` | `functions` | `worker` |
 | --- | :---: | :---: | :---: | :---: |
 | `/api/auth`, `/api/data`, `/api/storage`, `/api/meta` | ✅ | ✅ | — | — |
-| `/api/admin`, `/api/logs`, l'editor dello schema | ✅ | ✅ | — | — |
+| `/api/admin` (compresi log ed editor dello schema) | ✅ | ✅ | — | — |
 | `/api/functions/*` | ✅ | inoltra (vedi sotto) | ✅ | — |
-| `/api/cron` (la superficie admin) | ✅ | ✅ | — | — |
+| `/api/admin/cron` (la superficie admin) | ✅ | ✅ | — | — |
 | `/health`, `/livez`, `/metrics` | ✅ | ✅ | ✅ | ✅ |
 | Gestisce i websocket, consuma eventi di modifica | ✅ | ✅ | — | — |
 | Crea lo schema all'avvio | ✅ | ✅ | — | — |
@@ -47,10 +47,14 @@ Il realtime è presente nell'elenco perché ha un costo a prescindere dal fatto 
 meno: un processo che consuma eventi di modifica mantiene attiva una connessione `LISTEN` al di fuori
 del pool per tutta la sua esecuzione, e installa i trigger di acquisizione all'avvio. Solo
 un processo che gestisce websocket ha dei destinatari a cui inviare i dati, quindi i due ruoli che
-non ne gestiscono non fanno nessuna delle due cose. **Le scritture effettuate da tali processi vengono comunque rilevate** — l'acquisizione
-avviene tramite trigger di database, quindi una modifica viene pubblicata dal database anziché
-dal singolo processo che l'ha eseguita. Una funzione che scrive una riga attiva comunque
-ogni subscriber sull'`api`.
+non ne gestiscono non fanno nessuna delle due cose. **Le scritture effettuate da tali processi vengono comunque rilevate.**
+Con la change capture attiva, l'acquisizione avviene tramite trigger di database, quindi una modifica
+viene pubblicata dal database anziché dal singolo processo che l'ha eseguita. Con l'acquisizione
+disattivata (`REALTIME_CDC=off`, oppure `auto` che ripiega perché il ruolo del database non può
+creare trigger), un processo `worker` o `functions` annuncia invece ogni propria
+scrittura sul canale cross-istanza, senza tenere una connessione `LISTEN`.
+In entrambi i casi, una funzione che scrive una riga attiva comunque ogni
+subscriber sull'`api`.
 
 ## Docker Compose
 
@@ -183,8 +187,9 @@ Un processo `functions` non esegue mai nessuno dei due. La sua scalabilità dipe
 carico delle richieste e viene sostituito liberamente; assegnargli attività pianificate darebbe
 al suo numero di repliche un significato improprio.
 
-Tieni presente che `rebase.jobs.enqueue` continua a funzionare ovunque, anche su un processo
-che non esegue worker — l'accodamento è una scrittura, l'esecuzione è un ciclo di polling, e
+Tieni presente che l'accodamento — `jobQueue.enqueue`, l'`enqueue` di una coda dichiarata, il
+`publish` di un topic — continua a funzionare ovunque, anche su un processo che non esegue
+worker — l'accodamento è una scrittura, l'esecuzione è un ciclo di polling, e
 solo quest'ultimo viene disattivato da un ruolo.
 
 ## Cosa non offre la suddivisione

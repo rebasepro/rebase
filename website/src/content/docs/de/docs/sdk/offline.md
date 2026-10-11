@@ -1,5 +1,5 @@
 ---
-sourceHash: bc550d505d122629
+sourceHash: 6c16b3e7b3784d47
 title: Offline & Local-First-Sync
 sidebar_label: Offline
 description: Aktivieren Sie die Local-First-Sync-Engine des typisierten SDK von Rebase — eine lokale Zeilendatenbank, sofortige Offline-Schreibvorgänge mit Rollback und reaktive Live-Abfragen.
@@ -61,7 +61,7 @@ try {
 Solange bekannt ist, dass die Verbindung unterbrochen ist, wird ein Schreibvorgang gar nicht erst versucht — er wird lokal angewendet und eingereiht und kostet damit nichts statt eines Timeouts:
 
 ```typescript
-// Returns immediately, offline or not.
+// While offline, returns at once with the locally applied row.
 const post = await client.data.posts.create({ title: "Draft", status: "draft" });
 
 // Shows up in every matching list, right away.
@@ -70,7 +70,7 @@ const drafts = await client.data.posts.where("status", "==", "draft").find();
 
 Offline erstellte Zeilen erhalten eine vom Client generierte ID, und zwar in dem Typ, den die IDs der Sammlung bereits haben: eine **negative ganze Zahl**, wo sie Zahlen sind, eine UUID-Zeichenkette, wo sie Zeichenketten sind. Das Vorzeichen ist das Erkennungsmerkmal — ein echter Schlüssel ist nie negativ —, sodass eine Zeile, die den Server noch nicht erreicht hat, ohne Nachschlagen erkennbar ist und `id` weiterhin dem entspricht, was der generierte `Row`-Typ sagt. Bei einer Sammlung, die dieses Gerät noch nie gelesen hat, gibt es lokal nichts, woran sich der Typ ablesen ließe; dann ist die ID eine UUID.
 
-Vergibt der Server beim Wiederholen seine eigene, werden die lokale Zeile und alle eingereihten Schreibvorgänge, die noch auf die temporäre ID zeigen, auf die echte umgezogen. Bis dahin sollten Sie eine temporäre ID nirgends außerhalb der Offline-Datenbank speichern — ein Fremdschlüssel oder eine gespeicherte URL mit einer solchen ID zeigt auf eine Zeile, die gleich umnummeriert wird.
+Vergibt der Server beim Wiederholen seine eigene, werden die lokale Zeile und alle eingereihten Schreibvorgänge, die noch auf die temporäre ID zeigen, auf die echte umgezogen, in jeder Collection: Ein Post, der mit einer `author_id` eingereiht wurde, die auf einen offline erstellten Autor zeigt, wird mit der ID gesendet, die der Server dem Autor gegeben hat. Lehnt der Server stattdessen den Autor ab, werden Schreibvorgänge, die auf ihn verweisen, mit ihm verworfen und als `DEPENDENCY_REJECTED` gemeldet (siehe [Wenn der Server ablehnt](#wenn-der-server-ablehnt)). Bis dahin sollten Sie eine temporäre ID nirgends außerhalb der Offline-Datenbank speichern — ein Fremdschlüssel oder eine gespeicherte URL mit einer solchen ID zeigt auf eine Zeile, die gleich umnummeriert wird.
 
 Schreibvorgänge werden in der Reihenfolge wiederholt, in der Sie sie getätigt haben, collection-übergreifend — ein Create in einer Collection landet also weiterhin vor der Zeile in einer anderen, die darauf verweist.
 
@@ -123,7 +123,7 @@ const { online, pending, syncing, lastSyncedAt, lastError } = client.offline!.st
 
 | Methode | Zweck |
 |--------|---------|
-| `status()` | Aktuelle Verbindung, Warteschlangentiefe, Sync-Aktivität, letzter Fehler |
+| `status()` | Aktuelle Verbindung, Warteschlangentiefe, Sync-Aktivität, letzter Fehler und `persisted`: ob der Browser zugestimmt hat, die Offline-Datenbank zu behalten (wird gefragt, wenn der erste Schreibvorgang eingereiht wird; `false` heißt, sie kann bei Speicherdruck verdrängt werden, nicht gesendete Schreibvorgänge eingeschlossen) |
 | `onStatusChange(fn)` | Das Obige abonnieren |
 | `onQueueChange(fn)` | Nur die Anzahl der nicht gesendeten Schreibvorgänge, für ein Badge |
 | `pending()` | Die eingereihten Mutationen selbst, älteste zuerst. `pending({ orphaned: true })`: die, die ohne Anmeldung eingereiht wurden — siehe [Benutzer](#benutzer) |
@@ -147,7 +147,9 @@ const client = createRebaseClient({
 });
 ```
 
-Die Kaskade ist eng gefasst: Ein `update` wird zusammen mit dem Schreibvorgang verworfen, den es bearbeitet hat, weil es nur auf dieselbe Weise scheitern kann. Ein späteres `create` oder `delete` für dieselbe Zeile steht für sich und bleibt erhalten. Ein verworfener Schreibvorgang wurde nie gesendet. Er wird mit einem `RebaseApiError` gemeldet, dessen `code` `DEPENDENCY_REJECTED` ist und dessen `cause` die Ablehnung ist, die ihn zu Fall brachte — so lässt er sich von dem Schreibvorgang unterscheiden, den der Server tatsächlich abgelehnt hat. Unter 0.23 trägt er stattdessen den eigenen Fehler des abgelehnten Schreibvorgangs.
+Eine Zeile, die jemand anders gelöscht hat, ist der eine Fall, der nicht zurückgerollt wird. Ein eingereihtes `delete` darauf hat getan, wofür es gedacht war, und zählt daher als synchronisiert und wird nicht gemeldet. Eine eingereihte Bearbeitung davon wird gemeldet, und die Zeile wird aus der lokalen Datenbank entfernt, statt wiederhergestellt zu werden, weil der Server sie nicht mehr hat.
+
+Die Kaskade ist eng gefasst: Ein `update` wird zusammen mit dem Schreibvorgang verworfen, den es bearbeitet hat, weil es nur auf dieselbe Weise scheitern kann. Ein späteres `create` oder `delete` für dieselbe Zeile steht für sich und bleibt erhalten. Ein abgelehntes `create` einer offline erstellten Zeile nimmt außerdem jeden eingereihten Schreibvorgang in jeder Collection mit, dessen Werte auf die temporäre ID der Zeile verweisen. Ein verworfener Schreibvorgang wurde nie gesendet. Er wird mit einem `RebaseApiError` gemeldet, dessen `code` `DEPENDENCY_REJECTED` ist und dessen `cause` die Ablehnung ist, die ihn zu Fall brachte — so lässt er sich von dem Schreibvorgang unterscheiden, den der Server tatsächlich abgelehnt hat. Unter 0.23 trägt er stattdessen den eigenen Fehler des abgelehnten Schreibvorgangs.
 
 Aufeinanderfolgende Bearbeitungen einer Zeile im Offline-Zustand werden zu einem einzigen eingereihten Schreibvorgang zusammengeführt, sodass ein Formular, in das gerade getippt wird, die Warteschlange nicht wachsen lässt. Lehnt der Server den zusammengeführten Schreibvorgang wegen seines Inhalts ab (ein 400, 403 oder 422 — etwa ein Feld, das durch eine Schema-Änderung entfernt wurde, während der Benutzer offline war), teilt die Engine ihn wieder in die einzelnen Bearbeitungen auf und spielt jede erneut ab. Nur die Bearbeitung, die der Server ablehnt, wird zurückgerollt und gemeldet; die anderen bleiben erhalten.
 
@@ -156,6 +158,8 @@ Ein Fehlschlag, der lediglich vorübergehend ist — ein 429, ein 503, eine abge
 ## Mehrere Tabs
 
 Tabs derselben App teilen sich eine IndexedDB-Datenbank und damit die lokalen Zeilen und die Outbox. Ein Schreibvorgang in einem Tab erscheint in den anderen, und immer nur ein Tab zugleich wiederholt die Warteschlange. Es gibt nichts zu konfigurieren.
+
+Diese letzte Garantie stammt von der [Web Locks API](https://developer.mozilla.org/en-US/docs/Web/API/Web_Locks_API) des Browsers, die nur in einem sicheren Kontext (HTTPS oder `localhost`) existiert und nicht in Safari vor 15.4 oder in einigen eingebetteten Webviews. Ohne sie wiederholt jeder offene Tab die Warteschlange, wenn er synchronisiert. Creates, Bulk-Schreibvorgänge, Updates und Deletes werden alle mit einem Idempotenzschlüssel wiederholt, sodass ein Server, der Schlüssel speichert, jeden davon einmal anwendet; sichtbar ist dann derselbe Schreibvorgang, aus zwei Tabs gesendet.
 
 ## Benutzer
 
@@ -225,8 +229,11 @@ Der einzige Vertrag über das Offensichtliche hinaus ist, dass Präfix-Auflistun
 Der Client ist kein Replikat Ihrer Datenbank und gibt auch nicht vor, eines zu sein:
 
 - **Nur Zeilen, die die App gelesen oder geschrieben hat, liegen lokal vor.** Eine Abfrage, die der Client nie gesendet hat, kann trotzdem aus dem Vorhandenen beantwortet werden, aber der Antwort können Zeilen fehlen, die der Server zurückgegeben hätte. Live-Ergebnisse sagen das über `partial`.
+- **`findAll()` und `iterate()` lesen nur Seiten, die der Server auf diesem Gerät beantwortet hat.** Ein Durchlauf geht weiter, solange jede Seite sagt, dass es mehr gibt, und das kann nur der Server sagen. Offline scheitert ein Durchlauf, der eine Seite braucht, die dieses Gerät nie abgerufen hat, mit dem `OFFLINE`-Fehler (`isOfflineError`), statt einen Teil der Collection zurückzugeben, als wäre es alles. Auf 0.24 hörte er an dieser Seite auf und gab zurück, was er hatte.
+- **`count()` offline braucht eine Zählung, die der Server diesem Gerät für dieselbe Abfrage gegeben hat.** Seither eingereihte Schreibvorgänge verschieben sie: Creates, Bearbeitungen, die eine Zeile in den Filter hinein- oder aus ihm herausnehmen, und Deletes. Ohne eine scheitert er mit dem `OFFLINE`-Fehler, statt die Zeilen zu zählen, die dieses Gerät zufällig hält. Auf 0.24 gab er diese Zahl zurück.
 - **`searchString` wird angenähert** als Teilstringsuche über zwischengespeicherte String-Felder ohne Beachtung der Groß-/Kleinschreibung. Der Server führt eine echte Volltextsuche über die konfigurierten Spalten der Collection aus.
 - **Mit `include` eingebundene Relationen lassen sich lokal nicht auswerten** — die verwandten Zeilen liegen in Collections, die die Abfrage nie geladen hat. Eine solche Abfrage wird immer als `partial` markiert, wenn sie aus dem Cache beantwortet wird.
+- **Konflikte sind Last-Writer-Wins, pro Feld, ohne Erkennung.** Ein wiederholtes `update` sendet die Felder, die der Benutzer geändert hat, und nichts sonst, sodass Felder, die er nicht angefasst hat, behalten, was der Server hat. Bei einem Feld, das er *geändert* hat, wird eine Änderung, die jemand anders auf dem Server vornahm, während er offline war, überschrieben, wenn die Warteschlange wiederholt, und keiner der beiden Benutzer erfährt es. Beim Wiederholen vergleicht nichts Versionen.
 - **Das Wiederholen erfolgt mindestens einmal.** Ein Schreibvorgang, der den Server erreicht, dessen Antwort aber verloren geht, kann erneut gesendet werden. Bevorzugen Sie idempotente Schreibvorgänge (`createMany` mit `upsert`), wo Duplikate eine Rolle spielen würden.
 - **Ein Upsert auf einem natürlichen Schlüssel braucht den Server.** Welche Zeile ein `onConflict`-Ziel bezeichnet, kann nur der Server herausfinden, daher werden `upsert()` auf einem natürlichen Schlüssel (oder ohne die ID der Zeile) und ein nie gesendetes `createMany()` mit `onConflict` offline mit `OFFLINE_UPSERT_UNSUPPORTED` abgelehnt. Ein Upsert auf dem Primärschlüssel, mit dem Schlüssel in jeder Zeile, wird in die Warteschlange gestellt.
 - **Lokale Lesevorgänge wenden Postgres-Semantik an, nicht die Daten der Datenbank.** Filter werden so ausgewertet, wie SQL es täte — Vergleiche mit `NULL` sind unbekannt, `ORDER BY` stellt Nullwerte bei aufsteigender Sortierung ans Ende —, aber gegen die Kopie der Zeilen im Client, die veraltet sein kann.

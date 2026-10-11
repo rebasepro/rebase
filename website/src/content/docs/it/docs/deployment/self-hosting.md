@@ -1,5 +1,5 @@
 ---
-sourceHash: ae8d9da2fa3d1e43
+sourceHash: 1789995e7e1e6bf9
 title: Self-Hosting
 sidebar_label: Self-Hosting
 description: Esegui Rebase ovunque con l'immagine di runtime ufficiale e il bundle del tuo progetto — Docker Compose, Fly, Railway o un semplice VPS.
@@ -246,6 +246,15 @@ REBASE_METRICS_TOKEN=<random string>
 ```
 
 Espone metriche Prometheus su `/metrics`: conteggio delle richieste e istogrammi di latenza suddivisi per superficie API (data, auth, storage, functions) e collection, oltre a gauge sul processo. Senza un token, l'endpoint è leggibile da chiunque possa raggiungere la porta, quindi impostane uno a meno che non si trovi su una rete privata.
+
+<span class="since-badge" data-since="0.25">Da 0.25</span>
+`rebase_db_pool_wait_ms` è un istogramma di quanto ha atteso ogni query per una
+connessione dal pool del database, compresa l'apertura di una, con etichetta la chiave
+della data source (`source="(default)"` in un progetto che non dichiara data source). Un
+pool sano lo tiene vicino a zero. Una coda che
+cresce con il traffico significa che le richieste sono in attesa di connessioni — il più delle volte
+tenute da callback di scrittura che attendono qualcosa di lento; vedi
+[Un callback tiene una connessione](/docs/collections/callbacks/#a-callback-holds-a-connection).
 
 ## Header di sicurezza
 

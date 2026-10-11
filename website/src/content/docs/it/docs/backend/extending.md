@@ -1,5 +1,5 @@
 ---
-sourceHash: 589741179a41eb37
+sourceHash: a85dec5a1dd5e6ed
 title: Rebase non fa X
 sidebar_label: Estendere il server
 description: La scala di estensione lato server — dichiarazione, callback di collezione, funzione personalizzata, rotte personalizzate, server personalizzato, eject — con ciò che ciascuno può e non può raggiungere.
@@ -261,6 +261,13 @@ async function topSellers(driver: DataDriver, since: string) {
 da `context.driver` all'interno di un callback. Restringine il tipo con `isSQLAdmin` invece di effettuare un casting:
 la guardia fa la differenza tra un driver che dichiara l'impossibilità di eseguire SQL e uno
 che genera un errore `admin.executeSql is not a function` nel punto di chiamata.
+
+<span class="since-badge" data-since="0.25">Da 0.25</span> `executeSql` restituisce
+tutte le righe che legge. Per l'SQL di cui non controlli la dimensione, passa `maxResultBytes`:
+un risultato le cui righe occupano più byte di così viene rifiutato con un errore il cui
+`code` è `RESULT_TOO_LARGE`, mai restituito in parte. L'`EXECUTE_SQL` del socket
+realtime, attraverso cui passa l'`executeSql` di un client admin, imposta 128 MB per
+ogni chiamante.
 
 **Qualcosa che il framework dovrebbe fare e non fa.** Se ti ritrovi ad applicare
 patch a `@rebasepro/server-postgres`, o a eseguire l'eject per un singolo comportamento, conviene

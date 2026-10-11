@@ -1,5 +1,5 @@
 ---
-sourceHash: 7184b66cc0913ef9
+sourceHash: 2a29a9e6fa3879e6
 title: Acceso a campos
 sidebar_label: Acceso a campos
 description: Permisos de lectura y escritura por propiedad según el rol. Un emisor al que las reglas de seguridad de la fila permiten el paso aún así no recibe un campo que sus roles no pueden leer.
@@ -77,9 +77,16 @@ Esto es deliberado. Un valor retenido que se devolviera como `null` sería indis
 
 Se aplica en cada punto de salida: listados, obtención individual, destinos de relaciones incluidos con `?include=`, resultados de `_batch`, tramas en tiempo real de `.listen()`, resultados agregados e instantáneas del [historial](#historial).
 
+El valor de una propiedad de relación son sus filas relacionadas, así que una relación que no puedes leer se
+retiene entera. `?include=` la deja fuera de la fila, con su `_count`, desde
+todas las puertas: REST, el SDK, `.listen()` y las inclusiones anidadas un nivel por debajo.
+Nombrarla en cualquier otro sitio se rechaza como un campo (consulta [Consultas](#consultas)).
+
 ### Consultas
 
-Un `where`, `orderBy`, `fields`, un `select` de agregación o un `groupBy` que mencione un campo que no puedes leer genera un **400 `FIELD_NOT_READABLE`**:
+Un `where`, `orderBy`, `fields`, un `select` de agregación o un `groupBy` que mencione un campo que no puedes leer genera un **400 `FIELD_NOT_READABLE`**. Lo mismo ocurre con una relación que no puedes leer
+nombrada en una ruta anidada (`/departments/1/members`, `/departments/1/members/7`) o
+en una ordenación de agregado (`orderBy=count(members)`):
 
 ```http
 GET /api/data/staff?salary=gt.100000

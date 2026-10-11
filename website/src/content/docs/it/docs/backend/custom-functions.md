@@ -1,5 +1,5 @@
 ---
-sourceHash: 7db64266e1a6960b
+sourceHash: 0fc23adc81af9f41
 title: Funzioni personalizzate
 sidebar_label: Funzioni personalizzate
 description: Aggiungi endpoint API Hono personalizzati accanto alle tue route CRUD di Rebase. Individuazione automatica da una directory, con accesso completo all'istanza backend.
@@ -59,7 +59,7 @@ const { message } = await client.functions.invoke<{ message: string }>(
 `RebaseApiError` in caso di codice non-2xx — in questo modo la struttura dell'errore
 definita dalla funzione stessa raggiunge il chiamante invece di un semplice rifiuto di `fetch`.
 
-Tre parametri aggiuntivi che accetta oltre al nome:
+Quattro parametri aggiuntivi che accetta oltre al nome:
 
 ```typescript
 // A different method. The payload is dropped for GET, since GET has no body.
@@ -71,13 +71,19 @@ await client.functions.invoke("hello", undefined, { method: "GET", path: "stats"
 
 // A query string. Passed as `path`, with no separator inserted before `?`.
 await client.functions.invoke("reports", undefined, { method: "GET", path: "?days=30" });
+
+// A function that answers text or a file (`c.text(csv)`, `c.body(pdf)`).
+// The answer is read as JSON unless you say otherwise: "text" gives a string,
+// "blob" a Blob, "response" the Response itself with its body unread.
+const csv = await client.functions.invoke<string>("export-orders", undefined, { method: "GET", responseType: "text" });
 ```
 
 :::note
-Anche `client.call("functions/hello", …)` raggiunge una funzione, ma fa qualcosa
-di leggermente diverso: spacchetta `res.data` quando la risposta ne contiene uno. Due modalità
-di accesso con due contratti di risposta differenti è una trappola — usa `functions.invoke`. `call`
-esiste per le route montate all'esterno di `/api/functions`, che `invoke` non può esprimere.
+Anche `client.call("functions/hello", payload)` raggiunge una funzione. Fa sempre
+`POST` e, come `invoke`, restituisce il body così com'è — nessuno dei due cerca una
+chiave `data`. Preferisci `functions.invoke`, che accetta un metodo, un sotto-percorso e un
+`responseType`; `call` esiste per le route montate all'esterno di `/api/functions`, che
+`invoke` non può esprimere.
 :::
 
 :::important
@@ -497,7 +503,7 @@ Le funzioni personalizzate vengono caricate e montate **dopo** che `initializeRe
 3. **Route di storage** — `/api/storage/*`
 4. **Route dei dati** — `/api/data/*` (CRUD per le collection)
 5. **Funzioni personalizzate** ← `/api/functions/*`
-6. **Cron job** — `/api/cron/*`
+6. **Cron job** — `/api/admin/cron/*`
 7. **WebSocket** — Sottoscrizioni real-time
 
 Ciò significa che le tue funzioni personalizzate hanno accesso a tutti i servizi inizializzati. Registra qualsiasi route che debba essere eseguita **prima** di Rebase direttamente sull'app Hono, prima di chiamare `initializeRebaseBackend()`:
@@ -579,7 +585,7 @@ Il router viene montato per la **directory**, non per le singole funzioni al suo
 
 A `/api/functions/*` si applicano due limiti massimi:
 
-- **Timeout della richiesta** — 30 secondi per impostazione predefinita, rispondendo con `504` e il codice `FUNCTION_TIMEOUT`. Configura con `functionsTimeoutMs` (o `REBASE_FUNCTIONS_TIMEOUT_MS`); `0` lo disabilita. L'handler non può essere annullato dall'esterno, quindi assegna alle chiamate HTTP in uscita un `AbortSignal` — il timeout libera il client e il socket, ma non interrompe il lavoro in corso. Il fatto che l'handler *continui a essere eseguito* dopo l'errore 504 è una caratteristica di un processo Node a lunga esecuzione, non una garanzia del contratto; qualsiasi operazione che debba necessariamente completarsi appartiene a [`waitUntil`](#attività-in-background).
+- **Timeout della richiesta** — 30 secondi per impostazione predefinita, rispondendo con `504` e il codice `FUNCTION_TIMEOUT`. Configura con `functionsTimeoutMs` (o `REBASE_FUNCTIONS_TIMEOUT_MS`); `0` lo disabilita. L'handler non può essere fermato dall'esterno, ma viene avvisato: <span class="since-badge" data-since="0.25">Da 0.25</span> `getSignal(c)` da `@rebasepro/server/functions` viene interrotto nel momento del 504, quindi passalo a `fetch` e a tutto ciò che accetta un signal (`fetch(url, { signal: getSignal(c) })`). Il lavoro a cui non viene passato il signal prosegue — il timeout libera il client e il socket, ma non interrompe il lavoro in corso. Il fatto che l'handler *continui a essere eseguito* dopo l'errore 504 è una caratteristica di un processo Node a lunga esecuzione, non una garanzia del contratto; qualsiasi operazione che debba necessariamente completarsi appartiene a [`waitUntil`](#attività-in-background).
 - **Rate limit** — I chiamanti con chiave API e autenticati condividono i bucket dell'API dei dati. I chiamanti anonimi ricevono una quota dedicata, molto più permissiva (3000 per finestra temporale), poiché questo router è pubblico per impostazione predefinita per la ricezione dei webhook. È possibile sovrascriverlo con `rateLimit.anonymousFunctions`; `null` lo disattiva.
 
 I rifiuti di promise non gestiti (unhandled promise rejections) vengono registrati nei log anziché essere fatali: una chiamata fire-and-forget in una funzione terminerebbe altrimenti l'intero processo. Imposta `REBASE_EXIT_ON_UNHANDLED_REJECTION=1` per ripristinare il comportamento predefinito di Node.

@@ -1,5 +1,5 @@
 ---
-sourceHash: 81ca845faa40b4f5
+sourceHash: a30d441e176f5d1c
 title: Job in background
 sidebar_label: Job in background
 description: Una coda di job persistente basata su Postgres — lavoro che sopravvive a un riavvio, ritentato con backoff, con i fallimenti conservati anziché eliminati.
@@ -34,7 +34,25 @@ await initializeRebaseBackend({
 });
 ```
 
-Disabilitato se non richiesto esplicitamente: un worker interroga continuamente il database tramite polling, un comportamento che non è una scelta predefinita desiderabile per tutti. Richiede un driver in grado di eseguire SQL — su uno che non può farlo (MongoDB), la coda non è disponibile e ti viene segnalato all'avvio anziché al primo inserimento in coda.
+Disabilitato se non richiesto esplicitamente: un worker continua a cercare lavoro finché il processo è in vita, un comportamento che non è una scelta predefinita desiderabile per tutti. Richiede un driver in grado di eseguire SQL — su uno che non può farlo (MongoDB), la coda non è disponibile e ti viene segnalato all'avvio anziché al primo inserimento in coda.
+
+<span class="since-badge" data-since="0.25">Da 0.25</span> Un worker inattivo non esegue il polling ogni due secondi. Ogni inserimento in coda invia un
+`NOTIFY` sul canale `rebase_jobs` al momento del commit, e un worker che tiene un
+`LISTEN` su di esso acquisisce subito il job — un job accodato da un altro processo (il ruolo
+`api`, un'altra replica) parte in pochi millisecondi, e uno differito quando
+scade. Dietro a questo, controlla comunque ogni 30 secondi. Un job che questo processo
+accoda, un retry che ha pianificato e un job che ha recuperato lo svegliano senza
+una notifica.
+
+Il `LISTEN` richiede una connessione propria, trovata nello stesso modo in cui la trova il realtime:
+`DATABASE_DIRECT_URL` se impostato, altrimenti `DATABASE_URL`. Dietro un pooler in modalità
+transazione come PgBouncer, imposta `DATABASE_DIRECT_URL`: un pooler non mantiene un
+`LISTEN`, e i job di altri processi attenderebbero allora il controllo dei 30 secondi.
+Dove non esiste alcuna connessione di questo tipo (il database di sviluppo in-process),
+un worker inattivo rallenta: controlla dopo `pollIntervalMs` (2 secondi),
+poi il doppio dopo ogni controllo che non ha trovato nulla, fino a 30 secondi, e
+ricomincia ogni volta che trova lavoro. Un worker inattivo fa circa 2.900 acquisizioni al
+giorno invece di 43.200.
 
 ## Accodamento
 
@@ -82,10 +100,35 @@ Quindi un handler lento su un worker attivo mantiene il proprio job, per quanto 
 jobs: {
     enabled: true,
     concurrency: 5,              // jobs at once, per instance
-    pollIntervalMs: 2_000,       // when the last look found nothing
+    pollIntervalMs: 2_000,       // the first wait after a look that found nothing; it doubles up to 30 s
     visibilityTimeoutMs: 300_000 // how long an unrenewed claim holds
 }
 ```
+
+### Un handler che non finisce mai
+
+Il rovescio della medaglia: un handler in attesa di una `fetch` che non risponde mai tiene
+occupato il suo slot di worker, e la sua presa in carico, finché il processo è in vita — con cinque
+di questi il worker non esegue nient'altro, mentre `/health` resta verde.
+<span class="since-badge" data-since="0.25">Da 0.25</span> Imposta `timeoutMs` per
+limitare un tentativo. Alla scadenza il tentativo fallisce — ritentato finché restano
+tentativi, come qualsiasi throw — il suo slot viene liberato, e il `signal` dell'handler
+viene interrotto. Passa il signal a chi di dovere, così anche il lavoro si ferma; un handler che lo ignora
+continua a girare in background senza che nulla ne registri l'esito.
+
+```typescript no-verify
+jobs: {
+    enabled: true,
+    timeoutMs: 120_000,          // one attempt; no limit when left out
+    tasks: {
+        "sync-crm": async ({ payload, signal }) => {
+            await fetch(crmUrl, { method: "POST", body: JSON.stringify(payload), signal });
+        }
+    }
+}
+```
+
+Gli handler della coda e le sottoscrizioni ai topic ricevono lo stesso `signal` nel loro contesto.
 
 ## Istanze multiple
 
@@ -105,10 +148,10 @@ const { jobQueue } = await initializeRebaseBackend({ jobs: { enabled: true } });
 const dispatcher = new WebhookDispatcher({ jobQueue });
 dispatcher.setWebhooks(myWebhooks);
 
-jobQueue?.register(WEBHOOK_DELIVERY_TASK, ctx => dispatcher.deliverQueuedJob(ctx.payload as never));
+jobQueue?.register(WEBHOOK_DELIVERY_TASK, ctx => dispatcher.deliverQueuedJob(ctx.payload as never, ctx));
 ```
 
-Sul job viene memorizzato solo l'**id** del webhook, mai il webhook stesso — altrimenti il suo segreto di firma rimarrebbe in chiaro in `rebase.jobs` per tutto il periodo di retention della riga, e un webhook modificato tra l'accodamento e l'invio deve essere inviato con la configurazione attuale.
+Sul job viene memorizzato solo l'**id** del webhook, mai il webhook stesso — altrimenti il suo segreto di firma rimarrebbe in chiaro in `rebase.jobs` per tutto il periodo di retention della riga, e un webhook modificato tra l'accodamento e l'invio deve essere inviato con la configurazione attuale. Passare `ctx` come secondo argomento fa sì che ogni tentativo invii il proprio `X-Webhook-Attempt`; tutti i tentativi di una stessa consegna inviano lo stesso `X-Webhook-Delivery`, così un destinatario può deduplicare i retry.
 
 Un invio che il dispatcher si rifiuta di effettuare (una destinazione loopback, link-local, privata o non `http(s)`), o a cui il destinatario risponde con un redirect, fallisce ogni volta allo stesso modo. Finisce in dead-letter dopo un solo tentativo, con il motivo in `last_error`. Qualsiasi altro errore viene ritentato come per ogni job.
 

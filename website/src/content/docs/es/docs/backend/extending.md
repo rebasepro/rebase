@@ -1,5 +1,5 @@
 ---
-sourceHash: 589741179a41eb37
+sourceHash: a85dec5a1dd5e6ed
 title: Rebase no hace X
 sidebar_label: Extender el servidor
 description: La escalera de extensiones del lado del servidor — declaración, callback de colección, función personalizada, tus propias rutas, tu propio servidor, eject — con lo que cada uno puede y no puede alcanzar.
@@ -283,6 +283,13 @@ async function topSellers(driver: DataDriver, since: string) {
 `isSQLAdmin` en lugar de hacer un cast: el guard es la diferencia entre que un driver
 que no puede ejecutar SQL lo indique formalmente o que lance
 `admin.executeSql is not a function` en el punto de llamada.
+
+<span class="since-badge" data-since="0.25">Desde 0.25</span> `executeSql` devuelve
+todas las filas que lee. Para un SQL cuyo tamaño no controlas, pasa `maxResultBytes`:
+un resultado cuyas filas ocupen más bytes que eso se rechaza con un error cuyo
+`code` es `RESULT_TOO_LARGE`, nunca se devuelve en parte. El `EXECUTE_SQL` del socket
+en tiempo real, por el que pasa el `executeSql` de un cliente de administración,
+fija 128 MB para todos los llamadores.
 
 **Algo que el framework debería hacer y no hace.** Si te encuentras parcheando
 `@rebasepro/server-postgres` o haciendo un eject por un único comportamiento,

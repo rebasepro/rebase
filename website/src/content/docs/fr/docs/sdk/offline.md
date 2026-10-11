@@ -1,5 +1,5 @@
 ---
-sourceHash: bc550d505d122629
+sourceHash: 6c16b3e7b3784d47
 title: Hors ligne et synchronisation local-first
 sidebar_label: Hors ligne
 description: Activez le moteur de synchronisation local-first du SDK typé de Rebase — une base de données locale de lignes, des écritures hors ligne instantanées avec annulation, et des requêtes en direct réactives.
@@ -61,7 +61,7 @@ try {
 Tant que la connexion est connue comme coupée, une écriture n'est même pas tentée — elle s'applique localement et se met en file d'attente, ce qui ne coûte rien au lieu d'un délai d'attente expiré :
 
 ```typescript
-// Returns immediately, offline or not.
+// While offline, returns at once with the locally applied row.
 const post = await client.data.posts.create({ title: "Draft", status: "draft" });
 
 // Shows up in every matching list, right away.
@@ -70,7 +70,7 @@ const drafts = await client.data.posts.where("status", "==", "draft").find();
 
 Les lignes créées hors ligne reçoivent un id généré par le client, dans le type que les ids de la collection ont déjà : un **entier négatif** là où ce sont des nombres, une chaîne UUID là où ce sont des chaînes. Le signe est l'indice — une vraie clé n'est jamais négative —, si bien qu'une ligne qui n'a pas encore atteint le serveur se reconnaît sans consultation, et `id` reste ce que le type `Row` généré annonce. Sur une collection que cet appareil n'a jamais lue, rien en local ne permet de déduire le type, et l'id est un UUID.
 
-Si le serveur attribue le sien au moment du rejeu, la ligne locale et toutes les écritures en file d'attente qui pointent encore vers l'id temporaire sont basculées vers l'id réel. D'ici là, ne conservez pas un id temporaire hors de la base hors ligne : une clé étrangère ou une URL mise en signet qui en contient un désigne une ligne sur le point d'être renumérotée.
+Si le serveur attribue le sien au moment du rejeu, la ligne locale et toutes les écritures en file d'attente qui pointent encore vers l'id temporaire sont basculées vers l'id réel, dans chaque collection : un article en file d'attente dont `author_id` désigne un auteur créé hors ligne est envoyé avec l'id que le serveur a donné à cet auteur. Si le serveur refuse l'auteur à la place, les écritures qui le référencent sont écartées avec lui et signalées comme `DEPENDENCY_REJECTED` (voir [Quand le serveur refuse](#quand-le-serveur-refuse)). D'ici là, ne conservez pas un id temporaire hors de la base hors ligne : une clé étrangère ou une URL mise en signet qui en contient un désigne une ligne sur le point d'être renumérotée.
 
 Les écritures sont rejouées dans l'ordre où vous les avez faites, toutes collections confondues — ainsi une création dans une collection arrive toujours avant la ligne d'une autre collection qui la référence.
 
@@ -123,7 +123,7 @@ const { online, pending, syncing, lastSyncedAt, lastError } = client.offline!.st
 
 | Méthode | Rôle |
 |--------|---------|
-| `status()` | Connectivité actuelle, profondeur de la file d'attente, activité de synchronisation, dernière erreur |
+| `status()` | Connectivité actuelle, profondeur de la file d'attente, activité de synchronisation, dernière erreur, et `persisted` : indique si le navigateur a accepté de conserver la base hors ligne (demandé lorsque la première écriture est mise en file ; `false` signifie qu'elle peut être évincée en cas de pression sur le stockage, écritures non envoyées comprises) |
 | `onStatusChange(fn)` | S'abonner à ce qui précède |
 | `onQueueChange(fn)` | Uniquement le nombre d'écritures non envoyées, pour un badge |
 | `pending()` | Les mutations en file d'attente elles-mêmes, les plus anciennes d'abord. `pending({ orphaned: true })` : celles mises en file d'attente sans session ouverte — voir [Utilisateurs](#utilisateurs) |
@@ -147,7 +147,9 @@ const client = createRebaseClient({
 });
 ```
 
-La cascade est étroite : un `update` est écarté en même temps que l'écriture qu'il modifiait, car il ne peut échouer que de la même manière. Un `create` ou un `delete` ultérieur portant sur la même ligne se suffit à lui-même et est conservé. Une écriture écartée n'a jamais été envoyée. Elle est signalée avec une `RebaseApiError` dont le `code` est `DEPENDENCY_REJECTED` et dont la `cause` est le refus qui l'a condamnée, ce qui permet de la distinguer de l'écriture que le serveur a réellement refusée. Sur la 0.23 elle porte à la place l'erreur propre de l'écriture refusée.
+Une ligne supprimée par quelqu'un d'autre est le seul cas qui n'est pas annulé. Un `delete` en file d'attente de cette ligne a fait ce pour quoi il était fait : il compte comme synchronisé et n'est pas signalé. Une modification en file d'attente de cette ligne est signalée, et la ligne est retirée de la base locale au lieu d'être restaurée, car le serveur ne l'a plus.
+
+La cascade est étroite : un `update` est écarté en même temps que l'écriture qu'il modifiait, car il ne peut échouer que de la même manière. Un `create` ou un `delete` ultérieur portant sur la même ligne se suffit à lui-même et est conservé. Un `create` refusé d'une ligne créée hors ligne emporte aussi avec lui toute écriture en file d'attente, dans n'importe quelle collection, dont les valeurs référencent l'id temporaire de la ligne. Une écriture écartée n'a jamais été envoyée. Elle est signalée avec une `RebaseApiError` dont le `code` est `DEPENDENCY_REJECTED` et dont la `cause` est le refus qui l'a condamnée, ce qui permet de la distinguer de l'écriture que le serveur a réellement refusée. Sur la 0.23 elle porte à la place l'erreur propre de l'écriture refusée.
 
 Des modifications consécutives sur une même ligne pendant la déconnexion sont fusionnées en une seule écriture mise en file d'attente, de sorte qu'un formulaire en cours de saisie ne fait pas grossir la file. Si le serveur refuse l'écriture fusionnée en raison de son contenu (un 400, 403 ou 422 — par exemple un champ supprimé par un changement de schéma pendant que l'utilisateur était hors ligne), le moteur la scinde à nouveau en modifications séparées et rejoue chacune d'elles. Seule la modification que le serveur refuse est annulée et signalée ; les autres sont conservées.
 
@@ -156,6 +158,8 @@ Un échec simplement temporaire — un 429, un 503, une connexion coupée — n'
 ## Onglets multiples
 
 Les onglets d'une même application partagent une seule base IndexedDB : ils partagent donc les lignes locales et la file d'attente d'envoi. Une écriture dans l'un apparaît dans les autres, et un seul onglet à la fois rejoue la file d'attente. Rien à configurer.
+
+Cette dernière garantie vient de l'[API Web Locks](https://developer.mozilla.org/en-US/docs/Web/API/Web_Locks_API) du navigateur, qui n'existe que dans un contexte sécurisé (HTTPS, ou `localhost`) et pas dans Safari avant la 15.4 ni dans certaines webviews intégrées. Sans elle, chaque onglet ouvert rejoue la file d'attente lorsqu'il se synchronise. Les créations, écritures en masse, mises à jour et suppressions sont toutes rejouées avec une clé d'idempotence : un serveur qui stocke les clés applique donc chacune une seule fois ; ce que vous pouvez voir, c'est la même écriture envoyée depuis deux onglets.
 
 ## Utilisateurs
 
@@ -225,8 +229,11 @@ Le seul contrat au-delà de l'évidence est que les listages par préfixe revien
 Le client n'est pas une réplique de votre base de données, et il ne prétend pas l'être :
 
 - **Seules les lignes que l'application a lues ou écrites sont locales.** Une requête que le client n'a jamais envoyée peut tout de même trouver réponse dans ce qu'il détient, mais il peut manquer à cette réponse des lignes que le serveur aurait renvoyées. Les résultats en direct le signalent via `partial`.
+- **`findAll()` et `iterate()` ne lisent que les pages auxquelles le serveur a répondu sur cet appareil.** Un parcours se poursuit tant que chaque page indique qu'il y en a d'autres, et seul le serveur peut le dire. Hors ligne, un parcours qui a besoin d'une page que cet appareil n'a jamais récupérée échoue avec l'erreur `OFFLINE` (`isOfflineError`) au lieu de renvoyer une partie de la collection comme si c'était tout. Sur la 0.24, il s'arrêtait à cette page et renvoyait ce qu'il avait.
+- **`count()` hors ligne a besoin d'un décompte que le serveur a donné à cet appareil pour la même requête.** Les écritures mises en file depuis le déplacent : créations, modifications qui font entrer ou sortir une ligne du filtre, et suppressions. Sans décompte, il échoue avec l'erreur `OFFLINE` plutôt que de compter les lignes que cet appareil détient par hasard. Sur la 0.24, il renvoyait ce nombre.
 - **`searchString` est approximé** par un balayage de sous-chaîne insensible à la casse sur les champs texte en cache. Le serveur, lui, exécute une vraie recherche plein texte sur les colonnes configurées de la collection.
 - **Les relations passées à `include` ne peuvent pas être évaluées localement** — les lignes liées vivent dans des collections que la requête n'a jamais chargées. Une telle requête est toujours marquée `partial` lorsqu'elle est servie depuis le cache.
+- **Les conflits sont résolus par le dernier écrivain gagnant, champ par champ, sans détection.** Un `update` rejoué envoie les champs que l'utilisateur a modifiés et rien d'autre : les champs qu'il n'a pas touchés gardent ce que possède le serveur. Pour un champ qu'il a *bien* modifié, un changement fait par quelqu'un d'autre sur le serveur pendant qu'il était hors ligne est écrasé au rejeu de la file, et aucun des deux utilisateurs n'en est informé. Rien ne compare les versions au rejeu.
 - **Le rejeu est « au moins une fois ».** Une écriture qui atteint le serveur mais dont la réponse se perd peut être renvoyée. Préférez des écritures idempotentes (`createMany` avec `upsert`) là où des doublons poseraient problème.
 - **Un upsert sur une clé naturelle a besoin du serveur.** Seul le serveur peut trouver la ligne que désigne une cible `onConflict`, donc `upsert()` sur une clé naturelle (ou sans l'identifiant de la ligne), et un `createMany()` avec `onConflict` jamais envoyé, sont refusés hors ligne avec `OFFLINE_UPSERT_UNSUPPORTED`. Un upsert sur la clé primaire, avec la clé dans chaque ligne, est mis en file d'attente.
 - **Les lectures locales appliquent la sémantique de Postgres, pas les données de la base.** Les filtres sont évalués comme SQL le ferait — les comparaisons avec `NULL` sont inconnues, `ORDER BY` place les valeurs nulles en dernier en ordre croissant — mais sur la copie des lignes détenue par le client, qui peut être obsolète.

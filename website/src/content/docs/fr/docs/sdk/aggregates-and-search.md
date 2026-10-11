@@ -1,5 +1,5 @@
 ---
-sourceHash: 15505bc41ba0e8f2
+sourceHash: 06f83add20038a66
 title: Agrégats et recherche
 sidebar_label: Agrégats & recherche
 description: "Comptez, additionnez et regroupez avec le SDK, filtrez dans les colonnes JSON, et exécutez des recherches textuelles et vectorielles depuis le client."
@@ -151,7 +151,9 @@ déclarant un bloc `search`, ce qui permet également de classer les résultats 
 
 Pour les collections possédant une propriété `vector`, triez les lignes par
 similarité avec un embedding de requête. Les lignes sont renvoyées de la plus
-proche à la plus éloignée, chacune portant un `_distance`.
+proche à la plus éloignée, chacune portant un `_distance`. La distance
+est l'ordre : un `orderBy` sur la même requête est ignoré. Sans `limit`, une recherche vectorielle renvoie
+10 lignes, et non les 50 d'une liste.
 
 ```typescript
 const { data } = await client.data.docs
@@ -161,11 +163,22 @@ const { data } = await client.data.docs
     .find();
 ```
 
-`where` et `orderBy` sur la même requête agissent comme des filtres appliqués
-*avant* le tri — cela renvoie les lignes les plus proches qui correspondent
-également, et non les lignes les plus proches filtrées après coup. La production
-de `queryVector` vous incombe : Rebase stocke et recherche les embeddings, il
-ne les calcule pas.
+`where` sur la même requête est un filtre sur les lignes candidates — cela renvoie
+les lignes les plus proches qui correspondent également, et non les lignes les plus
+proches filtrées après coup. Sur l'index HNSW, cela vaut à partir de pgvector 0.8.0 (voir
+[Filtres sur un index approximatif](/docs/backend/vector-search/#filters-on-an-approximate-index)) ;
+sur un pgvector plus ancien, un filtre que peu des lignes les plus proches satisfont renvoie une page
+trop courte. La production de `queryVector` vous incombe : Rebase stocke et recherche les embeddings,
+il ne les calcule pas.
+
+<span class="since-badge" data-since="0.25">Depuis 0.25</span> Le SDK envoie une recherche vectorielle sous la forme `POST /api/data/<collection>/query`, avec l'embedding
+dans le corps : dans l'URL, 768 dimensions représentent environ 17 Ko, au-delà de ce qu'acceptent Node (16 Ko) et la
+plupart des proxys (nginx : 8 Ko). `count()` avec une recherche vectorielle emprunte le même chemin, sous la forme
+`POST /api/data/<collection>/count`. Face à un serveur antérieur à la 0.24, qui n'a pas cette route, l'un comme
+l'autre se rabat sur le `GET` — et un long embedding peut alors encore être refusé par un 431 ou un 414.
+
+<span class="since-badge" data-since="0.25">Depuis 0.25</span> Avec un `threshold`, le résultat n'a pas de `meta.total` — compter les lignes situées dans une
+distance le calcule pour chaque ligne de la table. Paginez avec `meta.hasMore`, qui reste exact.
 
 ### Ce que vous devez fournir
 

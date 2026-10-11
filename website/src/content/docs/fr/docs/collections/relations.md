@@ -1,5 +1,5 @@
 ---
-sourceHash: cbee90067ba8da67
+sourceHash: 53bd9f35a923ce72
 title: Relations
 sidebar_label: Relations
 description: Définir les relations SQL un-à-un, un-à-plusieurs et plusieurs-à-plusieurs entre les collections avec des clés étrangères, des tables de jonction et des jointures multi-sauts.
@@ -74,7 +74,7 @@ ou plusieurs reviennent, et ce qu'une écriture au travers peut toucher.
 | Kind | La clé vit | Renvoie | Notes |
 |---|---|---|---|
 | `belongsTo` | sur **cette** table | une | `localKey`, par défaut `<relationName>_id` |
-| `hasOne` | sur la table de la **cible** | une | `foreignKeyOnTarget`, par défaut `<thisCollection>_id` |
+| `hasOne` | sur la table de la **cible** | une | `foreignKeyOnTarget`, par défaut le singulier de cette collection suivi de `_id` (`users` → `user_id`) |
 | `hasMany` | sur la table de la **cible** | plusieurs | les enfants appartiennent à ce seul parent |
 | `manyToMany` | dans une **table de jonction** | plusieurs | les lignes sont partagées ; le lien vous appartient |
 | `via` | un `joinPath` explicite | l'un ou l'autre | lecture seule ; indiquez vous-même la `cardinality` |
@@ -91,6 +91,13 @@ author: {
 }
 // → posts.author_id
 ```
+
+<span class="since-badge" data-since="0.25">Depuis 0.25</span> La colonne est indexée pour vous : Postgres indexe la clé vers laquelle pointe une clé étrangère, jamais la
+colonne qui la porte ; sans index, chaque include `hasMany` et chaque liste imbriquée depuis l'autre côté
+parcourt cette table. `index: false` conserve la contrainte et supprime l'index — voir
+[Les clés étrangères sont indexées pour vous](/docs/backend/indexes#les-clés-étrangères-sont-indexées-pour-vous)
+pour savoir quand cela vaut la peine, et quand Rebase l'omet de lui-même parce qu'un autre index sert déjà
+la colonne.
 
 ### hasMany / hasOne — la clé est sur la leur
 
@@ -517,6 +524,7 @@ interface RelationBase {
 interface BelongsToRelation extends RelationBase {
     kind: "belongsTo";
     localKey?: string;              // column on THIS table
+    index?: boolean;                // btree on localKey; defaults to true
 }
 
 interface HasOneRelation extends RelationBase {

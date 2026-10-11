@@ -1,5 +1,5 @@
 ---
-sourceHash: 6e23ad27a4c203f4
+sourceHash: 1ae19e3e555334a4
 title: Database Branching
 sidebar_label: Branching
 description: Crea branch di database isolati per sviluppo, staging e testing utilizzando CREATE DATABASE ... TEMPLATE di PostgreSQL — copie istantanee a fedeltà totale senza tempi di inattività.
@@ -215,7 +215,15 @@ imposta `DATABASE_URL`; non deve però avere la precedenza sui due livelli super
 riga di comando è un'istruzione più immediata rispetto a uno switch effettuato in precedenza.
 
 `.rebase/` è incluso nel file .gitignore, pertanto il branch su cui ti trovi è un dato relativo alla tua macchina
-e mai al progetto.
+e mai relativo al progetto.
+
+<span class="since-badge" data-since="0.25">Da 0.25</span> In un checkout su cui hai cambiato
+branch, `rebase db branch create`, `list`, `info`, `delete` e `prune` operano sul
+database principale, dove si trova il registro, e lo dichiarano. `create` copia
+comunque il branch su cui ti trovi, a meno che tu non passi `--from`; viene
+registrato nel database principale, quindi `list` lo mostra da qualsiasi
+checkout. Prima della 0.25 lo faceva solo `list`, e un branch creato da un
+checkout con branch cambiato veniva registrato solo nello snapshot del branch.
 
 I branch sono normali database PostgreSQL denominati con il nome del branch preceduto dal prefisso `rb_`, quindi `dev_sandbox` nell'esempio precedente corrisponde al database `rb_dev_sandbox` sullo stesso server.
 

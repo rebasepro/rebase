@@ -1,5 +1,5 @@
 ---
-sourceHash: 15505bc41ba0e8f2
+sourceHash: 06f83add20038a66
 title: Aggregate und Suche
 sidebar_label: Aggregate & Suche
 description: "Zählen, summieren und gruppieren mit dem SDK, Filtern in JSON-Spalten und Ausführen von Volltext- und Vektorsuche über den Client."
@@ -151,7 +151,9 @@ Siehe [Suche](/docs/backend/search).
 
 Bei Collections mit einer `vector`-Eigenschaft können Zeilen nach der Ähnlichkeit
 zu einem Query-Embedding sortiert werden. Die Zeilen werden mit dem ähnlichsten
-Ergebnis zuerst zurückgegeben, jeweils mit einer `_distance`.
+Ergebnis zuerst zurückgegeben, jeweils mit einer `_distance`. Die Distanz ist die
+Reihenfolge: Ein `orderBy` in derselben Abfrage wird ignoriert. Ohne ein
+`limit` liefert eine Vektorsuche 10 Zeilen, nicht die 50 einer Auflistung.
 
 ```typescript
 const { data } = await client.data.docs
@@ -161,11 +163,25 @@ const { data } = await client.data.docs
     .find();
 ```
 
-`where` und `orderBy` in derselben Abfrage fungieren als Filter, die *vor* der
-Sortierung angewendet werden — dies gibt die nächstgelegenen Zeilen zurück, die
-ebenfalls übereinstimmen, nicht die nächstgelegenen Zeilen, die nachträglich
-gefiltert wurden. Die Erstellung des `queryVector` liegt in Ihrer Verantwortung:
-Rebase speichert und durchsucht Embeddings, berechnet sie jedoch nicht.
+`where` in derselben Abfrage ist ein Filter darauf, welche Zeilen Kandidaten sind — dies
+gibt die nächstgelegenen Zeilen zurück, die ebenfalls übereinstimmen, nicht die nächstgelegenen
+Zeilen, die nachträglich gefiltert wurden. Auf dem HNSW-Index gilt das ab pgvector 0.8.0 (siehe
+[Filter auf einem Näherungsindex](/docs/backend/vector-search/#filters-on-an-approximate-index));
+bei einem älteren pgvector liefert ein Filter, den nur wenige der nächstgelegenen Zeilen bestehen, eine zu kurze
+Seite. Die Erstellung des `queryVector` liegt in Ihrer Verantwortung: Rebase speichert und durchsucht
+Embeddings, berechnet sie jedoch nicht.
+
+<span class="since-badge" data-since="0.25">Seit 0.25</span> Das SDK sendet eine
+Vektorsuche als `POST /api/data/<collection>/query`, mit dem Embedding im
+Body: In der URL sind 768 Dimensionen etwa 17 KB, mehr, als Node (16 KB) und die meisten
+Proxys (nginx: 8 KB) akzeptieren. `count()` mit einer Vektorsuche geht denselben Weg,
+als `POST /api/data/<collection>/count`. Gegen einen Server älter als 0.24, der
+keine solche Route hat, fällt beides auf das `GET` zurück — und ein langes Embedding kann dort
+weiterhin mit einem 431 oder einem 414 abgelehnt werden.
+
+<span class="since-badge" data-since="0.25">Seit 0.25</span> Mit einem `threshold`
+hat das Ergebnis kein `meta.total` — das Zählen der Zeilen innerhalb einer Distanz berechnet sie
+für jede Zeile der Tabelle. Paginieren Sie mit `meta.hasMore`, das exakt bleibt.
 
 ### Was Sie bereitstellen müssen
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: b45fa53f7ac4412f
+sourceHash: 4af9a2f9013d4137
 title: Hooks Backend Globaux
 sidebar_label: Hooks Globaux
 description: Appliquez des callbacks de cycle de vie transversaux à chaque collection au niveau du serveur à l'aide de CollectionCallbacks.
@@ -215,14 +215,15 @@ callbacks: {
 }
 ```
 
-```typescript no-verify
+```typescript
+// backend/functions/read-article.ts — served at /api/functions/read-article/:id
 // ✓ The read and the audit row are two operations, and only the second writes.
-import { rebase } from "@rebasepro/server";
+import { defineFunction, getUserId, requireAuth, requireDriver } from "@rebasepro/server/functions";
 
-export default defineFunction("read-article", (app) => {
-    app.get("/:id", async (c) => {
-        const article = await c.var.driver.fetchOne({ path: "articles", id: c.req.param("id") });
-        await rebase.dataAsAdmin.read_log.create({ path: "articles", uid: c.var.user?.uid });
+export default defineFunction((app, { rebase }) => {
+    app.get("/:id", requireAuth, async (c) => {
+        const article = await requireDriver(c).fetchOne({ path: "articles", id: c.req.param("id") });
+        await rebase.dataAsAdmin.read_log.create({ path: "articles", uid: getUserId(c) });
         return c.json(article);
     });
 });

@@ -1,5 +1,5 @@
 ---
-sourceHash: 75ae5bf75334fb86
+sourceHash: abfa67cfbfee8f87
 title: SDK typé — Prise en main
 sidebar_label: Prise en main
 description: Installez et configurez le SDK typé de Rebase pour interagir avec votre backend depuis n'importe quelle application JavaScript ou TypeScript.
@@ -99,7 +99,7 @@ Lorsque `Database` est fourni, `createRebaseClient` renvoie une instance de `Cre
 
 Une clé de propriété que *vous* avez écrite est votre clé, quelle que soit sa forme — rien ne renomme un nom que vous avez choisi. Les deux clés qui sont dérivées plutôt que déclarées — la clé étrangère d'une relation et une colonne récupérée par introspection — sont en camelCase.
 
-`Row` décrit une lecture, `Insert` un `create()` et `Update` un `update()` — ils n'ont pas la même structure. Une colonne qui n'est pas obligatoire est `T | null` sur les trois, ce qui permet à une écriture de la vider ; la clé primaire est toujours présente lors d'une lecture et ne peut jamais être définie lors d'une mise à jour ; une cible `belongsTo` peut être écrite soit sous forme de relation (`{ author: 5 }`), soit sous forme de sa clé étrangère (`{ authorId: 5 }`) ; et une appartenance `hasMany` ou `manyToMany` s'écrit comme une liste d'identifiants cibles ou d'objets `{ id }` (`{ tags: ["t-1"] }`), chacun portant un `_pivot` lorsque la table de jonction déclare des colonnes de charge utile. Un champ que personne n'a le droit d'écrire (`access: { write: [] }`) ne figure ni sur `Insert` ni sur `Update`.
+`Row` décrit une lecture, `Insert` un `create()` et `Update` un `update()` — ils n'ont pas la même structure. Une colonne qui n'est pas obligatoire est `T | null` sur les trois, ce qui permet à une écriture de la vider ; la clé primaire est toujours présente lors d'une lecture et ne peut jamais être définie lors d'une mise à jour ; une cible `belongsTo` peut être écrite soit sous forme de relation (`{ author: 5 }`), soit sous forme de sa clé étrangère (`{ authorId: 5 }`) ; et une appartenance `hasMany` ou `manyToMany` s'écrit comme une liste d'identifiants cibles ou d'objets `{ id }` (`{ tags: ["t-1"] }`), chacun portant un `_pivot` lorsque la table de jonction déclare des colonnes de charge utile. Un champ que personne n'a le droit d'écrire (`access: { write: [] }`) ne figure ni sur `Insert` ni sur `Update`. Une colonne `date` se lit sous forme de chaîne ISO, et une écriture accepte soit cette chaîne, soit un `Date`.
 
 ## Exemple rapide
 

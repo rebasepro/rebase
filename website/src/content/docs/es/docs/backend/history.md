@@ -1,5 +1,5 @@
 ---
-sourceHash: c61516d8bb8e724e
+sourceHash: a62053f25d91d42c
 title: Historial de entidades
 sidebar_label: Historial de entidades
 description: Realiza un seguimiento de cada cambio en tus entidades con un registro de auditoría completo — quién cambió qué, cuándo y la entidad completa antes y después.
@@ -61,9 +61,11 @@ const ordersCollection = defineCollection({
 ## Cómo funciona
 
 1. El backend crea automáticamente una tabla `rebase.entity_history`.
-2. En cada creación, actualización o eliminación, se registra una instantánea con:
+2. En cada creación, actualización o eliminación, se registra una entrada con:
    - El ID de la entidad y el slug de la colección (en `table_name`)
-   - Los valores completos de la entidad (antes y después)
+   - Los valores de la entidad tras el cambio (`values`; en un borrado, la entidad
+     que se eliminó)
+   - En una actualización, lo que contenían antes los campos modificados (`previous_values`)
    - Marca de tiempo e ID de usuario
    - La acción (`create`, `update`, `delete`)
    - Un array de `changed_fields` que muestra qué columnas se modificaron
@@ -78,6 +80,28 @@ campo de soft delete a `null`) como `update`. El historial de una fila sigue
 siendo legible mientras la fila está en la papelera, y revertirla a una
 versión anterior al borrado la restaura.
 
+### Qué contiene `previous_values`
+
+<span class="since-badge" data-since="0.25">Desde 0.25</span> Una entrada de
+actualización guarda, en `previous_values`, solo los campos listados en
+`changed_fields`. Todos los demás campos tenían el mismo valor antes y después del
+cambio, así que ya están en `values`; guardar la fila entera dos veces costaba a un
+cambio de un campo en una fila de 20 campos 1.269 bytes, donde ahora cuesta 794.
+
+Las entradas registradas antes de la 0.25 conservan la fila anterior completa. El
+`format` de la entrada indica cuál es:
+
+| `format` | `previous_values` en una actualización |
+|---|---|
+| `1` (entradas anteriores a la 0.25) | La fila completa antes del cambio |
+| `2` | Solo los `changed_fields`, cada uno tal como lo tenía la fila completa |
+
+La vista de historial del administrador y un revert leen ambos por igual: la vista
+muestra el valor anterior de cada campo modificado, y un revert escribe los `values`
+de la entrada elegida, que están completos en ambos formatos. Para reconstruir la fila
+tal como era antes de un cambio de `format: 2`, toma `values` y devuelve cada campo
+que contiene `previous_values`.
+
 ### Seguimiento de diferencias e igualdad estructural profunda
 
 Para evitar registrar logs redundantes donde los campos se guardan pero ningún valor cambia, el `HistoryService` realiza una comparación de igualdad estructural profunda (deep equality) en las claves de nivel superior de los valores antiguos y nuevos:
@@ -85,11 +109,18 @@ Para evitar registrar logs redundantes donde los campos se guardan pero ningún 
 - Si se encuentran diferencias, los nombres de las propiedades modificadas se guardan en la columna `changed_fields` (`text[]`).
 - Si la verificación de igualdad profunda detecta cero cambios, la inserción en el historial se omite por completo.
 
-### Purgado no bloqueante posterior al guardado
+### Purgado
 
-A diferencia de los sistemas tradicionales que dependen por completo de scripts por lotes periódicos y lentos, Rebase aplica tus políticas de retención de forma continua:
-- Justo después de guardar o eliminar una entidad, el servidor programa un **barrido asíncrono en línea** en una promesa no bloqueante de tipo fire-and-forget.
-- Este barrido comprueba inmediatamente los límites de retención para ese ID de entidad específico y purga las entradas que superen las 200 más recientes, o que sean más antiguas que el período de retención.
+La retención se aplica en dos lugares:
+- **Tras cada escritura**, para la entidad escrita: justo después de guardarla o
+  eliminarla, el servidor purga las entradas de esa entidad que superen las 200 más
+  recientes, o que sean más antiguas que el período de retención. No retiene la
+  escritura.
+- <span class="since-badge" data-since="0.25">Desde 0.25</span> **Una vez por hora**,
+  para todas las entidades: se eliminan las entradas más antiguas que el período de
+  retención, sea cual sea la entidad a la que pertenezcan — incluidas las entidades
+  en las que nunca se vuelve a escribir, como las eliminadas. Consulta
+  [Mecánica del ciclo de vida del purgado](#mecánica-del-ciclo-de-vida-del-purgado).
 
 ## Endpoint REST
 
@@ -109,9 +140,10 @@ Devuelve una lista de entradas del historial para una entidad específica, orden
             "action": "update",
             "changed_fields": ["status"],
             "values": { "status": "shipped", "total": 99.99 },
-            "previous_values": { "status": "pending", "total": 99.99 },
+            "previous_values": { "status": "pending" },
             "updated_by": "admin-user-id",
-            "updated_at": "2025-01-15T10:30:00Z"
+            "updated_at": "2025-01-15T10:30:00Z",
+            "format": 2
         }
     ],
     "meta": { "total": 1, "limit": 20, "offset": 0, "hasMore": false }
@@ -128,7 +160,33 @@ Cada entidad también conserva como máximo sus **200** entradas más recientes.
 
 ### Mecánica del ciclo de vida del purgado
 
-El purgado solo se realiza en línea. Se ejecuta de forma asíncrona justo después de cada cambio registrado, para la entidad modificada: se eliminan las entradas más antiguas que el período de retención y, a continuación, todo lo que supere las 200 más recientes. No hay ningún barrido periódico, por lo que el historial de una entidad en la que nunca se vuelva a escribir no se purga — sus entradas antiguas permanecen hasta el siguiente cambio en esa entidad o hasta que las elimines de `rebase.entity_history` tú mismo.
+Tras cada cambio registrado, se purga la entidad modificada: se eliminan sus entradas
+más antiguas que el período de retención y, a continuación, todo lo que supere sus 200
+más recientes. Esto se ejecuta de forma asíncrona y no retiene la escritura.
+
+<span class="since-badge" data-since="0.25">Desde 0.25</span> Una vez por hora, el
+backend elimina además todas las entradas más antiguas que el período de retención, de
+todas las entidades. Antes, el historial de una entidad en la que nunca se volvía a
+escribir — todas las eliminadas — no se purgaba en absoluto. El barrido:
+
+- se ejecuta en una instancia de la flota por hora, en los procesos que ejecutan los
+  trabajos programados (reclama su hora en `rebase.cron_claims`, como hace una
+  ejecución de cron), la primera vez cuando arranca el backend;
+- elimina en lotes de 5.000 entradas, una sentencia cada uno, hasta que un lote vuelve
+  corto, saltándose las entradas que otro barrido retiene — así que un primer barrido
+  sobre un gran retraso son muchos borrados cortos, no uno largo;
+- lee un índice sobre `updated_at`, `idx_history_updated_at`. En una base de datos
+  creada antes de la 0.25 se construye en segundo plano tras el primer arranque,
+  con `CREATE INDEX CONCURRENTLY`, sin bloquear lecturas ni escrituras — alrededor de un
+  segundo por cada 2 millones de entradas.
+
+El mismo arranque elimina `idx_history_entity` donde existe: `idx_history_time`
+empieza por las mismas columnas y sirve todas las lecturas que servía aquel, así que
+solo ralentizaba cada cambio registrado. La eliminación espera como máximo un segundo
+cada vez por el bloqueo de la tabla, y una tabla que algo retiene todo el tiempo conserva
+el índice hasta el siguiente arranque.
+
+El tope de 200 entradas por entidad solo se aplica después de una escritura en esa entidad.
 
 ## Próximos pasos
 

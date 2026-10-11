@@ -1,5 +1,5 @@
 ---
-sourceHash: a1bb0a08ed6263fe
+sourceHash: 4bed2a9ed4ceb358
 title: Autenticazione
 sidebar_label: Autenticazione
 description: Autenticazione lato client con l'SDK di Rebase — accesso con email/password, provider OAuth, gestione delle sessioni e listener dello stato di autenticazione.
@@ -188,7 +188,8 @@ const profile = await client.auth.findUserByEmail("user@example.com");
 // { uid, displayName, photoURL } | null
 ```
 
-Tre campi non sensibili e nient'altro — sufficienti per mostrare "stai invitando Jane" prima che venga inviato un invito.
+Tre campi non sensibili e nient'altro — sufficienti per mostrare "stai invitando Jane" prima che venga inviato un invito. Opt-in: solo per un chiamante autenticato, e un 404
+a meno che il backend imposti `AUTH_ALLOW_USER_LOOKUP=true` (`auth.allowUserLookup`).
 
 ## Autenticazione a più fattori (MFA)
 
@@ -376,7 +377,7 @@ function useCurrentUser() {
 
 `useRebaseAuthController` in `@rebasepro/app` esegue già questa operazione, quindi un'applicazione creata sul template generato ne dispone automaticamente. Le richieste di dati non devono attendere: una effettuata durante il ripristino viene inviata non appena questo si assesta — come utente ripristinato, oppure in forma anonima — così un primo render non legge mai un elenco pubblico al posto di quello dell'utente.
 
-Un ripristino riuscito raggiunge anche `onAuthStateChange` come `TOKEN_REFRESHED` — *è* a tutti gli effetti un refresh — ma un listener da solo non può indicare che il ripristino è terminato: un avvio senza sessione non emette alcunché, risultando indistinguibile da un avvio ancora in corso. Attendi `isInitialized()` per verificare questo stato e usa il listener per le modifiche successive.
+Un ripristino che esegue un refresh (un token memorizzato scaduto, o la modalità cookie) raggiunge `onAuthStateChange` come `TOKEN_REFRESHED`; un token memorizzato ancora valido viene adottato in silenzio. Quindi un listener non può indicare che il ripristino è terminato: un avvio che non emette nulla è indistinguibile da uno ancora in corso. Attendi `isInitialized()` per verificare questo stato e usa il listener per le modifiche successive.
 
 ## Listener dello stato di autenticazione
 
@@ -523,10 +524,9 @@ const config = await client.auth.getAuthConfig();
 //   sessionManagement: boolean,
 //   profileUpdate: boolean,
 //   emailVerification: boolean,
-//   magicLink: boolean,
-//   anonymousLogin: boolean,
-//   enabledProviders: string[],
-//   needsSetup: boolean
+//   magicLink: boolean, emailOtp?: boolean,
+//   anonymousLogin: boolean, enabledProviders: string[],
+//   externalLoginUrl?: string, needsSetup?: boolean, storage?: boolean
 // }
 ```
 

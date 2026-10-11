@@ -1,5 +1,5 @@
 ---
-sourceHash: 8f5d12b8af667778
+sourceHash: 6d4b5fe12fe09451
 title: Índice de endpoints
 sidebar_label: Índice de endpoints
 description: Cada rota HTTP montada por um backend Rebase — dados, autenticação, armazenamento, administração, meta — com a restrição de acesso (gate) de cada uma e a página que a explica.
@@ -38,7 +38,9 @@ fixa. `:slug` é o `slug` de uma coleção.
 | `GET` | `/api/data/collections` | session | [REST API](/docs/backend/api/) |
 | `GET` | `/api/data/:slug` | RLS | [Querying](/docs/backend/api/#filtering) |
 | `POST` | `/api/data/:slug` | RLS | [REST API](/docs/backend/api/) |
+| `POST` | `/api/data/:slug/query` | RLS | A listagem, com os parâmetros de consulta no corpo — [Consultas longas demais para uma URL](/docs/backend/vector-search/#queries-too-long-for-a-url) |
 | `GET` | `/api/data/:slug/count` | RLS | [Querying](/docs/backend/api/#filtering) |
+| `POST` | `/api/data/:slug/count` | RLS | A contagem, com os parâmetros de consulta no corpo — [Consultas longas demais para uma URL](/docs/backend/vector-search/#queries-too-long-for-a-url) |
 | `GET` | `/api/data/:slug/aggregate` | RLS | [REST API](/docs/backend/api/#rest-endpoints) |
 | `GET` | `/api/data/:slug/:id` | RLS | [REST API](/docs/backend/api/) |
 | `PATCH` | `/api/data/:slug/:id` | RLS | [REST API](/docs/backend/api/) |
@@ -134,11 +136,13 @@ uma coleção não acessa nada disso. Consulte [Papéis e escopos](/docs/backend
 | `GET` | `/api/admin/cron/:id/logs` | `cron:read` | [Cron Jobs](/docs/backend/cron-jobs/) |
 | `POST` | `/api/admin/cron/:id/trigger` | `cron:write` | Executa um job agora |
 | `GET` | `/api/admin/backups` | `backups:read` | Inventário de backups |
-| `GET` | `/api/admin/backups/download` | `backups:read` | Transmite um backup via stream |
+| `GET` | `/api/admin/backups/download` | `backups:read` | Transmite um backup via stream. Com `?token=` de um link de download, nenhum cabeçalho é necessário, apenas para esse backup |
+| `POST` | `/api/admin/backups/download-url` | `backups:read` | <span class="since-badge" data-since="0.25">Desde 0.25</span> Um link para um backup, `{ key }` → `{ url, token, expiresIn }`, válido por 60 segundos — [Backups](/docs/deployment/backups/#baixar-um-backup) |
 | `GET` | `/api/admin/logs` | `logs:read` | O buffer de logs recentes |
 | `GET` | `/api/admin/logs/latest` | `logs:read` | As entradas mais recentes |
 | `GET` | `/api/admin/logs/stream` | `logs:read` | Server-sent events |
 | `GET` | `/api/admin/rls-audit` | `schema:read` | O resultado mais recente da auditoria agendada |
+| `POST` | `/api/admin/sql/csv` | `database:write` | <span class="since-badge" data-since="0.25">Desde 0.25</span> Transmite via stream o resultado completo de uma consulta somente leitura como CSV — "Baixar resultado completo como CSV" do [Studio](/docs/studio/) |
 | `GET` | `/api/admin/schema/status` | `schema:read` | [Live schema editing](/docs/backend/live-schema-editing/) |
 | `POST` | `/api/admin/schema/plan` | `schema:read` | Planeja uma alteração; nunca aplica |
 | `POST` | `/api/admin/schema/apply` | `schema:write` | Apenas uma pessoa, a menos que `REBASE_LIVE_SCHEMA_ALLOW_MACHINE_APPLY` |
@@ -162,6 +166,7 @@ existem para projetos que ainda não migraram; escreva código novo usando o cam
 | `GET` | `/api/storage/file/*` | session + `storageAuthorize` | [Storage](/docs/backend/storage/) |
 | `DELETE` | `/api/storage/file/*` | session + `storageAuthorize` | [Storage](/docs/backend/storage/) |
 | `GET` | `/api/storage/metadata/*` | session + `storageAuthorize` | [Storage](/docs/backend/storage/) |
+| `POST` | `/api/storage/metadata` | session + `storageAuthorize`, por chave | <span class="since-badge" data-since="0.25">Desde 0.25</span> [Storage](/docs/backend/storage/#storage-endpoints): metadados de até 100 objetos |
 | `GET` | `/api/storage/list` | session + `storageAuthorize` | [Storage](/docs/backend/storage/) |
 | `POST` | `/api/storage/folder` | session + `storageAuthorize` | [Storage](/docs/backend/storage/) |
 | `GET` | `/api/storage/sources` | session | As fontes de armazenamento nomeadas atendidas por este backend |

@@ -1,5 +1,5 @@
 ---
-sourceHash: 60c797ac2e9a363f
+sourceHash: 8a336726f6416a25
 title: Propiedades
 sidebar_label: Propiedades
 description: Los tipos de propiedades definen el tipo de dato, la validación y el renderizado de la interfaz de usuario para cada campo en una colección. Rebase admite los tipos string, number, boolean, date, array, map, reference, relation y geopoint.
@@ -20,14 +20,14 @@ Las propiedades definen las columnas en la tabla de su base de datos y cómo se 
 
 | Tipo | Descripción | Columna de PostgreSQL |
 |------|-------------|-----------------------|
-| `string` | Texto, select, markdown, subida de archivos, URL, correo electrónico | `varchar`, `text`, `jsonb` |
+| `string` | Texto, select, markdown, subida de archivos, URL, correo electrónico | `text` por defecto; `varchar`, `char` o `uuid` con `columnType` |
 | `number` | Entero, decimal, moneda | `integer`, `numeric`, `bigint`, `serial` |
 | `boolean` | Selector booleano (verdadero/falso) | `boolean` |
 | `date` | Fecha, fecha y hora, marca de tiempo | `timestamp`, `date` |
-| `array` | Lista ordenada de valores | `jsonb` |
+| `array` | Lista ordenada de valores | Un array nativo (`text[]`, `integer[]`, `numeric[]`, `boolean[]`) cuando `of` es una sola propiedad string, number o boolean; `jsonb` en caso contrario |
 | `map` | Objeto clave-valor | `jsonb` |
 | `geopoint` | Par latitud/longitud | `jsonb` |
-| `reference` | Referencia incrustada a otra entidad | `varchar` (almacena ID) |
+| `reference` | Referencia incrustada a otra entidad | El tipo de la clave primaria del destino (almacena su ID) |
 | `relation` | Relación de clave foránea SQL | Utiliza el array `relations` |
 | `vector` | Embedding, para búsqueda de vecinos más cercanos | `VECTOR(n)` (pgvector) |
 | `binary` | Bytes en bruto, leídos y escritos en base64 | `bytea` |
@@ -206,7 +206,7 @@ category: {
 
 ### Selección múltiple
 
-Varios valores de un conjunto fijo es un **array de un enum string**, no un indicador sobre uno solo: la columna contiene múltiples valores, por lo que la propiedad que la describe es el array. `columnType: "text[]"` es lo que hace que sea una sola columna de Postgres en lugar de un join.
+Varios valores de un conjunto fijo es un **array de un enum string**, no un indicador sobre uno solo: la columna contiene múltiples valores, por lo que la propiedad que la describe es el array. Es una sola columna de Postgres, un `text[]`, en lugar de un join: un array cuyo `of` es una sola propiedad string obtiene un array nativo por defecto, y el `columnType` de abajo solo lo indica de forma explícita.
 
 ```typescript no-verify
 locales: {
@@ -237,7 +237,7 @@ locales: {
 | `url` | `boolean` | Validación de formato de URL |
 | `storage` | `StorageConfig` | Habilitar subida de archivos — consulte [Subida de archivos](/docs/collections/file-uploads) |
 | `enum` | `EnumValues` | Renderizar como menú desplegable de selección |
-| `columnType` | `"varchar" \| "text" \| "char" \| "uuid"` | La columna de base de datos. Por defecto es `varchar`, o `uuid` si `isId` así lo indica. `text` para cadenas ilimitadas, `char` para ancho fijo |
+| `columnType` | `"varchar" \| "text" \| "char" \| "uuid"` | La columna de base de datos. Por defecto es `text`, o `uuid` si `isId` así lo indica. `text` para cadenas ilimitadas, `char` para ancho fijo |
 | `isId` | `boolean \| string` | Marca la propiedad como clave primaria y define quién la genera: `"manual"` (usted), `"uuid"` (`gen_random_uuid()`), o cualquier otra cadena de texto, utilizada literalmente como la expresión de SQL default de la columna — directa (`nanoid()`) o en formato plantilla (``"sql`nanoid()`"``). La función debe existir; nada aquí la crea. `"increment"` es una estrategia para **number** y no hace nada aquí, y `"cuid"` es rechazada al cargar la configuración |
 | `autoValue` | `"user_on_create" \| "user_on_update"` | Asigna automáticamente a la columna el **uid del usuario activo** — solo en la creación o en cada escritura. Consulte [Columnas de auditoría](#columnas-de-auditoría) |
 | `userSelect` | `boolean` | Renderizar como selector de usuarios. El valor es una columna de texto simple que almacena el id del usuario — nada lo resuelve ni lo valida en la entrada. **Solo para el formulario de administración — no se aplica en la API ni en la base de datos.** |

@@ -1,5 +1,5 @@
 ---
-sourceHash: 0007bd5679d9971e
+sourceHash: 224692816eecfaad
 title: Backup e ripristino
 sidebar_label: Backup
 description: Crea, pianifica, elenca e ripristina backup del database con pg_dump — cosa contiene un backup, il file dei ruoli che lo accompagna, e l'unica cosa che non copre, i tuoi file caricati.
@@ -305,6 +305,40 @@ I download passano attraverso
 bucket non deve mai essere pubblico; una chiave fuori dal prefisso della
 destinazione viene rifiutata. Con `BACKUP_DESTINATION` non impostata, il
 pannello indica che i backup non sono configurati.
+
+### Scaricare un backup
+
+<span class="since-badge" data-since="0.25">Da 0.25</span> Un browser non può
+mettere un header `Authorization` su un download, quindi Studio e l'SDK chiedono prima
+un link. `POST /api/admin/backups/download-url` con `{ "key": "…" }` (stesso scope admin e
+stessi controlli sulla chiave del download) risponde
+`{ url, token, expiresIn }`: un URL il cui token sostituisce l'header, per
+quel solo backup alla destinazione corrente, per 60 secondi. Il token viene
+rifiutato ovunque altro — come sessione, come token di download dello storage, per un altro
+backup — e una volta scaduto. Il browser trasmette poi il dump direttamente
+su disco, così un backup grande quanto il tuo database non deve mai stare in una tab.
+
+```ts
+// In a browser: the browser saves the file.
+await client.backups.download(key);
+
+// Anywhere: a link that needs no header, for 60 seconds.
+const { url } = await client.backups.downloadUrl(key);
+
+// In Node: stream the bytes to a file.
+import { createWriteStream } from "node:fs";
+import { Readable } from "node:stream";
+import { pipeline } from "node:stream/promises";
+
+const { stream, name } = await client.backups.stream(key);
+await pipeline(Readable.fromWeb(stream), createWriteStream(name));
+```
+
+Prima della 0.24, `backups.download(key)` rispondeva con un `Blob` contenente l'intero dump.
+Ora salva il file in un browser e lancia un errore altrove; usa `stream(key)`
+in Node. Contro un server senza link di download (uno precedente alla 0.24, o uno
+senza un segreto JWT per firmarli), `download()` ripiega sulla lettura dei byte
+da sé.
 
 ## Mantieni i backup privati
 

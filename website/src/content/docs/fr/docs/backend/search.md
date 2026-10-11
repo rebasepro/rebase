@@ -1,5 +1,5 @@
 ---
-sourceHash: bd5c3797254d822d
+sourceHash: aa6e4f1031d85124
 title: Recherche
 sidebar_label: Recherche
 description: Comment .search() se comporte par défaut, et comment activer la recherche en texte intégral classée par pertinence sur les champs de votre choix pour une collection Postgres — y compris les contenus JSONB et tableaux.
@@ -23,7 +23,7 @@ C'est suffisant pour une petite collection dont le texte se trouve dans des colo
 
 - **Il ne peut pas inspecter l'intérieur des propriétés `map` ou `array`.** Une collection qui stocke son contenu interrogeable dans du JSONB — étiquettes, certifications, questionnaire — dispose d'un champ de recherche qui ne renverra silencieusement rien.
 - **Il n'y a pas de notion de pertinence.** Les lignes sont renvoyées dans l'ordre du `orderBy`, de sorte que la meilleure correspondance peut se trouver à la page sept.
-- **Il ne peut pas utiliser d'index.** Un caractère `%` en début de motif empêche l'utilisation d'un B-tree, donc chaque recherche effectue un parcours séquentiel (sequential scan). Cela convient pour un millier de lignes, mais devient critique à un million.
+- **Il ne peut pas utiliser d'index.** Un caractère `%` en début de motif empêche l'utilisation d'un B-tree, donc chaque recherche effectue un parcours séquentiel (sequential scan). Cela convient pour un millier de lignes, mais devient critique à un million. `rebase doctor` nomme les collections pour lesquelles cela a commencé à compter : aucun bloc `search` et plus d'environ 10 000 lignes.
 
 Le terme fait l'objet d'une correspondance **littérale** : `%` et `_` sont des métacaractères LIKE, et ils sont échappés avant la construction du motif. Ainsi, chercher `50%` recherche bien `50%` plutôt que de renvoyer toutes les lignes. Si vous souhaitez utiliser des caractères génériques (wildcards), l'opérateur de filtre `like` accepte un motif (`.where("title", "like", "post-%")`) ; ce n'est pas le cas de `.search()`.
 
@@ -213,7 +213,7 @@ Lorsque `unaccent` est activé, les extraits sont présentés sans accents — `
 
 ## Ajouter le bloc à une collection en production
 
-La colonne générée est ajoutée lors de la vérification du schéma au démarrage (schema ensure), comme n'importe quelle autre colonne, et son index est créé avec `CREATE INDEX CONCURRENTLY` afin de ne pas bloquer les écritures. L'ajout d'une colonne générée *stockée* (stored) réécrit la table ; sur une table volumineuse, planifiez cela comme toute autre réécriture.
+La colonne générée est ajoutée lors de la vérification du schéma au démarrage (schema ensure), comme n'importe quelle autre colonne, Son index est construit une fois le serveur en service, en arrière-plan, avec `CREATE INDEX CONCURRENTLY` afin de ne pas bloquer les écritures (voir [Index](/docs/backend/indexes#when-they-are-created)). Tant que l'index n'est pas construit, une recherche fonctionne mais lit toute la table. L'ajout d'une colonne générée *stockée* (stored) réécrit la table ; sur une table volumineuse, planifiez cela comme toute autre réécriture.
 
 ## Moteurs pris en charge
 

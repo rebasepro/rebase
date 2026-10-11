@@ -1,5 +1,5 @@
 ---
-sourceHash: cbee90067ba8da67
+sourceHash: 53bd9f35a923ce72
 title: Relaciones
 sidebar_label: Relaciones
 description: Define relaciones SQL uno a uno, uno a muchos y muchos a muchos entre colecciones con claves foráneas, tablas de unión y uniones multi-salto.
@@ -74,7 +74,7 @@ vuelve una fila o muchas, y qué puede tocar una escritura a través de ella.
 | Kind | La clave vive | Devuelve | Notas |
 |---|---|---|---|
 | `belongsTo` | en **esta** tabla | una | `localKey`, por defecto `<relationName>_id` |
-| `hasOne` | en la tabla del **destino** | una | `foreignKeyOnTarget`, por defecto `<thisCollection>_id` |
+| `hasOne` | en la tabla del **destino** | una | `foreignKeyOnTarget`, por defecto el singular de esta colección más `_id` (`users` → `user_id`) |
 | `hasMany` | en la tabla del **destino** | muchas | los hijos pertenecen solo a este padre |
 | `manyToMany` | en una **tabla de unión** | muchas | las filas se comparten; tuyo es el enlace |
 | `via` | un `joinPath` explícito | cualquiera | de solo lectura; indica tú mismo la `cardinality` |
@@ -91,6 +91,14 @@ author: {
 }
 // → posts.author_id
 ```
+
+<span class="since-badge" data-since="0.25">Desde 0.25</span> La columna se
+indexa por ti: Postgres indexa la clave a la que apunta una clave foránea, nunca la
+columna que la contiene, así que sin un índice cada inclusión `hasMany` y cada listado anidado
+desde el otro lado recorre esta tabla. `index: false` conserva la restricción y
+elimina el índice — consulta [Las claves foráneas se indexan por ti](/docs/backend/indexes#foreign-keys-are-indexed-for-you)
+para saber cuándo vale la pena, y cuándo Rebase lo omite por sí mismo porque
+otro índice ya sirve la columna.
 
 ### hasMany / hasOne — la clave está en la suya
 
@@ -511,6 +519,7 @@ interface RelationBase {
 interface BelongsToRelation extends RelationBase {
     kind: "belongsTo";
     localKey?: string;              // column on THIS table
+    index?: boolean;                // btree on localKey; defaults to true
 }
 
 interface HasOneRelation extends RelationBase {

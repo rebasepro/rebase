@@ -1,5 +1,5 @@
 ---
-sourceHash: cbee90067ba8da67
+sourceHash: 53bd9f35a923ce72
 title: Beziehungen
 sidebar_label: Beziehungen
 description: Definieren Sie Eins-zu-Eins-, Eins-zu-Viele- und Viele-zu-Viele-SQL-Beziehungen zwischen Sammlungen mit Fremdschlüsseln, Verbindungstabellen und Multi-Hop-Joins.
@@ -77,7 +77,7 @@ sie hindurch anfassen darf.
 | Art | Der Schlüssel liegt | Liefert | Hinweise |
 |---|---|---|---|
 | `belongsTo` | auf **dieser** Tabelle | eine | `localKey`, Standard `<relationName>_id` |
-| `hasOne` | auf der Tabelle des **Ziels** | eine | `foreignKeyOnTarget`, Standard `<thisCollection>_id` |
+| `hasOne` | auf der Tabelle des **Ziels** | eine | `foreignKeyOnTarget`, Standard der Singular dieser Collection plus `_id` (`users` → `user_id`) |
 | `hasMany` | auf der Tabelle des **Ziels** | viele | Kinder gehören allein zu diesem Elternteil |
 | `manyToMany` | in einer **Verbindungstabelle** | viele | Zeilen werden geteilt; Ihnen gehört die Verknüpfung |
 | `via` | ein expliziter `joinPath` | beides | schreibgeschützt; `cardinality` geben Sie selbst an |
@@ -94,6 +94,14 @@ author: {
 }
 // → posts.author_id
 ```
+
+<span class="since-badge" data-since="0.25">Seit 0.25</span> Die Spalte wird für Sie
+indiziert: Postgres indiziert den Schlüssel, auf den ein Fremdschlüssel zeigt, nie die
+Spalte, die ihn hält, sodass ohne Index jedes `hasMany`-Include und jede verschachtelte Auflistung
+von der anderen Seite diese Tabelle scannt. `index: false` behält die Constraint und
+lässt den Index weg — siehe [Fremdschlüssel werden für Sie indiziert](/docs/backend/indexes#foreign-keys-are-indexed-for-you),
+wann sich das lohnt und wann Rebase ihn von selbst auslässt, weil
+ein anderer Index die Spalte bereits bedient.
 
 ### hasMany / hasOne — der Schlüssel liegt auf ihrer
 
@@ -525,6 +533,7 @@ interface RelationBase {
 interface BelongsToRelation extends RelationBase {
     kind: "belongsTo";
     localKey?: string;              // column on THIS table
+    index?: boolean;                // btree on localKey; defaults to true
 }
 
 interface HasOneRelation extends RelationBase {

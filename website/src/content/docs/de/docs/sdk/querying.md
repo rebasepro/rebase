@@ -1,5 +1,5 @@
 ---
-sourceHash: b8aea50207626bc4
+sourceHash: e06718f3afc5cad4
 title: Daten abfragen
 sidebar_label: Daten abfragen
 description: CRUD-Operationen, Fluent Query Builder, Filteroperatoren, Sortierung, Spaltenauswahl und Aggregate mit dem typisierten SDK von Rebase.
@@ -70,6 +70,9 @@ async function loadProduct(id: string) {
 const maybe = await client.data.products.findById(42);
 // Row | undefined
 ```
+
+`findById` nimmt die zu ladenden Relationen entgegen, wie `find` es tut:
+`findById(1, { include: ["tags"] })`.
 
 :::note
 Row-Level Security macht „Keine solche Zeile“ und „Keine Leseberechtigung“ ganz bewusst zur selben Antwort: Ein 404-Fehler, der dazwischen unterscheiden würde, würde die Existenz der Zeile bestätigen.
@@ -149,6 +152,11 @@ const { data } = await client.data.products
 | `"is-not-null"` | `"notnull"` | Spalte ist nicht `NULL`. Akzeptiert keinen Wert |
 
 Die Alias-Spalte ist die **Wire**-Schreibweise, die in REST-Query-Strings verwendet wird. Sie taucht niemals im Anwendungscode auf: Sowohl das SDK als auch das Admin-Panel verwenden den kanonischen Operator auf der linken Seite.
+
+Die vier Muster-Operatoren vergleichen Text. Ein `enum`-Feld wird über seinen Wert abgeglichen,
+sodass `{ status: ["like", "draft%"] }` bei einem als Postgres-Enum gespeicherten Status funktioniert.
+Bei einer Zahl, einem Datum oder jedem anderen Feld, das kein Text ist, werden sie mit einem
+400 `INVALID_FILTER_OPERATOR` abgelehnt.
 
 ### Syntax der Where-Klausel
 

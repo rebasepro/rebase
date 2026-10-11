@@ -1,5 +1,5 @@
 ---
-sourceHash: a1bb0a08ed6263fe
+sourceHash: 4bed2a9ed4ceb358
 title: Authentifizierung
 sidebar_label: Authentifizierung
 description: Clientseitige Authentifizierung mit dem Rebase SDK — E-Mail/Passwort-Anmeldung, OAuth-Anbieter, Sitzungsverwaltung und Auth-Status-Listener.
@@ -185,7 +185,7 @@ const profile = await client.auth.findUserByEmail("user@example.com");
 // { uid, displayName, photoURL } | null
 ```
 
-Drei unkritische Felder und nichts weiter — genug, um „Sie laden Jane ein“ anzuzeigen, bevor eine Einladung gesendet wird.
+Drei unkritische Felder und nichts weiter — genug, um „Sie laden Jane ein“ anzuzeigen, bevor eine Einladung gesendet wird. Opt-in: nur für einen angemeldeten Aufrufer, und ein 404, sofern das Backend nicht `AUTH_ALLOW_USER_LOOKUP=true` (`auth.allowUserLookup`) setzt.
 
 ## Multi-Faktor-Authentifizierung
 
@@ -371,7 +371,7 @@ function useCurrentUser() {
 
 `useRebaseAuthController` in `@rebasepro/app` erledigt dies bereits, sodass eine auf der generierten Vorlage aufbauende App dies automatisch mitbringt. Datenanfragen müssen nicht warten: Eine mitten in der Wiederherstellung gestellte wird gesendet, sobald diese abgeschlossen ist — als der wiederhergestellte Benutzer oder anonym —, sodass ein erstes Rendern nie eine öffentliche Auflistung anstelle der eigenen des Benutzers liest.
 
-Eine erfolgreiche Wiederherstellung erreicht `onAuthStateChange` auch als `TOKEN_REFRESHED` — es *ist* eine Aktualisierung —, aber ein Listener allein kann Ihnen nicht sagen, ob die Wiederherstellung abgeschlossen ist: Ein Start ohne Sitzung löst gar nichts aus, was von einem noch laufenden Vorgang nicht zu unterscheiden ist. Warten Sie für diese Prüfung `isInitialized()` ab und nutzen Sie den Listener für spätere Änderungen.
+Eine Wiederherstellung, die aktualisiert (ein abgelaufenes gespeichertes Token oder der Cookie-Modus), erreicht `onAuthStateChange` als `TOKEN_REFRESHED`; ein noch gültiges gespeichertes Token wird still übernommen. Ein Listener kann Ihnen also nicht sagen, ob die Wiederherstellung abgeschlossen ist: Ein Start, der nichts auslöst, ist von einem noch laufenden Vorgang nicht zu unterscheiden. Warten Sie für diese Prüfung `isInitialized()` ab und nutzen Sie den Listener für spätere Änderungen.
 
 ## Auth-Status-Listener
 
@@ -515,10 +515,9 @@ const config = await client.auth.getAuthConfig();
 //   sessionManagement: boolean,
 //   profileUpdate: boolean,
 //   emailVerification: boolean,
-//   magicLink: boolean,
-//   anonymousLogin: boolean,
-//   enabledProviders: string[],
-//   needsSetup: boolean
+//   magicLink: boolean, emailOtp?: boolean,
+//   anonymousLogin: boolean, enabledProviders: string[],
+//   externalLoginUrl?: string, needsSetup?: boolean, storage?: boolean
 // }
 ```
 

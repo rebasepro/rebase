@@ -1,5 +1,5 @@
 ---
-sourceHash: 7c51c9877d9d0803
+sourceHash: 376a90002cda8008
 title: Chiavi API
 sidebar_label: Chiavi API
 description: "Chiavi di lunga durata per script, CI, agenti e integrazioni: chiavi di servizio e chiavi personali, gli scope che possiedono, come si combinano con la sicurezza a livello di riga e le route che le gestiscono."
@@ -155,7 +155,9 @@ Il `rate_limit` di una chiave è il numero di richieste che può fare in un inte
 di 15 minuti, e ogni porta d'accesso lo consuma in un unico bucket, `api-key:<id>`:
 
 - le sue richieste HTTP alle API di dati, storage e funzioni;
-- i suoi frame di dati sul WebSocket realtime: fetch, conteggi, salvataggi ed eliminazioni;
+- i suoi frame di dati sul WebSocket realtime: fetch, conteggi, salvataggi ed eliminazioni,
+  più le sottoscrizioni e le richieste di cronologia dei canali oltre la
+  [quota](/docs/backend/realtime/#what-a-write-costs-and-the-limits) di ogni socket;
 - le sue richieste a [`/mcp`](/docs/ai/mcp/#the-remote-endpoint).
 
 Senza un `rate_limit` il bucket ha il valore predefinito del server per le chiavi API, 1000. Una

@@ -1,5 +1,5 @@
 ---
-sourceHash: a1bb0a08ed6263fe
+sourceHash: 4bed2a9ed4ceb358
 title: Autenticación
 sidebar_label: Autenticación
 description: Autenticación del lado del cliente con el SDK de Rebase — inicio de sesión con correo electrónico/contraseña, proveedores OAuth, gestión de sesiones y escuchadores de estado de autenticación.
@@ -187,7 +187,8 @@ const profile = await client.auth.findUserByEmail("user@example.com");
 // { uid, displayName, photoURL } | null
 ```
 
-Tres campos no sensibles y nada más — lo suficiente para mostrar "estás invitando a Jane" antes de enviar una invitación.
+Tres campos no sensibles y nada más — lo suficiente para mostrar "estás invitando a Jane" antes de enviar una invitación. Opcional: solo para quien llama con sesión iniciada, y un 404
+a menos que el backend defina `AUTH_ALLOW_USER_LOOKUP=true` (`auth.allowUserLookup`).
 
 ## Autenticación multifactor
 
@@ -376,7 +377,11 @@ function useCurrentUser() {
 
 `useRebaseAuthController` en `@rebasepro/app` ya hace esto, por lo que una aplicación construida sobre la plantilla generada lo obtiene de forma automática. Las solicitudes de datos no tienen que esperar: una hecha a mitad de la restauración se envía en cuanto esta termina —como el usuario restaurado, o de forma anónima—, de modo que un primer renderizado nunca lee un listado público en lugar del propio del usuario.
 
-Una restauración exitosa también llega a `onAuthStateChange` como `TOKEN_REFRESHED` — *es* una actualización —, pero un escuchador por sí solo no puede indicarte que la restauración ha finalizado: un arranque sin sesión no emite absolutamente nada, lo cual es indistinguible de uno que aún está en curso. Espera con `await isInitialized()` para esa comprobación y utiliza el escuchador para los cambios posteriores.
+Una restauración que actualiza (un token almacenado caducado, o el modo cookie) llega a
+`onAuthStateChange` como `TOKEN_REFRESHED`; un token almacenado todavía válido se adopta
+silenciosamente. Así que un escuchador no puede indicarte que la restauración ha finalizado: un arranque que no emite
+nada es indistinguible de uno que aún está en curso. Espera con `await isInitialized()`
+para esa comprobación y utiliza el escuchador para los cambios posteriores.
 
 ## Escuchador del estado de autenticación
 
@@ -526,10 +531,9 @@ const config = await client.auth.getAuthConfig();
 //   sessionManagement: boolean,
 //   profileUpdate: boolean,
 //   emailVerification: boolean,
-//   magicLink: boolean,
-//   anonymousLogin: boolean,
-//   enabledProviders: string[],
-//   needsSetup: boolean
+//   magicLink: boolean, emailOtp?: boolean,
+//   anonymousLogin: boolean, enabledProviders: string[],
+//   externalLoginUrl?: string, needsSetup?: boolean, storage?: boolean
 // }
 ```
 

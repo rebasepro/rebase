@@ -1,5 +1,5 @@
 ---
-sourceHash: 107ae13db8d0ff4a
+sourceHash: 8aef72b75f28c106
 title: Relationen abfragen
 sidebar_label: Relationen
 description: "Binden Sie verknüpfte Entitäten in eine Abfrage ein und lesen Sie eine Child-Collection über ihr Parent mit den Relations-Accessors des SDKs."
@@ -75,8 +75,35 @@ const { data } = await client.data.posts.include({
 | `orderBy` | Dieselbe Sortiersyntax, einschließlich der [NULL-Platzierung](/docs/sdk/querying#where-nulls-sort). Gleichstände sowie ein `limit` ohne `orderBy` richten sich nach dem Schlüssel der verknüpften Zeile, aufsteigend. |
 | `fields` | Spalten der *verknüpften* Zeile. Ihr Schlüssel bleibt immer erhalten, sodass die Zeile adressierbar bleibt. |
 | `include` | Relationen der verknüpften Zeile wiederum – so wird der Baum verschachtelt. |
+| `count` | <span class="since-badge" data-since="0.25">Seit 0.25</span> Liefert zusätzlich, wie viele verknüpfte Zeilen es insgesamt gibt, pro Parent, unter dem `_count` der Zeile. Siehe [Zählen, was ein Limit auslässt](#zählen-was-ein-limit-auslässt). |
 
 `true` ist die Kurzform für „vollständig laden“: `{ author: true }` und `["author"]` sind dieselbe Anfrage.
+
+### Zählen, was ein Limit auslässt
+
+<span class="since-badge" data-since="0.25">Seit 0.25</span> Ein `limit` begrenzt,
+was gesendet wird, und `count: true` sagt, wie viel ausgelassen wurde. Das braucht eine Liste,
+um vier Tags und ein „+33“ zu zeigen:
+
+```typescript
+const { data } = await client.data.posts.include({
+    tags: { limit: 4, count: true }
+}).find();
+
+// data[0] → { id: 1, title: "…", tags: [ …4 rows ], _count: { tags: 37 } }
+```
+
+- `_count` ist ein Objekt pro Zeile, nach Relationsnamen benannt. Das Zählen zweier Relationen
+  fügt zwei Schlüssel hinzu.
+- Die Gesamtzahl wird in derselben SQL-Anweisung gezählt, die die Zeilen liest. Sie umfasst
+  dieselben Zeilen, die ein Lesezugriff ohne das `limit` zurückgäbe: das `where` des Includes,
+  Soft Delete und Row-Level Security gelten alle. Sie anzufordern fügt keine Abfrage hinzu.
+- Ohne ein `limit` ist die Gesamtzahl die Anzahl der zurückgegebenen Zeilen.
+- `count` funktioniert nur bei To-many-Relationen. Bei einer To-one-Relation liefert es einen
+  400 `INVALID_INCLUDE`. Das gilt auch für eine Collection mit einer Property namens
+  `_count`, weil die Gesamtzahl sie überschreiben würde.
+- Eine Relation, die der Aufrufer nicht lesen darf (Feldzugriff), wird in `_count` ausgelassen,
+  genauso wie ihre Zeilen.
 
 ### Unbekannte Relationsnamen werden abgelehnt
 
@@ -179,14 +206,22 @@ Ohne ein generiertes `Database` bleibt `include` ein einfaches `string[]` oder e
 
 ### Relationsnamen
 
-Die Relationsnamen, die Sie an `include()` übergeben, müssen mit dem in dem `relations`-Array der Collection definierten `relationName` übereinstimmen:
+Die Namen, die Sie an `include()` übergeben, sind die Schlüssel der Relations-Properties der Collection:
 
 ```typescript
 // Collection definition
-relations: [
-    { relationName: "author", target: () => usersCollection, ... },
-    { relationName: "categories", target: () => categoriesCollection, ... }
-]
+properties: {
+    author: {
+        type: "relation",
+        name: "Author",
+        relation: { kind: "belongsTo", target: () => usersCollection }
+    },
+    categories: {
+        type: "relation",
+        name: "Categories",
+        relation: { kind: "manyToMany", target: () => categoriesCollection }
+    }
+}
 
 // SDK usage — names must match
 client.data.articles.include("author", "categories").find()

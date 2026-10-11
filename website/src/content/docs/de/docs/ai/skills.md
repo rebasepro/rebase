@@ -1,5 +1,5 @@
 ---
-sourceHash: 0b7bd3b233513344
+sourceHash: 06e95610513a9c52
 title: Agent Skills
 sidebar_label: Agent Skills
 description: "rebase skills install schreibt 21 Rebase-Referenz-Skills in dein Repo – genau in dem Layout, das dein KI-Assistent erwartet: Cursor, Claude Code, Windsurf, Gemini CLI und Antigravity."
@@ -90,13 +90,20 @@ Skills werden **relativ zu deinem Projekt-Root** geschrieben – dem nächstgele
 
 Checke sie ein. Sie sind genauso Teil des Repositories wie eine Linter-Konfiguration: Der Assistent jedes Mitwirkenden arbeitet dann auf Basis desselben Verständnisses der Codebasis, einschließlich Mitwirkender, die den Befehl nie ausgeführt haben.
 
-**Führe den Befehl erneut aus, um zu aktualisieren.** Dateien werden bedingungslos überschrieben; nach einem Rebase-Upgrade also:
+**Führe den Befehl nach einem Rebase-Upgrade erneut aus, um zu aktualisieren:**
 
 ```bash
 rebase skills install --agent all
 ```
 
-Zwei Konsequenzen von „bedingungslos“: Lokale Bearbeitungen an einem installierten Skill gehen beim nächsten Durchlauf verloren – bewahre projektspezifische Anweisungen stattdessen in [`ai-instructions.md`](/docs/ai/instruction-files) auf, die dir gehört und niemals überschrieben wird. Zudem werden Skills, die in einem neueren Release entfernt wurden, nicht aus deinem Repo gelöscht; nur noch existierende Dateien werden neu geschrieben.
+Jedes Zielverzeichnis enthält ein Manifest `.rebase-skills.json` mit allem, was der Befehl geschrieben hat, sodass ein erneuter Durchlauf eine Bearbeitung von der Kopie eines älteren Releases unterscheiden kann. Committe es zusammen mit den Skills.
+
+- Eine Datei, die niemand bearbeitet hat, wird durch die Kopie des neuen Releases ersetzt.
+- Eine Datei, die du bearbeitet hast, bleibt erhalten, und der Befehl listet sie auf. `--force` ersetzt sie.
+- Ein Skill, den ein neueres Release nicht mehr mitliefert, wird entfernt, es sei denn, du hast ihn bearbeitet. Dann bleibt er erhalten und wird aufgelistet.
+- Dateien, die der Befehl nie geschrieben hat, werden nicht angefasst.
+
+Projektspezifische Anweisungen gehören weiterhin in [`ai-instructions.md`](/docs/ai/instruction-files), die dir gehört. Ein bearbeiteter Skill erhält keine Updates mehr, bis du ihn mit `--force` ersetzt.
 
 Der Befehl funktioniert auch außerhalb eines Rebase-Projekts und weicht dabei auf das Arbeitsverzeichnis aus – nützlich für ein separates Frontend-Repo, das mit einem Rebase-Backend kommuniziert.
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: d7e22a508527032c
+sourceHash: d5f6bfc83168dcfd
 title: Exécuter plus d'une instance
 sidebar_label: Plus d'une instance
 description: Chaque élément d'état qu'un processus Rebase garde pour lui seul, et le réglage qui le partage — ce qu'il faut définir avant qu'une seconde réplique, un déploiement progressif ou un déploiement scindé ne prenne du trafic.
@@ -35,7 +35,7 @@ actualisation.
 | Abonnements aux collections | Partagés via la base de données lorsque la CDC est active | `REALTIME_CDC=auto` (valeur par défaut) |
 | Canaux de diffusion et présence | En mémoire | `REALTIME_CHANNEL_BUS=postgres` |
 | Fichiers téléversés, `STORAGE_TYPE=local` | Le disque propre à l'instance | S3 ou GCS, ou un volume partagé unique sous `STORAGE_PATH` |
-| Téléversements avec reprise (TUS) en cours | La mémoire et le disque de l'instance | Sessions collantes (sticky sessions) ; un redémarrage les perd quand même |
+| Téléversements avec reprise (TUS) en cours | Le disque de l'instance, sous `STORAGE_PATH/.tus-uploads` | Un volume partagé sous `STORAGE_PATH`, ou des sessions collantes (sticky sessions) |
 | Transformations d'image | Un cache interne au processus | `STORAGE_RENDITION_CACHE=true` |
 | Logs Explorer | Un anneau des 10 000 dernières lignes | Rien — envoyez stdout vers un agrégateur de logs |
 | Minuteries cron | Chaque processus qui exécute le planificateur | Réservée en base de données : une exécution par créneau. `REBASE_CRON_SCHEDULER` choisit où vivent les minuteries |
@@ -94,15 +94,17 @@ sous `STORAGE_PATH` sur chaque instance. Voir
 [Auto-hébergement : stockage de fichiers](/docs/deployment/self-hosting/#file-storage).
 
 **Les téléversements avec reprise** (le point de terminaison TUS) conservent le fichier partiel de
-chaque téléversement et son état sur le disque local de l'instance qui l'a créé, sous
-`STORAGE_PATH/.tus-uploads` — même lorsque les fichiers terminés partent vers S3 ou GCS. Un
-fragment qui atterrit sur une autre instance reçoit une 404 et le client recommence. Routez les
-requêtes de téléversement d'un client vers une seule instance (sessions collantes sur
-l'équilibreur de charge). Un volume partagé sous `STORAGE_PATH` partage les fichiers partiels mais
-pas encore l'état du téléversement, qui est conservé dans la mémoire du processus — un redémarrage
-ou un déploiement progressif renvoie donc aussi un téléversement en cours à l'octet 0. Les
-téléversements ordinaires via `POST /upload` tiennent en une seule requête et ne sont pas
-concernés.
+chaque téléversement, et <span class="since-badge" data-since="0.25">Depuis 0.25</span> un enregistrement du téléversement à côté, sur le disque de l'instance qui l'a
+créé, sous `STORAGE_PATH/.tus-uploads` — même lorsque les fichiers terminés partent vers S3 ou GCS.
+Montez un volume unique sous `STORAGE_PATH` sur chaque instance et n'importe quelle instance sert
+n'importe quel téléversement ; un redémarrage ou un déploiement progressif reprend un téléversement là où
+il s'était arrêté. Sans volume partagé, un fragment qui atterrit sur une autre instance reçoit une 404 :
+routez les requêtes de téléversement d'un client vers une seule instance (sessions collantes sur
+l'équilibreur de charge). Le SDK et le panneau d'administration, qui utilisent ce point de terminaison pour
+les fichiers de plus de 8 Mio, envoient alors le fichier via `POST /upload` à la place, et continuent de le
+faire pour le reste de la session. Les téléversements ordinaires via `POST /upload` tiennent en une seule
+requête et ne sont pas concernés. Sur la 0.23, l'état du téléversement se trouvait dans la mémoire du
+processus : un volume partagé n'aidait donc pas et un redémarrage renvoyait un téléversement à l'octet 0.
 
 **Les transformations d'image** (`?width=400&format=webp`) sont mises en cache en mémoire, donc
 chaque instance calcule chaque variante une fois, et une nouvelle instance démarre à froid.

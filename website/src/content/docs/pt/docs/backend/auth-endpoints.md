@@ -1,5 +1,5 @@
 ---
-sourceHash: 83e2d04a56801ab8
+sourceHash: 5f6462b96e4cf1be
 title: Endpoints de autenticação e tokens
 sidebar_label: Endpoints de autenticação
 description: As rotas de autenticação que o backend do Rebase disponibiliza, seus formatos de resposta, autenticação multifator, o contexto de banco de dados que uma política visualiza, JWKS e chaves de serviço.
@@ -72,6 +72,18 @@ Consulte [Papéis e escopos](/docs/backend/roles-and-scopes/).
 | `POST` | `/api/admin/bootstrap` | Permitir que o primeiro usuário registrado assuma a role de admin enquanto nenhuma existir. Recusado em produção — veja [First User Bootstrap](/docs/backend/authentication/#first-user-bootstrap) |
 
 Todos os endpoints da API de dados requerem um cabeçalho `Authorization: Bearer <token>` válido quando `requireAuth: true` (o padrão).
+
+### Política de senhas
+
+Uma senha nova precisa ter pelo menos 8 caracteres, com uma letra maiúscula, uma
+minúscula e um dígito. O registro, a redefinição e a alteração recusam uma senha que
+falhe, com `400 WEAK_PASSWORD`, listando cada regra violada, e o mesmo vale para um
+administrador que define uma senha com `PUT /api/admin/users/:uid` (como um `400`
+simples). `POST /api/admin/users` não verifica a senha que recebe. O login nunca
+verifica a política, então uma senha antiga continua funcionando. Para definir suas
+próprias regras, passe `auth.hooks.validatePasswordStrength` a partir de um backend
+[ejetado](/docs/backend/authentication/#configuration). O primeiro admin criado a partir de
+`REBASE_ADMIN_PASSWORD` segue uma regra diferente: pelo menos 12 caracteres, e nada mais.
 
 ### Formato da resposta
 

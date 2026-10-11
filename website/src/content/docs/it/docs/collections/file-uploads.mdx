@@ -1,5 +1,5 @@
 ---
-sourceHash: 40c6996a773e6e50
+sourceHash: e18fe07b6281381b
 title: Campi di caricamento file
 sidebar_label: Caricamenti file
 description:"\"Dichiarare un campo file o immagine su una collezione: il blocco storage, i caricamenti di file singoli e multipli e quali delle sue opzioni vengono risolte dal pannello anziché dal server.\""
@@ -108,9 +108,11 @@ proprietà `public: true` è sotto `public/`.
   `property`, come li invia `putObject({ context })`) è vincolato anche a
   quella proprietà. Indicare una proprietà più permissiva non sblocca il
   percorso di una più restrittiva.
+  I caricamenti del pannello (campi file, celle di tabella e immagini markdown) la
+  indicano sempre.
 - Uno `storagePath` scritto come funzione non può essere letto senza eseguirlo,
   quindi non ha una regola lato server: quei limiti valgono solo per i
-  caricamenti che indicano la proprietà.
+  caricamenti che indicano la proprietà, cosa che fanno quelli del pannello.
 - Un percorso che nessuna proprietà dichiara è vincolato solo al limite
   proprio della sorgente (`STORAGE_MAX_FILE_SIZE`).
 

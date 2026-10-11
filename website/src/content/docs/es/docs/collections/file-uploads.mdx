@@ -1,5 +1,5 @@
 ---
-sourceHash: 40c6996a773e6e50
+sourceHash: e18fe07b6281381b
 title: Campos de subida de archivos
 sidebar_label: Subidas de archivos
 description:"\"Declarar un campo de archivo o imagen en una colección: el bloque storage, subidas de archivos individuales o múltiples, y cuáles de sus opciones son resueltas por el panel en lugar del servidor.\""
@@ -107,9 +107,11 @@ propiedad `public: true` está bajo `public/`.
   los envía `putObject({ context })`) se sujeta también a esa propiedad.
   Nombrar una propiedad más permisiva no desbloquea la ruta de una más
   estricta.
+  Las subidas del panel (campos de archivo, celdas de tabla e imágenes de markdown)
+  siempre la nombran.
 - Un `storagePath` escrito como función no se puede leer sin ejecutarla, así
   que no tiene regla del lado del servidor: esos límites solo se aplican a
-  las subidas que nombran la propiedad.
+  las subidas que nombran la propiedad, como hacen las del panel.
 - Una ruta que ninguna propiedad reclama se sujeta solo al límite propio del
   origen (`STORAGE_MAX_FILE_SIZE`).
 

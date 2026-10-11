@@ -1,5 +1,5 @@
 ---
-sourceHash: 1e8fb1164e9af606
+sourceHash: 7334975536857911
 title: API REST
 sidebar_label: API REST
 description: Endpoint API REST generati automaticamente per ogni collection, con filtraggio, ordinamento, paginazione e inclusione delle relazioni.
@@ -22,6 +22,7 @@ Per ogni collection vengono generati i seguenti endpoint. Tutte le altre route m
 | Metodo | Percorso | Descrizione |
 |--------|----------|-------------|
 | `GET` | `/api/data/:slug` | Elenca le entità |
+| `POST` | `/api/data/:slug/query` | <span class="since-badge" data-since="0.25">Da 0.25</span> Lo stesso elenco, con i parametri di query in un body JSON — per una query troppo lunga per un URL. Vedi [Query troppo lunghe per un URL](/docs/backend/vector-search/#queries-too-long-for-a-url) |
 | `GET` | `/api/data/:slug/count` | Conta le entità |
 | `GET` | `/api/data/:slug/aggregate` | `count()`, `sum()`, `avg()`, `min()`, `max()`, opzionalmente raggruppati. Accetta gli stessi filtri dell'endpoint di elenco e la RLS si applica alle righe aggregate — vedi [Querying](/docs/sdk/querying/) |
 | `GET` | `/api/data/:slug/:id` | Recupera una singola entità |
@@ -39,6 +40,8 @@ Le relazioni annidate sono accessibili tramite percorsi URL:
 
 ```
 GET    /api/data/authors/42/posts         → list author's posts
+POST   /api/data/authors/42/posts/query   → the same listing, parameters in the body (0.24+)
+POST   /api/data/authors/42/posts/count   → the same count, parameters in the body (0.24+)
 GET    /api/data/authors/42/posts/7       → get a specific post by author
 POST   /api/data/authors/42/posts         → create a post for author
 PATCH  /api/data/authors/42/posts/7       → update the post
@@ -118,6 +121,10 @@ GET /api/data/products?tags=csa.(electronics,books)
 | `isnull` | La colonna è `NULL` (`is-null`) | `?deleted_at=isnull.null` |
 | `notnull` | La colonna non è `NULL` (`is-not-null`) | `?deleted_at=notnull.null` |
 
+I quattro operatori di pattern confrontano testo. Una colonna enum viene confrontata
+per valore (`?status=like.draft%25`); su un numero, una data o qualsiasi altra colonna
+che non sia testo sono un 400 `INVALID_FILTER_OPERATOR`.
+
 `isnull` e `notnull` ignorano il rispettivo valore — l'operatore costituisce l'intera condizione e qualsiasi cosa dopo il punto viene scartata. L'SDK scrive `.null`, quindi è questa la dicitura che vedrai transitare in rete.
 
 :::caution[`eq.null` è la stringa di quattro caratteri, non `IS NULL`]
@@ -149,6 +156,11 @@ GET /api/data/products?not=(or(status.eq.draft,status.eq.archived))
 ```
 
 I gruppi possono essere annidati fino a 32 livelli di profondità; oltre questo limite la richiesta viene rifiutata con `INVALID_LOGICAL_GROUP`.
+
+Una condizione dentro un gruppo il cui operatore il dialetto non conosce —
+`?not=(title.contains.x)` — è un 400 `UNKNOWN_FILTER_OPERATOR`, come in un `where`
+JSON. Non viene letta come uguaglianza su `contains.x`, che dentro `not` avrebbe
+corrisposto a ogni riga.
 
 Un gruppo **restringe** i risultati insieme ai filtri di campo anziché sostituirli — vedi [Come si combinano i filtri](#come-si-combinano-i-filtri).
 
@@ -244,7 +256,8 @@ Tutti e tre i parametri della finestra vengono rifiutati anziché corretti autom
 ciò che costa una richiesta di elenco. `?count=none` (`GET /api/data/orders?count=none`) lo salta:
 niente `meta.total`, mentre `meta.hasMore` resta esatto (la lettura chiede una riga oltre la pagina).
 `?count=exact` è il valore predefinito; qualsiasi altro valore è un 400 `INVALID_COUNT`. Una lettura
-con `?distinct=true` non viene mai conteggiata.
+con `?distinct=true` non viene mai conteggiata, e nemmeno una ricerca vettoriale con
+un `vector_threshold` (vedi [Ricerca vettoriale](/docs/backend/vector-search/)).
 
 ### Paginazione tramite cursore
 
@@ -370,20 +383,16 @@ GET /api/data/products?searchString=wireless%20keyboard
 
 ## Ricerca vettoriale
 
-Se una collection definisce una proprietà di tipo `vector`, puoi eseguire ricerche per similarità ad alta velocità utilizzando le operazioni di distanza di pgvector compilate direttamente nella query del database.
+Una collection con una proprietà `vector` accetta una ricerca del vicino più prossimo
+sull'elenco: `?vector_search=embedding&vector=[0.15,0.22,-0.05]`, con `vector_distance`
+e `vector_threshold` opzionali. I parametri, le soglie e il comportamento dei filtri
+sull'indice sono in [Ricerca vettoriale](/docs/backend/vector-search/).
 
-```bash
-GET /api/data/products?vector_search=embedding&vector=[0.15,0.22,-0.05]&vector_distance=cosine&vector_threshold=0.8
-```
+## Query troppo lunghe per un URL
 
-### Parametri di query vettoriale
-
-| Parametro | Tipo | Descrizione |
-|-----------|------|-------------|
-| `vector_search` | `string` | Il nome della proprietà vettoriale su cui eseguire la query. |
-| `vector` | `string` | Un array di float serializzato in JSON che rappresenta il vettore di query. |
-| `vector_distance` | `string` | La metrica di distanza da valutare. Valori supportati: `cosine` (predefinito, `<=>`), `l2` (`<->`), `inner_product` (`<#>`). |
-| `vector_threshold` | `number` | Soglia massima di distanza. Vengono restituiti solo i record con distanza inferiore a questa soglia. |
+<span class="since-badge" data-since="0.25">Da 0.25</span> `POST /api/data/:slug/query` (questo elenco) e `POST /api/data/:slug/count`
+accettano i parametri di query in un body JSON, per una query il cui URL non ci starebbe — un embedding, una lunga lista `in`.
+Vedi [Query troppo lunghe per un URL](/docs/backend/vector-search/#queries-too-long-for-a-url).
 
 ## Inclusione delle relazioni
 
@@ -418,6 +427,7 @@ GET /api/data/posts?include={"comments":{"limit":5,"where":{"published":["==",tr
 | `orderBy` | La stessa sintassi di ordinamento, inclusa la posizione dei valori NULL. Gli ex aequo, e un `limit` senza `orderBy`, seguono la chiave della riga correlata, in ordine crescente |
 | `fields` | Colonne della riga *correlata*; la sua chiave viene sempre preservata |
 | `include` | A sua volta, relazioni della riga correlata |
+| `count` | <span class="since-badge" data-since="0.25">Da 0.25</span> `true` restituisce anche il totale di ciascun genitore sotto `_count` (`"_count":{"comments":37}`), contato dalla stessa istruzione. Solo relazioni to-many. Vedi [Contare ciò che un limite lascia fuori](/docs/sdk/relations#counting-what-a-limit-leaves-out) |
 
 `true` significa "carica l'entità per intero", quindi `{"author":true}` e `author` rappresentano la medesima richiesta. Entrambe le formulazioni funzionano sulla route di elenco, sulla route get-by-id e sulle route di subcollection annidate.
 

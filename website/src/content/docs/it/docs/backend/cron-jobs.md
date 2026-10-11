@@ -1,5 +1,5 @@
 ---
-sourceHash: 37805343f12779ab
+sourceHash: 781657121510be7a
 title: Cron Jobs
 sidebar_label: Cron Jobs
 description: Pianifica attività ricorrenti in background con il sistema di cron job integrato di Rebase. Definisci i job come file TypeScript, monitorali in Studio e gestiscili tramite l'API REST.
@@ -178,6 +178,8 @@ interface CronJobContext {
 
 Usa `ctx.log()` per emettere output strutturato. Queste righe vengono acquisite nel log di esecuzione e sono visibili in Studio e tramite l'API REST. Ogni riga viene scritta anche nel log del server a livello `info`, con un campo `cron` che contiene l'ID del job, quindi compare ovunque venga raccolto l'output del tuo container, compresi i log di debug di Rebase Cloud. Questa copia viene oscurata come le righe di log del server stesso: i valori di chiavi come `password` o `apiKey`, e l'SQL e i parametri di una query fallita, vengono sostituiti. Il log di esecuzione conserva la riga senza questo oscuramento.
 
+<span class="since-badge" data-since="0.25">Da 0.25</span> Il log di esecuzione conserva le prime 500 righe di un'esecuzione o 64 KB di esse, a seconda di quale limite viene raggiunto per primo, e poi una riga che dice quante altre ce n'erano: `… 9500 more lines not kept — see the server log`. Il log del server riceve ogni riga. Un job che registra una riga per ogni elemento che elabora deve aspettarsi che la sua cronologia mostri l'inizio dell'esecuzione.
+
 ### `ctx.signal` — interrompere il lavoro quando l'esecuzione si ferma
 
 Il timeout interrompe l'*esecuzione*: lo scheduler smette di attendere e registra un fallimento. Non interrompe però l'handler. Passa `ctx.signal` a qualsiasi operazione che lo accetti, e il lavoro si interromperà di conseguenza:
@@ -280,7 +282,7 @@ Vedi [Ruoli e scope](/docs/backend/roles-and-scopes/).
 | `GET` | `/api/admin/cron` | Elenca tutti i cron job registrati |
 | `GET` | `/api/admin/cron/:id` | Recupera lo stato di un singolo job |
 | `POST` | `/api/admin/cron/:id/trigger` | Avvia manualmente un job — `409` mentre è già in esecuzione |
-| `GET` | `/api/admin/cron/:id/logs` | Ottieni la cronologia delle esecuzioni (`?limit=N`). `503` quando `rebase.cron_logs` non può essere letto, anziché una cronologia vuota |
+| `GET` | `/api/admin/cron/:id/logs` | Ottieni la cronologia delle esecuzioni (`?limit=N`), degli ultimi 30 giorni. `503` quando `rebase.cron_logs` non può essere letto, anziché una cronologia vuota |
 | `PUT` | `/api/admin/cron/:id` | Mette in pausa o riprende un job ovunque (`{ "enabled": false }`); `null` torna a seguire il codice |
 
 ### Esempio: Elencare tutti i job
@@ -397,13 +399,9 @@ La dashboard si aggiorna automaticamente ogni 15 secondi.
 
 Il pannello mostra la stessa cosa qualunque processo lo serva. Un job che un
 altro processo sta eseguendo appare in esecuzione.
-Su ogni processo che dispone di uno store, il numero di esecuzioni, il numero di errori e
-l'ultima esecuzione vengono letti da `rebase.cron_logs`, con una query limitata alle righe
-di ciascun job. I contatori propri di un processo contengono solo le esecuzioni che ha fatto
-lui: il ruolo `api` accanto a un worker non esegue nulla, e di due repliche che pianificano
-entrambe, nessuna vede gli slot rivendicati dall'altra. Solo quando `cron_logs` non può essere
-letto la scheda ripiega sui contatori di questo processo, con un avviso nel log del
-server.
+Su ogni processo che dispone di uno store, il numero di esecuzioni, il numero di errori e l'ultima esecuzione vengono letti dal database, dove sono contate le esecuzioni di ogni processo. I contatori propri di un processo contengono solo le esecuzioni che ha fatto lui: il ruolo `api` accanto a un worker non esegue nulla, e di due repliche che pianificano entrambe, nessuna vede gli slot rivendicati dall'altra. Solo quando il database non può essere letto la scheda ripiega sui contatori di questo processo, con un avviso nel log del server.
+
+<span class="since-badge" data-since="0.25">Da 0.25</span> I conteggi sono complessivi; la cronologia è quella degli ultimi 30 giorni. La riga di ogni esecuzione in `rebase.cron_logs` viene eliminata 30 giorni dopo il suo avvio, da una pulizia oraria, mentre i conteggi di esecuzioni e fallimenti continuano a includerla. Un'esecuzione saltata conta come esecuzione, come è sempre stato: è una riga della cronologia.
 
 ## Validazione della pianificazione e parsing dell'AST
 
@@ -440,7 +438,7 @@ pianificato è descritto in [Cron su più istanze](/docs/backend/cron-across-ins
   `Error: Cron job "<id>" timed out after <N>ms`
   L'abort è la metà che interrompe il *lavoro*; il rifiuto interrompe solo l'attesa dello scheduler. Un handler che ignora `ctx.signal` continuerà a essere eseguito oltre la sua stessa esecuzione.
 - **Arresto**: `backend.shutdown()` attende un'esecuzione in corso, entro lo stesso budget della coda dei job (due terzi del timeout di arresto). Se l'esecuzione è ancora in corso quando il budget si esaurisce, `ctx.signal` viene interrotto e l'esecuzione viene registrata come fallita, con il motivo. Il suo slot resta reclamato, quindi nessun'altra istanza la riesegue.
-- **Try/Catch a prova di errore**: Ogni job handler viene eseguito all'interno di un wrapper isolato. Eventuali eccezioni non rilevate vengono intercettate, formattando il traceback dell'errore in una stringa, impostando lo stato del job su `"error"` e aggiornando i contatori dei fallimenti in `rebase.cron_logs`. Un arresto anomalo all'interno di un singolo cron task non causerà mai il crash del ciclo dello scheduler né del server web HTTP principale Hono.
+- **Try/Catch a prova di errore**: Ogni job handler viene eseguito all'interno di un wrapper isolato. Eventuali eccezioni non rilevate vengono intercettate, formattando il traceback dell'errore in una stringa, impostando lo stato del job su `"error"` e aggiornando il contatore dei fallimenti del job. Un arresto anomalo all'interno di un singolo cron task non causerà mai il crash del ciclo dello scheduler né del server web HTTP principale Hono.
 - **Ring buffer in memoria**: Lo scheduler mantiene un ring buffer contenente le ultime **50 esecuzioni** per ogni job. Questo buffer viene conservato in memoria per consentire letture quasi istantanee da Rebase Studio.
 
 ---
@@ -465,16 +463,25 @@ CREATE TABLE IF NOT EXISTS rebase.cron_logs (
     manual       BOOLEAN NOT NULL DEFAULT false        -- True if triggered from Studio/REST
 );
 
+ALTER TABLE rebase.cron_logs ADD COLUMN IF NOT EXISTS counted BOOLEAN;  -- the run is in the counters below
+
 CREATE INDEX IF NOT EXISTS idx_cron_logs_job ON rebase.cron_logs(job_id, started_at DESC);
-CREATE INDEX IF NOT EXISTS idx_cron_logs_job_failures ON rebase.cron_logs(job_id) WHERE NOT success;
+CREATE INDEX IF NOT EXISTS idx_cron_logs_started ON rebase.cron_logs(started_at);
+CREATE INDEX IF NOT EXISTS idx_cron_logs_uncounted ON rebase.cron_logs(job_id, started_at DESC) WHERE counted IS NULL;
 
 CREATE TABLE IF NOT EXISTS rebase.cron_job_state (
-    job_id         TEXT PRIMARY KEY,
-    enabled        BOOLEAN,       -- NULL: follow the job's own `enabled`
-    updated_at     TIMESTAMPTZ,   -- when `enabled` was last set, and by whom
-    updated_by     TEXT,
-    running_until  TIMESTAMPTZ,   -- the run lease: live while in the future
-    running_by     TEXT
+    job_id            TEXT PRIMARY KEY,
+    enabled           BOOLEAN,       -- NULL: follow the job's own `enabled`
+    updated_at        TIMESTAMPTZ,   -- when `enabled` was last set, and by whom
+    updated_by        TEXT,
+    running_until     TIMESTAMPTZ,   -- the run lease: live while in the future
+    running_by        TEXT,
+    total_runs        BIGINT NOT NULL DEFAULT 0,   -- all-time, skips included
+    total_failures    BIGINT NOT NULL DEFAULT 0,
+    last_run_at       TIMESTAMPTZ,                 -- the most recently started run
+    last_duration_ms  INTEGER,
+    last_success      BOOLEAN,
+    last_error        TEXT
 );
 ```
 
@@ -484,7 +491,9 @@ ottiene al deploy successivo. Nessuna è una collection, e il ruolo utente final
 permetterebbe a un utente autenticato di mettere in pausa un job per tutti, o di
 trattenerne il lease così che nulla lo esegua.
 
-All'avvio, lo scheduler legge le statistiche da questa tabella tramite query aggregate (`COUNT(*)`, `SUM(CASE WHEN success = false THEN 1 ELSE 0 END)`) per popolare la cronologia di `totalRuns` e `totalFailures`. Gli inserimenti dei log vengono eseguiti tramite un passaggio asincrono non bloccante; se un flush nel database fallisce, lo scheduler registra l'errore e prosegue la normale esecuzione usando il ring buffer in memoria come fallback.
+<span class="since-badge" data-since="0.25">Da 0.25</span> La riga di un'esecuzione e il suo conteggio vengono scritti in un'unica istruzione: l'inserimento in `cron_logs` e un upsert dei contatori del job su `cron_job_state`. Un elenco legge una riga di `cron_job_state` per job, per quanto lunga sia la cronologia, e lo stesso fa lo scheduler quando inizializza `totalRuns` e `totalFailures` all'avvio. Le scritture dei log non fanno attendere l'esecuzione; se una fallisce, lo scheduler registra l'errore e prosegue, con l'esecuzione ancora nel ring buffer in memoria.
+
+Una volta all'ora, e all'avvio, lo scheduler elimina le righe di cronologia più vecchie di 30 giorni e conta le esecuzioni non ancora contate, entrambe a lotti di 5.000 righe. Una cronologia scritta prima della 0.24 viene contata dalla prima di queste pulizie, fuori dal percorso di avvio. Finché non ha finito, un elenco somma ai contatori le esecuzioni non ancora contate, così i numeri non cambiano all'aggiornamento. Lo stesso vale per un'esecuzione che un server più vecchio registra durante un deploy progressivo.
 
 ## Esempio: Job di pulizia giornaliero
 

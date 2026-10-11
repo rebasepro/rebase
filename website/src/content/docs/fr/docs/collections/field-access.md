@@ -1,5 +1,5 @@
 ---
-sourceHash: 7184b66cc0913ef9
+sourceHash: 2a29a9e6fa3879e6
 title: Accès aux champs
 sidebar_label: Accès aux champs
 description: Permissions de lecture et d'écriture par propriété et par rôle. Un appelant autorisé par les règles de sécurité de la ligne ne reçoit toujours pas un champ que ses rôles ne permettent pas de lire.
@@ -77,9 +77,14 @@ C'est délibéré. Une valeur masquée renvoyée sous la forme `null` est indisc
 
 Cela s'applique à chaque sortie : liste, lecture unitaire, cibles de relation incluses avec `?include=`, résultats de `_batch`, trames temps réel issues de `.listen()`, résultats d'agrégation et instantanés de l'[historique](#historique).
 
+La valeur d'une propriété de relation, ce sont ses lignes liées ; une relation que vous ne pouvez pas lire est donc
+retenue en entier. `?include=` l'omet de la ligne, avec son `_count`, par toutes les portes : REST, le SDK,
+`.listen()`, et les includes imbriqués d'un niveau plus bas. La nommer ailleurs est refusé comme un champ
+(voir [Requêtes](#requêtes)).
+
 ### Requêtes
 
-Un `where`, `orderBy`, `fields`, un `select` d'agrégation ou un `groupBy` mentionnant un champ que vous ne pouvez pas lire renvoie une erreur **400 `FIELD_NOT_READABLE`** :
+Un `where`, `orderBy`, `fields`, un `select` d'agrégation ou un `groupBy` mentionnant un champ que vous ne pouvez pas lire renvoie une erreur **400 `FIELD_NOT_READABLE`**. Il en va de même pour une relation que vous ne pouvez pas lire, nommée dans un chemin imbriqué (`/departments/1/members`, `/departments/1/members/7`) ou dans un tri d'agrégat (`orderBy=count(members)`) :
 
 ```http
 GET /api/data/staff?salary=gt.100000

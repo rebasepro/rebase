@@ -1,5 +1,5 @@
 ---
-sourceHash: 0b7bd3b233513344
+sourceHash: 06e95610513a9c52
 title: Agent Skills
 sidebar_label: Agent Skills
 description: O comando rebase skills install grava 21 habilidades de referência do Rebase em seu repositório, no layout que seu assistente de IA espera — Cursor, Claude Code, Windsurf, Gemini CLI e Antigravity.
@@ -127,18 +127,25 @@ Faça o commit delas. Elas fazem parte do repositório da mesma forma que a conf
 assim, o assistente de cada colaborador trabalhará com o mesmo entendimento da base de código,
 incluindo colaboradores que nunca executaram o comando.
 
-**Execute novamente o comando para atualizar.** Os arquivos são sobrescritos incondicionalmente, então
-após uma atualização do Rebase:
+**Execute novamente o comando para atualizar** após uma atualização do Rebase:
 
 ```bash
 rebase skills install --agent all
 ```
 
-Duas consequências de "incondicionalmente": edições locais em uma habilidade instalada são
-perdidas na próxima execução — em vez disso, mantenha orientações específicas do projeto em
-[`ai-instructions.md`](/docs/ai/instruction-files), que pertence a você e
-nunca é sobrescrito. E habilidades removidas em uma versão mais recente não são excluídas do
-seu repositório; apenas os arquivos que ainda existem são regravados.
+Cada diretório de destino contém um manifesto `.rebase-skills.json` do que o
+comando gravou, de modo que uma nova execução distingue uma edição sua da cópia de uma
+versão anterior. Faça o commit dele junto com as habilidades.
+
+- Um arquivo que ninguém editou é substituído pela cópia da nova versão.
+- Um arquivo que você editou é mantido, e o comando o lista. `--force` o substitui.
+- Uma habilidade que uma versão mais recente deixou de distribuir é removida, a menos que
+  você a tenha editado. Nesse caso ela é mantida e listada.
+- Arquivos que o comando nunca gravou não são tocados.
+
+Orientações específicas do projeto continuam pertencendo a
+[`ai-instructions.md`](/docs/ai/instruction-files), que é seu. Uma habilidade editada
+deixa de receber atualizações até você usar `--force`.
 
 O comando também funciona fora de um projeto Rebase, usando como fallback o diretório de trabalho —
 útil para um repositório frontend separado que se comunica com um backend Rebase.

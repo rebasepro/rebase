@@ -1,5 +1,5 @@
 ---
-sourceHash: d7e22a508527032c
+sourceHash: d5f6bfc83168dcfd
 title: Executando mais de uma instância
 sidebar_label: Mais de uma instância
 description: Todo estado que um processo Rebase mantém só para si, e a configuração que o compartilha — o que definir antes de uma segunda réplica, um deploy rolling ou uma implantação dividida receber tráfego.
@@ -35,7 +35,7 @@ cada atualização.
 | Assinaturas de coleções | Compartilhadas pelo banco de dados quando o CDC está ativo | `REALTIME_CDC=auto` (o padrão) |
 | Canais de broadcast e presença | Em memória | `REALTIME_CHANNEL_BUS=postgres` |
 | Arquivos enviados, `STORAGE_TYPE=local` | O próprio disco da instância | S3 ou GCS, ou um volume compartilhado em `STORAGE_PATH` |
-| Uploads retomáveis (TUS) em andamento | A memória e o disco da instância | Sticky sessions; um restart ainda os perde |
+| Uploads retomáveis (TUS) em andamento | O disco da instância, em `STORAGE_PATH/.tus-uploads` | Um volume compartilhado em `STORAGE_PATH`, ou sticky sessions |
 | Transformações de imagem | Um cache em processo | `STORAGE_RENDITION_CACHE=true` |
 | Logs Explorer | Um anel com as últimas 10.000 linhas | Nada — envie o stdout para um agregador de logs |
 | Timers de cron | Todo processo que executa o scheduler | Reivindicado no banco de dados: uma execução por slot. `REBASE_CRON_SCHEDULER` decide onde os timers vivem |
@@ -95,16 +95,18 @@ recebeu, e outra instância responde 404 para eles. Use S3 ou GCS, ou monte um
 único volume em `STORAGE_PATH` em todas as instâncias. Veja
 [Auto-hospedagem: armazenamento de arquivos](/docs/deployment/self-hosting/#file-storage).
 
-**Os uploads retomáveis** (o endpoint TUS) mantêm o arquivo parcial de cada
-upload e seu estado no disco local da instância que o criou, em
-`STORAGE_PATH/.tus-uploads` — mesmo quando os arquivos finalizados vão para o
-S3 ou o GCS. Um chunk que chega a outra instância recebe 404 e o cliente
-recomeça. Direcione as requisições de upload de um cliente para uma única
-instância (sticky sessions no load balancer). Um volume compartilhado em
-`STORAGE_PATH` compartilha os arquivos parciais, mas ainda não o estado do
-upload, que é mantido na memória do processo — então um restart ou um deploy
-rolling também devolve um upload em andamento para o byte 0. Uploads comuns
-via `POST /upload` são uma única requisição e não são afetados.
+**Os uploads retomáveis** (o endpoint TUS) mantêm o arquivo parcial de cada upload e,
+<span class="since-badge" data-since="0.25">Desde 0.25</span> um registro do upload ao lado dele, no disco da instância que o
+criou, em `STORAGE_PATH/.tus-uploads` — mesmo quando os arquivos finalizados vão para o
+S3 ou o GCS. Monte um volume em `STORAGE_PATH` em toda instância e qualquer instância
+atende qualquer upload; um restart ou um deploy rolling retoma um upload de onde ele
+parou. Sem um volume compartilhado, um chunk que chega a outra instância recebe
+404: direcione as requisições de upload de um cliente para uma única instância (sticky sessions
+no load balancer). O SDK e o painel de admin, que usam esse endpoint para
+arquivos acima de 8 MiB, então enviam o arquivo por `POST /upload`, e continuam
+fazendo isso pelo resto da sessão. Uploads comuns via `POST /upload` são uma única requisição
+e não são afetados. Na 0.23 o estado do upload ficava na memória do processo,
+então um volume compartilhado não ajudava e um restart devolvia um upload ao byte 0.
 
 **As transformações de imagem** (`?width=400&format=webp`) são armazenadas em
 cache na memória, então cada instância calcula cada variante uma vez, e uma

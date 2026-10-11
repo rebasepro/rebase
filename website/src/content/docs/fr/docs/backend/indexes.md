@@ -1,5 +1,5 @@
 ---
-sourceHash: 17ca6f6a285eea43
+sourceHash: 3d8676ac5f8d58c7
 title: Index
 sidebar_label: Index
 description: Déclarez des index Postgres ordinaires sur une collection — btree, GIN et BRIN, partiels, composites, couvrants et uniques — et comprenez pourquoi un index écrit à la main disparaissait auparavant.
@@ -63,7 +63,7 @@ C'est le piège classique. Une relation `belongsTo` se compile vers sa `localKey
 { on: ["author"], reason: "an author's posts, and the ON DELETE cascade" }
 ```
 
-Écrire `author_id` ici fonctionnerait pour la plupart des propriétés et n'indexerait silencieusement rien pour une clé étrangère, qui est pourtant celle que l'on cherche à indexer. Postgres n'indexe pas de colonne de clé étrangère à votre place — sans cet index, « lister les publications de cet auteur » et la cascade `ON DELETE` sont tous deux des scans séquentiels.
+Écrire `author_id` ici est refusé à la construction : c'est une colonne, et non une propriété de la collection, alors que `on` nomme des propriétés. Postgres n'indexe pas de colonne de clé étrangère à votre place — sans cet index, « lister les publications de cet auteur » et la cascade `ON DELETE` sont tous deux des scans séquentiels.
 
 Une relation `hasMany` ou many-to-many ne possède aucune colonne sur cette table, et est rejetée en indiquant la collection qui possède effectivement la clé étrangère.
 
@@ -175,7 +175,95 @@ Les deux producteurs les émettent, ce qui est important car tous les déploieme
 
 - **`rebase db push` / `rebase db generate`** les placent dans `schema.sql`, selon le parcours Atlas habituel — ils bénéficient ainsi des migrations, de la détection de dérive et du rollback comme n'importe quel autre objet.
 - **`rebase schema generate`** les écrit également dans `schema.generated.ts`, de sorte que le schéma Drizzle décrive la même table que celle présente dans la base de données. Les colonnes `INCLUDE` d'un index couvrant constituent la seule exception : Drizzle ne peut pas les exprimer, et la ligne générée comporte un commentaire le signalant et renvoyant vers `schema.sql`, qui les gère.
-- **L'assurance de schéma au démarrage (boot-time schema ensure)** les crée avec `CREATE INDEX CONCURRENTLY IF NOT EXISTS`, selon les mêmes modalités que les index ANN à leurs côtés. Un tenant de runtime managé provisionne au démarrage et n'exécute jamais `db push` ; sans cela, il démarrerait sans aucun de ses index déclarés et rien ne le signalerait.
+- **L'assurance de schéma au démarrage (boot-time schema ensure)** les crée aussi, selon les mêmes modalités que les index de recherche et ANN à leurs côtés. Un tenant de runtime managé provisionne au démarrage et n'exécute jamais `db push` ; sans cela, il démarrerait sans aucun de ses index déclarés et rien ne le signalerait. Une table que le démarrage crée reçoit ses index avec la table. Sur une table qui existe déjà, le démarrage construit un index manquant une fois le serveur en service, en arrière-plan, comme il construit les [index de clés étrangères](#ce-que-fait-la-mise-à-niveau-sur-une-base-de-données-existante). Il utilise `CREATE INDEX CONCURRENTLY` sur une connexion à part, de sorte que le `statement_timeout` de 30 s du pool ne peut pas annuler une longue construction. Un index qu'une construction interrompue a laissé `INVALID` sous son nom est supprimé puis reconstruit. `IF NOT EXISTS` compare le nom, il ne répare donc jamais un tel index. Un index `unique` est construit de la même façon, mais avant que le serveur ne soit en service, et le démarrage échoue s'il ne peut pas être construit. Servir sans lui laisserait entrer des lignes en double.
+
+## Les clés étrangères sont indexées pour vous
+
+<span class="since-badge" data-since="0.25">Depuis 0.25</span> Postgres crée l'index vers lequel une clé étrangère *pointe* — la clé primaire de la cible — et jamais
+un index sur la colonne qui la *porte*. Chaque lecture depuis l'autre côté d'un lien filtre sur cette
+colonne : un include `hasMany` ou `hasOne`, une liste imbriquée comme `/authors/5/posts` (sa page et son
+comptage), le côté inverse d'un `manyToMany`, et la vérification `ON DELETE` lorsqu'une ligne parente est
+supprimée. Sans index, chacune de ces lectures parcourt toutes les lignes de la table enfant.
+
+Rebase dérive donc un btree simple pour :
+
+- la `localKey` de chaque [`belongsTo`](/docs/collections/relations#belongsto--la-clé-est-sur-cette-table)
+  — qui est aussi la colonne que lit le `hasOne` / `hasMany` du côté opposé ;
+- la colonne cible de chaque table de jonction `manyToMany`. La clé primaire `(source, target)` de la
+  jonction sert déjà les recherches par la colonne source ; le côté inverse du lien a besoin de celui-ci.
+  Une jonction est une table de Rebase, celui-ci n'a donc aucune option de désactivation.
+
+Mesuré sur Postgres 18 avec un cache chaud, 1 M de commentaires répartis sur 50 k articles :
+
+| La lecture | Sans l'index | Avec |
+|---|---|---|
+| `include=comments` sur une page de 25 articles (`post_id IN (…)`) | 38 ms | 0,3 ms |
+| `GET /posts/77/comments?limit=25` — la page | 28 ms | 0,3 ms |
+| …et son `count(*)` | 29 ms | 0,2 ms |
+| suppression d'un article (vérification `ON DELETE SET NULL`) | 129 ms | 1,7 ms |
+
+Rien n'est indexé deux fois. L'index dérivé est omis lorsque la colonne est déjà en tête de la clé primaire,
+porte un `UNIQUE` (`validation.unique` sur la relation ou sur la propriété qui possède la colonne), ou est
+en tête d'un index de `indexes:` — simple ou composite, tant que c'est un btree sans `where`. Un index
+partiel ne peut pas servir une recherche qui doit atteindre toutes les lignes, et un index GIN ou BRIN
+répond à une autre question ; aucun des deux ne compte.
+
+Le nom est celui que dérive [une déclaration](#comment-une-déclaration-est-nommée) d'un index simple sur
+cette colonne — `posts_author_id_ix_00ad191` — si bien que l'index dérivé et
+`indexes: [{ on: ["author"], … }]` forment un seul objet, et non deux. C'est un
+[nom dérivé figé](/docs/architecture/schema-as-code) comme tous les autres.
+
+Pour garder la contrainte et supprimer l'index — une table si intensive en écriture que l'index coûte
+plus que les recherches qu'il sert, ou une table où vous gardez un index à vous en dehors de
+`indexes:` — dites-le sur la relation :
+
+```typescript
+author: {
+    name: "Author",
+    type: "relation",
+    relation: { kind: "belongsTo", target: () => authors, index: false }
+}
+```
+
+`index` n'est accepté que sur un `belongsTo` ; sur les autres types, le validateur de configuration le
+refuse, car leur clé étrangère est une colonne de la cible (définissez `index` sur le `belongsTo` de la
+cible) ou d'une jonction.
+
+Rebase ne lit que vos collections pour en décider, jamais la base de données : `db push` et le
+démarrage doivent aboutir au même ensemble d'index avec les mêmes noms, faute de quoi le `push` suivant
+supprimerait ce que le démarrage a construit. Un index que vous avez écrit à la main sur la même
+colonne, en dehors de `indexes:`, n'est donc pas vu — déclarez-le dans `indexes:`, ou définissez
+`index: false`, pour garder un seul index au lieu de deux.
+
+### Ce que fait la mise à niveau sur une base de données existante
+
+Les index sont de nouveaux objets sur des tables qui contiennent déjà des données, et les deux portes
+les construisent différemment :
+
+- **Le démarrage ne les attend pas.** Sur une table qui existe déjà, l'assurance de schéma laisse les
+  index de clés étrangères manquants hors du démarrage et les construit une fois le serveur en
+  service, un par un, avec `CREATE INDEX CONCURRENTLY` sur une connexion à part (le `statement_timeout`
+  de 30 s du pool ne s'y applique pas). Cela ne prend aucun verrou que les lectures ou les écritures
+  attendent. Une table qu'une autre session retient — la construction d'une autre instance, un
+  `ALTER TABLE` — est abandonnée dans le budget de verrou du démarrage et retentée au démarrage suivant.
+  Un index qu'une construction interrompue a laissé `INVALID` (un déploiement qui a remplacé le
+  processus en pleine construction, deux instances en concurrence sur un même nom) est supprimé puis
+  reconstruit. Chacun est journalisé à son début et à sa fin ; un échec est un avertissement, jamais un
+  démarrage en échec. Une table que ce démarrage crée reçoit ses index avec la table, avant que quoi que
+  ce soit puisse y écrire. Avec `REBASE_PROVISION_ONLY`, les constructions s'exécutent avant que le
+  processus ne se termine, puisque rien après lui ne les exécuterait.
+- **`rebase db push` les construit avant de planifier**, avec le même constructeur et dans les mêmes
+  conditions que le démarrage : `CREATE INDEX CONCURRENTLY`, un par un, de sorte que les lectures et les
+  écritures continuent pendant son exécution (environ 0,4 s pour 1 M de lignes et 6 s pour 10 M en
+  construction simple sur un SSD d'ordinateur portable, `maintenance_work_mem` à 64 Mo ; une
+  construction concurrente est plus longue et ne bloque rien). Atlas trouve alors chaque index déjà en
+  place et ne planifie rien pour lui. Un index qu'il n'a pas pu construire d'abord — une table qu'une
+  autre session a retenue pendant tout le budget de verrou — est laissé à Atlas, qui le construit
+  dans la transaction du push et bloque donc les écritures sur cette table pendant la construction ;
+  le push indique lesquels. Une colonne de clé étrangère que le push ajoute lui-même reçoit son index
+  d'Atlas avec la colonne, avant qu'elle ne contienne quoi que ce soit. `--dry-run` ne construit rien :
+  il nomme les index qu'un vrai push construirait d'abord, et le plan qu'il affiche les liste, puisqu'ils
+  n'existent pas encore.
 
 ## Ce qui est refusé, et quand
 

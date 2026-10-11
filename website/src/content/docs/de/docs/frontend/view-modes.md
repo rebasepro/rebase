@@ -1,5 +1,5 @@
 ---
-sourceHash: 480ba165906124fe
+sourceHash: 9109031950f77ac1
 title: Ansichtsmodi
 sidebar_label: Ansichtsmodi
 description: Konfigurieren Sie Tabellen-, Karten- und Kanban-Board-Ansichten für Ihre Sammlungen.
@@ -52,7 +52,7 @@ Die Listenansicht ist der klassische, saubere CMS-Standardansichtsmodus, der Ent
 
 ## Tabellenansicht
 
-Die Standardansicht ist eine hochleistungsfähige virtualisierte Tabelle mit:
+Die Tabellenansicht ist eine hochleistungsfähige virtualisierte Tabelle mit:
 
 - **Inline-Bearbeitung** — Klicken Sie auf eine beliebige Zelle, um sie direkt zu bearbeiten
 - **Spaltengrößenanpassung** — Spaltenüberschriften ziehen
@@ -68,11 +68,11 @@ Steuern Sie die Zeilenhöhe mit `defaultSize`:
 
 | Größe | Pixel | Am besten geeignet für |
 |------|--------|----------|
-| `"xs"` | 40 | Dichte Datentabellen |
-| `"s"` | 54 | Standard |
-| `"m"` | 80 | Mit Bildminiaturen |
-| `"l"` | 120 | Karten mit Vorschauen |
-| `"xl"` | 260 | Vorschauen von Rich Media Inhalten |
+| `"xs"` | 36 | Dichte Datentabellen |
+| `"s"` | 42 | Kompakte Textzeilen |
+| `"m"` | 48 | Standard |
+| `"l"` | 96 | Mittelgroße Bildminiaturen |
+| `"xl"` | 160 | Große Bildminiaturen |
 
 ## Kanban-Ansicht
 

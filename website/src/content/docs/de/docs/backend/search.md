@@ -1,5 +1,5 @@
 ---
-sourceHash: bd5c3797254d822d
+sourceHash: aa6e4f1031d85124
 title: Suche
 sidebar_label: Suche
 description: Wie sich .search() standardmäßig verhält und wie Sie eine Postgres-Collection für die gerankte Volltextsuche über die von Ihnen benannten Felder aktivieren – einschließlich JSONB- und Array-Inhalten.
@@ -39,6 +39,8 @@ jedoch drei Einschränkungen, die durch keine interne Einstellung behoben werden
 - **Es kann keinen Index verwenden.** Ein führendes `%` hebelt einen B-Tree aus,
   sodass jede Suche ein sequentieller Scan ist. Bei tausend Zeilen in Ordnung;
   bei einer Million ein steiler Abgrund.
+  `rebase doctor` nennt die Collections, bei denen dies zum Problem zu werden beginnt:
+  kein `search`-Block und mehr als etwa 10.000 Zeilen.
 
 Der Begriff wird **wörtlich (literal)** abgeglichen: `%` und `_` sind LIKE-Metazeichen
 und werden escaped, bevor das Pattern erstellt wird. Die Suche nach `50%` sucht
@@ -356,8 +358,10 @@ stillschweigend nichts hervorhebt.
 ## Den Block zu einer Produktiv-Collection hinzufügen
 
 Die generierte Spalte wird wie jede andere Spalte durch die Schema-Sicherstellung
-beim Start hinzugefügt, und ihr Index wird mit `CREATE INDEX CONCURRENTLY`
-erstellt, sodass Schreibvorgänge nicht blockiert werden. Das Hinzufügen einer
+beim Start hinzugefügt. Ihr Index wird gebaut, nachdem der Server bedient, im
+Hintergrund, mit `CREATE INDEX CONCURRENTLY`, sodass Schreibvorgänge nicht blockiert
+werden (siehe [Indizes](/docs/backend/indexes#when-they-are-created)). Bis der Index
+gebaut ist, funktioniert eine Suche, liest aber die ganze Tabelle. Das Hinzufügen einer
 *gespeicherten (stored)* generierten Spalte schreibt die Tabelle jedoch um –
 planen Sie dies bei einer großen Tabelle wie jedes andere Tabellen-Rewrite.
 

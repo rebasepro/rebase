@@ -1,5 +1,5 @@
 ---
-sourceHash: 7e5bf22227544ae0
+sourceHash: 76a511b15a0fae61
 title: Authentifizierung
 sidebar_label: Authentifizierung
 description: Konfigurieren Sie JWT-Authentifizierung, OAuth-Provider, SMTP-E-Mail, Bot-Schutz und die Users-Collection im Rebase-Backend.
@@ -60,6 +60,7 @@ const backend = await initializeRebaseBackend({
                         ? { user: env.SMTP_USER, pass: env.SMTP_PASS! }
                         : undefined,
                     name: env.SMTP_NAME,               // Optional EHLO/HELO hostname
+                    timeoutMs: 30_000,                 // Connect, greeting and silence limit (the default)
                 },
                 appName: env.APP_NAME,
                 logoUrl: env.EMAIL_LOGO_URL,           // Logo shown atop the default templates

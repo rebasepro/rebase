@@ -1,5 +1,5 @@
 ---
-sourceHash: 40c6996a773e6e50
+sourceHash: e18fe07b6281381b
 title: Campos de upload de arquivos
 sidebar_label: Uploads de arquivos
 description:"\"Declarando um campo de arquivo ou imagem em uma coleção: o bloco de storage, uploads de arquivo único e múltiplos arquivos, e quais de suas opções o painel resolve em vez do servidor.\""
@@ -107,9 +107,11 @@ caminho, `{path}` qualquer número deles. O caminho de uma propriedade com
   como `putObject({ context })` os envia) também é submetido às regras dessa
   propriedade. Especificar uma propriedade mais permissiva não libera o caminho
   de uma mais restritiva.
+  Os uploads do painel (campos de arquivo, células de tabela e imagens markdown) sempre
+  a especificam.
 - Um `storagePath` escrito como função não pode ser lido sem executá-lo, então
   não tem regra no servidor: esses limites só valem para uploads que
-  especificam a propriedade.
+  especificam a propriedade, o que os do painel fazem.
 - Um caminho que nenhuma propriedade reivindica fica sujeito apenas ao limite
   da própria fonte (`STORAGE_MAX_FILE_SIZE`).
 

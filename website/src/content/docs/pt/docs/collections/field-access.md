@@ -1,5 +1,5 @@
 ---
-sourceHash: 7184b66cc0913ef9
+sourceHash: 2a29a9e6fa3879e6
 title: Acesso a campos
 sidebar_label: Acesso a campos
 description: Permissões de leitura e escrita por propriedade com base em papéis. Um chamador autorizado pelas regras de segurança da linha ainda assim não recebe um campo que seus papéis não podem ler.
@@ -101,10 +101,17 @@ Isso se aplica a todas as saídas: listagem, busca individual, alvos de relacion
 `?include=`, resultados de `_batch`, mensagens em tempo real de `.listen()`, resultados
 agregados e snapshots de [histórico](#histórico).
 
+O valor de uma propriedade de relação são as suas linhas relacionadas, então uma relação que você não
+pode ler é retida por inteiro. O `?include=` a deixa de fora da linha, com o seu `_count`, em
+todas as portas: REST, o SDK, `.listen()` e includes aninhados um nível abaixo.
+Citá-la em qualquer outro lugar é recusado como um campo (veja [Consultas](#consultas)).
+
 ### Consultas
 
 Um `where`, `orderBy`, `fields`, `select` agregado ou `groupBy` que cite um campo que
-você não pode ler resulta em um erro **400 `FIELD_NOT_READABLE`**:
+você não pode ler resulta em um erro **400 `FIELD_NOT_READABLE`**. O mesmo vale para uma
+relação que você não pode ler citada em um caminho aninhado (`/departments/1/members`,
+`/departments/1/members/7`) ou em uma ordenação agregada (`orderBy=count(members)`):
 
 ```http
 GET /api/data/staff?salary=gt.100000

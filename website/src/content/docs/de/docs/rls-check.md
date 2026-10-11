@@ -1,5 +1,5 @@
 ---
-sourceHash: 4efc850ec3b2c417
+sourceHash: bd7b49238143886e
 slug: de/docs/rls-check
 title: rls-check
 description: Überprüfen Sie Row-Level Security auf jeder PostgreSQL-Datenbank – Supabase, Neon, RDS oder Ihr eigener Server. Schreibgeschützt, keine Registrierung, kein Rebase erforderlich.
@@ -94,7 +94,7 @@ Datenbank tatsächlich sieht.
 | --- | --- |
 | `0` | Keine Ergebnisse bei oder über dem `--fail-on`-Schwellenwert |
 | `1` | Mindestens ein Ergebnis bei oder über dem Schwellenwert |
-| `2` | Der Scan konnte nicht ausgeführt werden – ungültige Argumente, Verbindung verweigert, Authentifizierungsfehler, Timeout |
+| `2` | Der Scan konnte nicht ausgeführt werden – ungültige Argumente, Verbindung verweigert, Authentifizierungsfehler, Timeout – oder war unvollständig: Ein Katalog-Read ist fehlgeschlagen oder eine Prüfung ist abgestürzt (`diagnostics.degraded`). Das gilt auch mit `--fail-on none` |
 
 `1` und `2` sind bewusst unterschiedlich: Eine fehlerhafte Verbindung darf niemals wie eine saubere
 Datenbank aussehen.
@@ -225,10 +225,11 @@ was *diese* Verbindung erlebt. Die Befunde beziehen sich darauf, was andere Roll
 ### Auf einer Rebase-Datenbank: Ändern Sie die Regel, nicht die Policy
 
 Jede Policy in einem Rebase-Deployment wird aus den `securityRules` einer Collection kompiliert, und
-die Runtime **wendet sie bei jedem Start neu an**: Sie löscht jede generierte Policy und erstellt sie
-aus der Konfiguration neu. Ein `ALTER POLICY`, das auf eine dieser Policies angewendet wird, überlebt
-daher exakt bis zum nächsten Neustart, und der Befund kehrt zurück – nachdem Sie zugesehen haben,
-wie er verschwand.
+die Runtime **prüft sie bei jedem Start**: Jede generierte Policy trägt einen Stempel (einen
+`rebase:<hash>`-Kommentar) dessen, was kompiliert wurde und was Postgres gespeichert hat, und eine Tabelle, deren
+Policies nicht mehr dazu passen, wird aus der Konfiguration neu angewendet. Ein `ALTER POLICY`, das auf eine dieser Policies
+angewendet wird, überlebt daher exakt bis zum nächsten Neustart, und der Befund kehrt mit ihm zurück –
+nachdem Sie zugesehen haben, wie er verschwand.
 
 `rls-check` erkennt diese Policies (an einem Namen im Format `<table>_<operation>_<hash>` oder einem
 Aufruf von `rebase.uid()` / `rebase.roles()` im Ausdruck) und gibt die Regel anstelle von SQL vor.
@@ -278,8 +279,9 @@ gegen einen stillen Ausfall eingetauscht. Siehe [rls-enabled-no-policies](#rls-e
 
 **Policy gewährt bedingungslosen Zugriff.** Critical.
 
-Eine permissive Policy, deren `USING`- oder `WITH CHECK`-Ausdruck eine konstante Wahrheit ist – `true`,
-`(true)`, `1 = 1`. Permissive Policies werden mit ODER verknüpft, sodass eine einzige dieser Regeln
+Eine permissive Policy, deren `USING`- oder `WITH CHECK`-Ausdruck eine konstante Wahrheit ist : `true`,
+`(true)`, `1 = 1`, `1 > 0`, `NOT false`, `true OR <anything>` oder eine Konstante, die über einen Cast mit
+sich selbst verglichen wird. Permissive Policies werden mit ODER verknüpft, sodass eine einzige dieser Regeln
 den Zeilenfilter der Tabelle erfüllt, ganz gleich, wie streng jede andere Policy ist.
 
 Wie bei jeder Prüfung wird die Policy nur gemeldet, wenn eine Rolle, für die sie gilt, die Tabelle
@@ -331,6 +333,10 @@ Der Schweregrad ist plattformabhängig, und diese Unterscheidung ist wichtig:
 - **Auf einer nicht erkannten Plattform** gemeldet als **medium**, da es davon abhängt, ob Ihr Stack
   einen solchen Sentinel verwendet, ob es sich um eine Lücke handelt.
 
+Eine Datenbank zählt als Rebase, wenn sie das Schema `rebase` hat. Die Rolle `rebase_user`
+entscheidet das nicht, weil Rollen zum ganzen Server gehören und ein Server, der eine
+Rebase-App hostet, weitere Datenbanken enthalten kann.
+
 ```sql
 -- Scope to the row's owner rather than to the existence of an id
 ALTER POLICY "your_policy" ON "public"."your_table"
@@ -355,6 +361,10 @@ ist das Eingrenzen von Zeilen: Was übrig bleibt, ist *jedes registrierte Konto 
 Tabelle lesen*, was eine andere Aussage ist als die, die normalerweise beabsichtigt war. Auf einem
 Rebase-Projekt ist das eine Regel, deren `condition` `policy.authenticated()` ist und sonst nichts,
 die die Datenbank als `rebase.uid() <> ALL (ARRAY['anonymous', 'anon'])` speichert.
+<span class="since-badge" data-since="0.25">Seit 0.25</span> Eine Regel, deren Bedingung nur
+`policy.registered()` ist, wird ebenfalls gemeldet: Ihr zusätzliches `NOT rebase.is_anonymous()` hält
+Gäste fern und grenzt ebenfalls keine Zeilen ein, sodass jedes Konto, das kein Gast ist, jede
+Zeile liest. Mit dem Standard `--fail-on high` schlägt ein CI-Lauf, der eine solche Policy scannt, jetzt fehl.
 
 Das ist das Muster, das eine `users`-Tabelle in ein Verzeichnis aller Adressen auf der Plattform verwandelt,
 lesbar für jeden, der sich registriert hat – und wo die Registrierung offen ist, ist "jeder, der sich

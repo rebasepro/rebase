@@ -1,5 +1,5 @@
 ---
-sourceHash: 32fc3b3ccab733ad
+sourceHash: 536427d653beb637
 title: Guida rapida
 sidebar_label: Guida rapida
 description: Crea un nuovo progetto Rebase e avvialo localmente in meno di 2 minuti.
@@ -107,8 +107,8 @@ Questo comando analizzerà le tabelle del tuo database e genererà i corrisponde
 
 Quando apri l'URL del frontend mostrato da `rebase dev`, vedrai la schermata di login. Il **primo utente** a registrarsi diventa automaticamente un amministratore: questo è il flusso di bootstrap.
 
-1. Clicca su **Sign Up**
-2. Inserisci email e password
+1. La schermata si apre su **Welcome!**, il modulo per quel primo account
+2. Inserisci email e password, poi clicca su **Create account**
 3. Hai effettuato l'accesso — con privilegi completi di amministratore
 
 `rebase init` ha inoltre inserito `REBASE_ADMIN_EMAIL` e una `REBASE_ADMIN_PASSWORD` generata all'interno di `.env`. Queste non sono le credenziali da usare in questa fase: `rebase dev` le ignora e lo segnala all'avvio. Servono per gli avvii in produzione — `docker compose up` o qualsiasi processo con `NODE_ENV=production` — dove la finestra di bootstrap è chiusa, poiché il server risponde su un hostname pubblico prima ancora che tu possa inserire dei dati. Consulta [Your first admin](/docs/getting-started/deployment#your-first-admin).

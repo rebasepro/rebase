@@ -1,5 +1,5 @@
 ---
-sourceHash: a1bb0a08ed6263fe
+sourceHash: 4bed2a9ed4ceb358
 title: Authentification
 sidebar_label: Authentification
 description: Authentification côté client avec le SDK Rebase — connexion par e-mail/mot de passe, fournisseurs OAuth, gestion des sessions et écouteurs d'état d'authentification.
@@ -190,7 +190,7 @@ const profile = await client.auth.findUserByEmail("user@example.com");
 // { uid, displayName, photoURL } | null
 ```
 
-Trois champs non sensibles et rien d'autre — suffisant pour afficher « vous invitez Jane » avant l'envoi d'une invitation.
+Trois champs non sensibles et rien d'autre — suffisant pour afficher « vous invitez Jane » avant l'envoi d'une invitation. Sur option : réservé à un appelant connecté, et un 404 tant que le backend ne définit pas `AUTH_ALLOW_USER_LOOKUP=true` (`auth.allowUserLookup`).
 
 ## Authentification multifacteur
 
@@ -375,7 +375,7 @@ function useCurrentUser() {
 
 `useRebaseAuthController` dans `@rebasepro/app` effectue déjà cela, donc une application construite sur le modèle généré en bénéficie automatiquement. Les requêtes de données n'ont pas à attendre : celle émise pendant la restauration part une fois celle-ci terminée — en tant qu'utilisateur restauré, ou anonymement — de sorte qu'un premier rendu ne lit jamais une liste publique à la place de celle de l'utilisateur.
 
-Une restauration réussie parvient également à `onAuthStateChange` sous forme de `TOKEN_REFRESHED` — il s'agit bien d'un rafraîchissement — mais un écouteur seul ne peut pas vous indiquer que la restauration s'est terminée : un démarrage sans session n'émet absolument rien, ce qui ne permet pas de le distinguer d'une restauration encore en cours. Attendez la résolution de `isInitialized()` pour cette vérification et utilisez l'écouteur pour les changements ultérieurs.
+Une restauration qui rafraîchit (un jeton stocké expiré, ou le mode cookie) parvient à `onAuthStateChange` sous forme de `TOKEN_REFRESHED` ; un jeton stocké encore valide est adopté silencieusement. Un écouteur ne peut donc pas vous indiquer que la restauration s'est terminée : un démarrage qui n'émet rien ne se distingue pas d'une restauration encore en cours. Attendez la résolution de `isInitialized()` pour cette vérification et utilisez l'écouteur pour les changements ultérieurs.
 
 ## Écouteur d'état d'authentification
 
@@ -519,10 +519,9 @@ const config = await client.auth.getAuthConfig();
 //   sessionManagement: boolean,
 //   profileUpdate: boolean,
 //   emailVerification: boolean,
-//   magicLink: boolean,
-//   anonymousLogin: boolean,
-//   enabledProviders: string[],
-//   needsSetup: boolean
+//   magicLink: boolean, emailOtp?: boolean,
+//   anonymousLogin: boolean, enabledProviders: string[],
+//   externalLoginUrl?: string, needsSetup?: boolean, storage?: boolean
 // }
 ```
 

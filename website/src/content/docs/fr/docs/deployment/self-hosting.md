@@ -1,5 +1,5 @@
 ---
-sourceHash: ae8d9da2fa3d1e43
+sourceHash: 1789995e7e1e6bf9
 title: Auto-hébergement
 sidebar_label: Auto-hébergement
 description: Exécutez Rebase n'importe où avec l'image runtime officielle et le bundle de votre projet — Docker Compose, Fly, Railway ou un simple VPS.
@@ -243,6 +243,15 @@ REBASE_METRICS_TOKEN=<random string>
 ```
 
 Expose les métriques Prometheus sur `/metrics` : nombre de requêtes et histogrammes de latence ventilés par surface d'API (data, auth, storage, functions) et collection, ainsi que des jauges de processus. Sans token, le point de terminaison est accessible à toute personne pouvant joindre le port ; définissez-en donc un à moins qu'il ne soit sur un réseau privé.
+
+<span class="since-badge" data-since="0.25">Depuis 0.25</span>
+`rebase_db_pool_wait_ms` est un histogramme du temps qu'a attendu chaque requête pour obtenir une
+connexion du pool de la base de données, ouverture d'une connexion comprise, étiqueté par clé de source
+de données (`source="(default)"` dans un projet qui ne déclare aucune source de données). Un pool sain le
+maintient près de zéro. Une traîne qui grandit avec le trafic signifie que des requêtes font la queue
+pour des connexions — le plus souvent retenues par des callbacks d'écriture qui attendent quelque chose
+de lent ; voir
+[Un callback retient une connexion](/docs/collections/callbacks/#un-callback-retient-une-connexion).
 
 ## En-têtes de sécurité
 

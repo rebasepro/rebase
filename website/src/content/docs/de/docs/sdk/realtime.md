@@ -1,5 +1,5 @@
 ---
-sourceHash: 62e51002f973bf74
+sourceHash: bdc7510e49d0db5c
 title: Realtime-Abonnements
 sidebar_label: Realtime
 description: Abonnieren Sie Live-Datenänderungen mit dem typisierten SDK von Rebase über WebSocket-basierte Realtime-Listener.
@@ -123,11 +123,22 @@ const unsubscribe = client.data
 listenById(
     id: string | number,
     onUpdate: (row: M | undefined) => void,
-    onError?: (error: Error) => void
+    onError?: (error: Error) => void,
+    options?: { include?: IncludeSpec }
 ): () => void   // returns unsubscribe function
 ```
 
 Der Callback empfängt eine flache Zeile – keine `Entity`, es gibt also kein `.values` – und `undefined`, wenn der Datensatz gelöscht wird.
+
+Jeder Frame trägt die Relationen, die `options.include` nennt, geladen so, wie `find({ include })`
+sie in jede Zeile einer Liste lädt. Eine To-many-Relation, die dort nicht genannt wird, fehlt in
+der Zeile, sie ist nicht leer:
+
+```typescript
+client.data.posts.listenById(1, (post) => {
+    console.log(post?.tags); // the post's tags, on every update
+}, undefined, { include: ["tags"] });
+```
 
 ## Fluent Query Builder
 

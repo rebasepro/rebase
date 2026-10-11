@@ -1,5 +1,5 @@
 ---
-sourceHash: 107ae13db8d0ff4a
+sourceHash: 8aef72b75f28c106
 title: Consultando relações
 sidebar_label: Relações
 description: "Inclua entidades relacionadas em uma consulta e leia uma coleção filha por meio de seu pai com os acessadores de relação do SDK."
@@ -75,8 +75,35 @@ const { data } = await client.data.posts.include({
 | `orderBy` | A mesma sintaxe de ordenação, incluindo o [posicionamento de NULL](/docs/sdk/querying#where-nulls-sort). Os empates, e um `limit` sem `orderBy`, seguem a chave da linha relacionada, em ordem ascendente. |
 | `fields` | Colunas da linha *relacionada*. Sua chave sempre é mantida, garantindo que a linha permaneça endereçável. |
 | `include` | Relações da linha relacionada, por sua vez — é assim que a árvore se aninha. |
+| `count` | <span class="since-badge" data-since="0.25">Desde 0.25</span> Devolve também quantas linhas relacionadas existem no total, por pai, sob o `_count` da linha. Veja [Contando o que um limit deixa de fora](#contando-o-que-um-limit-deixa-de-fora). |
 
 `true` é a forma abreviada para "carregar por completo": `{ author: true }` e `["author"]` são a mesma requisição.
+
+### Contando o que um limit deixa de fora
+
+<span class="since-badge" data-since="0.25">Desde 0.25</span> Um `limit` limita
+o que é enviado, e `count: true` diz quanto ficou de fora. É disso que uma lista
+precisa para mostrar quatro tags e um "+33":
+
+```typescript
+const { data } = await client.data.posts.include({
+    tags: { limit: 4, count: true }
+}).find();
+
+// data[0] → { id: 1, title: "…", tags: [ …4 rows ], _count: { tags: 37 } }
+```
+
+- `_count` é um objeto por linha, indexado pelo nome da relação. Contar duas relações
+  acrescenta duas chaves.
+- O total é contado na mesma instrução SQL que lê as linhas. Ele cobre
+  as mesmas linhas que uma leitura sem o `limit` retornaria: o `where` do include,
+  o soft delete e a segurança em nível de linha se aplicam. Pedi-lo não acrescenta nenhuma consulta.
+- Sem um `limit`, o total é o número de linhas retornadas.
+- `count` funciona apenas em relações para-muitos. Em uma relação para-um, ele retorna um
+  400 `INVALID_INCLUDE`. O mesmo acontece com uma coleção que tem uma propriedade chamada
+  `_count`, porque o total a sobrescreveria.
+- Uma relação que o chamador não pode ler (acesso a campos) fica fora de `_count`,
+  do mesmo modo que as suas linhas.
 
 ### Nomes de relações desconhecidos são recusados
 
@@ -181,14 +208,22 @@ Sem um `Database` gerado, o `include` permanece como um simples `string[]` ou á
 
 ### Nomes de relações
 
-Os nomes de relação passados para `include()` devem corresponder ao `relationName` definido no array `relations` da coleção:
+Os nomes passados para `include()` são as chaves das propriedades de relação da coleção:
 
 ```typescript
 // Collection definition
-relations: [
-    { relationName: "author", target: () => usersCollection, ... },
-    { relationName: "categories", target: () => categoriesCollection, ... }
-]
+properties: {
+    author: {
+        type: "relation",
+        name: "Author",
+        relation: { kind: "belongsTo", target: () => usersCollection }
+    },
+    categories: {
+        type: "relation",
+        name: "Categories",
+        relation: { kind: "manyToMany", target: () => categoriesCollection }
+    }
+}
 
 // SDK usage — names must match
 client.data.articles.include("author", "categories").find()

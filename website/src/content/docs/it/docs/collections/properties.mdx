@@ -1,5 +1,5 @@
 ---
-sourceHash: 60c797ac2e9a363f
+sourceHash: 8a336726f6416a25
 title: Proprietà
 sidebar_label: Proprietà
 description: I tipi di proprietà definiscono il tipo di dati, la validazione e il rendering dell'interfaccia utente per ogni campo in una collection. Rebase supporta i tipi string, number, boolean, date, array, map, reference, relation e geopoint.
@@ -20,14 +20,14 @@ Le proprietà definiscono le colonne nella tabella del database e la loro modali
 
 | Tipo | Descrizione | Colonna PostgreSQL |
 |------|-------------|-------------------|
-| `string` | Testo, select, markdown, caricamento file, URL, email | `varchar`, `text`, `jsonb` |
+| `string` | Testo, select, markdown, caricamento file, URL, email | `text` per impostazione predefinita; `varchar`, `char` o `uuid` con `columnType` |
 | `number` | Intero, decimale, valuta | `integer`, `numeric`, `bigint`, `serial` |
 | `boolean` | Interruttore true/false | `boolean` |
 | `date` | Data, data e ora, timestamp | `timestamp`, `date` |
-| `array` | Elenco ordinato di valori | `jsonb` |
+| `array` | Elenco ordinato di valori | Un array nativo (`text[]`, `integer[]`, `numeric[]`, `boolean[]`) quando `of` è una sola proprietà string, number o boolean; altrimenti `jsonb` |
 | `map` | Oggetto chiave-valore | `jsonb` |
 | `geopoint` | Coppia latitudine/longitudine | `jsonb` |
-| `reference` | Riferimento incorporato a un'altra entità | `varchar` (memorizza l'ID) |
+| `reference` | Riferimento incorporato a un'altra entità | Il tipo della chiave primaria della destinazione (ne memorizza l'ID) |
 | `relation` | Relazione con chiave esterna SQL | Utilizza l'array `relations` |
 | `vector` | Embedding, per la ricerca del vicino più prossimo | `VECTOR(n)` (pgvector) |
 | `binary` | Byte grezzi, letti e scritti come base64 | `bytea` |
@@ -219,7 +219,9 @@ category: {
 
 Più valori scelti da un set fisso rappresentano un **array di stringhe enum**, non un flag su
 una singola stringa: la colonna memorizza più valori, quindi la proprietà che la descrive è l'array.
-`columnType: "text[]"` è ciò che la rende una singola colonna Postgres anziché una join.
+È una singola colonna Postgres, un `text[]`, anziché una join: un array il cui `of`
+è una sola proprietà string ottiene per impostazione predefinita un array nativo, e il
+`columnType` qui sotto lo dice soltanto in modo esplicito.
 
 ```typescript no-verify
 locales: {
@@ -250,7 +252,7 @@ locales: {
 | `url` | `boolean` | Validazione del formato URL |
 | `storage` | `StorageConfig` | Abilita il caricamento dei file — vedere [Caricamento file](/docs/collections/file-uploads) |
 | `enum` | `EnumValues` | Renderizza come menu a discesa select |
-| `columnType` | `"varchar" \| "text" \| "char" \| "uuid"` | La colonna del database. Il valore predefinito è `varchar`, o `uuid` se specificato da `isId`. `text` per stringhe a lunghezza illimitata, `char` per lunghezza fissa |
+| `columnType` | `"varchar" \| "text" \| "char" \| "uuid"` | La colonna del database. Il valore predefinito è `text`, o `uuid` se specificato da `isId`. `text` per stringhe a lunghezza illimitata, `char` per lunghezza fissa |
 | `isId` | `boolean \| string` | Contrassegna la proprietà come chiave primaria e stabilisce come viene popolata: `"manual"` (inserimento manuale), `"uuid"` (`gen_random_uuid()`), o qualsiasi altra stringa, usata letteralmente come espressione predefinita SQL della colonna — semplice (`nanoid()`) o in formato template (``"sql`nanoid()`"``). La funzione deve esistere; nulla qui provvede a crearla. `"increment"` è una strategia per valori di tipo **number** e qui non ha effetto, mentre `"cuid"` viene rifiutato durante il caricamento della configurazione |
 | `autoValue` | `"user_on_create" \| "user_on_update"` | Imposta nella colonna l'**uid dell'utente corrente** — solo alla creazione o a ogni scrittura. Vedere [Colonne di audit](#colonne-di-audit) |
 | `userSelect` | `boolean` | Renderizza come selettore utente. Il valore è una normale colonna di tipo stringa contenente l'id utente — non viene risolto né verificato all'inserimento. **Solo per il modulo admin — non applicato dall'API o dal database.** |

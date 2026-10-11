@@ -1,5 +1,5 @@
 ---
-sourceHash: c61516d8bb8e724e
+sourceHash: a62053f25d91d42c
 title: Histórico de Entidades
 sidebar_label: Histórico de Entidades
 description: Rastreie todas as alterações em suas entidades com uma trilha de auditoria completa — quem alterou o quê, quando e a entidade completa antes/depois.
@@ -61,9 +61,11 @@ const ordersCollection = defineCollection({
 ## Como Funciona
 
 1. O backend cria uma tabela `rebase.entity_history` automaticamente.
-2. Em cada criação, atualização ou exclusão, um snapshot é registrado com:
+2. Em cada criação, atualização ou exclusão, uma entrada é registrada com:
    - ID da entidade e o slug da coleção (em `table_name`)
-   - Os valores completos da entidade (antes e depois)
+   - Os valores da entidade depois da alteração (`values`; em uma exclusão, a
+     entidade que foi excluída)
+   - Em uma atualização, o que os campos alterados continham antes (`previous_values`)
    - Timestamp e ID do usuário
    - A ação (`create`, `update`, `delete`)
    - Um array de `changed_fields` mostrando quais colunas foram modificadas
@@ -78,6 +80,28 @@ campo de soft delete para `null`) como `update`. O histórico de uma linha
 permanece legível enquanto ela está na lixeira, e revertê-la para uma versão
 anterior à exclusão a restaura.
 
+### O que `previous_values` contém
+
+<span class="since-badge" data-since="0.25">Desde 0.25</span> Uma entrada de
+atualização guarda, em `previous_values`, apenas os campos listados em
+`changed_fields`. Todos os outros campos tinham o mesmo valor antes e depois da
+alteração, portanto já estão em `values`; guardar a linha inteira duas vezes custava,
+para uma alteração de um campo em uma linha de 20 campos, 1.269 bytes, e agora custa 794.
+
+As entradas registradas antes da 0.25 mantêm a linha anterior inteira. O `format` da
+entrada diz qual é o caso:
+
+| `format` | `previous_values` em uma atualização |
+|---|---|
+| `1` (entradas anteriores à 0.25) | A linha inteira antes da alteração |
+| `2` | Apenas os `changed_fields`, cada um como a linha inteira o tinha |
+
+A visão de histórico do admin e um revert leem ambos da mesma forma: a visão mostra o
+valor anterior de cada campo alterado, e um revert grava os `values` da entrada escolhida,
+que são completos nos dois formatos. Para reconstruir a linha como era antes de uma
+alteração `format: 2`, pegue `values` e recoloque cada campo que `previous_values`
+contém.
+
 ### Rastreamento de Diffs e Igualdade Estrutural Profunda
 
 Para evitar o registro de logs redundantes onde campos são salvos mas nenhum valor é alterado, o `HistoryService` realiza uma comparação de igualdade estrutural profunda (deep equality) nas chaves de nível superior dos valores antigos e novos:
@@ -85,11 +109,16 @@ Para evitar o registro de logs redundantes onde campos são salvos mas nenhum va
 - Se diferenças forem encontradas, os nomes das propriedades modificadas são salvos na coluna `changed_fields` (`text[]`).
 - Se a verificação de deep equality detectar zero alterações, a inserção no histórico é totalmente ignorada.
 
-### Limpeza (Pruning) Não Bloqueante Pós-Salvamento
+### Limpeza (Pruning)
 
-Diferente dos sistemas tradicionais que dependem inteiramente de scripts periódicos em lote (batch) lentos, o Rebase aplica suas políticas de retenção continuamente:
-- Logo após uma entidade ser salva ou excluída, o servidor agenda uma **varredura assíncrona em linha** em uma promise "fire-and-forget" não bloqueante.
-- Esta varredura verifica imediatamente os limites de retenção para aquele ID de entidade específico e remove entradas além das 200 mais recentes, ou mais antigas que o período de retenção.
+A retenção é aplicada em dois lugares:
+- **Após cada escrita**, para a entidade escrita: logo depois de ela ser salva ou
+  excluída, o servidor remove as entradas dessa entidade além das 200 mais recentes,
+  ou mais antigas que o período de retenção. Isso não segura a escrita.
+- <span class="since-badge" data-since="0.25">Desde 0.25</span> **Uma vez por hora**,
+  para todas as entidades: as entradas mais antigas que o período de retenção são
+  excluídas, não importa a quem pertençam — inclusive entidades que nunca mais são
+  escritas, como as excluídas. Veja [Mecânica do ciclo de vida da limpeza](#mecânica-do-ciclo-de-vida-da-limpeza).
 
 ## Endpoint REST
 
@@ -109,9 +138,10 @@ Retorna uma lista de entradas de histórico para uma entidade específica, orden
             "action": "update",
             "changed_fields": ["status"],
             "values": { "status": "shipped", "total": 99.99 },
-            "previous_values": { "status": "pending", "total": 99.99 },
+            "previous_values": { "status": "pending" },
             "updated_by": "admin-user-id",
-            "updated_at": "2025-01-15T10:30:00Z"
+            "updated_at": "2025-01-15T10:30:00Z",
+            "format": 2
         }
     ],
     "meta": { "total": 1, "limit": 20, "offset": 0, "hasMore": false }
@@ -128,7 +158,28 @@ Cada entidade também mantém no máximo suas **200** entradas mais recentes. Es
 
 ### Mecânica do Ciclo de Vida da Limpeza
 
-A limpeza (pruning) é apenas inline. Ela é executada de forma assíncrona logo após cada alteração registrada, para a entidade que foi alterada: entradas mais antigas que o período de retenção são removidas, e em seguida tudo além das 200 mais recentes. Não há varredura periódica, portanto o histórico de uma entidade que nunca mais for alterada não é limpo — suas entradas antigas permanecem até a próxima alteração nessa entidade, ou até que você mesmo as exclua de `rebase.entity_history`.
+Após cada alteração registrada, a entidade alterada é limpa: suas entradas mais antigas que o período de retenção são removidas, e em seguida tudo além das 200 mais recentes. Isso roda de forma assíncrona e não segura a escrita.
+
+<span class="since-badge" data-since="0.25">Desde 0.25</span> Uma vez por hora, o backend também exclui todas as entradas mais antigas que o período de retenção, de todas as entidades. Antes disso, o histórico de uma entidade que nunca mais era escrita — toda entidade excluída — não era limpo de forma alguma. A varredura:
+
+- roda em uma instância da frota por hora, nos processos que executam os jobs agendados
+  (ela reivindica sua hora em `rebase.cron_claims`, como uma execução de cron faz), a
+  primeira vez quando o backend inicia;
+- exclui em lotes de 5.000 entradas, uma instrução cada, até um lote voltar menor que o
+  limite, ignorando as entradas que outra varredura segura — assim, uma primeira varredura
+  sobre um grande acúmulo são muitas exclusões curtas, não uma longa;
+- lê um índice em `updated_at`, `idx_history_updated_at`. Em um banco de dados criado antes
+  da 0.25, ele é construído em segundo plano após a primeira inicialização, com
+  `CREATE INDEX CONCURRENTLY`, sem bloquear leituras nem escritas — cerca de um segundo
+  para cada 2 milhões de entradas.
+
+A mesma inicialização remove `idx_history_entity` onde ele existe: `idx_history_time`
+começa com as mesmas colunas e atende todas as leituras que ele atendia, de modo que ele
+só deixava cada alteração registrada mais lenta. A remoção espera no máximo um segundo
+por vez pelo lock da tabela, e uma tabela que algo mantém ocupada o tempo todo conserva o
+índice até a próxima inicialização.
+
+O limite de 200 entradas por entidade só é aplicado depois de uma escrita nessa entidade.
 
 ## Próximos Passos
 

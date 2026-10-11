@@ -1,5 +1,5 @@
 ---
-sourceHash: 0db20d62bf304b74
+sourceHash: a03adef95cbad36c
 title: Paginación
 sidebar_label: Paginación
 description: Pagina una colección con limit/offset, números de página o un cursor keyset — y cuándo cada uno deja de ser correcto.
@@ -130,7 +130,7 @@ const rows = await client.data.orders
     .findAll();
 ```
 
-Tres opciones configuran el recorrido:
+Cuatro opciones configuran el recorrido:
 
 | Opción | Por defecto | Qué hace |
 |--------|-------------|----------|

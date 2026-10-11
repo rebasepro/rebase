@@ -1,5 +1,5 @@
 ---
-sourceHash: 107ae13db8d0ff4a
+sourceHash: 8aef72b75f28c106
 title: Interroger les relations
 sidebar_label: Relations
 description: "Incluez des entités liées dans une requête et lisez une collection enfant via son parent grâce aux accesseurs de relations du SDK."
@@ -81,9 +81,34 @@ const { data } = await client.data.posts.include({
 | `orderBy` | La même syntaxe de tri, y compris le [positionnement des valeurs NULL](/docs/sdk/querying#where-nulls-sort). En cas d'égalité, ou pour une `limit` sans `orderBy`, l'ordre suit la clé de la ligne liée, croissante. |
 | `fields` | Colonnes de la ligne *liée*. Sa clé est toujours conservée, afin que la ligne reste adressable. |
 | `include` | Relations de la ligne liée, à leur tour — c'est ainsi que l'arborescence s'imbrique. |
+| `count` | <span class="since-badge" data-since="0.25">Depuis 0.25</span> Renvoie aussi le nombre total de lignes liées, par parent, sous le `_count` de la ligne. Voir [Compter ce qu'une limite laisse de côté](#compter-ce-quune-limite-laisse-de-côté). |
 
 `true` est le raccourci pour "charger dans son intégralité" : `{ author: true }` et
 `["author"]` correspondent à la même requête.
+
+### Compter ce qu'une limite laisse de côté
+
+<span class="since-badge" data-since="0.25">Depuis 0.25</span> Un `limit` plafonne ce qui est envoyé, et `count: true` dit combien a été laissé de côté. C'est ce dont une
+liste a besoin pour afficher quatre tags et un « +33 » :
+
+```typescript
+const { data } = await client.data.posts.include({
+    tags: { limit: 4, count: true }
+}).find();
+
+// data[0] → { id: 1, title: "…", tags: [ …4 rows ], _count: { tags: 37 } }
+```
+
+- `_count` est un objet par ligne, indexé par nom de relation. Compter deux relations ajoute deux clés.
+- Le total est compté dans la même instruction SQL que celle qui lit les lignes. Il couvre les mêmes lignes
+  qu'une lecture sans le `limit` renverrait : le `where` de l'include, le soft delete et la sécurité au niveau
+  des lignes s'appliquent tous. Le demander n'ajoute aucune requête.
+- Sans `limit`, le total est le nombre de lignes renvoyées.
+- `count` ne fonctionne que sur les relations vers plusieurs lignes. Sur une relation vers une seule ligne,
+  il renvoie une erreur 400 `INVALID_INCLUDE`. Il en va de même pour une collection qui a une propriété
+  nommée `_count`, car le total l'écraserait.
+- Une relation que l'appelant n'a pas le droit de lire (accès aux champs) est omise de `_count`, de la même
+  manière que ses lignes.
 
 ### Les noms de relation inconnus sont rejetés
 
@@ -214,14 +239,22 @@ type de ligne écrit manuellement ne contient aucune relation à valider, et le 
 
 ### Noms de relation
 
-Les noms de relation que vous passez à `include()` doivent correspondre au `relationName` défini dans le tableau `relations` de la collection :
+Les noms que vous passez à `include()` sont les clés des propriétés de relation de la collection :
 
 ```typescript
 // Collection definition
-relations: [
-    { relationName: "author", target: () => usersCollection, ... },
-    { relationName: "categories", target: () => categoriesCollection, ... }
-]
+properties: {
+    author: {
+        type: "relation",
+        name: "Author",
+        relation: { kind: "belongsTo", target: () => usersCollection }
+    },
+    categories: {
+        type: "relation",
+        name: "Categories",
+        relation: { kind: "manyToMany", target: () => categoriesCollection }
+    }
+}
 
 // SDK usage — names must match
 client.data.articles.include("author", "categories").find()

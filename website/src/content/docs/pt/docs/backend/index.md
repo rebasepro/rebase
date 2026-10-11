@@ -1,5 +1,5 @@
 ---
-sourceHash: a6b7f50250fe821b
+sourceHash: 627e02641d926641
 title: Visão Geral do Backend
 sidebar_label: Backend
 description: O backend do Rebase fornece um servidor completo com API REST, autenticação, armazenamento, tempo real com WebSocket e histórico de entidades — tudo inicializado com uma única chamada de função.
@@ -117,7 +117,7 @@ Após a inicialização, estas rotas são montadas:
 | `/api/meta/contract` | O esquema de coleções do projeto (requer `schema:read`) |
 | `/api/meta/schema-version` | Uma string de versão para esse esquema (não autenticado) |
 | `/api/functions/*` | Rotas de funções personalizadas (quando `functionsDir` está definido) |
-| `/api/cron/*` | Gerenciamento de tarefas cron (`cron:read` / `cron:write`, quando `cronsDir` está definido) |
+| `/api/admin/cron/*` | Gerenciamento de tarefas cron (`cron:read` / `cron:write`, quando `cronsDir` está definido) |
 | WebSocket no upgrade | Inscrições em tempo real |
 
 ---
@@ -342,7 +342,11 @@ O SDK tipado converte cada uma dessas falhas em um `RebaseApiError` contendo
 `status`, `code` e `details` — incluindo as falhas que nem sequer chegaram a um
 servidor. Uma conexão recusada, uma falha de DNS, CORS ou um cancelamento (abort) chega como
 `status: 0`, `code: "NETWORK_ERROR"`, com o erro do próprio runtime em `cause`,
-em vez de qualquer coisa com a qual o `fetch` decidiu rejeitar. Assim, o
+em vez de qualquer coisa com a qual o `fetch` decidiu rejeitar. Uma resposta sem
+envelope — um 413 de um proxy, um 502 de um balanceador de carga — ainda recebe um `code`
+a partir do seu status (`PAYLOAD_TOO_LARGE`, `SERVICE_UNAVAILABLE`, `INTERNAL_ERROR`, …), e
+um cliente criado fora de um navegador sem `baseUrl` falha com
+`BASE_URL_REQUIRED` em vez de um erro de rede. Assim, o
 código da aplicação captura apenas uma classe:
 
 ```typescript

@@ -1,5 +1,5 @@
 ---
-sourceHash: 75ae5bf75334fb86
+sourceHash: abfa67cfbfee8f87
 title: SDK tipizzato — Primi passi
 sidebar_label: Primi Passi
 description: Installa e configura l'SDK tipizzato di Rebase per interagire con il tuo backend da qualsiasi applicazione JavaScript o TypeScript.
@@ -96,7 +96,7 @@ Quando viene fornito `Database`, `createRebaseClient` restituisce un'istanza di 
 
 Una chiave di proprietà scritta da *te* rimane invariata, qualunque sia la sua forma — nulla rinomina un nome da te scelto. Le due chiavi che vengono derivate anziché dichiarate, ovvero la foreign key di una relazione e una colonna letta tramite introspezione, sono in camelCase.
 
-`Row` descrive una lettura, `Insert` una `create()` e `Update` una `update()` — non hanno la stessa forma. Una colonna non obbligatoria è `T | null` su tutte e tre, così una scrittura può azzerarla; la primary key è sempre presente in lettura e non è mai impostabile in un aggiornamento; il target di un `belongsTo` può essere scritto sia come relazione (`{ author: 5 }`) sia come foreign key (`{ authorId: 5 }`); e un'appartenenza `hasMany` o `manyToMany` si scrive come un elenco di id target o di oggetti `{ id }` (`{ tags: ["t-1"] }`), ciascuno con un `_pivot` quando la tabella di giunzione dichiara colonne di payload. Un campo che nessuno può scrivere (`access: { write: [] }`) non compare né su `Insert` né su `Update`.
+`Row` descrive una lettura, `Insert` una `create()` e `Update` una `update()` — non hanno la stessa forma. Una colonna non obbligatoria è `T | null` su tutte e tre, così una scrittura può azzerarla; la primary key è sempre presente in lettura e non è mai impostabile in un aggiornamento; il target di un `belongsTo` può essere scritto sia come relazione (`{ author: 5 }`) sia come foreign key (`{ authorId: 5 }`); e un'appartenenza `hasMany` o `manyToMany` si scrive come un elenco di id target o di oggetti `{ id }` (`{ tags: ["t-1"] }`), ciascuno con un `_pivot` quando la tabella di giunzione dichiara colonne di payload. Un campo che nessuno può scrivere (`access: { write: [] }`) non compare né su `Insert` né su `Update`. Una colonna `date` si legge come stringa ISO, e una scrittura accetta quella stringa oppure un `Date`.
 
 ## Esempio rapido
 

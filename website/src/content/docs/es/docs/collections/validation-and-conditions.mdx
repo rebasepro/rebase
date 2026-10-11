@@ -1,5 +1,5 @@
 ---
-sourceHash: 7e7cf627ef1d34b8
+sourceHash: aa008173a34fc3e9
 title: Validación y condiciones
 sidebar_label: Validación y condiciones
 description: "Valores enum, reglas de validación por propiedad y los campos condicionales que hacen que una propiedad sea requerida, deshabilitada u oculta en función de los propios valores de la entidad."
@@ -9,24 +9,43 @@ description: "Valores enum, reglas de validación por propiedad y los campos con
 
 Se utiliza con propiedades de tipo string o number para renderizar selects:
 
-```typescript no-verify
-// Simple array
-enum: ["draft", "published", "archived"]
+```typescript
+import type { StringProperty } from "@rebasepro/types";
 
-// With labels
-enum: [
-    { id: "draft", label: "Draft" },
-    { id: "published", label: "Published" },
-    { id: "archived", label: "Archived" }
-]
+// Simple: each value mapped to its label
+const simple: StringProperty = {
+    type: "string",
+    name: "Status",
+    enum: { draft: "Draft", published: "Published", archived: "Archived" }
+};
+
+// As a list, which keeps the order you write
+const listed: StringProperty = {
+    type: "string",
+    name: "Status",
+    enum: [
+        { id: "draft", label: "Draft" },
+        { id: "published", label: "Published" },
+        { id: "archived", label: "Archived" }
+    ]
+};
 
 // With colors (for Kanban columns and chips)
-enum: [
-    { id: "draft", label: "Draft", color: "grayDark" },
-    { id: "published", label: "Published", color: "greenDark" },
-    { id: "archived", label: "Archived", color: "orangeDark" }
-]
+const colored: StringProperty = {
+    type: "string",
+    name: "Status",
+    enum: [
+        { id: "draft", label: "Draft", color: "grayDark" },
+        { id: "published", label: "Published", color: "greenDark" },
+        { id: "archived", label: "Archived", color: "orangeDark" }
+    ]
+};
 ```
+
+Una lista simple de valores, `enum: ["draft", "published", "archived"]`, no forma parte
+del tipo. Una configuración en JavaScript que escriba una sigue funcionando: el enum de la base de datos,
+los tipos generados y el desplegable del administrador la leen como esos valores, cada
+uno con sí mismo como etiqueta.
 
 ## Validación
 
@@ -79,7 +98,7 @@ escribe.
 | Regla | Tipo | Descripción |
 |------|------|-------------|
 | `required` | `boolean` | El valor debe estar presente |
-| `requiredMessage` | `string` | Lo que muestra el formulario cuando no lo está. **Solo en el formulario de administración; no lo impone la API ni la base de datos.** |
+| `requiredMessage` | `string` | Lo que se dice cuando no lo está: por el formulario de administración, y como el `message` de la entrada `required` del campo en el 400 de la API. El NOT NULL de la base de datos no lleva mensaje |
 | `unique` | `boolean` | Solo una fila de la tabla puede contener este valor. El formulario de administración también lo comprueba al guardar un valor que la edición cambió, de modo que un duplicado se señala en su campo antes de la escritura |
 | `uniqueInArray` | `boolean` | Solo una entrada *por array* puede contenerlo. Se aplica a un hijo directo de una propiedad `array`, o a un hijo de primer nivel de un `map` dentro de uno. **Solo en el formulario de administración; no lo impone la API ni la base de datos.** |
 

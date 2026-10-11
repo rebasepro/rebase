@@ -1,5 +1,5 @@
 ---
-sourceHash: 564c58f7bc002c6f
+sourceHash: 1437a2b48ddb6d7b
 title: Édition de schéma en direct
 description: Créez et modifiez des collections sur un backend en cours d'exécution — d'abord validé dans votre dépôt, puis appliqué.
 ---
@@ -231,7 +231,7 @@ Un échec de l'application n'est donc **pas une erreur**. La réponse le précis
 
 ## Où cela fonctionne
 
-La ligne de démarcation réside dans le fait que le serveur en cours d'exécution dispose ou non de votre **code source sur le disque** — et non dans le fait qu'il s'agisse de la production.
+L'édition de schéma en direct réécrit le code source de vos collections avec le même éditeur que celui des enregistrements du panneau qui ne touchent que la source ; elle fonctionne donc là où cet éditeur fonctionne : un serveur qui dispose du **code source de vos collections sur le disque** (`collectionsDir`) et dont l'éditeur de schéma est activé. L'éditeur de schéma est désactivé avec `NODE_ENV=production`, sauf si le serveur définit `schemaEditor: true`, et il nécessite que `ts-morph` soit installé.
 
 ### MongoDB
 
@@ -244,15 +244,14 @@ La seule chose qui mérite une lecture attentive est une suppression. Sur Postgr
 | Déploiement | Fonctionne |
 |---|---|
 | `rebase dev` sur votre machine | oui |
-| Auto-hébergement avec le projet monté | oui |
-| Auto-hébergement à partir d'un bundle compilé | oui, avec `liveSchema.repository` |
-| Rebase Cloud, ou tout bundle | oui, avec `liveSchema.repository` |
+| Auto-hébergement avec le projet et son arbre de travail git montés | oui, lorsque `NODE_ENV` n'est pas `production`, ou avec `schemaEditor: true` |
+| Un bundle compilé : un auto-hébergement servant un build, ou Rebase Cloud | non |
 
-Un bundle étant un résultat compilé, il ne contient pas le code source des collections. Configurez `liveSchema.repository` et le code source sera récupéré depuis votre dépôt à la place ; sans cela, les routes répondent `SCHEMA_EDITING_NO_REPOSITORY` en indiquant la raison.
+Un bundle étant un résultat compilé, il ne contient pas le code source des collections, et le runtime qui le sert désactive l'éditeur de schéma. `/api/admin/schema/status` répond `enabled: false` avec le code `SCHEMA_EDITOR_DISABLED`. Modifiez les collections en développement, validez (commit) et déployez.
 
-### Un déploiement sans code source sur le disque
+### Valider dans un dépôt distant
 
-Un bundle est un résultat compilé — chaque client Cloud, et tout auto-hébergement servant un build. Il n'y a pas de code source de collection à réécrire pour l'éditeur, pointez-le donc vers le dépôt dans lequel se trouve réellement le code source :
+`liveSchema.repository` fait valider chaque modification par le serveur dans un dépôt GitHub via l'API Git Data, au lieu d'exécuter `git commit` dans un arbre de travail. Il ne prend effet que sur un serveur dont l'éditeur de schéma est activé, c'est-à-dire un serveur dont `collectionsDir` est sur le disque (voir le tableau ci-dessus). Un bundle compilé ne le lit pas.
 
 ```typescript no-verify
 initializeRebaseBackend({
@@ -272,7 +271,7 @@ initializeRebaseBackend({
 })
 ```
 
-La modification est alors lue depuis le dépôt, réécrite avec le même éditeur que celui qui s'exécute localement, et validée via l'API Git Data — un blob, une arborescence (tree), un commit et une mise à jour de référence. Rien n'est cloné et rien n'est laissé sur le disque.
+Le fichier de collection modifié est alors lu depuis le dépôt, réécrit avec le même éditeur que celui qui s'exécute localement, et validé via l'API Git Data : un blob, une arborescence (tree), un commit et une mise à jour de référence. Rien n'est cloné et rien n'est laissé sur le disque. Seul ce fichier est récupéré, deux modifications sont donc impossibles dans ce mode : ajouter une relation qui cible une autre collection, et supprimer une collection.
 
 `auth` prend un jeton ou une installation de GitHub App :
 
@@ -289,7 +288,7 @@ Utilisez le jeton pour un projet unique validant dans un dépôt que vous possé
 
 Le jeton a besoin de `contents: read and write` sur ce dépôt, et rien d'autre.
 
-Sur une machine qui possède le dépôt, le commit est un simple `git commit` — rien à authentifier, aucun jeton, aucun réseau. Un déploiement qui n'en possède pas valide via l'API Git Data à la place, sans clone — voir [Un déploiement sans code source sur le disque](#un-déploiement-sans-code-source-sur-le-disque).
+Sans `liveSchema.repository`, le commit est un simple `git commit` dans l'arbre de travail qui contient `collectionsDir` : rien à authentifier, aucun jeton, aucun réseau.
 
 Deux éléments garantissent la sécurité de l'exécution sur un dépôt dans lequel quelqu'un d'autre travaille :
 

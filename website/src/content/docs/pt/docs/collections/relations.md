@@ -1,5 +1,5 @@
 ---
-sourceHash: cbee90067ba8da67
+sourceHash: 53bd9f35a923ce72
 title: Relações
 sidebar_label: Relações
 description: Defina relações SQL um-para-um, um-para-muitos e muitos-para-muitos entre coleções com chaves estrangeiras, tabelas de junção e junções multi-salto.
@@ -74,7 +74,7 @@ uma linha ou muitas, e o que uma escrita através dela pode tocar.
 | Kind | A chave vive | Retorna | Notas |
 |---|---|---|---|
 | `belongsTo` | **nesta** tabela | uma | `localKey`, padrão `<relationName>_id` |
-| `hasOne` | na tabela do **destino** | uma | `foreignKeyOnTarget`, padrão `<thisCollection>_id` |
+| `hasOne` | na tabela do **destino** | uma | `foreignKeyOnTarget`, padrão o singular desta coleção mais `_id` (`users` → `user_id`) |
 | `hasMany` | na tabela do **destino** | muitas | os filhos pertencem só a este pai |
 | `manyToMany` | numa **tabela de junção** | muitas | as linhas são compartilhadas; o vínculo é seu |
 | `via` | um `joinPath` explícito | qualquer | somente leitura; declare você mesmo a `cardinality` |
@@ -91,6 +91,14 @@ author: {
 }
 // → posts.author_id
 ```
+
+<span class="since-badge" data-since="0.25">Desde 0.25</span> A coluna é
+indexada para você: o Postgres indexa a chave para a qual uma chave estrangeira aponta, nunca a
+coluna que a contém, de modo que, sem um índice, todo include `hasMany` e toda listagem aninhada
+a partir do outro lado varre esta tabela. `index: false` mantém a constraint e
+descarta o índice — veja [Chaves estrangeiras são indexadas para você](/docs/backend/indexes#foreign-keys-are-indexed-for-you)
+para saber quando isso vale a pena, e quando o Rebase o dispensa por conta própria porque
+outro índice já atende a coluna.
 
 ### hasMany / hasOne — a chave está na deles
 
@@ -508,6 +516,7 @@ interface RelationBase {
 interface BelongsToRelation extends RelationBase {
     kind: "belongsTo";
     localKey?: string;              // column on THIS table
+    index?: boolean;                // btree on localKey; defaults to true
 }
 
 interface HasOneRelation extends RelationBase {

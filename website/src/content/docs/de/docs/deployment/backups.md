@@ -1,5 +1,5 @@
 ---
-sourceHash: 0007bd5679d9971e
+sourceHash: 224692816eecfaad
 title: Backups und Wiederherstellung
 sidebar_label: Backups
 description: Datenbank-Backups mit pg_dump erstellen, planen, auflisten und wiederherstellen — was ein Backup enthält, die Rollen-Datei, die mit ihm reist, und die eine Sache, die es nicht abdeckt, Ihre hochgeladenen Dateien.
@@ -138,6 +138,11 @@ export default resolved.config
 Der Storage-Controller wird übergeben, statt aus dem Kontext des Jobs
 übernommen zu werden, weil `rebase.storage` im Kontext die clientseitige
 Storage-API ist, kein Controller für den Backup-Bucket.
+
+Ein Backup unterliegt nicht den Upload-Limits des Controllers. `maxFileSize` (50 MB,
+sofern nicht gesetzt) und `allowedMimeTypes` gelten für das, was Benutzer hochladen, daher wird ein Dump
+beliebiger Größe hochgeladen, ebenso einer, der über den Controller geschrieben wird, der die
+Dateien Ihrer App ausliefert.
 
 Ein Backup unterliegt nicht den Upload-Limits des Controllers. `maxFileSize` (50 MB,
 sofern nicht gesetzt) und `allowedMimeTypes` gelten für das, was Benutzer hochladen;
@@ -307,6 +312,39 @@ Downloads streamen über `GET /api/admin/backups/download?key=…`, nur für
 Admins, sodass der Bucket niemals öffentlich sein muss; ein Key außerhalb des
 Präfixes des Ziels wird abgelehnt. Mit nicht gesetztem `BACKUP_DESTINATION`
 meldet das Werkzeug, dass keine Backups konfiguriert sind.
+
+### Ein Backup herunterladen
+
+<span class="since-badge" data-since="0.25">Seit 0.25</span> Ein Browser kann bei einem Download keinen
+`Authorization`-Header setzen, daher fragen Studio und das SDK zuerst nach einem Link. `POST /api/admin/backups/download-url` mit `{ "key": "…" }` (derselbe
+Admin-Scope und dieselben Key-Prüfungen wie beim Download) antwortet mit
+`{ url, token, expiresIn }`: eine URL, deren Token den Header ersetzt, für
+genau dieses eine Backup am aktuellen Ziel, 60 Sekunden lang. Das Token wird
+überall sonst abgelehnt — als Sitzung, als Storage-Download-Token, für ein anderes
+Backup — und sobald es abläuft. Der Browser streamt den Dump dann direkt auf die Festplatte,
+sodass ein Backup von der Größe Ihrer Datenbank nie in einen Tab passen muss.
+
+```ts
+// In a browser: the browser saves the file.
+await client.backups.download(key);
+
+// Anywhere: a link that needs no header, for 60 seconds.
+const { url } = await client.backups.downloadUrl(key);
+
+// In Node: stream the bytes to a file.
+import { createWriteStream } from "node:fs";
+import { Readable } from "node:stream";
+import { pipeline } from "node:stream/promises";
+
+const { stream, name } = await client.backups.stream(key);
+await pipeline(Readable.fromWeb(stream), createWriteStream(name));
+```
+
+Vor 0.24 antwortete `backups.download(key)` mit einem `Blob`, der den gesamten Dump enthielt.
+Jetzt speichert es die Datei in einem Browser und wirft anderswo einen Fehler; verwenden Sie `stream(key)`
+in Node. Gegen einen Server ohne Download-Links (einen älter als 0.24 oder einen
+ohne JWT-Secret zum Signieren) fällt `download()` darauf zurück, die Bytes
+selbst zu lesen.
 
 ## Backups privat halten
 

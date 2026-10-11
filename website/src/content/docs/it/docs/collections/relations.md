@@ -1,5 +1,5 @@
 ---
-sourceHash: cbee90067ba8da67
+sourceHash: 53bd9f35a923ce72
 title: Relazioni
 sidebar_label: Relazioni
 description: Definisci relazioni SQL uno-a-uno, uno-a-molti e molti-a-molti tra collezioni con chiavi esterne, tabelle di giunzione e join multi-hop.
@@ -75,7 +75,7 @@ attraverso.
 | Kind | La chiave vive | Restituisce | Note |
 |---|---|---|---|
 | `belongsTo` | su **questa** tabella | una | `localKey`, predefinito `<relationName>_id` |
-| `hasOne` | sulla tabella della **destinazione** | una | `foreignKeyOnTarget`, predefinito `<thisCollection>_id` |
+| `hasOne` | sulla tabella della **destinazione** | una | `foreignKeyOnTarget`, predefinito il singolare di questa collection più `_id` (`users` → `user_id`) |
 | `hasMany` | sulla tabella della **destinazione** | molte | i figli appartengono a questo solo padre |
 | `manyToMany` | in una **tabella di giunzione** | molte | le righe sono condivise; il collegamento è tuo |
 | `via` | un `joinPath` esplicito | l'una o l'altra | in sola lettura; la `cardinality` la dichiari tu |
@@ -92,6 +92,14 @@ author: {
 }
 // → posts.author_id
 ```
+
+<span class="since-badge" data-since="0.25">Da 0.25</span> La colonna viene
+indicizzata per te: Postgres indicizza la chiave a cui punta una chiave esterna, mai la
+colonna che la contiene, quindi senza un indice ogni include `hasMany` e ogni elenco annidato
+dall'altro lato scorre questa tabella. `index: false` mantiene il vincolo e
+elimina l'indice — vedi [Le chiavi esterne sono indicizzate per te](/docs/backend/indexes#foreign-keys-are-indexed-for-you)
+per quando vale la pena, e per quando Rebase lo salta da solo perché
+un altro indice serve già la colonna.
 
 ### hasMany / hasOne — la chiave è sulla loro
 
@@ -516,6 +524,7 @@ interface RelationBase {
 interface BelongsToRelation extends RelationBase {
     kind: "belongsTo";
     localKey?: string;              // column on THIS table
+    index?: boolean;                // btree on localKey; defaults to true
 }
 
 interface HasOneRelation extends RelationBase {

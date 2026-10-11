@@ -1,5 +1,5 @@
 ---
-sourceHash: 7184b66cc0913ef9
+sourceHash: 2a29a9e6fa3879e6
 title: Feldzugriff
 sidebar_label: Feldzugriff
 description: Lese- und Schreibberechtigungen auf Eigenschaftsebene nach Rolle. Ein Aufrufer, den die Sicherheitsregeln der Zeile durchlassen, erhält dennoch kein Feld, das seine Rollen nicht lesen dürfen.
@@ -101,10 +101,16 @@ Dies gilt für jeden Ausgabekanal: Listen, einzelne GET-Abfragen, über `?includ
 eingebundene Relationsziele, `_batch`-Ergebnisse, Realtime-Frames von `.listen()`, Aggregationsergebnisse
 und [Historie](#historie)-Snapshots.
 
+Der Wert einer Relations-Property sind ihre verknüpften Zeilen, daher wird eine Relation, die Sie nicht lesen können, vollständig zurückgehalten. `?include=` lässt sie samt ihrem `_count` aus der Zeile weg, über
+jeden Zugang: REST, das SDK, `.listen()` und verschachtelte Includes eine Ebene tiefer.
+Sie anderswo zu benennen, wird wie ein Feld abgelehnt (siehe [Abfragen](#abfragen)).
+
 ### Abfragen
 
 Ein `where`, `orderBy`, `fields`, Aggregations-`select` oder `groupBy`, das ein Feld benennt, welches
-Sie nicht lesen können, führt zu einem **400 `FIELD_NOT_READABLE`**:
+Sie nicht lesen können, führt zu einem **400 `FIELD_NOT_READABLE`**. Das gilt auch für eine Relation, die Sie nicht lesen können
+und die in einem verschachtelten Pfad (`/departments/1/members`, `/departments/1/members/7`) oder einer
+Aggregat-Sortierung (`orderBy=count(members)`) benannt wird:
 
 ```http
 GET /api/data/staff?salary=gt.100000

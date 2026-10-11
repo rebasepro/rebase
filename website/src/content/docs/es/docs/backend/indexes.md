@@ -1,5 +1,5 @@
 ---
-sourceHash: 17ca6f6a285eea43
+sourceHash: 3d8676ac5f8d58c7
 title: Índices
 sidebar_label: Índices
 description: Declara índices ordinarios de Postgres en una colección — btree, GIN y BRIN, parciales, compuestos, cubrientes y únicos — y por qué uno escrito a mano solía desaparecer.
@@ -78,8 +78,8 @@ Este es el detalle que suele causar problemas. Una relación `belongsTo` compila
 { on: ["author"], reason: "an author's posts, and the ON DELETE cascade" }
 ```
 
-Escribir `author_id` aquí funcionaría para la mayoría de las propiedades y no indexaría
-nada silenciosamente para una clave foránea, que es justo la que la gente suele buscar. Postgres no
+Escribir `author_id` aquí se rechaza en la compilación: es una columna, no una propiedad de
+la colección, y `on` nombra propiedades. Postgres no
 indexa una columna de clave foránea por ti; sin este índice, tanto "listar los posts de este
 autor" como la cascada `ON DELETE` son escaneos secuenciales (*sequential scans*).
 
@@ -251,11 +251,112 @@ Ambos productores los emiten, lo cual es importante porque no todos los desplieg
   `INCLUDE` de un índice cubriente son la única excepción: Drizzle no puede expresarlas,
   y la línea generada incluye un comentario indicándolo y apuntando a
   `schema.sql`, que sí puede.
-- **Boot-time schema ensure** los crea con
-  `CREATE INDEX CONCURRENTLY IF NOT EXISTS`, en los mismos términos que los índices ANN
-  a su lado. Un inquilino (*tenant*) de entorno de ejecución administrado se aprovisiona en el arranque y nunca ejecuta
+- **Boot-time schema ensure** también los crea, en los mismos términos que los índices de
+  búsqueda y ANN a su lado. Un inquilino (*tenant*) de entorno de ejecución administrado se aprovisiona en el arranque y nunca ejecuta
   `db push`; sin esto, comenzaría sin ninguno de sus índices declarados y
-  nada lo advertiría.
+  nada lo advertiría. Una tabla que crea el arranque recibe sus índices junto con la tabla.
+  En una tabla que ya existe, el arranque construye un índice que falta una vez que el
+  servidor ya está sirviendo, en segundo plano, igual que construye los
+  [índices de claves foráneas](#qué-hace-la-actualización-a-una-base-de-datos-existente).
+  Usa `CREATE INDEX CONCURRENTLY` en una conexión propia, de modo que el
+  `statement_timeout` de 30 s del pool no pueda cancelar una construcción larga. Un índice
+  que una construcción interrumpida dejó `INVALID` bajo su nombre se elimina y se construye de nuevo.
+  `IF NOT EXISTS` compara por el nombre, así que nunca repara uno. Un índice `unique`
+  se construye del mismo modo, pero antes de que el servidor sirva, y el arranque falla
+  si no se puede construir. Servir sin él dejaría entrar filas duplicadas.
+
+## Las claves foráneas se indexan por ti
+
+<span class="since-badge" data-since="0.25">Desde 0.25</span> Postgres crea el
+índice al que una clave foránea *apunta* —la clave primaria del destino— y nunca uno en
+la columna que la *contiene*. Toda lectura desde el otro lado de un enlace filtra por
+esa columna: una inclusión `hasMany` o `hasOne`, un listado anidado como
+`/authors/5/posts` (su página y su conteo), el lado inverso de un
+`manyToMany`, y la comprobación de `ON DELETE` cuando se elimina una fila padre. Sin
+un índice, cada una de esas lecturas recorre todas las filas de la tabla hija.
+
+Por eso Rebase deriva un btree simple para:
+
+- la `localKey` de cada [`belongsTo`](/docs/collections/relations#belongsto--the-key-is-on-this-table)
+  —que es también la columna que lee el `hasOne` / `hasMany` del otro lado—;
+- la columna de destino de cada tabla de unión de un `manyToMany`. La clave primaria
+  `(source, target)` de la tabla de unión ya sirve las búsquedas por la columna de origen;
+  el lado inverso del enlace necesita este. Una tabla de unión es una tabla de Rebase, así que este
+  no tiene opción de exclusión.
+
+Medido en Postgres 18 con la caché caliente, 1M de comentarios en 50k posts:
+
+| La lectura | Sin el índice | Con él |
+|---|---|---|
+| `include=comments` en una página de 25 posts (`post_id IN (…)`) | 38 ms | 0,3 ms |
+| `GET /posts/77/comments?limit=25` — la página | 28 ms | 0,3 ms |
+| …y su `count(*)` | 29 ms | 0,2 ms |
+| eliminar un post (comprobación de `ON DELETE SET NULL`) | 129 ms | 1,7 ms |
+
+Nada se indexa dos veces. El índice derivado se omite cuando la columna ya encabeza la
+clave primaria, lleva un `UNIQUE` (`validation.unique` en la relación o en la propiedad
+que posee la columna), o encabeza un índice de `indexes:` —simple o compuesto, siempre
+que sea un btree sin `where`. Un índice parcial no puede servir una búsqueda que tiene que
+alcanzar todas las filas, y un índice GIN o BRIN responde a una pregunta distinta, así que
+ninguno cuenta.
+
+El nombre es el que deriva [una declaración](#cómo-se-nombra-una-declaración) de un índice
+simple en esa columna —`posts_author_id_ix_00ad191`—, de modo que el índice derivado y
+`indexes: [{ on: ["author"], … }]` son un solo objeto, no dos. Es un
+[nombre derivado congelado](/docs/architecture/schema-as-code) como todos los demás.
+
+Para conservar la restricción y eliminar el índice —una tabla con tantas escrituras que
+el índice cuesta más que las búsquedas que sirve, o una donde mantienes un índice
+propio fuera de `indexes:`— indícalo en la relación:
+
+```typescript
+author: {
+    name: "Author",
+    type: "relation",
+    relation: { kind: "belongsTo", target: () => authors, index: false }
+}
+```
+
+`index` se acepta solo en un `belongsTo`; en los demás tipos el validador de configuración
+lo rechaza, porque su clave foránea es una columna del destino (define
+`index` en el `belongsTo` del destino) o está en una tabla de unión.
+
+Rebase lee solo tus colecciones para decidir esto, nunca la base de datos: `db
+push` y el arranque tienen que llegar al mismo conjunto de índices con los mismos nombres, o
+el siguiente push eliminaría lo que construyó el arranque. Por lo tanto, un índice que escribiste
+a mano en la misma columna, fuera de `indexes:`, no se ve: decláralo en
+`indexes:`, o define `index: false`, para conservar un índice en lugar de dos.
+
+### Qué hace la actualización a una base de datos existente
+
+Los índices son objetos nuevos en tablas que ya contienen datos, y las dos vías
+los construyen de forma distinta:
+
+- **El arranque no los espera.** En una tabla que ya existe, el schema ensure deja
+  fuera del arranque los índices de claves foráneas que faltan y los
+  construye cuando el servidor ya está sirviendo, de uno en uno, con
+  `CREATE INDEX CONCURRENTLY` en una conexión propia (el `statement_timeout` de 30 s
+  del pool no se aplica). Eso no toma ningún bloqueo que esperen lecturas o escrituras. Una
+  tabla que otra sesión retiene —la construcción de otra instancia, un
+  `ALTER TABLE`— se abandona dentro del presupuesto de bloqueo del arranque y se reintenta en
+  el siguiente arranque. Un índice que una construcción interrumpida dejó `INVALID` (un despliegue
+  que reemplazó el proceso a mitad de la construcción, dos instancias compitiendo por un mismo nombre) se elimina
+  y se construye de nuevo. Cada uno se registra al empezar y al terminar; un fallo es una
+  advertencia, nunca un arranque fallido. Una tabla que crea este arranque recibe sus índices junto con
+  la tabla, antes de que nada pueda escribir en ella. Con `REBASE_PROVISION_ONLY` las
+  construcciones se ejecutan antes de que el proceso termine, ya que nada posterior las ejecutaría.
+- **`rebase db push` los construye antes de planificar**, con el mismo constructor y
+  en los mismos términos que el arranque: `CREATE INDEX CONCURRENTLY`, de uno en uno,
+  de modo que lecturas y escrituras continúan mientras se ejecuta (alrededor de 0,4 s con 1M de filas y 6 s con
+  10M como construcción simple en un SSD de portátil, `maintenance_work_mem` 64 MB; una
+  concurrente tarda más y no bloquea nada). Atlas encuentra entonces cada índice
+  en su sitio y no planifica nada para él. Un índice que no se pudo construir antes —una
+  tabla que otra sesión retuvo durante todo el presupuesto de bloqueo— se deja a Atlas,
+  que lo construye dentro de la transacción del push y por tanto bloquea las escrituras en esa
+  tabla durante la construcción; el push lo indica. Una columna de clave foránea que añade el propio
+  push recibe su índice de Atlas junto con la columna, antes de que haya nada
+  en ella. `--dry-run` no construye nada: nombra los índices que un push real
+  construiría primero, y el plan que imprime los lista, ya que todavía no existen.
 
 ## Qué se rechaza y cuándo
 

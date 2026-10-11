@@ -1,5 +1,5 @@
 ---
-sourceHash: 40c6996a773e6e50
+sourceHash: e18fe07b6281381b
 title: Datei-Upload-Felder
 sidebar_label: Datei-Uploads
 description:"\"Deklarieren eines Datei- oder Bildfelds in einer Collection: der storage-Block, Einzel- und Mehrfach-Datei-Uploads und welche Optionen vom Panel statt vom Server aufgelöst werden.\""
@@ -103,9 +103,10 @@ Pfad einer Eigenschaft mit `public: true` liegt unter `public/`.
 - Ein Upload, der zusätzlich seine Eigenschaft benennt (`collection` + `property`, so wie
   `putObject({ context })` sie sendet), wird auch an diese Eigenschaft gebunden. Eine lockerere
   Eigenschaft zu benennen, schaltet den Pfad einer strengeren nicht frei.
+  Die Uploads des Panels (Dateifelder, Tabellenzellen und Markdown-Bilder) benennen sie immer.
 - Ein als Funktion geschriebener `storagePath` kann nicht gelesen werden, ohne ihn auszuführen,
   daher gibt es für ihn keine serverseitige Regel: Diese Limits greifen nur für Uploads, die die
-  Eigenschaft benennen.
+  Eigenschaft benennen, was die des Panels tun.
 - Ein Pfad, den keine Eigenschaft beansprucht, unterliegt allein dem eigenen Limit der Quelle
   (`STORAGE_MAX_FILE_SIZE`).
 

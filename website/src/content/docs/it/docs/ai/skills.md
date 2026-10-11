@@ -1,5 +1,5 @@
 ---
-sourceHash: 0b7bd3b233513344
+sourceHash: 06e95610513a9c52
 title: Agent Skills
 sidebar_label: Agent Skills
 description: rebase skills install scrive 21 skill di riferimento di Rebase nel tuo repository, nel layout previsto dal tuo assistente IA — Cursor, Claude Code, Windsurf, Gemini CLI e Antigravity.
@@ -97,13 +97,20 @@ Le skill vengono scritte **relativamente alla radice del tuo progetto** — il p
 
 Effettua il commit di questi file. Fanno parte del repository esattamente come una configurazione di linting: in questo modo l'assistente di ogni collaboratore opera con la stessa comprensione del codebase, compresi i collaboratori che non hanno mai eseguito il comando.
 
-**Esegui nuovamente il comando per aggiornare.** I file vengono sovrascritti incondizionatamente, quindi dopo un aggiornamento di Rebase:
+**Esegui nuovamente il comando per aggiornare** dopo un aggiornamento di Rebase:
 
 ```bash
 rebase skills install --agent all
 ```
 
-Due conseguenze del termine «incondizionatamente»: le modifiche locali apportate a una skill installata andranno perse all'esecuzione successiva — mantieni invece le istruzioni specifiche del progetto in [`ai-instructions.md`](/docs/ai/instruction-files), che ti appartiene e non viene mai sovrascritto. Inoltre, le skill rimosse in una versione più recente non vengono eliminate dal tuo repository; solo i file tuttora esistenti vengono riscritti.
+Ogni directory di destinazione contiene un manifest `.rebase-skills.json` con ciò che il comando ha scritto, così una nuova esecuzione sa distinguere una tua modifica dalla copia di una release precedente. Fanne il commit insieme alle skill.
+
+- Un file che nessuno ha modificato viene sostituito con la copia della nuova release.
+- Un file che hai modificato viene mantenuto, e il comando lo elenca. `--force` lo sostituisce.
+- Una skill che una release più recente non distribuisce più viene rimossa, a meno che tu non l'abbia modificata. In quel caso viene mantenuta ed elencata.
+- I file che il comando non ha mai scritto non vengono toccati.
+
+Le istruzioni specifiche del progetto vanno comunque in [`ai-instructions.md`](/docs/ai/instruction-files), che ti appartiene. Una skill modificata smette di ricevere aggiornamenti finché non usi `--force`.
 
 Il comando funziona anche al di fuori di un progetto Rebase, ripiegando sulla directory di lavoro corrente — utile per un repository frontend separato che comunica con un backend Rebase.
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: 15505bc41ba0e8f2
+sourceHash: 06f83add20038a66
 title: Agregaciones y búsqueda
 sidebar_label: Agregaciones y búsqueda
 description: "Cuenta, suma y agrupa con el SDK, filtra dentro de columnas JSON y ejecuta búsquedas de texto completo y vectoriales desde el cliente."
@@ -116,7 +116,9 @@ Una colección de Postgres puede habilitar la búsqueda de texto completo real d
 
 ## Búsqueda vectorial
 
-Para colecciones con una propiedad `vector`, ordena las filas por similitud con un embedding de consulta. Las filas se devuelven ordenadas de más cercana a más lejana, cada una con un `_distance`.
+Para colecciones con una propiedad `vector`, ordena las filas por similitud con un embedding de consulta. Las filas se devuelven ordenadas de más cercana a más lejana, cada una con un `_distance`. La
+distancia es el orden: un `orderBy` en la misma consulta se ignora. Sin un
+`limit`, una búsqueda vectorial devuelve 10 filas, no las 50 de un listado.
 
 ```typescript
 const { data } = await client.data.docs
@@ -126,7 +128,25 @@ const { data } = await client.data.docs
     .find();
 ```
 
-`where` y `orderBy` en la misma consulta actúan como filtros aplicados *antes* del ordenamiento; esto devuelve las filas más cercanas que también coinciden, no las filas más cercanas filtradas después. Producir `queryVector` es tu responsabilidad: Rebase almacena y busca embeddings, no los calcula.
+`where` en la misma consulta es un filtro sobre qué filas son candidatas; esto
+devuelve las filas más cercanas que también coinciden, no las filas más cercanas
+filtradas después. En el índice HNSW eso se cumple desde pgvector 0.8.0 (consulta
+[Filtros en un índice aproximado](/docs/backend/vector-search/#filters-on-an-approximate-index));
+en un pgvector más antiguo, un filtro que pocas de las filas más cercanas superan devuelve una
+página corta. Producir `queryVector` es tu responsabilidad: Rebase almacena y busca
+embeddings, no los calcula.
+
+<span class="since-badge" data-since="0.25">Desde 0.25</span> El SDK envía una
+búsqueda vectorial como `POST /api/data/<collection>/query`, con el embedding en el
+cuerpo: en la URL, 768 dimensiones son unos 17 KB, más de lo que aceptan Node (16 KB) y la mayoría de los
+proxies (nginx: 8 KB). `count()` con una búsqueda vectorial va por el mismo camino,
+como `POST /api/data/<collection>/count`. Frente a un servidor anterior a la 0.24, que
+no tiene esa ruta, cualquiera de las dos recurre al `GET` — y allí un embedding largo
+aún puede ser rechazado con un 431 o un 414.
+
+<span class="since-badge" data-since="0.25">Desde 0.25</span> Con un `threshold`,
+el resultado no tiene `meta.total` — contar las filas dentro de una distancia lo calcula
+para cada fila de la tabla. Pagina con `meta.hasMore`, que sigue siendo exacto.
 
 ### Lo que debes proporcionar
 

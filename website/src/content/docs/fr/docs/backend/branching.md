@@ -1,5 +1,5 @@
 ---
-sourceHash: 6e23ad27a4c203f4
+sourceHash: 1ae19e3e555334a4
 title: Branches de base de données
 sidebar_label: Branches
 description: Créez des branches de base de données isolées pour le développement, le staging et les tests à l'aide de CREATE DATABASE ... TEMPLATE de PostgreSQL — des copies instantanées et parfaitement fidèles, sans temps d'arrêt.
@@ -199,6 +199,13 @@ Il s'intercale entre le shell et le fichier de projet dans l'ordre de résolutio
 Une branche doit avoir la priorité sur `.env`, sinon le basculement n'aurait aucun effet sur un projet qui définit `DATABASE_URL` ; elle ne doit pas avoir la priorité sur les deux éléments supérieurs, car une option sur la ligne de commande est une instruction plus immédiate qu'un basculement effectué hier.
 
 `.rebase/` est ignoré par Git, donc la branche sur laquelle vous vous trouvez est propre à votre machine et ne concerne jamais le projet lui-même.
+
+<span class="since-badge" data-since="0.25">Depuis 0.25</span> Sur un espace de travail basculé,
+`rebase db branch create`, `list`, `info`, `delete` et `prune` opèrent sur la base de données principale,
+là où se trouve le registre, et l'indiquent. `create` copie toujours la branche sur laquelle vous êtes, sauf
+si vous passez `--from` ; elle est enregistrée dans la base de données principale, donc `list` la montre
+depuis n'importe quel espace de travail. Avant la 0.25, seul `list` le faisait, et une branche créée depuis
+un espace de travail basculé n'était enregistrée que dans le snapshot de la branche.
 
 Les branches sont des bases de données PostgreSQL ordinaires nommées d'après la branche avec un préfixe `rb_` ; ainsi, `dev_sandbox` ci-dessus correspond à la base de données `rb_dev_sandbox` sur le même serveur.
 

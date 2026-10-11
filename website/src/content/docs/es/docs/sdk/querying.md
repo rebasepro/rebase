@@ -1,5 +1,5 @@
 ---
-sourceHash: b8aea50207626bc4
+sourceHash: e06718f3afc5cad4
 title: Consulta de datos
 sidebar_label: Consulta de datos
 description: Operaciones CRUD, constructor de consultas fluido, operadores de filtro, ordenación, selección de columnas y agregaciones con el SDK tipado de Rebase.
@@ -70,6 +70,9 @@ async function loadProduct(id: string) {
 const maybe = await client.data.products.findById(42);
 // Row | undefined
 ```
+
+`findById` acepta las relaciones que se cargan, igual que `find`:
+`findById(1, { include: ["tags"] })`.
 
 :::note
 La seguridad a nivel de fila (RLS) hace que "la fila no existe" y "no tienes permisos para leerla" devuelvan deliberadamente la misma respuesta: un 404 que los distinguiera confirmaría la existencia de la fila.
@@ -149,6 +152,11 @@ const { data } = await client.data.products
 | `"is-not-null"` | `"notnull"` | La columna no es `NULL`. No recibe ningún valor |
 
 La columna de alias representa la sintaxis utilizada en la red (**wire**), empleada en las cadenas de consulta REST. Nunca aparece en el código de la aplicación: tanto el SDK como el panel de administración utilizan el operador canónico de la izquierda.
+
+Los cuatro operadores de patrón comparan texto. Un campo `enum` se compara por su valor,
+así que `{ status: ["like", "draft%"] }` funciona con un estado almacenado como enum de Postgres.
+En un número, una fecha o cualquier otro campo que no sea texto se rechazan con un
+400 `INVALID_FILTER_OPERATOR`.
 
 ### Sintaxis de cláusulas Where
 

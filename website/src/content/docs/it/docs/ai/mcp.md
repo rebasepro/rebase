@@ -1,5 +1,5 @@
 ---
-sourceHash: 373a79f1c328f730
+sourceHash: 679087dc4cea0cbb
 title: Server MCP
 sidebar_label: Server MCP
 description: Connetti Claude Code, Cursor, Gemini CLI o qualsiasi client MCP a un progetto Rebase — i 42 tool esposti, le credenziali con cui si autentica e il loopback gate che si interpone tra un agent e la produzione.
@@ -324,12 +324,18 @@ https://api.example.com/, which is not local. Set REBASE_MCP_ALLOW_REMOTE_WRITES
 to allow destructive tools against remote environments.
 ```
 
-**Se non è possibile risolvere alcuna stringa di connessione, i tool del DB vengono rifiutati** —
-una destinazione non verificabile non è considerata sicura:
+**Se non è possibile risolvere alcuna stringa di connessione, i tool del DB soggetti a gate vengono rifiutati.**
+Senza `DATABASE_URL`, la CLI usa il database di sviluppo gestito, che è
+l'impostazione predefinita per un nuovo progetto, e la CLI rifiuta lì stessa
+`db push`, `db migrate` e `db branch`. Il rifiuto lo dice e indica cosa funziona
+al suo posto. Non suggerisce la via d'uscita:
 
 ```text
-Error: Refusing to run "rebase_db_push": no DATABASE_URL could be resolved for
-project "default", so the database it would connect to cannot be verified as local.
+Error: Refusing to run "rebase_db_push": project "default" sets no DATABASE_URL, so the
+CLI would use the managed development database (PGlite, started by `rebase dev`). You
+most likely do not need this tool: the dev server applies the collections to that
+database at boot, additively. After changing a collection, restart it with
+rebase_dev_stop and rebase_dev_start. …
 ```
 
 Solo il loopback è considerato locale: `localhost`, `*.localhost`, `127.0.0.0/8`, `::1`.
@@ -364,9 +370,10 @@ all'esterno.
 
 L'[endpoint remoto](#lendpoint-remoto) racchiude allo stesso modo i risultati dei
 suoi tool e lo comunica al client; il suo `structuredContent` trasporta il risultato puro.
-<span class="since-badge" data-since="0.25">Da 0.25</span> `list_collections` fa eccezione:
-il suo elenco lo legge solo un modello, quindi viene inviato una sola volta, nel testo.
-Prima della 0.24 portava anche una copia in `structuredContent`.
+<span class="since-badge" data-since="0.25">Da 0.25</span> `list_collections` e
+`describe_collection` fanno eccezione: li legge solo un modello, quindi vengono
+inviati una sola volta, nel testo. Prima della 0.24 l'elenco portava anche una
+copia in `structuredContent`.
 
 Si tratta di un marcatore, non di una sandbox. Un assistente provvisto di questi tool è sicuro
 tanto quanto i contenuti che gli viene consentito di leggere.
@@ -455,12 +462,12 @@ a un singolo utente, l'endpoint si rifiuta di essere montato e ne spiega il moti
   è attiva per impostazione predefinita; `REBASE_MCP_OPEN_REGISTRATION=false` la limita
   ai client registrati manualmente) e reindirizza la persona a una schermata di consenso che ne esegue
   l'accesso tramite il tuo `/auth/login` esistente.
-- **Sette tool, tre scope.** Gli stessi [scope](/docs/backend/roles-and-scopes/)
-  usati da ogni credenziale. `data:read` offre `list_collections`,
+- **Otto tool, tre scope.** Gli stessi [scope](/docs/backend/roles-and-scopes/)
+  usati da ogni credenziale. `data:read` offre `list_collections`, `describe_collection`,
   `query_collection`, `count_documents` e `get_document`; `data:write` aggiunge `create_document` e
   `update_document`; `data:delete` aggiunge `delete_document`. Un client che non chiede
   nulla riceve `data:read`. Ognuno si restringe a una collection: `data:read:posts`
-  elenca e legge `posts` e nient'altro. Uno scope determina quali tool vengono
+  elenca, descrive e legge `posts` e nient'altro. Uno scope determina quali tool vengono
   offerti e quali collection raggiungono, non quali righe: un elenco vuoto può essere il normale
   funzionamento dell'RLS, e `data:write` continua a non poter scrivere una riga che la persona non potrebbe scrivere.
 - **Le autorizzazioni concesse prima della 0.24 mantengono la loro portata.** `mcp:read` viene letto come
@@ -478,13 +485,19 @@ a un singolo utente, l'endpoint si rifiuta di essere montato e ne spiega il moti
   di `GET /api/data/<collection>`, quindi una riga torna come la serve REST
   (date ISO, un `belongsTo` come la sua chiave esterna, ad es. `authorId`) e
   può essere rinviata in un aggiornamento senza modifiche. `query_collection`
-  risponde `{ data, meta }` con `meta.total` e `meta.hasMore`,
-  `count_documents` risponde `{ count }`, e `list_collections` risponde con
-  gli schemi OpenAPI `row` e `create` di ciascuna collection, più
-  `softDeleteField` per indicare dove le righe vanno nel cestino. Come su
-  REST, un `limit` superiore a 1000, un argomento non dichiarato e una
-  modifica o eliminazione di una riga nel cestino (404) vengono rifiutati;
-  impostare il campo di soft-delete a `null` la ripristina.
+  risponde `{ data, meta }` con `meta.total` e `meta.hasMore`, e
+  `count_documents` risponde `{ count }`. Come su REST, un `limit` superiore a
+  1000, un argomento non dichiarato e una modifica o eliminazione di una riga
+  nel cestino (404) vengono rifiutati; impostare il campo di soft-delete a
+  `null` la ripristina.
+- <span class="since-badge" data-since="0.25">Da 0.25</span> **L'elenco nomina le collection; `describe_collection` dà lo schema di una.**
+  `list_collections` risponde con `name`, `title` e `description` di ciascuna
+  collection, e `describe_collection { collection }` con gli schemi OpenAPI
+  `row` e `create` di quella collection, più `softDeleteField` dove le righe
+  vanno nel cestino. Le descrizioni dei tool dicono al modello di descrivere una
+  collection prima di scriverci. L'elenco di un progetto con 200 collection pesa
+  circa 5k token, e ogni descrizione meno di 1k; con tutti gli schemi nell'elenco
+  erano circa 150k.
 - **Un token valido solo per questo endpoint.** Un token di accesso MCP viene rifiutato da
   `/api/data`, `/api/admin` e dai WebSocket, quindi connettere un assistente non
   equivale a fornirgli una sessione generale.

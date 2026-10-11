@@ -1,5 +1,5 @@
 ---
-sourceHash: bd5c3797254d822d
+sourceHash: aa6e4f1031d85124
 title: Busca
 sidebar_label: Busca
 description: Como o .search() se comporta por padrão e como habilitar a busca de texto completo ranqueada em uma coleção Postgres nos campos especificados — incluindo conteúdo JSONB e array.
@@ -37,6 +37,8 @@ Tem três limitações que nenhuma configuração interna pode resolver:
 - **Não pode usar um índice.** Um `%` no início inutiliza uma B-tree, então toda
   busca é uma varredura sequencial (sequential scan). Aceitável com mil linhas;
   um abismo com um milhão.
+  `rebase doctor` indica as coleções em que isso começou a importar: sem bloco
+  `search` e com mais de cerca de 10.000 linhas.
 
 O termo é correspondido **literalmente**: `%` e `_` são metacaracteres do LIKE e
 são escapados antes da criação do padrão; portanto, buscar por `50%` busca por
@@ -336,10 +338,12 @@ bonito que silenciosamente não destaca nada.
 ## Adicionando o bloco a uma coleção ativa
 
 A coluna gerada é adicionada pela verificação de schema na inicialização, como
-qualquer outra coluna, e seu índice é construído com `CREATE INDEX CONCURRENTLY`,
-para que as gravações não sejam bloqueadas. Adicionar uma coluna gerada *armazenada*
-(stored) reescreve a tabela, portanto, em uma tabela grande, planeje isso como
-qualquer outra reescrita.
+qualquer outra coluna. Seu índice é construído depois que o servidor já está atendendo,
+em segundo plano, com `CREATE INDEX CONCURRENTLY`, para que as gravações não sejam
+bloqueadas (veja [Índices](/docs/backend/indexes#when-they-are-created)). Até o
+índice ser construído, uma busca funciona, mas lê a tabela inteira. Adicionar uma coluna
+gerada *armazenada* (stored) reescreve a tabela, portanto, em uma tabela grande, planeje
+isso como qualquer outra reescrita.
 
 ## Quais mecanismos
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: 62e51002f973bf74
+sourceHash: bdc7510e49d0db5c
 title: Sottoscrizioni Realtime
 sidebar_label: Realtime
 description: Sottoscrivi le modifiche ai dati in tempo reale con l'SDK tipizzato di Rebase utilizzando listener realtime basati su WebSocket.
@@ -123,11 +123,22 @@ const unsubscribe = client.data
 listenById(
     id: string | number,
     onUpdate: (row: M | undefined) => void,
-    onError?: (error: Error) => void
+    onError?: (error: Error) => void,
+    options?: { include?: IncludeSpec }
 ): () => void   // returns unsubscribe function
 ```
 
 Il callback riceve una riga piatta — non un'`Entity`, quindi non c'è `.values` — e `undefined` quando il record viene eliminato.
+
+Ogni frame porta le relazioni che `options.include` nomina, caricate come `find({ include })`
+le carica in ogni riga di un elenco. Una relazione to-many non nominata lì è assente
+dalla riga, non vuota:
+
+```typescript
+client.data.posts.listenById(1, (post) => {
+    console.log(post?.tags); // the post's tags, on every update
+}, undefined, { include: ["tags"] });
+```
 
 ## Query builder fluent
 

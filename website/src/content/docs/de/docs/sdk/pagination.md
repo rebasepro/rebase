@@ -1,5 +1,5 @@
 ---
-sourceHash: 0db20d62bf304b74
+sourceHash: a03adef95cbad36c
 title: Paginierung
 sidebar_label: Paginierung
 description: Paginieren Sie eine Collection mit Limit/Offset, Seitenzahlen oder einem Keyset-Cursor – und wann die jeweilige Methode nicht mehr korrekt funktioniert.
@@ -157,7 +157,7 @@ const rows = await client.data.orders
     .findAll();
 ```
 
-Drei Optionen steuern den Durchlauf:
+Vier Optionen steuern den Durchlauf:
 
 | Option | Standard | Was sie bewirkt |
 |--------|----------|-----------------|

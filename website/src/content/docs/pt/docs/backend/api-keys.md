@@ -1,5 +1,5 @@
 ---
-sourceHash: 7c51c9877d9d0803
+sourceHash: 376a90002cda8008
 title: Chaves de API
 sidebar_label: Chaves de API
 description: "Chaves de longa duração para scripts, CI, agentes e integrações: chaves de serviço e chaves pessoais, os escopos que elas têm, como se combinam com a segurança em nível de linha (RLS) e as rotas que as gerenciam."
@@ -156,7 +156,9 @@ O `rate_limit` de uma chave é quantas requisições ela pode fazer em uma janel
 15 minutos, e todas as portas de entrada contam para ele em um único bucket, `api-key:<id>`:
 
 - suas requisições HTTP às APIs de dados, de storage e de funções;
-- seus frames de dados no socket de realtime: buscas, contagens, salvamentos e exclusões;
+- seus frames de dados no socket de realtime: buscas, contagens, salvamentos e exclusões,
+  e as assinaturas e requisições de histórico de canal além da
+  [cota](/docs/backend/realtime/#what-a-write-costs-and-the-limits) de cada socket;
 - suas requisições ao [`/mcp`](/docs/ai/mcp/#the-remote-endpoint).
 
 Sem um `rate_limit`, o bucket usa o padrão do servidor para chaves de API, 1000. Uma

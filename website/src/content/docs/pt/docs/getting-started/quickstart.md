@@ -1,5 +1,5 @@
 ---
-sourceHash: 32fc3b3ccab733ad
+sourceHash: 536427d653beb637
 title: Início Rápido
 sidebar_label: Início Rápido
 description: Crie um novo projeto Rebase e coloque-o para rodar localmente em menos de 2 minutos.
@@ -123,8 +123,8 @@ Isso analisará as tabelas do seu banco de dados e gerará os arquivos TypeScrip
 
 Quando você abrir a URL do frontend que o `rebase dev` exibiu, verá a tela de login. O **primeiro usuário** a se registrar torna-se automaticamente um administrador — este é o fluxo de inicialização (bootstrap).
 
-1. Clique em **Sign Up**
-2. Insira seu e-mail e senha
+1. A tela abre em **Welcome!**, o formulário dessa primeira conta
+2. Insira seu e-mail e senha e clique em **Create account**
 3. Pronto — com acesso total de administrador
 
 O `rebase init` também gravou `REBASE_ADMIN_EMAIL` e um `REBASE_ADMIN_PASSWORD` gerado no `.env`. Essas não são suas credenciais aqui: o `rebase dev` as ignora e avisa isso na inicialização. Elas pertencem a uma inicialização em produção — `docker compose up`, ou qualquer coisa com `NODE_ENV=production` — onde essa janela de bootstrap é fechada, pois o servidor responde em um hostname antes que você tenha digitado qualquer coisa. Veja [Seu primeiro admin](/docs/getting-started/deployment#your-first-admin).

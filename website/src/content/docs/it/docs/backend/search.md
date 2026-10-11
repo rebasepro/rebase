@@ -1,5 +1,5 @@
 ---
-sourceHash: bd5c3797254d822d
+sourceHash: aa6e4f1031d85124
 title: Ricerca
 sidebar_label: Ricerca
 description: Come si comporta .search() per impostazione predefinita e come abilitare la ricerca full-text con ranking per una collection Postgres sui campi specificati — inclusi contenuti JSONB e array.
@@ -24,6 +24,8 @@ Questo approccio è sufficiente per una collection di piccole dimensioni con il 
 - **Non può esaminare le proprietà `map` o `array`.** Una collection che conserva i propri contenuti ricercabili in JSONB — tag, certificazioni, un questionario — ha una casella di ricerca che non restituisce nulla senza segnalare errori.
 - **Non ha un concetto di rilevanza.** Le righe vengono restituite secondo l'ordinamento specificato in `orderBy`, quindi la corrispondenza migliore potrebbe trovarsi a pagina sette.
 - **Non può utilizzare un indice.** Un carattere `%` iniziale rende inutilizzabile un indice B-tree, quindi ogni ricerca si traduce in una scansione sequenziale. Va bene con mille righe; diventa ingestibile con un milione.
+  `rebase doctor` nomina le collection in cui questo ha cominciato a pesare: nessun blocco
+  `search` e più di circa 10.000 righe.
 
 La corrispondenza del termine è **letterale**: `%` e `_` sono metacaratteri LIKE e vengono sottoposti a escape prima che il pattern venga generato, quindi la ricerca di `50%` cercherà esattamente `50%` invece di restituire ogni riga. Se desideri usare caratteri jolly, l'operatore di filtro `like` accetta un pattern (`.where("title", "like", "post-%")`); `.search()` non lo fa.
 
@@ -213,7 +215,7 @@ Con `unaccent` attivo, gli snippet vengono letti con gli accenti rimossi — `Au
 
 ## Aggiungere il blocco a una collection attiva
 
-La colonna generata viene aggiunta dal controllo dello schema all'avvio, come qualsiasi altra colonna, e il relativo indice viene creato con `CREATE INDEX CONCURRENTLY` in modo da non bloccare le scritture. L'aggiunta di una colonna generata di tipo *stored* comporta la riscrittura della tabella, pertanto su una tabella di grandi dimensioni è opportuno pianificarla come qualsiasi altra operazione di riscrittura.
+La colonna generata viene aggiunta dal controllo dello schema all'avvio, come qualsiasi altra colonna. Il relativo indice viene creato dopo che il server è in servizio, in background, con `CREATE INDEX CONCURRENTLY` in modo da non bloccare le scritture (vedi [Indici](/docs/backend/indexes#when-they-are-created)). Finché l'indice non è pronto, una ricerca funziona ma legge l'intera tabella. L'aggiunta di una colonna generata di tipo *stored* comporta la riscrittura della tabella, pertanto su una tabella di grandi dimensioni è opportuno pianificarla come qualsiasi altra operazione di riscrittura.
 
 ## Quali motori sono supportati
 

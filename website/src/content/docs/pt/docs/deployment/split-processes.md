@@ -1,5 +1,5 @@
 ---
-sourceHash: 1214584ea35bf933
+sourceHash: a46a7358b856be2f
 title: Divisão em vários processos
 sidebar_label: Processos Divididos
 description: Execute um bundle como vários processos cooperantes — uma API, uma camada de funções, um worker — a partir da mesma imagem de runtime publicada, para que uma função customizada pesada deixe de concorrer com a API de dados.
@@ -25,9 +25,9 @@ REBASE_ROLE=all        # the default: everything, one process
 | | `all` | `api` | `functions` | `worker` |
 | --- | :---: | :---: | :---: | :---: |
 | `/api/auth`, `/api/data`, `/api/storage`, `/api/meta` | ✅ | ✅ | — | — |
-| `/api/admin`, `/api/logs`, o editor de schema | ✅ | ✅ | — | — |
+| `/api/admin` (logs e o editor de schema entre eles) | ✅ | ✅ | — | — |
 | `/api/functions/*` | ✅ | encaminha (veja abaixo) | ✅ | — |
-| `/api/cron` (a superfície de administração) | ✅ | ✅ | — | — |
+| `/api/admin/cron` (a superfície de administração) | ✅ | ✅ | — | — |
 | `/health`, `/livez`, `/metrics` | ✅ | ✅ | ✅ | ✅ |
 | Serve websockets, consome eventos de alteração | ✅ | ✅ | — | — |
 | Cria o schema na inicialização | ✅ | ✅ | — | — |
@@ -36,7 +36,7 @@ REBASE_ROLE=all        # the default: everything, one process
 
 Health e métricas estão em todas as roles, sem exceção. Um processo que um orquestrador não consegue sondar é um processo que ele não consegue atualizar.
 
-O Realtime está na lista porque tem um custo, quer alguém o utilize ou não: um processo que consome eventos de alteração mantém uma conexão `LISTEN` fora do pool enquanto estiver em execução e instala os triggers de captura na inicialização. Apenas um processo que serve websockets tem alguém para quem entregar, portanto as duas roles que não servem nenhum não fazem nenhuma das duas coisas. **As gravações feitas por esses processos ainda são detectadas** — a captura é feita por triggers de banco de dados, de modo que uma alteração é publicada pelo banco de dados em vez de qualquer processo que a tenha feito. Uma função que grava uma linha ainda acorda todos os assinantes na `api`.
+O Realtime está na lista porque tem um custo, quer alguém o utilize ou não: um processo que consome eventos de alteração mantém uma conexão `LISTEN` fora do pool enquanto estiver em execução e instala os triggers de captura na inicialização. Apenas um processo que serve websockets tem alguém para quem entregar, portanto as duas roles que não servem nenhum não fazem nenhuma das duas coisas. **As gravações feitas por esses processos ainda são detectadas.** Com a captura de alterações ligada, a captura é feita por triggers de banco de dados, de modo que uma alteração é publicada pelo banco de dados em vez de qualquer processo que a tenha feito. Com a captura desligada (`REALTIME_CDC=off`, ou `auto` recorrendo a isso porque a role do banco de dados não pode criar triggers), um processo `worker` ou `functions` anuncia cada uma de suas próprias gravações no canal entre instâncias, sem manter uma conexão `LISTEN`. De qualquer modo, uma função que grava uma linha ainda acorda todos os assinantes na `api`.
 
 ## Docker Compose
 
@@ -138,7 +138,7 @@ Adicione um processo `worker` quando quiser trabalho agendado fora do caminho da
 
 Um processo `functions` nunca executa nenhum dos dois. Ele é escalado pela carga de requisições e substituído à vontade, e atribuir a ele trabalho agendado faria com que sua contagem de réplicas significasse algo que não deveria.
 
-Observe que o `rebase.jobs.enqueue` continua funcionando em qualquer lugar, inclusive em um processo que não executa workers — enfileirar é uma gravação, executar é um loop de sondagem (polling), e apenas o segundo é o que uma role desativa.
+Observe que enfileirar — `jobQueue.enqueue`, o `enqueue` de uma fila declarada, o `publish` de um tópico — continua funcionando em qualquer lugar, inclusive em um processo que não executa workers — enfileirar é uma gravação, executar é um loop de sondagem (polling), e apenas o segundo é o que uma role desativa.
 
 ## O que a divisão não oferece
 

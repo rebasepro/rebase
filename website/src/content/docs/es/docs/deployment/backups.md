@@ -1,5 +1,5 @@
 ---
-sourceHash: 0007bd5679d9971e
+sourceHash: 224692816eecfaad
 title: Copias de seguridad y restauración
 sidebar_label: Copias de seguridad
 description: Crea, programa, lista y restaura copias de seguridad de la base de datos con pg_dump — qué contiene una copia de seguridad, el archivo de roles que la acompaña, y lo único que no cubre, tus archivos subidos.
@@ -309,6 +309,40 @@ Las descargas se transmiten a través de `GET /api/admin/backups/download?key=�
 solo para administradores, así que el bucket nunca tiene que ser público; una
 clave fuera del prefijo del destino se rechaza. Con `BACKUP_DESTINATION` sin
 definir, el panel indica que las copias de seguridad no están configuradas.
+
+### Descargar una copia de seguridad
+
+<span class="since-badge" data-since="0.25">Desde 0.25</span> Un navegador no puede
+poner una cabecera `Authorization` en una descarga, así que Studio y el SDK piden
+primero un enlace. `POST /api/admin/backups/download-url` con `{ "key": "…" }` (mismo
+alcance de administración y mismas comprobaciones de clave que la descarga) responde
+`{ url, token, expiresIn }`: una URL cuyo token sustituye a la cabecera, para
+esa única copia de seguridad en el destino actual, durante 60 segundos. El token se
+rechaza en cualquier otro sitio — como sesión, como token de descarga de almacenamiento, para otra
+copia de seguridad — y una vez que expira. El navegador transmite entonces el volcado directamente al
+disco, así que una copia de seguridad del tamaño de tu base de datos nunca tiene que caber en una pestaña.
+
+```ts
+// In a browser: the browser saves the file.
+await client.backups.download(key);
+
+// Anywhere: a link that needs no header, for 60 seconds.
+const { url } = await client.backups.downloadUrl(key);
+
+// In Node: stream the bytes to a file.
+import { createWriteStream } from "node:fs";
+import { Readable } from "node:stream";
+import { pipeline } from "node:stream/promises";
+
+const { stream, name } = await client.backups.stream(key);
+await pipeline(Readable.fromWeb(stream), createWriteStream(name));
+```
+
+Antes de la 0.24, `backups.download(key)` respondía con un `Blob` que contenía todo el volcado.
+Ahora guarda el archivo en un navegador y lanza un error en cualquier otro sitio; usa `stream(key)`
+en Node. Frente a un servidor sin enlaces de descarga (uno anterior a la 0.24, o uno
+sin secreto JWT para firmarlos), `download()` recurre a leer los bytes
+por sí mismo.
 
 ## Mantén las copias de seguridad privadas
 

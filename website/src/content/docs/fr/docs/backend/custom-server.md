@@ -1,5 +1,5 @@
 ---
-sourceHash: 15e127696fc3c50e
+sourceHash: b27c45a011cb8c16
 title: Intégration de serveur personnalisé
 sidebar_label: Serveur personnalisé (Express)
 description: Comment intégrer les services Rebase Database et Realtime dans votre propre backend Node.js personnalisé sans utiliser Hono ni le coordinateur Rebase.
@@ -46,7 +46,7 @@ Ne déclarez pas `zod` dans les dépendances de votre projet — le runtime le f
 :::
 
 **Comportements clés :**
-- Génère automatiquement des clés éphémères `JWT_SECRET` et `REBASE_SERVICE_KEY` en développement pour que vous puissiez démarrer sans configuration manuelle.
+- Génère `JWT_SECRET` et `REBASE_SERVICE_KEY` en développement lorsqu'ils ne sont pas définis, pour que vous puissiez démarrer sans configuration manuelle, et les met en cache dans `.rebase-dev-secrets.json` afin qu'un redémarrage ne déconnecte personne.
 - Bloque les secrets générés automatiquement en production — vous devez les définir explicitement.
 - Valide que `CORS_ORIGINS` ou `FRONTEND_URL` est défini en production.
 - Refuse un schéma `extend` construit par une copie différente de zod.
@@ -78,8 +78,9 @@ async function startServer() {
     
     // 1. WebSocket Upgrade Guard
     // WebSockets require hijacking the HTTP Upgrade header. You must bind
-    // Rebase to a raw Node.js http.Server instance.
-    const server = createServer(app);
+    // Rebase to a raw Node.js http.Server instance. 64 KB of headers, as the
+    // Rebase runtime takes: a vector search in the URL outgrows Node's 16 KB.
+    const server = createServer({ maxHeaderSize: 64 * 1024 }, app);
 
     // 2. Configure the connection pool
     const pool = new pg.Pool({
@@ -202,7 +203,7 @@ async function startServer() {
 startServer();
 ```
 
-> **Voie standard :** si votre serveur utilise `initializeRebaseBackend` (comme le fait le template généré), ne concevez pas vous-même le gestionnaire d'arrêt ci-dessus — utilisez plutôt le helper intégré. Il vide les connexions HTTP, arrête le planificateur de tâches cron, détruit les services en temps réel, protège contre les signaux répétés et force l'arrêt si la fermeture se bloque :
+> **Voie standard :** si votre serveur utilise `initializeRebaseBackend` (comme le fait le template généré), ne concevez pas vous-même le gestionnaire d'arrêt ci-dessus — utilisez plutôt le helper intégré. Il vide les connexions HTTP, arrête le planificateur de tâches cron, détruit les services en temps réel, ferme le pool de connexions SMTP une fois que plus rien ne peut envoyer, protège contre les signaux répétés et force l'arrêt si la fermeture se bloque :
 >
 > ```ts
 > import { installShutdownHandlers } from "@rebasepro/server";
@@ -243,10 +244,16 @@ app.use(cors({
     exposedHeaders: [
         "ETag", "Retry-After", "X-Request-ID",
         "X-RateLimit-Limit", "X-RateLimit-Remaining", "X-RateLimit-Reset",
-        "Preference-Applied"
+        "Preference-Applied",
+        // Resumable uploads, which the SDK uses for files over 8 MiB
+        "Location", "Upload-Offset", "Rebase-Upload-Result"
     ]
 }));
 ```
+
+<span class="since-badge" data-since="0.25">Depuis 0.25</span> Les trois derniers sont ceux dans lesquels répond un téléversement reprenable. Sans eux, le
+SDK ne peut pas en suivre un depuis une autre origine et envoie chaque fichier en une seule
+requête multipart.
 
 Le runtime Rebase et le backend éjecté envoient déjà cette liste. Sur la 0.23
 ils n'exposent aucun de ces en-têtes, si bien qu'un frontend sur une autre origine ne lit aucun `ETag`.

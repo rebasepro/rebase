@@ -1,5 +1,5 @@
 ---
-sourceHash: 0007bd5679d9971e
+sourceHash: 224692816eecfaad
 title: Backups e restauração
 sidebar_label: Backups
 description: Crie, agende, liste e restaure backups do banco de dados com pg_dump — o que um backup contém, o arquivo de roles que viaja com ele, e a única coisa que ele não cobre, seus arquivos enviados.
@@ -301,6 +301,40 @@ Os downloads passam por `GET /api/admin/backups/download?key=…`, somente para
 admin, então o bucket nunca precisa ser público; uma chave fora do prefixo do
 destino é recusada. Com `BACKUP_DESTINATION` não definida, o painel informa
 que os backups não estão configurados.
+
+### Baixar um backup
+
+<span class="since-badge" data-since="0.25">Desde 0.25</span> Um navegador não consegue
+colocar um cabeçalho `Authorization` em um download, então o Studio e o SDK pedem um
+link primeiro. `POST /api/admin/backups/download-url` com `{ "key": "…" }` (o mesmo
+escopo de admin e as mesmas verificações de chave do download) responde
+`{ url, token, expiresIn }`: uma URL cujo token faz as vezes do cabeçalho, para
+aquele único backup no destino atual, por 60 segundos. O token é
+recusado em qualquer outro lugar — como sessão, como token de download de storage, para outro
+backup — e depois que expira. O navegador então transmite o dump direto para o
+disco, de modo que um backup do tamanho do seu banco de dados nunca precisa caber em uma aba.
+
+```ts
+// In a browser: the browser saves the file.
+await client.backups.download(key);
+
+// Anywhere: a link that needs no header, for 60 seconds.
+const { url } = await client.backups.downloadUrl(key);
+
+// In Node: stream the bytes to a file.
+import { createWriteStream } from "node:fs";
+import { Readable } from "node:stream";
+import { pipeline } from "node:stream/promises";
+
+const { stream, name } = await client.backups.stream(key);
+await pipeline(Readable.fromWeb(stream), createWriteStream(name));
+```
+
+Antes da 0.24, `backups.download(key)` respondia um `Blob` com o dump inteiro.
+Agora ele salva o arquivo em um navegador e lança um erro em outros lugares; use `stream(key)`
+no Node. Contra um servidor sem links de download (um anterior à 0.24, ou um
+sem segredo JWT para assiná-los), `download()` recorre a ler os bytes
+por conta própria.
 
 ## Mantenha os backups privados
 

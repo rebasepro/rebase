@@ -1,5 +1,5 @@
 ---
-sourceHash: 7edfb533f917e6ae
+sourceHash: 8fca289475b169ca
 title: Geração de Esquema
 sidebar_label: Geração de Esquema
 description: Gere esquemas Drizzle ORM a partir das definições de coleções, crie migrações SQL e mantenha seu banco de dados sincronizado com a CLI da Rebase.
@@ -78,7 +78,7 @@ rebase schema introspect
 
 Isso é útil ao adotar a Rebase em um banco de dados existente — faça a introspecção primeiro, depois personalize as coleções geradas.
 
-**Introspectar e depois fazer push não muda nada.** As propriedades geradas dizem exatamente o que cada coluna é — `columnType`, `precision`/`scale`, `defaultValue`, `required`, o `isId` de uma chave (`"increment"` para uma identity inteira, `columnType: "serial"` para uma serial, `"manual"` para uma chave sem default), o `onDelete` de uma relação, e o bloco `search` de uma coleção lido de volta a partir da coluna que ele construiu — então `rebase db push --dry-run` logo depois de uma introspecção não planeja nenhuma mudança. Onde nenhuma propriedade consegue descrever uma coluna — um `timestamp` sem fuso horário, um `interval`, um `inet`, um tipo enum que não se chama `<table>_<column>`, um default como `CURRENT_DATE` — a introspecção avisa, por coluna, no terminal e no topo do arquivo, com o que um push faria com ela e, quando existir, a instrução que faz as duas coisas coincidirem (`ALTER TYPE "mood" RENAME TO "customers_current_mood";`). Uma tabela com chave composta por mais de uma coluna volta como uma chave composta, com o seu `isId` em cada coluna da chave. Ela é deixada de fora, com o motivo, quando uma coluna da chave não pode levar `isId` (um timestamp, por exemplo) ou a chave estrangeira de outra tabela aponta para ela, o que uma relação de uma só coluna não consegue fazer; o `db push` deixa em paz uma tabela que não é uma coleção. Na 0.23 o push logo depois de uma introspecção ainda pode planejar mudanças de tipo, defaults removidos e NOT NULLs, e uma chave `id` fantasma.
+**Introspectar e depois fazer push não muda nada.** As propriedades geradas dizem exatamente o que cada coluna é — `columnType`, `precision`/`scale`, `defaultValue`, `required`, o `isId` de uma chave (`"increment"` para uma identity inteira, `columnType: "serial"` para uma serial, `"manual"` para uma chave sem default), o `onDelete` de uma relação — e o seu `index: false` onde o banco de dados não tem índice na coluna da chave, já que um `belongsTo` é [indexado por padrão](/docs/backend/indexes#foreign-keys-are-indexed-for-you) (apague a linha para que um seja construído) — e o bloco `search` de uma coleção lido de volta a partir da coluna que ele construiu — então `rebase db push --dry-run` logo depois de uma introspecção não planeja nenhuma mudança. Onde nenhuma propriedade consegue descrever uma coluna — um `timestamp` sem fuso horário, um `interval`, um `inet`, um tipo enum que não se chama `<table>_<column>`, um default como `CURRENT_DATE` — a introspecção avisa, por coluna, no terminal e no topo do arquivo, com o que um push faria com ela e, quando existir, a instrução que faz as duas coisas coincidirem (`ALTER TYPE "mood" RENAME TO "customers_current_mood";`). Uma tabela com chave composta por mais de uma coluna volta como uma chave composta, com o seu `isId` em cada coluna da chave. Ela é deixada de fora, com o motivo, quando uma coluna da chave não pode levar `isId` (um timestamp, por exemplo) ou a chave estrangeira de outra tabela aponta para ela, o que uma relação de uma só coluna não consegue fazer; o `db push` deixa em paz uma tabela que não é uma coleção. Na 0.23 o push logo depois de uma introspecção ainda pode planejar mudanças de tipo, defaults removidos e NOT NULLs, e uma chave `id` fantasma.
 
 ### `rebase db push`
 
@@ -94,7 +94,30 @@ rebase db push
 - Executa o plano primeiro em modo dry run e para antes de tudo o que destrói dados: uma tabela, coluna, schema, view ou tipo removidos, um `TRUNCATE`, uma mudança de tipo de coluna que pode perder valores (`timestamptz` → `date`, `numeric` → `integer`), ou uma mudança de chave primária: `(id)` → `(id, locale)` dá a cada linha um id novo, de modo que links, chaves estrangeiras e ids guardados em outros lugares deixam de encontrar sua linha. Pergunta em um terminal e recusa caso contrário; `--allow-destructive` (ou `--yes`) aplica mesmo assim
 - Ativa a segurança em nível de linha em todas as tabelas de coleção, incluindo as tabelas de junção, logo após a mudança de schema e antes de qualquer etapa que possa falhar, de modo que um push que para no meio deixa uma tabela nova negando todas as requisições em vez de aberta a elas
 - Aplica as políticas RLS das suas coleções e **remove as políticas que um push anterior substituiu**
+- <span class="since-badge" data-since="0.25">Desde 0.25</span> Constrói qualquer
+  [índice de chave estrangeira que o Rebase deriva](/docs/backend/indexes#foreign-keys-are-indexed-for-you)
+  e que uma tabela existente não tenha, **antes** de planejar, com
+  `CREATE INDEX CONCURRENTLY`, para que as escritas na tabela continuem durante a construção;
+  o Atlas então o encontra no lugar. `--dry-run` os nomeia e não constrói nada
+- <span class="since-badge" data-since="0.25">Desde 0.25</span> Marca as
+  políticas que aplica do mesmo modo que a inicialização do servidor, de modo que a primeira inicialização depois de um
+  push as deixa em paz em vez de recriar cada uma
+- <span class="since-badge" data-since="0.25">Desde 0.25</span> `--dry-run`
+  não grava nada do projeto: `src/schema.generated.ts` é deixado como está,
+  e as cópias `drizzle/*.sql` que uma versão mais antiga incluiu em um commit são nomeadas, não
+  excluídas. Apenas a entrada do plano vai para `.rebase/sql/`, que não entra em um commit
 - **Não** cria arquivos de migração
+
+**Quanto tempo leva.** Quase todo o tempo de um push é o Atlas calculando o plano: ele
+constrói o schema desejado em um banco de dados temporário e o compara com o
+real, e esse custo cresce mais rápido que o número de tabelas — em um notebook sem carga,
+cerca de 0,25 s por plano com 11 tabelas, 0,9 s com 111 e 5,5 s com 411. Um push que
+não muda nada planeja uma vez; um que muda alguma coisa planeja duas vezes (o dry-run
+que o gate de mudanças destrutivas lê, e depois a aplicação). Assim, um push em um schema de
+400 ou mais tabelas leva dezenas de segundos, e mais em uma máquina ocupada ou lenta.
+Esse tempo é do Atlas, não do seu banco de dados: as etapas ao redor — gerar o
+SQL, o lock de RLS, busca, triggers, políticas, a role — levam alguns segundos nesse
+tamanho, sobre uma conexão com o seu banco de dados.
 
 **Os arquivos que ele gera no caminho**, todos em `.rebase/sql/` no diretório do backend. `db push` e `db generate` escrevem os cinco a partir das suas coleções a cada execução, antes de ler qualquer um deles, então nada leria uma cópia incluída em um commit. O diretório traz seu próprio `.gitignore` e nunca entra em um commit.
 
@@ -189,6 +212,8 @@ rebase doctor
 - Coleções ↔ Banco de dados — há alguma divergência inesperada?
 
 Execute `doctor` sempre que algo parecer fora de sincronia. Ele aponta exatamente onde está a incompatibilidade.
+
+<span class="since-badge" data-since="0.25">Desde 0.25</span> Ele também nomeia toda coleção sem [bloco `search`](/docs/backend/search) cuja tabela tenha mais de cerca de 10.000 linhas. Uma busca ali — a caixa de busca do admin, `.search()`, `?searchString=` — é `ILIKE '%term%'` sobre as colunas de texto, que nenhum índice consegue atender, então cada uma lê a tabela inteira, e a sua contagem a lê de novo (cerca de um terço de segundo com 100.000 linhas, crescendo com a tabela). A contagem de linhas é a estimativa do próprio Postgres, então a verificação não varre nada. É uma dica: ela não muda o código de saída, e nada é indexado para você.
 
 ### `rebase generate-sdk`
 

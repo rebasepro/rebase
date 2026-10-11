@@ -1,5 +1,5 @@
 ---
-sourceHash: d7e22a508527032c
+sourceHash: d5f6bfc83168dcfd
 title: Eseguire più di un'istanza
 sidebar_label: Più di un'istanza
 description: Ogni elemento di stato che un processo Rebase conserva solo per sé, e l'impostazione che lo condivide — cosa impostare prima che una seconda replica, un rolling deploy o un deployment suddiviso ricevano traffico.
@@ -36,7 +36,7 @@ vedono mai, o una pagina che mostra log diversi a ogni aggiornamento.
 | Sottoscrizioni alle collezioni | Condivise tramite il database quando il CDC è attivo | `REALTIME_CDC=auto` (il valore predefinito) |
 | Canali di broadcast e presence | In memoria | `REALTIME_CHANNEL_BUS=postgres` |
 | File caricati, `STORAGE_TYPE=local` | Il disco proprio dell'istanza | S3 o GCS, oppure un volume condiviso su `STORAGE_PATH` |
-| Upload ripristinabili (TUS) in corso | La memoria e il disco dell'istanza | Sessioni sticky; un riavvio li perde comunque |
+| Upload ripristinabili (TUS) in corso | Il disco dell'istanza, in `STORAGE_PATH/.tus-uploads` | Un volume condiviso su `STORAGE_PATH`, oppure sessioni sticky |
 | Trasformazioni di immagini | Una cache in-process | `STORAGE_RENDITION_CACHE=true` |
 | Logs Explorer | Un ring delle ultime 10.000 righe | Niente — invia lo stdout a un aggregatore di log |
 | Timer cron | Ogni processo che esegue lo scheduler | Prenotati nel database: una sola esecuzione per slot. `REBASE_CRON_SCHEDULER` decide dove vivono i timer |
@@ -97,16 +97,17 @@ monta un unico volume su `STORAGE_PATH` su ogni istanza. Vedi
 [Self-hosting: archiviazione file](/docs/deployment/self-hosting/#file-storage).
 
 Gli **upload ripristinabili** (l'endpoint TUS) mantengono il file parziale di
-ogni caricamento e il suo stato sul disco locale dell'istanza che lo ha
+ogni caricamento e, <span class="since-badge" data-since="0.25">Da 0.25</span>, un record del caricamento accanto a esso, sul disco dell'istanza che lo ha
 creato, sotto `STORAGE_PATH/.tus-uploads` — anche quando i file completati
-finiscono su S3 o GCS. Un chunk che arriva su un'altra istanza riceve 404 e il
-client ricomincia da capo. Instrada le richieste di upload di un client verso
-una sola istanza (sessioni sticky sul load balancer). Un volume condiviso su
-`STORAGE_PATH` condivide i file parziali ma non ancora lo stato del
-caricamento, che è mantenuto nella memoria del processo — quindi un riavvio o
-un rolling deploy rimanda anche un upload in corso al byte 0. I caricamenti
-ordinari tramite `POST /upload` sono una singola richiesta e non sono
-interessati.
+finiscono su S3 o GCS. Monta un volume su `STORAGE_PATH` su ogni istanza e qualsiasi istanza
+serve qualsiasi caricamento; un riavvio o un rolling deploy riprende un caricamento da dove si
+era fermato. Senza un volume condiviso, un chunk che arriva su un'altra istanza riceve
+404: instrada le richieste di upload di un client verso una sola istanza (sessioni sticky
+sul load balancer). L'SDK e il pannello di amministrazione, che usano questo endpoint per
+i file oltre 8 MiB, inviano allora il file tramite `POST /upload`, e continuano a farlo
+per il resto della sessione. I caricamenti ordinari tramite `POST /upload` sono una singola richiesta
+e non sono interessati. Sulla 0.23 lo stato del caricamento era nella memoria del processo,
+quindi un volume condiviso non aiutava e un riavvio rimandava un upload al byte 0.
 
 Le **trasformazioni di immagini** (`?width=400&format=webp`) vengono
 memorizzate in cache in memoria, quindi ogni istanza calcola ogni variante

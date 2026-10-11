@@ -1,5 +1,5 @@
 ---
-sourceHash: 62e51002f973bf74
+sourceHash: bdc7510e49d0db5c
 title: Abonnements en temps réel
 sidebar_label: Temps réel
 description: Abonnez-vous aux modifications de données en direct avec le SDK typé de Rebase à l'aide d'écouteurs en temps réel basés sur WebSocket.
@@ -144,12 +144,23 @@ const unsubscribe = client.data
 listenById(
     id: string | number,
     onUpdate: (row: M | undefined) => void,
-    onError?: (error: Error) => void
+    onError?: (error: Error) => void,
+    options?: { include?: IncludeSpec }
 ): () => void   // returns unsubscribe function
 ```
 
 Le callback reçoit une ligne plate — pas une `Entity`, il n'y a donc pas de `.values` —
 et `undefined` lorsque l'enregistrement est supprimé.
+
+Chaque trame porte les relations que nomme `options.include`, chargées comme `find({ include })` les charge
+dans chaque ligne d'une liste. Une relation vers plusieurs lignes qui n'y est pas nommée est absente de la
+ligne, et non vide :
+
+```typescript
+client.data.posts.listenById(1, (post) => {
+    console.log(post?.tags); // the post's tags, on every update
+}, undefined, { include: ["tags"] });
+```
 
 ## Générateur de requêtes fluide (Fluent Query Builder)
 

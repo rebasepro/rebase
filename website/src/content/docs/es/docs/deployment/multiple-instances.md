@@ -1,5 +1,5 @@
 ---
-sourceHash: d7e22a508527032c
+sourceHash: d5f6bfc83168dcfd
 title: Ejecutar más de una instancia
 sidebar_label: Más de una instancia
 description: Cada parte del estado que un proceso de Rebase guarda para sí mismo, y el ajuste que lo comparte — qué configurar antes de que una segunda réplica, un despliegue progresivo o un despliegue dividido reciban tráfico.
@@ -37,7 +37,7 @@ registros distintos en cada actualización.
 | Suscripciones a colecciones | Compartidas a través de la base de datos cuando el CDC está activo | `REALTIME_CDC=auto` (el valor por defecto) |
 | Canales de difusión (broadcast) y presencia | En memoria | `REALTIME_CHANNEL_BUS=postgres` |
 | Archivos subidos, `STORAGE_TYPE=local` | El disco propio de la instancia | S3 o GCS, o un volumen compartido en `STORAGE_PATH` |
-| Subidas reanudables (TUS) en curso | La memoria y el disco de la instancia | Sesiones persistentes (sticky sessions); un reinicio las pierde igualmente |
+| Subidas reanudables (TUS) en curso | El disco de la instancia, en `STORAGE_PATH/.tus-uploads` | Un volumen compartido en `STORAGE_PATH`, o sesiones persistentes (sticky sessions) |
 | Transformaciones de imágenes | Una caché en proceso | `STORAGE_RENDITION_CACHE=true` |
 | Explorador de logs | Un anillo con las últimas 10.000 líneas | Nada — envía la salida estándar (stdout) a un agregador de logs |
 | Temporizadores de cron | Cada proceso que ejecuta el programador | Reclamados en la base de datos: una ejecución por franja. `REBASE_CRON_SCHEDULER` decide dónde viven los temporizadores |
@@ -103,16 +103,17 @@ Consulta
 [Autoalojamiento: almacenamiento de archivos](/docs/deployment/self-hosting/#file-storage).
 
 Las **subidas reanudables** (el endpoint TUS) mantienen el archivo parcial de
-cada subida y su estado en el disco local de la instancia que la creó, bajo
-`STORAGE_PATH/.tus-uploads` — incluso cuando los archivos terminados van a S3 o
-GCS. Un fragmento (chunk) que llega a otra instancia se responde con 404 y el
-cliente empieza de nuevo. Enruta las peticiones de subida de un cliente a una
-sola instancia (sesiones persistentes en el balanceador de carga). Un volumen
-compartido en `STORAGE_PATH` comparte los archivos parciales pero todavía no
-el estado de la subida, que se guarda en la memoria del proceso — así que un
-reinicio o un despliegue progresivo también devuelve al byte 0 una subida en
-curso. Las subidas ordinarias a través de `POST /upload` son una sola petición
-y no se ven afectadas.
+cada subida, y <span class="since-badge" data-since="0.25">Desde 0.25</span> un registro de la subida a su lado, en el disco de la instancia que la
+creó, bajo `STORAGE_PATH/.tus-uploads` — incluso cuando los archivos terminados van a
+S3 o GCS. Monta un volumen en `STORAGE_PATH` en cada instancia y cualquier instancia
+sirve cualquier subida; un reinicio o un despliegue progresivo reanuda una subida donde
+se detuvo. Sin un volumen compartido, un fragmento (chunk) que llega a otra instancia se
+responde con 404: enruta las peticiones de subida de un cliente a una sola instancia (sesiones persistentes
+en el balanceador de carga). El SDK y el panel de administración, que usan este endpoint para
+archivos de más de 8 MiB, envían entonces el archivo a través de `POST /upload`, y siguen
+haciéndolo durante el resto de la sesión. Las subidas ordinarias a través de `POST /upload` son una sola petición
+y no se ven afectadas. En la 0.23 el estado de la subida estaba en la memoria del proceso,
+así que un volumen compartido no ayudaba y un reinicio devolvía una subida al byte 0.
 
 Las **transformaciones de imágenes** (`?width=400&format=webp`) se guardan en
 caché en memoria, así que cada instancia calcula cada variante una vez, y una

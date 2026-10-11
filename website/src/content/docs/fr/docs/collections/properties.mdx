@@ -1,5 +1,5 @@
 ---
-sourceHash: 60c797ac2e9a363f
+sourceHash: 8a336726f6416a25
 title: Propriétés
 sidebar_label: Propriétés
 description: Les types de propriétés définissent le type de données, la validation et le rendu de l'interface utilisateur pour chaque champ d'une collection. Rebase prend en charge les types string, number, boolean, date, array, map, reference, relation et geopoint.
@@ -20,14 +20,14 @@ Les propriétés définissent les colonnes de votre table de base de données ai
 
 | Type | Description | Colonne PostgreSQL |
 |------|-------------|-------------------|
-| `string` | Texte, select, markdown, téléversement de fichier, URL, e-mail | `varchar`, `text`, `jsonb` |
+| `string` | Texte, select, markdown, téléversement de fichier, URL, e-mail | `text` par défaut ; `varchar`, `char` ou `uuid` avec `columnType` |
 | `number` | Entier, décimal, devise | `integer`, `numeric`, `bigint`, `serial` |
 | `boolean` | Bascule vrai/faux | `boolean` |
 | `date` | Date, date et heure, horodatage | `timestamp`, `date` |
-| `array` | Liste ordonnée de valeurs | `jsonb` |
+| `array` | Liste ordonnée de valeurs | Un tableau natif (`text[]`, `integer[]`, `numeric[]`, `boolean[]`) lorsque `of` est une unique propriété chaîne, nombre ou booléen ; `jsonb` sinon |
 | `map` | Objet clé-valeur | `jsonb` |
 | `geopoint` | Paire latitude/longitude | `jsonb` |
-| `reference` | Référence intégrée vers une autre entité | `varchar` (stocke l'ID) |
+| `reference` | Référence intégrée vers une autre entité | Le type de la clé primaire de la cible (stocke son ID) |
 | `relation` | Relation de clé étrangère SQL | Utilise le tableau `relations` |
 | `vector` | Embedding, pour la recherche des plus proches voisins | `VECTOR(n)` (pgvector) |
 | `binary` | Octets bruts, lus et écrits en base64 | `bytea` |
@@ -220,7 +220,7 @@ category: {
 
 Plusieurs valeurs issues d'un ensemble fixe correspondent à un **tableau de chaînes enum**, et non à un indicateur sur
 une chaîne unique : la colonne contient plusieurs valeurs, la propriété qui la décrit est donc le tableau.
-`columnType: "text[]"` est ce qui en fait une colonne Postgres unique plutôt qu'une jointure.
+C'est une colonne Postgres unique, un `text[]`, plutôt qu'une jointure : un tableau dont `of` est une unique propriété chaîne reçoit par défaut un tableau natif, et le `columnType` ci-dessous ne fait que le dire explicitement.
 
 ```typescript no-verify
 locales: {
@@ -251,7 +251,7 @@ locales: {
 | `url` | `boolean` | Validation du format d'URL |
 | `storage` | `StorageConfig` | Active le téléversement de fichiers — voir [Téléversements de fichiers](/docs/collections/file-uploads) |
 | `enum` | `EnumValues` | Rendu sous forme de liste déroulante de sélection |
-| `columnType` | `"varchar" \| "text" \| "char" \| "uuid"` | La colonne de base de données. Par défaut `varchar`, ou `uuid` lorsque `isId` l'indique. `text` pour les chaînes sans limite de taille, `char` pour une longueur fixe |
+| `columnType` | `"varchar" \| "text" \| "char" \| "uuid"` | La colonne de base de données. Par défaut `text`, ou `uuid` lorsque `isId` l'indique. `text` pour les chaînes sans limite de taille, `char` pour une longueur fixe |
 | `isId` | `boolean \| string` | Marque la propriété comme clé primaire et indique qui la renseigne : `"manual"` (vous-même), `"uuid"` (`gen_random_uuid()`), ou toute autre chaîne, utilisée textuellement comme expression SQL par défaut de la colonne — brute (`nanoid()`) ou sous forme de template (``"sql`nanoid()`"``). La fonction doit exister ; rien ici ne la crée. `"increment"` est une stratégie pour les **nombres** et ne fait rien ici, et `"cuid"` est refusé au chargement de la configuration |
 | `autoValue` | `"user_on_create" \| "user_on_update"` | Marque la colonne avec l'**uid de l'utilisateur actif** — à la création uniquement, ou à chaque écriture. Voir [Colonnes d'audit](#colonnes-daudit) |
 | `userSelect` | `boolean` | Rendu sous forme de sélecteur d'utilisateur. La valeur est une simple colonne de chaîne contenant l'identifiant de l'utilisateur — rien ne la résout ni ne la vérifie à l'entrée. **Formulaire d'administration uniquement — non appliqué par l'API ou la base de données.** |

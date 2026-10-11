@@ -1,5 +1,5 @@
 ---
-sourceHash: bd5c3797254d822d
+sourceHash: aa6e4f1031d85124
 title: Búsqueda
 sidebar_label: Búsqueda
 description: Cómo se comporta .search() por defecto y cómo habilitar en una colección de Postgres la búsqueda de texto completo con relevancia en los campos que indiques, incluyendo contenido JSONB y arrays.
@@ -24,6 +24,8 @@ Esto es suficiente para una colección pequeña con su texto en columnas simples
 - **No puede ver dentro de propiedades `map` o `array`.** Una colección que guarda su contenido buscable en JSONB —etiquetas, certificaciones, un cuestionario— tiene un cuadro de búsqueda que silenciosamente no coincide con nada.
 - **No tiene relevancia.** Las filas se devuelven en el orden de `orderBy`, por lo que la mejor coincidencia puede estar en la página siete.
 - **No puede usar un índice.** Un `%` inicial anula un árbol B (B-tree), por lo que cada búsqueda es un escaneo secuencial. Funciona bien con mil filas; es un abismo con un millón.
+  `rebase doctor` nombra las colecciones donde esto ha empezado a importar: sin bloque
+  `search` y con más de unas 10.000 filas.
 
 El término se compara de forma **literal**: `%` y `_` son metacaracteres de LIKE y se escapan antes de construir el patrón, por lo que buscar `50%` busca `50%` en lugar de devolver todas las filas. Si deseas comodines, el operador de filtro `like` acepta un patrón (`.where("title", "like", "post-%")`); `.search()` no lo hace.
 
@@ -213,7 +215,7 @@ Con `unaccent` activado, los fragmentos se leen con los acentos normalizados: `A
 
 ## Añadir el bloque a una colección en producción
 
-La columna generada se añade mediante la verificación del esquema en el arranque, como cualquier otra columna, y su índice se construye con `CREATE INDEX CONCURRENTLY` para que no se bloqueen las escrituras. Añadir una columna generada *almacenada* (`STORED`) reescribe la tabla, por lo que en una grande, planifícalo como cualquier otra reescritura.
+La columna generada se añade mediante la verificación del esquema en el arranque, como cualquier otra columna. Su índice se construye cuando el servidor ya está sirviendo, en segundo plano, con `CREATE INDEX CONCURRENTLY` para que no se bloqueen las escrituras (consulta [Índices](/docs/backend/indexes#when-they-are-created)). Hasta que el índice esté construido, una búsqueda funciona pero lee toda la tabla. Añadir una columna generada *almacenada* (`STORED`) reescribe la tabla, por lo que en una grande, planifícalo como cualquier otra reescritura.
 
 ## Motores compatibles
 

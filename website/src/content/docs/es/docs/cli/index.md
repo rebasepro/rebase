@@ -1,5 +1,5 @@
 ---
-sourceHash: 151bdf50176c7654
+sourceHash: 0a0cf0feead32d31
 title: Referencia de la CLI
 sidebar_label: CLI
 description: Comandos de Rebase CLI para inicialización de proyectos, generación de esquemas, migraciones de bases de datos y generación de SDK.
@@ -78,6 +78,16 @@ El bundle es el artefacto que despliegas — la imagen del runtime lo carga, por
 | `--skip-static-build` | Integra el frontend como ya compilado, sin ejecutar su comando de compilación |
 
 Las dependencias se empaquetan por defecto (vendored) para que el reinicio de un pod no conlleve una instalación de 35–55 segundos. Un árbol que supere los 200 MB en disco se descarta en su lugar, ya que el límite de subida es de 100 MB comprimido — consulta el registro de cambios (changelog) para conocer el motivo.
+
+<span class="since-badge" data-since="0.25">Desde 0.25</span> Cada aplicación estática que
+lleva el bundle recibe una copia brotli (`.br`) y otra gzip (`.gz`) junto a cada
+recurso con hash de contenido de 1 KB o más — los archivos que un navegador guarda en
+caché durante un año. El runtime envía la que el navegador acepta, así que esos archivos no
+cuestan trabajo de compresión por solicitud, tampoco en la primera visita tras un
+despliegue, y los navegadores que aceptan brotli la reciben (alrededor de un 11 % más
+pequeña que gzip en el JavaScript del administrador). La salida de compilación de tu propio
+frontend se deja como estaba; solo cambia la copia dentro del bundle. En la aplicación de
+ejemplo esto añade menos de un segundo a la compilación y unos 2,4 MB al bundle.
 
 ### `rebase upgrade`
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: 37408b06e86d1ddb
+sourceHash: 9793c6efe5a375a7
 title: Ambiente e configurazione
 sidebar_label: Configurazione
 description: Tutte le variabili d'ambiente e le opzioni di configurazione per i progetti Rebase.
@@ -204,7 +204,7 @@ questo requisito con uno solo tra i seguenti: un hook `storageAuthorize` esporta
 | `DB_POOL_MAX` | Numero massimo di connessioni nel pool | `20` |
 | `DB_POOL_IDLE_TIMEOUT` | Millisecondi di mantenimento di una connessione inattiva | `30000` |
 | `DB_POOL_CONNECT_TIMEOUT` | Millisecondi di attesa per una connessione | `10000` |
-| `DATABASE_DIRECT_URL` | Connessione diretta (non in pool). Richiesta per [Realtime](/docs/backend/realtime): `LISTEN`/`NOTIFY` non sopravvive a un transaction pooler come PgBouncer, e senza di essa le notifiche di modifica vengono disabilitate con un avviso anziché perdersi silenziosamente. | — |
+| `DATABASE_DIRECT_URL` | Connessione diretta (non in pool). Richiesta per [Realtime](/docs/backend/realtime): `LISTEN`/`NOTIFY` non sopravvive a un transaction pooler come PgBouncer, e senza di essa le notifiche di modifica vengono disabilitate con un avviso anziché perdersi silenziosamente. Anche il [worker dei job](/docs/backend/jobs) vi tiene il proprio `LISTEN` di risveglio. | — |
 | `DATABASE_READ_URL` | Replica di lettura. Le letture vengono indirizzate lì quando impostata e diversa da `DATABASE_URL`; se la connessione fallisce, tutte le operazioni passano al primario con un avviso. | — |
 | `REBASE_DB_POOL_MAX` | Limite massimo su ogni pool nel processo, applicato a prescindere da quanto richiesto da ciascuno. Solo cifre numeriche: un valore malformato viene ignorato anziché serializzare silenziosamente il server. | — |
 

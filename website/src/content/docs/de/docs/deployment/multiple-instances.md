@@ -1,5 +1,5 @@
 ---
-sourceHash: d7e22a508527032c
+sourceHash: d5f6bfc83168dcfd
 title: Mehr als eine Instanz ausführen
 sidebar_label: Mehr als eine Instanz
 description: Jedes Stück Zustand, das ein Rebase-Prozess für sich behält, und die Einstellung, die es teilt — was zu setzen ist, bevor eine zweite Replik, ein Rolling Deployment oder ein aufgeteiltes Deployment Traffic übernimmt.
@@ -33,7 +33,7 @@ Ereignis, das manche Clients nie sehen, oder als eine Seite, die bei jedem Neula
 | Collection-Abonnements | Über die Datenbank geteilt, wenn CDC aktiv ist | `REALTIME_CDC=auto` (Standard) |
 | Broadcast-Kanäle und Presence | Im Arbeitsspeicher | `REALTIME_CHANNEL_BUS=postgres` |
 | Hochgeladene Dateien, `STORAGE_TYPE=local` | Die eigene Festplatte der Instanz | S3 oder GCS, oder ein gemeinsames Volume unter `STORAGE_PATH` |
-| Laufende fortsetzbare (TUS) Uploads | Arbeitsspeicher und Festplatte der Instanz | Sticky Sessions; ein Neustart verliert sie trotzdem |
+| Laufende fortsetzbare (TUS) Uploads | Festplatte der Instanz, unter `STORAGE_PATH/.tus-uploads` | Ein gemeinsames Volume unter `STORAGE_PATH` oder Sticky Sessions |
 | Bild-Transformationen | Ein prozessinterner Cache | `STORAGE_RENDITION_CACHE=true` |
 | Logs Explorer | Ein Ring der letzten 10.000 Zeilen | Nichts — leiten Sie stdout an einen Log-Aggregator weiter |
 | Cron-Timer | Jeder Prozess, der den Scheduler ausführt | In der Datenbank beansprucht: ein Lauf pro Slot. `REBASE_CRON_SCHEDULER` legt fest, wo Timer leben |
@@ -87,14 +87,18 @@ und eine andere Instanz beantwortet sie mit 404. Verwenden Sie S3 oder GCS, oder
 gemeinsames Volume unter `STORAGE_PATH` auf jeder Instanz. Siehe
 [Self-Hosting: Dateispeicher](/docs/deployment/self-hosting/#file-storage).
 
-**Fortsetzbare Uploads** (der TUS-Endpunkt) halten die Teildatei jedes Uploads und ihren Zustand auf
-der lokalen Festplatte der Instanz, die ihn angelegt hat, unter `STORAGE_PATH/.tus-uploads` — selbst
-wenn fertige Dateien nach S3 oder GCS gehen. Ein Chunk, der auf einer anderen Instanz landet, wird mit
-404 beantwortet, und der Client startet erneut. Leiten Sie die Upload-Anfragen eines Clients an eine
-Instanz weiter (Sticky Sessions auf dem Load Balancer). Ein gemeinsames Volume unter `STORAGE_PATH`
-teilt die Teildateien, aber noch nicht den Upload-Zustand, der im Arbeitsspeicher des Prozesses liegt
-— ein Neustart oder ein Rolling Deployment schickt einen laufenden Upload daher ebenfalls zurück auf
-Byte 0. Gewöhnliche Uploads über `POST /upload` sind eine einzelne Anfrage und davon nicht betroffen.
+**Fortsetzbare Uploads** (der TUS-Endpunkt) halten die Teildatei jedes Uploads und
+<span class="since-badge" data-since="0.25">Seit 0.25</span> einen Datensatz des Uploads daneben auf der Festplatte der Instanz, die ihn
+angelegt hat, unter `STORAGE_PATH/.tus-uploads` — selbst wenn fertige Dateien nach
+S3 oder GCS gehen. Binden Sie auf jeder Instanz ein Volume unter `STORAGE_PATH` ein, und jede Instanz
+bedient jeden Upload; ein Neustart oder ein Rolling Deployment setzt einen Upload dort fort, wo er
+stehen geblieben ist. Ohne gemeinsames Volume wird ein Chunk, der auf einer anderen Instanz landet,
+mit 404 beantwortet: Leiten Sie die Upload-Anfragen eines Clients an eine Instanz weiter (Sticky Sessions
+auf dem Load Balancer). Das SDK und das Admin-Panel, die diesen Endpunkt für
+Dateien über 8 MiB verwenden, senden die Datei dann stattdessen über `POST /upload` und tun das
+für den Rest der Sitzung weiter. Gewöhnliche Uploads über `POST /upload` sind eine einzelne Anfrage
+und davon nicht betroffen. Auf 0.23 lag der Zustand des Uploads im Arbeitsspeicher des Prozesses,
+sodass ein gemeinsames Volume nicht half und ein Neustart einen Upload zurück auf Byte 0 schickte.
 
 **Bild-Transformationen** (`?width=400&format=webp`) werden im Arbeitsspeicher zwischengespeichert,
 sodass jede Instanz jede Variante einmal berechnet und eine neue Instanz kalt startet. Setzen Sie

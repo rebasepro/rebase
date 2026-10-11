@@ -1,5 +1,5 @@
 ---
-sourceHash: 15e127696fc3c50e
+sourceHash: b27c45a011cb8c16
 title: Integration eines eigenen Servers
 sidebar_label: Eigener Server (Express)
 description: Wie Sie Rebase-Datenbank- und Realtime-Dienste in Ihr eigenes benutzerdefiniertes Node.js-Backend einbetten, ohne Hono oder den Rebase-Koordinator zu verwenden.
@@ -48,7 +48,7 @@ Deklarieren Sie `zod` nicht in den Abhängigkeiten Ihres Projekts – die Runtim
 :::
 
 **Wichtigste Verhaltensweisen:**
-- Generiert in der Entwicklungsumgebung automatisch kurzlebige Werte für `JWT_SECRET` und `REBASE_SERVICE_KEY`, sodass Sie ohne manuelle Einrichtung starten können.
+- Generiert in der Entwicklungsumgebung `JWT_SECRET` und `REBASE_SERVICE_KEY`, wenn sie nicht gesetzt sind, sodass Sie ohne manuelle Einrichtung starten können, und legt sie in `.rebase-dev-secrets.json` ab, damit ein Neustart niemanden abmeldet.
 - Blockiert automatisch generierte Secrets in der Produktionsumgebung – Sie müssen diese explizit setzen.
 - Prüft, ob in der Produktionsumgebung `CORS_ORIGINS` oder `FRONTEND_URL` gesetzt ist.
 - Verweigert ein `extend`-Schema, das von einer anderen Kopie von Zod erstellt wurde.
@@ -80,8 +80,9 @@ async function startServer() {
     
     // 1. WebSocket Upgrade Guard
     // WebSockets require hijacking the HTTP Upgrade header. You must bind
-    // Rebase to a raw Node.js http.Server instance.
-    const server = createServer(app);
+    // Rebase to a raw Node.js http.Server instance. 64 KB of headers, as the
+    // Rebase runtime takes: a vector search in the URL outgrows Node's 16 KB.
+    const server = createServer({ maxHeaderSize: 64 * 1024 }, app);
 
     // 2. Configure the connection pool
     const pool = new pg.Pool({
@@ -204,7 +205,7 @@ async function startServer() {
 startServer();
 ```
 
-> **Standard-Weg:** Wenn Ihr Server `initializeRebaseBackend` verwendet (wie es die vorgefertigte Vorlage tut), schreiben Sie den oben gezeigten Shutdown-Handler nicht von Hand – verwenden Sie stattdessen den integrierten Helper. Dieser schließt HTTP-Verbindungen ordnungsgemäß ab, stoppt den Cron-Scheduler, beendet Realtime-Dienste, schützt vor wiederholten Signalen und erzwingt das Beenden, falls der Shutdown hängen bleibt:
+> **Standard-Weg:** Wenn Ihr Server `initializeRebaseBackend` verwendet (wie es die vorgefertigte Vorlage tut), schreiben Sie den oben gezeigten Shutdown-Handler nicht von Hand – verwenden Sie stattdessen den integrierten Helper. Dieser schließt HTTP-Verbindungen ordnungsgemäß ab, stoppt den Cron-Scheduler, beendet Realtime-Dienste, schließt den SMTP-Connection-Pool, sobald nichts mehr senden kann, schützt vor wiederholten Signalen und erzwingt das Beenden, falls der Shutdown hängen bleibt:
 >
 > ```ts
 > import { installShutdownHandlers } from "@rebasepro/server";
@@ -242,10 +243,16 @@ app.use(cors({
     exposedHeaders: [
         "ETag", "Retry-After", "X-Request-ID",
         "X-RateLimit-Limit", "X-RateLimit-Remaining", "X-RateLimit-Reset",
-        "Preference-Applied"
+        "Preference-Applied",
+        // Resumable uploads, which the SDK uses for files over 8 MiB
+        "Location", "Upload-Offset", "Rebase-Upload-Result"
     ]
 }));
 ```
+
+<span class="since-badge" data-since="0.25">Seit 0.25</span> Die letzten drei sind das, worin eine fortsetzbare Übertragung antwortet. Ohne sie kann das
+SDK keine von einem anderen Origin aus verfolgen und sendet jede Datei stattdessen als eine
+einzige Multipart-Anfrage.
 
 Die Rebase-Runtime und das ejected Backend senden diese Liste bereits. Auf 0.23
 geben sie keinen dieser Header frei, sodass ein Frontend auf einem anderen Origin kein `ETag` lesen kann.

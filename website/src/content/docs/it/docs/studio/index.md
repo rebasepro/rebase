@@ -1,5 +1,5 @@
 ---
-sourceHash: 0ee4f3fca623b579
+sourceHash: 9a09e0dab8bc0697
 title: Strumenti Studio
 sidebar_label: Studio
 description: Rebase Studio fornisce strumenti per sviluppatori per la modifica visiva dello schema, query SQL, scripting JavaScript, gestione delle policy RLS e navigazione dello storage.
@@ -64,7 +64,7 @@ import { RebaseStudio } from "@rebasepro/studio";
 />
 ```
 
-Se un *salvataggio* vada a buon fine lo decide il server, non il pannello: l'editor riscrive i file sorgente delle collezioni, quindi è disattivato con `NODE_ENV=production`, in modalità `baas` e su un server senza `collectionsDir`. Il pannello interroga `GET /api/schema-editor/status` e mostra il motivo ricevuto accanto al pulsante disabilitato.
+Se un *salvataggio* vada a buon fine lo decide il server, non il pannello: l'editor riscrive i file sorgente delle collezioni, quindi è disattivato con `NODE_ENV=production`, in modalità `baas` e su un server senza `collectionsDir`. Il pannello interroga `GET /api/admin/schema-editor/status` e mostra il motivo ricevuto accanto al pulsante disabilitato.
 
 ### Strumenti integrati
 
@@ -72,9 +72,9 @@ Fanno parte di Studio e vengono **caricati in modo lazy da `RebaseStudio`** — 
 
 | Scheda | Slug | Gruppo | Cosa fa |
 |--------|------|--------|---------|
-| Console SQL | `sql` | Database | Eseguire SQL grezzo sul tuo database PostgreSQL e leggere i risultati in tabella. La tabella mostra il risultato dell'ultima istruzione, fino alle prime 10.000 righe o ai primi 32 MB di valori; un risultato più lungo indica quante righe erano, e copia ed esporta includono solo le righe mostrate |
+| Console SQL | `sql` | Database | Eseguire SQL grezzo sul tuo database PostgreSQL e leggere i risultati in tabella. La tabella mostra il risultato dell'ultima istruzione, fino alle prime 10.000 righe o ai primi 32 MB di valori; un risultato più lungo indica quante righe erano, e copia ed esporta includono solo le righe mostrate. <span class="since-badge" data-since="0.25">Da 0.25</span> Un risultato del genere offre anche **Download full result as CSV**: il server lo trasmette per intero attraverso un cursore di sola lettura (`POST /api/admin/sql/csv`), una query alla volta, su un server Postgres tuo anziché sul database di sviluppo in-process |
 | Policy RLS | `rls` | Database | Ispezionare e gestire le policy di Row Level Security delle tue tabelle. Una policy viene elencata così come la conserva il database, con il badge **Differs from code** dove non corrisponde a ciò che dichiara il progetto. Una policy che Rebase genera non può essere modificata direttamente nel database, e su una tabella gestita da Rebase un banner indica che ogni avvio del server e `rebase db push` riapplicano le policy dichiarate |
-| Visualizzatore di schema | `schema-visualizer` | Database | Diagramma delle entità delle tue collezioni e delle loro relazioni, tracciato dalle definizioni delle collezioni: tabelle, colonne, tipi e relazioni sono come le dichiarano le collezioni. Solo gli indicatori RLS vengono letti dal database |
+| Visualizzatore di schema | `schema-visualizer` | Database | Diagramma delle entità delle tue collezioni e delle loro relazioni, tracciato dalle definizioni delle collezioni: tabelle, colonne, tipi e relazioni sono come le dichiarano le collezioni. Solo gli indicatori RLS vengono letti dal database. Il layout viene eseguito in un web worker, così la pagina resta reattiva mentre un diagramma grande viene disposto. Uno schema di più di 300 tabelle viene disegnato un vicinato di tabella alla volta — le tabelle a una o due relazioni di distanza — a partire dalla tabella più connessa; scegli un'altra tabella nell'elenco per spostarti |
 | Branch | `branches` | Database | Creare e gestire i [branch del database](/docs/backend/branching) |
 | Backup | `backups` | Database | Sfogliare e scaricare i backup del database |
 | Esploratore dei log | `logs` | Database | Log delle richieste in tempo reale, più tutto ciò che il server segnala a warn o error — vedi sotto |

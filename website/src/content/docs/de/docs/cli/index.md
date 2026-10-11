@@ -1,5 +1,5 @@
 ---
-sourceHash: 151bdf50176c7654
+sourceHash: 0a0cf0feead32d31
 title: CLI-Referenz
 sidebar_label: CLI
 description: Rebase-CLI-Befehle für Projektinitialisierung, Schemagenerierung, Datenbankmigrationen und SDK-Generierung.
@@ -81,6 +81,16 @@ Anwendungs-Image selbst gebaut werden muss. Nützliche Flags:
 
 Abhängigkeiten werden standardmäßig per Vendoring eingebunden, damit ein Pod-Neustart keine
 35–55 Sekunden dauernde Installation durchführen muss. Ein Abhängigkeitsbaum, der auf der Festplatte über 200 MB anwächst, wird stattdessen verworfen, da das Upload-Limit komprimiert 100 MB beträgt — siehe Changelog für die Begründung.
+
+<span class="since-badge" data-since="0.25">Seit 0.25</span> Jede statische App, die das
+Bundle enthält, erhält neben jedem inhaltsgehashten Asset ab 1 KB eine Brotli-Kopie (`.br`) und eine gzip-Kopie
+(`.gz`) — die Dateien, die ein Browser ein Jahr lang cacht.
+Die Runtime sendet diejenige, die der Browser akzeptiert, sodass diese Dateien pro Anfrage
+keine Komprimierungsarbeit kosten, auch nicht beim ersten Besuch nach einem Deploy, und
+Browser, die Brotli akzeptieren, es bekommen (etwa 11 % kleiner als gzip beim
+JavaScript des Admins). Die eigene Build-Ausgabe Ihres Frontends bleibt, wie sie war; nur die Kopie
+im Bundle ändert sich. Bei der Beispiel-App kommt dadurch unter eine Sekunde zum Build
+und etwa 2,4 MB zum Bundle hinzu.
 
 ### `rebase upgrade`
 

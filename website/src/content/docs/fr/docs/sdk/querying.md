@@ -1,5 +1,5 @@
 ---
-sourceHash: b8aea50207626bc4
+sourceHash: e06718f3afc5cad4
 title: Interroger les données
 sidebar_label: Interroger les données
 description: Opérations CRUD, constructeur de requêtes fluide, opérateurs de filtrage, tri, sélection de colonnes et agrégats avec le SDK typé de Rebase.
@@ -70,6 +70,8 @@ async function loadProduct(id: string) {
 const maybe = await client.data.products.findById(42);
 // Row | undefined
 ```
+
+`findById` accepte les relations à charger, comme `find` : `findById(1, { include: ["tags"] })`.
 
 :::note
 La sécurité au niveau des lignes (Row-Level Security) renvoie délibérément la même réponse pour « ligne inexistante » et « non autorisé en lecture » : une erreur 404 qui ferait la distinction confirmerait l'existence de la ligne.
@@ -149,6 +151,10 @@ const { data } = await client.data.products
 | `"is-not-null"` | `"notnull"` | La colonne n'est pas `NULL`. Ne prend aucune valeur |
 
 La colonne alias correspond à la notation **réseau** (wire format), utilisée dans les chaînes de requête REST. Elle n'apparaît jamais dans le code applicatif : le SDK et le panneau d'administration utilisent tous deux l'opérateur canonique de gauche.
+
+Les quatre opérateurs de motif comparent du texte. Un champ `enum` se compare par sa valeur, de sorte que
+`{ status: ["like", "draft%"] }` fonctionne sur un statut stocké comme enum Postgres. Sur un nombre, une
+date ou tout autre champ qui n'est pas du texte, ils sont refusés par une erreur 400 `INVALID_FILTER_OPERATOR`.
 
 ### Syntaxes de la clause Where
 

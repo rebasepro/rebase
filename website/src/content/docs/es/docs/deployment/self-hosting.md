@@ -1,5 +1,5 @@
 ---
-sourceHash: ae8d9da2fa3d1e43
+sourceHash: 1789995e7e1e6bf9
 title: Autoalojamiento
 sidebar_label: Autoalojamiento
 description: Ejecuta Rebase en cualquier lugar con la imagen oficial del runtime y el bundle de tu proyecto — Docker Compose, Fly, Railway o un VPS básico.
@@ -372,6 +372,15 @@ Expone métricas de Prometheus en `/metrics`: conteo de peticiones e histogramas
 desglosados por superficie de API (data, auth, storage, functions) y colección,
 además de indicadores (gauges) del proceso. Sin un token, el endpoint puede ser leído por cualquiera que alcance
 el puerto, así que define uno a menos que esté en una red privada.
+
+<span class="since-badge" data-since="0.25">Desde 0.25</span>
+`rebase_db_pool_wait_ms` es un histograma de cuánto esperó cada consulta una
+conexión del pool de la base de datos, incluida la apertura de una, con la etiqueta de la clave del origen de
+datos (`source="(default)"` en un proyecto que no declara orígenes de datos). Un
+pool sano lo mantiene cerca de cero. Una cola que
+crece con el tráfico significa que las solicitudes esperan conexiones — casi siempre
+retenidas por callbacks de escritura que esperan algo lento; consulta
+[Un callback retiene una conexión](/docs/collections/callbacks/#a-callback-holds-a-connection).
 
 ## Cabeceras de seguridad
 

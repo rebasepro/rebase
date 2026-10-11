@@ -1,5 +1,5 @@
 ---
-sourceHash: 480ba165906124fe
+sourceHash: 9109031950f77ac1
 title: Modos de Vista
 sidebar_label: Modos de Vista
 description: Configure vistas de tabla, tarjetas y tablero Kanban para sus colecciones.
@@ -52,7 +52,7 @@ La vista de lista es el modo de vista predeterminado clásico y limpio del CMS, 
 
 ## Vista de Tabla
 
-La vista predeterminada es una hoja de cálculo virtualizada de alto rendimiento con:
+La vista de tabla es una hoja de cálculo virtualizada de alto rendimiento con:
 
 - **Edición en línea** — Haga clic en cualquier celda para editar in situ
 - **Redimensionamiento de columnas** — Arrastre los encabezados de las columnas
@@ -68,11 +68,11 @@ Controle la altura de la fila con `defaultSize`:
 
 | Tamaño | Píxeles | Ideal para |
 |------|--------|----------|
-| `"xs"` | 40 | Tablas de datos densos |
-| `"s"` | 54 | Predeterminado |
-| `"m"` | 80 | Con miniaturas de imágenes |
-| `"l"` | 120 | Tarjetas con previsualizaciones |
-| `"xl"` | 260 | Previsualizaciones de contenido enriquecido |
+| `"xs"` | 36 | Tablas de datos densos |
+| `"s"` | 42 | Filas de texto compactas |
+| `"m"` | 48 | Predeterminado |
+| `"l"` | 96 | Miniaturas de imagen medianas |
+| `"xl"` | 160 | Miniaturas de imagen grandes |
 
 ## Vista Kanban
 

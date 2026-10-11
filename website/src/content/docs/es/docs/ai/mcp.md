@@ -1,5 +1,5 @@
 ---
-sourceHash: 373a79f1c328f730
+sourceHash: 679087dc4cea0cbb
 title: Servidor MCP
 sidebar_label: Servidor MCP
 description: "Conecta Claude Code, Cursor, Gemini CLI o cualquier cliente MCP a un proyecto de Rebase: las 42 herramientas que expone, la credencial con la que se autentica y la barrera de loopback que se interpone entre un agente y producción."
@@ -326,12 +326,18 @@ https://api.example.com/, which is not local. Set REBASE_MCP_ALLOW_REMOTE_WRITES
 to allow destructive tools against remote environments.
 ```
 
-**Si no se puede resolver ninguna cadena de conexión, las herramientas de base de datos son rechazadas** —
-un destino no verificable no es un destino seguro:
+**Si no se puede resolver ninguna cadena de conexión, las herramientas de base de datos con barrera son rechazadas.**
+Sin `DATABASE_URL`, la CLI usa la base de datos de desarrollo gestionada, que es la
+predeterminada en un proyecto nuevo, y la propia CLI rechaza `db push`, `db migrate` y
+`db branch` allí. El rechazo lo dice y nombra lo que sí funciona. No sugiere la
+desactivación de la barrera:
 
 ```text
-Error: Refusing to run "rebase_db_push": no DATABASE_URL could be resolved for
-project "default", so the database it would connect to cannot be verified as local.
+Error: Refusing to run "rebase_db_push": project "default" sets no DATABASE_URL, so the
+CLI would use the managed development database (PGlite, started by `rebase dev`). You
+most likely do not need this tool: the dev server applies the collections to that
+database at boot, additively. After changing a collection, restart it with
+rebase_dev_stop and rebase_dev_start. …
 ```
 
 Solo loopback cuenta como local: `localhost`, `*.localhost`, `127.0.0.0/8`, `::1`.
@@ -365,9 +371,10 @@ tenga forma de marcador se divide con un espacio de ancho cero, por lo que una f
 
 El [endpoint remoto](#el-endpoint-remoto) marca los resultados de sus herramientas de la misma
 forma y se lo indica al cliente; su `structuredContent` transporta el resultado sin marcar.
-<span class="since-badge" data-since="0.25">Desde 0.25</span> `list_collections` es la
-excepción: solo un modelo lee su listado, así que se envía una sola vez, en el texto.
-Antes de la 0.24 llevaba además una copia en `structuredContent`.
+<span class="since-badge" data-since="0.25">Desde 0.25</span> `list_collections` y
+`describe_collection` son las excepciones: solo un modelo las lee, así que se envían
+una sola vez, en el texto. Antes de la 0.24 el listado llevaba además una copia en
+`structuredContent`.
 
 Es un marcador, no un entorno aislado (sandbox). Un asistente que disponga de estas herramientas
 es tan seguro como el contenido que le permitas leer.
@@ -452,11 +459,11 @@ de inicio. Ningún `REBASE_ROLE` lo activa.
   activado por defecto; `REBASE_MCP_OPEN_REGISTRATION=false` lo limita a los clientes que
   registres) y envía a la persona a una pantalla de consentimiento que inicia su sesión a
   través de tu `/auth/login` existente.
-- **Siete herramientas, tres alcances.** Los mismos [alcances](/docs/backend/roles-and-scopes/)
-  que usa toda credencial. `data:read` ofrece `list_collections`, `query_collection`,
+- **Ocho herramientas, tres alcances.** Los mismos [alcances](/docs/backend/roles-and-scopes/)
+  que usa toda credencial. `data:read` ofrece `list_collections`, `describe_collection`, `query_collection`,
   `count_documents` y `get_document`; `data:write` añade `create_document` y `update_document`; `data:delete`
   añade `delete_document`. Un cliente que no pide nada recibe `data:read`. Cada uno se
-  restringe a una colección: `data:read:posts` lista y lee `posts` y nada más. Un alcance
+  restringe a una colección: `data:read:posts` lista, describe y lee `posts` y nada más. Un alcance
   decide qué herramientas se ofrecen y a qué colecciones llegan, no qué filas: una lista
   vacía puede ser resultado del funcionamiento de RLS, y `data:write` sigue sin poder
   escribir una fila que la persona no podría.
@@ -475,11 +482,16 @@ de inicio. Ningún `REBASE_ROLE` lo activa.
   como la sirve REST (fechas ISO, una `belongsTo` como su clave foránea, p. ej.
   `authorId`) y puede reenviarse sin cambios en una actualización. `query_collection`
   responde `{ data, meta }` con `meta.total` y `meta.hasMore`, `count_documents`
-  `{ count }`, y `list_collections` el esquema OpenAPI `row` y `create` de cada colección,
-  además de `softDeleteField` cuando las filas van a una papelera. Igual que en REST, se
-  rechazan un `limit` superior a 1000, un argumento no declarado y una edición o
-  eliminación de una fila en la papelera (404); poner el campo de borrado suave a `null`
-  la restaura.
+  `{ count }`. Igual que en REST, se rechazan un `limit` superior a 1000, un argumento
+  no declarado y una edición o eliminación de una fila en la papelera (404); poner el
+  campo de borrado suave a `null` la restaura.
+- <span class="since-badge" data-since="0.25">Desde 0.25</span> **El listado nombra las colecciones; `describe_collection` da el esquema de una.**
+  `list_collections` responde el `name`, el `title` y la `description` de cada colección,
+  y `describe_collection { collection }` el esquema OpenAPI `row` y `create` de esa
+  colección, además de `softDeleteField` cuando las filas van a una papelera. Las
+  descripciones de las herramientas indican al modelo que describa una colección antes de
+  escribir en ella. El listado de un proyecto de 200 colecciones ocupa unos 5k tokens, y
+  cada descripción menos de 1k; con todos los esquemas en el listado eran unos 150k.
 - **Un token solo para este endpoint.** Un token de acceso MCP es rechazado por `/api/data`,
   `/api/admin` y el WebSocket, por lo que conectar un asistente no le otorga una sesión.
 

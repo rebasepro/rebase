@@ -1,5 +1,5 @@
 ---
-sourceHash: 65b97b80de0b2704
+sourceHash: 840da8865bd3eab7
 title: Architektur-Überblick
 sidebar_label: Architektur
 description: Erfahren Sie, wie Backend, Frontend, typisiertes SDK und Datenbank von Rebase ineinandergreifen, um ein vollständiges Backend-as-a-Service zu bilden.
@@ -85,7 +85,7 @@ Wie Treiber werden auch Storage-Backends in einer Registry registriert. Sie kön
 | `@rebasepro/forms` | Leichtgewichtiges React-Formular-Zustandsmanagement | Frontend |
 | `@rebasepro/plugin-ai` | KI-gestütztes Plugin zur automatischen Feldvervollständigung | Frontend |
 | `@rebasepro/plugin-data-import-export` | CSV/JSON/Excel-Import und -Export | Frontend |
-| `@rebasepro/inference` | Automatische Schemaerkennung aus vorhandenen Datenbankdaten | Backend/CLI |
+| `@rebasepro/inference` | Leitet Collection-Properties aus Beispielzeilen ab (der Import „Collection aus einer Datei erstellen“ im Admin) | Frontend |
 
 ## Datenfluss
 

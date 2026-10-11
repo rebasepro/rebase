@@ -1,5 +1,5 @@
 ---
-sourceHash: 81ca845faa40b4f5
+sourceHash: a30d441e176f5d1c
 title: Tâches en arrière-plan
 sidebar_label: Tâches en arrière-plan
 description: Une file d'attente de tâches durable, basée sur Postgres — des traitements qui survivent à un redémarrage, réessayés avec un backoff, avec conservation des échecs plutôt que leur abandon.
@@ -34,7 +34,23 @@ await initializeRebaseBackend({
 });
 ```
 
-Désactivé par défaut : un worker interroge la base de données en permanence (polling), ce qui n'est pas un comportement par défaut souhaité. Il nécessite un pilote capable d'exécuter du SQL — sur un pilote qui ne le peut pas (MongoDB), la file d'attente est indisponible et vous en êtes informé au démarrage plutôt qu'à la première mise en file d'attente.
+Désactivé par défaut : un worker continue de chercher du travail tant que le processus vit, ce qui n'est pas un comportement par défaut souhaité. Il nécessite un pilote capable d'exécuter du SQL — sur un pilote qui ne le peut pas (MongoDB), la file d'attente est indisponible et vous en êtes informé au démarrage plutôt qu'à la première mise en file d'attente.
+
+<span class="since-badge" data-since="0.25">Depuis 0.25</span> Un worker inactif n'interroge pas la base toutes les deux secondes. Chaque mise en file d'attente envoie un
+`NOTIFY` sur le canal `rebase_jobs` lorsqu'elle est validée, et un worker qui détient un `LISTEN` dessus
+réserve aussitôt — un job mis en file d'attente par un autre processus (le rôle `api`, une autre
+réplique) démarre en quelques millisecondes, et un job différé démarre à son échéance. En arrière-plan, il
+regarde de toute façon toutes les 30 secondes. Un job que ce processus met lui-même en file d'attente, une
+nouvelle tentative qu'il a planifiée et un job qu'il a récupéré le réveillent sans notification.
+
+Le `LISTEN` a besoin d'une connexion à part, trouvée comme le fait le temps réel :
+`DATABASE_DIRECT_URL` si elle est définie, sinon `DATABASE_URL`. Derrière un pooler en mode transaction
+tel que PgBouncer, définissez `DATABASE_DIRECT_URL` : un pooler ne conserve pas un `LISTEN`, et les jobs
+d'autres processus attendraient alors la vérification de 30 secondes. Lorsqu'il n'existe aucune connexion
+de ce type (la base de développement en processus), un worker inactif ralentit à la place : il regarde
+après `pollIntervalMs` (2 secondes), puis deux fois plus longtemps après chaque vérification qui n'a rien
+trouvé, jusqu'à 30 secondes, et repart de zéro dès qu'il trouve du travail. Un worker inactif effectue
+environ 2 900 réservations par jour au lieu de 43 200.
 
 ## Mise en file d'attente
 
@@ -82,10 +98,34 @@ Ainsi, un gestionnaire lent sur un worker actif conserve son job, quelle que soi
 jobs: {
     enabled: true,
     concurrency: 5,              // jobs at once, per instance
-    pollIntervalMs: 2_000,       // when the last look found nothing
+    pollIntervalMs: 2_000,       // the first wait after a look that found nothing; it doubles up to 30 s
     visibilityTimeoutMs: 300_000 // how long an unrenewed claim holds
 }
 ```
+
+### Un gestionnaire qui ne se termine jamais
+
+L'envers du décor : un gestionnaire qui attend un `fetch` qui ne répond jamais conserve son emplacement de
+worker, et sa réservation, tant que le processus vit — avec cinq d'entre eux, le worker n'exécute plus rien
+d'autre, alors que `/health` reste vert.
+<span class="since-badge" data-since="0.25">Depuis 0.25</span> Définissez `timeoutMs` pour borner une tentative. À l'échéance, la tentative échoue — retentée tant
+qu'il reste des tentatives, comme n'importe quelle exception — son emplacement est libéré, et le `signal`
+du gestionnaire est interrompu. Transmettez le signal, pour que le travail s'arrête lui aussi ; un
+gestionnaire qui l'ignore continue de s'exécuter en arrière-plan sans que rien n'enregistre son résultat.
+
+```typescript no-verify
+jobs: {
+    enabled: true,
+    timeoutMs: 120_000,          // one attempt; no limit when left out
+    tasks: {
+        "sync-crm": async ({ payload, signal }) => {
+            await fetch(crmUrl, { method: "POST", body: JSON.stringify(payload), signal });
+        }
+    }
+}
+```
+
+Les gestionnaires de file et les abonnements à un topic reçoivent le même `signal` dans leur contexte.
 
 ## Plusieurs instances
 
@@ -105,10 +145,10 @@ const { jobQueue } = await initializeRebaseBackend({ jobs: { enabled: true } });
 const dispatcher = new WebhookDispatcher({ jobQueue });
 dispatcher.setWebhooks(myWebhooks);
 
-jobQueue?.register(WEBHOOK_DELIVERY_TASK, ctx => dispatcher.deliverQueuedJob(ctx.payload as never));
+jobQueue?.register(WEBHOOK_DELIVERY_TASK, ctx => dispatcher.deliverQueuedJob(ctx.payload as never, ctx));
 ```
 
-Seul l'**identifiant** du webhook est stocké dans le job, jamais le webhook lui-même — son secret de signature se trouverait sinon en clair dans `rebase.jobs` pendant toute la durée de rétention de la ligne, et un webhook modifié entre la mise en file d'attente et l'envoi doit être transmis avec sa configuration actuelle.
+Seul l'**identifiant** du webhook est stocké dans le job, jamais le webhook lui-même — son secret de signature se trouverait sinon en clair dans `rebase.jobs` pendant toute la durée de rétention de la ligne, et un webhook modifié entre la mise en file d'attente et l'envoi doit être transmis avec sa configuration actuelle. Passer `ctx` en second argument fait que chaque tentative envoie son propre `X-Webhook-Attempt` ; toutes les tentatives d'un même envoi envoient le même `X-Webhook-Delivery`, ce qui permet à un destinataire de dédoublonner les nouvelles tentatives.
 
 Un envoi que le dispatcher refuse d'effectuer (une destination loopback, link-local, privée ou non `http(s)`), ou auquel le destinataire répond par une redirection, échoue de la même manière à chaque fois. Il est placé en dead-letter après une seule tentative, avec la raison dans `last_error`. Tout autre échec est retenté comme pour n'importe quel job.
 

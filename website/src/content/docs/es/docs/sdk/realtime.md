@@ -1,5 +1,5 @@
 ---
-sourceHash: 62e51002f973bf74
+sourceHash: bdc7510e49d0db5c
 title: Suscripciones en tiempo real
 sidebar_label: Tiempo real
 description: Suscríbete a cambios de datos en vivo con el SDK tipado de Rebase utilizando listeners en tiempo real basados en WebSocket.
@@ -123,11 +123,22 @@ const unsubscribe = client.data
 listenById(
     id: string | number,
     onUpdate: (row: M | undefined) => void,
-    onError?: (error: Error) => void
+    onError?: (error: Error) => void,
+    options?: { include?: IncludeSpec }
 ): () => void   // returns unsubscribe function
 ```
 
 La callback recibe una fila plana (no una `Entity`, por lo que no existe `.values`) y `undefined` cuando el registro se elimina.
+
+Cada trama lleva las relaciones que nombra `options.include`, cargadas como `find({ include })`
+las carga en cada fila de una lista. Una relación a muchos que no se nombra ahí está ausente
+de la fila, no vacía:
+
+```typescript
+client.data.posts.listenById(1, (post) => {
+    console.log(post?.tags); // the post's tags, on every update
+}, undefined, { include: ["tags"] });
+```
 
 ## Fluent Query Builder
 

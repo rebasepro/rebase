@@ -1,5 +1,5 @@
 ---
-sourceHash: 40c6996a773e6e50
+sourceHash: e18fe07b6281381b
 title: Champs de téléversement de fichiers
 sidebar_label: Téléversements de fichiers
 description:"\"Déclarer un champ de fichier ou d'image sur une collection : le bloc storage, les téléversements uniques et multiples, et quelles options sont résolues par le panneau plutôt que par le serveur.\""
@@ -92,7 +92,8 @@ Les deux sont désormais vérifiés par le serveur par rapport à **l'endroit o�
 
 - Plusieurs propriétés partageant un même chemin : un fichier accepté par l'une d'elles est accepté.
 - Un téléversement qui nomme aussi sa propriété (`collection` + `property`, comme les envoie `putObject({ context })`) est également soumis à cette propriété. Nommer une propriété plus permissive ne débloque pas le chemin d'une propriété plus stricte.
-- Un `storagePath` écrit sous forme de fonction ne peut pas être lu sans l'exécuter, il n'a donc aucune règle côté serveur : ces limites ne s'appliquent qu'aux téléversements qui nomment la propriété.
+  Les téléversements du panneau (champs de fichier, cellules de tableau et images markdown) la nomment toujours.
+- Un `storagePath` écrit sous forme de fonction ne peut pas être lu sans l'exécuter, il n'a donc aucune règle côté serveur : ces limites ne s'appliquent qu'aux téléversements qui nomment la propriété, ce que font ceux du panneau.
 - Un chemin qu'aucune propriété ne revendique est soumis uniquement à la limite propre à la source (`STORAGE_MAX_FILE_SIZE`).
 
 ### Images dans un champ markdown

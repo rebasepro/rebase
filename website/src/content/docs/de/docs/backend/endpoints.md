@@ -1,5 +1,5 @@
 ---
-sourceHash: 8f5d12b8af667778
+sourceHash: 6d4b5fe12fe09451
 title: Endpunkt-Index
 sidebar_label: Endpunkt-Index
 description: Jede HTTP-Route, die ein Rebase-Backend mountet – Daten, Authentifizierung, Speicher, Admin, Meta – mit dem jeweiligen Gate und der Seite, die sie erklärt.
@@ -38,7 +38,9 @@ Liste. `:slug` ist der `slug` einer Collection.
 | `GET` | `/api/data/collections` | session | [REST API](/docs/backend/api/) |
 | `GET` | `/api/data/:slug` | RLS | [Abfragen](/docs/backend/api/#filtering) |
 | `POST` | `/api/data/:slug` | RLS | [REST API](/docs/backend/api/) |
+| `POST` | `/api/data/:slug/query` | RLS | Die Auflistung, Query-Parameter im Body — [Abfragen, die für eine URL zu lang sind](/docs/backend/vector-search/#queries-too-long-for-a-url) |
 | `GET` | `/api/data/:slug/count` | RLS | [Abfragen](/docs/backend/api/#filtering) |
+| `POST` | `/api/data/:slug/count` | RLS | Die Zählung, Query-Parameter im Body — [Abfragen, die für eine URL zu lang sind](/docs/backend/vector-search/#queries-too-long-for-a-url) |
 | `GET` | `/api/data/:slug/aggregate` | RLS | [REST API](/docs/backend/api/#rest-endpoints) |
 | `GET` | `/api/data/:slug/:id` | RLS | [REST API](/docs/backend/api/) |
 | `PATCH` | `/api/data/:slug/:id` | RLS | [REST API](/docs/backend/api/) |
@@ -134,11 +136,13 @@ der auf eine Collection beschränkt ist, erreicht nichts davon. Siehe [Rollen un
 | `GET` | `/api/admin/cron/:id/logs` | `cron:read` | [Cron Jobs](/docs/backend/cron-jobs/) |
 | `POST` | `/api/admin/cron/:id/trigger` | `cron:write` | Einen Job jetzt ausführen |
 | `GET` | `/api/admin/backups` | `backups:read` | Backup-Inventar |
-| `GET` | `/api/admin/backups/download` | `backups:read` | Streamt ein Backup |
+| `GET` | `/api/admin/backups/download` | `backups:read` | Streamt ein Backup. Mit `?token=` aus einem Download-Link ist kein Header nötig, nur für dieses Backup |
+| `POST` | `/api/admin/backups/download-url` | `backups:read` | <span class="since-badge" data-since="0.25">Seit 0.25</span> Ein Link zu einem Backup, `{ key }` → `{ url, token, expiresIn }`, 60 Sekunden gültig — [Backups](/docs/deployment/backups/#download-a-backup) |
 | `GET` | `/api/admin/logs` | `logs:read` | Der Puffer der letzten Protokolle |
 | `GET` | `/api/admin/logs/latest` | `logs:read` | Die neuesten Einträge |
 | `GET` | `/api/admin/logs/stream` | `logs:read` | Server-Sent Events |
 | `GET` | `/api/admin/rls-audit` | `schema:read` | Das jüngste Ergebnis des geplanten Audits |
+| `POST` | `/api/admin/sql/csv` | `database:write` | <span class="since-badge" data-since="0.25">Seit 0.25</span> Streamt das gesamte Ergebnis einer schreibgeschützten Abfrage als CSV — „Gesamtes Ergebnis als CSV herunterladen“ in [Studio](/docs/studio/) |
 | `GET` | `/api/admin/schema/status` | `schema:read` | [Live-Schema-Bearbeitung](/docs/backend/live-schema-editing/) |
 | `POST` | `/api/admin/schema/plan` | `schema:read` | Plant eine Änderung; wendet sie niemals an |
 | `POST` | `/api/admin/schema/apply` | `schema:write` | Nur eine Person, außer wenn `REBASE_LIVE_SCHEMA_ALLOW_MACHINE_APPLY` |
@@ -162,6 +166,7 @@ sind für Projekte gedacht, die noch nicht umgestellt wurden; schreiben Sie neue
 | `GET` | `/api/storage/file/*` | session + `storageAuthorize` | [Speicher](/docs/backend/storage/) |
 | `DELETE` | `/api/storage/file/*` | session + `storageAuthorize` | [Speicher](/docs/backend/storage/) |
 | `GET` | `/api/storage/metadata/*` | session + `storageAuthorize` | [Speicher](/docs/backend/storage/) |
+| `POST` | `/api/storage/metadata` | session + `storageAuthorize`, pro Schlüssel | <span class="since-badge" data-since="0.25">Seit 0.25</span> [Speicher](/docs/backend/storage/#storage-endpoints): Metadaten für bis zu 100 Objekte |
 | `GET` | `/api/storage/list` | session + `storageAuthorize` | [Speicher](/docs/backend/storage/) |
 | `POST` | `/api/storage/folder` | session + `storageAuthorize` | [Speicher](/docs/backend/storage/) |
 | `GET` | `/api/storage/sources` | session | Die benannten Speicherquellen, die dieses Backend bedient |

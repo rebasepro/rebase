@@ -1,5 +1,5 @@
 ---
-sourceHash: 7e7cf627ef1d34b8
+sourceHash: aa008173a34fc3e9
 title: Validazione e condizioni
 sidebar_label: Validazione e condizioni
 description: "Valori enum, regole di validazione per proprietà e campi condizionali che rendono una proprietà obbligatoria, disabilitata o nascosta in base ai valori dell'entità stessa."
@@ -9,24 +9,43 @@ description: "Valori enum, regole di validazione per proprietà e campi condizio
 
 Utilizzato con proprietà di tipo stringa o numero per renderizzare menu a tendina (select):
 
-```typescript no-verify
-// Simple array
-enum: ["draft", "published", "archived"]
+```typescript
+import type { StringProperty } from "@rebasepro/types";
 
-// With labels
-enum: [
-    { id: "draft", label: "Draft" },
-    { id: "published", label: "Published" },
-    { id: "archived", label: "Archived" }
-]
+// Simple: each value mapped to its label
+const simple: StringProperty = {
+    type: "string",
+    name: "Status",
+    enum: { draft: "Draft", published: "Published", archived: "Archived" }
+};
+
+// As a list, which keeps the order you write
+const listed: StringProperty = {
+    type: "string",
+    name: "Status",
+    enum: [
+        { id: "draft", label: "Draft" },
+        { id: "published", label: "Published" },
+        { id: "archived", label: "Archived" }
+    ]
+};
 
 // With colors (for Kanban columns and chips)
-enum: [
-    { id: "draft", label: "Draft", color: "grayDark" },
-    { id: "published", label: "Published", color: "greenDark" },
-    { id: "archived", label: "Archived", color: "orangeDark" }
-]
+const colored: StringProperty = {
+    type: "string",
+    name: "Status",
+    enum: [
+        { id: "draft", label: "Draft", color: "grayDark" },
+        { id: "published", label: "Published", color: "greenDark" },
+        { id: "archived", label: "Archived", color: "orangeDark" }
+    ]
+};
 ```
+
+Un semplice elenco di valori, `enum: ["draft", "published", "archived"]`, non fa parte
+del tipo. Una configurazione JavaScript che ne scrive uno funziona comunque: l'enum del database,
+i tipi generati e il menu a tendina dell'admin lo leggono come quei valori, ciascuno
+con sé stesso come etichetta.
 
 ## Validazione
 
@@ -76,7 +95,7 @@ cosa scritta dal tuo codice server va controllata nel codice che la scrive.
 | Regola | Tipo | Descrizione |
 |------|------|-------------|
 | `required` | `boolean` | Il valore deve essere presente |
-| `requiredMessage` | `string` | Cosa mostra il modulo quando non è presente. **Solo modulo di amministrazione — non applicato dall'API o dal database.** |
+| `requiredMessage` | `string` | Cosa viene detto quando non è presente: dal modulo di amministrazione, e come `message` della voce `required` del campo nel 400 dell'API. Il NOT NULL del database non porta alcun messaggio |
 | `unique` | `boolean` | Solo una riga nella tabella può contenere questo valore. Il modulo di amministrazione lo controlla anche quando salva un valore che la modifica ha cambiato, così un duplicato viene segnalato sul suo campo prima della scrittura |
 | `uniqueInArray` | `boolean` | Solo una voce *per array* può contenerlo. Si applica a un figlio diretto di una proprietà `array`, o a un figlio di primo livello di una `map` al suo interno. **Solo modulo di amministrazione — non applicato dall'API o dal database.** |
 

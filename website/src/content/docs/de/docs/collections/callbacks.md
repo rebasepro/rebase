@@ -1,5 +1,5 @@
 ---
-sourceHash: c1478b42d3c890a5
+sourceHash: 941bbd72bbc3e338
 title: Entitäts-Callbacks
 sidebar_label: Callbacks
 description: Nutzen Sie Lifecycle-Callbacks, um benutzerdefinierte Logik auszuführen, wenn Entitäten erstellt, aktualisiert, gelesen oder gelöscht werden. Beinhaltet die context.data-API für kollektionsübergreifende Operationen.
@@ -60,6 +60,11 @@ Aus „wird an jeden Besucher ausgeliefert“ ergeben sich zwei Regeln, und kein
 
 Bei einer Kollektion mit Server-Transport — dem Standard und höchstwahrscheinlich auch Ihrem Fall — hat der Server `callbacks` bereits ausgeführt, bevor die Zeile das Panel erreicht, sodass ein `browserCallbacks.afterRead` *zusätzlich* dazu ausgeführt wird. Schreiben Sie es idempotent, oder schreiben Sie es gar nicht.
 
+Ein `browserCallbacks.afterSave` läuft, nachdem der Schreibvorgang gespeichert wurde, und
+nichts im Browser kann ihn zurückrollen. Ein Fehler (Throw) daraus wird als Warnung angezeigt;
+das Speichern selbst wird als erledigt gemeldet, sodass das Formular nicht anbietet,
+den Datensatz ein zweites Mal zu erstellen.
+
 ## Callbacks definieren
 
 ```typescript
@@ -103,7 +108,7 @@ const articlesCollection = defineCollection({
 
         beforeDelete: async ({ id }) => {
             // Prevent deletion of published articles
-            // Throw to block the deletion
+            // Throw (or return false) to block the deletion
         },
 
         afterRead: async ({ row }) => {
@@ -149,6 +154,9 @@ Ein Lesevorgang wird bewusst nicht eingeschränkt: die Eindeutigkeitsprüfung hi
 ### `beforeSave`
 
 Wird aufgerufen, bevor ein Datensatz in die Datenbank geschrieben wird. Gibt die modifizierten Werte zurück.
+Unter Postgres läuft er innerhalb der Transaktion des Schreibvorgangs, die bereits begonnen hat, und hält
+daher eine Pool-Verbindung, solange er läuft — siehe [Ein Callback hält eine
+Verbindung](#ein-callback-hält-eine-verbindung).
 
 ```typescript
 beforeSave: async ({
@@ -253,7 +261,7 @@ afterRead: async ({
 
 ### `beforeDelete`
 
-Wird aufgerufen, bevor ein Datensatz gelöscht wird. Werfen Sie einen Fehler, um das Löschen zu blockieren.
+Wird aufgerufen, bevor ein Datensatz gelöscht wird. Werfen Sie einen Fehler, um das Löschen zu blockieren, und der Aufrufer erhält `400 CALLBACK_REJECTED` mit Ihrer Meldung. Auch die Rückgabe von `false` blockiert es, als `403 CALLBACK_REJECTED` ohne Meldung von Ihnen.
 
 ```typescript
 beforeDelete: async ({
@@ -414,7 +422,7 @@ Der auslösende Schreibvorgang und alles, was seine Callbacks geschrieben haben,
 
 - Ein Fehler (Throw) in `afterSave` oder `afterDelete` rollt den auslösenden Schreibvorgang sowie jeden `context.data`-Schreibvorgang der Callbacks zurück. Der Aufrufer erhält **400 `CALLBACK_REJECTED`** mit `details.stage`, das den jeweiligen Hook benennt — oder den spezifischen Fehlerstatus, falls vorhanden: ein von Ihnen geworfener `RebaseApiError`, der 409-Fehler einer Eindeutigkeitsverletzung.
 - Realtime-Abonnenten erfahren erst nach dem Commit von der Zeile; ein zurückgerollter Schreibvorgang wird also niemals angekündigt.
-- Ein Callback hält die Transaktion während seiner Ausführung offen. Ein langsamer Callback bedeutet daher eine gehaltene Sperre und eine blockierte Verbindung im Connection-Pool.
+- Ein Callback hält die Transaktion während seiner Ausführung offen. Ein langsamer Callback bedeutet daher eine gehaltene Sperre und eine blockierte Verbindung im Connection-Pool — `beforeSave` und `beforeDelete` ebenso wie die `after`-Hooks. Siehe [Ein Callback hält eine Verbindung](#ein-callback-hält-eine-verbindung).
 - Ein `context.data`-Schreibvorgang führt auch die Callbacks der Zielkollektion aus, sodass ein `afterSave`, das seine eigene Zeile aktualisiert, sich selbst erneut ausführt. Schreibvorgänge, die mehr als 16 Ebenen tief verschachtelt sind, werden mit **500 `CALLBACK_RECURSION`** abgelehnt, unter Angabe des Hooks und der Collection, und der gesamte Schreibvorgang wird zurückgerollt. Machen Sie einen solchen Schreibvorgang bedingt, wie es das Beispiel unten tut.
 
 Lassen Sie einen Fehler werfen, wenn der auslösende Schreibvorgang diesen nicht überstehen soll. Fangen Sie ihn ab, wenn er überstehen soll, aber nur um einen `context.data`-**Schreibvorgang** herum: Ein Create, Update oder Delete, das die Datenbank ablehnt (eine Unique- oder Foreign-Key-Verletzung, ein Trigger), wird isoliert rückgängig gemacht, und der Rest wird committet.
@@ -441,6 +449,40 @@ afterSave: async ({ values, id, status, context }) => {
 Arbeiten, die die Datenbank verlassen müssen — eine E-Mail, ein Webhook, ein Aufruf einer Drittanbieter-API —, gehören nicht in den Callback-Body. Sie würden die Transaktion für einen Netzwerk-Roundtrip offenhalten, und nichts kann sie zurücknehmen, wenn der Schreibvorgang zurückgerollt wird. Stellen Sie dafür einen [Job](/docs/backend/jobs) in die Warteschlange oder führen Sie die Aktion aus, nachdem der Schreibvorgang zurückgekehrt ist: Veröffentlichen Sie auf einem [Realtime-Kanal](/docs/backend/realtime) oder verwenden Sie `waitUntil` in einer [benutzerdefinierten Funktion](/docs/backend/custom-functions). Unter [Hooks](/docs/backend/hooks#side-effects-that-must-not-hold-the-transaction) erfahren Sie, was sich am besten eignet.
 
 Bei MongoDB trifft nichts davon zu. Dieser Treiber führt dieselben Callbacks ohne Transaktion aus, sodass der Schreibvorgang bereits gespeichert ist, wenn `afterSave` ausgeführt wird, und ein dortiger Fehler lediglich das Scheitern meldet, ohne es rückgängig zu machen.
+
+### Ein Callback hält eine Verbindung
+
+Unter Postgres läuft ein Schreibvorgang auf einer einzigen Verbindung, die aus dem Datenbank-Pool entnommen wird,
+und jeder Callback läuft darauf: `beforeSave` und `beforeDelete`, nachdem die
+Transaktion begonnen hat, `afterSave` und `afterDelete`, bevor sie committet. Solange ein Callback läuft —
+beim Abwarten einer Abfrage, einer Berechnung, irgendetwas —, bedient diese
+Verbindung nichts anderes, und die Sperren, die der Schreibvorgang genommen hat, bleiben genommen:
+in `afterSave` die gerade geschriebene Zeile; bei einem Bulk- oder [`_batch`](/docs/backend/writes/#cross-collection-batches)-Schreibvorgang
+jede Zeile, die die Transaktion zuvor geschrieben hat.
+
+Die Kosten sind die eigene Dauer des Callbacks, und gleichzeitige Schreibvorgänge summieren sie:
+
+- Der Pool hält standardmäßig 20 Verbindungen (`DB_POOL_MAX`). 25 gleichzeitige Speichervorgänge,
+  deren `beforeSave` 300 ms abwartete, ließen einen unbeteiligten Ein-Zeilen-Read 290 ms dauern,
+  fast alles davon Warten auf eine Verbindung.
+- Ein Bulk-Create von 100 Zeilen, dessen `beforeSave` 50 ms abwartet, ist eine Transaktion,
+  die 5,3 s offen ist und dabei ihre Verbindung und die Sperren jeder bisher geschriebenen Zeile
+  die ganze Zeit hält.
+
+Daher:
+
+- Halten Sie alles Langsame aus Callbacks heraus. Ein Aufruf eines anderen Dienstes gehört in einen
+  [Job](/docs/backend/jobs) oder nach der Rückkehr des Schreibvorgangs.
+- Schlagen Sie nach, was ein Hook braucht, bevor Sie schreiben, wenn möglich — im Client oder
+  in einer [benutzerdefinierten Funktion](/docs/backend/custom-functions), die dann schreibt.
+- Senden Sie Zeilen, deren Hooks langsam sind, in kleineren Bulks.
+- Laufen viele langsame Hooks absichtlich gleichzeitig, erhöhen Sie `DB_POOL_MAX`, im Rahmen dessen,
+  was `max_connections` der Datenbank für jede Instanz erlaubt.
+- <span class="since-badge" data-since="0.25">Seit 0.25</span> Mit
+  `REBASE_METRICS=true` meldet `/metrics` `rebase_db_pool_wait_ms`: wie lange
+  jede Abfrage auf eine Verbindung wartete. Ein gesunder Pool hält ihn nahe null; ein Tail,
+  der mit dem Traffic wächst, sind Anfragen, die auf Verbindungen warten, die Callbacks
+  halten. Siehe [Metriken](/docs/deployment/self-hosting/#metrics).
 
 ## Daten zwischen Kollektionen synchronisieren
 

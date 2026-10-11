@@ -1,5 +1,5 @@
 ---
-sourceHash: 15e127696fc3c50e
+sourceHash: b27c45a011cb8c16
 title: Integração com Servidor Customizado
 sidebar_label: Servidor Customizado (Express)
 description: Como incorporar os serviços de Banco de Dados e Realtime do Rebase em seu próprio backend Node.js customizado sem usar o Hono ou o coordenador do Rebase.
@@ -46,7 +46,7 @@ Não declare `zod` nas dependências do seu projeto — o runtime o fornece. Se 
 :::
 
 **Comportamentos principais:**
-- Gera automaticamente `JWT_SECRET` e `REBASE_SERVICE_KEY` efêmeros em desenvolvimento para que você possa começar sem configuração manual.
+- Gera `JWT_SECRET` e `REBASE_SERVICE_KEY` em desenvolvimento quando não estão definidos, para que você possa começar sem configuração manual, e os guarda em cache em `.rebase-dev-secrets.json` para que uma reinicialização não desconecte ninguém.
 - Bloqueia segredos gerados automaticamente em produção — você deve defini-los explicitamente.
 - Valida se `CORS_ORIGINS` ou `FRONTEND_URL` está definido em produção.
 - Recusa um esquema `extend` construído por uma cópia diferente do zod.
@@ -78,8 +78,9 @@ async function startServer() {
     
     // 1. WebSocket Upgrade Guard
     // WebSockets require hijacking the HTTP Upgrade header. You must bind
-    // Rebase to a raw Node.js http.Server instance.
-    const server = createServer(app);
+    // Rebase to a raw Node.js http.Server instance. 64 KB of headers, as the
+    // Rebase runtime takes: a vector search in the URL outgrows Node's 16 KB.
+    const server = createServer({ maxHeaderSize: 64 * 1024 }, app);
 
     // 2. Configure the connection pool
     const pool = new pg.Pool({
@@ -202,7 +203,7 @@ async function startServer() {
 startServer();
 ```
 
-> **Caminho padrão:** se o seu servidor usa `initializeRebaseBackend` (como faz o template gerado), não implemente manualmente o manipulador de desligamento acima — use o helper embutido. Ele drena as conexões HTTP, para o agendador de crons, encerra os serviços de realtime, protege contra sinais repetidos e força o encerramento se o desligamento travar:
+> **Caminho padrão:** se o seu servidor usa `initializeRebaseBackend` (como faz o template gerado), não implemente manualmente o manipulador de desligamento acima — use o helper embutido. Ele drena as conexões HTTP, para o agendador de crons, encerra os serviços de realtime, fecha o pool de conexões SMTP quando nada mais pode enviar, protege contra sinais repetidos e força o encerramento se o desligamento travar:
 >
 > ```ts
 > import { installShutdownHandlers } from "@rebasepro/server";
@@ -240,10 +241,16 @@ app.use(cors({
     exposedHeaders: [
         "ETag", "Retry-After", "X-Request-ID",
         "X-RateLimit-Limit", "X-RateLimit-Remaining", "X-RateLimit-Reset",
-        "Preference-Applied"
+        "Preference-Applied",
+        // Resumable uploads, which the SDK uses for files over 8 MiB
+        "Location", "Upload-Offset", "Rebase-Upload-Result"
     ]
 }));
 ```
+
+<span class="since-badge" data-since="0.25">Desde 0.25</span> Os três últimos são aqueles em que um upload retomável responde. Sem eles,
+o SDK não consegue acompanhar um a partir de outra origem, e envia cada arquivo como uma única
+requisição multipart.
 
 O runtime do Rebase e o backend ejetado já enviam essa lista. Na 0.23
 eles não expõem nenhum desses cabeçalhos, então um frontend em outra origem não lê nenhum `ETag`.

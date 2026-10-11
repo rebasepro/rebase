@@ -1,5 +1,5 @@
 ---
-sourceHash: a2683fa13dc31db1
+sourceHash: 5cc79175741f55e8
 title: Projektstruktur
 sidebar_label: Projektstruktur
 description: Verstehen Sie die Struktur eines Rebase-Projekts – Frontend, Backend und Collections-Konfiguration.
@@ -212,7 +212,7 @@ Der `slug` wird zum URL-Pfad in der Admin-UI und zum REST-API-Endpunkt (`/api/da
 1. **Sie definieren** Collections in `config/collections/`
 2. **Das Backend** liest sie ein, um Drizzle-Schemas zu generieren und REST-Routen einzubinden
 3. **Das Frontend** liest sie ein (über ein Vite-Plugin), um Tabellen, Formulare und die Navigation zu rendern
-4. **Die CLI** liest sie ein, um mit `rebase schema generate` Migrationsdateien zu erzeugen
+4. **Die CLI** liest sie ein, um das Drizzle-Schema (`rebase schema generate`), die SDK-Typen (`rebase generate-sdk`) und, aus diesem Schema, Migrationsdateien (`rebase db generate`) zu erzeugen
 
 Während `rebase dev` läuft, werden beim Speichern einer Datei unter `config/collections/`
 die Datei `backend/src/schema.generated.ts` und die SDK-Typen in `generated/sdk/` neu

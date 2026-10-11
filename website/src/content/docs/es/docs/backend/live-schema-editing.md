@@ -1,5 +1,5 @@
 ---
-sourceHash: 564c58f7bc002c6f
+sourceHash: 1437a2b48ddb6d7b
 title: Edición de esquemas en vivo
 description: "Crea y modifica colecciones en un backend en ejecución: primero se confirman en tu repositorio y luego se aplican."
 ---
@@ -239,7 +239,11 @@ Por lo tanto, una aplicación fallida **no es un error**. La respuesta así lo i
 
 ## Dónde funciona esto
 
-La línea divisoria es si el servidor en ejecución tiene tu **código fuente en disco**, no si está en producción.
+La edición de esquema en vivo reescribe el código fuente de tus colecciones con el mismo editor
+que usan los guardados de solo código fuente del panel, así que se ejecuta donde se ejecuta ese
+editor: un servidor con el **código fuente de tus colecciones en disco** (`collectionsDir`) y su
+editor de esquema activado. El editor de esquema está desactivado bajo `NODE_ENV=production`
+salvo que el servidor defina `schemaEditor: true`, y necesita `ts-morph` instalado.
 
 ### MongoDB
 
@@ -252,15 +256,21 @@ Lo único que vale la pena leer con atención es una eliminación. En Postgres, 
 | Despliegue | Funciona |
 |---|---|
 | `rebase dev` en tu máquina | sí |
-| Autohospedado con el proyecto montado | sí |
-| Autohospedado desde un bundle compilado | sí, con `liveSchema.repository` |
-| Rebase Cloud o cualquier bundle | sí, con `liveSchema.repository` |
+| Autohospedado con el proyecto y su árbol de trabajo de git montados | sí, cuando `NODE_ENV` no es `production`, o con `schemaEditor: true` |
+| Un bundle compilado: un autohospedado que sirve una compilación, o Rebase Cloud | no |
 
-Un bundle es una salida compilada, por lo que no contiene el código fuente de las colecciones. Si configuras `liveSchema.repository`, el código fuente se obtiene de tu repositorio en su lugar; sin esto, las rutas responden `SCHEMA_EDITING_NO_REPOSITORY` y explican el motivo.
+Un bundle es una salida compilada, por lo que no contiene el código fuente de las colecciones, y el
+runtime que lo sirve desactiva el editor de esquema. `/api/admin/schema/status`
+responde `enabled: false` con el código `SCHEMA_EDITOR_DISABLED`. Edita las
+colecciones en desarrollo, haz commit y despliega.
 
-### Un despliegue sin código fuente en disco
+### Confirmar en un repositorio remoto
 
-Un bundle es una salida compilada: todos los tenants de Cloud y cualquier autohospedado que sirva una compilación. No hay código fuente de colecciones que el editor pueda reescribir, así que apúntalo al repositorio donde realmente reside el código fuente:
+`liveSchema.repository` hace que el servidor confirme cada cambio en un repositorio de
+GitHub a través de la API Git Data, en lugar de ejecutar `git commit` en un árbol de
+trabajo. Solo surte efecto en un servidor con el editor de esquema activado,
+es decir, un servidor con `collectionsDir` en disco (consulta la tabla anterior). Un
+bundle compilado no lo lee.
 
 ```typescript no-verify
 initializeRebaseBackend({
@@ -280,7 +290,11 @@ initializeRebaseBackend({
 })
 ```
 
-El cambio se lee entonces desde el repositorio, se reescribe con el mismo editor que se ejecuta localmente y se vuelve a confirmar a través de la API Git Data: un blob, un tree, un commit y una actualización de ref. No se clona nada ni se deja nada en disco.
+El archivo de la colección modificada se lee entonces desde el repositorio, se reescribe con
+el mismo editor que se ejecuta localmente y se vuelve a confirmar a través de la API Git Data:
+un blob, un tree, un commit y una actualización de ref. No se clona nada ni se deja nada en
+disco. Como solo se obtiene ese archivo, en este modo no se pueden hacer dos cambios: añadir una
+relación que apunte a otra colección y eliminar una colección.
 
 `auth` acepta un token o una instalación de GitHub App:
 
@@ -297,7 +311,8 @@ Usa el token para un único proyecto que realice commits en un repositorio del q
 
 El token necesita permisos de `contents: read and write` en ese repositorio, y nada más.
 
-En una máquina que tiene el repositorio, el commit es un simple `git commit`: nada que autenticar, sin token, sin red. Un despliegue sin él realiza el commit a través de la API Git Data en su lugar, sin clonar; consulta [Un despliegue sin código fuente en disco](#un-despliegue-sin-código-fuente-en-disco).
+Sin `liveSchema.repository`, el commit es un simple `git commit` en el árbol de trabajo
+que contiene `collectionsDir`: nada que autenticar, sin token, sin red.
 
 Dos cosas que hacen que sea seguro ejecutarlo contra un repositorio en el que otra persona está trabajando:
 

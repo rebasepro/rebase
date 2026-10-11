@@ -1,5 +1,5 @@
 ---
-sourceHash: 17ca6f6a285eea43
+sourceHash: 3d8676ac5f8d58c7
 title: Indizes
 sidebar_label: Indizes
 description: Deklarieren Sie gewöhnliche Postgres-Indizes für eine Collection – btree, GIN und BRIN, partiell, zusammengesetzt, abdeckend und eindeutig – und warum ein handgeschriebener früher verschwand.
@@ -63,7 +63,7 @@ Das ist die typische Falle. Eine `belongsTo`-Relation kompiliert zu ihrem aufgel
 { on: ["author"], reason: "an author's posts, and the ON DELETE cascade" }
 ```
 
-Hier `author_id` zu schreiben, würde für die meisten Properties funktionieren und bei einem Fremdschlüssel – genau dem, den man eigentlich meint – stillschweigend gar nichts indizieren. Postgres indiziert eine Fremdschlüsselspalte nicht automatisch für Sie – ohne diesen Index sind sowohl „die Beiträge dieses Autors auflisten“ als auch die `ON DELETE`-Kaskade sequenzielle Scans.
+Hier `author_id` zu schreiben, wird beim Build abgelehnt: Es ist eine Spalte, keine Property der Collection, und `on` benennt Properties. Postgres indiziert eine Fremdschlüsselspalte nicht automatisch für Sie – ohne diesen Index sind sowohl „die Beiträge dieses Autors auflisten“ als auch die `ON DELETE`-Kaskade sequenzielle Scans.
 
 Eine `hasMany`- oder Many-to-Many-Relation besitzt keine Spalte auf dieser Tabelle und wird unter Verweis auf die Collection abgelehnt, die den Fremdschlüssel tatsächlich besitzt.
 
@@ -175,7 +175,50 @@ Beide Producer geben sie aus, was wichtig ist, da nicht jedes Deployment `db pus
 
 - **`rebase db push` / `rebase db generate`** schreiben sie in `schema.sql`, auf dem normalen Atlas-Pfad – sodass sie wie jedes andere Objekt Migrationen, Drift-Erkennung und Rollbacks erhalten.
 - **`rebase schema generate`** schreibt sie auch in `schema.generated.ts`, sodass das Drizzle-Schema dieselbe Tabelle beschreibt, die die Datenbank besitzt. Die `INCLUDE`-Spalten eines abdeckenden Index sind die einzige Ausnahme: Drizzle kann sie nicht abbilden, und die generierte Zeile enthält einen entsprechenden Kommentar, der auf `schema.sql` verweist, wo dies möglich ist.
-- **Schema-Ensure beim Booten** erstellt sie mit `CREATE INDEX CONCURRENTLY IF NOT EXISTS` zu denselben Bedingungen wie die ANN-Indizes daneben. Ein Managed-Runtime-Mandant wird beim Booten bereitgestellt und führt niemals `db push` aus; ohne diesen Mechanismus würde er ohne deklarierte Indizes starten, ohne dass darauf hingewiesen würde.
+- **Schema-Ensure beim Booten** erstellt sie ebenfalls, zu denselben Bedingungen wie die Such- und ANN-Indizes daneben. Ein Managed-Runtime-Mandant wird beim Booten bereitgestellt und führt niemals `db push` aus; ohne diesen Mechanismus würde er ohne deklarierte Indizes starten, ohne dass darauf hingewiesen würde. Eine Tabelle, die der Boot anlegt, erhält ihre Indizes mit der Tabelle. Auf einer bereits vorhandenen Tabelle baut der Boot einen fehlenden Index, nachdem der Server bedient, im Hintergrund, so wie er die [Fremdschlüssel-Indizes](#was-ein-upgrade-mit-einer-bestehenden-datenbank-macht) baut. Er verwendet `CREATE INDEX CONCURRENTLY` auf einer eigenen Verbindung, sodass das `statement_timeout` des Pools von 30 s einen langen Build nicht abbrechen kann. Ein Index, den ein unterbrochener Build unter seinem Namen als `INVALID` hinterlassen hat, wird entfernt und neu gebaut. `IF NOT EXISTS` vergleicht den Namen, repariert also nie einen solchen. Ein `unique`-Index wird auf dieselbe Weise gebaut, aber bevor der Server bedient, und der Boot schlägt fehl, wenn er nicht gebaut werden kann. Ohne ihn zu bedienen, würden doppelte Zeilen hineinkommen.
+
+## Fremdschlüssel werden für Sie indiziert
+
+<span class="since-badge" data-since="0.25">Seit 0.25</span> Postgres erstellt den Index, auf den ein Fremdschlüssel *zeigt* — den Primärschlüssel des Ziels —, und nie einen auf der Spalte, die ihn *hält*. Jeder Lesezugriff von der anderen Seite einer Verknüpfung filtert auf dieser Spalte: ein `hasMany`- oder `hasOne`-Include, eine verschachtelte Auflistung wie `/authors/5/posts` (ihre Seite und ihre Zählung), die Rückseite einer `manyToMany` und die `ON DELETE`-Prüfung, wenn eine übergeordnete Zeile gelöscht wird. Ohne Index liest jeder davon jede Zeile der Kind-Tabelle.
+
+Rebase leitet daher einen einfachen B-Tree ab für:
+
+- den `localKey` jeder [`belongsTo`](/docs/collections/relations#belongsto--the-key-is-on-this-table) — das ist auch die Spalte, die das `hasOne` / `hasMany` der Gegenseite liest;
+- die Zielspalte jeder `manyToMany`-Junction. Der Primärschlüssel `(source, target)` der Junction bedient bereits Abfragen nach der Quellspalte; die Rückseite der Verknüpfung braucht diesen hier. Eine Junction ist die Tabelle von Rebase, daher gibt es hierfür kein Opt-out.
+
+Gemessen auf Postgres 18 mit warmem Cache, 1 Mio. Kommentare auf 50.000 Beiträgen:
+
+| Der Lesezugriff | Ohne den Index | Mit ihm |
+|---|---|---|
+| `include=comments` auf einer Seite mit 25 Beiträgen (`post_id IN (…)`) | 38 ms | 0,3 ms |
+| `GET /posts/77/comments?limit=25` — die Seite | 28 ms | 0,3 ms |
+| …und sein `count(*)` | 29 ms | 0,2 ms |
+| einen Beitrag löschen (`ON DELETE SET NULL`-Prüfung) | 129 ms | 1,7 ms |
+
+Nichts wird doppelt indiziert. Der abgeleitete Index wird übersprungen, wenn die Spalte den Primärschlüssel bereits anführt, ein `UNIQUE` trägt (`validation.unique` an der Relation oder an der Property, der die Spalte gehört) oder einen Index in `indexes:` anführt — einfach oder zusammengesetzt, solange es ein B-Tree ohne `where` ist. Ein partieller Index kann keine Abfrage bedienen, die jede Zeile erreichen muss, und ein GIN- oder BRIN-Index beantwortet eine andere Frage, daher zählt keiner von beiden.
+
+Der Name ist der, den [eine Deklaration](#wie-eine-deklaration-benannt-wird) eines einfachen Index auf dieser Spalte ableitet — `posts_author_id_ix_00ad191` —, sodass der abgeleitete Index und `indexes: [{ on: ["author"], … }]` ein Objekt sind, nicht zwei. Er ist wie jeder andere ein [eingefrorener abgeleiteter Name](/docs/architecture/schema-as-code).
+
+Um die Constraint zu behalten und den Index wegzulassen — bei einer Tabelle, die so schreibintensiv ist, dass der Index mehr kostet als die Lookups, die er bedient, oder bei einer, auf der Sie einen eigenen Index außerhalb von `indexes:` führen —, sagen Sie es an der Relation:
+
+```typescript
+author: {
+    name: "Author",
+    type: "relation",
+    relation: { kind: "belongsTo", target: () => authors, index: false }
+}
+```
+
+`index` wird nur bei einer `belongsTo` akzeptiert; bei den anderen Arten lehnt der Config-Validator es ab, weil ihr Fremdschlüssel eine Spalte auf dem Ziel ist (setzen Sie `index` an der `belongsTo` des Ziels) oder in einer Junction liegt.
+
+Rebase liest zu dieser Entscheidung nur Ihre Collections, nie die Datenbank: `db push` und der Boot müssen dieselbe Menge an Indizes mit denselben Namen erreichen, sonst würde der nächste Push entfernen, was der Boot gebaut hat. Ein Index, den Sie von Hand auf derselben Spalte außerhalb von `indexes:` angelegt haben, wird daher nicht gesehen — deklarieren Sie ihn in `indexes:` oder setzen Sie `index: false`, um einen Index statt zwei zu behalten.
+
+### Was ein Upgrade mit einer bestehenden Datenbank macht
+
+Die Indizes sind neue Objekte auf Tabellen, die bereits Daten enthalten, und die beiden Wege bauen sie unterschiedlich:
+
+- **Der Boot wartet nicht auf sie.** Auf einer bereits vorhandenen Tabelle lässt das Schema-Ensure die fehlenden Fremdschlüssel-Indizes aus dem Boot heraus und baut sie, nachdem der Server bedient, einen nach dem anderen, mit `CREATE INDEX CONCURRENTLY` auf einer eigenen Verbindung (das `statement_timeout` des Pools von 30 s gilt dafür nicht). Das nimmt keine Sperre, auf die Lese- oder Schreibzugriffe warten. Eine Tabelle, die eine andere Sitzung hält — der Build einer anderen Instanz, ein `ALTER TABLE` —, wird innerhalb des Sperrbudgets des Boots aufgegeben und beim nächsten Boot erneut versucht. Ein Index, den ein unterbrochener Build als `INVALID` hinterlassen hat (ein Deploy, der den Prozess mitten im Build ersetzt hat, zwei Instanzen, die um einen Namen konkurrieren), wird entfernt und neu gebaut. Jeder wird beim Start und Ende protokolliert; ein Fehler ist eine Warnung, nie ein fehlgeschlagener Boot. Eine Tabelle, die dieser Boot anlegt, erhält ihre Indizes mit der Tabelle, bevor irgendetwas darauf schreiben kann. Unter `REBASE_PROVISION_ONLY` laufen die Builds, bevor der Prozess endet, da nichts danach sie ausführen würde.
+- **`rebase db push` baut sie, bevor es plant**, mit demselben Builder und zu denselben Bedingungen wie der Boot: `CREATE INDEX CONCURRENTLY`, einen nach dem anderen, sodass Lese- und Schreibzugriffe weiterlaufen (etwa 0,4 s bei 1 Mio. Zeilen und 6 s bei 10 Mio. als einfacher Build auf einer Laptop-SSD, `maintenance_work_mem` 64 MB; ein nebenläufiger dauert länger und blockiert nichts). Atlas findet dann jeden Index vor und plant nichts dafür. Ein Index, den es zuvor nicht bauen konnte — eine Tabelle, die eine andere Sitzung das gesamte Sperrbudget über hielt —, bleibt Atlas überlassen, das ihn innerhalb der Transaktion des Push baut und damit Schreibzugriffe auf diese Tabelle für die Dauer des Builds blockiert; der Push sagt, welcher es ist. Eine Fremdschlüsselspalte, die der Push selbst hinzufügt, erhält ihren Index von Atlas zusammen mit der Spalte, bevor irgendetwas darin steht. `--dry-run` baut nichts: Es nennt die Indizes, die ein echter Push zuerst bauen würde, und der Plan, den es ausgibt, listet sie, da sie noch nicht existieren.
 
 ## Was abgelehnt wird, und wann
 

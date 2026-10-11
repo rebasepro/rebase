@@ -1,5 +1,5 @@
 ---
-sourceHash: 15c8b3bdbf304f1c
+sourceHash: 439048db8ee5b538
 title: Configuração de Armazenamento
 sidebar_label: Configuração de Armazenamento
 description: Configure backends de armazenamento em sistema de arquivos local, compatíveis com S3 ou GCS/Firebase Storage para uploads de arquivos, imagens e mídia.
@@ -36,6 +36,8 @@ const backend = await initializeRebaseBackend({
     }
 });
 ```
+
+O armazenamento local guarda os metadados de cada objeto ao lado dele, como `<key>.metadata.json`, de modo que uma chave cujo último segmento termina em `.metadata.json` é recusada com `400 INVALID_STORAGE_KEY` em todas as rotas. O S3 e o GCS guardam os metadados no próprio objeto e armazenam qualquer chave.
 
 ### Armazenamento S3
 
@@ -101,7 +103,8 @@ image: {
 | `POST` | `/api/storage/upload?storageId=<key>` | Upload para um backend nomeado específico |
 | `GET` | `/api/storage/file/*` | Obter um arquivo — tudo após `/file/` é a chave do objeto |
 | `GET` | `/api/storage/file/*?storageId=<key>` | Obter um arquivo de um backend específico |
-| `GET` | `/api/storage/metadata/*` | Tamanho, content-type e última modificação de um objeto, sem os seus bytes |
+| `GET` | `/api/storage/metadata/*` | Tamanho, content-type e metadados personalizados de um objeto, sem os seus bytes, mais um token de download de curta duração quando ele é privado |
+| `POST` | `/api/storage/metadata` | <span class="since-badge" data-since="0.25">Desde 0.25</span> O mesmo para até 100 objetos de uma fonte: corpo `{ keys, storageId? }` |
 | `DELETE` | `/api/storage/file/*` | Excluir um arquivo |
 | `GET` | `/api/storage/list` | Listar objetos sob um prefixo (`prefix`, `bucket`, `maxResults`, `pageToken`, `storageId`). Um `maxResults` menor que 1, ou um `pageToken` que a fonte nunca emitiu, resulta em `400 INVALID_LIST_OPTIONS` |
 | `POST` | `/api/storage/folder` | Criar um marcador de pasta vazia |
@@ -120,12 +123,22 @@ com os códigos na [referência de erros](/docs/backend/errors/). O `/api/storag
 
 ```json
 // GET /api/storage/list?prefix=products/images/
-{ "data": { "items": [ { "bucket": "default", "fullPath": "products/images/a.jpg", "name": "a.jpg" } ], "prefixes": [] } }
+{ "data": { "items": [ { "bucket": "default", "fullPath": "products/images/a.jpg", "name": "a.jpg",
+  "size": 48213, "updated": "2026-10-01T12:00:00.000Z", "contentType": "image/jpeg" } ], "prefixes": [] } }
 ```
+
+<span class="since-badge" data-since="0.25">Desde 0.25</span> Uma listagem descreve cada arquivo que devolve: seu `size` em bytes e
+`updated`, quando foi gravado pela última vez, no armazenamento local, no S3 e no GCS, e seu
+`contentType` no armazenamento local e no GCS. Uma listagem do S3 não traz o tipo,
+então no S3 ele está ausente e `/api/storage/metadata/*` continua informando. Uma pasta em
+`prefixes` não traz nenhum deles, nem um `StorageController` personalizado que
+não os defina.
 
 O `POST /api/storage/upload` responde com `201` contendo `{ key, bucket, storageUrl }`
 do objeto armazenado sob `data`; o `GET /api/storage/metadata/*` retorna os metadados
 do objeto e, para um objeto privado, o `token` de curta duração;
+o `POST /api/storage/metadata` um objeto indexado pelos caminhos que foram enviados, cada
+um contendo o que o `GET` teria respondido para ele (veja abaixo);
 o `GET /api/storage/sources` retorna o array de fontes configuradas, com `configured: true`. Em uma implantação sem nenhum armazenamento, ele responde `200 {"data": [], "configured": false}`, enquanto todas as outras rotas respondem `501 STORAGE_NOT_CONFIGURED`. O `GET /api/auth/config` informa o mesmo como `storage: false`, para que um cliente não precise perguntar.
 O `DELETE /api/storage/file/*` e o `POST /api/storage/folder` trazem apenas uma
 `message`, já que não há nada a retornar.
@@ -134,6 +147,29 @@ No S3 e no GCS, um `bucket` precisa ser um que a fonte serve, em escritas como
 em leituras: um upload, um `POST /api/storage/folder` ou um upload TUS que
 nomeie qualquer outro bucket responde `404 UNKNOWN_STORAGE_SOURCE`, como a
 listagem. O armazenamento local continua criando um bucket na primeira escrita.
+
+**Muitos objetos de uma vez.** <span class="since-badge" data-since="0.25">Desde 0.25</span> `POST /api/storage/metadata` recebe
+`{ "keys": ["photos/a.png", "photos/b.png"], "storageId": "media" }` — até 100
+caminhos de objeto de uma fonte, cada um escrito como `GET /api/storage/metadata/<key>`
+o recebe — e responde com uma entrada por chave:
+
+```json
+{ "data": {
+  "photos/a.png": { "fullPath": "photos/a.png", "size": 48213, "contentType": "image/png", "token": "…", "tokenExpiresIn": 300 },
+  "photos/b.png": { "error": { "code": "FORBIDDEN", "message": "Not authorized for this object", "status": 403 } }
+} }
+```
+
+Cada chave é julgada exatamente como o `GET` a julga — o mesmo hook `storageAuthorize`
+e escopo de storage, a mesma regra de público, um token de download próprio — e uma
+chave recusada, ausente ou malformada responde com o seu próprio `error` sem fazer as
+outras falharem nem revelá-las. Um chamador sem sessão em uma implantação que exige uma
+recebe o `401` que o `GET` responderia, a menos que todas as chaves sejam públicas. Mais de
+100 chaves, ou um corpo sem `keys`, resulta em `400 BAD_REQUEST`. O limitador de taxa conta
+a requisição como ⌈N/10⌉ requisições para N chaves, de modo que uma página de 100 miniaturas custa 10.
+`client.storage.getSignedUrl()` e o painel de admin enviam desse modo as consultas que uma página faz
+em conjunto, e recorrem a um `GET` por arquivo em um servidor sem essa
+rota.
 
 **Como a leitura de um arquivo é autorizada.** As rotas de leitura — `/api/storage/file/*` e
 `/api/storage/metadata/*` — aceitam o token assinado de curta duração emitido por
@@ -237,11 +273,7 @@ em toda resposta, incluindo URLs transformadas e URLs com token de download.
 Aberto diretamente, ele renderiza com scripts desativados e uma origem opaca, então
 não pode alcançar os cookies ou endpoints da API.
 
-## Protocolo de Upload Retomável TUS
-
-Para o upload de arquivos grandes ou para lidar com condições de rede instáveis, o Rebase implementa o protocolo aberto **TUS v1.0.0**, incluindo as extensões `Creation` e `Termination`.
-
-### Qual o tamanho máximo de um arquivo
+## Qual o tamanho máximo de um arquivo
 
 Cada fonte de storage aceita arquivos até o seu próprio limite: **50 MB**, a menos que
 `STORAGE_MAX_FILE_SIZE` (em bytes, com o sufixo `__<KEY>` para uma fonte nomeada) ou o
@@ -259,29 +291,13 @@ STORAGE_MAX_FILE_SIZE=209715200          # (default): 200 MB
 STORAGE_MAX_FILE_SIZE__MEDIA=1073741824  # media: 1 GB
 ```
 
-Um arquivo completo é mantido na memória do servidor enquanto é gravado no
-armazenamento, em todo caminho de upload, então dimensione o limite para a memória que o servidor tem.
-
-```
-Client                                                   Rebase Server
-  │                                                           │
-  │─── POST /api/storage/tus (Upload-Length: 50000000) ──────>│ (Generates session ID)
-  │<── 201 Created (Location: /api/storage/tus/uuid-abc) ────│
-  │                                                           │
-  │─── PATCH /api/storage/tus/uuid-abc (Upload-Offset: 0) ───>│ (Appends chunk via open/write)
-  │<── 204 No Content (Upload-Offset: 1500000) ───────────────│
-  │                                                           │
-  │─── PATCH /api/storage/tus/uuid-abc (Upload-Offset: 1.5M) ─>│ (Upload finishes)
-  │<── 204 No Content (Upload-Offset: 50000000) ──────────────│ (Copies to storage, unlinks temp)
-```
-
-### Mecânica do Ciclo de Vida do Upload
-
-1. **Inicialização da Sessão (`POST`)**: O cliente envia o tamanho total do arquivo no cabeçalho `Upload-Length` e metadados em base64 via `Upload-Metadata`. O servidor cria um arquivo temporário vazio sob o diretório oculto `.tus-uploads/` e retorna a URL de upload.
-2. **Consultas de Progresso (`HEAD`)**: Se um upload for interrompido, o cliente consulta a URL de upload usando uma requisição `HEAD`. O servidor retorna a posição atual em bytes no cabeçalho `Upload-Offset`.
-3. **Anexo de Dados (`PATCH`)**: O cliente retoma o envio de dados binários a partir do offset retornado com `Content-Type: application/offset+octet-stream`. O servidor grava cada chunk no arquivo temporário no offset de bytes que a requisição declara, que precisa ser o offset que o servidor possui (`409` caso contrário). Um chunk é recebido por vez: um `PATCH` que chega enquanto outro para o mesmo upload ainda está sendo recebido — tipicamente um cliente reenviando um chunk que travou — é respondido com `423 UPLOAD_LOCKED`, e o cliente retoma a partir do offset que o `HEAD` reporta.
-4. **Finalização**: Quando o `Upload-Offset` acumulado corresponde ao `Upload-Length` declarado, o Rebase lê o arquivo temporário concluído, envolve-o como um objeto JavaScript `File` padrão e o salva no backend de armazenamento configurado (disco local ou S3). O arquivo temporário é então excluído.
-5. **Varredura Periódica**: Um limpador em segundo plano é executado a cada **60 segundos** para excluir uploads temporários incompletos e órfãos que excederam o limite de retenção de **24 horas**.
+A quantidade de um arquivo que o servidor mantém de uma vez depende da porta de entrada.
+`POST /api/storage/upload` é um único corpo multipart, que o servidor processa por inteiro:
+de três a cinco vezes o arquivo em sua memória. Um upload retomável (TUS) mantém um
+chunk por vez. <span class="since-badge" data-since="0.25">Desde 0.25</span> `client.storage.putObject()` e o painel de admin enviam um arquivo
+acima de 8 MiB da forma retomável. Veja
+[Uploads retomáveis (TUS)](/docs/backend/storage-resumable-uploads/) para o
+protocolo, o que ele responde e como se comporta entre instâncias.
 
 ## Variáveis de Ambiente
 
@@ -509,7 +525,8 @@ Retorne `false` para negar o acesso com um erro **403**. Lançar um erro também
 
 Vale a pena saber:
 
-- **A rota de metadados é onde o acesso de leitura é realmente decidido.** Ela emite o token de download de curta duração e com escopo de caminho que a rota de arquivos valida, logo o hook atua nela. Requisições que já carregam tal token, ou que atingem um caminho público declarado, ignoram o hook — o token já foi emitido sob suas regras e é válido apenas para o seu próprio caminho.
+- **A rota de metadados é onde o acesso de leitura é realmente decidido.** Ela emite o token de download de curta duração e com escopo de caminho que a rota de arquivos valida, logo o hook atua nela. Requisições que já carregam tal token, ou que atingem um caminho público declarado, ignoram o hook — o token já foi emitido sob suas regras e é válido apenas para o seu próprio caminho. Só essas duas leituras o ignoram: um usuário que o seu adaptador de autenticação chame de `public` é consultado como qualquer outro.
+- **Um bucket, um nome.** No S3 e no GCS, o `bucket` do hook é sempre `"default"`, inclusive quando uma requisição nomeia o bucket do provedor, que alcança os mesmos objetos.
 - **Um caminho é público quando a chave que ele nomeia é.** O prefixo `public/` é testado na chave canônica que a rota serve — depois de ler um segmento de bucket `default/` inicial e de recolher `//`, `./` e uma `/` inicial —, nunca na URL como foi escrita. `/api/storage/file/notes://public/x.txt` nomeia a chave privada `notes:/public/x.txt`, e a chave `default/public/x.txt` (alcançada como `/api/storage/file/default/default/public/x.txt`) fica numa pasta chamada `default`; nenhuma das duas é pública. Num hook, teste a `key` que você recebe com `isPublicStorageKey` de `@rebasepro/types` — `isPublicStoragePath` lê um caminho ou URL do lado do cliente, e considera ambos públicos.
 - **O `list` é controlado no prefixo.** Listar é a forma de descobrir chaves que ninguém informou a você.
 - **Uploads retomáveis (TUS) são controlados no momento da criação**, de forma que um upload negado não deixa nenhum arquivo temporário para trás.
@@ -539,7 +556,7 @@ storageTriggers: [
         path: "uploads/:uid/**",
         events: ["finalize"],
         handler: async ({ key, params, size, user }) => {
-            await jobs.enqueue("index-upload", { key, uid: params.uid, size });
+            await indexUpload.enqueue({ key, uid: params.uid, size }); // a `queue()` in config/resources.ts
         }
     }
 ]

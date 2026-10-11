@@ -1,5 +1,5 @@
 ---
-sourceHash: 589741179a41eb37
+sourceHash: a85dec5a1dd5e6ed
 title: Rebase ne fait pas X
 sidebar_label: Étendre le serveur
 description: L'échelle d'extension côté serveur — déclaration, callback de collection, fonction personnalisée, vos propres routes, votre propre serveur, eject — avec ce que chacun peut et ne peut pas atteindre.
@@ -185,6 +185,12 @@ async function topSellers(driver: DataDriver, since: string) {
 ```
 
 `driver` est ce que vous transmet le contexte d'une fonction personnalisée (`c.get("driver")`), ou `context.driver` dans un callback. Restreignez son type avec `isSQLAdmin` plutôt que de forcer le transtypage (casting) : ce garde fait la différence entre un driver incapable d'exécuter du SQL qui le signale clairement, et un driver qui lève une exception `admin.executeSql is not a function` au point d'appel.
+
+<span class="since-badge" data-since="0.25">Depuis 0.25</span> `executeSql` renvoie toutes les lignes qu'il lit. Pour du SQL dont vous ne
+maîtrisez pas la taille, passez `maxResultBytes` : un résultat dont les lignes pèsent plus d'octets
+que cette valeur est refusé avec une erreur dont le `code` est `RESULT_TOO_LARGE`, jamais renvoyé en
+partie. Le `EXECUTE_SQL` du socket temps réel, par lequel passe le `executeSql` d'un client admin,
+fixe 128 Mo pour tous les appelants.
 
 **Quelque chose que le framework devrait faire mais ne fait pas.** Si vous vous retrouvez à patcher `@rebasepro/server-postgres`, ou à faire un eject pour un seul comportement, cela mérite l'ouverture d'une issue plutôt qu'un fork — [github.com/rebasepro/rebase/issues](https://github.com/rebasepro/rebase/issues). `beforeQuery` et `search.mode: "hybrid"` existent tous deux parce qu'un driver patché était la seule alternative.
 

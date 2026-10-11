@@ -1,5 +1,5 @@
 ---
-sourceHash: 75ae5bf75334fb86
+sourceHash: abfa67cfbfee8f87
 title: Typisiertes SDK — Erste Schritte
 sidebar_label: Erste Schritte
 description: Installieren und konfigurieren Sie das typisierte SDK von Rebase, um von jeder JavaScript- oder TypeScript-Anwendung aus mit Ihrem Backend zu interagieren.
@@ -101,7 +101,7 @@ Wenn `Database` übergeben wird, gibt `createRebaseClient` eine Instanz von `Cre
 
 Ein von *Ihnen* geschriebener Property-Schlüssel bleibt Ihr Schlüssel, unabhängig von seiner Schreibweise — nichts benennt einen von Ihnen gewählten Namen um. Die beiden Schlüssel, die eher abgeleitet als deklariert werden – der Fremdschlüssel einer Relation und eine durch Introspektion zurückgelesene Spalte –, sind in camelCase gehalten.
 
-`Row` beschreibt einen Lesevorgang, `Insert` ein `create()` und `Update` ein `update()` — sie haben nicht dieselbe Struktur. Eine Spalte, die nicht erforderlich ist, ist bei allen drei als `T | null` definiert, sodass ein Schreibvorgang sie leeren kann; der Primärschlüssel ist bei einem Lesevorgang immer vorhanden und bei einem Update niemals setzbar; ein `belongsTo`-Ziel kann entweder als Relation (`{ author: 5 }`) oder als Fremdschlüssel (`{ authorId: 5 }`) geschrieben werden; und eine `hasMany`- oder `manyToMany`-Mitgliedschaft wird als Liste von Ziel-IDs oder `{ id }`-Objekten geschrieben (`{ tags: ["t-1"] }`), jedes mit einem `_pivot`, wenn die Zwischentabelle (Junction) Payload-Spalten deklariert. Ein Feld, das niemand schreiben darf (`access: { write: [] }`), ist weder in `Insert` noch in `Update` enthalten.
+`Row` beschreibt einen Lesevorgang, `Insert` ein `create()` und `Update` ein `update()` — sie haben nicht dieselbe Struktur. Eine Spalte, die nicht erforderlich ist, ist bei allen drei als `T | null` definiert, sodass ein Schreibvorgang sie leeren kann; der Primärschlüssel ist bei einem Lesevorgang immer vorhanden und bei einem Update niemals setzbar; ein `belongsTo`-Ziel kann entweder als Relation (`{ author: 5 }`) oder als Fremdschlüssel (`{ authorId: 5 }`) geschrieben werden; und eine `hasMany`- oder `manyToMany`-Mitgliedschaft wird als Liste von Ziel-IDs oder `{ id }`-Objekten geschrieben (`{ tags: ["t-1"] }`), jedes mit einem `_pivot`, wenn die Zwischentabelle (Junction) Payload-Spalten deklariert. Ein Feld, das niemand schreiben darf (`access: { write: [] }`), ist weder in `Insert` noch in `Update` enthalten. Eine `date`-Spalte wird als ISO-String gelesen, und ein Schreibvorgang akzeptiert diesen String oder ein `Date`.
 
 ## Kurzes Beispiel
 

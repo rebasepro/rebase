@@ -1,5 +1,5 @@
 ---
-sourceHash: 480ba165906124fe
+sourceHash: 9109031950f77ac1
 title: Modos de Visualização
 sidebar_label: Modos de Visualização
 description: Configure as visualizações de tabela, cartões e quadro Kanban para suas coleções.
@@ -52,7 +52,7 @@ A visualização em lista é o modo de visualização padrão clássico e limpo 
 
 ## Visualização em Tabela
 
-A visualização padrão é uma planilha virtualizada de alto desempenho com:
+A visualização de tabela é uma planilha virtualizada de alto desempenho com:
 
 - **Edição inline** — Clique em qualquer célula para editar no local
 - **Redimensionamento de colunas** — Arraste os cabeçalhos das colunas
@@ -68,11 +68,11 @@ Controle a altura da linha com `defaultSize`:
 
 | Tamanho | Pixels | Melhor para |
 |---------|--------|-------------|
-| `"xs"`  | 40     | Tabelas de dados densos |
-| `"s"`   | 54     | Padrão      |
-| `"m"`   | 80     | Com miniaturas de imagem |
-| `"l"`   | 120    | Cartões com pré-visualizações |
-| `"xl"`  | 260    | Pré-visualizações de conteúdo rico |
+| `"xs"`  | 36     | Tabelas de dados densos |
+| `"s"`   | 42     | Linhas de texto compactas |
+| `"m"`   | 48     | Padrão      |
+| `"l"`   | 96     | Miniaturas de imagem médias |
+| `"xl"`  | 160    | Miniaturas de imagem grandes |
 
 ## Visualização Kanban
 

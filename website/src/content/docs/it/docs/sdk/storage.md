@@ -1,5 +1,5 @@
 ---
-sourceHash: 1a6f27afc2ce649a
+sourceHash: 7f4db751ce80395f
 title: Archiviazione e file
 sidebar_label: Archiviazione
 description: Carica, scarica, elenca ed elimina file usando il modulo di archiviazione dell'SDK tipizzato di Rebase.
@@ -29,6 +29,16 @@ const result = await client.storage.putObject({
 
 // result: { key: string; bucket: string; storageUrl: string }
 ```
+
+<span class="since-badge" data-since="0.25">Da 0.25</span> Un file oltre 8 MiB sale attraverso l'endpoint
+riprendibile (TUS) del server, 8 MiB per richiesta, invece che come un'unica richiesta multipart che il server
+analizza per intero — così un caricamento grande costa al server un chunk di memoria, non da tre
+a cinque volte il file. Un chunk che fallisce lungo la strada viene inviato di nuovo da dove
+il server era arrivato. Il risultato, l'oggetto memorizzato e i controlli del server
+sono gli stessi in entrambi i casi. Quando l'endpoint riprendibile non può accettare il file (un
+server più vecchio, o più istanze che non condividono i caricamenti), il file va come un unico
+`POST /api/storage/upload`, e lo stesso vale per ogni file successivo di quel client. Vedi
+[Caricamenti riprendibili (TUS)](/docs/backend/storage-resumable-uploads/).
 
 ### Da un campo file
 
@@ -76,7 +86,11 @@ const { url } = await client.storage.getSignedUrl(
 ```
 
 L'SDK memorizza nella cache gli URL firmati per evitare chiamate ridondanti al server, fino alla scadenza
-del token di download di ciascuno. La cache appartiene alla credenziale che l'ha richiesta: quando il token
+del token di download di ciascuno. <span class="since-badge" data-since="0.25">Da 0.25</span> Le ricerche fatte insieme — una pagina di anteprime
+che chiama `getSignedUrl()` nello stesso tick — vanno al server come un solo
+`POST /api/storage/metadata` ogni 100 file, che il rate limiter conta come un
+decimo delle richieste che sostituisce; un file che un chiamante non può leggere fa fallire
+solo quella chiamata. La cache appartiene alla credenziale che l'ha richiesta: quando il token
 di accesso cambia — una disconnessione, un altro utente che accede, un refresh — riparte da zero, così a un
 utente non viene mai consegnato un URL generato per un altro.
 
@@ -157,7 +171,7 @@ const result = await client.storage.listObjects("products/images/", {
 });
 
 for (const item of result.items) {
-    console.log(item.fullPath, item.name);
+    console.log(item.fullPath, item.name, item.size, item.updated, item.contentType);
 }
 
 // Paginate
@@ -167,6 +181,12 @@ if (result.nextPageToken) {
     });
 }
 ```
+
+<span class="since-badge" data-since="0.25">Da 0.25</span> Ogni elemento porta la sua `size` in byte e `updated` (un
+timestamp ISO 8601) su storage locale, S3 e GCS, e il suo `contentType` su storage locale
+e GCS — abbastanza per mostrare una cartella senza un `getSignedUrl()` per file. Un elenco
+S3 non ha il content type; le cartelle (`result.prefixes`) non portano nessuno dei
+tre.
 
 ## Formati delle chiavi di archiviazione
 

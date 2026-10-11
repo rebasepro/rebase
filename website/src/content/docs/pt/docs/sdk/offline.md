@@ -1,5 +1,5 @@
 ---
-sourceHash: bc550d505d122629
+sourceHash: 6c16b3e7b3784d47
 title: Offline e Sincronização Local-First
 sidebar_label: Offline
 description: Ative o motor de sincronização local-first do SDK tipado do Rebase — um banco de dados local de linhas, escritas offline instantâneas com reversão e consultas ao vivo reativas.
@@ -61,7 +61,7 @@ try {
 Enquanto a conexão está reconhecidamente fora do ar, uma escrita sequer é tentada — ela é aplicada localmente e entra na fila, de modo que não custa nada em vez de um timeout:
 
 ```typescript
-// Returns immediately, offline or not.
+// While offline, returns at once with the locally applied row.
 const post = await client.data.posts.create({ title: "Draft", status: "draft" });
 
 // Shows up in every matching list, right away.
@@ -70,7 +70,7 @@ const drafts = await client.data.posts.where("status", "==", "draft").find();
 
 As linhas criadas offline recebem um id gerado pelo cliente, no tipo que os ids da coleção já têm: um **inteiro negativo** onde são números, uma string UUID onde são strings. O sinal é a pista — uma chave real nunca é negativa —, por isso uma linha que ainda não chegou ao servidor é reconhecível sem consulta, e `id` continua a ser o que o tipo `Row` gerado diz. Numa coleção que este dispositivo nunca leu não há nada local de onde deduzir o tipo, e o id é um UUID.
 
-Se o servidor atribuir o seu próprio na reexecução, a linha local e quaisquer escritas enfileiradas que ainda apontem para o id temporário são movidas para o id real. Até lá, não guarde um id temporário fora da base de dados offline: uma chave estrangeira ou um URL guardado que contenha um aponta para uma linha prestes a ser renumerada.
+Se o servidor atribuir o seu próprio na reexecução, a linha local e quaisquer escritas enfileiradas que ainda apontem para o id temporário são movidas para o id real, em todas as coleções: um post enfileirado com `author_id` definido como um autor criado offline é enviado com o id que o servidor deu ao autor. Se o servidor recusar o autor, as escritas que o referenciam são descartadas junto com ele e reportadas como `DEPENDENCY_REJECTED` (veja [Quando o Servidor Diz Não](#quando-o-servidor-diz-não)). Até lá, não guarde um id temporário fora da base de dados offline: uma chave estrangeira ou um URL guardado que contenha um aponta para uma linha prestes a ser renumerada.
 
 As escritas são reexecutadas na ordem em que você as fez, entre coleções — de modo que um create em uma coleção ainda chega antes da linha de outra que o referencia.
 
@@ -123,7 +123,7 @@ const { online, pending, syncing, lastSyncedAt, lastError } = client.offline!.st
 
 | Método | Finalidade |
 |--------|---------|
-| `status()` | Conectividade atual, tamanho da fila, atividade de sincronização, último erro |
+| `status()` | Conectividade atual, tamanho da fila, atividade de sincronização, último erro e `persisted`: se o navegador concordou em manter a base de dados offline (perguntado quando a primeira escrita é enfileirada; `false` significa que ela pode ser removida sob pressão de armazenamento, escritas não enviadas inclusive) |
 | `onStatusChange(fn)` | Assinar o item acima |
 | `onQueueChange(fn)` | Apenas o número de escritas não enviadas, para um badge |
 | `pending()` | As próprias mutações enfileiradas, da mais antiga para a mais recente. `pending({ orphaned: true })`: as que foram enfileiradas sem sessão iniciada — veja [Usuários](#usuários) |
@@ -147,7 +147,9 @@ const client = createRebaseClient({
 });
 ```
 
-A cascata é estreita: um `update` é descartado junto com a escrita que ele editava, porque só pode falhar da mesma maneira. Um `create` ou `delete` posterior para a mesma linha se sustenta por conta própria e é mantido. Uma escrita descartada nunca foi enviada. Ela é reportada com um `RebaseApiError` cujo `code` é `DEPENDENCY_REJECTED` e cujo `cause` é a recusa que a condenou, para que você possa distingui-la da escrita que o servidor de fato recusou. Na 0.23 ela carrega em vez disso o próprio erro da escrita recusada.
+Uma linha que outra pessoa excluiu é o único caso que não é revertido. Um `delete` enfileirado dela fez o que devia, então conta como sincronizado e não é reportado. Uma edição enfileirada dela é reportada, e a linha é removida da base de dados local em vez de restaurada, porque o servidor não a tem mais.
+
+A cascata é estreita: um `update` é descartado junto com a escrita que ele editava, porque só pode falhar da mesma maneira. Um `create` ou `delete` posterior para a mesma linha se sustenta por conta própria e é mantido. Um `create` recusado de uma linha criada offline também leva consigo toda escrita enfileirada, em qualquer coleção, cujos valores referenciem o id temporário da linha. Uma escrita descartada nunca foi enviada. Ela é reportada com um `RebaseApiError` cujo `code` é `DEPENDENCY_REJECTED` e cujo `cause` é a recusa que a condenou, para que você possa distingui-la da escrita que o servidor de fato recusou. Na 0.23 ela carrega em vez disso o próprio erro da escrita recusada.
 
 Edições consecutivas em uma mesma linha enquanto offline são mescladas em uma única escrita na fila, para que um formulário sendo digitado não faça a fila crescer. Se o servidor recusar a escrita mesclada por causa do seu conteúdo (um 400, 403 ou 422 — por exemplo, um campo removido por uma alteração de esquema enquanto o usuário estava offline), o motor a divide novamente nas edições separadas e reproduz cada uma. Apenas a edição que o servidor recusa é revertida e reportada; as demais são mantidas.
 
@@ -156,6 +158,8 @@ Uma falha que é meramente temporária — um 429, um 503, uma conexão interrom
 ## Várias Abas
 
 As abas do mesmo app compartilham um único banco de dados IndexedDB, portanto compartilham as linhas locais e a fila de saída (outbox). Uma escrita em uma delas aparece nas outras, e apenas uma aba por vez reexecuta a fila. Nada a configurar.
+
+Essa última garantia vem da [Web Locks API](https://developer.mozilla.org/en-US/docs/Web/API/Web_Locks_API) do navegador, que só existe em um contexto seguro (HTTPS ou `localhost`) e não no Safari anterior ao 15.4 nem em alguns webviews embutidos. Sem ela, toda aba aberta reexecuta a fila quando sincroniza. Creates, escritas em lote, updates e deletes são todos reexecutados sob uma chave de idempotência, então um servidor que armazena chaves aplica cada um deles uma só vez; o que você pode ver é a mesma escrita enviada de duas abas.
 
 ## Usuários
 
@@ -225,8 +229,11 @@ O único contrato além do óbvio é que as listagens por prefixo voltam em orde
 O cliente não é uma réplica do seu banco de dados, e não finge ser:
 
 - **Apenas as linhas que o app leu ou escreveu estão locais.** Uma consulta que o cliente nunca enviou ainda pode ser respondida com o que ele possui, mas a resposta pode estar sem linhas que o servidor teria retornado. Os resultados ao vivo indicam isso através de `partial`.
+- **`findAll()` e `iterate()` leem apenas páginas que o servidor respondeu neste dispositivo.** Uma varredura continua enquanto cada página disser que há mais, e só o servidor pode dizer isso. Offline, uma varredura que precisa de uma página que este dispositivo nunca buscou falha com o erro `OFFLINE` (`isOfflineError`) em vez de retornar parte da coleção como se fosse toda ela. Na 0.24 ela parava nessa página e retornava o que tinha.
+- **`count()` offline precisa de uma contagem que o servidor deu a este dispositivo para a mesma consulta.** As escritas enfileiradas desde então a movem: creates, edições que levam uma linha para dentro ou para fora do filtro, e deletes. Sem uma, ele falha com o erro `OFFLINE` em vez de contar as linhas que este dispositivo por acaso possui. Na 0.24 ele retornava esse número.
 - **`searchString` é aproximado** como uma varredura de substring que não diferencia maiúsculas de minúsculas sobre os campos de texto em cache. O servidor executa uma busca de texto completo real sobre as colunas configuradas da coleção.
 - **As relações trazidas por `include` não podem ser avaliadas localmente** — as linhas relacionadas vivem em coleções que a consulta nunca carregou. Uma consulta assim é sempre marcada como `partial` quando respondida a partir do cache.
+- **Os conflitos são last-writer-wins, por campo, sem detecção.** Um `update` reexecutado envia os campos que o usuário alterou e nada mais, então os campos que ele não tocou mantêm o que o servidor tem. Para um campo que ele *alterou*, uma mudança que outra pessoa fez no servidor enquanto ele estava offline é sobrescrita quando a fila é reexecutada, e nenhum dos usuários é avisado. Nada compara versões na reexecução.
 - **A reexecução é pelo menos uma vez.** Uma escrita que chega ao servidor mas cuja resposta se perde pode ser enviada de novo. Prefira escritas idempotentes (`createMany` com `upsert`) onde duplicatas fizerem diferença.
 - **Um upsert em uma chave natural precisa do servidor.** Qual linha um destino `onConflict` indica só o servidor consegue descobrir, então `upsert()` em uma chave natural (ou sem o id da linha), e um `createMany()` com `onConflict` que nunca foi enviado, são recusados offline com `OFFLINE_UPSERT_UNSUPPORTED`. Um upsert na chave primária, com a chave em cada linha, é colocado na fila.
 - **As leituras locais aplicam a semântica do Postgres, não os dados do banco de dados.** Os filtros são avaliados como o SQL faria — comparações com `NULL` são desconhecidas, `ORDER BY` coloca os nulos por último em ordem crescente —, mas sobre a cópia das linhas que o cliente tem, que pode estar desatualizada.

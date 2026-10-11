@@ -1,5 +1,5 @@
 ---
-sourceHash: 0db20d62bf304b74
+sourceHash: a03adef95cbad36c
 title: Paginazione
 sidebar_label: Paginazione
 description: Esegui la paginazione di una collezione con limit/offset, numeri di pagina o un cursore keyset — e scopri quando ciascuno smette di essere corretto.
@@ -159,7 +159,7 @@ const rows = await client.data.orders
     .findAll();
 ```
 
-Tre opzioni configurano lo scorrimento:
+Quattro opzioni configurano lo scorrimento:
 
 | Opzione | Predefinito | Cosa fa |
 |---------|-------------|---------|

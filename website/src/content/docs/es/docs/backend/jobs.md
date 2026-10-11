@@ -1,5 +1,5 @@
 ---
-sourceHash: 81ca845faa40b4f5
+sourceHash: a30d441e176f5d1c
 title: Trabajos en segundo plano
 sidebar_label: Trabajos en segundo plano
 description: Una cola de trabajos duradera respaldada por Postgres — trabajo que sobrevive a un reinicio, reintentado con retroceso, donde los fallos se conservan en lugar de descartarse.
@@ -34,7 +34,25 @@ await initializeRebaseBackend({
 });
 ```
 
-Desactivado a menos que lo solicite: un worker sondea la base de datos continuamente, lo cual no es un valor predeterminado que cualquiera elegiría. Necesita un controlador capaz de ejecutar SQL; en uno que no puede (MongoDB), la cola no está disponible y se le informa al arrancar en lugar de al realizar el primer encolado.
+Desactivado a menos que lo solicite: un worker sigue buscando trabajo mientras el proceso viva, lo cual no es un valor predeterminado que cualquiera elegiría. Necesita un controlador capaz de ejecutar SQL; en uno que no puede (MongoDB), la cola no está disponible y se le informa al arrancar en lugar de al realizar el primer encolado.
+
+<span class="since-badge" data-since="0.25">Desde 0.25</span> Un worker inactivo no sondea cada dos segundos. Cada encolado envía un
+`NOTIFY` en el canal `rebase_jobs` cuando se confirma, y un worker que mantiene un
+`LISTEN` sobre él reclama de inmediato: un trabajo encolado por otro proceso (el rol
+`api`, otra réplica) empieza en milisegundos, y uno diferido cuando
+vence. Aun así, revisa cada 30 segundos de todos modos. Un trabajo que encola este proceso,
+un reintento que programó y un trabajo que recuperó lo despiertan sin
+notificación.
+
+El `LISTEN` necesita una conexión propia, que se busca como la busca el tiempo real:
+`DATABASE_DIRECT_URL` si está definida, si no `DATABASE_URL`. Detrás de un pooler en modo transacción
+como PgBouncer, define `DATABASE_DIRECT_URL`: un pooler no mantiene un
+`LISTEN`, y los trabajos de otros procesos esperarían entonces a la revisión de 30 segundos.
+Donde no hay ninguna conexión así (la base de datos de desarrollo en proceso),
+un worker inactivo espacia sus revisiones: mira tras `pollIntervalMs` (2 segundos),
+luego el doble de tiempo tras cada revisión que no encontró nada, hasta 30 segundos, y
+vuelve a empezar cada vez que encuentra trabajo. Un worker inactivo hace unos 2.900 reclamos
+al día en lugar de 43.200.
 
 ## Encolado
 
@@ -83,10 +101,35 @@ Así, un handler lento en un worker vivo conserva su trabajo, tarde lo que tarde
 jobs: {
     enabled: true,
     concurrency: 5,              // jobs at once, per instance
-    pollIntervalMs: 2_000,       // when the last look found nothing
+    pollIntervalMs: 2_000,       // the first wait after a look that found nothing; it doubles up to 30 s
     visibilityTimeoutMs: 300_000 // how long an unrenewed claim holds
 }
 ```
+
+### Un handler que nunca termina
+
+La otra cara: un handler que espera un `fetch` que nunca responde retiene su ranura de
+worker, y su reclamo, mientras el proceso viva — cinco de ellos y el worker no ejecuta
+nada más, mientras `/health` sigue en verde.
+<span class="since-badge" data-since="0.25">Desde 0.25</span> Define `timeoutMs` para
+acotar un intento. Al llegar al límite, el intento falla — se reintenta mientras queden
+intentos, como cualquier excepción —, su ranura se libera y el `signal` del handler se
+aborta. Pásalo a lo que corresponda, para que el trabajo también se detenga; un handler que lo ignora
+sigue ejecutándose en segundo plano sin que nada registre su resultado.
+
+```typescript no-verify
+jobs: {
+    enabled: true,
+    timeoutMs: 120_000,          // one attempt; no limit when left out
+    tasks: {
+        "sync-crm": async ({ payload, signal }) => {
+            await fetch(crmUrl, { method: "POST", body: JSON.stringify(payload), signal });
+        }
+    }
+}
+```
+
+Los handlers de cola y las suscripciones a temas reciben el mismo `signal` en su contexto.
 
 ## Varias instancias
 
@@ -106,10 +149,10 @@ const { jobQueue } = await initializeRebaseBackend({ jobs: { enabled: true } });
 const dispatcher = new WebhookDispatcher({ jobQueue });
 dispatcher.setWebhooks(myWebhooks);
 
-jobQueue?.register(WEBHOOK_DELIVERY_TASK, ctx => dispatcher.deliverQueuedJob(ctx.payload as never));
+jobQueue?.register(WEBHOOK_DELIVERY_TASK, ctx => dispatcher.deliverQueuedJob(ctx.payload as never, ctx));
 ```
 
-Solo el **id** del webhook se almacena en el trabajo, nunca el webhook en sí; de lo contrario, su secreto de firma permanecería en texto plano en `rebase.jobs` durante todo el tiempo que la retención conserve la fila, y un webhook editado entre el encolado y la entrega debe enviarse con su estado actual.
+Solo el **id** del webhook se almacena en el trabajo, nunca el webhook en sí; de lo contrario, su secreto de firma permanecería en texto plano en `rebase.jobs` durante todo el tiempo que la retención conserve la fila, y un webhook editado entre el encolado y la entrega debe enviarse con su estado actual. Pasar `ctx` como segundo argumento hace que cada intento envíe su propio `X-Webhook-Attempt`; todos los intentos de una misma entrega envían el mismo `X-Webhook-Delivery`, de modo que un receptor puede deduplicar los reintentos.
 
 Una entrega que el dispatcher se niega a enviar (un destino loopback, link-local, privado o que no sea `http(s)`), o una que el receptor responde con una redirección, falla de la misma manera cada vez. Pasa a dead-letter tras un solo intento, con el motivo en `last_error`. Cualquier otro fallo se reintenta como en cualquier trabajo.
 

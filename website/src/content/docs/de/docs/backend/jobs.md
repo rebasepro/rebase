@@ -1,5 +1,5 @@
 ---
-sourceHash: 81ca845faa40b4f5
+sourceHash: a30d441e176f5d1c
 title: Hintergrund-Jobs
 sidebar_label: Hintergrund-Jobs
 description: Eine dauerhafte, Postgres-gestützte Job-Warteschlange – Aufgaben, die einen Neustart überstehen, mit Backoff wiederholt werden und bei denen Fehler aufbewahrt statt verworfen werden.
@@ -34,7 +34,11 @@ await initializeRebaseBackend({
 });
 ```
 
-Standardmäßig deaktiviert: Ein Worker pollt die Datenbank kontinuierlich, was kein Standardverhalten ist, das jeder möchte. Er benötigt einen Treiber, der SQL ausführen kann – bei einem Treiber, der dies nicht kann (MongoDB), ist die Warteschlange nicht verfügbar, und Sie werden bereits beim Start darauf hingewiesen und nicht erst beim ersten Einreihen.
+Standardmäßig deaktiviert: Ein Worker sucht so lange nach Arbeit, wie der Prozess lebt, was kein Standardverhalten ist, das jeder möchte. Er benötigt einen Treiber, der SQL ausführen kann – bei einem Treiber, der dies nicht kann (MongoDB), ist die Warteschlange nicht verfügbar, und Sie werden bereits beim Start darauf hingewiesen und nicht erst beim ersten Einreihen.
+
+<span class="since-badge" data-since="0.25">Seit 0.25</span> Ein untätiger Worker pollt nicht alle zwei Sekunden. Jedes Einreihen sendet beim Commit ein `NOTIFY` auf dem Kanal `rebase_jobs`, und ein Worker, der ein `LISTEN` darauf hält, beansprucht sofort – ein Job, der von einem anderen Prozess eingereiht wird (die `api`-Rolle, eine andere Replik), startet innerhalb von Millisekunden, ein verzögerter, wenn er fällig wird. Dahinter schaut er trotzdem alle 30 Sekunden nach. Ein Job, den dieser Prozess einreiht, ein Retry, den er geplant hat, und ein Job, den er zurückgefordert hat, wecken ihn ohne Benachrichtigung.
+
+Das `LISTEN` braucht eine eigene Verbindung, die so gefunden wird wie bei Realtime: `DATABASE_DIRECT_URL`, wenn gesetzt, sonst `DATABASE_URL`. Setzen Sie hinter einem Pooler im Transaction-Modus wie PgBouncer `DATABASE_DIRECT_URL`: Ein Pooler hält kein `LISTEN`, und Jobs aus anderen Prozessen würden dann auf den 30-Sekunden-Blick warten. Wo es überhaupt keine solche Verbindung gibt (die In-Process-Entwicklungsdatenbank), fährt ein untätiger Worker stattdessen zurück: Er schaut nach `pollIntervalMs` (2 Sekunden) nach, danach nach jeweils doppelt so langer Zeit, wenn der Blick nichts fand, bis zu 30 Sekunden, und beginnt von vorn, sobald er Arbeit findet. Ein untätiger Worker macht etwa 2.900 Claims pro Tag statt 43.200.
 
 ## Jobs einreihen
 
@@ -83,10 +87,29 @@ Ein langsamer Handler auf einem lebenden Worker behält seinen Job also, egal wi
 jobs: {
     enabled: true,
     concurrency: 5,              // jobs at once, per instance
-    pollIntervalMs: 2_000,       // when the last look found nothing
+    pollIntervalMs: 2_000,       // the first wait after a look that found nothing; it doubles up to 30 s
     visibilityTimeoutMs: 300_000 // how long an unrenewed claim holds
 }
 ```
+
+### Ein Handler, der nie fertig wird
+
+Die Kehrseite: Ein Handler, der auf ein `fetch` wartet, das nie antwortet, hält seinen Worker-Slot und seinen Claim, solange der Prozess lebt – bei fünf davon führt der Worker nichts anderes mehr aus, während `/health` grün bleibt.
+<span class="since-badge" data-since="0.25">Seit 0.25</span> Setzen Sie `timeoutMs`, um einen Versuch zu begrenzen. Mit Ablauf der Frist schlägt der Versuch fehl — er wird wiederholt, solange Versuche übrig sind, wie bei jedem Throw —, sein Slot wird frei, und das `signal` des Handlers wird abgebrochen. Reichen Sie das Signal weiter, damit auch die Arbeit stoppt; ein Handler, der es ignoriert, läuft im Hintergrund weiter, ohne dass etwas sein Ergebnis aufzeichnet.
+
+```typescript no-verify
+jobs: {
+    enabled: true,
+    timeoutMs: 120_000,          // one attempt; no limit when left out
+    tasks: {
+        "sync-crm": async ({ payload, signal }) => {
+            await fetch(crmUrl, { method: "POST", body: JSON.stringify(payload), signal });
+        }
+    }
+}
+```
+
+Queue-Handler und Topic-Subscriptions erhalten dasselbe `signal` in ihrem Kontext.
 
 ## Mehrere Instanzen
 
@@ -106,10 +129,10 @@ const { jobQueue } = await initializeRebaseBackend({ jobs: { enabled: true } });
 const dispatcher = new WebhookDispatcher({ jobQueue });
 dispatcher.setWebhooks(myWebhooks);
 
-jobQueue?.register(WEBHOOK_DELIVERY_TASK, ctx => dispatcher.deliverQueuedJob(ctx.payload as never));
+jobQueue?.register(WEBHOOK_DELIVERY_TASK, ctx => dispatcher.deliverQueuedJob(ctx.payload as never, ctx));
 ```
 
-Auf dem Job wird nur die **ID** des Webhooks gespeichert, niemals der Webhook selbst – das Signatur-Secret würde sonst für die Dauer der Aufbewahrungsfrist im Klartext in `rebase.jobs` liegen, und ein Webhook, der zwischen dem Einreihen und der Zustellung bearbeitet wurde, sollte im aktuellen Zustand gesendet werden.
+Auf dem Job wird nur die **ID** des Webhooks gespeichert, niemals der Webhook selbst – das Signatur-Secret würde sonst für die Dauer der Aufbewahrungsfrist im Klartext in `rebase.jobs` liegen, und ein Webhook, der zwischen dem Einreihen und der Zustellung bearbeitet wurde, sollte im aktuellen Zustand gesendet werden. Wird `ctx` als zweites Argument übergeben, sendet jeder Versuch seinen eigenen `X-Webhook-Attempt`; alle Versuche einer Zustellung senden denselben `X-Webhook-Delivery`, sodass ein Empfänger die Wiederholungen deduplizieren kann.
 
 Eine Zustellung, die der Dispatcher verweigert (ein Loopback-, Link-Local-, privates oder Nicht-`http(s)`-Ziel), oder eine, auf die der Empfänger mit einer Weiterleitung antwortet, schlägt jedes Mal gleich fehl. Sie geht nach einem Versuch in die Dead-Letter-Ablage, mit dem Grund in `last_error`. Jeder andere Fehler wird wie bei jedem Job wiederholt.
 

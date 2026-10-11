@@ -1,5 +1,5 @@
 ---
-sourceHash: 15c8b3bdbf304f1c
+sourceHash: 439048db8ee5b538
 title: Configuration du stockage
 sidebar_label: Configuration du stockage
 description: Configurez des backends de stockage sur système de fichiers local, compatibles S3 ou GCS/Firebase Storage pour les téléversements de fichiers, les images et les médias.
@@ -36,6 +36,8 @@ const backend = await initializeRebaseBackend({
     }
 });
 ```
+
+Le stockage local conserve les métadonnées de chaque objet à côté de lui, sous la forme `<key>.metadata.json` : une clé dont le dernier segment se termine par `.metadata.json` est donc refusée avec `400 INVALID_STORAGE_KEY` sur toutes les routes. S3 et GCS conservent les métadonnées sur l'objet et stockent n'importe quelle clé.
 
 ### Stockage S3
 
@@ -101,7 +103,8 @@ image: {
 | `POST` | `/api/storage/upload?storageId=<key>` | Téléversement vers un backend nommé spécifique |
 | `GET` | `/api/storage/file/*` | Récupérer un fichier — tout ce qui suit `/file/` est la clé de l'objet |
 | `GET` | `/api/storage/file/*?storageId=<key>` | Récupérer un fichier depuis un backend spécifique |
-| `GET` | `/api/storage/metadata/*` | Taille, type de contenu et dernière modification d'un objet, sans ses octets |
+| `GET` | `/api/storage/metadata/*` | Taille, type de contenu et métadonnées personnalisées d'un objet, sans ses octets, plus un jeton de téléchargement à courte durée de vie lorsqu'il est privé |
+| `POST` | `/api/storage/metadata` | <span class="since-badge" data-since="0.25">Depuis 0.25</span> La même chose pour 100 objets au plus d'une même source : corps `{ keys, storageId? }` |
 | `DELETE` | `/api/storage/file/*` | Supprimer un fichier |
 | `GET` | `/api/storage/list` | Lister les objets sous un préfixe (`prefix`, `bucket`, `maxResults`, `pageToken`, `storageId`). Un `maxResults` inférieur à 1, ou un `pageToken` que la source n'a jamais émis, donne `400 INVALID_LIST_OPTIONS` |
 | `POST` | `/api/storage/folder` | Créer un marqueur de dossier vide |
@@ -120,12 +123,21 @@ fait exception, car sa charge utile est le fichier lui-même — elle répond av
 
 ```json
 // GET /api/storage/list?prefix=products/images/
-{ "data": { "items": [ { "bucket": "default", "fullPath": "products/images/a.jpg", "name": "a.jpg" } ], "prefixes": [] } }
+{ "data": { "items": [ { "bucket": "default", "fullPath": "products/images/a.jpg", "name": "a.jpg",
+  "size": 48213, "updated": "2026-10-01T12:00:00.000Z", "contentType": "image/jpeg" } ], "prefixes": [] } }
 ```
+
+<span class="since-badge" data-since="0.25">Depuis 0.25</span> Une liste décrit chaque fichier qu'elle renvoie : sa `size` en octets et `updated`, la date de sa dernière
+écriture, sur le stockage local, S3 et GCS, et son `contentType` sur le stockage local et GCS. Une liste S3
+ne porte pas le type : sur S3 il est donc absent, et `/api/storage/metadata/*` le donne toujours. Un dossier de
+`prefixes` ne porte aucun de ces champs, pas plus qu'un `StorageController` personnalisé qui ne les
+définit pas.
 
 `POST /api/storage/upload` répond `201` avec les informations `{ key, bucket, storageUrl }`
 de l'objet stocké sous `data` ; `GET /api/storage/metadata/*` renvoie les métadonnées
 de l'objet et, pour un objet privé, le `token` à courte durée de vie ;
+`POST /api/storage/metadata` un objet indexé par les chemins qui ont été envoyés, chacun contenant ce que
+le `GET` aurait répondu pour lui (voir ci-dessous) ;
 `GET /api/storage/sources` renvoie le tableau des sources configurées, avec `configured: true`. Sur un déploiement sans aucun stockage, il répond `200 {"data": [], "configured": false}`, tandis que toutes les autres routes répondent `501 STORAGE_NOT_CONFIGURED`. `GET /api/auth/config` signale la même chose avec `storage: false`, si bien qu'un client peut se dispenser de demander.
 `DELETE /api/storage/file/*` et `POST /api/storage/folder` ne transportent qu'un
 `message`, puisqu'il n'y a rien à retourner.
@@ -135,6 +147,26 @@ Sur S3 et GCS, un `bucket` doit être l'un de ceux que sert la source, en
 un téléversement TUS qui nomme un autre bucket répond
 `404 UNKNOWN_STORAGE_SOURCE`, comme le listage. Le stockage local crée toujours
 un bucket lors de sa première écriture.
+
+**Beaucoup d'objets à la fois.** <span class="since-badge" data-since="0.25">Depuis 0.25</span> `POST /api/storage/metadata` accepte
+`{ "keys": ["photos/a.png", "photos/b.png"], "storageId": "media" }` — jusqu'à 100 chemins d'objets d'une
+même source, chacun écrit comme l'accepte `GET /api/storage/metadata/<key>` — et répond une entrée par clé :
+
+```json
+{ "data": {
+  "photos/a.png": { "fullPath": "photos/a.png", "size": 48213, "contentType": "image/png", "token": "…", "tokenExpiresIn": 300 },
+  "photos/b.png": { "error": { "code": "FORBIDDEN", "message": "Not authorized for this object", "status": 403 } }
+} }
+```
+
+Chaque clé est jugée exactement comme le `GET` la juge — le même hook `storageAuthorize` et la même portée de
+stockage, la même règle de publicité, un jeton de téléchargement qui lui est propre — et une clé refusée,
+absente ou mal formée répond avec son propre `error` sans faire échouer ni révéler les autres. Un appelant
+sans session dans un déploiement qui en exige une reçoit le `401` que répondrait le `GET`, sauf si toutes les
+clés sont publiques. Plus de 100 clés, ou un corps sans `keys`, donne `400 BAD_REQUEST`. Le limiteur de débit
+compte la requête comme ⌈N/10⌉ requêtes pour N clés : une page de 100 miniatures en coûte donc 10.
+`client.storage.getSignedUrl()` et le panneau d'administration envoient ainsi les recherches qu'une page fait
+ensemble, et se rabattent sur un `GET` par fichier face à un serveur qui n'a pas cette route.
 
 **Comment la lecture d'un fichier est autorisée.** Les routes de lecture — `/api/storage/file/*` et
 `/api/storage/metadata/*` — acceptent le jeton signé à courte durée de vie généré par
@@ -238,11 +270,7 @@ sur chaque réponse, transformations d'URL et URL à jeton de téléchargement c
 directement, il s'affiche avec les scripts désactivés et une origine opaque, si bien qu'il ne
 peut atteindre ni les cookies ni les points de terminaison de l'API.
 
-## Protocole de reprise de téléversement TUS
-
-Pour le téléversement de fichiers volumineux ou la gestion de conditions réseau instables, Rebase implémente le protocole ouvert **TUS v1.0.0**, incluant les extensions `Creation` et `Termination`.
-
-### Quelle taille un fichier peut atteindre
+## Quelle taille un fichier peut atteindre
 
 Chaque source de stockage accepte des fichiers jusqu'à sa propre limite : **50 Mo** sauf si
 `STORAGE_MAX_FILE_SIZE` (en octets, suffixé `__<KEY>` pour une source nommée) ou le `maxFileSize`
@@ -259,30 +287,13 @@ STORAGE_MAX_FILE_SIZE=209715200          # (default): 200 MB
 STORAGE_MAX_FILE_SIZE__MEDIA=1073741824  # media: 1 GB
 ```
 
-Un fichier complet est retenu dans la mémoire du serveur pendant son écriture vers le stockage,
-sur chaque chemin de téléversement ; dimensionnez donc la limite en fonction de la mémoire dont
-dispose le serveur.
-
-```
-Client                                                   Rebase Server
-  │                                                           │
-  │─── POST /api/storage/tus (Upload-Length: 50000000) ──────>│ (Generates session ID)
-  │<── 201 Created (Location: /api/storage/tus/uuid-abc) ────│
-  │                                                           │
-  │─── PATCH /api/storage/tus/uuid-abc (Upload-Offset: 0) ───>│ (Appends chunk via open/write)
-  │<── 204 No Content (Upload-Offset: 1500000) ───────────────│
-  │                                                           │
-  │─── PATCH /api/storage/tus/uuid-abc (Upload-Offset: 1.5M) ─>│ (Upload finishes)
-  │<── 204 No Content (Upload-Offset: 50000000) ──────────────│ (Copies to storage, unlinks temp)
-```
-
-### Mécanique du cycle de vie d'un téléversement
-
-1. **Initialisation de la session (`POST`)** : Le client envoie la taille totale du fichier dans l'en-tête `Upload-Length` et les métadonnées en base64 via `Upload-Metadata`. Le serveur crée un fichier temporaire vide sous un répertoire temporaire masqué `.tus-uploads/` et renvoie l'URL de téléversement.
-2. **Consultation de la progression (`HEAD`)** : Si un téléversement est interrompu, le client interroge l'URL de téléversement à l'aide d'une requête `HEAD`. Le serveur renvoie la position actuelle en octets dans l'en-tête `Upload-Offset`.
-3. **Ajout de données (`PATCH`)** : Le client reprend l'envoi des données binaires en partant du décalage retourné avec `Content-Type: application/offset+octet-stream`. Le serveur écrit chaque fragment dans le fichier temporaire au décalage d'octets que déclare la requête, qui doit être le décalage que détient le serveur (`409` sinon). Un seul fragment est reçu à la fois : un `PATCH` qui arrive alors qu'un autre fragment du même téléversement est encore en cours de réception — typiquement un client qui renvoie un fragment resté bloqué — reçoit `423 UPLOAD_LOCKED`, et le client reprend depuis le décalage que rapporte `HEAD`.
-4. **Finalisation** : Lorsque l'`Upload-Offset` cumulé correspond à l'`Upload-Length` déclaré, Rebase lit le fichier temporaire finalisé, l'encapsule sous forme d'objet `File` JavaScript standard et l'enregistre sur le backend de stockage configuré (disque local ou S3). Le fichier temporaire est ensuite supprimé.
-5. **Nettoyage périodique** : Un processus de nettoyage en arrière-plan s'exécute toutes les **60 secondes** pour supprimer les téléversements temporaires orphelins et incomplets qui ont dépassé le seuil de rétention de **24 heures**.
+La quantité d'un fichier que le serveur détient à la fois dépend de la porte d'accès.
+`POST /api/storage/upload` est un seul corps multipart, que le serveur analyse en entier :
+trois à cinq fois le fichier dans sa mémoire. Un téléversement reprenable (TUS) ne détient qu'un
+fragment à la fois. <span class="since-badge" data-since="0.25">Depuis 0.25</span> `client.storage.putObject()` et le panneau d'administration envoient un fichier
+de plus de 8 Mio de façon reprenable. Voir
+[Téléversements reprenables (TUS)](/docs/backend/storage-resumable-uploads/) pour le
+protocole, ce qu'il répond et son comportement entre plusieurs instances.
 
 ## Variables d'environnement
 
@@ -511,7 +522,8 @@ Renvoyez `false` pour refuser avec un code **403**. Lever une exception refuse �
 
 Bon à savoir :
 
-- **La route de métadonnées est l'endroit où l'accès en lecture est réellement validé.** Elle génère le jeton de téléchargement temporaire restreint au chemin, auquel la route de fichier fait confiance ; le hook effectue donc le filtrage à ce niveau. Les requêtes présentant déjà un tel jeton, ou ciblant un chemin déclaré public, ignorent le hook — le jeton a été délivré sous son contrôle et n'est valide que pour son propre chemin.
+- **La route de métadonnées est l'endroit où l'accès en lecture est réellement validé.** Elle génère le jeton de téléchargement temporaire restreint au chemin, auquel la route de fichier fait confiance ; le hook effectue donc le filtrage à ce niveau. Les requêtes présentant déjà un tel jeton, ou ciblant un chemin déclaré public, ignorent le hook — le jeton a été délivré sous son contrôle et n'est valide que pour son propre chemin. Seules ces deux lectures l'ignorent : un utilisateur que votre adaptateur d'authentification appelle `public` est interrogé comme n'importe qui d'autre.
+- **Un bucket, un nom.** Sur S3 et GCS, le `bucket` du hook vaut toujours `"default"`, y compris lorsqu'une requête nomme le bucket du fournisseur, qui atteint les mêmes objets.
 - **Un chemin est public quand la clé qu'il désigne l'est.** Le préfixe `public/` est testé sur la clé canonique que sert la route — après lecture d'un segment de bucket `default/` initial et repli de `//`, `./` et d'un `/` initial —, jamais sur l'URL telle qu'elle est écrite. `/api/storage/file/notes://public/x.txt` désigne la clé privée `notes:/public/x.txt`, et la clé `default/public/x.txt` (atteinte via `/api/storage/file/default/default/public/x.txt`) se trouve dans un dossier nommé `default` ; aucune des deux n'est publique. Dans un hook, testez la `key` qui vous est transmise avec `isPublicStorageKey` de `@rebasepro/types` — `isPublicStoragePath` lit un chemin ou une URL côté client, et considère ces deux cas comme publics.
 - **`list` est filtré selon le préfixe.** L'opération de listage permet de découvrir des clés dont personne ne vous a communiqué l'existence.
 - **Les téléversements avec reprise (TUS) sont filtrés dès la création**, ainsi un téléversement refusé ne laisse aucun fichier temporaire derrière lui.
@@ -541,7 +553,7 @@ storageTriggers: [
         path: "uploads/:uid/**",
         events: ["finalize"],
         handler: async ({ key, params, size, user }) => {
-            await jobs.enqueue("index-upload", { key, uid: params.uid, size });
+            await indexUpload.enqueue({ key, uid: params.uid, size }); // a `queue()` in config/resources.ts
         }
     }
 ]

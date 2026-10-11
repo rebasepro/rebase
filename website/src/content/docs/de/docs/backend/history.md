@@ -1,5 +1,5 @@
 ---
-sourceHash: c61516d8bb8e724e
+sourceHash: a62053f25d91d42c
 title: Entitätshistorie
 sidebar_label: Entitätshistorie
 description: Verfolgen Sie jede Änderung an Ihren Entitäten mit einem vollständigen Audit-Trail – wer hat was wann geändert, inklusive vollständigem Vorher-/Nachher-Zustand.
@@ -61,9 +61,11 @@ const ordersCollection = defineCollection({
 ## Funktionsweise
 
 1. Das Backend erstellt automatisch eine Tabelle `rebase.entity_history`.
-2. Bei jedem Erstellen, Aktualisieren oder Löschen wird ein Snapshot aufgezeichnet mit:
+2. Bei jedem Erstellen, Aktualisieren oder Löschen wird ein Eintrag aufgezeichnet mit:
    - Der Entitäts-ID und dem Collection-Slug (in `table_name`)
-   - Den vollständigen Werten der Entität (vorher und nachher)
+   - Den Werten der Entität nach der Änderung (`values`; bei einem Löschen die
+     Entität, die gelöscht wurde)
+   - Bei einem Update dem, was die geänderten Felder davor enthielten (`previous_values`)
    - Zeitstempel und Benutzer-ID
    - Der Aktion (`create`, `update`, `delete`)
    - Einem Array aus `changed_fields`, das zeigt, welche Spalten geändert wurden
@@ -72,6 +74,28 @@ Die Werte sind die Zeile, so wie die REST-API sie liefert: ihre Spalten, Daten a
 
 Bei einer Collection mit [Soft Delete](/docs/collections/soft-delete/) wird ein Löschen als `delete` aufgezeichnet und eine Wiederherstellung (das Update, das das Soft-Delete-Feld wieder auf `null` setzt) als `update`. Die Historie einer Zeile bleibt lesbar, während sich die Zeile im Papierkorb befindet, und ein Revert auf eine Version von vor dem Löschen stellt sie wieder her.
 
+### Was `previous_values` enthält
+
+<span class="since-badge" data-since="0.25">Seit 0.25</span> Ein Update-Eintrag
+behält in `previous_values` nur die Felder, die in `changed_fields` aufgeführt sind. Jedes
+andere Feld hatte vor und nach der Änderung denselben Wert und steht deshalb bereits in
+`values`; die ganze Zeile doppelt zu speichern kostete bei einer Ein-Feld-Änderung an einer
+Zeile mit 20 Feldern 1.269 Bytes, wo es jetzt 794 sind.
+
+Vor 0.25 aufgezeichnete Einträge behalten die ganze vorherige Zeile. Das `format` des
+Eintrags sagt, welche es ist:
+
+| `format` | `previous_values` bei einem Update |
+|---|---|
+| `1` (Einträge von vor 0.25) | Die ganze Zeile vor der Änderung |
+| `2` | Nur die `changed_fields`, jedes so, wie die ganze Zeile es hatte |
+
+Die Historienansicht des Admins und ein Revert lesen beide gleichermaßen: Die Ansicht zeigt den
+vorherigen Wert jedes geänderten Felds, und ein Revert schreibt die `values` des gewählten
+Eintrags zurück, die in beiden Formaten vollständig sind. Um die Zeile so wiederherzustellen,
+wie sie vor einer `format: 2`-Änderung war, nehmen Sie `values` und setzen jedes Feld zurück,
+das `previous_values` enthält.
+
 ### Diff-Tracking & strukturelle Deep Equality
 
 Um redundante Protokolle zu vermeiden, wenn Felder gespeichert werden, sich aber keine Werte ändern, führt der `HistoryService` einen strukturellen Deep-Equality-Vergleich auf den Top-Level-Schlüsseln der alten und neuen Werte durch:
@@ -79,11 +103,17 @@ Um redundante Protokolle zu vermeiden, wenn Felder gespeichert werden, sich aber
 - Wenn Unterschiede festgestellt werden, werden die Namen der geänderten Eigenschaften in der Spalte `changed_fields` (`text[]`) gespeichert.
 - Wenn die Deep-Equality-Prüfung keinerlei Änderungen feststellt, wird das Einfügen in die Historie vollständig übersprungen.
 
-### Nicht-blockierendes Pruning nach dem Speichern
+### Pruning
 
-Im Gegensatz zu herkömmlichen Systemen, die sich vollständig auf langsame, periodische Batch-Skripte verlassen, setzt Rebase Ihre Aufbewahrungsrichtlinien kontinuierlich durch:
-- Direkt nachdem eine Entität gespeichert oder gelöscht wurde, plant der Server einen **inline asynchronen Bereinigungsdurchlauf** in einem nicht-blockierenden Fire-and-Forget-Promise ein.
-- Dieser Durchlauf prüft sofort die Retention-Limits für diese spezifische Entitäts-ID und entfernt Einträge, die über die neuesten 200 hinausgehen oder älter als der Aufbewahrungszeitraum sind.
+Die Aufbewahrung wird an zwei Stellen durchgesetzt:
+- **Nach jedem Schreibvorgang**, für die geschriebene Entität: Direkt nachdem sie gespeichert
+  oder gelöscht wurde, entfernt der Server die Einträge dieser Entität, die über die neuesten
+  200 hinausgehen oder älter als der Aufbewahrungszeitraum sind. Der Schreibvorgang wird dadurch
+  nicht aufgehalten.
+- <span class="since-badge" data-since="0.25">Seit 0.25</span> **Einmal pro Stunde**,
+  für jede Entität: Einträge, die älter als der Aufbewahrungszeitraum sind, werden gelöscht,
+  unabhängig davon, wozu sie gehören — auch bei Entitäten, in die nie wieder geschrieben
+  wird, etwa gelöschten. Siehe [Pruning-Lebenszyklusmechanik](#pruning-lebenszyklusmechanik).
 
 ## REST-Endpunkt
 
@@ -103,9 +133,10 @@ Gibt eine Liste von Historie-Einträgen für eine bestimmte Entität zurück, ab
             "action": "update",
             "changed_fields": ["status"],
             "values": { "status": "shipped", "total": 99.99 },
-            "previous_values": { "status": "pending", "total": 99.99 },
+            "previous_values": { "status": "pending" },
             "updated_by": "admin-user-id",
-            "updated_at": "2025-01-15T10:30:00Z"
+            "updated_at": "2025-01-15T10:30:00Z",
+            "format": 2
         }
     ],
     "meta": { "total": 1, "limit": 20, "offset": 0, "hasMore": false }
@@ -122,7 +153,17 @@ Jede Entität behält zudem höchstens ihre neuesten **200** Einträge. Diese Ob
 
 ### Pruning-Lebenszyklusmechanik
 
-Das Pruning erfolgt ausschließlich inline. Es wird asynchron direkt nach jeder aufgezeichneten Änderung für die geänderte Entität ausgeführt: Einträge, die älter als der Aufbewahrungszeitraum sind, werden gelöscht, danach alles, was über die neuesten 200 hinausgeht. Es gibt keinen periodischen Durchlauf; daher wird die Historie einer Entität, in die nie wieder geschrieben wird, nicht bereinigt – ihre alten Einträge bleiben bestehen, bis die nächste Änderung an dieser Entität vorgenommen wird oder Sie sie selbst aus `rebase.entity_history` löschen.
+Nach jeder aufgezeichneten Änderung wird die geänderte Entität bereinigt: Ihre Einträge, die älter als der Aufbewahrungszeitraum sind, werden gelöscht, danach alles, was über ihre neuesten 200 hinausgeht. Das läuft asynchron und hält den Schreibvorgang nicht auf.
+
+<span class="since-badge" data-since="0.25">Seit 0.25</span> Einmal pro Stunde löscht das Backend zusätzlich jeden Eintrag, der älter als der Aufbewahrungszeitraum ist, von jeder Entität. Zuvor wurde die Historie einer Entität, in die nie wieder geschrieben wurde — jeder gelöschten —, überhaupt nicht bereinigt. Der Durchlauf:
+
+- läuft pro Stunde auf einer Instanz der Flotte, auf den Prozessen, die die geplanten Jobs ausführen (er beansprucht seine Stunde in `rebase.cron_claims`, wie es eine Cron-Ausführung tut), zum ersten Mal beim Start des Backends;
+- löscht in Batches von 5.000 Einträgen, je eine Anweisung, bis ein Batch kürzer ausfällt, und überspringt Einträge, die ein anderer Durchlauf hält — ein erster Durchlauf über einen großen Rückstand besteht also aus vielen kurzen Löschvorgängen, nicht aus einem langen;
+- liest einen Index auf `updated_at`, `idx_history_updated_at`. In einer vor 0.25 erstellten Datenbank wird er nach dem ersten Start im Hintergrund aufgebaut, per `CREATE INDEX CONCURRENTLY`, ohne Lese- oder Schreibzugriffe zu blockieren — etwa eine Sekunde pro 2 Millionen Einträge.
+
+Derselbe Start entfernt `idx_history_entity`, wo er existiert: `idx_history_time` beginnt mit denselben Spalten und bedient jeden Lesezugriff, den er bediente, sodass er nur jede aufgezeichnete Änderung verlangsamte. Das Entfernen wartet jeweils höchstens eine Sekunde auf die Sperre der Tabelle, und eine Tabelle, die etwas durchgehend hält, behält den Index bis zum nächsten Start.
+
+Die Obergrenze von 200 Einträgen pro Entität wird nur nach einem Schreibvorgang auf diese Entität angewendet.
 
 ## Nächste Schritte
 

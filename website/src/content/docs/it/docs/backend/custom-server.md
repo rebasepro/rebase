@@ -1,5 +1,5 @@
 ---
-sourceHash: 15e127696fc3c50e
+sourceHash: b27c45a011cb8c16
 title: Integrazione Server Personalizzato
 sidebar_label: Server Personalizzato (Express)
 description: Come integrare i servizi Rebase Database e Realtime nel tuo backend Node.js personalizzato senza utilizzare Hono o il coordinator di Rebase.
@@ -56,7 +56,7 @@ e validarlo solo a metà.
 :::
 
 **Comportamenti chiave:**
-- Genera automaticamente `JWT_SECRET` e `REBASE_SERVICE_KEY` effimeri in fase di sviluppo, permettendo l'avvio senza configurazione manuale.
+- Genera `JWT_SECRET` e `REBASE_SERVICE_KEY` in fase di sviluppo quando non sono impostati, permettendo l'avvio senza configurazione manuale, e li memorizza in `.rebase-dev-secrets.json` così un riavvio non disconnette nessuno.
 - Blocca i segreti generati automaticamente in produzione — è necessario impostarli esplicitamente.
 - Valida che `CORS_ORIGINS` o `FRONTEND_URL` siano configurati in produzione.
 - Rifiuta uno schema `extend` generato da una copia diversa di zod.
@@ -88,8 +88,9 @@ async function startServer() {
     
     // 1. WebSocket Upgrade Guard
     // WebSockets require hijacking the HTTP Upgrade header. You must bind
-    // Rebase to a raw Node.js http.Server instance.
-    const server = createServer(app);
+    // Rebase to a raw Node.js http.Server instance. 64 KB of headers, as the
+    // Rebase runtime takes: a vector search in the URL outgrows Node's 16 KB.
+    const server = createServer({ maxHeaderSize: 64 * 1024 }, app);
 
     // 2. Configure the connection pool
     const pool = new pg.Pool({
@@ -212,7 +213,7 @@ async function startServer() {
 startServer();
 ```
 
-> **Percorso standard:** se il tuo server utilizza `initializeRebaseBackend` (come nel template di scaffolding), non implementare manualmente l'handler di shutdown mostrato sopra: usa invece l'helper integrato. Questo si occupa di svuotare le richieste HTTP, arrestare il cron scheduler, arrestare i servizi realtime, proteggere da segnali ripetuti ed eseguire un'uscita forzata se la chiusura si blocca:
+> **Percorso standard:** se il tuo server utilizza `initializeRebaseBackend` (come nel template di scaffolding), non implementare manualmente l'handler di shutdown mostrato sopra: usa invece l'helper integrato. Questo si occupa di svuotare le richieste HTTP, arrestare il cron scheduler, arrestare i servizi realtime, chiudere il pool di connessioni SMTP quando nulla può più inviare, proteggere da segnali ripetuti ed eseguire un'uscita forzata se la chiusura si blocca:
 >
 > ```ts
 > import { installShutdownHandlers } from "@rebasepro/server";
@@ -254,10 +255,16 @@ app.use(cors({
     exposedHeaders: [
         "ETag", "Retry-After", "X-Request-ID",
         "X-RateLimit-Limit", "X-RateLimit-Remaining", "X-RateLimit-Reset",
-        "Preference-Applied"
+        "Preference-Applied",
+        // Resumable uploads, which the SDK uses for files over 8 MiB
+        "Location", "Upload-Offset", "Rebase-Upload-Result"
     ]
 }));
 ```
+
+<span class="since-badge" data-since="0.25">Da 0.25</span> Gli ultimi tre sono gli header con cui risponde un upload riprendibile. Senza di essi
+l'SDK non può seguirne uno da un'altra origine, e invia ogni file come un'unica
+richiesta multipart.
 
 Il runtime di Rebase e il backend ottenuto con `rebase eject` inviano già questo elenco. Sulla 0.23 non espongono nessuno di questi header, quindi un frontend su un'altra origine non legge alcun `ETag`.
 

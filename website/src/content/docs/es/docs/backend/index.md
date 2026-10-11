@@ -1,5 +1,5 @@
 ---
-sourceHash: a6b7f50250fe821b
+sourceHash: 627e02641d926641
 title: Descripción general del backend
 sidebar_label: Backend
 description: El backend de Rebase proporciona un servidor completo con API REST, autenticación, almacenamiento, WebSocket en tiempo real e historial de entidades, todo inicializado con una única llamada a una función.
@@ -101,7 +101,7 @@ Tras la inicialización, se montan estas rutas:
 | `/api/meta/contract` | El esquema de colecciones del proyecto (necesita `schema:read`) |
 | `/api/meta/schema-version` | Una cadena de versión para dicho esquema (sin autenticación) |
 | `/api/functions/*` | Rutas de funciones personalizadas (cuando `functionsDir` está configurado) |
-| `/api/cron/*` | Gestión de tareas cron (`cron:read` / `cron:write`, cuando `cronsDir` está configurado) |
+| `/api/admin/cron/*` | Gestión de tareas cron (`cron:read` / `cron:write`, cuando `cronsDir` está configurado) |
 | WebSocket en upgrade | Suscripciones en tiempo real |
 
 ---
@@ -294,7 +294,7 @@ Cada fallo —desde cualquier ruta, en cualquier subsistema— se devuelve en un
 
 El estado HTTP se encuentra en la respuesta, no en el cuerpo. Bifurque sobre `code`, no sobre `message`; los mensajes están escritos para humanos y pueden cambiar con libertad.
 
-El SDK tipado convierte cada uno de estos en un `RebaseApiError` que incluye `status`, `code` y `details`, incluidos los fallos que ni siquiera llegaron a un servidor. Una conexión rechazada, un fallo de DNS, CORS o una cancelación (abort) llegan como `status: 0`, `code: "NETWORK_ERROR"`, con el propio error del runtime en `cause`, en lugar de lo que a `fetch` le haya parecido rechazar. Por lo tanto, el código de la aplicación captura una sola clase:
+El SDK tipado convierte cada uno de estos en un `RebaseApiError` que incluye `status`, `code` y `details`, incluidos los fallos que ni siquiera llegaron a un servidor. Una conexión rechazada, un fallo de DNS, CORS o una cancelación (abort) llegan como `status: 0`, `code: "NETWORK_ERROR"`, con el propio error del runtime en `cause`, en lugar de lo que a `fetch` le haya parecido rechazar. Una respuesta sin envoltorio (envelope) — un 413 de un proxy, un 502 de un balanceador de carga — recibe igualmente un `code` a partir de su estado (`PAYLOAD_TOO_LARGE`, `SERVICE_UNAVAILABLE`, `INTERNAL_ERROR`, …), y un cliente construido fuera de un navegador sin `baseUrl` falla con `BASE_URL_REQUIRED` en lugar de con un error de red. Por lo tanto, el código de la aplicación captura una sola clase:
 
 ```typescript
 async function setPrice(id: string, price: number) {

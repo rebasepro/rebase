@@ -1,5 +1,5 @@
 ---
-sourceHash: a1bb0a08ed6263fe
+sourceHash: 4bed2a9ed4ceb358
 title: Autenticação
 sidebar_label: Autenticação
 description: Autenticação no lado do cliente com o SDK Rebase — login com e-mail/senha, provedores OAuth, gerenciamento de sessão e listeners de estado de autenticação.
@@ -202,7 +202,8 @@ const profile = await client.auth.findUserByEmail("user@example.com");
 ```
 
 Três campos não sensíveis e nada mais — o suficiente para exibir "você está convidando
-Jane" antes que um convite seja enviado.
+Jane" antes que um convite seja enviado. Opt-in: apenas para um chamador conectado, e um 404
+a menos que o backend defina `AUTH_ALLOW_USER_LOOKUP=true` (`auth.allowUserLookup`).
 
 ## Autenticação Multifator
 
@@ -401,11 +402,11 @@ no template gerado recebe isso automaticamente. As requisições de dados não p
 em meio à restauração é enviada assim que ela se resolve — como o usuário restaurado, ou anonimamente — de modo que uma
 primeira renderização nunca lê uma listagem pública no lugar da do próprio usuário.
 
-Uma restauração bem-sucedida também aciona `onAuthStateChange` como `TOKEN_REFRESHED` — afinal,
-*é* uma atualização —, mas um listener sozinho não consegue informar se a restauração terminou:
-uma inicialização sem sessão não emite absolutamente nada, o que é indistinguível de uma
-ainda em andamento. Aguarde `isInitialized()` para essa confirmação e use o
-listener para alterações posteriores.
+Uma restauração que atualiza (um token armazenado expirado, ou o modo cookie) aciona
+`onAuthStateChange` como `TOKEN_REFRESHED`; um token armazenado ainda válido é adotado
+silenciosamente. Assim, um listener não consegue informar se a restauração terminou: uma inicialização que não emite
+nada é indistinguível de uma ainda em andamento. Aguarde `isInitialized()`
+para essa confirmação e use o listener para alterações posteriores.
 
 ## Listener de Estado de Autenticação
 
@@ -549,10 +550,9 @@ const config = await client.auth.getAuthConfig();
 //   sessionManagement: boolean,
 //   profileUpdate: boolean,
 //   emailVerification: boolean,
-//   magicLink: boolean,
-//   anonymousLogin: boolean,
-//   enabledProviders: string[],
-//   needsSetup: boolean
+//   magicLink: boolean, emailOtp?: boolean,
+//   anonymousLogin: boolean, enabledProviders: string[],
+//   externalLoginUrl?: string, needsSetup?: boolean, storage?: boolean
 // }
 ```
 

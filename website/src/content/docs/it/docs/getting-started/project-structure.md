@@ -1,5 +1,5 @@
 ---
-sourceHash: a2683fa13dc31db1
+sourceHash: 5cc79175741f55e8
 title: Struttura del progetto
 sidebar_label: Struttura del progetto
 description: Comprendi la struttura di un progetto Rebase — frontend, backend e configurazione delle collection.
@@ -174,7 +174,7 @@ Lo `slug` diventa il percorso URL nell'interfaccia di amministrazione e l'endpoi
 1. **Tu definisci** le collection in `config/collections/`
 2. **Il backend** le legge per generare gli schemi Drizzle e registrare le route REST
 3. **Il frontend** le legge (tramite il plugin Vite) per renderizzare tabelle, moduli e navigazione
-4. **La CLI** le legge per generare i file di migrazione con `rebase schema generate`
+4. **La CLI** le legge per generare lo schema Drizzle (`rebase schema generate`), i tipi dell'SDK (`rebase generate-sdk`) e, a partire da quello schema, i file di migrazione (`rebase db generate`)
 
 Mentre `rebase dev` è in esecuzione, il salvataggio di un file all'interno di `config/collections/` rigenera `backend/src/schema.generated.ts` e i tipi dell'SDK in `generated/sdk/` e riavvia il backend; all'avvio vengono create le tabelle e le colonne mancanti. Al di fuori di `rebase dev`, gli stessi passaggi corrispondono a `rebase schema generate` e `rebase generate-sdk`.
 

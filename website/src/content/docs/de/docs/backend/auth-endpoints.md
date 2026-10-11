@@ -1,5 +1,5 @@
 ---
-sourceHash: 83e2d04a56801ab8
+sourceHash: 5f6462b96e4cf1be
 title: Auth-Endpunkte und Tokens
 sidebar_label: Auth-Endpunkte
 description: Die Authentifizierungs-Routen, die das Rebase-Backend bereitstellt, ihre Antwortstrukturen, Multi-Faktor-Authentifizierung, der Datenbankkontext für Richtlinien, JWKS und Service-Schlüssel.
@@ -68,6 +68,19 @@ Die administrative Benutzer- und Rollenverwaltung ist eine **separate Schnittste
 | `POST` | `/api/admin/bootstrap` | Dem am frühesten registrierten Benutzer erlauben, die Administratorrolle zu beanspruchen, solange keine existiert. In der Produktion abgelehnt – siehe [First User Bootstrap](/docs/backend/authentication/#first-user-bootstrap) |
 
 Alle Daten-API-Endpunkte erfordern einen gültigen `Authorization: Bearer <token>`-Header, wenn `requireAuth: true` gesetzt ist (Standardeinstellung).
+
+### Passwort-Richtlinie
+
+Ein neues Passwort braucht mindestens 8 Zeichen, mit einem Großbuchstaben, einem
+Kleinbuchstaben und einer Ziffer. Registrierung, Zurücksetzen und Ändern lehnen ein
+Passwort ab, das dies nicht erfüllt, mit `400 WEAK_PASSWORD` und listen jede verletzte
+Regel auf; dasselbe gilt, wenn ein Administrator mit `PUT /api/admin/users/:uid` ein
+Passwort setzt (als einfaches `400`). `POST /api/admin/users` prüft ein übergebenes
+Passwort nicht. Die Anmeldung prüft die Richtlinie nie, sodass ein älteres Passwort
+weiter funktioniert. Um eigene Regeln festzulegen, übergib
+`auth.hooks.validatePasswordStrength` von einem [ejected](/docs/backend/authentication/#configuration)
+Backend. Für den ersten Admin, der aus `REBASE_ADMIN_PASSWORD` angelegt wird, gilt
+eine andere Regel: mindestens 12 Zeichen, sonst nichts.
 
 ### Antwortformat
 

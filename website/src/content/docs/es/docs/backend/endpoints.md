@@ -1,5 +1,5 @@
 ---
-sourceHash: 8f5d12b8af667778
+sourceHash: 6d4b5fe12fe09451
 title: Índice de endpoints
 sidebar_label: Índice de endpoints
 description: Cada ruta HTTP que monta un backend de Rebase — datos, autenticación, almacenamiento, administración, meta — con el control de acceso de cada una y la página que la explica.
@@ -38,7 +38,9 @@ lista fija. `:slug` es el `slug` de una colección.
 | `GET` | `/api/data/collections` | session | [API REST](/docs/backend/api/) |
 | `GET` | `/api/data/:slug` | RLS | [Consultas](/docs/backend/api/#filtering) |
 | `POST` | `/api/data/:slug` | RLS | [API REST](/docs/backend/api/) |
+| `POST` | `/api/data/:slug/query` | RLS | El listado, con los parámetros de consulta en el cuerpo — [Consultas demasiado largas para una URL](/docs/backend/vector-search/#queries-too-long-for-a-url) |
 | `GET` | `/api/data/:slug/count` | RLS | [Consultas](/docs/backend/api/#filtering) |
+| `POST` | `/api/data/:slug/count` | RLS | El conteo, con los parámetros de consulta en el cuerpo — [Consultas demasiado largas para una URL](/docs/backend/vector-search/#queries-too-long-for-a-url) |
 | `GET` | `/api/data/:slug/aggregate` | RLS | [API REST](/docs/backend/api/#rest-endpoints) |
 | `GET` | `/api/data/:slug/:id` | RLS | [API REST](/docs/backend/api/) |
 | `PATCH` | `/api/data/:slug/:id` | RLS | [API REST](/docs/backend/api/) |
@@ -137,11 +139,13 @@ puede acceder a nada de esto. Consulte [Roles y alcances](/docs/backend/roles-an
 | `GET` | `/api/admin/cron/:id/logs` | `cron:read` | [Trabajos cron](/docs/backend/cron-jobs/) |
 | `POST` | `/api/admin/cron/:id/trigger` | `cron:write` | Ejecuta un trabajo ahora |
 | `GET` | `/api/admin/backups` | `backups:read` | Inventario de copias de seguridad |
-| `GET` | `/api/admin/backups/download` | `backups:read` | Transmite en flujo una copia de seguridad |
+| `GET` | `/api/admin/backups/download` | `backups:read` | Transmite en flujo una copia de seguridad. Con `?token=` de un enlace de descarga no hace falta cabecera, solo para esa copia |
+| `POST` | `/api/admin/backups/download-url` | `backups:read` | <span class="since-badge" data-since="0.25">Desde 0.25</span> Un enlace a una copia de seguridad, `{ key }` → `{ url, token, expiresIn }`, válido durante 60 segundos — [Copias de seguridad](/docs/deployment/backups/#download-a-backup) |
 | `GET` | `/api/admin/logs` | `logs:read` | El búfer de registros recientes |
 | `GET` | `/api/admin/logs/latest` | `logs:read` | Las entradas más recientes |
 | `GET` | `/api/admin/logs/stream` | `logs:read` | Server-sent events |
 | `GET` | `/api/admin/rls-audit` | `schema:read` | El resultado más reciente de la auditoría programada |
+| `POST` | `/api/admin/sql/csv` | `database:write` | <span class="since-badge" data-since="0.25">Desde 0.25</span> Transmite en flujo el resultado completo de una consulta de solo lectura como CSV — «Descargar el resultado completo como CSV» de [Studio](/docs/studio/) |
 | `GET` | `/api/admin/schema/status` | `schema:read` | [Edición de esquema en vivo](/docs/backend/live-schema-editing/) |
 | `POST` | `/api/admin/schema/plan` | `schema:read` | Planifica un cambio; nunca lo aplica |
 | `POST` | `/api/admin/schema/apply` | `schema:write` | Solo una persona, a menos que `REBASE_LIVE_SCHEMA_ALLOW_MACHINE_APPLY` |
@@ -166,6 +170,7 @@ a la ruta canónica.
 | `GET` | `/api/storage/file/*` | session + `storageAuthorize` | [Almacenamiento](/docs/backend/storage/) |
 | `DELETE` | `/api/storage/file/*` | session + `storageAuthorize` | [Almacenamiento](/docs/backend/storage/) |
 | `GET` | `/api/storage/metadata/*` | session + `storageAuthorize` | [Almacenamiento](/docs/backend/storage/) |
+| `POST` | `/api/storage/metadata` | session + `storageAuthorize`, por clave | <span class="since-badge" data-since="0.25">Desde 0.25</span> [Almacenamiento](/docs/backend/storage/#storage-endpoints): metadatos de hasta 100 objetos |
 | `GET` | `/api/storage/list` | session + `storageAuthorize` | [Almacenamiento](/docs/backend/storage/) |
 | `POST` | `/api/storage/folder` | session + `storageAuthorize` | [Almacenamiento](/docs/backend/storage/) |
 | `GET` | `/api/storage/sources` | session | Las fuentes de almacenamiento con nombre que sirve este backend |

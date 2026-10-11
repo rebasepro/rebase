@@ -1,5 +1,5 @@
 ---
-sourceHash: 69847a513d72f4a9
+sourceHash: 969be31749747f0b
 title: Référence des Hooks
 sidebar_label: Hooks
 description: Hooks React fournis par Rebase pour accéder à l'authentification, aux données, à la navigation, aux panneaux latéraux, au stockage et à l'état de l'interface.
@@ -152,7 +152,7 @@ function ProductDetail({ productId }) {
 
 Rebase tient un cache mémoire global pour éviter les clignotements de l'interface. Vous pouvez le manipuler directement :
 
-- `populateFetchCache(path, entities)`: Pré-remplit le cache avec une liste d'entités (par ex. après une action groupée ou un appel d'API personnalisé).
+- `populateFetchCache(path, entities)`: Pré-remplit le cache avec une liste d'entités (par ex. après une action groupée ou un appel d'API personnalisé). <span class="since-badge" data-since="0.25">Depuis 0.25</span> Le cache conserve les 2 000 enregistrements écrits ou lus le plus récemment. Une vue de collection n'y écrit plus chaque ligne qu'elle affiche : cliquer sur une ligne, ou sur son action **Edit** ou **Copy**, y place cette seule ligne, si bien que l'enregistrement s'ouvre toujours avec ses valeurs à l'écran.
 - `clearFetchCache()`: Vide le cache. À appeler de préférence à la déconnexion de l'utilisateur, pour éviter toute fuite de données.
 
 ## `usePermissions`

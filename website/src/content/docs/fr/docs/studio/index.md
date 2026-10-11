@@ -1,5 +1,5 @@
 ---
-sourceHash: 0ee4f3fca623b579
+sourceHash: 9a09e0dab8bc0697
 title: Outils du Studio
 sidebar_label: Studio
 description: Rebase Studio fournit des outils de développement pour l'édition visuelle de schémas, les requêtes SQL, le scripting JavaScript, la gestion des politiques RLS et la navigation dans le stockage.
@@ -64,7 +64,7 @@ import { RebaseStudio } from "@rebasepro/studio";
 />
 ```
 
-C'est le serveur, et non le panneau, qui décide si un *enregistrement* aboutit : l'éditeur réécrit les fichiers source des collections, il est donc désactivé sous `NODE_ENV=production`, en mode `baas` et sur un serveur sans `collectionsDir`. Le panneau interroge `GET /api/schema-editor/status` et affiche la raison reçue à côté du bouton désactivé.
+C'est le serveur, et non le panneau, qui décide si un *enregistrement* aboutit : l'éditeur réécrit les fichiers source des collections, il est donc désactivé sous `NODE_ENV=production`, en mode `baas` et sur un serveur sans `collectionsDir`. Le panneau interroge `GET /api/admin/schema-editor/status` et affiche la raison reçue à côté du bouton désactivé.
 
 ### Outils intégrés
 
@@ -72,9 +72,9 @@ Ils sont fournis avec Studio et **chargés à la demande par `RebaseStudio`** �
 
 | Onglet | Slug | Groupe | Rôle |
 |--------|------|--------|------|
-| Console SQL | `sql` | Base de données | Exécuter du SQL brut sur votre base PostgreSQL et lire les résultats dans un tableau. Le tableau affiche le résultat de la dernière instruction, dans la limite de ses 10 000 premières lignes ou de 32 Mo de valeurs ; un résultat plus long indique combien de lignes il comptait, et la copie comme l'export n'incluent que les lignes affichées |
+| Console SQL | `sql` | Base de données | Exécuter du SQL brut sur votre base PostgreSQL et lire les résultats dans un tableau. Le tableau affiche le résultat de la dernière instruction, dans la limite de ses 10 000 premières lignes ou de 32 Mo de valeurs ; un résultat plus long indique combien de lignes il comptait, et la copie comme l'export n'incluent que les lignes affichées. <span class="since-badge" data-since="0.25">Depuis 0.25</span> Un tel résultat propose aussi **Download full result as CSV** : le serveur diffuse l'intégralité du résultat à travers un curseur en lecture seule (`POST /api/admin/sql/csv`), une requête à la fois, sur un serveur Postgres de votre choix plutôt que sur la base de développement en processus |
 | Politiques RLS | `rls` | Base de données | Inspecter et gérer les politiques Row Level Security de vos tables. Une politique est listée telle que la base de données la détient, avec le badge **Diffère du code** lorsque ce n'est pas ce que le projet déclare. Une politique que Rebase génère ne peut pas être modifiée directement dans la base de données, et sur une table que Rebase gère, une bannière indique que chaque démarrage du serveur et chaque `rebase db push` réappliquent les politiques déclarées |
-| Visualiseur de schéma | `schema-visualizer` | Base de données | Diagramme d'entités de vos collections et de leurs relations, tracé à partir des définitions de collection : tables, colonnes, types et relations sont tels que les collections les déclarent. Seuls les marqueurs RLS sont lus depuis la base de données |
+| Visualiseur de schéma | `schema-visualizer` | Base de données | Diagramme d'entités de vos collections et de leurs relations, tracé à partir des définitions de collection : tables, colonnes, types et relations sont tels que les collections les déclarent. Seuls les marqueurs RLS sont lus depuis la base de données. La disposition s'exécute dans un web worker, de sorte que la page reste réactive pendant l'agencement d'un grand diagramme. Un schéma de plus de 300 tables est dessiné un voisinage de table à la fois — les tables situées à une ou deux relations — en partant de la table la plus connectée ; choisissez une autre table dans la liste pour vous déplacer |
 | Branches | `branches` | Base de données | Créer et gérer des [branches de base de données](/docs/backend/branching) |
 | Sauvegardes | `backups` | Base de données | Parcourir et télécharger les sauvegardes de la base |
 | Explorateur de logs | `logs` | Base de données | Journal des requêtes en direct, plus tout ce que le serveur signale en warn ou error — voir ci-dessous |

@@ -1,5 +1,5 @@
 ---
-sourceHash: 480ba165906124fe
+sourceHash: 9109031950f77ac1
 title: Modes d'affichage
 sidebar_label: Modes d'affichage
 description: Configurez les vues tableau, cartes et Kanban pour vos collections.
@@ -52,7 +52,7 @@ La vue liste est le mode d'affichage par défaut classique et épuré des CMS, p
 
 ## Vue Tableau
 
-La vue par défaut est une feuille de calcul virtualisée haute performance avec :
+La vue tableau est une feuille de calcul virtualisée haute performance avec :
 
 - **Édition en ligne** — Cliquez sur n'importe quelle cellule pour modifier sur place
 - **Redimensionnement des colonnes** — Faites glisser les en-têtes de colonne
@@ -68,11 +68,11 @@ Contrôlez la hauteur des lignes avec `defaultSize` :
 
 | Taille | Pixels | Idéal pour |
 |--------|--------|------------|
-| `"xs"` | 40 | Tableaux de données denses |
-| `"s"` | 54 | Par défaut |
-| `"m"` | 80 | Avec des vignettes d'image |
-| `"l"` | 120 | Cartes avec aperçus |
-| `"xl"` | 260 | Aperçus de contenu riche |
+| `"xs"` | 36 | Tableaux de données denses |
+| `"s"` | 42 | Lignes de texte compactes |
+| `"m"` | 48 | Par défaut |
+| `"l"` | 96 | Vignettes d'image moyennes |
+| `"xl"` | 160 | Grandes vignettes d'image |
 
 ## Vue Kanban
 

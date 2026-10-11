@@ -1,5 +1,5 @@
 ---
-sourceHash: 6e23ad27a4c203f4
+sourceHash: 1ae19e3e555334a4
 title: Ramificación de bases de datos
 sidebar_label: Ramificación
 description: Crea ramas aisladas de bases de datos para desarrollo, staging y pruebas usando CREATE DATABASE ... TEMPLATE de PostgreSQL — copias instantáneas y de fidelidad total sin tiempo de inactividad.
@@ -212,6 +212,14 @@ Se sitúa entre el shell y el archivo del proyecto en el orden de resolución:
 Una rama debe tener mayor precedencia que `.env`; de lo contrario, cambiar de rama no tendría efecto en ningún proyecto que defina `DATABASE_URL`. No debe anular a los dos primeros, ya que una opción en la línea de comandos es una instrucción más inmediata que un cambio de rama realizado ayer.
 
 `.rebase/` se encuentra en el archivo gitignore, por lo que la rama en la que te encuentras es un dato propio de tu máquina y nunca del proyecto.
+
+<span class="since-badge" data-since="0.25">Desde 0.25</span> En un checkout cambiado de
+rama, `rebase db branch create`, `list`, `info`, `delete` y `prune` trabajan sobre la base
+de datos principal, donde está el registro, y lo indican. `create` sigue copiando la rama en
+la que estás, salvo que pases `--from`; queda registrada en la base de datos principal, así
+que `list` la muestra desde cualquier checkout. Antes de la 0.25 solo `list` hacía esto, y
+una rama creada desde un checkout cambiado se registraba únicamente en la instantánea de la
+rama.
 
 Las ramas son bases de datos de PostgreSQL comunes nombradas con el prefijo `rb_` seguido del nombre de la rama; por lo tanto, el comando `dev_sandbox` anterior corresponde a la base de datos `rb_dev_sandbox` en el mismo servidor.
 

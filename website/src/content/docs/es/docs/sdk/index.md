@@ -1,5 +1,5 @@
 ---
-sourceHash: 75ae5bf75334fb86
+sourceHash: abfa67cfbfee8f87
 title: SDK tipado — Primeros pasos
 sidebar_label: Primeros pasos
 description: Instala y configura el SDK tipado de Rebase para interactuar con tu backend desde cualquier aplicación JavaScript o TypeScript.
@@ -96,7 +96,7 @@ Cuando se proporciona `Database`, `createRebaseClient` devuelve una instancia de
 
 Una clave de propiedad que *tú* escribiste es tu clave, cualquiera que sea su formato — nada renombra un nombre que hayas elegido. Las dos claves que se derivan en lugar de declararse, la clave foránea de una relación y una columna leída mediante introspección, están en camelCase.
 
-`Row` describe una lectura, `Insert` un `create()` y `Update` un `update()` — no tienen la misma forma. Una columna que no es obligatoria es `T | null` en las tres, de modo que una escritura pueda vaciarla; la clave primaria siempre está presente en una lectura y nunca se puede establecer en una actualización; un destino `belongsTo` se puede escribir tanto como la relación (`{ author: 5 }`) o como su clave foránea (`{ authorId: 5 }`); y una pertenencia `hasMany` o `manyToMany` se escribe como una lista de ids de destino u objetos `{ id }` (`{ tags: ["t-1"] }`), cada uno con un `_pivot` cuando la tabla de unión declara columnas de payload. Un campo que nadie puede escribir (`access: { write: [] }`) no está ni en `Insert` ni en `Update`.
+`Row` describe una lectura, `Insert` un `create()` y `Update` un `update()` — no tienen la misma forma. Una columna que no es obligatoria es `T | null` en las tres, de modo que una escritura pueda vaciarla; la clave primaria siempre está presente en una lectura y nunca se puede establecer en una actualización; un destino `belongsTo` se puede escribir tanto como la relación (`{ author: 5 }`) o como su clave foránea (`{ authorId: 5 }`); y una pertenencia `hasMany` o `manyToMany` se escribe como una lista de ids de destino u objetos `{ id }` (`{ tags: ["t-1"] }`), cada uno con un `_pivot` cuando la tabla de unión declara columnas de payload. Un campo que nadie puede escribir (`access: { write: [] }`) no está ni en `Insert` ni en `Update`. Una columna `date` se lee como una cadena ISO, y una escritura acepta esa cadena o un `Date`.
 
 ## Ejemplo rápido
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: 0ee4f3fca623b579
+sourceHash: 9a09e0dab8bc0697
 title: Studio-Tools
 sidebar_label: Studio
 description: Rebase Studio bietet Entwickler-Tools für die visuelle Schema-Bearbeitung, SQL-Abfragen, JavaScript-Skripte, RLS-Richtlinienverwaltung und das Durchsuchen von Speichern.
@@ -65,7 +65,7 @@ import { RebaseStudio } from "@rebasepro/studio";
 />
 ```
 
-Ob ein *Speichern* ankommt, entscheidet der Server und nicht das Panel: Der Editor schreibt die Quelldateien der Sammlungen, also ist er unter `NODE_ENV=production`, im `baas`-Modus und auf einem Server ohne `collectionsDir` aus. Das Panel fragt `GET /api/schema-editor/status` ab und zeigt den zurückgegebenen Grund neben der deaktivierten Schaltfläche an.
+Ob ein *Speichern* ankommt, entscheidet der Server und nicht das Panel: Der Editor schreibt die Quelldateien der Sammlungen, also ist er unter `NODE_ENV=production`, im `baas`-Modus und auf einem Server ohne `collectionsDir` aus. Das Panel fragt `GET /api/admin/schema-editor/status` ab und zeigt den zurückgegebenen Grund neben der deaktivierten Schaltfläche an.
 
 ### Integrierte Werkzeuge
 
@@ -73,9 +73,9 @@ Sie gehören zu Studio und werden **von `RebaseStudio` lazy geladen** — jedes 
 
 | Tab | Slug | Gruppe | Funktion |
 |-----|------|--------|----------|
-| SQL-Konsole | `sql` | Datenbank | Rohes SQL gegen Ihre PostgreSQL-Datenbank ausführen und Ergebnisse als Tabelle lesen. Die Tabelle zeigt das Ergebnis der letzten Anweisung, bis zu den ersten 10.000 Zeilen oder 32 MB an Werten; ein längeres Ergebnis nennt die Anzahl der Zeilen, und Kopieren und Export enthalten nur die angezeigten Zeilen |
+| SQL-Konsole | `sql` | Datenbank | Rohes SQL gegen Ihre PostgreSQL-Datenbank ausführen und Ergebnisse als Tabelle lesen. Die Tabelle zeigt das Ergebnis der letzten Anweisung, bis zu den ersten 10.000 Zeilen oder 32 MB an Werten; ein längeres Ergebnis nennt die Anzahl der Zeilen, und Kopieren und Export enthalten nur die angezeigten Zeilen. <span class="since-badge" data-since="0.25">Seit 0.25</span> Ein solches Ergebnis bietet außerdem **Download full result as CSV**: Der Server streamt es vollständig über einen schreibgeschützten Cursor (`POST /api/admin/sql/csv`), eine Abfrage nach der anderen, auf einem eigenen Postgres-Server statt der In-Process-Entwicklungsdatenbank |
 | RLS-Richtlinien | `rls` | Datenbank | Row-Level-Security-Richtlinien Ihrer Tabellen prüfen und verwalten. Eine Richtlinie wird so aufgeführt, wie die Datenbank sie hält, und mit **Differs from code** markiert, wo das nicht dem entspricht, was das Projekt deklariert. Eine Richtlinie, die Rebase generiert, lässt sich nicht direkt in der Datenbank bearbeiten, und auf einer Tabelle, die Rebase verwaltet, weist ein Banner darauf hin, dass jeder Serverstart und `rebase db push` die deklarierten Richtlinien erneut anwenden |
-| Schema-Visualizer | `schema-visualizer` | Datenbank | Entity-Diagramm Ihrer Sammlungen und ihrer Beziehungen, gezeichnet aus den Sammlungsdefinitionen: Tabellen, Spalten, Typen und Beziehungen sind so, wie die Sammlungen sie deklarieren. Nur die RLS-Markierungen werden aus der Datenbank gelesen |
+| Schema-Visualizer | `schema-visualizer` | Datenbank | Entity-Diagramm Ihrer Sammlungen und ihrer Beziehungen, gezeichnet aus den Sammlungsdefinitionen: Tabellen, Spalten, Typen und Beziehungen sind so, wie die Sammlungen sie deklarieren. Nur die RLS-Markierungen werden aus der Datenbank gelesen. Das Layout läuft in einem Web Worker, sodass die Seite reaktionsfähig bleibt, während ein großes Diagramm angeordnet wird. Ein Schema mit mehr als 300 Tabellen wird jeweils für die Umgebung einer Tabelle gezeichnet — die Tabellen, die eine oder zwei Relationen entfernt sind —, beginnend bei der am stärksten verbundenen Tabelle; wählen Sie in der Liste eine andere Tabelle, um zu wechseln |
 | Branches | `branches` | Datenbank | [Datenbank-Branches](/docs/backend/branching) anlegen und verwalten |
 | Backups | `backups` | Datenbank | Datenbank-Backups durchsuchen und herunterladen |
 | Logs-Explorer | `logs` | Datenbank | Live-Request-Log, dazu alles, was der Server auf warn oder error meldet — siehe unten |

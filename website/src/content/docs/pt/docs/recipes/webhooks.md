@@ -1,5 +1,5 @@
 ---
-sourceHash: 39e76a1b431b1678
+sourceHash: 97ec2f8d66caedf1
 title: "Receita: Integração de Webhook"
 sidebar_label: Webhooks
 description: Utilize callbacks de entidade para enviar webhooks a serviços externos quando os dados mudam, sem manter aberta a transação da escrita.
@@ -26,59 +26,145 @@ Portanto: nunca use `await` numa requisição HTTP de saída dentro de um callba
 imediatamente — o POST acontece quando a escrita é confirmada, nunca para uma revertida — e o dispatcher
 valida o destino, assina o payload, limita cada tentativa com um prazo e repete as falhas.
 
+Entregue a ele a fila de jobs do backend e cada entrega se torna uma linha em `rebase.jobs`: ela sobrevive a
+um deploy ou a uma falha, é repetida com backoff pelo worker de qualquer instância que a reivindique, e um
+receptor que fica fora do ar por um dia custa linhas, não memória. Ligue a fila com
+`jobs: { enabled: true }` em `initializeRebaseBackend`, e conecte o dispatcher depois que ela
+tiver retornado:
+
 ```typescript
-import type { PostgresCollectionConfig } from "@rebasepro/types";
-import { WebhookDispatcher } from "@rebasepro/server";
+import {
+    WebhookDispatcher,
+    WEBHOOK_DELIVERY_TASK,
+    type QueuedWebhookDelivery,
+    type RebaseBackendInstance
+} from "@rebasepro/server";
 
-// The row shape, so `values.customer_name` is a string rather than nothing.
-type Order = { customer_name: string; total: number };
-
-const dispatcher = new WebhookDispatcher({
-    // Queued deliveries return nothing to the caller, so this is where their
-    // failures surface. Without it, a receiver that has been down for a week
-    // looks exactly like one that is working.
-    onDelivery: (result) => {
-        if (!result.success) {
-            console.error(`Webhook ${result.webhookId} failed: ${result.statusCode} ${result.responseBody}`);
+// Call once, with what `initializeRebaseBackend({ …, jobs: { enabled: true } })` returned.
+export function sendOrderWebhooks(backend: RebaseBackendInstance): void {
+    const dispatcher = new WebhookDispatcher({
+        // Each delivery is a job: kept across deploys, retried by the queue.
+        jobQueue: backend.jobQueue,
+        // Queued deliveries return nothing to the caller, so this is where their
+        // failures surface. Without it, a receiver that has been down for a week
+        // looks exactly like one that is working.
+        onDelivery: (result) => {
+            if (!result.success) {
+                console.error(`Webhook ${result.webhookId} failed: ${result.statusCode} ${result.responseBody}`);
+            }
         }
-    }
-});
+    });
 
-dispatcher.setWebhooks([
-    {
-        id: "wh_orders_slack",
-        url: process.env.SLACK_WEBHOOK_URL!,
-        secret: process.env.WEBHOOK_SECRET,
-        events: ["INSERT"],
-        table: "orders",
-        enabled: true
-    }
-]);
+    dispatcher.setWebhooks([
+        {
+            id: "wh_orders_slack",
+            url: process.env.SLACK_WEBHOOK_URL!,
+            secret: process.env.WEBHOOK_SECRET,
+            events: ["INSERT"],
+            table: "orders",
+            enabled: true
+        }
+    ]);
 
-const ordersCollection: PostgresCollectionConfig<Order> = {
-    slug: "orders",
-    name: "Orders",
-    table: "orders",
-    callbacks: {
+    // The worker side: one attempt per job, and the queue's retries. Passing
+    // `ctx` lets each attempt send its real `X-Webhook-Attempt`.
+    backend.jobQueue?.register<QueuedWebhookDelivery>(WEBHOOK_DELIVERY_TASK, (ctx) => dispatcher.deliverQueuedJob(ctx.payload, ctx));
+
+    backend.setCollectionCallbacks("orders", {
         afterSave: async ({ values, id, status }) => {
             if (status === "new") {
-                // Returns void, immediately. The delivery runs after this
-                // callback returns, so the transaction is not waiting on it.
+                // Returns void, immediately. The job is written after the
+                // write commits, so the transaction is not waiting on it.
                 dispatcher.enqueueEntityChange("orders", "INSERT", String(id), values);
             }
         }
-    },
-    properties: { /* ... */ }
-};
+    });
+}
 ```
 
-A fila é em processo e em memória: uma falha do processo ou um deploy entre a confirmação e a
-entrega perde o evento. Cada webhook tem a sua própria fila, então um receptor fora do ar atrasa apenas
-as suas próprias entregas, nunca as de outro webhook. Chame `await dispatcher.flush(10_000)` no encerramento: ele espera
-o que está na fila e resolve `false` se o orçamento de tempo acabar antes, porque um receptor que
-está fora do ar pode reter cada uma das suas entregas por até ~36 segundos de tentativas. Se as entregas precisam
-sobreviver a um reinício, escreva uma linha de outbox na mesma transação e esvazie-a a partir de um
-job.
+Apenas o id do webhook é armazenado no job, de modo que o seu segredo de assinatura nunca fica em `rebase.jobs`. Um
+destino que o dispatcher recusa, ou um receptor que responde com um redirecionamento, vai para a dead-letter
+após uma tentativa, com o motivo; qualquer outra falha é repetida como em qualquer job. Veja
+[Webhooks duráveis](/docs/backend/jobs#durable-webhooks).
+
+### Sem uma fila de jobs
+
+Deixe `jobQueue` de fora — ou execute em um driver sem SQL, onde o backend não tem uma — e as
+entregas ficam na fila em memória, no processo que fez a alteração. É mais simples, e
+basta para uma notificação que você pode se dar ao luxo de perder:
+
+```typescript
+import { WebhookDispatcher, type RebaseBackendInstance } from "@rebasepro/server";
+
+// Server-only, like the version above: call it with what `initializeRebaseBackend` returned.
+export function sendOrderWebhooks(backend: RebaseBackendInstance): void {
+    const dispatcher = new WebhookDispatcher({
+        onDelivery: (result) => {
+            if (!result.success) {
+                console.error(`Webhook ${result.webhookId} failed: ${result.statusCode} ${result.responseBody}`);
+            }
+        }
+    });
+
+    dispatcher.setWebhooks([
+        {
+            id: "wh_orders_slack",
+            url: process.env.SLACK_WEBHOOK_URL!,
+            secret: process.env.WEBHOOK_SECRET,
+            events: ["INSERT"],
+            table: "orders",
+            enabled: true
+        }
+    ]);
+
+    backend.setCollectionCallbacks("orders", {
+        afterSave: async ({ values, id, status }) => {
+            if (status === "new") {
+                dispatcher.enqueueEntityChange("orders", "INSERT", String(id), values);
+            }
+        }
+    });
+}
+```
+
+Mantenha o dispatcher fora do próprio arquivo da coleção. Um arquivo de coleção também é incluído no
+admin, no navegador: o build remove os seus callbacks, mas um dispatcher criado no topo do arquivo
+e o seu import de `@rebasepro/server` iriam para todos os visitantes, e fariam o build do admin falhar.
+
+Uma falha ou um deploy entre a confirmação e a entrega perde o evento. Cada webhook tem a sua própria
+fila, então um receptor fora do ar atrasa apenas as suas próprias entregas, nunca as de outro webhook.
+<span class="since-badge" data-since="0.25">Desde 0.25</span> A fila de cada webhook comporta no máximo
+10.000 entregas em espera; enquanto estiver cheia, uma nova entrega é recusada e reportada ao `onDelivery`
+com `success: false`, `statusCode: 0`, `attemptNumber: 0` e `responseBody: "queue full"`, e
+o log do servidor avisa uma vez. Chame `await dispatcher.flush(10_000)` no encerramento: ele espera o que
+está na fila e resolve `false` se o orçamento de tempo acabar antes, porque um receptor que está fora do ar pode
+reter cada uma das suas entregas por até ~36 segundos de tentativas.
+
+### O que o receptor recebe
+
+Toda entrega é um `POST` com um corpo JSON e estes cabeçalhos:
+
+| Cabeçalho | Valor |
+| --- | --- |
+| `X-Webhook-Id` | O `id` do webhook |
+| `X-Webhook-Event` | `INSERT`, `UPDATE` ou `DELETE` |
+| `X-Webhook-Delivery` | Um id por entrega, o mesmo em toda tentativa dela |
+| `X-Webhook-Attempt` | Qual tentativa é esta, a partir de `1` |
+| `X-Webhook-Signature` | `sha256=` e o HMAC-SHA256 em hexadecimal do corpo bruto, com a chave `secret` do webhook (apenas quando ele tem uma) |
+
+As entregas são at-least-once: um receptor que respondeu devagar demais, ou um worker que morreu depois do
+`POST`, faz a mesma entrega chegar de novo. Deduplique por `X-Webhook-Delivery` e verifique a
+assinatura sobre o corpo exatamente como ele chegou — antes de interpretá-lo:
+
+```typescript
+import { createHmac, timingSafeEqual } from "node:crypto";
+
+export function isSignedByRebase(rawBody: string, header: string | null, secret: string): boolean {
+    const expected = Buffer.from(`sha256=${createHmac("sha256", secret).update(rawBody).digest("hex")}`);
+    const received = Buffer.from(header ?? "");
+    return received.length === expected.length && timingSafeEqual(received, expected);
+}
+```
 
 ### Chamar um endpoint diretamente
 
@@ -117,6 +203,10 @@ Nunca passe para um `fetch` nu uma URL vinda do seu banco de dados. O dispatcher
 loopback, link-local, privados e esquemas que não sejam `http(s)` antes de conectar, e recusa-se a
 seguir redirecionamentos, justamente porque uma URL armazenada é entrada controlada por um
 atacante.
+<span class="since-badge" data-since="0.25">Desde 0.25</span> No Node, ele julga o endereço para o qual cada
+conexão é de fato feita, dentro da própria resolução de DNS da conexão, de modo que um nome cujo registro
+muda entre uma verificação e a conexão não consegue passar; o nome de um receptor é resolvido
+uma vez por conexão, não uma vez por entrega.
 
 ## Sincronização com API Externa
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: 564c58f7bc002c6f
+sourceHash: 1437a2b48ddb6d7b
 title: Modifica dello schema live
 description: "Crea e modifica collection a fronte di un backend in esecuzione: prima committate nel repository, poi applicate."
 ---
@@ -241,7 +241,11 @@ Pertanto, un'applicazione fallita **non è un errore**. La risposta lo indica ch
 
 ## Dove funziona
 
-La linea di demarcazione è rappresentata dalla presenza o meno del **codice sorgente su disco** sul server in esecuzione — non dal fatto che si tratti o meno di produzione.
+La modifica live dello schema riscrive il sorgente delle tue collection con lo stesso editor
+usato dai salvataggi del pannello che toccano solo il sorgente, quindi funziona dove funziona
+quell'editor: un server con il **sorgente delle collection su disco** (`collectionsDir`) e il
+suo schema editor attivo. Lo schema editor è disattivato con `NODE_ENV=production` a meno che
+il server non imposti `schemaEditor: true`, e richiede che `ts-morph` sia installato.
 
 ### MongoDB
 
@@ -254,15 +258,21 @@ L'unico aspetto che merita un'attenta lettura è la rimozione. Su Postgres la ri
 | Distribuzione | Funziona |
 |---|---|
 | `rebase dev` sulla tua macchina | sì |
-| Self-host con il progetto montato | sì |
-| Self-host da un bundle compilato | sì, con `liveSchema.repository` |
-| Rebase Cloud o qualsiasi bundle | sì, con `liveSchema.repository` |
+| Self-host con il progetto e il suo working tree git montati | sì, quando `NODE_ENV` non è `production`, oppure con `schemaEditor: true` |
+| Un bundle compilato: un self-host che serve una build, oppure Rebase Cloud | no |
 
-Un bundle è un output compilato, quindi non contiene il sorgente delle collection. Configura `liveSchema.repository` e il sorgente verrà recuperato direttamente dal tuo repository; in caso contrario, le route risponderanno con `SCHEMA_EDITING_NO_REPOSITORY` spiegandone la ragione.
+Un bundle è un output compilato, quindi non contiene il sorgente delle collection, e il
+runtime che lo serve disattiva lo schema editor. `/api/admin/schema/status`
+risponde `enabled: false` con il codice `SCHEMA_EDITOR_DISABLED`. Modifica le
+collection in sviluppo, fai il commit e distribuisci.
 
-### Una distribuzione senza sorgente su disco
+### Fare il commit su un repository remoto
 
-Un bundle è un output compilato — vale per ogni tenant Cloud e per qualunque installazione self-host che utilizzi una build. L'editor non ha a disposizione il sorgente delle collection da riscrivere, per cui è necessario puntarlo verso il repository in cui risiede effettivamente il codice:
+`liveSchema.repository` fa sì che il server faccia il commit di ogni modifica su un
+repository GitHub tramite le Git Data API, invece di eseguire `git commit` in un
+working tree. Ha effetto solo su un server con lo schema editor attivo,
+cioè un server con `collectionsDir` su disco (vedi la tabella sopra). Un
+bundle compilato non lo legge.
 
 ```typescript no-verify
 initializeRebaseBackend({
@@ -282,7 +292,7 @@ initializeRebaseBackend({
 })
 ```
 
-La modifica viene quindi letta dal repository, riscritta con lo stesso editor utilizzato in locale e committata nuovamente tramite le Git Data API: un blob, un tree, un commit e l'aggiornamento di un ref. Nulla viene clonato e nulla viene lasciato su disco.
+Il file della collection modificata viene quindi letto dal repository, riscritto con lo stesso editor utilizzato in locale e committato nuovamente tramite le Git Data API: un blob, un tree, un commit e l'aggiornamento di un ref. Nulla viene clonato e nulla viene lasciato su disco. Viene recuperato solo quel file, quindi in questa modalità non si possono fare due modifiche: aggiungere una relazione che ha come destinazione un'altra collection, ed eliminare una collection.
 
 `auth` accetta un token o un'installazione di una GitHub App:
 
@@ -299,7 +309,7 @@ Utilizza il token per un singolo progetto che esegue commit su un repository gi�
 
 Il token richiede il permesso `contents: read and write` su quel repository, e nient'altro.
 
-Su una macchina in cui è presente il repository, il commit è un semplice `git commit` — nulla da autenticare, nessun token, nessuna rete. Una distribuzione che ne è priva esegue invece il commit tramite le Git Data API, senza clonare nulla — vedi [Una distribuzione senza sorgente su disco](#una-distribuzione-senza-sorgente-su-disco).
+Senza `liveSchema.repository`, il commit è un semplice `git commit` nel working tree che contiene `collectionsDir`: nulla da autenticare, nessun token, nessuna rete.
 
 Due aspetti rendono sicura l'esecuzione a fronte di un repository su cui sta lavorando qualcun altro:
 

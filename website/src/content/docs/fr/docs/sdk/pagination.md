@@ -1,5 +1,5 @@
 ---
-sourceHash: 0db20d62bf304b74
+sourceHash: a03adef95cbad36c
 title: Pagination
 sidebar_label: Pagination
 description: Parcourir une collection par pagination limit/offset, numéros de page ou curseur keyset — et quand chacune cesse d'être exacte.
@@ -159,7 +159,7 @@ const rows = await client.data.orders
     .findAll();
 ```
 
-Trois options définissent le parcours :
+Quatre options définissent le parcours :
 
 | Option | Par défaut | Description |
 |--------|---------|--------------|

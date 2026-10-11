@@ -1,5 +1,5 @@
 ---
-sourceHash: 259c5bd1a0583132
+sourceHash: 1fc6cf953cae9632
 title: Tiempo real y WebSocket
 sidebar_label: Tiempo real
 description: Sincronización de datos en tiempo real, canales de difusión y seguimiento de presencia mediante WebSocket.
@@ -23,7 +23,7 @@ El flujo de procesamiento en tiempo real consta de tres etapas:
 └──────────────┘      └────────────────────┘      └──────────────┘
 ```
 
-Para despliegues de múltiples instancias, Rebase utiliza `LISTEN/NOTIFY` de PostgreSQL para difundir los cambios entre las instancias del servidor. Esto se gestiona automáticamente: una conexión dedicada de PostgreSQL escucha en el canal `rebase_entity_changes` y retransmite las actualizaciones a los suscriptores locales.
+Para despliegues de múltiples instancias, Rebase utiliza `LISTEN/NOTIFY` de PostgreSQL para difundir los cambios entre las instancias del servidor. Esto se gestiona automáticamente. Con la [captura de cambios a nivel de base de datos](#captura-de-cambios-a-nivel-de-base-de-datos-cdc) activada (el valor por defecto allí donde el rol de la base de datos puede crear triggers), cada instancia escucha en el canal `rebase_cdc` en el que publican los triggers de captura, de modo que una escritura se oye venga del proceso o de la herramienta que venga. Sin captura, cada instancia anuncia sus propias escrituras en el canal `rebase_entity_changes`, y una conexión dedicada en cada una de las demás instancias las retransmite a sus suscriptores locales.
 
 ### Cero configuración
 
@@ -150,6 +150,11 @@ Un cambio nunca viaja a un suscriptor como datos directos. Viaja como el hecho d
 
 2. **Refetch con RLS y debounce.** Tras **300ms** (`REFETCH_DEBOUNCE_MS`), el servidor vuelve a consultar la colección con tus filtros y orden originales. La consulta se ejecuta dentro de una transacción que establece `app.user_id` y `app.user_roles` locales a la transacción a partir del `SubscriptionAuthContext` del suscriptor, de modo que Postgres evalúa la Row-Level Security (RLS) bajo la identidad de ese cliente y solo las filas que tiene autorización para ver se envían en el `collection_update`. El debounce también agrupa ráfagas de escrituras en una sola consulta. Espera 300 ms sin un cambio más, pero nunca más de **1 s** (`REFETCH_MAX_WAIT_MS`) tras el primero, de modo que una colección escrita varias veces por segundo envía de todos modos una trama a sus suscriptores al menos una vez por segundo.
 
+   <span class="since-badge" data-since="0.25">Desde 0.25</span> Un refetch que lee exactamente lo que se le envió por última vez a un suscriptor no le envía
+   nada: una escritura en la fila 9.000 de una lista que muestra las primeras 50 cuesta
+   la lectura, no una trama a cada espectador. Tras una trama de error, las siguientes filas
+   se vuelven a enviar aunque sean las mismas.
+
 Las versiones anteriores enviaban un `collection_patch` inmediato con la fila escrita antes de este refetch, para ofrecer una respuesta de submilisegundos entre pestañas. Esa fila se había leído bajo el alcance de quien escribió, por lo que podía llegar —y llegaba— a suscriptores cuyas propias políticas la habrían denegado, y el filtro `where` propio de la suscripción tampoco se le aplicaba. El parche se ha eliminado: la latencia percibida para una actualización es ahora la ventana del debounce.
 
 ### El refetch es la lectura REST
@@ -235,6 +240,8 @@ Un id de suscripción es propio del socket: dos clientes que nombran ambos una
 suscripción `"sub-1"` conservan cada uno la suya, y un `unsubscribe` termina
 solo la del emisor.
 
+<span class="since-badge" data-since="0.25">Desde 0.25</span> **Suscribirse cuenta contra el límite de tasa de datos.** La primera trama de una suscripción es una lectura, ejecutada como el suscriptor, y lo mismo es la solicitud de historial de un canal. Por eso `subscribe_collection`, `subscribe_one` y `channel_history` cuentan como solicitudes de datos en el contador de límite de tasa de quien llama (el que comparten sus solicitudes HTTP y sus otros sockets) una vez agotada la asignación propia del socket. Cada socket puede enviar 1.000 de ellas sin contarlas, o tantas como su techo de suscripciones cuando este es mayor, y la asignación se recupera a lo largo de 15 minutos. Eso es todo lo que un socket puede tener, así que la nueva suscripción tras una reconexión nunca se rechaza y nunca gasta el presupuesto de la persona. Superada la asignación, una trama por encima del límite se rechaza con una trama de error con el código `RATE_LIMITED`, que el SDK entrega al `onError` de esa suscripción, o al del canal. En 0.23 estas tramas solo cuentan contra el presupuesto propio del socket de 2.000 tramas por minuto.
+
 ### Sockets que dejan de responder
 
 Un cliente puede desaparecer sin cerrar su socket: un móvil
@@ -248,7 +255,10 @@ responderlos, como hacen la mayoría de las bibliotecas de WebSocket.
 
 Un socket también se termina cuando más de 16&nbsp;MiB de frames enviados a él
 siguen sin leerse. Es un cliente que no lee lo que se le envía, o uno tan
-retrasado que lo que leería ya está desfasado.
+retrasado que lo que leería ya está desfasado. Y cuando los sockets de un servidor
+juntos acumulan más de 256&nbsp;MiB sin leer (o una cuarta parte del límite de memoria bajo
+el que se ejecuta el servidor, si este es menor), se terminan primero los que más tienen
+sin leer, hasta que el resto cabe.
 
 Un socket terminado se limpia como uno cerrado. Sus suscripciones terminan, sale
 de sus canales y se elimina su presencia, y la salida se anuncia a los demás
@@ -411,9 +421,9 @@ Las presencias inactivas se eliminan automáticamente tras 30 segundos de inacti
 
 El SDK tipado se reconecta automáticamente cuando se pierde la conexión WebSocket:
 
-- **Retroceso exponencial (Exponential backoff)** — El primer intento de reconexión ocurre unos 2 segundos después de la caída, y cada uno posterior espera el doble, hasta 30 segundos. Cada retraso se acorta hasta en una quinta parte al azar, para que los clientes que se desconectaron juntos por un despliegue no vuelvan todos en el mismo instante.
+- **Retroceso exponencial (Exponential backoff)** — Cada reconexión espera un tramo que empieza en 2 segundos y se duplica cada vez, hasta 30 segundos. El retraso se elige al azar en cualquier punto de su tramo, pero nunca por debajo de un cuarto de segundo, de modo que los clientes que se desconectaron juntos por un despliegue vuelven repartidos a lo largo de todo el tramo en lugar de en el mismo instante.
 - **No se rinde mientras algo esté vivo** — Mientras exista una suscripción o un canal al que se haya unido, el cliente sigue reconectándose con el techo de 30 segundos durante toda la interrupción. Sin nada registrado, se detiene tras 5 intentos fallidos, y la siguiente suscripción vuelve a marcar. En un navegador, el evento `online` y que la pestaña vuelva a ser visible provocan ambos una reconexión inmediata en lugar de esperar el retroceso.
-- **Las interrupciones se informan una vez** — Cuando la conexión ha estado caída durante unos 15 segundos (tres intentos fallidos), el `onError` de cada suscripción activa y el `onError` de cada canal al que se haya unido recibe un único `RebaseApiError` con el código `CONNECTION_LOST`. La suscripción se **conserva**: el error indica que sus datos no se están actualizando, no que haya terminado.
+- **Las interrupciones se informan una vez** — Cuando la conexión ha estado caída durante 14 segundos, cuantas reconexiones hayan sido, el `onError` de cada suscripción activa y el `onError` de cada canal al que se haya unido recibe un único `RebaseApiError` con el código `CONNECTION_LOST`. La suscripción se **conserva**: el error indica que sus datos no se están actualizando, no que haya terminado.
 - **Resuscripción automática** — Al reconectarse con éxito, todas las suscripciones activas se vuelven a registrar en el servidor, y el siguiente `onUpdate` de cada una lleva todo lo que se escribió mientras el cliente estaba fuera. Esa actualización es la señal de recuperación. No requiere intervención manual.
 - **Las solicitudes son como mucho una vez** — Una solicitud hecha mientras el socket está caído espera a que vuelva, hasta 30 segundos desde la llamada, y luego falla con `REQUEST_TIMEOUT` sin llegar a enviarse nunca. Una que ya se había enviado cuando la conexión cayó falla con `CONNECTION_LOST` y **no** se vuelve a enviar: el servidor puede haberla ejecutado o no, y solo quien la llamó sabe si ejecutarla dos veces es seguro.
 
@@ -452,7 +462,7 @@ Las suscripciones WebSocket respetan automáticamente las políticas de Row-Leve
 
 1. La conexión WebSocket se autentica utilizando el mismo token JWT que la API REST.
 2. Cada reconsulta (refetch) de la suscripción se ejecuta dentro de una transacción de PostgreSQL con `set_config('app.user_id', ...)` y `set_config('app.user_roles', ...)`, garantizando la aplicación de las políticas RLS.
-3. La identidad se vuelve a comprobar durante todo el tiempo que el socket esté abierto, no solo cuando se autentica. Antes de cada trama, el servidor pregunta lo mismo que preguntaría una solicitud HTTP: si el token sigue siendo válido, si su sesión se cerró o se revocó, si la cuenta todavía existe, y qué roles tiene ahora. Las tramas de canal se preguntan como máximo una vez por segundo. Un socket que solo escucha se pregunta al menos cada 30 segundos, y un token deja de respetarse en el instante en que expira. Un rol retirado se aplica desde la siguiente trama, tanto a lecturas como a escrituras y a suscripciones abiertas. Un socket cuya identidad ha terminado recibe una trama `AUTH_ERROR` con el código `SESSION_ENDED` o `TOKEN_EXPIRED` y se cierra con el código `4001`. El SDK vuelve a autenticar su socket cada vez que renueva su token, y tras un `4001` se reconecta con la sesión que tenga en ese momento, o sin ninguna. Un cliente que hable el protocolo directamente tiene que enviar un token nuevo en `AUTHENTICATE` antes de que expire el anterior.
+3. La identidad se vuelve a comprobar durante todo el tiempo que el socket esté abierto, no solo cuando se autentica. Antes de cada trama, el servidor pregunta lo mismo que preguntaría una solicitud HTTP: si el token sigue siendo válido, si su sesión se cerró o se revocó, si la cuenta todavía existe, y qué roles tiene ahora. Las tramas de canal se preguntan como máximo una vez por segundo. Un socket que solo escucha se pregunta al menos cada 30 segundos, y un token deja de respetarse en el instante en que expira. Un rol retirado se aplica desde la siguiente trama, tanto a lecturas como a escrituras y a suscripciones abiertas. Un socket cuya identidad ha terminado recibe una trama `AUTH_ERROR` con el código `SESSION_ENDED` o `TOKEN_EXPIRED` y se cierra con el código `4001`. El SDK vuelve a autenticar su socket cada vez que renueva su token; un token nuevo para la misma identidad (el mismo id de usuario, roles, marca de invitado y claims) deja las suscripciones abiertas como están, y uno para una identidad distinta vuelve a consultar cada una como esa identidad. Tras un `4001` se reconecta con la sesión que tenga en ese momento, o sin ninguna. Un cliente que hable el protocolo directamente tiene que enviar un token nuevo en `AUTHENTICATE` antes de que expire el anterior.
 
 Esto significa que cada socket solo recibe actualizaciones de los registros que su identidad autenticada tiene permiso para ver.
 
@@ -501,11 +511,13 @@ Si la conexión no lo soporta, `auto` muestra en su lugar una línea informativa
 
 ### Cómo funciona
 
-1. **Aprovisionamiento automático** — Al inicio (contexto de servidor/propietario), Rebase instala un trigger idempotente `AFTER INSERT/UPDATE/DELETE` en cada tabla administrada. El trigger emite una notificación de cambio en el canal `rebase_cdc` que identifica la fila modificada por su clave — la clave primaria, más las dos columnas de id en el caso de una tabla de unión many-to-many — y no lleva **ninguna otra columna**. PostgreSQL no exige ningún privilegio para `LISTEN`, así que cualquier rol que pueda conectarse a la base de datos puede leer este canal; así se entera de qué claves cambiaron, nunca de qué contienen. Una clave demasiado grande para el límite de 8&nbsp;KB de `NOTIFY` en PostgreSQL se envía sin clave (un cambio a toda la colección), de modo que CDC nunca pueda abortar la escritura desencadenante. La función se reemplaza en cada arranque que aprovisiona, así que una base de datos instrumentada por una versión anterior — cuyo trigger enviaba filas completas — queda actualizada en el siguiente arranque, incluso con `REALTIME_CDC=off`.
+1. **Aprovisionamiento automático** — Al inicio (contexto de servidor/propietario), Rebase instala triggers idempotentes `AFTER INSERT/UPDATE/DELETE/TRUNCATE` en cada tabla administrada. Se disparan una vez por sentencia y emiten notificaciones de cambio en el canal `rebase_cdc` que identifican las filas modificadas por su clave — la clave primaria, más las dos columnas de id en el caso de una tabla de unión many-to-many — y no llevan **ninguna otra columna**. Una sentencia que cambió muchas filas las nombra en lotes de unas mil claves, así que un `UPDATE` de 1M de filas envía unas 1.000 notificaciones en lugar de un millón; una sentencia que cambió una fila envía una notificación, y una que no cambió ninguna no envía nada. Un `TRUNCATE` se anuncia como un cambio a todas las filas de la colección. Una tabla particionada mantiene un trigger por fila, porque PostgreSQL copia un trigger de fila en cada partición y una escritura hecha directamente en una partición también se ve. PostgreSQL no exige ningún privilegio para `LISTEN`, así que cualquier rol que pueda conectarse a la base de datos puede leer este canal; así se entera de qué claves cambiaron, nunca de qué contienen. Una clave demasiado grande para el límite de 8&nbsp;KB de `NOTIFY` en PostgreSQL se envía sin clave (un cambio a toda la colección, que vuelven a consultar todas las suscripciones de lista y de una sola fila sobre ella), de modo que CDC nunca pueda abortar la escritura desencadenante. Las funciones se reemplazan en cada arranque que aprovisiona, así que una base de datos instrumentada por una versión anterior — cuyo trigger enviaba filas completas — queda actualizada en el siguiente arranque, incluso con `REALTIME_CDC=off`.
+
+   <span class="since-badge" data-since="0.25">Desde 0.25</span> **Actualización.** Una base de datos instrumentada por una versión anterior al procesamiento por lotes tiene un trigger por fila; el primer arranque de una versión más nueva lo reemplaza por los triggers por sentencia. Durante las 24 horas siguientes, los nuevos triggers siguen enviando una notificación por fila, como hacían los antiguos, de modo que las instancias de la versión anterior que sigan ejecutándose durante un despliegue progresivo (o tras una reversión) oyen cada fila. Pasada la ventana, agrupan en lotes. Toda versión que agrupa en lotes lee ambas formas.
 2. **Captura** — Un cliente `LISTEN` dedicado y no agrupado (unpooled) por instancia consume `rebase_cdc`, mapea la tabla modificada a su colección correspondiente e introduce el cambio en el mismo flujo de `RealtimeService` utilizado por las mutaciones de la API. Al igual que el listener entre instancias, prioriza `DATABASE_DIRECT_URL` y se reconecta automáticamente.
 3. **Entrega segura con RLS** — La fila en bruto del flujo de cambios **nunca** se reenvía a los suscriptores. El cambio se marca como invalidado y cada suscripción vuelve a leer la fila bajo su **propio** contexto de autenticación. Por tanto, el filtrado es por suscriptor y nunca por emisor: un cliente solo recibe las filas que sus políticas RLS le permiten.
 4. **Entre instancias** — Dado que cada instancia observa cada commit a través del flujo de cambios, CDC también *es* el canal entre instancias; la difusión heredada por mutación `rebase_entity_changes` no se utiliza mientras CDC esté activo.
-5. **Desduplicación** — Una mutación realizada a través de la API de Rebase se entrega localmente en el instante en que se confirma (commits) y también se replica a través del flujo de cambios. La instancia de origen suprime ese eco (un registro efímero de sus propias emisiones), de modo que los suscriptores nunca ven una escritura de la API dos veces.
+5. **Desduplicación** — Una mutación realizada a través de la API de Rebase se entrega localmente en el instante en que se confirma (commits) y también se replica a través del flujo de cambios. La instancia de origen suprime un eco que llega dentro de la ventana de debounce del refetch (un registro efímero de sus propias emisiones), de modo que una escritura de la API normalmente produce una trama. Un eco que llega más tarde dispara un refetch más, que entrega de nuevo las mismas filas: es inocuo, pero un suscriptor puede ver una trama idéntica dos veces.
 
 ### Requisitos y notas
 
@@ -540,7 +552,7 @@ channel.onError((error) => {
 | Código | Significado |
 |------|-------|
 | `CHANNEL_FORBIDDEN` | No eres miembro del canal; únete a él antes de transmitir o leer su historial |
-| `RATE_LIMITED` | Has superado el límite de tramas por canal mencionado anteriormente |
+| `RATE_LIMITED` | Has superado el límite de tramas por canal mencionado anteriormente o, en una solicitud de historial, el [límite de tasa de datos](#lo-que-cuesta-una-escritura-y-los-límites) |
 | `CHANNEL_HISTORY_WRITE_FAILED` | No se pudo persistir una difusión retenida, por lo que fue descartada |
 | `CHANNEL_HISTORY_READ_FAILED` | No se pudo atender una solicitud para ponerse al día |
 | `CHANNEL_HISTORY_GAP` | Lo genera el cliente: al ponerse al día se descubrió que el servidor ya no conserva mensajes que este cliente nunca recibió. `details` es `{ from, to }`, los números de secuencia perdidos. Vuelve a sincronizar el estado del canal desde su fuente de verdad |

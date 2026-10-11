@@ -1,5 +1,5 @@
 ---
-sourceHash: 7184b66cc0913ef9
+sourceHash: 2a29a9e6fa3879e6
 title: Accesso ai campi
 sidebar_label: Accesso ai campi
 description: Permessi di lettura e scrittura per proprietà in base al ruolo. Un chiamante ammesso dalle regole di sicurezza della riga non riceve comunque un campo che i suoi ruoli non possono leggere.
@@ -100,10 +100,17 @@ Si applica a ogni punto di uscita: list, get singolo, destinazioni di relazioni 
 `?include=`, risultati di `_batch`, frame realtime da `.listen()`, risultati aggregati e snapshot
 della [cronologia](#cronologia).
 
+Il valore di una proprietà relazione sono le sue righe correlate, quindi una relazione che non puoi leggere
+viene trattenuta per intero. `?include=` la lascia fuori dalla riga, con il suo `_count`, da
+ogni porta: REST, SDK, `.listen()` e gli include annidati un livello più giù.
+Nominarla altrove viene rifiutato come un campo (vedi [Query](#query)).
+
 ### Query
 
 Un `where`, `orderBy`, `fields`, `select` aggregata o `groupBy` che fa riferimento a un campo che
-non puoi leggere restituisce un errore **400 `FIELD_NOT_READABLE`**:
+non puoi leggere restituisce un errore **400 `FIELD_NOT_READABLE`**. Lo stesso vale per una relazione che non puoi leggere
+nominata in un percorso annidato (`/departments/1/members`, `/departments/1/members/7`) o
+in un ordinamento di aggregato (`orderBy=count(members)`):
 
 ```http
 GET /api/data/staff?salary=gt.100000

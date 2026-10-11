@@ -1,5 +1,5 @@
 ---
-sourceHash: 480ba165906124fe
+sourceHash: 9109031950f77ac1
 title: Modalità di Visualizzazione
 sidebar_label: Modalità di Visualizzazione
 description: Configura le visualizzazioni tabella, schede e bacheca Kanban per le tue collezioni.
@@ -52,7 +52,7 @@ La visualizzazione lista è la modalità predefinita classica e pulita del CMS, 
 
 ## Visualizzazione Tabella
 
-La visualizzazione predefinita è un foglio di calcolo virtualizzato ad alte prestazioni con:
+La visualizzazione tabella è un foglio di calcolo virtualizzato ad alte prestazioni con:
 
 - **Modifica inline** — Clicca su qualsiasi cella per modificare sul posto
 - **Ridimensionamento colonne** — Trascina le intestazioni delle colonne
@@ -68,11 +68,11 @@ Controlla l'altezza delle righe con `defaultSize`:
 
 | Dimensione | Pixel | Ideale per |
 |------------|-------|------------|
-| `"xs"` | 40 | Tabelle dati dense |
-| `"s"` | 54 | Predefinito |
-| `"m"` | 80 | Con miniature di immagini |
-| `"l"` | 120 | Schede con anteprime |
-| `"xl"` | 260 | Anteprime di contenuti ricchi |
+| `"xs"` | 36 | Tabelle dati dense |
+| `"s"` | 42 | Righe di testo compatte |
+| `"m"` | 48 | Predefinito |
+| `"l"` | 96 | Miniature di immagini medie |
+| `"xl"` | 160 | Miniature di immagini grandi |
 
 ## Visualizzazione Kanban
 

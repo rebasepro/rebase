@@ -1,5 +1,5 @@
 ---
-sourceHash: 7edfb533f917e6ae
+sourceHash: 8fca289475b169ca
 title: Schema-Generierung
 sidebar_label: Schema-Generierung
 description: Generieren Sie Drizzle-ORM-Schemas aus Collection-Definitionen, erstellen Sie SQL-Migrationen und halten Sie Ihre Datenbank mit der Rebase-CLI synchron.
@@ -78,7 +78,7 @@ rebase schema introspect
 
 Dies ist nützlich, wenn Sie Rebase auf einer bestehenden Datenbank einführen — zuerst introspizieren, dann die generierten Collections anpassen.
 
-**Introspektion, gefolgt von Push, ändert nichts.** Die generierten Eigenschaften geben exakt an, was jede Spalte ist — `columnType`, `precision`/`scale`, `defaultValue`, `required`, das `isId` eines Schlüssels (`"increment"` für eine ganzzahlige Identity, `columnType: "serial"` für ein Serial, `"manual"` für einen Schlüssel ohne Default), das `onDelete` einer Relation sowie der `search`-Block einer Collection, zurückgelesen aus der Spalte, die er aufgebaut hat — daher plant `rebase db push --dry-run` direkt nach einer Introspektion keine Änderungen. Wo keine Eigenschaft eine Spalte vollständig abbilden kann — ein `timestamp` ohne Zeitzone, ein `interval`, ein `inet`, ein Enum-Typ, der nicht `<table>_<column>` heißt, ein Default wie `CURRENT_DATE` — weist die Introspektion pro Spalte darauf hin, im Terminal und am Anfang der Datei, mit dem, was ein Push damit tun würde, und, wenn vorhanden, dem Statement, das die beiden in Übereinstimmung bringt (`ALTER TYPE "mood" RENAME TO "customers_current_mood";`). Eine Tabelle, deren Schlüssel aus mehr als einer Spalte besteht, kommt als ein zusammengesetzter Schlüssel zurück, wobei jede Schlüsselspalte ihr `isId` trägt. Sie wird mit ihrem Grund ausgelassen, wenn eine Schlüsselspalte kein `isId` tragen kann (etwa ein Timestamp) oder der Fremdschlüssel einer anderen Tabelle auf sie verweist, was eine einspaltige Relation nicht kann; `db push` lässt eine Tabelle, die keine Collection ist, unangetastet. Auf 0.23 kann der Push direkt nach einer Introspektion weiterhin Typänderungen, entfernte Defaults und NOT NULLs sowie einen Phantom-`id`-Schlüssel planen.
+**Introspektion, gefolgt von Push, ändert nichts.** Die generierten Eigenschaften geben exakt an, was jede Spalte ist — `columnType`, `precision`/`scale`, `defaultValue`, `required`, das `isId` eines Schlüssels (`"increment"` für eine ganzzahlige Identity, `columnType: "serial"` für ein Serial, `"manual"` für einen Schlüssel ohne Default), das `onDelete` einer Relation — und ihr `index: false`, wo die Datenbank keinen Index auf der Schlüsselspalte hat, da eine `belongsTo` [standardmäßig indiziert](/docs/backend/indexes#foreign-keys-are-indexed-for-you) wird (löschen Sie die Zeile, damit einer gebaut wird) — sowie der `search`-Block einer Collection, zurückgelesen aus der Spalte, die er aufgebaut hat — daher plant `rebase db push --dry-run` direkt nach einer Introspektion keine Änderungen. Wo keine Eigenschaft eine Spalte vollständig abbilden kann — ein `timestamp` ohne Zeitzone, ein `interval`, ein `inet`, ein Enum-Typ, der nicht `<table>_<column>` heißt, ein Default wie `CURRENT_DATE` — weist die Introspektion pro Spalte darauf hin, im Terminal und am Anfang der Datei, mit dem, was ein Push damit tun würde, und, wenn vorhanden, dem Statement, das die beiden in Übereinstimmung bringt (`ALTER TYPE "mood" RENAME TO "customers_current_mood";`). Eine Tabelle, deren Schlüssel aus mehr als einer Spalte besteht, kommt als ein zusammengesetzter Schlüssel zurück, wobei jede Schlüsselspalte ihr `isId` trägt. Sie wird mit ihrem Grund ausgelassen, wenn eine Schlüsselspalte kein `isId` tragen kann (etwa ein Timestamp) oder der Fremdschlüssel einer anderen Tabelle auf sie verweist, was eine einspaltige Relation nicht kann; `db push` lässt eine Tabelle, die keine Collection ist, unangetastet. Auf 0.23 kann der Push direkt nach einer Introspektion weiterhin Typänderungen, entfernte Defaults und NOT NULLs sowie einen Phantom-`id`-Schlüssel planen.
 
 ### `rebase db push`
 
@@ -94,7 +94,30 @@ rebase db push
 - Führt den Plan zuerst als Dry-Run aus und hält vor jeder Änderung an, die Daten zerstört: eine gelöschte Tabelle, Spalte, View, ein gelöschtes Schema oder ein gelöschter Typ, ein `TRUNCATE` eine Änderung des Spaltentyps, bei der Werte verloren gehen können (`timestamptz` → `date`, `numeric` → `integer`), oder eine Änderung des Primärschlüssels – `(id)` → `(id, locale)` gibt jeder Zeile eine neue ID, sodass Links, Fremdschlüssel und anderswo gespeicherte IDs ihre Zeile nicht mehr finden. Im Terminal fragt er nach, sonst verweigert er; `--allow-destructive` (oder `--yes`) wendet die Änderung trotzdem an
 - Schaltet Row-Level Security für jede Collection-Tabelle ein, Junction-Tabellen eingeschlossen, direkt nach der Schemaänderung und vor jedem Schritt, der fehlschlagen kann – ein Push, der mittendrin abbricht, hinterlässt eine neue Tabelle also verweigernd statt offen für jede Anfrage
 - Wendet die RLS-Policies Ihrer Collections an und **entfernt Policies, die ein früherer Push ersetzt hat**
+- <span class="since-badge" data-since="0.25">Seit 0.25</span> Baut jeden
+  [von Rebase abgeleiteten Fremdschlüssel-Index](/docs/backend/indexes#foreign-keys-are-indexed-for-you),
+  der einer vorhandenen Tabelle fehlt, **vor** der Planung mit
+  `CREATE INDEX CONCURRENTLY`, sodass Schreibvorgänge auf die Tabelle während des Builds weiterlaufen;
+  Atlas findet ihn dann vor. `--dry-run` nennt diese und baut nichts
+- <span class="since-badge" data-since="0.25">Seit 0.25</span> Stempelt die
+  Policies, die es anwendet, so wie der Boot des Servers, sodass der erste Boot nach einem
+  Push sie in Ruhe lässt, statt jede neu anzulegen
+- <span class="since-badge" data-since="0.25">Seit 0.25</span> `--dry-run`
+  schreibt nichts vom Projekt: `src/schema.generated.ts` bleibt, wie es ist,
+  und die `drizzle/*.sql`-Kopien, die ein älteres Release committet hat, werden genannt, nicht
+  gelöscht. Nur die Eingabe des Plans geht nach `.rebase/sql/`, das nicht committet wird
 - Erstellt **keine** Migrationsdateien
+
+**Wie lange es dauert.** Fast der gesamte Push ist Atlas, das den Plan berechnet: Es
+baut Ihr gewünschtes Schema in einer Scratch-Datenbank auf und vergleicht es mit der echten,
+und dieser Aufwand wächst schneller als die Anzahl der Tabellen — auf einem ruhigen Laptop
+etwa 0,25 s pro Plan bei 11 Tabellen, 0,9 s bei 111 und 5,5 s bei 411. Ein Push, der
+nichts ändert, plant einmal; einer, der etwas ändert, plant zweimal (der Dry-Run,
+den das Gate für destruktive Änderungen liest, dann das Anwenden). Ein Push auf ein Schema mit
+400 oder mehr Tabellen dauert also zehn Sekunden und mehr, auf einem ausgelasteten oder langsamen Rechner länger.
+Diese Zeit gehört Atlas, nicht Ihrer Datenbank: Die Schritte drumherum — das Generieren des
+SQL, die RLS-Sperre, Suche, Trigger, Policies, die Rolle — dauern bei dieser Größe wenige Sekunden,
+über eine Verbindung zu Ihrer Datenbank.
 
 **Die Dateien, die dabei entstehen**, alle unter `.rebase/sql/` im Backend-Verzeichnis. `db push` und `db generate` schreiben alle fünf bei jedem Lauf aus Ihren Collections, bevor sie eine davon lesen, daher würde eine committete Kopie von nichts gelesen. Das Verzeichnis bringt seine eigene `.gitignore` mit und wird nie committet.
 
@@ -189,6 +212,8 @@ rebase doctor
 - Collections ↔ Datenbank — gibt es unerwarteten Drift?
 
 Führen Sie `doctor` aus, wann immer sich etwas nicht synchron anfühlt. Es zeigt genau, wo die Diskrepanz liegt.
+
+<span class="since-badge" data-since="0.25">Seit 0.25</span> Es nennt außerdem jede Collection ohne [`search`-Block](/docs/backend/search), deren Tabelle mehr als etwa 10.000 Zeilen enthält. Eine Suche dort — das Suchfeld des Admins, `.search()`, `?searchString=` — ist `ILIKE '%term%'` über die Textspalten, was kein Index bedienen kann, sodass jede die ganze Tabelle liest und ihr Count sie erneut liest (etwa eine Drittelsekunde bei 100.000 Zeilen, mit der Tabelle wachsend). Die Zeilenzahl ist die eigene Schätzung von Postgres, die Prüfung scannt also nichts. Es ist ein Hinweis: Der Exit-Code ändert sich nicht, und nichts wird für Sie indiziert.
 
 ### `rebase generate-sdk`
 
