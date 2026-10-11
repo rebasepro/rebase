@@ -116,6 +116,7 @@ type PropertiesForEngine<E> =
  *
  * @example
  * export default defineCollection({
+ *     name: "Posts",
  *     slug: "posts",
  *     table: "posts",
  *     properties: {
