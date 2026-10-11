@@ -774,7 +774,40 @@ async function readColumns(db: Reader, schemas: string[]): Promise<Map<string, D
     return map;
 }
 
-async function readPolicies(db: Reader, schemas: string[]): Promise<DbPolicy[]> {
+/**
+ * A Postgres array literal of text, `{a,"b c","d, e"}`, as its elements.
+ *
+ * Splitting on commas read a role named `web readers, all` as two roles that
+ * do not exist: a false `policy-role-unreachable` and a missed
+ * `policy-always-true` on the role the policy actually names.
+ */
+export function parsePgTextArray(literal: string): string[] {
+    const body = literal.trim().replace(/^\{/, "").replace(/\}$/, "");
+    const out: string[] = [];
+    let i = 0;
+    while (i < body.length) {
+        let value = "";
+        if (body[i] === "\"") {
+            i++;
+            while (i < body.length && body[i] !== "\"") {
+                if (body[i] === "\\") i++;
+                value += body[i] ?? "";
+                i++;
+            }
+            i++; // closing quote
+            out.push(value);
+        } else {
+            while (i < body.length && body[i] !== ",") value += body[i++];
+            value = value.trim();
+            if (value && value.toUpperCase() !== "NULL") out.push(value);
+        }
+        while (i < body.length && body[i] !== ",") i++;
+        i++; // the comma
+    }
+    return out;
+}
+
+export async function readPolicies(db: Reader, schemas: string[]): Promise<DbPolicy[]> {
     const rows = await db.query<{
         schemaname: string;
         tablename: string;
@@ -786,7 +819,9 @@ async function readPolicies(db: Reader, schemas: string[]): Promise<DbPolicy[]> 
         with_check: string | null;
     }>(
         "policies",
-        `SELECT schemaname, tablename, policyname, permissive, roles, cmd, qual, with_check
+        // `roles` is `name[]`, which node-postgres does not parse; as `text[]`
+        // it arrives as an array.
+        `SELECT schemaname, tablename, policyname, permissive, roles::text[] AS roles, cmd, qual, with_check
          FROM pg_policies
          WHERE schemaname = ANY($1)
          ORDER BY schemaname, tablename, policyname`,
@@ -799,13 +834,7 @@ async function readPolicies(db: Reader, schemas: string[]): Promise<DbPolicy[]> 
         name: r.policyname,
         permissive: String(r.permissive ?? "PERMISSIVE").toUpperCase() !== "RESTRICTIVE",
         // node-postgres yields text[] as an array; some drivers hand back "{a,b}".
-        roles: Array.isArray(r.roles)
-            ? r.roles
-            : String(r.roles ?? "")
-                  .replace(/^\{|\}$/g, "")
-                  .split(",")
-                  .map((s) => s.trim().replace(/^"|"$/g, ""))
-                  .filter(Boolean),
+        roles: Array.isArray(r.roles) ? r.roles : parsePgTextArray(String(r.roles ?? "")),
         command: (String(r.cmd ?? "ALL").toUpperCase() as PolicyCommand) ?? "ALL",
         using: r.qual,
         withCheck: r.with_check
