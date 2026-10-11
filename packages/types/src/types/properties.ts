@@ -488,8 +488,9 @@ export interface StringProperty extends BaseProperty {
      */
     defaultValue?: string;
     /**
-     * Optional database column type. If not set, it defaults to `varchar` or `uuid` depending on `isId` configuration.
-     * Use `text` for strings with unbound length, `char` for fixed-length strings, or `varchar` for variable-length strings with a limit.
+     * Optional database column type. If not set, it is `text` — or `uuid` for an `isId: "uuid"` key.
+     * `validation.max` does not bound a `text` column; declare `varchar` (or `char`) to get a
+     * width, which is then taken from `validation.max` (255 when it states none).
      */
     columnType?: "varchar" | "text" | "char" | "uuid";
     /**
