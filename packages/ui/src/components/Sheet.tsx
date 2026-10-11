@@ -110,7 +110,7 @@ export const Sheet: React.FC<SheetProps> = ({
                     className={cls(
                         "outline-none",
                         "fixed inset-0 bg-surface-scrim",
-                        "backdrop-blur-sm transition-all duration-100 motion-reduce:transition-none data-[state=closed]:animate-out data-[state=closed]:fade-out data-[state=open]:fade-in",
+                        "backdrop-blur-sm transition-all duration-100 motion-reduce:transition-none",
                         overlayZIndex,
                         overlayClassName
                     )}

@@ -162,7 +162,6 @@ export const TextField = forwardRef<HTMLDivElement, TextFieldProps<string | numb
                 className={cls(
                     "w-full outline-none bg-transparent leading-normal px-3 text-sm",
                     "rounded-lg",
-                    "focused:text-text-primary focused:dark:text-text-primary-dark",
                     invisible ? focusedInvisibleMixin : "",
                     // No fill, hover or disabled tint on the input itself: the
                     // wrapper carries all three. Both used to carry the hover

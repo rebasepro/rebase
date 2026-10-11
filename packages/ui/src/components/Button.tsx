@@ -62,7 +62,7 @@ const ButtonInner = React.memo(React.forwardRef<
         // Text Variants
         "border border-transparent text-primary hover:text-primary hover:bg-surface-hover": variant === "text" && color === "primary" && !disabled,
         "border border-transparent text-secondary hover:text-secondary hover:bg-surface-hover": variant === "text" && color === "secondary" && !disabled,
-        "border border-transparent text-red-600 hover:text-red-600 hover:bg-red-600 hover:bg-opacity-10 hover:bg-red-600/10": variant === "text" && color === "error" && !disabled,
+        "border border-transparent text-red-600 hover:text-red-600 hover:bg-red-600/10": variant === "text" && color === "error" && !disabled,
         "border border-transparent text-text-primary hover:text-text-primary dark:text-text-primary-dark hover:dark:text-text-primary-dark hover:bg-surface-hover": variant === "text" && color === "text" && !disabled,
         "border border-transparent text-text-primary hover:text-text-primary dark:text-text-primary-dark dark:hover:text-text-primary-dark hover:bg-surface-hover": variant === "text" && color === "neutral" && !disabled,
 

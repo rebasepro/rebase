@@ -37,8 +37,8 @@ function SliderThumb(props: {
                         "border-surface-raised-hover bg-surface-raised-hover": props.props.disabled
                     },
                     props.classes,
-                    "focus-visible:ring-4 focus-visible:ring-primary focus-visible:ring-opacity-50 focus-visible:ring-primary/50",
-                    "hover:ring-4 hover:ring-primary hover:ring-opacity-25 hover:ring-primary/25",
+                    "focus-visible:ring-4 focus-visible:ring-primary focus-visible:ring-primary/50",
+                    "hover:ring-4 hover:ring-primary hover:ring-primary/25",
                     "block rounded-full transition-colors focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50")}
 
             />
