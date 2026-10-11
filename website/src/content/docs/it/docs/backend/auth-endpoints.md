@@ -1,5 +1,5 @@
 ---
-sourceHash: 5f6462b96e4cf1be
+sourceHash: 609d0bdbbaabe6b1
 title: Endpoint e token di autenticazione
 sidebar_label: Endpoint di autenticazione
 description: Le route di autenticazione montate dal backend Rebase, la struttura delle loro risposte, l'autenticazione a più fattori, il contesto del database visibile a una policy, JWKS e chiavi di servizio.
@@ -50,7 +50,7 @@ Tutti gli endpoint di autenticazione sono montati su `/api/auth/`:
 | `GET` | `/api/auth/mfa/factors` | Elenca i fattori registrati dal chiamante |
 | `POST` | `/api/auth/mfa/challenge` | Avvia una verifica (challenge) su un fattore verificato |
 | `POST` | `/api/auth/mfa/challenge/verify` | Risponde a una challenge — questo passaggio emette la sessione |
-| `DELETE` | `/api/auth/mfa/unenroll` | Rimuove un fattore (richiede una sessione `aal2`) |
+| `DELETE` | `/api/auth/mfa/unenroll` | Rimuove un fattore (richiede una sessione `aal2` una volta che l'account ha un fattore verificato) |
 | `POST` | `/api/auth/mfa/recovery-codes` | Sostituisce i codici di recupero del chiamante con dieci nuovi (richiede una sessione `aal2`) |
 
 La gestione amministrativa di utenti e ruoli è una **superficie separata**, montata su

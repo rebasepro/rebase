@@ -1,5 +1,5 @@
 ---
-sourceHash: 6d792c1a29a7f0a9
+sourceHash: 66aded96fdd7fc98
 title: Datenimport & -export
 sidebar_label: Datenimport & -export
 description: Importieren Sie Daten aus CSV-, JSON- und Excel-Dateien in Ihre Collections und exportieren Sie Collection-Daten nach CSV oder JSON mit optionalen berechneten Feldern.
@@ -80,6 +80,8 @@ Server beim Schreiben der Zeilen geprüft, in Batches von bis zu 500 Zeilen (wen
 Zeilen, damit eine Anfrage unter etwa 1 MB bleibt). Ein Batch wird ganz oder gar nicht gespeichert.
 Wird eine Zeile abgelehnt, stoppt der Import und benennt sie; die Batches davor sind bereits
 gespeichert, und **Retry** setzt ab der ersten Zeile des Batches der abgelehnten Zeile fort.
+
+Eine Zeile, deren ID bereits in der Collection existiert, aktualisiert diesen Datensatz: Die Spalten, die die Datei enthält, werden geschrieben, die übrigen behalten ihre gespeicherten Werte. So setzt eine Datei mit `id,price` die Preise bestehender Produkte neu, ohne deren Pflichtfelder zu wiederholen. Eine neue Zeile braucht weiterhin alle Pflichtfelder. Ein Batch, der Aktualisierungen und neue Zeilen mischt, wird als zwei Anfragen geschrieben, sodass eine abgelehnte neue Zeile die Aktualisierungen dieses Batches gespeichert zurücklassen kann; **Retry** schreibt sie erneut mit denselben Werten.
 
 ### Eine Collection aus einer Datei erstellen
 

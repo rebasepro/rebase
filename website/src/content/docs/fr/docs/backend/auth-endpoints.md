@@ -1,5 +1,5 @@
 ---
-sourceHash: 5f6462b96e4cf1be
+sourceHash: 609d0bdbbaabe6b1
 title: Endpoints d'authentification et jetons
 sidebar_label: Endpoints d'authentification
 description: Les routes d'authentification montées par le backend Rebase, le format de leurs réponses, l'authentification multifacteur, le contexte de base de données vu par une politique, JWKS et clés de service.
@@ -50,7 +50,7 @@ Tous les endpoints d'authentification sont montés sur `/api/auth/` :
 | `GET` | `/api/auth/mfa/factors` | Lister les facteurs enregistrés de l'appelant |
 | `POST` | `/api/auth/mfa/challenge` | Initier un challenge pour un facteur vérifié |
 | `POST` | `/api/auth/mfa/challenge/verify` | Répondre à un challenge — c'est ce qui émet la session |
-| `DELETE` | `/api/auth/mfa/unenroll` | Supprimer un facteur (nécessite une session `aal2`) |
+| `DELETE` | `/api/auth/mfa/unenroll` | Supprimer un facteur (nécessite une session `aal2` dès que le compte a un facteur vérifié) |
 | `POST` | `/api/auth/mfa/recovery-codes` | Remplacer les codes de récupération de l'appelant par dix nouveaux (nécessite une session `aal2`) |
 
 La gestion administrative des utilisateurs et des rôles est une **surface distincte**, montée sur

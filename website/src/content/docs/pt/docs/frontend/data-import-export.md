@@ -1,5 +1,5 @@
 ---
-sourceHash: 6d792c1a29a7f0a9
+sourceHash: 66aded96fdd7fc98
 title: Importação e Exportação de Dados
 sidebar_label: Importação e Exportação de Dados
 description: Importe dados de arquivos CSV, JSON e Excel para suas coleções e exporte dados de coleções para CSV ou JSON com campos computados opcionais.
@@ -62,6 +62,8 @@ Um arquivo exportado de uma coleção é importado de volta com os mesmos valore
 A pré-visualização lista cada célula que não é convertida, por coluna, com quantas existem e as primeiras por linha e motivo. Essas células são deixadas vazias nas linhas importadas; nada é transformado em `0`, `false` ou um valor vazio sem ser listado. Volte para mapear a coluna para outra propriedade, ou corrija o arquivo e envie-o novamente.
 
 As próprias regras da coleção — campos obrigatórios, opções de enum, valores únicos — são verificadas pelo servidor conforme as linhas são gravadas, em lotes de até 500 linhas (menos quando as linhas são largas, para que uma requisição fique abaixo de cerca de 1 MB). Um lote é salvo por inteiro ou não é salvo. Se uma linha for recusada, a importação para e a identifica; os lotes anteriores a ela já estão salvos, e **Tentar novamente** retoma a partir da primeira linha do lote da linha recusada.
+
+Uma linha cujo id já está na coleção atualiza esse registro: as colunas que o arquivo traz são gravadas e as demais mantêm seus valores armazenados, então um arquivo `id,price` reajusta o preço de produtos existentes sem repetir seus campos obrigatórios. Uma linha nova ainda precisa de todos os campos obrigatórios. Um lote que mistura atualizações e linhas novas é gravado como duas requisições, então uma linha nova recusada pode deixar as atualizações desse lote salvas; **Tentar novamente** as grava de novo com os mesmos valores.
 
 ### Criando uma coleção a partir de um arquivo
 

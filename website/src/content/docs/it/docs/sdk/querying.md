@@ -1,5 +1,5 @@
 ---
-sourceHash: e06718f3afc5cad4
+sourceHash: dc64725d910c68e0
 title: Interrogare i dati
 sidebar_label: Interrogare i dati
 description: Operazioni CRUD, fluent query builder, operatori di filtro, ordinamento, selezione delle colonne e aggregazioni con l'SDK tipizzato di Rebase.
@@ -210,6 +210,8 @@ const { data } = await client.data.products
 ```
 
 `cond` accetta l'operatore canonico — la colonna di sinistra della tabella degli [Operatori di filtro](#operatori-di-filtro). Un operatore non supportato dal dialetto genera un `TypeError` durante la serializzazione della query, invece di produrre silenziosamente una query diversa.
+
+Su un client con [tipi generati](/docs/sdk#typed-sdk-generation), `logical` e `.where(group)` controllano ogni condizione dell'albero rispetto alla riga, come fa `where`: una colonna che la riga non ha, o un valore del tipo sbagliato per l'operatore (`cond("views", "==", "many")` su una colonna numerica), è un errore di compilazione. Una relazione o un percorso JSON (`author.name`, `metadata->>tier`) non viene controllato.
 
 ### Negazione
 

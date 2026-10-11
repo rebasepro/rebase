@@ -1,5 +1,5 @@
 ---
-sourceHash: 3b804a4a444623d1
+sourceHash: f08c99f0d9d82678
 title: Coleções
 sidebar_label: Coleções
 description: As coleções são o bloco de construção fundamental do Rebase — cada coleção é mapeada para uma tabela de banco de dados e define seu esquema, relações, segurança e comportamento de interface.
@@ -271,7 +271,7 @@ Dentro de `admin`, exceto `history`, que é um recurso de backend e permanece no
 | `hideIdFromCollection` | `boolean` | `false` | Ocultar a coluna de ID da tabela |
 | `includeJsonView` | `boolean` | `true` | Disponibilizar os valores brutos no inspetor de registros |
 | `history` | `boolean` | `false` | Rastrear alterações no histórico da entidade |
-| `alwaysApplyDefaultValues` | `boolean` | `false` | Aplicar valores padrão a cada salvamento |
+| `alwaysApplyDefaultValues` | `boolean` | `false` | Quando um registro existente é aberto no formulário, preenche o `defaultValue` declarado de cada propriedade em um valor que o registro deixa vazio (`null` ou ausente), de modo que o próximo salvamento o grave |
 | `previewProperties` | `string[]` | — | Propriedades a serem exibidas em pré-visualizações de referências |
 | `display` | `EntityDisplay` | — | O que preenche cada papel de exibição — consulte [Exibição de entidade](#exibição-de-entidade) |
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: 5f6462b96e4cf1be
+sourceHash: 609d0bdbbaabe6b1
 title: Auth-Endpunkte und Tokens
 sidebar_label: Auth-Endpunkte
 description: Die Authentifizierungs-Routen, die das Rebase-Backend bereitstellt, ihre Antwortstrukturen, Multi-Faktor-Authentifizierung, der Datenbankkontext für Richtlinien, JWKS und Service-Schlüssel.
@@ -50,7 +50,7 @@ Alle Auth-Endpunkte sind unter `/api/auth/` eingebunden:
 | `GET` | `/api/auth/mfa/factors` | Registrierte Faktoren des Aufrufers auflisten |
 | `POST` | `/api/auth/mfa/challenge` | Challenge für einen verifizierten Faktor eröffnen |
 | `POST` | `/api/auth/mfa/challenge/verify` | Challenge beantworten – dies stellt die Sitzung aus |
-| `DELETE` | `/api/auth/mfa/unenroll` | Faktor entfernen (erfordert eine `aal2`-Sitzung) |
+| `DELETE` | `/api/auth/mfa/unenroll` | Faktor entfernen (erfordert eine `aal2`-Sitzung, sobald das Konto einen verifizierten Faktor hat) |
 | `POST` | `/api/auth/mfa/recovery-codes` | Die Wiederherstellungscodes des Aufrufers durch zehn neue ersetzen (erfordert eine `aal2`-Sitzung) |
 
 Die administrative Benutzer- und Rollenverwaltung ist eine **separate Schnittstelle**, die unter `/api/admin/` statt `/api/auth/` eingebunden ist. Lesen braucht den Scope `users:read`, Ändern braucht `users:write`. Ein Admin und der Service-Schlüssel halten beide; ebenso eine Rolle, die sie deklariert. Niemand darf ein Konto ändern, das mehr hält als er selbst. Siehe [Rollen und Scopes](/docs/backend/roles-and-scopes/).

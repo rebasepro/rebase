@@ -1,5 +1,5 @@
 ---
-sourceHash: 3b804a4a444623d1
+sourceHash: f08c99f0d9d82678
 title: Collections
 sidebar_label: Collections
 description: Les collections sont la brique de base de Rebase — chaque collection correspond à une table de base de données et définit son schéma, ses relations, sa sécurité et son comportement d'interface utilisateur.
@@ -271,7 +271,7 @@ Dans `admin`, à l'exception de `history`, qui est une fonctionnalité backend e
 | `hideIdFromCollection` | `boolean` | `false` | Masquer la colonne ID dans le tableau |
 | `includeJsonView` | `boolean` | `true` | Proposer les valeurs brutes dans l'inspecteur d'enregistrement |
 | `history` | `boolean` | `false` | Suivre les modifications dans l'historique de l'entité |
-| `alwaysApplyDefaultValues` | `boolean` | `false` | Appliquer les valeurs par défaut à chaque enregistrement |
+| `alwaysApplyDefaultValues` | `boolean` | `false` | Lorsqu'un enregistrement existant s'ouvre dans le formulaire, remplit avec le `defaultValue` déclaré de chaque propriété toute valeur que l'enregistrement laisse vide (`null` ou absente), de sorte que le prochain enregistrement l'écrive |
 | `previewProperties` | `string[]` | — | Propriétés à afficher dans les aperçus de référence |
 | `display` | `EntityDisplay` | — | Ce qui remplit chaque rôle d'affichage — voir [Affichage de l'entité](#affichage-de-lentité) |
 

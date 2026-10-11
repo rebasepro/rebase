@@ -1,5 +1,5 @@
 ---
-sourceHash: 627e02641d926641
+sourceHash: 898ece2b48e7a8b7
 title: Backend-Übersicht
 sidebar_label: Backend
 description: Das Rebase-Backend bietet einen vollständigen Server mit REST-API, Authentifizierung, Storage, WebSocket-Echtzeit und Entitätshistorie – alles initialisiert mit einem einzigen Funktionsaufruf.
@@ -294,7 +294,8 @@ Jeder Fehler – von jeder Route, in jedem Subsystem – wird in einem einheitli
 
 Der HTTP-Status befindet sich auf der Response, nicht im Body. Verzweigen Sie basierend auf `code`, nicht auf `message` – Meldungen sind für Menschen geschrieben und können sich ändern.
 
-Das typisierte SDK wandelt jeden dieser Fehler in einen `RebaseApiError` um, der `status`, `code` und `details` enthält – einschließlich der Fehler, die den Server gar nicht erst erreicht haben. Eine abgewiesene Verbindung, ein DNS-Fehler, CORS oder ein Verbindungsabbruch kommen als `status: 0`, `code: "NETWORK_ERROR"` an, wobei der Fehler der Runtime selbst unter `cause` liegt, anstatt als beliebiger Fehler, mit dem `fetch` gerade abbrechen wollte. Eine Antwort ohne Envelope — das 413 eines Proxys, das 502 eines Load Balancers — erhält dennoch einen `code` aus ihrem Status (`PAYLOAD_TOO_LARGE`, `SERVICE_UNAVAILABLE`, `INTERNAL_ERROR`, …), und ein außerhalb eines Browsers erstellter Client ohne `baseUrl` scheitert mit `BASE_URL_REQUIRED` statt mit einem Netzwerkfehler. Daher fängt Anwendungscode eine einzige Klasse ab:
+Das typisierte SDK wandelt jeden dieser Fehler in einen `RebaseApiError` um, der `status`, `code` und `details` enthält – einschließlich der Fehler, die den Server gar nicht erst erreicht haben. Eine abgewiesene Verbindung, ein DNS-Fehler, CORS oder ein Verbindungsabbruch kommen als `status: 0`, `code: "NETWORK_ERROR"` an, wobei der Fehler der Runtime selbst unter `cause` liegt, anstatt als beliebiger Fehler, mit dem `fetch` gerade abbrechen wollte. Eine Antwort ohne Envelope — das 413 eines Proxys, das 502 eines Load Balancers — erhält dennoch einen `code` aus ihrem Status (`PAYLOAD_TOO_LARGE`, `SERVICE_UNAVAILABLE`, `INTERNAL_ERROR`, …), und ein außerhalb eines Browsers erstellter Client ohne `baseUrl` scheitert mit `BASE_URL_REQUIRED` statt mit einem Netzwerkfehler.
+<span class="since-badge" data-since="0.25">Seit 0.25</span> Ein Lesezugriff, der einen Erfolg ohne die erwartete Form erhält — ein `204`, ein leerer Body, eine Seite ohne `data`-Liste —, scheitert mit `UNEXPECTED_RESPONSE`, statt als „keine Zeilen" aufgelöst zu werden, und `createMany`, `updateMany`, `deleteMany` oder `batch` scheitern mit `INVALID_BULK_BODY`, dem Code, den der Server für denselben Fehler verwendet, wenn etwas anderes als ein Array übergeben wird. Daher fängt Anwendungscode eine einzige Klasse ab:
 
 ```typescript
 async function setPrice(id: string, price: number) {

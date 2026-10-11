@@ -1,5 +1,5 @@
 ---
-sourceHash: 627e02641d926641
+sourceHash: 898ece2b48e7a8b7
 title: Visão Geral do Backend
 sidebar_label: Backend
 description: O backend do Rebase fornece um servidor completo com API REST, autenticação, armazenamento, tempo real com WebSocket e histórico de entidades — tudo inicializado com uma única chamada de função.
@@ -346,8 +346,13 @@ em vez de qualquer coisa com a qual o `fetch` decidiu rejeitar. Uma resposta sem
 envelope — um 413 de um proxy, um 502 de um balanceador de carga — ainda recebe um `code`
 a partir do seu status (`PAYLOAD_TOO_LARGE`, `SERVICE_UNAVAILABLE`, `INTERNAL_ERROR`, …), e
 um cliente criado fora de um navegador sem `baseUrl` falha com
-`BASE_URL_REQUIRED` em vez de um erro de rede. Assim, o
-código da aplicação captura apenas uma classe:
+`BASE_URL_REQUIRED` em vez de um erro de rede.
+<span class="since-badge" data-since="0.25">Desde 0.25</span> Uma leitura que recebe um sucesso
+sem a forma que ela lê — um `204`, um corpo vazio, uma página sem a lista
+`data` — falha com `UNEXPECTED_RESPONSE` em vez de resolver como "nenhuma linha", e
+`createMany`, `updateMany`, `deleteMany` ou `batch` que recebem algo diferente de
+um array falham com `INVALID_BULK_BODY`, o código que o servidor usa para o mesmo
+erro. Assim, o código da aplicação captura apenas uma classe:
 
 ```typescript
 async function setPrice(id: string, price: number) {

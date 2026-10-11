@@ -1,5 +1,5 @@
 ---
-sourceHash: 5f6462b96e4cf1be
+sourceHash: 609d0bdbbaabe6b1
 title: Endpoints de autenticação e tokens
 sidebar_label: Endpoints de autenticação
 description: As rotas de autenticação que o backend do Rebase disponibiliza, seus formatos de resposta, autenticação multifator, o contexto de banco de dados que uma política visualiza, JWKS e chaves de serviço.
@@ -50,7 +50,7 @@ Todos os endpoints de autenticação são montados em `/api/auth/`:
 | `GET` | `/api/auth/mfa/factors` | Listar os fatores cadastrados do chamador |
 | `POST` | `/api/auth/mfa/challenge` | Abrir um desafio (challenge) contra um fator verificado |
 | `POST` | `/api/auth/mfa/challenge/verify` | Responder a um desafio — é isso que emite a sessão |
-| `DELETE` | `/api/auth/mfa/unenroll` | Remover um fator (requer uma sessão `aal2`) |
+| `DELETE` | `/api/auth/mfa/unenroll` | Remover um fator (requer uma sessão `aal2` assim que a conta tem um fator verificado) |
 | `POST` | `/api/auth/mfa/recovery-codes` | Substituir os códigos de recuperação do chamador por dez novos (requer uma sessão `aal2`) |
 
 O gerenciamento administrativo de usuários e papéis (roles) é uma **superfície separada**, montada em

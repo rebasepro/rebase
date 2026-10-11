@@ -1,5 +1,5 @@
 ---
-sourceHash: 6c16b3e7b3784d47
+sourceHash: 8deb74573f8209f1
 title: Offline e Sincronização Local-First
 sidebar_label: Offline
 description: Ative o motor de sincronização local-first do SDK tipado do Rebase — um banco de dados local de linhas, escritas offline instantâneas com reversão e consultas ao vivo reativas.
@@ -100,7 +100,13 @@ Cada resultado carrega o que uma interface precisa para se descrever:
 | `partial` | O banco de dados local pode não conter todas as linhas correspondentes — trate como melhor esforço |
 | `error` | A última revalidação falhou |
 
-`observeById()` faz o mesmo para uma única linha e passa `undefined` quando ela é excluída.
+`observeById()` faz o mesmo para uma única linha e passa `undefined` quando ela é excluída. Ele aceita `include` como `findById()`, e cada emissão carrega essas relações:
+
+```typescript
+const stop = client.data.posts.observeById(postId, (post) => render(post), undefined, {
+    include: ["tags"]
+});
+```
 
 Ambos vinculam a assinatura em tempo real quando o cliente tem uma, então as mudanças feitas por outros usuários também chegam por streaming. Passe `{ realtime: false }` para uma assinatura que reflita apenas o estado local e as atualizações explícitas.
 

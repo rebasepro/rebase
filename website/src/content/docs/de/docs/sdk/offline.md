@@ -1,5 +1,5 @@
 ---
-sourceHash: 6c16b3e7b3784d47
+sourceHash: 8deb74573f8209f1
 title: Offline & Local-First-Sync
 sidebar_label: Offline
 description: Aktivieren Sie die Local-First-Sync-Engine des typisierten SDK von Rebase — eine lokale Zeilendatenbank, sofortige Offline-Schreibvorgänge mit Rollback und reaktive Live-Abfragen.
@@ -100,7 +100,13 @@ Jedes Ergebnis trägt, was eine UI braucht, um sich selbst zu beschreiben:
 | `partial` | Die lokale Datenbank hält möglicherweise nicht jede passende Zeile — als bestmögliche Näherung behandeln |
 | `error` | Die letzte Revalidierung ist fehlgeschlagen |
 
-`observeById()` tut dasselbe für eine einzelne Zeile und übergibt `undefined`, wenn sie gelöscht wird.
+`observeById()` tut dasselbe für eine einzelne Zeile und übergibt `undefined`, wenn sie gelöscht wird. Es akzeptiert `include` wie `findById()`, und jede Emission enthält diese Relationen:
+
+```typescript
+const stop = client.data.posts.observeById(postId, (post) => render(post), undefined, {
+    include: ["tags"]
+});
+```
 
 Beide binden das Echtzeit-Abonnement ein, wenn der Client eines hat, sodass auch Änderungen anderer Benutzer hereinströmen. Übergeben Sie `{ realtime: false }` für ein Abonnement, das nur den lokalen Zustand und explizite Aktualisierungen widerspiegelt.
 

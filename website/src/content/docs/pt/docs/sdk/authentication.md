@@ -1,5 +1,5 @@
 ---
-sourceHash: 4bed2a9ed4ceb358
+sourceHash: 0e00ae18684830bb
 title: Autenticação
 sidebar_label: Autenticação
 description: Autenticação no lado do cliente com o SDK Rebase — login com e-mail/senha, provedores OAuth, gerenciamento de sessão e listeners de estado de autenticação.
@@ -282,8 +282,9 @@ Sem `mfaToken`, as duas chamadas elevam a sessão que este cliente já mantém d
 await client.auth.mfa.unenroll(factorId);
 ```
 
-Requer uma sessão `aal2` — que já tenha respondido a um desafio — para que um
-token `aal1` roubado não possa desativar o MFA. Remover o último fator verificado também
+Depois que um fator é verificado, isso requer uma sessão `aal2`, para que um token
+`aal1` roubado não possa desativar o MFA; um primeiro cadastro inacabado é removido a
+partir de qualquer sessão. Remover o último fator verificado também
 descarta os códigos de recuperação.
 
 ## Logout

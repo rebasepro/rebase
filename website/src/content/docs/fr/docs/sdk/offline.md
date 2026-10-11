@@ -1,5 +1,5 @@
 ---
-sourceHash: 6c16b3e7b3784d47
+sourceHash: 8deb74573f8209f1
 title: Hors ligne et synchronisation local-first
 sidebar_label: Hors ligne
 description: Activez le moteur de synchronisation local-first du SDK typé de Rebase — une base de données locale de lignes, des écritures hors ligne instantanées avec annulation, et des requêtes en direct réactives.
@@ -100,7 +100,13 @@ Chaque résultat porte ce dont une interface a besoin pour se décrire :
 | `partial` | La base de données locale ne détient peut-être pas toutes les lignes correspondantes — à traiter comme un résultat « au mieux » |
 | `error` | La dernière revalidation a échoué |
 
-`observeById()` fait de même pour une seule ligne, et passe `undefined` lorsqu'elle est supprimée.
+`observeById()` fait de même pour une seule ligne, et passe `undefined` lorsqu'elle est supprimée. Il accepte `include` comme `findById()`, et chaque émission porte ces relations :
+
+```typescript
+const stop = client.data.posts.observeById(postId, (post) => render(post), undefined, {
+    include: ["tags"]
+});
+```
 
 Les deux se lient à l'abonnement temps réel lorsque le client en a un, de sorte que les changements effectués par d'autres utilisateurs arrivent aussi en flux. Passez `{ realtime: false }` pour un abonnement qui ne reflète que l'état local et les rafraîchissements explicites.
 

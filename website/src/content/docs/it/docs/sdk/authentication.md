@@ -1,5 +1,5 @@
 ---
-sourceHash: 4bed2a9ed4ceb358
+sourceHash: 0e00ae18684830bb
 title: Autenticazione
 sidebar_label: Autenticazione
 description: Autenticazione lato client con l'SDK di Rebase — accesso con email/password, provider OAuth, gestione delle sessioni e listener dello stato di autenticazione.
@@ -268,7 +268,7 @@ Senza `mfaToken`, le due chiamate elevano la sessione che questo client possiede
 await client.auth.mfa.unenroll(factorId);
 ```
 
-Richiede una sessione `aal2` — ovvero una sessione che ha già risposto a un challenge — in modo che un token `aal1` sottratto non possa disattivare l'MFA. La rimozione dell'ultimo fattore verificato elimina anche i codici di recupero.
+Una volta che un fattore è verificato, richiede una sessione `aal2`, in modo che un token `aal1` sottratto non possa disattivare l'MFA; una prima registrazione non completata viene rimossa da qualsiasi sessione. La rimozione dell'ultimo fattore verificato elimina anche i codici di recupero.
 
 ## Disconnessione
 

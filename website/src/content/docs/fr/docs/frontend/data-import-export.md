@@ -1,5 +1,5 @@
 ---
-sourceHash: 6d792c1a29a7f0a9
+sourceHash: 66aded96fdd7fc98
 title: Import et export de données
 sidebar_label: Import et export de données
 description: Importez des données depuis des fichiers CSV, JSON et Excel dans vos collections, et exportez les données de vos collections au format CSV ou JSON avec des champs calculés optionnels.
@@ -62,6 +62,8 @@ Un fichier exporté depuis une collection se réimporte avec les mêmes valeurs,
 L'aperçu liste chaque cellule qui ne se convertit pas, par colonne, avec leur nombre et les premières d'entre elles par ligne et par raison. Ces cellules sont laissées vides dans les lignes importées ; rien n'est transformé en `0`, `false` ou une valeur vide sans être listé. Revenez en arrière pour associer la colonne à une autre propriété, ou corrigez le fichier et téléchargez-le à nouveau.
 
 Les propres règles de la collection — champs obligatoires, options d'énumération, valeurs uniques — sont vérifiées par le serveur au fur et à mesure que les lignes sont écrites, par lots pouvant atteindre 500 lignes (moins lorsque les lignes sont larges, afin qu'une requête reste sous environ 1 Mo). Un lot est enregistré en entier ou pas du tout. Si une ligne est refusée, l'importation s'arrête et la désigne ; les lots qui la précèdent sont déjà enregistrés, et **Retry** reprend à partir de la première ligne du lot de la ligne refusée.
+
+Une ligne dont l'id existe déjà dans la collection met à jour cet enregistrement : les colonnes présentes dans le fichier sont écrites, les autres conservent leurs valeurs stockées, si bien qu'un fichier `id,price` réévalue des produits existants sans répéter leurs champs obligatoires. Une nouvelle ligne exige toujours tous les champs obligatoires. Un lot qui mêle mises à jour et nouvelles lignes est écrit en deux requêtes, de sorte qu'une nouvelle ligne refusée peut laisser les mises à jour de ce lot enregistrées ; **Retry** les réécrit avec les mêmes valeurs.
 
 ### Créer une collection à partir d'un fichier
 

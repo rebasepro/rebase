@@ -1,5 +1,5 @@
 ---
-sourceHash: e06718f3afc5cad4
+sourceHash: dc64725d910c68e0
 title: Consulta de datos
 sidebar_label: Consulta de datos
 description: Operaciones CRUD, constructor de consultas fluido, operadores de filtro, ordenación, selección de columnas y agregaciones con el SDK tipado de Rebase.
@@ -210,6 +210,8 @@ const { data } = await client.data.products
 ```
 
 `cond` recibe el operador canónico (la columna izquierda de la tabla de [Operadores de filtro](#operadores-de-filtro)). Un operador no admitido por el dialecto generará un `TypeError` al serializar la consulta, en lugar de producir silenciosamente una consulta diferente.
+
+En un cliente con [tipos generados](/docs/sdk#typed-sdk-generation), `logical` y `.where(group)` comprueban cada condición del árbol contra la fila, igual que `where`: una columna que la fila no tiene, o un valor del tipo incorrecto para el operador (`cond("views", "==", "many")` en una columna numérica), es un error de compilación. Una relación o una ruta JSON (`author.name`, `metadata->>tier`) no se comprueba.
 
 ### Negación
 

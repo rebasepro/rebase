@@ -1,5 +1,5 @@
 ---
-sourceHash: 6d792c1a29a7f0a9
+sourceHash: 66aded96fdd7fc98
 title: Importazione ed esportazione dati
 sidebar_label: Importazione ed esportazione dati
 description: Importa dati da file CSV, JSON ed Excel nelle tue collezioni ed esporta i dati delle collezioni in CSV o JSON con campi calcolati opzionali.
@@ -62,6 +62,8 @@ Un file esportato da una collezione si reimporta con gli stessi valori, in CSV c
 L'anteprima elenca ogni cella che non si converte, per colonna, con il numero di celle e le prime per riga e motivo. Quelle celle vengono lasciate vuote nelle righe importate; nulla viene trasformato in `0`, `false` o un valore vuoto senza essere elencato. Torna indietro per mappare la colonna su un'altra proprietà, oppure correggi il file e caricalo di nuovo.
 
 Le regole della collezione stessa — campi obbligatori, opzioni enum, valori unici — vengono verificate dal server mentre le righe vengono scritte, in lotti fino a 500 righe (meno quando le righe sono larghe, così una richiesta resta sotto circa 1 MB). Un lotto viene salvato per intero o per nulla. Se una riga viene rifiutata, l'importazione si interrompe e la indica; i lotti precedenti sono già salvati, e **Retry** riprende dalla prima riga del lotto della riga rifiutata.
+
+Una riga il cui id è già nella collezione aggiorna quel record: le colonne presenti nel file vengono scritte, le altre mantengono i valori memorizzati, quindi un file `id,price` riprezza i prodotti esistenti senza ripetere i loro campi obbligatori. Una riga nuova richiede comunque tutti i campi obbligatori. Un lotto che mescola aggiornamenti e righe nuove viene scritto come due richieste, quindi una riga nuova rifiutata può lasciare salvati gli aggiornamenti di quel lotto; **Retry** li riscrive con gli stessi valori.
 
 ### Creare una collezione da un file
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: 5f6462b96e4cf1be
+sourceHash: 609d0bdbbaabe6b1
 title: Endpoints y tokens de autenticación
 sidebar_label: Endpoints de autenticación
 description: Las rutas de autenticación que monta el backend de Rebase, las estructuras de sus respuestas, autenticación multifactor, el contexto de base de datos que ve una directiva, JWKS y claves de servicio.
@@ -50,7 +50,7 @@ Todos los endpoints de autenticación están montados en `/api/auth/`:
 | `GET` | `/api/auth/mfa/factors` | Listar los factores registrados del usuario emisor |
 | `POST` | `/api/auth/mfa/challenge` | Abrir un desafío (challenge) contra un factor verificado |
 | `POST` | `/api/auth/mfa/challenge/verify` | Responder a un desafío — esto es lo que emite la sesión |
-| `DELETE` | `/api/auth/mfa/unenroll` | Eliminar un factor (requiere una sesión `aal2`) |
+| `DELETE` | `/api/auth/mfa/unenroll` | Eliminar un factor (requiere una sesión `aal2` una vez que la cuenta tiene un factor verificado) |
 | `POST` | `/api/auth/mfa/recovery-codes` | Sustituir los códigos de recuperación del emisor por diez nuevos (requiere una sesión `aal2`) |
 
 La gestión administrativa de usuarios y roles es una **superficie independiente**, montada en `/api/admin/` en lugar de `/api/auth/`. Leer necesita el alcance `users:read` y cambiar necesita `users:write`. Un administrador y la clave de servicio tienen ambos; también los tiene un rol que los declare. Nadie puede cambiar una cuenta que tenga más que él. Consulte [Roles y alcances](/docs/backend/roles-and-scopes/).

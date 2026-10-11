@@ -1,5 +1,5 @@
 ---
-sourceHash: 627e02641d926641
+sourceHash: 898ece2b48e7a8b7
 title: Panoramica del backend
 sidebar_label: Backend
 description: Il backend di Rebase fornisce un server completo con API REST, autenticazione, storage, WebSocket in tempo reale e cronologia delle entità — tutto inizializzato con una singola chiamata di funzione.
@@ -294,7 +294,8 @@ Ogni errore — proveniente da qualsiasi route o sottosistema — viene restitui
 
 Lo stato HTTP è presente nella risposta, non nel corpo. Gestisci la logica basandoti su `code` e non su `message` — i messaggi sono scritti per gli utenti e possono variare.
 
-L'SDK tipizzato converte ciascuno di questi errori in un `RebaseApiError` contenente `status`, `code` e `details` — inclusi i fallimenti che non hanno mai raggiunto il server. Una connessione rifiutata, un errore DNS, problemi di CORS o un'interruzione (abort) vengono restituiti come `status: 0`, `code: "NETWORK_ERROR"`, con l'errore del runtime associato a `cause`, anziché con l'eccezione generica restituita da `fetch`. Una risposta senza envelope — un 413 di un proxy, un 502 di un load balancer — riceve comunque un `code` dal suo status (`PAYLOAD_TOO_LARGE`, `SERVICE_UNAVAILABLE`, `INTERNAL_ERROR`, …), e un client costruito fuori da un browser senza `baseUrl` fallisce con `BASE_URL_REQUIRED` anziché con un errore di rete. In questo modo il codice applicativo gestisce un'unica classe di errore:
+L'SDK tipizzato converte ciascuno di questi errori in un `RebaseApiError` contenente `status`, `code` e `details` — inclusi i fallimenti che non hanno mai raggiunto il server. Una connessione rifiutata, un errore DNS, problemi di CORS o un'interruzione (abort) vengono restituiti come `status: 0`, `code: "NETWORK_ERROR"`, con l'errore del runtime associato a `cause`, anziché con l'eccezione generica restituita da `fetch`. Una risposta senza envelope — un 413 di un proxy, un 502 di un load balancer — riceve comunque un `code` dal suo status (`PAYLOAD_TOO_LARGE`, `SERVICE_UNAVAILABLE`, `INTERNAL_ERROR`, …), e un client costruito fuori da un browser senza `baseUrl` fallisce con `BASE_URL_REQUIRED` anziché con un errore di rete.
+<span class="since-badge" data-since="0.25">Da 0.25</span> Una lettura che riceve un successo privo della forma che legge — un `204`, un corpo vuoto, una pagina senza l'elenco `data` — fallisce con `UNEXPECTED_RESPONSE` invece di risolversi come "nessuna riga", e `createMany`, `updateMany`, `deleteMany` o `batch` che ricevono qualcosa di diverso da un array falliscono con `INVALID_BULK_BODY`, il codice che il server usa per lo stesso errore. In questo modo il codice applicativo gestisce un'unica classe di errore:
 
 ```typescript
 async function setPrice(id: string, price: number) {

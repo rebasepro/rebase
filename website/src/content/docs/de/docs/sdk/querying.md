@@ -1,5 +1,5 @@
 ---
-sourceHash: e06718f3afc5cad4
+sourceHash: dc64725d910c68e0
 title: Daten abfragen
 sidebar_label: Daten abfragen
 description: CRUD-Operationen, Fluent Query Builder, Filteroperatoren, Sortierung, Spaltenauswahl und Aggregate mit dem typisierten SDK von Rebase.
@@ -210,6 +210,8 @@ const { data } = await client.data.products
 ```
 
 `cond` akzeptiert den kanonischen Operator – die linke Spalte der Tabelle [Filteroperatoren](#filteroperatoren). Ein Operator, den der Dialekt nicht unterstützt, führt bei der Serialisierung der Abfrage zu einem `TypeError` und nicht zu einer stillschweigend veränderten Abfrage.
+
+Bei einem Client mit [generierten Typen](/docs/sdk#typed-sdk-generation) prüfen `logical` und `.where(group)` jede Bedingung im Baum gegen die Zeile, so wie es `where` tut: Eine Spalte, die die Zeile nicht hat, oder ein Wert vom falschen Typ für den Operator (`cond("views", "==", "many")` bei einer Zahlenspalte) ist ein Compile-Fehler. Eine Relation oder ein JSON-Pfad (`author.name`, `metadata->>tier`) wird nicht geprüft.
 
 ### Negation
 

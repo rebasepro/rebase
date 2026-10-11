@@ -1,5 +1,5 @@
 ---
-sourceHash: 4bed2a9ed4ceb358
+sourceHash: 0e00ae18684830bb
 title: Authentification
 sidebar_label: Authentification
 description: Authentification côté client avec le SDK Rebase — connexion par e-mail/mot de passe, fournisseurs OAuth, gestion des sessions et écouteurs d'état d'authentification.
@@ -266,7 +266,7 @@ Sans `mfaToken`, les deux appels élèvent la session que ce client détient dé
 await client.auth.mfa.unenroll(factorId);
 ```
 
-Nécessite une session `aal2` — ayant déjà validé un challenge — afin qu'un jeton `aal1` dérobé ne puisse pas désactiver la MFA. La suppression du dernier facteur vérifié élimine également les codes de récupération.
+Une fois un facteur vérifié, cela nécessite une session `aal2`, afin qu'un jeton `aal1` dérobé ne puisse pas désactiver la MFA ; une première inscription inachevée se supprime depuis n'importe quelle session. La suppression du dernier facteur vérifié élimine également les codes de récupération.
 
 ## Déconnexion
 

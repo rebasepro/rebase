@@ -1,5 +1,5 @@
 ---
-sourceHash: 4bed2a9ed4ceb358
+sourceHash: 0e00ae18684830bb
 title: Authentifizierung
 sidebar_label: Authentifizierung
 description: Clientseitige Authentifizierung mit dem Rebase SDK — E-Mail/Passwort-Anmeldung, OAuth-Anbieter, Sitzungsverwaltung und Auth-Status-Listener.
@@ -261,7 +261,7 @@ Ohne `mfaToken` stufen die beiden Aufrufe die Sitzung, die dieser Client bereits
 await client.auth.mfa.unenroll(factorId);
 ```
 
-Erfordert eine `aal2`-Sitzung — also eine, die bereits eine Challenge beantwortet hat —, damit ein gestohlenes `aal1`-Token MFA nicht deaktivieren kann. Durch das Entfernen des letzten verifizierten Faktors werden auch die Wiederherstellungscodes gelöscht.
+Sobald ein Faktor verifiziert ist, erfordert dies eine `aal2`-Sitzung, damit ein gestohlenes `aal1`-Token MFA nicht deaktivieren kann; eine unvollendete erste Registrierung wird aus jeder Sitzung entfernt. Durch das Entfernen des letzten verifizierten Faktors werden auch die Wiederherstellungscodes gelöscht.
 
 ## Abmelden
 
