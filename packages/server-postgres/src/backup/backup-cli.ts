@@ -16,7 +16,6 @@ import chalk from "chalk";
 import { out as print, outWarn, outError } from "../cli-output";
 import { parseDriverLine } from "../cli-flags";
 import type { StorageController } from "@rebasepro/server";
-import { parseEnvBoolean } from "@rebasepro/types";
 import {
     BackupDestination,
     globalsFileForDump,
@@ -60,38 +59,30 @@ async function* webChunks(stream: ReadableStream<Uint8Array>): AsyncGenerator<Ui
 }
 
 /**
- * Build a StorageController for an object-storage destination from the same
- * `S3_*` env vars the backend uses. Returns `null` for local destinations.
+ * The controller for an object-storage destination, or `null` for a local one.
+ *
+ * Built by `backupStorageFromEnv` from `@rebasepro/server` — the function the
+ * Backups panel's routes use — so the CLI and the panel read a bucket the same
+ * way. This file had its own copy, and the two had already drifted once
+ * (`S3_FORCE_PATH_STYLE` read as `=== "true"`, so a MinIO backup addressed the
+ * bucket as a host).
+ *
+ * Exported for its test.
  */
-async function resolveStorageForDestination(
+export async function resolveStorageForDestination(
     dest: BackupDestination,
     env: Record<string, string | undefined>
 ): Promise<StorageController | null> {
     if (dest.kind === "local") return null;
-    if (dest.kind === "gcs") {
-        const { GCSStorageController } = await import("@rebasepro/server");
-        return new GCSStorageController({ type: "gcs", bucket: dest.bucket });
-    }
-    // s3 (also covers R2/MinIO/Hetzner/GCS-interop via S3_ENDPOINT)
-    if (!env.S3_ACCESS_KEY_ID || !env.S3_SECRET_ACCESS_KEY) {
+    const { backupStorageFromEnv } = await import("@rebasepro/server");
+    try {
+        return backupStorageFromEnv(dest, env);
+    } catch (error) {
         throw new BackupToolError(
-            "S3 destination requires S3_ACCESS_KEY_ID and S3_SECRET_ACCESS_KEY in the environment.",
+            error instanceof Error ? error.message : String(error),
             "Set the same S3_* variables your backend uses for storage."
         );
     }
-    const { S3StorageController } = await import("@rebasepro/server");
-    return new S3StorageController({
-        type: "s3",
-        bucket: dest.bucket,
-        region: env.S3_REGION || "auto",
-        accessKeyId: env.S3_ACCESS_KEY_ID,
-        secretAccessKey: env.S3_SECRET_ACCESS_KEY,
-        endpoint: env.S3_ENDPOINT,
-        // Unset stays unset, so the controller decides from the endpoint the
-        // way it does for the runtime's own storage. `=== "true"` made it an
-        // explicit `false`, and a MinIO backup addressed the bucket as a host.
-        forcePathStyle: parseEnvBoolean(env.S3_FORCE_PATH_STYLE)
-    });
 }
 
 function requireConnection(): string {

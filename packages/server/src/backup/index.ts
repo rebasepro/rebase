@@ -4,7 +4,8 @@
  */
 export * from "./backup-common";
 export { createBackupRoutes, createBackupLinkRoutes, BACKUP_DOWNLOAD_LINK_TTL_SECONDS } from "./backup-routes";
-export { backupDestinationFromEnv } from "./backup-storage";
+export { backupDestinationFromEnv, backupStorageFromEnv } from "./backup-storage";
+export type { ObjectBackupDestination } from "./backup-storage";
 export type { BackupRoutesConfig } from "./backup-routes";
 export { readBackupSchedule, isBackupCronDefinition, BACKUP_CRON_MARK } from "./backup-schedule";
 export type { BackupScheduleSource } from "./backup-schedule";

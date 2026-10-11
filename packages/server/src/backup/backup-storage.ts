@@ -46,8 +46,8 @@ export function backupStorageFromEnv(
     // s3 also covers R2, MinIO and the other S3-compatible stores, through S3_ENDPOINT.
     if (!env.S3_ACCESS_KEY_ID || !env.S3_SECRET_ACCESS_KEY) {
         throw new Error(
-            "S3_ACCESS_KEY_ID and S3_SECRET_ACCESS_KEY are not set in this server's environment. " +
-            "Set the same S3_* variables the backup cron uses."
+            "An S3 backup destination needs S3_ACCESS_KEY_ID and S3_SECRET_ACCESS_KEY in the environment " +
+            "— the same S3_* variables the backup cron uses."
         );
     }
     return new S3StorageController({
