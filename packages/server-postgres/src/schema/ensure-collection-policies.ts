@@ -449,8 +449,9 @@ type AtomicOutcome =
  * Bring the declared collections' RLS policies up to date. Returns what it did.
  *
  * Only tables that already exist are touched: the boot-time table creator runs
- * first, so anything still missing is a table this additive path is not allowed
- * to create (a junction, or a relation left to a migration). Enabling RLS on a
+ * first, so anything still missing is a table this additive path did not
+ * create (it creates junctions too) — one a failed boot DDL left out, or a
+ * project whose schema a migration owns. Enabling RLS on a
  * non-existent table would error, so those are recorded as skipped, not failed.
  *
  * ## One transaction per table
