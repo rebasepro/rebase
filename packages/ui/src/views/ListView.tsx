@@ -192,6 +192,7 @@ export function ListView<T>({
             ro.disconnect();
             if (rafId !== null) cancelAnimationFrame(rafId);
         };
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- `pendingScroll` is the ref object `useScrollParentRestoration` returns, the same one for the component's life; `update` reads `.current` when it runs.
     }, [setItemCount]);
 
     const { pendingScroll } = useScrollParentRestoration({ containerRef, initialScroll, onScroll, dataLength: data.length });

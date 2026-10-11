@@ -238,9 +238,11 @@ export function useBatchedFetch<M extends Record<string, any>>({
 }): FetchResult<M> {
     const data = useData();
     const id = entityId === undefined || entityId === null || entityId === "" ? undefined : String(entityId);
+    // The batcher depends on whether there is an id, not on which one.
+    const hasId = id !== undefined;
     const batcher = useMemo(
-        () => id !== undefined ? batcherFor(data, path, collection) : undefined,
-        [data, path, collection, id !== undefined]
+        () => hasId ? batcherFor(data, path, collection) : undefined,
+        [data, path, collection, hasId]
     );
 
     const subscribe = useCallback(

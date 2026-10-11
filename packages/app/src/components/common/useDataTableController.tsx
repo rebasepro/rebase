@@ -250,6 +250,7 @@ export function useDataTableController<M extends Record<string, any> = any, USER
                 filters: filterValues
             });
         }
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- once, on mount: marks the entry this view was restored from as used, with the values it was restored with.
     }, []);
 
     const [itemCount, setItemCount] = React.useState<number | undefined>(paginationEnabled ? initialItemCount : undefined);

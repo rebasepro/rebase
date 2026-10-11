@@ -81,7 +81,8 @@ export function CollectionBoardViewBinding<M extends Record<string, unknown> = R
     const sidePanelController = useSidePanel();
     const analyticsController = useAnalyticsController();
     const { t } = useTranslation();
-    const plugins = customizationController.plugins ?? [];
+    const configuredPlugins = customizationController.plugins;
+    const plugins = useMemo(() => configuredPlugins ?? [], [configuredPlugins]);
 
     // State for backfill dialog
     const [showBackfillDialog, setShowBackfillDialog] = useState(false);
