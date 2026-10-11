@@ -1,5 +1,5 @@
 ---
-sourceHash: 4fc97bd0da41030a
+sourceHash: c30985ad74db5bdc
 title: Escritura de datos
 sidebar_label: Escritura de datos
 description: create, upsert, update y delete con el SDK — operaciones de campo, escrituras condicionales, claves de idempotencia, escrituras por lotes y escritura entre colecciones en una sola transacción.
@@ -67,6 +67,10 @@ generado desde el interior de una transacción.
 
 La marca de tiempo `on_create` y el creador `user_on_create` de una fila que ya existía no se
 modifican: un conflicto significa que su creación es un hecho del pasado.
+
+#### No en la colección de usuarios
+
+<span class="since-badge" data-since="0.25">Since 0.25</span> `upsert()` en la colección de usuarios (la que tiene `auth` activado) se rechaza con un 400 (`INVALID_CONFLICT_TARGET`), igual que `createMany` con `upsert` en ella. Crear un usuario y modificarlo siguen reglas distintas — una creación cifra la contraseña con hash y envía la invitación, una actualización no puede degradar al último administrador — y un upsert solo sabe cuál de las dos es dentro de la escritura. Llame a `create` o a `update` en su lugar.
 
 ### Update
 

@@ -177,16 +177,6 @@ ignoring it turns a re-runnable import into a duplicating one.
 row it matched could live under another parent, and the upsert would move it
 under this one. Send the upsert to the collection's own route.
 
-The users collection (the one with `auth` enabled) refuses an upsert on every
-door — `?on_conflict=`, `/bulk` with `upsert: true`, a `_batch` `upsert`
-operation, the SDK's `upsert()` and the realtime socket — with a `400`
-(`INVALID_CONFLICT_TARGET`). Its rows are the users, and creating one and
-changing one follow different rules: a create hashes the password, normalizes
-the email, runs `onCreateUser` and sends the invitation, and an update may not
-demote the last administrator. An upsert only learns which it is inside the
-write, too late to apply either. Create users with a plain `POST` and change
-them with `PATCH`.
-
 An upsert that meets a stored row is an update of it. The server reads the row
 the key names, in the caller's scope and inside the write's transaction, and
 runs the ordinary update: the fields in the body are written, the ones it leaves
@@ -203,6 +193,18 @@ A row that already existed keeps its `on_create` timestamp and its
 `user_on_create` creator. A conflict means the row's creation is a fact about the
 past, and a nightly re-import that reset `createdAt` on everything it touched
 would take every "new this week" query with it.
+
+#### Not on the users collection
+
+<span class="since-badge" data-since="0.25">Since 0.25</span> The users collection (the one with `auth` enabled) refuses an upsert on every
+door — `?on_conflict=`, `/bulk` with `upsert: true`, a `_batch` `upsert`
+operation, the SDK's `upsert()` and the realtime socket — with a `400`
+(`INVALID_CONFLICT_TARGET`). Its rows are the users, and creating one and
+changing one follow different rules: a create hashes the password, normalizes
+the email, runs `onCreateUser` and sends the invitation, and an update may not
+demote the last administrator. An upsert only learns which it is inside the
+write, too late to apply either. Create users with a plain `POST` and change
+them with `PATCH`.
 
 ### `Prefer: return=minimal`
 

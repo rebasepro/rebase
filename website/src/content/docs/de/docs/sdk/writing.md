@@ -1,5 +1,5 @@
 ---
-sourceHash: 4fc97bd0da41030a
+sourceHash: c30985ad74db5bdc
 title: Daten schreiben
 sidebar_label: Daten schreiben
 description: Erstellen, Upserten, Aktualisieren und Löschen mit dem SDK – Feldoperationen, bedingte Schreibvorgänge, Idempotenzschlüssel, Batch-Schreibvorgänge und kollektionsübergreifendes Schreiben in einer einzigen Transaktion.
@@ -65,6 +65,10 @@ zu einem Fehler innerhalb einer Transaktion.
 
 Der `on_create`-Zeitstempel und der `user_on_create`-Ersteller einer bereits existierenden Zeile
 bleiben unberührt: Ein Konflikt bedeutet, dass ihre Erstellung eine Tatsache aus der Vergangenheit ist.
+
+#### Nicht auf der Users-Collection
+
+<span class="since-badge" data-since="0.25">Since 0.25</span> `upsert()` auf der Users-Collection (der mit aktiviertem `auth`) wird mit einem 400 (`INVALID_CONFLICT_TARGET`) abgelehnt, ebenso `createMany` mit `upsert` dort. Das Anlegen und das Ändern eines Benutzers folgen unterschiedlichen Regeln — ein Create hasht das Passwort und verschickt die Einladung, ein Update darf den letzten Administrator nicht herabstufen — und ein Upsert erfährt erst innerhalb des Schreibvorgangs, was es ist. Rufen Sie stattdessen `create` oder `update` auf.
 
 ### Update
 

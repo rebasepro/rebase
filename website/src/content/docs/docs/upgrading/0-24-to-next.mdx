@@ -181,12 +181,13 @@ set of rules: no password hashing, email normalization, `onCreateUser` or
 invitation on a create, and no last-administrator check on an update.
 
 **Who is affected:** code that upserts users, for example a sync that ran
-`client.data.users.upsert(row, { onConflict: ["email"] })`.
+`client.data.users.upsert(user, { onConflict: ["email"] })`.
 
 **What to change:** look the user up, then create or update.
 
 ```ts
-const existing = await client.data.users.find({ where: { email: ["==", row.email] }, limit: 1 });
-if (existing.data.length === 0) await client.data.users.create(row);
-else await client.data.users.update(existing.data[0].id, row);
+const user = { email: "ada@example.com", displayName: "Ada" };
+const { data: [found] } = await client.data.users.find({ where: { email: ["==", user.email] }, limit: 1 });
+if (!found) await client.data.users.create(user);
+else await client.data.users.update(String(found.id), user);
 ```

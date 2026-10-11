@@ -1,5 +1,5 @@
 ---
-sourceHash: 2969a9944ef12fb9
+sourceHash: f214eaa0ccfb78a2
 title: Escritura a través de REST
 sidebar_label: Escritura a través de REST
 description: Claves de idempotencia, escrituras condicionales con ETag e If-Match, operaciones de campo, upserts sobre clave natural, return=minimal y lotes entre colecciones.
@@ -89,7 +89,7 @@ Una operación responde a la `validation` de la propiedad igual que un valor. Lo
 
 ### Upsert sobre una clave natural
 
-`POST /api/data/:slug?on_conflict=email` inserta la fila, o actualiza la que ya tiene ese email, en lugar de fallar por ella. La ruta bulk admite el mismo objetivo como `onConflict` junto a `upsert: true`, al igual que cada operación `upsert` de un lote.
+`POST /api/data/:slug?on_conflict=sku` inserta la fila, o actualiza la que ya tiene ese SKU, en lugar de fallar por ella. La ruta bulk admite el mismo objetivo como `onConflict` junto a `upsert: true`, al igual que cada operación `upsert` de un lote.
 
 ```bash
 curl -X POST '/api/data/products?on_conflict=sku' \
@@ -111,6 +111,10 @@ Especificar un objetivo sin `upsert: true` en una escritura masiva también gene
 Un upsert que encuentra una fila almacenada es una actualización de ella. El servidor lee la fila que nombra la clave, en el ámbito del emisor de la llamada y dentro de la transacción de la escritura, y ejecuta la actualización ordinaria: se escriben los campos del cuerpo, los que omite conservan sus valores almacenados en lugar de restablecerse a su `defaultValue`, `beforeSave` y `afterSave` ven `status: "existing"` con los valores anteriores, y el historial registra una actualización. Una fila que la lectura no pudo ver, o una insertada de forma concurrente, la sigue capturando `ON CONFLICT … DO UPDATE`, que establece solo lo que escribieron el cuerpo y los hooks, y las marcas `on_update`. Una clave que nombra una fila fuera del ámbito `beforeQuery` del emisor de la llamada responde `404`. Una clave que pertenece a una fila en la [papelera](/docs/collections/soft-delete/) responde `409 ROW_IN_TRASH` y no escribe nada: restaura la fila primero, o púrgala.
 
 Una fila que ya existía conserva su marca de tiempo `on_create` y su creador `user_on_create`. Un conflicto implica que la creación de la fila es un hecho del pasado, y una reimportación nocturna que restableciera `createdAt` en todo lo que modificara alteraría por completo cualquier consulta de «nuevos esta semana».
+
+#### No en la colección de usuarios
+
+<span class="since-badge" data-since="0.25">Since 0.25</span> La colección de usuarios (la que tiene `auth` activado) rechaza un upsert por cualquier vía — `?on_conflict=`, `/bulk` con `upsert: true`, una operación `upsert` de `_batch`, el `upsert()` del SDK y el socket en tiempo real — con un `400` (`INVALID_CONFLICT_TARGET`). Sus filas son los usuarios, y crear uno y modificarlo siguen reglas distintas: una creación cifra la contraseña con hash, normaliza el email, ejecuta `onCreateUser` y envía la invitación, y una actualización no puede degradar al último administrador. Un upsert solo sabe cuál de las dos es dentro de la escritura, demasiado tarde para aplicar ninguna. Cree los usuarios con un `POST` normal y modifíquelos con `PATCH`.
 
 ### `Prefer: return=minimal`
 

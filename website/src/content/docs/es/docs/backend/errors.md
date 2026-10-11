@@ -1,5 +1,5 @@
 ---
-sourceHash: e0ea7eaf72bbb3c5
+sourceHash: b93b744a1a28bc24
 title: Códigos de error
 sidebar_label: Códigos de error
 description: Todos los códigos de error que un backend de Rebase puede devolver, con su estado HTTP, qué significan y qué hacer al respecto; además del envelope de respuesta, X-Request-ID y las reglas de details.
@@ -185,7 +185,7 @@ que enviaste es el ID que obtuviste. Lee la cabecera de respuesta.
 | `INVALID_BATCH_BODY` | 400 | A una operación de `/_batch` le falta `op`, `collection`, `values` o `id`, nombra una colección que este backend no sirve, o reutiliza un nombre de `ref`. | Consulta el mensaje; identifica la operación por su índice. |
 | `INVALID_BATCH_REF` | 400 | Un `{ "$ref": "<name>.<field>" }` no nombra ninguna operación anterior, apunta hacia adelante o solicita un campo que la fila referenciada no tiene. Solo se resuelven referencias hacia atrás. | Asigna el nombre a la operación con `ref` *antes* de referenciarla. |
 | `INVALID_BULK_BODY` | 400 | El cuerpo masivo no tiene la estructura esperada. | Envía el array `items` documentado. |
-| `INVALID_CONFLICT_TARGET` | 400 | El `on_conflict` / `onConflict` de un upsert nombra columnas sin garantía de unicidad, las nombra sin `upsert: true`, o se envía en una creación anidada, donde una fila encontrada pasaría al nuevo padre. De lo contrario, Postgres respondería 42P10 desde el interior de una transacción que ya ha realizado trabajo. | Declara `validation: { unique: true }` o un índice `unique`; el mensaje lista los destinos que sí existen. |
+| `INVALID_CONFLICT_TARGET` | 400 | El `on_conflict` / `onConflict` de un upsert nombra columnas sin garantía de unicidad, las nombra sin `upsert: true`, o se envía en una creación anidada, donde una fila encontrada pasaría al nuevo padre. De lo contrario, Postgres respondería 42P10 desde el interior de una transacción que ya ha realizado trabajo. También cualquier upsert en la colección de usuarios (auth), donde una creación y una actualización siguen reglas distintas. | Declara `validation: { unique: true }` o un índice `unique`; el mensaje lista los destinos que sí existen. En la colección de usuarios, envíe un `POST` para crear y un `PATCH` para actualizar. |
 | `INVALID_COUNT` | 400 | `?count=` no es `exact` ni `none`. Se rechaza en lugar de leerse como el valor por defecto: un `?count=nnone` mal escrito pagaría el conteo que se escribió para omitir. | Envía `exact` (el valor por defecto) o `none`. Consulta [Omitir el conteo](/docs/backend/api/#skipping-the-count). |
 | `INVALID_COUNT` | 400 | `?count=` no es `exact` ni `none`. Rechazado en lugar de leerse como el valor por defecto: un `?count=nnone` mal escrito pagaría el conteo que se quería omitir. | Envía `exact` (el valor por defecto) o `none`. Consulta [Omitir el conteo](/docs/backend/api/#skipping-the-count). |
 | `INVALID_CURSOR` | 400 | El cursor `after` no se puede leer, o nombra un id de fila que no encaja con las columnas clave de la colección: se truncó, se volvió a codificar o se construyó a mano. | Devuelve `meta.nextCursor` de la página anterior sin cambios. Consulta [Paginación](/docs/sdk/pagination/). |

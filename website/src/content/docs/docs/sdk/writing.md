@@ -66,7 +66,9 @@ that do exist, rather than an error raised from inside a transaction.
 The `on_create` timestamp and the `user_on_create` creator of a row that already
 existed are left alone: a conflict means its creation is a fact about the past.
 
-`upsert()` on the users collection (the one with `auth` enabled) is refused
+#### Not on the users collection
+
+<span class="since-badge" data-since="0.25">Since 0.25</span> `upsert()` on the users collection (the one with `auth` enabled) is refused
 with a 400 (`INVALID_CONFLICT_TARGET`), and so is `createMany` with `upsert`
 there. Creating a user and changing one follow different rules — a create
 hashes the password and sends the invitation, an update may not demote the last

@@ -1,5 +1,5 @@
 ---
-sourceHash: 2969a9944ef12fb9
+sourceHash: f214eaa0ccfb78a2
 title: Schreiben über REST
 sidebar_label: Schreiben über REST
 description: Idempotenz-Schlüssel, bedingte Schreibvorgänge mit ETag und If-Match, Feldoperationen, Upserts über natürliche Schlüssel, return=minimal und sammlungsübergreifende Batches.
@@ -82,7 +82,7 @@ Eine Operation unterliegt der `validation` der Eigenschaft wie ein Wert. Hinzuge
 
 ### Upsert über einen natürlichen Schlüssel
 
-`POST /api/data/:slug?on_conflict=email` fügt die Zeile ein oder aktualisiert diejenige, die diese E-Mail bereits enthält, statt daran zu scheitern. Die Bulk-Route akzeptiert dasselbe Ziel als `onConflict` neben `upsert: true`, ebenso wie jede `upsert`-Operation eines Batches.
+`POST /api/data/:slug?on_conflict=sku` fügt die Zeile ein oder aktualisiert diejenige, die diese SKU bereits enthält, statt daran zu scheitern. Die Bulk-Route akzeptiert dasselbe Ziel als `onConflict` neben `upsert: true`, ebenso wie jede `upsert`-Operation eines Batches.
 
 ```bash
 curl -X POST '/api/data/products?on_conflict=sku' \
@@ -104,6 +104,10 @@ Die Angabe eines Ziels ohne `upsert: true` bei einem Bulk-Schreibvorgang führt 
 Ein Upsert, das auf eine gespeicherte Zeile trifft, ist ein Update dieser Zeile. Der Server liest die Zeile, die der Schlüssel benennt, im Scope des Aufrufers und innerhalb der Transaktion des Schreibvorgangs, und führt das gewöhnliche Update aus: Die Felder im Body werden geschrieben, die weggelassenen behalten ihre gespeicherten Werte, statt auf ihren `defaultValue` zurückgesetzt zu werden, `beforeSave` und `afterSave` sehen `status: "existing"` mit den vorherigen Werten, und die Historie verzeichnet ein Update. Eine Zeile, die das Lesen nicht sehen konnte, oder eine, die gleichzeitig eingefügt wurde, wird weiterhin von `ON CONFLICT … DO UPDATE` erfasst, das nur setzt, was der Body und die Hooks geschrieben haben, sowie die `on_update`-Stempel. Ein Schlüssel, der eine Zeile außerhalb des `beforeQuery`-Scopes des Aufrufers benennt, antwortet mit `404`. Ein Schlüssel, der zu einer Zeile im [Papierkorb](/docs/collections/soft-delete/) gehört, antwortet mit `409 ROW_IN_TRASH` und schreibt nichts: Stellen Sie die Zeile zuerst wieder her, oder löschen Sie sie endgültig.
 
 Eine Zeile, die bereits existierte, behält ihren `on_create`-Zeitstempel und ihren `user_on_create`-Ersteller. Ein Konflikt bedeutet, dass die Erstellung der Zeile ein Fakt der Vergangenheit ist; ein nächtlicher Re-Import, der `createdAt` bei jedem berührten Datensatz zurücksetzte, würde jede „Neu diese Woche“-Abfrage verfälschen.
+
+#### Nicht auf der Users-Collection
+
+<span class="since-badge" data-since="0.25">Since 0.25</span> Die Users-Collection (die mit aktiviertem `auth`) lehnt ein Upsert an jeder Tür ab — `?on_conflict=`, `/bulk` mit `upsert: true`, eine `upsert`-Operation in `_batch`, das `upsert()` des SDK und den Realtime-Socket — mit einem `400` (`INVALID_CONFLICT_TARGET`). Ihre Zeilen sind die Benutzer, und das Anlegen und das Ändern eines Benutzers folgen unterschiedlichen Regeln: Ein Create hasht das Passwort, normalisiert die E-Mail, führt `onCreateUser` aus und verschickt die Einladung, und ein Update darf den letzten Administrator nicht herabstufen. Ein Upsert erfährt erst innerhalb des Schreibvorgangs, was es ist, zu spät, um eines davon anzuwenden. Legen Sie Benutzer mit einem einfachen `POST` an und ändern Sie sie mit `PATCH`.
 
 ### `Prefer: return=minimal`
 

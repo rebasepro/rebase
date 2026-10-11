@@ -1548,6 +1548,28 @@ a type error.
 **What to change:** delete the prop. For a multi-select's changes use
 `onValueChange`.
 
+### 77. An upsert on the users collection is refused
+
+The users collection (the one with `auth` enabled) now answers a 400
+`INVALID_CONFLICT_TARGET` to an upsert, on every door: `?on_conflict=`, `/bulk`
+with `upsert: true`, a `_batch` `upsert` operation, the SDK's `upsert()` and
+`createMany(…, { upsert: true })`, and the realtime socket. An upsert only
+learns inside the write whether it creates or updates, so it applied neither
+set of rules: no password hashing, email normalization, `onCreateUser` or
+invitation on a create, and no last-administrator check on an update.
+
+**Who is affected:** code that upserts users, for example a sync that ran
+`client.data.users.upsert(user, { onConflict: ["email"] })`.
+
+**What to change:** look the user up, then create or update.
+
+```ts
+const user = { email: "ada@example.com", displayName: "Ada" };
+const { data: [found] } = await client.data.users.find({ where: { email: ["==", user.email] }, limit: 1 });
+if (!found) await client.data.users.create(user);
+else await client.data.users.update(String(found.id), user);
+```
+
 ## Upgrading 0.23 to 0.24
 
 ## Upgrading 0.23 → 0.24
@@ -3750,6 +3772,17 @@ yet, listed so that nobody reads a promise into them:
   and `my_title`) and a relation `target` written as a string
   (`target: "authors"`) are refused at config time too, each saying what to
   write. Rename one of the colliding names.
+
+- **An upsert on the users (auth) collection is refused with a 400
+  `INVALID_CONFLICT_TARGET`.** It skipped both rule sets: the create rules
+  (password hashing, email normalization, `onCreateUser`, the invitation) and
+  the update rules (the last administrator cannot be demoted). A `/bulk` upsert
+  of `{ id: <the last admin>, roles: ["viewer"] }` demoted them, and an inserted
+  row had no password and the email as typed. The refusal covers `?on_conflict=`,
+  `/bulk` with `upsert: true`, a `_batch` `upsert` operation, the SDK's
+  `upsert()` and `createMany(…, { upsert: true })`, and the realtime socket.
+  Create users with `POST` (or `create`) and change them with `PATCH` (or
+  `update`).
 
 ##### MCP
 
@@ -15865,19 +15898,19 @@ the request-level validation.
 
 #### Upsert on a natural key
 
-`POST /api/data/:slug?on_conflict=email` inserts the row, or updates the one
-that already holds that email, instead of failing on it. The bulk route takes
+`POST /api/data/:slug?on_conflict=sku` inserts the row, or updates the one
+that already holds that SKU, instead of failing on it. The bulk route takes
 the same target as `onConflict` beside `upsert: true`, and so does each `upsert`
 operation of a batch.
 
 ```bash
-curl -X POST '/api/data/users?on_conflict=email' \
-     -d '{"email": "ada@example.com", "name": "Ada"}'
+curl -X POST '/api/data/products?on_conflict=sku' \
+     -d '{"sku": "LAMP-01", "name": "Desk lamp", "price": 39}'
 
-curl -X POST /api/data/users/bulk -d '{
+curl -X POST /api/data/products/bulk -d '{
   "rows": [ … ],
   "upsert": true,
-  "onConflict": ["tenant_id", "slug"]
+  "onConflict": ["tenant_id", "sku"]
 }'
 ```
 
@@ -15912,6 +15945,18 @@ A row that already existed keeps its `on_create` timestamp and its
 `user_on_create` creator. A conflict means the row's creation is a fact about the
 past, and a nightly re-import that reset `createdAt` on everything it touched
 would take every "new this week" query with it.
+
+##### Not on the users collection
+
+<span class="since-badge" data-since="0.25">Since 0.25</span> The users collection (the one with `auth` enabled) refuses an upsert on every
+door — `?on_conflict=`, `/bulk` with `upsert: true`, a `_batch` `upsert`
+operation, the SDK's `upsert()` and the realtime socket — with a `400`
+(`INVALID_CONFLICT_TARGET`). Its rows are the users, and creating one and
+changing one follow different rules: a create hashes the password, normalizes
+the email, runs `onCreateUser` and sends the invitation, and an update may not
+demote the last administrator. An upsert only learns which it is inside the
+write, too late to apply either. Create users with a plain `POST` and change
+them with `PATCH`.
 
 #### `Prefer: return=minimal`
 
@@ -17173,7 +17218,7 @@ Inside `admin`, except `history`, which is a backend feature and stays at the to
 | `hideIdFromCollection` | `boolean` | `false` | Hide the ID column from the table |
 | `includeJsonView` | `boolean` | `true` | Offer the raw values in the record inspector |
 | `history` | `boolean` | `false` | Track changes in entity history |
-| `alwaysApplyDefaultValues` | `boolean` | `false` | Apply default values on every save |
+| `alwaysApplyDefaultValues` | `boolean` | `false` | When an existing record opens in the form, fill each property's declared `defaultValue` into a value the record leaves empty (`null` or missing), so the next save writes it |
 | `previewProperties` | `string[]` | — | Properties to display in reference previews |
 | `display` | `EntityDisplay` | — | What fills each display role — see [Entity display](#entity-display) |
 
@@ -21809,19 +21854,19 @@ the request-level validation.
 
 #### Upsert on a natural key
 
-`POST /api/data/:slug?on_conflict=email` inserts the row, or updates the one
-that already holds that email, instead of failing on it. The bulk route takes
+`POST /api/data/:slug?on_conflict=sku` inserts the row, or updates the one
+that already holds that SKU, instead of failing on it. The bulk route takes
 the same target as `onConflict` beside `upsert: true`, and so does each `upsert`
 operation of a batch.
 
 ```bash
-curl -X POST '/api/data/users?on_conflict=email' \
-     -d '{"email": "ada@example.com", "name": "Ada"}'
+curl -X POST '/api/data/products?on_conflict=sku' \
+     -d '{"sku": "LAMP-01", "name": "Desk lamp", "price": 39}'
 
-curl -X POST /api/data/users/bulk -d '{
+curl -X POST /api/data/products/bulk -d '{
   "rows": [ … ],
   "upsert": true,
-  "onConflict": ["tenant_id", "slug"]
+  "onConflict": ["tenant_id", "sku"]
 }'
 ```
 
@@ -21856,6 +21901,18 @@ A row that already existed keeps its `on_create` timestamp and its
 `user_on_create` creator. A conflict means the row's creation is a fact about the
 past, and a nightly re-import that reset `createdAt` on everything it touched
 would take every "new this week" query with it.
+
+##### Not on the users collection
+
+<span class="since-badge" data-since="0.25">Since 0.25</span> The users collection (the one with `auth` enabled) refuses an upsert on every
+door — `?on_conflict=`, `/bulk` with `upsert: true`, a `_batch` `upsert`
+operation, the SDK's `upsert()` and the realtime socket — with a `400`
+(`INVALID_CONFLICT_TARGET`). Its rows are the users, and creating one and
+changing one follow different rules: a create hashes the password, normalizes
+the email, runs `onCreateUser` and sends the invitation, and an update may not
+demote the last administrator. An upsert only learns which it is inside the
+write, too late to apply either. Create users with a plain `POST` and change
+them with `PATCH`.
 
 #### `Prefer: return=minimal`
 
@@ -22481,7 +22538,7 @@ the ID you got. Read the response header.
 | `INVALID_BATCH_BODY` | 400 | A `/_batch` operation is missing `op`, `collection`, `values` or `id`, names a collection this backend does not serve, or reuses a `ref` name. | See the message; it names the operation by index. |
 | `INVALID_BATCH_REF` | 400 | A `{ "$ref": "<name>.<field>" }` names no earlier operation, points forward, or asks for a field the referenced row does not have. Only backward references resolve. | Name the operation with `ref` *before* referencing it. |
 | `INVALID_BULK_BODY` | 400 | The bulk body is not the expected shape. | Send the documented `items` array. |
-| `INVALID_CONFLICT_TARGET` | 400 | An upsert's `on_conflict` / `onConflict` names columns carrying no uniqueness guarantee, names them without `upsert: true`, or is sent on a nested create, where a matched row would move under the new parent. Postgres would otherwise answer 42P10 from inside a transaction that has already done work. | Declare `validation: { unique: true }` or a `unique` index; the message lists the targets that do exist. |
+| `INVALID_CONFLICT_TARGET` | 400 | An upsert's `on_conflict` / `onConflict` names columns carrying no uniqueness guarantee, names them without `upsert: true`, or is sent on a nested create, where a matched row would move under the new parent. Postgres would otherwise answer 42P10 from inside a transaction that has already done work. Also any upsert on the users (auth) collection, where a create and an update follow different rules. | Declare `validation: { unique: true }` or a `unique` index; the message lists the targets that do exist. On the users collection, send a `POST` to create and a `PATCH` to update. |
 | `INVALID_COUNT` | 400 | `?count=` is not `exact` or `none`. Refused rather than read as the default: a mistyped `?count=nnone` would pay for the count it was written to skip. | Send `exact` (the default) or `none`. See [Skipping the count](/docs/backend/api/#skipping-the-count). |
 | `INVALID_CURSOR` | 400 | The `after` cursor cannot be read, or names a row id that does not fit the collection's key columns: it was truncated, re-encoded or built by hand. | Pass back `meta.nextCursor` from the previous page unchanged. See [Pagination](/docs/sdk/pagination/). |
 | `INVALID_DELETED_PARAM` | 400 | `?deleted=` is neither `include` nor `only`. Refused rather than ignored: a mistyped `?deleted=true` that quietly hid every deleted row would look like it worked and answer the opposite question. | Send `include` (live and deleted) or `only` (deleted alone). Omit it for live rows only. |
@@ -24302,7 +24359,7 @@ All auth endpoints are mounted at `/api/auth/`:
 | `GET` | `/api/auth/mfa/factors` | List the caller's enrolled factors |
 | `POST` | `/api/auth/mfa/challenge` | Open a challenge against a verified factor |
 | `POST` | `/api/auth/mfa/challenge/verify` | Answer a challenge — this is what issues the session |
-| `DELETE` | `/api/auth/mfa/unenroll` | Remove a factor (requires an `aal2` session) |
+| `DELETE` | `/api/auth/mfa/unenroll` | Remove a factor (requires an `aal2` session once the account has a verified factor) |
 | `POST` | `/api/auth/mfa/recovery-codes` | Replace the caller's recovery codes with ten new ones (requires an `aal2` session) |
 
 Administrative user and role management is a **separate surface**, mounted at
@@ -37754,6 +37811,7 @@ import { ToggleButtonGroup } from "@rebasepro/ui";
 | `className` | `string` | — |  |
 | `aria-label` | `string` | — | Names the group: what it chooses between, e.g. "View mode". |
 | `aria-labelledby` | `string` | — | The id of a visible label that names the group. |
+| `fullWidth` | `boolean` | — | Stretch the track to its container and split it evenly between the options. |
 
 ### Example
 
@@ -39421,6 +39479,12 @@ const { data } = await client.data.products
 have is a `TypeError` when the query is serialized, not a silently different
 query.
 
+On a client with [generated types](/docs/sdk#typed-sdk-generation), `logical` and `.where(group)`
+check every condition in the tree against the row, the way `where` does: a
+column the row does not have, or a value of the wrong type for the operator
+(`cond("views", "==", "many")` on a number column), is a compile error. A
+relation or JSON path (`author.name`, `metadata->>tier`) is not checked.
+
 #### Negation
 
 `not` negates the **conjunction** of its conditions: `not(a)` is `NOT a`, and
@@ -39994,9 +40058,9 @@ const newProduct = await client.data.products.create(
 Insert the row, or update the one already occupying its key:
 
 ```typescript
-await client.data.users.upsert(
-    { email: "ada@example.com", name: "Ada" },
-    { onConflict: ["email"] }
+await client.data.products.upsert(
+    { sku: "LAMP-01", name: "Desk lamp", price: 39 },
+    { onConflict: ["sku"] }
 );
 ```
 
@@ -40022,6 +40086,15 @@ that do exist, rather than an error raised from inside a transaction.
 
 The `on_create` timestamp and the `user_on_create` creator of a row that already
 existed are left alone: a conflict means its creation is a fact about the past.
+
+##### Not on the users collection
+
+<span class="since-badge" data-since="0.25">Since 0.25</span> `upsert()` on the users collection (the one with `auth` enabled) is refused
+with a 400 (`INVALID_CONFLICT_TARGET`), and so is `createMany` with `upsert`
+there. Creating a user and changing one follow different rules — a create
+hashes the password and sends the invitation, an update may not demote the last
+administrator — and an upsert only learns which it is inside the write. Call
+`create` or `update` instead.
 
 #### Update
 
@@ -41196,9 +41269,9 @@ holds from `aal1` to `aal2`.
 await client.auth.mfa.unenroll(factorId);
 ```
 
-Requires an `aal2` session — one that has already answered a challenge — so a
-stolen `aal1` token cannot turn MFA off. Removing the last verified factor also
-discards the recovery codes.
+Once a factor is verified this requires an `aal2` session, so a stolen `aal1`
+token cannot turn MFA off; an unfinished first enrolment is removed from any
+session. Removing the last verified factor also discards the recovery codes.
 
 ### Sign Out
 
@@ -42053,7 +42126,13 @@ Each result carries what a UI needs to describe itself:
 | `partial` | The local database may not hold every matching row — treat as best effort |
 | `error` | The last revalidation failed |
 
-`observeById()` does the same for a single row, and passes `undefined` when it is deleted.
+`observeById()` does the same for a single row, and passes `undefined` when it is deleted. It takes `include` as `findById()` does, and every emission carries those relations:
+
+```typescript
+const stop = client.data.posts.observeById(postId, (post) => render(post), undefined, {
+    include: ["tags"]
+});
+```
 
 Both bind the realtime subscription when the client has one, so changes made by other users stream in too. Pass `{ realtime: false }` for a subscription that only reflects local state and explicit refreshes.
 

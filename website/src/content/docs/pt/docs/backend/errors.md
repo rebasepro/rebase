@@ -1,5 +1,5 @@
 ---
-sourceHash: e0ea7eaf72bbb3c5
+sourceHash: b93b744a1a28bc24
 title: Códigos de erro
 sidebar_label: Códigos de erro
 description: Todos os códigos de erro que um backend Rebase pode retornar, com seu status HTTP, significado e o que fazer a respeito — além do envelope de resposta, X-Request-ID e as regras de details.
@@ -183,7 +183,7 @@ ID recebido. Leia o cabeçalho de resposta.
 | `INVALID_BATCH_BODY` | 400 | Uma operação de `/_batch` não possui `op`, `collection`, `values` ou `id`, especifica uma collection não atendida por este backend ou reutiliza um nome de `ref`. | Veja a mensagem; ela identifica a operação pelo índice. |
 | `INVALID_BATCH_REF` | 400 | Um `{ "$ref": "<name>.<field>" }` não referencia nenhuma operação anterior, aponta para a frente ou solicita um campo que a linha referenciada não possui. Apenas referências retroativas são resolvidas. | Nomeie a operação com `ref` *antes* de referenciá-la. |
 | `INVALID_BULK_BODY` | 400 | O corpo da operação em massa não está no formato esperado. | Envie o array `items` documentado. |
-| `INVALID_CONFLICT_TARGET` | 400 | O `on_conflict` / `onConflict` de um upsert referencia colunas sem garantia de unicidade, as referencia sem `upsert: true`, ou é enviado em uma criação aninhada, onde uma linha encontrada passaria para o novo pai. Caso contrário, o Postgres retornaria 42P10 de dentro de uma transação que já realizou operações. | Declare `validation: { unique: true }` ou um índice `unique`; a mensagem lista os alvos que realmente existem. |
+| `INVALID_CONFLICT_TARGET` | 400 | O `on_conflict` / `onConflict` de um upsert referencia colunas sem garantia de unicidade, as referencia sem `upsert: true`, ou é enviado em uma criação aninhada, onde uma linha encontrada passaria para o novo pai. Caso contrário, o Postgres retornaria 42P10 de dentro de uma transação que já realizou operações. Também qualquer upsert na coleção de usuários (auth), onde uma criação e uma atualização seguem regras diferentes. | Declare `validation: { unique: true }` ou um índice `unique`; a mensagem lista os alvos que realmente existem. Na coleção de usuários, envie um `POST` para criar e um `PATCH` para atualizar. |
 | `INVALID_COUNT` | 400 | `?count=` não é `exact` nem `none`. Recusado em vez de lido como o padrão: um erro de digitação `?count=nnone` pagaria pela contagem que ele foi escrito para dispensar. | Envie `exact` (o padrão) ou `none`. Veja [Ignorando a contagem](/docs/backend/api/#skipping-the-count). |
 | `INVALID_COUNT` | 400 | `?count=` não é `exact` nem `none`. Recusado em vez de lido como o padrão: um `?count=nnone` digitado errado pagaria pela contagem que ele foi escrito para dispensar. | Envie `exact` (o padrão) ou `none`. Veja [Ignorando a contagem](/docs/backend/api/#skipping-the-count). |
 | `INVALID_CURSOR` | 400 | O cursor `after` não pode ser lido, ou indica um id de linha que não corresponde às colunas-chave da collection: foi truncado, recodificado ou construído à mão. | Devolva o `meta.nextCursor` da página anterior sem alterações. Veja [Paginação](/docs/sdk/pagination/). |

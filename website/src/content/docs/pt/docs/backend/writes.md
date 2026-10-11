@@ -1,5 +1,5 @@
 ---
-sourceHash: 2969a9944ef12fb9
+sourceHash: f214eaa0ccfb78a2
 title: Escrita via REST
 sidebar_label: Escrita via REST
 description: Chaves de idempotência, escritas condicionais com ETag e If-Match, operações de campo, upserts em chave natural, return=minimal e lotes entre coleções.
@@ -139,8 +139,8 @@ Uma operação responde à `validation` da propriedade como um valor. Os element
 
 ### Upsert em uma chave natural
 
-`POST /api/data/:slug?on_conflict=email` insere a linha, ou atualiza a que
-já contém esse email, em vez de falhar por causa dela. A rota em lote
+`POST /api/data/:slug?on_conflict=sku` insere a linha, ou atualiza a que
+já contém esse SKU, em vez de falhar por causa dela. A rota em lote
 aceita o mesmo destino que `onConflict` junto a `upsert: true`, assim como cada operação de
 `upsert` de um lote.
 
@@ -187,6 +187,10 @@ Uma linha que já existia mantém seu timestamp `on_create` e seu criador
 `user_on_create`. Um conflito significa que a criação da linha é um fato do
 passado, e uma reimportação noturna que redefinisse `createdAt` em tudo o que tocasse
 arruinaria qualquer consulta de "novidades desta semana".
+
+#### Não na coleção de usuários
+
+<span class="since-badge" data-since="0.25">Since 0.25</span> A coleção de usuários (a que tem `auth` ativado) recusa um upsert por qualquer porta — `?on_conflict=`, `/bulk` com `upsert: true`, uma operação `upsert` de `_batch`, o `upsert()` do SDK e o socket em tempo real — com um `400` (`INVALID_CONFLICT_TARGET`). Suas linhas são os usuários, e criar um usuário e alterá-lo seguem regras diferentes: uma criação faz o hash da senha, normaliza o email, executa `onCreateUser` e envia o convite, e uma atualização não pode rebaixar o último administrador. Um upsert só descobre qual dos dois é dentro da escrita, tarde demais para aplicar qualquer um. Crie usuários com um `POST` simples e altere-os com `PATCH`.
 
 ### `Prefer: return=minimal`
 

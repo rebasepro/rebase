@@ -1,5 +1,5 @@
 ---
-sourceHash: 2969a9944ef12fb9
+sourceHash: f214eaa0ccfb78a2
 title: Scrittura tramite REST
 sidebar_label: Scrittura tramite REST
 description: Chiavi di idempotenza, scritture condizionali con ETag e If-Match, operazioni sui campi, upsert su chiave naturale, return=minimal e batch tra collezioni.
@@ -145,8 +145,8 @@ Un'operazione risponde alla `validation` della proprietà come un valore. Gli el
 
 ### Upsert su una chiave naturale
 
-`POST /api/data/:slug?on_conflict=email` inserisce la riga, oppure aggiorna
-quella che contiene già quell'email, invece di fallire su di essa. La
+`POST /api/data/:slug?on_conflict=sku` inserisce la riga, oppure aggiorna
+quella che contiene già quello SKU, invece di fallire su di essa. La
 rotta bulk accetta lo stesso target come `onConflict` insieme a `upsert: true`,
 e lo stesso vale per ogni operazione di `upsert` all'interno di un batch.
 
@@ -200,6 +200,10 @@ creatore `user_on_create`. Un conflitto
 implica che la creazione della riga sia un evento passato, e una reimportazione
 notturna che reimpostasse `createdAt` su ogni record toccato comprometterebbe
 qualsiasi query basata su "nuovi di questa settimana".
+
+#### Non sulla collection degli utenti
+
+<span class="since-badge" data-since="0.25">Since 0.25</span> La collection degli utenti (quella con `auth` attivo) rifiuta un upsert da ogni porta — `?on_conflict=`, `/bulk` con `upsert: true`, un'operazione `upsert` di `_batch`, l'`upsert()` dell'SDK e il socket realtime — con un `400` (`INVALID_CONFLICT_TARGET`). Le sue righe sono gli utenti, e creare un utente e modificarlo seguono regole diverse: una creazione esegue l'hash della password, normalizza l'email, esegue `onCreateUser` e invia l'invito, e un aggiornamento non può declassare l'ultimo amministratore. Un upsert scopre quale dei due è solo dentro la scrittura, troppo tardi per applicare l'una o l'altra. Crea gli utenti con un semplice `POST` e modificali con `PATCH`.
 
 ### `Prefer: return=minimal`
 
