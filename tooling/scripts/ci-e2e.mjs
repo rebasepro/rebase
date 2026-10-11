@@ -188,7 +188,7 @@ The fixtures are frozen and hand-authored; see tests/fixtures/bundles/README.md.
             },
             {
                 run: "rls:check",
-                args: ["--min-tables", "8", "--min-policies", "40"],
+                args: ["--min-tables", "8", "--min-policies", "40", "--strict-baseline"],
                 env: (pg) => ({ RLS_CHECK_DATABASE_URL: pg.url("rebase_acceptance", "?sslmode=disable") }),
                 why: `The scan, pointed at a database this lane generated: \`verify:selfhost\` runs
 \`rebase db push\` over the reference app's collections into rebase_acceptance,
@@ -197,7 +197,8 @@ purpose live in tooling/scripts/rls-baseline.json, per table, with a reason.
 The floors are what stop it being vacuous: it runs even when the push above
 failed, and against the empty database that leaves it would find nothing and
 exit 0. They are floors, not equality — set well below the ~11 tables / ~88
-policies the reference app generates.`
+policies the reference app generates. \`--strict-baseline\` fails on a baseline
+entry nothing matches any more, so it cannot later accept a regression.`
             }
         ]
     },

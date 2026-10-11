@@ -70,11 +70,14 @@ export function entryKey(entry) {
  *   isGating: (finding: F) => boolean,
  *   minTables: number,
  *   minPolicies: number,
+ *   strictBaseline?: boolean,
  * }} input
  * @returns {{ code: 0 | 1 | 2, shortfall: string[], degraded: { what: string, error: string }[],
  *   gating: F[], unexpected: F[], stale: BaselineEntry[] }}
  */
-export function verdict({ stats, findings, diagnostics, policies, baseline, isGating, minTables, minPolicies }) {
+export function verdict({
+    stats, findings, diagnostics, policies, baseline, isGating, minTables, minPolicies, strictBaseline = false
+}) {
     const shortfall = [];
     if (stats.tables < minTables) shortfall.push(`${stats.tables} table(s), expected at least ${minTables}`);
     if (stats.policies < minPolicies) {
@@ -91,7 +94,14 @@ export function verdict({ stats, findings, diagnostics, policies, baseline, isGa
     // Both "nothing was there to check" and "part of it could not be read" are
     // a broken pipeline, not a clean database: a check whose catalogue read
     // failed returns no findings, which is indistinguishable from finding none.
-    const code = shortfall.length > 0 || degraded.length > 0 ? 2 : unexpected.length > 0 ? 1 : 0;
+    //
+    // Under `strictBaseline` a stale entry fails too. An entry nothing matches is
+    // an acceptance waiting for a regression: if the table later grows that
+    // finding back, the entry swallows it and the gate stays green. Deleting
+    // the entry is the whole fix, so the failure costs one line.
+    const code = shortfall.length > 0 || degraded.length > 0
+        ? 2
+        : unexpected.length > 0 || (strictBaseline && stale.length > 0) ? 1 : 0;
 
     return { code, shortfall, degraded, gating, unexpected, stale };
 }

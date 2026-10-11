@@ -83,10 +83,11 @@ Options
   --schema <name>         Restrict to a schema. Repeatable or comma-separated.
   --min-tables <n>        Exit 2 if the scan saw fewer tables. Default: 1.
   --min-policies <n>      Exit 2 if the scan saw fewer policies. Default: 1.
+  --strict-baseline       Exit 1 if a baseline entry matches no finding (default: warn).
 
 Exit codes
   0  No finding at or above --fail-on that is not baselined.
-  1  Findings that are not baselined.
+  1  Findings that are not baselined, or (--strict-baseline) stale baseline entries.
   2  The scan did not happen, or the database was too empty to prove anything.
 `;
 
@@ -98,6 +99,7 @@ let baselinePath: string | null = DEFAULT_BASELINE;
 let failOn: Severity | "none" = "high";
 let minTables = 1;
 let minPolicies = 1;
+let strictBaseline = false;
 const schemas: string[] = [];
 
 for (let i = 0; i < argv.length; i += 1) {
@@ -128,6 +130,9 @@ for (let i = 0; i < argv.length; i += 1) {
             break;
         case "--min-policies":
             minPolicies = Number(take());
+            break;
+        case "--strict-baseline":
+            strictBaseline = true;
             break;
         case "-h":
         case "--help":
@@ -249,7 +254,8 @@ const outcome = verdict({
     baseline,
     isGating: (finding: Finding) => exceedsThreshold([finding], failOn),
     minTables,
-    minPolicies
+    minPolicies,
+    strictBaseline
 });
 
 // The vacuity guard, before any verdict. Exits 2, not 1: "nothing was there to
@@ -279,18 +285,25 @@ console.log(
 );
 
 if (outcome.stale.length > 0) {
-    // A warning, not a failure: a baseline entry that no longer matches means
-    // the database got SAFER (or the table is gone). Failing the build for that
-    // would make a security improvement look like a regression.
-    console.log("\nStale baseline entries — nothing matches these any more, so delete them:");
+    // Without --strict-baseline, a warning: a baseline entry that no longer
+    // matches means the database got SAFER (or the table is gone). With it (CI
+    // passes it), a failure: the entry would silently accept that finding again
+    // if the table ever regressed to it, and deleting it is a one-line fix.
+    const say = strictBaseline ? console.error : console.log;
+    say(`\n${strictBaseline ? "✗" : "!"} Stale baseline entries — nothing matches these any more, so delete them from ${path.relative(ROOT, baselinePath ?? DEFAULT_BASELINE)}:`);
     for (const entry of outcome.stale) {
-        console.log(`  · ${entry.check} on ${entry.target}${entry.command ? ` (${entry.command})` : ""}`);
+        say(`  · ${entry.check} on ${entry.target}${entry.command ? ` (${entry.command})` : ""}`);
     }
 }
 
 if (outcome.code === 0) {
     console.log(`\n✓ No unexpected RLS findings at or above "${failOn}".`);
     process.exit(0);
+}
+
+if (outcome.unexpected.length === 0) {
+    // Only stale entries under --strict-baseline got here; they are listed above.
+    process.exit(1);
 }
 
 console.error(`\n✗ ${outcome.unexpected.length} RLS finding(s) at or above "${failOn}" are not in the baseline:\n`);

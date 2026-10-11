@@ -102,7 +102,7 @@ test("the vitest lane runs each package on its own, with no retries", () => {
 test("the RLS scan keeps its floors, so an empty database cannot pass it", () => {
     const selfhost = LANES.find((l) => l.lane === "selfhost");
     const scan = selfhost.suites.find((s) => s.run === "rls:check");
-    assert.deepEqual(scan.args, ["--min-tables", "8", "--min-policies", "40"]);
+    assert.deepEqual(scan.args, ["--min-tables", "8", "--min-policies", "40", "--strict-baseline"]);
 });
 
 test("a lane's Postgres is probed over TCP, and removed with its volume when setup fails", () => {

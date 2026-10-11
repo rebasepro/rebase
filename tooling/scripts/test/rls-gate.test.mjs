@@ -103,6 +103,22 @@ test("a degraded scan is not a clean one", () => {
     assert.equal(result.degraded.length, 1);
 });
 
+test("a stale baseline entry warns by default and fails under strictBaseline", () => {
+    // Nothing matches SELECT_ENTRY: the table got safer, or went away.
+    const lenient = run({ findings: [] });
+    assert.deepEqual(lenient.stale, [SELECT_ENTRY]);
+    assert.equal(lenient.code, 0);
+
+    const strict = run({ findings: [], strictBaseline: true });
+    assert.deepEqual(strict.stale, [SELECT_ENTRY]);
+    assert.equal(strict.code, 1);
+});
+
+test("strictBaseline passes a baseline every entry of which still matches", () => {
+    const result = run({ findings: [alwaysTrue("posts", "posts_select_841c287")], strictBaseline: true });
+    assert.equal(result.code, 0);
+});
+
 test("an empty database is a setup failure, not a pass", () => {
     const result = run({ stats: { tables: 0, policies: 0 } });
     assert.equal(result.code, 2);

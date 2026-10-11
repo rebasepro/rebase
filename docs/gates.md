@@ -165,7 +165,7 @@ The root scripts among them:
 | `verify:selfhost` | A self-hosted deploy, built and booted from the repository. Lane `selfhost`. | — |
 | `verify:selfhost:docker` | The same, through the shipped compose file and image. Lane `selfhost`. | — |
 | `verify:corpus` | A corpus of bundles still loads under the current runtime contract. Lane `selfhost`. | — |
-| `rls:check` | The database `verify:selfhost` pushed into, against the fifteen RLS checks, with table and policy floors so an empty database cannot pass. Lane `selfhost`. | `tooling/scripts/rls-baseline.json` |
+| `rls:check` | The database `verify:selfhost` pushed into, against the fifteen RLS checks, with table and policy floors so an empty database cannot pass, and `--strict-baseline` so a baseline entry nothing matches any more fails instead of waiting to accept a regression. Lane `selfhost`. | `tooling/scripts/rls-baseline.json` |
 
 And the suites that are not root scripts:
 
