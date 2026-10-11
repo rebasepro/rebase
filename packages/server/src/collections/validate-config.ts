@@ -1427,6 +1427,48 @@ function keyColumnCount(collection: unknown): number {
  *
  * Refused here too, so the config names the link before a push or a boot does.
  */
+/**
+ * A `hasOne`/`hasMany` reads its rows through a column on the *target* — the
+ * target's `belongsTo` back, or a property of its own. With neither, `schema
+ * generate` and `db push` succeeded, created no such column, and only the
+ * server's boot refused ("foreignKeyOnTarget … is not a column"). Checked here
+ * against the target's declared columns, the same way the planner names them.
+ */
+function checkForeignKeyOnTarget(
+    kind: string,
+    foreignKeyOnTarget: string | undefined,
+    target: unknown,
+    path: string,
+    collect: ProblemCollector
+): void {
+    if (!foreignKeyOnTarget || !isPlainObject(target) || !isPlainObject(target.properties)) return;
+    if (!isRelationalCollection(dataSourceOf(target))) return;
+    const columns = new Set<string>();
+    for (const [key, prop] of Object.entries(target.properties)) {
+        if (!isPlainObject(prop) || prop.type === "relation") continue;
+        columns.add(typeof prop.columnName === "string" && prop.columnName ? prop.columnName : toSnakeCase(key));
+    }
+    try {
+        for (const back of Object.values(resolveCollectionRelations(asCollectionConfig(target)))) {
+            if (back.kind === "belongsTo" && back.localKey) columns.add(back.localKey);
+        }
+    } catch {
+        // The target's own relations have their own messages.
+        return;
+    }
+    if (columns.has(foreignKeyOnTarget)) return;
+    const slug = typeof target.slug === "string" ? target.slug : "the target";
+    // A warning, not a refusal: the schema editor saves the two sides of a
+    // link one at a time, and the half-declared state between them is real.
+    collect.warn(
+        path,
+        `this \`${kind}\` reads \`${slug}\` rows by their "${foreignKeyOnTarget}" column, and \`${slug}\` declares ` +
+        "no such column — no property and no `belongsTo` back — so no table will have it and the server " +
+        `will refuse to boot with it. Add the \`belongsTo\` on \`${slug}\` that this relation is the other side of, ` +
+        "or set `foreignKeyOnTarget` to a column it does declare."
+    );
+}
+
 function checkLinksIntoCompositeKeys(collections: readonly unknown[], collect: ProblemCollector): void {
     const relational = collections.filter((collection): collection is Record<string, unknown> =>
         isPlainObject(collection) && isRelationalCollection(dataSourceOf(collection)));
@@ -1474,6 +1516,7 @@ function checkLinksIntoCompositeKeys(collections: readonly unknown[], collect: P
                         refuse(pathOf(key), `\`foreignKeyOnTarget: "${relation.foreignKeyOnTarget}"\``, collection,
                             `Give the relation a \`sourceKey\` naming a single unique column of \`${at}\` to point at, ${viaFix}`);
                     }
+                    checkForeignKeyOnTarget(relation.kind, relation.foreignKeyOnTarget, target, pathOf(key), collect);
                     break;
                 case "manyToMany":
                     if (keyColumnCount(collection) > 1 || keyColumnCount(target) > 1) {

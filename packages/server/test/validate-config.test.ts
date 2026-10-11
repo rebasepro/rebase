@@ -1139,3 +1139,43 @@ describe("a relation whose `target` is a slug string instead of a thunk", () => 
         expect(problem?.message).toContain("target: () =>");
     });
 });
+
+describe("a hasMany whose target never declares the foreign key", () => {
+    const books = (withBack: boolean) => ({
+        name: "Books",
+        slug: "books",
+        table: "books",
+        properties: {
+            id: { name: "ID", type: "string", isId: "uuid" },
+            title: { name: "Title", type: "string" },
+            ...(withBack ? {
+                author: { name: "Author", type: "relation", relation: { kind: "belongsTo", target: () => authors, relationName: "author" } }
+            } : {})
+        }
+    });
+    const authors: Record<string, unknown> = {
+        name: "Authors",
+        slug: "authors",
+        table: "authors",
+        properties: { id: { name: "ID", type: "string", isId: "uuid" } }
+    };
+    const withBooks = (target: Record<string, unknown>) => ({
+        ...authors,
+        properties: {
+            id: { name: "ID", type: "string", isId: "uuid" },
+            books: { name: "Books", type: "relation", relation: { kind: "hasMany", target: () => target, relationName: "books" } }
+        }
+    });
+
+    it("warns at config time, naming the column and the missing belongsTo", () => {
+        const target = books(false);
+        const found = warnings([withBooks(target), target]).find(p => p.message.includes("declares no such column"));
+        expect(found?.path).toBe("authors.properties.books");
+        expect(found?.message).toContain("belongsTo");
+    });
+
+    it("accepts it when the target has the belongsTo back", () => {
+        const target = books(true);
+        expect(warnings([withBooks(target), target]).filter(p => p.message.includes("declares no such column"))).toEqual([]);
+    });
+});
