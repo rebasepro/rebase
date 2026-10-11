@@ -1,4 +1,4 @@
-import type { Check, DbSnapshot, Finding } from "../types";
+import type { Check, DbPolicy, DbSnapshot, Finding } from "../types";
 
 import {
     callerIdCall,
@@ -10,7 +10,8 @@ import {
     qi,
     qrel
 } from "./util";
-import { callerIdOnlyClause } from "./policy-anonymous-tautology";
+import { callerIdOnlyClause, signedInRoleOnlyClause } from "./policy-anonymous-tautology";
+import { unconditionalReading } from "./policy-always-true";
 
 const ID = "policy-authenticated-tautology";
 
@@ -38,6 +39,12 @@ const ID = "policy-authenticated-tautology";
  * different fixes and different severities have to be two ids. Someone who has
  * decided their `countries` table really is world-readable should be able to
  * silence that without also silencing "signed-out callers can read it".
+ *
+ * The same id also covers `auth.role() = 'authenticated'` (and the `role`
+ * claim of `auth.jwt()`, either way round): a role test that says "signed in"
+ * and nothing about rows. That one is graded by `policy-always-true`'s rule,
+ * not `high`, because it is `TO authenticated USING (true)` spelled as an
+ * expression, and the two spellings must not get different answers.
  */
 export const policyAuthenticatedTautology: Check = {
     id: ID,
@@ -56,6 +63,13 @@ export const policyAuthenticatedTautology: Check = {
 
             const exposed = policyReachedBy(snapshot, policy);
             if (exposed.length === 0) continue;
+
+            const usingRole = signedInRoleOnlyClause(policy.using);
+            const checkRole = signedInRoleOnlyClause(policy.withCheck);
+            if (usingRole || checkRole) {
+                findings.push(roleOnlyFinding(snapshot, policy, usingRole, checkRole, uidCall));
+                continue;
+            }
 
             const usingMatch = callerIdOnlyClause(policy.using);
             const checkMatch = callerIdOnlyClause(policy.withCheck);
@@ -118,3 +132,55 @@ export const policyAuthenticatedTautology: Check = {
         return findings;
     }
 };
+
+/**
+ * `auth.role() = 'authenticated'` and its spellings: every signed-in caller,
+ * every row — graded exactly as `TO authenticated USING (true)` is.
+ */
+function roleOnlyFinding(
+    snapshot: DbSnapshot,
+    policy: DbPolicy,
+    usingRole: { shape: string } | null,
+    checkRole: { shape: string } | null,
+    uidCall: string
+): Finding {
+    const clauses: string[] = [];
+    if (usingRole) clauses.push("USING");
+    if (checkRole) clauses.push("WITH CHECK");
+    const shape = (usingRole ?? checkRole)!.shape;
+    const { severity, gate } = unconditionalReading(snapshot, policy, clauses);
+
+    return finding({
+        id: ID,
+        severity,
+        confidence: gate ? "heuristic" : "certain",
+        title:
+            `Policy "${policy.name}" on ${policy.schema}.${policy.table} admits every signed-in caller ` +
+            `to every row`,
+        target: { schema: policy.schema, table: policy.table, policy: policy.name },
+        detail:
+            `The ${listAnd(clauses)} expression of this ${policy.command} policy tests only that ` +
+            `${shape} is 'authenticated'. That is \`TO authenticated USING (true)\` written as an ` +
+            `expression: it keeps signed-out callers out, compares nothing to a column, and so every ` +
+            `row satisfies it for every account that signs in.` +
+            (gate
+                ? ` The ${gate.name} also ${gate.verb} to this command, ANDed after it, so access may ` +
+                  `still be gated — verify that it covers the rows you expect.`
+                : ""),
+        impact:
+            "Any user with an account reaches every row this policy covers, including rows belonging " +
+            "to other users and other tenants. Where registration is open, \"any user with an account\" " +
+            "is anybody who fills in a form.",
+        fix: isRebaseManagedPolicy(snapshot, policy)
+            ? managedPolicyFix(
+                policy,
+                "scope the rule to the row rather than to the caller's role — an `ownerField`, or a " +
+                "`condition` naming the group whose members may share rows"
+            )
+            : "-- Scope the policy to the row, rather than to the caller's role:\n" +
+            `ALTER POLICY ${qi(policy.name)} ON ${qrel(policy.schema, policy.table)}\n` +
+            `    ${clauses.includes("USING") ? "USING" : "WITH CHECK"} (user_id = ${uidCall});\n` +
+            "-- If the table genuinely is readable by every account, keep this policy and\n" +
+            `-- skip the finding: rls-check --skip ${ID}`
+    });
+}

@@ -63,6 +63,7 @@ const EXPECTED: { id: string; object: string }[] = [
     { id: "policy-always-true", object: "vuln_policy_always_true" },
     { id: "policy-anonymous-tautology", object: "vuln_anon_tautology" },
     { id: "policy-authenticated-tautology", object: "vuln_registered_tautology" },
+    { id: "policy-authenticated-tautology", object: "vuln_role_authenticated" },
     { id: "view-bypasses-rls", object: "vuln_ledger_view" },
     { id: "matview-bypasses-rls", object: "vuln_ledger_matview" },
     { id: "anonymous-write-allowed", object: "vuln_anon_write" },
@@ -132,7 +133,7 @@ describe.skipIf(!dockerAvailable)("rls-check against a real PostgreSQL", () => {
         expect(full.stats.policies).toBeGreaterThan(10);
         // At least one check per expected finding; since the registered()
         // fixture, every check has one.
-        expect(full.stats.checksRun).toBeGreaterThanOrEqual(EXPECTED.length);
+        expect(full.stats.checksRun).toBeGreaterThanOrEqual(new Set(EXPECTED.map((entry) => entry.id)).size);
         expect(full.database.name).toBe("rlscheck");
         expect(full.database.host).toBe("localhost");
     });
@@ -228,6 +229,13 @@ describe.skipIf(!dockerAvailable)("rls-check against a real PostgreSQL", () => {
         const onTable = full.findings.filter((finding) => objectName(finding) === "vuln_registered_tautology");
         expect(onTable.map((finding) => finding.id)).toEqual(["policy-authenticated-tautology"]);
         expect(onTable[0].title).toContain("not a guest");
+    });
+
+    it("grades `auth.role() = 'authenticated'` as critical as `TO authenticated USING (true)`, once", () => {
+        const onTable = full.findings.filter((finding) => objectName(finding) === "vuln_role_authenticated");
+        expect(onTable.map((finding) => [finding.id, finding.severity])).toEqual([
+            ["policy-authenticated-tautology", "critical"]
+        ]);
     });
 
     it("flags a guard that excludes the wrong literal, and not one that excludes the right ones", () => {

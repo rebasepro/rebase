@@ -472,6 +472,73 @@ export function callerIdOnlyClause(clause: string | null | undefined): Tautology
 }
 
 /**
+ * The expressions that read the caller's *role*, for {@link signedInRoleOnlyClause}:
+ * `auth.role()`, the `role` claim of `auth.jwt()` / `rebase.jwt()`, and the
+ * settings PostgREST publishes it in. After {@link callerIdOnlyClause}'s
+ * flattening, so casts are gone and whitespace is single.
+ */
+const CALLER_ROLE_READS: { re: RegExp; label: string }[] = [
+    { re: /auth\.role\s*\(\s*\)/g, label: "auth.role()" },
+    { re: /(rebase|auth)\.jwt\s*\(\s*\)\s*->>\s*'role'/g, label: "jwt() ->> 'role'" },
+    {
+        re: /current_setting\s*\(\s*'request\.jwt\.claims'\s*(?:,\s*[a-z]+\s*)?\)\s*->>\s*'role'/g,
+        label: "current_setting('request.jwt.claims') ->> 'role'"
+    },
+    {
+        re: /current_setting\s*\(\s*'request\.jwt\.claim\.role'\s*(?:,\s*[a-z]+\s*)?\)/g,
+        label: "current_setting('request.jwt.claim.role')"
+    }
+];
+
+/**
+ * `auth.role() = 'authenticated'` — and nothing that narrows which rows.
+ *
+ * That is `TO authenticated USING (true)` written as an expression: every
+ * signed-in caller passes it, for every row. The policy-level spelling was
+ * graded critical by `policy-always-true` while this one gave no finding at
+ * all, which is the gap a scanner must not have. The same two rules as
+ * {@link callerIdOnlyClause}: every conjunct must be accounted for (the role
+ * test, or the guest exclusion, which scopes nothing either), and any `OR`
+ * means the shape no longer describes what the policy admits.
+ *
+ * Returns how to name the role read in prose, or `null`.
+ */
+export function signedInRoleOnlyClause(clause: string | null | undefined): { shape: string } | null {
+    if (!clause) return null;
+
+    const flat = clause
+        .toLowerCase()
+        .replace(/::\s*[a-z0-9_]+(?:\s*\[\s*\])*/g, "")
+        .replace(/\s+/g, " ")
+        .trim();
+
+    for (const { re, label } of CALLER_ROLE_READS) {
+        const first = new RegExp(re.source).exec(flat);
+        if (!first) continue;
+        const shape = label.startsWith("jwt()") ? `${first[1]}.${label}` : label;
+
+        const substituted = flat.replace(new RegExp(re.source, "g"), " callerid ");
+        if (/\bor\b/.test(substituted)) return null;
+
+        let sawRoleTest = false;
+        for (const raw of splitTopLevelAnd(substituted)) {
+            const conjunct = canon(raw);
+            if (conjunct === "") continue;
+            if (conjunct === "callerid = 'authenticated'" || conjunct === "'authenticated' = callerid") {
+                sawRoleTest = true;
+                continue;
+            }
+            if (GUEST_EXCLUSION.test(conjunct)) continue;
+            return null; // something we do not understand: stay quiet
+        }
+
+        if (sawRoleTest) return { shape };
+    }
+
+    return null;
+}
+
+/**
  * "The caller is not a guest" — `policy.registered()`'s conjunct, in the
  * spellings it reaches a policy in, after {@link canon}: the compiler's
  * `NOT (SELECT rebase.is_anonymous())`, the stored

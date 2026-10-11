@@ -55,21 +55,9 @@ export const policyAlwaysTrue: Check = {
             if (isUnconditionalTrue(policy.withCheck)) clauses.push("WITH CHECK");
             if (clauses.length === 0) continue;
 
-            const gates = restrictiveGate(snapshot, policy);
-            const gate = gates && gates.length === 1
-                ? { name: `RESTRICTIVE policy "${gates[0]}"`, verb: "applies" }
-                : gates
-                    ? { name: `RESTRICTIVE policies ${listAnd(gates.map((g) => `"${g}"`))}`, verb: "apply" }
-                    : null;
+            const { severity, gate, checkOnly } = unconditionalReading(snapshot, policy, clauses);
             const rel = relationAt(snapshot, policy.schema, policy.table);
             const verb = policy.command === "SELECT" ? "read" : "act on";
-            // Only the check is constant, on a policy whose USING decides which
-            // rows can be touched: what is given away is what a row may become,
-            // not which rows. FOR ALL keeps critical — its check also admits any
-            // INSERT, which is the same hole as an INSERT policy's.
-            const checkOnly =
-                !clauses.includes("USING") && (policy.command === "UPDATE" || policy.command === "ALL");
-            const severity: Severity = gate ? "medium" : checkOnly && policy.command === "UPDATE" ? "high" : "critical";
 
             findings.push(
                 finding({
@@ -137,6 +125,36 @@ export const policyAlwaysTrue: Check = {
         return findings;
     }
 };
+
+/**
+ * How bad an unconditional clause on `policy` is, by the command it governs and
+ * the RESTRICTIVE policies that gate it.
+ *
+ * Exported because `USING (true)` is not the only way to write it:
+ * `policy-authenticated-tautology` grades `auth.role() = 'authenticated'` —
+ * the same grant, spelled as an expression — by this same rule, so the two
+ * spellings cannot drift apart.
+ */
+export function unconditionalReading(
+    snapshot: DbSnapshot,
+    policy: DbPolicy,
+    clauses: string[]
+): { severity: Severity; gate: { name: string; verb: string } | null; checkOnly: boolean } {
+    const gates = restrictiveGate(snapshot, policy);
+    const gate = gates && gates.length === 1
+        ? { name: `RESTRICTIVE policy "${gates[0]}"`, verb: "applies" }
+        : gates
+            ? { name: `RESTRICTIVE policies ${listAnd(gates.map((g) => `"${g}"`))}`, verb: "apply" }
+            : null;
+    // Only the check is constant, on a policy whose USING decides which
+    // rows can be touched: what is given away is what a row may become,
+    // not which rows. FOR ALL keeps critical — its check also admits any
+    // INSERT, which is the same hole as an INSERT policy's.
+    const checkOnly =
+        !clauses.includes("USING") && (policy.command === "UPDATE" || policy.command === "ALL");
+    const severity: Severity = gate ? "medium" : checkOnly && policy.command === "UPDATE" ? "high" : "critical";
+    return { severity, gate, checkOnly };
+}
 
 /**
  * Does `policy` apply to a caller arriving as `role`?

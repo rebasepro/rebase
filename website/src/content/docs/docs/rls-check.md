@@ -341,7 +341,7 @@ the pre-1.0 `auth` schema is still checked.
 
 ### policy-authenticated-tautology
 
-**Policy admits every signed-in caller to every row.** High.
+**Policy admits every signed-in caller to every row.** High; critical for the role-test form below.
 
 The corrected form of the check above — `rebase.uid() IS NOT NULL AND rebase.uid() <>
 'anonymous'` — and the place people stop. It does exclude signed-out callers. What it does
@@ -353,6 +353,13 @@ else, which the database stores as `rebase.uid() <> ALL (ARRAY['anonymous', 'ano
 only `policy.registered()` is reported too: its extra `NOT rebase.is_anonymous()` keeps
 guests out and scopes no rows either, so every account that is not a guest reads every
 row. With the default `--fail-on high`, a CI run that scans such a policy now fails.
+
+<span class="since-badge" data-since="0.25">Since 0.25</span> A policy whose expression only
+tests the caller's role — `auth.role() = 'authenticated'`, `(auth.jwt() ->> 'role') =
+'authenticated'`, either way round — is reported under this id too. It is `TO authenticated
+USING (true)` written as an expression, so it gets the severity
+[`policy-always-true`](#policy-always-true) gives that: critical, or high when only the
+`WITH CHECK` of an `UPDATE` policy is the role test.
 
 That is the shape that turns a `users` table into a directory of every address on the
 platform, readable by anyone who signed up — and where registration is open, "anyone who

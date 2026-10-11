@@ -4,11 +4,13 @@ import { policy, reachable, snapshot, table } from "../../test/fixtures/snapshot
 import type { DbSnapshot } from "../types";
 import { policyAuthenticatedTautology as authenticated } from "./policy-authenticated-tautology";
 import { policyAnonymousTautology as anonymous } from "./policy-anonymous-tautology";
+import { policyAlwaysTrue as alwaysTrue } from "./policy-always-true";
 
 // These tests are about the policy's shape; `reachable` grants every table to
 // the exposed roles, because a policy on a table nobody can reach is not reported.
 const policyAuthenticatedTautology = { run: (s: DbSnapshot) => authenticated.run(reachable(s)) };
 const policyAnonymousTautology = { run: (s: DbSnapshot) => anonymous.run(reachable(s)) };
+const policyAlwaysTrue = { run: (s: DbSnapshot) => alwaysTrue.run(reachable(s)) };
 
 const withPolicy = (using: string | null) =>
     snapshot({
@@ -196,5 +198,64 @@ describe("policy-authenticated-tautology", () => {
         const bare = withPolicy("(auth.uid() IS NOT NULL)");
         expect(policyAnonymousTautology.run(bare)).toHaveLength(1);
         expect(policyAuthenticatedTautology.run(bare)).toEqual([]);
+    });
+
+    /**
+     * `auth.role() = 'authenticated'` is `TO authenticated USING (true)` spelled
+     * as an expression: it lets in every signed-in caller and scopes no row.
+     * The scanner graded the second critical and said nothing about the first.
+     */
+    describe("a role test that only says \"signed in\"", () => {
+        const supabase = (using: string | null, command: "SELECT" | "UPDATE" | "ALL" = "SELECT", withCheck: string | null = null) =>
+            snapshot({
+                platform: "supabase",
+                relations: [table("public", "users")],
+                policies: [policy("public", "users", "users_read", { using, withCheck, command, roles: ["public"] })]
+            });
+
+        it("reports each spelling, either way round, at the severity USING (true) gets", () => {
+            const equivalent = policyAlwaysTrue.run(
+                snapshot({
+                    platform: "supabase",
+                    relations: [table("public", "users")],
+                    policies: [policy("public", "users", "users_read", { using: "true", roles: ["authenticated"] })]
+                })
+            );
+            expect(equivalent[0].severity).toBe("critical");
+
+            for (const using of [
+                "(auth.role() = 'authenticated'::text)",
+                "('authenticated'::text = auth.role())",
+                "(( SELECT auth.role() AS role) = 'authenticated'::text)",
+                "((auth.jwt() ->> 'role'::text) = 'authenticated'::text)",
+                "('authenticated'::text = (auth.jwt() ->> 'role'::text))",
+                "(current_setting('request.jwt.claim.role'::text, true) = 'authenticated'::text)"
+            ]) {
+                const findings = policyAuthenticatedTautology.run(supabase(using));
+                expect({ using, ids: findings.map((f) => f.id) }).toEqual({ using, ids: ["policy-authenticated-tautology"] });
+                expect({ using, severity: findings[0].severity }).toEqual({ using, severity: "critical" });
+                expect(findings[0].detail).toContain("'authenticated'");
+                expect({ using, anonymous: policyAnonymousTautology.run(supabase(using)).length }).toEqual({ using, anonymous: 0 });
+            }
+        });
+
+        it("says nothing once the clause also scopes rows", () => {
+            for (const using of [
+                "((auth.role() = 'authenticated'::text) AND (user_id = auth.uid()))",
+                "(auth.role() = 'authenticated' AND user_id = auth.uid())",
+                "((auth.role() = 'authenticated'::text) OR (is_public = true))",
+                "(auth.role() = 'service_role'::text)"
+            ]) {
+                expect({ using, findings: policyAuthenticatedTautology.run(supabase(using)).length }).toEqual({ using, findings: 0 });
+            }
+        });
+
+        it("downgrades a check-only UPDATE the way policy-always-true does", () => {
+            const findings = policyAuthenticatedTautology.run(
+                supabase("(user_id = auth.uid())", "UPDATE", "(auth.role() = 'authenticated'::text)")
+            );
+            expect(findings).toHaveLength(1);
+            expect(findings[0].severity).toBe("high");
+        });
     });
 });

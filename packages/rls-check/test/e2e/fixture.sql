@@ -286,6 +286,20 @@ CREATE POLICY vuln_registered_tautology_read ON public.vuln_registered_tautology
     );
 GRANT SELECT ON public.vuln_registered_tautology TO authenticated;
 
+-- `auth.role() = 'authenticated'`: `TO authenticated USING (true)` written as an
+-- expression. Every signed-in account reads every row; the scanner used to say
+-- nothing here while grading the policy-level spelling critical. Postgres stores
+-- it as `(auth.role() = 'authenticated'::text)`, which is what is scanned.
+CREATE TABLE public.vuln_role_authenticated (
+    id   uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    body text
+);
+ALTER TABLE public.vuln_role_authenticated ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.vuln_role_authenticated FORCE ROW LEVEL SECURITY;
+CREATE POLICY vuln_role_authenticated_read ON public.vuln_role_authenticated
+    FOR SELECT TO public USING (auth.role() = 'authenticated');
+GRANT SELECT ON public.vuln_role_authenticated TO anon, authenticated;
+
 -- The base table for the view checks below. Correct in itself.
 CREATE TABLE public.protected_ledger (
     id        uuid PRIMARY KEY DEFAULT gen_random_uuid(),
