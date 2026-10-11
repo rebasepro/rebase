@@ -649,44 +649,65 @@ export function createRebaseClient<DB = Record<string, unknown>>(options: Create
 
     const dataTarget = { collection } as Record<string, unknown>;
 
+    /**
+     * Names the proxy never serves as a collection: the ones promise and
+     * serialisation machinery probe for (`then`, `toJSON`, React's
+     * `$$typeof`), and everything a plain object inherits — so
+     * `client.data.toString` is `Object.prototype.toString`, not a collection
+     * client, and `String(client.data)` is `"[object Object]"` rather than a
+     * throw. `prop in collections` used to walk the prototype too, which is how
+     * `toString` and `constructor` became "collections" under a dictionary.
+     */
+    const isProbedName = (prop: string) => prop === "then" || prop === "toJSON" || prop === "$$typeof";
+    const isReservedName = (prop: string) => isProbedName(prop) || prop in Object.prototype;
+
     const dataProxy = new Proxy(dataTarget, {
         get(_target, prop: string | symbol) {
             if (prop === "collection") {
                 return collection;
             }
             if (typeof prop === "symbol") return undefined;
-            if (typeof prop === "string" && prop !== "then" && prop !== "toJSON" && prop !== "$$typeof") {
-                if (options.collections) {
-                    if (prop in options.collections) {
-                        return collection(options.collections[prop]);
-                    }
-                    // Strict mode: the developer supplied a typed dictionary,
-                    // so we know the full set of valid accessors.
-                    const knownKeys = Object.keys(options.collections);
-                    const suggestion = suggestCollection(prop, knownKeys);
-                    const knownList = knownKeys.join(", ");
-                    let msg = `Unknown collection accessor "${prop}". Known collections: ${knownList}.`;
-                    if (suggestion) msg += ` Did you mean "${suggestion}"?`;
-                    msg += ` Use data.collection("<slug>") for dynamic slugs.`;
-                    throw new RebaseClientError(msg, {
-                        code: "UNKNOWN_COLLECTION",
-                        details: { accessor: prop, known: knownKeys }
-                    });
-                }
-                // Untyped fallback: convert camelCase property names to snake_case slugs.
-                // e.g. `companyMembers` → `company_members`
-                if (!untypedWarned) {
-                    untypedWarned = true;
-                    console.warn(
-                        `[Rebase] Untyped data access detected (client.data.${prop}). ` +
-                        `Collection names are resolved via snake_case conversion, which may cause silent 404s at request time. ` +
-                        `Pass a \`collections\` dictionary to createRebaseClient() or use the generated SDK for type-safe access.`
-                    );
-                }
-                const slug = toSnakeCase(prop);
-                return collection(slug);
+            if (isProbedName(prop)) return undefined;
+            if (options.collections && Object.hasOwn(options.collections, prop)) {
+                return collection(options.collections[prop]);
             }
-            return undefined;
+            if (prop in Object.prototype) return Reflect.get(_target, prop);
+            if (options.collections) {
+                // Strict mode: the developer supplied a typed dictionary,
+                // so we know the full set of valid accessors.
+                const knownKeys = Object.keys(options.collections);
+                const suggestion = suggestCollection(prop, knownKeys);
+                const knownList = knownKeys.join(", ");
+                let msg = `Unknown collection accessor "${prop}". Known collections: ${knownList}.`;
+                if (suggestion) msg += ` Did you mean "${suggestion}"?`;
+                msg += ` Use data.collection("<slug>") for dynamic slugs.`;
+                throw new RebaseClientError(msg, {
+                    code: "UNKNOWN_COLLECTION",
+                    details: { accessor: prop, known: knownKeys }
+                });
+            }
+            // Untyped fallback: convert camelCase property names to snake_case slugs.
+            // e.g. `companyMembers` → `company_members`
+            if (!untypedWarned) {
+                untypedWarned = true;
+                console.warn(
+                    `[Rebase] Untyped data access detected (client.data.${prop}). ` +
+                    `Collection names are resolved via snake_case conversion, which may cause silent 404s at request time. ` +
+                    `Pass a \`collections\` dictionary to createRebaseClient() or use the generated SDK for type-safe access.`
+                );
+            }
+            const slug = toSnakeCase(prop);
+            return collection(slug);
+        },
+        // `"posts" in client.data` answers what `get` serves: with a
+        // dictionary, its own accessors; without one, any name that is not
+        // reserved, since every such name reaches a collection by its slug.
+        has(_target, prop: string | symbol) {
+            if (prop === "collection") return true;
+            if (typeof prop === "symbol") return false;
+            if (isProbedName(prop)) return false;
+            if (options.collections) return Object.hasOwn(options.collections, prop);
+            return !isReservedName(prop);
         }
     });
 

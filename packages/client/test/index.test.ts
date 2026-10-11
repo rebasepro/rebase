@@ -228,6 +228,50 @@ meta: { total: 0 } }),
     });
 
     // -----------------------------------------------------------------------
+    // client.data behaves as an object
+    // -----------------------------------------------------------------------
+    /**
+     * The data layer is a Proxy, and it answered only `get`. So with a
+     * dictionary, `client.data.toString` resolved to a collection client —
+     * `prop in collections` walks the prototype — `"posts" in client.data` was
+     * false for a collection it served, and `String(client.data)` threw.
+     */
+    describe("client.data as an object", () => {
+        const dictionary = { posts: "posts", orderItems: "order_items" };
+
+        it("answers `in` for the accessors it serves", () => {
+            const client = createRebaseClient({ baseUrl: "https://api.example.com", collections: dictionary });
+            expect("posts" in client.data).toBe(true);
+            expect("orderItems" in client.data).toBe(true);
+            expect("collection" in client.data).toBe(true);
+            expect("nope" in client.data).toBe(false);
+        });
+
+        it("does not turn Object.prototype names into collections", () => {
+            const client = createRebaseClient({ baseUrl: "https://api.example.com", collections: dictionary });
+            const data = client.data as unknown as Record<string, unknown>;
+            expect(data.toString).toBe(Object.prototype.toString);
+            expect(data.hasOwnProperty).toBe(Object.prototype.hasOwnProperty);
+            expect(data.constructor).toBe(Object);
+            expect("toString" in client.data).toBe(false);
+        });
+
+        it("can be turned into a string, with or without a dictionary", () => {
+            const typed = createRebaseClient({ baseUrl: "https://api.example.com", collections: dictionary });
+            const untyped = createRebaseClient({ baseUrl: "https://api.example.com" });
+            expect(String(typed.data)).toBe("[object Object]");
+            expect(String(untyped.data)).toBe("[object Object]");
+            expect(`${untyped.data}`).toBe("[object Object]");
+        });
+
+        it("still refuses an unknown accessor when a dictionary is given", () => {
+            const client = createRebaseClient({ baseUrl: "https://api.example.com", collections: dictionary });
+            expect(() => (client.data as unknown as Record<string, unknown>).postz)
+                .toThrow(/Unknown collection accessor "postz"/);
+        });
+    });
+
+    // -----------------------------------------------------------------------
     // call() method
     // -----------------------------------------------------------------------
     describe("call() method", () => {
