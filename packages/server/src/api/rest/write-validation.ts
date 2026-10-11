@@ -566,6 +566,20 @@ function collectViolations(
             const of = property.of;
             if (of && !Array.isArray(of)) {
                 value.forEach((item, index) => collectViolations(`${key}[${index}]`, of as Property, item, into));
+            } else if (!of && property.oneOf?.properties) {
+                // Blocks: `{ type, value }` items whose value answers to the
+                // property its type names, as an `of` item answers to `of`.
+                const typeField = property.oneOf.typeField ?? "type";
+                const valueField = property.oneOf.valueField ?? "value";
+                const blockProperties = property.oneOf.properties as Record<string, Property>;
+                value.forEach((item, index) => {
+                    if (typeof item !== "object" || item === null || Array.isArray(item)) return;
+                    const type = (item as Record<string, unknown>)[typeField];
+                    if (typeof type !== "string" || !Object.prototype.hasOwnProperty.call(blockProperties, type)) return;
+                    const blockProperty = blockProperties[type];
+                    if (!blockProperty || typeof blockProperty !== "object") return;
+                    collectViolations(`${key}[${index}].${valueField}`, blockProperty, (item as Record<string, unknown>)[valueField], into);
+                });
             }
             return;
         }

@@ -3,7 +3,7 @@ import type { ArrayProperty, MapProperty, NumberProperty, Property, BooleanPrope
 ;
 import { z, ZodTypeAny } from "zod";
 import { deepEqual as isDeepEqual } from "fast-equals";
-import { enumToObjectEntries, isPropertyBuilder } from "@rebasepro/common";
+import { DEFAULT_ONE_OF_TYPE, DEFAULT_ONE_OF_VALUE, enumToObjectEntries, isPropertyBuilder } from "@rebasepro/common";
 import { getValueInPath, hydrateRegExp, isPlainObject, prettifyIdentifier } from "@rebasepro/utils";
 
 /** Whether an authored relation yields many rows. Derived from its kind. */
@@ -559,6 +559,48 @@ function getZodArraySchema({
 }: PropertyContext<ArrayProperty>): ZodTypeAny {
 
     let arraySchema: ZodTypeAny = z.array(z.any()).nullable().optional();
+
+    if (!property.of && property.oneOf?.properties) {
+        // Blocks: each item is `{ [typeField]: key, [valueField]: value }`, and
+        // its value answers to `oneOf.properties[key]`, as an `of` item answers
+        // to `of`. The error lands on `blocks.<i>.<valueField>`, which is the
+        // key the block's inner field is bound to.
+        const typeField = property.oneOf.typeField ?? DEFAULT_ONE_OF_TYPE;
+        const valueField = property.oneOf.valueField ?? DEFAULT_ONE_OF_VALUE;
+        const blockProperties = property.oneOf.properties as Record<string, Property>;
+        const blockSchemas = new Map<string, ZodTypeAny>();
+        const schemaFor = (type: string): ZodTypeAny | undefined => {
+            if (!Object.prototype.hasOwnProperty.call(blockProperties, type)) return undefined;
+            const blockProperty = blockProperties[type];
+            if (!blockProperty || isPropertyBuilder(blockProperty)) return undefined;
+            let schema = blockSchemas.get(type);
+            if (!schema) {
+                schema = mapPropertyToZod({ property: blockProperty, parentProperty: property, entityId, name: type });
+                blockSchemas.set(type, schema);
+            }
+            return schema;
+        };
+        arraySchema = z.array(z.any()).superRefine(async (items, ctx) => {
+            for (let index = 0; index < items.length; index++) {
+                const item: unknown = items[index];
+                if (!isPlainObject(item)) continue;
+                const type = (item as Record<string, unknown>)[typeField];
+                if (typeof type !== "string") continue;
+                const schema = schemaFor(type);
+                if (!schema) continue;
+                const result = await schema.safeParseAsync((item as Record<string, unknown>)[valueField]);
+                if (!result.success) {
+                    result.error.issues.forEach((issue) => {
+                        ctx.addIssue({
+                            code: "custom",
+                            message: issue.message,
+                            path: [index, valueField, ...issue.path]
+                        });
+                    });
+                }
+            }
+        }).nullable().optional();
+    }
 
     if (property.of) {
         if (Array.isArray(property.of)) {
