@@ -158,6 +158,8 @@ A failure that is merely temporary — a 429, a 503, a dropped connection — is
 
 Tabs of the same app share one IndexedDB database, so they share the local rows and the outbox. A write in one appears in the others, and only one tab at a time replays the queue. Nothing to configure.
 
+That last guarantee comes from the browser's [Web Locks API](https://developer.mozilla.org/en-US/docs/Web/API/Web_Locks_API), which exists only in a secure context (HTTPS, or `localhost`) and not in Safari before 15.4 or in some embedded webviews. Without it, every open tab replays the queue when it syncs. Creates, bulk writes, updates and deletes all replay under an idempotency key, so a server that stores keys applies each of them once; what you can see is the same write sent from two tabs.
+
 ## Users
 
 The local database and the outbox are partitioned per signed-in user. Cached rows are whatever row-level security let that user see, and a queued write has to replay as its author — so signing out and back in as someone else never mixes the two. Signing out does not need to clear anything.
@@ -229,6 +231,7 @@ The client is not a replica of your database, and it does not pretend to be:
 - **`findAll()` and `iterate()` read only pages the server answered on this device.** A walk goes on for as long as each page says there is more, and only the server can say that. Offline, a walk that needs a page this device never fetched fails with the `OFFLINE` error (`isOfflineError`) instead of returning part of the collection as if it were all of it. On 0.24 it stopped at that page and returned what it had.
 - **`searchString` is approximated** as a case-insensitive substring scan over cached string fields. The server runs real full-text search over the collection's configured columns.
 - **`include`d relations cannot be evaluated locally** — the related rows live in collections the query never loaded. Such a query is always marked `partial` when answered from the cache.
+- **Conflicts are last-writer-wins, per field, with no detection.** A replayed `update` sends the fields the user changed and nothing else, so fields they did not touch keep whatever the server has. For a field they *did* change, a change someone else made on the server while they were offline is overwritten when the queue replays, and neither user is told. Nothing compares versions on replay.
 - **Replay is at-least-once.** A write that reaches the server but whose response is lost may be sent again. Prefer idempotent writes (`createMany` with `upsert`) where duplicates would matter.
 - **An upsert on a natural key needs the server.** Which row an `onConflict` target names is the server's to find, so `upsert()` on a natural key (or without the row's id), and a `createMany()` with `onConflict` that was never sent, are refused while offline with `OFFLINE_UPSERT_UNSUPPORTED`. An upsert on the primary key, with the key in each row, is queued.
 - **Local reads apply Postgres semantics, not the database's data.** Filters are evaluated the way SQL would — comparisons against `NULL` are unknown, `ORDER BY` puts nulls last ascending and breaks the remaining ties on the row id descending, exactly as the server does — but against the client's copy of the rows, which may be stale.
