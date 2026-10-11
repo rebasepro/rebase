@@ -1,5 +1,5 @@
 "use client";
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useId, useState } from "react";
 import { LayoutList, Table2, LayoutGrid, Kanban, Settings2 } from "lucide-react";
 import { iconSize } from "../../icons/Icon";
 import { SearchBar } from "../../components/SearchBar";
@@ -87,6 +87,7 @@ export function CollectionViewToolbar({
     onKanbanPropertyChange,
 }: CollectionViewToolbarProps) {
     const [popoverOpen, setPopoverOpen] = useState(false);
+    const viewLabelId = useId();
 
     // A key outside the four built-ins takes its label and icon from the
     // custom view that declared it; without one it falls back to the key
@@ -174,6 +175,7 @@ export function CollectionViewToolbar({
                         {showViewToggle && (
                             <div className="flex flex-col gap-1">
                                 <Typography
+                                    id={viewLabelId}
                                     variant="caption"
                                     color="secondary"
                                     className="font-medium uppercase tracking-wider"
@@ -181,6 +183,7 @@ export function CollectionViewToolbar({
                                     View
                                 </Typography>
                                 <ToggleButtonGroup<CollectionViewMode>
+                                    aria-labelledby={viewLabelId}
                                     value={viewMode}
                                     onValueChange={handleViewModeChange}
                                     options={viewOptions}

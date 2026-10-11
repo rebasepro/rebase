@@ -25,6 +25,9 @@ export type ToggleButtonGroupProps<T extends string = string> = {
      * Additional class names for the container
      */
     className?: string;
+    /** Names the group: what it chooses between, e.g. "View mode". */
+    "aria-label"?: string;
+    "aria-labelledby"?: string;
 }
 
 /**
@@ -35,14 +38,16 @@ export function ToggleButtonGroup<T extends string = string>({
     value,
     onValueChange,
     options,
-    className
+    className,
+    "aria-label": ariaLabel,
+    "aria-labelledby": ariaLabelledBy
 }: ToggleButtonGroupProps<T>) {
     return (
         // A 32px rounded track (`lg`) with `md` segments. It was 48px with a
         // blue label on the active segment; the lifted fill already says which
         // segment is on, so the label stays in the primary ink and the hue is
         // not spent twice.
-        <div role="group" aria-label="Toggle options" className={cls("inline-flex flex-row bg-surface-field rounded-lg p-1 gap-1", className)}>
+        <div role="group" aria-label={ariaLabel} aria-labelledby={ariaLabelledBy} className={cls("inline-flex flex-row bg-surface-field rounded-lg p-1 gap-1", className)}>
             {options.map((option) => (
                 <button
                     key={option.value}

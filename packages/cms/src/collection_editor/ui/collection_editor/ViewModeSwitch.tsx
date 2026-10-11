@@ -1,3 +1,4 @@
+import { useId } from "react";
 import { CollectionCustomView, ViewMode } from "@rebasepro/cms-types";
 import {
     cls,
@@ -28,10 +29,12 @@ export function ViewModeSwitch({
     // the key is what makes it editable, the same bargain `entityViews` makes.
     const registeredViews: CollectionCustomView[] = customizationController.collectionViews ?? [];
 
+    const labelId = useId();
     return <div className={cls(className)}>
-        <Typography variant={"label"} color={"secondary"} className={"ml-3.5"}>Default collection view</Typography>
+        <Typography id={labelId} variant={"label"} color={"secondary"} className={"ml-3.5"}>Default collection view</Typography>
         <div className={"my-2"}>
             <ToggleButtonGroup
+                aria-labelledby={labelId}
                 value={value}
                 onValueChange={onChange}
                 options={[

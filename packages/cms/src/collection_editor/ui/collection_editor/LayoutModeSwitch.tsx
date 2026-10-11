@@ -1,3 +1,4 @@
+import { useId } from "react";
 import {
     AppWindow,
     cls,
@@ -18,10 +19,12 @@ export function LayoutModeSwitch({
     className?: string;
 }) {
 
+    const labelId = useId();
     return <div className={cls(className)}>
-        <Typography variant={"label"} color={"secondary"} className={"ml-3.5"}>Document view</Typography>
+        <Typography id={labelId} variant={"label"} color={"secondary"} className={"ml-3.5"}>Document view</Typography>
         <div className={"my-2"}>
             <ToggleButtonGroup
+                aria-labelledby={labelId}
                 value={value}
                 onValueChange={onChange}
                 options={[
