@@ -7,13 +7,13 @@ import type { LucideIcon } from "lucide-react";
  * Rendering a Lucide icon chosen at runtime, without shipping all ~1,750 of them
  * on the login screen.
  *
- * `@rebasepro/ui` used to re-export lucide's whole `icons` map:
+ * `@rebasepro/ui` re-exports lucide's whole `icons` map:
  *
  *     export { icons as lucideIcons } from "lucide-react";
  *
  * That map is an object literal holding a reference to every icon component in
  * the library, so a tree-shaker cannot drop a single one — reaching the map
- * reaches all of them. Two callers reached it, both by name lookup: `getIcon`
+ * reaches all of them. Two callers used to reach it, both by name lookup: `getIcon`
  * in `@rebasepro/app` (a collection's `icon: "ShoppingCart"`) and the admin's
  * icon picker. That put 822 kB of SVG components (unminified) into the entry
  * chunk's static graph, `modulepreload`ed before authentication.
