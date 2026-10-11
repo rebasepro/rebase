@@ -526,7 +526,11 @@ function createDriverAccessor<M extends Record<string, unknown> = Record<string,
                     logical: params.logical,
                     searchString: params.searchString,
                     limit: limit !== undefined ? limit + 1 : params.limit,
-                    offset: params.offset
+                    offset: params.offset,
+                    // The sort the HTTP route forwards. Dropped here, an
+                    // in-process `aggregate({ orderBy: ["sum_total", "desc"] })`
+                    // came back in group-key order instead.
+                    orderBy: normalizeOrderBy(params.orderBy)
                 });
                 if (limit === undefined) return rows;
                 const page: AggregateResult = rows.slice(0, limit);

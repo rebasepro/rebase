@@ -1,7 +1,7 @@
 import type { VectorSearchParams } from "./data_driver";
 import type { ComputedSortField, SearchMatch } from "../types/search";
 import { Entity, EntityValues } from "../types/entities";
-import { WhereFilterOp, FieldPath, NonColumnFieldPath, FilterValues, NullsPlacement, OrderBySpec, RelationAggregateSort } from "../types/filter-operators";
+import { WhereFilterOp, FieldPath, NonColumnFieldPath, FilterValues, NullsPlacement, OrderBySpec, OrderByTuple, RelationAggregateSort } from "../types/filter-operators";
 
 /**
  * The element type of an array column, and the column's own type otherwise.
@@ -873,7 +873,46 @@ export interface AggregateParams<M extends Record<string, unknown> = Record<stri
     limit?: number;
     /** Groups to skip, to page past `limit`. Grouped aggregates only. */
     offset?: number;
+    /**
+     * Sort the groups — by a `groupBy` column or by an aggregate's alias
+     * (`"count"`, `"sum_total"`, see {@link AggregateAlias}). One
+     * `[key, "asc" | "desc"]` tuple, or several applied in order. Groups the
+     * sort leaves tied keep their `groupBy` order. Grouped aggregates only:
+     * without `groupBy` there is one row, and over HTTP an `orderBy` beside it is
+     * refused with `INVALID_AGGREGATE_WINDOW`. A key that is neither a group
+     * column nor a selected aggregate is refused with `INVALID_ORDER_BY`.
+     *
+     * ```ts
+     * await client.data.orders.aggregate({
+     *     select: [{ fn: "sum", field: "total" }],
+     *     groupBy: ["status"],
+     *     orderBy: ["sum_total", "desc"]
+     * });
+     * ```
+     */
+    orderBy?: OrderByTuple<AggregateOrderKey<M>> | OrderByTuple<AggregateOrderKey<M>>[];
 }
+
+/**
+ * The key an {@link AggregateSelect} comes back under: `count` for `count()`,
+ * `<fn>_<field>` otherwise (`sum_total`, `max_created_at`).
+ *
+ * @group Data
+ */
+export type AggregateAlias<M extends Record<string, unknown> = Record<string, unknown>> =
+    | "count"
+    | `${"count" | "min" | "max"}_${Extract<keyof M, string>}`
+    | `${"sum" | "avg"}_${NumericKeyOf<M>}`;
+
+/**
+ * What {@link AggregateParams.orderBy} can sort the groups by: a column (to
+ * group by) or an aggregate's alias.
+ *
+ * @group Data
+ */
+export type AggregateOrderKey<M extends Record<string, unknown> = Record<string, unknown>> =
+    | Extract<keyof M, string>
+    | AggregateAlias<M>;
 
 /**
  * Where a grouped aggregate's page of groups sits: the `limit` it was cut at,

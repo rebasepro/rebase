@@ -55,6 +55,21 @@ GET /api/data/orders/aggregate?select=count()&groupBy=customer&orderBy=count:des
 is a `400 INVALID_AGGREGATE_WINDOW`: an ungrouped aggregate has one row, and a
 group is not a row a cursor can continue after.
 
+From the SDK, `aggregate()` takes the same `orderBy` a `find()` does — one
+`[key, "asc" | "desc"]` tuple or a list of them — where the key is a `groupBy`
+column or a result key. Both are typed: on a generated model, a key that is
+neither does not compile. In process (`rebase.data`), the groups come back in
+the same order as over HTTP.
+
+```ts
+const topCustomers = await client.data.orders.aggregate({
+    select: [{ fn: "count" }, { fn: "sum", field: "total" }],
+    groupBy: ["customer"],
+    orderBy: ["sum_total", "desc"],
+    limit: 10
+});
+```
+
 It takes the same filters as the list endpoint, so an aggregate can be narrowed
 the same way a listing is:
 

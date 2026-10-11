@@ -348,9 +348,10 @@ function appendWhere(pairs: [string, string][], where: Record<string, unknown>):
  * by exactly the same code a `find()` uses, so "revenue by status, this month"
  * narrows the same rows whichever call is asking.
  *
- * `orderBy`, `include` and the page are deliberately not here: an aggregate has
- * no rows to sort, no relations to load and no page to continue. `limit` is,
- * and bounds the number of *groups*.
+ * `include` and a cursor are deliberately not here: an aggregate has no
+ * relations to load and no row to continue after. `limit`, `offset` and
+ * `orderBy` are, and page and sort the *groups* — `orderBy` by a group column or
+ * an aggregate's alias, in the spelling a `find()` sends.
  */
 export function buildAggregateQueryString<M extends Record<string, unknown>>(params: AggregateParams<M>): string {
     const pairs: [string, string][] = [];
@@ -365,6 +366,10 @@ export function buildAggregateQueryString<M extends Record<string, unknown>>(par
     }
     if (params.limit != null) pairs.push(["limit", String(params.limit)]);
     if (params.offset != null) pairs.push(["offset", String(params.offset)]);
+    if (params.orderBy) {
+        const wire = serializeOrderBy(params.orderBy);
+        if (wire) pairs.push(["orderBy", wire]);
+    }
     if (params.searchString) {
         pairs.push(["searchString", params.searchString]);
     }
