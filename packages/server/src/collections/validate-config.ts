@@ -3,7 +3,7 @@ import type { AnyCollectionConfig, CollectionConfig, PolicyExpression, PostgresC
 
 import { getEffectiveSecurityRules, getTableName, isRelationalCollection, resolveCollectionRelations, securityRuleToConditions } from "@rebasepro/common";
 import type { DataSourceResolvable } from "@rebasepro/common";
-import { suggestNearMiss } from "@rebasepro/utils";
+import { suggestNearMiss, toSnakeCase } from "@rebasepro/utils";
 
 import { logger } from "../utils/logger";
 
@@ -1579,6 +1579,41 @@ function checkNumericPrecision(
     }
 }
 
+/**
+ * Two properties that resolve to one column.
+ *
+ * A property's column is its `columnName`, or its key snake-cased — the same
+ * rule the planner applies (`resolveColumnName`). `myTitle` beside `my_title`,
+ * or an agent adding `createdAt` next to an existing `created_at`, produced a
+ * `CREATE TABLE` declaring the column twice; generate reported success and only
+ * Atlas refused it ("column specified more than once", 42701). Relation
+ * properties are left out: a `belongsTo`'s foreign key column may be owned by
+ * a declared property on purpose, and the planner handles that pairing.
+ */
+function checkColumnCollisions(
+    properties: Record<string, unknown>,
+    at: string,
+    collect: ProblemCollector
+): void {
+    const owners = new Map<string, string>();
+    for (const [key, prop] of Object.entries(properties)) {
+        if (!isPlainObject(prop) || prop.type === "relation") continue;
+        const column = typeof prop.columnName === "string" && prop.columnName ? prop.columnName : toSnakeCase(key);
+        const first = owners.get(column);
+        if (first === undefined) {
+            owners.set(column, key);
+            continue;
+        }
+        collect.error(
+            `${at}.properties.${key}`,
+            `\`${key}\` and \`${first}\` both resolve to the column "${column}" (a property's column is its ` +
+            "`columnName`, or its key in snake_case), so the table would declare that column twice and " +
+            "`rebase db push` fails with \"column specified more than once\". Rename one of the two, or give " +
+            "it its own column with `columnName`."
+        );
+    }
+}
+
 function checkCollection(
     collection: unknown,
     index: number,
@@ -1623,6 +1658,7 @@ function checkCollection(
         checkProperties(collection.properties, `${at}.properties`, collect);
         checkRelationPropertiesResolve(collection, at, collect);
         checkPrimaryKeyStrategy(collection, at, collect);
+        checkColumnCollisions(collection.properties, at, collect);
     } else if (collection.properties !== undefined) {
         collect.error(`${at}.properties`, "`properties` must be an object keyed by property name.");
     }

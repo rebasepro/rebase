@@ -1091,3 +1091,37 @@ describe("no message names a path inside this repository", () => {
         }
     });
 });
+
+describe("two properties that land on one column", () => {
+    // `myTitle` and `my_title` both snake-case to `my_title`: the generated
+    // CREATE TABLE declared the column twice and only Atlas noticed
+    // ("column specified more than once", 42701); boot would ADD it twice.
+    it("refuses keys that snake-case to the same column, naming both and `columnName`", () => {
+        const collection = valid();
+        Object.assign(collection.properties, {
+            myTitle: { name: "My title", type: "string" },
+            my_title: { name: "My title (2)", type: "string" }
+        });
+        const found = errors([collection]);
+        const clash = found.find(p => p.message.includes("my_title"));
+        expect(clash).toBeDefined();
+        expect(clash?.message).toContain("myTitle");
+        expect(clash?.message).toContain("columnName");
+    });
+
+    it("refuses a `columnName` that names another property's column", () => {
+        const collection = valid();
+        Object.assign(collection.properties, {
+            heading: { name: "Heading", type: "string", columnName: "title" }
+        });
+        expect(errors([collection]).some(p => p.message.includes("\"title\"") && p.message.includes("heading"))).toBe(true);
+    });
+
+    it("accepts a belongsTo whose foreign key column a declared property owns", () => {
+        const collection = valid();
+        Object.assign(collection.properties, {
+            author_id: { name: "Author id", type: "string" }
+        });
+        expect(errors([collection]).filter(p => p.message.includes("resolve to the column"))).toEqual([]);
+    });
+});
