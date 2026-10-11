@@ -106,6 +106,7 @@ export const BoardColumn = memo(function BoardColumn<T>({
                 </div>
                 {onAddItem && (
                     <IconButton
+                        aria-label={`Add to ${title}`}
                         size="small"
                         onClick={(e: React.MouseEvent) => {
                             e.stopPropagation();

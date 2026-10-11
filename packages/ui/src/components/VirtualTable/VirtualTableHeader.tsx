@@ -215,6 +215,7 @@ export const VirtualTableHeader = React.memo<VirtualTableHeaderProps<Record<stri
                                 modal={true}
                                 trigger={
                                     <IconButton
+                                        aria-label={column.title ? `Filter ${column.title}` : "Filter"}
                                         className={onHover || openFilter ? "bg-surface-card" : undefined}
                                         size={"small"}
                                         onClick={handleSettingsClick}>

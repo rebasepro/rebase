@@ -162,6 +162,7 @@ export function CollectionViewToolbar({
                     align="end"
                     trigger={
                         <IconButton
+                            aria-label="View settings"
                             size="small"
                             onClick={() => setPopoverOpen((prev) => !prev)}
                         >
