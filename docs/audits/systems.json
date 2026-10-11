@@ -54,6 +54,7 @@
         "packages/server-postgres/src/schema/**",
         "packages/server-postgres/src/collections/**",
         "packages/server-postgres/src/cli*.ts",
+        "packages/server-postgres/src/tsx-loader.ts",
         "packages/server-postgres/src/generated-sql.ts",
         "packages/server-postgres/src/branch-*.ts",
         "packages/server-postgres/src/PostgresBootstrapper.ts",
@@ -81,7 +82,8 @@
         "packages/server/src/api/ast-schema-editor.ts",
         "packages/server/src/api/live-schema-routes.ts",
         "packages/server/src/api/schema-editor-routes.ts",
-        "packages/server/src/api/logs-routes.ts"
+        "packages/server/src/api/logs-routes.ts",
+        "packages/server/src/api/sql-export-routes.ts"
       ],
       "focus": "Every edit the UI can express (add/rename/delete/retype a property, add each relation kind, change enum values, rename a collection) must leave source code AND database agreeing, on a fresh DB and one with rows. An edit that cannot be applied must say so truthfully and leave no half state. Two tabs editing one collection. SQL console: session/role isolation, result editing, huge results, cancel. Storage browser, logs, cron and functions views. Screens built from @rebasepro/ui and consistent with UIReferenceView.",
       "audits": [
@@ -194,6 +196,7 @@
         "packages/server/src/history/**",
         "packages/server/src/services/webhook-service.ts",
         "packages/server/src/services/outbound-url-guard.ts",
+        "packages/server/src/services/outbound-post.ts",
         "packages/server/src/init/callback-client.ts",
         "packages/server/src/init/global-callbacks.ts",
         "packages/server-postgres/src/history/**",
