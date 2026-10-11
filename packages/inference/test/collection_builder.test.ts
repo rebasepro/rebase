@@ -336,3 +336,18 @@ describe("keys starting with an underscore", () => {
         expect(Object.keys(properties)).toEqual(["name"]);
     });
 });
+
+describe("a field inside a map", () => {
+    // The values of nested fields were recorded under a key the builder never
+    // read, so a nested column got no enum and no `required`.
+    it("is inferred from its values, as a top-level field is", async () => {
+        const rows = Array.from({ length: 12 }, (_, i) => ({
+            status: i % 2 ? "draft" : "published",
+            meta: { status: i % 2 ? "draft" : "published", code: "0012" }
+        }));
+        const properties = await buildEntityPropertiesFromData(rows, inferType);
+        const nested = (properties.meta as { properties: Properties }).properties;
+        expect(nested.status).toEqual(expect.objectContaining({ enum: properties.status.enum, validation: { required: true } }));
+        expect(nested.code.type).toBe("string");
+    });
+});

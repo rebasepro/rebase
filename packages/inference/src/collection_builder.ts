@@ -216,21 +216,20 @@ function increaseValuesCount(
 ) {
     const type = getType(fieldValue);
 
-    const valuesRecord: {
-        values: unknown[];
-        valuesCount: Map<unknown, number>;
-        map?: ValuesCountRecord;
-    } = ownEntry(typeValuesRecord, key) ?? {
+    const valuesRecord: ValuesCountEntry = ownEntry(typeValuesRecord, key) ?? {
         values: [],
         valuesCount: new Map()
     };
     typeValuesRecord[key] = valuesRecord;
 
     if (type === "map") {
-        let mapValuesRecord: ValuesCountRecord | undefined = valuesRecord.map;
+        // Under `mapValues`, the field `buildPropertyFromCount` reads. Stored
+        // under `map`, a nested field's values were never seen: no enum, no
+        // `required`, and no number-from-text decision for it.
+        let mapValuesRecord: ValuesCountRecord | undefined = valuesRecord.mapValues;
         if (!mapValuesRecord) {
             mapValuesRecord = {};
-            valuesRecord.map = mapValuesRecord;
+            valuesRecord.mapValues = mapValuesRecord;
         }
         if (fieldValue)
             Object.entries(fieldValue as Record<string, unknown>).forEach(([subKey, value]) =>
