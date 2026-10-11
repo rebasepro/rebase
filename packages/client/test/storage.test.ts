@@ -538,7 +538,11 @@ fileNotFound: true });
                 ok: false
             } as any);
 
-            await expect(storage.getObject("error.txt")).rejects.toThrow("Failed to get file");
+            // A RebaseApiError with the status, like every other failure the
+            // client reports — it was a plain Error with the status dropped.
+            await expect(storage.getObject("error.txt")).rejects.toMatchObject({
+                name: "RebaseApiError", status: 500, code: "INTERNAL_ERROR"
+            });
         });
 
         it("strips local:// prefix", async () => {

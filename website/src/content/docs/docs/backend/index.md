@@ -340,8 +340,12 @@ The typed SDK turns every one of these into a `RebaseApiError` carrying
 `status`, `code` and `details` — including the failures that never reached a
 server at all. A refused connection, a DNS failure, CORS or an abort arrives as
 `status: 0`, `code: "NETWORK_ERROR"`, with the runtime's own error on `cause`,
-rather than as whatever `fetch` felt like rejecting with. So application code
-catches one class:
+rather than as whatever `fetch` felt like rejecting with. A response with no
+envelope — a proxy's 413, a load balancer's 502 — still gets a `code` from its
+status (`PAYLOAD_TOO_LARGE`, `SERVICE_UNAVAILABLE`, `INTERNAL_ERROR`, …), and a
+client built outside a browser with no `baseUrl` fails with
+`BASE_URL_REQUIRED` rather than a network error. So application code catches
+one class:
 
 ```typescript
 async function setPrice(id: string, price: number) {

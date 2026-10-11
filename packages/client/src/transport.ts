@@ -484,6 +484,32 @@ export interface Transport {
  * amount of CORS configuration repairs, because a SameSite=Lax auth cookie is
  * not sent cross-site either.
  */
+/**
+ * The code an error carries when the response did not name one: a proxy's 413,
+ * a load balancer's 502, a crash page's 500 — anything without the server's
+ * envelope. Without it `e.code` was `undefined` and the documented
+ * `switch (e.code)` fell through to `default` on exactly the failures that are
+ * not Rebase's own. Only codes the backend itself answers with, so a switch
+ * written against the error reference catches both.
+ *
+ * @internal
+ */
+export function defaultCodeForStatus(status: number): string | undefined {
+    switch (status) {
+        case 400: return "BAD_REQUEST";
+        case 401: return "UNAUTHORIZED";
+        case 403: return "FORBIDDEN";
+        case 404: return "NOT_FOUND";
+        case 409: return "CONFLICT";
+        case 412: return "PRECONDITION_FAILED";
+        case 413: return "PAYLOAD_TOO_LARGE";
+        case 415: return "UNSUPPORTED_MEDIA_TYPE";
+        case 429: return "RATE_LIMITED";
+        case 502: case 503: case 504: return "SERVICE_UNAVAILABLE";
+        default: return status >= 500 && status < 600 ? "INTERNAL_ERROR" : undefined;
+    }
+}
+
 function resolveBaseUrl(configured?: string): string {
     if (configured) return configured.replace(/\/$/, "");
     if (typeof window !== "undefined" && window.location?.origin) return window.location.origin;
@@ -520,6 +546,18 @@ export function createTransport(config: RebaseClientConfig, environment?: Transp
         } catch (e) {
             if (e instanceof RebaseApiError) throw e;
             const url = typeof input === "string" ? input : String((input as Request).url ?? input);
+            // No `baseUrl`, outside a browser: the URL is relative, and there
+            // is no page origin for `fetch` to resolve it against. That is a
+            // configuration error, not the server being unreachable — said as
+            // a network failure, it sent people looking for a server that was
+            // never the problem.
+            if (!/^[a-z][a-z0-9+.-]*:/i.test(url) && typeof window === "undefined") {
+                throw new RebaseClientError(
+                    `This client has no \`baseUrl\`, and outside a browser the relative URL ${url} cannot be fetched. ` +
+                    "Pass `baseUrl` (e.g. \"http://localhost:3001\") to createRebaseClient().",
+                    { code: "BASE_URL_REQUIRED", cause: e }
+                );
+            }
             throw new RebaseApiError(
                 `Could not reach the server at ${url}: ${e instanceof Error ? e.message : String(e)}`,
                 { status: 0, code: "NETWORK_ERROR", cause: e }
@@ -682,7 +720,7 @@ export function createTransport(config: RebaseClientConfig, environment?: Transp
             String(getErrorField(body, "message") || fallbackMessage || `Request failed with status ${res.status}`),
             {
                 status: res.status,
-                code: getErrorField(body, "code") as string | undefined,
+                code: (getErrorField(body, "code") as string | undefined) || defaultCodeForStatus(res.status),
                 details: getErrorField(body, "details"),
                 ...(typeof requestId === "string" && requestId ? { requestId } : {}),
                 ...(() => {

@@ -471,6 +471,50 @@ body: JSON.stringify({ name: "test" }) });
     });
 
     // --- Error Handling ---
+    /**
+     * The SDK documents `switch (e.code)`. A response with no envelope — a
+     * proxy's 413, a load balancer's 502, a crash page's 500 — arrived with
+     * `code: undefined`, so every such switch fell through to `default`.
+     */
+    describe("an error with no envelope still has a code", () => {
+        const cases: [number, string][] = [
+            [400, "BAD_REQUEST"], [401, "UNAUTHORIZED"], [403, "FORBIDDEN"], [404, "NOT_FOUND"],
+            [409, "CONFLICT"], [412, "PRECONDITION_FAILED"], [413, "PAYLOAD_TOO_LARGE"],
+            [415, "UNSUPPORTED_MEDIA_TYPE"], [429, "RATE_LIMITED"], [500, "INTERNAL_ERROR"],
+            [502, "SERVICE_UNAVAILABLE"], [503, "SERVICE_UNAVAILABLE"], [504, "SERVICE_UNAVAILABLE"]
+        ];
+        it.each(cases)("a bare %i is %s", async (status, code) => {
+            const transport = createTransport({ baseUrl: "http://localhost", fetch: fetchMock as typeof globalThis.fetch });
+            fetchMock.mockResolvedValueOnce({
+                ok: false, status, statusText: "x", text: async () => "<html>proxy page</html>"
+            });
+            await expect(transport.request("/data/posts")).rejects.toMatchObject({ status, code });
+        });
+
+        it("keeps the server's own code when it sent one", async () => {
+            const transport = createTransport({ baseUrl: "http://localhost", fetch: fetchMock as typeof globalThis.fetch });
+            fetchMock.mockResolvedValueOnce({
+                ok: false, status: 400, text: async () => JSON.stringify({ error: { message: "m", code: "INVALID_FILTER" } })
+            });
+            await expect(transport.request("/data/posts")).rejects.toMatchObject({ code: "INVALID_FILTER" });
+        });
+    });
+
+    /**
+     * Outside a browser, a client with no `baseUrl` sends a relative URL that
+     * `fetch` cannot parse — reported, on the first request, as a
+     * `NETWORK_ERROR` "Could not reach the server", sending the developer to
+     * look for a server that is down instead of a missing option.
+     */
+    it("names a missing baseUrl outside a browser instead of reporting the network", async () => {
+        const failingFetch = jest.fn(async () => { throw new TypeError("Failed to parse URL from /api/data/posts"); });
+        const transport = createTransport({ fetch: failingFetch as unknown as typeof globalThis.fetch });
+        const error = await transport.request("/data/posts").catch((e: unknown) => e);
+        expect(error).toBeInstanceOf(RebaseApiError);
+        expect(error).toMatchObject({ code: "BASE_URL_REQUIRED" });
+        expect(String((error as Error).message)).toMatch(/baseUrl/);
+    });
+
     describe("Error Handling", () => {
         it("throws RebaseApiError on non-ok JSON responses", async () => {
             const transport = createTransport({ baseUrl: "http://localhost",
@@ -541,7 +585,8 @@ code: "ACCESS_DENIED" })
                 // top-level `{ message, code }` is not parsed — we fall back to statusText.
                 expect(err.status).toBe(403);
                 expect(err.message).toBe("Forbidden"); // from statusText fallback
-                expect(err.code).toBeUndefined();
+                // The status's default code, not the body's bare `ACCESS_DENIED`.
+                expect(err.code).toBe("FORBIDDEN");
             }
         });
 

@@ -10,7 +10,7 @@ import {
     type ResolvedDownload,
     type ResumableUploadSend
 } from "@rebasepro/common";
-import { Transport, type ResponseMeta } from "./transport";
+import { defaultCodeForStatus, Transport, type ResponseMeta } from "./transport";
 
 /**
  * Create a StorageSource that talks to the Rebase backend REST API.
@@ -308,7 +308,14 @@ export function createStorage(transport: Transport, storageId?: string): Storage
         });
 
         if (response.status === 404) return null;
-        if (!response.ok) throw new Error("Failed to get file");
+        // A RebaseApiError with the status, as every other failure here is;
+        // a plain Error dropped the status, so a 403 and a 500 read the same.
+        if (!response.ok) {
+            throw new RebaseApiError(`Failed to get file ${key}: the server answered ${response.status}.`, {
+                status: response.status,
+                code: defaultCodeForStatus(response.status)
+            });
+        }
 
         const blob = await response.blob();
         const fileName = (bucket ? `${bucket}/${key}` : key).split("/").pop() || "file";
