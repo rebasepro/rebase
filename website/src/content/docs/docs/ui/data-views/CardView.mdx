@@ -12,7 +12,7 @@ import { CardView } from "@rebasepro/ui";
 
 | Prop | Type | Required | Description |
 | --- | --- | --- | --- |
-| `data` | `T[]` | yes | Virtualized card grid. Generic over the row type T. |
+| `data` | `(T \| undefined)[]` | yes | Virtualized card grid. Generic over the row type T. <span class="since-badge" data-since="0.25">Since 0.25</span> Only the rows of cards on screen, and two either side, are mounted; each row is as tall as its tallest card, measured as it is drawn. A position holding `undefined` is an item that exists but has not been read yet: a placeholder card is drawn in its place, and `renderCard` is not called for it. |
 | `renderCard` | `(item: T, extra: { selected: boolean; highlighted: boolean; onSelectionChange: (selected: boolean) => void; onClick: (e: React.MouseEvent) => void }) => React.ReactNode` | yes |  |
 | `dataLoading` | `boolean` | — |  |
 | `noMoreToLoad` | `boolean` | — |  |
@@ -29,6 +29,7 @@ import { CardView } from "@rebasepro/ui";
 | `initialScroll` | `number` | — |  |
 | `size` | `"xs" \| "s" \| "m" \| "l" \| "xl"` | — |  |
 | `emptyComponent` | `React.ReactNode` | — |  |
+| `onRowsRendered` | `(range: { start: number; end: number }) => void` | — | <span class="since-badge" data-since="0.25">Since 0.25</span> Called with the positions in `data` of the cards on screen (the rows of cards on screen, not the ones drawn ahead of them), end exclusive, each time they change. While the grid is still scrolling to `initialScroll`, the cards there. The collection views use it to keep only the rows near the screen current under realtime. |
 
 ## Example
 

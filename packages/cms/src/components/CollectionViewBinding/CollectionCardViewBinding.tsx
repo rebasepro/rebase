@@ -105,6 +105,8 @@ export function CollectionCardViewBinding<M extends Record<string, unknown> = Re
 
     const {
         data,
+        sparseData,
+        onRowsRendered,
         dataLoading,
         noMoreToLoad,
         dataLoadingError,
@@ -113,6 +115,10 @@ export function CollectionCardViewBinding<M extends Record<string, unknown> = Re
         pageSize = 50,
         paginationEnabled
     } = tableController;
+
+    // The grid stops drawing cards when it goes (another view takes over):
+    // say so, so the controller keeps every row held current again.
+    useEffect(() => () => onRowsRendered?.(undefined), [onRowsRendered]);
 
     const handleEntityClick = useCallback((entity: Entity<M>) => {
         onEntityClick?.(entity);
@@ -160,7 +166,8 @@ export function CollectionCardViewBinding<M extends Record<string, unknown> = Re
 
     return (
         <CardView<Entity<M>>
-            data={data}
+            data={sparseData ?? data}
+            onRowsRendered={onRowsRendered}
             dataLoading={dataLoading}
             noMoreToLoad={noMoreToLoad}
             dataLoadingError={dataLoadingError}

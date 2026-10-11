@@ -7,11 +7,11 @@ import { act, fireEvent, render } from "@testing-library/react";
 import type { Entity } from "@rebasepro/types";
 
 /**
- * The card grid draws every loaded card. Loading the next page used to draw
+ * The card grid used to draw every loaded card, and loading the next page drew
  * every one of them again — twice, once for "loading" and once for the rows —
  * so scrolling to N cards cost O(N²) card renders: 4,050 renders for the 50
- * cards of the 41st page. A page, a push or a tick has to draw the cards that
- * changed and no other.
+ * cards of the 41st page. It draws the cards on screen now, and a page, a push
+ * or a tick has to draw the cards that changed and no other.
  *
  * Counted with the real binding, grid and card: the `Collection.Card` override
  * slot hands back the real card wrapped in a counter.
@@ -103,21 +103,34 @@ function resetCounts() {
 
 describe("the card grid draws again only the cards that changed", () => {
 
-    it("loading the next page draws the new cards only", async () => {
+    // The grid draws the rows of cards on screen and a couple either side:
+    // 2,000 loaded cards used to mean 2,000 cards mounted, ~44,000 DOM nodes.
+    it("draws the cards on screen, not every card loaded", async () => {
         const rows = Array.from({ length: 2000 }, (_, i) => row(i));
         let view!: ReturnType<typeof render>;
         await act(async () => {
             view = render(<Grid data={rows} loading={false}/>);
         });
-        expect(mockCounts.cardRenders).toBe(2000);
+        expect(mockCounts.cardRenders).toBeLessThanOrEqual(60);
+        expect(view.container.querySelectorAll("*").length).toBeLessThan(5_000);
+        view.unmount();
+    });
+
+    it("loading the next page draws no card already drawn", async () => {
+        const rows = Array.from({ length: 2000 }, (_, i) => row(i));
+        let view!: ReturnType<typeof render>;
+        await act(async () => {
+            view = render(<Grid data={rows} loading={false}/>);
+        });
 
         resetCounts();
-        // The window emits "loading", then the rows with the next page.
+        // The window emits "loading", then the rows with the next page — below
+        // the screen, so nothing is drawn for them yet.
         await act(async () => view.rerender(<Grid data={rows} loading={true}/>));
         const more = rows.concat(Array.from({ length: 50 }, (_, i) => row(2000 + i)));
         await act(async () => view.rerender(<Grid data={more} loading={false}/>));
 
-        expect(mockCounts.cardRenders).toBe(50);
+        expect(mockCounts.cardRenders).toBe(0);
         view.unmount();
     });
 
