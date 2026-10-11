@@ -17,7 +17,13 @@ export type ResizablePanelsProps = {
     animateLayout?: boolean;
     className?: string;
     stacked?: boolean;
+    /** Accessible name of the divider, e.g. "Resize the list". */
+    dividerAriaLabel?: string;
 };
+
+/** How far an arrow key moves the divider, in percent; Shift moves it further. */
+const KEY_STEP = 2;
+const KEY_STEP_LARGE = 10;
 
 export function ResizablePanels({
     firstPanel,
@@ -30,7 +36,8 @@ export function ResizablePanels({
     orientation = "horizontal",
     animateLayout = true,
     className,
-    stacked = false
+    stacked = false,
+    dividerAriaLabel
 }: ResizablePanelsProps) {
 
     const containerRef = useRef<HTMLDivElement>(null);
@@ -44,7 +51,9 @@ export function ResizablePanels({
     const [isResizing, setIsResizing] = useState(false);
     const isHorizontal = orientation === "horizontal";
 
-    const handleResizeStart = useCallback((e: React.MouseEvent) => {
+    // Pointer events, not mouse events: a mouse-only handle could not be
+    // dragged on a tablet.
+    const handleResizeStart = useCallback((e: React.PointerEvent) => {
         if (!showFirstPanel || !showSecondPanel) return;
 
         e.preventDefault();
@@ -63,7 +72,7 @@ export function ResizablePanels({
     }, [isHorizontal, showFirstPanel, showSecondPanel]);
 
     useEffect(() => {
-        const handleMouseMove = (e: MouseEvent) => {
+        const handleMouseMove = (e: PointerEvent) => {
             if (!isResizingRef.current || !containerRef.current) return;
 
             const currentPos = isHorizontal ? e.clientX : e.clientY;
@@ -110,14 +119,34 @@ export function ResizablePanels({
             }
         };
 
-        window.addEventListener("mousemove", handleMouseMove);
-        window.addEventListener("mouseup", handleMouseUp);
+        window.addEventListener("pointermove", handleMouseMove);
+        window.addEventListener("pointerup", handleMouseUp);
+        window.addEventListener("pointercancel", handleMouseUp);
 
         return () => {
-            window.removeEventListener("mousemove", handleMouseMove);
-            window.removeEventListener("mouseup", handleMouseUp);
+            window.removeEventListener("pointermove", handleMouseMove);
+            window.removeEventListener("pointerup", handleMouseUp);
+            window.removeEventListener("pointercancel", handleMouseUp);
         };
     }, [onPanelSizeChange, isHorizontal, minPanelSizePx]);
+
+    // The arrow keys move the divider by a step, within the same bounds a drag has.
+    const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+        const back = isHorizontal ? "ArrowLeft" : "ArrowUp";
+        const forward = isHorizontal ? "ArrowRight" : "ArrowDown";
+        if (e.key !== back && e.key !== forward) return;
+        e.preventDefault();
+        const step = (e.shiftKey ? KEY_STEP_LARGE : KEY_STEP) * (e.key === forward ? 1 : -1);
+        let min = 0;
+        let max = 100;
+        const container = containerRef.current?.getBoundingClientRect();
+        const total = container ? (isHorizontal ? container.width : container.height) : 0;
+        if (total > 0) {
+            min = Math.min(50, (minPanelSizePx / total) * 100);
+            max = Math.max(50, 100 - (minPanelSizePx / total) * 100);
+        }
+        onPanelSizeChange(Math.max(min, Math.min(max, panelSizePercent + step)));
+    }, [isHorizontal, minPanelSizePx, onPanelSizeChange, panelSizePercent]);
 
     // Calculate applied size
     const appliedBasis = !showFirstPanel ? "0%" : (showSecondPanel ? `${panelSizePercent}%` : "100%");
@@ -159,11 +188,20 @@ export function ResizablePanels({
                     // differ by a surface step, and a permanent 1px line between
                     // them was one of six on the split record view where the
                     // reference draws one.
+                    role="separator"
+                    tabIndex={0}
+                    aria-label={dividerAriaLabel}
+                    // The line between side-by-side panels is vertical.
+                    aria-orientation={isHorizontal ? "vertical" : "horizontal"}
+                    aria-valuenow={Math.round(panelSizePercent)}
+                    aria-valuemin={0}
+                    aria-valuemax={100}
                     className={cls(
-                        "relative z-10 flex flex-shrink-0 items-center justify-center border-transparent",
+                        "relative z-10 flex flex-shrink-0 items-center justify-center border-transparent touch-none group/divider",
                         isHorizontal ? "border-l w-px h-full cursor-col-resize" : "border-t h-px w-full cursor-row-resize"
                     )}
-                    onMouseDown={handleResizeStart}
+                    onPointerDown={handleResizeStart}
+                    onKeyDown={handleKeyDown}
                 >
                     {/* Transparent Hit Area with Pill inside */}
                     <div className={cls(
@@ -171,7 +209,7 @@ export function ResizablePanels({
                         isHorizontal ? "w-4 h-full cursor-col-resize top-0" : "h-4 w-full cursor-row-resize left-0"
                     )}>
                         <div className={cls(
-                            "bg-primary/60 dark:bg-primary rounded-full opacity-0 group-hover:opacity-100 transition-all duration-200",
+                            "bg-primary/60 dark:bg-primary rounded-full opacity-0 group-hover:opacity-100 group-focus-visible/divider:opacity-100 transition-all duration-200",
                             isHorizontal ? "w-1 h-8" : "h-1 w-8"
                         )}/>
                     </div>
