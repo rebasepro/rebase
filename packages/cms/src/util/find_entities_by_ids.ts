@@ -1,5 +1,5 @@
 import { MAX_LIST_LIMIT } from "@rebasepro/types";
-import type { CollectionAccessor, CollectionConfig, Entity, FilterValues, FieldPath } from "@rebasepro/types";
+import type { CollectionAccessor, CollectionConfig, Entity, WhereFor } from "@rebasepro/types";
 import { getPrimaryKeys } from "@rebasepro/common";
 
 /**
@@ -37,8 +37,11 @@ export async function findEntitiesByIds<M extends Record<string, unknown>>(
         try {
             for (let start = 0; start < wanted.length; start += MAX_LIST_LIMIT) {
                 const chunk = wanted.slice(start, start + MAX_LIST_LIMIT);
-                const where: FilterValues<FieldPath<M>> = {};
-                where[keys[0]] = ["in", chunk];
+                // SAFETY: `keys[0]` is M's primary-key column, read from the
+                // collection at runtime — the compiler cannot tie a runtime key
+                // to `keyof M`, and `in` with a list of ids is a condition the
+                // object-form `where` admits on any column.
+                const where = { [keys[0]]: ["in", chunk] } as WhereFor<M>;
                 // Nothing here reads a total.
                 const { data } = await accessor.find({ where, limit: chunk.length, count: "none" });
                 for (const entity of data) found.set(String(entity.id), entity);

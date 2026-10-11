@@ -69,6 +69,35 @@ export type WhereValueFor<Op extends WhereFilterOp, T> =
                     : T | null;
 
 /**
+ * One `[operator, value]` condition on a column of type `T`, with the value
+ * typed for the operator exactly as the fluent `where(column, op, value)` types
+ * it — a union with one tuple per operator, so `["array-contains", "featured"]`
+ * on a `string[]` column compiles and `["array-contains", ["featured"]]` (which
+ * builds `@> ARRAY[$1]` and matches nothing) does not.
+ */
+export type WhereConditionFor<T> = { [Op in WhereFilterOp]: [Op, WhereValueFor<Op, T>] }[WhereFilterOp];
+
+/**
+ * The object-form `where` for row type `M`: each column takes conditions typed
+ * against that column, as the fluent form does.
+ *
+ * `FilterValues` typed the key and left the value `unknown`, so the very
+ * shapes the fluent form was fixed to refuse — a wrong value type, an array
+ * where `array-contains` wants one element — compiled in `find({ where })`,
+ * the form `listen`, `observe`, `count` and `iterate` all take.
+ *
+ * A path that is not a column (`author.name`, `metadata->>tier`) has no type to
+ * check against and stays `unknown`, as in {@link FieldPath}. An untyped `M`
+ * (`Record<string, unknown>`, every key) collapses to plain `FilterValues`, so
+ * an untyped client is exactly as permissive as before.
+ */
+export type WhereFor<M extends Record<string, unknown>> =
+    string extends keyof M
+        ? FilterValues<FieldPath<M>>
+        : { [K in Extract<keyof M, string>]?: WhereConditionFor<M[K]> | WhereConditionFor<M[K]>[] }
+            & FilterValues<NonColumnFieldPath>;
+
+/**
  * A group of conditions combined with `and`, `or`, or negated with `not`.
  *
  * ## `not`
@@ -294,7 +323,7 @@ export interface FindParams<M extends Record<string, unknown> = Record<string, u
      * { role: ["in", ["admin", "editor"]] }
      * { age: [[">=", 18], ["<", 65]] }
      */
-    where?: FilterValues<FieldPath<M>>;
+    where?: WhereFor<M>;
     /**
      * Logical grouping conditions (AND/OR). Use this for anything `where`
      * can't express — notably OR-ing conditions. AND-ed with `where` and
@@ -756,7 +785,7 @@ export interface AggregateParams<M extends Record<string, unknown> = Record<stri
     /** Columns to group by. Omit for a single row over everything that matches. */
     groupBy?: Extract<keyof M, string>[];
     /** Filter conditions, as {@link FindParams.where}. */
-    where?: FilterValues<FieldPath<M>>;
+    where?: WhereFor<M>;
     /** An `and`/`or`/`not` group, AND-ed with `where`. */
     logical?: LogicalCondition;
     /** Text search, AND-ed with the filters. */

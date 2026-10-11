@@ -265,3 +265,30 @@ export const paramsJsonPath: FindParams<ContractRow> = {
 export const paramsRelationAggregateSort: FindParams<PostRow> = {
     orderBy: [[{ relation: "tags", agg: "count" }, "desc"]]
 };
+
+// ── the object form types its values as the fluent form does ───────────────
+
+/**
+ * `FilterValues` typed the key and left the value `unknown`, so the shape the
+ * fluent form was fixed to refuse compiled in `find({ where })` — the form
+ * `listen`, `observe`, `count` and `iterate` all take.
+ */
+export const paramsArrayContainsWholeArray: FindParams<ContractRow> = {
+    // @ts-expect-error - `array-contains` takes one element; the whole array builds `@> ARRAY[$1]` and matches nothing
+    where: { tags: ["array-contains", ["featured"]] }
+};
+
+export const paramsWrongValueType: FindParams<ContractRow> = {
+    // @ts-expect-error - `age` is a number
+    where: { age: ["==", "many"] }
+};
+
+/** A path that is not a column has nothing to check against, and stays open. */
+export const paramsRelationPathTyped: FindParams<ContractRow> = {
+    where: { "author.name": ["==", "Ada"] }
+};
+
+/** An untyped row keeps the object form exactly as permissive as it was. */
+export const paramsUntyped: FindParams = {
+    where: { anything: ["array-contains", ["whatever"]] }
+};
