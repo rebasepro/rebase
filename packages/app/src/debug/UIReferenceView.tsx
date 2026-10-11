@@ -47,6 +47,7 @@ import {
     IconButton,
     iconSize,
     KanbanIcon,
+    Label,
     LayoutGridIcon,
     ListIcon,
     LoadingButton,
@@ -76,6 +77,7 @@ import {
     Tabs,
     TagIcon,
     TextField,
+    ToggleButtonGroup,
     Tooltip,
     Trash2Icon,
     TypeIcon,
@@ -93,6 +95,12 @@ import {
     PrinciplesSection,
     ShapeSpaceSection
 } from "./ui-reference/SystemSections";
+import {
+    DataDisplaySection,
+    DisclosureLayoutSection,
+    MoreControlsSection,
+    OverlaysSection
+} from "./ui-reference/ComponentSections";
 
 /** The page's chapters, in reading order: the system first, then the elements built on it. */
 const SECTIONS: { id: string; label: string; icon: React.ComponentType<{ size?: number }>; group: "System" | "Shell" | "Controls" | "Screens" }[] = [
@@ -108,8 +116,12 @@ const SECTIONS: { id: string; label: string; icon: React.ComponentType<{ size?: 
     { id: "editor-sidebar", label: "Editor sidebar", icon: ColumnsIcon, group: "Shell" },
     { id: "buttons", label: "Buttons", icon: PlusIcon, group: "Controls" },
     { id: "inputs", label: "Form inputs", icon: FileTextIcon, group: "Controls" },
+    { id: "more-controls", label: "More form controls", icon: FileTextIcon, group: "Controls" },
+    { id: "overlays", label: "Overlays", icon: AppWindow, group: "Controls" },
+    { id: "disclosure", label: "Disclosure and layout", icon: ColumnsIcon, group: "Controls" },
     { id: "chips-alerts", label: "Chips and alerts", icon: TagIcon, group: "Controls" },
     { id: "data", label: "Cards and data", icon: LayoutGridIcon, group: "Controls" },
+    { id: "data-display", label: "Data display", icon: ListIcon, group: "Controls" },
     { id: "empty-states", label: "Empty states", icon: FileIcon, group: "Screens" },
     { id: "users", label: "Management", icon: UserIcon, group: "Screens" },
     { id: "user-dialog", label: "Form dialog", icon: CircleUserIcon, group: "Screens" },
@@ -123,6 +135,7 @@ const SECTION_GROUPS = ["System", "Shell", "Controls", "Screens"] as const;
 
 export function UIReferenceView() {
     const [activeSection, setActiveSection] = useState("principles");
+    const [panelMode, setPanelMode] = useState<"cms" | "studio">("cms");
     const scrollContainerRef = React.useRef<HTMLDivElement>(null);
 
     const scrollTo = (id: string) => {
@@ -375,7 +388,7 @@ export function UIReferenceView() {
                 <SectionBlock id="drawer" title="Drawer — DefaultDrawer.tsx">
                     <Typography variant="body2" color="secondary" className="mb-4">
                         The drawer wraps <code className="font-mono text-xs">DrawerLogo</code>, scrollable <code className="font-mono text-xs">DrawerNavigationGroup</code>s,
-                        and <code className="font-mono text-xs">DrawerToggle</code>. Two visual states: collapsed (icon only, 72px) and expanded (280px).
+                        and <code className="font-mono text-xs">DrawerToggle</code>; with Studio enabled, the CMS / Studio switch sits under the logo. Two visual states: collapsed (icon only, 72px) and expanded (280px).
                     </Typography>
                     <div className="flex gap-6 flex-wrap">
 
@@ -423,6 +436,19 @@ export function UIReferenceView() {
                                     <div className="flex flex-row items-center overflow-hidden transition-all duration-200 ease-in-out opacity-100 w-full ml-1">
                                         <Typography variant="subtitle1" noWrap className="truncate">Rebase</Typography>
                                     </div>
+                                </div>
+                                {/* DrawerModeSwitch — the kit's ToggleButtonGroup, full width */}
+                                <div className="shrink-0 px-3 h-8 mt-2">
+                                    <ToggleButtonGroup
+                                        fullWidth
+                                        aria-label="Panel mode"
+                                        value={panelMode}
+                                        onValueChange={setPanelMode}
+                                        options={[
+                                            { value: "cms", label: "CMS" },
+                                            { value: "studio", label: "Studio" }
+                                        ]}
+                                    />
                                 </div>
                                 {/* DrawerNavigationGroup: an 11px uppercase group label in the
                                     muted tier, then 30px sentence-case rows at 13px from
@@ -478,8 +504,7 @@ export function UIReferenceView() {
                 ═══════════════════════════════════════════════ */}
                 <SectionBlock id="appbar" title="App Bar — DefaultAppBar.tsx">
                     <Typography variant="body2" color="secondary" className="mb-4">
-                        Fixed at top (<code className="font-mono text-xs">h-16 absolute top-0</code>). Contains breadcrumbs (caption + body2), Content/Studio pill toggle,
-                        theme menu, and user avatar menu via <code className="font-mono text-xs">Menu</code>.
+                        Fixed at top (<code className="font-mono text-xs">h-16 absolute top-0</code>). Contains breadcrumbs (caption + body2), the theme menu, and user avatar menu via <code className="font-mono text-xs">Menu</code>.
                     </Typography>
                     {/* Exact classes from DefaultAppBar */}
                     <div className={cls("w-full h-16 flex flex-row gap-2 px-4 items-center border rounded-lg relative", defaultBorderMixin)}>
@@ -498,15 +523,6 @@ export function UIReferenceView() {
                             </div>
                         </div>
                         <div className="grow"/>
-                        {/* Content/Studio toggle — from DefaultAppBar */}
-                        <div className={cls("mr-2 hidden sm:flex bg-surface-field rounded-lg p-0.5")}>
-                            <button className={cls("px-3 py-1 text-xs font-medium rounded-md transition-all", "bg-surface-lifted shadow-sm text-text-primary dark:text-text-primary-dark")}>
-                                Content
-                            </button>
-                            <button className={cls("px-3 py-1 text-xs font-medium rounded-md transition-all", "text-surface-500 hover:text-surface-900 dark:hover:text-white")}>
-                                Studio
-                            </button>
-                        </div>
                         {/* Theme menu — from DefaultAppBar */}
                         <Menu trigger={
                             <IconButton>
@@ -912,9 +928,9 @@ selected: true }, { name: "Tags" }].map(c => (
                         </div>
                         <div className="col-span-12 sm:col-span-6 flex flex-col gap-3">
                             <Typography variant="caption" color="secondary" className="block font-mono">Checkbox</Typography>
-                            <label className="flex items-center gap-2 cursor-pointer"><Checkbox checked={true} onCheckedChange={() => {}}/><span>Checked</span></label>
-                            <label className="flex items-center gap-2 cursor-pointer"><Checkbox checked={false} onCheckedChange={() => {}}/><span>Unchecked</span></label>
-                            <label className="flex items-center gap-2"><Checkbox checked={true} disabled/><span>Disabled</span></label>
+                            <Label className="flex items-center gap-2 cursor-pointer"><Checkbox checked={true} onCheckedChange={() => {}}/>Checked</Label>
+                            <Label className="flex items-center gap-2 cursor-pointer"><Checkbox checked={false} onCheckedChange={() => {}}/>Unchecked</Label>
+                            <Label className="flex items-center gap-2"><Checkbox checked={true} disabled/>Disabled</Label>
                         </div>
                         <div className="col-span-12 sm:col-span-6 flex flex-col gap-3">
                             <Typography variant="caption" color="secondary" className="block font-mono">BooleanSwitch</Typography>
@@ -937,6 +953,10 @@ selected: true }, { name: "Tags" }].map(c => (
                         </div>
                     </div>
                 </SectionBlock>
+
+                <MoreControlsSection/>
+                <OverlaysSection/>
+                <DisclosureLayoutSection/>
 
                 {/* ═══════════════════════════════════════════════
                     SECTION: Chips & Alerts
@@ -1005,6 +1025,7 @@ selected: true }, { name: "Tags" }].map(c => (
                 </SectionBlock>
 
                 <CardsDataSection/>
+                <DataDisplaySection/>
 
                 {/* ═══════════════════════════════════════════════
                     SECTION: Management Screen

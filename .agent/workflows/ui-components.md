@@ -22,7 +22,7 @@ description: Rules for creating UI components in the Rebase codebase
 
 2. **Never use `as any`** in TypeScript code. Use proper typing or explicit type narrowing instead.
 
-3. **Follow existing patterns**: `UIReferenceView` (`packages/app/src/debug/UIReferenceView.tsx`, served at `/debug/ui`) is the design source of truth for the kit. For layout, read `ContentHomePage`, `StudioHomePage` or `NavigationCardBinding` and follow how they compose kit components.
+3. **Follow existing patterns**: `UIReferenceView` (`packages/app/src/debug/UIReferenceView.tsx`, served at `/debug/ui`) is the design source of truth for the kit. For layout, read `ContentHomePage`, `StudioHomePage` or `NavigationCardBinding` and follow how they compose kit components. Every component exported from `packages/ui/src/components` is shown there with its states (`ui-reference/ComponentSections.tsx` holds the overlays, disclosure, extra form controls and data display); `packages/app/test/ui_reference_coverage.test.ts` fails when a new kit component is not. `Autocomplete` is pointer-only and not portalled — prefer `Select`/`MultiSelect`.
 
 4. **Use `cls()` from `@rebasepro/ui`** for conditional class merging instead of template literals.
 
