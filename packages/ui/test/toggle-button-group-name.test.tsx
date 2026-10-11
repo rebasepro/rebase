@@ -20,4 +20,16 @@ describe("ToggleButtonGroup", () => {
         render(<ToggleButtonGroup value="cms" onValueChange={() => { /* noop */ }} options={options}/>);
         expect(screen.getByRole("group")).not.toHaveAttribute("aria-label", "Toggle options");
     });
+
+    it("stretches the track and splits it evenly when fullWidth (the drawer's switch)", () => {
+        render(<ToggleButtonGroup aria-label="Mode" fullWidth value="cms" onValueChange={() => { /* noop */ }} options={options}/>);
+        expect(screen.getByRole("group", { name: "Mode" })).toHaveClass("w-full");
+        for (const button of screen.getAllByRole("button")) expect(button).toHaveClass("flex-1");
+    });
+
+    it("stays inline by default", () => {
+        render(<ToggleButtonGroup aria-label="Mode" value="cms" onValueChange={() => { /* noop */ }} options={options}/>);
+        expect(screen.getByRole("group", { name: "Mode" })).toHaveClass("inline-flex");
+        expect(screen.getByRole("group", { name: "Mode" })).not.toHaveClass("w-full");
+    });
 });

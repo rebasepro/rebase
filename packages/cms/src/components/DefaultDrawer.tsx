@@ -2,6 +2,7 @@ import type { NavigationEntry, NavigationResult } from "@rebasepro/cms-types";
 import React, { useCallback, useMemo } from "react";
 
 import { useCollapsedGroups, buildCollapsedDefaults, useLargeLayout, useAdminModeController, useAuthController, useModeController, useTranslation, useSlot, useRebaseContext, useAnalyticsController, useRebaseRegistry, useComponentOverride } from "@rebasepro/app";
+import type { AdminModeController } from "@rebasepro/app";
 import { useUrlController } from "../hooks/navigation/contexts/UrlContext";
 import { useNavigationStateController } from "../hooks/navigation/contexts/NavigationStateContext";
 
@@ -25,6 +26,7 @@ import {
     Skeleton,
     SunIcon,
     SunMoonIcon,
+    ToggleButtonGroup,
     Tooltip,
     Typography
 } from "@rebasepro/ui";
@@ -426,47 +428,33 @@ function DrawerModeSwitch({
     const adminModeController = useAdminModeController();
     const urlController = useUrlController();
     const navigate = useNavigate();
+    const { t } = useTranslation();
     const showSwitch = drawerOpen || drawerHovered;
 
     return (
         <div
+            // Hidden by opacity so it can fade with the rail; `inert` takes it
+            // out of the tab order and the accessibility tree while it is.
+            inert={!showSwitch}
             className={cls(
-                "shrink-0 overflow-hidden transition-all duration-200 ease-in-out px-3",
-                showSwitch ? "opacity-100 h-7 mt-2 mb-0" : "opacity-0 pointer-events-none h-7 mt-2 mb-0"
+                "shrink-0 overflow-hidden transition-all duration-200 ease-in-out px-3 h-8 mt-2 mb-0",
+                showSwitch ? "opacity-100" : "opacity-0 pointer-events-none"
             )}
         >
-            <div role="group" aria-label="Panel mode" className="flex bg-surface-field rounded-lg p-0.5">
-                <button
-                    onClick={() => {
-                        adminModeController.setMode("cms");
-                        navigate(urlController.basePath ?? "/");
-                    }}
-                    aria-pressed={adminModeController.mode === "cms"}
-                    className={cls(
-                        "flex-1 px-3 py-0.5 text-xs font-medium rounded-md transition-all text-center",
-                        adminModeController.mode === "cms"
-                            ? "bg-surface-lifted shadow-sm text-text-primary dark:text-text-primary-dark"
-                            : "text-surface-500 hover:text-surface-900 dark:hover:text-white"
-                    )}
-                >
-                    CMS
-                </button>
-                <button
-                    onClick={() => {
-                        adminModeController.setMode("studio");
-                        navigate(urlController.basePath === "/" ? "/s" : `${urlController.basePath ?? ""}/s`);
-                    }}
-                    aria-pressed={adminModeController.mode === "studio"}
-                    className={cls(
-                        "flex-1 px-3 py-0.5 text-xs font-medium rounded-md transition-all text-center",
-                        adminModeController.mode === "studio"
-                            ? "bg-surface-lifted shadow-sm text-text-primary dark:text-text-primary-dark"
-                            : "text-surface-500 hover:text-surface-900 dark:hover:text-white"
-                    )}
-                >
-                    Studio
-                </button>
-            </div>
+            <ToggleButtonGroup<AdminModeController["mode"]>
+                fullWidth
+                aria-label={t("panel_mode")}
+                value={adminModeController.mode}
+                onValueChange={(mode) => {
+                    adminModeController.setMode(mode);
+                    if (mode === "cms") navigate(urlController.basePath ?? "/");
+                    else navigate(urlController.basePath === "/" ? "/s" : `${urlController.basePath ?? ""}/s`);
+                }}
+                options={[
+                    { value: "cms", label: "CMS" },
+                    { value: "studio", label: "Studio" }
+                ]}
+            />
         </div>
     );
 }

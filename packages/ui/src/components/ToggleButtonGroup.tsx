@@ -28,6 +28,8 @@ export type ToggleButtonGroupProps<T extends string = string> = {
     /** Names the group: what it chooses between, e.g. "View mode". */
     "aria-label"?: string;
     "aria-labelledby"?: string;
+    /** Stretch the track to its container and split it evenly between the options. */
+    fullWidth?: boolean;
 }
 
 /**
@@ -40,14 +42,15 @@ export function ToggleButtonGroup<T extends string = string>({
     options,
     className,
     "aria-label": ariaLabel,
-    "aria-labelledby": ariaLabelledBy
+    "aria-labelledby": ariaLabelledBy,
+    fullWidth
 }: ToggleButtonGroupProps<T>) {
     return (
         // A 32px rounded track (`lg`) with `md` segments. It was 48px with a
         // blue label on the active segment; the lifted fill already says which
         // segment is on, so the label stays in the primary ink and the hue is
         // not spent twice.
-        <div role="group" aria-label={ariaLabel} aria-labelledby={ariaLabelledBy} className={cls("inline-flex flex-row bg-surface-field rounded-lg p-1 gap-1", className)}>
+        <div role="group" aria-label={ariaLabel} aria-labelledby={ariaLabelledBy} className={cls(fullWidth ? "flex w-full" : "inline-flex", "flex-row bg-surface-field rounded-lg p-1 gap-1", className)}>
             {options.map((option) => (
                 <button
                     key={option.value}
@@ -62,6 +65,7 @@ export function ToggleButtonGroup<T extends string = string>({
                     aria-pressed={value === option.value}
                     aria-disabled={option.disabled || undefined}
                     className={cls(
+                        fullWidth && "flex-1",
                         "flex flex-row items-center justify-center gap-2 h-6 px-3.5 rounded-md transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
                         value === option.value
                             ? "bg-surface-lifted text-text-primary dark:text-text-primary-dark shadow-sm"
