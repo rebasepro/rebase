@@ -48,6 +48,7 @@ import {
 import { forLibpq } from "./utils/connection-string";
 import { dropLegacyAuthSchema, RLS_BOOTSTRAP_SQL } from "./schema/rls-bootstrap-sql";
 import { detectDestructiveStatements, decidePushSafety, extractPlanStatements } from "./schema/destructive-sql";
+import type { LegacyRename } from "./schema/push-legacy-renames";
 import {
     parseColumnMutations,
     findGeneratedColumnConflicts,
@@ -593,6 +594,12 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
             // push's one transaction never builds one while holding the
             // table's writes. See `schema/push-index-prebuild.ts`. A dry-run
             // only names them.
+            // First of all: relation columns a pre-0.13 Rebase named the old
+            // way (`categorie_id`) are renamed — the lossless, metadata-only
+            // statement boot runs — so Atlas does not plan them as a drop and
+            // an add. See `schema/push-legacy-renames.ts`.
+            if (databaseUrl) await renameLegacyForeignKeys(databaseUrl, collectionsPath, dryRun);
+
             const prebuilt = databaseUrl ? await prebuildForeignKeyIndexes(databaseUrl, collectionsPath, dryRun) : [];
 
             // Preview the plan before touching data. `atlas schema apply` with
@@ -836,6 +843,40 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
  *
  * @returns `schema.index` of each one missing when this started.
  */
+/** Renames relation columns that carry their pre-0.13 derived name, as boot does; a dry-run only names them. */
+async function renameLegacyForeignKeys(databaseUrl: string, collectionsPath: string, dryRun: boolean): Promise<void> {
+    let renames: LegacyRename[];
+    try {
+        const { loadCollections } = await import("./schema/doctor");
+        const { legacyForeignKeyRenames } = await import("./schema/push-legacy-renames");
+        const collections = await loadCollections(path.resolve(process.cwd(), collectionsPath));
+        renames = await withAppClient(databaseUrl, client => legacyForeignKeyRenames(
+            { query: async (text) => ({ rows: (await client.query(text)).rows }) },
+            collections
+        ));
+    } catch {
+        // Not knowing leaves Atlas's plan as it was, and its destructive gate with it.
+        return;
+    }
+    if (renames.length === 0) return;
+    out(chalk.gray(dryRun
+        ? `  ${renames.length} relation column(s) carry the name Rebase derived before 0.13; a push renames them first,`
+        : `  Renaming ${renames.length} relation column(s) that carry the name Rebase derived before 0.13 (data, indexes and`));
+    out(chalk.gray(dryRun
+        ? "  keeping their data (the plan below still shows them as a drop and an add, because nothing ran):"
+        : "  constraints are kept — the same rename `rebase dev` runs):"));
+    for (const rename of renames) {
+        out(chalk.gray(`       ${rename.table}: "${rename.legacy}" → "${rename.expected}"`));
+    }
+    if (!dryRun) {
+        await withAppClient(databaseUrl, async client => {
+            for (const rename of renames) await client.query(rename.sql);
+        });
+    }
+    out(chalk.gray("  To keep an old name instead, name the column on the relation (`localKey`, or `through` on a many-to-many)."));
+    out("");
+}
+
 /** Names the enum labels the database keeps after the collections dropped them. See `schema/enum-labels-kept.ts`. */
 async function reportKeptEnumLabels(databaseUrl: string, collectionsPath: string): Promise<void> {
     try {
