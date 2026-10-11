@@ -180,7 +180,7 @@ export interface AdminAPI {
         orderDir?: "asc" | "desc";
     }): Promise<{ users: AdminUser[]; total: number; limit: number; offset: number }>;
     getUser(uid: string): Promise<{ user: AdminUser }>;
-    createUser(data: { email: string; displayName?: string; password?: string; roles?: string[]; metadata?: Record<string, any> }): Promise<{ user: AdminUser }>;
+    createUser(data: { email: string; displayName?: string; password?: string; roles?: string[]; metadata?: Record<string, any> }): Promise<{ user: AdminUser; temporaryPassword?: string; invitationSent?: boolean; emailDeliveryFailed?: boolean }>;
     updateUser(uid: string, data: { email?: string; displayName?: string; password?: string; roles?: string[]; metadata?: Record<string, any> }): Promise<{ user: AdminUser }>;
     deleteUser(uid: string): Promise<{ success: boolean }>;
     resetPassword(uid: string, options?: { password?: string }): Promise<{ user: AdminUser; temporaryPassword?: string; invitationSent?: boolean; emailDeliveryFailed?: boolean }>;

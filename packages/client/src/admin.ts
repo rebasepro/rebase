@@ -48,8 +48,13 @@ export function createAdmin(transport: Transport, options?: CreateAdminOptions) 
         return transport.request<{ user: AdminUser }>(adminPath + "/users/" + encodeURIComponent(userId), { method: "GET" });
     }
 
+    /**
+     * Create an account. When the server could not send an invitation (no
+     * email configured, or the send failed) the answer carries the generated
+     * `temporaryPassword` — returned this once and never again.
+     */
     async function createUser(data: { email: string, displayName?: string, password?: string, roles?: string[] }) {
-        return transport.request<{ user: AdminUser }>(adminPath + "/users", {
+        return transport.request<{ user: AdminUser; temporaryPassword?: string; invitationSent?: boolean; emailDeliveryFailed?: boolean }>(adminPath + "/users", {
             method: "POST",
             body: JSON.stringify(data)
         });
