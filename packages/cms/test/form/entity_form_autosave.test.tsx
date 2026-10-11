@@ -4,7 +4,7 @@
 import React from "react";
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { act, render } from "@testing-library/react";
-import type { Entity } from "@rebasepro/types";
+import { RebaseApiError, type Entity } from "@rebasepro/types";
 import type { EntityCustomViewParams, FormContext } from "@rebasepro/cms-types";
 
 class ResizeObserverStub {
@@ -134,5 +134,22 @@ describe("autosave", () => {
         await act(async () => context.setFieldValue("price", 3));
         await wait(5000);
         expect(payloads).toEqual([{ price: 3 }]);
+    });
+
+    it("marks the fields a server refusal names, as Save does", async () => {
+        const onSubmit = jest.fn(async (): Promise<Entity<Post>> => {
+            throw new RebaseApiError("'price' must be at most 100 (received 300).", {
+                status: 400,
+                details: { violations: [{ field: "price", code: "max", message: "'price' must be at most 100 (received 300)." }] }
+            });
+        });
+        jest.spyOn(console, "error").mockImplementation(() => undefined);
+        open("existing", onSubmit);
+
+        await act(async () => context.setFieldValue("price", 300));
+        await wait(5000);
+        expect(onSubmit).toHaveBeenCalledTimes(1);
+        expect(context.formex.errors.price).toBeTruthy();
+        expect(context.formex.submitCount).toBeGreaterThan(0);
     });
 });

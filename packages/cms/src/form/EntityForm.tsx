@@ -130,6 +130,13 @@ export function EntityForm<M extends Record<string, unknown>>({
             .catch((e) => {
                 console.error(e);
                 setSavingError(e);
+                // The fields the server refused, marked as a Save marks them;
+                // an autosave has no submit to make them show, so it counts one.
+                const fieldErrors = serverViolationErrors(e, Object.keys(collection.properties ?? {}));
+                if (Object.keys(fieldErrors).length > 0) {
+                    for (const [key, message] of Object.entries(fieldErrors)) formex.setFieldError(key, message);
+                    formex.setSubmitCount(formex.submitCount + 1);
+                }
             })
             .finally(() => setIsSavingAutoSave(false));
     }, false, 2000);
