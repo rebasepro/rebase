@@ -1125,3 +1125,17 @@ describe("two properties that land on one column", () => {
         expect(errors([collection]).filter(p => p.message.includes("resolve to the column"))).toEqual([]);
     });
 });
+
+describe("a relation whose `target` is a slug string instead of a thunk", () => {
+    it("says what `target` must be, rather than claiming there is none", () => {
+        const collection = valid();
+        Object.assign(collection.properties, {
+            author: { name: "Author", type: "relation", relation: { kind: "belongsTo", target: "authors", relationName: "author" } }
+        });
+        let problems: ReturnType<typeof errors> = [];
+        expect(() => { problems = errors([collection]); }).not.toThrow();
+        const problem = problems.find(p => p.path.includes("author"));
+        expect(problem?.message).toContain("got a string");
+        expect(problem?.message).toContain("target: () =>");
+    });
+});

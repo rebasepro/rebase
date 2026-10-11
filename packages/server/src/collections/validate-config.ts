@@ -492,6 +492,11 @@ class ProblemCollector {
     }
 }
 
+/** `"blog-authors"` → `blogAuthors`, for an example in a message. */
+function toCamelIdentifier(slug: string): string {
+    return slug.replace(/[^A-Za-z0-9]+(.)?/g, (_, c: string | undefined) => (c ? c.toUpperCase() : ""));
+}
+
 function checkRelation(
     relation: unknown,
     path: string,
@@ -510,6 +515,20 @@ function checkRelation(
         );
     } else if (!RELATION_KINDS.includes(kind)) {
         collect.error(path, `\`kind: "${kind}"\` is not a relation kind. Expected one of ${RELATION_KINDS.join(", ")}.`);
+    }
+
+    // A slug where a thunk belongs is the common slip (`target: "authors"`).
+    // Left alone it reached `resolveRelation`, whose error said the relation
+    // "has no `target`" — naming the wrong cause, as a stack trace.
+    if ("target" in relation && relation.target !== undefined && typeof relation.target !== "function") {
+        const got = typeof relation.target === "string" ? `a string ("${relation.target}")` : `a ${typeof relation.target}`;
+        const example = typeof relation.target === "string" ? `${toCamelIdentifier(relation.target)}Collection` : "otherCollection";
+        collect.error(
+            `${path}.target`,
+            `\`target\` must be a function returning the target collection, and got ${got}. ` +
+            `Write \`target: () => ${example}\` — a thunk, so collections can point at each other ` +
+            "before both are defined."
+        );
     }
 
     for (const key of Object.keys(relation)) {
