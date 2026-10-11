@@ -200,3 +200,21 @@ describe("ConnectivityMonitor", () => {
         expect(monitor.shouldAttempt()).toBe(true);
     });
 });
+
+describe("a retry interval past what a timer can hold (audit 34, L4)", () => {
+    it("is held to the longest delay setTimeout accepts, instead of firing at once", () => {
+        const delays: number[] = [];
+        const monitor = new ConnectivityMonitor({
+            initialBackoffMs: 3_000_000_000,
+            maxBackoffMs: 3_000_000_000,
+            now: () => 0,
+            setTimer: (_fn, ms) => { delays.push(ms); return 0 as unknown as ReturnType<typeof setTimeout>; },
+            clearTimer: () => undefined
+        });
+        monitor.onRetryDue = () => undefined;
+        monitor.markFailure();
+        expect(delays).toHaveLength(1);
+        expect(delays[0]).toBeGreaterThan(1_000_000_000);
+        expect(delays[0]).toBeLessThanOrEqual(2_147_483_647);
+    });
+});

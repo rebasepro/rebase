@@ -107,6 +107,13 @@ export function isDuplicateKeyError(error: unknown): boolean {
     return error.status === 409 && !isIdempotencyInProgressError(error);
 }
 
+/**
+ * The longest delay `setTimeout` holds. Past it the delay overflows a signed
+ * 32-bit integer and the timer fires after 1 ms — so a `syncIntervalMs` of a
+ * month retried continuously instead of almost never.
+ */
+const MAX_TIMER_DELAY_MS = 2_147_483_647;
+
 export interface ConnectivityOptions {
     /** First retry delay after a failure. Defaults to 1 000 ms. */
     initialBackoffMs?: number;
@@ -255,7 +262,7 @@ export class ConnectivityMonitor {
         this.timer = this.setTimer(() => {
             this.timer = undefined;
             this.onRetryDue?.();
-        }, delay);
+        }, Math.min(delay, MAX_TIMER_DELAY_MS));
         // A retry timer must never be the reason a Node script refuses to exit.
         unref(this.timer);
     }
