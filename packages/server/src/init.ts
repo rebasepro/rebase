@@ -978,7 +978,7 @@ export interface RebaseBackendInstance {
      * ```ts
      * const { jobQueue } = await initializeRebaseBackend({ jobs: { enabled: true } });
      * const dispatcher = new WebhookDispatcher({ jobQueue });
-     * jobQueue?.register(WEBHOOK_DELIVERY_TASK, ctx => dispatcher.deliverQueuedJob(ctx.payload));
+     * jobQueue?.register(WEBHOOK_DELIVERY_TASK, ctx => dispatcher.deliverQueuedJob(ctx.payload, ctx));
      * ```
      */
     jobQueue?: import("./jobs").JobQueue;

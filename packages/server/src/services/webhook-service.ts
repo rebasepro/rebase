@@ -92,6 +92,21 @@ interface QueuedDelivery {
     webhook: WebhookConfig;
     event: string;
     payload: Record<string, unknown>;
+    /** Sent as `X-Webhook-Delivery` on every attempt at this delivery. */
+    deliveryId: string;
+}
+
+/**
+ * What a delivery queued as a job carries: the webhook's id — never its
+ * secret — and the delivery id every attempt sends, so a receiver can
+ * deduplicate the queue's at-least-once retries. Rows queued before the id was
+ * stored have none; the job's own id stands in for it.
+ */
+export interface QueuedWebhookDelivery {
+    webhookId: string;
+    event: string;
+    payload: Record<string, unknown>;
+    deliveryId?: string;
 }
 
 /**
@@ -178,7 +193,7 @@ export class WebhookDispatcher {
         // One delivery per matching webhook, so nothing here has an order to
         // keep but the results', which `Promise.all` keeps.
         return Promise.all(jobs.map(async (job) => {
-            const result = await this.deliverWithRetry(job.webhook, job.event, job.payload);
+            const result = await this.deliverWithRetry(job.webhook, job.event, job.payload, job.deliveryId);
             this.options.onDelivery?.(result);
             return result;
         }));
@@ -239,8 +254,9 @@ export class WebhookDispatcher {
                     .enqueue(WEBHOOK_DELIVERY_TASK, {
                         webhookId: job.webhook.id,
                         event: job.event,
-                        payload: job.payload
-                    })
+                        payload: job.payload,
+                        deliveryId: job.deliveryId
+                    } satisfies QueuedWebhookDelivery)
                     .catch((error) => {
                         // The one case where the durable path is worse than the
                         // memory one, so it does not fail silently — and the
@@ -319,8 +335,17 @@ export class WebhookDispatcher {
      * of three job attempts is nine deliveries and about two minutes of holding
      * a worker slot — and only the queue's retries survive a restart, which is
      * the whole reason for moving.
+     *
+     * Pass the job context as the second argument —
+     * `ctx => dispatcher.deliverQueuedJob(ctx.payload, ctx)` — so each attempt
+     * sends its real `X-Webhook-Attempt`, and a row queued without a delivery
+     * id still sends the same `X-Webhook-Delivery` on every retry (the job's
+     * id). Without it, every attempt says it is the first.
      */
-    async deliverQueuedJob(job: { webhookId: string; event: string; payload: Record<string, unknown> }): Promise<void> {
+    async deliverQueuedJob(
+        job: QueuedWebhookDelivery,
+        context?: { id?: string; attempt?: number }
+    ): Promise<void> {
         const webhook = this.webhooks.find(w => w.id === job.webhookId);
         if (!webhook) {
             // Deleted or disabled between the enqueue and now. Not an error:
@@ -330,7 +355,10 @@ export class WebhookDispatcher {
             return;
         }
 
-        const { result, terminal } = await this.deliver(webhook, job.event, job.payload, 1);
+        const deliveryId = job.deliveryId ?? context?.id ?? randomUUID();
+        const { result, terminal } = await this.deliver(
+            webhook, job.event, job.payload, context?.attempt ?? 1, deliveryId
+        );
         this.options.onDelivery?.(result);
 
         if (result.success) return;
@@ -400,7 +428,7 @@ export class WebhookDispatcher {
                     lane.refused = 0;
                 }
                 try {
-                    const result = await this.deliverWithRetry(job.webhook, job.event, job.payload);
+                    const result = await this.deliverWithRetry(job.webhook, job.event, job.payload, job.deliveryId);
                     this.options.onDelivery?.(result);
                 } catch {
                     // `deliverWithRetry` converts everything to a result, but a
@@ -427,6 +455,7 @@ export class WebhookDispatcher {
 
         return matchingWebhooks.map(webhook => ({
             webhook,
+            deliveryId: randomUUID(),
             event,
             payload: {
                 type: event,
@@ -442,10 +471,11 @@ export class WebhookDispatcher {
     private async deliverWithRetry(
         webhook: WebhookConfig,
         event: string,
-        payload: Record<string, unknown>
+        payload: Record<string, unknown>,
+        deliveryId: string
     ): Promise<WebhookDeliveryResult> {
         for (let attempt = 1; attempt <= this.maxRetries; attempt++) {
-            const { result, terminal } = await this.deliver(webhook, event, payload, attempt);
+            const { result, terminal } = await this.deliver(webhook, event, payload, attempt, deliveryId);
             if (result.success || terminal) return result;
 
             if (attempt < this.maxRetries) {
@@ -477,7 +507,8 @@ export class WebhookDispatcher {
         webhook: WebhookConfig,
         event: string,
         payload: Record<string, unknown>,
-        attemptNumber: number
+        attemptNumber: number,
+        deliveryId: string
     ): Promise<DeliveryAttempt> {
         const body = JSON.stringify(payload);
 
@@ -485,7 +516,9 @@ export class WebhookDispatcher {
             "Content-Type": "application/json",
             "X-Webhook-Id": webhook.id,
             "X-Webhook-Event": event,
-            "X-Webhook-Delivery": randomUUID(),
+            // One id per delivery, the same on every attempt at it: the
+            // receiver's only handle for deduplicating retries.
+            "X-Webhook-Delivery": deliveryId,
             "X-Webhook-Attempt": String(attemptNumber),
             ...(webhook.headers || {})
         };

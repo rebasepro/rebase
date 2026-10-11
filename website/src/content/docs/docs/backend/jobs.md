@@ -169,13 +169,15 @@ const { jobQueue } = await initializeRebaseBackend({ jobs: { enabled: true } });
 const dispatcher = new WebhookDispatcher({ jobQueue });
 dispatcher.setWebhooks(myWebhooks);
 
-jobQueue?.register(WEBHOOK_DELIVERY_TASK, ctx => dispatcher.deliverQueuedJob(ctx.payload as never));
+jobQueue?.register(WEBHOOK_DELIVERY_TASK, ctx => dispatcher.deliverQueuedJob(ctx.payload as never, ctx));
 ```
 
 Only the webhook's **id** is stored on the job, never the webhook itself — its
 signing secret would otherwise sit in `rebase.jobs` in cleartext for as long as
 retention keeps the row, and a webhook edited between the enqueue and the
-delivery should go out as it is now.
+delivery should go out as it is now. Passing `ctx` as the second argument makes
+each attempt send its own `X-Webhook-Attempt`; every attempt at one delivery sends
+the same `X-Webhook-Delivery`, so a receiver can deduplicate the retries.
 
 A delivery the dispatcher refuses to send (a loopback, link-local, private or
 non-`http(s)` destination), or one the receiver answers with a redirect, fails
