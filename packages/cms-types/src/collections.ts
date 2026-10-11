@@ -377,6 +377,23 @@ export type DefaultSelectedViewParams = {
  */
 export type EntityTableController<M extends Record<string, unknown> = Record<string, unknown>> = {
     data: Entity<M>[];
+    /**
+     * `data` by position in the collection, with `undefined` where a row
+     * exists but has not been read: the rows above a scroll position a view
+     * came back to, until it scrolls to them. Present only while there are
+     * such rows, and only once a view has reported what it draws
+     * (`onRowsRendered`). A view that draws it shows a placeholder for each
+     * `undefined`; `data` holds the rows read, in order.
+     */
+    sparseData?: (Entity<M> | undefined)[];
+    /**
+     * Called by a view with the positions of the rows it draws in
+     * `sparseData ?? data` (end exclusive), and with `undefined` when it stops
+     * drawing them. Under realtime, the rows within a page of them are read
+     * again on each change and rows further away when they come near; without
+     * a report, every row held is.
+     */
+    onRowsRendered?: (range?: { start: number; end: number }) => void;
     dataLoading: boolean;
     noMoreToLoad: boolean;
     dataLoadingError?: Error;

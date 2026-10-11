@@ -12,7 +12,7 @@ import { ListView } from "@rebasepro/ui";
 
 | Prop | Type | Required | Description |
 | --- | --- | --- | --- |
-| `data` | `T[]` | yes | Virtualized list. Generic over the row type T. |
+| `data` | `(T \| undefined)[]` | yes | Virtualized list. Generic over the row type T. <span class="since-badge" data-since="0.25">Since 0.25</span> A position holding `undefined` is a row that exists but has not been read yet: a placeholder row is drawn in its place, and `renderRow` is not called for it. |
 | `renderRow` | `(params: { item: T; index: number; style: React.CSSProperties; className: string; selected: boolean; highlighted: boolean; isLast: boolean; onClick: (e: React.MouseEvent) => void; onSelectionChange: (selected: boolean) => void }) => React.ReactNode` | yes |  |
 | `dataLoading` | `boolean` | — |  |
 | `noMoreToLoad` | `boolean` | — |  |
@@ -29,6 +29,7 @@ import { ListView } from "@rebasepro/ui";
 | `onSelectionChange` | `(item: T, selected: boolean) => void` | — |  |
 | `size` | `"xs" \| "s" \| "m" \| "l" \| "xl"` | — |  |
 | `emptyComponent` | `React.ReactNode` | — |  |
+| `onRowsRendered` | `(range: { start: number; end: number }) => void` | — | <span class="since-badge" data-since="0.25">Since 0.25</span> Called with the positions in `data` of the rows on screen (not the ones drawn ahead of them), end exclusive, each time they change. While the list is still scrolling to `initialScroll`, the rows there. The collection views use it to keep only the rows near the screen current under realtime. |
 
 ## Example
 

@@ -394,6 +394,8 @@ export function CollectionListViewBinding<M extends Record<string, unknown> = Re
 
     const {
         data,
+        sparseData,
+        onRowsRendered,
         dataLoading,
         noMoreToLoad,
         dataLoadingError,
@@ -409,6 +411,10 @@ export function CollectionListViewBinding<M extends Record<string, unknown> = Re
         onScroll,
         initialScroll
     } = tableController;
+
+    // The list stops drawing rows when it goes (another view takes over):
+    // say so, so the controller keeps every row held current again.
+    useEffect(() => () => onRowsRendered?.(undefined), [onRowsRendered]);
 
     const resolvedCollection = collection;
 
@@ -866,7 +872,8 @@ position });
     return (
         <div ref={containerRef} className="w-full">
             <ListView<Entity<M>>
-                data={data}
+                data={sparseData ?? data}
+                onRowsRendered={onRowsRendered}
                 dataLoading={dataLoading}
                 noMoreToLoad={noMoreToLoad}
                 dataLoadingError={dataLoadingError}

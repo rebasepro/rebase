@@ -10,6 +10,8 @@ import { VirtualTable } from "@rebasepro/ui";
 
 > This component takes no documented props, or its type could not be flattened. See the source.
 
+<span class="since-badge" data-since="0.25">Since 0.25</span> `data` may hold `undefined` at a position: a row that exists but has not been read yet. It is drawn, and its cells are rendered with no `rowData`, so a `cellRenderer` can show a placeholder. `onRowsRendered(range)` is called with the positions in `data` of the rows on screen (not the ones drawn ahead of them), end exclusive, each time they change — while the table is still scrolling to `initialScroll`, the rows there.
+
 ## Example
 
 This is the example the design-system sync renders and verifies for this component.

@@ -135,6 +135,8 @@ export const SelectableTable = function SelectableTable<M extends Record<string,
         tableController:
         {
             data,
+            sparseData,
+            onRowsRendered,
             dataLoading,
             noMoreToLoad,
             dataLoadingError,
@@ -233,6 +235,10 @@ export const SelectableTable = function SelectableTable<M extends Record<string,
         };
     }, [unselect]);
 
+    // The table stops drawing rows when it goes (another view takes over):
+    // say so, so the controller keeps every row held current again.
+    useEffect(() => () => onRowsRendered?.(undefined), [onRowsRendered]);
+
     const onFilterUpdate = useCallback((updatedFilterValues?: VirtualTableFilterValues<string>) => {
         if (setFilterValues) {
             setFilterValues({
@@ -279,7 +285,8 @@ export const SelectableTable = function SelectableTable<M extends Record<string,
                 ref={ref}>
 
                  <VirtualTable
-                    data={data}
+                    data={sparseData ?? data}
+                    onRowsRendered={onRowsRendered}
                     columns={columns}
                     cellRenderer={cellRenderer}
                     onRowClick={inlineEditing ? undefined : (onEntityClick ? onRowClick : undefined)}

@@ -140,7 +140,8 @@ const VirtualTableInner = React.memo<VirtualTableProps<Record<string, unknown>>>
         AddColumnComponent,
         initialScroll = 0,
         onColumnsOrderChange,
-        extraData
+        extraData,
+        onRowsRendered
     }: VirtualTableProps<T>) {
 
         // Where each sorted column sits in the order, so a header can show both
@@ -218,6 +219,11 @@ position });
         const handleDragCancel = useCallback(() => {
             setDraggingColumnId(null);
         }, []);
+
+        // The offset this table opened at, until it has scrolled there: the
+        // list first draws its top rows, and reporting them would have the
+        // rows above a restored position read for nothing.
+        const pendingInitialScroll = useRef(initialScroll > 0 ? initialScroll : undefined);
 
         // Set initial scroll position
         useEffect(() => {
@@ -335,6 +341,7 @@ position });
             scrollOffset: number,
             scrollUpdateWasRequested: boolean;
         }) => {
+            if (scrollOffset > 0) pendingInitialScroll.current = undefined;
             if (onScrollProp) {
                 debouncedScroll({
                     scrollDirection,
@@ -345,6 +352,29 @@ position });
             if (!scrollUpdateWasRequested && (scrollOffset >= maxScroll - endOffset))
                 onEndReachedInternal(scrollOffset);
         }, [maxScroll, onEndReachedInternal]);
+
+        const lastReportedRange = useRef<{ start: number; end: number } | undefined>(undefined);
+        const onItemsRendered = useCallback(({
+            visibleStartIndex,
+            visibleStopIndex
+        }: { visibleStartIndex: number; visibleStopIndex: number }) => {
+            if (!onRowsRendered) return;
+            const rows = data?.length ?? 0;
+            let start = visibleStartIndex;
+            let end = visibleStopIndex + 1;
+            const restoring = pendingInitialScroll.current;
+            if (restoring !== undefined && visibleStartIndex === 0) {
+                start = Math.floor(restoring / rowHeight);
+                end = start + Math.max(1, Math.ceil(bounds.height / rowHeight));
+            }
+            // The end adornment's slot is not a row.
+            start = Math.min(start, rows);
+            end = Math.min(end, rows);
+            const last = lastReportedRange.current;
+            if (last && last.start === start && last.end === end) return;
+            lastReportedRange.current = { start, end };
+            onRowsRendered({ start, end });
+        }, [onRowsRendered, data?.length, rowHeight, bounds.height]);
 
         const onFilterUpdateInternal = useCallback((column: VirtualTableColumn, filterForProperty?: [VirtualTableWhereFilterOp, unknown]) => {
 
@@ -443,6 +473,7 @@ position });
                         height={bounds.height}
                         itemCount={(data?.length ?? 0) + (endAdornment ? 1 : 0)}
                         onScroll={draggingColumnId ? undefined : onScroll}
+                        onItemsRendered={onRowsRendered ? onItemsRendered : undefined}
                         itemSize={rowHeight}/>
 
                 </VirtualListContext.Provider>
@@ -711,6 +742,7 @@ function MemoizedList({
     height,
     itemCount,
     onScroll,
+    onItemsRendered,
     itemSize
 }: {
     outerRef: RefObject<HTMLDivElement | null>;
@@ -722,6 +754,7 @@ function MemoizedList({
         scrollOffset: number,
         scrollUpdateWasRequested: boolean;
     }) => void;
+    onItemsRendered?: (params: { visibleStartIndex: number; visibleStopIndex: number }) => void;
     itemSize: number;
 }) {
 
@@ -788,6 +821,7 @@ function MemoizedList({
         overscanCount={4}
         itemCount={itemCount}
         onScroll={onScroll}
+        onItemsRendered={onItemsRendered}
         itemSize={itemSize}>
         {Row}
     </List>;

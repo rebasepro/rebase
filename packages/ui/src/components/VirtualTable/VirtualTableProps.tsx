@@ -28,9 +28,11 @@ export type OnRowClickParams<T extends object> = {
 export interface VirtualTableProps<T extends object> {
 
     /**
-     * Array of arbitrary data
+     * Array of arbitrary data. A position holding `undefined` is a row that
+     * exists but has not been read yet: it is drawn, and its cells are
+     * rendered with no `rowData`, so the renderer can show a placeholder.
      */
-    data?: T[];
+    data?: (T | undefined)[];
 
     /**
      * Properties displayed in this collection. If this property is not set
@@ -177,6 +179,13 @@ export interface VirtualTableProps<T extends object> {
      * Initial scroll position
      */
     initialScroll?: number;
+
+    /**
+     * Called with the positions in `data` of the rows on screen — not the
+     * ones drawn ahead of them — end exclusive, each time they change. While
+     * the table is still scrolling to `initialScroll`, the rows there.
+     */
+    onRowsRendered?: (range: { start: number; end: number }) => void;
 
     /**
      * Callback when columns are reordered via drag-and-drop.

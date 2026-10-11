@@ -42,7 +42,14 @@ export function useScrollParentRestoration({
     initialScroll?: number;
     onScroll?: (props: ViewScrollEvent) => void;
     dataLength: number;
-}) {
+}): {
+    /**
+     * The scroll parent's offset this view is on its way back to, until it has
+     * been put there. The rows at the top are drawn first, and are not the
+     * ones the view is about to show.
+     */
+    pendingScroll: React.RefObject<number | undefined>;
+} {
     // The offset this mount started with, and only that one. `initialScroll`
     // goes on changing after mount — callers read it back from the store
     // `onScroll` writes — so following the prop would scroll the view to where
@@ -98,4 +105,6 @@ export function useScrollParentRestoration({
         scrollEl.addEventListener("scroll", handleScroll, { passive: true });
         return () => scrollEl.removeEventListener("scroll", handleScroll);
     }, [containerRef, onScroll]);
+
+    return { pendingScroll: restoreTo };
 }

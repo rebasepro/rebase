@@ -31,7 +31,7 @@ export type VirtualTableRowProps<T extends object> = {
 };
 
 export type VirtualTableContextProps<T extends object> = {
-    data?: T[];
+    data?: (T | undefined)[];
     rowHeight?: number,
     headerHeight?: number,
     columns: VirtualTableColumn[];

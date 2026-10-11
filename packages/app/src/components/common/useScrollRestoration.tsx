@@ -8,8 +8,23 @@ import { Entity, FilterValues } from "@rebasepro/types";
  */
 const SCROLL_CACHE_LIMIT = 20;
 
+/**
+ * Where a collection view was, and the rows to show when it comes back.
+ *
+ * `data` is the rows around what was on screen — a page either side, when the
+ * view reports what it draws — starting at row `dataOffset` (0 when absent:
+ * `data` then starts at the first row). It used to be every row the view held,
+ * which a table scrolled to 100,000 rows kept for the rest of the session and
+ * read again in full on the way back.
+ */
+export type CollectionScrollEntry = {
+    scrollOffset: number;
+    data: Entity<any>[];
+    dataOffset?: number;
+};
+
 /** Key: path plus filters (`createCacheKey`). Emptied on sign-out. */
-const collectionScrollCache = new Map<string, { scrollOffset: number, data: Entity<any>[] }>();
+const collectionScrollCache = new Map<string, CollectionScrollEntry>();
 
 /**
  * Forget every collection's scroll position and the rows kept with it.
@@ -24,16 +39,11 @@ export function clearCollectionScrollCache(): void {
 export type ScrollRestorationController = {
 
     getCollectionScroll: (path: string,
-        filters?: FilterValues<any>) => {
-            scrollOffset: number,
-            data: Entity<any>[]
-        } | undefined;
+        filters?: FilterValues<any>) => CollectionScrollEntry | undefined;
 
-    updateCollectionScroll: (props: {
+    updateCollectionScroll: (props: CollectionScrollEntry & {
         path: string,
-        scrollOffset: number,
         filters?: FilterValues<any>;
-        data: Entity<any>[]
     }) => void;
 
 }
@@ -44,20 +54,19 @@ export function useScrollRestoration(): ScrollRestorationController {
         path,
         filters,
         scrollOffset,
-        data
-    }: {
+        data,
+        dataOffset
+    }: CollectionScrollEntry & {
         path: string;
         filters?: FilterValues<any>;
-        sort?: [string, "asc" | "desc"];
-        scrollOffset: number;
-        data: Entity<any>[]
     }) => {
         const key = createCacheKey(path, filters);
         // Re-inserted, so the Map's order is the order of last use.
         collectionScrollCache.delete(key);
         collectionScrollCache.set(key, {
             scrollOffset,
-            data
+            data,
+            ...(dataOffset !== undefined && dataOffset > 0 && { dataOffset })
         });
         if (collectionScrollCache.size > SCROLL_CACHE_LIMIT) {
             const oldest = collectionScrollCache.keys().next().value;

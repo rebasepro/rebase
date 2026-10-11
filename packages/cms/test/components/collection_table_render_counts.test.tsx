@@ -33,6 +33,7 @@ const ROWS = 200;
 
 const mockState: {
     rows: Entity<Record<string, unknown>>[];
+    sparse?: (Entity<Record<string, unknown>> | undefined)[];
     tick: number;
     listeners: Set<() => void>;
     controller: Record<string, unknown> | undefined;
@@ -101,6 +102,7 @@ jest.mock("@rebasepro/app", () => {
             if (!mockState.controller) {
                 mockState.controller = {
                     data: mockState.rows,
+                    ...(mockState.sparse && { sparseData: mockState.sparse }),
                     dataLoading: false,
                     noMoreToLoad: false,
                     filterValues: undefined,
@@ -217,6 +219,7 @@ describe("the collection table draws again only what changed", () => {
 
     beforeEach(() => {
         mockState.rows = Array.from({ length: ROWS }, (_, i) => buildRow(i));
+        mockState.sparse = undefined;
         mockState.controller = undefined;
         mockState.tick = 0;
         mockState.listeners.clear();
@@ -386,5 +389,20 @@ describe("the collection table draws again only what changed", () => {
         expect(mockState.propertyCellRenders).toBeGreaterThan(200);
         expect(mockState.schemasBuilt).toBeLessThanOrEqual(Object.keys(properties).length);
         view.unmount();
+    });
+
+    // Back on a collection scrolled deep, the rows above the screen are known
+    // to exist but are not read until scrolled to (`sparseData`).
+    it("draws a placeholder row for a row not read yet, and the rows read as usual", async () => {
+        mockState.sparse = [...Array.from({ length: 5 }, () => undefined), ...mockState.rows.slice(5)];
+        let view!: ReturnType<typeof render>;
+        await act(async () => {
+            view = render(<View/>);
+        });
+        const placeholders = view.container.querySelectorAll("#virtual-table [aria-busy=\"true\"]");
+        // Every column of each of the five rows.
+        expect(placeholders.length).toBeGreaterThanOrEqual(5 * 12);
+        expect(view.container.textContent).not.toContain("Row 0 value 0");
+        expect(view.container.textContent).toContain("Row 5 value 0");
     });
 });

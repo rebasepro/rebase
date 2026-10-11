@@ -339,6 +339,14 @@ export const CollectionTableBinding = function CollectionTableBinding<M extends 
         const columns = props.columns;
         const columnKey = column.key;
 
+        // A row that exists but has not been read: above a scroll position
+        // the view came back to, until it is scrolled to.
+        if (!props.rowData) {
+            return <div className="w-full h-full flex items-center px-4" style={{ width: column.width }} aria-busy={true}>
+                {renderSkeletonText(undefined, Math.min(120, Math.max(24, column.width - 32)))}
+            </div>;
+        }
+
         try {
             if (props.columnIndex === 0) {
                 return <TableRowActions entity={props.rowData!}

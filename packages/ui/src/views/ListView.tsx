@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
     CircularProgress,
+    Skeleton,
     Typography
 } from "../components";
 import { cls } from "../util";
@@ -18,7 +19,11 @@ export type ListViewColumnDef<T> = {
 };
 
 export type ListViewProps<T> = {
-    data: T[];
+    /**
+     * The rows, in order. A position holding `undefined` is a row that exists
+     * but has not been read yet: a placeholder is drawn in its place.
+     */
+    data: (T | undefined)[];
     dataLoading?: boolean;
     noMoreToLoad?: boolean;
     dataLoadingError?: Error;
@@ -41,6 +46,13 @@ export type ListViewProps<T> = {
      */
     onScroll?: (props: ViewScrollEvent) => void;
     initialScroll?: number;
+
+    /**
+     * Called with the positions in `data` of the rows on screen — not the
+     * ones drawn ahead of them — end exclusive, each time they change. While
+     * the list is still scrolling to `initialScroll`, the rows there.
+     */
+    onRowsRendered?: (range: { start: number; end: number }) => void;
 
     size?: CollectionSize;
     selectedEntityId?: string | number;
@@ -98,6 +110,7 @@ export function ListView<T>({
 
     onScroll,
     initialScroll,
+    onRowsRendered,
     size = "m",
     selectedEntityId,
     header,
@@ -119,6 +132,10 @@ export function ListView<T>({
     const estimatedRowHeight = getEstimatedRowHeight(size);
     const [effectiveScrollTop, setEffectiveScrollTop] = useState(0);
     const [viewportHeight, setViewportHeight] = useState(800);
+    // Where the rows on screen start, for `onRowsRendered`: the scroll
+    // position the list is being restored to, until it gets there.
+    const [reportedScrollTop, setReportedScrollTop] = useState(0);
+    const [reportedHeight, setReportedHeight] = useState(800);
 
     const paginationStateRef = useRef({ paginationEnabled, noMoreToLoad, itemCount, pageSize });
     useEffect(() => {
@@ -141,6 +158,13 @@ export function ListView<T>({
             const listTopRelative = listRect.top - scrollRect.top;
             setEffectiveScrollTop(Math.max(0, -listTopRelative));
             setViewportHeight(scrollRect.height);
+            const restoring = pendingScroll.current;
+            const top = restoring
+                ? restoring - (scrollEl.scrollTop + listTopRelative)
+                : -listTopRelative;
+            setReportedScrollTop(Math.max(0, top));
+            // Only the part of the screen the rows are in: not the header above.
+            setReportedHeight(Math.max(0, scrollRect.height + Math.min(0, top)));
 
             const { paginationEnabled: pe, noMoreToLoad: nm, itemCount: ic, pageSize: ps } = paginationStateRef.current;
             if (
@@ -170,7 +194,14 @@ export function ListView<T>({
         };
     }, [setItemCount]);
 
-    useScrollParentRestoration({ containerRef, initialScroll, onScroll, dataLength: data.length });
+    const { pendingScroll } = useScrollParentRestoration({ containerRef, initialScroll, onScroll, dataLength: data.length });
+
+    const visibleStart = Math.min(data.length, Math.floor(reportedScrollTop / estimatedRowHeight));
+    const visibleEnd = Math.min(data.length, Math.ceil((reportedScrollTop + reportedHeight) / estimatedRowHeight));
+    useEffect(() => {
+        if (onRowsRendered && data.length > 0) onRowsRendered({ start: visibleStart, end: visibleEnd });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [visibleStart, visibleEnd, onRowsRendered]);
 
     const totalHeight = data.length * estimatedRowHeight;
     const startIndex = Math.max(0, Math.floor(effectiveScrollTop / estimatedRowHeight) - OVERSCAN_COUNT);
@@ -186,7 +217,7 @@ export function ListView<T>({
     const isInitialLoading = dataLoading && data.length === 0;
     const isEmpty = !dataLoading && data.length === 0 && !dataLoadingError;
 
-    const getItemId = useCallback((item: T): string | number => {
+    const getItemId = useCallback((item: T | undefined): string | number => {
         if (item && typeof item === "object" && "id" in item) {
             const id = (item as Record<"id", unknown>).id;
             return typeof id === "number" ? id : String(id);
@@ -235,6 +266,9 @@ export function ListView<T>({
                         <div style={{ position: "absolute", top: offsetY, left: 0, right: 0 }}>
                             {visibleData.map((item, i) => {
                                 const actualIndex = startIndex + i;
+                                if (item === undefined) {
+                                    return <UnreadRow key={`__unread_${actualIndex}`} height={estimatedRowHeight}/>;
+                                }
                                 const isLast = actualIndex === data.length - 1;
                                 const id = getItemId(item);
                                 const selected = selectedIds?.has(id) ?? false;
@@ -298,6 +332,19 @@ export function ListView<T>({
                     </div>
                 </>
             )}
+        </div>
+    );
+}
+
+/** A row that exists but has not been read yet. */
+function UnreadRow({ height }: { height: number }) {
+    return (
+        <div className="py-0.5 flex items-center gap-3 px-4" style={{ height, overflow: "hidden" }} aria-busy={true}>
+            <Skeleton width={32} height={32}/>
+            <div className="flex flex-col gap-1.5 grow">
+                <Skeleton width={160} height={12}/>
+                <Skeleton width={96} height={10}/>
+            </div>
         </div>
     );
 }

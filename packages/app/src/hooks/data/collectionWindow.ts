@@ -23,6 +23,15 @@ export interface CollectionWindowState<M extends Record<string, unknown> = Recor
      * flashing a partial list.
      */
     rows: Entity<M>[] | undefined;
+    /**
+     * The same rows by position, with `undefined` where a row exists but has
+     * not been read — the rows above a scroll position the window was
+     * restored to ({@link CollectionWindowOptions.seed}), until the view
+     * scrolls to them. Absent when nothing is missing, which is always the
+     * case for a window no view reports a range to: `rows` is then complete
+     * from the first row.
+     */
+    sparse?: (Entity<M> | undefined)[];
     /** Rows not yet on screen are being read: the first page, or the next one. */
     loading: boolean;
     error: Error | undefined;
@@ -61,8 +70,24 @@ export interface CollectionWindowOptions<M extends Record<string, unknown>> {
      * once; pushes inside this window fold into one re-read at its end.
      */
     rereadIntervalMs?: number;
+    /**
+     * Rows already known, from a view this window replaces (a scroll position
+     * kept while a record was open full screen): `rows` sit at `offset` and
+     * on. They are shown at once and read again only when a view reports
+     * them in range ({@link CollectionWindow.setVisibleRange}); the rows
+     * between the first page and `offset` are not read until a view scrolls
+     * to them. `target` should cover them.
+     */
+    seed?: { offset: number; rows: Entity<M>[] };
     onChange: (state: CollectionWindowState<M>) => void;
 }
+
+/**
+ * A row held past the first page, and the version of the collection it was
+ * read at. The version moves on with every push that says the collection
+ * changed, so a row read before the last push is stale.
+ */
+type Slot<M extends Record<string, unknown>> = { row: Entity<M>; version: number };
 
 /**
  * The quiet time between two re-reads of the rows held past the first page.
@@ -99,18 +124,34 @@ export const REREAD_INTERVAL_MS = 2_000;
  *   view offers can express — a relevance-ordered search has no cursor — and
  *   because the server breaks ties on the id, so pages neither repeat nor skip
  *   rows under a sort with duplicates.
- * - **Realtime** covers every row held, not only the first page. The server
- *   re-runs a subscription on every write to its collection, so each push after
- *   the first says "something changed". The rows past the first page are then
- *   read again, in reads of at most `MAX_LIST_LIMIT`, and replaced in one step.
- *   A push after a quiet spell is re-read at once; pushes that arrive while a
- *   re-read runs, or within `rereadIntervalMs` of the last one ending, fold
- *   into one re-read at the end of that interval — sooner if the view asks
- *   for more rows meanwhile, so scrolling never waits on the timer. The first
- *   page itself is applied the moment it is pushed, as always.
+ * - **Realtime.** The server re-runs a subscription on every write to its
+ *   collection, so each push after the first says "something changed", and
+ *   every row held past the first page is stale from then on. Which of them
+ *   are read again depends on whether a view says what it shows:
+ *   - A view that reports the rows it draws ({@link setVisibleRange}) has the
+ *     rows on screen read again, plus a page either side — one read, however
+ *     far it was scrolled. Rows further out stay stale and are read when they
+ *     come within half a page of the screen, before they are on it.
+ *   - Without a report, every row held is read again, in reads of at most
+ *     `MAX_LIST_LIMIT`, and replaced in one step — the only way a view that
+ *     cannot say what it shows never shows a stale row.
+ *   Either way a push after a quiet spell is re-read at once; pushes that
+ *   arrive while a re-read runs, or within `rereadIntervalMs` of the last one
+ *   ending, fold into one re-read at the end of that interval — at once if the
+ *   view asks for more rows or scrolls to rows not read since. The first page
+ *   itself is applied the moment it is pushed, as always.
  *
- * Rows are de-duplicated by id: between a push moving the first page and the
- * re-read of the rest, a row can briefly belong to both.
+ * Rows are de-duplicated by id, keeping the copy read last: an insert or a
+ * delete above shifts every offset by one, so between a push and the re-read
+ * of the rows it moved, a row can sit in two places — on the first page and in
+ * the stale row below it, or in the rows just re-read and the stale ones next
+ * to them.
+ *
+ * A window can hold **gaps**: a restored scroll position ({@link
+ * CollectionWindowOptions.seed}) shows the rows that were on screen without
+ * reading every row above them. A gap is read when a view scrolls to it; a
+ * window no view reports a range to reads its gaps at once and shows nothing
+ * until they are filled, as it would have read them all before.
  */
 export class CollectionWindow<M extends Record<string, unknown>> {
 
@@ -125,13 +166,26 @@ export class CollectionWindow<M extends Record<string, unknown>> {
     private head: Entity<M>[] | undefined;
     /** The first page came back full, so there may be more past it. */
     private headFull = false;
-    /** Rows past the first page, from offset `pageSize` on. */
-    private tail: Entity<M>[] = [];
-    /** The last read past the first page came back short. */
+    /**
+     * Rows past the first page: `slots[i]` is the row at offset
+     * `pageSize + i`, `undefined` where it has not been read (a gap).
+     */
+    private slots: (Slot<M> | undefined)[] = [];
+    /** The last read reaching the end of the held rows came back short. */
     private tailEnded = false;
-    /** The first page changed after it first arrived: re-read the rest. */
-    private stale = false;
+    /** Moves on with every push after the first: rows read before it are stale. */
+    private version = 0;
+    /**
+     * The offsets a view says it draws, end exclusive. `undefined` until one
+     * says so, and again when it goes: every held row is then kept current.
+     */
+    private range: { start: number; end: number } | undefined;
+    /** The view moved to rows not read since: read them without waiting. */
+    private rangeMoved = false;
+    /** Offset of each row (or gap) of the last state reported, by position. */
+    private emittedOffsets: number[] | undefined;
     private pumping = false;
+    private pumpQueued = false;
     private loadingMore = false;
     private headError: Error | undefined;
     private tailError: Error | undefined;
@@ -158,6 +212,15 @@ export class CollectionWindow<M extends Record<string, unknown>> {
         // away. "Everything" is the exception: the first page shows at once and
         // the rest follow.
         this.holdUntil = Number.isFinite(this.target) ? this.target : this.pageSize;
+        const seed = options.seed;
+        if (seed && seed.rows.length > 0) {
+            // Read at no version the collection has had: stale from the start.
+            const start = Math.max(0, Math.floor(seed.offset) - this.pageSize);
+            const skip = Math.max(0, this.pageSize - Math.floor(seed.offset));
+            const rows = seed.rows.slice(skip);
+            this.slots = Array.from({ length: start + rows.length },
+                (_, i) => i < start ? undefined : { row: rows[i - start], version: -1 });
+        }
     }
 
     start(): void {
@@ -191,14 +254,64 @@ export class CollectionWindow<M extends Record<string, unknown>> {
         if (next === this.target) return;
         this.target = next;
         const keep = Math.max(0, next - this.pageSize);
-        if (this.tail.length > keep) {
-            this.tail = this.tail.slice(0, keep);
+        if (this.slots.length > keep) {
+            this.slots = this.slots.slice(0, keep);
             this.tailEnded = false;
         }
         // Asking for more is also how a view retries a page that failed.
         this.tailError = undefined;
         this.emit();
         void this.pump();
+    }
+
+    /**
+     * The rows a view draws, by position in the last `rows` (or `sparse`) it
+     * was given, end exclusive; `undefined` when it stops drawing them. Rows
+     * near the range are kept current and gaps near it are read; see the
+     * class comment.
+     */
+    setVisibleRange(range: { start: number; end: number } | undefined): void {
+        if (this.disposed) return;
+        const next = range ? this.toOffsets(range) : undefined;
+        if (next === undefined && this.range === undefined) return;
+        if (next && this.range && next.start === this.range.start && next.end === this.range.end) return;
+        this.range = next;
+        this.rangeMoved = true;
+        // Not at once: a view handing over to another reports `undefined`
+        // and then the new range in the same breath, and reading for the
+        // moment in between would read every held row.
+        this.schedulePump();
+    }
+
+    /**
+     * What to keep of this window to show it again later: the rows read
+     * around the range a view last reported — or, with none reported, every
+     * row from the first — the offset of the first of them, and how many
+     * rows the window holds in all. See {@link CollectionWindowOptions.seed}.
+     */
+    snapshot(): { offset: number; rows: Entity<M>[]; held: number } {
+        const held = this.head === undefined ? 0 : this.head.length + this.slots.length;
+        if (!this.range) return { offset: 0, rows: this.rows().rows, held };
+        const margin = this.pageSize;
+        const from = Math.max(0, this.range.start - margin);
+        const to = this.range.end + margin;
+        const rows: Entity<M>[] = [];
+        let offset: number | undefined;
+        if (from < this.pageSize && this.head) {
+            for (let i = from; i < Math.min(to, this.head.length); i++) rows.push(this.head[i]);
+            offset = from;
+        }
+        for (let i = Math.max(0, from - this.pageSize); i < Math.min(this.slots.length, to - this.pageSize); i++) {
+            const slot = this.slots[i];
+            if (!slot) {
+                // A gap ends the run: the rows kept are one block.
+                if (rows.length > 0) break;
+                continue;
+            }
+            if (offset === undefined) offset = this.pageSize + i;
+            rows.push(slot.row);
+        }
+        return { offset: offset ?? 0, rows, held };
     }
 
     dispose(): void {
@@ -266,11 +379,10 @@ export class CollectionWindow<M extends Record<string, unknown>> {
         this.headError = undefined;
         if (!this.headFull) {
             // The whole set fits in the first page: nothing is held past it.
-            this.tail = [];
+            this.slots = [];
             this.tailEnded = false;
-            this.stale = false;
         } else if (!first) {
-            this.stale = true;
+            this.version++;
             this.tailError = undefined;
         }
         this.emit();
@@ -280,7 +392,57 @@ export class CollectionWindow<M extends Record<string, unknown>> {
     /** Rows still wanted past the ones held. */
     private wanted(): number {
         if (this.head === undefined || !this.headFull || this.tailEnded || this.tailError) return 0;
-        return Math.max(0, this.target - this.pageSize - this.tail.length);
+        return Math.max(0, this.target - this.pageSize - this.slots.length);
+    }
+
+    private needsRead(index: number): boolean {
+        const slot = this.slots[index];
+        return slot === undefined || slot.version < this.version;
+    }
+
+    /**
+     * The held rows to read again now, by slot, or `undefined` if none.
+     *
+     * With a range: the stale rows and gaps within a page of it, once any of
+     * them is within half a page — so scrolling into stale rows reads a
+     * stretch of them ahead of the screen rather than one row per frame.
+     * Without: every stale row and gap, as one span.
+     */
+    private nextRefresh(): { start: number; end: number; urgent: boolean } | undefined {
+        if (!this.headFull || this.slots.length === 0 || this.tailError) return undefined;
+        let readFrom = 0;
+        let readTo = this.slots.length;
+        if (this.range) {
+            const margin = this.pageSize;
+            const half = Math.ceil(margin / 2);
+            const triggerFrom = Math.max(0, this.range.start - half - this.pageSize);
+            const triggerTo = Math.min(this.slots.length, this.range.end + half - this.pageSize);
+            let triggered = false;
+            for (let i = triggerFrom; i < triggerTo && !triggered; i++) triggered = this.needsRead(i);
+            if (!triggered) return undefined;
+            readFrom = Math.max(0, this.range.start - margin - this.pageSize);
+            readTo = Math.min(this.slots.length, this.range.end + margin - this.pageSize);
+        }
+        let start = -1;
+        let end = -1;
+        let gap = false;
+        for (let i = readFrom; i < readTo; i++) {
+            if (!this.needsRead(i)) continue;
+            if (start < 0) start = i;
+            end = i + 1;
+            if (this.slots[i] === undefined) gap = true;
+        }
+        if (start < 0) return undefined;
+        return { start, end, urgent: gap || (this.range !== undefined && this.rangeMoved) };
+    }
+
+    private schedulePump(): void {
+        if (this.pumpQueued) return;
+        this.pumpQueued = true;
+        queueMicrotask(() => {
+            this.pumpQueued = false;
+            void this.pump();
+        });
     }
 
     /**
@@ -292,18 +454,19 @@ export class CollectionWindow<M extends Record<string, unknown>> {
         this.pumping = true;
         try {
             while (!this.disposed && this.head !== undefined) {
-                if (this.stale && this.headFull && !this.tailError) {
-                    // A view asking for more rows is not kept waiting: the
-                    // re-read runs now, and the next page after it.
-                    const wait = this.wanted() > 0 ? 0 : this.rereadWait();
+                const refresh = this.nextRefresh();
+                if (refresh) {
+                    // A view asking for more rows, or looking at rows not read
+                    // since, is not kept waiting: the re-read runs now.
+                    const wait = refresh.urgent || this.wanted() > 0 ? 0 : this.rereadWait();
                     if (wait > 0) {
                         this.armReread(wait);
-                        break;
+                    } else {
+                        this.rangeMoved = false;
+                        await this.reread(refresh.start, refresh.end);
+                        this.lastRereadEndedAt = Date.now();
+                        continue;
                     }
-                    this.stale = false;
-                    await this.reread();
-                    this.lastRereadEndedAt = Date.now();
-                    continue;
                 }
                 const wanted = this.wanted();
                 if (wanted > 0) {
@@ -334,8 +497,9 @@ export class CollectionWindow<M extends Record<string, unknown>> {
     }
 
     private async readNext(wanted: number): Promise<void> {
-        const offset = this.pageSize + this.tail.length;
+        const offset = this.pageSize + this.slots.length;
         const limit = Math.min(MAX_LIST_LIMIT, wanted);
+        const version = this.version;
         this.loadingMore = true;
         this.emit();
         try {
@@ -344,7 +508,7 @@ export class CollectionWindow<M extends Record<string, unknown>> {
             const raw = response.data ?? [];
             const processed = await this.process(raw);
             if (this.disposed) return;
-            this.tail = this.tail.concat(processed);
+            this.slots = this.slots.concat(processed.map((row) => ({ row, version })));
             if (raw.length < limit) this.tailEnded = true;
         } catch (error) {
             if (this.disposed) return;
@@ -355,13 +519,18 @@ export class CollectionWindow<M extends Record<string, unknown>> {
         this.emit();
     }
 
-    /** Read every held row past the first page again, and swap them in at once. */
-    private async reread(): Promise<void> {
-        const span = this.tail.length;
-        if (span === 0) return;
+    /**
+     * Read the held rows in slots `[from, to)` again, and swap them in at once.
+     * A read that comes back short says where the collection ends now: the
+     * rows held past that are dropped.
+     */
+    private async reread(from: number, to: number): Promise<void> {
+        const span = to - from;
+        if (span <= 0) return;
+        const version = this.version;
         const fresh: Entity<M>[] = [];
         let ended = false;
-        let offset = this.pageSize;
+        let offset = this.pageSize + from;
         try {
             while (fresh.length < span) {
                 const limit = Math.min(MAX_LIST_LIMIT, span - fresh.length);
@@ -384,8 +553,17 @@ export class CollectionWindow<M extends Record<string, unknown>> {
         }
         // Rows held past a target that shrank while this ran stay dropped.
         const keep = Math.max(0, this.target - this.pageSize);
-        this.tail = fresh.length > keep ? fresh.slice(0, keep) : fresh;
-        this.tailEnded = ended && fresh.length <= keep;
+        const slots = this.slots.slice(0, Math.min(from, keep));
+        for (const row of fresh) {
+            if (slots.length >= keep) break;
+            slots.push({ row, version });
+        }
+        if (ended) {
+            this.tailEnded = slots.length <= keep;
+        } else {
+            for (let i = to; i < this.slots.length && slots.length < keep; i++) slots.push(this.slots[i]);
+        }
+        this.slots = slots;
         this.emit();
     }
 
@@ -411,36 +589,89 @@ export class CollectionWindow<M extends Record<string, unknown>> {
         return !this.headFull || this.tailEnded;
     }
 
+    private hasGaps(): boolean {
+        for (const slot of this.slots) if (slot === undefined) return true;
+        return false;
+    }
+
     private emit(): void {
         if (this.disposed) return;
         const error = this.headError ?? this.tailError;
         if (!this.settled && this.head !== undefined) {
-            const held = this.pageSize + this.tail.length;
-            if (this.complete() || held >= Math.min(this.holdUntil, this.target) || this.tailError) {
+            const held = this.pageSize + this.slots.length;
+            const enough = this.complete() || held >= Math.min(this.holdUntil, this.target) || this.tailError;
+            // Gaps are only shown to a view that draws them: one that reports
+            // what it shows. Any other waits until they are read.
+            if (enough && (this.range !== undefined || this.tailError || !this.hasGaps())) {
                 this.settled = true;
             }
         }
-        const rows = this.settled ? this.rows() : undefined;
+        let rows: Entity<M>[] | undefined;
+        let sparse: (Entity<M> | undefined)[] | undefined;
+        if (this.settled) {
+            const built = this.rows();
+            rows = built.rows;
+            sparse = built.sparse;
+            this.emittedOffsets = built.offsets;
+        }
         this.options.onChange({
             rows,
+            ...(sparse && { sparse }),
             loading: (this.head === undefined && !this.headError) || this.loadingMore || (!this.settled && !error),
             error,
             complete: this.complete()
         });
     }
 
-    private rows(): Entity<M>[] {
+    /**
+     * The rows to show, in order, each id once — the copy read last wins, the
+     * first page counting as read now — with gaps kept as positions in
+     * `sparse`, and the offset each position stands for.
+     */
+    private rows(): { rows: Entity<M>[]; sparse?: (Entity<M> | undefined)[]; offsets: number[] } {
         const head = this.head ?? [];
-        if (this.tail.length === 0) return head;
-        const seen = new Set<string>();
-        const out: Entity<M>[] = [];
-        for (const row of head.concat(this.tail)) {
-            const key = String(row.id);
-            if (seen.has(key)) continue;
-            seen.add(key);
-            out.push(row);
+        if (this.slots.length === 0) {
+            return { rows: head, offsets: head.map((_, i) => i) };
         }
-        return out;
+        // Which copy of each id to keep: the newest version, then the first.
+        const keep = new Map<string, { version: number; offset: number }>();
+        const consider = (row: Entity<M>, version: number, offset: number) => {
+            const key = String(row.id);
+            const held = keep.get(key);
+            if (!held || version > held.version) keep.set(key, { version, offset });
+        };
+        head.forEach((row, i) => consider(row, Infinity, i));
+        this.slots.forEach((slot, i) => {
+            if (slot) consider(slot.row, slot.version, this.pageSize + i);
+        });
+        const rows: Entity<M>[] = [];
+        const positions: (Entity<M> | undefined)[] = [];
+        const offsets: number[] = [];
+        let gaps = false;
+        const place = (row: Entity<M> | undefined, offset: number) => {
+            if (row && keep.get(String(row.id))?.offset !== offset) return;
+            if (row) rows.push(row);
+            else gaps = true;
+            positions.push(row);
+            offsets.push(offset);
+        };
+        head.forEach((row, i) => place(row, i));
+        // Gaps start where the first page ends: a page that came back with
+        // fewer rows than it holds now (a delete) leaves no hole of its own.
+        this.slots.forEach((slot, i) => place(slot?.row, this.pageSize + i));
+        return gaps ? { rows, offsets, sparse: positions } : { rows, offsets };
+    }
+
+    /** Positions in the last state reported, as offsets in the collection. */
+    private toOffsets(range: { start: number; end: number }): { start: number; end: number } {
+        const offsets = this.emittedOffsets;
+        const start = Math.max(0, Math.floor(range.start));
+        const end = Math.max(start, Math.ceil(range.end));
+        if (!offsets || offsets.length === 0) return { start, end };
+        const at = (position: number) => position < offsets.length
+            ? offsets[position]
+            : offsets[offsets.length - 1] + 1 + (position - offsets.length);
+        return { start: at(start), end: end > start ? at(end - 1) + 1 : at(start) };
     }
 }
 

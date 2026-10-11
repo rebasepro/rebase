@@ -8,7 +8,7 @@ type VirtualTableCellProps<T> = {
     dataKey: string;
     column: VirtualTableColumn;
     columns: VirtualTableColumn[];
-    rowData: T;
+    rowData: T | undefined;
     cellData: unknown;
     rowIndex: number;
     columnIndex: number;
@@ -25,7 +25,10 @@ type VirtualTableCellProps<T> = {
 
 export const VirtualTableCell = React.memo<VirtualTableCellProps<unknown>>(
     function VirtualTableCell<T>(props: VirtualTableCellProps<T>) {
-        return props.rowData ? props.cellRenderer(
+        // `undefined` is a row that exists but has not been read: the
+        // renderer is still asked, with no `rowData`, so it can draw a
+        // placeholder (see `VirtualTableProps.data`).
+        return props.rowData !== null ? props.cellRenderer(
             {
                 cellData: props.cellData,
                 rowData: props.rowData,

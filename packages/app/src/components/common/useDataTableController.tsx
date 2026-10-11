@@ -212,15 +212,41 @@ export function useDataTableController<M extends Record<string, any> = any, USER
      * now-wrong offset and rows in place for a view whose rows have gone. What
      * is wrong is reading "nothing was restored" as "ask for nothing".
      */
-    const restoredItemCount = collectionScroll?.data.length ?? 0;
+    // The rows kept sit at `dataOffset` (0 when absent): the view held every
+    // row up to the last of them.
+    const restoredItemCount = collectionScroll ? (collectionScroll.dataOffset ?? 0) + collectionScroll.data.length : 0;
     const initialItemCount = restoredItemCount > 0 ? restoredItemCount : pageSize;
+
+    /**
+     * What a restored view shows before anything is read: the rows kept for
+     * it, where they sat. Kept rows that start past the first row are
+     * positions only (`sparseData`, the rows above them not read); `data`
+     * holds no row until the window has read the first page, so a view that
+     * draws `data` never draws them at the wrong place.
+     */
+    const [restored] = useState(() => {
+        if (!collectionScroll || collectionScroll.data.length === 0) return undefined;
+        const offset = collectionScroll.dataOffset ?? 0;
+        return {
+            seed: { offset, rows: collectionScroll.data as Entity<M>[] },
+            rows: offset === 0 ? collectionScroll.data as Entity<M>[] : [],
+            sparse: offset === 0
+                ? undefined
+                : Array.from({ length: offset + collectionScroll.data.length },
+                    (_, i) => i < offset ? undefined : collectionScroll.data[i - offset] as Entity<M>)
+        };
+    });
+    // Handed to the first window only: a later one reads a different query.
+    const seedRef = React.useRef(restored?.seed);
 
     useEffect(() => {
         if (scrollRestoration) {
+            // Marks the entry used, as it was restored.
             scrollRestoration.updateCollectionScroll({
                 path,
                 scrollOffset: collectionScroll?.scrollOffset ?? 0,
-                data: rawData,
+                data: collectionScroll?.data ?? [],
+                ...(collectionScroll?.dataOffset !== undefined && { dataOffset: collectionScroll.dataOffset }),
                 filters: filterValues
             });
         }
@@ -235,22 +261,34 @@ export function useDataTableController<M extends Record<string, any> = any, USER
 
     const context: RebaseContext<USER> = useRebaseContext();
 
-    const [rawData, setRawData] = useState<Entity<M>[]>(collectionScroll?.data ?? []);
+    const [rawData, setRawData] = useState<Entity<M>[]>(restored?.rows ?? []);
+    const [sparseData, setSparseData] = useState<(Entity<M> | undefined)[] | undefined>(restored?.sparse);
+    const rawDataRef = React.useRef(rawData);
+    rawDataRef.current = rawData;
+    const windowRef = React.useRef<CollectionWindow<M> | undefined>(undefined);
 
+    /**
+     * What comes back with the view: its offset, and the rows around what it
+     * showed — a page either side of the rows on screen, where a view reports
+     * them, rather than every row it held. A table scrolled to 100,000 rows
+     * kept all of them here, and coming back read every one again before
+     * showing any.
+     */
     const onScroll = useCallback(({
         scrollOffset
     }: {
         scrollOffset: number
     }) => {
-        if (scrollRestoration) {
-            scrollRestoration.updateCollectionScroll({
-                path,
-                scrollOffset,
-                data: rawData,
-                filters: filterValues
-            });
-        }
-    }, [scrollRestoration, path, rawData, filterValues]);
+        if (!scrollRestoration) return;
+        const snapshot = windowRef.current?.snapshot();
+        scrollRestoration.updateCollectionScroll({
+            path,
+            scrollOffset,
+            data: snapshot ? snapshot.rows : rawDataRef.current,
+            ...(snapshot && snapshot.offset > 0 && { dataOffset: snapshot.offset }),
+            filters: filterValues
+        });
+    }, [scrollRestoration, path, filterValues]);
 
     const [dataLoading, setDataLoading] = useState<boolean>(false);
     const [dataLoadingError, setDataLoadingError] = useState<Error | undefined>();
@@ -299,7 +337,24 @@ export function useDataTableController<M extends Record<string, any> = any, USER
     const target = itemCount ?? Infinity;
     const targetRef = React.useRef(target);
     targetRef.current = target;
-    const windowRef = React.useRef<CollectionWindow<M> | undefined>(undefined);
+
+    // The rows the view says it draws, kept for a window opened after it said
+    // so (the view's effects run before this hook's).
+    const rangeRef = React.useRef<{ start: number; end: number } | undefined>(undefined);
+    // Rows `entitiesDisplayedFirst` puts in front of the window's.
+    const displayedFirstCount = entitiesDisplayedFirst?.length ?? 0;
+    const displayedFirstCountRef = React.useRef(displayedFirstCount);
+    displayedFirstCountRef.current = displayedFirstCount;
+
+    const onRowsRendered = useCallback((range?: { start: number; end: number }) => {
+        const first = displayedFirstCountRef.current;
+        const next = range && {
+            start: Math.max(0, range.start - first),
+            end: Math.max(0, range.end - first)
+        };
+        rangeRef.current = next;
+        windowRef.current?.setVisibleRange(next);
+    }, []);
 
     useEffect(() => {
 
@@ -357,12 +412,15 @@ export function useDataTableController<M extends Record<string, any> = any, USER
         // offset, none above the API's ceiling — see `CollectionWindow`. The
         // query is assembled in one place (`toFindParams`); listing the fields
         // here is what let `searchExplain` reach three of four read paths.
+        const seed = seedRef.current;
+        seedRef.current = undefined;
         const collectionWindow = new CollectionWindow<M>({
             accessor: dataClient.collection<M>(path),
             query: toFindParams({ where: whereParams, orderBy: orderByParams, searchString, include: includeParams }),
             pageSize,
             target: targetRef.current,
             process,
+            seed,
             onChange: (state) => {
                 if (cancelled) return;
                 // The rows do not go into the record cache here. They did, all
@@ -371,7 +429,10 @@ export function useDataTableController<M extends Record<string, any> = any, USER
                 // them alive after it closed. Opening a record from a list is a
                 // click, and the click puts that one row there
                 // (`CollectionViewBinding`'s `onEntityClick`).
-                if (state.rows) setRawData(state.rows);
+                if (state.rows) {
+                    setRawData(state.rows);
+                    setSparseData(state.sparse);
+                }
                 if (state.error) console.error("ERROR", state.error);
                 setDataLoading(state.loading);
                 setDataLoadingError(state.error);
@@ -379,6 +440,7 @@ export function useDataTableController<M extends Record<string, any> = any, USER
             }
         });
         windowRef.current = collectionWindow;
+        if (rangeRef.current) collectionWindow.setVisibleRange(rangeRef.current);
         collectionWindow.start();
 
         return () => {
@@ -410,6 +472,8 @@ export function useDataTableController<M extends Record<string, any> = any, USER
 
     return useMemo(() => ({
         data,
+        ...(sparseData && { sparseData }),
+        onRowsRendered,
         dataLoading,
         noMoreToLoad,
         dataLoadingError,
@@ -431,6 +495,8 @@ export function useDataTableController<M extends Record<string, any> = any, USER
         setPopupCell
     }), [
         data,
+        sparseData,
+        onRowsRendered,
         dataLoading,
         noMoreToLoad,
         dataLoadingError,
