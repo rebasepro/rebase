@@ -47,10 +47,6 @@ export type TextFieldProps<T extends string | number> = {
     inputStyle?: React.CSSProperties;
     inputRef?: React.ForwardedRef<any>;
     /**
-     * Maximum number of rows to display.
-     */
-    maxRows?: number | string;
-    /**
      * Minimum number of rows to display.
      * @default 1
      */
@@ -68,7 +64,6 @@ export const TextField = forwardRef<HTMLDivElement, TextFieldProps<string | numb
             type = "text",
             multiline = false,
             invisible,
-            maxRows,
             minRows,
             disabled,
             error,

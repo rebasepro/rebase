@@ -32,6 +32,10 @@ export type DateTimeFieldProps = {
     pickerButton?: boolean;
     /** The native input, for a caller that opens the picker itself (`showPicker()`). */
     inputRef?: React.Ref<HTMLInputElement>;
+    /**
+     * BCP 47 locale, set as the input's `lang`. The browser still draws a
+     * native date input in its own UI language; this is the hint it may use.
+     */
     locale?: string;
     /**
      * IANA timezone string (e.g., "America/New_York", "Europe/London").
@@ -129,6 +133,7 @@ export const DateTimeField: React.FC<DateTimeFieldProps> = ({
     pickerButton = true,
     inputRef: inputRefProp,
     timezone,
+    locale,
     "aria-label": ariaLabel
 }) => {
     const inputRef = useRef<HTMLInputElement>(null);
@@ -338,6 +343,7 @@ export const DateTimeField: React.FC<DateTimeFieldProps> = ({
                     aria-labelledby={label ? labelId : undefined}
                     aria-label={label ? undefined : ariaLabel}
                     type={mode === "date_time" ? "datetime-local" : "date"}
+                    lang={locale}
                     value={isTyping ? internalValue : displayValue}
                     onChange={handleInputChange}
                     onFocus={handleFocus}
