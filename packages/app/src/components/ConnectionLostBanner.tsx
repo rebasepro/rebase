@@ -55,7 +55,7 @@ export function ConnectionLostBanner({ className }: ConnectionLostBannerProps) {
 
     return (
         <div role="status" aria-live="polite" className={className}>
-            <Alert color="warning" size="small">
+            <Alert color="warning" size="small" role={null}>
                 <div className="flex flex-col gap-0.5">
                     <Typography variant="label">
                         {t("realtime_connection_lost_title")}
