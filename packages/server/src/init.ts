@@ -2747,7 +2747,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
                 new ApiError(
                     413,
                     "PAYLOAD_TOO_LARGE",
-                    `File too large. Maximum upload size is ${Math.round(storageMaxSize / 1024 / 1024)}MB.`
+                    `File too large. Maximum upload size is ${formatByteSize(storageMaxSize)}.`
                 ),
                 c
             ) as Response
@@ -3488,7 +3488,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
                 installQueueRuntime({ queue: jobQueue, queues: declaredQueues });
             }
             // Constructed either way, started only where this process owns the
-            // workers: `rebase.jobs.enqueue` must keep working in a process that
+            // workers: `jobQueue.enqueue` must keep working in a process that
             // runs none of them. Enqueueing is a write to a table; running is a
             // poll loop, and only the second is what "owning" means here.
             if (ownership.jobWorkers) {
@@ -3519,7 +3519,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
             // `createJobStore` already said why. What it cannot say is what the
             // caller should expect instead, which depends on who asked.
             logger.warn(
-                "Job queue requested but unavailable on this driver — `rebase.jobs.enqueue` will throw, " +
+                "Job queue requested but unavailable on this driver — the backend's `jobQueue` is undefined, " +
                 "and webhook deliveries fall back to the in-memory queue."
             );
         }

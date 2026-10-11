@@ -561,7 +561,8 @@ storageTriggers: [
         path: "uploads/:uid/**",
         events: ["finalize"],
         handler: async ({ key, params, size, user }) => {
-            await jobs.enqueue("index-upload", { key, uid: params.uid, size });
+            // `indexUpload` is a `queue()` declared in config/resources.ts
+            await indexUpload.enqueue({ key, uid: params.uid, size });
         }
     }
 ]

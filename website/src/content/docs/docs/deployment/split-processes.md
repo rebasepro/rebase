@@ -187,8 +187,9 @@ A `functions` process never runs either. It is scaled by request load and
 replaced at will, and giving it scheduled work would make its replica count mean
 something it should not.
 
-Note that `rebase.jobs.enqueue` keeps working everywhere, including on a process
-that runs no workers — enqueueing is a write, running is a poll loop, and only
+Note that enqueueing — `jobQueue.enqueue`, a declared queue's `enqueue`, a
+topic's `publish` — keeps working everywhere, including on a process that runs
+no workers — enqueueing is a write, running is a poll loop, and only
 the second is what a role turns off.
 
 ## What splitting does not give you
