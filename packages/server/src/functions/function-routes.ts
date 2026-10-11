@@ -98,8 +98,12 @@ export function createFunctionRoutes(
                 "The path after the function name is routed by the function's own Hono app."
             );
         }
+        // The file name is the same inventory, a file at a time — and it
+        // names a source file besides — so it is told to an identified caller
+        // only. An anonymous one gets exactly the answer a name that matches
+        // nothing gets.
         const file = failedToLoad.get(name);
-        if (file) {
+        if (file && identified) {
             refuse(
                 `The function '${name}' is not served: '${file}' failed to load. ` +
                 "The server log records why, at boot."

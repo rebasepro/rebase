@@ -67,8 +67,9 @@ describe("an unknown function name", () => {
         expect(error.message).not.toContain("hello");
     });
 
-    it("says when a file of that name failed to load", async () => {
+    it("says when a file of that name failed to load — to a caller the server could identify", async () => {
         const { error } = await body(await app({
+            identified: true,
             functions: [],
             problems: ["broken.ts (threw: Cannot find module 'nowhere')"]
         }).request("/broken"));
@@ -78,6 +79,19 @@ describe("an unknown function name", () => {
         expect(error.message).toContain("failed to load");
         // The reason stays in the server log: it carries import paths.
         expect(error.message).not.toContain("Cannot find module");
+    });
+
+    it("answers an anonymous caller as if no such function existed", async () => {
+        // The file name is the inventory `GET /api/functions` gates on an
+        // identity, one file at a time.
+        const broken = await body(await app({
+            functions: [],
+            problems: ["broken.ts (threw: Cannot find module 'nowhere')"]
+        }).request("/broken"));
+        expect(broken.error.code).toBe("FUNCTION_NOT_FOUND");
+        expect(broken.error.message).toBe("No function named 'broken' on this backend.");
+        expect(broken.error.message).not.toContain("broken.ts");
+        expect(broken.error.message).not.toContain("failed to load");
     });
 
     it("distinguishes a served function with no route at that path", async () => {
