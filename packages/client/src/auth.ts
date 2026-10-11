@@ -1318,10 +1318,6 @@ refreshToken: session.refreshToken };
         },
 
         /**
-         * Remove a factor. Requires an `aal2` session — one that has already
-         * answered a challenge — so a stolen `aal1` token cannot turn MFA off.
-         */
-        /**
          * Replace the account's recovery codes with ten new ones, shown once.
          * Needs an `aal2` session. Adding a second factor keeps the codes the
          * account already has; this is how to get new ones.
@@ -1329,6 +1325,13 @@ refreshToken: session.refreshToken };
         async regenerateRecoveryCodes() {
             return transport.request<{ recoveryCodes: string[] }>(authPath + "/mfa/recovery-codes", { method: "POST" });
         },
+
+        /**
+         * Remove a factor. Once the account has a verified factor this
+         * requires an `aal2` session — one that has already answered a
+         * challenge — so a stolen `aal1` token cannot turn MFA off. An
+         * unfinished first enrolment can be removed from any session.
+         */
         async unenroll(factorId: string) {
             return transport.request<{ success: boolean; message: string }>(
                 authPath + "/mfa/unenroll",

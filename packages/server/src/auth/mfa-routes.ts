@@ -581,13 +581,12 @@ export function mountMfaRoutes(opts: MfaRoutesConfig): void {
             throw ApiError.unauthorized("Not authenticated");
         }
 
-        // Require aal2 (MFA-verified session) to unenroll MFA factors
-        if (userCtx.aal !== "aal2") {
-            throw ApiError.forbidden(
-                "MFA verification required to unenroll. Please re-authenticate with your second factor.",
-                "AAL2_REQUIRED"
-            );
-        }
+        // The same gate as enroll and verify: aal2 once the account has a
+        // verified factor. Before that no session can reach aal2, so an
+        // unconditional aal2 check left an abandoned first enrolment
+        // impossible to remove — and every factor removable at aal1 here is
+        // necessarily unverified.
+        await requireStepUpForFactorChange(userCtx);
 
         const unenrollSchema = z.object({
             factorId: z.string().min(1, "Factor ID is required")

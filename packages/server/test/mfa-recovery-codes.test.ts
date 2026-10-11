@@ -132,6 +132,37 @@ describe("printed recovery codes", () => {
     });
 });
 
+/**
+ * The documented gate (auth-endpoints.md): the first factor may be enrolled
+ * from an ordinary session, and only once one is verified do enroll, verify
+ * and unenroll need `aal2`. Unenroll demanded `aal2` unconditionally, and an
+ * account with no verified factor can never reach `aal2` — so an enrolment
+ * started and abandoned could never be removed.
+ */
+describe("DELETE /auth/mfa/unenroll", () => {
+    it("removes an abandoned first enrolment from an ordinary session", async () => {
+        const w = world();
+        const registered = await w.call("POST", "/auth/register", { email: EMAIL, password: PASSWORD });
+        const token = registered.json.tokens.accessToken as string;
+        const enrol = await w.call("POST", "/auth/mfa/enroll", { friendlyName: "Abandoned" }, token);
+        expect(enrol.status).toBe(201);
+
+        const removed = await w.call("DELETE", "/auth/mfa/unenroll", { factorId: enrol.json.factor.id }, token);
+        expect(removed.status).toBe(200);
+        expect((await w.call("GET", "/auth/mfa/factors", undefined, token)).json.factors).toEqual([]);
+    });
+
+    it("still needs aal2 once the account has a verified factor", async () => {
+        const w = world();
+        const { uid } = await enrolPhone(w);
+        const factorId = (await w.store.repo().getMfaFactors(uid))[0].id;
+        const passwordOnly = await generateAccessToken(uid, [], "aal1");
+        const refused = await w.call("DELETE", "/auth/mfa/unenroll", { factorId }, passwordOnly);
+        expect(refused.status).toBe(403);
+        expect(refused.json.error.code).toBe("AAL2_REQUIRED");
+    });
+});
+
 describe("DELETE /admin/users/:uid/mfa", () => {
     it("removes the factors and codes, ends the sessions, and lets the password sign in again", async () => {
         const w = world();

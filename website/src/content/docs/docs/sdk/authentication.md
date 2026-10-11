@@ -278,9 +278,9 @@ holds from `aal1` to `aal2`.
 await client.auth.mfa.unenroll(factorId);
 ```
 
-Requires an `aal2` session — one that has already answered a challenge — so a
-stolen `aal1` token cannot turn MFA off. Removing the last verified factor also
-discards the recovery codes.
+Once a factor is verified this requires an `aal2` session, so a stolen `aal1`
+token cannot turn MFA off; an unfinished first enrolment is removed from any
+session. Removing the last verified factor also discards the recovery codes.
 
 ## Sign Out
 

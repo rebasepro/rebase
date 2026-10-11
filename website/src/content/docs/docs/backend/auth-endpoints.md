@@ -49,7 +49,7 @@ All auth endpoints are mounted at `/api/auth/`:
 | `GET` | `/api/auth/mfa/factors` | List the caller's enrolled factors |
 | `POST` | `/api/auth/mfa/challenge` | Open a challenge against a verified factor |
 | `POST` | `/api/auth/mfa/challenge/verify` | Answer a challenge — this is what issues the session |
-| `DELETE` | `/api/auth/mfa/unenroll` | Remove a factor (requires an `aal2` session) |
+| `DELETE` | `/api/auth/mfa/unenroll` | Remove a factor (requires an `aal2` session once the account has a verified factor) |
 | `POST` | `/api/auth/mfa/recovery-codes` | Replace the caller's recovery codes with ten new ones (requires an `aal2` session) |
 
 Administrative user and role management is a **separate surface**, mounted at
