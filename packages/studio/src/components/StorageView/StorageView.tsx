@@ -911,18 +911,23 @@ export const StorageView = () => {
 
     // Upload files
     const handleUpload = useCallback(async (uploadFiles: File[]) => {
-        for (const file of uploadFiles) {
-            const key = currentPath ? `${currentPath}/${file.name}` : file.name;
-            await storageSourceRef.current.putObject({
-                file,
-                key
-            });
+        try {
+            for (const file of uploadFiles) {
+                const key = currentPath ? `${currentPath}/${file.name}` : file.name;
+                await storageSourceRef.current.putObject({
+                    file,
+                    key
+                });
+            }
+        } finally {
+            // Listed whether or not every file made it: the ones uploaded
+            // before a failure are in the folder.
+            await fetchContents(currentPath);
         }
         snackbarController.open({
             type: "success",
             message: t("studio_storage_files_uploaded", { count: uploadFiles.length })
         });
-        await fetchContents(currentPath);
     }, [currentPath, snackbarController, fetchContents, t]);
 
     // Create new folder
@@ -995,12 +1000,13 @@ key });
                 type: "success",
                 message: t("studio_storage_files_uploaded", { count: droppedFiles.length })
             });
-            await fetchContents(currentPath);
         } catch (e) {
             snackbarController.open({
                 type: "error",
                 message: e instanceof Error ? e.message : String(e)
             });
+        } finally {
+            await fetchContents(currentPath);
         }
     }, [currentPath, snackbarController, fetchContents, t]);
 
@@ -1064,10 +1070,12 @@ message: t("studio_storage_file_deleted", { name: file.name }) });
                 next.delete(file.fullPath);
                 return next;
             });
-            fetchContents(currentPath);
         } catch (e) {
             snackbarController.open({ type: "error",
 message: e instanceof Error ? e.message : String(e) });
+        } finally {
+            // A delete that failed part-way has still deleted what it got to.
+            fetchContents(currentPath);
         }
     }, [currentPath, snackbarController, fetchContents, deleteItems, reportStillThere, t]);
 
@@ -1086,11 +1094,11 @@ message: t("studio_storage_items_deleted", { count: items.length }) });
             setSelectedPaths(new Set());
             setSelectedFile(null);
             setSelectedLink(null);
-            await fetchContents(currentPath);
         } catch (e) {
             snackbarController.open({ type: "error",
 message: e instanceof Error ? e.message : String(e) });
         } finally {
+            await fetchContents(currentPath);
             setDeleting(false);
             setDeleteDialogOpen(false);
             setDeleteDialogTarget(null);
@@ -1120,11 +1128,11 @@ message: deleteDialogTarget.isFolder
                 next.delete(deleteDialogTarget.fullPath);
                 return next;
             });
-            await fetchContents(currentPath);
         } catch (e) {
             snackbarController.open({ type: "error",
 message: e instanceof Error ? e.message : String(e) });
         } finally {
+            await fetchContents(currentPath);
             setDeleting(false);
             setDeleteDialogOpen(false);
             setDeleteDialogTarget(null);
