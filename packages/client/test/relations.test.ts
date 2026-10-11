@@ -468,7 +468,7 @@ title: "T" });
         expect((mockRequest.mock.calls[0][0] as string)).toBe("/data/posts/1");
     });
     it("findById asks for the relations named in `include`", async () => {
-        const c = createCollectionClient<PostModel>(transport, "posts");
+        const c = createCollectionClient(transport, "posts");
         mockRequest.mockResolvedValueOnce({ id: 1,
 title: "T" });
         await c.findById(1, { include: ["tags"] });
