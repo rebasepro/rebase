@@ -1,0 +1,11 @@
+Migrating to version 20260102000000 from 20260101000000 (1 migrations in total):
+
+  -- migrating version 20260102000000
+    -> ALTER TABLE "public"."t" DROP COLUMN "done";
+    -> CREATE TABLE "public"."u" ("id" integer);
+  -- ok (44.292µs)
+
+  -------------------------
+  -- 1.474375ms
+  -- 1 migration
+  -- 2 sql statements

@@ -63,8 +63,11 @@ const PLAN_MARKER_RE = /^\s*->\s?/;
 const PLAN_RULE_RE = /^\s*-{5,}\s*$/;
 /** `Planning migration statements (3 in total):` — and the count it announces. */
 const PLAN_HEADING_RE = /^Planning migration statements \((\d+) in total\):/m;
-/** What Atlas prints, and nothing else, when there is nothing to plan. */
-const PLAN_SYNCED_RE = /^\s*Schema is synced, no changes to be made\s*$/;
+/**
+ * What Atlas prints, and nothing else, when there is nothing to plan — from
+ * `schema apply`, or from `migrate apply` with no file pending.
+ */
+const PLAN_SYNCED_RE = /^\s*(?:Schema is synced, no changes to be made|No migration files to execute)\s*$/;
 
 /** What {@link readPlan} could make of a plan. */
 interface ReadPlan {

@@ -288,4 +288,36 @@ describe("Database migration E2E", () => {
         );
         expect(userRes.rows.length).toBe(1);
     }, 120_000);
+
+    // ── Scenario 3: A migration that drops a column ─────────────────────
+
+    /**
+     * `db push` stops before a destructive change. `db generate` wrote the
+     * same `DROP COLUMN` into a migration without a word, and `db migrate`
+     * applied it with no way to say "not if it destroys data".
+     */
+    it("names a destructive migration, and --refuse-destructive will not apply it", async () => {
+        const cliScript = resolveCliScript();
+        const tsxBin = path.join(monorepoRoot, "node_modules", ".bin", "tsx");
+        const run = (...args: string[]) => execa(tsxBin, [cliScript, ...args], { cwd: workDir, env, all: true, reject: false });
+        const doneExists = async () => (await dbClient.query(
+            "SELECT 1 FROM information_schema.columns WHERE table_name = 'tasks' AND column_name = 'done'"
+        )).rows.length === 1;
+
+        // `done` is removed from the collection.
+        fs.writeFileSync(path.join(collectionsDir, "tasks.js"), tasksCollectionJs().replace(/\n\s*done:.*\n/, "\n"));
+        const generated = await run("db", "generate", "--collections", collectionsDir, "drop_done");
+        expect(generated.exitCode).toBe(0);
+        expect(generated.all).toContain("destructive change(s) that will DESTROY data when applied");
+        expect(generated.all).toMatch(/DROP COLUMN.*"done"/);
+
+        const refused = await run("db", "migrate", "--refuse-destructive");
+        expect(refused.exitCode).toBe(1);
+        expect(refused.all).toContain("Refusing to migrate");
+        expect(await doneExists()).toBe(true);
+
+        const applied = await run("db", "migrate");
+        expect(applied.exitCode).toBe(0);
+        expect(await doneExists()).toBe(false);
+    }, 180_000);
 });

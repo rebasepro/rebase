@@ -82,8 +82,13 @@ export const DRIVER_FLAG_SPECS: Record<string, arg.Spec> = {
     // `migrate apply` then dies on `type "…" already exists (42710)`. It maps
     // onto Atlas's own `migrate apply --baseline`, which writes the revision
     // row Atlas reads — no ledger of ours.
+    //
+    // `--refuse-destructive` is opt-in: it dry-runs the pending files and exits
+    // 1, applying nothing, when one drops or narrows data — the gate `db push`
+    // has always had, for the path that had none.
     "db migrate": {
-        "--baseline": String
+        "--baseline": String,
+        "--refuse-destructive": Boolean
     },
     "schema generate": {
         "--collections": String,

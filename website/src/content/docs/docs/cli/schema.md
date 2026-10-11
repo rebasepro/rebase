@@ -187,6 +187,11 @@ rebase db generate
 - Compares the Drizzle schema against the current database state
 - Produces timestamped SQL migration files in `drizzle/migrations/`
 - Files can be reviewed, edited, and committed to version control
+- <span class="since-badge" data-since="0.25">Since 0.25</span> Names every
+  statement in the new migration that destroys data, using the check `db push`
+  runs before it applies: a dropped table, column, schema, view or type, a
+  `TRUNCATE`, a column type change that can lose values, or a primary key
+  change. It still writes the file and exits 0, so it warns and does not refuse.
 
 The generated migrations are plain SQL files — you can inspect and modify them before applying.
 
@@ -202,6 +207,21 @@ rebase db migrate
 - Reads `drizzle/migrations/` for unapplied migrations
 - Applies them in order to the database
 - Tracks which migrations have been applied
+
+<span class="since-badge" data-since="0.25">Since 0.25</span> `--refuse-destructive`
+makes it refuse instead. It dry-runs the pending migrations first. If any
+statement destroys data, by the same check `db push` and `db generate` use, it
+lists those statements and exits 1. It applies nothing, not even the files
+before that statement. Without the flag, `db migrate` behaves as before and
+applies every pending file:
+
+```bash
+rebase db migrate --refuse-destructive
+```
+
+A migration that rebuilds a search column drops it first, so this flag refuses
+that migration too. Read the list it prints, then run `rebase db migrate`
+without the flag to apply it.
 
 #### Baselining a database Rebase has already booted
 
@@ -359,6 +379,7 @@ rebase db migrate
 | Schema file not updating | Check the `--collections` path points to the right directory |
 | Migration shows unexpected changes | Run `rebase doctor` to identify drift |
 | `db push` fails on production | Use `db generate` + `db migrate` instead |
+| A migration must not drop data in CI or production | `rebase db migrate --refuse-destructive` exits 1 and applies nothing when a pending statement destroys data |
 | `db migrate` fails with `already exists (42710)` | Boot or `db push` already provisioned the schema — record it with `rebase db migrate --baseline <version>` |
 
 ## Next Steps

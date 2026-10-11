@@ -47,7 +47,7 @@ import {
 } from "./cli-errors";
 import { forLibpq } from "./utils/connection-string";
 import { dropLegacyAuthSchema, RLS_BOOTSTRAP_SQL } from "./schema/rls-bootstrap-sql";
-import { detectDestructiveStatements, decidePushSafety, extractPlanStatements } from "./schema/destructive-sql";
+import { detectDestructiveStatements, decidePushSafety, extractPlanStatements, type DestructiveStatement, type ExistingColumnType } from "./schema/destructive-sql";
 import type { LegacyRename } from "./schema/push-legacy-renames";
 import {
     parseColumnMutations,
@@ -353,6 +353,52 @@ async function stripCarvedOutFromNewestMigration(collectionsPath: string): Promi
 }
 
 /**
+ * One line per destructive statement, as `db push` prints them — shared by
+ * push, `db generate` and `db migrate --refuse-destructive`, so the three
+ * describe the same statement the same way.
+ */
+function destructiveLines(destructive: readonly DestructiveStatement[]): string[] {
+    return destructive.map(d =>
+        chalk.red(`       ${d.kind}${d.detail ? ` (${d.detail})` : ""}: `) + chalk.gray(d.statement.replace(/\s+/g, " ")));
+}
+
+/**
+ * The column types `detectDestructiveStatements` reads a type change against,
+ * or none when the database cannot be asked — every type change then counts
+ * as destructive, which is the safe side of a report.
+ */
+async function columnTypesOrNone(databaseUrl: string | undefined): Promise<ExistingColumnType[]> {
+    if (!databaseUrl) return [];
+    try {
+        return await queryColumnTypes(databaseUrl);
+    } catch {
+        return [];
+    }
+}
+
+/**
+ * Say what in the migration `db generate` just wrote destroys data.
+ *
+ * `db push` stops before a destructive change; `db generate` wrote the same
+ * `DROP COLUMN` into a file without a word, and `db migrate` applied it. Only
+ * the part Atlas planned is read: what is appended after it (the search
+ * rebuild, policies, triggers) is Rebase's own and puts back what it drops.
+ * A report, not a refusal — the exit code is unchanged.
+ */
+async function reportDestructiveMigration(migrationSql: string, migrationFile: string, databaseUrl: string | undefined): Promise<void> {
+    const destructive = detectDestructiveStatements(migrationSql, await columnTypesOrNone(databaseUrl));
+    if (destructive.length === 0) return;
+    outWarn("");
+    outWarn(chalk.yellow(`  ⚠️  ${migrationFile} includes ${destructive.length} destructive change(s) that will DESTROY data when applied:`));
+    outWarn("");
+    for (const line of destructiveLines(destructive)) outWarn(line);
+    outWarn("");
+    outWarn(chalk.yellow("  Review it before `rebase db migrate`. `rebase db migrate --refuse-destructive` will not apply it."));
+    outWarn(chalk.yellow("  Back up first: rebase db backup"));
+    outWarn("");
+}
+
+/**
  * The flags `rebase db` reads for the subcommands it parses itself. Hoisted
  * and named `…FLAGS` so the documentation verifier, which reads specs out of
  * this source, sees them.
@@ -360,6 +406,7 @@ async function stripCarvedOutFromNewestMigration(collectionsPath: string): Promi
 const DB_FLAGS = {
     "--collections": String,
     "--allow-destructive": Boolean,
+    "--refuse-destructive": Boolean,
     "--dry-run": Boolean,
     "--yes": Boolean,
     "--baseline": String,
@@ -428,6 +475,14 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
         let wroteNewMigration = listMigrationFiles().length > migrationsBefore.length;
         if (wroteNewMigration) {
             wroteNewMigration = await stripCarvedOutFromNewestMigration(collectionsPath);
+        }
+        const newestWritten = wroteNewMigration ? listMigrationFiles().at(-1) : undefined;
+        if (newestWritten) {
+            await reportDestructiveMigration(
+                fs.readFileSync(path.resolve(process.cwd(), "drizzle", "migrations", newestWritten), "utf-8"),
+                newestWritten,
+                process.env.DATABASE_URL
+            );
         }
         
         // Post-process the migration Atlas just wrote.
@@ -702,9 +757,7 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
                 }
                 if (destructive.length > 0) {
                     outWarn(chalk.yellow(`  ⚠️  ${destructive.length} of those DESTROY data:`));
-                    for (const d of destructive) {
-                        outWarn(chalk.red(`       ${d.kind}${d.detail ? ` (${d.detail})` : ""}: `) + chalk.gray(d.statement.replace(/\s+/g, " ")));
-                    }
+                    for (const line of destructiveLines(destructive)) outWarn(line);
                     outWarn("");
                     outWarn(chalk.yellow("  Applying them needs `rebase db push --allow-destructive`. Back up first: rebase db backup"));
                     outWarn("");
@@ -732,9 +785,7 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
             if (destructive.length > 0) {
                 outWarn(chalk.yellow(`  ⚠️  This push includes ${destructive.length} destructive change(s) that will DESTROY data:`));
                 outWarn("");
-                for (const d of destructive) {
-                    outWarn(chalk.red(`       ${d.kind}${d.detail ? ` (${d.detail})` : ""}: `) + chalk.gray(d.statement.replace(/\s+/g, " ")));
-                }
+                for (const line of destructiveLines(destructive)) outWarn(line);
                 outWarn("");
                 outWarn(chalk.yellow("  Full planned changes:"));
                 outWarn(chalk.gray(planListing.split("\n").map((l) => `       ${l}`).join("\n")));
@@ -807,15 +858,38 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
             });
         } else if (subcommand === "migrate") {
             const databaseUrl = process.env.DATABASE_URL;
-            if (databaseUrl) {
-                await ensureAuthSchemaAndFunctions(databaseUrl);
-            }
             // `--baseline <version>` is relayed to Atlas as its own: it records
             // the version as already applied and starts from the next one. The
             // database a Rebase boot has provisioned is exactly the case it is
             // for, and without it `migrate apply` there is unusable — see
             // `formatBaselineRemedy`, which is what prints when it is missing.
             const baseline = argsList["--baseline"];
+            // Opt-in, and first: a refused run writes nothing at all. Atlas's
+            // own dry-run lists exactly the statements the apply would run, in
+            // the files still pending — the same reading `db push` gates on.
+            if (argsList["--refuse-destructive"] === true) {
+                const plan = await runAtlas(
+                    "migrate",
+                    [...migrateApplyArgs(argsList._, baseline), "--dry-run"],
+                    collectionsPath,
+                    { captureStdout: true }
+                );
+                const destructive = detectDestructiveStatements(plan, await columnTypesOrNone(databaseUrl));
+                if (destructive.length > 0) {
+                    outError(chalk.red(`  ✗ Refusing to migrate: the pending migrations include ${destructive.length} destructive change(s):`));
+                    outError("");
+                    for (const line of destructiveLines(destructive)) outError(line);
+                    outError("");
+                    outError(chalk.gray("    Nothing was applied. Run `rebase db migrate` without --refuse-destructive to apply them."));
+                    outError(chalk.gray("    Back up first: rebase db backup"));
+                    process.exit(1);
+                }
+                out(chalk.gray(`  --refuse-destructive: ${extractPlanStatements(plan).length} pending statement(s), none destructive.`));
+                out("");
+            }
+            if (databaseUrl) {
+                await ensureAuthSchemaAndFunctions(databaseUrl);
+            }
             if (baseline) {
                 out(chalk.gray(`  Recording ${baseline} as already applied, then migrating from the next one.`));
                 out("");

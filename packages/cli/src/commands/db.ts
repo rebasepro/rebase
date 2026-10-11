@@ -1303,12 +1303,16 @@ const DB_ACTION_HELP: Record<string, { usage: string; summary: string; notes?: s
     generate: {
         usage: "rebase db generate [--collections <dir>]",
         summary: "Generate the Drizzle schema, the Postgres DDL and a SQL migration file from the collections.",
-        notes: [`--collections <dir>: ${COLLECTIONS_FLAG_HELP}.`]
+        notes: [
+            "A migration that drops or narrows data is named when it is written. It is still written.",
+            `--collections <dir>: ${COLLECTIONS_FLAG_HELP}.`
+        ]
     },
     migrate: {
-        usage: "rebase db migrate [--baseline <version>] [amount]",
+        usage: "rebase db migrate [--baseline <version>] [--refuse-destructive] [amount]",
         summary: "Run the pending migration files against the database.",
         notes: [
+            "--refuse-destructive dry-runs the pending files and applies nothing when one drops or narrows data.",
             "--baseline <version> records that version as already applied and starts from the next one.",
             "It is what a database Rebase has already booted against needs: boot ensures the schema, so the first migration would try to create tables that are already there.",
             "The version is the numeric prefix of a file in drizzle/migrations."
