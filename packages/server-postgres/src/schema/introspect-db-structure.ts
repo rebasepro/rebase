@@ -646,6 +646,28 @@ export function deriveKanbanProperty(facts: Map<string, ColumnFacts>): string | 
     return undefined;
 }
 
+/** Names a string column goes by when it holds a board's card order (a fractional-indexing key). */
+const ORDER_KEY_NAMES = new Set(["__order", "order_key", "sort_key", "rank", "lexorank", "position_key"]);
+
+/**
+ * The string column that can hold a board's card order, or nothing.
+ *
+ * A board without `orderProperty` cannot keep a card's position within a
+ * column, and the config validator says so on every generate — so a board is
+ * emitted only when the table already has somewhere to store the order. A
+ * legacy table almost never does; asking its owner to add a hidden column
+ * just to satisfy generated output was the wrong way round.
+ */
+export function deriveKanbanOrderProperty(facts: Map<string, ColumnFacts>): string | undefined {
+    for (const fact of facts.values()) {
+        if (fact.isPk || fact.isFk || fact.isGenerated || fact.enumValues) continue;
+        if (fact.propType !== "string") continue;
+        if (!/^(text|character varying)$/.test(fact.column.data_type)) continue;
+        if (ORDER_KEY_NAMES.has(fact.column.column_name.toLowerCase())) return fact.column.column_name;
+    }
+    return undefined;
+}
+
 /**
  * The column a list should be sorted by, newest first.
  *

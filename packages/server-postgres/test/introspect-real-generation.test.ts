@@ -369,16 +369,18 @@ describe("relation property keys", () => {
 // A board, on the one real schema that earns it
 // ═══════════════════════════════════════════════════════════════════════
 describe("boards derived from a real schema", () => {
-    it("gives OpenStreetMap's enum-typed tables a board", () => {
+    it("offers OpenStreetMap's enum-typed tables a board, without declaring one that has nowhere to keep card order", () => {
         // OSM declares eight enum types, several of them NOT NULL — the only
-        // sample schema here that does.
-        const boards = [...openstreetmap.files.values()].filter((f) => f.includes("kanban: {"));
-        expect(boards.length).toBeGreaterThanOrEqual(5);
+        // sample schema here that does. None has a string order-key column,
+        // so a declared board would warn "no orderProperty" on every generate.
+        const files = [...openstreetmap.files.values()];
+        expect(files.filter((f) => f.includes("// A board over")).length).toBeGreaterThanOrEqual(5);
+        expect(files.filter((f) => /^\s*kanban: \{/m.test(f))).toEqual([]);
     });
 
     it("names a property the collection actually declares", () => {
         for (const [table, source] of openstreetmap.files) {
-            const column = source.match(/columnProperty: "(\w+)"/)?.[1];
+            const column = source.match(/A board over "(\w+)"/)?.[1];
             if (!column) continue;
             expect({ table, declared: propertyKeys(source).includes(column) }).toEqual({ table, declared: true });
         }
@@ -395,13 +397,14 @@ describe("a required enum column", () => {
      * in. Built here rather than left untested, because the alternative is
      * emission code that has never run.
      */
-    function ticketsWith(nullable: "YES" | "NO"): string {
+    function ticketsWith(nullable: "YES" | "NO", orderKey = false): string {
         const { metadata, tables } = buildSchema({
             tables: [{
                 name: "tickets",
                 columns: [
                     serialPk("tickets"),
                     column("tickets", "subject", { is_nullable: "NO" }),
+                    ...(orderKey ? [column("tickets", "order_key")] : []),
                     column("tickets", "state", {
                         data_type: "USER-DEFINED", udt_name: "ticket_state", is_nullable: nullable
                     })
@@ -418,8 +421,16 @@ describe("a required enum column", () => {
         );
     }
 
-    it("becomes the column property of a board", () => {
-        expect(adminBlock(ticketsWith("NO"))).toContain('kanban: {\n            columnProperty: "state"');
+    it("becomes the column property of a board when the table has a string order key", () => {
+        const admin = adminBlock(ticketsWith("NO", true));
+        expect(admin).toContain('kanban: {\n            columnProperty: "state"');
+        expect(admin).toContain('orderProperty: "orderKey"');
+    });
+
+    it("is only suggested, in a comment, when the table has nowhere to keep card order", () => {
+        const admin = adminBlock(ticketsWith("NO"));
+        expect(admin).not.toMatch(/^\s*kanban: \{/m);
+        expect(admin).toContain('// A board over "state"');
     });
 
     it("does not, when it is nullable", () => {

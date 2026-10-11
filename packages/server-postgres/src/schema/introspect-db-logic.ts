@@ -18,6 +18,7 @@ import type { CheckFactsByTable } from "./introspect-db-constraints";
 import type { TableClassification } from "./introspect-db-structure";
 import {
     buildColumnFacts,
+    deriveKanbanOrderProperty,
     deriveKanbanProperty,
     deriveListProperties,
     deriveSort,
@@ -1492,7 +1493,20 @@ export function generateCollectionFile(
             if (titleProperty) adminEntries.push(`display: { title: ${quote(asProperty(titleProperty))} }`);
 
             const kanbanProperty = deriveKanbanProperty(derivedFacts);
-            if (kanbanProperty) adminEntries.push(`kanban: {\n            columnProperty: ${quote(asProperty(kanbanProperty))}\n        }`);
+            const orderProperty = kanbanProperty ? deriveKanbanOrderProperty(derivedFacts) : undefined;
+            if (kanbanProperty && orderProperty) {
+                adminEntries.push(`kanban: {\n            columnProperty: ${quote(asProperty(kanbanProperty))}\n        }`);
+                adminEntries.push(`orderProperty: ${quote(asProperty(orderProperty))}`);
+            } else if (kanbanProperty) {
+                // No column to keep a card's position in, so no board: one
+                // without `orderProperty` is a validator warning on every
+                // generate. Said here, where the owner reads the collection.
+                adminEntries.push(
+                    `// A board over ${quote(asProperty(kanbanProperty))} fits this table, but a board needs a string column ` +
+                    "to keep each card's order in. Add one, then declare " +
+                    `kanban: { columnProperty: ${quote(asProperty(kanbanProperty))} } and orderProperty: "<that property>".`
+                );
+            }
 
             const sort = deriveSort(derivedFacts);
             if (sort) adminEntries.push(`sort: [${quote(asProperty(sort[0]))}, "desc"]`);
