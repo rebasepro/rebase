@@ -11,8 +11,8 @@ import {
     LazyDetailViewBinding as DetailViewBinding,
     LazyEditViewBinding as EditViewBinding
 } from "../components/lazy_record_views";
-import { ErrorView, NotFoundPage, useUserConfigurationPersistence, useComponentOverride, useNavigationBlocker } from "@rebasepro/app";
-import { resolveOpenEntityMode, resolveViewMode } from "../util/view_mode";
+import { ErrorView, NotFoundPage, useCustomizationController, useUserConfigurationPersistence, useComponentOverride, useNavigationBlocker } from "@rebasepro/app";
+import { resolveCollectionOpenMode } from "../util/collection_open_mode";
 import { isPathWithinRecord } from "../util/navigation_utils";
 import { UnsavedChangesDialog } from "@rebasepro/app";
 import { CenteredView, CircularProgressCenter } from "@rebasepro/ui";
@@ -38,6 +38,7 @@ function RebaseRouteContent() {
     const urlController = useUrlController();
     const breadcrumbs = useBreadcrumbsController();
     const userConfigPersistence = useUserConfigurationPersistence();
+    const customizationController = useCustomizationController();
     const ResolvedCollectionView = useComponentOverride("Collection.View", CollectionViewBinding);
     const navigationState = useNavigationStateController();
 
@@ -167,13 +168,11 @@ function RebaseRouteContent() {
             collection = collectionRegistry.getCollection(firstCollectionEntry.slug);
 
         const effectiveOpenMode = collection
-            ? resolveOpenEntityMode({
+            ? resolveCollectionOpenMode({
                 collection,
-                viewMode: resolveViewMode({
-                    collection,
-                    search: location.search,
-                    savedViewMode: userConfigPersistence?.getCollectionConfig(collection.slug)?.defaultViewMode as ViewMode | undefined
-                })
+                search: location.search,
+                savedViewMode: userConfigPersistence?.getCollectionConfig(collection.slug)?.defaultViewMode as ViewMode | undefined,
+                registeredViews: customizationController.collectionViews
             })
             : undefined;
         if (collection && effectiveOpenMode === "split") {
@@ -251,6 +250,7 @@ function EntityFullScreenRoute({
     const navigate = useNavigate();
     const location = useLocation();
     const userConfigPersistence = useUserConfigurationPersistence();
+    const customizationController = useCustomizationController();
 
     // defaultValues may be carried via location.state when openNewDocument() is called
     // for full-screen mode. We read it once on mount — after that, the form owns its state.
@@ -368,13 +368,11 @@ function EntityFullScreenRoute({
     const splitListAvailable = !isNew && !isCopy && entityId !== undefined &&
         navigationEntries[0]?.type === "collection" &&
         (navigationEntries.length === 2 || navigationEntries.length === 3) &&
-        resolveOpenEntityMode({
+        resolveCollectionOpenMode({
             collection,
-            viewMode: resolveViewMode({
-                collection,
-                search: location.search,
-                savedViewMode: userConfigPersistence?.getCollectionConfig(collection.slug)?.defaultViewMode as ViewMode | undefined
-            })
+            search: location.search,
+            savedViewMode: userConfigPersistence?.getCollectionConfig(collection.slug)?.defaultViewMode as ViewMode | undefined,
+            registeredViews: customizationController.collectionViews
         }) === "split";
 
     const showList = splitListAvailable
