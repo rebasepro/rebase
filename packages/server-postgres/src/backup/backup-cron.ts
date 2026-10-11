@@ -9,6 +9,8 @@
 import fs from "fs";
 import type { CronJobDefinition } from "@rebasepro/types";
 import type { StorageController } from "@rebasepro/server";
+import { logger } from "@rebasepro/server";
+import { pgToolVariable, resolvePgBinary, type PgTool } from "./pg-binary";
 import {
     BackupDestination,
     parseBackupDestination,
@@ -142,6 +144,7 @@ function parseOptionalInt(value: string | undefined): number | null | "invalid" 
  */
 export function createBackupCron(config: BackupCronConfig): CronJobDefinition {
     const dbName = parseDbNameFromUrl(config.connectionString) ?? "database";
+    if (config.enabled ?? true) warnOfMissingTools(config.name ?? "Scheduled database backup");
 
     const job: CronJobDefinition = {
         name: config.name ?? "Scheduled database backup",
@@ -237,6 +240,26 @@ export function createBackupCron(config: BackupCronConfig): CronJobDefinition {
     // definition is unchanged. See `readBackupSchedule` in the server package.
     Object.defineProperty(job, Symbol.for("rebase.backupCron"), { value: true });
     return job;
+}
+
+/**
+ * Say at registration, not at 03:00, that the job cannot run.
+ *
+ * Each run needs `pg_dump` for the dump and `pg_dumpall` for the roles
+ * sidecar. Without them every run fails with "Could not find the 'pg_dump'
+ * binary", and that was the first an operator heard of it — a runtime image
+ * once shipped without the client tools, and every nightly backup failed.
+ */
+function warnOfMissingTools(jobName: string): void {
+    const needed: PgTool[] = ["pg_dump", "pg_dumpall"];
+    const missing = needed.filter(tool => !resolvePgBinary(tool));
+    if (missing.length === 0) return;
+    logger.error(
+        `"${jobName}" is scheduled, but ${missing.map(tool => `'${tool}'`).join(" and ")} ` +
+        `${missing.length > 1 ? "were" : "was"} not found on this machine, so every run will fail. ` +
+        "Install the PostgreSQL client tools (the same major version as the server, or newer), " +
+        `or set ${missing.map(pgToolVariable).join(" / ")} to the binary.`
+    );
 }
 
 function formatBytes(bytes: number): string {

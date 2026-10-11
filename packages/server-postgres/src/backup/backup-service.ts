@@ -12,7 +12,7 @@ import os from "os";
 import path from "path";
 import { execa } from "execa";
 import type { StorageController } from "@rebasepro/server";
-import { resolveLocalBin } from "../cli-helpers";
+import { resolvePgBinary } from "./pg-binary";
 import {
     BackupDestination,
     buildBackupFilename,
@@ -54,18 +54,7 @@ export class BackupToolError extends Error {
     }
 }
 
-/** Locate `pg_dump` / `pg_restore` / `pg_dumpall`, honouring an env override. */
-export function resolvePgBinary(
-    tool: "pg_dump" | "pg_restore" | "pg_dumpall",
-    env: Record<string, string | undefined> = process.env
-): string | null {
-    const overrideVar =
-        tool === "pg_dump" ? env.PG_DUMP_PATH
-        : tool === "pg_restore" ? env.PG_RESTORE_PATH
-        : env.PG_DUMPALL_PATH;
-    if (overrideVar && fs.existsSync(overrideVar)) return overrideVar;
-    return resolveLocalBin(tool);
-}
+export { resolvePgBinary };
 
 /** Run `<bin> --version` and extract the major version. */
 export async function detectToolMajor(bin: string): Promise<number | null> {
