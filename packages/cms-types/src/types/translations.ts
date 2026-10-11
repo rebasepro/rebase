@@ -625,6 +625,9 @@ export interface RebaseTranslations {
     revoking?: string;
     revoke_all_sessions?: string;
     unknown_device?: string;
+    unknown_address?: string;
+    session_details?: string;
+    revoke_session?: string;
     current?: string;
     role_id: string;
     role_name: string;

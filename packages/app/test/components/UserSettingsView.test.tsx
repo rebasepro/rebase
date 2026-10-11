@@ -152,3 +152,33 @@ describe("UserSettingsView email change", () => {
         expect(screen.queryByRole("button", { name: "email_change_button" })).toBeNull();
     });
 });
+
+/**
+ * The sessions tab speaks the user's language: its line under each device
+ * and its revoke button's accessible name were English literals.
+ */
+describe("UserSettingsView sessions", () => {
+    it("labels a session and its revoke button through translations", async () => {
+        const authController = {
+            user: { uid: "u1", email: "me@corp.com" },
+            initialLoading: false, authLoading: false, loginSkipped: false, extra: null,
+            setExtra: () => undefined, getAuthToken: async () => "t", signOut: async () => undefined,
+            fetchSessions: async () => [
+                { id: "s1", userAgent: "Firefox", ipAddress: null, createdAt: "2026-10-01T10:00:00.000Z", isCurrentSession: true }
+            ],
+            revokeSession: async () => undefined
+        };
+        render(
+            <AuthControllerContext.Provider value={authController as never}>
+                <UserSettingsView/>
+            </AuthControllerContext.Provider>
+        );
+        await act(async () => {
+            fireEvent.mouseDown(screen.getByRole("tab", { name: "sessions" }));
+        });
+
+        expect(screen.getByText("session_details")).toBeInTheDocument();
+        expect(screen.queryByText(/IP:|Unknown|Created:/)).toBeNull();
+        expect(screen.getByRole("button", { name: "revoke_session" })).toBeInTheDocument();
+    });
+});

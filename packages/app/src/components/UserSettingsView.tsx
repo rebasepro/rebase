@@ -305,7 +305,7 @@ export function UserSettingsView() {
                         <Typography color="error">{passwordError}</Typography>
                     )}
                     {passwordSuccess && (
-                        <Typography className="text-emerald-600 dark:text-emerald-400">{passwordSuccess}</Typography>
+                        <Alert color="success">{passwordSuccess}</Alert>
                     )}
 
                     <div className="mt-4">
@@ -355,14 +355,17 @@ export function UserSettingsView() {
                                             )}
                                         </div>
                                         <Typography variant="caption" color="secondary">
-                                            IP: {session.ipAddress || "Unknown"} • Created: {new Date(session.createdAt).toLocaleString()}
+                                            {t("session_details", {
+                                                ip: session.ipAddress || t("unknown_address"),
+                                                created: new Date(session.createdAt).toLocaleString()
+                                            })}
                                         </Typography>
                                     </div>
                                     <div className="ml-4">
                                         {revokingSessionId === session.id ? (
                                             <CircularProgress size="small"/>
                                         ) : (
-                                            <IconButton onClick={() => handleRevokeSession(session.id, session.isCurrentSession)} aria-label="Revoke Session">
+                                            <IconButton onClick={() => handleRevokeSession(session.id, session.isCurrentSession)} aria-label={t("revoke_session")}>
                                                 <Trash2Icon/>
                                             </IconButton>
                                         )}
