@@ -436,6 +436,13 @@ export type TokenRefresher = () => Promise<string | undefined> | undefined;
 
 export interface Transport {
     request: <T = unknown>(path: string, init?: RequestInit, meta?: ResponseMeta) => Promise<T>;
+    /**
+     * Like `request`, but the body of a success is left unread: the response
+     * comes back as it arrived, for a caller that wants text, a Blob or a
+     * stream. Auth, the refresh-and-resend and the error envelope are the same.
+     * Optional so a hand-written transport need not have it.
+     */
+    requestRaw?: (path: string, init?: RequestInit, meta?: ResponseMeta) => Promise<Response>;
     setToken: (newToken: string | null) => void;
     setAuthTokenGetter: (getter: () => Promise<string | null>) => void;
     setOnUnauthorized: (handler: () => Promise<boolean>) => void;
@@ -605,13 +612,23 @@ export function createTransport(config: RebaseClientConfig, environment?: Transp
      * retry is a second copy of this whole response-reading path, and copies
      * are how one of them ends up fixed and the other not.
      */
-    function unreadableResponse(status: number, text: string): RebaseApiError {
+    function unreadableResponse(status: number, text: string, contentType: string | null): RebaseApiError {
+        const type = contentType?.split(";")[0].trim().toLowerCase() || "";
+        // A body that says what it is — CSV, plain text, a PDF — was sent on
+        // purpose, by a custom function or route; blaming the API URL for it
+        // points the developer at a misconfiguration that does not exist.
+        // Only HTML (or no type at all) is the signature of the wrong host.
+        const deliberate = type !== "" && type !== "text/html" && !type.includes("json");
+        const cause = deliberate
+            ? `The body is ${type}. If this is a custom function that answers text or a file, ask for it ` +
+              "with `functions.invoke(name, payload, { responseType: \"text\" | \"blob\" | \"response\" })`."
+            : "This usually means the request reached something other than the Rebase API — a single-page-app " +
+              "fallback serving index.html, or a proxy error page — so check the API URL configuration " +
+              "(e.g. VITE_API_URL).";
         return new RebaseApiError(
             `The server answered ${status} with a body that is not JSON, so there is nothing to return. ` +
-            "This usually means the request reached something other than the Rebase API — a single-page-app " +
-            "fallback serving index.html, or a proxy error page — so check the API URL configuration " +
-            `(e.g. VITE_API_URL). The body began: ${JSON.stringify(text.slice(0, 120))}`,
-            { status, code: "INVALID_JSON_RESPONSE" }
+            `${cause} The body began: ${JSON.stringify(text.slice(0, 120))}`,
+            { status, code: "INVALID_JSON_RESPONSE", ...(type ? { details: { contentType: type } } : {}) }
         );
     }
 
@@ -705,115 +722,114 @@ export function createTransport(config: RebaseClientConfig, environment?: Transp
         return token;
     }
 
-    async function request<T = unknown>(path: string, init?: RequestInit, meta?: ResponseMeta): Promise<T> {
+    /** The body as JSON, `{}` for none, `undefined` when it is there and is not JSON. */
+    function parseBody(text: string): Record<string, unknown> | undefined {
+        if (!text) return {};
+        try {
+            return parseRebaseJson<Record<string, unknown>>(text);
+        } catch (e) {
+            return undefined;
+        }
+    }
+
+    /**
+     * Send a request and hand back the response that answers it: the token
+     * attached, a token refusal answered by one refresh and resend, and an
+     * error status thrown as a {@link RebaseApiError}. The body of a success is
+     * left unread, for the caller to read in whatever form it expects.
+     *
+     * One path for the first attempt and the post-refresh retry: the two used
+     * to be separate copies of this whole sequence, and copies are how one of
+     * them ends up fixed and the other not.
+     */
+    async function requestRaw(path: string, init?: RequestInit, meta?: ResponseMeta): Promise<Response> {
         const url = resolveBaseUrl(config.baseUrl) + apiPath + path;
 
         const activeToken = await tokenForRequest();
 
         warnIfAnonymousServerClient(activeToken);
 
-        const headers = getHeaders(activeToken, init);
+        let res = await fetchFn(url, { ...init,
+headers: getHeaders(activeToken, init) });
+        // A body read to decide on a refresh is spent; it is kept here so the
+        // error built from the same response can still quote it.
+        let readText: string | undefined;
 
-        const res = await fetchFn(url, { ...init,
-headers });
+        if (res.status === 401 && onUnauthorizedHandler) {
+            readText = await res.text().catch(() => "");
+            if (isTokenRefusal(parseBody(readText) ?? {})) {
+                const retried = await onUnauthorizedHandler();
+                if (retried) {
+                    let retryToken = token;
+                    if (tokenGetter) {
+                        try {
+                            const fetched = await tokenGetter();
+                            if (fetched !== null && fetched !== undefined) {
+                                retryToken = fetched;
+                            }
+                        } catch (e) { /* ignore */ }
+                    }
+                    res = await fetchFn(url, { ...init,
+headers: getHeaders(retryToken, init) });
+                    readText = undefined;
+                }
+            }
+        }
 
+        // The response the caller gets is the one whose metadata describes
+        // what they are holding — after a retry, recording the 401's would hand
+        // back the ETag of an error page.
         if (meta) {
             meta.status = res.status;
             meta.etag = res.headers?.get?.("ETag") ?? undefined;
             meta.headers = res.headers;
         }
 
-        if (res.status === 204) return undefined as T; // SAFETY: HTTP 204 No Content has no body
-
-        const text = await res.text().catch(() => "");
-        let body: Record<string, unknown> = {};
-        /**
-         * Whether the body was there and could not be read as JSON.
-         *
-         * On an error status this does not matter — the status is the answer
-         * and the message falls back to `statusText`. On a *success* status it
-         * is the whole answer, and `{}` was being returned as though the server
-         * had sent it: `find()` answered `{}` instead of an array, `getOne()`
-         * an empty object, with nothing thrown.
-         *
-         * The case that produces it is not exotic. Point `VITE_API_URL` at the
-         * frontend's own host and `/api/data/posts` lands on the SPA fallback,
-         * which answers `200` with `index.html` — so the misconfiguration the
-         * 404 branch below spends four lines explaining reaches the caller, in
-         * its most common form, as an empty success.
-         */
-        let unreadableBody = false;
-        if (text) {
-            try {
-                body = parseRebaseJson<Record<string, unknown>>(text);
-            } catch (e) {
-                unreadableBody = true;
-            }
-        }
-
-        if (res.status === 401 && onUnauthorizedHandler && isTokenRefusal(body)) {
-            const retried = await onUnauthorizedHandler();
-            if (retried) {
-                let retryToken = token;
-                if (tokenGetter) {
-                    try {
-                        const fetched = await tokenGetter();
-                        if (fetched !== null && fetched !== undefined) {
-                            retryToken = fetched;
-                        }
-                    } catch (e) { /* ignore */ }
-                }
-                const retryHeaders = getHeaders(retryToken, init);
-                const retryRes = await fetchFn(url, { ...init,
-headers: retryHeaders });
-                // The retry is the response the caller gets, so it is the one
-                // whose metadata describes what they are holding — recording
-                // the 401's would hand back the ETag of an error page.
-                if (meta) {
-                    meta.status = retryRes.status;
-                    meta.etag = retryRes.headers?.get?.("ETag") ?? undefined;
-                    meta.headers = retryRes.headers;
-                }
-                if (retryRes.status === 204) return undefined as T; // SAFETY: HTTP 204 No Content has no body
-                const retryText = await retryRes.text().catch(() => "");
-                let retryBody: Record<string, unknown> = {};
-                let retryUnreadable = false;
-                if (retryText) {
-                    try {
-                        retryBody = parseRebaseJson<Record<string, unknown>>(retryText);
-                    } catch (e) {
-                        retryUnreadable = true;
-                    }
-                }
-                if (!retryRes.ok) {
-                    let fallbackMessage = retryRes.statusText;
-                    if (retryRes.status === 404 && !fallbackMessage) {
-                        const method = init?.method || "GET";
-                        fallbackMessage = `Endpoint not found (${method} ${path}). This usually means the collection is not registered on the backend, or the frontend API URL configuration (e.g. VITE_API_URL) is missing or pointing to the wrong host.`;
-                    }
-                    throw errorFrom(retryRes, retryBody, fallbackMessage);
-                }
-                if (retryUnreadable) throw unreadableResponse(retryRes.status, retryText);
-                return retryBody as T;
-            }
-        }
-
         if (!res.ok) {
+            const text = readText ?? await res.text().catch(() => "");
             let fallbackMessage = res.statusText;
             if (res.status === 404 && !fallbackMessage) {
                 const method = init?.method || "GET";
                 fallbackMessage = `Endpoint not found (${method} ${path}). This usually means the collection is not registered on the backend, or the frontend API URL configuration (e.g. VITE_API_URL) is missing or pointing to the wrong host.`;
             }
-            throw errorFrom(res, body, fallbackMessage);
+            // On an error status an unreadable body does not matter — the
+            // status is the answer and the message falls back to `statusText`.
+            throw errorFrom(res, parseBody(text) ?? {}, fallbackMessage);
         }
 
-        if (unreadableBody) throw unreadableResponse(res.status, text);
+        return res;
+    }
+
+    async function request<T = unknown>(path: string, init?: RequestInit, meta?: ResponseMeta): Promise<T> {
+        const res = await requestRaw(path, init, meta);
+
+        if (res.status === 204) return undefined as T; // SAFETY: HTTP 204 No Content has no body
+
+        const text = await res.text().catch(() => "");
+        /**
+         * `undefined` when the body was there and could not be read as JSON.
+         *
+         * On a *success* status that is the whole answer, and `{}` was being
+         * returned as though the server had sent it: `find()` answered `{}`
+         * instead of an array, `getOne()` an empty object, with nothing thrown.
+         *
+         * The case that produces it is not exotic. Point `VITE_API_URL` at the
+         * frontend's own host and `/api/data/posts` lands on the SPA fallback,
+         * which answers `200` with `index.html` — so the misconfiguration the
+         * 404 message spends four lines explaining reaches the caller, in its
+         * most common form, as an empty success.
+         */
+        const body = parseBody(text);
+        if (body === undefined) {
+            throw unreadableResponse(res.status, text, res.headers?.get?.("Content-Type") ?? null);
+        }
 
         return body as T;
     }
 
     return {
         request,
+        requestRaw,
         setToken(newToken: string | null) { token = newToken || undefined; },
         setAuthTokenGetter(getter: () => Promise<string | null>) { tokenGetter = getter; },
         setOnUnauthorized(handler: () => Promise<boolean>) { onUnauthorizedHandler = handler; },

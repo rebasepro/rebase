@@ -58,7 +58,7 @@ const { message } = await client.functions.invoke<{ message: string }>(
 `RebaseApiError` on a non-2xx — so the function's own error shape reaches the
 caller instead of a bare `fetch` rejection.
 
-Three things it takes beyond the name:
+Four things it takes beyond the name:
 
 ```typescript
 // A different method. The payload is dropped for GET, since GET has no body.
@@ -70,6 +70,11 @@ await client.functions.invoke("hello", undefined, { method: "GET", path: "stats"
 
 // A query string. Passed as `path`, with no separator inserted before `?`.
 await client.functions.invoke("reports", undefined, { method: "GET", path: "?days=30" });
+
+// A function that answers text or a file (`c.text(csv)`, `c.body(pdf)`).
+// The answer is read as JSON unless you say otherwise: "text" gives a string,
+// "blob" a Blob, "response" the Response itself with its body unread.
+const csv = await client.functions.invoke<string>("export-orders", undefined, { method: "GET", responseType: "text" });
 ```
 
 :::note

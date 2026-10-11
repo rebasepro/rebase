@@ -30,7 +30,8 @@ export interface FunctionsClient {
      *                  One path segment: a sub-path goes in `options.path`.
      * @param payload - Optional JSON-serialisable body. Dropped for `GET`.
      * @param options - Optional overrides (HTTP method, sub-path, extra headers).
-     * @returns The parsed JSON response from the function.
+     * @returns The parsed JSON response from the function, or — with
+     *          `options.responseType` — its text, a `Blob`, or the raw `Response`.
      */
     invoke<T = unknown>(
         name: string,
@@ -101,6 +102,24 @@ export function createFunctionsClient(transport: Transport): FunctionsClient {
 
             if (options?.headers) {
                 init.headers = options.headers;
+            }
+
+            // A function may answer text or a file; reading that as JSON
+            // refused a body the function sent on purpose.
+            const responseType = options?.responseType ?? "json";
+            if (responseType !== "json") {
+                if (!transport.requestRaw) {
+                    throw new RebaseClientError(
+                        `responseType "${responseType}" needs a transport that can hand back the raw response.`,
+                        { code: "UNSUPPORTED_OPTION", details: { responseType } }
+                    );
+                }
+                const res = await transport.requestRaw(routePath, init);
+                // SAFETY: the caller names T for the mode it asked for — a
+                // string, a Blob or the Response — as with the JSON default.
+                if (responseType === "response") return res as unknown as T;
+                if (responseType === "blob") return (await res.blob()) as unknown as T;
+                return (await res.text()) as unknown as T;
             }
 
             // The function's body, verbatim: nothing here reaches in for a

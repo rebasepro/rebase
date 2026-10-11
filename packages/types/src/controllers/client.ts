@@ -241,6 +241,15 @@ export interface FunctionInvokeOptions {
     path?: string;
     /** Extra headers merged into the request. */
     headers?: Record<string, string>;
+    /**
+     * How to read the function's answer — defaults to `"json"`.
+     *
+     * A function is a Hono route, so it may answer `c.text(csv)` or
+     * `c.body(pdf)`: ask for `"text"` (a string), `"blob"` (a `Blob`) or
+     * `"response"` (the `Response` itself, body unread, for streaming or
+     * headers). An error status is thrown as a `RebaseApiError` in every mode.
+     */
+    responseType?: "json" | "text" | "blob" | "response";
 }
 
 /**

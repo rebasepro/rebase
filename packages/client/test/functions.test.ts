@@ -1,5 +1,6 @@
 import { describe, expect, it, jest } from "@jest/globals";
 import { createFunctionsClient } from "../src/functions";
+import { createTransport } from "../src/transport";
 
 /** Captures the path the client asks the transport for. */
 function transportSpy() {
@@ -103,5 +104,74 @@ describe("functions.invoke — a name is one segment", () => {
         await client.invoke("weird name", undefined, { method: "GET" });
 
         expect(calls[0].path).toBe("/functions/weird%20name");
+    });
+});
+
+/**
+ * A function is a Hono route, so it may answer `c.text(csv)` or `c.body(pdf)`.
+ *
+ * `invoke()` read every success as JSON, so such a function was unreadable from
+ * the SDK: the call threw `INVALID_JSON_RESPONSE` and told the developer to check
+ * `VITE_API_URL` — a misconfiguration that did not exist. `responseType` asks for
+ * the body as text, a Blob or the raw `Response`, and the refusal for a non-JSON
+ * body now names the content type it saw and the option that reads it.
+ */
+describe("functions.invoke — a function that does not answer JSON", () => {
+    const csv = "id,total\n1,10\n2,20\n";
+
+    function realTransportAnswering(body: string, contentType: string, status = 200) {
+        const fetchFn = jest.fn(async () => new Response(body, { status, headers: { "Content-Type": contentType } }));
+        const transport = createTransport({
+            baseUrl: "https://api.example.com",
+            token: "tok",
+            fetch: fetchFn as unknown as typeof globalThis.fetch
+        });
+        return { transport, fetchFn };
+    }
+
+    it("reads the body as text when asked", async () => {
+        const { transport } = realTransportAnswering(csv, "text/csv");
+        const client = createFunctionsClient(transport);
+
+        await expect(client.invoke("export-orders", undefined, { method: "GET", responseType: "text" }))
+            .resolves.toBe(csv);
+    });
+
+    it("reads the body as a Blob when asked", async () => {
+        const { transport } = realTransportAnswering(csv, "text/csv");
+        const client = createFunctionsClient(transport);
+
+        const blob = await client.invoke<Blob>("export-orders", undefined, { method: "GET", responseType: "blob" });
+        expect(blob).toBeInstanceOf(Blob);
+        await expect(blob.text()).resolves.toBe(csv);
+    });
+
+    it("hands back the raw Response when asked", async () => {
+        const { transport } = realTransportAnswering(csv, "text/csv");
+        const client = createFunctionsClient(transport);
+
+        const res = await client.invoke<Response>("export-orders", undefined, { method: "GET", responseType: "response" });
+        expect(res.headers.get("Content-Type")).toBe("text/csv");
+        await expect(res.text()).resolves.toBe(csv);
+    });
+
+    it("still throws the API error for a failed call in a raw mode", async () => {
+        const { transport } = realTransportAnswering(
+            JSON.stringify({ error: { message: "nope", code: "FORBIDDEN" } }), "application/json", 403);
+        const client = createFunctionsClient(transport);
+
+        await expect(client.invoke("export-orders", undefined, { method: "GET", responseType: "text" }))
+            .rejects.toMatchObject({ name: "RebaseApiError", status: 403, code: "FORBIDDEN" });
+    });
+
+    it("names the content type and the option instead of blaming the API URL", async () => {
+        const { transport } = realTransportAnswering(csv, "text/csv");
+        const client = createFunctionsClient(transport);
+
+        const error = await client.invoke("export-orders", undefined, { method: "GET" }).catch((e: unknown) => e);
+        expect(error).toMatchObject({ code: "INVALID_JSON_RESPONSE", status: 200 });
+        expect(String((error as Error).message)).toMatch(/text\/csv/);
+        expect(String((error as Error).message)).toMatch(/responseType/);
+        expect(String((error as Error).message)).not.toMatch(/VITE_API_URL/);
     });
 });
