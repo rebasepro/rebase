@@ -88,6 +88,38 @@ export function clearFetchCache(): void {
 }
 
 /**
+ * `delivered`, with every relation property it does not carry taken from the
+ * record already on screen.
+ *
+ * A record's listener (`listenById`) takes no `include`, so its frames never
+ * carry a to-many relation — the key is absent, not empty. The list row a click
+ * opens the record on does carry it (a list read includes every relation
+ * property). Replaced wholesale, the first frame took `tags` off the screen; the
+ * form follows an untouched field, so the field emptied, and a tag added to it
+ * was saved as the whole set — which a many-to-many save takes as the new
+ * membership, unlinking every other tag. Absent is "not delivered": the value
+ * the record was opened with stands until a frame carries one (an empty array
+ * included). Same record only; nothing survives a deletion.
+ */
+function keepUndeliveredRelations<M extends Record<string, any>>(
+    shown: Entity<M> | undefined,
+    delivered: Entity<M>,
+    collection: AdminCollection<M, any>
+): Entity<M> {
+    if (!shown || String(shown.id) !== String(delivered.id)) return delivered;
+    const properties = collection.properties;
+    if (!properties) return delivered;
+    let values: M | undefined;
+    for (const [name, property] of Object.entries(properties)) {
+        if (property?.type !== "relation") continue;
+        if (name in (delivered.values ?? {}) || !(name in (shown.values ?? {}))) continue;
+        values ??= { ...delivered.values };
+        values[name as keyof M] = shown.values[name];
+    }
+    return values ? { ...delivered, values } : delivered;
+}
+
+/**
  * This hook is used to fetch a entity.
  * It gives real time updates if the driver supports it.
  * @param path
@@ -133,8 +165,12 @@ export function useFetch<M extends Record<string, any>, USER extends User = User
 
         // Whether a record is on screen — the cached one counts.
         let showingEntity = Boolean(cached);
+        // The record on screen, so a frame can be read against it.
+        let shown: Entity<M> | undefined = cached;
 
-        const onEntityUpdate = async (updatedEntity?: Entity<M> | null) => {
+        const onEntityUpdate = async (delivered?: Entity<M> | null) => {
+            const updatedEntity = delivered ? keepUndeliveredRelations(shown, delivered, collection) : delivered;
+            shown = updatedEntity ?? undefined;
             showingEntity = Boolean(updatedEntity);
             writeCache(key, updatedEntity ?? undefined);
             setEntity(updatedEntity ?? undefined);
