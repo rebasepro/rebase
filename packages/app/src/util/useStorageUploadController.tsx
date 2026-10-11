@@ -4,7 +4,8 @@ import Compressor from "compressorjs";
 import { deepEqual as equal } from "fast-equals";
 
 import { resourceKeyOf } from "@rebasepro/types";
-import { EntityValues, StorageConfig, StorageSource, StorageSourceRegistry } from "@rebasepro/types";import { useCallback, useEffect, useMemo, useState } from "react";
+import { EntityValues, StorageConfig, StorageSource, StorageSourceRegistry, UploadFileProps } from "@rebasepro/types";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { resolveStorageFilenameString, resolveStoragePathString, resolveStorageSource } from "@rebasepro/common";
 import { useAuthController } from "../hooks";
 import { useStorageSources } from "../contexts/StorageSourcesContext";
@@ -36,6 +37,7 @@ export function useStorageUploadController<M extends Record<string, unknown>>({
     propertyKey,
     storageSource,
     storageSourceRegistry,
+    collectionSlug,
     disabled,
     onChange
 }:
@@ -50,6 +52,9 @@ export function useStorageUploadController<M extends Record<string, unknown>>({
         /** Optional explicit registry. When omitted, the hook reads from the
          *  `StorageSourcesContext` provided by `<Rebase storageSources={...}>`. */
         storageSourceRegistry?: StorageSourceRegistry,
+        /** The slug of the collection the property belongs to, so the server
+         *  can hold the upload to the property's own `maxSize`/`acceptedFiles`. */
+        collectionSlug?: string,
         disabled: boolean,
         onChange: (value: string | string[] | null) => void
     }) {
@@ -65,7 +70,7 @@ export function useStorageUploadController<M extends Record<string, unknown>>({
 
     // Resolve the correct storage source for this property.
     // Priority: explicit registry prop → StorageSourcesContext → default.
-    const resolvedStorageSource = useMemo(() => resolveStorageSource({
+    const propertySource = useMemo(() => resolveStorageSource({
         sourceKey: storage?.storageSource === undefined ? undefined : resourceKeyOf(storage.storageSource),
         registry: storageSourceRegistry,
         sources: storageSources.sources,
@@ -74,6 +79,21 @@ export function useStorageUploadController<M extends Record<string, unknown>>({
     }), [storage?.storageSource, storageSourceRegistry, storageSources.sources, storageSources.createSource, storageSource]);
 
     const multipleFilesSupported = property.type === "array";
+
+    // What every upload of this property tells the storage source beyond the
+    // file: `storage.public` (stored under the public prefix, served by a
+    // stable token-less URL) and which property it is for. Neither used to be
+    // sent, so a `public: true` field stored private files with expiring URLs,
+    // and the server could not hold the upload to the property's own limits.
+    //
+    // Carried by the source this hook hands out — the one the field provides
+    // to its upload components — so every upload of the property sends them,
+    // whichever component calls `putObject`.
+    const isPublic = storage?.public === true;
+    const resolvedStorageSource = useMemo(() => withUploadOptions(propertySource, {
+        ...(isPublic ? { public: true } : {}),
+        ...(collectionSlug ? { context: { collection: collectionSlug, property: propertyKey } } : {})
+    }), [propertySource, isPublic, collectionSlug, propertyKey]);
 
     if (!storage)
         throw Error("Storage meta must be specified");
@@ -259,7 +279,8 @@ export function useStorageUploadController<M extends Record<string, unknown>>({
         onFilesAdded,
         multipleFilesSupported,
         /** The resolved StorageSource for this property — may differ from the
-         *  default context source when `StorageConfig.storageSource` is set. */
+         *  default context source when `StorageConfig.storageSource` is set —
+         *  whose uploads carry the property's `public` flag and `context`. */
         resolvedStorageSource
     }
 }
@@ -353,4 +374,23 @@ async function resizeImage(
             error: reject
         });
     });
+}
+
+/**
+ * `source`, with `options` sent on every `putObject` (a call's own values win).
+ * Delegates method by method rather than spreading, so a class-based source
+ * keeps its `this`.
+ */
+function withUploadOptions(
+    source: StorageSource,
+    options: Pick<UploadFileProps, "public" | "context">
+): StorageSource {
+    if (options.public === undefined && options.context === undefined) return source;
+    return {
+        putObject: (props) => source.putObject({ ...options, ...props }),
+        getSignedUrl: (keyOrUrl, bucket) => source.getSignedUrl(keyOrUrl, bucket),
+        getObject: (key, bucket) => source.getObject(key, bucket),
+        deleteObject: (key, bucket) => source.deleteObject(key, bucket),
+        listObjects: (prefix, options) => source.listObjects(prefix, options)
+    };
 }

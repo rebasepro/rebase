@@ -214,9 +214,14 @@ export function MarkdownEditorFieldBinding({
             const storagePath = storagePathBuilder(file);
             const fileName = await fileNameBuilder(file);
             const key = `${storagePath}/${fileName}`.replace(/^\/+/, "").replace(/\/+/g, "/");
+            const collectionSlug = context.collection?.slug;
             const result = await storageSource.putObject({
                 file,
-                key
+                key,
+                // The property's own `storage.public`, and which property this
+                // is, so the server holds the image to its limits.
+                ...(storage?.public ? { public: true } : {}),
+                ...(collectionSlug ? { context: { collection: collectionSlug, property: propertyKey } } : {})
             });
             // The text keeps a reference to the object, never its URL. A
             // private object's URL carries a download token that expires in

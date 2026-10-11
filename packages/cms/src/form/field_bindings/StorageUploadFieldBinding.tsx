@@ -89,6 +89,7 @@ export function StorageUploadFieldBinding({
         entityValues: context.values,
         entityId: context.entityId,
         path: context.path,
+        collectionSlug: context.collection?.slug,
         property,
         propertyKey,
         value: value as string | string[] | null,

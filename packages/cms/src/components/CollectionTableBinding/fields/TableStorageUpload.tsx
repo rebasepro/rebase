@@ -11,6 +11,7 @@ import { cls, IconButton, PencilIcon, Typography } from "@rebasepro/ui";
 import { useSnackbarController, useStorageSource, useTranslation, StorageFieldItem, useStorageUploadController, StorageSourceContext } from "@rebasepro/app";
 import { getThumbnailMeasure } from "../../../preview/util";
 import { StorageUploadProgress } from "../../../form/components/StorageUploadProgress";
+import { useCollectionRegistryController } from "../../../hooks/navigation/contexts/CollectionRegistryContext";
 import { EntityTableCellActions } from "../internal/EntityTableCellActions";
 
 const dropZoneClasses = "max-w-full box-border relative pt-[2px] items-center border border-transparent outline-hidden rounded-md duration-200 ease-[cubic-bezier(0.4,0,0.2,1)] focus:border-primary";
@@ -56,6 +57,7 @@ export function TableStorageUpload(props: {
     } = props;
 
     const storageSource = useStorageSource();
+    const collectionSlug = useCollectionRegistryController().getCollection(path)?.slug;
 
     const {
         internalValue,
@@ -70,6 +72,7 @@ export function TableStorageUpload(props: {
         entityValues: entity.values,
         entityId: entity.id,
         path,
+        collectionSlug,
         property: property as StringProperty,
         propertyKey,
         storageSource,

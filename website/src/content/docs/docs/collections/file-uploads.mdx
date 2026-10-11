@@ -102,9 +102,11 @@ own storage source. Placeholders match whatever the panel would fill in:
 - An upload that also names its property (`collection` + `property`, as
   `putObject({ context })` sends them) is held to that property too. Naming a
   looser property does not unlock a stricter one's path.
+  The panel's uploads (file fields, table cells and markdown images) always
+  name it.
 - A `storagePath` written as a function cannot be read without running it, so
   it has no server-side rule: those limits hold only for uploads that name the
-  property.
+  property, which the panel's do.
 - A path no property claims is held to the source's own limit
   (`STORAGE_MAX_FILE_SIZE`) alone.
 
