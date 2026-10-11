@@ -637,7 +637,8 @@ type RebaseClient = {
         listRoles: () => Promise<unknown>;
     };
     cron: {
-        listJobs: () => Promise<{ jobs: unknown[] }>;
+        // `CronJobListing`: the refused and unloadable cron files ride beside the jobs.
+        listJobs: () => Promise<{ jobs: unknown[]; skipped?: number; rejected?: unknown[]; note?: string }>;
         getJob: (jobId: string) => Promise<{ job: unknown }>;
         triggerJob: (jobId: string) => Promise<{ log: unknown; job: unknown }>;
         getJobLogs: (jobId: string, options?: { limit?: number }) => Promise<{ logs: unknown[] }>;
