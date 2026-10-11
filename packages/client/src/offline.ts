@@ -3,7 +3,7 @@ import { FindAllParams, FindResult, IterateParams, LogicalCondition, SDKCollecti
 import { collectAllPages, normalizeOrderBy, paginateFind } from "@rebasepro/common";
 import { CollectionClient, LiveResult, ObserveOptions, RowSnapshotMeta } from "./collection";
 import { SDKQueryBuilder } from "./sdk_query_builder";
-import { dehydrateRow, hydrateRow, setOwn } from "./offline-codec";
+import { dehydrateMutation, dehydrateRow, hydrateMutation, hydrateRow, setOwn } from "./offline-codec";
 import { RebaseClientError } from "./errors";
 import {
     ConnectivityMonitor,
@@ -618,13 +618,14 @@ export class OfflineManager {
                     if (this.scope === SIGNED_OUT_SCOPE) return [];
                     // Read off the store, never loaded into `queue`: nothing
                     // here may replay under the signed-in user's credentials.
-                    return await this.store.listQueue(`${SIGNED_OUT_SCOPE}|`);
+                    return await this.readQueue(`${SIGNED_OUT_SCOPE}|`);
                 }
                 await this.ensureQueueLoaded();
                 // Deep-copied: these are live queue entries (tail coalescing
                 // mutates them in place), and a caller must not be able to
-                // edit what will be replayed.
-                return this.queue.map((m) => structuredClone(m));
+                // edit what will be replayed. Through the codec, which a bare
+                // structured clone would flatten every class instance past.
+                return this.queue.map((m) => hydrateMutation(structuredClone(dehydrateMutation(m))));
             },
             status: () => ({ ...this.currentStatus }),
             onStatusChange: (listener) => {
@@ -2084,7 +2085,7 @@ data: u.data as AnyRow })),
         if (this.scopeHold) return this.scopeKnown().then(() => this.ensureQueueLoaded());
         if (!this.queueLoad) {
             const scope = this.scope;
-            this.queueLoad = this.store.listQueue(`${scope}|`).then((queue) => {
+            this.queueLoad = this.readQueue(`${scope}|`).then((queue) => {
                 // A scope switch during the load must not graft the old
                 // user's queue onto the new one.
                 if (this.scope !== scope) return;
@@ -2111,7 +2112,7 @@ data: u.data as AnyRow })),
                     queuedAt: Date.now(),
                     schemaVersion: QUEUE_SCHEMA_VERSION
                 };
-                await this.store.enqueue(`${ticket.scope}|${orphan.mutationId}`, orphan);
+                await this.persistMutation(`${ticket.scope}|${orphan.mutationId}`, orphan);
                 return;
             }
 
@@ -2147,7 +2148,7 @@ data: u.data as AnyRow })),
                         tail.parts = [...(tail.parts ?? [{ ...(tail.data as AnyRow) }]), { ...(mutation.data as AnyRow) }];
                     }
                     tail.data = { ...(tail.data as AnyRow), ...(mutation.data as AnyRow), id: tail.id };
-                    await this.store.enqueue(this.queueKey(tail), tail);
+                    await this.persistMutation(this.queueKey(tail), tail);
                     return;
                 }
             }
@@ -2189,7 +2190,7 @@ data: u.data as AnyRow })),
                 queuedAt: Date.now(),
                 schemaVersion: QUEUE_SCHEMA_VERSION
             };
-            await this.store.enqueue(this.queueKey(full), full);
+            await this.persistMutation(this.queueKey(full), full);
             this.queue.push(full);
             this.afterQueueChange();
             this.requestPersistence();
@@ -2343,7 +2344,7 @@ data: u.data as AnyRow })),
                             // The server is busy, not unhappy. Keep the op — and
                             // its place in line, since later writes may depend on
                             // it — and come back after a backoff.
-                            await this.store.enqueue(`${ticket.scope}|${op.mutationId}`, op).catch(() => undefined);
+                            await this.persistMutation(`${ticket.scope}|${op.mutationId}`, op).catch(() => undefined);
                             this.connectivity.deferRetry();
                             this.patchStatus({ lastError: op.lastError });
                             break;
@@ -2504,7 +2505,7 @@ data: u.data as AnyRow })),
             // since.
             if (!op.sent) {
                 op.sent = { idempotencyKey: op.mutationId };
-                await this.store.enqueue(`${ticket.scope}|${op.mutationId}`, op).catch(() => undefined);
+                await this.persistMutation(`${ticket.scope}|${op.mutationId}`, op).catch(() => undefined);
             }
             const row = await inner.update(op.id!, op.data as AnyRow, { idempotencyKey: op.sent.idempotencyKey });
             await this.ingestReplaced(op, op.id!, row, ticket);
@@ -2569,7 +2570,7 @@ data: u.data as AnyRow })),
             // are still signed in.
             const queue = this.isCurrent(ticket)
                 ? this.queue
-                : await this.store.listQueue(`${ticket.scope}|`).catch(() => []);
+                : await this.readQueue(`${ticket.scope}|`).catch(() => []);
             // A minted id names nothing but this row, so wherever another
             // queued write carries it — a post's `author_id`, in any
             // collection — it is a reference to this row, and has to follow it.
@@ -2595,7 +2596,7 @@ data: u.data as AnyRow })),
                     }
                 }
                 if (queued.collection !== slug) {
-                    if (dirty) await this.store.enqueue(`${ticket.scope}|${queued.mutationId}`, queued).catch(() => undefined);
+                    if (dirty) await this.persistMutation(`${ticket.scope}|${queued.mutationId}`, queued).catch(() => undefined);
                     continue;
                 }
                 if (queued.id !== undefined && String(queued.id) === oldKey) {
@@ -2613,7 +2614,7 @@ data: u.data as AnyRow })),
                     delete rollbackRows[oldKey];
                     dirty = true;
                 }
-                if (dirty) await this.store.enqueue(`${ticket.scope}|${queued.mutationId}`, queued).catch(() => undefined);
+                if (dirty) await this.persistMutation(`${ticket.scope}|${queued.mutationId}`, queued).catch(() => undefined);
             }
         }
         await this.ingestReplaced(op, serverId ?? localId!, row, ticket);
@@ -2761,7 +2762,7 @@ data: u.data as AnyRow })),
             return piece;
         });
         for (const piece of pieces) {
-            await this.store.enqueue(`${ticket.scope}|${piece.mutationId}`, piece).catch(() => undefined);
+            await this.persistMutation(`${ticket.scope}|${piece.mutationId}`, piece).catch(() => undefined);
         }
         await this.store.dequeue(`${ticket.scope}|${op.mutationId}`).catch(() => undefined);
         if (!this.isCurrent(ticket)) return;
@@ -2887,7 +2888,7 @@ data: u.data as AnyRow })),
     private async reloadQueue(): Promise<void> {
         if (this.scopeHold) return;
         const scope = this.scope;
-        const queue = await this.store.listQueue(`${scope}|`).catch(() => undefined);
+        const queue = await this.readQueue(`${scope}|`).catch(() => undefined);
         if (!queue || this.scope !== scope) return;
         this.queue = queue;
         this.afterQueueChange(false);
@@ -2934,6 +2935,16 @@ data: u.data as AnyRow })),
 
     private queueKey(mutation: PendingMutation): string {
         return `${this.scope}|${mutation.mutationId}`;
+    }
+
+    /** Queue a write in the store, its rows encoded as the cache's are. */
+    private persistMutation(key: string, op: PendingMutation): Promise<void> {
+        return this.store.enqueue(key, dehydrateMutation(op));
+    }
+
+    /** The store's queue under `prefix`, its rows revived. */
+    private async readQueue(prefix: string): Promise<PendingMutation[]> {
+        return (await this.store.listQueue(prefix)).map(hydrateMutation);
     }
 
     private async readCache<T>(key: string): Promise<T | undefined> {

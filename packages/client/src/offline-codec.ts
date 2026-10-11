@@ -1,5 +1,6 @@
 import { EntityReference, EntityRelation, GeoPoint, Vector } from "@rebasepro/types";
 import { rebaseReviver } from "./reviver";
+import type { PendingMutation } from "./offline-store";
 
 /**
  * Lossless round-tripping of rows through the offline store.
@@ -86,4 +87,40 @@ export function dehydrateRow<T extends Record<string, unknown>>(row: T): Record<
 /** Restore a row read back from the store. */
 export function hydrateRow<T extends Record<string, unknown>>(row: Record<string, unknown>): T {
     return hydrateValue(row) as T;
+}
+
+/**
+ * A queued write as the store keeps it, and back. Its payloads are rows, and
+ * a row read back from the queue has to be the row that was queued: stored
+ * raw, a pending `GeoPoint` came back after a reload as a bare
+ * `{ latitude, longitude }`, was overlaid onto the server's rows, and was
+ * written back to the cache that way.
+ */
+function mapMutation(op: PendingMutation, map: (value: unknown) => unknown): PendingMutation {
+    const rows = (value: PendingMutation["data"]) => value === undefined ? value : map(value) as PendingMutation["data"];
+    return {
+        ...op,
+        ...(op.data !== undefined ? { data: rows(op.data) } : {}),
+        ...(op.parts ? { parts: op.parts.map((part) => map(part) as Record<string, unknown>) } : {}),
+        ...(op.updates ? { updates: op.updates.map((u) => ({ id: u.id, data: map(u.data) as Record<string, unknown> })) } : {}),
+        ...(op.rollback
+            ? {
+                rollback: {
+                    rows: Object.fromEntries(Object.entries(op.rollback.rows).map(([id, row]) =>
+                        [id, row === null ? null : map(row) as Record<string, unknown>]))
+                }
+            }
+            : {}),
+        ...(op.sent?.data !== undefined ? { sent: { ...op.sent, data: rows(op.sent.data) } } : {})
+    };
+}
+
+/** Prepare a queued write for the store. */
+export function dehydrateMutation(op: PendingMutation): PendingMutation {
+    return mapMutation(op, dehydrateValue);
+}
+
+/** Restore a queued write read back from the store. */
+export function hydrateMutation(op: PendingMutation): PendingMutation {
+    return mapMutation(op, hydrateValue);
 }

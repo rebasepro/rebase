@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from "@jest/globals";
+import { GeoPoint } from "@rebasepro/types";
 import { OfflineManager } from "../src/offline";
 import { MemoryOfflineStore, type PendingMutation } from "../src/offline-store";
 import { fakeServer, manager, networkError, restoreNavigator, setNavigatorOnLine } from "./support/offline-fake-server";
@@ -282,5 +283,22 @@ describe("the local database's bounds (L3)", () => {
         for (const limit of [1, 2, 3]) await posts.find({ limit });
         const state = (Reflect.get(offline, "collections") as Map<string, { fresh: Set<string> }>).get("posts")!;
         expect(state.fresh.size).toBe(1);
+    });
+});
+
+describe("a queued write read back after a reload (L2)", () => {
+    it("keeps its class instances, as the cached rows do", async () => {
+        const server = fakeServer();
+        const store = new MemoryOfflineStore();
+        const first = new OfflineManager({ store, syncIntervalMs: 0 }, () => server.client);
+        setNavigatorOnLine(false);
+        await first.wrap("posts", server.client).create({ title: "pin", location: new GeoPoint(45.4, 9.2) });
+        first.dispose();
+
+        // The page reloads.
+        const second = new OfflineManager({ store, syncIntervalMs: 0 }, () => server.client);
+        const [queued] = await second.api.pending();
+        expect((queued.data as { location: unknown }).location).toBeInstanceOf(GeoPoint);
+        expect((queued.data as { location: GeoPoint }).location.latitude).toBe(45.4);
     });
 });
