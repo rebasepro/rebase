@@ -1889,6 +1889,7 @@ data: u.data as AnyRow })),
             state.absent.add(key);
             state.freshRows.add(key);
             void this.writeCache(this.absentKey(slug, key), true);
+            this.capTombstones(slug);
         } else {
             state.freshRows.delete(key);
         }
@@ -2047,14 +2048,21 @@ data: u.data as AnyRow })),
         const doomed = evictable.slice(0, excess);
         for (const [key] of doomed) state.rows.delete(key);
         if (doomed.length > 0) void this.deleteCache(doomed.map(([key]) => this.rowKey(slug, key)));
+    }
 
-        // Tombstones are tiny but unbounded — every row the app ever asked for
-        // and did not find leaves one. Cap them against the same budget.
-        if (state.absent.size > this.maxCachedRows) {
-            const stale = [...state.absent].slice(0, state.absent.size - this.maxCachedRows);
-            for (const key of stale) state.absent.delete(key);
-            void this.deleteCache(stale.map((key) => this.absentKey(slug, key)));
-        }
+    /**
+     * Tombstones are tiny but unbounded — every row the app ever asked for and
+     * did not find leaves one. Capped against the row budget, oldest first,
+     * whenever one is added: the cap used to sit behind the row cache's own
+     * early return, so it only applied once the rows were over theirs, and
+     * looking up missing ids grew the set without limit.
+     */
+    private capTombstones(slug: string): void {
+        const state = this.collections.get(slug);
+        if (!state || state.absent.size <= this.maxCachedRows) return;
+        const stale = [...state.absent].slice(0, state.absent.size - this.maxCachedRows);
+        for (const key of stale) state.absent.delete(key);
+        void this.deleteCache(stale.map((key) => this.absentKey(slug, key)));
     }
 
     private evictSnapshots(slug: string): void {
@@ -2063,7 +2071,10 @@ data: u.data as AnyRow })),
         // Insertion order is recency order for a Map that re-sets on write.
         const excess = state.snapshots.size - this.maxCachedQueries;
         const doomed = [...state.snapshots.keys()].slice(0, excess);
-        for (const key of doomed) state.snapshots.delete(key);
+        for (const key of doomed) {
+            state.snapshots.delete(key);
+            state.fresh.delete(key);
+        }
         void this.deleteCache(doomed.map((key) => `${this.scope}|q|${slug}|${key}`));
     }
 

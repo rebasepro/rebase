@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from "@jest/globals";
-import type { PendingMutation } from "../src/offline-store";
+import { OfflineManager } from "../src/offline";
+import { MemoryOfflineStore, type PendingMutation } from "../src/offline-store";
 import { fakeServer, manager, networkError, restoreNavigator, setNavigatorOnLine } from "./support/offline-fake-server";
 
 /**
@@ -261,5 +262,25 @@ describe("a count answered while writes are queued (M11)", () => {
         await posts.find({ limit: 2 });
         setNavigatorOnLine(false);
         await expect(posts.count()).rejects.toMatchObject({ code: "OFFLINE" });
+    });
+});
+
+describe("the local database's bounds (L3)", () => {
+    it("caps the remembered missing ids even while the row cache is under its own cap", async () => {
+        const server = fakeServer();
+        const offline = new OfflineManager({ store: new MemoryOfflineStore(), syncIntervalMs: 0, maxCachedRowsPerCollection: 2 }, () => server.client);
+        const posts = offline.wrap("posts", server.client);
+        for (const id of ["a", "b", "c", "d", "e"]) await posts.findById(id);
+        const state = (Reflect.get(offline, "collections") as Map<string, { absent: Set<string> }>).get("posts")!;
+        expect(state.absent.size).toBeLessThanOrEqual(2);
+    });
+
+    it("forgets that an evicted query was fresh", async () => {
+        const server = fakeServer();
+        const offline = new OfflineManager({ store: new MemoryOfflineStore(), syncIntervalMs: 0, maxCachedQueriesPerCollection: 1 }, () => server.client);
+        const posts = offline.wrap("posts", server.client);
+        for (const limit of [1, 2, 3]) await posts.find({ limit });
+        const state = (Reflect.get(offline, "collections") as Map<string, { fresh: Set<string> }>).get("posts")!;
+        expect(state.fresh.size).toBe(1);
     });
 });
