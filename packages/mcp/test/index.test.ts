@@ -1913,6 +1913,25 @@ describe("error ergonomics", () => {
         expect(result.content[0].text).toContain("backend/crons/");
     });
 
+    // The scheduler refused the only job (a 6-field schedule): the listing has
+    // no jobs, but says why — and the tool answered "declares no cron jobs".
+    it("passes refused and unloadable cron files through instead of saying there are none", async () => {
+        mockClient.cron.listJobs.mockResolvedValueOnce({
+            jobs: [],
+            skipped: 1,
+            rejected: [{ id: "nightly", name: "nightly", schedule: "0 0 0 * * *", reason: "Expected 5 fields, got 6" }],
+            note: "1 cron file did not become a job."
+        });
+        const result = await handler()({
+            method: "tools/call",
+            params: { name: "cron_list_jobs", arguments: {} }
+        });
+        const text = result.content[0].text as string;
+        expect(text).not.toContain("declares no cron jobs");
+        expect(text).toContain("Expected 5 fields, got 6");
+        expect(text).toContain("nightly");
+    });
+
     it("leaves a 404 alone for a tool whose surface is always mounted", () => {
         const notFound = Object.assign(new Error("Not Found"), { status: 404 });
         expect(explainToolError(notFound, "http://x", "get_document")).toBe("Not Found");

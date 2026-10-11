@@ -2260,7 +2260,11 @@ roles });
             // An empty list is the same situation as an unmounted surface, and
             // `{ "jobs": [] }` on its own reads as a failure to an agent that
             // asked what runs on a schedule. Say what a job is made of.
-            if (!result?.jobs?.length) {
+            // But a listing with no jobs and refused or unloadable files is not
+            // "declares no cron jobs": the jobs are there, and the scheduler
+            // said why it did not run them (`rejected`, `skipped`, `note`).
+            const refusedOrSkipped = (result?.rejected?.length ?? 0) > 0 || (result?.skipped ?? 0) > 0;
+            if (!result?.jobs?.length && !refusedOrSkipped) {
                 return textResult(
                     "This project declares no cron jobs. Add one at `backend/crons/<name>.ts`, " +
                     "default-exporting a `CronJobDefinition`, and restart `rebase dev` — the " +
