@@ -20,10 +20,11 @@ describe("extractEnumFromValues", () => {
         expect(myVal!.label.length).toBeGreaterThan(0);
     });
 
-    it("filters out non-string values", () => {
-        const result = extractEnumFromValues(["hello", 42, null, undefined, "world"]);
-        expect(result).toHaveLength(2);
-        expect(result.map(e => e.id)).toEqual(expect.arrayContaining(["hello", "world"]));
+    // A number beside text is one of the column's options, by its text:
+    // dropped, the enum refused the rows it was inferred from.
+    it("keeps numbers and booleans as their text, and drops null and objects", () => {
+        const result = extractEnumFromValues(["hello", 42, null, undefined, "world", true, { a: 1 }, "42"]);
+        expect(result.map(e => e.id).sort()).toEqual(["42", "hello", "true", "world"]);
     });
 
     it("returns empty array for empty input", () => {

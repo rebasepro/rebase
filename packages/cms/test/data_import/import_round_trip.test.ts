@@ -106,3 +106,23 @@ describe("every column gets a property of its own", () => {
         expect(fromFile.headingsOrder).not.toContain("constructor");
     });
 });
+
+describe("the inferred schema accepts the file it was inferred from", () => {
+    // A size column `S, M, L, XL, 10, 12` got the enum `[L, M, S, XL]`: the
+    // numbers were dropped from it, and their rows refused at save.
+    test("an enum holds the numbers a text column mixes in", async () => {
+        const { properties, entities } = await importIntoNewCollection("g_enum.csv");
+        const size = properties.size as { enum?: Array<{ id: string }> };
+        expect(size.enum).toBeDefined();
+        const ids = new Set((size.enum ?? []).map(option => option.id));
+        for (const entity of entities) expect(ids.has(String(entity.values.size))).toBe(true);
+    });
+
+    // With 4 of 5 values valid, the column was inferred `email: true` /
+    // `url: true`, and the fifth row was refused at save.
+    test("email and url hold only when every value is one", async () => {
+        const { properties } = await importIntoNewCollection("h_strings.csv");
+        expect(properties.email).not.toHaveProperty("email", true);
+        expect(properties.site).not.toHaveProperty("url", true);
+    });
+});

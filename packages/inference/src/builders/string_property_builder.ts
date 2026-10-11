@@ -9,6 +9,18 @@ const VIDEO_EXTENSIONS = [".avi", ".mp4"];
 
 const emailRegEx = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
 
+// The shape the server checks an `email` property against
+// (`write-validation.ts`): the regex above alone accepts `a@localhost`.
+const EMAIL_SHAPE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function isAbsoluteUrl(value: string): boolean {
+    try {
+        return Boolean(new URL(value).protocol);
+    } catch {
+        return false;
+    }
+}
+
 export function buildStringProperty({
     name,
     totalDocsCount,
@@ -28,16 +40,20 @@ export function buildStringProperty({
 
         const config: Partial<StringProperty> = {};
 
-        const probablyAURL = valuesResult.values
-            .filter((value) => typeof value === "string" &&
-                value.toString().startsWith("http")).length > totalDocsCount / 3 * 2;
+        // `url` and `email` are constraints a write is checked against, so
+        // they hold only when every value the column has meets them: set at
+        // two thirds, the import refused the rest of the rows it was inferred
+        // from. A blank is no value.
+        const nonBlank = valuesResult.values.filter((value) => value !== "" && value !== null && value !== undefined);
+        const everyValue = (test: (value: string) => boolean) =>
+            nonBlank.length > 0 && nonBlank.every((value) => typeof value === "string" && test(value));
+
+        const probablyAURL = everyValue((value) => value.startsWith("http") && isAbsoluteUrl(value));
         if (probablyAURL) {
             config.url = true;
         }
 
-        const probablyAnEmail = valuesResult.values
-            .filter((value) => typeof value === "string" &&
-                emailRegEx.test(value)).length > totalDocsCount / 3 * 2;
+        const probablyAnEmail = everyValue((value) => emailRegEx.test(value) && EMAIL_SHAPE.test(value));
         if (probablyAnEmail) {
             config.email = true;
         }

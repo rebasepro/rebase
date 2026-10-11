@@ -1,0 +1,7 @@
+id,email,site
+1,ann@example.com,https://a.example.com
+2,bob@example.com,https://b.example.com
+3,cy@example.com,https://c.example.com
+4,dee@example.com,https://d.example.com
+5,not an email,http//broken
+6,,

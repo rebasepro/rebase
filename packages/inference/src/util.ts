@@ -12,16 +12,18 @@ export function extractEnumFromValues(values: unknown[]) {
     if (!Array.isArray(values)) {
         return [];
     }
-    const enumValues = values
-        .map((value) => {
-            if (typeof value === "string") {
-                return ({
-                    id: value,
-                    label: unslugify(value)
-                });
-            } else
-                return null;
-        }).filter(Boolean) as Array<{ id: string, label: string }>;
+    // A number or a boolean in a text column is one of its options too (`10`
+    // and `12` beside `S`, `M`, `L`): left out, the enum refused the rows it
+    // was inferred from. Its id is its text, which is what the import writes.
+    const seen = new Set<string>();
+    const enumValues: Array<{ id: string, label: string }> = [];
+    for (const value of values) {
+        if (typeof value !== "string" && typeof value !== "number" && typeof value !== "boolean") continue;
+        const id = String(value);
+        if (seen.has(id)) continue;
+        seen.add(id);
+        enumValues.push({ id, label: typeof value === "string" ? unslugify(value) : id });
+    }
     enumValues.sort((a, b) => a.label.localeCompare(b.label));
     return enumValues;
 }
