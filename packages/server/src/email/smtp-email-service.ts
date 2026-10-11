@@ -64,6 +64,13 @@ function assertSafeHeaders(headers: Record<string, string> | undefined): void {
 const DEFAULT_MAX_CONNECTIONS = 5;
 
 /**
+ * Connect, greeting and socket-silence timeout for SMTP, unless
+ * `smtp.timeoutMs` says otherwise. Under the 60 seconds a proxy commonly
+ * allows, because the auth routes await their mail inside the request.
+ */
+export const DEFAULT_SMTP_TIMEOUT_MS = 30_000;
+
+/**
  * How long the connection pool may sit unused before it is closed.
  *
  * Long enough that a burst — a team invited at once, a `Promise.all` over
@@ -156,6 +163,9 @@ export class SMTPEmailService implements EmailService {
                 host: this.config.smtp.host,
                 port: this.config.smtp.port,
                 secure: this.config.smtp.secure ?? (this.config.smtp.port === 465),
+                connectionTimeout: this.config.smtp.timeoutMs ?? DEFAULT_SMTP_TIMEOUT_MS,
+                greetingTimeout: this.config.smtp.timeoutMs ?? DEFAULT_SMTP_TIMEOUT_MS,
+                socketTimeout: this.config.smtp.timeoutMs ?? DEFAULT_SMTP_TIMEOUT_MS,
                 auth: this.config.smtp.auth ? {
                     user: this.config.smtp.auth.user,
                     pass: this.config.smtp.auth.pass

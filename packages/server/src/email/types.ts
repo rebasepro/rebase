@@ -31,6 +31,16 @@ export interface SMTPConfig {
      * mailbox — Office 365 SMTP AUTH allows 3.
      */
     maxConnections?: number;
+    /**
+     * How long to wait for the server to accept the connection, to greet, and
+     * between any two of its replies, in milliseconds. Default 30000.
+     *
+     * Invitation, verification and reset mails are sent while the request that
+     * asked for them waits, so this bounds that request too. nodemailer's own
+     * defaults — two minutes to connect, ten minutes of silence — outlast
+     * every proxy in front of the server.
+     */
+    timeoutMs?: number;
 }
 
 /**

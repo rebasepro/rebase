@@ -59,6 +59,7 @@ const backend = await initializeRebaseBackend({
                         ? { user: env.SMTP_USER, pass: env.SMTP_PASS! }
                         : undefined,
                     name: env.SMTP_NAME,               // Optional EHLO/HELO hostname
+                    timeoutMs: 30_000,                 // Connect, greeting and silence limit (the default)
                 },
                 appName: env.APP_NAME,
                 logoUrl: env.EMAIL_LOGO_URL,           // Logo shown atop the default templates
