@@ -5,6 +5,7 @@ import {
     Typography
 } from "../components";
 import { cls } from "../util";
+import { useUiLabels } from "../hooks/UiLabelsContext";
 import { getScrollParent, useScrollParentRestoration, type ViewScrollEvent } from "./useScrollParentRestoration";
 
 export type CollectionSize = "xs" | "s" | "m" | "l" | "xl";
@@ -116,6 +117,7 @@ export function ListView<T>({
     header,
     renderRow
 }: ListViewProps<T>) {
+    const labels = useUiLabels();
     const containerRef = useRef<HTMLDivElement>(null);
     // The rows' own box, which a header shifts down from the container's top.
     // Virtualization measures against it rather than against the container, so
@@ -239,7 +241,7 @@ export function ListView<T>({
             {dataLoadingError && data.length === 0 ? (
                 <div className="flex items-center justify-center p-8">
                     <Typography className="text-red-500">
-                        Error loading data: {dataLoadingError.message}
+                        {labels.errorLoadingData(dataLoadingError.message)}
                     </Typography>
                 </div>
             ) : isInitialLoading ? (
@@ -250,7 +252,7 @@ export function ListView<T>({
                 <div className="w-full flex items-center justify-center py-12 px-8">
                     {emptyComponent ?? (
                         <Typography variant="label" color="secondary">
-                            No entries found
+                            {labels.noEntriesFound}
                         </Typography>
                     )}
                 </div>
@@ -326,7 +328,7 @@ export function ListView<T>({
                                 style={{ position: "absolute", top: totalHeight, left: 0, right: 0 }}
                             >
                                 <Typography variant="caption" color="secondary">
-                                    All {data.length} entries loaded
+                                    {labels.allEntriesLoaded(data.length)}
                                 </Typography>
                             </div>
                         )}

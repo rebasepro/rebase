@@ -1,5 +1,5 @@
 import type { Property } from "@rebasepro/types";
-import { formatRelativeTime } from "@rebasepro/utils";
+import { formatRelativeTime, type RelativeTimeLabels } from "@rebasepro/utils";
 import { getDatePropertyMode, getDatePropertyTimezone } from "../preview/util";
 
 export type FormatCollectionDateOptions = {
@@ -7,6 +7,8 @@ export type FormatCollectionDateOptions = {
     now?: Date;
     /** BCP 47 locale. Defaults to the browser's. */
     locale?: string;
+    /** The relative phrases, in the admin language (`useUiLabels().relativeTime`). English when absent. */
+    relativeTimeLabels?: Partial<RelativeTimeLabels>;
 };
 
 function yearIn(date: Date, timeZone: string | undefined): string {
@@ -55,7 +57,7 @@ export function formatCollectionDate(
         // A date slot holds whatever the collection points it at, as often a
         // due or publish date as an `updated_at`; `formatRelativeTime` reads
         // the sign, so a scheduled date says "in 3d".
-        const relative = formatRelativeTime(date, { now });
+        const relative = formatRelativeTime(date, { now, labels: options.relativeTimeLabels });
         if (relative) return relative;
     }
 

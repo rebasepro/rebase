@@ -1,10 +1,11 @@
-import React, { PropsWithChildren, useEffect, useRef } from "react";
+import React, { PropsWithChildren, useEffect, useMemo, useRef } from "react";
 import i18next, { BackendModule, i18n } from "i18next";
 import { I18nextProvider, initReactI18next } from "react-i18next";
-import { loadChunk } from "@rebasepro/ui";
+import { loadChunk, UiLabelsProvider, type UiLabelsProviderProps } from "@rebasepro/ui";
 import { en } from "../locales/en";
 import { RebaseTranslations } from "@rebasepro/cms-types";
 import { readStoredString, writeStoredString } from "../util/local_storage";
+import { useTranslation } from "../hooks/useTranslation";
 
 const REBASE_NS = "rebase_core";
 
@@ -178,7 +179,9 @@ export function RebaseI18nProvider({
 
     return (
         <I18nextProvider i18n={i18nRef.current}>
-            {children}
+            <UiLabelsFromTranslations>
+                {children}
+            </UiLabelsFromTranslations>
         </I18nextProvider>
     );
 }
@@ -248,4 +251,34 @@ function createLocaleBackend(getOverrides: () => TranslationOverrides | undefine
             );
         }
     };
+}
+
+/**
+ * The UI kit's own words (`@rebasepro/ui`'s list and card notices, the table's
+ * error title, the search bar's names, relative dates) in the admin language.
+ * The kit speaks English on its own; this fills its labels from the
+ * translations, and refills them when the language changes.
+ */
+function UiLabelsFromTranslations({ children }: PropsWithChildren) {
+    const { t, i18n } = useTranslation();
+    const language = i18n.language;
+    const labels = useMemo((): UiLabelsProviderProps["labels"] => ({
+        errorLoadingData: (message) => t("error_loading_data_message", { message }),
+        noEntriesFound: t("no_entries_found"),
+        allEntriesLoaded: (count) => t("all_entries_loaded", { count }),
+        error: t("error"),
+        search: t("search"),
+        clearSearch: t("clear_search"),
+        relativeTime: {
+            justNow: t("relative_just_now"),
+            inAMoment: t("relative_in_a_moment"),
+            minutesAgo: (count) => t("relative_minutes_ago", { count }),
+            inMinutes: (count) => t("relative_in_minutes", { count }),
+            hoursAgo: (count) => t("relative_hours_ago", { count }),
+            inHours: (count) => t("relative_in_hours", { count }),
+            daysAgo: (count) => t("relative_days_ago", { count }),
+            inDays: (count) => t("relative_in_days", { count })
+        }
+    }), [t, language]);
+    return <UiLabelsProvider labels={labels}>{children}</UiLabelsProvider>;
 }

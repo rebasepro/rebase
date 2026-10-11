@@ -102,3 +102,32 @@ describe("formatRelativeTime", () => {
         expect(formatRelativeTime(new Date(Date.now() + 5.5 * MINUTE))).toBe("in 5m");
     });
 });
+
+describe("formatRelativeTime in another language", () => {
+    const italian = {
+        justNow: "adesso",
+        inAMoment: "tra un attimo",
+        minutesAgo: (n: number) => `${n} min fa`,
+        inMinutes: (n: number) => `tra ${n} min`,
+        hoursAgo: (n: number) => `${n} h fa`,
+        inHours: (n: number) => `tra ${n} h`,
+        daysAgo: (n: number) => (n === 1 ? "ieri" : `${n} giorni fa`),
+        inDays: (n: number) => (n === 1 ? "domani" : `tra ${n} giorni`)
+    };
+
+    it("says every phrase with the labels it is given", () => {
+        const say = (ms: number) => formatRelativeTime(at(ms), { now: NOW, labels: italian });
+        expect(say(-30 * 1000)).toBe("adesso");
+        expect(say(30 * 1000)).toBe("tra un attimo");
+        expect(say(-5 * MINUTE)).toBe("5 min fa");
+        expect(say(5 * MINUTE)).toBe("tra 5 min");
+        expect(say(-3 * HOUR)).toBe("3 h fa");
+        expect(say(3 * HOUR)).toBe("tra 3 h");
+        expect(say(-1 * DAY)).toBe("ieri");
+        expect(say(2 * DAY)).toBe("tra 2 giorni");
+    });
+
+    it("fills a phrase left out with the English one", () => {
+        expect(formatRelativeTime(at(-5 * MINUTE), { now: NOW, labels: { justNow: "adesso" } })).toBe("5m ago");
+    });
+});

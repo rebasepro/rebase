@@ -13,7 +13,8 @@ import {
     IconButton,
     Tooltip,
     Typography,
-    ListView
+    ListView,
+    useUiLabels
 } from "@rebasepro/ui";
 import { PropertyPreview } from "../../preview";
 import {
@@ -1274,6 +1275,7 @@ function ListCell<M extends Record<string, unknown>>({
     entity: Entity<M>;
     slots: EntityPreviewSlots;
 }) {
+    const relativeTimeLabels = useUiLabels().relativeTime;
     if (column.slot === "tags") {
         if (!slots.tags) return null;
         return (
@@ -1304,7 +1306,7 @@ function ListCell<M extends Record<string, unknown>>({
     if (property.type === "date") {
         return (
             <Typography variant="caption" className="whitespace-nowrap text-surface-400 dark:text-surface-500 font-medium">
-                {formatCollectionDate(value, property) ?? "—"}
+                {formatCollectionDate(value, property, { relativeTimeLabels }) ?? "—"}
             </Typography>
         );
     }

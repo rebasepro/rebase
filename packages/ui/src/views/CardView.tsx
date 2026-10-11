@@ -6,6 +6,7 @@ import {
     Typography
 } from "../components";
 import { cls } from "../util";
+import { useUiLabels } from "../hooks/UiLabelsContext";
 
 import { CollectionSize } from "./ListView";
 import { getScrollParent, useScrollParentRestoration, type ViewScrollEvent } from "./useScrollParentRestoration";
@@ -162,6 +163,7 @@ export function CardView<T>({
     renderCard,
     emptyComponent
 }: CardViewProps<T>) {
+    const labels = useUiLabels();
     const containerRef = useRef<HTMLDivElement>(null);
     // The rows' own box: the window of drawn rows is measured against it.
     const rowsRef = useRef<HTMLDivElement>(null);
@@ -436,7 +438,7 @@ export function CardView<T>({
             {dataLoadingError && data.length === 0 ? (
                 <div className="h-full flex items-center justify-center p-8">
                     <Typography className="text-red-500">
-                        Error loading data: {dataLoadingError.message}
+                        {labels.errorLoadingData(dataLoadingError.message)}
                     </Typography>
                 </div>
             ) : isInitialLoading ? (
@@ -447,7 +449,7 @@ export function CardView<T>({
                 <div className="w-full flex items-center justify-center py-12 px-8">
                     {emptyComponent ?? (
                         <Typography variant="label" color="secondary">
-                            No entries found
+                            {labels.noEntriesFound}
                         </Typography>
                     )}
                 </div>
@@ -466,7 +468,7 @@ export function CardView<T>({
                         )}
                         {!dataLoading && noMoreToLoad && data.length > 0 && (
                             <Typography variant="caption" color="secondary">
-                                All {data.length} entries loaded
+                                {labels.allEntriesLoaded(data.length)}
                             </Typography>
                         )}
                     </div>

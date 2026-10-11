@@ -75,6 +75,11 @@ describe("collection date slot and list date column", () => {
         expect(formatCollectionDate(new Date("2026-10-11T09:00:00Z"), undefined, { now })).toBe("3h ago");
     });
 
+    it("says the relative phrase in the labels' language", () => {
+        const relativeTimeLabels = { hoursAgo: (n: number) => `${n} h fa` };
+        expect(formatCollectionDate(new Date("2026-10-11T09:00:00Z"), inTokyo, { now, relativeTimeLabels })).toBe("3 h fa");
+    });
+
     it("has nothing to say about an empty or unreadable value", () => {
         expect(formatCollectionDate(null, dateOnly, { now })).toBeNull();
         expect(formatCollectionDate("not a date", dateOnly, { now })).toBeNull();

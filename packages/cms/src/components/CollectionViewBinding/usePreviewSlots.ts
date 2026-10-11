@@ -8,9 +8,9 @@ import { getLeadingRelationTitleKey, getTitlePropertyCandidates, looksLikeIdenti
 import { getEntityFromCache } from "@rebasepro/app";
 import { getEntityPreviewKeys } from "../../util/previews";
 import { getValueInPath } from "@rebasepro/utils";
-import { formatCollectionDate } from "../../util/format_collection_date";
+import { formatCollectionDate, type FormatCollectionDateOptions } from "../../util/format_collection_date";
 import type { AuthController } from "@rebasepro/cms-types";
-import { ChipColorScheme, CHIP_COLORS, CHIP_SEED_KEYS } from "@rebasepro/ui";
+import { ChipColorScheme, CHIP_COLORS, CHIP_SEED_KEYS, useUiLabels } from "@rebasepro/ui";
 import { useEntityDisplay } from "../../hooks/useEntityDisplay";
 
 /** Whether an authored relation yields many rows. Derived from its kind. */
@@ -369,7 +369,9 @@ export function useCollectionSlotKeys(
 export function resolveEntitySlots(
     entity: Entity<Record<string, unknown>>,
     collection: AdminCollection<Record<string, unknown>>,
-    slotKeys: CollectionSlotKeys
+    slotKeys: CollectionSlotKeys,
+    /** How the date slot is written: the relative phrases' language, say. */
+    dateOptions?: FormatCollectionDateOptions
 ): EntityPreviewSlots {
     const { titleKey, titleKeyCandidates, imageKey, subtitleKey, relationKeys, statusKey, dateKey, tagsKey } = slotKeys;
 
@@ -491,7 +493,7 @@ value: val };
                 property: prop,
                 propertyKey: dateKey,
                 value: val,
-                formatted: formatCollectionDate(val, prop) ?? String(val)
+                formatted: formatCollectionDate(val, prop, dateOptions) ?? String(val)
             };
         }
     }
@@ -635,9 +637,10 @@ export function useEntitySlots(
     slotKeys: CollectionSlotKeys
 ): EntityPreviewSlots {
 
+    const relativeTimeLabels = useUiLabels().relativeTime;
     const derived = useMemo(
-        () => resolveEntitySlots(entity, collection, slotKeys),
-        [entity, collection, slotKeys]
+        () => resolveEntitySlots(entity, collection, slotKeys, { relativeTimeLabels }),
+        [entity, collection, slotKeys, relativeTimeLabels]
     );
 
     const params = { collection,
@@ -675,9 +678,9 @@ value: resolved.value }
             status: computed("status", status) ?? derived.status,
             date: computedDate
                 ? { ...computedDate,
-formatted: formatCollectionDate(computedDate.value, undefined) ?? String(computedDate.value) }
+formatted: formatCollectionDate(computedDate.value, undefined, { relativeTimeLabels }) ?? String(computedDate.value) }
                 : derived.date,
             tags: computed("tags", tags) ?? derived.tags
         };
-    }, [derived, title, subtitle, image, status, date, tags]);
+    }, [derived, title, subtitle, image, status, date, tags, relativeTimeLabels]);
 }

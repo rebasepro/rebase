@@ -89,6 +89,19 @@ export interface RebaseTranslations {
     no_items: string;
     no_entries_found: string;
     all_entries_loaded: string;
+    /** A list or card view that could not load: "Error loading data: {{message}}". */
+    error_loading_data_message?: string;
+    /** The search bar's clear button. */
+    clear_search?: string;
+    /** Relative time, as list, card and history dates say it. `{{count}}` is the number. */
+    relative_just_now?: string;
+    relative_in_a_moment?: string;
+    relative_minutes_ago?: string;
+    relative_in_minutes?: string;
+    relative_hours_ago?: string;
+    relative_in_hours?: string;
+    relative_days_ago?: string;
+    relative_in_days?: string;
     create_your_first_entry: string;
     no_results_filter_sort: string;
     /** An empty view the user narrowed with filters */

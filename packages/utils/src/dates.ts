@@ -3,7 +3,40 @@ export const defaultDateFormat = "MMMM dd, yyyy, HH:mm:ss";
 /** Seven days, the distance past which a relative phrase stops being useful. */
 const DEFAULT_MAX_MS = 7 * 24 * 60 * 60 * 1000;
 
+/**
+ * The phrases {@link formatRelativeTime} says, for a language other than
+ * English. A phrase with a number is a function of it, so a translation can
+ * choose its own plural form.
+ */
+export type RelativeTimeLabels = {
+    justNow: string;
+    inAMoment: string;
+    minutesAgo: (count: number) => string;
+    inMinutes: (count: number) => string;
+    hoursAgo: (count: number) => string;
+    inHours: (count: number) => string;
+    daysAgo: (count: number) => string;
+    inDays: (count: number) => string;
+};
+
+/** The English phrases, used wherever no labels are given. */
+export const defaultRelativeTimeLabels: RelativeTimeLabels = {
+    justNow: "just now",
+    inAMoment: "in a moment",
+    minutesAgo: (count) => `${count}m ago`,
+    inMinutes: (count) => `in ${count}m`,
+    hoursAgo: (count) => `${count}h ago`,
+    inHours: (count) => `in ${count}h`,
+    daysAgo: (count) => `${count}d ago`,
+    inDays: (count) => `in ${count}d`
+};
+
 export type FormatRelativeTimeOptions = {
+    /**
+     * The phrases to use. Any left out are said in English, and with none the
+     * output is the English "5m ago", "in 3h".
+     */
+    labels?: Partial<RelativeTimeLabels>;
     /**
      * The instant the distance is measured from. Defaults to the current time.
      * Pass it explicitly to make a caller testable without faking the clock.
@@ -56,14 +89,15 @@ export function formatRelativeTime(
     if (distance > maxMs) return null;
 
     const future = delta < 0;
+    const labels = options.labels ? { ...defaultRelativeTimeLabels, ...options.labels } : defaultRelativeTimeLabels;
 
     const minutes = Math.floor(distance / 60_000);
-    if (minutes < 1) return future ? "in a moment" : "just now";
-    if (minutes < 60) return future ? `in ${minutes}m` : `${minutes}m ago`;
+    if (minutes < 1) return future ? labels.inAMoment : labels.justNow;
+    if (minutes < 60) return future ? labels.inMinutes(minutes) : labels.minutesAgo(minutes);
 
     const hours = Math.floor(distance / 3_600_000);
-    if (hours < 24) return future ? `in ${hours}h` : `${hours}h ago`;
+    if (hours < 24) return future ? labels.inHours(hours) : labels.hoursAgo(hours);
 
     const days = Math.floor(distance / 86_400_000);
-    return future ? `in ${days}d` : `${days}d ago`;
+    return future ? labels.inDays(days) : labels.daysAgo(days);
 }

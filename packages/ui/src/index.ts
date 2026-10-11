@@ -40,6 +40,8 @@ export { useDebounceValue } from "./hooks/useDebounceValue";
 export { useInjectStyles } from "./hooks/useInjectStyles";
 export { PortalContainerProvider, usePortalContainer } from "./hooks/PortalContainerContext";
 export type { PortalContainerContextType, PortalContainerProviderProps } from "./hooks/PortalContainerContext";
+export { UiLabelsProvider, useUiLabels, defaultUiLabels } from "./hooks/UiLabelsContext";
+export type { UiLabels, UiLabelsProviderProps, UiRelativeTimeLabels } from "./hooks/UiLabelsContext";
 
 // =============================================================================
 // Lower-level utilities (used by framework packages)

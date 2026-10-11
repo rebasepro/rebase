@@ -10,6 +10,7 @@ import { IconButton } from "./IconButton";
 
 import { cls } from "../util";
 import { useDebounceValue } from "../hooks";
+import { useUiLabels } from "../hooks/UiLabelsContext";
 
 interface SearchBarProps {
     onClick?: () => void;
@@ -38,7 +39,7 @@ interface SearchBarProps {
 export function SearchBar({
     onClick,
     onTextSearch,
-    placeholder = "Search",
+    placeholder,
     expandable = false,
     size = "medium",
     innerClassName,
@@ -49,6 +50,9 @@ export function SearchBar({
     inputRef,
     initialValue
 }: SearchBarProps) {
+
+    const labels = useUiLabels();
+    const placeholderText = placeholder ?? labels.search;
 
     const [searchText, setSearchText] = useState<string>(initialValue ?? "");
     const [active, setActive] = useState<boolean>(false);
@@ -83,7 +87,7 @@ export function SearchBar({
     return (
         <div
             role="search"
-            aria-label="Search"
+            aria-label={labels.search}
             onClick={onClick}
             className={cls("relative transition-all",
                 heightClass,
@@ -100,8 +104,8 @@ export function SearchBar({
                 value={searchText ?? ""}
                 ref={inputRef}
                 onClick={onClick}
-                placeholder={placeholder}
-                aria-label={placeholder}
+                placeholder={placeholderText}
+                aria-label={placeholderText}
                 readOnly={!onTextSearch}
                 disabled={disabled}
                 onChange={onTextSearch
@@ -126,7 +130,7 @@ export function SearchBar({
                 ? <IconButton
                     className={`${size === "small" ? "mr-0 top-0" : "mr-1 top-0"} absolute right-0 z-10`}
                     size={"small"}
-                    aria-label="Clear search"
+                    aria-label={labels.clearSearch}
                     onClick={clearText}>
                     <XIcon size={iconSize.smallest}/>
                 </IconButton>

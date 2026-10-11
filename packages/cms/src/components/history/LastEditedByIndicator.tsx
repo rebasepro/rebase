@@ -3,17 +3,18 @@ import React, { useEffect, useState, useCallback } from "react";
 ;
 import { useApiBase, useApiConfig } from "@rebasepro/app";
 import { useAuthController } from "@rebasepro/app";
-import { formatRelativeTime } from "@rebasepro/utils";
+import { formatRelativeTime, type RelativeTimeLabels } from "@rebasepro/utils";
+import { useUiLabels } from "@rebasepro/ui";
 import { HistoryEntryData } from "../../hooks";
 import type { AdminCollection } from "@rebasepro/cms-types";
 
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 
-function getRelativeTimeString(date: Date): string {
+function getRelativeTimeString(date: Date, labels: Partial<RelativeTimeLabels>): string {
     // An edit is in the past, but the timestamp comes from the server and the
     // phrase is rendered against the browser's clock — a few seconds of skew
     // used to be enough to make a fresh edit read as the wrong thing entirely.
-    return formatRelativeTime(date, { maxMs: THIRTY_DAYS_MS }) ?? date.toLocaleDateString();
+    return formatRelativeTime(date, { maxMs: THIRTY_DAYS_MS, labels }) ?? date.toLocaleDateString();
 }
 
 /**
@@ -32,6 +33,7 @@ export function LastEditedByIndicator({
     const apiConfig = useApiConfig();
     const apiBase = useApiBase();
     const authController = useAuthController();
+    const relativeTimeLabels = useUiLabels().relativeTime;
     const [latestEntry, setLatestEntry] = useState<HistoryEntryData | undefined>();
 
     const fetchLatest = useCallback(async () => {
@@ -65,7 +67,7 @@ export function LastEditedByIndicator({
 
     const uid = latestEntry.updated_by;
     const date = new Date(latestEntry.updated_at);
-    const timeString = getRelativeTimeString(date);
+    const timeString = getRelativeTimeString(date, relativeTimeLabels);
 
     // Try to match the current user
     const currentUser = authController.user;

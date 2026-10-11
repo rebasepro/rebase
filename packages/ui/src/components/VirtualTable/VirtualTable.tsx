@@ -25,6 +25,7 @@ import { CenteredView } from "../CenteredView";
 import { Typography } from "../Typography";
 import { cls } from "../../util/cls";
 import { useDebounceCallback } from "../../hooks/useDebounceCallback";
+import { useUiLabels } from "../../hooks/UiLabelsContext";
 import {
     closestCenter,
     DndContext,
@@ -395,13 +396,14 @@ position });
             if (onFilterUpdate) onFilterUpdate(newFilterValue);
         }, [checkFilterCombination, onFilterUpdate, sortBy]);
 
+        const labels = useUiLabels();
         const empty = !loading && (data?.length ?? 0) === 0;
         const customView = (error && (data?.length ?? 0) === 0)
             ? <CenteredView maxWidth={"2xl"}
                 className="flex flex-col gap-2">
 
                 <Typography variant={"h6"}>
-                    {"Error"}
+                    {labels.error}
                 </Typography>
 
                 {error?.message && <SafeLinkRenderer text={error.message}/>}
