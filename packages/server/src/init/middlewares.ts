@@ -9,6 +9,7 @@ import { logger } from "../utils/logger";
 import { logMiddleware } from "../api/logs-routes";
 import { ApiError, errorHandler } from "../api/errors";
 import { RUNTIME_DEFAULT_MAX_BODY_SIZE } from "../deploy/pod-contract";
+import { formatByteSize } from "../utils/byte-size";
 
 interface MiddlewareConfig {
     maxBodySize?: number;
@@ -87,7 +88,7 @@ export function configureMiddlewares(
                 new ApiError(
                     413,
                     "PAYLOAD_TOO_LARGE",
-                    `Request body too large. Maximum size is ${Math.round(maxBodySize / 1024 / 1024)}MB.`
+                    `Request body too large. Maximum size is ${formatByteSize(maxBodySize)}.`
                 ),
                 c
             ) as Response
@@ -121,8 +122,10 @@ export function configureMiddlewares(
         );
     }
 
-    // Request Logging
-    app.use(`${basePath}/*`, requestLogger());
+    // Request Logging. Mounted under the base path, so every path it sees
+    // starts with it: the health probe it skips is `${basePath}/health`, not
+    // the `/health` of `requestLogger`'s default, which it never sees.
+    app.use(`${basePath}/*`, requestLogger({ skip: [`${basePath}/health`, `${basePath}/favicon.ico`] }));
 
     // Record requests into the in-memory ring buffer that backs the Studio's
     // Logs Explorer. This is a separate sink from `requestLogger` above, which

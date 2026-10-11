@@ -70,8 +70,8 @@ async function readDefaults(directory: string): Promise<CollectionDefaults> {
             throw new CollectionConfigError(
                 `Could not load ${indexPath}.\n\n` +
                 `${err instanceof Error ? err.message : String(err)}\n\n` +
-                "This file declares `defaultSecurityRules` — the access rules every collection " +
-                "that declares none of its own inherits. Loading the collections without it would " +
+                "A collections index may declare `defaultSecurityRules` — the access rules every collection " +
+                "that declares none of its own inherits — and this one could not be read to find out. Loading the collections without it could " +
                 "serve them under a different authorization model than the project declares, so " +
                 "this is fatal. Fix the file, or delete it if the project has no defaults.",
                 undefined,

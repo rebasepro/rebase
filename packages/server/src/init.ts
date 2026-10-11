@@ -56,6 +56,7 @@ import { Hono, type MiddlewareHandler } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { HonoEnv } from "./api/types";
 import { logger, setLogLevel } from "./utils/logger";
+import { formatByteSize } from "./utils/byte-size";
 import { configureMiddlewares } from "./init/middlewares";
 import { initializeStorage, assertStorageAccessControlConfigured } from "./init/storage";
 import { resolveStorageAccessControl } from "./storage/policies";

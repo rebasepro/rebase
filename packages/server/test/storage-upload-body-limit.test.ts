@@ -247,3 +247,39 @@ describe("the defaults are the ones the pod contract states", () => {
         expect((await errorOf(over)).message).toMatch(/^File too large\./);
     });
 });
+
+describe("a refusal names the limit that was configured", () => {
+    // Both messages rounded to whole megabytes, so `maxBodySize: 1000` said
+    // "Maximum size is 0MB" and a 512 KiB upload limit said "1MB".
+    async function bootWith(config: { maxBodySize?: number; maxFileSize?: number }) {
+        const app = new Hono();
+        await initializeRebaseBackend({
+            app: app as never,
+            server: {} as never,
+            collections: [],
+            bootstrappers: [bootstrapper],
+            auth: signedIn,
+            maxBodySize: config.maxBodySize,
+            storage: { type: "local", basePath: tempDir, maxFileSize: config.maxFileSize }
+        } as never);
+        return app;
+    }
+
+    it("says 1000 bytes, not 0MB", async () => {
+        const app = await bootWith({ maxBodySize: 1000 });
+
+        const res = await app.request("/api/anything", sized("POST", 2000));
+
+        expect(res.status).toBe(413);
+        expect((await errorOf(res)).message).toBe("Request body too large. Maximum size is 1000 bytes.");
+    });
+
+    it("says 512KB for an upload limit of 512 KiB, not 1MB", async () => {
+        const app = await bootWith({ maxFileSize: 512 * 1024 });
+
+        const res = await app.request("/api/storage/upload", await multipartUpload(600 * 1024, "half.bin"));
+
+        expect(res.status).toBe(413);
+        expect((await errorOf(res)).message).toBe("File too large. Maximum upload size is 512KB.");
+    });
+});

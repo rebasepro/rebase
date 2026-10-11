@@ -111,6 +111,18 @@ export const defaultSecurityRules = [{ operation: "select", access: "public" }];
         await expect(loadCollectionsFromDirectory(dir)).rejects.toThrow(/defaultSecurityRules/);
     });
 
+    it("does not claim an index it could not read declares defaults", async () => {
+        // The message cannot know what a file it failed to import declares.
+        // It said "This file declares `defaultSecurityRules`" of an index that
+        // declared none, which sent the reader looking for rules that were
+        // never there.
+        fs.writeFileSync(path.join(dir, "posts.ts"), collectionFile("posts"));
+        fs.writeFileSync(path.join(dir, "index.ts"), "export const broken = {{{ ;");
+
+        await expect(loadCollectionsFromDirectory(dir)).rejects.not.toThrow(/This file declares/);
+        await expect(loadCollectionsFromDirectory(dir)).rejects.toThrow(/may declare `defaultSecurityRules`/);
+    });
+
     it("throws on a file with no default export", async () => {
         fs.writeFileSync(path.join(dir, "stray.ts"), "export const notDefault = 1;");
 
