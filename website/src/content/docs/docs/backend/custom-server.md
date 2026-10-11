@@ -245,24 +245,24 @@ with no `If-Match` — and a 429 loses its `Retry-After`:
 ```typescript
 import express from "express";
 import cors from "cors";
+import { CORS_EXPOSED_HEADERS } from "@rebasepro/server";
 
 const app = express();
 app.use(cors({
     origin: ["https://app.example.com"],
     credentials: true,
-    exposedHeaders: [
-        "ETag", "Retry-After", "X-Request-ID",
-        "X-RateLimit-Limit", "X-RateLimit-Remaining", "X-RateLimit-Reset",
-        "Preference-Applied",
-        // Resumable uploads, which the SDK uses for files over 8 MiB
-        "Location", "Upload-Offset", "Rebase-Upload-Result"
-    ]
+    exposedHeaders: [...CORS_EXPOSED_HEADERS]
 }));
 ```
 
-<span class="since-badge" data-since="0.25">Since 0.25</span> The last three are what a resumable upload answers in. Without them the
-SDK cannot follow one from another origin, and sends every file as one
-multipart request instead.
+<span class="since-badge" data-since="0.25">Since 0.25</span> `CORS_EXPOSED_HEADERS` is the list the runtime itself exposes, so a
+header the SDK starts reading in a later version reaches your frontend without
+a change here. It is `ETag`, `Retry-After`, `X-Request-ID`, the three
+`X-RateLimit-*` headers and `Preference-Applied`, plus `Location`,
+`Upload-Offset` and `Rebase-Upload-Result`, which a resumable upload (files over
+8 MiB) answers in. Without those three the SDK cannot follow an upload from
+another origin, and sends every file as one multipart request instead. On 0.24,
+write the list out by hand.
 
 The Rebase runtime and the ejected backend send this list already. On 0.23
 they expose none of these headers, so a frontend on another origin reads no `ETag`.

@@ -4,7 +4,7 @@ import path from "node:path";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 
-import { resolveCorsOptions, type RebaseBootEnv } from "../src/boot/env";
+import { CORS_EXPOSED_HEADERS, resolveCorsOptions, type RebaseBootEnv } from "../src/boot/env";
 
 /**
  * Every response header the SDK reads is one a browser on another origin is
@@ -101,5 +101,15 @@ describe("CORS exposes every response header the SDK reads", () => {
         const list = /exposeHeaders:\s*\[([^\]]*)\]/.exec(source)?.[1] ?? "";
         const exposed = [...list.matchAll(/["'`]([A-Za-z0-9-]+)["'`]/g)].map(m => m[1].toLowerCase());
         expect(exposed).toEqual(expect.arrayContaining(read));
+    });
+});
+
+describe("CORS_EXPOSED_HEADERS is public", () => {
+    // A backend that wires its own `cors()` (docs: backend/custom-server) needs
+    // the same list the runtime exposes, or the SDK loses `ETag` there.
+    it("is importable from the package entry and names ETag", async () => {
+        const server = await import("../src/index");
+        expect(server.CORS_EXPOSED_HEADERS).toContain("ETag");
+        expect(server.CORS_EXPOSED_HEADERS).toBe(CORS_EXPOSED_HEADERS);
     });
 });

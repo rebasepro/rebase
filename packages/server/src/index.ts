@@ -443,7 +443,7 @@ export {
     loadUsersCollection
 } from "./boot/bundle";
 export type { LoadedBundle, BundleConfigExports } from "./boot/bundle";
-export { loadBootEnv, resolveCorsOrigin, isLocalhostOrigin } from "./boot/env";
+export { loadBootEnv, resolveCorsOrigin, isLocalhostOrigin, CORS_EXPOSED_HEADERS } from "./boot/env";
 export type { RebaseBootEnv, CorsOriginResolver } from "./boot/env";
 export { resolveAuthOptions, resolveEmailOptions } from "./boot/options";
 export {
