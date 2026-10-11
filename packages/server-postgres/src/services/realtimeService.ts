@@ -1437,9 +1437,11 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
                 orderBy,
                 order: request.order,
                 limit: boundedLimit,
-                // `page` wins over `offset`, exactly as `FindParams`
-                // documents and the REST parser applies it — one rule, so a
-                // live list and the fetch behind it land on the same window.
+                // The SDK's `listen()` sends `page` beside the `offset` it
+                // resolved from it, so the two agree and `page` decides here.
+                // A caller's own `page` + `offset` never gets this far: the
+                // SDK refuses the pair (`PAGE_WITH_OFFSET`) before sending, as
+                // the REST parser does — one window, one rule.
                 offset: request.page != null && request.page > 0
                     ? (request.page - 1) * boundedLimit
                     : request.offset,
