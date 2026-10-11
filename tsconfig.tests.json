@@ -110,10 +110,9 @@
     "packages/app/src",
     "packages/common/test",
     "packages/common/src",
-    // `packages/firebase` declares no test runner — a recorded gap in
-    // `tooling/scripts/check-test-scripts.mjs`, and the reason its tests have never
-    // executed. Until one lands, tsc reading them is the only thing standing
-    // between the assertions and the code they assert on.
+    // `packages/firebase` runs its tests under jest, whose ts-jest transform
+    // compiles each file on its own (`isolatedModules`) and so does not hold
+    // them to the types they import. tsc reading them here is what does.
     "packages/firebase/test",
     // Four files, not the directory. The import/export regression tests build
     // wire-shaped fixtures — a paginated `find` that clamps the way the REST
