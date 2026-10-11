@@ -56,6 +56,9 @@ large: 32 },
     // Panels arrive as props, not as children, so the Proxy fallback rendered
     // an empty div — a pane laid out with this one had no DOM at all and every
     // query against it failed as if the component were broken.
+    // The real table: the fallback div would drop the row's ref (the storage
+    // list's lazy-metadata observer), its handlers and `th scope="col"`.
+    ...require("../../../ui/src/components/Table"),
     ResizablePanels: ({ firstPanel, secondPanel }) =>
         React.createElement("div", { "data-testid": "resizable-panels" }, firstPanel, secondPanel),
     Button: ({ children, startIcon, endIcon, variant: _v, color: _c, size: _s, ...props }) =>

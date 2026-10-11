@@ -33,6 +33,11 @@ import {
     ResizablePanels,
     Select,
     SelectItem,
+    Table,
+    TableBody,
+    TableCell,
+    TableHeader,
+    TableRow,
     TextField,
     Tooltip,
     Trash2Icon,
@@ -1284,41 +1289,36 @@ message: e instanceof Error ? e.message : String(e) });
         if (viewMode === "list") {
             return (
                 <div className="flex-grow overflow-auto">
-                    <table className="w-full">
-                        <thead>
-                            <tr className={cls("border-b text-left text-xs text-text-secondary dark:text-text-secondary-dark", defaultBorderMixin)}>
-                                <th className="pl-3 pr-0 py-2 w-8">
-                                    <Checkbox
-                                        size="small"
-                                        checked={allItems.length > 0 && selectedPaths.size === allItems.length}
-                                        indeterminate={selectedPaths.size > 0 && selectedPaths.size < allItems.length}
-                                        onCheckedChange={handleSelectAll}
-                                    />
-                                </th>
-                                <th className="px-2 py-2 font-medium">{t("studio_storage_name")}</th>
-                                <th className="px-4 py-2 font-medium w-24">{t("studio_storage_type")}</th>
-                                <th className="px-4 py-2 font-medium w-24 text-right">{t("studio_storage_size")}</th>
-                                <th className="px-2 py-2 w-10"/>
-                            </tr>
-                        </thead>
-                        <tbody>
+                    <Table className="w-full">
+                        <TableHeader className="text-xs font-normal text-text-secondary dark:text-text-secondary-dark">
+                            <TableCell className="pl-3 pr-0 py-2 w-8">
+                                <Checkbox
+                                    size="small"
+                                    checked={allItems.length > 0 && selectedPaths.size === allItems.length}
+                                    indeterminate={selectedPaths.size > 0 && selectedPaths.size < allItems.length}
+                                    onCheckedChange={handleSelectAll}
+                                />
+                            </TableCell>
+                            <TableCell className="px-2 py-2 font-medium">{t("studio_storage_name")}</TableCell>
+                            <TableCell className="px-4 py-2 font-medium w-24">{t("studio_storage_type")}</TableCell>
+                            <TableCell className="px-4 py-2 font-medium w-24 text-right">{t("studio_storage_size")}</TableCell>
+                            <TableCell className="px-2 py-2 w-10"/>
+                        </TableHeader>
+                        <TableBody>
                             {folders.map(folder => {
                                 const isChecked = selectedPaths.has(folder.fullPath);
                                 return (
-                                    <tr
+                                    <TableRow
                                         key={folder.fullPath}
                                         data-storage-item
                                         className={cls(
-                                            "cursor-pointer transition-colors border-b group",
-                                            defaultBorderMixin,
-                                            isChecked
-                                                ? "bg-primary/5 dark:bg-primary/10"
-                                                : "hover:bg-surface-hover"
+                                            "group",
+                                            isChecked && "bg-primary/5 dark:bg-primary/10"
                                         )}
                                         onClick={(e) => handleItemClick(folder, e)}
                                         onDoubleClick={() => handleItemDoubleClick(folder)}
                                     >
-                                        <td className="pl-3 pr-0 py-2.5" onClick={(e) => e.stopPropagation()}>
+                                        <TableCell className="pl-3 pr-0 py-2.5" onClick={(e) => e.stopPropagation()}>
                                             <Checkbox
                                                 size="small"
                                                 checked={isChecked}
@@ -1331,27 +1331,27 @@ message: e instanceof Error ? e.message : String(e) });
                                                     });
                                                 }}
                                             />
-                                        </td>
-                                        <td className="px-2 py-2.5">
+                                        </TableCell>
+                                        <TableCell className="px-2 py-2.5">
                                             <div className="flex items-center gap-2">
                                                 <FolderIcon size={iconSize.smallest} className="text-amber-500 dark:text-amber-400 shrink-0"/>
                                                 <Typography variant="body2" className="text-[13px] font-medium truncate">
                                                     {folder.name}
                                                 </Typography>
                                             </div>
-                                        </td>
-                                        <td className="px-4 py-2.5">
+                                        </TableCell>
+                                        <TableCell className="px-4 py-2.5">
                                             <Typography variant="caption" className="text-text-secondary dark:text-text-secondary-dark">
                                                 {t("studio_storage_folder")}
                                             </Typography>
-                                        </td>
-                                        <td className="px-4 py-2.5 text-right">
+                                        </TableCell>
+                                        <TableCell className="px-4 py-2.5 text-right">
                                             <Typography variant="caption" className="text-text-disabled dark:text-text-disabled-dark">
                                                 —
                                             </Typography>
-                                        </td>
-                                        <td className="px-2 py-2.5"/>
-                                    </tr>
+                                        </TableCell>
+                                        <TableCell className="px-2 py-2.5"/>
+                                    </TableRow>
                                 );
                             })}
                             {files.map(listed => {
@@ -1359,22 +1359,19 @@ message: e instanceof Error ? e.message : String(e) });
                                 const FileIconComp = getFileIcon(file.contentType, file.name);
                                 const isChecked = selectedPaths.has(file.fullPath);
                                 return (
-                                    <tr
+                                    <TableRow
                                         key={file.fullPath}
                                         ref={observeFile}
                                         data-storage-path={file.fullPath}
                                         data-storage-item
                                         className={cls(
-                                            "cursor-pointer transition-colors border-b group",
-                                            defaultBorderMixin,
-                                            isChecked
-                                                ? "bg-primary/5 dark:bg-primary/10"
-                                                : "hover:bg-surface-hover"
+                                            "group",
+                                            isChecked && "bg-primary/5 dark:bg-primary/10"
                                         )}
                                         onClick={(e) => handleItemClick(file, e)}
                                         onDoubleClick={() => handleItemDoubleClick(file)}
                                     >
-                                        <td className="pl-3 pr-0 py-2.5" onClick={(e) => e.stopPropagation()}>
+                                        <TableCell className="pl-3 pr-0 py-2.5" onClick={(e) => e.stopPropagation()}>
                                             <Checkbox
                                                 size="small"
                                                 checked={isChecked}
@@ -1387,26 +1384,26 @@ message: e instanceof Error ? e.message : String(e) });
                                                     });
                                                 }}
                                             />
-                                        </td>
-                                        <td className="px-2 py-2.5">
+                                        </TableCell>
+                                        <TableCell className="px-2 py-2.5">
                                             <div className="flex items-center gap-2">
                                                 <FileIconComp size={iconSize.smallest} className="text-surface-accent-400 shrink-0"/>
                                                 <Typography variant="body2" className="text-[13px] truncate">
                                                     {file.name}
                                                 </Typography>
                                             </div>
-                                        </td>
-                                        <td className="px-4 py-2.5">
+                                        </TableCell>
+                                        <TableCell className="px-4 py-2.5">
                                             <Typography variant="caption" className="text-text-secondary dark:text-text-secondary-dark">
                                                 {getExtension(file.name) || file.contentType?.split("/")[1]?.toUpperCase() || "—"}
                                             </Typography>
-                                        </td>
-                                        <td className="px-4 py-2.5 text-right">
+                                        </TableCell>
+                                        <TableCell className="px-4 py-2.5 text-right">
                                             <Typography variant="caption" className="text-text-secondary dark:text-text-secondary-dark font-mono text-[11px]">
                                                 {file.size !== undefined ? formatFileSize(file.size) : "—"}
                                             </Typography>
-                                        </td>
-                                        <td className="px-2 py-2.5" onClick={(e) => e.stopPropagation()}>
+                                        </TableCell>
+                                        <TableCell className="px-2 py-2.5" onClick={(e) => e.stopPropagation()}>
                                             <IconButton
                                                 size="smallest"
                                                 className="opacity-0 group-hover:opacity-100 transition-opacity"
@@ -1417,12 +1414,12 @@ message: e instanceof Error ? e.message : String(e) });
                                             >
                                                 <Trash2Icon size={14}/>
                                             </IconButton>
-                                        </td>
-                                    </tr>
+                                        </TableCell>
+                                    </TableRow>
                                 );
                             })}
-                        </tbody>
-                    </table>
+                        </TableBody>
+                    </Table>
                 </div>
             );
         }
