@@ -51,6 +51,15 @@ Client                                                   Rebase Server
 4. **Finalisation**: When the accumulated `Upload-Offset` matches the declared `Upload-Length`, Rebase reads the completed temporary file, wraps it as a standard JavaScript `File` object, and saves it to the configured storage backend (local disk or S3). The temporary file is then deleted. <span class="since-badge" data-since="0.25">Since 0.25</span> That last `PATCH` answers `Rebase-Upload-Result` with the stored object — `{ key, bucket, storageUrl }`, what `POST /api/storage/upload` answers under `data` — as URI-encoded JSON. A frontend on another origin can read it, and `Location` and `Upload-Offset`, only when the server exposes them in `Access-Control-Expose-Headers`: the Rebase runtime and the ejected backend do; a [custom server](/docs/backend/custom-server/) has to.
 5. **Periodic Sweep**: A background cleaner runs every **60 seconds** to delete incomplete temporary uploads that began more than **24 hours** ago — those another process started too, read from the directory.
 
+## Who can reach an upload
+
+An upload started by a signed-in caller answers only to that caller and to administrators;
+anyone else gets `404`, as if the id did not exist. An upload started without a session has no
+owner, so its id is a capability: whoever holds the upload URL can read its progress, append
+to it and cancel it. Keep that URL secret, as you would a download token. Only a deployment
+that runs storage with `requireAuth: false` can start one: with `requireAuth` on, the
+default, a `POST` without a session is refused with `401`.
+
 ## Related
 
 - [Storage Configuration](/docs/backend/storage/) — sources, limits, endpoints and authorization
