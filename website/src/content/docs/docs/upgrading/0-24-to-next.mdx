@@ -17,7 +17,9 @@ come back when you move.
 The first three come with the performance work: the count switch on REST lists,
 the MCP collection listing, and the admin's translations. The rest come from the
 backlog sweep: stricter refusals at boot and on `OPTIONS`, the SDK's cron path
-and offline reads, the storage source registry, and unused UI kit props.
+and offline reads, the storage source registry, unused UI kit props, the
+users-collection upsert, a read naming both `page` and `offset`, and the default
+policy names on long tables.
 
 ---
 
@@ -191,3 +193,39 @@ const { data: [found] } = await client.data.users.find({ where: { email: ["==", 
 if (!found) await client.data.users.create(user);
 else await client.data.users.update(String(found.id), user);
 ```
+
+## 78. `page` with `offset` is refused with `PAGE_WITH_OFFSET`
+
+A read naming both `page` and `offset` is now refused. The server answers
+`400 PAGE_WITH_OFFSET`, and the SDK refuses the pair before any request, with a
+`RebaseClientError` carrying the same code: over HTTP, in-process
+(`rebase.data`) and offline. Before, `page` won and the `offset` was dropped
+without a word.
+
+**Who is affected:** code that sends both, for example a `find({ page, offset })`
+or a REST call with `?page=3&offset=40`. Such a read was already only reading
+`page`.
+
+**What to change:** send one of them. To keep what the read returned before,
+drop `offset`.
+
+```diff lang="ts"
+- await client.data.products.find({ page: 3, offset: 40, limit: 20 });
++ await client.data.products.find({ page: 3, limit: 20 });
+```
+
+## 79. Long tables get new default admin-write policy names
+
+On a table whose name is 42 bytes or more, the three default admin-write
+policies (`…_default_admin_write_insert`, `_update` and `_delete`) are now named
+`<head>_<hash8>_<op>`, at most 63 bytes. Postgres keeps 63 bytes of a name, so
+the three old names were cut to the same name and only one policy, the DELETE
+one, existed: admins could not insert or update.
+
+**Who is affected:** a project with a table name of 42 bytes or more, and
+anything that refers to those policies by name, such as a migration or a script
+that drops them. The old names never existed in the database.
+
+**What to change:** nothing for the database. The next boot or `rebase db push`
+drops the truncated policy and creates one policy per operation. Update any
+script that names the old policies.

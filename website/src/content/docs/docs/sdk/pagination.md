@@ -23,7 +23,7 @@ if (page1.meta.hasMore) {
 const page = await client.data.products.find({ page: 2, limit: 20 });
 ```
 
-Use one or the other. `page` and `offset` together describe the same window
+Use one or the other. <span class="since-badge" data-since="0.25">Since 0.25</span> `page` and `offset` together describe the same window
 twice, and the read is refused with `PAGE_WITH_OFFSET` rather than quietly
 applying `page`. The SDK refuses it before any request, over HTTP, in-process and
 offline; the server answers a raw request that sends both with a 400.

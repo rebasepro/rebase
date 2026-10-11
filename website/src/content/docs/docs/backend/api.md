@@ -146,9 +146,10 @@ All three window parameters are refused rather than repaired, and each names
 itself: `INVALID_LIMIT`, `INVALID_OFFSET` (a whole number of 0 or more) and
 `INVALID_PAGE` (a whole number of 1 or more). A window quietly different from
 the one asked for cannot be told apart from having reached the end of the
-collection, which is why none of them is clamped or ignored. For the same reason
-`page` and `offset` together are a 400 `PAGE_WITH_OFFSET` rather than one of
-them quietly winning.
+collection, which is why none of them is clamped or ignored.
+
+<span class="since-badge" data-since="0.25">Since 0.25</span> For the same reason `page` and `offset` together are a 400
+`PAGE_WITH_OFFSET` rather than one of them quietly winning.
 
 ### Skipping the count
 
