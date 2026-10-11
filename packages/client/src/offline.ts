@@ -752,50 +752,70 @@ export class OfflineManager {
     wrap<M extends AnyRow>(slug: string, inner: CollectionClient<M>): CollectionClient<M> {
         this.inners.set(slug, inner as SDKCollectionClient<AnyRow>);
 
-        const wrapped: CollectionClient<M> = {
-            find: async (params?: FindParams<M>): Promise<FindResult<M>> => {
-                const ticket = this.ticket() ?? await this.nextTicket();
-                const state = await this.ensureCollection(slug);
-                if (this.connectivity.shouldAttempt()) {
-                    try {
-                        const res = await inner.find(params);
-                        this.connectivity.markSuccess();
-                        // Answered for a user who has since signed out: theirs
-                        // to read, not the next user's to keep.
-                        if (!this.isCurrent(ticket)) return res;
-                        await this.ingest(slug, res.data ?? [], ticket, isProjection(params));
-                        if (!this.isCurrent(ticket)) return res;
-                        const snapshot = this.recordSnapshot(slug, params, res, ticket);
-                        const answer = this.answer<M>(slug, params, snapshot);
-                        this.notifyCollection(slug, false);
-                        return { data: answer.data, meta: answer.meta };
-                    } catch (error) {
-                        if (!isNetworkError(error)) {
-                            // A 5xx or a rate limit still deserves the cached
-                            // answer rather than an exception the app has to
-                            // special-case, but only when we have one.
-                            if (isRetryableError(error) && this.hasLocalAnswer(state, slug, params)) {
-                                const answer = this.answer<M>(slug, params, this.snapshotFor(slug, params));
-                                return { data: answer.data, meta: answer.meta };
-                            }
-                            throw error;
+        /**
+         * `find`, and the page reader of `iterate()` / `findAll()` when `walk`
+         * is set.
+         *
+         * A walk reads `meta.hasMore` as the server's word on whether to go
+         * on. A page the server never answered here is evaluated over whatever
+         * rows happen to be cached, and its `hasMore` is about those rows — so
+         * offline, `findAll()` stopped at the first such page and returned a
+         * fraction of the collection as the whole of it, with nothing to tell
+         * the two apart. A walk refuses that page instead.
+         */
+        const findPage = async (params: FindParams<M> | undefined, walk: boolean): Promise<FindResult<M>> => {
+            const ticket = this.ticket() ?? await this.nextTicket();
+            const state = await this.ensureCollection(slug);
+            if (this.connectivity.shouldAttempt()) {
+                try {
+                    const res = await inner.find(params);
+                    this.connectivity.markSuccess();
+                    // Answered for a user who has since signed out: theirs
+                    // to read, not the next user's to keep.
+                    if (!this.isCurrent(ticket)) return res;
+                    await this.ingest(slug, res.data ?? [], ticket, isProjection(params));
+                    if (!this.isCurrent(ticket)) return res;
+                    const snapshot = this.recordSnapshot(slug, params, res, ticket);
+                    const answer = this.answer<M>(slug, params, snapshot);
+                    this.notifyCollection(slug, false);
+                    return { data: answer.data, meta: answer.meta };
+                } catch (error) {
+                    if (!isNetworkError(error)) {
+                        // A 5xx or a rate limit still deserves the cached
+                        // answer rather than an exception the app has to
+                        // special-case, but only when we have one.
+                        if (isRetryableError(error) && this.hasLocalAnswer(state, slug, params)
+                            && !(walk && !this.snapshotFor(slug, params))) {
+                            const answer = this.answer<M>(slug, params, this.snapshotFor(slug, params));
+                            return { data: answer.data, meta: answer.meta };
                         }
-                        this.connectivity.markFailure();
+                        throw error;
                     }
+                    this.connectivity.markFailure();
                 }
-                const answer = this.localFind<M>(slug, params);
-                // Falling back is a state change even when the rows are the
-                // same — it is how a "showing cached data" badge lights up.
-                this.notifyCollection(slug, false);
-                return { data: answer.data, meta: answer.meta };
-            },
+            }
+            if (walk && !this.snapshotFor(slug, params)) throw unwalkable();
+            const answer = this.localFind<M>(slug, params);
+            // Falling back is a state change even when the rows are the
+            // same — it is how a "showing cached data" badge lights up.
+            this.notifyCollection(slug, false);
+            return { data: answer.data, meta: answer.meta };
+        };
+        const unwalkable = () => offlineError(
+            `Offline: a page of "${slug}" the server has not answered on this device is needed to ` +
+            "read the collection to the end, and the local database cannot say what is on it."
+        );
 
-            // Paginates the *wrapped* find, so a walk started offline is served
-            // page by page out of the local database exactly as it would be
-            // from the server, and rejoins the network mid-walk if it returns.
-            iterate: (params?: IterateParams<M>) => paginateFind<M>((p) => wrapped.find(p), params, slug),
+        const wrapped: CollectionClient<M> = {
+            find: (params?: FindParams<M>) => findPage(params, false),
 
-            findAll: (params?: FindAllParams<M>) => collectAllPages<M>((p) => wrapped.find(p), params, slug),
+            // Paginates through the local database page by page as the server
+            // answered those pages here, and rejoins the network mid-walk if
+            // it returns. A page it never answered fails the walk — see
+            // `findPage`.
+            iterate: (params?: IterateParams<M>) => paginateFind<M>((p) => findPage(p, true), params, slug),
+
+            findAll: (params?: FindAllParams<M>) => collectAllPages<M>((p) => findPage(p, true), params, slug),
 
             findById: async (id: string | number) => {
                 const ticket = this.ticket() ?? await this.nextTicket();

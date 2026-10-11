@@ -135,3 +135,26 @@ describe("a page answered from a snapshot keeps its limit (M6)", () => {
         expect(page.meta.hasMore).toBe(true);
     });
 });
+
+describe("a walk the local database cannot answer page by page (M7)", () => {
+    it("findAll() offline fails instead of returning a fraction of the collection as the whole", async () => {
+        const server = fakeServer();
+        for (let i = 1; i <= 30; i++) server.rows.set(String(i), { id: String(i), n: i });
+        const { posts } = manager(server);
+        // Only the first page was ever read here.
+        await posts.find({ limit: 20 });
+
+        setNavigatorOnLine(false);
+        await expect(posts.findAll({ pageSize: 20 } as never)).rejects.toMatchObject({ code: "OFFLINE" });
+    });
+
+    it("a walk over pages the server answered here still works offline", async () => {
+        const server = fakeServer();
+        for (let i = 1; i <= 5; i++) server.rows.set(String(i), { id: String(i), n: i });
+        const { posts } = manager(server);
+        const online = await posts.findAll();
+
+        setNavigatorOnLine(false);
+        expect(await posts.findAll()).toHaveLength(online.length);
+    });
+});

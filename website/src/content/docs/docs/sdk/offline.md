@@ -226,6 +226,7 @@ The only contract beyond the obvious is that prefix listings come back in lexico
 The client is not a replica of your database, and it does not pretend to be:
 
 - **Only rows the app has read or written are local.** A query the client has never sent can still be answered from what it holds, but the answer may be missing rows the server would have returned. Live results say so via `partial`.
+- **`findAll()` and `iterate()` read only pages the server answered on this device.** A walk goes on for as long as each page says there is more, and only the server can say that. Offline, a walk that needs a page this device never fetched fails with the `OFFLINE` error (`isOfflineError`) instead of returning part of the collection as if it were all of it. On 0.24 it stopped at that page and returned what it had.
 - **`searchString` is approximated** as a case-insensitive substring scan over cached string fields. The server runs real full-text search over the collection's configured columns.
 - **`include`d relations cannot be evaluated locally** — the related rows live in collections the query never loaded. Such a query is always marked `partial` when answered from the cache.
 - **Replay is at-least-once.** A write that reaches the server but whose response is lost may be sent again. Prefer idempotent writes (`createMany` with `upsert`) where duplicates would matter.
