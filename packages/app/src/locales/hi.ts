@@ -187,6 +187,10 @@ export const hi: RebaseTranslations = {
     change_language: "भाषा बदलें",
     toggle_theme: "थीम बदलें",
     user_menu: "उपयोगकर्ता मेनू",
+    resize_sidebar: "साइडबार का आकार बदलें",
+    resize_editor: "एडिटर का आकार बदलें",
+    resize_list: "सूची का आकार बदलें",
+    panel_mode: "पैनल मोड",
 
     // ─── Error states ─────────────────────────────────────────────
     error: "त्रुटि",

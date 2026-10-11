@@ -767,6 +767,7 @@ message: t("studio_sql_markdown_copy_failed") });
             {/* Main content */}
             <div className="flex-grow overflow-hidden">
                 <ResizablePanels
+                    dividerAriaLabel={t("resize_sidebar")}
                     orientation="horizontal"
                     panelSizePercent={sidebarSize}
                     onPanelSizeChange={setSidebarSize}
@@ -850,6 +851,7 @@ message: t("studio_sql_markdown_copy_failed") });
                             {/* Editor + Results split */}
                             <div className="flex-grow overflow-hidden">
                                 <ResizablePanels
+                                    dividerAriaLabel={t("resize_editor")}
                                     orientation="vertical"
                                     panelSizePercent={editorHeight}
                                     onPanelSizeChange={setEditorHeight}

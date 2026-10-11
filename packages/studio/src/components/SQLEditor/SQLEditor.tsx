@@ -1459,6 +1459,7 @@ id: String(ra.entityId) })}
     return (
         <div className="flex h-full w-full bg-surface-card overflow-hidden text-text-primary dark:text-text-primary-dark">
             <ResizablePanels
+                dividerAriaLabel={t("resize_sidebar")}
                 orientation="horizontal"
                 panelSizePercent={sidebarSize}
                 onPanelSizeChange={setSidebarSize}
@@ -1654,6 +1655,7 @@ isFavorite: !s.isFavorite } : s));
                         </div>
 
                         <ResizablePanels
+                            dividerAriaLabel={t("resize_editor")}
                             orientation="vertical"
                             panelSizePercent={editorHeight}
                             onPanelSizeChange={setEditorHeight}

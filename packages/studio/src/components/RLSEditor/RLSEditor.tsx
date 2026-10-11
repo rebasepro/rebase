@@ -592,6 +592,7 @@ totalPolicies };
     return (
         <div className="flex h-full w-full bg-surface-card overflow-hidden text-text-primary dark:text-text-primary-dark">
             <ResizablePanels
+                dividerAriaLabel={t("resize_sidebar")}
                 orientation="horizontal"
                 panelSizePercent={sidebarSize}
                 onPanelSizeChange={setSidebarSize}

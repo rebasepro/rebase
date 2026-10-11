@@ -10,7 +10,7 @@ import {
     isKeyHandled,
     ResizablePanels
 } from "@rebasepro/ui";
-import { useLargeLayout, UnsavedChangesDialog, useNavigationBlocker } from "@rebasepro/app";
+import { useLargeLayout, UnsavedChangesDialog, useNavigationBlocker, useTranslation } from "@rebasepro/app";
 import { useCollectionRegistryController } from "../../hooks/navigation/contexts/CollectionRegistryContext";
 import { useNavigate, useLocation } from "react-router";
 import { useUrlController } from "../../hooks/navigation/contexts/UrlContext";
@@ -150,6 +150,7 @@ export function SplitListView<M extends Record<string, unknown> = Record<string,
     toolbar,
     children
 }: SplitListViewProps<M>) {
+    const { t } = useTranslation();
     const largeLayout = useLargeLayout();
     const collectionRegistryController = useCollectionRegistryController();
     const location = useLocation();
@@ -484,6 +485,7 @@ export function SplitListView<M extends Record<string, unknown> = Record<string,
     return (
         <SplitViewProvider value={splitViewController}>
             <ResizablePanels
+                dividerAriaLabel={t("resize_list")}
                 stacked={!largeLayout}
                 firstPanel={listPanel}
                 secondPanel={detailPanel}

@@ -164,6 +164,14 @@ export interface RebaseTranslations {
     toggle_theme?: string;
     /** Aria label for the user menu trigger in the drawer footer */
     user_menu?: string;
+    /** Names a split view's divider between a sidebar and what it opens */
+    resize_sidebar?: string;
+    /** Names a split view's divider between an editor and its results */
+    resize_editor?: string;
+    /** Names the divider between a collection list and the open record */
+    resize_list?: string;
+    /** Names the drawer's CMS / Studio switch */
+    panel_mode?: string;
 
     // ─── Error states ─────────────────────────────────────────────
     error: string;

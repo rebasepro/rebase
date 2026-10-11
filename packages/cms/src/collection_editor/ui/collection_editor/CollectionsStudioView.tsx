@@ -122,6 +122,7 @@ export function CollectionsStudioView({
     return (
         <div className="flex h-full w-full bg-surface-sheet overflow-hidden">
             <ResizablePanels
+                dividerAriaLabel={t("resize_sidebar")}
                 orientation="horizontal"
                 panelSizePercent={sidebarSize}
                 onPanelSizeChange={setSidebarSize}

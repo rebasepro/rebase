@@ -187,6 +187,10 @@ export const fr: RebaseTranslations = {
     change_language: "Changer de langue",
     toggle_theme: "Changer de thème",
     user_menu: "Menu utilisateur",
+    resize_sidebar: "Redimensionner la barre latérale",
+    resize_editor: "Redimensionner l'éditeur",
+    resize_list: "Redimensionner la liste",
+    panel_mode: "Mode du panneau",
 
     // ─── Error states ─────────────────────────────────────────────
     error: "Erreur",

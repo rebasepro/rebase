@@ -195,6 +195,10 @@ export const en: RebaseTranslations = {
     change_language: "Change language",
     toggle_theme: "Toggle theme",
     user_menu: "User menu",
+    resize_sidebar: "Resize the sidebar",
+    resize_editor: "Resize the editor",
+    resize_list: "Resize the list",
+    panel_mode: "Panel mode",
 
     // ─── Error states ─────────────────────────────────────────────
     error: "Error",

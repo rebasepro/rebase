@@ -259,6 +259,7 @@ duration: 400 }
 
     return (
         <ResizablePanels
+            dividerAriaLabel={t("resize_sidebar")}
             orientation="horizontal"
             panelSizePercent={sidebarSize}
             onPanelSizeChange={setSidebarSize}
