@@ -11,6 +11,7 @@ import { Hono } from "hono";
 import { createAdminUsersRoute } from "../src/auth/admin-users-route";
 import { createResetPasswordRoute } from "../src/auth/reset-password-admin";
 import { errorHandler } from "../src/api/errors";
+import type { HonoEnv } from "../src/api/types";
 import type { AuthRepository, UserData } from "../src/auth/interfaces";
 import { configureJwt, generateAccessToken } from "../src/auth/jwt";
 
@@ -39,7 +40,7 @@ function repo() {
     return { authRepo, updateUser, updatePassword };
 }
 
-async function send(app: Hono, method: string, path: string, body: unknown): Promise<Response> {
+async function send(app: Hono<HonoEnv>, method: string, path: string, body: unknown): Promise<Response> {
     return app.request(path, {
         method,
         headers: {
@@ -57,7 +58,7 @@ describe("an administrator setting a weak password", () => {
 
     it("PUT /users/:uid answers 400 WEAK_PASSWORD and writes nothing", async () => {
         const { authRepo, updateUser } = repo();
-        const app = new Hono();
+        const app = new Hono<HonoEnv>();
         app.onError(errorHandler);
         app.route("/", createAdminUsersRoute({ authRepo }));
 
@@ -72,7 +73,7 @@ describe("an administrator setting a weak password", () => {
 
     it("POST /users/:uid/reset-password with a chosen password answers 400 WEAK_PASSWORD", async () => {
         const { authRepo, updatePassword } = repo();
-        const app = new Hono();
+        const app = new Hono<HonoEnv>();
         app.onError(errorHandler);
         app.route("/", createResetPasswordRoute({ authRepo }));
 
