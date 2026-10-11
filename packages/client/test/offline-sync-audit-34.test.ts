@@ -346,3 +346,40 @@ describe("an offline edit that moves a cached row into a filtered list", () => {
         expect((await posts.find(open)).meta.total).toBe(2);
     });
 });
+
+describe("a bulk edit queued offline, under a server row arriving", () => {
+    it("keeps the user's edit, as a single edit does", async () => {
+        const server = fakeServer();
+        server.rows.set("1", { id: "1", title: "a" });
+        const { posts } = manager(server);
+        await posts.find();
+        setNavigatorOnLine(false);
+        await posts.updateMany([{ id: "1", data: { title: "bulk" } }]);
+        setNavigatorOnLine(true);
+        server.state.online = false;
+        // A realtime frame (or any read) brings the server's row in.
+        const unlisten = posts.listen!(undefined, () => undefined);
+        server.listeners[0]({ data: [{ id: "1", title: "a" }] });
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        unlisten();
+        expect((await posts.findById("1"))?.title).toBe("bulk");
+    });
+});
+
+describe("a bulk delete queued offline, under a server row arriving", () => {
+    it("keeps the row deleted", async () => {
+        const server = fakeServer();
+        server.rows.set("1", { id: "1", title: "a" });
+        const { posts } = manager(server);
+        await posts.find();
+        setNavigatorOnLine(false);
+        await posts.deleteMany(["1"]);
+        setNavigatorOnLine(true);
+        server.state.online = false;
+        const unlisten = posts.listen!(undefined, () => undefined);
+        server.listeners[0]({ data: [{ id: "1", title: "a" }] });
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        unlisten();
+        await expect(posts.findById("1")).resolves.toBeUndefined();
+    });
+});

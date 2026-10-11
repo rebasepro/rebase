@@ -2006,6 +2006,19 @@ data: u.data as AnyRow })),
                 if (match) row = { ...match };
                 continue;
             }
+            // The bulk verbs name their rows in a list rather than in `id`,
+            // and were skipped here — so a server row arriving before the
+            // replay (a realtime frame, a refetch) put back what an offline
+            // bulk edit had changed, and a row deleted in bulk.
+            if (op.type === "updateMany") {
+                const update = op.updates?.find((u) => String(u.id) === idKey);
+                if (update) row = { ...(row ?? {}), ...update.data, id: update.id };
+                continue;
+            }
+            if (op.type === "deleteMany") {
+                if (op.ids?.some((id) => String(id) === idKey)) row = undefined;
+                continue;
+            }
             if (op.id === undefined || String(op.id) !== idKey) continue;
             if (op.type === "create") row = { ...(op.data as AnyRow) };
             else if (op.type === "update") row = { ...(row ?? {}), ...(op.data as AnyRow), id: op.id };
@@ -2258,6 +2271,10 @@ data: u.data as AnyRow })),
                         note(entry, String(row.id), op);
                         entry.creates.add(String(row.id));
                     }
+                } else if (op.type === "updateMany") {
+                    for (const update of op.updates ?? []) note(entry, String(update.id), op);
+                } else if (op.type === "deleteMany") {
+                    for (const id of op.ids ?? []) note(entry, String(id), op);
                 } else if (op.id !== undefined) {
                     note(entry, String(op.id), op);
                     if (op.type === "create") entry.creates.add(String(op.id));
@@ -2833,6 +2850,8 @@ data: u.data as AnyRow })),
         if (op.type === "createMany") {
             return ((op.data as AnyRow[] | undefined) ?? []).map((r) => String(r.id));
         }
+        if (op.type === "updateMany") return (op.updates ?? []).map((u) => String(u.id));
+        if (op.type === "deleteMany") return (op.ids ?? []).map((id) => String(id));
         return op.id === undefined ? [] : [String(op.id)];
     }
 
