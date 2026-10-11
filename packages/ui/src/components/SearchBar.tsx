@@ -103,6 +103,7 @@ export function SearchBar({
                 placeholder={placeholder}
                 aria-label={placeholder}
                 readOnly={!onTextSearch}
+                disabled={disabled}
                 onChange={onTextSearch
                     ? (event) => {
                         setSearchText(event.target.value);

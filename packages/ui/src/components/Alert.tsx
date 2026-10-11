@@ -11,6 +11,12 @@ export interface AlertProps {
     className?: string;
     outerClassName?: string;
     style?: React.CSSProperties;
+    /**
+     * The live-region role. Defaults to `alert` (announced at once) for
+     * `error` and `warning`, `status` (announced politely) otherwise. Pass
+     * `null` for an alert that is static page content, not news.
+     */
+    role?: "alert" | "status" | null;
 }
 
 const getSizeClasses = (size: "small" | "medium" | "large") => {
@@ -82,13 +88,15 @@ export const Alert: React.FC<AlertProps> = ({
                                                 action,
                                                 outerClassName,
                                                 className,
-                                                style
+                                                style,
+                                                role
                                             }) => {
     const classes = getColorClasses(color);
     const iconSize = getIconSize(size);
 
     return (
         <div
+            role={role === null ? undefined : role ?? (color === "error" || color === "warning" ? "alert" : "status")}
             style={style}
             className={cls(
                 getSizeClasses(size),

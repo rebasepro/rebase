@@ -10,9 +10,11 @@ export interface AvatarProps {
     outerClassName?: string;
     hover?: boolean;
     style?: React.CSSProperties;
+    /** Makes the avatar a button. Without it (or a menu trigger's handlers) it is a plain image. */
+    onClick?: React.MouseEventHandler<HTMLElement>;
 }
 
-const AvatarInner: React.ForwardRefRenderFunction<HTMLButtonElement, AvatarProps> = (
+const AvatarInner: React.ForwardRefRenderFunction<HTMLElement, AvatarProps> = (
     {
         src,
         alt,
@@ -34,10 +36,22 @@ const AvatarInner: React.ForwardRefRenderFunction<HTMLButtonElement, AvatarProps
         setFailedSrc(src);
     };
 
+    // A button only when something handles it: an `onClick`, or the handlers a
+    // Radix trigger (`Menu trigger={<Avatar/>}`) slots in. A bare avatar inside
+    // a caller's own button was a second, unnamed tab stop that did nothing.
+    const interactive = Object.keys(props).some((key) => /^on[A-Z]/.test(key));
+    const Root = interactive ? "button" : "span";
+    // One ref for either element, without asserting which one it is.
+    const setRef = React.useCallback((element: HTMLElement | null) => {
+        if (typeof ref === "function") ref(element);
+        else if (ref) ref.current = element;
+    }, [ref]);
+
     return (
-        <button
-            ref={ref}
+        <Root
+            ref={setRef}
             style={style}
+            {...(interactive ? { type: "button" as const } : {})}
             {...props}
             className={cls(
                 "rounded-full flex items-center justify-center overflow-hidden",
@@ -69,7 +83,7 @@ const AvatarInner: React.ForwardRefRenderFunction<HTMLButtonElement, AvatarProps
           {children}
         </span>
             )}
-        </button>
+        </Root>
     );
 };
 
