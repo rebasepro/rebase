@@ -547,8 +547,7 @@ const config = await client.auth.getAuthConfig();
 //   profileUpdate: boolean,
 //   emailVerification: boolean,
 //   magicLink: boolean, emailOtp?: boolean,
-//   anonymousLogin: boolean,
-//   enabledProviders: string[],
+//   anonymousLogin: boolean, enabledProviders: string[],
 //   externalLoginUrl?: string, needsSetup?: boolean, storage?: boolean
 // }
 ```
