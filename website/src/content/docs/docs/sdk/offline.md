@@ -60,7 +60,7 @@ try {
 While the connection is known to be down, a write is not even attempted — it applies locally and queues, so it costs nothing instead of a timeout:
 
 ```typescript
-// Returns immediately, offline or not.
+// While offline, returns at once with the locally applied row.
 const post = await client.data.posts.create({ title: "Draft", status: "draft" });
 
 // Shows up in every matching list, right away.

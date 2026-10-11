@@ -157,7 +157,7 @@ const rows = await client.data.orders
     .findAll();
 ```
 
-Three options shape the walk:
+Four options shape the walk:
 
 | Option | Default | What it does |
 |--------|---------|--------------|

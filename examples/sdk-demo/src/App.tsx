@@ -536,10 +536,7 @@ label: "Posts",
 icon: "📝" },
   { slug: "tags",
 label: "Tags",
-icon: "🏷️" },
-  { slug: "profiles",
-label: "Profiles",
-icon: "📋" }
+icon: "🏷️" }
 ];
 
 /**

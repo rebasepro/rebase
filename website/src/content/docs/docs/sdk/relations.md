@@ -240,14 +240,22 @@ hand-written row type has no relations in it to check against, and the server's
 
 ### Relation Names
 
-The relation names you pass to `include()` must match the `relationName` defined in the collection's `relations` array:
+The names you pass to `include()` are the keys of the collection's relation properties:
 
 ```typescript
 // Collection definition
-relations: [
-    { relationName: "author", target: () => usersCollection, ... },
-    { relationName: "categories", target: () => categoriesCollection, ... }
-]
+properties: {
+    author: {
+        type: "relation",
+        name: "Author",
+        relation: { kind: "belongsTo", target: () => usersCollection }
+    },
+    categories: {
+        type: "relation",
+        name: "Categories",
+        relation: { kind: "manyToMany", target: () => categoriesCollection }
+    }
+}
 
 // SDK usage — names must match
 client.data.articles.include("author", "categories").find()

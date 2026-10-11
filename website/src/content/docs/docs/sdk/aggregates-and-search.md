@@ -142,7 +142,9 @@ A Postgres collection can opt in to real full-text search by declaring a
 ## Vector Search
 
 For collections with a `vector` property, order rows by similarity to a query
-embedding. Rows come back closest-first, each carrying a `_distance`.
+embedding. Rows come back closest-first, each carrying a `_distance`. The
+distance is the order: an `orderBy` on the same query is ignored. Without a
+`limit` a vector search returns 10 rows, not a listing's 50.
 
 ```typescript
 const { data } = await client.data.docs

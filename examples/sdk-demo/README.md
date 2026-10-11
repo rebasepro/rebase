@@ -5,7 +5,7 @@ A sample React + Vite app demonstrating the `@rebasepro/client` SDK.
 ## Features
 
 - **Authentication** — Login / Register using the SDK's auth client
-- **Collection Browsing** — Navigate Authors, Posts, Tags, Profiles
+- **Collection Browsing** — Navigate Authors, Posts, Tags
 - **CRUD Operations** — Create, edit, delete records via the SDK
 - **Pagination** — Server-side pagination with page navigation
 - **Live queries** — Lists are driven by `observe()`, so writes appear without a refetch

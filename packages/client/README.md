@@ -34,7 +34,7 @@ of it resolves too: Node has supported `require(esm)` since 22.12.
 |---|---|
 | `createRebaseClient<DB>(options)` | Create a client instance. Generic `DB` parameter enables type-safe `client.data.*` access. |
 | `CreateRebaseClientResult<DB>` | The client type it returns (`RebaseClient<DB>` from `@rebasepro/types`, narrowed) — includes `auth`, `admin`, `cron`, `functions`, `storage`, `ws`, `data`, `call`, and token management methods. |
-| `CreateRebaseClientOptions` | Extends `RebaseClientConfig` with `auth`, `admin`, and `cron` sub-configs. |
+| `CreateRebaseClientOptions` | Extends `RebaseClientConfig` with the `auth`, `admin`, `cron`, `apiKeys` and `personalKeys` sub-configs, plus `storageSources`, `collections` and `offline`. |
 
 ### Config
 
@@ -65,7 +65,7 @@ of it resolves too: Node has supported `require(esm)` since 22.12.
 | `where(col, op, val)` | Start a fluent query — returns `QueryBuilder` |
 | `orderBy(col, dir?)` | Order results — returns `QueryBuilder` |
 | `limit(n)` / `offset(n)` | Pagination — returns `QueryBuilder` |
-| `search(str)` | Full-text search — returns `QueryBuilder` |
+| `search(str)` | Text search: a case-insensitive substring match by default, ranked full-text where the collection opts in — returns `QueryBuilder` |
 | `include(...rels)` | Include related rows — returns `QueryBuilder` |
 | `listen(params, onUpdate, onError?)` | Realtime subscription (requires WebSocket) |
 | `listenById(id, onUpdate, onError?)` | Realtime single-row subscription |
@@ -107,7 +107,7 @@ of it resolves too: Node has supported `require(esm)` since 22.12.
 
 | Method | Description |
 |---|---|
-| `listUsers()` / `listUsersPaginated(options?)` | List all users |
+| `listUsers(options?)` / `listUsersPaginated(options?)` | One page of users (25 by default; `limit`, `offset`, `search`, `orderBy`, `orderDir`) with `total` |
 | `getUser(userId)` | Get a single user |
 | `createUser(data)` | Create a user |
 | `updateUser(userId, data)` | Update a user |
