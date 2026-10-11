@@ -32,10 +32,12 @@ receiver that is down for a day costs rows, not memory. Turn the queue on with
 returned:
 
 ```typescript
-import { WebhookDispatcher, WEBHOOK_DELIVERY_TASK, type RebaseBackendInstance } from "@rebasepro/server";
-
-/** What a queued delivery carries: the webhook's id, never its secret. */
-type QueuedDelivery = Parameters<WebhookDispatcher["deliverQueuedJob"]>[0];
+import {
+    WebhookDispatcher,
+    WEBHOOK_DELIVERY_TASK,
+    type QueuedWebhookDelivery,
+    type RebaseBackendInstance
+} from "@rebasepro/server";
 
 // Call once, with what `initializeRebaseBackend({ …, jobs: { enabled: true } })` returned.
 export function sendOrderWebhooks(backend: RebaseBackendInstance): void {
@@ -63,8 +65,9 @@ export function sendOrderWebhooks(backend: RebaseBackendInstance): void {
         }
     ]);
 
-    // The worker side: one attempt per job, and the queue's retries.
-    backend.jobQueue?.register<QueuedDelivery>(WEBHOOK_DELIVERY_TASK, (ctx) => dispatcher.deliverQueuedJob(ctx.payload));
+    // The worker side: one attempt per job, and the queue's retries. Passing
+    // `ctx` lets each attempt send its real `X-Webhook-Attempt`.
+    backend.jobQueue?.register<QueuedWebhookDelivery>(WEBHOOK_DELIVERY_TASK, (ctx) => dispatcher.deliverQueuedJob(ctx.payload, ctx));
 
     backend.setCollectionCallbacks("orders", {
         afterSave: async ({ values, id, status }) => {
@@ -90,45 +93,42 @@ deliveries are queued in memory, in the process that made the change. That is si
 enough for a notification you can afford to lose:
 
 ```typescript
-import type { PostgresCollectionConfig } from "@rebasepro/types";
-import { WebhookDispatcher } from "@rebasepro/server";
+import { WebhookDispatcher, type RebaseBackendInstance } from "@rebasepro/server";
 
-// The row shape, so `values.customer_name` is a string rather than nothing.
-type Order = { customer_name: string; total: number };
-
-const dispatcher = new WebhookDispatcher({
-    onDelivery: (result) => {
-        if (!result.success) {
-            console.error(`Webhook ${result.webhookId} failed: ${result.statusCode} ${result.responseBody}`);
+// Server-only, like the version above: call it with what `initializeRebaseBackend` returned.
+export function sendOrderWebhooks(backend: RebaseBackendInstance): void {
+    const dispatcher = new WebhookDispatcher({
+        onDelivery: (result) => {
+            if (!result.success) {
+                console.error(`Webhook ${result.webhookId} failed: ${result.statusCode} ${result.responseBody}`);
+            }
         }
-    }
-});
+    });
 
-dispatcher.setWebhooks([
-    {
-        id: "wh_orders_slack",
-        url: process.env.SLACK_WEBHOOK_URL!,
-        secret: process.env.WEBHOOK_SECRET,
-        events: ["INSERT"],
-        table: "orders",
-        enabled: true
-    }
-]);
+    dispatcher.setWebhooks([
+        {
+            id: "wh_orders_slack",
+            url: process.env.SLACK_WEBHOOK_URL!,
+            secret: process.env.WEBHOOK_SECRET,
+            events: ["INSERT"],
+            table: "orders",
+            enabled: true
+        }
+    ]);
 
-const ordersCollection: PostgresCollectionConfig<Order> = {
-    slug: "orders",
-    name: "Orders",
-    table: "orders",
-    callbacks: {
+    backend.setCollectionCallbacks("orders", {
         afterSave: async ({ values, id, status }) => {
             if (status === "new") {
                 dispatcher.enqueueEntityChange("orders", "INSERT", String(id), values);
             }
         }
-    },
-    properties: { /* ... */ }
-};
+    });
+}
 ```
+
+Keep the dispatcher out of the collection file itself. A collection file is also bundled into the
+admin, in the browser: the build strips its callbacks, but a dispatcher built at the top of the file
+and its `@rebasepro/server` import would ship to every visitor, and fail the admin build.
 
 A crash or a deploy between the commit and the delivery drops the event. Each webhook has its own
 queue, so a receiver that is down delays only its own deliveries, never another webhook's.
@@ -138,6 +138,32 @@ with `success: false`, `statusCode: 0`, `attemptNumber: 0` and `responseBody: "q
 the server log says so once. Call `await dispatcher.flush(10_000)` on shutdown: it waits for what
 is queued and resolves `false` if the budget runs out first, because a receiver that is down can
 hold each of its deliveries for up to ~36 seconds of retries.
+
+### What the receiver gets
+
+Every delivery is a `POST` with a JSON body and these headers:
+
+| Header | Value |
+| --- | --- |
+| `X-Webhook-Id` | The webhook's `id` |
+| `X-Webhook-Event` | `INSERT`, `UPDATE` or `DELETE` |
+| `X-Webhook-Delivery` | One id per delivery, the same on every attempt at it |
+| `X-Webhook-Attempt` | Which attempt this is, from `1` |
+| `X-Webhook-Signature` | `sha256=` and the hex HMAC-SHA256 of the raw body, keyed with the webhook's `secret` (only when it has one) |
+
+Deliveries are at-least-once: a receiver that answered too slowly, or a worker that died after the
+`POST`, means the same delivery arrives again. Deduplicate on `X-Webhook-Delivery`, and check the
+signature over the body exactly as it arrived — before parsing it:
+
+```typescript
+import { createHmac, timingSafeEqual } from "node:crypto";
+
+export function isSignedByRebase(rawBody: string, header: string | null, secret: string): boolean {
+    const expected = Buffer.from(`sha256=${createHmac("sha256", secret).update(rawBody).digest("hex")}`);
+    const received = Buffer.from(header ?? "");
+    return received.length === expected.length && timingSafeEqual(received, expected);
+}
+```
 
 ### Calling an endpoint directly
 
