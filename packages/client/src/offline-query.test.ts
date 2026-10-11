@@ -208,11 +208,14 @@ describe("local query engine", () => {
     });
 
     describe("pagination", () => {
-        it("resolves page over offset the way the server does", () => {
+        it("resolves page and offset the way the server does", () => {
             expect(resolvePagination({ limit: 10, offset: 30 })).toEqual({ limit: 10, offset: 30 });
             expect(resolvePagination({ limit: 10, page: 3 })).toEqual({ limit: 10, offset: 20 });
-            // `page` wins over `offset`, and the first page is not negative.
-            expect(resolvePagination({ limit: 10, page: 1, offset: 99 })).toEqual({ limit: 10, offset: 0 });
+            // The first page is not negative, and the pair is refused as the
+            // server refuses it rather than one quietly winning.
+            expect(resolvePagination({ limit: 10, page: 1 })).toEqual({ limit: 10, offset: 0 });
+            expect(() => resolvePagination({ limit: 10, page: 1, offset: 99 }))
+                .toThrow(expect.objectContaining({ code: "PAGE_WITH_OFFSET" }));
         });
 
         it("defaults to the same page size the server would apply", () => {
@@ -233,8 +236,7 @@ describe("local query engine", () => {
                 { limit: 10 },
                 { offset: 30 },
                 { page: 4 },
-                { limit: 25, page: 2 },
-                { limit: 10, page: 1, offset: 99 }
+                { limit: 25, page: 2 }
             ]) {
                 const { limit, offset } = resolveFindWindow(params);
                 expect(resolvePagination(params)).toEqual({ limit, offset });

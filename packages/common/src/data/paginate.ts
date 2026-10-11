@@ -3,7 +3,8 @@ import {
     FindAllParams,
     FindParams,
     FindResult,
-    IterateParams
+    IterateParams,
+    RebaseClientError
 } from "@rebasepro/types";
 import { normalizeOrderBy } from "./sort-dialect";
 
@@ -68,6 +69,12 @@ export class RebasePaginationError extends Error {
     }
 }
 
+/**
+ * What a read naming both `page` and `offset` is refused with — by the server
+ * (400 `PAGE_WITH_OFFSET`) and, before any request, by every client.
+ */
+export const PAGE_WITH_OFFSET_MESSAGE = "`page` and `offset` describe the same window; send one.";
+
 /** The one thing a transport has to provide to be paginated. */
 export type PageFinder<M extends Record<string, unknown> = Record<string, unknown>> =
     (params: FindParams<M>) => Promise<FindResult<M>>;
@@ -82,7 +89,9 @@ export type PageFinder<M extends Record<string, unknown> = Record<string, unknow
  * the published type documented a fourth number. Pages that overlap or skip
  * rows are the mildest of those outcomes.
  *
- * `page` wins over `offset`, as {@link FindParams} documents. `driverOffset`
+ * `page` and `offset` together are refused with `PAGE_WITH_OFFSET`, as the
+ * server refuses them: they name one window twice, and `page` used to win
+ * silently over an `offset` the caller then never saw applied. `driverOffset`
  * is the value to hand a driver: it stays `undefined` when the caller named no
  * offset, because keyset pagination seeks with a `where` clause and must not
  * look like it is paging by offset.
@@ -90,6 +99,9 @@ export type PageFinder<M extends Record<string, unknown> = Record<string, unknow
 export function resolveFindWindow(
     params?: Pick<FindParams, "limit" | "offset" | "page">
 ): { limit: number; offset: number; driverOffset: number | undefined } {
+    if (params?.page != null && params.offset != null) {
+        throw new RebaseClientError(PAGE_WITH_OFFSET_MESSAGE, { code: "PAGE_WITH_OFFSET" });
+    }
     const limit = params?.limit ?? DEFAULT_LIST_LIMIT;
     const offset = params?.page != null
         ? Math.max(0, (params.page - 1) * limit)

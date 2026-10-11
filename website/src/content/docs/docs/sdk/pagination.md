@@ -23,6 +23,10 @@ if (page1.meta.hasMore) {
 const page = await client.data.products.find({ page: 2, limit: 20 });
 ```
 
+Use one or the other. `page` and `offset` together describe the same window
+twice, and the read is refused with `PAGE_WITH_OFFSET` — a 400 over HTTP, and
+before any read in-process and offline — rather than quietly applying `page`.
+
 `limit` must be a whole number between 1 and 1000. A larger one — or a zero,
 negative, or fractional one — is refused with a 400 `INVALID_LIMIT` rather than
 clamped, because a silently smaller page cannot be told apart from the last one.

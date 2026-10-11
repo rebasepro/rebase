@@ -338,10 +338,12 @@ export const MAX_INCLUDE_DEPTH = 3;
  *
  * ## Pagination precedence
  *
- * `limit`/`offset` and `page` describe the same window two ways. If **both
- * `offset` and `page` are provided, `page` wins** — the backend computes
- * `offset = (page - 1) * (limit ?? DEFAULT_LIST_LIMIT)` and ignores the
- * explicit `offset`. Pick one style per query.
+ * `limit`/`offset` and `page` describe the same window two ways, so send one.
+ * `page` is `offset = (page - 1) * (limit ?? DEFAULT_LIST_LIMIT)`. A read with
+ * **both** is refused with `PAGE_WITH_OFFSET` — a 400 from the server, and a
+ * `RebaseClientError` with that code from a client before any request — rather
+ * than quietly applying one of them. `after` is refused beside either
+ * (`CURSOR_WITH_OFFSET`).
  *
  * @group Data
  */
@@ -360,13 +362,14 @@ export interface FindParams<M extends Record<string, unknown> = Record<string, u
      */
     limit?: number;
     /**
-     * Number of items to skip. Ignored when {@link FindParams.page} is also
-     * set — `page` takes precedence.
+     * Number of items to skip. Not with {@link FindParams.page}: the pair is
+     * refused with `PAGE_WITH_OFFSET`.
      */
     offset?: number;
     /**
-     * Page number (1-indexed), alternative to {@link FindParams.offset}.
-     * When set, overrides `offset` as `(page - 1) * (limit ?? DEFAULT_LIST_LIMIT)`.
+     * Page number (1-indexed), alternative to {@link FindParams.offset}: it
+     * skips `(page - 1) * (limit ?? DEFAULT_LIST_LIMIT)` rows. Sent with
+     * `offset`, the read is refused with `PAGE_WITH_OFFSET`.
      */
     page?: number;
     /**

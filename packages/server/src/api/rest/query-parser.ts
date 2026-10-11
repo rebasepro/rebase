@@ -7,6 +7,7 @@ import {
     type FieldViewer,
     IncludeSpecError,
     OrderBySpecError,
+    PAGE_WITH_OFFSET_MESSAGE,
     decodeCursor,
     deserializeFilter,
     deserializeInclude,
@@ -473,6 +474,12 @@ export function parseQueryOptions(
     if (offsetVal) options.offset = parseWindowParam(offsetVal, "offset", 0, "INVALID_OFFSET");
 
     const pageVal = getLastValue(query.page);
+    // Two names for one window. `page` used to win silently, so a caller who
+    // sent `offset=10` read whatever page two was and was told nothing — the
+    // same quiet override `after` + `offset` is refused for below.
+    if (pageVal && offsetVal) {
+        throw invalidParam(PAGE_WITH_OFFSET_MESSAGE, "PAGE_WITH_OFFSET");
+    }
     if (pageVal) {
         const page = parseWindowParam(pageVal, "page", 1, "INVALID_PAGE");
         // Page stride uses the same bounded page size the read will use, so

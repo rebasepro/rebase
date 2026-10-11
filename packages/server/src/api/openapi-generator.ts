@@ -53,7 +53,7 @@ export function generateOpenApiSpec(
         { name: "offset", in: "query", schema: { type: "integer", default: 0 },
             description: "Number of records to skip" },
         { name: "page", in: "query", schema: { type: "integer", minimum: 1 },
-            description: "Page number (alternative to offset). Calculates offset as (page-1)*limit" },
+            description: "Page number (alternative to offset). Calculates offset as (page-1)*limit. Cannot be combined with `offset` (400 PAGE_WITH_OFFSET)." },
         {
             name: "after",
             in: "query",
