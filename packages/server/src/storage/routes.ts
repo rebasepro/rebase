@@ -1254,6 +1254,15 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
         // "reject full-access JWTs on file routes" did not close the gap.
         await checkAuthorizedAs(caller, "read", resolvedPath, bucket, storageId);
 
+        // A folder is not an object. On S3 and GCS a `folder/` marker is a real
+        // zero-byte object, so it would be described — and a download token
+        // for a key ending in `/` reads as a prefix grant, opening every object
+        // under it while the hook was asked about the marker alone. Local
+        // storage has no such object; every store answers the same 404.
+        if (resolvedPath.endsWith("/")) {
+            throw ApiError.notFound("File not found");
+        }
+
         // Only the metadata goes back — the client builds the `/file/*` URL
         // itself — so a controller that can describe an object without signing
         // a URL for it is asked to. On GCS without a key file, signing is a

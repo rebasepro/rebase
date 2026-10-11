@@ -137,7 +137,10 @@ does not set them.
 of the stored object under `data`; `GET /api/storage/metadata/*` the object's
 metadata and, for a private object, the short-lived `token`;
 `POST /api/storage/metadata` an object keyed by the paths it was sent, each
-holding what the `GET` would have answered for it (see below);
+holding what the `GET` would have answered for it (see below). A folder is not
+an object: `/metadata` on a key ending in `/` is `404`, on S3 and GCS as on local
+storage, even where a `folder/` marker object exists, so no download token is
+ever minted for a prefix;
 `GET /api/storage/sources` the array of configured sources, with
 `configured: true`. On a deployment with no storage at all, it answers
 `200 {"data": [], "configured": false}`, while every other route answers

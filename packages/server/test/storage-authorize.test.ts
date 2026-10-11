@@ -107,6 +107,50 @@ describe("storage per-object authorization", () => {
         });
     });
 
+    /**
+     * On S3 and GCS a "folder" is often a real zero-byte object whose key ends
+     * in `/`, so `getMetadata("alice/")` answers. A download token minted for
+     * that key reads as a prefix grant — it opened every object under it,
+     * while the hook was only asked about the marker. Local storage has no
+     * such object and already answered 404; the bucket stores now do too.
+     */
+    describe("a key that names a folder", () => {
+        /** The local controller, plus the folder markers S3/GCS keep. */
+        class FolderMarkerController extends LocalStorageController {
+            override async getSignedUrl(key: string, bucket?: string) {
+                return super.getSignedUrl(key.endsWith("/") ? "alice/notes.txt" : key, bucket);
+            }
+        }
+
+        it("is not found, and mints no token, on a store that keeps folder markers", async () => {
+            controller = new FolderMarkerController({ basePath: tempDir });
+            await mount(ownerOnly);
+
+            const single = await app.fetch(new Request("http://localhost/api/storage/metadata/default/alice/"));
+            expect(single.status).toBe(404);
+            expect(JSON.stringify(await single.json())).not.toContain("token");
+
+            const batch = await app.fetch(new Request("http://localhost/api/storage/metadata", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ keys: ["default/alice/", "default/alice/notes.txt"] })
+            }));
+            expect(batch.status).toBe(200);
+            const body = await batch.json() as { data: Record<string, { token?: string; error?: { status: number } }> };
+            expect(body.data["default/alice/"]).toEqual({ error: expect.objectContaining({ status: 404 }) });
+            expect(body.data["default/alice/notes.txt"].token).toBeDefined();
+
+            const file = await app.fetch(new Request("http://localhost/api/storage/metadata/default/alice/notes.txt"));
+            expect(file.status).toBe(200);
+            expect((await file.json() as { data: { token?: string } }).data.token).toBeDefined();
+        });
+
+        it("is not found on local storage either", async () => {
+            const res = await app.fetch(new Request("http://localhost/api/storage/metadata/default/alice/"));
+            expect(res.status).toBe(404);
+        });
+    });
+
     describe("the two principals the hook is not asked about", () => {
         /**
          * The hook is deliberately NOT re-run for a `?token=` request or a
