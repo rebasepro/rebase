@@ -994,12 +994,16 @@ export function assertDestructiveTargetIsLocal(toolName: string): void {
     // child resolves its own connection string, from files and variables this
     // process cannot see all of, so "I found none" says nothing about what it
     // will find.
+    //
+    // With no connection string anywhere, the CLI falls through to the managed
+    // development database (`packages/cli/src/dev-db/resolve.ts`, rule 6) —
+    // the default of every `rebase init` scaffold — where it refuses `db push`,
+    // `db migrate` and `db branch` itself. So the message says what the CLI
+    // says, and never offers the opt-out: an agent told to set
+    // REBASE_MCP_ALLOW_REMOTE_WRITES in `.mcp.json` disables the gate for every
+    // later call, to fix a project that was never remote.
     if (targets.length === 0) {
-        throw new Error(
-            `Refusing to run "${toolName}": no DATABASE_URL could be resolved for project ` +
-            `"${project.name}", so the database it would connect to cannot be verified as local. ` +
-            `Set DATABASE_URL in the project's .env, or ${optOut.charAt(0).toLowerCase()}${optOut.slice(1)}`
-        );
+        throw new Error(managedDatabaseRefusal(toolName, project.name));
     }
     const remote = targets.find((target) => !isLocalTarget(target.url));
     if (!remote) return;
@@ -1008,6 +1012,27 @@ export function assertDestructiveTargetIsLocal(toolName: string): void {
         `Refusing to run "${toolName}": DATABASE_URL for project "${project.name}" points at ` +
         `${redactUrl(remote.url)} (from ${remote.source}), which is not local. ${optOut}`
     );
+}
+
+/**
+ * Why a database tool is refused on a project with no `DATABASE_URL`: the CLI
+ * would run it on the managed development database, and what to do instead.
+ */
+export function managedDatabaseRefusal(toolName: string, projectName: string): string {
+    const head =
+        `Refusing to run "${toolName}": project "${projectName}" sets no DATABASE_URL, so the CLI ` +
+        "would use the managed development database (PGlite, started by `rebase dev`). ";
+    const realPostgres =
+        "To use it anyway, the project needs a real Postgres: ask the user to point DATABASE_URL in " +
+        "the project's .env at one (or to run `rebase dev --docker`). Do not invent a DATABASE_URL.";
+    if (toolName.startsWith("rebase_db_branch_")) {
+        return head + "Branches do not work there: PGlite serves exactly one database, so a branch " +
+            "would be the original. " + realPostgres;
+    }
+    return head + "You most likely do not need this tool: the dev server applies the collections to " +
+        "that database at boot, additively. After changing a collection, restart it with " +
+        "rebase_dev_stop and rebase_dev_start. Migrations, and dropping or renaming columns, need " +
+        "a real Postgres. " + realPostgres;
 }
 
 /**

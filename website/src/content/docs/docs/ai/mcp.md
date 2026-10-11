@@ -323,12 +323,18 @@ https://api.example.com/, which is not local. Set REBASE_MCP_ALLOW_REMOTE_WRITES
 to allow destructive tools against remote environments.
 ```
 
-**If no connection string can be resolved at all, the DB tools are refused** —
-an unverifiable target is not a safe one:
+**If no connection string can be resolved at all, the gated DB tools are refused.**
+With no `DATABASE_URL`, the CLI uses the managed development database, which is
+the default for a new project, and the CLI refuses `db push`, `db migrate` and
+`db branch` there itself. The refusal says so and names what works instead. It
+does not suggest the opt-out:
 
 ```text
-Error: Refusing to run "rebase_db_push": no DATABASE_URL could be resolved for
-project "default", so the database it would connect to cannot be verified as local.
+Error: Refusing to run "rebase_db_push": project "default" sets no DATABASE_URL, so the
+CLI would use the managed development database (PGlite, started by `rebase dev`). You
+most likely do not need this tool: the dev server applies the collections to that
+database at boot, additively. After changing a collection, restart it with
+rebase_dev_stop and rebase_dev_start. …
 ```
 
 Only loopback counts as local: `localhost`, `*.localhost`, `127.0.0.0/8`, `::1`.

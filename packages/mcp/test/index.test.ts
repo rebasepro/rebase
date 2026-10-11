@@ -965,7 +965,28 @@ describe("the db gate checks the DSN the child would actually use", () => {
         });
 
         expect(result.isError).toBe(true);
-        expect(result.content[0].text).toContain("no DATABASE_URL could be resolved");
+        expect(result.content[0].text).toContain("sets no DATABASE_URL");
+        expect(spawn).not.toHaveBeenCalled();
+    });
+
+    // A fresh scaffold has no DATABASE_URL: the managed database is the
+    // default. The refusal told the agent to set REBASE_MCP_ALLOW_REMOTE_WRITES
+    // — the gate's off switch — or to invent a DATABASE_URL, the opposite of
+    // what the skill says about the managed database.
+    it("on the managed database, says what the CLI says and never offers the opt-out", async () => {
+        await useProject(projectDir);
+
+        for (const name of ["rebase_db_push", "rebase_db_migrate", "rebase_db_branch_create", "rebase_db_branch_delete"]) {
+            const result = await handler()({
+                method: "tools/call",
+                params: { name, arguments: name.startsWith("rebase_db_branch_") ? { name: "feature_x" } : {} }
+            });
+            expect(result.isError).toBe(true);
+            const text = result.content[0].text as string;
+            expect(text).toContain("managed development database");
+            expect(text).not.toContain("REBASE_MCP_ALLOW_REMOTE_WRITES");
+            if (name === "rebase_db_push") expect(text).toContain("rebase_dev_start");
+        }
         expect(spawn).not.toHaveBeenCalled();
     });
 
