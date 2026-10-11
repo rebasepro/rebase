@@ -344,8 +344,12 @@ rather than as whatever `fetch` felt like rejecting with. A response with no
 envelope — a proxy's 413, a load balancer's 502 — still gets a `code` from its
 status (`PAYLOAD_TOO_LARGE`, `SERVICE_UNAVAILABLE`, `INTERNAL_ERROR`, …), and a
 client built outside a browser with no `baseUrl` fails with
-`BASE_URL_REQUIRED` rather than a network error. So application code catches
-one class:
+`BASE_URL_REQUIRED` rather than a network error. A read that gets a success
+without the shape it reads — a `204`, an empty body, a page with no `data`
+list — fails with `UNEXPECTED_RESPONSE` instead of resolving as "no rows", and
+`createMany`, `updateMany`, `deleteMany` or `batch` given something other than
+an array fails with `INVALID_BULK_BODY`, the code the server uses for the same
+mistake. So application code catches one class:
 
 ```typescript
 async function setPrice(id: string, price: number) {

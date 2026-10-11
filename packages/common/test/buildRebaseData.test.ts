@@ -1,5 +1,5 @@
-import { buildRebaseData, wrapAsEntityData } from "../src/data/buildRebaseData";
-import { CollectionAccessor, DataDriver, Entity, RebaseData, RebaseSdkData } from "@rebasepro/types";
+import { buildRebaseData, buildSdkData, wrapAsEntityData } from "../src/data/buildRebaseData";
+import { CollectionAccessor, DataDriver, Entity, RebaseClientError, RebaseData, RebaseSdkData } from "@rebasepro/types";
 
 /**
  * `RebaseData`'s dynamic index signature is a union of a collection accessor
@@ -523,5 +523,22 @@ describe("wrapAsEntityData", () => {
         expect(written[0].id).toEqual("p1");
         expect(written[0].values).toEqual({ id: "p1",
             name: "Widget" });
+    });
+});
+
+/**
+ * A bulk call given something other than an array is a `RebaseClientError`
+ * with the server's code for the same mistake, as on the HTTP client — not a
+ * bare `TypeError` that `switch (e.code)` cannot see.
+ */
+describe("buildSdkData bulk arguments", () => {
+    it.each(["createMany", "updateMany", "deleteMany"] as const)("%s refuses a non-array with INVALID_BULK_BODY", async (method) => {
+        const posts = buildSdkData(createMockDriver({
+            saveMany: jest.fn(),
+            deleteMany: jest.fn()
+        } as Partial<DataDriver>)).collection("posts");
+        const call = posts[method] as (arg: unknown) => Promise<unknown>;
+        await expect(call.call(posts, "nope")).rejects.toBeInstanceOf(RebaseClientError);
+        await expect(call.call(posts, "nope")).rejects.toMatchObject({ code: "INVALID_BULK_BODY" });
     });
 });

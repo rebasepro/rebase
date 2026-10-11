@@ -99,13 +99,12 @@ hasMore: false } });
             expect(mockRequest).toHaveBeenCalledWith("/data/posts", { method: "GET" });
         });
 
-        it("handles empty/missing data array gracefully", async () => {
+        it("refuses a page without a data list rather than reading it as no rows", async () => {
             const client = createCollectionClient<PostModel>(transport, "posts");
             mockRequest.mockResolvedValueOnce({ data: undefined,
 meta: {} });
 
-            const result = await client.find();
-            expect(result.data).toEqual([]);
+            await expect(client.find()).rejects.toMatchObject({ code: "UNEXPECTED_RESPONSE" });
         });
 
         it("returns multiple rows as flat objects", async () => {

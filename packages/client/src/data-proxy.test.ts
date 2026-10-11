@@ -38,7 +38,7 @@ describe("client.data proxy — strict mode (collections dictionary provided)", 
         // `blog_posts` that the untyped snake_case fallback would produce.
         // A client of its own: the shared one above captured `globalThis.fetch`
         // when this file was collected, which is before `beforeAll` swaps it.
-        const fetchMock = jest.fn<typeof fetch>(async () => new Response("{}"));
+        const fetchMock = jest.fn<typeof fetch>(async () => new Response(JSON.stringify({ data: [] })));
         const wired = createRebaseClient({
             baseUrl: "http://localhost:3000",
             fetch: fetchMock as typeof fetch,

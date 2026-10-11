@@ -177,6 +177,30 @@ function sendsQueryBody(
  * instead, and the transport remembers — unless the `GET` 404s as well, which
  * is the collection's answer, not the route's.
  */
+/**
+ * A success whose body is not the shape the method reads: no body at all (a
+ * `204`, or a `200` with nothing in it), or JSON without the page's `data`
+ * list. Usually a proxy or a route that is not the Rebase API answering. It
+ * used to resolve as an empty page, or the row `{}`, or throw a bare
+ * `TypeError` — none of which `switch (e.code)` could tell from a real answer.
+ */
+function unexpectedResponse(slug: string, method: string, status: number, expected: string): RebaseApiError {
+    return new RebaseApiError(
+        `${method} on "${slug}" got ${status === 204 ? "a 204 with no body" : `a ${status} without ${expected}`} from the server. ` +
+        "This usually means something other than the Rebase API answered — a proxy, or a route outside the API — so check the API URL configuration.",
+        { status, code: "UNEXPECTED_RESPONSE" }
+    );
+}
+
+/**
+ * A bulk call given something other than an array. A `RebaseClientError` with
+ * the code the server uses for the same mistake in a request body, so one
+ * `case "INVALID_BULK_BODY"` covers both.
+ */
+export function invalidBulkBody(message: string): RebaseClientError {
+    return new RebaseClientError(message, { code: "INVALID_BULK_BODY" });
+}
+
 async function readWithParams<T>(
     transport: Transport,
     path: string,
@@ -394,8 +418,15 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
     const client: CollectionClient<M> = {
         async find(params?: FindParams<M>): Promise<FindResult<M>> {
             type Page = { data: Record<string, unknown>[]; meta: FindResult<M>["meta"] };
-            const read = (p: FindParams<M> | undefined): Promise<Page> =>
-                readWithParams<Page>(transport, basePath, `${basePath}/query`, p, serversWithoutQueryRoute);
+            const read = async (p: FindParams<M> | undefined): Promise<Page> => {
+                const page = await readWithParams<Page | undefined>(transport, basePath, `${basePath}/query`, p, serversWithoutQueryRoute);
+                // The transport answers `undefined` for a 204 and nothing
+                // else, and a read route answers every other success with 200.
+                if (!page || !Array.isArray(page.data)) {
+                    throw unexpectedResponse(slug, "find()", page ? 200 : 204, "a page with a `data` list");
+                }
+                return page;
+            };
             const counted = { ...params, count: undefined };
             let raw: Awaited<ReturnType<typeof read>>;
             if (params?.count !== "none") {
@@ -412,7 +443,7 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
                 }
             }
             return {
-                data: (raw.data || []) as M[],
+                data: raw.data as M[],
                 meta: raw.meta
             };
         },
@@ -437,6 +468,8 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
                     meta
                 );
                 if (!raw) return undefined;
+                // An empty body reads as `{}`, and no row has no columns.
+                if (Object.keys(raw).length === 0) throw unexpectedResponse(slug, "findById()", meta.status ?? 200, "a row");
                 return withETag(raw as M, meta.etag);
             } catch (err) {
                 if (err instanceof RebaseApiError && err.status === 404) {
@@ -510,7 +543,7 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
             options?: { upsert?: boolean; onConflict?: readonly string[] } & WriteOptions
         ) {
             if (!Array.isArray(data)) {
-                throw new TypeError("createMany expects an array of records.");
+                throw invalidBulkBody("createMany expects an array of records.");
             }
             if (data.length === 0) return [];
 
@@ -555,7 +588,7 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
             options?: WriteOptions
         ) {
             if (!Array.isArray(updates)) {
-                throw new TypeError("updateMany expects an array of { id, data } entries.");
+                throw invalidBulkBody("updateMany expects an array of { id, data } entries.");
             }
             if (updates.length === 0) return [];
 
@@ -593,7 +626,7 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
          */
         async deleteMany(ids: (string | number)[], options?: WriteOptions) {
             if (!Array.isArray(ids)) {
-                throw new TypeError("deleteMany expects an array of ids.");
+                throw invalidBulkBody("deleteMany expects an array of ids.");
             }
             if (ids.length === 0) return;
 

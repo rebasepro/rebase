@@ -396,11 +396,11 @@ author_id: 5 }]));
 title: "Plain",
 author_id: 5 });
     });
-    it("handles undefined data gracefully", async () => {
+    it("refuses a page without a data list", async () => {
         const c = createCollectionClient<PostModel>(transport, "posts");
         mockRequest.mockResolvedValueOnce({ data: undefined,
 meta: {} });
-        expect((await c.find()).data).toEqual([]);
+        await expect(c.find()).rejects.toMatchObject({ code: "UNEXPECTED_RESPONSE" });
     });
     it("handles empty data array", async () => {
         const c = createCollectionClient<PostModel>(transport, "posts");

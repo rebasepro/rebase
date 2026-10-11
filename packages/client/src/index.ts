@@ -5,7 +5,7 @@ import { createAdmin, CreateAdminOptions } from "./admin";
 import { createCron, CreateCronOptions } from "./cron";
 import { createBackups } from "./backups";
 import { createApiKeys, CreateApiKeysOptions, createPersonalKeys, CreatePersonalKeysOptions } from "./api-keys";
-import { CollectionClient, createCollectionClient } from "./collection";
+import { CollectionClient, createCollectionClient, invalidBulkBody } from "./collection";
 import { createFunctionsClient } from "./functions";
 import { createStorage } from "./storage";
 import { ClientStorageSourceRegistry } from "./storage-registry";
@@ -847,7 +847,7 @@ export function createRebaseClient<DB = Record<string, unknown>>(options: Create
         },
         batch: async (operations: unknown[], batchOptions?: WriteOptions): Promise<BatchResult> => {
             if (!Array.isArray(operations)) {
-                throw new TypeError("batch expects an array of operations.");
+                throw invalidBulkBody("batch expects an array of operations.");
             }
             // Answered locally rather than sent: an empty transaction is a
             // round trip that cannot do anything, and the server would have to

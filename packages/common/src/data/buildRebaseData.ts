@@ -1029,7 +1029,7 @@ function toSdkCollectionClient<M extends Record<string, unknown>>(
         ): Promise<M[]> {
             refuseUnhonouredWriteOptions("createMany", slug, options);
             if (!Array.isArray(data)) {
-                throw new TypeError("createMany expects an array of records.");
+                throw new RebaseClientError("createMany expects an array of records.", { code: "INVALID_BULK_BODY" });
             }
             if (data.length === 0) return [];
             if (!snap.createMany) {
@@ -1079,7 +1079,7 @@ function toSdkCollectionClient<M extends Record<string, unknown>>(
         ): Promise<M[]> {
             refuseUnhonouredWriteOptions("updateMany", slug, options);
             if (!Array.isArray(updates)) {
-                throw new TypeError("updateMany expects an array of { id, data } entries.");
+                throw new RebaseClientError("updateMany expects an array of { id, data } entries.", { code: "INVALID_BULK_BODY" });
             }
             if (updates.length === 0) return [];
             if (!snap.updateMany) {
@@ -1101,7 +1101,7 @@ data: u.data as Partial<EntityValues<M>> }))
         async deleteMany(ids: (string | number)[], options?: WriteOptions): Promise<void> {
             refuseUnhonouredWriteOptions("deleteMany", slug, options);
             if (!Array.isArray(ids)) {
-                throw new TypeError("deleteMany expects an array of ids.");
+                throw new RebaseClientError("deleteMany expects an array of ids.", { code: "INVALID_BULK_BODY" });
             }
             if (ids.length === 0) return;
             if (!snap.deleteMany) {

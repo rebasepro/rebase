@@ -1,7 +1,7 @@
 import { buildQueryString, FindParams, RebaseApiError } from "./transport";
 import { FindAllParams, FindResult, IterateParams, LogicalCondition, SDKCollectionClient, WhereFilterOp, WhereValueFor, WriteOptions, hasFieldOperation, isUnsupported, type ByIdReadOptions, type UpdateValues, type UpsertOptions } from "@rebasepro/types";
 import { collectAllPages, normalizeOrderBy, paginateFind } from "@rebasepro/common";
-import { CollectionClient, LiveResult, ObserveOptions, RowSnapshotMeta, byIdRead, type ObserveByIdOptions } from "./collection";
+import { CollectionClient, LiveResult, ObserveOptions, RowSnapshotMeta, byIdRead, invalidBulkBody, type ObserveByIdOptions } from "./collection";
 import { SDKQueryBuilder } from "./sdk_query_builder";
 import { dehydrateMutation, dehydrateRow, hydrateMutation, hydrateRow, setOwn } from "./offline-codec";
 import { RebaseClientError } from "./errors";
@@ -963,7 +963,7 @@ export class OfflineManager {
                 const ticket = this.ticket() ?? await this.nextTicket();
                 await this.ensureCollection(slug);
                 if (!Array.isArray(data)) {
-                    throw new TypeError("createMany expects an array of records.");
+                    throw invalidBulkBody("createMany expects an array of records.");
                 }
                 if (data.length === 0) return [];
                 // As in `create`: the key the batch is sent under is the key
@@ -1080,7 +1080,7 @@ export class OfflineManager {
                 const ticket = this.ticket() ?? await this.nextTicket();
                 await this.ensureCollection(slug);
                 if (!Array.isArray(updates)) {
-                    throw new TypeError("updateMany expects an array of { id, data } entries.");
+                    throw invalidBulkBody("updateMany expects an array of { id, data } entries.");
                 }
                 if (updates.length === 0) return [];
                 // Any row in the batch with a write already queued sends the
@@ -1124,7 +1124,7 @@ data: u.data as AnyRow })),
                 const ticket = this.ticket() ?? await this.nextTicket();
                 await this.ensureCollection(slug);
                 if (!Array.isArray(ids)) {
-                    throw new TypeError("deleteMany expects an array of ids.");
+                    throw invalidBulkBody("deleteMany expects an array of ids.");
                 }
                 if (ids.length === 0) return;
                 const anyPending = ids.some((id) => this.hasPending(slug, id));
