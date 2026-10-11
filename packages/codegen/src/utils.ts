@@ -43,6 +43,25 @@ export function toSafeIdentifier(str: string): string {
 }
 
 /**
+ * Property names `client.data` never serves as a collection: `collection` is
+ * the dynamic `collection(slug)` function, and `then`, `toJSON` and `$$typeof`
+ * answer `undefined` so promise and serialisation probes leave the proxy alone
+ * (`packages/client/src/index.ts`).
+ */
+const RESERVED_ACCESSORS: ReadonlySet<string> = new Set(["collection", "then", "toJSON", "$$typeof"]);
+
+/**
+ * The property a slug is reachable under on `client.data` in the generated SDK:
+ * its safe identifier, or `<name>Collection` when that identifier is one the
+ * client reserves — the generated property would otherwise never work.
+ * Anything that prints an accessor for a slug goes through here.
+ */
+export function toCollectionAccessor(slug: string): string {
+    const safe = toSafeIdentifier(slug);
+    return RESERVED_ACCESSORS.has(safe) ? `${safe}Collection` : safe;
+}
+
+/**
  * Indent a block of text by a given number of spaces
  */
 export function indent(text: string, spaces: number): string {

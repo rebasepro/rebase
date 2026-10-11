@@ -12,7 +12,7 @@ import fs from "fs";
 import path from "path";
 import chalk from "chalk";
 import { CollectionConfig, computeSchemaVersion, deserializeCollections } from "@rebasepro/types";
-import { CodegenError, generateSDK, GeneratedFile, toSafeIdentifier } from "@rebasepro/codegen";
+import { CodegenError, generateSDK, GeneratedFile, toCollectionAccessor } from "@rebasepro/codegen";
 import { detectPackageManager, getPMCommands } from "../utils/package-manager";
 import { findProjectRoot } from "../utils/project";
 import { readLink } from "./cloud/context";
@@ -477,7 +477,7 @@ export const SCHEMA_VERSION = ${JSON.stringify(schemaVersion)};
     // `Record<string, unknown>` and has no link to `Database` — it was the
     // headline example here for a while, which advertised the one call shape
     // that throws away the types this command just generated.
-    const exampleAccessor = toSafeIdentifier(exampleSlug);
+    const exampleAccessor = toCollectionAccessor(exampleSlug);
     const exampleAccess = isIdentifierLike(exampleAccessor)
         ? `rebase.data.${exampleAccessor}`
         : `rebase.data[${JSON.stringify(exampleAccessor)}]`;

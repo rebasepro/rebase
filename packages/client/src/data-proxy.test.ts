@@ -181,3 +181,34 @@ describe("client.data proxy — untyped mode (no collections dictionary)", () =>
         }
     });
 });
+
+describe("client.data — a collection whose slug the proxy reserves", () => {
+    // Codegen names the accessor `<name>Collection` for a slug whose accessor
+    // would be `collection`, `then`, `toJSON` or `$$typeof`, and maps it back
+    // in `collectionsDictionary`. This is the client half of that contract.
+    type Database = {
+        collectionCollection: { Row: { id: string; title: string }; Slug: "collection" };
+        thenCollection: { Row: { id: string }; Slug: "then" };
+    };
+    const collectionsDictionary = { collectionCollection: "collection", thenCollection: "then" } as const;
+
+    it("reaches `/data/collection` and `/data/then` through the renamed accessors", async () => {
+        const fetchMock = jest.fn<typeof fetch>(async () => new Response(JSON.stringify({ data: [] })));
+        const client = createRebaseClient<Database>({
+            baseUrl: "http://localhost:3000",
+            fetch: fetchMock as typeof fetch,
+            anonymous: true,
+            collections: collectionsDictionary
+        });
+
+        await client.data.collectionCollection.find();
+        expect(new URL(String(fetchMock.mock.calls[0][0])).pathname).toBe("/api/data/collection");
+
+        await client.data.thenCollection.find();
+        expect(new URL(String(fetchMock.mock.calls[1][0])).pathname).toBe("/api/data/then");
+
+        // The dynamic form keeps working for the same slug.
+        await client.data.collection("collection").find();
+        expect(new URL(String(fetchMock.mock.calls[2][0])).pathname).toBe("/api/data/collection");
+    });
+});

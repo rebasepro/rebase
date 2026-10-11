@@ -1,6 +1,6 @@
 import { getDeclaredSubcollections, CollectionConfig, Property, Properties, MapProperty, ArrayProperty, StringProperty, NumberProperty, ResolvedRelation } from "@rebasepro/types";
 import { effectiveAccess, fieldKeyForColumn, findRelation, isRelationRequired, resolveCollectionRelations, sortCollectionsBySlug } from "@rebasepro/common";
-import { toSafeIdentifier } from "./utils";
+import { toCollectionAccessor, toSafeIdentifier } from "./utils";
 
 /**
  * A schema that cannot be expressed as a valid TypeScript file.
@@ -237,17 +237,26 @@ function buildAccessors(collections: CollectionConfig[]): Map<string, string> {
             );
         }
 
-        const existing = bySafeName.get(safe);
+        const accessor = toCollectionAccessor(slug);
+        if (accessor !== safe) {
+            console.warn(
+                `[codegen] The collection ${emitString(slug)} would be \`client.data.${safe}\`, a name ` +
+                `the client reserves, so its typed accessor is \`client.data.${accessor}\`. ` +
+                `\`client.data.collection(${emitString(slug)})\` reaches it too.`
+            );
+        }
+
+        const existing = bySafeName.get(accessor);
         if (existing !== undefined) {
             throw new CodegenError(
                 `The collections ${emitString(existing)} and ${emitString(slug)} both generate the ` +
-                `accessor "${safe}", so only one of them could be reached from the generated client ` +
+                `accessor "${accessor}", so only one of them could be reached from the generated client ` +
                 "and the other's reads would silently go to the wrong table. Rename one of the slugs."
             );
         }
 
-        bySafeName.set(safe, slug);
-        accessors.set(slug, safe);
+        bySafeName.set(accessor, slug);
+        accessors.set(slug, accessor);
     }
 
     return accessors;

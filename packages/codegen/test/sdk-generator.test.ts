@@ -1,5 +1,5 @@
-import { describe, it, expect } from "@jest/globals";
-import { toPascalCase, toCamelCase, toSafeIdentifier, indent } from "../src/utils";
+import { describe, it, expect, jest } from "@jest/globals";
+import { toPascalCase, toCamelCase, toSafeIdentifier, toCollectionAccessor, indent } from "../src/utils";
 import { generateTypedefs } from "../src/generate-types";
 import { generateSDK } from "../src/index";
 import { CollectionConfig } from "@rebasepro/types";
@@ -73,6 +73,16 @@ describe("Utils", () => {
         });
     });
 
+    describe("toCollectionAccessor", () => {
+        it("is the safe identifier for an ordinary slug", () => {
+            expect(toCollectionAccessor("my-notes")).toBe("myNotes");
+        });
+        it("renames an accessor the client proxy reserves", () => {
+            expect(toCollectionAccessor("collection")).toBe("collectionCollection");
+            expect(toCollectionAccessor("then")).toBe("thenCollection");
+            expect(toCollectionAccessor("toJSON")).toBe("toJSONCollection");
+        });
+    });
     describe("indent", () => {
         it("indents multi-line string by given space count", () => {
             const block = "line1\nline2\nline3";
@@ -1010,5 +1020,52 @@ describe("generateTypedefs is independent of collection order", () => {
         const input = [authors, articles];
         generateTypedefs(input);
         expect(input.map(c => c.slug)).toEqual(["authors", "articles"]);
+    });
+});
+
+describe("a slug the client proxy reserves gets a renamed accessor", () => {
+    // `client.data.collection` is the dynamic `collection(slug)` function, and
+    // `then`, `toJSON` and `$$typeof` are answered `undefined` so promise and
+    // serialisation probes do not mistake the proxy for something else. A
+    // collection whose accessor was one of those names generated a property
+    // that could never be reached.
+    const slugs = ["collection", "then", "toJSON", "posts"];
+    const collections = slugs.map(slug => ({
+        slug,
+        properties: { title: { type: "string" } }
+    }) as unknown as CollectionConfig);
+
+    it("emits `<name>Collection` and maps it back to the slug", () => {
+        const warn = jest.spyOn(console, "warn").mockImplementation(() => undefined);
+        try {
+            const output = generateTypedefs(collections);
+            expect(output).toContain("  collectionCollection: \"collection\",");
+            expect(output).toContain("  thenCollection: \"then\",");
+            expect(output).toContain("  toJSONCollection: \"toJSON\",");
+            expect(output).toContain("  posts: \"posts\",");
+            expect(output).toMatch(/^ {2}collectionCollection: \{$/m);
+            expect(output).not.toMatch(/^ {2}collection: /m);
+            expect(output).not.toMatch(/^ {2}then: /m);
+
+            const messages = warn.mock.calls.map(call => String(call[0]));
+            expect(messages.some(m => m.includes("\"collection\"") && m.includes("collectionCollection"))).toBe(true);
+            expect(messages.some(m => m.includes("\"then\"") && m.includes("thenCollection"))).toBe(true);
+            expect(messages.some(m => m.includes("posts"))).toBe(false);
+        } finally {
+            warn.mockRestore();
+        }
+    });
+
+    it("refuses when the renamed accessor collides with another slug's", () => {
+        const clash = [
+            collections[0],
+            { slug: "collection_collection", properties: {} } as unknown as CollectionConfig
+        ];
+        const warn = jest.spyOn(console, "warn").mockImplementation(() => undefined);
+        try {
+            expect(() => generateTypedefs(clash)).toThrow(/collectionCollection/);
+        } finally {
+            warn.mockRestore();
+        }
     });
 });

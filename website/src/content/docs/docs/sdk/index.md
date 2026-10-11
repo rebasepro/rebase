@@ -95,6 +95,8 @@ When `Database` is supplied, `createRebaseClient` returns a `CreateRebaseClientR
 
 `collectionsDictionary` maps each accessor back to the slug the wire uses. Pass it whenever a slug is not already a valid property name — `my-notes` is reachable as `client.data.myNotes` only because the dictionary says so.
 
+A few names on `client.data` are taken: `collection` is the dynamic `collection(slug)` function, and `then`, `toJSON` and `$$typeof` are left alone for promise and serialisation checks. A collection whose accessor would be one of them is generated as `<name>Collection` — the `collection` slug is `client.data.collectionCollection` — and `generate-sdk` prints a warning naming both. `client.data.collection("collection")` reaches it too.
+
 ### Field names
 
 **A field's name on the wire is its property key**, and the API is camelCase throughout. A `createdAt` property stored in a `created_at` column is `row.createdAt`, and a relation's foreign key is `authorId` even though the column stays `author_id`. `where` and `orderBy` are keyed off the same `Row` type, so what compiles is what the backend answers to.

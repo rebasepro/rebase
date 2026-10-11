@@ -8,7 +8,7 @@ import { CollectionConfig } from "@rebasepro/types";
 import { generateTypedefs } from "./generate-types";
 
 export { generateTypedefs, CodegenError } from "./generate-types";
-export { toPascalCase, toCamelCase, toSafeIdentifier, indent } from "./utils";
+export { toPascalCase, toCamelCase, toSafeIdentifier, toCollectionAccessor, indent } from "./utils";
 
 // ─── Public API ────────────────────────────────────────────────────
 
@@ -80,6 +80,8 @@ JSON — and nothing here renames anything.
   the column spelling.
 - **A collection accessor is camelCase too** (\`my-notes\` → \`rebase.data.myNotes\`),
   which is what \`collectionsDictionary\` maps back to the slug.
+  A slug whose accessor the client reserves (\`collection\`, \`then\`, \`toJSON\`)
+  is generated as \`<name>Collection\`: \`rebase.data.collectionCollection\`.
 
 \`where\` and \`orderBy\` are keyed off the same type, so what compiles is what the
 backend answers to.
