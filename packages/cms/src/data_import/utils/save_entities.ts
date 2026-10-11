@@ -137,16 +137,35 @@ function isMissingRequiredOnly(error: unknown): boolean {
 }
 
 /**
- * A batch the bulk upsert refused for missing required columns: the rows whose
- * id is stored are updates — the given columns are written, the rest keep
- * their values, as the per-row path and the preview's "overwritten" say — and
- * the others go back to the bulk upsert, where a new row still needs every
- * required column. A refusal of one of those names its row in `batch`.
+ * Whether the collection's rows are the users, read the way the server reads it
+ * (`collection.auth`, `true` or `{ enabled: true }`).
+ *
+ * The server refuses an upsert there: a create hashes the password and runs
+ * `onCreateUser`, an update may not demote the last administrator, and an
+ * upsert decides between the two too late to follow either rule.
+ */
+function isAuthCollection(collection: CollectionConfig | undefined): boolean {
+    const auth = collection?.auth;
+    return auth === true || (!!auth && typeof auth === "object" && auth.enabled === true);
+}
+
+/**
+ * A batch split by whether each row's id is stored: the rows whose id is
+ * stored are updates — the given columns are written, the rest keep their
+ * values, as the per-row path and the preview's "overwritten" say — and the
+ * others are created, where a new row still needs every required column. A
+ * refusal of one of those names its row in `batch`.
+ *
+ * Used when the bulk upsert refused a batch for missing required columns
+ * (the creates then go back as an upsert), and for every batch of the auth
+ * collection, which takes no upsert (the creates go as a plain bulk create,
+ * which the server runs through user creation).
  */
 async function writeUpdatesAndCreates(accessor: CollectionAccessor,
     batch: Partial<Entity<any>>[],
     collection: CollectionConfig,
-    createMany: NonNullable<CollectionAccessor["createMany"]>): Promise<void> {
+    createMany: NonNullable<CollectionAccessor["createMany"]>,
+    upsert: boolean): Promise<void> {
 
     const ids = batch.map(entity => entity.id).filter((id): id is string | number => id !== undefined && id !== null && id !== "");
     const stored = await findEntitiesByIds(accessor, collection, ids);
@@ -164,7 +183,8 @@ async function writeUpdatesAndCreates(accessor: CollectionAccessor,
     const creates = batch.map((entity, index) => ({ entity, index })).filter(({ entity }) => !isUpdate(entity));
     if (creates.length === 0) return;
     try {
-        await createMany(creates.map(({ entity }) => toBulkRow(entity)), { upsert: true });
+        const rows = creates.map(({ entity }) => toBulkRow(entity));
+        await (upsert ? createMany(rows, { upsert: true }) : createMany(rows));
     } catch (e) {
         // "Row 1" of the rows sent is "Row <n>" of the batch.
         const message = (e as Error)?.message;
@@ -193,15 +213,24 @@ async function writeBatch(accessor: CollectionAccessor,
 
     if (accessor.createMany && !bulkUnsupported.current) {
         try {
+            if (collection && isAuthCollection(collection)) {
+                // Not one transaction: the updates are written before the
+                // creates, and a retry of the batch writes them again, to the
+                // same values — while a stored id among the creates is a
+                // conflict, never an overwrite of a user's password.
+                await writeUpdatesAndCreates(accessor, batch, collection, accessor.createMany.bind(accessor), false);
+                written.count = batch.length;
+                return;
+            }
             await accessor.createMany(batch.map(toBulkRow), { upsert: true });
             written.count = batch.length;
             return;
         } catch (e) {
-            if (collection && isMissingRequiredOnly(e) && batch.some(entity => entity.id !== undefined && entity.id !== null && entity.id !== "")) {
+            if (collection && !isAuthCollection(collection) && isMissingRequiredOnly(e) && batch.some(entity => entity.id !== undefined && entity.id !== null && entity.id !== "")) {
                 // Not one transaction any more: a refused create leaves the
                 // updates before it written, and a retry of the batch writes
                 // them again, to the same values.
-                await writeUpdatesAndCreates(accessor, batch, collection, accessor.createMany.bind(accessor));
+                await writeUpdatesAndCreates(accessor, batch, collection, accessor.createMany.bind(accessor), true);
                 written.count = batch.length;
                 return;
             }
