@@ -5,7 +5,8 @@ import path from "path";
 import { Hono } from "hono";
 import { errorHandler } from "../src/api/errors";
 import { TusHandler } from "../src/storage/tus-handler";
-import type { StorageController } from "../src/storage/storage-controller";
+import type { StorageController } from "../src/storage/types";
+import type { HonoEnv } from "../src/api/types";
 
 /**
  * A resumable upload is authorized once, at creation, and then finished on
@@ -43,7 +44,7 @@ describe("who may continue a resumable upload", () => {
      * this is about.
      */
     function app(handler: TusHandler) {
-        const a = new Hono();
+        const a = new Hono<HonoEnv>();
         a.onError(errorHandler);
         a.use("/*", async (c, next) => {
             const as = c.req.header("X-Test-User");
@@ -57,10 +58,10 @@ describe("who may continue a resumable upload", () => {
         return a;
     }
 
-    const as = (user: Record<string, unknown> | null) =>
+    const as = (user: Record<string, unknown> | null): Record<string, string> =>
         user ? { "X-Test-User": JSON.stringify(user) } : {};
 
-    async function create(a: Hono, owner: Record<string, unknown> | null, body = "hello") {
+    async function create(a: Hono<HonoEnv>, owner: Record<string, unknown> | null, body = "hello") {
         const res = await a.request("/tus", {
             method: "POST",
             headers: {
@@ -185,7 +186,7 @@ describe("the size a resumable upload may declare", () => {
     });
 
     function app(handler: TusHandler) {
-        const a = new Hono();
+        const a = new Hono<HonoEnv>();
         a.onError(errorHandler);
         a.post("/tus", (c) => handler.create(c));
         return a;

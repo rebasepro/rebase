@@ -33,7 +33,7 @@ function app(basePath: string) {
 }
 
 describe("the request log and health probes", () => {
-    afterEach(() => jest.restoreAllMocks());
+    afterEach(() => { jest.restoreAllMocks(); });
 
     it("does not log GET /api/health", async () => {
         const lines = requestLines();

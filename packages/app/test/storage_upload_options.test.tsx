@@ -19,7 +19,7 @@ function sourceRecording(calls: UploadFileProps[]): StorageSource {
     return {
         putObject: async (props) => {
             calls.push(props);
-            return { key: props.key, storageUrl: props.key };
+            return { key: props.key, bucket: props.bucket ?? "default", storageUrl: props.key };
         },
         getSignedUrl: async () => ({ url: null }),
         getObject: async () => null,

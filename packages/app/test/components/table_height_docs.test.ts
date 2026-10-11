@@ -20,7 +20,7 @@ describe("the documented row heights", () => {
         expect(rows.map((row) => row[1]).sort()).toEqual(["l", "m", "s", "xl", "xs"]);
     });
 
-    it.each(rows.map((row) => [row[1] as TableSize, Number(row[2])]))("%s is %ipx", (size, documented) => {
+    it.each(rows.map((row): [TableSize, number] => [row[1] as TableSize, Number(row[2])]))("%s is %ipx", (size, documented) => {
         expect(documented).toBe(getRowHeight(size));
     });
 

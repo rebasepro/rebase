@@ -89,6 +89,11 @@ async function exportAs(format: "CSV" | "JSON"): Promise<string> {
         <ExportCollectionAction
             collection={collection as never}
             path="items"
+            relativePath="items"
+            parentCollectionSlugs={[]}
+            parentEntityIds={[]}
+            context={{} as never}
+            openNewDocument={() => undefined}
             collectionEntitiesCount={6}
             tableController={{} as never}
             selectionController={undefined as never}/>

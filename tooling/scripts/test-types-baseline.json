@@ -1,10 +1,8 @@
 {
-  "app": 58,
+  "app": 56,
   "cli": 23,
   "client": 292,
-  "cms": 108,
-  "inference": 1,
-  "mcp": 2,
-  "server": 334,
+  "cms": 105,
+  "server": 321,
   "server-postgres": 602
 }

@@ -82,8 +82,8 @@ const wait = (ms: number) => act(async () => {
     await jest.advanceTimersByTimeAsync(ms);
 });
 
-beforeEach(() => jest.useFakeTimers());
-afterEach(() => jest.useRealTimers());
+beforeEach(() => { jest.useFakeTimers(); });
+afterEach(() => { jest.useRealTimers(); });
 
 describe("autosave", () => {
     const recording = () => {
