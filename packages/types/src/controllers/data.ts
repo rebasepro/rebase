@@ -46,8 +46,10 @@ export type WhereElementOf<T> = ElementOf<T> | IdOf<ElementOf<T>>;
  * - `array-contains` → one element of the column (or a related row's id).
  * - `in` / `not-in` / `array-contains-any` → a list of elements; a bare element
  *   is read as the one-element list, and `null` is a null check.
- * - `like` / `ilike` / `not-like` / `not-ilike` → a SQL pattern. Always a
- *   string, including on numeric and date columns, which the driver casts.
+ * - `like` / `ilike` / `not-like` / `not-ilike` → a SQL pattern, always a
+ *   string. It matches a text column, or an enum by its label; on a number,
+ *   a date or any other column the Postgres driver refuses it with a 400
+ *   (`INVALID_FILTER_OPERATOR`).
  * - `is-null` / `is-not-null` → nothing; the value is ignored everywhere.
  * - everything else → the column's own type, or `null` for a null comparison.
  *
