@@ -106,3 +106,19 @@ describe("a URL naming a collection the registry cannot resolve", () => {
         warn.mockRestore();
     });
 });
+
+describe("a pasted new-record side-panel link", () => {
+    // `/c/products#new_side` opened in a new tab: the side panel draws the new
+    // form, and the route under it is the collection. `isNew` matched `#new`
+    // inside `#new_side`, so a second, full-screen new form sat under the panel.
+    it("renders the collection under the panel, not a second new form", async () => {
+        renderAt("/c/products#new_side");
+        expect(await screen.findByTestId("collection-view")).toBeTruthy();
+        expect(screen.queryByTestId("full-screen-record")).toBeNull();
+    });
+
+    it("still opens a full-screen new record for #new", async () => {
+        renderAt("/c/products#new");
+        expect(await screen.findByTestId("full-screen-record")).toBeTruthy();
+    });
+});

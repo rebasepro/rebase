@@ -43,8 +43,13 @@ function RebaseRouteContent() {
     const navigationState = useNavigationStateController();
 
     const hash = location.hash;
-    const isSidePanel = hash.includes("#side");
-    const isNew = hash.includes("#new") || hash.includes("#new_side");
+    // `#new_side` is a new record in the side panel, drawn by the side panel
+    // (`useBuildSidePanel`); under it this route shows the collection, as it
+    // does for `#side`. It contains `#new`, which made a pasted
+    // `/c/products#new_side` draw a second, full-screen new form under the panel.
+    const isNewInSidePanel = hash.includes("#new_side");
+    const isSidePanel = hash.includes("#side") || isNewInSidePanel;
+    const isNew = hash.includes("#new") && !isNewInSidePanel;
     const isCopy = hash.includes("#copy");
     const isFullScreen = hash.includes("#full");
 
