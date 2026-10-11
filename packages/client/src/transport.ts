@@ -352,7 +352,7 @@ function appendWhere(pairs: [string, string][], where: Record<string, unknown>):
  * no rows to sort, no relations to load and no page to continue. `limit` is,
  * and bounds the number of *groups*.
  */
-export function buildAggregateQueryString(params: AggregateParams): string {
+export function buildAggregateQueryString<M extends Record<string, unknown>>(params: AggregateParams<M>): string {
     const pairs: [string, string][] = [];
 
     const select = params.select

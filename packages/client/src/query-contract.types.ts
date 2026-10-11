@@ -23,7 +23,7 @@
  * generated SDK — where `M` is a concrete row type — the documented call was a
  * compile error. Nothing in this repo noticed; a downstream application did.
  */
-import type { FindParams, FindResult, SDKQueryBuilderInterface, WhereFilterOp } from "@rebasepro/types";
+import type { AggregateParams, FindParams, FindResult, SDKQueryBuilderInterface, UpdateValues, WhereFilterOp } from "@rebasepro/types";
 
 /**
  * A row shaped the way a **generated** SDK shapes one: a type alias with a
@@ -47,6 +47,8 @@ type ContractRow = {
     tags: string[];
     age: number;
     deleted_at: string | null;
+    /** A `vector` property. */
+    embedding: number[];
 };
 
 /** A to-many relation, which codegen emits as `Array<TargetRow>`. */
@@ -292,3 +294,32 @@ export const paramsRelationPathTyped: FindParams<ContractRow> = {
 export const paramsUntyped: FindParams = {
     where: { anything: ["array-contains", ["whatever"]] }
 };
+
+// ── a name the server would refuse is refused here ─────────────────────────
+
+/** `fields` is a projection of columns; a typo was `UNKNOWN_FIELD` at runtime. */
+export const fieldsColumn = (qb: SDKQueryBuilderInterface<ContractRow>) => qb.fields("title", "age");
+export const fieldsTypo = (qb: SDKQueryBuilderInterface<ContractRow>) =>
+    // @ts-expect-error - not a column
+    qb.fields("titel");
+
+/** `vectorSearch` names a column. */
+export const vectorTypo = (qb: SDKQueryBuilderInterface<ContractRow>) =>
+    // @ts-expect-error - not a column
+    qb.vectorSearch("embeding", [0.1]);
+
+/** `sum` and `avg` add numbers up; `min`/`max` order anything. */
+export const aggregateSum: AggregateParams<ContractRow> = { select: [{ fn: "sum", field: "age" }, { fn: "max", field: "title" }] };
+export const aggregateSumText: AggregateParams<ContractRow> = {
+    // @ts-expect-error - `title` is text: the server answers 400
+    select: [{ fn: "sum", field: "title" }]
+};
+
+/** A field operation fits its column: `$inc` a number, `$push` an array. */
+export const updateOps: UpdateValues<Partial<ContractRow>> = { age: { $inc: 1 }, tags: { $push: "x" } };
+export const updateIncText: UpdateValues<Partial<ContractRow>> = {
+    // @ts-expect-error - `$inc` on a text column is a 400
+    title: { $inc: 1 }
+};
+/** An untyped row keeps every operation on every key. */
+export const updateUntyped: UpdateValues<Partial<Record<string, unknown>>> = { anything: { $inc: 1 } };

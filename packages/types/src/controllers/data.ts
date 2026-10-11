@@ -765,7 +765,18 @@ export type QueryComputedFields = {
  */
 export type AggregateSelect<M extends Record<string, unknown> = Record<string, unknown>> =
     | { fn: "count"; field?: Extract<keyof M, string> }
-    | { fn: "sum" | "avg" | "min" | "max"; field: Extract<keyof M, string> };
+    | { fn: "sum" | "avg"; field: NumericKeyOf<M> }
+    | { fn: "min" | "max"; field: Extract<keyof M, string> };
+
+/**
+ * The columns of `M` that hold numbers — what `sum` and `avg` can add up. Any
+ * column used to be accepted, and `sum` of a text column was a 400. An untyped
+ * row (every key `string`) keeps every name.
+ */
+export type NumericKeyOf<M extends Record<string, unknown>> =
+    string extends keyof M
+        ? Extract<keyof M, string>
+        : { [K in Extract<keyof M, string>]: NonNullable<M[K]> extends number ? K : never }[Extract<keyof M, string>];
 
 /**
  * One row of an aggregate result: the `groupBy` columns, plus one key per
@@ -976,7 +987,7 @@ export interface SDKQueryBuilderInterface<M extends Record<string, unknown> = Re
      * The query embedding is the caller's to produce.
      */
     vectorSearch(
-        property: string,
+        property: Extract<keyof M, string>,
         vector: number[],
         options?: { distance?: "cosine" | "l2" | "inner_product"; threshold?: number }
     ): this;
@@ -989,7 +1000,7 @@ export interface SDKQueryBuilderInterface<M extends Record<string, unknown> = Re
      * Return only these columns. A real projection: the columns are what is
      * read from the database, not what survives a trim of the response.
      */
-    fields(...columns: (FieldPath<M> | string)[]): this;
+    fields(...columns: Extract<keyof M, string>[]): this;
     /** `SELECT DISTINCT` over the projection — see {@link FindParams.distinct}. */
     distinct(enabled?: boolean): this;
     /** Continue after a previous page's `meta.nextCursor`. */
@@ -1137,7 +1148,20 @@ export type FieldOperation =
  *
  * @group Data
  */
-export type UpdateValues<U> = { [K in keyof U]?: U[K] | FieldOperation };
+export type UpdateValues<U> = { [K in keyof U]?: U[K] | FieldOperationFor<U[K]> };
+
+/**
+ * The field operations a column of type `T` takes: `$inc` on a number, `$push`
+ * / `$pull` on an array, `$merge` on a map. Any operation on any column used to
+ * compile — `update(id, { title: { $inc: 1 } })` — and the server answered 400.
+ * A column whose type says nothing (`unknown`, an untyped client) takes them all.
+ */
+export type FieldOperationFor<T> =
+    unknown extends T
+        ? FieldOperation
+        : | (NonNullable<T> extends number ? { $inc: number } : never)
+          | (NonNullable<T> extends readonly unknown[] ? { $push: unknown } | { $pull: unknown } : never)
+          | (NonNullable<T> extends readonly unknown[] ? never : NonNullable<T> extends Record<string, unknown> ? { $merge: Record<string, unknown> } : never);
 
 /**
  * Where an upsert looks for the row it might be replacing.
@@ -1220,7 +1244,7 @@ export type BatchOperation<DB = Record<string, unknown>> = {
             op: "update";
             collection: K;
             id: string | number | BatchRef;
-            values: { [F in keyof UpdateOf<DB[K]>]?: UpdateOf<DB[K]>[F] | FieldOperation | BatchRef };
+            values: { [F in keyof UpdateOf<DB[K]>]?: UpdateOf<DB[K]>[F] | FieldOperationFor<UpdateOf<DB[K]>[F]> | BatchRef };
             ref?: string;
         }
         | {
@@ -1708,13 +1732,13 @@ export interface SDKCollectionClient<
      * {@link SDKQueryBuilderInterface.vectorSearch}.
      */
     vectorSearch(
-        property: string,
+        property: Extract<keyof M, string>,
         vector: number[],
         options?: { distance?: "cosine" | "l2" | "inner_product"; threshold?: number }
     ): SDKQueryBuilderInterface<M, Inc>;
     include(...relations: IncludeArgOf<Inc>[]): SDKQueryBuilderInterface<M, Inc>;
     /** {@link SDKQueryBuilderInterface.fields} */
-    fields(...columns: (FieldPath<M> | string)[]): SDKQueryBuilderInterface<M, Inc>;
+    fields(...columns: Extract<keyof M, string>[]): SDKQueryBuilderInterface<M, Inc>;
     /** {@link SDKQueryBuilderInterface.distinct} */
     distinct(enabled?: boolean): SDKQueryBuilderInterface<M, Inc>;
     /** {@link SDKQueryBuilderInterface.after} */
