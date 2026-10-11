@@ -25,9 +25,11 @@ import { ADMIN_PROPERTY_KEYS } from "@rebasepro/types";
  * whether or not the bug existed. The two control cases below are what caught
  * it, and they are the reason they are here.
  */
+const users = { slug: "users", table: "users", name: "Users", singularName: "User", properties: {} };
+
 const BASES: Record<string, Record<string, unknown>> = {
     reference: { type: "reference", name: "Ref", path: "users" },
-    relation: { type: "relation", name: "Rel", relation: { kind: "belongsTo", target: "users" } },
+    relation: { type: "relation", name: "Rel", relation: { kind: "belongsTo", target: () => users } },
     array: { type: "array", name: "Arr", of: { type: "string", name: "Item" } },
     map: { type: "map", name: "Map", properties: {} }
 };

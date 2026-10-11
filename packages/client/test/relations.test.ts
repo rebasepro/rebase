@@ -456,21 +456,25 @@ title: "E" });
         expect(mockRequest).toHaveBeenCalledWith("/data/posts/a%2Fb", { method: "GET" }, expect.any(Object));
     });
     /**
-     * LIMITATION, not a contract: `findById(id)` takes no params, so there is
-     * no way to ask it for relations — callers who need them use
-     * `find({ where: { id: ["==", id] }, include: [...] })`.
-     *
-     * This test therefore FAILS THE DAY findById GAINS PARAMS. That is
-     * deliberate: it is a reminder to delete it, not a reason to keep the
-     * signature. Do not "fix" a failure here by re-dropping the parameter.
+     * `findById(id, { include })` loads relations into the one row, as
+     * `find({ include })` does into each row of a list (d0dd4b607). Without
+     * options it is still the bare row URL.
      */
-    it("findById sends a bare row URL — it has no params, so no include", async () => {
+    it("findById sends a bare row URL when no relation is asked for", async () => {
         const c = createCollectionClient<PostModel>(transport, "posts");
         mockRequest.mockResolvedValueOnce({ id: 1,
 title: "T" });
         await c.findById(1);
         expect((mockRequest.mock.calls[0][0] as string)).toBe("/data/posts/1");
-        expect(c.findById.length).toBe(1);
+    });
+    it("findById asks for the relations named in `include`", async () => {
+        const c = createCollectionClient<PostModel>(transport, "posts");
+        mockRequest.mockResolvedValueOnce({ id: 1,
+title: "T" });
+        await c.findById(1, { include: ["tags"] });
+        const url = mockRequest.mock.calls[0][0] as string;
+        expect(url.startsWith("/data/posts/1?")).toBe(true);
+        expect(new URLSearchParams(url.split("?")[1]).get("include")).toBe("tags");
     });
 });
 
