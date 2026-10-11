@@ -58,7 +58,11 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   workers: 1,
-  reporter: [["html", { outputFolder: "../../.artifacts/playwright-report" }]],
+  // `list` as well as `html`: the job log is where a reader looks, and with
+  // only the html artifact a test that failed and then passed on retry (which
+  // `--fail-on-flaky-tests` in ci-e2e.mjs now fails the run for) was named
+  // nowhere in it.
+  reporter: [["list"], ["html", { outputFolder: "../../.artifacts/playwright-report"}]],
   outputDir: "../../.artifacts/test-results",
   use: {
     baseURL: `http://localhost:${PORT}`,
