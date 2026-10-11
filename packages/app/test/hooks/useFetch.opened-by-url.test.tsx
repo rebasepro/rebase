@@ -12,8 +12,9 @@ import { EntityRelation, type ByIdReadOptions, type Entity } from "@rebasepro/ty
  * saved as the whole set (`tags: [new]`). A many-to-many save sets membership:
  * every stored tag was unlinked.
  *
- * The record's read now names the collection's relation properties, exactly as
- * the list read does, on the live path and the one-shot one alike.
+ * The record views' read now names the collection's relation properties,
+ * exactly as the list read does, on the live path and the one-shot one alike.
+ * A preview's read does not: it would load every related row of the record.
  */
 
 const STORED: Entity = {
@@ -61,7 +62,7 @@ describe("a record opened by URL, with nothing cached", () => {
 
     it("is delivered by its listener with its many-to-many values", async () => {
         live = true;
-        const { result } = renderHook(() => useFetch({ path: "posts", entityId: "1", collection }));
+        const { result } = renderHook(() => useFetch({ path: "posts", entityId: "1", collection, relations: true }));
         await waitFor(() => expect(result.current.entity).toBeDefined());
         await act(async () => undefined);
         expect(result.current.entity?.values.tags).toEqual(STORED.values.tags);
@@ -69,8 +70,15 @@ describe("a record opened by URL, with nothing cached", () => {
 
     it("is read with them too where there is no socket", async () => {
         live = false;
-        const { result } = renderHook(() => useFetch({ path: "posts", entityId: "1", collection }));
+        const { result } = renderHook(() => useFetch({ path: "posts", entityId: "1", collection, relations: true }));
         await waitFor(() => expect(result.current.entity).toBeDefined());
         expect(result.current.entity?.values.tags).toEqual(STORED.values.tags);
+    });
+
+    it("is read without them by a preview, which does not ask", async () => {
+        live = true;
+        const { result } = renderHook(() => useFetch({ path: "posts", entityId: "1", collection }));
+        await waitFor(() => expect(result.current.entity).toBeDefined());
+        expect(result.current.entity?.values.tags).toBeUndefined();
     });
 });

@@ -165,6 +165,8 @@ export function EditViewBinding<M extends Record<string, unknown>>({
         path: props.path,
         entityId: entityId,
         collection: props.collection,
+        // The relation fields' values, read with the record (see `useFetch`).
+        relations: true,
         databaseId: props.databaseId,
         useCache: false
     });

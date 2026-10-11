@@ -16,6 +16,14 @@ export interface FetchProps<M extends Record<string, any>, USER extends User = U
     databaseId?: string;
     collection: AdminCollection<M, USER>;
     useCache?: boolean;
+    /**
+     * Load the collection's relation properties into the record, as a list
+     * read loads them into each row. The record views ask for it: a form built
+     * on a record without them shows a many-to-many field empty, and saving it
+     * sets that empty membership. A preview leaves it off, since it would load
+     * every related row of the record it previews.
+     */
+    relations?: boolean;
 }
 
 /**
@@ -148,7 +156,8 @@ export function useFetch<M extends Record<string, any>, USER extends User = User
         entityId,
         collection,
         databaseId,
-        useCache = false
+        useCache = false,
+        relations = false
     }: FetchProps<M, USER>): FetchResult<M> {
 
     const dataClient = useData();
@@ -217,7 +226,7 @@ export function useFetch<M extends Record<string, any>, USER extends User = User
             // absent from the record, and one opened by URL — nothing cached
             // to fall back on — showed its many-to-many field empty; a save
             // from it set that empty membership, unlinking every related row.
-            const readOptions = relationsToRead(collection);
+            const readOptions = relations ? relationsToRead(collection) : undefined;
 
             if (accessor.listenById) {
                 return accessor.listenById(entityId, (entity) => onEntityUpdate(entity as Entity<M> | undefined), onError, readOptions);
@@ -250,7 +259,7 @@ export function useFetch<M extends Record<string, any>, USER extends User = User
             return () => {
             };
         }
-    }, [entityId, path, dataClient, collection, useCache, databaseId]);
+    }, [entityId, path, dataClient, collection, useCache, databaseId, relations]);
 
     return useMemo(() => ({
         entity,

@@ -25,10 +25,15 @@ import { MemoryRouter } from "react-router";
 
 /** What `useFetch` answers. Set per test. */
 let fetched: { entity: unknown; dataLoading: boolean } = { entity: undefined, dataLoading: false };
+/** What each `useFetch` call was asked for. */
+const fetchedWith: Record<string, unknown>[] = [];
 
 jest.mock("@rebasepro/app", () => {
     const overrides: Record<string, unknown> = {
-        useFetch: () => ({ ...fetched, dataLoadingError: undefined }),
+        useFetch: (props: Record<string, unknown>) => {
+            fetchedWith.push(props);
+            return { ...fetched, dataLoadingError: undefined };
+        },
         usePermissions: () => ({ canEdit: () => true }),
         useAuthController: () => ({ user: { uid: "u1" } })
     };
@@ -127,5 +132,15 @@ describe("a record that is not there", () => {
 
         expect(screen.queryByText("Entity not found")).toBeNull();
         expect(logged.join(" ")).not.toContain("not found in collection");
+    });
+});
+
+describe("the record's read", () => {
+    it("loads its relations, so a many-to-many field opened by URL is not empty", () => {
+        // A form built on a record read without them showed the field empty,
+        // and saving it set that empty membership: every related row unlinked.
+        fetchedWith.length = 0;
+        renderRecord("ghost-id");
+        expect(fetchedWith[0]).toMatchObject({ path: "posts", entityId: "ghost-id", relations: true });
     });
 });
