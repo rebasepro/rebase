@@ -188,9 +188,8 @@ const profile = await client.auth.findUserByEmail("user@example.com");
 ```
 
 Three non-sensitive fields and nothing else — enough to show "you are inviting
-Jane" before an invitation is sent. The lookup is opt-in: the backend serves it
-only with `AUTH_ALLOW_USER_LOOKUP=true` (`auth.allowUserLookup`), and only to a
-signed-in caller. Without it the call fails with a 404.
+Jane" before an invitation is sent. Opt-in: a signed-in caller only, and a 404
+unless the backend sets `AUTH_ALLOW_USER_LOOKUP=true` (`auth.allowUserLookup`).
 
 ## Multi-Factor Authentication
 
@@ -399,13 +398,11 @@ on the generated template gets it for free. Data requests need not wait: one mad
 mid-restore is sent once it settles — as the restored user, or anonymously — so a
 first render never reads a public listing in place of the user's own.
 
-A restore that has to refresh (the stored access token expired, or cookie mode)
-also reaches `onAuthStateChange` as `TOKEN_REFRESHED`, because it *is* a
-refresh. A stored token that is still valid is adopted silently. So a listener
-alone cannot tell you that the restore finished: a boot with no session, or
-with a valid one, emits nothing at all, which is indistinguishable from one
-still in progress. Await `isInitialized()` for that question and use the
-listener for changes after it.
+A restore that refreshes (an expired stored token, or cookie mode) reaches
+`onAuthStateChange` as `TOKEN_REFRESHED`; a still-valid stored token is adopted
+silently. So a listener cannot tell you the restore finished: a boot that emits
+nothing is indistinguishable from one still in progress. Await `isInitialized()`
+for that question and use the listener for changes after it.
 
 ## Auth State Listener
 
@@ -549,13 +546,10 @@ const config = await client.auth.getAuthConfig();
 //   sessionManagement: boolean,
 //   profileUpdate: boolean,
 //   emailVerification: boolean,
-//   magicLink: boolean,
-//   emailOtp?: boolean,             // six-digit sign-in codes by email
+//   magicLink: boolean, emailOtp?: boolean,
 //   anonymousLogin: boolean,
 //   enabledProviders: string[],
-//   externalLoginUrl?: string,      // an external adapter's login page
-//   needsSetup?: boolean,
-//   storage?: boolean               // whether this backend serves file storage
+//   externalLoginUrl?: string, needsSetup?: boolean, storage?: boolean
 // }
 ```
 
