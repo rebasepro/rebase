@@ -201,6 +201,11 @@ export function useCreateFormex<T = any>({
             setValuesInner(newValues);
             if (!equal(getIn(initialValuesRef.current as Record<string, unknown>, key), value)) {
                 setDirty(true);
+            } else {
+                // Typed back to its stored value: the form is clean again
+                // unless another field still differs. The whole comparison
+                // runs only here, not on every keystroke.
+                setDirty(!equal(initialValuesRef.current, newValues));
             }
             if (shouldValidate) {
                 validate();
