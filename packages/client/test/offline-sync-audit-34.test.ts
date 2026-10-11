@@ -99,3 +99,39 @@ describe("a replay answered 404: the row is gone on the server (M2)", () => {
         await expect(posts.findById("1")).resolves.toBeUndefined();
     });
 });
+
+describe("a page answered from a snapshot keeps its limit (M6)", () => {
+    function fullPage() {
+        const server = fakeServer();
+        for (const id of ["1", "2", "3"]) server.rows.set(id, { id, n: Number(id) });
+        const { posts } = manager(server);
+        return { server, posts };
+    }
+
+    it("a row created offline displaces the tail of a full page instead of extending it", async () => {
+        const { posts } = fullPage();
+        const online = await posts.find({ limit: 2 });
+        expect(online.data).toHaveLength(2);
+
+        setNavigatorOnLine(false);
+        const created = await posts.create({ n: 0 });
+        const page = await posts.find({ limit: 2 });
+
+        expect(page.data).toHaveLength(2);
+        expect(page.meta.limit).toBe(2);
+        expect(page.meta.hasMore).toBe(true);
+        expect(page.data.map((row) => row.id)).toContain(created.id);
+    });
+
+    it("an ordered page is cut where the order puts it", async () => {
+        const { posts } = fullPage();
+        await posts.find({ limit: 2, orderBy: ["n", "asc"] } as never);
+
+        setNavigatorOnLine(false);
+        await posts.create({ n: 0 });
+        const page = await posts.find({ limit: 2, orderBy: ["n", "asc"] } as never);
+
+        expect(page.data.map((row) => row.n)).toEqual([0, 1]);
+        expect(page.meta.hasMore).toBe(true);
+    });
+});

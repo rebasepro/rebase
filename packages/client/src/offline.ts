@@ -269,6 +269,22 @@ function mentionsMintedId(op: PendingMutation, id: string | number): boolean {
     return payloads.some((payload) => replaceMintedId(payload, id, "").changed);
 }
 
+/**
+ * A page that local rows were added to, cut back to the `limit` it was asked
+ * with — as a refetch would return it.
+ *
+ * Sorted, the page is cut where the order puts it. Unsorted, the rows created
+ * here (the last `added`) stand where they were placed, and the server's rows
+ * make room from the end of the page.
+ */
+function fitToLimit<R>(rows: R[], limit: number, added: number, sorted: boolean): R[] {
+    if (!(limit > 0) || rows.length <= limit) return rows;
+    if (sorted || added === 0) return rows.slice(0, limit);
+    const local = rows.slice(rows.length - added);
+    const server = rows.slice(0, rows.length - added);
+    return [...server.slice(0, Math.max(0, limit - local.length)), ...local].slice(0, limit);
+}
+
 /** The server has no such row — deleted by someone else, or never visible to this user. */
 function isNotFoundError(error: unknown): boolean {
     return error instanceof RebaseApiError && error.status === 404;
@@ -1655,16 +1671,18 @@ data: u.data as AnyRow })),
         // and the result says so rather than presenting it as the sorted page
         // that was asked for.
         const orderIsLocal = isLocallySortable(rows, params?.orderBy);
-        if (params?.orderBy && orderIsLocal) sortRows(rows, params.orderBy);
+        const sorted = Boolean(params?.orderBy && orderIsLocal);
+        if (sorted) sortRows(rows, params!.orderBy!);
 
         const total = Math.max(rows.length, snapshot.total - removed + added);
+        const page = fitToLimit(rows, snapshot.limit, added, sorted);
         return {
-            data: rows,
+            data: page,
             meta: {
                 total,
                 limit: snapshot.limit,
                 offset,
-                hasMore: snapshot.hasMore
+                hasMore: snapshot.hasMore || page.length < rows.length
             },
             fromCache,
             hasPendingWrites: rows.some((row) => this.hasPending(slug, row.id as string | number)),
@@ -1733,15 +1751,17 @@ data: u.data as AnyRow })),
             }
         }
         const orderIsLocal = added === 0 || isLocallySortable(rows, params?.orderBy);
-        if (added > 0 && params?.orderBy && orderIsLocal) sortRows(rows, params.orderBy);
+        const sorted = Boolean(added > 0 && params?.orderBy && orderIsLocal);
+        if (sorted) sortRows(rows, params!.orderBy!);
+        const page = fitToLimit(rows, snapshot.limit, added, sorted);
 
         return {
-            data: rows as M[],
+            data: page as M[],
             meta: {
                 total: Math.max(rows.length, snapshot.total - removed + added),
                 limit: snapshot.limit,
                 offset,
-                hasMore: snapshot.hasMore
+                hasMore: snapshot.hasMore || page.length < rows.length
             },
             fromCache,
             hasPendingWrites: rows.some((row) => row.id !== undefined && row.id !== null
