@@ -1,4 +1,7 @@
-import { describe, it, expect, beforeEach, jest } from "@jest/globals";
+import { describe, it, expect, beforeEach, afterEach, jest } from "@jest/globals";
+import * as fs from "fs";
+import * as os from "os";
+import * as path from "path";
 /**
  * One bucket, one name — for the `storageAuthorize` hook.
  *
@@ -46,9 +49,14 @@ const stores: Array<[string, string, () => StorageController]> = [
 describe.each(stores)("the hook is told one bucket name — %s", (_kind, providerBucket, make) => {
     let app: Hono<HonoEnv>;
     let asked: StorageAuthorizeContext[];
+    // An S3 or GCS source stages resumable uploads under STORAGE_PATH (or
+    // ./uploads, inside the package); a scratch directory keeps them out of it.
+    let tusRoot: string;
 
-    beforeEach(() => {
+    beforeEach(async () => {
         asked = [];
+        tusRoot = await fs.promises.mkdtemp(path.join(os.tmpdir(), "rebase-bucket-alias-"));
+        process.env.STORAGE_PATH = tusRoot;
         app = new Hono<HonoEnv>();
         app.onError(errorHandler);
         app.route("/api/storage", createStorageRoutes({
@@ -59,6 +67,11 @@ describe.each(stores)("the hook is told one bucket name — %s", (_kind, provide
                 return true;
             }
         }));
+    });
+
+    afterEach(async () => {
+        delete process.env.STORAGE_PATH;
+        await fs.promises.rm(tusRoot, { recursive: true, force: true });
     });
 
     it("on an upload naming the provider's bucket", async () => {
