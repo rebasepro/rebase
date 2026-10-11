@@ -38,6 +38,7 @@ import {
     getChangedProperties,
     overlayEdit,
     serverViolationErrors,
+    withoutUnsetNulls,
     zodToFormErrors
 } from "./form_utils";
 
@@ -367,7 +368,9 @@ export function EntityForm<M extends Record<string, unknown>>({
         const writtenValues = applyValueTransforms(values, collection.properties);
         const valuesToSave = status === "existing"
             ? getChangedProperties<M>(writtenValues, entity?.values || {}) as EntityValues<M>
-            : writtenValues;
+            : status === "new"
+                ? withoutUnsetNulls(writtenValues, baseInitialValues as Partial<M>)
+                : writtenValues;
 
         if (status === "existing" && Object.keys(valuesToSave).length === 0 && entity) {
             return Promise.resolve(entity);

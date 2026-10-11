@@ -186,6 +186,29 @@ export function getChangedProperties<M extends Record<string, unknown>>(
 }
 
 /**
+ * What a create sends: the form's values without the empty ones nobody set.
+ *
+ * A key the form opened as `null` and still holds as `null` is not a value
+ * the user chose. Sent, it is an explicit `NULL`, which beats the column's
+ * `DEFAULT` — `published_at timestamptz DEFAULT now()` was created empty from
+ * the panel and filled from the API. Left out, the database fills it. A
+ * `null` the user set over an opening value (a declared default) is sent, and
+ * so is every non-null value, `false` and `[]` included.
+ */
+export function withoutUnsetNulls<M extends Record<string, unknown>>(
+    values: M,
+    openingValues: Partial<M> | undefined
+): M {
+    const result: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(values)) {
+        const opening = openingValues?.[key];
+        if ((value === null || value === undefined) && (opening === null || opening === undefined)) continue;
+        result[key] = value;
+    }
+    return result as M;
+}
+
+/**
  * What the local-changes backup still has to offer, given what the form is
  * already showing — the answer the "unsaved local changes" banner is asking for.
  * `undefined` means there is nothing left to apply, and no banner.
