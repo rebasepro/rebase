@@ -1,0 +1,62 @@
+{
+  "app": {
+    "as any": 1,
+    "as never": 4,
+    "as unknown as": 3
+  },
+  "cli": {
+    "as never": 5,
+    "as unknown as": 5
+  },
+  "client": {
+    "as any": 1,
+    "as unknown as": 6
+  },
+  "cms": {
+    "as any": 4,
+    "as never": 11,
+    "as unknown as": 13
+  },
+  "cms-types": {
+    "as unknown as": 1
+  },
+  "codegen": {
+    "as unknown as": 2
+  },
+  "common": {
+    "as any": 1,
+    "as never": 3,
+    "as unknown as": 4
+  },
+  "firebase": {
+    "as unknown as": 4
+  },
+  "server": {
+    "as any": 5,
+    "as never": 26,
+    "as unknown as": 10
+  },
+  "server-mongo": {
+    "as unknown as": 1
+  },
+  "server-postgres": {
+    "as any": 3,
+    "as never": 27,
+    "as unknown as": 10
+  },
+  "studio": {
+    "as never": 1,
+    "as unknown as": 1
+  },
+  "types": {
+    "as any": 2,
+    "as unknown as": 2
+  },
+  "ui": {
+    "as any": 1,
+    "as unknown as": 1
+  },
+  "utils": {
+    "as unknown as": 2
+  }
+}

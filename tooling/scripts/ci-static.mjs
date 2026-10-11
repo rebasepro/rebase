@@ -252,6 +252,15 @@ tracked tsconfig's extends, files, include, references and paths entry has to
 name something on disk.`
     },
     {
+        run: "check:casts",
+        why: `"Never convert to any, and never cast structurally around a type" is enforced
+by ESLint in three packages. Everywhere else it drifted: over September, in
+non-test source, \`as never\` went 60 → 74 and \`as any\` 12 → 16. The counts
+of \`as any\`, \`as never\` and \`as unknown as\` per package are pinned in
+tooling/scripts/casts-baseline.json; growth fails, and so does a shrink that
+was not banked, so a cleanup's room is not spent by the next cast.`
+    },
+    {
         run: "check:test-resolution",
         why: `A workspace package's \`exports\` point at \`dist\`, so a jest or vitest config
 with no source mapping tests the last BUILD of its dependencies. CI builds
