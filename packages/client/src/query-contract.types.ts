@@ -23,7 +23,7 @@
  * generated SDK — where `M` is a concrete row type — the documented call was a
  * compile error. Nothing in this repo noticed; a downstream application did.
  */
-import type { AggregateParams, FindParams, FindResult, SDKQueryBuilderInterface, UpdateValues, WhereFilterOp } from "@rebasepro/types";
+import type { AggregateParams, FindParams, FindResult, SDKCollectionClient, SDKQueryBuilderInterface, UpdateValues, WhereFilterOp } from "@rebasepro/types";
 
 /**
  * A row shaped the way a **generated** SDK shapes one: a type alias with a
@@ -323,3 +323,13 @@ export const updateIncText: UpdateValues<Partial<ContractRow>> = {
 };
 /** An untyped row keeps every operation on every key. */
 export const updateUntyped: UpdateValues<Partial<Record<string, unknown>>> = { anything: { $inc: 1 } };
+
+/**
+ * A typed client is still a client: a helper written against the wide
+ * `SDKCollectionClient` (an export, a paginator, a seeder) takes
+ * `rebase.data.posts`. The column checks above must narrow what a typed
+ * client's methods accept without making the typed client a different kind
+ * of thing — `NumericKeyOf` as a conditional over `keyof M` made tsc measure
+ * `AggregateParams` invariant, and this line stopped compiling.
+ */
+export const typedClientWidens = (posts: SDKCollectionClient<ContractRow>): SDKCollectionClient => posts;

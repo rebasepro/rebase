@@ -772,11 +772,16 @@ export type AggregateSelect<M extends Record<string, unknown> = Record<string, u
  * The columns of `M` that hold numbers — what `sum` and `avg` can add up. Any
  * column used to be accepted, and `sum` of a text column was a 400. An untyped
  * row (every key `string`) keeps every name.
+ *
+ * Written as the keys of a key-remapped mapped type, not as a conditional over
+ * `keyof M`: tsc measures the conditional form as invariant in `M`, which made
+ * a typed `SDKCollectionClient<Post>` unassignable to the wide
+ * `SDKCollectionClient` that helpers taking any collection accept. A mapped
+ * type is related structurally, so a typed client still widens.
  */
-export type NumericKeyOf<M extends Record<string, unknown>> =
-    string extends keyof M
-        ? Extract<keyof M, string>
-        : { [K in Extract<keyof M, string>]: NonNullable<M[K]> extends number ? K : never }[Extract<keyof M, string>];
+export type NumericKeyOf<M extends Record<string, unknown>> = Extract<keyof {
+    [K in keyof M as string extends K ? K : NonNullable<M[K]> extends number ? K : never]: M[K]
+}, string>;
 
 /**
  * One row of an aggregate result: the `groupBy` columns, plus one key per
