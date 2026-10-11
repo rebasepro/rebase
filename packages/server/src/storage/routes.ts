@@ -42,6 +42,7 @@ import { parseTransformOptions, transformImage, transformContentType, isTransfor
 import { TusHandler } from "./tus-handler";
 import { storageRequestWildcard } from "./requested-object";
 import { isDownloadTokenGrant, isPublicObjectGrant, PUBLIC_OBJECT_PRINCIPAL } from "./request-principals";
+import { storageBucketVariable } from "./source-variables";
 import { canonicalStorageId, InvalidListOptionsError } from "./keys";
 import {
     canonicalKeyOrBadRequest,
@@ -680,16 +681,16 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
      *   of, which is a caller mistake. `expected`, so one client holding a
      *   stale source name does not write a warning per request forever.
      */
-    const declaredKeys = new Set((declaredSources ?? []).map((s) => s.key));
-
     const refuseUnknownSource = (storageId: string, knownKeys: string[]): never => {
-        if (declaredKeys.has(storageId)) {
+        const declared = (declaredSources ?? []).find((s) => s.key === storageId);
+        if (declared) {
+            const variable = storageBucketVariable(declared.key, declared.engine);
             throw new ApiError(
                 501,
                 "STORAGE_SOURCE_NOT_CONFIGURED",
                 `Storage source "${storageId}" is declared but not configured on this deployment, ` +
-                "so it cannot be read from or written to. Set its credentials " +
-                `(the ${storageId} suffixed environment variables) and redeploy.`
+                `so it cannot be read from or written to. Set ${variable} (and its credentials) and redeploy.`,
+                { storageId, variable }
             );
         }
         throw new ApiError(

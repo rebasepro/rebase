@@ -8,6 +8,7 @@ import {
     type StorageSourceDefinition
 } from "@rebasepro/types";
 import type { BackendStorageConfig } from "../storage/types";
+import { storageBucketVariable } from "../storage/source-variables";
 import { BundleError } from "./bundle";
 import { logger } from "../utils/logger";
 
@@ -618,7 +619,17 @@ export function resolveStorageSources(
             definition.account,
             options
         );
-        if (!config) continue;
+        if (!config) {
+            // Declared, and nothing on this deployment binds it. Said at boot,
+            // naming the variable: the first sign used to be a 501 on the first
+            // upload, whose message did not name it either.
+            logger.warn(
+                `Storage source "${definition.key}" is declared but not configured on this deployment, ` +
+                `so every request to it answers 501. Set ${storageBucketVariable(definition.key, definition.engine)} ` +
+                "(and its credentials) and redeploy."
+            );
+            continue;
+        }
         result[definition.key] = config;
         // `default: true` binds the same backend under the default key as well,
         // so an unqualified upload reaches it. Registered rather than renamed:

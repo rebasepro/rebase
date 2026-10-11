@@ -25,7 +25,6 @@
  */
 import {
     DEFAULT_RESOURCE_KEY,
-    resourceEnvSuffix,
     resourceKind,
     resourceKinds,
     resourceToDataSource,
@@ -35,6 +34,7 @@ import {
 } from "@rebasepro/types";
 import { localStorageForced } from "../init/storage.js";
 import { BundleError } from "./bundle.js";
+import { storageBucketVariable } from "../storage/source-variables.js";
 import {
     ACCOUNT_SCOPED_STORAGE_BASES,
     resolveDataSources,
@@ -191,9 +191,8 @@ const bucketResolver: ResourceResolver = {
         } catch (err) {
             return { state: "blocked", detail: describeRefusal(err) };
         }
-        const suffix = resourceEnvSuffix(declaration.key);
         if (!config) {
-            const bucketVar = `${declaration.engine === "gcs" ? "GCS" : "S3"}_BUCKET${suffix}`;
+            const bucketVar = storageBucketVariable(declaration.key, declaration.engine);
             return {
                 state: "unbound",
                 detail: `declared, not configured — uploads here answer 501. Set ${bucketVar}.`
