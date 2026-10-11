@@ -1,5 +1,5 @@
 import { buildQueryString, FindParams, RebaseApiError } from "./transport";
-import { FindAllParams, FindResult, IterateParams, LogicalCondition, SDKCollectionClient, WhereFilterOp, WhereValueFor, WriteOptions, hasFieldOperation, isUnsupported, type UpdateValues, type UpsertOptions } from "@rebasepro/types";
+import { FindAllParams, FindResult, IterateParams, LogicalCondition, SDKCollectionClient, WhereFilterOp, WhereValueFor, WriteOptions, hasFieldOperation, isUnsupported, type ByIdReadOptions, type UpdateValues, type UpsertOptions } from "@rebasepro/types";
 import { collectAllPages, normalizeOrderBy, paginateFind } from "@rebasepro/common";
 import { CollectionClient, LiveResult, ObserveOptions, RowSnapshotMeta } from "./collection";
 import { SDKQueryBuilder } from "./sdk_query_builder";
@@ -871,12 +871,12 @@ export class OfflineManager {
 
             findAll: (params?: FindAllParams<M>) => collectAllPages<M>((p) => findPage(p, true), params, slug),
 
-            findById: async (id: string | number) => {
+            findById: async (id: string | number, options?: ByIdReadOptions) => {
                 const ticket = this.ticket() ?? await this.nextTicket();
                 await this.ensureCollection(slug);
                 if (this.connectivity.shouldAttempt()) {
                     try {
-                        const row = await inner.findById(id);
+                        const row = await inner.findById(id, options);
                         this.connectivity.markSuccess();
                         if (!this.isCurrent(ticket)) return row;
                         if (row !== undefined) {
@@ -1369,7 +1369,7 @@ data: u.data as AnyRow })),
             );
         }
         if (!isUnsupported(inner.listenById)) {
-            wrapped.listenById = (id, onUpdate, onError) => inner.listenById(
+            wrapped.listenById = (id, onUpdate, onError, options) => inner.listenById(
                 id,
                 (row) => {
                     const ticket = this.ticket();
@@ -1393,7 +1393,8 @@ data: u.data as AnyRow })),
                         onUpdate(this.localRow<M>(slug, id) ?? row);
                     });
                 },
-                onError
+                onError,
+                options
             );
         }
 

@@ -73,6 +73,9 @@ const maybe = await client.data.products.findById(42);
 // Row | undefined
 ```
 
+`findById` takes the relations to load, as `find` does:
+`findById(1, { include: ["tags"] })`.
+
 :::note
 Row-level security makes "no such row" and "not yours to read" the same answer,
 deliberately: a 404 that distinguished them would confirm the row exists.

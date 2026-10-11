@@ -1,5 +1,6 @@
 import { jest } from "@jest/globals";
 import { RebaseWebSocketClient } from "./websocket";
+import { createCollectionClient } from "./collection";
 
 /**
  * A table's reference and relation cells each watch the record they point at
@@ -66,5 +67,38 @@ describe("record subscriptions shared across listeners", () => {
         });
         await jest.advanceTimersByTimeAsync(50);
         expect(sent.filter(m => m.type === "unsubscribe")).toHaveLength(1);
+    });
+
+    it("asks for the relations a listener names, and shares a subscription only between listeners that name the same", async () => {
+        const { FakeWS, sent } = fakeSocket();
+        const client = new RebaseWebSocketClient({
+            websocketUrl: "ws://localhost:1234",
+            WebSocket: FakeWS,
+            getAuthToken: async () => "token"
+        });
+
+        client.listenOne({ path: "posts", id: "1" }, () => undefined);
+        client.listenOne({ path: "posts", id: "1", include: ["tags"] }, () => undefined);
+        client.listenOne({ path: "posts", id: "1", include: ["tags"] }, () => undefined);
+        await jest.advanceTimersByTimeAsync(50);
+
+        const subscribes = sent.filter(m => m.type === "subscribe_one").map(m => (m.payload as { include?: unknown }).include);
+        expect(subscribes).toHaveLength(2);
+        expect(subscribes).toContainEqual(["tags"]);
+        expect(subscribes).toContainEqual(undefined);
+    });
+});
+
+describe("a collection client's row listener", () => {
+    it("hands the relations it is asked for to the socket, and a row read sends them as ?include=", async () => {
+        const listenOne = jest.fn((..._args: unknown[]) => () => undefined);
+        const request = jest.fn(async (..._args: unknown[]) => ({ id: 1 }));
+        const collection = createCollectionClient({ request } as never, "posts", { listenOne } as never);
+
+        collection.listenById(1, () => undefined, undefined, { include: ["tags"] });
+        await collection.findById(1, { include: ["tags"] });
+
+        expect(listenOne.mock.calls[0][0]).toEqual({ path: "posts", id: "1", include: ["tags"] });
+        expect(request.mock.calls[0][0]).toBe("/data/posts/1?include=tags");
     });
 });

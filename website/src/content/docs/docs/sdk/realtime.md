@@ -145,12 +145,23 @@ const unsubscribe = client.data
 listenById(
     id: string | number,
     onUpdate: (row: M | undefined) => void,
-    onError?: (error: Error) => void
+    onError?: (error: Error) => void,
+    options?: { include?: IncludeSpec }
 ): () => void   // returns unsubscribe function
 ```
 
 The callback receives a flat row — not an `Entity`, so there is no `.values` —
 and `undefined` when the record is deleted.
+
+Each frame carries the relations `options.include` names, loaded as `find({ include })`
+loads them into each row of a list. A to-many relation not named there is absent
+from the row, not empty:
+
+```typescript
+client.data.posts.listenById(1, (post) => {
+    console.log(post?.tags); // the post's tags, on every update
+}, undefined, { include: ["tags"] });
+```
 
 ## Fluent Query Builder
 

@@ -5,6 +5,7 @@ import { RebaseContext, AdminCollection } from "@rebasepro/cms-types";
 import { useData } from "./useData";
 import { useRebaseContext } from "../useRebaseContext";
 import { isConnectionLostError } from "../../util/realtime";
+import { getRelationIncludeParams } from "../../util/previews";
 
 /**
  * @group Hooks and utilities
@@ -91,15 +92,17 @@ export function clearFetchCache(): void {
  * `delivered`, with every relation property it does not carry taken from the
  * record already on screen.
  *
- * A record's listener (`listenById`) takes no `include`, so its frames never
- * carry a to-many relation — the key is absent, not empty. The list row a click
- * opens the record on does carry it (a list read includes every relation
- * property). Replaced wholesale, the first frame took `tags` off the screen; the
- * form follows an untouched field, so the field emptied, and a tag added to it
- * was saved as the whole set — which a many-to-many save takes as the new
- * membership, unlinking every other tag. Absent is "not delivered": the value
- * the record was opened with stands until a frame carries one (an empty array
- * included). Same record only; nothing survives a deletion.
+ * The record's read names the collection's relation properties (see
+ * `useFetch`), so a frame normally carries them. One that does not — from a
+ * server that ignores a row subscription's `include`, or a data source that
+ * cannot load relations — has the key absent, not empty. The list row a click
+ * opens the record on does carry it. Replaced wholesale, such a frame took
+ * `tags` off the screen; the form follows an untouched field, so the field
+ * emptied, and a tag added to it was saved as the whole set — which a
+ * many-to-many save takes as the new membership, unlinking every other tag.
+ * Absent is "not delivered": the value the record was opened with stands until
+ * a frame carries one (an empty array included). Same record only; nothing
+ * survives a deletion.
  */
 function keepUndeliveredRelations<M extends Record<string, any>>(
     shown: Entity<M> | undefined,
@@ -117,6 +120,16 @@ function keepUndeliveredRelations<M extends Record<string, any>>(
         values[name as keyof M] = shown.values[name];
     }
     return values ? { ...delivered, values } : delivered;
+}
+
+/**
+ * The relations a record's read loads: the ones a list read of the same
+ * collection loads into each row. Typed as `keepUndeliveredRelations` takes its
+ * collection, since `useFetch`'s own `USER` reaches the export callbacks.
+ */
+function relationsToRead<M extends Record<string, any>>(collection: AdminCollection<M, any>): { include: string[] } | undefined {
+    const include = getRelationIncludeParams(collection);
+    return include ? { include } : undefined;
 }
 
 /**
@@ -199,9 +212,15 @@ export function useFetch<M extends Record<string, any>, USER extends User = User
             };
         } else if (entityId && path && collection) {
             const accessor = dataClient.collection(path);
+            // The relations the form edits, read with the record exactly as a
+            // list read includes them. Without them a to-many relation was
+            // absent from the record, and one opened by URL — nothing cached
+            // to fall back on — showed its many-to-many field empty; a save
+            // from it set that empty membership, unlinking every related row.
+            const readOptions = relationsToRead(collection);
 
             if (accessor.listenById) {
-                return accessor.listenById(entityId, (entity) => onEntityUpdate(entity as Entity<M> | undefined), onError);
+                return accessor.listenById(entityId, (entity) => onEntityUpdate(entity as Entity<M> | undefined), onError, readOptions);
             } else {
                 // The one-shot fallback, taken whenever the client has no
                 // socket. `listenById` above cancels on cleanup; a promise
@@ -211,7 +230,7 @@ export function useFetch<M extends Record<string, any>, USER extends User = User
                 // in place — a slow response for the record just left would
                 // otherwise land on top of the one now showing.
                 let cancelled = false;
-                accessor.findById(entityId)
+                accessor.findById(entityId, readOptions)
                     .then((entity) => {
                         if (cancelled) return;
                         onEntityUpdate(entity as Entity<M> | undefined);

@@ -978,7 +978,7 @@ export class PostgresBackendDriver implements DataDriver {
      * the subscriber. Reads as {@link listenCollection} does.
      */
     listenOne<M extends Record<string, unknown>>(
-        { path, id, onUpdate, onError }: ListenOneProps<M>,
+        { path, id, include, onUpdate, onError }: ListenOneProps<M>,
         authContext: SubscriptionAuthContext | undefined = this.user ? authContextOf(this.user) : undefined
     ): () => void {
         const subscriptionId = this.generateSubscriptionId();
@@ -987,6 +987,7 @@ export class PostgresBackendDriver implements DataDriver {
             type: "single",
             path,
             id,
+            include,
             authContext,
             onError: fetchErrorListener(onError)
         }, (row) => {

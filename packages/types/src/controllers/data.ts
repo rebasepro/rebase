@@ -208,6 +208,21 @@ export interface IncludeOptions {
 export type IncludeSpec = string[] | Record<string, true | IncludeOptions>;
 
 /**
+ * What a read of one record by id takes besides the id — `findById` and
+ * `listenById`.
+ *
+ * @group Data
+ */
+export interface ByIdReadOptions<Inc = IncludeSpec> {
+    /**
+     * Relations to load into the row, as {@link FindParams.include} loads them
+     * into each row of a list. A to-many relation not named here is absent
+     * from the row — not empty.
+     */
+    include?: Inc;
+}
+
+/**
  * An include checked against one generated collection's relations: `R` is its
  * `Relations` map (relation name → the accessor it reaches) and `DB` the
  * generated `Database`, so a nested `include` is checked against the *target's*
@@ -537,7 +552,7 @@ export interface CollectionAccessor<M extends Record<string, unknown> = Record<s
     /**
      * Find a single record by its ID.
      */
-    findById(id: string | number): Promise<Entity<M> | undefined>;
+    findById(id: string | number, options?: ByIdReadOptions): Promise<Entity<M> | undefined>;
 
     /**
      * Create a new record.
@@ -590,10 +605,11 @@ export interface CollectionAccessor<M extends Record<string, unknown> = Record<s
     listen?(params: FindParams<M> | undefined, onUpdate: (response: FindResponse<M>) => void, onError?: (error: Error) => void): () => void;
 
     /**
-     * Subscribe to a single record for real-time updates.
+     * Subscribe to a single record for real-time updates: every frame is the
+     * record as `findById(id, options)` reads it.
      * Optional method.
      */
-    listenById?(id: string | number, onUpdate: (entity: Entity<M> | undefined) => void, onError?: (error: Error) => void): () => void;
+    listenById?(id: string | number, onUpdate: (entity: Entity<M> | undefined) => void, onError?: (error: Error) => void, options?: ByIdReadOptions): () => void;
 
     /**
      * Count the number of records matching the given filter.
@@ -1397,9 +1413,10 @@ export interface SDKCollectionClient<
     findAll(params?: FindAllParams<M, Inc>): Promise<M[]>;
 
     /**
-     * Find a single record by its ID.
+     * Find a single record by its ID. `options.include` loads its relations,
+     * as `find({ include })` does for each row of a list.
      */
-    findById(id: string | number): Promise<M | undefined>;
+    findById(id: string | number, options?: ByIdReadOptions<Inc>): Promise<M | undefined>;
 
     /**
      * Read one record by its ID, or throw if it is not there.
@@ -1632,8 +1649,11 @@ export interface SDKCollectionClient<
      */
     listen(params: FindParams<M, Inc> | undefined, onUpdate: (response: FindResult<M>) => void, onError?: (error: Error) => void): () => void;
 
-    /** {@link listen} for a single row. Prefer `observeById()`. */
-    listenById(id: string | number, onUpdate: (row: M | undefined) => void, onError?: (error: Error) => void): () => void;
+    /**
+     * {@link listen} for a single row. Prefer `observeById()`. Every frame is
+     * the row as `findById(id, options)` reads it, relations included.
+     */
+    listenById(id: string | number, onUpdate: (row: M | undefined) => void, onError?: (error: Error) => void, options?: ByIdReadOptions<Inc>): () => void;
 
     /**
      * Count the number of records matching the given filter.

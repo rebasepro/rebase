@@ -26,10 +26,28 @@ export interface FetchOneProps<M extends Record<string, unknown> = Record<string
 }
 
 /**
+ * What a row listener subscribes to: the row, and the relations each frame
+ * loads into it.
+ *
+ * @internal
+ */
+export type ListenOneTarget<M extends Record<string, unknown> = Record<string, unknown>> =
+    FetchOneProps<M>
+    & {
+        /**
+         * Relations to load into every frame, as {@link FetchCollectionProps.include}
+         * loads them into each row of a list. Without it a to-many relation
+         * is absent from each frame, and the admin's record form, opened by
+         * URL, showed it empty — so a save from it unlinked every related row.
+         */
+        include?: IncludeSpec;
+    }
+
+/**
  * @internal
  */
 export type ListenOneProps<M extends Record<string, unknown> = Record<string, unknown>> =
-    FetchOneProps<M>
+    ListenOneTarget<M>
     & {
         onUpdate: (row: Record<string, unknown> | null) => void,
         onError?: (error: Error) => void,

@@ -4,6 +4,7 @@ import {
     FetchCollectionProps,
     ListenCollectionProps,
     FetchOneProps,
+    ListenOneTarget,
     SaveProps,
     WebSocketMessage,
     WebSocketErrorPayload,
@@ -421,7 +422,7 @@ export class RebaseWebSocketClient {
             onUpdate: (row: Record<string, unknown> | null) => void;
             onError?: (error: Error) => void;
         }>;
-        props: FetchOneProps;
+        props: ListenOneTarget;
         latestData?: Record<string, unknown> | null; // Cache the latest flat row
         lastUpdated?: number; // Timestamp for cache invalidation
         isInitialDataReceived?: boolean; // Track if we got initial data
@@ -1041,7 +1042,7 @@ export class RebaseWebSocketClient {
         subscription: {
             backendSubscriptionId: string;
             callbacks: Map<string, { onUpdate: (...args: never[]) => void; onError?: (error: Error) => void }>;
-            props: FetchCollectionProps | FetchOneProps;
+            props: FetchCollectionProps | ListenOneTarget;
         },
         subscriptionKey: string,
         idPrefix: "collection" | "row",
@@ -1992,7 +1993,7 @@ onError });
     }
 
     listenOne<M extends Record<string, unknown>>(
-        props: FetchOneProps<M>,
+        props: ListenOneTarget<M>,
         onUpdate: (row: Record<string, unknown> | null) => void,
         onError?: (error: Error) => void
     ): () => void {
@@ -2370,7 +2371,10 @@ onError });
         });
     }
 
-    private createSingleSubscriptionKey(props: FetchOneProps): string {
-        return `${props.path}|${props.id}`;
+    private createSingleSubscriptionKey(props: ListenOneTarget): string {
+        // Listeners asking for different relations are different reads: one
+        // shared subscription would hand each the other's shape.
+        const include = props.include !== undefined ? `|${JSON.stringify(props.include)}` : "";
+        return `${props.path}|${props.id}${include}`;
     }
 }

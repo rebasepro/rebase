@@ -206,7 +206,7 @@ export type DataDriverSubscriptionRequest = {
     onError?: (error: unknown) => void;
 } & (
     | { type: "collection"; collectionRequest: StoredCollectionRequest }
-    | { type: "single"; id: string | number }
+    | { type: "single"; id: string | number; include?: IncludeSpec }
 );
 
 /**
@@ -240,6 +240,11 @@ type Subscription = {
     id?: string | number;
     // Store full collection request parameters for proper refetching
     collectionRequest?: StoredCollectionRequest;
+    /**
+     * The relations a single-row subscription loads into every frame — the
+     * `include` a `findById` takes. A list keeps its own in `collectionRequest`.
+     */
+    include?: IncludeSpec;
     // Auth context for RLS — when set, refetches run in a transaction
     // with set_config('app.uid', ...) / set_config('app.user_roles', ...)
     authContext?: SubscriptionAuthContext;
@@ -291,6 +296,8 @@ type SubscriptionGroup = {
     /** The row a single-row group reads, as a string. */
     id?: string;
     collectionRequest?: StoredCollectionRequest;
+    /** The relations a single-row group's read loads. See {@link Subscription.include}. */
+    include?: IncludeSpec;
     authContext?: SubscriptionAuthContext;
     /** The subscriptions in the group, by internal key. */
     members: Set<string>;
@@ -750,13 +757,16 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
     private groupKeyFor(
         key: string,
         shared: boolean,
-        target: { type: "collection" | "single"; path: string; id?: string | number; collectionRequest?: StoredCollectionRequest; authContext?: SubscriptionAuthContext }
+        target: { type: "collection" | "single"; path: string; id?: string | number; collectionRequest?: StoredCollectionRequest; include?: IncludeSpec; authContext?: SubscriptionAuthContext }
     ): string {
         if (!shared) return `listener\u0000${key}`;
         return canonicalJson({
             type: target.type,
             path: target.path,
             id: target.type === "single" ? String(target.id) : undefined,
+            // Two readers of one row asking for different relations are two
+            // reads: one frame cannot answer both.
+            include: target.type === "single" ? target.include : undefined,
             request: target.type === "collection" ? (target.collectionRequest ?? {}) : undefined,
             principal: principalOf(target.authContext)
         });
@@ -781,7 +791,7 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
                 key: subscription.groupKey,
                 path: subscription.path,
                 type: subscription.type,
-                ...(subscription.type === "single" ? { id: String(subscription.id) } : {}),
+                ...(subscription.type === "single" ? { id: String(subscription.id), include: subscription.include } : {}),
                 collectionRequest: subscription.collectionRequest,
                 authContext: subscription.authContext,
                 members: new Set(),
@@ -984,7 +994,7 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
                     this.sendDataFrame(target.subscription, "collection_update", frame);
                 }
             } else {
-                const row = (await this.fetchEntityWithAuth(group.path, group.id!, group.authContext)) ?? null;
+                const row = (await this.fetchEntityWithAuth(group.path, group.id!, group.authContext, group.include)) ?? null;
                 let frame: { body: string; digest: string } | undefined;
                 for (const target of targets) {
                     if (!target.canDeliver()) continue;
@@ -1094,7 +1104,7 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
         try {
             const data = subscription.type === "collection"
                 ? (await this.fetchCollectionWithAuth(subscription.path, subscription.collectionRequest ?? {}, subscription.authContext, { meta: false })).rows
-                : (await this.fetchEntityWithAuth(subscription.path, String(subscription.id), subscription.authContext)) ?? null;
+                : (await this.fetchEntityWithAuth(subscription.path, String(subscription.id), subscription.authContext, subscription.include)) ?? null;
             if (canDeliver()) callback(data);
         } catch (error) {
             logger.error(`❌ [RealtimeService] Error in the first fetch for DataDriver subscription ${subscription.subscriptionId}`, { error: error });
@@ -1501,8 +1511,27 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
 
             if (!this.admitSubscription(clientId, subscriptionId)) return;
 
-            // Store subscription in memory with auth context for RLS
-            const target = { type: "single" as const, path: request.path, id: request.id, authContext };
+            // The relations it asks for are read as the subscriber, under the
+            // check a list subscription's `include` passes (and `GET /:id`'s).
+            try {
+                assertReadRequestReadable(
+                    { include: request.include },
+                    collection,
+                    { roles: authContext?.roles ?? ["anon"] }
+                );
+            } catch (e) {
+                if (!(e instanceof ApiError)) throw e;
+                logger.warn(`[RealtimeService] Refused subscription to '${request.path}': ${e.message}`);
+                this.sendError(clientId, e.message, subscriptionId, e.code);
+                return;
+            }
+
+            // Store subscription in memory with auth context for RLS. The
+            // `include` is stored with it, so every refetch reads what the
+            // first frame did: without one, a row's frames carried no to-many
+            // relation at all, and the record form opened by URL showed a
+            // many-to-many field empty — saving it then unlinked every row.
+            const target = { type: "single" as const, path: request.path, id: request.id, include: request.include, authContext };
             const subscription: Subscription = {
                 subscriptionId,
                 clientId,
@@ -1522,7 +1551,8 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
             const row = await this.fetchEntityWithAuth(
                 request.path,
                 String(request.id),
-                authContext
+                authContext,
+                request.include
             );
 
             if (canDeliver()) {
@@ -2084,7 +2114,8 @@ roles: ["anon"] };
     private async fetchEntityWithAuth(
         notifyPath: string,
         id: string | number,
-        authContext?: SubscriptionAuthContext
+        authContext?: SubscriptionAuthContext,
+        include?: IncludeSpec
     ): Promise<Record<string, unknown> | undefined> {
         if (this.driver) {
             const collection = this.registry.getCollectionByPath(notifyPath);
@@ -2126,7 +2157,7 @@ roles: ["anon"] };
                     // eagerly loaded, each under a `{ __type: "relation" }`
                     // envelope. A subscriber got one shape and a fetch the other.
                     let processedEntity = await txEntityService.fetchOneForRest(
-                        notifyPath, id, undefined, collection?.databaseId
+                        notifyPath, id, include, collection?.databaseId
                     ) ?? undefined;
 
                     if (processedEntity) {

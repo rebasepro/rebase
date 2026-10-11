@@ -23,6 +23,7 @@ import {
     type AggregateParams,
     type AggregateResult,
     type AggregateRow,
+    type ByIdReadOptions,
     type CollectionUpdateMeta,
     type IncludeSpec,
     type NullsPlacement,
@@ -411,11 +412,11 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
             return collectAllPages<M>((p) => client.find(p), params, slug);
         },
 
-        async findById(id: string | number) {
+        async findById(id: string | number, options?: ByIdReadOptions) {
             try {
                 const meta: ResponseMeta = {};
                 const raw = await transport.request<Record<string, unknown>>(
-                    `${basePath}/${encodeURIComponent(String(id))}`,
+                    `${basePath}/${encodeURIComponent(String(id))}${buildQueryString({ include: options?.include })}`,
                     { method: "GET" },
                     meta
                 );
@@ -970,11 +971,15 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
             };
         };
 
-        client.listenById = (id: string | number, onUpdate: (data: M | undefined) => void, onError?: (error: Error) => void) => {
+        client.listenById = (id: string | number, onUpdate: (data: M | undefined) => void, onError?: (error: Error) => void, options?: ByIdReadOptions) => {
             return ws.listenOne(
                 {
                     path: slug,
-                    id: String(id)
+                    id: String(id),
+                    // The relations every frame loads. Without them a to-many
+                    // relation was absent from each frame, and a form built on
+                    // one saved it as empty.
+                    ...(options?.include !== undefined ? { include: options.include } : {})
                 },
                 (row: Record<string, unknown> | null) => {
                     if (row) {

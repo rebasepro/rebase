@@ -397,7 +397,7 @@ title: "newer" }]
             await settle();
 
             expect(service["fetchCollectionWithAuth"]).toHaveBeenCalledWith("notes", {}, auth, { meta: false });
-            expect(service["fetchEntityWithAuth"]).toHaveBeenCalledWith("notes", "n1", auth);
+            expect(service["fetchEntityWithAuth"]).toHaveBeenCalledWith("notes", "n1", auth, undefined);
         });
 
         it("does not overwrite a newer refetch", async () => {

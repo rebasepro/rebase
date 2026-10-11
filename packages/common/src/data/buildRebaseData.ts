@@ -1,4 +1,4 @@
-import { CollectionAccessor, DataDriver, DEFAULT_VECTOR_LIST_LIMIT, Entity, EntityValues, FindAllParams, FindParams, FindResponse, FindResult, IterateParams, LogicalCondition, OrderByTuple, PageWalkOptions, RebaseApiError, RebaseData, RebaseSdkData, RelationAggregateSort, SDKCollectionClient, SDKQueryBuilderInterface, sortKeyToString, type AggregateMeta, type AggregateParams, type AggregateResult, type AggregateSelect, type ComputedSortField, type FieldPath, type IncludeSpec, type NonColumnFieldPath, type NullsPlacement, type SearchMatch, type UpdateValues, type UpsertOptions, type WriteOptions, RebaseClientError, WhereFilterOp, WhereValueFor, isUnsupported, unsupportedMethod } from "@rebasepro/types";
+import { CollectionAccessor, DataDriver, DEFAULT_VECTOR_LIST_LIMIT, Entity, EntityValues, FindAllParams, FindParams, FindResponse, FindResult, IterateParams, LogicalCondition, OrderByTuple, PageWalkOptions, RebaseApiError, RebaseData, RebaseSdkData, RelationAggregateSort, SDKCollectionClient, SDKQueryBuilderInterface, sortKeyToString, type AggregateMeta, type AggregateParams, type AggregateResult, type AggregateSelect, type ComputedSortField, type FieldPath, type ByIdReadOptions, type IncludeSpec, type NonColumnFieldPath, type NullsPlacement, type SearchMatch, type UpdateValues, type UpsertOptions, type WriteOptions, RebaseClientError, WhereFilterOp, WhereValueFor, isUnsupported, unsupportedMethod } from "@rebasepro/types";
 import { toSnakeCase, toWireKey } from "@rebasepro/utils";
 import { cursorToStartAfter, decodeCursor, reconcileCursorOrder } from "./cursor";
 import { mergeIncludeSpecs } from "./include-spec";
@@ -168,8 +168,8 @@ function toViewModelValues(
         // A relation nobody included is still a relation: the row carries only
         // its foreign key, and an addressable ref with no data attached is what
         // lets the preview fetch the one record it needs. Without this the
-        // record form showed an empty chip where the customer goes — the panel
-        // reads a form through `listenById`, which takes no `include`.
+        // record form showed an empty chip where the customer goes, on a read
+        // that did not name the relation in its `include`.
         if (!(key in values)) {
             const fkRelation = relations[key];
             // `localKey` is the column; the row is keyed the way the wire keys
@@ -496,12 +496,12 @@ function createDriverAccessor<M extends Record<string, unknown> = Record<string,
             };
         },
 
-        async findById(id: string | number): Promise<Entity<M> | undefined> {
+        async findById(id: string | number, options?: ByIdReadOptions): Promise<Entity<M> | undefined> {
             // Same contract as `find` above: one row read the same way the
             // collection read is, so `find()[0]` and `findById()` agree.
             const fetchService = driver.restFetchService;
             const row = fetchService
-                ? await fetchService.fetchOneForRest(storedPath(), id)
+                ? await fetchService.fetchOneForRest(storedPath(), id, options?.include)
                 : await driver.fetchOne<M>({ path: storedPath(), id: id });
             return row ? rowToEntity<M>(row, slug, getPks(), toViewModel) : undefined;
         },
@@ -670,11 +670,12 @@ ids });
             } : undefined,
 
         listenById: driver.listenOne
-            ? (id: string | number, onUpdate: (entity: Entity<M> | undefined) => void, onError?: (error: Error) => void) => {
+            ? (id: string | number, onUpdate: (entity: Entity<M> | undefined) => void, onError?: (error: Error) => void, options?: ByIdReadOptions) => {
                 const normalize = driver.restFetchService ? inlineRelationRefs : (row: Record<string, unknown>) => row;
                 return driver.listenOne!<M>({
                     path: storedPath(),
                     id: id,
+                    include: options?.include,
                     onUpdate: (entity) => onUpdate(entity ? rowToEntity<M>(normalize(entity), slug, getPks(), toViewModel) : undefined),
                     onError
                 });
@@ -1001,8 +1002,8 @@ function toSdkCollectionClient<M extends Record<string, unknown>>(
         findAll(params?: FindAllParams<M>) {
             return collectAllPages<M>((p) => client.find(p), params, slug);
         },
-        async findById(id: string | number): Promise<M | undefined> {
-            const s = await snap.findById(id);
+        async findById(id: string | number, options?: ByIdReadOptions): Promise<M | undefined> {
+            const s = await snap.findById(id, options);
             return s ? entityToRow(s) : undefined;
         },
         async get(id: string | number): Promise<M> {
@@ -1123,8 +1124,8 @@ data: u.data as Partial<EntityValues<M>> }))
                 snap.listen!(params, (res) => onUpdate({ data: res.data.map(entityToRow), meta: res.meta }), onError)
             : unsupportedMethod(noRealtime(slug)),
         listenById: snap.listenById
-            ? (id: string | number, onUpdate: (r: M | undefined) => void, onError?: (e: Error) => void) =>
-                snap.listenById!(id, (s) => onUpdate(s ? entityToRow(s) : undefined), onError)
+            ? (id: string | number, onUpdate: (r: M | undefined) => void, onError?: (e: Error) => void, options?: ByIdReadOptions) =>
+                snap.listenById!(id, (s) => onUpdate(s ? entityToRow(s) : undefined), onError, options)
             : unsupportedMethod(noRealtime(slug)),
         where(columnOrCondition: string | LogicalCondition, operator?: WhereFilterOp, value?: unknown) {
             const builder = new SdkQueryBuilder<M>(client);
@@ -1179,8 +1180,8 @@ function toEntityAccessor<M extends Record<string, unknown>>(
             const res = await sdk.find(params);
             return { data: res.data.map((row) => rowToEntity<M>(row, slug, getPks(), toViewModel)), meta: res.meta };
         },
-        async findById(id: string | number): Promise<Entity<M> | undefined> {
-            const row = await sdk.findById(id);
+        async findById(id: string | number, options?: ByIdReadOptions): Promise<Entity<M> | undefined> {
+            const row = await sdk.findById(id, options);
             return row ? rowToEntity<M>(row, slug, getPks(), toViewModel) : undefined;
         },
         async create(data: Partial<EntityValues<M>>, id?: string | number): Promise<Entity<M>> {
@@ -1252,8 +1253,8 @@ function toEntityAccessor<M extends Record<string, unknown>>(
             },
         listenById: isUnsupported(sdk.listenById)
             ? undefined
-            : (id: string | number, onUpdate: (s: Entity<M> | undefined) => void, onError?: (e: Error) => void) =>
-                sdk.listenById(id, (row) => onUpdate(row ? rowToEntity<M>(row, slug, getPks(), toViewModel) : undefined), onError),
+            : (id: string | number, onUpdate: (s: Entity<M> | undefined) => void, onError?: (e: Error) => void, options?: ByIdReadOptions) =>
+                sdk.listenById(id, (row) => onUpdate(row ? rowToEntity<M>(row, slug, getPks(), toViewModel) : undefined), onError, options),
         where(columnOrCondition: string | LogicalCondition, operator?: WhereFilterOp, value?: unknown) {
             const builder = new QueryBuilder<M>(accessor);
             if (typeof columnOrCondition === "object") {
