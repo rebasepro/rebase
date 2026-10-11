@@ -25,6 +25,7 @@ const props = {
     propertyKey: "status",
     value: null,
     setValue: () => undefined,
+    setFieldValue: () => undefined,
     error: undefined,
     showError: false,
     disabled: false,

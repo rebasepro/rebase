@@ -18,6 +18,9 @@ jest.mock("@rebasepro/app", () => {
 });
 
 import { RebaseI18nProvider } from "@rebasepro/app";
+import { useCreateFormex } from "@rebasepro/forms";
+import type { MapProperty } from "@rebasepro/types";
+import type { FormContext } from "../../src/types/fields";
 import { KeyValueFieldBinding } from "../../src/form/field_bindings/KeyValueFieldBinding";
 
 /**
@@ -25,15 +28,28 @@ import { KeyValueFieldBinding } from "../../src/form/field_bindings/KeyValueFiel
  * saved before the new key was named stored an entry under the empty key.
  * The new row is the form's until it has a name.
  */
-const property = { type: "map", name: "Attributes", keyValue: true } as never;
+const property: MapProperty = { type: "map", name: "Attributes", keyValue: true };
+
+type Row = Record<string, unknown>;
 
 function Field({ value, setValue }: { value: Record<string, unknown>; setValue: (v: unknown) => void }) {
+    const formex = useCreateFormex<Row>({ initialValues: { attrs: value }, onSubmit: () => undefined });
+    const context: FormContext<Row> = {
+        values: formex.values,
+        setFieldValue: formex.setFieldValue,
+        save: () => undefined,
+        submit: () => undefined,
+        status: "existing",
+        formex,
+        disabled: false
+    };
     return <RebaseI18nProvider locale="en">
         <KeyValueFieldBinding
             propertyKey="attrs"
             property={property}
-            value={value as never}
-            setValue={setValue as never}
+            value={value}
+            setValue={setValue}
+            setFieldValue={() => undefined}
             error={undefined}
             showError={false}
             disabled={false}
@@ -41,7 +57,7 @@ function Field({ value, setValue }: { value: Record<string, unknown>; setValue: 
             isSubmitting={false}
             includeDescription={false}
             minimalistView={true}
-            context={{ formex: { initialValues: { attrs: value } } } as never}/>
+            context={context}/>
     </RebaseI18nProvider>;
 }
 

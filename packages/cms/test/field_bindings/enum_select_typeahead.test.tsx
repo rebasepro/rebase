@@ -37,6 +37,7 @@ describe("an enum field with a long list", () => {
             propertyKey={"country"}
             value={null}
             setValue={(value: unknown) => values.push(value)}
+            setFieldValue={() => undefined}
             error={undefined}
             showError={false}
             disabled={false}

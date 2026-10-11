@@ -2,7 +2,7 @@
   "app": 56,
   "cli": 23,
   "client": 292,
-  "cms": 105,
+  "cms": 100,
   "server": 321,
   "server-postgres": 602
 }

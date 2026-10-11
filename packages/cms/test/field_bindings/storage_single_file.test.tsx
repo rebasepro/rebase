@@ -64,6 +64,7 @@ const props = {
     propertyKey: "picture",
     value: null,
     setValue: () => undefined,
+    setFieldValue: () => undefined,
     error: undefined,
     showError: false,
     autoFocus: false,
