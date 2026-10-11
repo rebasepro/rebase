@@ -127,6 +127,34 @@ export type { LiveResult, ObserveOptions, RowSnapshotMeta } from "./collection";
 // version never enters the generated `Row` type — see `etagOf`.
 export { etagOf } from "./collection";
 export type { BatchOperation, BatchRef, BatchResult, FieldOperation, UpdateValues, UpsertOptions } from "@rebasepro/types";
+// The types a call's own arguments and answers are written in. A browser app
+// installs `@rebasepro/client` alone, so a type it cannot import from here is a
+// type it cannot name: a dynamic filter UI holding a `WhereFilterOp`, a helper
+// taking `WriteOptions`, a wrapper returning an `AggregateResult`.
+export type {
+    WriteOptions,
+    WhereFilterOp,
+    WhereFor,
+    WhereConditionFor,
+    WhereValueFor,
+    FilterValues,
+    FieldPath,
+    OrderBySpec,
+    LogicalCondition,
+    FilterCondition,
+    AggregateParams,
+    AggregateSelect,
+    AggregateRow,
+    AggregateResult,
+    AggregateMeta,
+    IncludeSpec,
+    IncludeOptions,
+    QueryComputedFields,
+    RowOf,
+    InsertOf,
+    UpdateOf,
+    StorageSource
+} from "@rebasepro/types";
 export type { OfflineStore, OfflineCacheEntry, OfflineCacheRecord, PendingMutation, MutationRollback } from "./offline-store";
 export { MemoryOfflineStore } from "./offline-store";
 
