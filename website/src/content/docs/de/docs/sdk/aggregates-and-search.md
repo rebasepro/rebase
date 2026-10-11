@@ -1,5 +1,5 @@
 ---
-sourceHash: 06f83add20038a66
+sourceHash: 6a0a2927f191087f
 title: Aggregate und Suche
 sidebar_label: Aggregate & Suche
 description: "Zählen, summieren und gruppieren mit dem SDK, Filtern in JSON-Spalten und Ausführen von Volltext- und Vektorsuche über den Client."
@@ -57,6 +57,21 @@ GET /api/data/orders/aggregate?select=count()&groupBy=customer&orderBy=count:des
 Aggregat ergibt `400 INVALID_AGGREGATE_WINDOW`: Ein ungruppiertes Aggregat hat
 eine Zeile, und eine Gruppe ist keine Zeile, nach der ein Cursor fortsetzen
 könnte.
+
+Vom SDK aus nimmt `aggregate()` dasselbe `orderBy` wie ein `find()` – ein
+`[key, "asc" | "desc"]`-Tupel oder eine Liste davon –, wobei der Schlüssel eine `groupBy`-
+Spalte oder ein Ergebnisschlüssel ist. Beides ist typisiert: Bei einem generierten Modell kompiliert ein Schlüssel, der
+keines von beiden ist, nicht. In-Process (`rebase.data`) kommen die Gruppen in
+derselben Reihenfolge zurück wie über HTTP.
+
+```ts
+const topCustomers = await client.data.orders.aggregate({
+    select: [{ fn: "count" }, { fn: "sum", field: "total" }],
+    groupBy: ["customer"],
+    orderBy: ["sum_total", "desc"],
+    limit: 10
+});
+```
 
 Es akzeptiert dieselben Filter wie der List-Endpunkt, sodass ein Aggregat auf die
 gleiche Weise wie eine Auflistung eingegrenzt werden kann:

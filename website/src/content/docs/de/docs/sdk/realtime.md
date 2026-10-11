@@ -1,5 +1,5 @@
 ---
-sourceHash: bdc7510e49d0db5c
+sourceHash: 7d1fe8f3e85d948e
 title: Realtime-Abonnements
 sidebar_label: Realtime
 description: Abonnieren Sie Live-Datenänderungen mit dem typisierten SDK von Rebase über WebSocket-basierte Realtime-Listener.
@@ -139,6 +139,11 @@ client.data.posts.listenById(1, (post) => {
     console.log(post?.tags); // the post's tags, on every update
 }, undefined, { include: ["tags"] });
 ```
+
+**Grenzen.** Ein Frame wird gesendet, wenn sich die Zeile selbst ändert, und jeder Frame lädt seine eingebundenen
+Relationen neu. Eine Änderung nur an einer verknüpften Zeile sendet keinen Frame: Das Bearbeiten des Namens eines Tags
+aktualisiert einen mit `include: ["tags"]` beobachteten Post erst, wenn sich auch der Post ändert. Um
+den verknüpften Zeilen zu folgen, beobachten Sie zusätzlich deren Collection.
 
 ## Fluent Query Builder
 

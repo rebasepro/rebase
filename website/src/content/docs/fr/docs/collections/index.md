@@ -1,5 +1,5 @@
 ---
-sourceHash: f08c99f0d9d82678
+sourceHash: 2d930362e74e2a12
 title: Collections
 sidebar_label: Collections
 description: Les collections sont la brique de base de Rebase — chaque collection correspond à une table de base de données et définit son schéma, ses relations, sa sécurité et son comportement d'interface utilisateur.
@@ -252,7 +252,7 @@ Tous les éléments suivants vont dans `admin`.
 | `sideDialogWidth` | `number \| string` | — | Largeur du panneau latéral (side dialog) |
 | `inlineEditing` | `boolean` | `true` | Activer l'édition en ligne dans la vue feuille de calcul |
 | `defaultSize` | `"xs" \| "s" \| "m" \| "l" \| "xl"` | `"m"` | Densité par défaut des vues liste, tableau et cartes (la hauteur de ligne du tableau) |
-| `pagination` | `boolean \| number` | `true` (50) | Activer la pagination et/ou définir la taille de la page |
+| `pagination` | `boolean \| number` | `true` (50) | Activer la pagination et/ou définir la taille de la page. `false` charge toutes les lignes ; en développement, la console avertit une fois lorsqu'il y en a plus de 10 000 |
 | `listProperties` | `string[]` | — | Propriétés à afficher dans la vue en liste |
 | `propertiesOrder` | `string[]` | — | Ordre des colonnes dans la vue tableau |
 | `selectionEnabled` | `boolean` | `true` | Activer la sélection des lignes |

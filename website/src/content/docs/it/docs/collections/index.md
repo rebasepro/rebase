@@ -1,5 +1,5 @@
 ---
-sourceHash: f08c99f0d9d82678
+sourceHash: 2d930362e74e2a12
 title: Collezioni
 sidebar_label: Collezioni
 description: Le collezioni sono l'elemento fondamentale di Rebase — ogni collezione mappa una tabella di database e ne definisce schema, relazioni, sicurezza e comportamento dell'interfaccia utente.
@@ -282,7 +282,7 @@ Tutti i seguenti parametri vanno all'interno di `admin`.
 | `sideDialogWidth` | `number \| string` | — | Larghezza del pannello laterale (side dialog) |
 | `inlineEditing` | `boolean` | `true` | Abilita la modifica inline nella vista a foglio di calcolo |
 | `defaultSize` | `"xs" \| "s" \| "m" \| "l" \| "xl"` | `"m"` | Densità predefinita delle viste list, table e card (l'altezza delle righe della tabella) |
-| `pagination` | `boolean \| number` | `true` (50) | Abilita la paginazione e/o imposta la dimensione della pagina |
+| `pagination` | `boolean \| number` | `true` (50) | Abilita la paginazione e/o imposta la dimensione della pagina. `false` carica ogni riga; in sviluppo la console avvisa una volta quando sono più di 10.000 righe |
 | `listProperties` | `string[]` | — | Proprietà da mostrare nella vista a elenco |
 | `propertiesOrder` | `string[]` | — | Ordine delle colonne nella vista a tabella |
 | `selectionEnabled` | `boolean` | `true` | Abilita la selezione delle righe |

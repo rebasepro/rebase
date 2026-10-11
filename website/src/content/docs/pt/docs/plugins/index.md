@@ -1,5 +1,5 @@
 ---
-sourceHash: eff51262efe91a3e
+sourceHash: 38c32f7e5b1fc7ae
 title: Sistema de Plugins
 sidebar_label: Plugins
 description: Estenda o Rebase com plugins — injete componentes de UI, modifique coleções, adicione ações na barra de ferramentas e crie construtores de campos personalizados.
@@ -168,7 +168,8 @@ O preenchimento automático envia os valores dos campos da entidade para um serv
 hospedado para gerar uma sugestão. Por padrão, esse serviço é **`https://app.rebase.pro/api/functions/ai`**,
 executado pelo Rebase — gratuito para uso, sem necessidade de configuração e sem
 credencial anexada: as requisições são anônimas, limitadas por rate limit em vez de
-identidade. Seu JWT não é enviado.
+identidade. Seu JWT não é enviado. O autocompletar por barra (slash) do editor também envia texto: até 8.000
+caracteres de cada lado do cursor, nunca o documento inteiro.
 
 Se isso é aceitável ou não depende do que está contido nos campos. Aponte o `endpoint`
 para sua própria implantação para manter a geração dentro da sua infraestrutura:

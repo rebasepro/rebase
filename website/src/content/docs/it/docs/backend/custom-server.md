@@ -1,5 +1,5 @@
 ---
-sourceHash: b27c45a011cb8c16
+sourceHash: b807a42cae57ce6e
 title: Integrazione Server Personalizzato
 sidebar_label: Server Personalizzato (Express)
 description: Come integrare i servizi Rebase Database e Realtime nel tuo backend Node.js personalizzato senza utilizzare Hono o il coordinator di Rebase.
@@ -247,24 +247,24 @@ Esponi quelli che l'SDK legge, altrimenti `etagOf(row)` lì è sempre
 ```typescript
 import express from "express";
 import cors from "cors";
+import { CORS_EXPOSED_HEADERS } from "@rebasepro/server";
 
 const app = express();
 app.use(cors({
     origin: ["https://app.example.com"],
     credentials: true,
-    exposedHeaders: [
-        "ETag", "Retry-After", "X-Request-ID",
-        "X-RateLimit-Limit", "X-RateLimit-Remaining", "X-RateLimit-Reset",
-        "Preference-Applied",
-        // Resumable uploads, which the SDK uses for files over 8 MiB
-        "Location", "Upload-Offset", "Rebase-Upload-Result"
-    ]
+    exposedHeaders: [...CORS_EXPOSED_HEADERS]
 }));
 ```
 
-<span class="since-badge" data-since="0.25">Da 0.25</span> Gli ultimi tre sono gli header con cui risponde un upload riprendibile. Senza di essi
-l'SDK non può seguirne uno da un'altra origine, e invia ogni file come un'unica
-richiesta multipart.
+<span class="since-badge" data-since="0.25">Da 0.25</span> `CORS_EXPOSED_HEADERS` è l'elenco che espone il runtime stesso, così un
+header che l'SDK inizia a leggere in una versione successiva raggiunge il tuo frontend senza
+modifiche qui. Sono `ETag`, `Retry-After`, `X-Request-ID`, i tre
+header `X-RateLimit-*` e `Preference-Applied`, più `Location`,
+`Upload-Offset` e `Rebase-Upload-Result`, con cui risponde un upload riprendibile (file oltre
+8 MiB). Senza questi tre l'SDK non può seguire un upload da
+un'altra origine, e invia ogni file come un'unica richiesta multipart. Sulla 0.24,
+scrivi l'elenco a mano.
 
 Il runtime di Rebase e il backend ottenuto con `rebase eject` inviano già questo elenco. Sulla 0.23 non espongono nessuno di questi header, quindi un frontend su un'altra origine non legge alcun `ETag`.
 

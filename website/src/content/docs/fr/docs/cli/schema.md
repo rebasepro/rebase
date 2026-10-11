@@ -1,5 +1,5 @@
 ---
-sourceHash: 8fca289475b169ca
+sourceHash: d2dda811dc43afa7
 title: Génération de schéma
 sidebar_label: Génération de schéma
 description: Générez des schémas Drizzle ORM à partir des définitions de collections, créez des migrations SQL et gardez votre base de données synchronisée avec la CLI Rebase.
@@ -155,6 +155,12 @@ rebase db generate
 - Compare le schéma Drizzle avec l'état actuel de la base de données
 - Produit des fichiers de migration SQL horodatés dans `drizzle/migrations/`
 - Les fichiers peuvent être examinés, modifiés et validés dans le contrôle de version
+- <span class="since-badge" data-since="0.25">Depuis 0.25</span> Nomme chaque
+  instruction de la nouvelle migration qui détruit des données, avec la vérification
+  que `db push` exécute avant d'appliquer : une table, colonne, schéma, vue ou type
+  supprimé, un `TRUNCATE`, un changement de type de colonne pouvant perdre des valeurs,
+  ou un changement de clé primaire. Elle écrit quand même le fichier et se termine
+  avec le code 0 : elle avertit, elle ne refuse pas.
 
 Les migrations générées sont de simples fichiers SQL — vous pouvez les inspecter et les modifier avant de les appliquer.
 
@@ -170,6 +176,21 @@ rebase db migrate
 - Lit `drizzle/migrations/` pour les migrations non appliquées
 - Les applique dans l'ordre à la base de données
 - Suit quelles migrations ont été appliquées
+
+<span class="since-badge" data-since="0.25">Depuis 0.25</span> `--refuse-destructive`
+la fait refuser à la place. Elle exécute d'abord à blanc les migrations en attente. Si une
+instruction détruit des données, selon la même vérification que `db push` et
+`db generate`, elle liste ces instructions et se termine avec le code 1. Elle n'applique
+rien, pas même les fichiers qui précèdent cette instruction. Sans l'option, `db migrate`
+se comporte comme avant et applique chaque fichier en attente :
+
+```bash
+rebase db migrate --refuse-destructive
+```
+
+Une migration qui reconstruit une colonne de recherche la supprime d'abord, donc cette
+option refuse aussi cette migration. Lisez la liste qu'elle affiche, puis exécutez
+`rebase db migrate` sans l'option pour l'appliquer.
 
 #### Établir une baseline sur une base de données déjà démarrée par Rebase
 
@@ -212,6 +233,8 @@ Exécutez `doctor` chaque fois que quelque chose semble désynchronisé. Il indi
 La comparaison avec la base de données nécessite `DATABASE_URL` (ou `ADMIN_CONNECTION_STRING`). Sans l'une d'elles, cette phase est signalée comme **ignorée** plutôt que réussie, et l'exécution ne se termine jamais par « All schemas are in sync » — une vérification qui n'a pas eu lieu n'est pas un certificat de bonne santé.
 
 <span class="since-badge" data-since="0.25">Depuis 0.25</span> Il nomme aussi chaque collection sans [bloc `search`](/docs/backend/search) dont la table contient plus d'environ 10 000 lignes. Une recherche dans ce cas — la zone de recherche de l'admin, `.search()`, `?searchString=` — est un `ILIKE '%term%'` sur les colonnes de texte, qu'aucun index ne peut servir ; chacune lit donc toute la table, et son comptage la relit (environ un tiers de seconde pour 100 000 lignes, croissant avec la table). Le nombre de lignes est l'estimation de Postgres lui-même, la vérification ne parcourt donc rien. C'est une indication : elle ne change pas le code de sortie, et rien n'est indexé pour vous.
+
+<span class="since-badge" data-since="0.25">Depuis 0.25</span> Il nomme une **jonction orpheline** : une table `public` qui a la forme d'une jonction many-to-many qu'aucune collection ne déclare. Cette forme, ce sont deux colonnes qui forment ensemble la clé primaire, chacune clé étrangère vers la table d'une collection. Renommer ou supprimer une `manyToMany` laisse son ancienne jonction derrière, car push et le démarrage ne font que créer des tables, et chaque ligne de lien y est toujours. La note est purement informative, elle ne change donc pas le code de sortie. Sa solution est l'instruction `DROP TABLE`, que `doctor` affiche et n'exécute jamais.
 
 ### `rebase generate-sdk`
 
@@ -305,6 +328,7 @@ rebase db migrate
 | Le fichier de schéma ne se met pas à jour | Vérifiez que le chemin `--collections` pointe vers le bon répertoire |
 | La migration montre des changements inattendus | Exécutez `rebase doctor` pour identifier la dérive |
 | `db push` échoue en production | Utilisez `db generate` + `db migrate` à la place |
+| Une migration ne doit pas supprimer de données en CI ou en production | <span class="since-badge" data-since="0.25">Depuis 0.25</span> `rebase db migrate --refuse-destructive` se termine avec le code 1 et n'applique rien quand une instruction en attente détruit des données |
 | `db migrate` échoue sur `already exists (42710)` | Le démarrage ou `db push` a déjà provisionné le schéma — enregistrez-le avec `rebase db migrate --baseline <version>` |
 
 ## Étapes suivantes

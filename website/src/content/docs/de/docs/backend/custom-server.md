@@ -1,5 +1,5 @@
 ---
-sourceHash: b27c45a011cb8c16
+sourceHash: b807a42cae57ce6e
 title: Integration eines eigenen Servers
 sidebar_label: Eigener Server (Express)
 description: Wie Sie Rebase-Datenbank- und Realtime-Dienste in Ihr eigenes benutzerdefiniertes Node.js-Backend einbetten, ohne Hono oder den Rebase-Koordinator zu verwenden.
@@ -235,24 +235,24 @@ Ein eigener Server besitzt seine eigene CORS-Konfiguration, und ein Frontend auf
 ```typescript
 import express from "express";
 import cors from "cors";
+import { CORS_EXPOSED_HEADERS } from "@rebasepro/server";
 
 const app = express();
 app.use(cors({
     origin: ["https://app.example.com"],
     credentials: true,
-    exposedHeaders: [
-        "ETag", "Retry-After", "X-Request-ID",
-        "X-RateLimit-Limit", "X-RateLimit-Remaining", "X-RateLimit-Reset",
-        "Preference-Applied",
-        // Resumable uploads, which the SDK uses for files over 8 MiB
-        "Location", "Upload-Offset", "Rebase-Upload-Result"
-    ]
+    exposedHeaders: [...CORS_EXPOSED_HEADERS]
 }));
 ```
 
-<span class="since-badge" data-since="0.25">Seit 0.25</span> Die letzten drei sind das, worin eine fortsetzbare Übertragung antwortet. Ohne sie kann das
-SDK keine von einem anderen Origin aus verfolgen und sendet jede Datei stattdessen als eine
-einzige Multipart-Anfrage.
+<span class="since-badge" data-since="0.25">Seit 0.25</span> `CORS_EXPOSED_HEADERS` ist die Liste, die die Runtime selbst freigibt. Ein
+Header, den das SDK in einer späteren Version zu lesen beginnt, erreicht Ihr Frontend also ohne
+Änderung an dieser Stelle. Sie besteht aus `ETag`, `Retry-After`, `X-Request-ID`, den drei
+`X-RateLimit-*`-Headern und `Preference-Applied`, dazu `Location`,
+`Upload-Offset` und `Rebase-Upload-Result`, worin eine fortsetzbare Übertragung (Dateien über
+8 MiB) antwortet. Ohne diese drei kann das SDK keine Übertragung von einem anderen Origin aus
+verfolgen und sendet jede Datei stattdessen als eine einzige Multipart-Anfrage. Schreiben Sie die
+Liste auf 0.24 von Hand aus.
 
 Die Rebase-Runtime und das ejected Backend senden diese Liste bereits. Auf 0.23
 geben sie keinen dieser Header frei, sodass ein Frontend auf einem anderen Origin kein `ETag` lesen kann.

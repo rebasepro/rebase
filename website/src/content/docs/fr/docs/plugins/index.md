@@ -1,5 +1,5 @@
 ---
-sourceHash: eff51262efe91a3e
+sourceHash: 38c32f7e5b1fc7ae
 title: Système de plugins
 sidebar_label: Plugins
 description: Étendez Rebase avec des plugins — injectez des composants d'interface, modifiez des collections, ajoutez des actions de barre d'outils et créez des constructeurs de champs personnalisés.
@@ -148,7 +148,7 @@ const enhancementPlugin = useDataEnhancementPlugin();
 ![Data enhancement](/img/data_enhancement.png)
 
 :::caution[Ce plugin envoie des données en dehors de votre machine]
-Le remplissage automatique envoie les valeurs des champs de l'entité à un service hébergé afin de générer une suggestion. Par défaut, ce service est **`https://app.rebase.pro/api/functions/ai`**, géré par Rebase — gratuit d'utilisation, sans configuration, et sans identifiant associé : les requêtes sont anonymes, limitées par un quota de débit plutôt que par l'identité. Votre JWT n'est pas envoyé.
+Le remplissage automatique envoie les valeurs des champs de l'entité à un service hébergé afin de générer une suggestion. Par défaut, ce service est **`https://app.rebase.pro/api/functions/ai`**, géré par Rebase — gratuit d'utilisation, sans configuration, et sans identifiant associé : les requêtes sont anonymes, limitées par un quota de débit plutôt que par l'identité. Votre JWT n'est pas envoyé. L'autocomplétion par barre oblique de l'éditeur envoie aussi du texte : jusqu'à 8 000 caractères de chaque côté du curseur, jamais le document entier.
 
 L'acceptabilité de ce fonctionnement dépend du contenu des champs. Pointez `endpoint` vers votre propre déploiement pour conserver la génération au sein de votre infrastructure :
 

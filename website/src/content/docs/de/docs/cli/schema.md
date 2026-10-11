@@ -1,5 +1,5 @@
 ---
-sourceHash: 8fca289475b169ca
+sourceHash: d2dda811dc43afa7
 title: Schema-Generierung
 sidebar_label: Schema-Generierung
 description: Generieren Sie Drizzle-ORM-Schemas aus Collection-Definitionen, erstellen Sie SQL-Migrationen und halten Sie Ihre Datenbank mit der Rebase-CLI synchron.
@@ -159,6 +159,7 @@ rebase db generate
 - Vergleicht das Drizzle-Schema mit dem aktuellen Datenbankzustand
 - Erzeugt zeitgestempelte SQL-Migrationsdateien in `drizzle/migrations/`
 - Dateien können überprüft, bearbeitet und in die Versionskontrolle committet werden
+- <span class="since-badge" data-since="0.25">Seit 0.25</span> Nennt jede Anweisung der neuen Migration, die Daten zerstört, mit derselben Prüfung, die `db push` vor dem Anwenden ausführt: eine gelöschte Tabelle, Spalte, Schema, View oder ein gelöschter Typ, ein `TRUNCATE`, eine Änderung des Spaltentyps, die Werte verlieren kann, oder eine Änderung des Primärschlüssels. Er schreibt die Datei trotzdem und endet mit Exit-Code 0, warnt also und verweigert nicht.
 
 Die generierten Migrationen sind einfache SQL-Dateien — Sie können sie vor dem Anwenden inspizieren und ändern.
 
@@ -174,6 +175,21 @@ rebase db migrate
 - Liest `drizzle/migrations/` nach nicht angewendeten Migrationen
 - Wendet sie der Reihe nach auf die Datenbank an
 - Verfolgt, welche Migrationen angewendet wurden
+
+<span class="since-badge" data-since="0.25">Seit 0.25</span> `--refuse-destructive`
+lässt ihn stattdessen verweigern. Er führt zuerst einen Probelauf der ausstehenden Migrationen aus. Zerstört
+eine Anweisung Daten, nach derselben Prüfung, die `db push` und `db generate` verwenden, listet er diese
+Anweisungen auf und endet mit Exit-Code 1. Er wendet nichts an, auch nicht die Dateien
+vor dieser Anweisung. Ohne das Flag verhält sich `db migrate` wie bisher und
+wendet jede ausstehende Datei an:
+
+```bash
+rebase db migrate --refuse-destructive
+```
+
+Eine Migration, die eine Suchspalte neu aufbaut, löscht sie zuerst, daher verweigert dieses Flag
+auch diese Migration. Lesen Sie die ausgegebene Liste und führen Sie dann `rebase db migrate`
+ohne das Flag aus, um sie anzuwenden.
 
 #### Baseline für eine Datenbank, gegen die Rebase bereits gebootet hat
 
@@ -214,6 +230,8 @@ rebase doctor
 Führen Sie `doctor` aus, wann immer sich etwas nicht synchron anfühlt. Es zeigt genau, wo die Diskrepanz liegt.
 
 <span class="since-badge" data-since="0.25">Seit 0.25</span> Es nennt außerdem jede Collection ohne [`search`-Block](/docs/backend/search), deren Tabelle mehr als etwa 10.000 Zeilen enthält. Eine Suche dort — das Suchfeld des Admins, `.search()`, `?searchString=` — ist `ILIKE '%term%'` über die Textspalten, was kein Index bedienen kann, sodass jede die ganze Tabelle liest und ihr Count sie erneut liest (etwa eine Drittelsekunde bei 100.000 Zeilen, mit der Tabelle wachsend). Die Zeilenzahl ist die eigene Schätzung von Postgres, die Prüfung scannt also nichts. Es ist ein Hinweis: Der Exit-Code ändert sich nicht, und nichts wird für Sie indiziert.
+
+<span class="since-badge" data-since="0.25">Seit 0.25</span> Es nennt eine **verwaiste Junction**: eine `public`-Tabelle in der Form einer Many-to-many-Junction, die keine Collection deklariert. Die Form sind zwei Spalten, die zusammen den Primärschlüssel bilden und jeweils ein Fremdschlüssel auf die Tabelle einer Collection sind. Das Umbenennen oder Entfernen einer `manyToMany` lässt ihre alte Junction zurück, weil Push und Start nur Tabellen anlegen, und jede Verknüpfungszeile steckt weiterhin darin. Der Hinweis ist nur eine Information und ändert den Exit-Code nicht. Seine Abhilfe ist die `DROP TABLE`-Anweisung, die `doctor` anzeigt und nie ausführt.
 
 ### `rebase generate-sdk`
 
@@ -310,6 +328,7 @@ rebase db migrate
 | Schemadatei wird nicht aktualisiert | Prüfen Sie, ob der `--collections`-Pfad auf das richtige Verzeichnis zeigt |
 | Migration zeigt unerwartete Änderungen | Führen Sie `rebase doctor` aus, um den Drift zu identifizieren |
 | `db push` schlägt in der Produktion fehl | Verwenden Sie stattdessen `db generate` + `db migrate` |
+| Eine Migration darf in CI oder Produktion keine Daten löschen | <span class="since-badge" data-since="0.25">Seit 0.25</span> `rebase db migrate --refuse-destructive` endet mit Exit-Code 1 und wendet nichts an, wenn eine ausstehende Anweisung Daten zerstört |
 | `db migrate` scheitert mit `already exists (42710)` | Start oder `db push` haben das Schema bereits bereitgestellt — halten Sie es mit `rebase db migrate --baseline <version>` fest |
 
 ## Nächste Schritte

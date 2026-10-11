@@ -1,5 +1,5 @@
 ---
-sourceHash: 4e51a8f77f3a6daa
+sourceHash: 63a33a92e55310ba
 title: API REST
 sidebar_label: API REST
 description: Points de terminaison d'API REST générés automatiquement pour chaque collection, avec filtrage, tri, pagination et inclusion de relations.
@@ -120,7 +120,7 @@ Toute valeur autre que `first` ou `last` renvoie une erreur 400, et non un ordre
 
 ## Pagination
 
-Utilisez `limit` et `offset`, ou `page` :
+Utilisez `limit` et `offset`, ou `page` — l'un ou l'autre :
 
 ```bash
 # Limit and offset
@@ -133,6 +133,9 @@ GET /api/data/products?page=3
 La limite par défaut est de **50**, le maximum est de **1000**. Ces deux valeurs proviennent de `DEFAULT_LIST_LIMIT` / `MAX_LIST_LIMIT`, également indiquées dans la spécification OpenAPI générée — une valeur `limit` supérieure au maximum est rejetée plutôt que tronquée.
 
 Ces trois paramètres de fenêtre sont rejetés plutôt que corrigés automatiquement, et chacun renvoie une erreur explicite : `INVALID_LIMIT`, `INVALID_OFFSET` (un entier supérieur ou égal à 0) et `INVALID_PAGE` (un entier supérieur ou égal à 1). Une fenêtre silencieusement différente de celle demandée ne peut pas être distinguée de la fin de la collection, c'est pourquoi aucun d'eux n'est tronqué ni ignoré.
+
+<span class="since-badge" data-since="0.25">Depuis 0.25</span> Pour la même raison, `page` et `offset` ensemble donnent un 400
+`PAGE_WITH_OFFSET`, plutôt que de laisser l'un des deux l'emporter silencieusement.
 
 ### Ignorer le comptage
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: 439048db8ee5b538
+sourceHash: 2ea983a97d1ca602
 title: Configuración de almacenamiento
 sidebar_label: Configuración de almacenamiento
 description: Configure backends de sistema de archivos local, compatibles con S3 o GCS/Firebase Storage para la subida de archivos, imágenes y contenido multimedia.
@@ -138,7 +138,8 @@ no los establezca.
 del objeto almacenado bajo `data`; `GET /api/storage/metadata/*` devuelve los metadatos
 del objeto y, para un objeto privado, el `token` de corta duración;
 `POST /api/storage/metadata` un objeto indexado por las rutas que se enviaron, cada una
-con lo que habría respondido el `GET` para ella (véase más abajo);
+con lo que habría respondido el `GET` para ella (véase más abajo).
+Una carpeta no es un objeto: `/metadata` sobre una clave que termina en `/` es `404` en todos los almacenes, incluso donde S3 o GCS mantienen un marcador `folder/`, así que nunca se acuña un token de descarga para un prefijo;
 `GET /api/storage/sources` devuelve el array de orígenes configurados, con `configured: true`. En un despliegue sin ningún almacenamiento, responde `200 {"data": [], "configured": false}`, mientras que todas las demás rutas responden `501 STORAGE_NOT_CONFIGURED`. `GET /api/auth/config` informa de lo mismo como `storage: false`, así que un cliente puede ahorrarse la pregunta.
 `DELETE /api/storage/file/*` y `POST /api/storage/folder` solo contienen un
 `message`, ya que no hay nada que devolver.

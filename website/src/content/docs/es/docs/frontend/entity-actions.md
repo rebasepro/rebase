@@ -1,5 +1,5 @@
 ---
-sourceHash: db464576272c842b
+sourceHash: e4f5859b26bd6bf1
 title: Acciones de entidad
 sidebar_label: Acciones de entidad
 description: Añade botones de acción personalizados a las entidades para archivar, publicar, exportar, clonar y más.
@@ -85,6 +85,7 @@ Resérvelo para las una o dos acciones que son la razón de abrir el registro. L
 | `showActionsInListView` | `false` | `true` muestra la acción como un icono en cada fila de la vista de lista |
 | `isEnabled` | — | Devuelva `false` para mostrar la acción deshabilitada, como botón o como elemento del menú |
 | `disabledReason` | — | Explica por qué una acción deshabilitada no está disponible: bajo su nombre en el menú y como tooltip de un botón o icono deshabilitado |
+| `nameKey` | — | Una clave de traducción para el nombre. El administrador muestra su traducción en el idioma actual, y `name` donde la clave no tiene ninguna. Las acciones integradas la definen, así que Editar, Copiar y Eliminar siguen el idioma del administrador |
 
 Una acción deshabilitada que no dice por qué parece rota. `disabledReason` recibe las mismas props que `isEnabled`, así que puede nombrar lo que falta:
 

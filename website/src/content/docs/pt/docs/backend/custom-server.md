@@ -1,5 +1,5 @@
 ---
-sourceHash: b27c45a011cb8c16
+sourceHash: b807a42cae57ce6e
 title: Integração com Servidor Customizado
 sidebar_label: Servidor Customizado (Express)
 description: Como incorporar os serviços de Banco de Dados e Realtime do Rebase em seu próprio backend Node.js customizado sem usar o Hono ou o coordenador do Rebase.
@@ -233,24 +233,24 @@ Um servidor customizado é dono da sua própria configuração de CORS, e um fro
 ```typescript
 import express from "express";
 import cors from "cors";
+import { CORS_EXPOSED_HEADERS } from "@rebasepro/server";
 
 const app = express();
 app.use(cors({
     origin: ["https://app.example.com"],
     credentials: true,
-    exposedHeaders: [
-        "ETag", "Retry-After", "X-Request-ID",
-        "X-RateLimit-Limit", "X-RateLimit-Remaining", "X-RateLimit-Reset",
-        "Preference-Applied",
-        // Resumable uploads, which the SDK uses for files over 8 MiB
-        "Location", "Upload-Offset", "Rebase-Upload-Result"
-    ]
+    exposedHeaders: [...CORS_EXPOSED_HEADERS]
 }));
 ```
 
-<span class="since-badge" data-since="0.25">Desde 0.25</span> Os três últimos são aqueles em que um upload retomável responde. Sem eles,
-o SDK não consegue acompanhar um a partir de outra origem, e envia cada arquivo como uma única
-requisição multipart.
+<span class="since-badge" data-since="0.25">Desde 0.25</span> `CORS_EXPOSED_HEADERS` é a lista que o próprio runtime expõe, de modo que um
+cabeçalho que o SDK passe a ler em uma versão posterior chega ao seu frontend sem
+nenhuma mudança aqui. São `ETag`, `Retry-After`, `X-Request-ID`, os três
+cabeçalhos `X-RateLimit-*` e `Preference-Applied`, mais `Location`,
+`Upload-Offset` e `Rebase-Upload-Result`, nos quais um upload retomável (arquivos acima de
+8 MiB) responde. Sem esses três, o SDK não consegue acompanhar um upload a partir de outra
+origem, e envia cada arquivo como uma única requisição multipart. Na 0.24,
+escreva a lista à mão.
 
 O runtime do Rebase e o backend ejetado já enviam essa lista. Na 0.23
 eles não expõem nenhum desses cabeçalhos, então um frontend em outra origem não lê nenhum `ETag`.

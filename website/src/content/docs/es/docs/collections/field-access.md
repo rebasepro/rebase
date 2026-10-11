@@ -1,5 +1,5 @@
 ---
-sourceHash: 2a29a9e6fa3879e6
+sourceHash: cd33d688b582283c
 title: Acceso a campos
 sidebar_label: Acceso a campos
 description: Permisos de lectura y escritura por propiedad según el rol. Un emisor al que las reglas de seguridad de la fila permiten el paso aún así no recibe un campo que sus roles no pueden leer.
@@ -84,7 +84,9 @@ Nombrarla en cualquier otro sitio se rechaza como un campo (consulta [Consultas]
 
 ### Consultas
 
-Un `where`, `orderBy`, `fields`, un `select` de agregación o un `groupBy` que mencione un campo que no puedes leer genera un **400 `FIELD_NOT_READABLE`**. Lo mismo ocurre con una relación que no puedes leer
+Un `where`, `orderBy`, `fields`, un `select` de agregación o un `groupBy` que mencione un campo que no puedes leer genera un **400 `FIELD_NOT_READABLE`**. Lo mismo ocurre con un filtro a través de una relación
+sobre un campo de su destino que no puedes leer (`?author.salary=gt.1`), una ordenación de agregado
+sobre uno (`orderBy=max(staff.salary)`) y una relación que no puedes leer
 nombrada en una ruta anidada (`/departments/1/members`, `/departments/1/members/7`) o
 en una ordenación de agregado (`orderBy=count(members)`):
 
@@ -111,6 +113,15 @@ GET /api/data/staff?salary=gt.100000
 Sin esto, el valor sería legible predicado a predicado: veinte solicitudes equivaldrían a una búsqueda binaria sobre un salario.
 
 El error **indica el nombre del campo**. Es una decisión de diseño, no un descuido: el documento OpenAPI publicado lista cada propiedad de cada colección — se sirve desde la aplicación, no desde el router de datos autenticado — por lo que los nombres de los campos ya son públicos. Ocultar el nombre aquí no protegería nada y respondería a un error tipográfico legítimo del emisor con un "campo desconocido", haciéndole buscar una errata que no existe. **Los nombres de los campos son públicos; los valores de los campos no lo son.**
+
+Salvo los de un campo con `excludeFromApi`. OpenAPI, `list_collections` y el SDK generado
+lo omiten, así que su nombre no es público, y "no legible" confirmaría que existe. Un filtro,
+`orderBy`, `fields`, `include`, `select` o `groupBy` de agregado, o `vector_search` que
+nombre uno recibe exactamente la respuesta de un nombre mal escrito
+— `UNKNOWN_FILTER_FIELD`, `UNKNOWN_ORDER_BY_FIELD`, `UNKNOWN_FIELD`,
+`UNKNOWN_RELATION`, `UNKNOWN_AGGREGATE_FIELD` o `UNKNOWN_VECTOR_PROPERTY`, con el
+mismo mensaje y los mismos detalles — y ninguna respuesta de campo desconocido lo lista entre
+los campos válidos.
 
 ### Escrituras
 

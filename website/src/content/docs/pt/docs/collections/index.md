@@ -1,5 +1,5 @@
 ---
-sourceHash: f08c99f0d9d82678
+sourceHash: 2d930362e74e2a12
 title: Coleções
 sidebar_label: Coleções
 description: As coleções são o bloco de construção fundamental do Rebase — cada coleção é mapeada para uma tabela de banco de dados e define seu esquema, relações, segurança e comportamento de interface.
@@ -252,7 +252,7 @@ Tudo o que segue deve ficar dentro de `admin`.
 | `sideDialogWidth` | `number \| string` | — | Largura do diálogo lateral |
 | `inlineEditing` | `boolean` | `true` | Habilitar edição inline na visualização em planilha/tabela |
 | `defaultSize` | `"xs" \| "s" \| "m" \| "l" \| "xl"` | `"m"` | Densidade padrão das visualizações de lista, tabela e cards (a altura de linha da tabela) |
-| `pagination` | `boolean \| number` | `true` (50) | Habilitar paginação e/ou definir o tamanho da página |
+| `pagination` | `boolean \| number` | `true` (50) | Habilitar paginação e/ou definir o tamanho da página. `false` carrega todas as linhas; em desenvolvimento o console avisa uma vez quando são mais de 10.000 linhas |
 | `listProperties` | `string[]` | — | Propriedades a serem exibidas na visualização de lista |
 | `propertiesOrder` | `string[]` | — | Ordem das colunas na visualização de tabela |
 | `selectionEnabled` | `boolean` | `true` | Habilitar seleção de linhas |

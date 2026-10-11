@@ -1,5 +1,5 @@
 ---
-sourceHash: ec13f8f9c203aae2
+sourceHash: 1d28b55548286a2c
 slug: it/docs/compatibility
 title: Compatibilità
 description: Cosa promette Rebase tra una versione e l'altra e cosa no — i sei contratti con versione, come ciascuno fallisce e cosa può ancora cambiare in una minor.
@@ -270,6 +270,16 @@ ogni singolo avvio perché il confronto non poteva mai coincidere. Il troncament
 costruzione modifica ciò che questo repository *deriva* e non cambia nulla di ciò che un
 qualsiasi database distribuito *contiene*. Questo è il criterio da applicare: non "il nuovo nome è
 migliore?", ma "qualche database esistente deve cambiare?".
+
+L'altro caso in cui un nome può cambiare è un insieme di nomi che non potrebbero mai esistere tutti
+insieme. Una regola che copre più operazioni su una tabella di 42 byte o più derivava
+`<table>_default_admin_write_insert`, `_update` e `_delete`, e tutti e tre venivano troncati agli
+stessi 63 byte. Postgres memorizzava una sola policy, DELETE, e rifiutava ogni INSERT
+e UPDATE dell'admin. Solo quando i nomi di una regola collidono così vengono derivati
+con il suffisso per primo, come `<head>_<hash8>_<op>`. Ogni nome che funziona oggi mantiene
+la sua grafia. Il prossimo avvio o push elimina l'unica policy troncata e crea una
+policy per ciascuna operazione.
+
 L'unica cosa sempre sicura è *riconoscere* un vecchio nome per migrarlo:
 `legacyForeignKeyName` esiste per essere rilevato, mai per essere generato,
 e la baseline blocca anche tali rilevamenti. Rimuoverne uno de-migra silenziosamente

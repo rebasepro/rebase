@@ -1,5 +1,5 @@
 ---
-sourceHash: f08c99f0d9d82678
+sourceHash: 2d930362e74e2a12
 title: Collections
 sidebar_label: Collections
 description: Collections sind der zentrale Baustein von Rebase – jede Collection wird auf eine Datenbanktabelle abgebildet und definiert deren Schema, Relationen, Sicherheit und UI-Verhalten.
@@ -283,7 +283,7 @@ Alle folgenden Optionen gehören in `admin`.
 | `sideDialogWidth` | `number \| string` | — | Breite des seitlichen Dialogs |
 | `inlineEditing` | `boolean` | `true` | Inline-Bearbeitung in der Tabellenansicht aktivieren |
 | `defaultSize` | `"xs" \| "s" \| "m" \| "l" \| "xl"` | `"m"` | Standarddichte der Listen-, Tabellen- und Kartenansicht (die Zeilenhöhe der Tabelle) |
-| `pagination` | `boolean \| number` | `true` (50) | Paginierung aktivieren und/oder Seitengröße festlegen |
+| `pagination` | `boolean \| number` | `true` (50) | Paginierung aktivieren und/oder Seitengröße festlegen. `false` lädt jede Zeile; in der Entwicklung warnt die Konsole einmal, wenn das mehr als 10.000 Zeilen sind |
 | `listProperties` | `string[]` | — | Properties, die in der Listenansicht angezeigt werden sollen |
 | `propertiesOrder` | `string[]` | — | Spaltenreihenfolge in der Tabellenansicht |
 | `selectionEnabled` | `boolean` | `true` | Zeilenauswahl aktivieren |

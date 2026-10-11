@@ -1,5 +1,5 @@
 ---
-sourceHash: 4e51a8f77f3a6daa
+sourceHash: 63a33a92e55310ba
 title: REST API
 sidebar_label: REST API
 description: Automatisch generierte REST-API-Endpunkte für jede Collection, mit Filterung, Sortierung, Paginierung und Einbindung von Relationen.
@@ -133,7 +133,7 @@ sodass die Paginierung über einen Nullable-Schlüssel bei beiden Platzierungen 
 
 ## Paginierung
 
-Verwenden Sie `limit` und `offset`, oder `page`:
+Verwenden Sie `limit` und `offset`, oder `page` — das eine oder das andere:
 
 ```bash
 # Limit and offset
@@ -152,6 +152,9 @@ selbst: `INVALID_LIMIT`, `INVALID_OFFSET` (eine ganze Zahl von 0 oder mehr) und
 `INVALID_PAGE` (eine ganze Zahl von 1 oder mehr). Ein Fenster, das sich stillschweigend
 von dem angeforderten unterscheidet, lässt sich nicht vom Erreichen des Endes der Collection
 unterscheiden, weshalb keines davon gekappt oder ignoriert wird.
+
+<span class="since-badge" data-since="0.25">Seit 0.25</span> Aus demselben Grund sind `page` und `offset` zusammen ein 400 `PAGE_WITH_OFFSET`,
+statt dass eines von beiden stillschweigend gewinnt.
 
 ### Die Zählung überspringen
 

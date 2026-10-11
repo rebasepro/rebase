@@ -1,5 +1,5 @@
 ---
-sourceHash: 781657121510be7a
+sourceHash: 9057ef27ebe60995
 title: Cron Jobs
 sidebar_label: Cron Jobs
 description: Agende tarefas em segundo plano recorrentes com o sistema integrado de cron jobs do Rebase. Defina jobs como arquivos TypeScript, monitore-os no Studio e gerencie-os via REST API.
@@ -381,6 +381,10 @@ const { logs } = await client.cron.getJobLogs("health-check", { limit: 10 });
 await client.cron.toggleJob("health-check", false); // pause
 await client.cron.toggleJob("health-check", true);  // resume
 ```
+
+`triggerJob()` espera a execução terminar e responde com o seu log. Um proxy na frente do
+servidor pode cortar a resposta de um job longo (muitos o fazem aos 60 segundos) enquanto a
+execução em si continua. Nesse caso, leia o resultado em `getJobLogs()`.
 
 `listJobs()` é tipado como `CronJobListing`: `jobs`, mais os campos `skipped`,
 `rejected` e `note` descritos em [Jobs Que Não Estão Lá](#jobs-que-não-estão-lá).

@@ -1,5 +1,5 @@
 ---
-sourceHash: 06f83add20038a66
+sourceHash: 6a0a2927f191087f
 title: Agregaciones y búsqueda
 sidebar_label: Agregaciones y búsqueda
 description: "Cuenta, suma y agrupa con el SDK, filtra dentro de columnas JSON y ejecuta búsquedas de texto completo y vectoriales desde el cliente."
@@ -45,6 +45,21 @@ GET /api/data/orders/aggregate?select=count()&groupBy=customer&orderBy=count:des
 ```
 
 `offset`, `page` u `orderBy` sin `groupBy`, o un cursor en cualquier agregación, es un `400 INVALID_AGGREGATE_WINDOW`: una agregación sin agrupar tiene una fila, y un grupo no es una fila tras la que un cursor pueda continuar.
+
+Desde el SDK, `aggregate()` acepta el mismo `orderBy` que `find()` — una tupla
+`[key, "asc" | "desc"]` o una lista de ellas — donde la clave es una columna de `groupBy`
+o una clave de resultado. Ambas están tipadas: en un modelo generado, una clave que no es
+ninguna de las dos no compila. En proceso (`rebase.data`), los grupos vuelven en el
+mismo orden que por HTTP.
+
+```ts
+const topCustomers = await client.data.orders.aggregate({
+    select: [{ fn: "count" }, { fn: "sum", field: "total" }],
+    groupBy: ["customer"],
+    orderBy: ["sum_total", "desc"],
+    limit: 10
+});
+```
 
 Admite los mismos filtros que el endpoint de listado, por lo que una agregación se puede restringir de la misma manera que un listado:
 

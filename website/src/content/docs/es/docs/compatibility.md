@@ -1,5 +1,5 @@
 ---
-sourceHash: ec13f8f9c203aae2
+sourceHash: 1d28b55548286a2c
 slug: es/docs/compatibility
 title: Compatibilidad
 description: "Lo que Rebase promete entre versiones y lo que no: los seis contratos versionados, cómo falla cada uno y qué puede seguir cambiando en una versión menor."
@@ -170,6 +170,8 @@ La versión 0.13 es el ejemplo práctico. `generateForeignKeyName` aprendió a s
 **Si una derivación es genuinamente errónea**, se cambia para las colecciones creadas *posteriormente*, bajo una estrategia de nomenclatura registrada en el proyecto; nunca de forma retroactiva, y nunca como un efecto secundario de mejorar la función subyacente.
 
 **La única excepción legítima** es un cambio que haga que el código coincida con un nombre que la base de datos *ya tiene*. El ejemplo práctico es el truncamiento de identificadores: Postgres recorta silenciosamente un identificador a 63 bytes, por lo que un nombre de restricción derivado más largo nunca fue el nombre en el catálogo; la derivación estaba describiendo un objeto que no existía bajo esa grafía, y la verificación en arranque volvía a emitir `ADD CONSTRAINT` en cada arranque porque su comparación nunca coincidía. Truncar en la construcción cambia lo que este repositorio *deriva* y no cambia nada sobre lo que cualquier base de datos desplegada *contiene*. Esa es la prueba a aplicar: no «¿es mejor el nuevo nombre?», sino «¿debe cambiar alguna base de datos existente?».
+El otro caso en que un nombre puede cambiar es un conjunto de nombres que nunca podrían existir todos a la vez. Una regla que abarca varias operaciones sobre una tabla de 42 bytes o más derivaba `<table>_default_admin_write_insert`, `_update` y `_delete`, y los tres se cortaban en los mismos 63 bytes. Postgres almacenaba una sola política, DELETE, y rechazaba todo INSERT y UPDATE de administrador. Solo cuando los nombres de una regla colisionan así se derivan con el sufijo primero, como `<head>_<hash8>_<op>`. Todo nombre que funciona hoy conserva su grafía. El siguiente arranque o push elimina la única política truncada y crea una política para cada operación.
+
 Lo único que siempre es seguro es *reconocer* un nombre antiguo para poder migrarlo: `legacyForeignKeyName` existe para ser detectado, nunca para ser generado, y la línea base también fija esas detecciones. Eliminar una revierte silenciosamente la migración de cada base de datos que aún conserve esa grafía.
 
 **El gate.** `tooling/scripts/derived-names.mts` ejecuta un fixture de estrés de nombres (plurales irregulares, una terminación en `ss`, un acrónimo, una unión a partir de un slug en plural, anulaciones explícitas, un slug lo suficientemente largo como para truncarse) a través de ambos productores de DDL de esquema, y renderiza cada identificador que cualquiera de los dos genera:

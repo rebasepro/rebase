@@ -1,5 +1,5 @@
 ---
-sourceHash: 2a29a9e6fa3879e6
+sourceHash: cd33d688b582283c
 title: Accesso ai campi
 sidebar_label: Accesso ai campi
 description: Permessi di lettura e scrittura per proprietà in base al ruolo. Un chiamante ammesso dalle regole di sicurezza della riga non riceve comunque un campo che i suoi ruoli non possono leggere.
@@ -108,7 +108,9 @@ Nominarla altrove viene rifiutato come un campo (vedi [Query](#query)).
 ### Query
 
 Un `where`, `orderBy`, `fields`, `select` aggregata o `groupBy` che fa riferimento a un campo che
-non puoi leggere restituisce un errore **400 `FIELD_NOT_READABLE`**. Lo stesso vale per una relazione che non puoi leggere
+non puoi leggere restituisce un errore **400 `FIELD_NOT_READABLE`**. Lo stesso vale per un filtro attraverso una relazione
+su un campo della sua destinazione che non puoi leggere (`?author.salary=gt.1`), per un ordinamento
+di aggregato su uno di essi (`orderBy=max(staff.salary)`) e per una relazione che non puoi leggere
 nominata in un percorso annidato (`/departments/1/members`, `/departments/1/members/7`) o
 in un ordinamento di aggregato (`orderBy=count(members)`):
 
@@ -141,6 +143,15 @@ dall'app, non dal router dei dati autenticato — quindi i nomi dei campi sono g
 Nascondere il nome qui non proteggerebbe nulla e risponderebbe a un banale refuso del chiamante
 con "unknown field", spingendolo a cercare un errore di battitura inesistente. **I nomi dei campi
 sono pubblici; i valori dei campi non lo sono.**
+
+Tranne quello di un campo `excludeFromApi`. OpenAPI, `list_collections` e l'SDK generato
+lo omettono, quindi il suo nome non è pubblico, e "non leggibile" ne confermerebbe
+l'esistenza. Un filtro, `orderBy`, `fields`, `include`, la `select` di un aggregato o
+`groupBy`, oppure `vector_search` che ne specifica uno ottiene esattamente la risposta
+di un nome scritto male — `UNKNOWN_FILTER_FIELD`, `UNKNOWN_ORDER_BY_FIELD`, `UNKNOWN_FIELD`,
+`UNKNOWN_RELATION`, `UNKNOWN_AGGREGATE_FIELD` o `UNKNOWN_VECTOR_PROPERTY`, con lo
+stesso messaggio e gli stessi dettagli — e nessuna risposta di campo sconosciuto lo elenca tra i campi
+validi.
 
 ### Scritture
 

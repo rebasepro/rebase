@@ -1,5 +1,5 @@
 ---
-sourceHash: bd7b49238143886e
+sourceHash: 93d644977e36c23b
 slug: de/docs/rls-check
 title: rls-check
 description: Überprüfen Sie Row-Level Security auf jeder PostgreSQL-Datenbank – Supabase, Neon, RDS oder Ihr eigener Server. Schreibgeschützt, keine Registrierung, kein Rebase erforderlich.
@@ -353,7 +353,7 @@ werden beim Lesen von Policies erkannt, sodass eine Rebase-Datenbank während de
 
 ### policy-authenticated-tautology
 
-**Policy gewährt jedem angemeldeten Aufrufer Zugriff auf jede Zeile.** High.
+**Policy gewährt jedem angemeldeten Aufrufer Zugriff auf jede Zeile.** High; Critical für die unten beschriebene Rollentest-Form.
 
 Die korrigierte Form der obigen Prüfung – `rebase.uid() IS NOT NULL AND rebase.uid() <> 'anonymous'` –
 und die Stelle, an der viele aufhören. Sie schließt abgemeldete Aufrufer aus. Was sie jedoch nicht tut,
@@ -365,6 +365,13 @@ die die Datenbank als `rebase.uid() <> ALL (ARRAY['anonymous', 'anon'])` speiche
 `policy.registered()` ist, wird ebenfalls gemeldet: Ihr zusätzliches `NOT rebase.is_anonymous()` hält
 Gäste fern und grenzt ebenfalls keine Zeilen ein, sodass jedes Konto, das kein Gast ist, jede
 Zeile liest. Mit dem Standard `--fail-on high` schlägt ein CI-Lauf, der eine solche Policy scannt, jetzt fehl.
+
+<span class="since-badge" data-since="0.25">Seit 0.25</span> Eine Policy, deren Ausdruck nur
+die Rolle des Aufrufers prüft – `auth.role() = 'authenticated'`, `(auth.jwt() ->> 'role') =
+'authenticated'`, in beliebiger Reihenfolge – wird ebenfalls unter dieser ID gemeldet. Sie ist
+`TO authenticated USING (true)`, als Ausdruck geschrieben, und erhält daher den Schweregrad, den
+[`policy-always-true`](#policy-always-true) dafür vergibt: Critical, oder High, wenn nur die
+`WITH CHECK` einer `UPDATE`-Policy der Rollentest ist.
 
 Das ist das Muster, das eine `users`-Tabelle in ein Verzeichnis aller Adressen auf der Plattform verwandelt,
 lesbar für jeden, der sich registriert hat – und wo die Registrierung offen ist, ist "jeder, der sich

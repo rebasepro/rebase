@@ -1,5 +1,5 @@
 ---
-sourceHash: abfa67cfbfee8f87
+sourceHash: 7954aa8dc7ad5a41
 title: SDK typé — Prise en main
 sidebar_label: Prise en main
 description: Installez et configurez le SDK typé de Rebase pour interagir avec votre backend depuis n'importe quelle application JavaScript ou TypeScript.
@@ -92,6 +92,8 @@ const { data } = await client.data.products.find();
 Lorsque `Database` est fourni, `createRebaseClient` renvoie une instance de `CreateRebaseClientResult<DB>`. Cela associe directement les accesseurs de collection en camelCase sur `client.data` à leurs types correspondants, vous offrant une autocomplétion complète sur les opérations et les types de collections (ex. `client.data.products.find()`).
 
 `collectionsDictionary` associe chaque accesseur au slug utilisé sur le réseau. Passez-le chaque fois qu'un slug n'est pas déjà un nom de propriété valide — `my-notes` n'est accessible sous la forme `client.data.myNotes` que parce que le dictionnaire l'indique.
+
+Quelques noms sur `client.data` sont pris : `collection` est la fonction dynamique `collection(slug)`, et `then`, `toJSON` et `$$typeof` sont laissés tranquilles pour les vérifications de promesse et de sérialisation. Une collection dont l'accesseur serait l'un d'eux est générée sous la forme `<name>Collection` — le slug `collection` devient `client.data.collectionCollection` — et `generate-sdk` affiche un avertissement qui nomme les deux. `client.data.collection("collection")` l'atteint aussi.
 
 ### Noms des champs
 

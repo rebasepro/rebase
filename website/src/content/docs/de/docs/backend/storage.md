@@ -1,5 +1,5 @@
 ---
-sourceHash: 439048db8ee5b538
+sourceHash: 2ea983a97d1ca602
 title: Storage-Konfiguration
 sidebar_label: Storage-Konfiguration
 description: Konfigurieren Sie lokales Dateisystem, S3-kompatible oder GCS/Firebase Storage-Backends für Datei-Uploads, Bilder und Medien.
@@ -126,7 +126,8 @@ image: {
 <span class="since-badge" data-since="0.25">Seit 0.25</span> Eine Auflistung beschreibt jede Datei, die sie zurückgibt: ihre `size` in Bytes und `updated`, wann sie zuletzt geschrieben wurde, bei lokalem Speicher, S3 und GCS, und ihren `contentType` bei lokalem Speicher und GCS. Eine S3-Auflistung trägt den Typ nicht, daher fehlt er bei S3 und `/api/storage/metadata/*` nennt ihn weiterhin. Ein Ordner in `prefixes` trägt keines davon, ebenso wenig ein eigener `StorageController`, der sie nicht setzt.
 
 `POST /api/storage/upload` antwortet mit `201` und den `{ key, bucket, storageUrl }` des gespeicherten Objekts unter `data`; `GET /api/storage/metadata/*` mit den Metadaten des Objekts und, bei einem privaten Objekt, dem kurzlebigen `token`;
-`POST /api/storage/metadata` mit einem Objekt, das nach den gesendeten Pfaden benannt ist und jeweils enthält, was das `GET` dafür geantwortet hätte (siehe unten);
+`POST /api/storage/metadata` mit einem Objekt, das nach den gesendeten Pfaden benannt ist und jeweils enthält, was das `GET` dafür geantwortet hätte (siehe unten).
+Ein Ordner ist kein Objekt: `/metadata` auf einem Schlüssel, der auf `/` endet, ist auf jedem Store `404`, auch dort, wo S3 oder GCS einen `folder/`-Marker führt, sodass für ein Präfix kein Download-Token ausgestellt wird;
 `GET /api/storage/sources` mit dem Array der konfigurierten Quellen und `configured: true`. Auf einem Deployment ganz ohne Storage antwortet es mit `200 {"data": [], "configured": false}`, während jede andere Route mit `501 STORAGE_NOT_CONFIGURED` antwortet. `GET /api/auth/config` meldet dasselbe als `storage: false`, sodass ein Client gar nicht erst fragen muss. `DELETE /api/storage/file/*` und `POST /api/storage/folder` übertragen lediglich eine `message`, da es nichts zurückzugeben gibt.
 
 Bei S3 und GCS muss ein `bucket` einer sein, den die Quelle bedient, bei Schreib- wie bei Lesezugriffen: Ein Upload, ein `POST /api/storage/folder` oder ein TUS-Upload, der einen anderen Bucket nennt, antwortet mit `404 UNKNOWN_STORAGE_SOURCE`, wie die Auflistung. Lokaler Storage legt einen Bucket weiterhin beim ersten Schreiben an.

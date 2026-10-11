@@ -1,5 +1,5 @@
 ---
-sourceHash: db464576272c842b
+sourceHash: e4f5859b26bd6bf1
 title: Azioni entità
 sidebar_label: Azioni entità
 description: Aggiungi pulsanti di azione personalizzati alle entità per archiviare, pubblicare, esportare, clonare e altro ancora.
@@ -85,6 +85,7 @@ Riservatelo alle una o due azioni che sono il motivo per cui si apre il record. 
 | `showActionsInListView` | `false` | `true` mostra l'azione come icona su ogni riga della vista elenco |
 | `isEnabled` | — | Restituite `false` per mostrare l'azione disabilitata, come pulsante o come voce di menu |
 | `disabledReason` | — | Spiega perché un'azione disabilitata non è disponibile: sotto il suo nome nel menu e come tooltip di un pulsante o di un'icona disabilitati |
+| `nameKey` | — | Una chiave di traduzione per il nome. L'admin mostra la sua traduzione nella lingua corrente, e `name` dove la chiave non ne ha. Le azioni integrate la impostano, così Modifica, Copia ed Elimina seguono la lingua dell'admin |
 
 Un'azione disabilitata che non dice perché sembra rotta. `disabledReason` riceve le stesse props di `isEnabled`, quindi può indicare cosa manca:
 

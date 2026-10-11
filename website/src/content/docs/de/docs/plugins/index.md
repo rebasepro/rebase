@@ -1,5 +1,5 @@
 ---
-sourceHash: eff51262efe91a3e
+sourceHash: 38c32f7e5b1fc7ae
 title: Plugin-System
 sidebar_label: Plugins
 description: Erweitern Sie Rebase mit Plugins – injizieren Sie UI-Komponenten, modifizieren Sie Collections, fügen Sie Toolbar-Aktionen hinzu und erstellen Sie benutzerdefinierte Field Builder.
@@ -169,7 +169,8 @@ Autofill sendet die Feldwerte der Entität an einen gehosteten Dienst, um einen
 Vorschlag zu generieren. Standardmäßig ist dieser Dienst **`https://app.rebase.pro/api/functions/ai`**,
 der von Rebase betrieben wird – kostenlos nutzbar, ohne Konfiguration und ohne Anmeldedaten:
 Die Anfragen sind anonym und werden durch Ratenbegrenzung statt durch Identität beschränkt. Ihr
-JWT wird nicht gesendet.
+JWT wird nicht gesendet. Auch die Slash-Autovervollständigung des Editors sendet Text: bis zu 8.000
+Zeichen auf jeder Seite des Cursors, nie das ganze Dokument.
 
 Ob dies akzeptabel ist, hängt davon ab, was in den Feldern enthalten ist. Richten Sie `endpoint` auf
 Ihr eigenes Deployment, um die Generierung innerhalb Ihrer Infrastruktur zu belassen:

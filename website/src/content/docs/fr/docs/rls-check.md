@@ -1,5 +1,5 @@
 ---
-sourceHash: bd7b49238143886e
+sourceHash: 93d644977e36c23b
 slug: fr/docs/rls-check
 title: rls-check
 description: Auditez la sécurité au niveau des lignes (RLS) sur n'importe quelle base de données PostgreSQL — Supabase, Neon, RDS ou votre propre serveur. En lecture seule, sans inscription, sans Rebase requis.
@@ -342,7 +342,7 @@ de la lecture des stratégies, de sorte qu'une base Rebase en cours de migration
 
 ### policy-authenticated-tautology
 
-**La stratégie autorise chaque appelant connecté à accéder à toutes les lignes.** Élevé.
+**La stratégie autorise chaque appelant connecté à accéder à toutes les lignes.** Élevé ; critique pour la forme de test de rôle ci-dessous.
 
 La forme corrigée de la vérification précédente — `rebase.uid() IS NOT NULL AND rebase.uid() <> 'anonymous'` —
 et l'endroit où l'on s'arrête souvent par erreur. Elle exclut effectivement les appelants déconnectés. Ce qu'elle
@@ -352,6 +352,13 @@ peut lire chaque ligne de cette table*, ce qui est une affirmation bien différe
 `NOT rebase.is_anonymous()` supplémentaire écarte les invités et ne restreint aucune ligne non plus, si bien
 que chaque compte qui n'est pas un invité lit chaque ligne. Avec `--fail-on high` par défaut, une exécution
 CI qui analyse une telle stratégie échoue désormais.
+
+<span class="since-badge" data-since="0.25">Depuis 0.25</span> Une stratégie dont l'expression ne fait que
+tester le rôle de l'appelant — `auth.role() = 'authenticated'`, `(auth.jwt() ->> 'role') =
+'authenticated'`, dans un sens comme dans l'autre — est signalée sous cet identifiant aussi. C'est un `TO authenticated
+USING (true)` écrit sous forme d'expression ; elle reçoit donc la sévérité que lui donne
+[`policy-always-true`](#policy-always-true) : critique, ou élevée lorsque seul le
+`WITH CHECK` d'une stratégie `UPDATE` est le test de rôle.
 
 C'est cette structure qui transforme une table `users` en un annuaire de toutes les adresses de la plateforme,
 lisible par quiconque s'inscrit — et là où l'inscription est ouverte, « quiconque s'inscrit » désigne n'importe qui.

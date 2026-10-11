@@ -1,5 +1,5 @@
 ---
-sourceHash: bdc7510e49d0db5c
+sourceHash: 7d1fe8f3e85d948e
 title: Sottoscrizioni Realtime
 sidebar_label: Realtime
 description: Sottoscrivi le modifiche ai dati in tempo reale con l'SDK tipizzato di Rebase utilizzando listener realtime basati su WebSocket.
@@ -139,6 +139,11 @@ client.data.posts.listenById(1, (post) => {
     console.log(post?.tags); // the post's tags, on every update
 }, undefined, { include: ["tags"] });
 ```
+
+**Limiti.** Un frame viene inviato quando cambia la riga stessa, e ogni frame ricarica le relazioni
+incluse. La modifica di una sola riga correlata non invia alcun frame: modificare il nome di un tag non
+aggiorna un post ascoltato con `include: ["tags"]` finché non cambia anche il post. Per seguire
+le righe correlate, ascolta anche la loro collection.
 
 ## Query builder fluent
 

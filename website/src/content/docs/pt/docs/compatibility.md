@@ -1,5 +1,5 @@
 ---
-sourceHash: ec13f8f9c203aae2
+sourceHash: 1d28b55548286a2c
 slug: pt/docs/compatibility
 title: Compatibilidade
 description: O que o Rebase promete entre versões e o que não promete — os seis contratos versionados, como cada um falha e o que ainda pode mudar em uma versão minor.
@@ -277,6 +277,15 @@ boot-ensure reemitia `ADD CONSTRAINT` a cada inicialização porque sua compara�
 coincidia. Truncar na construção altera o que este repositório *deriva* e não altera em
 nada o que qualquer banco de dados implantado *contém*. Esse é o teste a ser aplicado:
 não "o novo nome é melhor?", mas "algum banco de dados existente precisa ser alterado?".
+
+O outro caso em que um nome pode mudar é um conjunto de nomes que nunca poderiam existir todos juntos.
+Uma regra que abrange várias operações em uma tabela de 42 bytes ou mais derivava
+`<table>_default_admin_write_insert`, `_update` e `_delete`, e os três eram cortados nos
+mesmos 63 bytes. O Postgres armazenava uma policy, a de DELETE, e recusava todo INSERT e UPDATE
+de admin. Somente quando os nomes de uma regra colidem assim eles são derivados com o sufixo
+primeiro, como `<head>_<hash8>_<op>`. Todo nome que funciona hoje mantém a sua grafia.
+O próximo boot ou push remove a policy truncada e cria uma policy para cada operação.
+
 A única coisa que é sempre segura é *reconhecer* um nome antigo para migrá-lo:
 `legacyForeignKeyName` existe para ser detectado, nunca para ser gerado, e a linha de
 base (baseline) fixa essas detecções também. Remover uma desfaz silenciosamente a

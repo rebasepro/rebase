@@ -1,5 +1,5 @@
 ---
-sourceHash: bdc7510e49d0db5c
+sourceHash: 7d1fe8f3e85d948e
 title: Abonnements en temps réel
 sidebar_label: Temps réel
 description: Abonnez-vous aux modifications de données en direct avec le SDK typé de Rebase à l'aide d'écouteurs en temps réel basés sur WebSocket.
@@ -161,6 +161,11 @@ client.data.posts.listenById(1, (post) => {
     console.log(post?.tags); // the post's tags, on every update
 }, undefined, { include: ["tags"] });
 ```
+
+**Limites.** Une trame est envoyée lorsque la ligne elle-même change, et chaque trame recharge ses
+relations incluses. Le changement d'une seule ligne liée n'envoie aucune trame : modifier le nom d'un tag ne
+rafraîchit pas un post écouté avec `include: ["tags"]` tant que le post ne change pas lui aussi. Pour suivre
+les lignes liées, écoutez aussi leur collection.
 
 ## Générateur de requêtes fluide (Fluent Query Builder)
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: ec13f8f9c203aae2
+sourceHash: 1d28b55548286a2c
 slug: fr/docs/compatibility
 title: Compatibilité
 description: Ce que Rebase garantit d'une version à l'autre et ce qu'il ne garantit pas — les six contrats versionnés, la manière dont chacun échoue et ce qui peut encore changer dans une version mineure.
@@ -307,6 +307,16 @@ comparaison ne pouvait jamais correspondre. La troncature à la construction mod
 ce que ce dépôt *dérive* sans rien changer à ce qu'une base de données déployée
 *contient*. C'est le test à appliquer : non pas « le nouveau nom est-il meilleur »,
 mais « une base de données existante doit-elle être modifiée ».
+
+L'autre cas où un nom peut changer est celui d'un ensemble de noms qui ne pourraient jamais
+exister tous ensemble. Une règle couvrant plusieurs opérations sur une table de 42 octets ou plus dérivait
+`<table>_default_admin_write_insert`, `_update` et `_delete`, et les trois étaient coupés
+aux mêmes 63 octets. Postgres n'en stockait qu'une, DELETE, et refusait tous les INSERT et
+UPDATE d'administrateur. Ce n'est que lorsque les noms d'une règle entrent ainsi en collision
+qu'ils sont dérivés en plaçant le suffixe en premier, sous la forme `<head>_<hash8>_<op>`.
+Tout nom qui fonctionne aujourd'hui garde son orthographe. Le prochain démarrage ou push
+supprime la stratégie tronquée et en crée une par opération.
+
 La seule opération toujours sûre consiste à *reconnaître* un ancien nom afin de
 pouvoir le migrer : `legacyForeignKeyName` existe pour être détecté, jamais pour être
 généré, et la ligne de référence (baseline) fige également ces détections. En

@@ -1,5 +1,5 @@
 ---
-sourceHash: db464576272c842b
+sourceHash: e4f5859b26bd6bf1
 title: Actions d'entité
 sidebar_label: Actions d'entité
 description: Ajoutez des boutons d'action personnalisés aux entités pour archiver, publier, exporter, cloner, et bien plus encore.
@@ -85,6 +85,7 @@ Réservez-le à la ou aux deux actions qui justifient l'ouverture de l'enregistr
 | `showActionsInListView` | `false` | `true` affiche l'action sous forme d'icône sur chaque ligne de la vue liste |
 | `isEnabled` | — | Renvoyez `false` pour afficher l'action désactivée, en bouton ou en élément de menu |
 | `disabledReason` | — | Indique pourquoi une action désactivée n'est pas disponible : sous son nom dans le menu, et en info-bulle d'un bouton ou d'une icône désactivés |
+| `nameKey` | — | Une clé de traduction pour le nom. L'admin affiche sa traduction dans la langue courante, et `name` lorsque la clé n'en a pas. Les actions intégrées la définissent, si bien que Modifier, Copier et Supprimer suivent la langue de l'admin |
 
 Une action désactivée qui ne dit pas pourquoi a l'air cassée. `disabledReason` reçoit les mêmes props que `isEnabled` et peut donc nommer ce qui manque :
 

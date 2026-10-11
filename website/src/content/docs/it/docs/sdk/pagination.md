@@ -1,5 +1,5 @@
 ---
-sourceHash: a03adef95cbad36c
+sourceHash: 5ea5126e8624cda2
 title: Paginazione
 sidebar_label: Paginazione
 description: Esegui la paginazione di una collezione con limit/offset, numeri di pagina o un cursore keyset — e scopri quando ciascuno smette di essere corretto.
@@ -23,6 +23,11 @@ if (page1.meta.hasMore) {
 // Page-number pagination (1-indexed)
 const page = await client.data.products.find({ page: 2, limit: 20 });
 ```
+
+Usa l'uno o l'altro. <span class="since-badge" data-since="0.25">Da 0.25</span> `page` e `offset` insieme descrivono la stessa finestra
+due volte, e la lettura viene rifiutata con `PAGE_WITH_OFFSET` anziché applicare
+in silenzio `page`. L'SDK la rifiuta prima di qualsiasi richiesta, via HTTP, in-process e
+offline; il server risponde con un 400 a una richiesta grezza che li invia entrambi.
 
 `limit` deve essere un numero intero compreso tra 1 e 1000. Un valore maggiore — o pari a zero,
 negativo o frazionario — viene rifiutato con un 400 `INVALID_LIMIT` invece di essere

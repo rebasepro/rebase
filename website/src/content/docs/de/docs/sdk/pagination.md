@@ -1,5 +1,5 @@
 ---
-sourceHash: a03adef95cbad36c
+sourceHash: 5ea5126e8624cda2
 title: Paginierung
 sidebar_label: Paginierung
 description: Paginieren Sie eine Collection mit Limit/Offset, Seitenzahlen oder einem Keyset-Cursor – und wann die jeweilige Methode nicht mehr korrekt funktioniert.
@@ -23,6 +23,11 @@ if (page1.meta.hasMore) {
 // Page-number pagination (1-indexed)
 const page = await client.data.products.find({ page: 2, limit: 20 });
 ```
+
+Verwenden Sie das eine oder das andere. <span class="since-badge" data-since="0.25">Seit 0.25</span> `page` und `offset` zusammen beschreiben dasselbe Fenster
+doppelt, und der Read wird mit `PAGE_WITH_OFFSET` abgelehnt, anstatt stillschweigend
+`page` anzuwenden. Das SDK lehnt es vor jeder Anfrage ab, über HTTP, In-Process und
+offline; der Server antwortet auf eine Roh-Anfrage, die beides sendet, mit einem 400.
 
 `limit` muss eine ganze Zahl zwischen 1 und 1000 sein. Ein größerer Wert – oder eine Null, ein negativer
 Wert oder ein Bruch – wird mit 400 `INVALID_LIMIT` abgelehnt, anstatt begrenzt zu werden, da eine

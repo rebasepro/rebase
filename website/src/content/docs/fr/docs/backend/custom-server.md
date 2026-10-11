@@ -1,5 +1,5 @@
 ---
-sourceHash: b27c45a011cb8c16
+sourceHash: b807a42cae57ce6e
 title: Intégration de serveur personnalisé
 sidebar_label: Serveur personnalisé (Express)
 description: Comment intégrer les services Rebase Database et Realtime dans votre propre backend Node.js personnalisé sans utiliser Hono ni le coordinateur Rebase.
@@ -236,24 +236,24 @@ que le SDK lit, sans quoi `etagOf(row)` y vaut toujours `undefined` — une écr
 ```typescript
 import express from "express";
 import cors from "cors";
+import { CORS_EXPOSED_HEADERS } from "@rebasepro/server";
 
 const app = express();
 app.use(cors({
     origin: ["https://app.example.com"],
     credentials: true,
-    exposedHeaders: [
-        "ETag", "Retry-After", "X-Request-ID",
-        "X-RateLimit-Limit", "X-RateLimit-Remaining", "X-RateLimit-Reset",
-        "Preference-Applied",
-        // Resumable uploads, which the SDK uses for files over 8 MiB
-        "Location", "Upload-Offset", "Rebase-Upload-Result"
-    ]
+    exposedHeaders: [...CORS_EXPOSED_HEADERS]
 }));
 ```
 
-<span class="since-badge" data-since="0.25">Depuis 0.25</span> Les trois derniers sont ceux dans lesquels répond un téléversement reprenable. Sans eux, le
-SDK ne peut pas en suivre un depuis une autre origine et envoie chaque fichier en une seule
-requête multipart.
+<span class="since-badge" data-since="0.25">Depuis 0.25</span> `CORS_EXPOSED_HEADERS` est la liste que le runtime expose lui-même : un en-tête que
+le SDK se met à lire dans une version ultérieure parvient ainsi à votre frontend sans
+modification ici. Elle contient `ETag`, `Retry-After`, `X-Request-ID`, les trois
+en-têtes `X-RateLimit-*` et `Preference-Applied`, plus `Location`,
+`Upload-Offset` et `Rebase-Upload-Result`, dans lesquels répond un téléversement
+reprenable (fichiers de plus de 8 MiB). Sans ces trois-là, le SDK ne peut pas suivre un
+téléversement depuis une autre origine et envoie chaque fichier en une seule requête
+multipart. Sur la 0.24, écrivez la liste à la main.
 
 Le runtime Rebase et le backend éjecté envoient déjà cette liste. Sur la 0.23
 ils n'exposent aucun de ces en-têtes, si bien qu'un frontend sur une autre origine ne lit aucun `ETag`.

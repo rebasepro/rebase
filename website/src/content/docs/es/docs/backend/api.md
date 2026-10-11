@@ -1,5 +1,5 @@
 ---
-sourceHash: 4e51a8f77f3a6daa
+sourceHash: 63a33a92e55310ba
 title: API REST
 sidebar_label: API REST
 description: Endpoints de la API REST autogenerados para cada colección, con filtrado, ordenación, paginación e inclusión de relaciones.
@@ -120,7 +120,7 @@ Cualquier valor distinto de `first` o `last` devuelve un 400, en lugar de un ord
 
 ## Paginación
 
-Utiliza `limit` y `offset`, o `page`:
+Utiliza `limit` y `offset`, o `page` — uno u otro:
 
 ```bash
 # Limit and offset
@@ -133,6 +133,8 @@ GET /api/data/products?page=3
 El límite predeterminado es **50**, y el máximo es **1000**. Ambos provienen de `DEFAULT_LIST_LIMIT` / `MAX_LIST_LIMIT`, que la especificación OpenAPI generada también reporta; un `limit` superior al máximo se rechaza en lugar de truncarse.
 
 Los tres parámetros de ventana se rechazan en lugar de corregirse, y cada uno indica su error: `INVALID_LIMIT`, `INVALID_OFFSET` (un número entero de 0 o más) e `INVALID_PAGE` (un número entero de 1 o más). Una ventana sutilmente diferente a la solicitada no se puede distinguir de haber llegado al final de la colección, razón por la cual ninguno de ellos se trunca ni se ignora.
+
+<span class="since-badge" data-since="0.25">Desde 0.25</span> Por la misma razón, `page` y `offset` juntos son un 400 `PAGE_WITH_OFFSET`, en lugar de que uno de los dos gane en silencio.
 
 ### Omitir el conteo
 

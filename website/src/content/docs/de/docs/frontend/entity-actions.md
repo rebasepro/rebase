@@ -1,5 +1,5 @@
 ---
-sourceHash: db464576272c842b
+sourceHash: e4f5859b26bd6bf1
 title: Entity-Aktionen
 sidebar_label: Entity-Aktionen
 description: Fügen Sie benutzerdefinierte Aktionsschaltflächen zu Entitäten hinzu, um zu archivieren, zu veröffentlichen, zu exportieren, zu klonen und mehr.
@@ -85,6 +85,7 @@ Reservieren Sie das für die ein oder zwei Aktionen, wegen derer der Datensatz g
 | `showActionsInListView` | `false` | `true` zeigt die Aktion als Symbol in jeder Zeile der Listenansicht |
 | `isEnabled` | — | Geben Sie `false` zurück, um die Aktion deaktiviert anzuzeigen, als Schaltfläche oder als Menüeintrag |
 | `disabledReason` | — | Sagt, warum eine deaktivierte Aktion nicht verfügbar ist: unter ihrem Namen im Menü und als Tooltip einer deaktivierten Schaltfläche oder eines Symbols |
+| `nameKey` | — | Ein Übersetzungsschlüssel für den Namen. Der Admin zeigt dessen Übersetzung in der aktuellen Sprache und `name`, wo der Schlüssel keine hat. Die eingebauten Aktionen setzen ihn, sodass Edit, Copy und Delete der Admin-Sprache folgen |
 
 Eine deaktivierte Aktion, die nicht sagt warum, wirkt defekt. `disabledReason` erhält dieselben Props wie `isEnabled` und kann daher benennen, was fehlt:
 

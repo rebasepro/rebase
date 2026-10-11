@@ -1,5 +1,5 @@
 ---
-sourceHash: bd7b49238143886e
+sourceHash: 93d644977e36c23b
 slug: it/docs/rls-check
 title: rls-check
 description: Esegui l'audit della row-level security su qualsiasi database PostgreSQL — Supabase, Neon, RDS o il tuo server. Di sola lettura, nessuna registrazione, nessun Rebase richiesto.
@@ -345,7 +345,7 @@ schema `auth` precedente alla 1.0 viene comunque verificato.
 
 ### policy-authenticated-tautology
 
-**La policy consente l'accesso a ogni riga a qualsiasi chiamante autenticato.** Alta.
+**La policy consente l'accesso a ogni riga a qualsiasi chiamante autenticato.** Alta; critica per la forma con test sul ruolo descritta più sotto.
 
 La forma corretta del controllo precedente — `rebase.uid() IS NOT NULL AND rebase.uid() <>
 'anonymous'` — e il punto in cui molti si fermano. Esclude i chiamanti non autenticati, ma
@@ -357,6 +357,13 @@ la cui `condition` è `policy.authenticated()` e nient'altro, che il database me
 solo `policy.registered()`: il suo `NOT rebase.is_anonymous()` aggiuntivo tiene fuori gli ospiti
 e non circoscrive comunque alcuna riga, quindi ogni account che non sia un ospite legge ogni
 riga. Con il valore predefinito `--fail-on high`, una CI che scansiona una policy di questo tipo ora fallisce.
+
+<span class="since-badge" data-since="0.25">Da 0.25</span> Con questo id viene segnalata anche una policy la cui espressione
+verifica soltanto il ruolo del chiamante — `auth.role() = 'authenticated'`, `(auth.jwt() ->> 'role') =
+'authenticated'`, in un senso o nell'altro. È `TO authenticated
+USING (true)` scritto come espressione, quindi riceve la gravità che
+[`policy-always-true`](#policy-always-true) assegna a quella: critica, oppure alta quando solo il
+`WITH CHECK` di una policy `UPDATE` è il test sul ruolo.
 
 Questo è il pattern che trasforma una tabella `users` in un elenco di tutti gli indirizzi della
 piattaforma, leggibile da chiunque si sia registrato — e nei casi in cui la registrazione è aperta, "chiunque si sia

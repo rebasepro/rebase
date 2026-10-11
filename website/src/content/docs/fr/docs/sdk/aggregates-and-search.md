@@ -1,5 +1,5 @@
 ---
-sourceHash: 06f83add20038a66
+sourceHash: 6a0a2927f191087f
 title: Agrégats et recherche
 sidebar_label: Agrégats & recherche
 description: "Comptez, additionnez et regroupez avec le SDK, filtrez dans les colonnes JSON, et exécutez des recherches textuelles et vectorielles depuis le client."
@@ -57,6 +57,21 @@ GET /api/data/orders/aggregate?select=count()&groupBy=customer&orderBy=count:des
 agrégat, donne un `400 INVALID_AGGREGATE_WINDOW` : un agrégat non groupé n'a
 qu'une ligne, et un groupe n'est pas une ligne après laquelle un curseur
 pourrait reprendre.
+
+Depuis le SDK, `aggregate()` accepte le même `orderBy` qu'un `find()` — un seul
+tuple `[key, "asc" | "desc"]` ou une liste de tuples — où la clé est une colonne de `groupBy`
+ou une clé de résultat. Les deux sont typés : sur un modèle généré, une clé qui n'est ni
+l'une ni l'autre ne compile pas. En cours de processus (`rebase.data`), les groupes reviennent dans
+le même ordre que via HTTP.
+
+```ts
+const topCustomers = await client.data.orders.aggregate({
+    select: [{ fn: "count" }, { fn: "sum", field: "total" }],
+    groupBy: ["customer"],
+    orderBy: ["sum_total", "desc"],
+    limit: 10
+});
+```
 
 Il accepte les mêmes filtres que le point de terminaison de liste, de sorte qu'un
 agrégat peut être restreint de la même manière qu'un listing :

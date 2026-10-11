@@ -1,5 +1,5 @@
 ---
-sourceHash: bdc7510e49d0db5c
+sourceHash: 7d1fe8f3e85d948e
 title: Suscripciones en tiempo real
 sidebar_label: Tiempo real
 description: Suscríbete a cambios de datos en vivo con el SDK tipado de Rebase utilizando listeners en tiempo real basados en WebSocket.
@@ -139,6 +139,11 @@ client.data.posts.listenById(1, (post) => {
     console.log(post?.tags); // the post's tags, on every update
 }, undefined, { include: ["tags"] });
 ```
+
+**Límites.** Se envía una trama cuando cambia la propia fila, y cada trama recarga sus relaciones
+incluidas. Un cambio solo en una fila relacionada no envía ninguna trama: editar el nombre de una etiqueta no
+refresca un post escuchado con `include: ["tags"]` hasta que el post también cambie. Para seguir
+las filas relacionadas, escucha también su colección.
 
 ## Fluent Query Builder
 

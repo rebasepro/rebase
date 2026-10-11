@@ -1,5 +1,5 @@
 ---
-sourceHash: 2a29a9e6fa3879e6
+sourceHash: cd33d688b582283c
 title: Accès aux champs
 sidebar_label: Accès aux champs
 description: Permissions de lecture et d'écriture par propriété et par rôle. Un appelant autorisé par les règles de sécurité de la ligne ne reçoit toujours pas un champ que ses rôles ne permettent pas de lire.
@@ -84,7 +84,7 @@ retenue en entier. `?include=` l'omet de la ligne, avec son `_count`, par toutes
 
 ### Requêtes
 
-Un `where`, `orderBy`, `fields`, un `select` d'agrégation ou un `groupBy` mentionnant un champ que vous ne pouvez pas lire renvoie une erreur **400 `FIELD_NOT_READABLE`**. Il en va de même pour une relation que vous ne pouvez pas lire, nommée dans un chemin imbriqué (`/departments/1/members`, `/departments/1/members/7`) ou dans un tri d'agrégat (`orderBy=count(members)`) :
+Un `where`, `orderBy`, `fields`, un `select` d'agrégation ou un `groupBy` mentionnant un champ que vous ne pouvez pas lire renvoie une erreur **400 `FIELD_NOT_READABLE`**. Il en va de même pour un filtre à travers une relation sur un champ de sa cible que vous ne pouvez pas lire (`?author.salary=gt.1`), pour un tri d'agrégat sur un tel champ (`orderBy=max(staff.salary)`), et pour une relation que vous ne pouvez pas lire, nommée dans un chemin imbriqué (`/departments/1/members`, `/departments/1/members/7`) ou dans un tri d'agrégat (`orderBy=count(members)`) :
 
 ```http
 GET /api/data/staff?salary=gt.100000
@@ -109,6 +109,15 @@ GET /api/data/staff?salary=gt.100000
 Sans cela, la valeur serait lisible prédicat par prédicat : vingt requêtes équivaudraient à une recherche binaire sur un salaire.
 
 L'erreur **nomme le champ**. C'est un choix délibéré, pas un oubli : le document OpenAPI publié liste chaque propriété de chaque collection — il est servi au niveau de l'application, pas au niveau du routeur de données authentifié — les noms de champs sont donc déjà publics. Masquer le nom ici ne protégerait rien et répondrait à une véritable faute de frappe d'un appelant par "champ inconnu", l'incitant à chercher une erreur de syntaxe inexistante. **Les noms de champs sont publics ; les valeurs des champs ne le sont pas.**
+
+Sauf pour un champ `excludeFromApi`. OpenAPI, `list_collections` et le SDK généré
+l'omettent : son nom n'est donc pas public, et « non lisible » confirmerait son
+existence. Un filtre, `orderBy`, `fields`, `include`, un `select` d'agrégation ou un
+`groupBy`, ou `vector_search` qui en mentionne un obtient exactement la réponse d'un nom mal
+orthographié — `UNKNOWN_FILTER_FIELD`, `UNKNOWN_ORDER_BY_FIELD`, `UNKNOWN_FIELD`,
+`UNKNOWN_RELATION`, `UNKNOWN_AGGREGATE_FIELD` ou `UNKNOWN_VECTOR_PROPERTY`, avec le
+même message et les mêmes détails — et aucune réponse de champ inconnu ne le liste parmi
+les champs valides.
 
 ### Écritures
 

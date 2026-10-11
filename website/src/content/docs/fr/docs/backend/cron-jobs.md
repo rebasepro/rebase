@@ -1,5 +1,5 @@
 ---
-sourceHash: 781657121510be7a
+sourceHash: 9057ef27ebe60995
 title: Tâches Cron
 sidebar_label: Tâches Cron
 description: Planifiez des tâches d'arrière-plan récurrentes grâce au système intégré de tâches cron de Rebase. Définissez des tâches sous forme de fichiers TypeScript, surveillez-les dans Studio et gérez-les via l'API REST.
@@ -410,6 +410,10 @@ const { logs } = await client.cron.getJobLogs("health-check", { limit: 10 });
 await client.cron.toggleJob("health-check", false); // pause
 await client.cron.toggleJob("health-check", true);  // resume
 ```
+
+`triggerJob()` attend la fin de l'exécution et répond avec son journal. Un proxy placé devant le
+serveur peut couper la réponse d'une tâche longue (beaucoup s'arrêtent à 60 secondes) alors que
+l'exécution se poursuit. Lisez alors son résultat via `getJobLogs()`.
 
 `listJobs()` est typé `CronJobListing` : `jobs`, plus les champs `skipped`,
 `rejected` et `note` décrits sous [Les tâches introuvables](#les-tâches-introuvables).

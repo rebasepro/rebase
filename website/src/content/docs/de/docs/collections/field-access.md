@@ -1,5 +1,5 @@
 ---
-sourceHash: 2a29a9e6fa3879e6
+sourceHash: cd33d688b582283c
 title: Feldzugriff
 sidebar_label: Feldzugriff
 description: Lese- und Schreibberechtigungen auf Eigenschaftsebene nach Rolle. Ein Aufrufer, den die Sicherheitsregeln der Zeile durchlassen, erhält dennoch kein Feld, das seine Rollen nicht lesen dürfen.
@@ -108,7 +108,9 @@ Sie anderswo zu benennen, wird wie ein Feld abgelehnt (siehe [Abfragen](#abfrage
 ### Abfragen
 
 Ein `where`, `orderBy`, `fields`, Aggregations-`select` oder `groupBy`, das ein Feld benennt, welches
-Sie nicht lesen können, führt zu einem **400 `FIELD_NOT_READABLE`**. Das gilt auch für eine Relation, die Sie nicht lesen können
+Sie nicht lesen können, führt zu einem **400 `FIELD_NOT_READABLE`**. Das gilt auch für einen Filter über eine Relation
+auf ein Feld ihres Ziels, das Sie nicht lesen können (`?author.salary=gt.1`), für eine Aggregat-Sortierung darüber
+(`orderBy=max(staff.salary)`) und für eine Relation, die Sie nicht lesen können
 und die in einem verschachtelten Pfad (`/departments/1/members`, `/departments/1/members/7`) oder einer
 Aggregat-Sortierung (`orderBy=count(members)`) benannt wird:
 
@@ -141,6 +143,15 @@ wird von der App ausgeliefert, nicht vom authentifizierten Daten-Router – dahe
 bereits öffentlich. Den Namen hier zu verbergen, würde nichts schützen und einen echten Tippfehler
 eines Aufrufers mit „Unbekanntes Feld“ beantworten, was ihn nach einem Schreibfehler suchen ließe,
 den es gar nicht gibt. **Feldnamen sind öffentlich; Feldwerte sind es nicht.**
+
+Außer bei einem `excludeFromApi`-Feld. OpenAPI, `list_collections` und das generierte
+SDK lassen es aus, sein Name ist also nicht öffentlich, und „nicht lesbar“ würde bestätigen, dass
+es existiert. Ein Filter, `orderBy`, `fields`, `include`, Aggregat-`select` oder
+`groupBy` oder `vector_search`, das eines benennt, erhält genau die Antwort, die ein falsch geschriebener Name
+erhält – `UNKNOWN_FILTER_FIELD`, `UNKNOWN_ORDER_BY_FIELD`, `UNKNOWN_FIELD`,
+`UNKNOWN_RELATION`, `UNKNOWN_AGGREGATE_FIELD` oder `UNKNOWN_VECTOR_PROPERTY`, mit derselben
+Nachricht und denselben Details – und keine Unbekanntes-Feld-Antwort listet es unter den gültigen
+Feldern auf.
 
 ### Schreibzugriffe
 

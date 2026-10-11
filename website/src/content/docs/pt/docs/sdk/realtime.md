@@ -1,5 +1,5 @@
 ---
-sourceHash: bdc7510e49d0db5c
+sourceHash: 7d1fe8f3e85d948e
 title: Subscrições em Tempo Real
 sidebar_label: Realtime
 description: Inscreva-se em alterações de dados em tempo real com o SDK tipado do Rebase usando listeners em tempo real baseados em WebSocket.
@@ -139,6 +139,11 @@ client.data.posts.listenById(1, (post) => {
     console.log(post?.tags); // the post's tags, on every update
 }, undefined, { include: ["tags"] });
 ```
+
+**Limites.** Um frame é enviado quando a própria linha muda, e cada frame recarrega as suas relações
+incluídas. Uma mudança apenas em uma linha relacionada não envia nenhum frame: editar o nome de uma tag não
+atualiza um post escutado com `include: ["tags"]` até que o post também mude. Para acompanhar
+as linhas relacionadas, escute também a coleção delas.
 
 ## Fluent Query Builder
 

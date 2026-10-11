@@ -1,5 +1,5 @@
 ---
-sourceHash: 8fca289475b169ca
+sourceHash: d2dda811dc43afa7
 title: Generazione dello Schema
 sidebar_label: Generazione dello Schema
 description: Genera schemi Drizzle ORM dalle definizioni delle collezioni, crea migrazioni SQL e mantieni il tuo database sincronizzato con la CLI di Rebase.
@@ -159,6 +159,11 @@ rebase db generate
 - Confronta lo schema Drizzle con lo stato corrente del database
 - Produce file di migrazione SQL con timestamp in `drizzle/migrations/`
 - I file possono essere revisionati, modificati e committati nel controllo di versione
+- <span class="since-badge" data-since="0.25">Da 0.25</span> Nomina ogni istruzione della nuova
+  migrazione che distrugge dati, usando il controllo che `db push` esegue prima di applicare: una
+  tabella, colonna, schema, vista o tipo eliminati, un `TRUNCATE`, un cambio di tipo di colonna che può
+  perdere valori, o una modifica della chiave primaria. Scrive comunque il file ed esce con 0, quindi
+  avvisa e non rifiuta.
 
 Le migrazioni generate sono semplici file SQL — puoi ispezionarle e modificarle prima di applicarle.
 
@@ -174,6 +179,21 @@ rebase db migrate
 - Legge `drizzle/migrations/` per le migrazioni non applicate
 - Le applica in ordine al database
 - Tiene traccia di quali migrazioni sono state applicate
+
+<span class="since-badge" data-since="0.25">Da 0.25</span> `--refuse-destructive`
+la fa invece rifiutare. Prima esegue una prova a secco (dry run) delle migrazioni in sospeso. Se
+un'istruzione distrugge dati, con lo stesso controllo usato da `db push` e `db generate`, elenca
+quelle istruzioni ed esce con 1. Non applica nulla, nemmeno i file
+precedenti a quell'istruzione. Senza il flag, `db migrate` si comporta come prima e
+applica ogni file in sospeso:
+
+```bash
+rebase db migrate --refuse-destructive
+```
+
+Una migrazione che ricostruisce una colonna di ricerca la elimina prima, quindi questo flag rifiuta
+anche quella migrazione. Leggi l'elenco che stampa, poi esegui `rebase db migrate`
+senza il flag per applicarla.
 
 #### Impostare una baseline su un database che Rebase ha già avviato
 
@@ -214,6 +234,8 @@ rebase doctor
 Esegui `doctor` ogni volta che qualcosa sembra non sincronizzato. Individua esattamente dove si trova la discrepanza.
 
 <span class="since-badge" data-since="0.25">Da 0.25</span> Nomina anche ogni collezione priva di un [blocco `search`](/docs/backend/search) la cui tabella contiene più di circa 10.000 righe. Una ricerca lì — la casella di ricerca dell'admin, `.search()`, `?searchString=` — è un `ILIKE '%term%'` sulle colonne di testo, che nessun indice può servire, quindi ognuna legge l'intera tabella, e il suo conteggio la legge di nuovo (circa un terzo di secondo a 100.000 righe, in crescita con la tabella). Il numero di righe è la stima di Postgres stesso, quindi il controllo non scansiona nulla. È un suggerimento: non cambia il codice di uscita, e nulla viene indicizzato per te.
+
+<span class="since-badge" data-since="0.25">Da 0.25</span> Nomina una **giunzione orfana**: una tabella `public` con la forma di una giunzione many-to-many che nessuna collezione dichiara. La forma è due colonne che insieme formano la chiave primaria, ciascuna una chiave esterna verso la tabella di una collezione. Rinominare o rimuovere una `manyToMany` lascia indietro la vecchia giunzione, perché push e avvio creano soltanto tabelle, e ogni riga di collegamento è ancora al suo interno. La nota è solo informativa, quindi non cambia il codice di uscita. La correzione è l'istruzione `DROP TABLE`, che `doctor` mostra e non esegue mai.
 
 ### `rebase generate-sdk`
 
@@ -307,6 +329,7 @@ rebase db migrate
 | Il file di schema non si aggiorna | Controlla che il percorso `--collections` punti alla directory corretta |
 | La migrazione mostra modifiche impreviste | Esegui `rebase doctor` per identificare la deriva |
 | `db push` fallisce in produzione | Usa `db generate` + `db migrate` invece |
+| Una migrazione non deve eliminare dati in CI o in produzione | <span class="since-badge" data-since="0.25">Da 0.25</span> `rebase db migrate --refuse-destructive` esce con 1 e non applica nulla quando un'istruzione in sospeso distrugge dati |
 | `db migrate` fallisce con `already exists (42710)` | L'avvio o `db push` hanno già predisposto lo schema — registratelo con `rebase db migrate --baseline <version>` |
 
 ## Prossimi Passi

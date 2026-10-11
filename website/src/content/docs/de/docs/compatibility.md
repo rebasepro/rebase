@@ -1,5 +1,5 @@
 ---
-sourceHash: ec13f8f9c203aae2
+sourceHash: 1d28b55548286a2c
 slug: de/docs/compatibility
 title: Kompatibilität
 description: Was Rebase über Versionen hinweg verspricht und was nicht – die sechs versionierten Verträge, wie jeder einzelne fehlschlägt und was sich in einem Minor-Release noch ändern kann.
@@ -312,6 +312,16 @@ Abschneiden bei der Konstruktion ändert, was dieses Repository *ableitet*, und
 ändert nichts daran, was eine deployte Datenbank *enthält*. Das ist der Maßstab,
 den man anlegen muss: Nicht „ist der neue Name besser?“, sondern „muss sich
 irgendeine bestehende Datenbank ändern?“.
+
+Der andere Fall, in dem sich ein Name ändern darf, ist eine Menge von Namen, die nie alle
+existieren könnten. Eine Regel über mehrere Operationen auf einer Tabelle mit 42 Bytes oder mehr leitete
+`<table>_default_admin_write_insert`, `_update` und `_delete` ab, und alle drei wurden bei denselben
+63 Bytes abgeschnitten. Postgres speicherte eine Policy, DELETE, und verweigerte jedes Admin-
+INSERT und -UPDATE. Nur wenn die Namen einer Regel so kollidieren, werden sie
+suffix-zuerst abgeleitet, als `<head>_<hash8>_<op>`. Jeder Name, der heute funktioniert, behält
+seine Schreibweise. Der nächste Boot oder Push löscht die eine abgeschnittene Policy und legt für
+jede Operation eine Policy an.
+
 Was immer sicher ist: einen alten Namen zu *erkennen*, um ihn zu migrieren.
 `legacyForeignKeyName` existiert, um erkannt zu werden, niemals um generiert zu
 werden, und die Baseline fixiert auch diese Erkennungen. Eine davon zu

@@ -1,5 +1,5 @@
 ---
-sourceHash: 4e51a8f77f3a6daa
+sourceHash: 63a33a92e55310ba
 title: API REST
 sidebar_label: API REST
 description: Endpoints de API REST gerados automaticamente para cada coleção, com filtragem, ordenação, paginação e inclusão de relações.
@@ -130,7 +130,7 @@ que a paginação sobre uma chave anulável permanece correta em qualquer posici
 
 ## Paginação
 
-Use `limit` e `offset`, ou `page`:
+Use `limit` e `offset`, ou `page` — um ou outro:
 
 ```bash
 # Limit and offset
@@ -147,6 +147,9 @@ identifica a si próprio: `INVALID_LIMIT`, `INVALID_OFFSET` (um número inteiro 
 `INVALID_PAGE` (um número inteiro maior ou igual a 1). Uma janela silenciosamente
 diferente da solicitada não pode ser diferenciada de ter chegado ao final da coleção,
 razão pela qual nenhum deles é ajustado ou ignorado.
+
+<span class="since-badge" data-since="0.25">Desde 0.25</span> Pelo mesmo motivo, `page` e `offset` juntos resultam em um 400
+`PAGE_WITH_OFFSET`, em vez de um deles prevalecer silenciosamente.
 
 ### Ignorando a contagem
 
