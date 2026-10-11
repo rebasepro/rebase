@@ -223,6 +223,12 @@ const { data } = await client.data.products
 have is a `TypeError` when the query is serialized, not a silently different
 query.
 
+On a client with [generated types](/docs/sdk#typed-sdk-generation), `logical` and `.where(group)`
+check every condition in the tree against the row, the way `where` does: a
+column the row does not have, or a value of the wrong type for the operator
+(`cond("views", "==", "many")` on a number column), is a compile error. A
+relation or JSON path (`author.name`, `metadata->>tier`) is not checked.
+
 ### Negation
 
 `not` negates the **conjunction** of its conditions: `not(a)` is `NOT a`, and

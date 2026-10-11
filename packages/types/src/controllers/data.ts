@@ -125,6 +125,50 @@ export interface FilterCondition {
 }
 
 /**
+ * One {@link FilterCondition} on row type `M`: the column is one of `M`'s and
+ * the value is typed for the operator against that column, exactly as the
+ * fluent `where(column, op, value)` types it. A path that is not a column
+ * (`author.name`, `metadata->>tier`) has nothing to check against and stays
+ * `unknown`, as in {@link WhereFor}.
+ *
+ * An untyped `M` (`Record<string, unknown>`) collapses to plain
+ * `FilterCondition`, so an untyped client is exactly as permissive as before.
+ */
+export type FilterConditionFor<M extends Record<string, unknown>> =
+    | ColumnConditions<M>[keyof ColumnConditions<M>]
+    | { column: NonColumnFieldPath; operator: WhereFilterOp; value: unknown };
+
+/**
+ * Per column, the union of its typed conditions; an index-signature key (an
+ * untyped row) maps to plain {@link FilterCondition}.
+ *
+ * A key-remapped mapped type rather than a conditional over `keyof M`, for the
+ * reason {@link NumericKeyOf} gives: tsc measures the conditional form as
+ * invariant in `M`, and a typed `SDKCollectionClient<Post>` stopped widening to
+ * the wide `SDKCollectionClient`.
+ */
+type ColumnConditions<M extends Record<string, unknown>> = {
+    [K in keyof M as K extends string ? K : never]: string extends K
+        ? FilterCondition
+        : { [Op in WhereFilterOp]: { column: K; operator: Op; value: WhereValueFor<Op, M[K]> } }[WhereFilterOp]
+};
+
+/**
+ * A {@link LogicalCondition} whose every condition, at any depth, is a
+ * {@link FilterConditionFor} row type `M`.
+ *
+ * `cond()` cannot know the row it will be used on, so it returns its column,
+ * operator and value exactly as written; this is where they are checked.
+ * `FindParams.logical` and the builders' `.where(group)` take it, so
+ * `posts.where(or(cond("titel", "==", 1)))` is a compile error on a typed
+ * client rather than the server's 400.
+ */
+export interface LogicalConditionFor<M extends Record<string, unknown>> {
+    type: "and" | "or" | "not";
+    conditions: (FilterConditionFor<M> | LogicalConditionFor<M>)[];
+}
+
+/**
  * How one relation is loaded by {@link FindParams.include}.
  *
  * `true` loads the relation whole. The object form narrows it — the same four
@@ -344,7 +388,7 @@ export interface FindParams<M extends Record<string, unknown> = Record<string, u
      * can't express — notably OR-ing conditions. AND-ed with `where` and
      * `searchString` when present (see the interface docs).
      */
-    logical?: LogicalCondition;
+    logical?: LogicalConditionFor<M>;
     /**
      * Sort order as a `[field, direction]` tuple, or a list of them applied in
      * order of significance — the second key breaks ties on the first, and so on.
@@ -507,7 +551,7 @@ export interface FindResponse<M extends Record<string, unknown> = Record<string,
  */
 export interface QueryBuilderInterface<M extends Record<string, unknown> = Record<string, unknown>> {
     where<K extends keyof M & string, Op extends WhereFilterOp>(column: K, operator: Op, value: WhereValueFor<Op, M[K]>): this;
-    where(logicalCondition: LogicalCondition): this;
+    where(logicalCondition: LogicalConditionFor<M>): this;
     orderBy(column: (keyof M & string) | ComputedSortField, direction?: "asc" | "desc"): this;
     limit(count: number): this;
     offset(count: number): this;
@@ -632,7 +676,7 @@ export interface CollectionAccessor<M extends Record<string, unknown> = Record<s
 
     // Fluent Query Builder
     where<K extends keyof M & string, Op extends WhereFilterOp>(column: K, operator: Op, value: WhereValueFor<Op, M[K]>): QueryBuilderInterface<M>;
-    where(logicalCondition: LogicalCondition): QueryBuilderInterface<M>;
+    where(logicalCondition: LogicalConditionFor<M>): QueryBuilderInterface<M>;
     orderBy(column: (keyof M & string) | ComputedSortField, direction?: "asc" | "desc"): QueryBuilderInterface<M>;
     limit(count: number): QueryBuilderInterface<M>;
     offset(count: number): QueryBuilderInterface<M>;
@@ -819,7 +863,7 @@ export interface AggregateParams<M extends Record<string, unknown> = Record<stri
     /** Filter conditions, as {@link FindParams.where}. */
     where?: WhereFor<M>;
     /** An `and`/`or`/`not` group, AND-ed with `where`. */
-    logical?: LogicalCondition;
+    logical?: LogicalConditionFor<M>;
     /** Text search, AND-ed with the filters. */
     searchString?: string;
     /** Most groups to return. Grouped aggregates only. */
@@ -968,7 +1012,7 @@ export interface SDKQueryBuilderInterface<M extends Record<string, unknown> = Re
      * errors on a typed client.
      */
     where(column: NonColumnFieldPath, operator: WhereFilterOp, value: unknown): this;
-    where(logicalCondition: LogicalCondition): this;
+    where(logicalCondition: LogicalConditionFor<M>): this;
     /**
      * Sort by a column, a relation or JSON path, `_score`, or an aggregate over
      * a to-many relation — the same key set {@link FindParams.orderBy} takes.
@@ -1726,7 +1770,7 @@ export interface SDKCollectionClient<
     where<K extends keyof M & string, Op extends WhereFilterOp>(column: K, operator: Op, value: WhereValueFor<Op, M[K]>): SDKQueryBuilderInterface<M, Inc>;
     /** A relation path (`author.name`) or a JSON path (`metadata->>tier`). */
     where(column: NonColumnFieldPath, operator: WhereFilterOp, value: unknown): SDKQueryBuilderInterface<M, Inc>;
-    where(logicalCondition: LogicalCondition): SDKQueryBuilderInterface<M, Inc>;
+    where(logicalCondition: LogicalConditionFor<M>): SDKQueryBuilderInterface<M, Inc>;
     orderBy(
         column: FieldPath<M> | ComputedSortField | RelationAggregateSort,
         direction?: "asc" | "desc",

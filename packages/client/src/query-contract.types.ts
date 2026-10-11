@@ -23,7 +23,8 @@
  * generated SDK — where `M` is a concrete row type — the documented call was a
  * compile error. Nothing in this repo noticed; a downstream application did.
  */
-import type { AggregateParams, FindParams, FindResult, SDKCollectionClient, SDKQueryBuilderInterface, UpdateValues, WhereFilterOp } from "@rebasepro/types";
+import type { AggregateParams, FindParams, FindResult, LogicalCondition, SDKCollectionClient, SDKQueryBuilderInterface, UpdateValues, WhereFilterOp } from "@rebasepro/types";
+import { and, cond, not, or } from "@rebasepro/common";
 
 /**
  * A row shaped the way a **generated** SDK shapes one: a type alias with a
@@ -49,6 +50,8 @@ type ContractRow = {
     deleted_at: string | null;
     /** A `vector` property. */
     embedding: number[];
+    /** An `enum` property, which codegen emits as a union of literals. */
+    status: "draft" | "published";
 };
 
 /** A to-many relation, which codegen emits as `Array<TargetRow>`. */
@@ -172,6 +175,57 @@ export const paramsArrayContains: FindParams<ContractRow> = {
 /** …and the array-of-tuples form the builder produces from two `.where()` calls. */
 export const paramsRange: FindParams<ContractRow> = {
     where: { age: [[">=", 18], ["<", 65]] }
+};
+
+// ── or()/and()/not()/cond() check against the row they are used on ─────────
+
+/**
+ * `cond` cannot know the row on its own; the place the group is used can.
+ * `logical` and `.where(group)` check every condition in the tree against `M`,
+ * as the object-form `where` does, so a typo'd column is a compile error, not
+ * the server's 400.
+ */
+export const logicalOk: FindParams<ContractRow> = {
+    logical: or(
+        cond("status", "==", "published"),
+        and(cond("age", ">=", 18), cond("tags", "array-contains", "featured")),
+        not(cond("deleted_at", "is-null", null)),
+        cond("author.name", "==", "bob")
+    )
+};
+
+export const logicalTypo: FindParams<ContractRow> = {
+    // @ts-expect-error - "titel" is not a column of ContractRow
+    logical: or(cond("titel", "==", "x"))
+};
+
+export const logicalWrongValue: FindParams<ContractRow> = {
+    // @ts-expect-error - `age` is a number
+    logical: and(cond("age", "==", "many"))
+};
+
+export const logicalEnumTypo: FindParams<ContractRow> = {
+    // @ts-expect-error - "publshed" is not a status
+    logical: not(cond("status", "==", "publshed"))
+};
+
+export const logicalArrayContainsList: FindParams<ContractRow> = {
+    // @ts-expect-error - `array-contains` takes one element, not a list
+    logical: or(cond("tags", "array-contains", ["a"]))
+};
+
+export const fluentLogicalTypo = (qb: SDKQueryBuilderInterface<ContractRow>) =>
+    // @ts-expect-error - "titel" is not a column of ContractRow
+    qb.where(or(cond("titel", "==", 1)));
+
+export const fluentLogicalOk = (qb: SDKQueryBuilderInterface<ContractRow>) =>
+    qb.where(or(cond("status", "==", "draft"), cond("age", "<", 10)));
+
+/** A group built at runtime keeps working where the row is untyped. */
+export const untypedLogical = (qb: SDKQueryBuilderInterface, group: LogicalCondition) => {
+    const built = and();
+    built.conditions.push(cond("anything", "==", 1), group);
+    return qb.where(built).where(group);
 };
 
 // ── what a query computes is readable off the row ──────────────────────────

@@ -906,7 +906,7 @@ class SdkQueryBuilder<M extends Record<string, unknown> = Record<string, unknown
         return this.client.aggregate({
             ...params,
             where: this.params.where as AggregateParams<M>["where"],
-            logical: this.params.logical,
+            logical: this.params.logical as AggregateParams<M>["logical"],
             searchString: this.params.searchString
         });
     }

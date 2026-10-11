@@ -16,11 +16,13 @@ import type {
     AggregateSelect,
     FieldPath,
     FilterCondition,
+    FilterConditionFor,
     FilterValues,
     IncludeOptions,
     IncludeSpec,
     InsertOf,
     LogicalCondition,
+    LogicalConditionFor,
     OrderBySpec,
     QueryComputedFields,
     RowOf,
@@ -36,7 +38,8 @@ import type {
 export type ConsumerCanName = [
     AggregateMeta, AggregateParams, AggregateResult, AggregateRow, AggregateSelect,
     FieldPath, FilterCondition, FilterValues<string>, IncludeOptions, IncludeSpec,
-    InsertOf<Record<string, unknown>>, LogicalCondition, OrderBySpec, QueryComputedFields,
+    InsertOf<Record<string, unknown>>, LogicalCondition, OrderBySpec,
+    FilterConditionFor<Record<string, unknown>>, LogicalConditionFor<Record<string, unknown>>, QueryComputedFields,
     RowOf<Record<string, unknown>>, StorageSource, UpdateOf<Record<string, unknown>>,
     WhereConditionFor<string>, WhereFilterOp, WhereFor<Record<string, unknown>>,
     WhereValueFor<"==", string>, WriteOptions
