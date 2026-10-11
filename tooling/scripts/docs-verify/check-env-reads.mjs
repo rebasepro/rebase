@@ -74,6 +74,8 @@ const NOT_OURS = new Map([
     // libuv's: Node sizes its thread pool from it. Read only to learn how many
     // password hashes a bulk user create can run at once, never to configure
     // anything of Rebase's.
+    // Node's own: read to hand the parent's flags on to a child process.
+    ["NODE_OPTIONS", "Node's own; read to pass the parent's flags on to a child process"],
     ["UV_THREADPOOL_SIZE", "libuv's own; read to size the bulk-create hash concurrency"],
     // Read to *recognise* where the process is running, never set by anyone
     // configuring Rebase. Documenting them would tell a reader to set a
