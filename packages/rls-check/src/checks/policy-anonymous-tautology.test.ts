@@ -359,3 +359,25 @@ describe("policy-anonymous-tautology", () => {
         expect(policyAnonymousTautology.run(unreachable)).toEqual([]);
     });
 });
+
+describe("policy-anonymous-tautology: the printed fix", () => {
+    const on = (columns: string[], platform: ReturnType<typeof snapshot>["platform"] = "supabase") =>
+        policyAnonymousTautology.run(snapshot({
+            platform,
+            relations: [table("public", "orders", { columns })],
+            policies: [policy("public", "orders", "orders_read", { using: "(auth.uid() IS NOT NULL)", roles: ["authenticated"] })]
+        }))[0];
+
+    // `auth.uid()` is a uuid on Supabase: `uuid <> ALL (ARRAY['anonymous', …])`
+    // does not compare, so the suggested line failed when uncommented.
+    it("compares the caller id as text against the sentinels", () => {
+        expect(on(["id", "user_id"]).fix).toContain("auth.uid()::text <> ALL (ARRAY['anonymous', 'anon'])");
+    });
+
+    it("scopes by an owner column the table has, and comments the statement out when there is none", () => {
+        expect(on(["id", "created_by"]).fix).toMatch(/^\s+USING \("created_by" = auth\.uid\(\)\);/m);
+        const none = on(["id", "label"]).fix ?? "";
+        expect(none).not.toMatch(/^ALTER POLICY/m);
+        expect(none).toContain("<owner_column>");
+    });
+});

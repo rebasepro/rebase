@@ -71,9 +71,15 @@ export const currentSettingThrows: Check = {
                             `pass the missing_ok argument in the rule's raw SQL — \`current_setting('${names[0]}', true)\` — ` +
                             `so an unset value denies instead of raising`
                         )
+                        // The policy's own clauses, with the argument added —
+                        // only the clauses that call it. A fixed `USING (tenant_id
+                        // = …)` failed when pasted onto an INSERT policy, which
+                        // has no USING, and named a column the table may not have.
                         : `-- Add the missing_ok argument so an unset value denies instead of raising:\n` +
                         `ALTER POLICY ${qi(policy.name)} ON ${qrel(policy.schema, policy.table)}\n` +
-                        `    USING (tenant_id = current_setting('${names[0]}', true)::uuid);`
+                        clauses
+                            .map((clause) => `    ${clause} (${withMissingOk((clause === "USING" ? policy.using : policy.withCheck) ?? "")})`)
+                            .join("\n") + ";"
                 })
             );
         }
@@ -81,6 +87,43 @@ export const currentSettingThrows: Check = {
         return findings;
     }
 };
+
+/**
+ * The expression with every one-argument `current_setting(...)` given
+ * `missing_ok`. The text is `pg_policies`' deparse, which spells the argument
+ * as a literal, usually cast: `current_setting('app.tenant'::text)`.
+ */
+export function withMissingOk(expr: string): string {
+    let out = "";
+    let i = 0;
+    const call = /current_setting\s*\(/gi;
+    for (let m = call.exec(expr); m; m = call.exec(expr)) {
+        const open = m.index + m[0].length;
+        // Find the call's closing parenthesis, outside string literals, and
+        // whether a comma sits at its top level (the two-argument form).
+        let depth = 1;
+        let topLevelComma = false;
+        let j = open;
+        for (; j < expr.length && depth > 0; j++) {
+            const ch = expr[j];
+            if (ch === "'") {
+                for (j++; j < expr.length; j++) {
+                    if (expr[j] === "'" && expr[j + 1] === "'") j++;
+                    else if (expr[j] === "'") break;
+                }
+            } else if (ch === "(") depth++;
+            else if (ch === ")") depth--;
+            else if (ch === "," && depth === 1) topLevelComma = true;
+        }
+        if (depth !== 0) break;
+        const close = j - 1;
+        if (!topLevelComma) {
+            out += expr.slice(i, close) + ", true";
+            i = close;
+        }
+    }
+    return out + expr.slice(i);
+}
 
 /** Setting names passed to a one-argument `current_setting` call. */
 function singleArgumentSettings(expr: string | null | undefined): string[] {

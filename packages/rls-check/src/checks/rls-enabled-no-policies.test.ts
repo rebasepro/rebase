@@ -52,3 +52,24 @@ describe("rls-enabled-no-policies", () => {
         ).toEqual([]);
     });
 });
+
+describe("rls-enabled-no-policies: the printed fix", () => {
+    // It created a policy on `user_id` for every table, and a table without
+    // one refused the pasted SQL.
+    it("scopes by an owner column the table has", () => {
+        const [f] = rlsEnabledNoPolicies.run(
+            snapshot({ relations: [table("public", "notes", { rlsEnabled: true, columns: ["id", "owner_id"] })] })
+        );
+        expect(f.fix).toMatch(/^CREATE POLICY[^;]*USING \("owner_id" = /m);
+        expect(f.fix).not.toContain("user_id");
+    });
+
+    it("leaves the statement commented when no column looks like the owner", () => {
+        const [f] = rlsEnabledNoPolicies.run(
+            snapshot({ relations: [table("public", "tags", { rlsEnabled: true, columns: ["id", "label"] })] })
+        );
+        expect(f.fix).not.toMatch(/^CREATE POLICY/m);
+        expect(f.fix).toContain("-- CREATE POLICY");
+        expect(f.fix).toContain("<owner_column>");
+    });
+});

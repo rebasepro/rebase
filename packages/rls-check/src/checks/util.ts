@@ -271,6 +271,18 @@ const UNPRINTABLE_ALL = new RegExp(UNPRINTABLE.source, "g");
  * break in it is written as a Unicode-escape identifier (`U&"a\000Ab"`), which
  * names the same object and has no line break to escape a comment with.
  */
+/** Column names that usually hold the id of the row's owner, most likely first. */
+const OWNER_COLUMNS = ["user_id", "owner_id", "created_by", "author_id", "account_id"];
+
+/**
+ * The column a printed fix should scope rows by, when the table has one that
+ * looks like the owner's id. Fixes named `user_id` on every table, and a table
+ * without one rejected the pasted SQL.
+ */
+export function ownerColumnOf(rel: DbRelation | undefined): string | undefined {
+    return OWNER_COLUMNS.find((name) => rel?.columns.some((c) => c.name === name));
+}
+
 export function qi(ident: string): string {
     const doubled = ident.replace(/"/g, '""');
     if (!UNPRINTABLE.test(ident)) return `"${doubled}"`;

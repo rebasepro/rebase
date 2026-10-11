@@ -1,6 +1,6 @@
-import type { Check, DbSnapshot, Finding } from "../types";
+import type { Check, DbRelation, DbSnapshot, Finding } from "../types";
 
-import { callerIdCall, finding, policiesFor, qi, qrel, scannedTables } from "./util";
+import { callerIdCall, finding, ownerColumnOf, policiesFor, qi, qrel, scannedTables } from "./util";
 
 const ID = "rls-enabled-no-policies";
 
@@ -45,10 +45,7 @@ export const rlsEnabledNoPolicies: Check = {
                         `Reads of this table return zero rows and writes are rejected for every ` +
                         `non-owner role. No data is exposed; data is silently missing instead, and ` +
                         `an empty result is indistinguishable from a correctly filtered one.`,
-                    fix:
-                        `-- Either define the policy you intended:\n` +
-                        `CREATE POLICY ${qi(`${rel.name}_select`)} ON ${qrel(rel.schema, rel.name)}\n` +
-                        `    FOR SELECT TO authenticated USING (user_id = ${uidCall});\n` +
+                    fix: definePolicyFix(rel, uidCall) +
                         `-- or, if this table is genuinely meant to be unreadable, drop the grants\n` +
                         `-- instead of relying on an empty policy set:\n` +
                         `-- REVOKE ALL ON ${qrel(rel.schema, rel.name)} FROM PUBLIC;`
@@ -59,3 +56,19 @@ export const rlsEnabledNoPolicies: Check = {
         return findings;
     }
 };
+
+/**
+ * The policy to suggest. It used to name `user_id` on every table, and a table
+ * without one rejected the pasted fix (`column "user_id" does not exist`). A
+ * column that looks like the owner is used; otherwise the template stays a
+ * comment, with the column to fill in.
+ */
+function definePolicyFix(rel: DbRelation, uidCall: string): string {
+    const owner = ownerColumnOf(rel);
+    const create = (column: string) =>
+        `CREATE POLICY ${qi(`${rel.name}_select`)} ON ${qrel(rel.schema, rel.name)}\n` +
+        `    FOR SELECT TO authenticated USING (${column} = ${uidCall});\n`;
+    if (owner) return `-- Either define the policy you intended:\n` + create(qi(owner));
+    return `-- Either define the policy you intended, naming the column that holds the row's owner:\n` +
+        create("<owner_column>").split("\n").map((line) => (line ? `-- ${line}` : line)).join("\n");
+}

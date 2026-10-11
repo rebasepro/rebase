@@ -1,4 +1,4 @@
-import type { Check, DbPolicy, DbSnapshot, Finding, Severity } from "../types";
+import type { Check, DbPolicy, DbRelation, DbSnapshot, Finding, Severity } from "../types";
 import { SEVERITIES } from "../types";
 
 import {
@@ -7,9 +7,11 @@ import {
     isRebaseManagedPolicy,
     listAnd,
     managedPolicyFix,
+    ownerColumnOf,
     policyReachedBy,
     qi,
-    qrel
+    qrel,
+    relationAt
 } from "./util";
 
 const ID = "policy-anonymous-tautology";
@@ -121,12 +123,12 @@ export const policyAnonymousTautology: Check = {
                             "of an id — `access: \"authenticated\"` compiled to exactly this shape before 1.0, " +
                             "so a database pushed then still carries it"
                         )
-                        : `-- Scope the policy to the row's owner rather than to the existence of an id:\n` +
-                        `ALTER POLICY ${qi(policy.name)} ON ${qrel(policy.schema, policy.table)}\n` +
-                        `    USING (user_id = ${uidCall});\n` +
+                        : scopeToOwnerFix(policy, relationAt(snapshot, policy.schema, policy.table), uidCall) +
                         `-- If the intent really is "any signed-in user", exclude every id your stack has\n` +
                         `-- ever used for "nobody" — one literal is not enough:\n` +
-                        `--     USING (${uidCall} IS NOT NULL AND ${uidCall} <> ALL (ARRAY['anonymous', 'anon']));`
+                        // `::text`: Supabase's `auth.uid()` is a uuid, and `uuid <> text` does
+                        // not compare — the line failed when uncommented.
+                        `--     USING (${uidCall} IS NOT NULL AND ${uidCall}::text <> ALL (ARRAY['anonymous', 'anon']));`
                 })
             );
         }
@@ -612,4 +614,21 @@ function literalList(inner: string): string[] | null {
         out.push(m[1]);
     }
     return out.length > 0 ? out : null;
+}
+
+/**
+ * `ALTER POLICY … USING (<owner> = <uid>)`, by a column the table has. It named
+ * `user_id` on every table, which a table without one refused when pasted; with
+ * no owner-looking column the statement stays a comment with a blank to fill.
+ */
+function scopeToOwnerFix(policy: DbPolicy, rel: DbRelation | undefined, uidCall: string): string {
+    const owner = ownerColumnOf(rel);
+    const clause = policy.command === "INSERT" ? "WITH CHECK" : "USING";
+    const statement =
+        `ALTER POLICY ${qi(policy.name)} ON ${qrel(policy.schema, policy.table)}\n` +
+        `    ${clause} (${owner ? qi(owner) : "<owner_column>"} = ${uidCall});\n`;
+    if (owner) return `-- Scope the policy to the row's owner rather than to the existence of an id:\n` + statement;
+    return `-- Scope the policy to the row's owner rather than to the existence of an id,\n` +
+        `-- naming the column that holds it:\n` +
+        statement.split("\n").map((line) => (line ? `-- ${line}` : line)).join("\n");
 }
