@@ -126,7 +126,7 @@ export function AddKanbanColumnAction({
                 )}
                 onClick={() => setDialogOpen(true)}
             >
-                <IconButton className="opacity-60 hover:opacity-100">
+                <IconButton aria-label={t("studio_add_kanban_column")} className="opacity-60 hover:opacity-100">
                     <PlusIcon/>
                 </IconButton>
                 <Typography variant="caption" color="secondary" className="mt-2">

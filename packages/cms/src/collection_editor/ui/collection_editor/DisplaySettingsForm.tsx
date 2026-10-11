@@ -1,7 +1,7 @@
 
 import { FieldCaption } from "../../_cms_internals";
 import React, { useMemo, useState } from "react";
-import { useCustomizationController } from "@rebasepro/app";
+import { useCustomizationController, useTranslation } from "@rebasepro/app";
 import { getFieldConfig } from "../../../components/field_configs";
 import { PropertyConfigBadge } from "../../../components/PropertyConfigBadge";
 import { Property } from "@rebasepro/types";
@@ -34,6 +34,7 @@ export function DisplaySettingsForm({
     expandKanban?: boolean;
     standalone?: boolean;
 }) {
+    const { t } = useTranslation();
 
     const {
         values,
@@ -130,7 +131,7 @@ export function DisplaySettingsForm({
                                                 );
                                             }}
                                             endAdornment={values.orderProperty ? (
-                                                <IconButton
+                                                <IconButton aria-label={t("clear")}
                                                     size="small"
                                                     onClick={(e) => {
                                                         e.stopPropagation();
@@ -263,7 +264,7 @@ hideFromCollection: true }
                                         setFieldValue("sideDialogWidth", Number(value));
                                     }
                                 }}
-                                endAdornment={<IconButton
+                                endAdornment={<IconButton aria-label={t("clear")}
                                     size={"small"}
                                     onClick={() => {
                                         setFieldValue("sideDialogWidth", null);

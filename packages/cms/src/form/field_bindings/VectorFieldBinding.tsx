@@ -1,3 +1,4 @@
+import { useTranslation } from "@rebasepro/app";
 import type { FieldProps } from "../../types/fields";
 import type { VectorProperty } from "@rebasepro/types";
 import React, { useState, useEffect, useCallback } from "react";
@@ -38,6 +39,7 @@ export function VectorFieldBinding({
     hideLabel,
     size = "large"
 }: FieldProps<VectorProperty>) {
+    const { t } = useTranslation();
     const isVectorObject = (val: unknown): val is { value: number[] } => {
         return typeof val === "object" && val !== null && "value" in val;
     };
@@ -138,7 +140,7 @@ export function VectorFieldBinding({
                                     </Button>
                                 )}
                                 {isPopulated && !disabled && (
-                                    <IconButton size="small" onClick={handleClearClick} className="text-text-secondary hover:text-red-500">
+                                    <IconButton aria-label={t("clear")} size="small" onClick={handleClearClick} className="text-text-secondary hover:text-red-500">
                                         <Trash2Icon size={14} />
                                     </IconButton>
                                 )}

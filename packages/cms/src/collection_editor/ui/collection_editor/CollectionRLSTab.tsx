@@ -183,6 +183,7 @@ function sameRoles(a: readonly string[] | undefined, b: readonly string[] | unde
 }
 
 export function CollectionRLSTab() {
+    const { t } = useTranslation();
     const { values, setFieldValue } = useFormex<CollectionWithSecurity>();
     // The rule being edited is held by its position: an unnamed rule has no
     // name to find it by, and matching `rule.name` against the editor's empty
@@ -374,7 +375,7 @@ export function CollectionRLSTab() {
                                     })}>
                                         EDIT
                                     </Button>
-                                    <IconButton size="small" disabled={readOnly} onClick={() => {
+                                    <IconButton aria-label={t("delete")} size="small" disabled={readOnly} onClick={() => {
                                         // By position, for the reason editing is: filtered
                                         // by `name`, every unnamed rule went with this one.
                                         setFieldValue("securityRules", rules.filter((_r: SecurityRule, i: number) => i !== index));

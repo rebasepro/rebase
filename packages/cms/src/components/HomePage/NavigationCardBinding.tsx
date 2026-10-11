@@ -6,7 +6,7 @@ import { IconButton, StarIcon, Tooltip } from "@rebasepro/ui";
 import { NavigationCard } from "./NavigationCard";
 import { SmallNavigationCard } from "./SmallNavigationCard";
 import React from "react";
-import { useRebaseContext, useSlot } from "@rebasepro/app";
+import { useRebaseContext, useSlot, useTranslation } from "@rebasepro/app";
 import { IconForView } from "@rebasepro/app";
 import { useUserConfigurationPersistence } from "@rebasepro/app";
 
@@ -37,6 +37,7 @@ export function NavigationCardBinding({
     onClick?: () => void,
     shrink?: boolean // <-- add shrink prop type
 }) {
+    const { t } = useTranslation();
 
     const userConfigurationPersistence = useUserConfigurationPersistence();
     const collectionIcon = <IconForView collectionOrView={collection ?? view} size={"small"}/>;
@@ -48,7 +49,7 @@ export function NavigationCardBinding({
 
     const actionsArray: React.ReactNode[] = userConfigurationPersistence
         ? [
-            <IconButton
+            <IconButton aria-label={favourite ? t("remove_from_favourites") : t("add_to_favourites")}
                 key={"favourite"}
                 size={"small"}
                 // An empty star on every card is a row of identical icons

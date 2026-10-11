@@ -247,7 +247,7 @@ export function BackupsView() {
                     <Chip size="smallest" className="bg-surface-raised text-surface-600 dark:text-surface-300">{backups.length}</Chip>
                     <Chip size="smallest" className="bg-surface-raised text-surface-500 dark:text-surface-400 uppercase font-mono text-[10px]">{destinationKind}</Chip>
                 </div>
-                <IconButton size="small" onClick={load} title={t("refresh_data")}>
+                <IconButton aria-label={t("refresh_data")} size="small" onClick={load} title={t("refresh_data")}>
                     <RefreshCwIcon size={iconSize.smallest}/>
                 </IconButton>
             </div>

@@ -1,3 +1,4 @@
+import { useTranslation } from "@rebasepro/app";
 import React, { useState, useCallback, useMemo, useEffect } from "react";
 import {
     Button,
@@ -370,6 +371,7 @@ function CustomKeyValueSection({
     onAdd: () => void;
     onRemove: (index: number) => void;
 }) {
+    const { t } = useTranslation();
     return (
         <div>
             <div className="flex items-center justify-between mb-2">
@@ -410,11 +412,11 @@ function CustomKeyValueSection({
                             className="flex-1"
                             inputClassName="font-mono text-xs"
                         />
-                        <IconButton
+                        <IconButton aria-label={t("remove")}
                             size="small"
                             onClick={() => onRemove(i)}
                             className="text-text-secondary hover:text-red-500 shrink-0"
-                            title="Remove"
+                            title={t("remove")}
                         >
                             <XIcon size={iconSize.small} />
                         </IconButton>

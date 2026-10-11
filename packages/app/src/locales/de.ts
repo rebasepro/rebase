@@ -1529,5 +1529,21 @@ export const de: RebaseTranslations = {
     insights_previous_period_value_one: "Vortag: {{value}}",
     insights_change_up: "Anstieg: {{change}}",
     insights_change_down: "Rückgang: {{change}}",
-    insights_change_none: "Unverändert"
+    insights_change_none: "Unverändert",
+
+    // ─── Icon button names ───────────────────────────────────────
+    add_to_favourites: "Zu Favoriten hinzufügen",
+    remove_from_favourites: "Aus Favoriten entfernen",
+    change_value_type: "Typ ändern",
+    refresh: "Aktualisieren",
+    create_branch: "Branch erstellen",
+    new_tab: "Neuer Tab",
+    close_tab: "Tab schließen",
+    help: "Hilfe",
+    copy_table_name: "Tabellennamen kopieren",
+    copy_column_name: "Spaltennamen kopieren",
+    generate_sql_templates: "SQL-Vorlagen erzeugen",
+    select_row: "{{id}} auswählen",
+    select: "Auswählen",
+    open_view: "Ansicht öffnen"
 };

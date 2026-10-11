@@ -2,7 +2,7 @@
 import React from "react";
 import { deepEqual as equal } from "fast-equals"
 
-import { AIModifiedIndicator } from "@rebasepro/app";
+import { AIModifiedIndicator, useTranslation } from "@rebasepro/app";
 import { Properties, Property } from "@rebasepro/types";
 import { AdditionalFieldDelegate } from "@rebasepro/cms-types";
 import { isPropertyBuilder } from "@rebasepro/common";
@@ -207,6 +207,7 @@ export function PropertyTreeEntry({
     onPropertyRemove?: (propertyKey: string, namespace?: string) => void;
     inferredPropertyKeys?: string[];
 }) {
+    const { t } = useTranslation();
 
     const {
         attributes,
@@ -310,7 +311,7 @@ export function PropertyTreeEntry({
 
                     <Menu
                         trigger={
-                            <IconButton
+                            <IconButton aria-label={t("more_actions")}
                                 size="smallest"
                             >
                                 <MoreVerticalIcon size={iconSize.smallest}/>

@@ -276,7 +276,7 @@ function StorageUpload({
                 showExpandIcon={true}
                 selected={selected}
                 openPopup={!disabled ? openPopup : undefined}>
-                <IconButton
+                <IconButton aria-label={t("edit")}
                     size={"small"}
                     onClick={open}>
                     <PencilIcon className={"text-surface-500"}/>

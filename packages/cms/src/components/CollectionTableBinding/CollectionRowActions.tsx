@@ -207,7 +207,7 @@ export const CollectionRowActions = function CollectionRowActions({
 
                     {hasCollapsedActions &&
                         <Menu
-                            trigger={<IconButton
+                            trigger={<IconButton aria-label={t("more_actions")}
                                 size={iconSize}>
                                 <MoreVerticalIcon/>
                             </IconButton>}>
@@ -233,8 +233,9 @@ export const CollectionRowActions = function CollectionRowActions({
                     }
 
                     {selectionEnabled &&
-                        <Tooltip title={`Select ${entity.id}`}>
+                        <Tooltip title={t("select_row", { id: String(entity.id) })}>
                             <Checkbox
+                                aria-label={t("select_row", { id: String(entity.id) })}
                                 size={"smallest"}
                                 checked={Boolean(isSelected)}
                                 onCheckedChange={onCheckedChange}

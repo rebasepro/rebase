@@ -272,6 +272,15 @@ tooling/scripts/casts-baseline.json; growth fails, and so does a shrink that
 was not banked, so a cleanup's room is not spent by the next cast.`
     },
     {
+        run: "check:icon-button-names",
+        why: `An icon-only button with no name is announced as "button". The admin had
+about 60 of them — the table row's menu, a list's remove button, the
+collection editor's delete icons — after the kit's tooltip learned to name the
+ones it wraps. Every IconButton in package source carries an aria-label (a
+translated one in the admin), forwards its props, or sits directly in a
+Tooltip with a title; any other site fails, by file and line.`
+    },
+    {
         run: "check:auth-sql-tests",
         why: `The MFA challenge cap and the code-replay guard each rest on one SQL
 statement, and for months their only tests mocked drizzle-orm or drove the

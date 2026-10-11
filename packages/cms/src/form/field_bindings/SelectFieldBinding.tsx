@@ -1,3 +1,4 @@
+import { useTranslation } from "@rebasepro/app";
 import type { FieldProps } from "../../types/fields";
 import type { NumberProperty, StringProperty } from "@rebasepro/types";
 import React, { useCallback } from "react";
@@ -32,6 +33,7 @@ export function SelectFieldBinding({
     hideLabel,
     size = "large"
 }: FieldProps<StringProperty | NumberProperty>) {
+    const { t } = useTranslation();
 
     const enumValues = resolveEnumValues(property.enum ?? []);
 
@@ -65,7 +67,7 @@ export function SelectFieldBinding({
                         className={"h-8 text-text-secondary dark:text-text-secondary-dark ml-3.5 my-0"}
                     />)}
                 endAdornment={
-                    property.admin?.clearable && !disabled && <IconButton
+                    property.admin?.clearable && !disabled && <IconButton aria-label={t("clear")}
                         size="small"
                         onClick={handleClearClick}>
                         <XIcon/>

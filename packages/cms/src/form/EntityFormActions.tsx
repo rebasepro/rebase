@@ -4,7 +4,8 @@ import type { EntityAction, AdminCollection } from "@rebasepro/cms-types";
 import React from "react";
 import { Entity } from "@rebasepro/types";
 import type { EntityFormActionsProps } from "../types/components/EntityFormActionsProps";
-import { getIcon } from "@rebasepro/app";
+import { getIcon, useTranslation } from "@rebasepro/app";
+import { entityActionName } from "../util/entity_actions";
 import {
     AlertCircleIcon,
     Button,
@@ -40,6 +41,7 @@ export function EntityFormActions({
     formContext,
     showDefaultActions = true
 }: EntityFormActionsProps) {
+    const { t } = useTranslation();
 
     return buildBottomActions({
         path,
@@ -53,7 +55,8 @@ export function EntityFormActions({
         navigateBack,
         formContext,
         formex,
-        showDefaultActions
+        showDefaultActions,
+        t
     });
 }
 
@@ -72,6 +75,8 @@ type ActionsViewProps<M extends Record<string, unknown>> = {
     formex: FormexController<Record<string, unknown>>;
     showDefaultActions: boolean;
     className?: string;
+    /** Names the entity actions in the admin language. */
+    t: (key: string, vars?: Record<string, string | number>) => string;
 };
 
 function buildBottomActions<M extends Record<string, unknown>>({
@@ -88,7 +93,8 @@ function buildBottomActions<M extends Record<string, unknown>>({
     formContext,
     formex,
     showDefaultActions,
-    className
+    className,
+    t
 }: ActionsViewProps<M>) {
 
     const hasErrors = Object.keys(formex.errors).length > 0 && formex.submitCount > 0;
@@ -111,7 +117,7 @@ function buildBottomActions<M extends Record<string, unknown>>({
         }
         {entityActions.length > 0 && <div className="grow flex overflow-auto no-scrollbar">
             {entityActions.map(action => (
-                <IconButton
+                <IconButton aria-label={entityActionName(action, t)}
                     key={action.name}
                     onClick={(event: React.MouseEvent<HTMLButtonElement, MouseEvent>) => {
                         event.stopPropagation();

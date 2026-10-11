@@ -6,6 +6,7 @@ import { Typography } from "../../components/Typography";
 import { Checkbox } from "../../components/Checkbox";
 import { DefaultCellRenderer } from "./DefaultCellRenderer";
 import { cls } from "../../util";
+import { useUiLabels } from "../../hooks/UiLabelsContext";
 import { cardSelectedMixin, fieldBackgroundMixin } from "../../styles";
 import type {
     CollectionPropertyConfig,
@@ -61,6 +62,7 @@ export function CollectionCardView<T extends Record<string, unknown> = Record<st
     emptyComponent,
     className,
 }: CollectionCardViewProps<T>) {
+    const labels = useUiLabels();
     const order = useMemo(
         () => propertiesOrder ?? Object.keys(properties),
         [propertiesOrder, properties]
@@ -187,6 +189,7 @@ export function CollectionCardView<T extends Record<string, unknown> = Record<st
                             onClick={(e) => e.stopPropagation()}
                         >
                             <Checkbox
+                                aria-label={labels.select}
                                 checked={extra.selected}
                                 onCheckedChange={extra.onSelectionChange}
                                 size="small"
@@ -237,7 +240,7 @@ export function CollectionCardView<T extends Record<string, unknown> = Record<st
                 </Card>
             );
         },
-        [titlePropertyKey, imageProperty, previewProperties, cellRenderer, selectionEnabled]
+        [titlePropertyKey, imageProperty, previewProperties, cellRenderer, selectionEnabled, labels]
     );
 
     return (

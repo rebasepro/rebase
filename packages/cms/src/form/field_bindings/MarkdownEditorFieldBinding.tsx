@@ -2,7 +2,7 @@ import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } fr
 import { resourceKeyOf, storageReference } from "@rebasepro/types";
 import { FieldHelperText } from "../components/FieldHelperText";
 import { LabelWithIcon } from "../components/LabelWithIcon";
-import { useAuthController, useStorageSource } from "@rebasepro/app";
+import { useAuthController, useStorageSource, useTranslation } from "@rebasepro/app";
 import { useStorageSources } from "@rebasepro/app";
 import { resolveStorageSource } from "@rebasepro/common";
 import { getIconForProperty } from "../../util/property_utils";
@@ -86,6 +86,7 @@ export function MarkdownEditorFieldBinding({
     context,
     customProps
 }: FieldProps<StringProperty, MarkdownEditorFieldProps>) {
+    const { t } = useTranslation();
 
     const authController = useAuthController();
     const disabled = disabledProp || isSubmitting;
@@ -261,7 +262,7 @@ export function MarkdownEditorFieldBinding({
             <div
                 className={cls("relative rounded-md", fieldBackgroundMixin, disabled ? fieldBackgroundDisabledMixin : fieldBackgroundHoverMixin)}>
                 {property.admin?.clearable && !disabled && (
-                    <IconButton
+                    <IconButton aria-label={t("clear")}
                         size="small"
                         className="absolute bottom-1 right-1 z-10"
                         onClick={(e) => {

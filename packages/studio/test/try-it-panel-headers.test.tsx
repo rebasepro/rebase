@@ -20,6 +20,7 @@ const session: { user: { uid: string; email: string; roles: string[] } | null; c
 
 jest.mock("@rebasepro/app", () => ({
     useRebaseContext: () => ({ authController: { user: session.user } }),
+    useTranslation: () => ({ t: (key: string) => key }),
     useRebaseClient: () => session.client,
     // The real picker is a popover; a row of buttons is enough to choose from.
     UserSelectPopover: ({ users, onUserSelected }: {

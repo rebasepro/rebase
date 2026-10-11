@@ -1,7 +1,7 @@
 
 import { FieldCaption } from "../../_cms_internals";
 import React, { useMemo, useRef, useState } from "react";
-import { useAuthController, useCustomizationController } from "@rebasepro/app";
+import { useAuthController, useCustomizationController, useTranslation } from "@rebasepro/app";
 import { Property } from "@rebasepro/types";
 import { PropertyConfigBadge } from "../../../components/PropertyConfigBadge";
 import { getFieldConfig } from "../../../components/field_configs";
@@ -18,6 +18,7 @@ export function KanbanConfigSection({
     className?: string;
     forceExpanded?: boolean;
 }) {
+    const { t } = useTranslation();
     const authController = useAuthController();
     const customizationController = useCustomizationController();
     const { values, setFieldValue } = useFormex<AdminCollection>();
@@ -101,7 +102,7 @@ block: "center" });
                     );
                 }}
                 endAdornment={kanbanConfig?.columnProperty ? (
-                    <IconButton
+                    <IconButton aria-label={t("clear")}
                         size="small"
                         onClick={(e) => {
                             e.stopPropagation();

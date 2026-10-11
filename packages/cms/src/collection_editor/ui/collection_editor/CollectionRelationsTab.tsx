@@ -1,4 +1,5 @@
 
+import { useTranslation } from "@rebasepro/app";
 import React, { useState } from "react";
 import {
     Button,
@@ -143,6 +144,7 @@ kind: "manyToMany",
 }
 
 export function CollectionRelationsTab() {
+    const { t } = useTranslation();
     const { values, setFieldValue } = useFormex<AdminPostgresCollection>();
     const { collections } = useCollectionsConfigController();
     const [editingRelationIndex, setEditingRelationIndex] = useState<number | null>(null);
@@ -230,7 +232,7 @@ kind: "hasMany" });
                                                   setEditingRelationState(relation as unknown as RelationDraft);
                                               }}>
                                         <TableCell style={{ width: "64px" }}>
-                                            <IconButton size="small" onClick={(e) => {
+                                            <IconButton aria-label={t("delete")} size="small" onClick={(e) => {
                                                 e.stopPropagation();
                                                 handleDelete(index);
                                             }}>

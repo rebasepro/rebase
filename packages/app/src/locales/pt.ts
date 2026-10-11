@@ -1534,5 +1534,21 @@ export const pt: RebaseTranslations = {
     insights_previous_period_value_one: "Dia anterior: {{value}}",
     insights_change_up: "Alta: {{change}}",
     insights_change_down: "Queda: {{change}}",
-    insights_change_none: "Sem alteração"
+    insights_change_none: "Sem alteração",
+
+    // ─── Icon button names ───────────────────────────────────────
+    add_to_favourites: "Adicionar aos favoritos",
+    remove_from_favourites: "Remover dos favoritos",
+    change_value_type: "Alterar tipo",
+    refresh: "Atualizar",
+    create_branch: "Criar ramo",
+    new_tab: "Novo separador",
+    close_tab: "Fechar separador",
+    help: "Ajuda",
+    copy_table_name: "Copiar nome da tabela",
+    copy_column_name: "Copiar nome da coluna",
+    generate_sql_templates: "Gerar modelos SQL",
+    select_row: "Selecionar {{id}}",
+    select: "Selecionar",
+    open_view: "Abrir vista"
 };

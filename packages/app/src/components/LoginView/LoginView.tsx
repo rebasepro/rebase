@@ -1079,7 +1079,7 @@ function LoginForm({
         <form onSubmit={handleSubmit} className="flex flex-col w-full gap-1 mt-2">
             {!bootstrapMode && (
                 <div className="w-full mb-2 -ml-2.5">
-                    <IconButton onClick={onClose}>
+                    <IconButton aria-label={t("back")} onClick={onClose}>
                         <ArrowLeftIcon/>
                     </IconButton>
                 </div>
@@ -1881,6 +1881,7 @@ function ForgotPasswordForm({
     onClose: () => void,
     authController: AuthControllerExtended
 }) {
+    const { t } = useTranslation();
     const [email, setEmail] = useState<string>("");
     const [submitted, setSubmitted] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -1932,7 +1933,7 @@ function ForgotPasswordForm({
         return (
             <div className="flex flex-col w-full gap-4 mt-2">
                 <div className="w-full -ml-2.5">
-                    <IconButton onClick={onClose}>
+                    <IconButton aria-label={t("back")} onClick={onClose}>
                         <ArrowLeftIcon/>
                     </IconButton>
                 </div>
@@ -1957,7 +1958,7 @@ function ForgotPasswordForm({
     return (
         <form onSubmit={handleSubmit} className="flex flex-col w-full gap-1 mt-2">
             <div className="w-full mb-2 -ml-2.5">
-                    <IconButton onClick={onClose}>
+                    <IconButton aria-label={t("back")} onClick={onClose}>
                         <ArrowLeftIcon/>
                 </IconButton>
             </div>

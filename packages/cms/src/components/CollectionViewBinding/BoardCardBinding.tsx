@@ -4,7 +4,7 @@ import { Entity } from "@rebasepro/types";
 import { Checkbox, Chip, cls, defaultBorderMixin } from "@rebasepro/ui";
 import { StorageMarkdown } from "../../preview/components/StorageMarkdown";
 import { PropertyPreview } from "../../preview";
-import { useAuthController, useCustomizationController } from "@rebasepro/app";
+import { useAuthController, useCustomizationController, useTranslation } from "@rebasepro/app";
 import { IconForView } from "@rebasepro/app";
 import { BoardItemViewProps } from "@rebasepro/ui";
 import { useCollectionSlotKeys, useEntitySlots } from "./usePreviewSlots";
@@ -38,6 +38,7 @@ function BoardCardBindingInner<M extends Record<string, unknown> = Record<string
     onSelectionChange,
     selectionEnabled = false
 }: BoardCardBindingProps<M>) {
+    const { t } = useTranslation();
     const entity = item.data;
     const authController = useAuthController();
     const customizationController = useCustomizationController();
@@ -156,6 +157,7 @@ function BoardCardBindingInner<M extends Record<string, unknown> = Record<string
                                 : "scale-75 group-hover/card:scale-100"
                         )}>
                             <Checkbox
+                                aria-label={t("select_row", { id: String(entity.id) })}
                                 checked={selected ?? false}
                                 onCheckedChange={handleSelectionChange}
                                 size="small"

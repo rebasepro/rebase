@@ -45,7 +45,7 @@ export const SchemaBrowser = ({
         <div className="flex flex-col h-full overflow-hidden">
             <div className={cls("flex items-center justify-between px-3 py-2 border-b bg-surface-sheet min-h-[48px]", defaultBorderMixin)}>
                 <Typography variant="caption" className="font-semibold uppercase tracking-wider text-text-disabled dark:text-text-disabled-dark">{t("studio_schema_tables")}</Typography>
-                <IconButton size="small" onClick={onRetrySchema} title="Refresh schema">
+                <IconButton aria-label={t("refresh")} size="small" onClick={onRetrySchema} title={t("refresh")}>
                     <RefreshCwIcon size={iconSize.smallest}/>
                 </IconButton>
             </div>
@@ -80,23 +80,23 @@ export const SchemaBrowser = ({
                                             <Typography variant="body2" className="text-text-secondary dark:text-text-secondary-dark text-xs truncate flex-1 min-w-0">{table.tableName}</Typography>
 
                                             <div className="flex opacity-0 group-hover:opacity-100 focus-within:opacity-100 absolute right-1 items-center bg-surface-raised px-1 gap-1 rounded transition-opacity">
-                                                <IconButton
+                                                <IconButton aria-label={t("copy_table_name")}
                                                     size="small"
                                                     onClick={(e) => {
                                                         e.stopPropagation();
                                                         navigator.clipboard.writeText(table.tableName);
                                                     }}
-                                                    title="Copy table name"
+                                                    title={t("copy_table_name")}
                                                 >
                                                     <CopyIcon size={iconSize.small}/>
                                                 </IconButton>
 
                                                 <Menu
                                                     trigger={
-                                                        <IconButton
+                                                        <IconButton aria-label={t("generate_sql_templates")}
                                                             size={"small"}
                                                             onClick={(e) => e.stopPropagation()}
-                                                            title="Generate SQL templates"
+                                                            title={t("generate_sql_templates")}
                                                         >
                                                             <MoreVerticalIcon size={iconSize.small}/>
                                                         </IconButton>
@@ -141,14 +141,14 @@ export const SchemaBrowser = ({
                                                         <svg className="w-3 h-3 mr-1.5 text-text-disabled dark:text-text-disabled-dark shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 4.5v15m6-15v15m-10.5-1.5h15c.621 0 1.125-.504 1.125-1.125V5.625c0-.621-.504-1.125-1.125-1.125h-15c-.621 0-1.125.504-1.125 1.125v12.75c0 .621.504 1.125 1.125 1.125Z"/></svg>
                                                         <Typography variant="caption" className="text-text-primary dark:text-text-primary-dark text-[11px] truncate flex-grow mr-2">{col.name}</Typography>
                                                         <Typography variant="caption" className="text-text-disabled dark:text-text-disabled-dark text-[9px] truncate mr-1 uppercase shrink-0" title={col.dataType}>{col.dataType}</Typography>
-                                                        <IconButton
+                                                        <IconButton aria-label={t("copy_column_name")}
                                                             size="smallest"
                                                             className="opacity-0 group-hover:opacity-100 absolute right-1 bg-surface-sheet transition-colors pointer-events-auto"
                                                             onClick={(e) => {
                                                                 e.stopPropagation();
                                                                 navigator.clipboard.writeText(col.name);
                                                             }}
-                                                            title="Copy column name"
+                                                            title={t("copy_column_name")}
                                                         >
                                                             <CopyIcon size={iconSize.smallest}/>
                                                         </IconButton>

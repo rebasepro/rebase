@@ -41,6 +41,7 @@ const AUTH = { getAuthToken: async () => "token" };
 
 jest.mock("@rebasepro/app", () => ({
     apiBaseOf: () => API_BASE,
+    useTranslation: () => ({ t: (key: string) => key }),
     useRebaseClient: () => CLIENT,
     useAuthController: () => AUTH,
     UserDisplay: ({ user }: { user: { uid: string, displayName?: string | null } }) =>

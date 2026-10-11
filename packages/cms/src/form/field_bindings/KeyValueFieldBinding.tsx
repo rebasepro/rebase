@@ -405,7 +405,7 @@ function MapKeyValueRow<T extends Record<string, unknown>>({
                 </div>
                 <div className={"flex flex-col"}>
                     <Menu
-                        trigger={<IconButton size={"smallest"}>
+                        trigger={<IconButton aria-label={t("change_value_type")} size={"smallest"}>
                             <ChevronDownIcon size={iconSize.small}/>
                         </IconButton>}
                     >
@@ -450,6 +450,7 @@ function ArrayKeyValueRow<T>({
     setValue: (value: T | null) => void,
     disabled?: boolean,
 }) {
+    const { t } = useTranslation();
 
     const { locale } = useCustomizationController();
     const [selectedtype, setSelectedtype] = useState<DataType>(gettype(value) ?? "string");
@@ -522,7 +523,7 @@ function ArrayKeyValueRow<T>({
                 </div>
 
                 <Menu
-                    trigger={<IconButton size={"small"}
+                    trigger={<IconButton aria-label={t("change_value_type")} size={"small"}
                                          className="h-7 w-7">
                         <ChevronDownIcon/>
                     </IconButton>}>

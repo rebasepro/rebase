@@ -1652,4 +1652,20 @@ export interface RebaseTranslations {
     insights_change_up?: string;
     insights_change_down?: string;
     insights_change_none?: string;
+
+    // ─── Icon button names ───────────────────────────────────────
+    add_to_favourites?: string;
+    remove_from_favourites?: string;
+    change_value_type?: string;
+    refresh?: string;
+    create_branch?: string;
+    new_tab?: string;
+    close_tab?: string;
+    help?: string;
+    copy_table_name?: string;
+    copy_column_name?: string;
+    generate_sql_templates?: string;
+    select_row?: string;
+    select?: string;
+    open_view?: string;
 }

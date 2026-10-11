@@ -330,7 +330,7 @@ message: e instanceof Error ? e.message : String(e) });
                         <Typography variant="subtitle2" className="font-semibold">{t("studio_tool_cron")}</Typography>
                         <Chip size="smallest" className="bg-surface-raised text-surface-600 dark:text-surface-300">{jobs.length}</Chip>
                     </div>
-                    <IconButton size="small" onClick={refreshJobs} title={t("studio_cron_refresh")}><RefreshCwIcon size={iconSize.smallest}/></IconButton>
+                    <IconButton aria-label={t("studio_cron_refresh")} size="small" onClick={refreshJobs} title={t("studio_cron_refresh")}><RefreshCwIcon size={iconSize.smallest}/></IconButton>
                 </div>
                 {hasProblems && (
                     <div className="p-2">
@@ -378,7 +378,7 @@ message: e instanceof Error ? e.message : String(e) });
                                 </div>
                             </div>
                             <div className="flex items-center gap-2 shrink-0">
-                                <IconButton title={selectedJob.enabled ? t("studio_cron_pause_job") : t("studio_cron_enable_job")} size="small" onClick={() => handleToggle(selectedJob.id, !selectedJob.enabled)}>
+                                <IconButton aria-label={selectedJob.enabled ? t("studio_cron_pause_job") : t("studio_cron_enable_job")} title={selectedJob.enabled ? t("studio_cron_pause_job") : t("studio_cron_enable_job")} size="small" onClick={() => handleToggle(selectedJob.id, !selectedJob.enabled)}>
                                     {selectedJob.enabled ? <PauseIcon size={iconSize.small}/> : <PlayIcon size={iconSize.smallest}/>}
                                 </IconButton>
                                 <Button
@@ -420,7 +420,7 @@ message: e instanceof Error ? e.message : String(e) });
                                 <HistoryIcon size={iconSize.smallest} className="text-surface-400"/>
                                 <Typography variant="subtitle2" className="font-semibold text-[13px]">{t("studio_cron_execution_history")}</Typography>
                             </div>
-                            <IconButton size="small" onClick={() => refreshLogs(selectedJob.id)} title={t("studio_cron_refresh_logs")}><RefreshCwIcon size={iconSize.smallest}/></IconButton>
+                            <IconButton aria-label={t("studio_cron_refresh_logs")} size="small" onClick={() => refreshLogs(selectedJob.id)} title={t("studio_cron_refresh_logs")}><RefreshCwIcon size={iconSize.smallest}/></IconButton>
                         </div>
                         <div className="flex-1 overflow-y-auto">
                             {logsLoading ? (

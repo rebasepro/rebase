@@ -525,7 +525,7 @@ export function UIReferenceView() {
                         <div className="grow"/>
                         {/* Theme menu — from DefaultAppBar */}
                         <Menu trigger={
-                            <IconButton>
+                            <IconButton aria-label="Theme">
                                 <MoonIcon/>
                             </IconButton>
                         }>
@@ -577,7 +577,7 @@ export function UIReferenceView() {
                                 {/* Section header pattern — used in all editor sidebars */}
                                 <div className={cls("p-3 border-b flex justify-between items-center", defaultBorderMixin)}>
                                     <Typography variant="caption" className="font-semibold uppercase tracking-wider text-text-disabled dark:text-text-disabled-dark">TABLES</Typography>
-                                    <IconButton size="small">
+                                    <IconButton aria-label="Settings" size="small">
                                         <SettingsIcon size={iconSize.smallest}/>
                                     </IconButton>
                                 </div>
@@ -602,7 +602,7 @@ export function UIReferenceView() {
                                             Query 2
                                         </Tab>
                                     </Tabs>
-                                    <IconButton size="small" className="ml-2 flex-shrink-0">
+                                    <IconButton aria-label="New tab" size="small" className="ml-2 flex-shrink-0">
                                         <PlusIcon/>
                                     </IconButton>
                                 </div>
@@ -638,7 +638,7 @@ export function UIReferenceView() {
                                 </Tabs>
                                 <div className={cls("p-3 border-b flex justify-between items-center", defaultBorderMixin)}>
                                     <Typography variant="caption" className="font-semibold uppercase tracking-wider text-text-secondary dark:text-text-secondary-dark">TABLES</Typography>
-                                    <IconButton size="small">
+                                    <IconButton aria-label="Settings" size="small">
                                         <SettingsIcon size={iconSize.smallest}/>
                                     </IconButton>
                                 </div>
@@ -672,7 +672,7 @@ export function UIReferenceView() {
                                 </Tabs>
                                 <div className={cls("p-3 border-b flex justify-between items-center", defaultBorderMixin)}>
                                     <Typography variant="caption" className="font-semibold uppercase tracking-wider text-text-disabled dark:text-text-disabled-dark">RLS</Typography>
-                                    <IconButton size="small">
+                                    <IconButton aria-label="Settings" size="small">
                                         <SettingsIcon size={iconSize.smallest}/>
                                     </IconButton>
                                 </div>
@@ -705,7 +705,7 @@ enabled: false }].map(t => (
                             <div className={cls("flex flex-col h-72 w-[240px] border rounded-lg overflow-hidden bg-surface-card", defaultBorderMixin)}>
                                 <div className={cls("p-3 border-b flex justify-between items-center", defaultBorderMixin)}>
                                     <Typography variant="caption" className="font-semibold uppercase tracking-wider text-text-disabled dark:text-text-disabled-dark">COLLECTIONS</Typography>
-                                    <IconButton size="small">
+                                    <IconButton aria-label="Add collection" size="small">
                                         <PlusIcon size={iconSize.smallest}/>
                                     </IconButton>
                                 </div>
@@ -833,20 +833,20 @@ selected: true }, { name: "Tags" }].map(c => (
                                     { s: "large" as const, icon: <PencilIcon size={24}/> }
                                 ]).map(({ s, icon }) => (
                                     <div key={s} className="flex flex-col items-center gap-1">
-                                        <IconButton size={s}>{icon}</IconButton>
+                                        <IconButton aria-label="Edit" size={s}>{icon}</IconButton>
                                         <Typography variant="caption" color="secondary">{s.charAt(0).toUpperCase() + s.slice(1)}</Typography>
                                     </div>
                                 ))}
                                 <div className="flex flex-col items-center gap-1">
-                                    <IconButton disabled><Trash2Icon size={20}/></IconButton>
+                                    <IconButton aria-label="Delete" disabled><Trash2Icon size={20}/></IconButton>
                                     <Typography variant="caption" color="secondary">Disabled</Typography>
                                 </div>
                                 <div className="flex flex-col items-center gap-1">
-                                    <IconButton variant="filled"><PlusIcon size={20}/></IconButton>
+                                    <IconButton aria-label="Add" variant="filled"><PlusIcon size={20}/></IconButton>
                                     <Typography variant="caption" color="secondary">Filled</Typography>
                                 </div>
                                 <div className="flex flex-col items-center gap-1">
-                                    <IconButton shape="square"><SettingsIcon size={20}/></IconButton>
+                                    <IconButton aria-label="Settings" shape="square"><SettingsIcon size={20}/></IconButton>
                                     <Typography variant="caption" color="secondary">Square</Typography>
                                 </div>
                             </div>

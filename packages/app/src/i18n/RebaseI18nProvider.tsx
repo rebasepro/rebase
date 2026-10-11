@@ -265,8 +265,8 @@ function createLocaleBackend(getOverrides: () => TranslationOverrides | undefine
  * translations, and refills them when the language changes.
  */
 function UiLabelsFromTranslations({ children }: PropsWithChildren) {
-    const { t, i18n } = useTranslation();
-    const language = i18n.language;
+    // `t` changes identity with the language, so the labels follow it.
+    const { t } = useTranslation();
     const labels = useMemo((): UiLabelsProviderProps["labels"] => ({
         errorLoadingData: (message) => t("error_loading_data_message", { message }),
         noEntriesFound: t("no_entries_found"),
@@ -274,6 +274,7 @@ function UiLabelsFromTranslations({ children }: PropsWithChildren) {
         error: t("error"),
         search: t("search"),
         clearSearch: t("clear_search"),
+        select: t("select"),
         relativeTime: {
             justNow: t("relative_just_now"),
             inAMoment: t("relative_in_a_moment"),
@@ -284,6 +285,6 @@ function UiLabelsFromTranslations({ children }: PropsWithChildren) {
             daysAgo: (count) => t("relative_days_ago", { count }),
             inDays: (count) => t("relative_in_days", { count })
         }
-    }), [t, language]);
+    }), [t]);
     return <UiLabelsProvider labels={labels}>{children}</UiLabelsProvider>;
 }

@@ -1,6 +1,6 @@
 import React, { PropsWithChildren, useState } from "react";
 import { cls, ExpandablePanel, IconButton, iconSize, PencilIcon, Typography } from "@rebasepro/ui";
-import { useNavigationGroupLabel } from "@rebasepro/app";
+import { useNavigationGroupLabel, useTranslation } from "@rebasepro/app";
 import { NAVIGATION_DEFAULT_GROUP_NAME } from "../../hooks/navigation/utils";
 
 export function NavigationGroup({
@@ -24,6 +24,7 @@ export function NavigationGroup({
     onToggleCollapsed?: () => void;
 }>) {
 
+    const { t } = useTranslation();
     const groupLabel = useNavigationGroupLabel();
     const [isHovered, setIsHovered] = useState(false);
 
@@ -65,7 +66,7 @@ export function NavigationGroup({
                 {currentGroupLabel}
             </Typography>
             {!isPreview && onEditGroup && !dndDisabled && (
-                <IconButton
+                <IconButton aria-label={t("rename_group")}
                     size="smallest"
                     onClick={(e) => {
                         e.stopPropagation(); // Prevent toggle on click

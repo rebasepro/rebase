@@ -1049,6 +1049,7 @@ const ListRow = React.memo(function ListRow<M extends Record<string, unknown>>({
                     onClick={handleCheckboxClick}
                 >
                     <Checkbox
+                        aria-label={t("select_row", { id: String(entity.id) })}
                         checked={selected ?? false}
                         onCheckedChange={handleCheckboxChange}
                         size="smallest"
@@ -1098,6 +1099,7 @@ const ListRow = React.memo(function ListRow<M extends Record<string, unknown>>({
                         >
                             <div className="pointer-events-none">
                                 <Checkbox
+                                    aria-label={t("select_row", { id: String(entity.id) })}
                                     checked={selected ?? false}
                                     onCheckedChange={handleCheckboxChange}
                                     size="smallest"

@@ -13,7 +13,8 @@ import type { EntityAction } from "@rebasepro/cms-types";
  * "Edit", "Copy", "Delete", "Remove" and "Reset Password" were English
  * literals on the actions themselves, rendered as `action.name` beside a row
  * menu otherwise in Italian. They carry a `nameKey` now; an action of the
- * project's own, without one, still shows its `name` as written.
+ * project's own, without one, still shows its `name` as written. The row's
+ * icon-only controls are named in the same language.
  */
 
 jest.mock("../../src/hooks/useAdminContext", () => {
@@ -80,6 +81,24 @@ describe("entity action names, in Italian", () => {
         const items = screen.getAllByRole("menuitem").map(item => item.textContent);
         expect(items).toContain("Copia");
         expect(items).toContain("Publish");
+    });
+
+    it("names the row's menu button and its selection checkbox", async () => {
+        render(
+            <RebaseI18nProvider locale="it">
+                <CollectionRowActions
+                    entity={post}
+                    path="posts"
+                    width={140}
+                    size="m"
+                    actions={[publish]}
+                    selectionEnabled
+                    isSelected={false}
+                    openEntityMode="side_panel"/>
+            </RebaseI18nProvider>
+        );
+        expect(await screen.findByRole("button", { name: "Altre azioni" })).toBeTruthy();
+        expect(screen.getByRole("checkbox", { name: "Seleziona 7" })).toBeTruthy();
     });
 
     it("an override that renames a built-in shows its own name", async () => {

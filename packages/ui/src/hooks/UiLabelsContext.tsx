@@ -22,6 +22,8 @@ export interface UiLabels {
     search: string;
     /** The search bar's clear button. */
     clearSearch: string;
+    /** A row's or card's selection checkbox in the collection views. */
+    select: string;
     /** The phrases `formatRelativeTime` (`@rebasepro/utils`) takes as `labels`. */
     relativeTime: UiRelativeTimeLabels;
 }
@@ -46,6 +48,7 @@ export const defaultUiLabels: UiLabels = {
     error: "Error",
     search: "Search",
     clearSearch: "Clear search",
+    select: "Select",
     relativeTime: {
         justNow: "just now",
         inAMoment: "in a moment",

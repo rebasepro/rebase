@@ -110,31 +110,31 @@ export const UIStyleGuide = () => {
                 <Paper className="p-6">
                     <div className="flex flex-wrap gap-8 items-center">
                         <div className="flex flex-col items-center gap-2">
-                            <IconButton>
+                            <IconButton aria-label="Example">
                                 <IconExample/>
                             </IconButton>
                             <span className="text-[10px] text-text-disabled font-mono">primary</span>
                         </div>
                         <div className="flex flex-col items-center gap-2">
-                            <IconButton>
+                            <IconButton aria-label="Example">
                                 <IconExample/>
                             </IconButton>
                             <span className="text-[10px] text-text-disabled font-mono">secondary</span>
                         </div>
                         <div className="flex flex-col items-center gap-2">
-                            <IconButton size="small">
+                            <IconButton aria-label="Example" size="small">
                                 <IconExample/>
                             </IconButton>
                             <span className="text-[10px] text-text-disabled font-mono">small</span>
                         </div>
                         <div className="flex flex-col items-center gap-2">
-                            <IconButton disabled>
+                            <IconButton aria-label="Example" disabled>
                                 <IconExample/>
                             </IconButton>
                             <span className="text-[10px] text-text-disabled font-mono">disabled</span>
                         </div>
                         <div className="flex flex-col items-center gap-2">
-                            <IconButton size="small">
+                            <IconButton aria-label="Delete" size="small">
                                 <Trash2Icon/>
                             </IconButton>
                             <span className="text-[10px] text-text-disabled font-mono">delete</span>

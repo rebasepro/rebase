@@ -151,7 +151,7 @@ export function FormEnhanceAction({
                             {samplePrompt.prompt}
                         </div>
 
-                        {samplePrompt.type === "recent" && <IconButton
+                        {samplePrompt.type === "recent" && <IconButton aria-label="Remove prompt"
                             onClick={(e) => {
                                 e.preventDefault();
                                 e.stopPropagation();
@@ -213,7 +213,7 @@ export function FormEnhanceAction({
                         {instructions.length > 0 && !loading && (
                             <div
                                 className={"flex flex-row justify-center items-center absolute h-full right-0 top-0 mr-2"}>
-                                <IconButton
+                                <IconButton aria-label="Clear instructions"
                                     size={"small"}
                                     onClick={() => {
                                         setInstructions("");
@@ -224,7 +224,7 @@ export function FormEnhanceAction({
                         )}
                     </div>
 
-                    <IconButton
+                    <IconButton aria-label="Generate"
                         onClick={() => generate(instructions)}
                         size={"small"}
                         disabled={loading || !instructions}>

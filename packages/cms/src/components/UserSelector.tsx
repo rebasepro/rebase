@@ -21,7 +21,7 @@ import * as React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Command as CommandPrimitive } from "cmdk";
 import { User } from "@rebasepro/types";
-import { apiBaseOf, useRebaseClient, useAuthController, UserDisplay } from "@rebasepro/app";
+import { apiBaseOf, useRebaseClient, useAuthController, UserDisplay, useTranslation } from "@rebasepro/app";
 import { EmptyValue } from "../preview";
 import { useResolvedUser } from "../hooks/useResolvedUsers";
 import { PickerTrigger } from "./PickerTrigger";
@@ -225,6 +225,7 @@ export const UserSelector = React.forwardRef<
         ref
     ) => {
 
+        const { t } = useTranslation();
         const [isPopoverOpen, setIsPopoverOpenState] = useState(false);
         // Latched on first open, as in `RelationSelector`: a form with three
         // user fields fetched the list three times on every open, and a table
@@ -484,7 +485,7 @@ export const UserSelector = React.forwardRef<
 
                                     <div className="flex-shrink-0 flex items-center gap-1">
                                         {clearable && !disabled && value && (
-                                            <IconButton
+                                            <IconButton aria-label={t("clear")}
                                                 size="small"
                                                 onClick={handleClear}>
                                                 <XIcon size={iconSize.small}/>

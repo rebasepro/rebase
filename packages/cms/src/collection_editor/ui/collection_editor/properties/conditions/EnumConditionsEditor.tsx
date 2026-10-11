@@ -1,4 +1,5 @@
 
+import { useTranslation } from "@rebasepro/app";
 import React from "react";
 import { useFormex } from "@rebasepro/forms";
 import {
@@ -340,6 +341,7 @@ function EnumConditionRow({
     propertyEnumValues,
     showErrors
 }: EnumConditionRowProps) {
+    const { t } = useTranslation();
     const operator = OPERATORS.find(op => op.id === config.operator);
     const showValueField = operator?.valueType !== "none";
 
@@ -366,7 +368,7 @@ function EnumConditionRow({
                 <Typography variant="label" className="font-medium text-primary">
                     {ENUM_CONDITION_TYPES.find(ct => ct.id === conditionType)?.label} when
                 </Typography>
-                <IconButton
+                <IconButton aria-label={t("remove")}
                     onClick={onRemove}
                     disabled={disabled}
                     size="small"

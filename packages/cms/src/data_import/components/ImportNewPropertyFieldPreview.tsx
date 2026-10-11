@@ -1,5 +1,5 @@
 import React from "react";
-import { useCustomizationController } from "@rebasepro/app";
+import { useCustomizationController, useTranslation } from "@rebasepro/app";
 import { Property } from "@rebasepro/types";
 import { getFieldConfig } from "../../components/field_configs";
 import { PropertyConfigBadge } from "../../components/PropertyConfigBadge";
@@ -20,6 +20,7 @@ export function ImportNewPropertyFieldPreview({
     onPropertyNameChanged?: (propertyKey: string, value: string) => void,
     propertyTypeView?: any
 }) {
+    const { t } = useTranslation();
 
     const { propertyConfigs } = useCustomizationController();
     const widget = property ? getFieldConfig(property, propertyConfigs) : null;
@@ -46,7 +47,7 @@ export function ImportNewPropertyFieldPreview({
                                     onPropertyNameChanged(propertyKey, e.target.value);
                             }}/>}
 
-                    <IconButton onClick={onEditClick} size={"small"}>
+                    <IconButton aria-label={t("edit")} onClick={onEditClick} size={"small"}>
                         <PencilIcon/>
                     </IconButton>
                 </div>

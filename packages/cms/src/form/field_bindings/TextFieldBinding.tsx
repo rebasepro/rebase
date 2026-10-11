@@ -1,3 +1,4 @@
+import { useTranslation } from "@rebasepro/app";
 import type { FieldProps } from "../../types/fields";
 import type { NumberProperty, StringProperty } from "@rebasepro/types";
 import React, { useCallback } from "react";
@@ -37,6 +38,7 @@ export function TextFieldBinding<T extends string | number>({
                                                                 hideLabel,
                                                                 size = "large"
                                                             }: FieldProps<StringProperty | NumberProperty>) {
+    const { t } = useTranslation();
 
     let multiline: boolean | undefined;
     let url: boolean | PreviewType | undefined;
@@ -140,7 +142,7 @@ export function TextFieldBinding<T extends string | number>({
                     {property.admin?.clearable && (
                         <div
                             className="flex flex-row justify-center items-center absolute h-full right-0 top-0 mr-4">
-                            <IconButton onClick={handleClearClick}>
+                            <IconButton aria-label={t("clear")} onClick={handleClearClick}>
                                 <XIcon/>
                             </IconButton>
                         </div>
@@ -157,7 +159,7 @@ export function TextFieldBinding<T extends string | number>({
                     type={inputType}
                     disabled={disabled}
                     endAdornment={
-                        property.admin?.clearable && <IconButton
+                        property.admin?.clearable && <IconButton aria-label={t("clear")}
                             onClick={handleClearClick}>
                             <XIcon/>
                         </IconButton>

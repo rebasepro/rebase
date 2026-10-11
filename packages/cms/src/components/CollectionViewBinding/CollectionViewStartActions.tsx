@@ -145,7 +145,7 @@ parentEntityIds,
                         {activeFilterCount > 0 ? `(${activeFilterCount})` : t("filters")}
                     </Button>
                 ) : (
-                    <IconButton
+                    <IconButton aria-label={t("filters")}
                         size={"small"}
                         onClick={() => setFiltersDialogOpen(true)}
                         className={cls(activeFilterCount > 0 && "text-primary")}

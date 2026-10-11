@@ -1529,5 +1529,21 @@ export const hi: RebaseTranslations = {
     insights_previous_period_value_one: "उससे पहले का दिन: {{value}}",
     insights_change_up: "बढ़त: {{change}}",
     insights_change_down: "गिरावट: {{change}}",
-    insights_change_none: "कोई बदलाव नहीं"
+    insights_change_none: "कोई बदलाव नहीं",
+
+    // ─── Icon button names ───────────────────────────────────────
+    add_to_favourites: "पसंदीदा में जोड़ें",
+    remove_from_favourites: "पसंदीदा से हटाएं",
+    change_value_type: "प्रकार बदलें",
+    refresh: "रीफ़्रेश करें",
+    create_branch: "ब्रांच बनाएं",
+    new_tab: "नया टैब",
+    close_tab: "टैब बंद करें",
+    help: "सहायता",
+    copy_table_name: "टेबल का नाम कॉपी करें",
+    copy_column_name: "कॉलम का नाम कॉपी करें",
+    generate_sql_templates: "SQL टेम्पलेट बनाएं",
+    select_row: "{{id}} चुनें",
+    select: "चुनें",
+    open_view: "व्यू खोलें"
 };

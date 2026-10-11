@@ -9,7 +9,7 @@ import { EditViewBinding } from "./EditViewBinding";
 import { DetailViewBinding } from "./DetailViewBinding";
 import { useSideDialogContext } from "./SideDialogs";
 import { useNavigate } from "react-router";
-import { useComponentOverride } from "@rebasepro/app";
+import { useComponentOverride, useTranslation } from "@rebasepro/app";
 import { useCollectionRegistryController } from "../hooks/navigation/contexts/CollectionRegistryContext";
 import { useSidePanel } from "../hooks/useSidePanel";
 import { useUrlController } from "../hooks/navigation/contexts/UrlContext";
@@ -24,6 +24,7 @@ import { resolveDefaultSelectedView } from "@rebasepro/app";
  * @group Components
  */
 export function SidePanelBinding(props: SidePanelBindingProps) {
+    const { t } = useTranslation();
 
     const {
         allowFullScreen = true,
@@ -217,7 +218,7 @@ entityId }
     }
 
     const closeButton = (
-        <IconButton
+        <IconButton aria-label={t("close")}
             className="self-center"
             size={"small"}
             onClick={onClose}>
@@ -267,7 +268,7 @@ entityId }
                         onEditClick={openEditView}
                         barActionsStart={barActionsStart}
                         barActions={() => windowControls(
-                            allowFullScreen && <IconButton
+                            allowFullScreen && <IconButton aria-label={t("full_screen")}
                                 className="self-center"
                                 size={"small"}
                                 onClick={() => {
@@ -308,7 +309,7 @@ entityId }
                         navigateBack={closeEditView}
                         barActionsStart={barActionsStart}
                         barActions={({ carryEdit }) => windowControls(
-                            allowFullScreen && <IconButton
+                            allowFullScreen && <IconButton aria-label={t("full_screen")}
                                 className="self-center"
                                 size={"small"}
                                 onClick={() => {

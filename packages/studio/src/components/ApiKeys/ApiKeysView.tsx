@@ -277,7 +277,7 @@ function KeysPane({
                             <Chip size="smallest" className="bg-surface-raised text-surface-600 dark:text-surface-300">{activeKeys.length}</Chip>
                         </div>
                         <div className="flex items-center gap-1">
-                            <IconButton size="small" onClick={loadKeys} title={t("studio_api_keys_refresh")}><RefreshCwIcon size={iconSize.smallest}/></IconButton>
+                            <IconButton aria-label={t("studio_api_keys_refresh")} size="small" onClick={loadKeys} title={t("studio_api_keys_refresh")}><RefreshCwIcon size={iconSize.smallest}/></IconButton>
                             <Button
                                 size="small"
                                 color="primary"

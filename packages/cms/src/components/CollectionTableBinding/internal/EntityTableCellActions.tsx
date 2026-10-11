@@ -1,5 +1,5 @@
 import { AlertCircleIcon, IconButton } from "@rebasepro/ui";
-import { ErrorTooltip } from "@rebasepro/app";
+import { ErrorTooltip, useTranslation } from "@rebasepro/app";
 import { useCallback, useEffect, useRef } from "react";
 
 export interface EntityTableCellActionsProps {
@@ -19,6 +19,7 @@ export function EntityTableCellActions({
     openPopup,
     children
 }: EntityTableCellActionsProps) {
+    const { t } = useTranslation();
 
     const ref = useRef<HTMLDivElement>(null);
     const doOpenPopup = useCallback(() => {
@@ -41,7 +42,7 @@ export function EntityTableCellActions({
                 {selected && children}
 
                 {selected && !disabled && showExpandIcon &&
-                    <IconButton
+                    <IconButton aria-label={t("expand")}
                         ref={iconRef}
                         size={"small"}
                         onClick={doOpenPopup}>

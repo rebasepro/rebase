@@ -676,7 +676,7 @@ id: String(ra.entityId) })}>
                 <div className="h-full flex items-center justify-center">
                     <Menu
                         trigger={
-                            <IconButton
+                            <IconButton aria-label={t("more_actions")}
                                 size={"small"}
                                 className="text-surface-400 dark:text-surface-500 hover:text-surface-600 dark:hover:text-surface-300"
                                 onClick={(e) => e.stopPropagation()}
@@ -794,7 +794,7 @@ message: t("studio_sql_markdown_copy_failed") });
                                                     <TerminalIcon size={iconSize.smallest} className="text-amber-500 mr-1.5 flex-shrink-0"/>
                                                     <span className="truncate">{tab.name}</span>
                                                     {tabs.length > 1 && (
-                                                        <IconButton
+                                                        <IconButton aria-label={t("close_tab")}
                                                             size="smallest"
                                                             onClick={(e) => { e.stopPropagation(); closeTab(tab.id); }}
                                                             className="ml-1 !p-0.5 opacity-0 group-hover:opacity-100 hover:text-red-500 transition-opacity"
@@ -805,7 +805,7 @@ message: t("studio_sql_markdown_copy_failed") });
                                                 </Tab>
                                             ))}
                                         </Tabs>
-                                        <IconButton
+                                        <IconButton aria-label={t("new_tab")}
                                             size="small"
                                             onClick={addTab}
                                             className="ml-2 flex-shrink-0"

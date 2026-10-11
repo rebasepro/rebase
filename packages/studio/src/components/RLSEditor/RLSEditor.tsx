@@ -611,7 +611,7 @@ totalPolicies };
                                         <Typography variant="caption" className="font-semibold uppercase tracking-wider text-text-disabled dark:text-text-disabled-dark">
                                             {t("studio_schema_tables")}
                                         </Typography>
-                                        <IconButton size="small" onClick={fetchRLSData} title="Refresh">
+                                        <IconButton aria-label={t("refresh")} size="small" onClick={fetchRLSData} title={t("refresh")}>
                                             <RefreshCwIcon size={iconSize.smallest}/>
                                         </IconButton>
                                     </div>

@@ -317,7 +317,7 @@ export function ShapeSpaceSection() {
                         <Select size={size} value="a" onValueChange={() => {}} className="w-40">
                             <SelectItem value="a">Select</SelectItem>
                         </Select>
-                        <IconButton size={size}><PencilIcon size={size === "smallest" ? 14 : size === "small" ? 16 : size === "medium" ? 20 : 24}/></IconButton>
+                        <IconButton aria-label="Edit" size={size}><PencilIcon size={size === "smallest" ? 14 : size === "small" ? 16 : size === "medium" ? 20 : 24}/></IconButton>
                         <Typography variant="caption" color="secondary" className="basis-full md:basis-auto">{use}</Typography>
                     </div>
                 ))}

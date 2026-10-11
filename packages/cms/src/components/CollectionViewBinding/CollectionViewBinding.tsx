@@ -1714,7 +1714,7 @@ function EntityIdHeaderWidget({
                 align={"start"}
                 alignOffset={-117}
                 trigger={
-                    <IconButton size={"small"}>
+                    <IconButton aria-label={t("search")} size={"small"}>
                         <SearchIcon size={iconSize.small}/>
                     </IconButton>
                 }>

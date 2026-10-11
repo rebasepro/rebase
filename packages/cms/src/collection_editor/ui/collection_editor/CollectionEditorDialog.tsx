@@ -6,7 +6,8 @@ import {
     UnsavedChangesDialog,
     useAuthController,
     useCustomizationController,
-    useUnsavedChangesDialog
+    useUnsavedChangesDialog,
+    useTranslation
 } from "@rebasepro/app";
 import {
     getInferenceType,
@@ -370,6 +371,7 @@ function CollectionEditorInternal<M extends Record<string, unknown>>({
     propertyConfigs: Record<string, PropertyConfig>,
 }
 ) {
+    const { t } = useTranslation();
 
     /** Why the submit buttons below are dead, straight from the backend. */
     const readOnlyTitle = configController?.readOnlyReason
@@ -913,7 +915,7 @@ function CollectionEditorInternal<M extends Record<string, unknown>>({
                                 hiddenPropertyTypes={hiddenPropertyTypes}
                                 renderExtraPropertyFields={renderExtraPropertyFields}
                                 extraIcon={extraView?.icon &&
-                                    <IconButton
+                                    <IconButton aria-label={t("open_view")}
                                         onClick={() => setCurrentView("extra_view")}>
                                         {extraView.icon}
                                     </IconButton>}

@@ -7,7 +7,7 @@ import React, { useCallback, useEffect, useLayoutEffect, useState } from "react"
 import { Button, DialogActions, IconButton, Portal, Typography, XIcon } from "@rebasepro/ui";
 
 import { Entity, EntityValues } from "@rebasepro/types";
-import { PluginProviderStack } from "@rebasepro/app";
+import { PluginProviderStack, useTranslation } from "@rebasepro/app";
 import { Formex, FormexController, getIn, useCreateFormex } from "@rebasepro/forms";
 import { useDraggable } from "./useDraggable";
 import { applyValueTransforms, CustomFieldValidator, getEntitySchema } from "../../../../form/validation";
@@ -101,6 +101,7 @@ export function PopupFormFieldInternal<M extends Record<string, unknown>>({
 }: PopupFormFieldProps<M> & {
     entity?: Entity<M>
 }) {
+    const { t } = useTranslation();
 
     const rebaseContext = useRebaseContext();
     const authController = useAuthController();
@@ -408,7 +409,7 @@ export function PopupFormFieldInternal<M extends Record<string, unknown>>({
                         width: "32px",
                         height: "32px"
                     }}>
-                    <IconButton
+                    <IconButton aria-label={t("close")}
                         size={"small"}
                         onClick={(event) => {
                             event.stopPropagation();

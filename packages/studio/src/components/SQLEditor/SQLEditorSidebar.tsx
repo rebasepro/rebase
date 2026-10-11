@@ -89,7 +89,7 @@ export const SQLEditorSidebar = ({
                                                         >
                                                             <Typography variant="body2" className="text-text-primary dark:text-text-primary-dark font-medium text-[13px] truncate pr-6">{snippet.name}</Typography>
                                                             <Typography variant="caption" className="text-text-secondary dark:text-text-secondary-dark text-[10px] block mt-1 truncate">{snippet.sql}</Typography>
-                                                            <IconButton
+                                                            <IconButton aria-label={t("studio_sql_sidebar_delete_snippet")}
                                                                 size="smallest"
                                                                 className="absolute right-1 top-1 opacity-0 group-hover:opacity-100 text-text-disabled hover:text-red-500 transition-opacity"
                                                                 onClick={(e) => {
@@ -120,7 +120,7 @@ export const SQLEditorSidebar = ({
                                                         >
                                                             <Typography variant="body2" className="text-text-primary dark:text-text-primary-dark font-medium text-[13px] truncate pr-6">{snippet.name}</Typography>
                                                             <Typography variant="caption" className="text-text-secondary dark:text-text-secondary-dark text-[10px] block mt-1 truncate">{snippet.sql}</Typography>
-                                                            <IconButton
+                                                            <IconButton aria-label={t("studio_sql_sidebar_delete_snippet")}
                                                                 size="smallest"
                                                                 className="absolute right-1 top-1 opacity-0 group-hover:opacity-100 text-text-disabled hover:text-red-500 transition-opacity"
                                                                 onClick={(e) => {

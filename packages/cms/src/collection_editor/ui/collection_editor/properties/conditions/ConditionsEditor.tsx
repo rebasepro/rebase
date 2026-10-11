@@ -1,4 +1,5 @@
 
+import { useTranslation } from "@rebasepro/app";
 import React from "react";
 import { useFormex } from "@rebasepro/forms";
 import {
@@ -348,6 +349,7 @@ function ConditionRow({
     showErrors,
     showRemoveButton = true
 }: RuleRowProps & { showRemoveButton?: boolean }) {
+    const { t } = useTranslation();
     const fieldDataType = getFieldDataType(rule.field, collectionProperties);
     const applicableOperators = getOperatorsForDataType(fieldDataType);
     const property = getPropertyAtPath(rule.field, collectionProperties);
@@ -483,7 +485,7 @@ value: newValue })}
 
             {/* Remove button */}
             {showRemoveButton && (
-                <IconButton onClick={onRemove} disabled={disabled} size="small" variant="ghost">
+                <IconButton aria-label={t("remove")} onClick={onRemove} disabled={disabled} size="small" variant="ghost">
                     <Trash2Icon size={iconSize.smallest}/>
                 </IconButton>
             )}
@@ -504,6 +506,7 @@ function ConditionGroupRow({
     collectionProperties,
     showErrors
 }: ConditionGroupRowProps) {
+    const { t } = useTranslation();
     const handleLogicChange = (logic: LogicOperator) => {
         onGroupChange({ ...group,
 logic });
@@ -555,7 +558,7 @@ rules: [...group.rules, defaultRule] });
                         </Select>
                     )}
                 </div>
-                <IconButton onClick={onRemove} disabled={disabled} size="small" variant="ghost">
+                <IconButton aria-label={t("remove")} onClick={onRemove} disabled={disabled} size="small" variant="ghost">
                     <Trash2Icon size={iconSize.smallest}/>
                 </IconButton>
             </div>

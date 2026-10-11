@@ -358,7 +358,7 @@ function UploadDialog({
                                             {formatFileSize(file.size)}
                                         </Typography>
                                     </div>
-                                    <IconButton
+                                    <IconButton aria-label={t("remove")}
                                         size="small"
                                         onClick={(e) => {
                                             e.stopPropagation();
@@ -478,7 +478,7 @@ message: e instanceof Error ? e.message : String(e) });
                                 <Trash2Icon size={iconSize.smallest}/>
                             </IconButton>
                         </Tooltip>
-                        <IconButton size="small" onClick={onClose}>
+                        <IconButton aria-label={t("close")} size="small" onClick={onClose}>
                             <XIcon size={iconSize.smallest}/>
                         </IconButton>
                     </div>
@@ -1404,7 +1404,7 @@ message: e instanceof Error ? e.message : String(e) });
                                             </Typography>
                                         </TableCell>
                                         <TableCell className="px-2 py-2.5" onClick={(e) => e.stopPropagation()}>
-                                            <IconButton
+                                            <IconButton aria-label={t("studio_storage_delete")}
                                                 size="smallest"
                                                 className="opacity-0 group-hover:opacity-100 transition-opacity"
                                                 onClick={() => {

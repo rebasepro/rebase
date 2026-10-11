@@ -205,7 +205,7 @@ export function StringNumberFilterField({
                             : evt.target.value;
                         updateFilter(operation, val);
                     }}
-                    endAdornment={internalValue !== undefined && internalValue != null && <IconButton
+                    endAdornment={internalValue !== undefined && internalValue != null && <IconButton aria-label={t("clear")}
                         onClick={(e) => updateFilter(operation, undefined)}>
                         <XIcon/>
                     </IconButton>}
@@ -225,7 +225,7 @@ export function StringNumberFilterField({
                             if (value !== "")
                                 updateFilter(operation, type === "number" ? parseInt(value as string) : value as string)
                         }}
-                        endAdornment={hasSingleValue && <IconButton
+                        endAdornment={hasSingleValue && <IconButton aria-label={t("clear")}
                             onClick={(e) => updateFilter(operation, undefined)}>
                             <XIcon/>
                         </IconButton>}

@@ -3,7 +3,7 @@ import React, { useCallback, useDeferredValue, useEffect, useMemo, useRef, useSt
 import { deepEqual as equal } from "fast-equals"
 
 import { Formex, FormexController, getIn, useCreateFormex } from "@rebasepro/forms";
-import { ConfirmationDialog } from "@rebasepro/app";
+import { ConfirmationDialog, useTranslation } from "@rebasepro/app";
 import { DEFAULT_FIELD_CONFIGS, getFieldConfig, getFieldId } from "../../../components/field_configs";
 import { PropertyConfigBadge } from "../../../components/PropertyConfigBadge";
 import { Property } from "@rebasepro/types";
@@ -381,6 +381,7 @@ function PropertyEditFormFields({
     collectionValues?: AdminCollection;
 
 } & FormexController<PropertyWithId>) {
+    const { t } = useTranslation();
 
     const [selectOpen, setSelectOpen] = useState(autoOpenTypeSelect);
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -624,7 +625,7 @@ propertyConfig: widgetId };
                 </div>
 
                 {onDelete && values?.id &&
-                    <IconButton
+                    <IconButton aria-label={t("delete")}
                         variant={"ghost"}
                         className="mt-1 shrink-0"
                         disabled={disabled}

@@ -132,7 +132,7 @@ export const PolicyEditor = ({
                         {t("studio_policy_defining_rules")} <span className="font-mono text-primary bg-primary-bg px-1 py-0.5 rounded">{schema}.{table}</span>
                     </div>
                 </div>
-                <IconButton size="small" onClick={() => setHelpOpen(true)}>
+                <IconButton aria-label={t("help")} size="small" onClick={() => setHelpOpen(true)}>
                     <HelpCircleIcon size={iconSize.smallest}/>
                 </IconButton>
             </Typography>

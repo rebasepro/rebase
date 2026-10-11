@@ -331,6 +331,7 @@ function CollectionItem({ collection, onInsertCode }: { collection: CollectionIn
 }
 
 function SnippetItem({ snippet, onSelect, onDelete }: { snippet: JSSnippet; onSelect: (code: string) => void; onDelete: (id: string) => void }) {
+    const { t } = useTranslation();
     return (
         <div
             className={cls("group p-2 rounded border hover:border-hairline-strong bg-surface-card transition-all cursor-pointer relative", defaultBorderMixin)}
@@ -342,7 +343,7 @@ function SnippetItem({ snippet, onSelect, onDelete }: { snippet: JSSnippet; onSe
             <Typography variant="caption" className="text-text-secondary dark:text-text-secondary-dark text-[10px] block mt-1 truncate font-mono">
                 {snippet.code}
             </Typography>
-            <IconButton
+            <IconButton aria-label={t("delete")}
                 size="smallest"
                 className="absolute right-1 top-1 opacity-0 group-hover:opacity-100 text-text-disabled hover:text-red-500 transition-opacity"
                 onClick={(e) => {

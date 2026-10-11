@@ -211,10 +211,10 @@ export function BranchesView() {
                         <Chip size="smallest" className="bg-surface-raised text-surface-600 dark:text-surface-300">{branches.length}</Chip>
                     </div>
                     <div className="flex items-center gap-1">
-                        <IconButton size="small" onClick={loadBranches} title="Refresh">
+                        <IconButton aria-label={t("refresh")} size="small" onClick={loadBranches} title={t("refresh")}>
                             <RefreshCwIcon size={iconSize.smallest}/>
                         </IconButton>
-                        <IconButton size="small" onClick={() => setCreateOpen(true)} title="Create branch" className="text-primary">
+                        <IconButton aria-label={t("create_branch")} size="small" onClick={() => setCreateOpen(true)} title={t("create_branch")} className="text-primary">
                             <PlusIcon size={iconSize.smallest}/>
                         </IconButton>
                     </div>

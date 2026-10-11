@@ -222,7 +222,7 @@ export function CollectionDetailsForm({
                                             );
                                         }}
                                         endAdornment={values.orderProperty ? (
-                                            <IconButton
+                                            <IconButton aria-label={t("clear")}
                                                 size="small"
                                                 onClick={(e) => {
                                                     e.stopPropagation();

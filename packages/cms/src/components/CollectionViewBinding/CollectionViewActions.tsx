@@ -154,7 +154,7 @@ export function CollectionViewActions<M extends Record<string, unknown>>({
             >
                 ({countLabel})
             </Button>
-            : <IconButton
+            : <IconButton aria-label={t("delete_selected")}
                 size={"small"}
                 disabled={!multipleDeleteEnabled}
                 onClick={onMultipleDeleteClick}>
@@ -233,7 +233,7 @@ parentEntityIds,
                     open={overflowOpen}
                     onOpenChange={setOverflowOpen}
                     trigger={
-                        <IconButton size="small">
+                        <IconButton aria-label={t("more_actions")} size="small">
                             <MoreVerticalIcon size={iconSize.smallest}/>
                         </IconButton>
                     }>

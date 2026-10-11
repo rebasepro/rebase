@@ -72,7 +72,7 @@ export function HomePageEditorCollectionAction({
         <div>
             {canDeleteCollections &&
                 <Menu
-                    trigger={<IconButton size={"small"}>
+                    trigger={<IconButton aria-label={t("more_actions")} size={"small"}>
                         <MoreVerticalIcon/>
                     </IconButton>}
                 >
@@ -104,7 +104,7 @@ export function HomePageEditorCollectionAction({
             }
 
             {canEditCollections &&
-                <IconButton
+                <IconButton aria-label={t("edit_collection")}
                     size={"small"}
                     onClick={(event: React.MouseEvent) => {
                          onEditCollectionClicked();

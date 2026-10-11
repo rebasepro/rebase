@@ -14,7 +14,7 @@ import {
     useAuthController,
     useCustomizationController
 } from "@rebasepro/app";
-import { useAnalyticsController } from "@rebasepro/app";
+import { useAnalyticsController, useTranslation } from "@rebasepro/app";
 import { IconForView } from "@rebasepro/app";
 import { useCollectionSlotKeys, useEntitySlots } from "./usePreviewSlots";
 import { Highlighted } from "./SearchHighlight";
@@ -62,6 +62,7 @@ export function EntityCardBinding<M extends Record<string, unknown> = Record<str
     size = "m",
     searchString
 }: EntityCardBindingProps<M>) {
+    const { t } = useTranslation();
     const authController = useAuthController();
     const analyticsController = useAnalyticsController();
     const customizationController = useCustomizationController();
@@ -156,6 +157,7 @@ export function EntityCardBinding<M extends Record<string, unknown> = Record<str
                         onClick={handleCheckboxClick}
                     >
                         <Checkbox
+                            aria-label={t("select_row", { id: String(entity.id) })}
                             checked={selected ?? false}
                             onCheckedChange={handleSelectionChange}
                             size={size === "xs" ? "smallest" : "small"}

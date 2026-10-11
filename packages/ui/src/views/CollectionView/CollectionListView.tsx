@@ -5,6 +5,7 @@ import { Typography } from "../../components/Typography";
 import { Checkbox } from "../../components/Checkbox";
 import { DefaultCellRenderer } from "./DefaultCellRenderer";
 import { cls } from "../../util";
+import { useUiLabels } from "../../hooks/UiLabelsContext";
 import type {
     CollectionPropertyConfig,
     CollectionDataController,
@@ -59,6 +60,7 @@ export function CollectionListView<T extends Record<string, unknown> = Record<st
     emptyComponent,
     className,
 }: CollectionListViewProps<T>) {
+    const labels = useUiLabels();
     const order = useMemo(
         () => propertiesOrder ?? Object.keys(properties),
         [propertiesOrder, properties]
@@ -161,6 +163,7 @@ export function CollectionListView<T extends Record<string, unknown> = Record<st
                     {selectionEnabled && (
                         <div className="flex-shrink-0" onClick={(e) => e.stopPropagation()}>
                             <Checkbox
+                                aria-label={labels.select}
                                 checked={selected}
                                 onCheckedChange={onSelectionChange}
                                 size="small"
@@ -212,7 +215,7 @@ export function CollectionListView<T extends Record<string, unknown> = Record<st
                 </div>
             );
         },
-        [titlePropertyKey, subtitleProperties, cellRenderer, selectionEnabled]
+        [titlePropertyKey, subtitleProperties, cellRenderer, selectionEnabled, labels]
     );
 
     return (
