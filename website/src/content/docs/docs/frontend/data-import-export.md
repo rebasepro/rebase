@@ -62,6 +62,8 @@ The preview lists every cell that does not convert, per column, with how many th
 
 The collection's own rules — required fields, enum options, unique values — are checked by the server as the rows are written, in batches of up to 500 rows (fewer when the rows are wide, so a request stays under about 1 MB). A batch is saved whole or not at all. If a row is refused, the import stops and names it; the batches before it are already saved, and **Retry** resumes from the first row of the refused row's batch.
 
+A row whose id is already in the collection updates that record: the columns the file carries are written, and the others keep their stored values, so a file of `id,price` reprices existing products without repeating their required fields. A new row still needs every required field. A batch that mixes updates and new rows is written as two requests, so a refused new row can leave that batch's updates saved; **Retry** writes them again with the same values.
+
 ### Creating a collection from a file
 
 When you create a collection from a file, each column's type is inferred from its values. A column is a number only if every value in it is a number or text that converts to one exactly, so a column of zip codes, product codes with leading zeros, long SKUs or phone numbers stays text. A column that mixes types (numbers and words, booleans and numbers) is text. Blank cells do not count, so a mostly empty column is not marked required.

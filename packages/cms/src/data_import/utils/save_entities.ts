@@ -1,4 +1,5 @@
-import { CollectionAccessor, Entity, RebaseData } from "@rebasepro/types";
+import { CollectionAccessor, CollectionConfig, Entity, RebaseData } from "@rebasepro/types";
+import { findEntitiesByIds } from "../../util/find_entities_by_ids";
 
 /**
  * Rows written per request, and per transaction where the data source has one.
@@ -123,6 +124,59 @@ function isConflict(error: unknown): boolean {
 }
 
 /**
+ * The server refused a row only for the required columns it leaves out.
+ *
+ * `POST /bulk` with `upsert: true` judges each row as a create, since it may
+ * insert, so a row meant to update a stored record with some of its columns
+ * (`id,price`) is refused as `'name' is required`.
+ */
+function isMissingRequiredOnly(error: unknown): boolean {
+    const violations = (error as { details?: { violations?: unknown } })?.details?.violations;
+    return Array.isArray(violations) && violations.length > 0
+        && violations.every(v => (v as { code?: unknown })?.code === "required");
+}
+
+/**
+ * A batch the bulk upsert refused for missing required columns: the rows whose
+ * id is stored are updates — the given columns are written, the rest keep
+ * their values, as the per-row path and the preview's "overwritten" say — and
+ * the others go back to the bulk upsert, where a new row still needs every
+ * required column. A refusal of one of those names its row in `batch`.
+ */
+async function writeUpdatesAndCreates(accessor: CollectionAccessor,
+    batch: Partial<Entity<any>>[],
+    collection: CollectionConfig,
+    createMany: NonNullable<CollectionAccessor["createMany"]>): Promise<void> {
+
+    const ids = batch.map(entity => entity.id).filter((id): id is string | number => id !== undefined && id !== null && id !== "");
+    const stored = await findEntitiesByIds(accessor, collection, ids);
+    const isUpdate = (entity: Partial<Entity<any>>) => entity.id !== undefined && entity.id !== null && stored.has(String(entity.id));
+
+    const updates = batch.filter(isUpdate);
+    if (updates.length > 0) {
+        if (accessor.updateMany) {
+            await accessor.updateMany(updates.map(entity => ({ id: entity.id as string | number, data: entity.values ?? {} })));
+        } else {
+            for (const entity of updates) await accessor.update(entity.id as string | number, entity.values ?? {});
+        }
+    }
+
+    const creates = batch.map((entity, index) => ({ entity, index })).filter(({ entity }) => !isUpdate(entity));
+    if (creates.length === 0) return;
+    try {
+        await createMany(creates.map(({ entity }) => toBulkRow(entity)), { upsert: true });
+    } catch (e) {
+        // "Row 1" of the rows sent is "Row <n>" of the batch.
+        const message = (e as Error)?.message;
+        const match = typeof message === "string" ? /^Row (\d+)/.exec(message) : null;
+        if (match && creates[Number(match[1])]) {
+            (e as Error).message = `Row ${creates[Number(match[1])].index}` + message.slice(match[0].length);
+        }
+        throw e;
+    }
+}
+
+/**
  * Write one batch, all-or-nothing wherever the data source can.
  *
  * `POST /<collection>/bulk` validates every row before the transaction opens,
@@ -134,7 +188,8 @@ function isConflict(error: unknown): boolean {
 async function writeBatch(accessor: CollectionAccessor,
     batch: Partial<Entity<any>>[],
     bulkUnsupported: { current: boolean },
-    written: { count: number }): Promise<void> {
+    written: { count: number },
+    collection: CollectionConfig | undefined): Promise<void> {
 
     if (accessor.createMany && !bulkUnsupported.current) {
         try {
@@ -142,6 +197,14 @@ async function writeBatch(accessor: CollectionAccessor,
             written.count = batch.length;
             return;
         } catch (e) {
+            if (collection && isMissingRequiredOnly(e) && batch.some(entity => entity.id !== undefined && entity.id !== null && entity.id !== "")) {
+                // Not one transaction any more: a refused create leaves the
+                // updates before it written, and a retry of the batch writes
+                // them again, to the same values.
+                await writeUpdatesAndCreates(accessor, batch, collection, accessor.createMany.bind(accessor));
+                written.count = batch.length;
+                return;
+            }
             if (!isBulkUnsupported(e)) throw e;
             // A data source without bulk writes: remember it, so the failed
             // round trip is not paid again on every later batch.
@@ -186,7 +249,8 @@ export async function saveImportedEntities(dataClient: RebaseData,
         batchSize = IMPORT_BATCH_SIZE,
         maxBatchBytes = IMPORT_BATCH_MAX_BYTES,
         onBatchCommitted = () => undefined,
-        bulkUnsupported = { current: false }
+        bulkUnsupported = { current: false },
+        collection
     }: {
         offset?: number;
         batchSize?: number;
@@ -194,6 +258,12 @@ export async function saveImportedEntities(dataClient: RebaseData,
         maxBatchBytes?: number;
         onBatchCommitted?: (rowsWritten: number) => void;
         bulkUnsupported?: { current: boolean };
+        /**
+         * The collection written to. With it, a row that updates a stored
+         * record with some of its columns is written as an update rather
+         * than refused for the required columns it leaves out.
+         */
+        collection?: CollectionConfig;
     } = {}): Promise<void> {
 
     console.debug("Saving imported data", offset, batchSize);
@@ -209,7 +279,7 @@ export async function saveImportedEntities(dataClient: RebaseData,
         const batch = data.slice(start, batchEnd(data, start, maxRows, maxBatchBytes));
         const written = { count: 0 };
         try {
-            await writeBatch(accessor, batch, bulkUnsupported, written);
+            await writeBatch(accessor, batch, bulkUnsupported, written, collection);
         } catch (e) {
             if (written.count === 0 && batch.length > 1 && isTooLarge(e)) {
                 maxRows = Math.max(1, Math.floor(batch.length / 2));

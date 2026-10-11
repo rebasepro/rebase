@@ -50,7 +50,8 @@ export function ImportSaveInProgress<C extends AdminCollection<any>>
                     committedRef.current = written;
                     setProcessedEntities(written);
                 },
-                bulkUnsupported: bulkUnsupportedRef.current
+                bulkUnsupported: bulkUnsupportedRef.current,
+                collection
             }
         ).then(() => {
             onImportSuccess(collection);
