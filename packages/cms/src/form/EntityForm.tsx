@@ -32,6 +32,7 @@ import { EntityFormActions } from "./EntityFormActions";
 import type { EntityFormActionsProps } from "../types/components/EntityFormActionsProps";
 import { LocalChangesMenu } from "./components/LocalChangesMenu";
 import { useUndoableDiscard } from "./useUndoableDiscard";
+import { ownsKeystroke, registerKeyboardScope } from "./form_keyboard_scope";
 
 import {
     getChangedProperties,
@@ -271,11 +272,25 @@ export function EntityForm<M extends Record<string, unknown>>({
     });
     const formex: FormexController<M> = formexProp ?? internalFormex;
 
+    // One form takes a shortcut: the one the focus is in, else the one
+    // mounted last (the top panel). Registered once per mount, so the order
+    // is the order the forms opened in. See `form_keyboard_scope.ts`.
+    const keyboardScope = useRef<ReturnType<typeof registerKeyboardScope> | undefined>(undefined);
+    useEffect(() => {
+        const scope = registerKeyboardScope(() => formElementRef.current);
+        keyboardScope.current = scope;
+        return () => {
+            scope.unregister();
+            keyboardScope.current = undefined;
+        };
+    }, []);
+
     useEffect(() => {
 
         const handleKeyDown = (e: KeyboardEvent) => {
             // A layer above the form (a dialog, a menu) already acted on it.
             if (isKeyHandled(e)) return;
+            if (!keyboardScope.current || !ownsKeystroke(keyboardScope.current, e)) return;
             const isUndo = (e.metaKey || e.ctrlKey) && !e.shiftKey && e.key.toLowerCase() === "z";
             const isRedo =
                 ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === "z") ||
