@@ -100,7 +100,8 @@ function createFakeServer() {
             async delete(id: string | number) {
                 assertOnline();
                 log.push({ collection: slug, op: "delete", id });
-                table(slug).delete(String(id));
+                // As the real route does: a missing row is a 404, not a no-op.
+                if (!table(slug).delete(String(id))) throw new RebaseApiError("Not found", { status: 404 });
             },
             async deleteMany(ids: (string | number)[]) {
                 assertOnline();

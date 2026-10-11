@@ -59,3 +59,43 @@ describe("an update only ever queued replays under a key (M1)", () => {
         expect(server.rows.get("1")).toMatchObject({ title: "b", status: "review" });
     });
 });
+
+describe("a replay answered 404: the row is gone on the server (M2)", () => {
+    function withRow() {
+        const server = fakeServer();
+        server.rows.set("1", { id: "1", title: "a" });
+        const errors: { error: Error; mutation: PendingMutation }[] = [];
+        const { offline, posts } = manager(server, { onSyncError: (error, mutation) => errors.push({ error, mutation }) });
+        return { server, errors, offline, posts };
+    }
+
+    it("a delete of a row someone else already deleted is done, not undone", async () => {
+        const { server, errors, offline, posts } = withRow();
+        await posts.findById("1");
+        setNavigatorOnLine(false);
+        await posts.delete("1");
+        setNavigatorOnLine(true);
+        server.rows.delete("1");
+
+        expect(await offline.sync()).toEqual({ flushed: 1, remaining: 0 });
+        expect(errors).toEqual([]);
+        expect(offline.api.status().lastError).toBeUndefined();
+        server.state.online = false;
+        await expect(posts.findById("1")).resolves.toBeUndefined();
+    });
+
+    it("an edit of a row deleted elsewhere is reported, and the row does not come back", async () => {
+        const { server, errors, offline, posts } = withRow();
+        await posts.findById("1");
+        setNavigatorOnLine(false);
+        await posts.update("1", { title: "b" });
+        setNavigatorOnLine(true);
+        server.rows.delete("1");
+
+        expect(await offline.sync()).toEqual({ flushed: 0, remaining: 0 });
+        expect(errors).toHaveLength(1);
+        expect(errors[0].mutation.type).toBe("update");
+        server.state.online = false;
+        await expect(posts.findById("1")).resolves.toBeUndefined();
+    });
+});

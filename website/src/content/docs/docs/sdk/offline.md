@@ -146,6 +146,8 @@ const client = createRebaseClient({
 });
 ```
 
+A row someone else deleted is the one case that is not rolled back. A queued `delete` of it did what it was for, so it counts as synced and is not reported. A queued edit of it is reported, and the row is removed from the local database instead of being restored, because the server no longer has it.
+
 The cascade is narrow: an `update` is discarded along with the write it edited, because it can only fail the same way. A later `create` or `delete` for the same row stands on its own and is kept. A discarded write was never sent. It is reported with a `RebaseApiError` whose `code` is `DEPENDENCY_REJECTED` and whose `cause` is the refusal that doomed it, so you can tell it from the write the server actually refused. On 0.23 it carries the refused write's own error instead.
 
 Consecutive edits to one row while offline are merged into a single queued write, so a form being typed into does not grow the queue. If the server refuses the merged write over its contents (a 400, 403 or 422 — say, a field removed by a schema change while the user was offline), the engine splits it back into the separate edits and replays each one. Only the edit the server refuses is rolled back and reported; the others are kept.

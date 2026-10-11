@@ -219,6 +219,11 @@ function isFieldRefusal(error: unknown): boolean {
     return error.status === 400 || error.status === 403 || error.status === 422;
 }
 
+/** The server has no such row — deleted by someone else, or never visible to this user. */
+function isNotFoundError(error: unknown): boolean {
+    return error instanceof RebaseApiError && error.status === 404;
+}
+
 function generateOfflineStringId(): string {
     if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
         return crypto.randomUUID();
@@ -2167,6 +2172,17 @@ data: u.data as AnyRow })),
                             this.patchStatus({ lastError: op.lastError });
                             break;
                         }
+                        // A delete of a row that is already gone did what it
+                        // was for. Rolling it back put a row the server no
+                        // longer has back on screen, and reported the opposite
+                        // of what happened.
+                        if (op.type === "delete" && isNotFoundError(error)) {
+                            this.connectivity.markSuccess();
+                            this.removeLocalRow(op.collection, op.id!, ticket, true);
+                            await this.drop(op, ticket);
+                            flushed++;
+                            continue;
+                        }
                         // Several edits merged into one request, refused as a
                         // whole: maybe over just one of them. Split it back,
                         // and let each edit stand or fall on its own.
@@ -2466,11 +2482,16 @@ data: u.data as AnyRow })),
         for (const dropped of doomed) await this.drop(dropped, ticket);
         if (!this.isCurrent(ticket)) return;
 
+        // An edit refused because its row is gone on the server: the row the
+        // edit started from is not there to restore. Putting it back showed a
+        // row nobody has, and served it offline until something refetched.
+        const goneKey = op.type === "update" && isNotFoundError(error) ? String(op.id) : undefined;
         for (const [idKey, previous] of Object.entries(op.rollback?.rows ?? {})) {
+            const gone = idKey === goneKey;
             // With the doomed writes gone, whatever survives in the queue is
             // what the row should still look like on top of the restored base.
-            const restored = this.applyPendingToRow(op.collection, idKey, previous ?? undefined);
-            if (restored === undefined) this.removeLocalRow(op.collection, idKey, ticket);
+            const restored = this.applyPendingToRow(op.collection, idKey, gone ? undefined : previous ?? undefined);
+            if (restored === undefined) this.removeLocalRow(op.collection, idKey, ticket, gone);
             else this.setLocalRow(op.collection, idKey, restored, ticket);
         }
 
