@@ -412,6 +412,22 @@ export function byIdRead<Inc>(options: ObserveByIdOptions<Inc> | undefined): ByI
     return options?.include !== undefined ? { include: options.include } : undefined;
 }
 
+/**
+ * The bulk route names the row a failure came from — "Row 0 of 1 (id 7)
+ * failed: …" — which is what a caller needs from a 10,000-row import and noise
+ * from `upsert()`, which the caller wrote as one row and which only travels as
+ * a one-row batch. Drops that prefix and nothing else: the error keeps its
+ * class, status, code, details and cause. `createMany` does not call this.
+ */
+const ONE_ROW_BULK_PREFIX = /^Row 0 of 1 \(.*?\) failed: /;
+
+function withoutBulkRowPrefix(error: unknown): unknown {
+    if (error instanceof Error && ONE_ROW_BULK_PREFIX.test(error.message)) {
+        error.message = error.message.replace(ONE_ROW_BULK_PREFIX, "");
+    }
+    return error;
+}
+
 export function createCollectionClient<M extends Record<string, unknown> = Record<string, unknown>>(transport: Transport, slug: string, ws?: RebaseWebSocketClient): CollectionClient<M> {
     const basePath = `/data/${slug}`;
 
@@ -531,6 +547,8 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
                     ...(options?.onConflict?.length ? { onConflict: options.onConflict } : {})
                 }),
                 ...writeHeaders(options)
+            }).catch((error: unknown) => {
+                throw withoutBulkRowPrefix(error);
             });
             // With `returning: false` the bulk route answers the id, not the
             // row — and `create` resolves to nothing there, so this does too.
