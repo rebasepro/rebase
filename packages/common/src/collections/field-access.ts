@@ -119,9 +119,32 @@ export function restrictedFieldNames(
     viewer: FieldViewer | undefined,
     kind: "read" | "write"
 ): { declared: string[]; refused: Set<string> } {
+    const allowed = kind === "read" ? canReadField : canWriteField;
+    return namesWhere(collection, property => !allowed(property, viewer));
+}
+
+/**
+ * The names on this collection that the API does not have, in every spelling
+ * a caller could write them in — the `excludeFromApi` properties, their column
+ * names, and the foreign key of an excluded to-one relation.
+ *
+ * Not the same set as {@link restrictedFieldNames}. A field restricted by role
+ * is public by name: OpenAPI and `list_collections` describe it, and refusing a
+ * query on it with "not readable" tells the caller nothing they could not read
+ * there. An `excludeFromApi` field is described nowhere, so a query naming one
+ * has to be answered as a query naming a column that does not exist — anything
+ * else confirms that it does.
+ */
+export function apiHiddenFieldNames(collection: CollectionConfig): Set<string> {
+    return namesWhere(collection, property => Boolean(property?.excludeFromApi)).refused;
+}
+
+function namesWhere(
+    collection: CollectionConfig,
+    restricted: (property: Property) => boolean
+): { declared: string[]; refused: Set<string> } {
     const declared: string[] = [];
     const refused = new Set<string>();
-    const allowed = kind === "read" ? canReadField : canWriteField;
     const properties = collection.properties ?? {};
     // Resolved only when a restricted property is a relation, which is rare:
     // the read strip runs this on every row.
@@ -133,7 +156,7 @@ export function restrictedFieldNames(
     };
 
     for (const [name, property] of Object.entries(properties)) {
-        if (allowed(property as Property, viewer)) continue;
+        if (!restricted(property as Property)) continue;
         restrict(name);
         const columnName = (property as Property).columnName;
         if (columnName) refused.add(columnName);

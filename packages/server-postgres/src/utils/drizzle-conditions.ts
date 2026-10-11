@@ -9,9 +9,12 @@ import {
 } from "@rebasepro/types";
 import {
     canReadField,
+    queryableFieldNames,
+    unknownFilterField,
+    unknownRelationTargetField,
     fieldKeyForColumn, getColumnName, getTableName, normalizeToEntityRelation, resolveCollectionRelations, toFilterTuples
 } from "@rebasepro/common";
-import { currentFieldViewer } from "../services/field-viewer";
+import { currentFieldViewer, namesHiddenFromCaller } from "../services/field-viewer";
 import { generateForeignKeyName, splitSearchTerms, toWireKey } from "@rebasepro/utils";
 /**
  * Postgres's own default for `pg_trgm.word_similarity_threshold`. Named here
@@ -47,6 +50,27 @@ import { columnNamed, getColumnMeta } from "../services/collection-helpers";
  *    have and has satisfied itself that widening is safe there.
  */
 export type UnknownFilterFieldsMode = "error" | "warn";
+
+
+/**
+ * The fields an unknown-field answer lists, sorted — never an `excludeFromApi`
+ * one, for any caller: the list is a hint for a typo, and naming a hidden
+ * column there answers the question the unknown-field answer leaves open.
+ *
+ * Read off the collection when there is one, with the function the REST check
+ * uses to answer a query on a hidden field — so its answer and this one are
+ * the same bytes. Off the table only when no collection is in hand.
+ */
+export function listedColumnKeys(table: PgTable<any>, collection: CollectionConfig | undefined): string[] {
+    if (collection) return queryableFieldNames(collection);
+    try {
+        return Object.keys(getTableColumns(table)).sort();
+    } catch {
+        // A table stand-in without Drizzle's column symbols — the message is
+        // worth less without the list, but not worth failing over.
+        return [];
+    }
+}
 
 /**
  * A user's search term, made safe to drop inside a `%…%` LIKE pattern.
@@ -739,29 +763,32 @@ export class DrizzleConditionBuilder {
             if (foreignKey) return { kind: "column", column: foreignKey };
         }
 
+        return this.unknownFilterField(table, field, collectionPath, mode, collection);
+    }
+
+    /**
+     * The answer to a filter field that names nothing. Built by the function
+     * the REST check answers an `excludeFromApi` field with, so the two cannot
+     * be told apart by a byte.
+     */
+    private static unknownFilterField(
+        table: PgTable<any>,
+        field: string,
+        collectionPath: string,
+        mode: UnknownFilterFieldsMode,
+        collection: CollectionConfig | undefined
+    ): undefined {
         if (mode === "warn") {
             logger.warn(`Filtering by field '${field}', but it does not exist in table for collection '${collectionPath}'`);
             return undefined;
-        }
-
-        let validFields: string[] = [];
-        try {
-            validFields = Object.keys(getTableColumns(table)).sort();
-        } catch {
-            // A table stand-in without Drizzle's column symbols — the message
-            // is worth less without the list, but not worth failing over.
         }
 
         // Not `expected`: unlike an anonymous token refresh, this is never a
         // routine outcome. It means a filter key and the schema have drifted
         // apart, which used to widen results silently — exactly the thing an
         // operator wants in the log at warn.
-        throw ApiError.badRequest(
-            `Unknown filter field '${field}' on collection '${collectionPath}'` +
-            (validFields.length > 0 ? `. Valid fields: ${validFields.join(", ")}` : ""),
-            "UNKNOWN_FILTER_FIELD",
-            { field, collection: collectionPath, ...(validFields.length > 0 && { validFields }) }
-        );
+        const answer = unknownFilterField(field, collectionPath, listedColumnKeys(table, collection));
+        throw ApiError.badRequest(answer.message, answer.code, answer.details);
     }
 
     /**
@@ -816,26 +843,12 @@ export class DrizzleConditionBuilder {
                 ? targetTable[path.fieldKey as keyof typeof targetTable] as AnyPgColumn
                 : undefined);
         if (!targetColumn) {
-            let validFields: string[] = [];
-            try {
-                validFields = Object.keys(getTableColumns(targetTable)).sort();
-            } catch {
-                // Same tolerance as the column path: a table stand-in without
-                // Drizzle's column symbols still gets the error, just no list.
-            }
-            throw ApiError.badRequest(
-                `Unknown field '${path.fieldKey}' on '${targetCollection.slug}', the target of relation ` +
-                `'${path.relationKey}' on collection '${collectionPath}'` +
-                (validFields.length > 0 ? `. Valid fields: ${validFields.join(", ")}` : ""),
-                "UNKNOWN_FILTER_FIELD",
-                {
-                    field,
-                    collection: collectionPath,
-                    relation: path.relationKey,
-                    targetCollection: targetCollection.slug,
-                    ...(validFields.length > 0 && { validFields })
-                }
+            const answer = unknownRelationTargetField(
+                { field, relationKey: path.relationKey, fieldKey: path.fieldKey },
+                { slug: targetCollection.slug, validFields: listedColumnKeys(targetTable, targetCollection) },
+                collectionPath
             );
+            throw ApiError.badRequest(answer.message, answer.code, answer.details);
         }
 
         // The column on *this* table the subquery correlates back to. Only
@@ -1533,7 +1546,11 @@ export class DrizzleConditionBuilder {
         collectionPath: string,
         correlateTo?: unknown
     ): SQL {
-        const relation = resolveCollectionRelations(collection)[spec.relation];
+        // A relation the API does not have is not a relation there, for this
+        // caller — the same answer, byte for byte, as one never declared.
+        const relation = namesHiddenFromCaller(collection).has(spec.relation)
+            ? undefined
+            : resolveCollectionRelations(collection)[spec.relation];
         if (!relation) {
             throw ApiError.badRequest(
                 `Cannot sort by '${encodeRelationAggregateSort(spec)}' on collection '${collectionPath}': ` +
@@ -1566,17 +1583,14 @@ export class DrizzleConditionBuilder {
         // never got this far — `parseRelationAggregateSort` refuses it.
         let aggregand: SQL = sql`*`;
         if (spec.field) {
-            const column = relationColumn(targetTable, targetCollection, spec.field)
-                ?? (spec.field in targetTable
-                    ? targetTable[spec.field as keyof typeof targetTable] as AnyPgColumn
-                    : undefined);
+            const column = namesHiddenFromCaller(targetCollection).has(spec.field)
+                ? undefined
+                : relationColumn(targetTable, targetCollection, spec.field)
+                    ?? (spec.field in targetTable
+                        ? targetTable[spec.field as keyof typeof targetTable] as AnyPgColumn
+                        : undefined);
             if (!column) {
-                let validFields: string[] = [];
-                try {
-                    validFields = Object.keys(getTableColumns(targetTable)).sort();
-                } catch {
-                    // A table stand-in without Drizzle's column symbols.
-                }
+                const validFields = listedColumnKeys(targetTable, targetCollection);
                 throw ApiError.badRequest(
                     `Unknown field '${spec.field}' on '${targetCollection.slug}', the target of relation ` +
                     `'${spec.relation}' on collection '${collectionPath}'` +

@@ -1,5 +1,6 @@
 import { AsyncLocalStorage } from "node:async_hooks";
-import type { FieldViewer } from "@rebasepro/common";
+import { apiHiddenFieldNames, type FieldViewer } from "@rebasepro/common";
+import type { CollectionConfig } from "@rebasepro/types";
 
 /**
  * Who the current read is *for*, available to the row walk without threading it
@@ -62,3 +63,22 @@ export function withFieldViewer<T>(viewer: FieldViewer | undefined, fn: () => T)
 export function currentFieldViewer(): FieldViewer | undefined {
     return storage.getStore();
 }
+
+/**
+ * The names an API caller's query may not see on `collection`: its
+ * `excludeFromApi` fields, in every spelling. Empty on the trusted server plane
+ * (no viewer), which may filter and sort on those columns — the auth adapter
+ * looks rows up by them — and empty with no collection in hand.
+ *
+ * A query naming one of these is answered exactly as a query naming a column
+ * the table does not have. The REST check passes such a name through to this
+ * driver rather than refusing it itself, so the two answers come from one throw
+ * and cannot drift: a "not readable" there would confirm a column OpenAPI and
+ * `list_collections` hide.
+ */
+export function namesHiddenFromCaller(collection: CollectionConfig | undefined): ReadonlySet<string> {
+    if (!collection || currentFieldViewer() === undefined) return NO_NAMES;
+    return apiHiddenFieldNames(collection);
+}
+
+const NO_NAMES: ReadonlySet<string> = new Set();

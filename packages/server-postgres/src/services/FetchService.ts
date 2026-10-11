@@ -2,9 +2,10 @@ import { and, asc, count, desc, eq, getTableColumns, getTableName, gt, is, isNot
 import { AnyPgColumn, PgTable, PgTimestamp, PgTimestampString } from "drizzle-orm/pg-core";
 import { CollectionConfig, FilterValues, INCLUDE_COUNT_KEY, JUNCTION_PIVOT_KEY, MAX_INCLUDE_DEPTH, OrderByTuple, ResolvedRelation, LogicalCondition, parseRelationAggregateSort } from "@rebasepro/types";
 import type { IncludeSpec, NullsPlacement, ReadOperation, ReadQuery, VectorSearchParams } from "@rebasepro/types";
-import { resolveCollectionRelations, findRelation, fieldKeyForColumn, createRelationRefWithData, hasFieldAccessRules, normalizeDriverOrderBy, normalizeInclude, encodeCursor, type IncludeNode, type NormalizedInclude } from "@rebasepro/common";
+import { includableRelationNames, queryableFieldNames, unknownIncludeRelation, unknownOrderByField, unknownProjectionField, resolveCollectionRelations, findRelation, fieldKeyForColumn, createRelationRefWithData, hasFieldAccessRules, normalizeDriverOrderBy, normalizeInclude, encodeCursor, type IncludeNode, type NormalizedInclude } from "@rebasepro/common";
 import { generateForeignKeyName, toWireKey } from "@rebasepro/utils";
-import { DrizzleConditionBuilder, getUnknownFilterFieldsMode, type FilterCompilationOptions } from "../utils/drizzle-conditions";
+import { DrizzleConditionBuilder, getUnknownFilterFieldsMode, listedColumnKeys, type FilterCompilationOptions } from "../utils/drizzle-conditions";
+import { namesHiddenFromCaller } from "./field-viewer";
 import { enableIterativeScan, inTransaction, iterativeScansAvailable } from "./vector-iterative-scan";
 import {
     getCollectionByPath,
@@ -107,6 +108,10 @@ export function numericAggregateAliases(
  * {@link canReadRelation} in `loadIncludes`), as the row strip omits any
  * withheld field from a row; a request that *names* one as what to read or
  * sort by is refused, naming it — field names are public, values are not.
+ *
+ * Except an `excludeFromApi` relation's name, which is not public. Its callers
+ * answer it as a relation the collection does not declare before they get
+ * here, so reaching this with one is a missed door — refused all the same.
  */
 function assertRelationReadable(
     collection: CollectionConfig,
@@ -365,7 +370,11 @@ export class FetchService {
         // Ordering the parents by a relation's count is a reading of it, as
         // `orderBy=salary` is of a column. An unknown relation is left to the
         // builder below, which refuses it naming the ones there are.
-        const sorted = findRelation(resolveCollectionRelations(collection), spec.relation);
+        // A relation the API does not have is the builder's to refuse too, as
+        // the unknown relation it is for this caller.
+        const sorted = namesHiddenFromCaller(collection).has(spec.relation)
+            ? undefined
+            : findRelation(resolveCollectionRelations(collection), spec.relation);
         if (sorted) assertRelationReadable(collection, spec.relation, sorted, "`orderBy`");
         const primaryKeys = getPrimaryKeys(collection, this.registry);
         const idColumn = primaryKeys.length === 1
@@ -572,24 +581,10 @@ target });
             return undefined;
         }
 
-        let validFields: string[] = [];
-        try {
-            validFields = Object.keys(getTableColumns(table)).sort();
-        } catch {
-            // A table stand-in without Drizzle's column symbols — the message
-            // is worth less without the list, but not worth failing over.
-        }
-
-        throw ApiError.badRequest(
-            `Unknown orderBy field '${orderBy}'${onCollection}` +
-            (validFields.length > 0 ? `. Valid fields: ${validFields.join(", ")}` : ""),
-            "UNKNOWN_ORDER_BY_FIELD",
-            {
-                field: orderBy,
-                ...(collectionName && { collection: collectionName }),
-                ...(validFields.length > 0 && { validFields })
-            }
-        );
+        // The REST check answers an `excludeFromApi` sort key with the same
+        // function, so a hidden field and a typo cannot be told apart.
+        const answer = unknownOrderByField(orderBy, collectionName, listedColumnKeys(table, collection));
+        throw ApiError.badRequest(answer.message, answer.code, answer.details);
     }
 
     // =============================================================
@@ -638,15 +633,12 @@ target });
             if (wildcard && key in resolvedRelations) continue;
             const relation = resolvedRelations[key];
             if (!relation) {
-                const known = Object.keys(resolvedRelations).sort();
-                throw ApiError.badRequest(
-                    `Unknown relation '${key}' on collection '${collection.slug ?? collection.name}'`
-                    + (known.length > 0
-                        ? `. Its relations are: ${known.join(", ")}`
-                        : ". It declares no relations."),
-                    "UNKNOWN_RELATION",
-                    { relation: key, collection: collection.slug ?? collection.name, ...(known.length > 0 && { validRelations: known }) }
+                // The REST check answers an include of an `excludeFromApi`
+                // relation with the same function, and neither lists one.
+                const answer = unknownIncludeRelation(
+                    key, collection.slug ?? collection.name, includableRelationNames(collection)
                 );
+                throw ApiError.badRequest(answer.message, answer.code, answer.details);
             }
             out.push({ key, node, relation });
         }
@@ -997,13 +989,12 @@ target });
             // `fields` too is how a caller says to return it. Read as a typo,
             // `fields=title,author&include=author` was a 400 on every door.
             if (name in relations) continue;
-            throw ApiError.badRequest(
-                `Unknown field '${name}' in \`fields\` on collection `
-                + `'${collection.slug ?? collection.name}'. Valid fields: `
-                + Object.keys(available).sort().join(", "),
-                "UNKNOWN_FIELD",
-                { field: name, collection: collection.slug ?? collection.name }
+            // The REST check answers an `excludeFromApi` field with the same
+            // function, so a hidden field and a typo cannot be told apart.
+            const answer = unknownProjectionField(
+                name, collection.slug ?? collection.name, queryableFieldNames(collection)
             );
+            throw ApiError.badRequest(answer.message, answer.code, answer.details);
         }
         return projection;
     }

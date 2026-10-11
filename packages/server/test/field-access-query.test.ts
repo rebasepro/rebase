@@ -75,10 +75,29 @@ describe("a query naming an unreadable field", () => {
             .toBe("FIELD_NOT_READABLE");
     });
 
-    it("refuses an `excludeFromApi` column under either of its spellings", () => {
-        expect(refusal(() => parseQueryOptions({ passwordHash: "eq.x" }, {}, admin)).code)
-            .toBe("FIELD_NOT_READABLE");
-        expect(refusal(() => parseQueryOptions({ password_hash: "eq.x" }, {}, admin)).code)
+    it("answers an `excludeFromApi` column, under either spelling, as a column that does not exist", () => {
+        // Its name is not public, so "not readable" would confirm it exists.
+        // The answer is byte-for-byte the driver's to a typo — pinned against
+        // Postgres in server-postgres `hidden-field-oracle-e2e.test.ts`.
+        const cases: [Record<string, string>, string][] = [
+            [{ passwordHash: "eq.x" }, "UNKNOWN_FILTER_FIELD"],
+            [{ password_hash: "eq.x" }, "UNKNOWN_FILTER_FIELD"],
+            [{ orderBy: "passwordHash" }, "UNKNOWN_ORDER_BY_FIELD"],
+            [{ fields: "id,password_hash" }, "UNKNOWN_FIELD"]
+        ];
+        for (const [query, code] of cases) {
+            const error = refusal(() => parseQueryOptions(query, {}, admin));
+            expect(error.code).toBe(code);
+            expect(error.message).not.toMatch(/Valid fields:.*password/i);
+        }
+    });
+
+    it("still answers a field restricted by role as unreadable — its name is public", () => {
+        expect(refusal(() => parseQueryOptions({ salary: "gt.1" }, {}, clerk)).code).toBe("FIELD_NOT_READABLE");
+    });
+
+    it("still refuses an `excludeFromApi` column where the driver has no unknown-field answer", () => {
+        expect(refusal(() => assertReadableFields(["passwordHash"], staff, { roles: ["admin"] }, "groupBy")).code)
             .toBe("FIELD_NOT_READABLE");
     });
 });
@@ -265,7 +284,7 @@ describe("a relation an include loads", () => {
 
     it("refuses a fields projection naming one", () => {
         expect(refusal(() => parseQueryOptions(
-            include({ staff: { fields: ["name", "passwordHash"] } }), {}, as(["admin"])
+            include({ staff: { fields: ["name", "salary"] } }), {}, as(["staff"])
         )).code).toBe("FIELD_NOT_READABLE");
     });
 

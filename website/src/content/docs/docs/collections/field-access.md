@@ -108,7 +108,9 @@ Naming it anywhere else is refused like a field (see [Queries](#queries)).
 ### Queries
 
 A `where`, `orderBy`, `fields`, aggregate `select` or `groupBy` naming a field you
-cannot read is a **400 `FIELD_NOT_READABLE`**. So is a relation you cannot read
+cannot read is a **400 `FIELD_NOT_READABLE`**. So is a filter through a relation
+on a field of its target you cannot read (`?author.salary=gt.1`), an aggregate
+sort over one (`orderBy=max(staff.salary)`), and a relation you cannot read
 named in a nested path (`/departments/1/members`, `/departments/1/members/7`) or
 an aggregate sort (`orderBy=count(members)`):
 
@@ -141,6 +143,14 @@ served off the app, not off the authenticated data router — so field names are
 already public. Hiding the name here would protect nothing and would answer a
 caller's genuine typo with "unknown field", sending them to look for a spelling
 mistake that is not there. **Field names are public; field values are not.**
+
+Except an `excludeFromApi` field's. OpenAPI, `list_collections` and the generated
+SDK leave it out, so its name is not public, and "not readable" would confirm it
+exists. A filter, `orderBy`, `fields` or `include` naming one gets exactly the
+answer a misspelt name gets — `UNKNOWN_FILTER_FIELD`, `UNKNOWN_ORDER_BY_FIELD`,
+`UNKNOWN_FIELD` or `UNKNOWN_RELATION`, the same message and details — and no
+unknown-field answer lists it among the valid fields. In an aggregate `select` or
+`groupBy` and in `vector_search` it is still refused with `FIELD_NOT_READABLE`.
 
 ### Writes
 

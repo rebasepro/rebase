@@ -26,7 +26,7 @@ import {
     prepareUserCreations,
     type UserCreatingAdapter
 } from "./auth-collection-writes";
-import { findRelation, getJunctionConfigForRelation, getTableName, resolveCollectionRelations, resolvePrimaryKeys } from "@rebasepro/common";
+import { apiHiddenFieldNames, findRelation, getJunctionConfigForRelation, getTableName, resolveCollectionRelations, resolvePrimaryKeys } from "@rebasepro/common";
 import {
     createIdempotencyStore,
     IDEMPOTENCY_HEADER,
@@ -675,7 +675,11 @@ export class RestApiGenerator {
         let relation: ResolvedRelation | undefined;
         for (let i = 2; i < segments.length; i += 2) {
             const current = chain[chain.length - 1];
-            relation = findRelation(resolveCollectionRelations(current), segments[i]);
+            // An `excludeFromApi` relation is one the API does not have: a
+            // segment naming it names nothing, in the same words as a typo.
+            relation = apiHiddenFieldNames(current).has(segments[i])
+                ? undefined
+                : findRelation(resolveCollectionRelations(current), segments[i]);
             if (!relation) {
                 throw new ApiError(
                     404,

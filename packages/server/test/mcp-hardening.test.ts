@@ -819,11 +819,15 @@ describe("query_collection applies the field read rules to what it filters and s
         expect(fetches).toHaveLength(0);
     });
 
-    it("refuses an `excludeFromApi` column in either position, for any role", async () => {
+    it("refuses an `excludeFromApi` column in either position, for any role, as a column that does not exist", async () => {
+        // `list_collections` does not describe it, so "not readable" would
+        // confirm it is there.
         for (const args of [{ where: { inviteToken: ["==", "t"] } }, { orderBy: "inviteToken" }]) {
             const { body, fetches } = await query(args, ["admin"]);
             expect(body.result?.isError).toBe(true);
-            expect(body.result?.content[0].text).toContain("'inviteToken' is not readable");
+            const text = body.result?.content[0].text ?? "";
+            expect(text).toMatch(/Unknown (filter|orderBy) field 'inviteToken'/);
+            expect(text).not.toContain("not readable");
             expect(fetches).toHaveLength(0);
         }
     });

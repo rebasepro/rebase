@@ -129,17 +129,28 @@ describe("the socket's request frames", () => {
         expect(frame.payload?.error?.message).toContain(`'${field}'`);
     };
 
+    /**
+     * An `excludeFromApi` field is described nowhere, so it is answered as the
+     * column it might as well not be — "not readable" would confirm it.
+     */
+    const unknownFor = (frame: Frame, field: string, code = "UNKNOWN_FILTER_FIELD") => {
+        expect(frame.type).toBe("ERROR");
+        expect(frame.payload?.error?.code).toBe(code);
+        expect(frame.payload?.error?.message).toContain(`'${field}'`);
+        expect(frame.payload?.error?.message).not.toContain("not readable");
+    };
+
     it("refuses a COUNT filtered on an excludeFromApi field", async () => {
         const { ws, send } = await connect(["user"]);
         await send({ type: "COUNT", requestId: "c", payload: { path: "staff", filter: { passwordHash: ["like", "$2b$10$A%"] } } });
-        refusedFor(lastFrame(ws), "passwordHash");
+        unknownFor(lastFrame(ws), "passwordHash");
         expect(driver.count).not.toHaveBeenCalled();
     });
 
     it("refuses it by the column's own name too", async () => {
         const { ws, send } = await connect(["user"]);
         await send({ type: "COUNT", requestId: "c", payload: { path: "staff", filter: { password_hash: ["like", "a%"] } } });
-        refusedFor(lastFrame(ws), "password_hash");
+        unknownFor(lastFrame(ws), "password_hash");
         expect(driver.count).not.toHaveBeenCalled();
     });
 
@@ -203,8 +214,10 @@ describe("the socket's request frames", () => {
 
     it("refuses a CHECK_UNIQUE_FIELD on a field the caller cannot read", async () => {
         const { ws, send } = await connect(["user"]);
+        await send({ type: "CHECK_UNIQUE_FIELD", requestId: "u", payload: { path: "staff", name: "salary", value: 1 } });
+        refusedFor(lastFrame(ws), "salary");
         await send({ type: "CHECK_UNIQUE_FIELD", requestId: "u", payload: { path: "staff", name: "passwordHash", value: "hash-a" } });
-        refusedFor(lastFrame(ws), "passwordHash");
+        unknownFor(lastFrame(ws), "passwordHash");
         expect(driver.checkUniqueField).not.toHaveBeenCalled();
     });
 
@@ -224,10 +237,10 @@ describe("the socket's request frames", () => {
         }
     });
 
-    it("refuses the excludeFromApi field to admin as well", async () => {
+    it("refuses the excludeFromApi field to admin as well, as a field that does not exist", async () => {
         const { ws, send } = await connect(["admin"]);
         await send({ type: "FETCH_COLLECTION", requestId: "f", payload: { path: "staff", orderBy: "passwordHash" } });
-        refusedFor(lastFrame(ws), "passwordHash");
+        unknownFor(lastFrame(ws), "passwordHash", "UNKNOWN_ORDER_BY_FIELD");
     });
 });
 
@@ -257,7 +270,7 @@ describe("subscribe_collection", () => {
     it("refuses a subscription filtered on a field the subscriber cannot read, and stores nothing", async () => {
         await subscribe({ filter: { passwordHash: ["like", "$2b$10$A%"] } });
         expect(frames()).toEqual([
-            expect.objectContaining({ type: "error", payload: expect.objectContaining({ error: expect.objectContaining({ code: "FIELD_NOT_READABLE" }) }) })
+            expect.objectContaining({ type: "error", payload: expect.objectContaining({ error: expect.objectContaining({ code: "UNKNOWN_FILTER_FIELD" }) }) })
         ]);
         expect(realtime.subscriptions.has("s1")).toBe(false);
     });

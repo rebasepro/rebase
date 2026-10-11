@@ -1,5 +1,6 @@
 import { CollectionConfig, ResolvedRelation } from "@rebasepro/types";
-import { findRelation, resolveCollectionRelations } from "@rebasepro/common";
+import { apiHiddenFieldNames, findRelation, resolveCollectionRelations } from "@rebasepro/common";
+import { namesHiddenFromCaller } from "./field-viewer";
 import { ApiError } from "@rebasepro/server";
 
 import { getCollectionByPath } from "./collection-helpers";
@@ -68,10 +69,15 @@ export function resolveNestedPath(
     for (let i = 2; i < segments.length; i += 2) {
         const relationKey = segments[i];
         const resolvedRelations = resolveCollectionRelations(parentCollection);
-        const relation = findRelation(resolvedRelations, relationKey);
+        // A relation the API does not have is a segment that names nothing,
+        // for this caller — and is never offered among the ones there are.
+        const relation = namesHiddenFromCaller(parentCollection).has(relationKey)
+            ? undefined
+            : findRelation(resolvedRelations, relationKey);
 
         if (!relation) {
-            const available = Object.keys(resolvedRelations).join(", ") || "(none)";
+            const apiHidden = apiHiddenFieldNames(parentCollection);
+            const available = Object.keys(resolvedRelations).filter(key => !apiHidden.has(key)).join(", ") || "(none)";
             // A path segment naming a relation the collection does not declare
             // is a bad URL, not a server fault. It answered 500 INTERNAL_ERROR,
             // which tells the caller to retry or report an outage over a
