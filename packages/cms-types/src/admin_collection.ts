@@ -457,9 +457,10 @@ export type AdminCollectionOptions<
     sideDialogWidth?: number | string;
 
     /**
-     * If set to true, the default values of the properties will be applied
-     * to the entity every time the entity is updated (not only when created).
-     * Defaults to false.
+     * If set to true, opening an existing record in the form fills each
+     * property's declared `defaultValue` into a value the record leaves empty
+     * (`null` or missing, inside maps too), so the next save writes it.
+     * Stored values, `false` and `0` included, are kept. Defaults to false.
      */
     alwaysApplyDefaultValues?: boolean;
 

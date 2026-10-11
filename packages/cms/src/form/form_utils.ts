@@ -5,7 +5,7 @@ import type { AuthController } from "@rebasepro/cms-types";
 import { deepEqual as equal } from "fast-equals";
 import { getIn, setIn } from "@rebasepro/forms";
 import { buildConditionContext, evaluateCondition, getCopyValues, getDefaultValuesFor } from "@rebasepro/common";
-import { isPlainObject, mergeDeep } from "@rebasepro/utils";
+import { isPlainObject } from "@rebasepro/utils";
 import { z } from "zod";
 
 // extract touched values for nested touched trees and map to current values
@@ -296,6 +296,30 @@ function withConditionalDefaults<M extends Record<string, unknown>>(
     return result;
 }
 
+/**
+ * `alwaysApplyDefaultValues`: a property's declared `defaultValue` fills a
+ * stored value that is empty, inside maps too.
+ *
+ * A Postgres row carries every column, an unset one as `null`, so merging the
+ * defaults *under* the row let `null` win and the flag did nothing. `false`,
+ * `0` and `""` are values the row holds, and are kept.
+ */
+function fillDeclaredDefaults(properties: AdminCollection["properties"], values: Record<string, unknown>): Record<string, unknown> {
+    const result: Record<string, unknown> = { ...values };
+    for (const [key, property] of Object.entries(properties ?? {})) {
+        if (!property || typeof property !== "object" || !("type" in property)) continue;
+        const current = result[key];
+        if (current === null || current === undefined) {
+            if (property.defaultValue !== undefined && property.defaultValue !== null) {
+                result[key] = property.defaultValue;
+            }
+        } else if (property.type === "map" && property.properties && isPlainObject(current)) {
+            result[key] = fillDeclaredDefaults(property.properties as AdminCollection["properties"], current as Record<string, unknown>);
+        }
+    }
+    return result;
+}
+
 export function getInitialEntityValues<M extends Record<string, unknown>>(
     authController: AuthController,
     collection: AdminCollection,
@@ -310,8 +334,7 @@ export function getInitialEntityValues<M extends Record<string, unknown>>(
         if (!collection.alwaysApplyDefaultValues) {
             values = entity.values ?? getDefaultValuesFor(properties);
         } else {
-            const defaultValues = getDefaultValuesFor(properties);
-            values = mergeDeep(defaultValues, entity.values ?? {});
+            values = fillDeclaredDefaults(properties, entity.values ?? {}) as Partial<EntityValues<M>>;
         }
         // A copy gets its own key, and leaves behind every relation it could
         // only take by re-pointing another row — see `getCopyValues`.

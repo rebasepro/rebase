@@ -301,7 +301,7 @@ Inside `admin`, except `history`, which is a backend feature and stays at the to
 | `hideIdFromCollection` | `boolean` | `false` | Hide the ID column from the table |
 | `includeJsonView` | `boolean` | `true` | Offer the raw values in the record inspector |
 | `history` | `boolean` | `false` | Track changes in entity history |
-| `alwaysApplyDefaultValues` | `boolean` | `false` | Apply default values on every save |
+| `alwaysApplyDefaultValues` | `boolean` | `false` | When an existing record opens in the form, fill each property's declared `defaultValue` into a value the record leaves empty (`null` or missing), so the next save writes it |
 | `previewProperties` | `string[]` | — | Properties to display in reference previews |
 | `display` | `EntityDisplay` | — | What fills each display role — see [Entity display](#entity-display) |
 
