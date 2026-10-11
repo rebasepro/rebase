@@ -44,6 +44,23 @@ export function createStaticAppResolver(
     };
 }
 
+/**
+ * The static apps that sit under the API's base path, and so are never served.
+ *
+ * The API's routes are mounted first and every app's fallback declines the API
+ * base path, so an app at or under it answers nothing. The reserved-path rule
+ * the CLI applies names the default `/api`; only the runtime knows
+ * `REBASE_BASE_PATH`, so a moved API is checked here.
+ */
+export function staticAppsShadowedByApi(
+    apps: readonly LoadedStaticApp[],
+    apiBasePath: string
+): LoadedStaticApp[] {
+    const base = apiBasePath.replace(/\/+$/, "");
+    if (base === "") return [];
+    return apps.filter(app => isUnderPath(app.path.replace(/\/+$/, "") || "/", base));
+}
+
 /** How one static app is mounted: what `serveSPA` needs beyond its own build. */
 export interface StaticAppMount {
     app: LoadedStaticApp;

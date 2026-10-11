@@ -5,6 +5,7 @@ import {
     BUNDLE_FORMAT_VERSION,
     RUNTIME_CONTRACT_VERSION,
     isValidAppHost,
+    reservedPrefixFor,
     type CollectionConfig,
     type CollectionCallbacks,
     type DataSourceDefinition,
@@ -276,6 +277,7 @@ export function loadBundle(bundleDir: string): LoadedBundle {
                 // Before the directory check, so a bad hostname is reported
                 // even on an app whose build is missing.
                 const host = readStaticAppHost(item);
+                refuseReservedStaticPath(item);
                 const resolved = resolveEntry(item.dir, `static app "${item.path}"`);
                 if (!resolved) return undefined;
                 return {
@@ -290,6 +292,24 @@ export function loadBundle(bundleDir: string): LoadedBundle {
             .filter((item): item is LoadedStaticApp => item !== undefined)
             .sort(compareStaticApps)
     };
+}
+
+/**
+ * Refuse a static app at a path the backend owns (`/api`, `/health`, …).
+ *
+ * The CLI and the control plane refuse it with the same function, so a bundle
+ * that reaches here with one was written by something else. Mounted, the app
+ * would sit under routes that answer first: an app nobody can reach, booted
+ * without a word.
+ */
+function refuseReservedStaticPath(item: RebaseBundleStatic): void {
+    const reserved = reservedPrefixFor(item.path);
+    if (!reserved) return;
+    const name = item.name ?? path.basename(item.dir);
+    throw new BundleError(
+        `Static app "${name}" is at ${item.path}, under ${reserved}, which the backend serves.`,
+        "Move the app to another path in rebase.json and rebuild with `rebase build`."
+    );
 }
 
 /**

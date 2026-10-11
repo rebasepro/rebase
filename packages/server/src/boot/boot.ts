@@ -45,7 +45,7 @@ import {
     type LoadedBundle
 } from "./bundle";
 import { resolveDataSources, resolveStorageSources } from "./sources";
-import { planStaticAppMounts } from "./static-routing";
+import { planStaticAppMounts, staticAppsShadowedByApi } from "./static-routing";
 import { bundleResolutionRoots, initializeDataSources, probeDataSource, type InitializedDataSource } from "./driver";
 import { resolveRlsAuditOptions } from "./rls-audit-option";
 import { resolveAuthOptions } from "./options";
@@ -503,6 +503,12 @@ export async function bootFromBundle(options: BootOptions = {}): Promise<BootedR
     // the site's index.html at the admin's URL. `planStaticAppMounts` decides
     // which rule does that.
     if (env.REBASE_SERVE_STATIC) {
+        for (const shadowed of staticAppsShadowedByApi(bundle.staticApps, env.REBASE_BASE_PATH)) {
+            logger.error(
+                `Static app at ${shadowed.path} is under the API's base path ${env.REBASE_BASE_PATH} ` +
+                "(REBASE_BASE_PATH), so it is never served. Move the app in rebase.json, or the API with REBASE_BASE_PATH."
+            );
+        }
         for (const { app: staticApp, siblingPaths, owns } of planStaticAppMounts(bundle.staticApps)) {
             logger.info("Serving static assets", {
                 path: staticApp.dir,
