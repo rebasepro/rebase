@@ -282,6 +282,7 @@ export const MultiSelect = React.forwardRef<
                             ref={inputRef ?? ref}
                             id={id}
                             disabled={disabled}
+                            aria-invalid={error || undefined}
                             aria-label={ariaLabel ?? (typeof label === "string" ? label : undefined)}
                             onClick={handleTogglePopover}
                             className={bare

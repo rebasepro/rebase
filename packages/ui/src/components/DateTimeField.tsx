@@ -344,6 +344,7 @@ export const DateTimeField: React.FC<DateTimeFieldProps> = ({
                     aria-label={label ? undefined : ariaLabel}
                     type={mode === "date_time" ? "datetime-local" : "date"}
                     lang={locale}
+                    aria-invalid={error || undefined}
                     value={isTyping ? internalValue : displayValue}
                     onChange={handleInputChange}
                     onFocus={handleFocus}
