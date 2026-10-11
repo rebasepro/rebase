@@ -4,7 +4,7 @@
 import React from "react";
 import { describe, expect, it, jest } from "@jest/globals";
 import { act, render, screen, waitFor } from "@testing-library/react";
-import type { Entity } from "@rebasepro/types";
+import { RebaseApiError, type Entity } from "@rebasepro/types";
 import type { EntityCustomViewParams, FormContext } from "@rebasepro/cms-types";
 import type { EntityFormProps } from "../../src/types/components/EntityFormProps";
 
@@ -313,4 +313,34 @@ describe("EntityForm: a string transform reaches the save", () => {
         expect(payloads).toEqual([{ slug: "my-slug" }]);
     });
 
+});
+
+describe("EntityForm: a save the server refuses field by field", () => {
+    it("marks each field the server names, under the property it belongs to", async () => {
+        const stored: Post = { title: "Hello", price: 1, address: { street: "Main 1", city: "Rome" } };
+        const refusal = new RebaseApiError("Invalid values", {
+            status: 400,
+            code: "VALIDATION_ERROR",
+            details: {
+                violations: [
+                    { field: "title", code: "unique", message: "Another post has this title" },
+                    { field: "address.city", code: "pattern", message: "Not a city" },
+                    { field: "nonexistent", code: "x", message: "ignored" }
+                ]
+            }
+        });
+        const onSubmit = jest.fn(async () => { throw refusal; });
+        jest.spyOn(console, "error").mockImplementation(() => undefined);
+        render(formFor(stored, onSubmit as never));
+
+        await act(async () => {
+            context.setFieldValue("title", "Taken");
+        });
+        await act(async () => {
+            await context.submit();
+        });
+
+        expect(context.formex.errors).toMatchObject({ title: "Another post has this title", address: "Not a city" });
+        expect(context.formex.errors).not.toHaveProperty("nonexistent");
+    });
 });

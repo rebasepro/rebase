@@ -340,3 +340,34 @@ export function zodToFormErrors(zodError: z.ZodError): Record<string, string> {
     }
     return errors;
 }
+
+/**
+ * The fields a server refusal names, as form errors keyed by the property each
+ * belongs to: `{ title: "…", address: "…" }`.
+ *
+ * The server answers a write it refuses with `details.violations` —
+ * `[{ field, code, message }]`, `field` the wire path (`address.city`,
+ * `tags[2]`). The form printed the sentence in its footer and marked no
+ * field, so a unique 409 or a rule only the server checks left the user
+ * hunting for the input. A path is marked on its top-level property, which is
+ * the field the form shows; a field the form does not have is left out. The
+ * first message for a property wins.
+ */
+export function serverViolationErrors(error: unknown, propertyKeys: readonly string[]): Record<string, string> {
+    const errors: Record<string, string> = {};
+    if (typeof error !== "object" || error === null || !("details" in error)) return errors;
+    const details = error.details;
+    if (typeof details !== "object" || details === null || !("violations" in details)) return errors;
+    const violations = details.violations;
+    if (!Array.isArray(violations)) return errors;
+    for (const violation of violations) {
+        if (typeof violation !== "object" || violation === null) continue;
+        if (!("field" in violation) || !("message" in violation)) continue;
+        const { field, message } = violation;
+        if (typeof field !== "string" || typeof message !== "string") continue;
+        const property = field.split(/[.[]/)[0];
+        if (!propertyKeys.includes(property) || property in errors) continue;
+        errors[property] = message;
+    }
+    return errors;
+}

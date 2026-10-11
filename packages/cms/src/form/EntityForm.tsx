@@ -37,6 +37,7 @@ import { ownsKeystroke, registerKeyboardScope } from "./form_keyboard_scope";
 import {
     getChangedProperties,
     overlayEdit,
+    serverViolationErrors,
     zodToFormErrors
 } from "./form_utils";
 
@@ -395,6 +396,10 @@ export function EntityForm<M extends Record<string, unknown>>({
             .catch(e => {
                 console.error(e);
                 setSavingError(e);
+                // The fields the server refused, marked where the user can
+                // see them — not only the sentence in the footer.
+                const fieldErrors = serverViolationErrors(e, Object.keys(collection.properties ?? {}));
+                for (const [key, message] of Object.entries(fieldErrors)) formex.setFieldError(key, message);
             });
     };
 
