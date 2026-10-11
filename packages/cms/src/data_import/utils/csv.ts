@@ -137,7 +137,18 @@ export function parseCsvToObjects(text: string): ParsedCsv {
 
     // The export writes every cell, headers included, through its formula
     // escape; reading one back undoes it.
-    const headers = rows[0].map((header, index) => unescapeCsvFormula(header).trim() || `Column${index + 1}`);
+    // Two columns with one header are two columns: `x,x` used to keep only the
+    // second, as each row wrote its cells under the same name. A repeated
+    // header gets `_2`, `_3`, … — and so does a real header a blank one's
+    // `ColumnN` would otherwise meet.
+    const taken = new Set<string>();
+    const headers = rows[0].map((header, index) => {
+        const base = unescapeCsvFormula(header).trim() || `Column${index + 1}`;
+        let name = base;
+        for (let n = 2; taken.has(name); n++) name = `${base}_${n}`;
+        taken.add(name);
+        return name;
+    });
 
     const data = rows.slice(1).map((cells) => {
         const obj: Record<string, string> = {};

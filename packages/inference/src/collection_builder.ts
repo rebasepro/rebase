@@ -27,9 +27,19 @@ function ownEntry<T>(record: Record<string, T>, key: string): T | undefined {
     return Object.hasOwn(record, key) ? record[key] : undefined;
 }
 
+export type BuildEntityPropertiesOptions = {
+    /**
+     * Top-level keys to leave out of the inferred properties — Firestore
+     * metadata such as `__name__`, say. Nothing is left out by default: a
+     * column is data, `_id` in a Mongo export included.
+     */
+    ignoreKey?: (key: string) => boolean;
+};
+
 export async function buildEntityPropertiesFromData(
     data: object[],
-    getType: InferenceTypeBuilder
+    getType: InferenceTypeBuilder,
+    options: BuildEntityPropertiesOptions = {}
 ): Promise<Properties> {
     const typesCount: TypesCountRecord = {};
     const valuesCount: ValuesCountRecord = {};
@@ -37,7 +47,7 @@ export async function buildEntityPropertiesFromData(
         data.forEach((entry) => {
             if (entry) {
                 Object.entries(entry).forEach(([key, value]) => {
-                    if (key.startsWith("_")) return; // Ignore properties starting with _
+                    if (options.ignoreKey?.(key)) return;
                     increaseMapTypeCount(typesCount, key, value, getType);
                     increaseValuesCount(valuesCount, key, value, getType);
                 });
@@ -186,8 +196,6 @@ function increaseMapTypeCount(
     fieldValue: unknown,
     getType: InferenceTypeBuilder
 ) {
-    if (key.startsWith("_")) return; // Ignore properties starting with _
-
     let typesCount: TypesCount | undefined = ownEntry(typesCountRecord, key);
     if (!typesCount) {
         typesCount = {};
@@ -206,8 +214,6 @@ function increaseValuesCount(
     fieldValue: unknown,
     getType: InferenceTypeBuilder
 ) {
-    if (key.startsWith("_")) return; // Ignore properties starting with _
-
     const type = getType(fieldValue);
 
     const valuesRecord: {

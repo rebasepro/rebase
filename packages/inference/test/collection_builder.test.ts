@@ -195,18 +195,6 @@ zip: "90001" } }
         expect(properties.value.type).toBe("string");
     });
 
-    it("ignores keys starting with underscore", async () => {
-        const data = [
-            { _id: "abc",
-name: "Test",
-_internal: true }
-        ];
-        const properties = await buildEntityPropertiesFromData(data, inferType);
-        expect(properties._id).toBeUndefined();
-        expect(properties._internal).toBeUndefined();
-        expect(properties.name).toBeDefined();
-    });
-
     it("handles empty data array", async () => {
         const properties = await buildEntityPropertiesFromData([], inferType);
         expect(Object.keys(properties)).toHaveLength(0);
@@ -327,5 +315,24 @@ describe("buildEntityPropertiesFromData reads a blank cell as no value", () => {
     it("a number column with a blank cell is still a number", async () => {
         const properties = await buildEntityPropertiesFromData([{ n: 1 }, { n: "" }, { n: 3 }], inferType);
         expect(properties.n.type).toBe("number");
+    });
+});
+
+describe("keys starting with an underscore", () => {
+    // The `_` skip was Firestore-metadata logic applied to every file: a
+    // Mongo export lost its `_id`, nested `_` fields too. Now opt-in.
+    it("are data by default, at the top level and nested", async () => {
+        const properties = await buildEntityPropertiesFromData([
+            { _id: "a1", name: "Ann", meta: { _rev: "3" } },
+            { _id: "a2", name: "Bob", meta: { _rev: "4" } }
+        ], inferType);
+        expect(Object.keys(properties).sort()).toEqual(["_id", "meta", "name"]);
+        expect(Object.keys((properties.meta as { properties: Properties }).properties)).toEqual(["_rev"]);
+    });
+
+    it("are left out when the caller asks", async () => {
+        const properties = await buildEntityPropertiesFromData([{ __name__: "x", name: "Ann" }], inferType,
+            { ignoreKey: key => key.startsWith("_") });
+        expect(Object.keys(properties)).toEqual(["name"]);
     });
 });

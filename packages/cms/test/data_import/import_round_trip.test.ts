@@ -1,5 +1,6 @@
 import { describe, expect, test } from "@jest/globals";
 import { importIntoNewCollection, lostCells } from "./fixtures/pipeline";
+import { getWorksheetHeaders } from "../../src/data_import/utils/file_headers";
 import { cleanPropertiesFromImport, importedColumnOrder } from "../../src/collection_editor/ui/collection_editor/import/clean_import_data";
 
 /**
@@ -69,8 +70,24 @@ describe("every column gets a property of its own", () => {
         expect(new Set(mapped).size).toBe(mapped.length);
         expect(mapped.map(key => result.entities[0].values[key as string]))
             .toEqual(["Ann", "ann", "アン", 100, 1, 2]);
-        // `_private` is left out of a new collection on purpose (AIX-15).
-        expect(lostCells(result).filter(line => !line.includes("'_private'"))).toEqual([]);
+        expect(lostCells(result)).toEqual([]);
+    });
+
+    // `x,x` kept only the second column's cells, and every `_`-prefixed
+    // column — a Mongo export's `_id` — was left out of the new collection.
+    test("a repeated header and a _-prefixed header keep their columns", async () => {
+        const result = await importIntoNewCollection("j_keys.csv");
+        expect(result.loaded.propertiesOrder).toEqual(expect.arrayContaining(["x", "x_2", "_private"]));
+        const values = result.entities.map(e => e.values);
+        expect(values.map(v => [v[result.headersMapping["x"] as string], v[result.headersMapping["x_2"] as string]]))
+            .toEqual([["x1", "x2"], ["x3", "x4"]]);
+        expect(values.map(v => v[result.headersMapping["_private"] as string])).toEqual(["p1", "p2"]);
+    });
+
+    test("a spreadsheet's repeated header is a column of its own", () => {
+        const headers = getWorksheetHeaders(["x", "x", null, "constructor", "y"]);
+        expect(headers.order).toEqual(["x", "x_2", "y"]);
+        expect([...headers.byColumn.entries()]).toEqual([[0, "x"], [1, "x_2"], [3, "constructor"], [4, "y"]]);
     });
 
     // `constructor` and `prototype` are refused as columns, but the file's

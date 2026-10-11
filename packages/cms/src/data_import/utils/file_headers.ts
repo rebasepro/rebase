@@ -1,3 +1,5 @@
+import { isPrototypePollutingKey } from "@rebasepro/utils";
+
 /**
  * The header row of a spreadsheet, as a column index → name map.
  *
@@ -32,15 +34,24 @@ export type SheetCell = string | number | boolean | Date | null;
 export function getWorksheetHeaders(headerRow: readonly SheetCell[]): SheetHeaders {
     const byColumn = new Map<number, string>();
     const order: string[] = [];
+    const taken = new Set<string>();
 
     headerRow.forEach((cell, index) => {
         // `0` and `false` are legitimate header text and must survive; only an
         // empty cell and an all-whitespace one are "no header".
         if (cell === null || cell === undefined) return;
-        const name = (cell instanceof Date ? cell.toISOString() : String(cell)).trim();
-        if (!name) return;
+        const base = (cell instanceof Date ? cell.toISOString() : String(cell)).trim();
+        if (!base) return;
+        // A repeated header is a column of its own (`x`, `x_2`), as in the
+        // CSV reader: under one name, the later column's cells overwrote the
+        // earlier's.
+        let name = base;
+        for (let n = 2; taken.has(name); n++) name = `${base}_${n}`;
+        taken.add(name);
         byColumn.set(index, name);
-        order.push(name);
+        // Refused as a column when the rows are read, so not one of the
+        // file's order either (see `parseCsvToObjects`).
+        if (!isPrototypePollutingKey(name)) order.push(name);
     });
 
     return { byColumn, order };
