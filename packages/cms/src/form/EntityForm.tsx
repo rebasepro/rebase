@@ -856,17 +856,17 @@ export function EntityForm<M extends Record<string, unknown>>({
 
             {!entity?.values && initialStatus === "existing" &&
                 <Alert color={"warning"} size={"small"} outerClassName={"w-full mb-4 text-xs"}>
-                    This entity does not exist yet
+                    {t("entity_does_not_exist")}
                 </Alert>}
 
             {children}
 
             {initialEntityId && !entity && initialStatus !== "new" && <Alert color={"info"} size={"small"}>
-                This entity does not exist yet
+                {t("entity_does_not_exist")}
             </Alert>}
 
             {hasFormErrors && <Alert color={"error"} size={"small"} outerClassName={"w-full mt-2"}>
-                Please fix the highlighted errors before saving.
+                {t("fix_errors_before_saving")}
             </Alert>}
 
             {predatingViolationLines.length > 0 &&

@@ -710,8 +710,7 @@ parentEntityIds,
                             openEntityMode={layout} />
                         : <div className="flex items-center justify-center w-full h-full p-3">
                             <Typography variant={"label"}>
-                                You need to save your entity before
-                                adding additional collections
+                                {t("save_entity_before_subcollections")}
                             </Typography>
                         </div>)
                 }
