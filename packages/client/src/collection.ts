@@ -518,10 +518,11 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
          * `PATCH`, the verb for a merge — `update(id, data: Partial<M>)` sends
          * only the keys the caller named and the server merges the rest.
          *
-         * It was `PUT` for a while, on a route that served both so older
-         * clients kept working. The alias is gone: the OpenAPI spec, the SDK
-         * and the route now name one verb, and a spec-validating gateway in
-         * front of the API sees the operation the server actually implements.
+         * `PATCH` is the verb the OpenAPI spec names, so a spec-validating
+         * gateway in front of the API sees the operation this sends. The
+         * server also answers `PUT` on the same route, as a deprecated alias
+         * marked `Deprecation: true` and left out of the spec; this client
+         * never sends it.
          */
         async update(id: string | number, data: Partial<M> | UpdateValues<Partial<M>>, options?: WriteOptions) {
             const raw = await transport.request<Record<string, unknown>>(`${basePath}/${encodeURIComponent(String(id))}`, {
