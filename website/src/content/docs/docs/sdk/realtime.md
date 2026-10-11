@@ -163,6 +163,11 @@ client.data.posts.listenById(1, (post) => {
 }, undefined, { include: ["tags"] });
 ```
 
+**Limits.** A frame is sent when the row itself changes, and each frame reloads its included
+relations. A change to a related row alone sends no frame: editing a tag's name does not
+refresh a post listened to with `include: ["tags"]` until the post changes too. To follow
+the related rows, listen to their collection as well.
+
 ## Fluent Query Builder
 
 You can also subscribe through the fluent query builder. This is equivalent to calling `listen()` with params, but lets you chain `.where()`, `.orderBy()`, etc.:
