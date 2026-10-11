@@ -50,7 +50,9 @@ jest.mock("../../src/components/lazy_record_views", () => ({
 }));
 jest.mock("../../src/hooks/navigation/contexts/CollectionRegistryContext", () => ({
     useCollectionRegistryController: () => ({
-        collections: [products],
+        // `ghost` is listed for navigation but resolves to nothing: the shape
+        // a slug the registry cannot look up takes.
+        collections: [products, { slug: "ghost", name: "Ghost", properties: {} }],
         initialised: true,
         getCollection: (slug: string) => slug === "products" ? products : undefined,
         getParentCollectionSlugs: () => [],
@@ -92,5 +94,15 @@ describe("opening a record from a custom view", () => {
     it("still opens a list's record beside the list", async () => {
         renderAt("/c/products/5?__view=list");
         expect((await screen.findByTestId("collection-view")).textContent).toBe("selected 5");
+    });
+});
+
+describe("a URL naming a collection the registry cannot resolve", () => {
+    it("says so in the reader's language", async () => {
+        const warn = jest.spyOn(console, "warn").mockImplementation(() => undefined);
+        renderAt("/c/ghost");
+        expect(await screen.findByText("collection_not_found")).toBeTruthy();
+        expect(screen.queryByText("Collection not found")).toBeNull();
+        warn.mockRestore();
     });
 });

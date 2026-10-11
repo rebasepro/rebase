@@ -11,7 +11,7 @@ import {
     LazyDetailViewBinding as DetailViewBinding,
     LazyEditViewBinding as EditViewBinding
 } from "../components/lazy_record_views";
-import { ErrorView, NotFoundPage, useCustomizationController, useUserConfigurationPersistence, useComponentOverride, useNavigationBlocker } from "@rebasepro/app";
+import { ErrorView, NotFoundPage, useCustomizationController, useTranslation, useUserConfigurationPersistence, useComponentOverride, useNavigationBlocker } from "@rebasepro/app";
 import { resolveCollectionOpenMode } from "../util/collection_open_mode";
 import { isPathWithinRecord } from "../util/navigation_utils";
 import { UnsavedChangesDialog } from "@rebasepro/app";
@@ -251,6 +251,7 @@ function EntityFullScreenRoute({
     const location = useLocation();
     const userConfigPersistence = useUserConfigurationPersistence();
     const customizationController = useCustomizationController();
+    const { t } = useTranslation();
 
     // defaultValues may be carried via location.state when openNewDocument() is called
     // for full-screen mode. We read it once on mount — after that, the form owns its state.
@@ -457,7 +458,7 @@ function EntityFullScreenRoute({
             open={blocker?.state === "blocked"}
             handleOk={() => blocker?.proceed?.()}
             handleCancel={() => blocker?.reset?.()}
-            body={"You have unsaved changes in this entity."}/>
+            body={t("unsaved_changes_in_entity")}/>
     </>;
 }
 
@@ -475,6 +476,7 @@ function EntityFullScreenRoute({
  * find. The lookup is fixed; this is the part that made it expensive.
  */
 function UnresolvedCollectionView({ path }: { path: string }) {
+    const { t } = useTranslation();
     // Warn, not debug: this is a route that renders nothing useful, and it
     // should be visible at the console's default level.
     useEffect(() => {
@@ -486,8 +488,8 @@ function UnresolvedCollectionView({ path }: { path: string }) {
 
     return <CenteredView>
         <ErrorView
-            title={"Collection not found"}
-            error={`Nothing is registered for "${path}".`}
-            tooltip={"The URL names a collection the panel does not know about. It may have been renamed or removed from the collections array, or the slug may not match the path."}/>
+            title={t("collection_not_found")}
+            error={t("collection_not_found_body", { path })}
+            tooltip={t("collection_not_found_hint")}/>
     </CenteredView>;
 }

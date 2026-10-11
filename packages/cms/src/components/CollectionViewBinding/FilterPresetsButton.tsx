@@ -2,6 +2,7 @@ import React, { useCallback, useMemo } from "react";
 import { CheckIcon, ChevronsUpDownIcon, cls, FilterChip, Menu, MenuItem, Tooltip } from "@rebasepro/ui";
 import type { FilterValues, FilterPreset, OrderByTuple } from "@rebasepro/types";
 import { normalizeOrderBy } from "@rebasepro/common";
+import { useTranslation } from "@rebasepro/app";
 import type { EntityTableController, PropertyPath } from "@rebasepro/cms-types";
 
 export interface FilterPresetsButtonProps<M extends Record<string, unknown>> {
@@ -71,9 +72,9 @@ function isPresetActive(
 /**
  * Generate a human-readable label from filter keys when no explicit label is provided.
  */
-function generateLabel(filterValues: FilterValues<string>): string {
+function generateLabel(filterValues: FilterValues<string>, emptyLabel: string): string {
     const keys = Object.keys(filterValues);
-    if (keys.length === 0) return "Filter";
+    if (keys.length === 0) return emptyLabel;
     if (keys.length === 1) return keys[0].replace(/_/g, " ");
     if (keys.length === 2) return keys.map(k => k.replace(/_/g, " ")).join(" + ");
     return `${keys[0].replace(/_/g, " ")} +${keys.length - 1}`;
@@ -98,6 +99,7 @@ interface OverflowMenuProps {
 }
 
 function OverflowMenu({ presets, activeSet, onToggle }: OverflowMenuProps) {
+    const { t } = useTranslation();
     const activeCount = presets.filter(p => activeSet.has(p.originalIndex)).length;
 
     const trigger = (
@@ -113,7 +115,7 @@ function OverflowMenu({ presets, activeSet, onToggle }: OverflowMenuProps) {
         <Menu trigger={trigger} side="bottom" align="start">
             <div className="min-w-[180px] max-w-[300px] max-h-[320px] overflow-y-auto">
                 {presets.map(({ preset, originalIndex }) => {
-                    const rawLabel = preset.label ?? generateLabel(preset.filterValues as FilterValues<string>);
+                    const rawLabel = preset.label ?? generateLabel(preset.filterValues as FilterValues<string>, t("filter"));
                     const active = activeSet.has(originalIndex);
 
                     return (
@@ -158,6 +160,7 @@ export function FilterPresetsButton<M extends Record<string, unknown>>({
     tableController,
     compact
 }: FilterPresetsButtonProps<M>) {
+    const { t } = useTranslation();
 
     // ── Derive active state from controller ─────────────────────────
     const activeSet = useMemo(() => {
@@ -263,7 +266,7 @@ export function FilterPresetsButton<M extends Record<string, unknown>>({
                 style={{ scrollbarWidth: "none" }}
             >
                 {visiblePresets.map((preset, index) => {
-                    const rawLabel = preset.label ?? generateLabel(preset.filterValues as FilterValues<string>);
+                    const rawLabel = preset.label ?? generateLabel(preset.filterValues as FilterValues<string>, t("filter"));
                     const { display, truncated } = truncateLabel(rawLabel);
                     const active = activeSet.has(index);
 
