@@ -252,6 +252,17 @@ tracked tsconfig's extends, files, include, references and paths entry has to
 name something on disk.`
     },
     {
+        run: "check:test-types",
+        why: `\`typecheck\` reads only the test directories that have no errors left; the
+rest carried debt nothing counted. In two months server's tests went from 165
+type errors to 275 and cli's from 11 to 23, and among them were fixtures
+describing shapes the types do not have (83 \`relationName\`s on a relation
+property, 42 \`idField\`s on a collection), where the test and the code agree
+on a fiction. Every package's tests are typechecked in one program (about half
+a minute) and the error count per package is pinned in
+tooling/scripts/test-types-baseline.json: growth fails, an unbanked shrink fails.`
+    },
+    {
         run: "check:casts",
         why: `"Never convert to any, and never cast structurally around a type" is enforced
 by ESLint in three packages. Everywhere else it drifted: over September, in
