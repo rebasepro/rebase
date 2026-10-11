@@ -1,7 +1,8 @@
 
-import { IconForView, UnsavedChangesDialog } from "@rebasepro/app";
+import { IconForView, UnsavedChangesDialog, useTranslation } from "@rebasepro/app";
 import React, { useState, useEffect } from "react";
 import {
+    Alert,
     Button,
     cls,
     defaultBorderMixin,
@@ -9,6 +10,8 @@ import {
     iconSize,
     PlusIcon,
     ResizablePanels,
+    surfaceActiveMixin,
+    surfaceHoverMixin,
     Tooltip,
     Typography
 } from "@rebasepro/ui";
@@ -58,6 +61,12 @@ export function CollectionsStudioView({
     visibleTabs,
     standalone,
 }: CollectionsStudioViewProps) {
+
+    const { t } = useTranslation();
+    /** Why nothing can be added or saved here, when that is so. */
+    const readOnlyReason = configController.readOnly
+        ? configController.readOnlyReason || t("studio_collections_editor_read_only")
+        : undefined;
 
     // ── Navigation state ────────────────────────────────────────────────
     // If onActiveCollectionChange is provided, the component is controlled.
@@ -111,7 +120,7 @@ export function CollectionsStudioView({
     }, [sidebarSize]);
 
     return (
-        <div className="flex h-full w-full bg-surface-sheet overflow-hidden text-text-primary dark:text-text-primary-dark">
+        <div className="flex h-full w-full bg-surface-sheet overflow-hidden">
             <ResizablePanels
                 orientation="horizontal"
                 panelSizePercent={sidebarSize}
@@ -119,18 +128,18 @@ export function CollectionsStudioView({
                 minPanelSizePx={220}
                 firstPanel={
                     <div className={cls("flex flex-col h-full w-full bg-surface-sheet border-r", defaultBorderMixin)}>
-                        <div className={cls("flex items-center justify-between px-3 py-2 border-b min-h-[48px]", defaultBorderMixin)}>
-                            <Typography variant="caption" className="font-semibold text-[11px] uppercase tracking-wider text-surface-400 dark:text-surface-400">
-                                Collections
+                        <div className="flex items-center justify-between px-3 py-2 min-h-[48px]">
+                            <Typography variant="subtitle2">
+                                {t("studio_collections_editor_title")}
                             </Typography>
-                            <Tooltip title={configController.readOnly ? configController.readOnlyReason || "Read only" : "Add collection"}>
+                            <Tooltip title={readOnlyReason ?? t("add_new_collection")}>
                                 <div>
                                     <IconButton
                                         size="small"
-                                        aria-label={"Add collection"}
+                                        aria-label={t("add_new_collection")}
                                         disabled={configController.readOnly}
                                         onClick={() => selectCollection("new")}
-                                        className={activeCollectionId === "new" ? "text-primary dark:text-primary-dark" : "text-text-secondary dark:text-text-secondary-dark"}
+                                        toggled={activeCollectionId === "new"}
                                     >
                                         <PlusIcon size={iconSize.smallest}/>
                                     </IconButton>
@@ -141,8 +150,8 @@ export function CollectionsStudioView({
                         <div className="flex-grow overflow-y-auto w-full no-scrollbar p-2 space-y-0.5">
                             {collections.length === 0 && (
                                 <div className="p-4 text-center">
-                                    <Typography variant="caption" className="text-text-disabled dark:text-text-disabled-dark italic">
-                                        No collections yet.
+                                    <Typography variant="caption" color="secondary">
+                                        {t("studio_collections_editor_empty")}
                                     </Typography>
                                 </div>
                             )}
@@ -152,22 +161,27 @@ export function CollectionsStudioView({
                                 return (
                                     <div
                                         key={collectionKey}
+                                        role="button"
+                                        tabIndex={0}
+                                        aria-current={isSelected ? "true" : undefined}
                                         onClick={() => selectCollection(collectionKey)}
+                                        onKeyDown={(event) => {
+                                            if (event.key === "Enter" || event.key === " ") {
+                                                event.preventDefault();
+                                                selectCollection(collectionKey);
+                                            }
+                                        }}
                                         className={cls(
-                                            "flex items-center gap-2.5 px-3 h-[30px] cursor-pointer rounded-lg text-[13px] font-medium transition-colors",
-                                            isSelected
-                                                ? "bg-primary/8 text-primary dark:bg-primary/10 dark:text-primary-light font-semibold"
-                                                : "hover:bg-surface-hover text-surface-700 dark:text-surface-300 hover:text-surface-900 dark:hover:text-white"
+                                            "flex items-center gap-2.5 px-3 h-[30px] cursor-pointer rounded-lg",
+                                            isSelected ? surfaceActiveMixin : surfaceHoverMixin
                                         )}
                                     >
-                                        <IconForView collectionOrView={collection} size={"smallest"} className={cls(
-                                            isSelected
-                                                ? "text-primary dark:text-primary-light"
-                                                : "text-surface-500 dark:text-text-secondary-dark"
-                                        )}/>
-                                        <span className="truncate flex-1">
+                                        <IconForView collectionOrView={collection} size={"smallest"}
+                                                     className="text-text-secondary dark:text-text-secondary-dark"/>
+                                        <Typography variant="body2" component="span"
+                                                    className={cls("truncate flex-1", isSelected && "font-medium")}>
                                             {collection.name || collection.slug}
-                                        </span>
+                                        </Typography>
                                     </div>
                                 );
                             })}
@@ -200,17 +214,18 @@ export function CollectionsStudioView({
                                 standalone={standalone}
                             />
                         ) : (
-                            <div className="flex flex-col items-center justify-center h-full gap-4">
+                            <div className="flex flex-col items-center justify-center h-full gap-4 px-4">
                                 <Typography variant="label">
-                                    Select a collection or create a new one to start editing
+                                    {t("studio_collections_editor_pick")}
                                 </Typography>
-                                <Button
-                                    disabled={configController.readOnly}
-                                    onClick={() => setActiveCollectionId("new")}
-                                >
-                                    <PlusIcon/>
-                                    Add new collection
-                                </Button>
+                                {readOnlyReason
+                                    // Not a button that does nothing: why nothing
+                                    // can be added, where the button would be.
+                                    ? <Alert color="info" className="max-w-lg">{readOnlyReason}</Alert>
+                                    : <Button onClick={() => setActiveCollectionId("new")}>
+                                        <PlusIcon/>
+                                        {t("add_new_collection")}
+                                    </Button>}
                             </div>
                         )}
                     </div>
@@ -218,7 +233,7 @@ export function CollectionsStudioView({
             />
             <UnsavedChangesDialog
                 open={pendingSelection !== null}
-                body={"There are unsaved changes in this collection"}
+                body={t("studio_collections_editor_unsaved")}
                 handleOk={() => {
                     const next = pendingSelection;
                     setPendingSelection(null);

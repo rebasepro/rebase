@@ -1079,6 +1079,11 @@ export const de: RebaseTranslations = {
     studio_kanban_configure: "Kanban konfigurieren",
     studio_missing_reference_error: "Keine Sammlung für den Pfad: {{path}}",
     studio_new_collection_add: "Neue Sammlung hinzufügen",
+    studio_collections_editor_title: "Collections",
+    studio_collections_editor_empty: "Noch keine Collections.",
+    studio_collections_editor_pick: "Wähle eine Collection aus oder lege eine neue an, um mit dem Bearbeiten zu beginnen.",
+    studio_collections_editor_read_only: "Collections können auf diesem Server nicht bearbeitet werden.",
+    studio_collections_editor_unsaved: "Diese Collection hat ungespeicherte Änderungen.",
 
     // ─── Property field labels ──────────────────────────────────
     db_column_type: "Datenbank-Spaltentyp",

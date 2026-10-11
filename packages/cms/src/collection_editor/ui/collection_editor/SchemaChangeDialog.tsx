@@ -23,7 +23,7 @@
  * boot reconciles. A button labelled "Save" would be describing a different,
  * worse thing.
  */
-import React, { useState } from "react";
+import React from "react";
 import {
     Alert,
     Button,
@@ -34,6 +34,7 @@ import {
     DialogActions,
     DialogContent,
     DialogTitle,
+    ExpandablePanel,
     Typography
 } from "@rebasepro/ui";
 
@@ -144,20 +145,16 @@ function Details({ summary, count, children }: {
     count: number;
     children: React.ReactNode;
 }) {
-    const [open, setOpen] = useState(false);
     if (count === 0) return null;
     return (
-        <div>
-            <button
-                type="button"
-                onClick={() => setOpen(o => !o)}
-                className="flex items-center gap-2 text-sm text-text-secondary dark:text-text-secondary-dark hover:underline"
-            >
-                <span className={cls("transition-transform", open && "rotate-90")}>›</span>
-                {summary} ({count})
-            </button>
-            {open && <div className="mt-2">{children}</div>}
-        </div>
+        <ExpandablePanel
+            initiallyExpanded={false}
+            titleClassName="!min-h-0 !py-2 px-3"
+            innerClassName="p-3"
+            title={<Typography variant="body2" color="secondary">{summary} ({count})</Typography>}
+        >
+            {children}
+        </ExpandablePanel>
     );
 }
 
@@ -209,13 +206,13 @@ function WithheldConstraints({ constraints }: { constraints: WithheldConstraint[
             <ul className="space-y-2">
                 {constraints.map(constraint => (
                     <li key={constraint.target} className="text-sm">
-                        <code className="bg-surface-raised px-1 rounded">
+                        <Typography component="code" variant="mono" className="bg-surface-raised px-1 rounded-md">
                             {constraint.target}
-                        </code>
-                        <div className="mt-1">{constraint.reason}</div>
-                        <div className="mt-1 text-text-secondary dark:text-text-secondary-dark">
+                        </Typography>
+                        <Typography variant="body2" className="mt-1">{constraint.reason}</Typography>
+                        <Typography variant="body2" color="secondary" className="mt-1">
                             {constraint.remedy}
-                        </div>
+                        </Typography>
                     </li>
                 ))}
             </ul>
@@ -255,7 +252,7 @@ function Applied({ result }: { result: LiveSchemaResult }) {
                     </Typography>
                     <Typography variant="body2">{result.applyError}</Typography>
                     <Typography variant="body2" className="mt-2">
-                        The commit is on <code>{result.committed.branch}</code> either way, so
+                        The commit is on <Typography component="code" variant="mono">{result.committed.branch}</Typography> either way, so
                         whatever did not run will be applied on the next boot.
                     </Typography>
                 </Alert>
@@ -327,9 +324,9 @@ export function SchemaChangeDialog({
         <Dialog open={open} onOpenChange={value => { if (!value) onClose(); }} maxWidth="3xl">
             <DialogTitle className="flex items-center gap-2">
                 {result ? (result.sourceOnly ? "Schema change committed" : "Schema change applied") : "Review schema change"}
-                <code className="text-sm font-normal text-text-secondary dark:text-text-secondary-dark">
+                <Typography component="code" variant="mono" color="secondary">
                     {collectionId}
-                </code>
+                </Typography>
             </DialogTitle>
 
             <DialogContent className="flex flex-col gap-4">
@@ -454,12 +451,9 @@ export function SchemaChangeDialog({
 
             <DialogActions>
                 {!result && target?.repository && (
-                    <span className={cls(
-                        monospace,
-                        "mr-auto text-text-secondary dark:text-text-secondary-dark truncate"
-                    )}>
+                    <Typography variant="caption" color="secondary" className={cls(monospace, "mr-auto truncate")}>
                         → {repositoryLabel(target.repository)}{target.branch ? ` · ${target.branch}` : ""}
-                    </span>
+                    </Typography>
                 )}
                 <Button variant="text" onClick={onClose} disabled={applying}>
                     {result ? "Close" : "Cancel"}

@@ -1084,6 +1084,11 @@ export const pt: RebaseTranslations = {
     studio_kanban_configure: "Configurar o Kanban",
     studio_missing_reference_error: "Não há coleção para o caminho: {{path}}",
     studio_new_collection_add: "Adicionar nova coleção",
+    studio_collections_editor_title: "Coleções",
+    studio_collections_editor_empty: "Ainda não há coleções.",
+    studio_collections_editor_pick: "Selecione uma coleção ou crie uma nova para começar a editar.",
+    studio_collections_editor_read_only: "As coleções não podem ser editadas neste servidor.",
+    studio_collections_editor_unsaved: "Esta coleção tem alterações por guardar.",
 
     // ─── Property field labels ──────────────────────────────────
     db_column_type: "Tipo de coluna do banco de dados",

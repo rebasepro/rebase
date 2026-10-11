@@ -1172,6 +1172,11 @@ export interface RebaseTranslations {
     studio_kanban_configure?: string;
     studio_missing_reference_error?: string;
     studio_new_collection_add?: string;
+    studio_collections_editor_title?: string;
+    studio_collections_editor_empty?: string;
+    studio_collections_editor_pick?: string;
+    studio_collections_editor_read_only?: string;
+    studio_collections_editor_unsaved?: string;
 
     // ─── Property field labels ──────────────────────────────────
     db_column_type?: string;

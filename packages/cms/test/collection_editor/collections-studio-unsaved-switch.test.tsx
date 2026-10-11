@@ -31,8 +31,11 @@ jest.mock("../../src/collection_editor/ui/collection_editor/CollectionEditorDial
 }));
 
 jest.mock("@rebasepro/app", () => {
+    // The English strings, as a person reads them.
+    const { en } = jest.requireActual("../../../app/src/locales/en") as { en: Record<string, string> };
     const overrides: Record<string, unknown> = {
-        IconForView: () => null
+        IconForView: () => null,
+        useTranslation: () => ({ t: (key: string) => en[key] ?? key })
     };
     return new Proxy({}, {
         get: (_t, key: string | symbol) =>
@@ -98,7 +101,7 @@ describe("switching collections with unsaved edits", () => {
     it("asks before starting a new collection too", () => {
         openPostsAndType();
 
-        fireEvent.click(screen.getByRole("button", { name: "Add collection" }));
+        fireEvent.click(screen.getByRole("button", { name: "Add new collection" }));
 
         expect(editing()).toBe("posts");
         expect(screen.getByRole("dialog")).toBeTruthy();

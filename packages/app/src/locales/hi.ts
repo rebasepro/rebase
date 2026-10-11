@@ -1079,6 +1079,11 @@ export const hi: RebaseTranslations = {
     studio_kanban_configure: "Kanban कॉन्फ़िगर करें",
     studio_missing_reference_error: "इस पथ के लिए कोई संग्रह नहीं: {{path}}",
     studio_new_collection_add: "नया संग्रह जोड़ें",
+    studio_collections_editor_title: "कलेक्शन",
+    studio_collections_editor_empty: "अभी कोई कलेक्शन नहीं है।",
+    studio_collections_editor_pick: "संपादन शुरू करने के लिए कोई कलेक्शन चुनें या नया बनाएँ।",
+    studio_collections_editor_read_only: "इस सर्वर पर कलेक्शन संपादित नहीं किए जा सकते।",
+    studio_collections_editor_unsaved: "इस कलेक्शन में बिना सहेजे बदलाव हैं।",
 
     // ─── Property field labels ──────────────────────────────────
     db_column_type: "डेटाबेस कॉलम प्रकार",
