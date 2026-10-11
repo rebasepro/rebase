@@ -1,4 +1,5 @@
 import chalk from "chalk";
+import { createHash } from "crypto";
 import fs from "fs";
 import path from "path";
 import inquirer from "inquirer";
@@ -419,16 +420,94 @@ export function detectInstalledAgents(home: string = os.homedir()): InstalledAge
 }
 
 /** Install skills for a specific agent into the project directory. */
+/**
+ * The file in each target directory that records what the installer wrote:
+ * relative path → sha256 of the bytes written. A dotfile, so no agent loads it
+ * as a rule.
+ */
+export const SKILLS_MANIFEST = ".rebase-skills.json";
+
+interface SkillsManifest {
+    version: 1;
+    files: Record<string, string>;
+}
+
+function sha256(bytes: Buffer | string): string {
+    return createHash("sha256").update(bytes).digest("hex");
+}
+
+function readManifest(targetBase: string): SkillsManifest | null {
+    try {
+        const parsed: unknown = JSON.parse(fs.readFileSync(path.join(targetBase, SKILLS_MANIFEST), "utf-8"));
+        if (parsed && typeof parsed === "object" && "files" in parsed) {
+            const files = (parsed as { files: unknown }).files;
+            if (files && typeof files === "object") {
+                const entries = Object.entries(files).filter((e): e is [string, string] => typeof e[1] === "string");
+                return { version: 1, files: Object.fromEntries(entries) };
+            }
+        }
+    } catch {
+        // No manifest, or one that is not ours: the first install, or one made
+        // before manifests existed.
+    }
+    return null;
+}
+
+/** What one agent's install did. */
+export interface AgentInstallResult {
+    skills: number;
+    assets: number;
+    /** Files left as they are because they were edited since the last install (relative to the target dir). */
+    kept: string[];
+    /** Files of skills the bundle no longer ships, removed because nobody edited them. */
+    removed: string[];
+}
+
 export function installForAgent(
     agentKey: AgentKey,
     skills: LoadedSkill[],
-    projectDir: string
-): { skills: number; assets: number } {
+    projectDir: string,
+    options: { force?: boolean } = {}
+): AgentInstallResult {
     const agent = AGENTS[agentKey];
     const targetBase = path.join(projectDir, agent.targetDir);
 
     // Ensure the target directory exists
     fs.mkdirSync(targetBase, { recursive: true });
+
+    // A re-run used to overwrite every file unconditionally and never remove
+    // one: a note a team appended to an installed skill and committed — as
+    // the command tells them to — vanished on the next `skills install`, and a
+    // skill a release retired stayed installed beside its replacement. The
+    // manifest records what was written, so an edit is told apart from an
+    // older bundle's copy. A file with no record (an install from before
+    // manifests) is overwritten, as before.
+    const previous = readManifest(targetBase);
+    const recorded: Record<string, string> = {};
+    const kept: string[] = [];
+
+    const place = (relPath: string, bytes: Buffer | string) => {
+        const target = path.join(targetBase, relPath);
+        const wanted = sha256(bytes);
+        const last = previous?.files[relPath];
+        if (fs.existsSync(target)) {
+            const current = sha256(fs.readFileSync(target));
+            if (current === wanted) {
+                recorded[relPath] = wanted;
+                return;
+            }
+            if (last !== undefined && current !== last && !options.force) {
+                // Edited since it was installed: left alone, and still recorded
+                // as what was installed, so the next run says so again.
+                kept.push(relPath);
+                recorded[relPath] = last;
+                return;
+            }
+        }
+        fs.mkdirSync(path.dirname(target), { recursive: true });
+        fs.writeFileSync(target, bytes);
+        recorded[relPath] = wanted;
+    };
 
     let count = 0;
     let assetCount = 0;
@@ -439,36 +518,54 @@ export function installForAgent(
         // agent's *rule* file (subdirectory layouts) or something the index
         // points at (flat ones).
         const { fileName, content } = agent.transformFile(skill.name, skill.content);
-        const targetPath = path.join(targetBase, fileName);
-
-        // Ensure parent directory exists (for subdirectory-based formats)
-        fs.mkdirSync(path.dirname(targetPath), { recursive: true });
-        fs.writeFileSync(targetPath, content, "utf-8");
+        place(fileName, content);
         count++;
 
         // A skill's assets always land in a directory named after the skill,
         // whatever the rule file's layout, so two skills' `references/` trees
         // cannot collide in a flat target directory.
         for (const asset of skill.assets) {
-            const assetTarget = path.join(targetBase, skill.name, asset);
-            fs.mkdirSync(path.dirname(assetTarget), { recursive: true });
-            fs.copyFileSync(path.join(skill.dir, asset), assetTarget);
+            place(path.join(skill.name, asset), fs.readFileSync(path.join(skill.dir, asset)));
             assetCount++;
         }
     }
 
     if (agent.flatLayout && agent.indexFile) {
-        fs.writeFileSync(path.join(targetBase, agent.indexFile), renderSkillIndex(skills, agentKey), "utf-8");
+        place(agent.indexFile, renderSkillIndex(skills, agentKey));
     }
 
-    return { skills: count, assets: assetCount };
+    // Retired files: removed when they are exactly what was installed, kept
+    // (and reported) when someone edited them.
+    const removed: string[] = [];
+    for (const [relPath, last] of Object.entries(previous?.files ?? {})) {
+        if (relPath in recorded) continue;
+        const target = path.join(targetBase, relPath);
+        if (!fs.existsSync(target)) continue;
+        if (sha256(fs.readFileSync(target)) !== last && !options.force) {
+            kept.push(relPath);
+            continue;
+        }
+        fs.rmSync(target);
+        removed.push(relPath);
+        // Empty directories the removal leaves behind, up to the target dir.
+        for (let dir = path.dirname(target); dir.startsWith(targetBase + path.sep); dir = path.dirname(dir)) {
+            if (fs.readdirSync(dir).length > 0) break;
+            fs.rmdirSync(dir);
+        }
+    }
+
+    fs.writeFileSync(
+        path.join(targetBase, SKILLS_MANIFEST),
+        JSON.stringify({ version: 1, files: recorded } satisfies SkillsManifest, null, 2) + "\n",
+        "utf-8"
+    );
+
+    return { skills: count, assets: assetCount, kept, removed };
 }
 
 /** What `installSkills` did for one agent. */
-export interface SkillsInstallResult {
+export interface SkillsInstallResult extends AgentInstallResult {
     agent: AgentKey;
-    skills: number;
-    assets: number;
     /** An earlier agent in the same run that already wrote this directory. */
     sharedWith?: AgentKey;
 }
@@ -482,13 +579,14 @@ export interface SkillsInstallResult {
 export function installSkills(
     agents: readonly AgentKey[],
     skills: LoadedSkill[],
-    projectDir: string
+    projectDir: string,
+    options: { force?: boolean } = {}
 ): SkillsInstallResult[] {
     const written = new Map<string, SkillsInstallResult>();
     return agents.map((agent) => {
         const earlier = written.get(AGENTS[agent].targetDir);
         if (earlier) return { ...earlier, agent, sharedWith: earlier.agent };
-        const result = { agent, ...installForAgent(agent, skills, projectDir) };
+        const result = { agent, ...installForAgent(agent, skills, projectDir, options) };
         written.set(AGENTS[agent].targetDir, result);
         return result;
     });
@@ -530,22 +628,26 @@ export function parseAgentFlags(rawArgs: string[]): AgentKey[] | null {
     return parseSkillsInstallLine(rawArgs).agents;
 }
 
-/** `rebase skills install`'s whole line: the agents it names, and `--mcp`. */
-export function parseSkillsInstallLine(rawArgs: string[]): { agents: AgentKey[] | null; mcp: boolean } {
+/** `rebase skills install`'s whole line: the agents it names, `--mcp` and `--force`. */
+export function parseSkillsInstallLine(rawArgs: string[]): { agents: AgentKey[] | null; mcp: boolean; force: boolean } {
     // Strict, and before anything is written. This used to scan `rawArgs` for
     // `--agent` and ignore every other token, so `rebase skills install
     // --frobnicate --agent claude` exited 0 after writing 21 files — the CLI's
     // other families reject an unknown flag, and an installer is the last place
     // to guess what the person meant.
     const { flags } = parseCommandArgs({
-        spec: { "--agent": [String], "-a": "--agent", "--mcp": Boolean },
+        spec: { "--agent": [String], "-a": "--agent", "--mcp": Boolean, "--force": Boolean },
         rawArgs,
         commandWords: 2,
         command: "skills install",
         maxPositionals: 0
     });
 
-    return { agents: resolveAgentNames(flags["--agent"] ?? []), mcp: flags["--mcp"] === true };
+    return {
+        agents: resolveAgentNames(flags["--agent"] ?? []),
+        mcp: flags["--mcp"] === true,
+        force: flags["--force"] === true
+    };
 }
 
 /**
@@ -580,7 +682,7 @@ export function resolveAgentNames(values: readonly string[]): AgentKey[] | null 
 async function skillsInstall(rawArgs: string[] = []) {
     // Parse the line before anything else touches the disk: a bad flag must
     // cost nothing, and everything below this writes or resolves paths.
-    const { agents: namedAgents, mcp: withMcp } = parseSkillsInstallLine(rawArgs);
+    const { agents: namedAgents, mcp: withMcp, force } = parseSkillsInstallLine(rawArgs);
 
     // The project root, not the cwd. Agent skills belong beside the repository's
     // other agent configuration — `.claude/`, `.cursor/` — which is both what
@@ -648,7 +750,8 @@ async function skillsInstall(rawArgs: string[] = []) {
     console.log(chalk.gray(`  Found ${chalk.white(skills.length)} Rebase skills`));
     console.log("");
 
-    for (const result of installSkills(agents, skills, projectDir)) {
+    let anyKept = false;
+    for (const result of installSkills(agents, skills, projectDir, { force })) {
         const agent = AGENTS[result.agent];
         // Relative to where the command was typed, now that the destination is
         // the project root rather than the cwd — otherwise `.claude/skills`
@@ -660,6 +763,17 @@ async function skillsInstall(rawArgs: string[] = []) {
         }
         const withAssets = result.assets > 0 ? ` (+ ${result.assets} reference file${result.assets === 1 ? "" : "s"})` : "";
         console.log(`  ${chalk.green("✓")} ${chalk.bold(agent.label)} — ${result.skills} skills installed${withAssets} to ${chalk.gray(shown)}`);
+        for (const file of result.removed) {
+            console.log(chalk.gray(`    − removed ${path.join(shown, file)} (no longer in the bundle)`));
+        }
+        for (const file of result.kept) {
+            anyKept = true;
+            console.log(chalk.yellow(`    ! kept ${path.join(shown, file)}: edited since it was installed`));
+        }
+    }
+    if (anyKept) {
+        console.log(chalk.yellow("  Edited files were left as they are. To replace them with the bundle's copy:"));
+        console.log(`    ${chalk.cyan("rebase skills install --force")}`);
     }
 
     // The MCP server, as `rebase init --agent` registers it. Imported here
@@ -721,6 +835,8 @@ ${chalk.green.bold("Subcommands")}
                Supports: ${Object.values(AGENTS).map(a => a.label).join(", ")}
 
 ${chalk.green.bold("Options")}
+  ${chalk.blue("--force")}       Replace installed skill files you edited, and remove edited files of
+                skills the bundle no longer ships. Without it, edits are kept.
   ${chalk.blue("--mcp")}         Also register the Rebase MCP server in each agent's project config
                 (.mcp.json, .cursor/mcp.json, …), as ${chalk.cyan("rebase init --agent")} does.
                 Servers already in the file are kept.

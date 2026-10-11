@@ -124,18 +124,25 @@ Commit them. They are part of the repo the same way a lint config is: every
 contributor's assistant then works from the same understanding of the codebase,
 including contributors who never ran the command.
 
-**Re-run the command to update.** Files are overwritten unconditionally, so
-after a Rebase upgrade:
+**Re-run the command to update** after a Rebase upgrade:
 
 ```bash
 rebase skills install --agent all
 ```
 
-Two consequences of "unconditionally": local edits to an installed skill are
-lost on the next run — keep project-specific guidance in
-[`ai-instructions.md`](/docs/ai/instruction-files) instead, which is yours and is
-never overwritten. And skills removed in a newer release are not deleted from
-your repo; only files that still exist get rewritten.
+Each target directory holds a `.rebase-skills.json` manifest of what the
+command wrote, so a re-run can tell an edit from an older release's copy. Commit
+it with the skills.
+
+- A file nobody edited is replaced with the new release's copy.
+- A file you edited is kept, and the command lists it. `--force` replaces it.
+- A skill a newer release no longer ships is removed, unless you edited it.
+  Then it is kept and listed.
+- Files the command never wrote are not touched.
+
+Project-specific guidance still belongs in
+[`ai-instructions.md`](/docs/ai/instruction-files), which is yours. An edited
+skill stops receiving updates until you `--force` it.
 
 The command also works outside a Rebase project, falling back to the working
 directory — useful for a separate frontend repo that talks to a Rebase backend.

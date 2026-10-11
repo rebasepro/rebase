@@ -24,7 +24,7 @@ import os from "os";
 import path from "path";
 import { fileURLToPath } from "url";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { detectAgents, installForAgent, loadSkills, renderSkillIndex } from "./skills";
+import { detectAgents, installForAgent, loadSkills, renderSkillIndex, SKILLS_MANIFEST } from "./skills";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 /** The bundle in this repository — `packages/cli/src/commands` → root. */
@@ -92,7 +92,7 @@ describe("installForAgent", () => {
             fs.mkdirSync(project, { recursive: true });
 
             const result = installForAgent(agent as keyof typeof LAYOUTS, skills, project);
-            expect(result).toEqual({ skills: 2, assets: 1 });
+            expect(result).toEqual({ skills: 2, assets: 1, kept: [], removed: [] });
 
             const bodyPath = path.join(project, layout.dir, bodyOf("demo-skill"));
             const installed = fs.readFileSync(bodyPath, "utf-8");
@@ -111,7 +111,9 @@ describe("installForAgent", () => {
             installForAgent(agent as keyof typeof LAYOUTS, skills, project);
 
             const base = path.join(project, layout.dir);
-            const topLevel = fs.readdirSync(base, { withFileTypes: true }).filter(e => e.isFile());
+            // The installer's own manifest is a dotfile no agent loads.
+            const topLevel = fs.readdirSync(base, { withFileTypes: true })
+                .filter(e => e.isFile() && e.name !== SKILLS_MANIFEST);
             if (layout.index) {
                 // Exactly one file at the top level: the index. Everything a
                 // flat-layout agent loads unconditionally is that one file.
@@ -124,6 +126,82 @@ describe("installForAgent", () => {
             }
         });
     }
+});
+
+describe("re-running the install", () => {
+    // A re-run overwrote every file and removed none: a note the team added
+    // to an installed skill and committed was lost without a word, and a
+    // skill a release retired stayed installed beside its replacement.
+    function project(): { dir: string; body: string } {
+        const dir = path.join(scratch, "project-rerun");
+        fs.mkdirSync(dir, { recursive: true });
+        return { dir, body: path.join(dir, ".claude/skills", bodyOf("demo-skill")) };
+    }
+
+    it("keeps a file the team edited, and says so", () => {
+        const { dir, body } = project();
+        installForAgent("claude", loadSkills(fixture()), dir);
+        fs.appendFileSync(body, "\nTeam note: we deploy on Fridays.\n");
+
+        const again = installForAgent("claude", loadSkills(fixture()), dir);
+
+        expect(fs.readFileSync(body, "utf-8")).toContain("Team note");
+        expect(again.kept).toEqual([bodyOf("demo-skill")]);
+    });
+
+    it("updates a file nobody edited when the bundle changes it", () => {
+        const { dir, body } = project();
+        const src = fixture();
+        installForAgent("claude", loadSkills(src), dir);
+        fs.appendFileSync(path.join(src, "demo-skill", "SKILL.md"), "\nNew in this release.\n");
+
+        const again = installForAgent("claude", loadSkills(src), dir);
+
+        expect(fs.readFileSync(body, "utf-8")).toContain("New in this release");
+        expect(again.kept).toEqual([]);
+    });
+
+    it("removes a retired skill nobody edited, and keeps an edited one", () => {
+        const { dir } = project();
+        const src = fixture();
+        installForAgent("claude", loadSkills(src), dir);
+        const demoRef = path.join(dir, ".claude/skills/demo-skill/references/view-patterns.md");
+        fs.appendFileSync(demoRef, "\nOur own pattern.\n");
+        fs.rmSync(path.join(src, "demo-skill"), { recursive: true });
+        fs.rmSync(path.join(src, "empty-skill"), { recursive: true });
+        fs.mkdirSync(path.join(src, "new-skill"));
+        fs.writeFileSync(path.join(src, "new-skill", "SKILL.md"), "# New\n");
+
+        const again = installForAgent("claude", loadSkills(src), dir);
+
+        expect(fs.existsSync(path.join(dir, ".claude/skills", bodyOf("empty-skill")))).toBe(false);
+        expect(fs.existsSync(path.join(dir, ".claude/skills/empty-skill"))).toBe(false);
+        expect(fs.existsSync(path.join(dir, ".claude/skills", bodyOf("demo-skill")))).toBe(false);
+        expect(fs.readFileSync(demoRef, "utf-8")).toContain("Our own pattern");
+        expect(again.removed.sort()).toEqual([bodyOf("demo-skill"), bodyOf("empty-skill")].sort());
+        expect(again.kept).toEqual([path.join("demo-skill", "references", "view-patterns.md")]);
+    });
+
+    it("replaces edits with --force", () => {
+        const { dir, body } = project();
+        installForAgent("claude", loadSkills(fixture()), dir);
+        fs.appendFileSync(body, "\nTeam note.\n");
+
+        const again = installForAgent("claude", loadSkills(fixture()), dir, { force: true });
+
+        expect(fs.readFileSync(body, "utf-8")).not.toContain("Team note");
+        expect(again.kept).toEqual([]);
+    });
+
+    it("leaves files it never installed alone", () => {
+        const { dir } = project();
+        const own = path.join(dir, ".claude/skills/our-skill/SKILL.md");
+        fs.mkdirSync(path.dirname(own), { recursive: true });
+        fs.writeFileSync(own, "# Ours\n");
+        installForAgent("claude", loadSkills(fixture()), dir);
+        installForAgent("claude", loadSkills(fixture()), dir);
+        expect(fs.readFileSync(own, "utf-8")).toBe("# Ours\n");
+    });
 });
 
 describe("renderSkillIndex", () => {
