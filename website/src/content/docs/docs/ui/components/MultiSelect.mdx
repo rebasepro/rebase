@@ -15,12 +15,10 @@ import { MultiSelect } from "@rebasepro/ui";
 | `modalPopover` | `boolean` | — |  |
 | `className` | `string` | — |  |
 | `open` | `boolean` | — |  |
-| `name` | `string` | — |  |
-| `id` | `string` | — |  |
+| `id` | `string` | — | Put on the trigger button, so a `<label htmlFor>` can name it. |
 | `onOpenChange` | `(open: boolean) => void` | — |  |
 | `value` | `T[]` | — |  |
 | `inputClassName` | `string` | — |  |
-| `onChange` | `(event: React.ChangeEvent<HTMLSelectElement, Element>) => void` | — |  |
 | `onValueChange` | `(updatedValue: T[]) => void` | — |  |
 | `placeholder` | `React.ReactNode` | — |  |
 | `size` | `"small" \| "smallest" \| "medium" \| "large"` | — |  |
@@ -28,13 +26,9 @@ import { MultiSelect } from "@rebasepro/ui";
 | `label` | `React.ReactNode` | — |  |
 | `disabled` | `boolean` | — |  |
 | `error` | `boolean` | — |  |
-| `position` | `"item-aligned" \| "popper"` | — |  |
-| `endAdornment` | `React.ReactNode` | — |  |
-| `multiple` | `boolean` | — |  |
 | `includeSelectAll` | `boolean` | — |  |
 | `includeClear` | `boolean` | — |  |
 | `inputRef` | `React.Ref` | — |  |
-| `padding` | `boolean` | — |  |
 | `invisible` | `boolean` | — |  |
 | `children` | `React.ReactNode` | yes |  |
 | `renderValues` | `(values: T[]) => React.ReactNode` | — |  |
