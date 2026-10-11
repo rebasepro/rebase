@@ -529,7 +529,7 @@ message: e instanceof Error ? e.message : String(e) });
                     {/* Metadata */}
                     <div className="p-4 space-y-3">
                         <div>
-                            <Typography variant="caption" className="text-text-disabled dark:text-text-disabled-dark text-[10px] uppercase tracking-wider font-semibold mb-1 block">
+                            <Typography variant="label" color="secondary" className="mb-1 block">
                                 {t("studio_storage_file_info")}
                             </Typography>
                         </div>
@@ -1286,7 +1286,7 @@ message: e instanceof Error ? e.message : String(e) });
                 <div className="flex-grow overflow-auto">
                     <table className="w-full">
                         <thead>
-                            <tr className={cls("border-b text-left text-[10px] uppercase tracking-wider text-text-disabled dark:text-text-disabled-dark", defaultBorderMixin)}>
+                            <tr className={cls("border-b text-left text-xs text-text-secondary dark:text-text-secondary-dark", defaultBorderMixin)}>
                                 <th className="pl-3 pr-0 py-2 w-8">
                                     <Checkbox
                                         size="small"
@@ -1295,9 +1295,9 @@ message: e instanceof Error ? e.message : String(e) });
                                         onCheckedChange={handleSelectAll}
                                     />
                                 </th>
-                                <th className="px-2 py-2 font-semibold">{t("studio_storage_name")}</th>
-                                <th className="px-4 py-2 font-semibold w-24">{t("studio_storage_type")}</th>
-                                <th className="px-4 py-2 font-semibold w-24 text-right">{t("studio_storage_size")}</th>
+                                <th className="px-2 py-2 font-medium">{t("studio_storage_name")}</th>
+                                <th className="px-4 py-2 font-medium w-24">{t("studio_storage_type")}</th>
+                                <th className="px-4 py-2 font-medium w-24 text-right">{t("studio_storage_size")}</th>
                                 <th className="px-2 py-2 w-10"/>
                             </tr>
                         </thead>

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { ArrowDownToLineIcon, Checkbox, cls, defaultBorderMixin, Label, Select, SelectItem, TextField, Typography } from "@rebasepro/ui";
+import { Alert, ArrowDownToLineIcon, Checkbox, cls, defaultBorderMixin, Label, Select, SelectItem, TextField, Typography } from "@rebasepro/ui";
 import { idNum, useLogTail } from "./useLogTail";
 import type { LogTransport } from "./useLogTail";
 
@@ -204,29 +204,19 @@ export function LogsExplorer() {
             {/* A broken tail must stay visible even while stale logs are on
                 screen — otherwise the view quietly freezes. */}
             {error && logs.length > 0 && (
-                <div className={cls(
-                    "px-4 py-1.5 border-b bg-amber-50 dark:bg-amber-950/20 shrink-0",
-                    defaultBorderMixin
-                )}>
-                    <Typography variant="caption" className="text-amber-700 dark:text-amber-400">
-                        {error}
-                    </Typography>
-                </div>
+                <Alert color="warning" size="small" outerClassName="mx-4 my-1.5 shrink-0">
+                    {error}
+                </Alert>
             )}
 
             {/* The server bounds what it holds per connection, so a burst big
                 enough leaves a hole in what is on screen. Say so: a tail that
                 silently skips entries is worse than one that admits it. */}
             {dropped > 0 && (
-                <div className={cls(
-                    "px-4 py-1.5 border-b bg-amber-50 dark:bg-amber-950/20 shrink-0",
-                    defaultBorderMixin
-                )}>
-                    <Typography variant="caption" className="text-amber-700 dark:text-amber-400">
-                        {dropped} {dropped === 1 ? "entry was" : "entries were"} dropped — the log is
-                        arriving faster than this view can read it. Narrow the filter to keep up.
-                    </Typography>
-                </div>
+                <Alert color="warning" size="small" outerClassName="mx-4 my-1.5 shrink-0">
+                    {dropped} {dropped === 1 ? "entry was" : "entries were"} dropped — the log is
+                    arriving faster than this view can read it. Narrow the filter to keep up.
+                </Alert>
             )}
 
             {/* Log entries */}

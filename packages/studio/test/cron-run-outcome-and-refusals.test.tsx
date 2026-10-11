@@ -66,7 +66,7 @@ async function runNow() {
     listJobs.mockResolvedValue({ jobs: [nightly] });
     render(<CronJobsView/>);
     fireEvent.click(await screen.findByText("Nightly sync"));
-    fireEvent.click(await screen.findByText("Run Now"));
+    fireEvent.click(await screen.findByText("Run now"));
     await waitFor(() => expect(openSnackbar).toHaveBeenCalled());
 }
 

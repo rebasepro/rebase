@@ -1320,7 +1320,7 @@ id: String(ra.entityId) })}
             return (
                 <div className="flex-grow flex items-center justify-center text-text-disabled dark:text-text-disabled-dark">
                     <div className="text-center">
-                        <svg className="w-12 h-12 mx-auto mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"/></svg>
+                        <DatabaseIcon size={48} strokeWidth={1} className="mx-auto mb-4 opacity-50"/>
                         <Typography variant="body2">{t("studio_sql_run_query_placeholder")}</Typography>
                     </div>
                 </div>
@@ -1334,7 +1334,7 @@ id: String(ra.entityId) })}
                 if (plan) {
                     return (
                         <div className="flex-grow overflow-auto p-4 bg-surface-sheet flex flex-col items-start">
-                            <Typography variant="caption" className="font-semibold text-text-secondary mb-4 tracking-wider uppercase">{t("studio_sql_visual_execution_plan")}</Typography>
+                            <Typography variant="label" color="secondary" className="mb-4">{t("studio_sql_visual_execution_plan")}</Typography>
                             <div className="pb-12">
                                 <ExplainVisualizer plan={plan}/>
                             </div>
@@ -1361,17 +1361,18 @@ id: String(ra.entityId) })}
                 {actionableCollections.length > 0 && (
                     <div className={cls("px-4 py-1.5 border-b flex items-center gap-2 shrink-0 bg-surface-sheet", defaultBorderMixin)}>
                         <Tooltip title={t("studio_sql_admin_collections_tooltip")}>
-                            <Typography variant="caption" className="text-[10px] font-semibold uppercase tracking-widest text-text-disabled dark:text-text-disabled-dark mr-1 shrink-0 cursor-help">{t("studio_sql_collections_label")}</Typography>
+                            <Typography variant="caption" color="secondary" className="mr-1 shrink-0 cursor-help">{t("studio_sql_collections_label")}</Typography>
                         </Tooltip>
                         <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
                             {actionableCollections.map(mc => (
                                 <Tooltip key={mc.tableName} title={`Table "${mc.tableName}" → ${mc.collection.name} (PK: ${mc.pkColumn})`}>
-                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-primary/10 dark:bg-primary-dark/15 text-primary dark:text-primary-dark whitespace-nowrap border border-primary/20 dark:border-primary-dark/20">
-                                        {typeof mc.collection.icon === "string" && (
-                                            <IconForView collectionOrView={mc.collection} className="text-[12px]"/>
-                                        )}
+                                    <Chip size="smallest"
+                                          className="whitespace-nowrap"
+                                          icon={typeof mc.collection.icon === "string"
+                                              ? <IconForView collectionOrView={mc.collection} size="smallest"/>
+                                              : undefined}>
                                         {mc.collection.name}
-                                    </span>
+                                    </Chip>
                                 </Tooltip>
                             ))}
                         </div>
@@ -1391,20 +1392,20 @@ id: String(ra.entityId) })}
 
                 <div className={cls("p-2 px-4 border-t bg-surface-sheet flex justify-between items-center shrink-0", defaultBorderMixin)}>
                     <div className="flex space-x-4">
-                        <div className="flex items-center text-[11px]">
-                            <span className="font-semibold text-text-disabled dark:text-text-disabled-dark mr-2 uppercase tracking-tighter">{t("studio_sql_rows")}</span>
-                            <span className="font-mono text-text-secondary dark:text-text-secondary-dark">{results.length}</span>
+                        <div className="flex items-center gap-2">
+                            <Typography variant="caption" color="secondary">{t("studio_sql_rows")}</Typography>
+                            <Typography variant="mono" className="text-[11px]">{results.length}</Typography>
                         </div>
-                        <div className="flex items-center text-[11px]">
-                            <span className="font-semibold text-text-disabled dark:text-text-disabled-dark mr-2 uppercase tracking-tighter">{t("studio_sql_time")}</span>
-                            <span className="font-mono text-text-secondary dark:text-text-secondary-dark">{execTime}ms</span>
+                        <div className="flex items-center gap-2">
+                            <Typography variant="caption" color="secondary">{t("studio_sql_time")}</Typography>
+                            <Typography variant="mono" className="text-[11px]">{execTime}ms</Typography>
                         </div>
                     </div>
                     <div className="flex gap-2 overflow-x-auto no-scrollbar items-center px-2">
                         <Button
                             size="small"
                             variant="text"
-                            className="text-[10px] uppercase font-semibold text-text-secondary dark:text-text-secondary-dark whitespace-nowrap"
+                            className="whitespace-nowrap"
                             onClick={handleExportMarkdown}
                         >
                             {t("studio_sql_copy_markdown")}
@@ -1412,7 +1413,7 @@ id: String(ra.entityId) })}
                         <Button
                             size="small"
                             variant="text"
-                            className="text-[10px] uppercase font-semibold text-text-secondary dark:text-text-secondary-dark whitespace-nowrap"
+                            className="whitespace-nowrap"
                             onClick={handleExportJSON}
                         >
                             {t("studio_sql_export_json")}
@@ -1420,7 +1421,7 @@ id: String(ra.entityId) })}
                         <Button
                             size="small"
                             variant="text"
-                            className="text-[10px] uppercase font-semibold text-text-secondary dark:text-text-secondary-dark whitespace-nowrap"
+                            className="whitespace-nowrap"
                             onClick={handleExportCSV}
                         >
                             {t("studio_sql_export_csv")}

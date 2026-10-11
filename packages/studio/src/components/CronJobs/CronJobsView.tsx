@@ -7,6 +7,7 @@ import {
     CalendarIcon,
     Card,
     CheckCircleIcon,
+    ChevronDownIcon,
     Chip,
     CircularProgress,
     cls,
@@ -33,16 +34,17 @@ function formatDuration(ms: number): string {
     return `${(ms / 60000).toFixed(1)}m`;
 }
 
-function formatRelative(iso: string | undefined): string {
+/** `iso` relative to now, in `language`: "in 5 min", "2 hr. ago"; a date past a day. */
+function formatRelative(iso: string | undefined, language: string): string {
     if (!iso) return "—";
     const d = new Date(iso);
-    const now = Date.now();
-    const diff = d.getTime() - now;
+    const diff = d.getTime() - Date.now();
     const abs = Math.abs(diff);
-    if (abs < 60000) return diff > 0 ? "in <1m" : "<1m ago";
-    if (abs < 3600000) { const m = Math.round(abs / 60000); return diff > 0 ? `in ${m}m` : `${m}m ago`; }
-    if (abs < 86400000) { const h = Math.round(abs / 3600000); return diff > 0 ? `in ${h}h` : `${h}h ago`; }
-    return d.toLocaleString();
+    if (abs >= 86400000) return d.toLocaleString(language);
+    const relative = new Intl.RelativeTimeFormat(language, { style: "short", numeric: "auto" });
+    return abs < 3600000
+        ? relative.format(Math.round(diff / 60000), "minute")
+        : relative.format(Math.round(diff / 3600000), "hour");
 }
 
 /** What the listing says did not become a job — see {@link CronLoadProblems}. */
@@ -100,7 +102,8 @@ disabled: "bg-surface-400"
 export function CronJobsView() {
     const client = useRebaseClient<RebaseClient>();
     const snackbar = useSnackbarController();
-    const { t } = useTranslation();
+    const { t, i18n } = useTranslation();
+    const language = i18n?.language ?? "en";
     const [jobs, setJobs] = useState<CronJobStatus[]>([]);
     const [problems, setProblems] = useState<CronProblems>({ rejected: [], filesFailed: 0 });
     const [loading, setLoading] = useState(true);
@@ -267,7 +270,7 @@ message: e instanceof Error ? e.message : String(e) });
         try {
             await c.cron.toggleJob(id, enabled);
             snackbarRef.current.open({ type: "success",
-message: enabled ? "Job enabled" : "Job paused" });
+message: enabled ? t("studio_cron_job_enabled") : t("studio_cron_job_paused") });
             await refreshJobs();
         } catch (e: unknown) {
             snackbarRef.current.open({ type: "error",
@@ -327,7 +330,7 @@ message: e instanceof Error ? e.message : String(e) });
                         <Typography variant="subtitle2" className="font-semibold">{t("studio_tool_cron")}</Typography>
                         <Chip size="smallest" className="bg-surface-raised text-surface-600 dark:text-surface-300">{jobs.length}</Chip>
                     </div>
-                    <IconButton size="small" onClick={refreshJobs} title="Refresh"><RefreshCwIcon size={iconSize.smallest}/></IconButton>
+                    <IconButton size="small" onClick={refreshJobs} title={t("studio_cron_refresh")}><RefreshCwIcon size={iconSize.smallest}/></IconButton>
                 </div>
                 {hasProblems && (
                     <div className="p-2">
@@ -361,7 +364,7 @@ message: e instanceof Error ? e.message : String(e) });
             <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
                 {!selectedJob ? (
                     <div className="flex items-center justify-center h-full">
-                        <Typography variant="body2" color="disabled">Select a cron job to view details</Typography>
+                        <Typography variant="body2" color="disabled">{t("studio_cron_select_job")}</Typography>
                     </div>
                 ) : (
                     <>
@@ -375,7 +378,7 @@ message: e instanceof Error ? e.message : String(e) });
                                 </div>
                             </div>
                             <div className="flex items-center gap-2 shrink-0">
-                                <IconButton title={selectedJob.enabled ? "Pause job" : "Enable job"} size="small" onClick={() => handleToggle(selectedJob.id, !selectedJob.enabled)}>
+                                <IconButton title={selectedJob.enabled ? t("studio_cron_pause_job") : t("studio_cron_enable_job")} size="small" onClick={() => handleToggle(selectedJob.id, !selectedJob.enabled)}>
                                     {selectedJob.enabled ? <PauseIcon size={iconSize.small}/> : <PlayIcon size={iconSize.smallest}/>}
                                 </IconButton>
                                 <Button
@@ -385,7 +388,7 @@ message: e instanceof Error ? e.message : String(e) });
                                     disabled={triggering === selectedJob.id}
                                     startIcon={triggering === selectedJob.id ? <CircularProgress size="smallest"/> : <PlayIcon size={iconSize.smallest}/>}
                                 >
-                                    Run Now
+                                    {t("studio_cron_run_now")}
                                 </Button>
                             </div>
                         </div>
@@ -393,24 +396,21 @@ message: e instanceof Error ? e.message : String(e) });
                         {/* Stats Cards */}
                         <div className="px-5 py-4 bg-surface-sheet">
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                                <StatCard label="Schedule" value={selectedJob.schedule} mono/>
-                                <StatCard label="Last Run" value={formatRelative(selectedJob.lastRunAt)}/>
-                                <StatCard label="Next Run" value={selectedJob.enabled ? formatRelative(selectedJob.nextRunAt) : "Paused"}/>
-                                <StatCard label="Duration" value={selectedJob.lastDurationMs !== undefined ? formatDuration(selectedJob.lastDurationMs) : "—"}/>
+                                <StatCard label={t("studio_cron_schedule")} value={selectedJob.schedule} mono/>
+                                <StatCard label={t("studio_cron_last_run")} value={formatRelative(selectedJob.lastRunAt, language)}/>
+                                <StatCard label={t("studio_cron_next_run")} value={selectedJob.enabled ? formatRelative(selectedJob.nextRunAt, language) : t("studio_cron_paused")}/>
+                                <StatCard label={t("studio_cron_duration")} value={selectedJob.lastDurationMs !== undefined ? formatDuration(selectedJob.lastDurationMs) : "—"}/>
                             </div>
                             <div className="grid grid-cols-3 gap-3 mt-3">
-                                <StatCard label="Status" value={selectedJob.state.toUpperCase()} chipColor={selectedJob.state === "error" ? "red" : selectedJob.state === "disabled" ? "gray" : "green"}/>
-                                <StatCard label="Total Runs" value={String(selectedJob.totalRuns)}/>
-                                <StatCard label="Failures" value={String(selectedJob.totalFailures)} highlight={selectedJob.totalFailures > 0}/>
+                                <StatCard label={t("studio_cron_status")} value={selectedJob.state.toUpperCase()} chipColor={selectedJob.state === "error" ? "red" : selectedJob.state === "disabled" ? "gray" : "green"}/>
+                                <StatCard label={t("studio_cron_total_runs")} value={String(selectedJob.totalRuns)}/>
+                                <StatCard label={t("studio_cron_failures")} value={String(selectedJob.totalFailures)} highlight={selectedJob.totalFailures > 0}/>
                             </div>
                             {selectedJob.lastError && (
-                                <div className="mt-3 p-3 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/50">
-                                    <div className="flex items-center gap-2 mb-1">
-                                        <AlertCircleIcon size={iconSize.smallest} className="text-red-500"/>
-                                        <Typography variant="caption" className="font-semibold text-red-700 dark:text-red-400">Last Error</Typography>
-                                    </div>
-                                    <Typography variant="caption" className="font-mono text-red-600 dark:text-red-300 text-[11px] break-all">{selectedJob.lastError}</Typography>
-                                </div>
+                                <Alert color="error" outerClassName="mt-3">
+                                    <Typography variant="caption" className="font-medium block">{t("studio_cron_last_error")}</Typography>
+                                    <Typography variant="mono" className="text-[11px] break-all">{selectedJob.lastError}</Typography>
+                                </Alert>
                             )}
                         </div>
 
@@ -418,9 +418,9 @@ message: e instanceof Error ? e.message : String(e) });
                         <div className={cls("flex items-center justify-between px-5 py-2 border-y bg-surface-card", defaultBorderMixin)}>
                             <div className="flex items-center gap-2">
                                 <HistoryIcon size={iconSize.smallest} className="text-surface-400"/>
-                                <Typography variant="subtitle2" className="font-semibold text-[13px]">Execution History</Typography>
+                                <Typography variant="subtitle2" className="font-semibold text-[13px]">{t("studio_cron_execution_history")}</Typography>
                             </div>
-                            <IconButton size="small" onClick={() => refreshLogs(selectedJob.id)} title="Refresh logs"><RefreshCwIcon size={iconSize.smallest}/></IconButton>
+                            <IconButton size="small" onClick={() => refreshLogs(selectedJob.id)} title={t("studio_cron_refresh_logs")}><RefreshCwIcon size={iconSize.smallest}/></IconButton>
                         </div>
                         <div className="flex-1 overflow-y-auto">
                             {logsLoading ? (
@@ -435,7 +435,7 @@ message: e instanceof Error ? e.message : String(e) });
                                 />
                             ) : logs.length === 0 ? (
                                 <div className="flex items-center justify-center h-32">
-                                    <Typography variant="body2" color="disabled">No executions yet</Typography>
+                                    <Typography variant="body2" color="disabled">{t("studio_cron_no_executions")}</Typography>
                                 </div>
                             ) : (
                                 <div className="divide-y divide-surface-100 dark:divide-surface-950">
@@ -457,7 +457,7 @@ function StatCard({ label, value, mono, chipColor, highlight }: {
 }) {
     return (
         <div className={cls("px-3 py-2 rounded-lg border bg-surface-card", defaultBorderMixin)}>
-            <Typography variant="caption" color="secondary" className="text-[10px] uppercase tracking-wider font-medium">{label}</Typography>
+            <Typography variant="caption" color="secondary">{label}</Typography>
             <Typography variant="body2" className={cls(
                 "mt-0.5 font-semibold text-[13px]",
                 mono && "font-mono",
@@ -471,6 +471,7 @@ function StatCard({ label, value, mono, chipColor, highlight }: {
 }
 
 function LogRow({ log }: { log: CronJobLogEntry }) {
+    const { t } = useTranslation();
     const [expanded, setExpanded] = useState(false);
     return (
         <div className="px-5 py-2.5 hover:bg-surface-hover transition-colors">
@@ -482,17 +483,17 @@ function LogRow({ log }: { log: CronJobLogEntry }) {
                     <Typography variant="caption" className="font-mono text-[11px] text-surface-500">{new Date(log.startedAt).toLocaleString()}</Typography>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
-                    {log.manual && <Chip size="smallest" className="bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300">manual</Chip>}
+                    {log.manual && <Chip size="smallest">{t("studio_cron_manual_run")}</Chip>}
                     <Typography variant="caption" className="font-mono text-[11px]">{formatDuration(log.durationMs)}</Typography>
-                    <svg className={cls("w-3 h-3 transition-transform text-surface-400", expanded && "rotate-180")} fill="currentColor" viewBox="0 0 20 20"><path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"/></svg>
+                    <ChevronDownIcon size={iconSize.smallest} className={cls("transition-transform text-text-secondary dark:text-text-secondary-dark", expanded && "rotate-180")}/>
                 </div>
             </div>
             {expanded && (
                 <div className="mt-2 ml-6 space-y-2">
                     {log.error && (
-                        <div className="p-2 rounded bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/50">
-                            <Typography variant="caption" className="font-mono text-[11px] text-red-600 dark:text-red-300 break-all">{log.error}</Typography>
-                        </div>
+                        <Alert color="error" size="small">
+                            <Typography variant="mono" className="text-[11px] break-all">{log.error}</Typography>
+                        </Alert>
                     )}
                     {log.logs.length > 0 && (
                         <div className="p-2 rounded bg-surface-sheet border border-hairline-strong max-h-40 overflow-auto">
