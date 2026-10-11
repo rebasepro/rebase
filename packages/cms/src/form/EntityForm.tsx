@@ -33,6 +33,7 @@ import type { EntityFormActionsProps } from "../types/components/EntityFormActio
 import { LocalChangesMenu } from "./components/LocalChangesMenu";
 import { useUndoableDiscard } from "./useUndoableDiscard";
 import { ownsKeystroke, registerKeyboardScope } from "./form_keyboard_scope";
+import { createFormUploadTracker, FormUploadsContext } from "./form_uploads";
 
 import {
     getChangedProperties,
@@ -252,8 +253,13 @@ export function EntityForm<M extends Record<string, unknown>>({
         return touched;
     });
 
+    // A Save waits for a file still uploading: its path reaches the values
+    // only when the upload ends. See `form_uploads.ts`.
+    const [uploadTracker] = useState(createFormUploadTracker);
+
     const internalFormex = useCreateFormex<M>({
         initialValues: baseInitialValues as M,
+        beforeSubmit: uploadTracker.wait,
         initialModifiedValues: initialModifiedValues as M | undefined,
         debugId: `EntityForm:${path}/${entityIdProp}`,
         initialTouched,
@@ -930,6 +936,7 @@ export function EntityForm<M extends Record<string, unknown>>({
 
     return (
         <Formex value={formex}>
+            <FormUploadsContext.Provider value={uploadTracker}>
             <form
                 ref={formElementRef}
                 onSubmit={formex.handleSubmit}
@@ -1006,6 +1013,7 @@ export function EntityForm<M extends Record<string, unknown>>({
                 {dialogActions}
 
             </form>
+            </FormUploadsContext.Provider>
 
         </Formex>
     );

@@ -45,6 +45,7 @@ export function useCreateFormex<T = any>({
     validateOnChange = false,
     validateOnInitialRender = false,
     onSubmit,
+    beforeSubmit,
     onReset,
     onValuesChangeDeferred,
     onBaselineConflict,
@@ -84,6 +85,13 @@ export function useCreateFormex<T = any>({
         | void;
     onValuesChangeDeferred?: (values: T, controller: FormexController<T>) => void;
     onSubmit?: (values: T, controller: FormexController<T>) => void | Promise<void>;
+    /**
+     * Awaited at the start of a submit, before the values are read — so
+     * validation and `onSubmit` both see what it left. The record form waits
+     * here for a file upload in progress, whose path lands in the values
+     * only when it finishes.
+     */
+    beforeSubmit?: () => void | Promise<void>;
     onReset?: (controller: FormexController<T>) => void | Promise<void>;
     /**
      * The baseline moved while the form was edited, and some fields were
@@ -131,6 +139,8 @@ export function useCreateFormex<T = any>({
     validationRef.current = validation;
     const onSubmitRef = useRef(onSubmit);
     onSubmitRef.current = onSubmit;
+    const beforeSubmitRef = useRef(beforeSubmit);
+    beforeSubmitRef.current = beforeSubmit;
     const onResetRef = useRef(onReset);
     onResetRef.current = onReset;
     const initialTouchedRef = useRef(initialTouched);
@@ -256,6 +266,7 @@ export function useCreateFormex<T = any>({
             e?.stopPropagation();
             setIsSubmitting(true);
             setSubmitCount((prev: number) => prev + 1);
+            await beforeSubmitRef.current?.();
             const validationErrors = await validationRef.current?.(valuesRef.current);
             if (validationErrors && Object.keys(validationErrors).length > 0) {
                 setErrors(validationErrors);

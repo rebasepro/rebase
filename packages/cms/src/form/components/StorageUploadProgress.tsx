@@ -5,6 +5,7 @@ import { StorageFieldItem } from "@rebasepro/app";
 import { ErrorView } from "@rebasepro/app";
 import type { StorageSource } from "@rebasepro/types";
 import { cls, paperMixin, Skeleton } from "@rebasepro/ui";
+import { useFormUploadTracker } from "../form_uploads";
 
 export interface StorageUploadItemProps {
     storagePath: string;
@@ -36,6 +37,7 @@ export function StorageUploadProgress({
     const storageSource = storageSourceProp ?? defaultStorageSource;
 
     const snackbarController = useSnackbarController();
+    const uploadTracker = useFormUploadTracker();
 
     const [error, setError] = React.useState<Error | undefined>();
     const [loading, setLoading] = React.useState<boolean>(false);
@@ -50,7 +52,8 @@ export function StorageUploadProgress({
         setLoading(true);
 
         const key = storagePath && fileName ? `${storagePath}/${fileName}` : fileName || storagePath || "unnamed";
-        storageSource.putObject({
+        // The form's Save waits for this, value written and all.
+        const inFlight = storageSource.putObject({
             file,
             key,
             metadata
@@ -75,7 +78,8 @@ export function StorageUploadProgress({
             .finally(() => {
                 uploading.current = false;
             });
-    }, [entry, metadata, onFileUploadComplete, storageSource, storagePath]);
+        uploadTracker?.track(inFlight);
+    }, [entry, metadata, onFileUploadComplete, storageSource, storagePath, uploadTracker]);
 
     React.useEffect(() => {
         mounted.current = true;
