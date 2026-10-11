@@ -28,7 +28,6 @@ jest.mock("@rebasepro/app", () => {
                 : (jest.requireActual("@rebasepro/app") as Record<string | symbol, unknown>)[key]
     });
 });
-});
 
 import { EntityForm } from "../../src/form/EntityForm";
 
