@@ -51,7 +51,7 @@ The list view is the classic, clean CMS default view mode, showing entities in a
 
 ## Table View
 
-The default view is a high-performance virtualized spreadsheet with:
+The table view is a high-performance virtualized spreadsheet with:
 
 - **Inline editing** — Click any cell to edit in-place
 - **Column resizing** — Drag column headers
@@ -67,11 +67,11 @@ Control row height with `defaultSize`:
 
 | Size | Pixels | Best for |
 |------|--------|----------|
-| `"xs"` | 40 | Dense data tables |
-| `"s"` | 54 | Default |
-| `"m"` | 80 | With image thumbnails |
-| `"l"` | 120 | Cards with previews |
-| `"xl"` | 260 | Rich content previews |
+| `"xs"` | 36 | Dense data tables |
+| `"s"` | 42 | Compact text rows |
+| `"m"` | 48 | Default |
+| `"l"` | 96 | Medium image thumbnails |
+| `"xl"` | 160 | Large image thumbnails |
 
 ## Kanban View
 

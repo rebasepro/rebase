@@ -275,13 +275,13 @@ All of the following go inside `admin`.
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
 | `defaultViewMode` | `"list" \| "table" \| "cards" \| "kanban"` | `"list"` | Default view mode |
-| `enabledViews` | `ViewMode[]` | All four | Which view modes are available |
+| `enabledViews` | `ViewMode[]` | The four built-ins plus every declared custom view (kanban only when an `enum` property exists) | Which view modes are available |
 | `kanban` | `KanbanConfig` | — | Kanban configuration (column property). Always pair with `orderProperty` — see [View Modes](/docs/frontend/view-modes) |
 | `orderProperty` | `string` | — | Key of the **string** property holding the drag-and-drop order key. Required for a working Kanban board |
 | `openEntityMode` | `"side_panel" \| "full_screen" \| "split" \| "dialog"` | From the view: `"split"` for list, `"full_screen"` for table and cards, `"side_panel"` for kanban and custom views | How entities open for editing |
 | `sideDialogWidth` | `number \| string` | — | Width of the side dialog |
 | `inlineEditing` | `boolean` | `true` | Enable inline editing in the spreadsheet view |
-| `defaultSize` | `"xs" \| "s" \| "m" \| "l" \| "xl"` | `"m"` | Default row height in the table |
+| `defaultSize` | `"xs" \| "s" \| "m" \| "l" \| "xl"` | `"m"` | Default density of the list, table and card views (the table's row height) |
 | `pagination` | `boolean \| number` | `true` (50) | Enable pagination and/or set page size |
 | `listProperties` | `string[]` | — | Properties to display in the list view |
 | `propertiesOrder` | `string[]` | — | Column order in the table view |
