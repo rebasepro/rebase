@@ -147,7 +147,7 @@ export const Dialog = ({
 
                     <DialogPrimitive.Overlay
                         ref={setOverlayEl}
-                        className={cls("fixed inset-0 transition-opacity ease-in-out duration-200 bg-surface-scrim backdrop-blur-sm",
+                        className={cls("fixed inset-0 transition-opacity ease-in-out duration-200 motion-reduce:transition-none bg-surface-scrim backdrop-blur-sm",
                             displayed && open ? "opacity-100" : "opacity-0",
                             "z-50 fixed top-0 left-0 w-full h-full"
                         )}
@@ -204,7 +204,7 @@ export const Dialog = ({
                                 "text-text-primary dark:text-text-primary-dark",
                                 "justify-center items-center",
                                 fullScreen ? undefined : "max-h-[90vh] shadow-lg",
-                                "ease-in-out duration-200",
+                                "ease-in-out duration-200 motion-reduce:transition-none",
                                 scrollable && "overflow-y-auto",
                                 displayed && open ? "opacity-100 scale-100" : "opacity-0 scale-[0.97]",
                                 className

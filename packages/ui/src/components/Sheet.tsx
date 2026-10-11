@@ -110,7 +110,7 @@ export const Sheet: React.FC<SheetProps> = ({
                     className={cls(
                         "outline-none",
                         "fixed inset-0 bg-surface-scrim",
-                        "backdrop-blur-sm transition-all duration-100 data-[state=closed]:animate-out data-[state=closed]:fade-out data-[state=open]:fade-in",
+                        "backdrop-blur-sm transition-all duration-100 motion-reduce:transition-none data-[state=closed]:animate-out data-[state=closed]:fade-out data-[state=open]:fade-in",
                         overlayZIndex,
                         overlayClassName
                     )}
@@ -138,7 +138,7 @@ export const Sheet: React.FC<SheetProps> = ({
                         // right-hand Select opened its list off the edge of the screen:
                         // the dropdown was open, just nowhere anyone could see it.
                         "text-surface-accent-900 dark:text-white",
-                        "fixed transform z-50 transition-[transform,opacity] ease-in-out",
+                        "fixed transform z-50 transition-[transform,opacity] ease-in-out motion-reduce:transition-none",
                         !displayed ? "duration-150" : "duration-100",
                         "outline-none focus:outline-none focus-visible:outline-none focus-visible:ring-0 focus:ring-0",
                         transparent ? "" : "shadow-md bg-surface-card",

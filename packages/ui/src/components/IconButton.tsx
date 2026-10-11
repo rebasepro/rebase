@@ -25,7 +25,7 @@ type IconButtonOwnProps<C extends React.ElementType> = {
 export type IconButtonProps<C extends React.ElementType = "button"> =
     IconButtonOwnProps<C> & Omit<React.ComponentPropsWithoutRef<C>, keyof IconButtonOwnProps<C> | "color">;
 
-const buttonClasses = "hover:scale-[1.04] active:scale-95 transition-transform";
+const buttonClasses = "motion-safe:hover:scale-[1.04] motion-safe:active:scale-95 transition-transform";
 // `[&>svg]:shrink-0` is load-bearing: without it flex compresses the icon to
 // whatever width is left after padding, so an 18px icon in a 28px button
 // rendered 12x18 — visibly squashed rather than merely small.

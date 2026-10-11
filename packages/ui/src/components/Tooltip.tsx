@@ -167,20 +167,20 @@ const styles = `
 }
 
 .TooltipContent[data-state='delayed-open'][data-side='top'] {
-  animation-name: slideDownAndFade;
+  animation-name: tooltipSlideDownAndFade;
 }
 .TooltipContent[data-state='delayed-open'][data-side='right'] {
-  animation-name: slideLeftAndFade;
+  animation-name: tooltipSlideLeftAndFade;
 }
 .TooltipContent[data-state='delayed-open'][data-side='bottom'] {
-  animation-name: slideUpAndFade;
+  animation-name: tooltipSlideUpAndFade;
 }
 .TooltipContent[data-state='delayed-open'][data-side='left'] {
-  animation-name: slideRightAndFade;
+  animation-name: tooltipSlideRightAndFade;
 }
 
 
-@keyframes slideUpAndFade {
+@keyframes tooltipSlideUpAndFade {
   from {
     opacity: 0;
     transform: translateY(4px);
@@ -191,7 +191,7 @@ const styles = `
   }
 }
 
-@keyframes slideRightAndFade {
+@keyframes tooltipSlideRightAndFade {
   from {
     opacity: 0;
     transform: translateX(-4px);
@@ -202,7 +202,7 @@ const styles = `
   }
 }
 
-@keyframes slideDownAndFade {
+@keyframes tooltipSlideDownAndFade {
   from {
     opacity: 0;
     transform: translateY(-4px);
@@ -213,7 +213,7 @@ const styles = `
   }
 }
 
-@keyframes slideLeftAndFade {
+@keyframes tooltipSlideLeftAndFade {
   from {
     opacity: 0;
     transform: translateX(4px);
@@ -221,5 +221,11 @@ const styles = `
   to {
     opacity: 1;
     transform: translateX(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .TooltipContent[data-state] {
+    animation: none;
   }
 }`;

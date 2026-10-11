@@ -99,26 +99,25 @@ export function Popover({
 }
 
 const popoverStyles = `
-/* ... (styles remain unchanged) ... */
 .PopoverContent {
   animation-duration: 400ms;
   animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
   will-change: transform, opacity;
 }
 .PopoverContent[data-state='open'][data-side='top'] {
-  animation-name: slideDownAndFade;
+  animation-name: popoverSlideDownAndFade;
 }
 .PopoverContent[data-state='open'][data-side='right'] {
-  animation-name: slideLeftAndFade;
+  animation-name: popoverSlideLeftAndFade;
 }
 .PopoverContent[data-state='open'][data-side='bottom'] {
-  animation-name: slideUpAndFade;
+  animation-name: popoverSlideUpAndFade;
 }
 .PopoverContent[data-state='open'][data-side='left'] {
-  animation-name: slideRightAndFade;
+  animation-name: popoverSlideRightAndFade;
 }
 
-@keyframes slideUpAndFade {
+@keyframes popoverSlideUpAndFade {
   from {
     opacity: 0;
     transform: translateY(2px);
@@ -129,7 +128,7 @@ const popoverStyles = `
   }
 }
 
-@keyframes slideRightAndFade {
+@keyframes popoverSlideRightAndFade {
   from {
     opacity: 0;
     transform: translateX(-2px);
@@ -140,7 +139,7 @@ const popoverStyles = `
   }
 }
 
-@keyframes slideDownAndFade {
+@keyframes popoverSlideDownAndFade {
   from {
     opacity: 0;
     transform: translateY(-2px);
@@ -151,7 +150,7 @@ const popoverStyles = `
   }
 }
 
-@keyframes slideLeftAndFade {
+@keyframes popoverSlideLeftAndFade {
   from {
     opacity: 0;
     transform: translateX(2px);
@@ -159,6 +158,12 @@ const popoverStyles = `
   to {
     opacity: 1;
     transform: translateX(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .PopoverContent[data-state] {
+    animation: none;
   }
 }
 `;

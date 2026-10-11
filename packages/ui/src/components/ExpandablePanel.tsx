@@ -36,13 +36,13 @@ export function ExpandablePanel({
   overflow: hidden;
 }
 .CollapsibleContent[data-state='open'] {
-  animation: slideDown 220ms ease-out
+  animation: expandablePanelSlideDown 220ms ease-out
 }
 .CollapsibleContent[data-state='closed'] {
-  animation: slideUp 220ms ease-out;
+  animation: expandablePanelSlideUp 220ms ease-out;
 }
 
-@keyframes slideDown {
+@keyframes expandablePanelSlideDown {
   from {
     height: 0;
   }
@@ -51,12 +51,18 @@ export function ExpandablePanel({
   }
 }
 
-@keyframes slideUp {
+@keyframes expandablePanelSlideUp {
   from {
     height: var(--radix-collapsible-content-height);
   }
   to {
     height: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .CollapsibleContent[data-state] {
+    animation: none;
   }
 }`);
 
@@ -99,7 +105,7 @@ export function ExpandablePanel({
                             "hover:bg-surface-hover active:bg-surface-active",
                             invisible ? "border-b px-2" : "p-4",
                             open ? "py-6" : "py-4",
-                            "transition-all duration-200",
+                            "transition-all duration-200 motion-reduce:transition-none",
                             invisible && defaultBorderMixin,
                             asField && fieldBackgroundMixin,
                             titleClassName,

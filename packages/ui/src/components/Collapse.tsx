@@ -24,13 +24,13 @@ export const Collapse = React.memo(({
   overflow: hidden;
 }
 .CollapseContent-${duration}[data-state='open'] {
-  animation: slideDown ${duration}ms ease-out;
+  animation: collapseSlideDown ${duration}ms ease-out;
 }
 .CollapseContent-${duration}[data-state='closed'] {
-  animation: slideUp ${duration}ms ease-in;
+  animation: collapseSlideUp ${duration}ms ease-in;
 }
 
-@keyframes slideDown {
+@keyframes collapseSlideDown {
   from {
     height: 0;
   }
@@ -39,12 +39,18 @@ export const Collapse = React.memo(({
   }
 }
 
-@keyframes slideUp {
+@keyframes collapseSlideUp {
   from {
     height: var(--radix-collapsible-content-height);
   }
   to {
     height: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .CollapseContent-${duration}[data-state] {
+    animation: none;
   }
 }
 `);
