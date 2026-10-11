@@ -1208,7 +1208,7 @@ function isPrivileged(
  * severity of `policy-anonymous-tautology`, so guessing wrong degrades a message
  * rather than inventing or hiding a finding.
  */
-function detectPlatform(allSchemas: string[], roles: DbRole[]): DbSnapshot["platform"] {
+export function detectPlatform(allSchemas: string[], roles: DbRole[]): DbSnapshot["platform"] {
     const schema = new Set(allSchemas);
     const role = new Set(roles.map((r) => r.name));
 
@@ -1220,7 +1220,12 @@ function detectPlatform(allSchemas: string[], roles: DbRole[]): DbSnapshot["plat
         return "supabase";
     }
 
-    if (role.has("rebase_user") || schema.has("rebase")) return "rebase";
+    // The `rebase` schema, which every Rebase app creates in its own database.
+    // Not the `rebase_user` role: roles are cluster-wide, so any database on a
+    // server that also hosts a Rebase app was labelled Rebase — fixes printed
+    // `rebase.uid()`, which does not exist there, and uid tautologies were
+    // graded critical.
+    if (schema.has("rebase")) return "rebase";
     if (role.has("web_anon")) return "postgrest";
     if (role.has("neon_superuser") || schema.has("neon")) return "neon";
 

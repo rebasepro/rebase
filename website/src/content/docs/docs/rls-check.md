@@ -320,6 +320,10 @@ The severity is platform-dependent, and this distinction matters:
 - **On an unrecognised platform**, reported as **medium**, since whether it is a hole
   depends on whether your stack uses such a sentinel.
 
+A database counts as Rebase when it has the `rebase` schema. The `rebase_user` role
+does not decide it, because roles belong to the whole server, and a server that hosts a
+Rebase app may hold other databases.
+
 ```sql
 -- Scope to the row's owner rather than to the existence of an id
 ALTER POLICY "your_policy" ON "public"."your_table"
