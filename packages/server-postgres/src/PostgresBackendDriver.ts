@@ -1687,20 +1687,23 @@ export class PostgresBackendDriver implements DataDriver {
             }
 
             // Notify real-time subscribers (deferred if inside a transaction)
+            const notifications: PostgresBackendDriver["_pendingNotifications"] = [{
+                path,
+                id: savedId,
+                row: savedRow,
+                databaseId: resolvedCollection?.databaseId
+            }, ...this.childListNotifications(resolvedCollection, savedId, updatedValues as Record<string, unknown>)];
             if (this._deferNotifications) {
-                this._pendingNotifications.push({
-                    path,
-                    id: savedId,
-                    row: savedRow,
-                    databaseId: resolvedCollection?.databaseId
-                });
+                this._pendingNotifications.push(...notifications);
             } else {
-                await this.realtimeService.notifyUpdate(
-                    path,
-                    savedId,
-                    savedRow,
-                    resolvedCollection?.databaseId
-                );
+                for (const notification of notifications) {
+                    await this.realtimeService.notifyUpdate(
+                        notification.path,
+                        notification.id,
+                        notification.row,
+                        notification.databaseId
+                    );
+                }
             }
 
             return savedRow;
@@ -2341,6 +2344,37 @@ export class PostgresBackendDriver implements DataDriver {
             );
         }
 
+    }
+
+    /**
+     * The child lists a save rewrote through the parent, as notifications —
+     * when nothing else will announce them.
+     *
+     * `save("posts", "p-1", { tags: [...] })` rewrites the junction, and
+     * `{ comments: [...] }` on a `hasMany` re-points the children's foreign
+     * keys: either way the contents of `posts/p-1/<relation>` changed, and the
+     * row notification names the parent, whose paths land on `posts`. Under
+     * change capture the junction's or the children's own triggers announce
+     * it. Without capture these did not reach anyone: a live list of a post's
+     * tags kept the old set. Addressed to every row of the list, which also
+     * reaches the target collection's own lists — a `hasMany` changed those
+     * rows' foreign keys.
+     */
+    private childListNotifications(
+        collection: CollectionConfig | undefined,
+        id: string,
+        values: Record<string, unknown>
+    ): PostgresBackendDriver["_pendingNotifications"] {
+        if (!collection) return [];
+        const relations = resolveCollectionRelations(collection);
+        const written = Object.keys(values).filter((key) => relations[key]?.cardinality === "many");
+        if (written.length === 0 || this.realtimeService.isCdcActive()) return [];
+        return written.map((key) => ({
+            path: `${collection.slug}/${id}/${key}`,
+            id: "*",
+            row: { _rebase_invalidated: true },
+            databaseId: collection.databaseId
+        }));
     }
 
     async deleteAll(path: string): Promise<void> {
