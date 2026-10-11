@@ -501,7 +501,7 @@ Portanto:
   `REBASE_METRICS=true`, `/metrics` informa `rebase_db_pool_wait_ms`: quanto tempo
   cada consulta esperou por uma conexão. Um pool saudável o mantém perto de zero; uma cauda
   que cresce com o tráfego são requisições na fila por conexões que os callbacks
-  seguram. Veja [Métricas](/docs/deployment/self-hosting/#métricas).
+  seguram. Veja [Métricas](/docs/deployment/self-hosting/#metrics).
 
 ## Sincronizando Dados Entre Coleções
 

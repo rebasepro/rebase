@@ -251,7 +251,7 @@ de données (`source="(default)"` dans un projet qui ne déclare aucune source d
 maintient près de zéro. Une traîne qui grandit avec le trafic signifie que des requêtes font la queue
 pour des connexions — le plus souvent retenues par des callbacks d'écriture qui attendent quelque chose
 de lent ; voir
-[Un callback retient une connexion](/docs/collections/callbacks/#un-callback-retient-une-connexion).
+[Un callback retient une connexion](/docs/collections/callbacks/#a-callback-holds-a-connection).
 
 ## En-têtes de sécurité
 

@@ -259,7 +259,7 @@ de dados (`source="(default)"` em um projeto que não declara fontes de dados). 
 pool saudável o mantém perto de zero. Uma cauda que
 cresce com o tráfego significa requisições na fila por conexões — na maioria das vezes
 seguradas por callbacks de escrita que aguardam algo lento; veja
-[Um callback segura uma conexão](/docs/collections/callbacks/#um-callback-segura-uma-conexão).
+[Um callback segura uma conexão](/docs/collections/callbacks/#a-callback-holds-a-connection).
 
 ## Cabeçalhos de segurança
 

@@ -118,7 +118,7 @@ La retention viene applicata in due punti:
 - <span class="since-badge" data-since="0.25">Da 0.25</span> **Una volta all'ora**,
   per ogni entità: le voci più vecchie del periodo di retention vengono eliminate
   qualunque entità le possieda — comprese quelle che non vengono mai più scritte,
-  come le entità eliminate. Vedi [Meccanica del ciclo di vita del pruning](#pruning-lifecycle-mechanics).
+  come le entità eliminate. Vedi [Meccanica del ciclo di vita del pruning](#meccanica-del-ciclo-di-vita-del-pruning).
 
 ## Endpoint REST
 

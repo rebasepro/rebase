@@ -95,7 +95,7 @@ author: {
 <span class="since-badge" data-since="0.25">Depuis 0.25</span> La colonne est indexée pour vous : Postgres indexe la clé vers laquelle pointe une clé étrangère, jamais la
 colonne qui la porte ; sans index, chaque include `hasMany` et chaque liste imbriquée depuis l'autre côté
 parcourt cette table. `index: false` conserve la contrainte et supprime l'index — voir
-[Les clés étrangères sont indexées pour vous](/docs/backend/indexes#les-clés-étrangères-sont-indexées-pour-vous)
+[Les clés étrangères sont indexées pour vous](/docs/backend/indexes#foreign-keys-are-indexed-for-you)
 pour savoir quand cela vaut la peine, et quand Rebase l'omet de lui-même parce qu'un autre index sert déjà
 la colonne.
 

@@ -258,7 +258,7 @@ eseguono `db push`:
   nulla lo segnalerebbe. Una tabella che l'avvio crea riceve i suoi indici insieme alla
   tabella. Su una tabella già esistente, l'avvio costruisce un indice mancante dopo che il
   server è già in servizio, in background, come fa con gli
-  [indici delle chiavi esterne](#what-upgrading-does-to-an-existing-database).
+  [indici delle chiavi esterne](#cosa-fa-laggiornamento-a-un-database-esistente).
   Usa `CREATE INDEX CONCURRENTLY` su una connessione propria, così lo
   `statement_timeout` di 30 s del pool non può annullare una build lunga. Un indice che
   una build interrotta ha lasciato `INVALID` con il suo nome viene eliminato e ricostruito.
@@ -301,7 +301,7 @@ semplice o composto, purché sia un btree senza `where`. Un indice parziale
 non può servire una ricerca che deve raggiungere ogni riga, e un indice GIN o BRIN
 risponde a una domanda diversa, quindi nessuno dei due conta.
 
-Il nome è quello che deriva [una dichiarazione](#what-a-declaration-is-called) di un indice
+Il nome è quello che deriva [una dichiarazione](#come-viene-nominata-una-dichiarazione) di un indice
 semplice su quella colonna — `posts_author_id_ix_00ad191` — quindi l'indice derivato e
 `indexes: [{ on: ["author"], … }]` sono un solo oggetto, non due. È un
 [nome derivato congelato](/docs/architecture/schema-as-code) come ogni altro.

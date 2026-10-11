@@ -23,7 +23,7 @@ La pipeline realtime si articola in tre fasi:
 └──────────────┘      └────────────────────┘      └──────────────┘
 ```
 
-Per i deployment multi-istanza, Rebase utilizza `LISTEN/NOTIFY` di PostgreSQL per trasmettere le modifiche tra le istanze del server. Questo processo è gestito automaticamente. Con la [change capture a livello di database](#database-level-change-capture-cdc) attiva (l'impostazione predefinita ovunque il ruolo del database possa creare trigger), ogni istanza è in ascolto sul canale `rebase_cdc` su cui pubblicano i trigger di acquisizione, così una scrittura viene sentita da qualunque processo o strumento l'abbia fatta. Senza acquisizione, ogni istanza annuncia le proprie scritture sul canale `rebase_entity_changes`, e una connessione dedicata su ogni altra istanza le ritrasmette ai propri sottoscrittori locali.
+Per i deployment multi-istanza, Rebase utilizza `LISTEN/NOTIFY` di PostgreSQL per trasmettere le modifiche tra le istanze del server. Questo processo è gestito automaticamente. Con la [change capture a livello di database](#acquisizione-delle-modifiche-a-livello-di-database-cdc) attiva (l'impostazione predefinita ovunque il ruolo del database possa creare trigger), ogni istanza è in ascolto sul canale `rebase_cdc` su cui pubblicano i trigger di acquisizione, così una scrittura viene sentita da qualunque processo o strumento l'abbia fatta. Senza acquisizione, ogni istanza annuncia le proprie scritture sul canale `rebase_entity_changes`, e una connessione dedicata su ogni altra istanza le ritrasmette ai propri sottoscrittori locali.
 
 ### Zero configurazione
 
@@ -554,7 +554,7 @@ channel.onError((error) => {
 | Codice | Significato |
 |------|-------|
 | `CHANNEL_FORBIDDEN` | Non sei un membro del canale — unisciti prima di trasmettere o leggerne la cronologia |
-| `RATE_LIMITED` | Superato il budget di frame del canale indicato sopra o, per una richiesta di cronologia, il [rate limit dei dati](#what-a-write-costs-and-the-limits) |
+| `RATE_LIMITED` | Superato il budget di frame del canale indicato sopra o, per una richiesta di cronologia, il [rate limit dei dati](#cosa-costa-una-scrittura-e-i-limiti) |
 | `CHANNEL_HISTORY_WRITE_FAILED` | Un broadcast conservato non ha potuto essere salvato, quindi è stato scartato |
 | `CHANNEL_HISTORY_READ_FAILED` | Impossibile soddisfare una richiesta di recupero (catch-up) |
 | `CHANNEL_HISTORY_GAP` | Generato dal client: un recupero (catch-up) ha rilevato che il server non conserva più messaggi che questo client non ha mai ricevuto. `details` è `{ from, to }`, i numeri di sequenza persi. Risincronizza lo stato del canale dalla sua fonte di verità |

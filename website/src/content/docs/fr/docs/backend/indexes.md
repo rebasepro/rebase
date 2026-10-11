@@ -187,7 +187,7 @@ supprimée. Sans index, chacune de ces lectures parcourt toutes les lignes de la
 
 Rebase dérive donc un btree simple pour :
 
-- la `localKey` de chaque [`belongsTo`](/docs/collections/relations#belongsto--la-clé-est-sur-cette-table)
+- la `localKey` de chaque [`belongsTo`](/docs/collections/relations#belongsto--the-key-is-on-this-table)
   — qui est aussi la colonne que lit le `hasOne` / `hasMany` du côté opposé ;
 - la colonne cible de chaque table de jonction `manyToMany`. La clé primaire `(source, target)` de la
   jonction sert déjà les recherches par la colonne source ; le côté inverse du lien a besoin de celui-ci.

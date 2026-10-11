@@ -428,7 +428,7 @@ GET /api/data/posts?include={"comments":{"limit":5,"where":{"published":["==",tr
 | `orderBy` | La même syntaxe de tri, y compris le positionnement des NULL. En cas d'égalité, ou pour une `limit` sans `orderBy`, l'ordre suit la clé de la ligne liée, croissante |
 | `fields` | Colonnes de la ligne *liée* ; sa clé primaire est toujours conservée |
 | `include` | Relations de la ligne liée, à leur tour |
-| `count` | <span class="since-badge" data-since="0.25">Depuis 0.25</span> `true` renvoie aussi le total de chaque parent sous `_count` (`"_count":{"comments":37}`), compté par la même instruction. Relations vers plusieurs lignes uniquement. Voir [Compter ce qu'une limite laisse de côté](/docs/sdk/relations#compter-ce-quune-limite-laisse-de-côté) |
+| `count` | <span class="since-badge" data-since="0.25">Depuis 0.25</span> `true` renvoie aussi le total de chaque parent sous `_count` (`"_count":{"comments":37}`), compté par la même instruction. Relations vers plusieurs lignes uniquement. Voir [Compter ce qu'une limite laisse de côté](/docs/sdk/relations#counting-what-a-limit-leaves-out) |
 
 `true` signifie « charger en totalité », de sorte que `{"author":true}` et `author` correspondent à la même requête. Les deux syntaxes fonctionnent sur la route de liste, la route d'obtention par ID et les routes de sous-collections imbriquées.
 
