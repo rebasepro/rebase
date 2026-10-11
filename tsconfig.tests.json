@@ -149,6 +149,11 @@
     "packages/cli/src/commands/cloud/context.test.ts",
     "packages/cli/src/commands/cloud/debug.test.ts",
     "packages/cli/src/commands/cloud/emit-json-arg.test.ts",
+    // The CLI's own `test/` directory (the e2e suite and its helpers) has no
+    // errors. Its `typecheck:test` script checked it and nothing ran that
+    // script, so the e2e drivers could drift from the code they drive and only
+    // fail minutes into a Docker-backed run.
+    "packages/cli/test",
     // `packages/client` carries 265 pre-existing errors, so one file: the
     // opt-out asserts a realtime option that is not on the type.
     "packages/client/src/realtime-optout.test.ts",

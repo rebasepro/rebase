@@ -177,6 +177,32 @@ And the suites that are not root scripts:
 - lane `cli`: `tests/e2e/tests/cli-init-e2e.ts`, `tests/e2e/tests/cli-init-baas-e2e.ts`, `tests/e2e/tests/client-sdk-e2e.ts`;
 - lane `admin`: `db push` and the seed into a fresh database, then the Playwright suite (`pnpm e2e`).
 
+## Package scripts
+
+A package's own test-shaped scripts (`test:*`, `typecheck*`, `smoke*`,
+`verify*`), other than `test` and `test:watch`, which `pnpm test` runs. Each
+has one line saying where it runs, or that nothing does and why;
+`check:gates-doc` fails on a script with no line and a line with no script.
+
+- `@rebasepro/server-postgres` `test:e2e` — lane `vitest` of `ci:e2e`.
+- `@rebasepro/rls-check` `test:e2e` — lane `vitest` of `ci:e2e`.
+- `@rebasepro/cli` `test:e2e` — lane `vitest` of `ci:e2e`.
+- `@rebasepro/cli` `test:integration` — lane `vitest` of `ci:e2e`.
+- `@rebasepro/cli` `typecheck:test` — the same files are in `tsconfig.tests.json`, which `typecheck` (static job) runs.
+- `@rebasepro/rls-check` `typecheck` — its `src` is in `tsconfig.typecheck.json`, which `typecheck` (static job) runs.
+- `@rebasepro/server-postgres` `smoke:baas` — **runs in no pipeline.** BaaS mode end to end against a Docker Postgres, run by hand as the root `pnpm smoke:baas`.
+- `@rebasepro/app` `test:lint` — `check:lint` (static job) lints the same files.
+- `@rebasepro/client` `test:lint` — `check:lint` (static job) lints the same files.
+- `@rebasepro/cms` `test:lint` — `check:lint` (static job) lints the same files.
+- `@rebasepro/cms-types` `test:lint` — `check:lint` (static job) lints the same files.
+- `@rebasepro/common` `test:lint` — `check:lint` (static job) lints the same files.
+- `@rebasepro/server` `test:lint` — `check:lint` (static job) lints the same files.
+- `@rebasepro/server-mongo` `test:lint` — `check:lint` (static job) lints the same files.
+- `@rebasepro/server-postgres` `test:lint` — `check:lint` (static job) lints the same files.
+- `@rebasepro/types` `test:lint` — `check:lint` (static job) lints the same files.
+- `@rebasepro/ui` `test:lint` — `check:lint` (static job) lints the same files.
+- `@rebasepro/utils` `test:lint` — `check:lint` (static job) lints the same files.
+
 ## Release only
 
 Run by `publish.yml` and `release.sh`, not on a pull request.

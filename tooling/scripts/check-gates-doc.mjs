@@ -342,6 +342,63 @@ const bailingTestRuns = [];
     }
 }
 
+/**
+ * The "## Tests" rows, which no `ci:*` runner owns: the workflow invokes each
+ * one as a step. A row whose step was deleted is a suite the map says CI runs
+ * and nothing does — deleting `test:harness`'s step failed nothing.
+ */
+const testsNotInWorkflow = [];
+{
+    const rows = sectionRows("## Tests");
+    const workflowPath = path.join(ROOT, WORKFLOW);
+    if (rows === null) {
+        testsNotInWorkflow.push(`${DOC} has no "## Tests" section.`);
+    } else if (fs.existsSync(workflowPath)) {
+        const invoked = invokedRootScripts(fs.readFileSync(workflowPath, "utf8"));
+        for (const { name } of rows) {
+            if (!invoked.has(name)) testsNotInWorkflow.push(`\`${name}\` is under "## Tests" and ${WORKFLOW} never runs it.`);
+        }
+    }
+}
+
+/**
+ * Every package's own test-shaped scripts — `test:*`, `typecheck*`, `smoke*`,
+ * `verify*`, other than `test` and `test:watch`, which `pnpm test` runs — has a
+ * line under "## Package scripts" saying where it runs, or that nothing does.
+ * Root package.json is all the rest of this check reads, so these were
+ * invisible: the CLI's managed-database suite and its test typecheck ran in no
+ * pipeline, and nothing could say so.
+ */
+const PACKAGE_SCRIPT = /^(test:|typecheck|smoke|verify)/;
+const unlistedPackageScripts = [];
+{
+    const start = doc.indexOf("## Package scripts\n");
+    if (start === -1) {
+        unlistedPackageScripts.push(`${DOC} has no "## Package scripts" section.`);
+    } else {
+        const after = doc.indexOf("\n## ", start + 1);
+        const body = doc.slice(start, after === -1 ? undefined : after);
+        const listed = new Set([...body.matchAll(/^- `(@rebasepro\/[\w-]+)` `([\w:.-]+)`/gm)].map(([, p, sc]) => `${p} ${sc}`));
+        const existing = new Set();
+        const packagesDir = path.join(ROOT, "packages");
+        for (const entry of fs.readdirSync(packagesDir)) {
+            const manifestPath = path.join(packagesDir, entry, "package.json");
+            if (!fs.existsSync(manifestPath)) continue;
+            const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+            for (const name of Object.keys(manifest.scripts ?? {})) {
+                if (!PACKAGE_SCRIPT.test(name) || name === "test:watch") continue;
+                existing.add(`${manifest.name} ${name}`);
+            }
+        }
+        for (const key of [...existing].sort()) {
+            if (!listed.has(key)) unlistedPackageScripts.push(`\`${key.replace(" ", "` `")}\` has no line under "## Package scripts".`);
+        }
+        for (const key of [...listed].sort()) {
+            if (!existing.has(key)) unlistedPackageScripts.push(`"## Package scripts" lists \`${key.replace(" ", "` `")}\`, which does not exist.`);
+        }
+    }
+}
+
 /** Script names the verifier README's "Where it blocks" section claims. */
 const readmeProblems = [];
 {
@@ -388,7 +445,8 @@ const readmeProblems = [];
 
 const problems = undocumented.length + phantom.length + misnamed.length
     + writersAsGates.length + readmeProblems.length + unrun.length + unregistered.length
-    + notRunBeforePush.length + bailingTestRuns.length;
+    + notRunBeforePush.length + bailingTestRuns.length
+    + testsNotInWorkflow.length + unlistedPackageScripts.length;
 
 if (problems === 0) {
     console.log(green(
@@ -398,6 +456,7 @@ if (problems === 0) {
         ` every e2e suite ${WORKFLOW} and ${E2E_RUNNER} run in a register,` +
         ` everything ${WORKFLOW} runs also run by ${VERIFY_QUALITY},` +
         " every recursive test run with --no-bail," +
+        ` every "## Tests" row run by ${WORKFLOW}, every package test script listed,` +
         ` and ${VERIFIER_README} says where it blocks.`
     ));
     process.exit(0);
@@ -483,6 +542,21 @@ if (bailingTestRuns.length > 0) {
         "\n    Add --no-bail. pnpm stops a recursive run at the first package that\n" +
         "    fails, so the packages after it report nothing and the next failure\n" +
         "    hides behind this one.\n"
+    ));
+}
+
+if (testsNotInWorkflow.length > 0) {
+    console.error(red(`  ${testsNotInWorkflow.length} "## Tests" row(s) the workflow does not run:`));
+    for (const line of testsNotInWorkflow) console.error(`    ${line}`);
+    console.error(dim("\n    Restore the step in the workflow, or move the row to where it does run.\n"));
+}
+
+if (unlistedPackageScripts.length > 0) {
+    console.error(red(`  ${unlistedPackageScripts.length} package script(s) out of step with "## Package scripts":`));
+    for (const line of unlistedPackageScripts) console.error(`    ${line}`);
+    console.error(dim(
+        "\n    One line per package test script: - `@rebasepro/<pkg>` `<script>` — where it runs\n" +
+        "    (a ci:e2e lane, a gate that covers it), or that nothing does and why.\n"
     ));
 }
 
