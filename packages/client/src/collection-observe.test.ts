@@ -238,3 +238,47 @@ describe("observe() does not fetch what the socket already answered", () => {
         stop();
     });
 });
+
+/**
+ * `observeById` reads the row twice — a one-shot `findById` and a `listenById`
+ * subscription — and both have to load the same relations. Without `include`
+ * a to-many relation was absent from the row, and a form built on it saved
+ * the relation as empty.
+ */
+describe("observeById({ include })", () => {
+    it("loads the relations on both the fetch and the subscription", async () => {
+        const transport = createTransport({});
+        (transport.request as jest.Mock).mockImplementation(() => Promise.resolve({ id: "1", name: "a", tags: [] }));
+        const listened: unknown[] = [];
+        const ws = {
+            listenOne: (props: unknown) => {
+                listened.push(props);
+                return () => undefined;
+            }
+        } as unknown as RebaseWebSocketClient;
+        const client = createCollectionClient<Row>(transport, "products", ws);
+
+        const seen: (Row | undefined)[] = [];
+        const stop = client.observeById("1", (row) => seen.push(row), undefined, { include: ["tags"] });
+        await flush();
+
+        expect(listened).toEqual([{ path: "products", id: "1", include: ["tags"] }]);
+        const url = (transport.request as jest.Mock).mock.calls[0][0] as string;
+        expect(decodeURIComponent(url)).toContain("include=tags");
+        expect(seen).toEqual([{ id: "1", name: "a", tags: [] }]);
+        stop();
+    });
+
+    it("loads them on the fetch when realtime is off", async () => {
+        const transport = createTransport({});
+        (transport.request as jest.Mock).mockImplementation(() => Promise.resolve({ id: "1", name: "a" }));
+        const client = createCollectionClient<Row>(transport, "products");
+
+        const stop = client.observeById("1", () => undefined, undefined, { include: ["tags"], realtime: false });
+        await flush();
+
+        const url = (transport.request as jest.Mock).mock.calls[0][0] as string;
+        expect(decodeURIComponent(url)).toContain("include=tags");
+        stop();
+    });
+});

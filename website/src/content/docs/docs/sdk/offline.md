@@ -99,7 +99,13 @@ Each result carries what a UI needs to describe itself:
 | `partial` | The local database may not hold every matching row — treat as best effort |
 | `error` | The last revalidation failed |
 
-`observeById()` does the same for a single row, and passes `undefined` when it is deleted.
+`observeById()` does the same for a single row, and passes `undefined` when it is deleted. It takes `include` as `findById()` does, and every emission carries those relations:
+
+```typescript
+const stop = client.data.posts.observeById(postId, (post) => render(post), undefined, {
+    include: ["tags"]
+});
+```
 
 Both bind the realtime subscription when the client has one, so changes made by other users stream in too. Pass `{ realtime: false }` for a subscription that only reflects local state and explicit refreshes.
 

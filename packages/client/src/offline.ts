@@ -1,7 +1,7 @@
 import { buildQueryString, FindParams, RebaseApiError } from "./transport";
 import { FindAllParams, FindResult, IterateParams, LogicalCondition, SDKCollectionClient, WhereFilterOp, WhereValueFor, WriteOptions, hasFieldOperation, isUnsupported, type ByIdReadOptions, type UpdateValues, type UpsertOptions } from "@rebasepro/types";
 import { collectAllPages, normalizeOrderBy, paginateFind } from "@rebasepro/common";
-import { CollectionClient, LiveResult, ObserveOptions, RowSnapshotMeta } from "./collection";
+import { CollectionClient, LiveResult, ObserveOptions, RowSnapshotMeta, byIdRead, type ObserveByIdOptions } from "./collection";
 import { SDKQueryBuilder } from "./sdk_query_builder";
 import { dehydrateMutation, dehydrateRow, hydrateMutation, hydrateRow, setOwn } from "./offline-codec";
 import { RebaseClientError } from "./errors";
@@ -136,7 +136,7 @@ export interface OfflineStatus {
     persisted?: boolean;
 }
 
-export type { LiveResult, ObserveOptions, RowSnapshotMeta } from "./collection";
+export type { LiveResult, ObserveByIdOptions, ObserveOptions, RowSnapshotMeta } from "./collection";
 
 /** Which queue {@link OfflineApi.pending} and {@link OfflineApi.clear} act on. */
 export interface OfflineQueueOptions {
@@ -1301,7 +1301,7 @@ data: u.data as AnyRow })),
                 id: string | number,
                 onResult: (row: M | undefined, meta: RowSnapshotMeta) => void,
                 onError?: (error: Error) => void,
-                options?: ObserveOptions
+                options?: ObserveByIdOptions
             ) => this.observeById<M>(slug, wrapped, inner, id, onResult, onError, options),
 
             // The builder calls back into `wrapped.find(...)`, so fluent
@@ -1485,15 +1485,17 @@ data: u.data as AnyRow })),
         id: string | number,
         onResult: (row: M | undefined, meta: RowSnapshotMeta) => void,
         onError?: (error: Error) => void,
-        options?: ObserveOptions
+        options?: ObserveByIdOptions
     ): () => void {
+        // Both reads load the same relations, so every emission carries them.
+        const read = byIdRead(options);
         let closed = false;
         let unlisten: (() => void) | undefined;
         const observer: Observer = {
             slug,
             id,
             settled: false,
-            refresh: () => wrapped.findById(id).catch(() => undefined),
+            refresh: () => wrapped.findById(id, read).catch(() => undefined),
             emit: () => {
                 if (closed || !this.collections.get(slug)?.ready) return;
                 const row = this.localRow<M>(slug, id);
@@ -1515,7 +1517,7 @@ data: u.data as AnyRow })),
             if (closed) return;
             if (this.localRow<M>(slug, id) !== undefined) observer.emit();
             try {
-                await wrapped.findById(id);
+                await wrapped.findById(id, read);
             } catch (error) {
                 if (closed) return;
                 if (!observer.settled) {
@@ -1538,7 +1540,7 @@ data: u.data as AnyRow })),
                     return;
                 }
                 void this.ingest(slug, [row], ticket).then(() => this.notifyCollection(slug, false));
-            }, onError);
+            }, onError, read);
         }
 
         return () => {

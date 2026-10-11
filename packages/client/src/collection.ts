@@ -324,6 +324,14 @@ export interface ObserveOptions {
 }
 
 /**
+ * Options for `observeById`: {@link ObserveOptions}, plus the relations to load
+ * into the row. `include` reaches both of its reads — the one-shot
+ * `findById` and the `listenById` subscription — so every emission carries
+ * the same relations.
+ */
+export interface ObserveByIdOptions<Inc = IncludeSpec> extends ObserveOptions, ByIdReadOptions<Inc> {}
+
+/**
  * The concrete, HTTP-backed implementation of the public
  * {@link SDKCollectionClient} contract — flat rows (no Entity wrapper), plus
  * fluent query-builder methods (`.where()`, `.orderBy()`, …).
@@ -368,8 +376,16 @@ export interface CollectionClient<
         id: string | number,
         onResult: (row: M | undefined, meta: RowSnapshotMeta) => void,
         onError?: (error: Error) => void,
-        options?: ObserveOptions
+        options?: ObserveByIdOptions<Inc>
     ): () => void;
+}
+
+/**
+ * The part of {@link ObserveByIdOptions} that is a read option: `include`, and
+ * nothing else, so `realtime` never travels as a query parameter.
+ */
+export function byIdRead<Inc>(options: ObserveByIdOptions<Inc> | undefined): ByIdReadOptions<Inc> | undefined {
+    return options?.include !== undefined ? { include: options.include } : undefined;
 }
 
 export function createCollectionClient<M extends Record<string, unknown> = Record<string, unknown>>(transport: Transport, slug: string, ws?: RebaseWebSocketClient): CollectionClient<M> {
@@ -717,7 +733,7 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
             id: string | number,
             onResult: (row: M | undefined, meta: RowSnapshotMeta) => void,
             onError?: (error: Error) => void,
-            options?: ObserveOptions
+            options?: ObserveByIdOptions
         ) {
             let closed = false;
             let liveDelivered = false;
@@ -737,10 +753,10 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
             // Subscribe first, for the reason `observe` does: a replayed row
             // makes the fetch one whose answer would be dropped.
             const live = options?.realtime !== false && !isUnsupported(client.listenById)
-                ? client.listenById(id, (row) => deliver(row, true), onError)
+                ? client.listenById(id, (row) => deliver(row, true), onError, byIdRead(options))
                 : undefined;
             if (!liveDelivered) {
-                client.findById(id).then((row) => deliver(row, false)).catch((error) => {
+                client.findById(id, byIdRead(options)).then((row) => deliver(row, false)).catch((error) => {
                     if (!closed) onError?.(error as Error);
                 });
             }

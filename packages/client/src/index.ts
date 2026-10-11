@@ -122,7 +122,7 @@ export type {
 // browser and needs no direct construction.
 export type { OfflineApi, OfflineConfig, OfflineQueueOptions, OfflineStatus } from "./offline";
 export { isOfflineError } from "./offline";
-export type { LiveResult, ObserveOptions, RowSnapshotMeta } from "./collection";
+export type { LiveResult, ObserveByIdOptions, ObserveOptions, RowSnapshotMeta } from "./collection";
 // The reader for a fetched row's version. A function rather than a field so the
 // version never enters the generated `Row` type — see `etagOf`.
 export { etagOf } from "./collection";

@@ -716,6 +716,34 @@ describe("live queries", () => {
         stop();
     });
 
+    it("observes a single row with its relations, on both reads", async () => {
+        const server = createFakeServer();
+        const { manager } = createManager(server);
+        const inner = server.client("posts");
+        const reads: unknown[] = [];
+        const listens: unknown[] = [];
+        const spied: CollectionClient<Row> = {
+            ...inner,
+            findById: (id, options) => {
+                reads.push(options);
+                return inner.findById(id);
+            },
+            listenById: (_id, _onUpdate, _onError, options) => {
+                listens.push(options);
+                return () => undefined;
+            }
+        };
+        const posts = manager.wrap("posts", spied);
+        await inner.create({ title: "a" }, "p1");
+
+        const stop = posts.observeById("p1", () => undefined, undefined, { include: ["tags"] });
+        await settle();
+        expect(reads.length).toBeGreaterThan(0);
+        expect(reads.every((options) => JSON.stringify(options) === JSON.stringify({ include: ["tags"] }))).toBe(true);
+        expect(listens).toEqual([{ include: ["tags"] }]);
+        stop();
+    });
+
     it("empties on sign-out instead of leaving the previous user's rows on screen", async () => {
         const server = createFakeServer();
         const { manager, wrap } = createManager(server);
