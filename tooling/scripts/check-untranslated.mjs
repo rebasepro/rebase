@@ -89,8 +89,9 @@ function sourceFiles(dir) {
  *
  * @param {string} line a source line
  * @param {{ key: string, value: string }[]} strings from {@link translatedStrings}
+ * @param {string} [nextLine] the line after it, where an entity action's `nameKey` sits
  */
-export function untranslatedKeyOn(line, strings) {
+export function untranslatedKeyOn(line, strings, nextLine = "") {
     const trimmed = line.trim();
     if (trimmed.startsWith("//") || trimmed.startsWith("*") || trimmed.startsWith("/*")) return null;
     // Console output, for the same reason as a comment: it is not a rendered
@@ -115,7 +116,13 @@ export function untranslatedKeyOn(line, strings) {
     // not fit between the tags onto its own line, and a check that only saw
     // `"value"` and `>value<` missed every wrapped one — 37 when it was added.
     for (const { key, value } of strings) {
-        if (line.includes(`"${value}"`) || line.includes(`>${value}<`) || trimmed === value) return key;
+        if (line.includes(`"${value}"`) || line.includes(`>${value}<`) || trimmed === value) {
+            // An entity action's `name` with the `nameKey` that translates it on
+            // the next line is the `?? "English"` shape spelt as two fields:
+            // `entityActionName` renders `t(nameKey)`, and `name` is the default.
+            if (/^name:\s*"/.test(trimmed) && nextLine.trim().startsWith(`nameKey: "${key}"`)) return null;
+            return key;
+        }
     }
     return null;
 }
@@ -127,8 +134,9 @@ function main() {
 
     for (const file of SCANNED.flatMap(sourceFiles)) {
         const rel = path.relative(ROOT, file);
-        for (const line of fs.readFileSync(file, "utf8").split("\n")) {
-            const key = untranslatedKeyOn(line, strings);
+        const lines = fs.readFileSync(file, "utf8").split("\n");
+        for (const [i, line] of lines.entries()) {
+            const key = untranslatedKeyOn(line, strings, lines[i + 1]);
             if (key === null) continue;
             const id = `${rel}::${key}`;
             found.set(id, (found.get(id) ?? 0) + 1);

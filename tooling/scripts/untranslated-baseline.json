@@ -111,8 +111,6 @@
   "packages/cms/src/collection_editor/ui/collection_editor/ViewModeSwitch.tsx::choose_how_entities_displayed_default": 1,
   "packages/cms/src/collection_editor/ui/collection_editor/ViewModeSwitch.tsx::default_collection_view": 1,
   "packages/cms/src/components/CollectionTableBinding/CollectionTableBinding.tsx::column_cannot_be_edited": 1,
-  "packages/cms/src/components/common/default_entity_actions.tsx::reset_mfa_title": 1,
-  "packages/cms/src/components/common/default_entity_actions.tsx::reset_password": 1,
   "packages/cms/src/components/DefaultAppBar.tsx::toggle_theme": 1,
   "packages/cms/src/components/DefaultAppBar.tsx::user_menu": 1,
   "packages/cms/src/components/DetailViewBinding.tsx::entity_not_found": 1,

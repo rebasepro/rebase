@@ -52,3 +52,13 @@ test("a translated line, a comment, a log line or a longer sentence is not a fin
         assert.equal(untranslatedKeyOn(line, STRINGS), null, line);
     }
 });
+
+test("an entity action's `name` beside the `nameKey` that translates it is its English default", () => {
+    // `{ name: "File not found", nameKey: "file_not_found" }`: `entityActionName`
+    // renders `t(nameKey)`, and `name` is what shows when no key resolves.
+    assert.equal(untranslatedKeyOn("    name: \"File not found\",", STRINGS, "    nameKey: \"file_not_found\","), null);
+    // A `nameKey` naming another key translates nothing this line says.
+    assert.equal(untranslatedKeyOn("    name: \"File not found\",", STRINGS, "    nameKey: \"new_collection\","), "file_not_found");
+    // Nor does a `nameKey` that is not beside it.
+    assert.equal(untranslatedKeyOn("    name: \"File not found\",", STRINGS, "    key: \"file\","), "file_not_found");
+});
