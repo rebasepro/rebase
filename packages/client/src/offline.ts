@@ -3,7 +3,7 @@ import { FindAllParams, FindResult, IterateParams, LogicalCondition, SDKCollecti
 import { collectAllPages, normalizeOrderBy, paginateFind } from "@rebasepro/common";
 import { CollectionClient, LiveResult, ObserveOptions, RowSnapshotMeta } from "./collection";
 import { SDKQueryBuilder } from "./sdk_query_builder";
-import { dehydrateRow, hydrateRow } from "./offline-codec";
+import { dehydrateRow, hydrateRow, setOwn } from "./offline-codec";
 import { RebaseClientError } from "./errors";
 import {
     ConnectivityMonitor,
@@ -254,7 +254,7 @@ function replaceMintedId(value: unknown, from: string | number, to: string | num
         for (const [key, item] of Object.entries(value as AnyRow)) {
             const replaced = replaceMintedId(item, from, to);
             changed ||= replaced.changed;
-            out[key] = replaced.value;
+            setOwn(out, key, replaced.value);
         }
         return changed ? { value: out, changed } : { value, changed };
     }
@@ -391,7 +391,7 @@ function isProjection(params?: FindParams): boolean {
 /** `row` narrowed to `keys`: a local row in the shape a projection has. */
 function pick(row: AnyRow, keys: readonly string[]): AnyRow {
     const out: AnyRow = {};
-    for (const key of keys) if (key in row) out[key] = row[key];
+    for (const key of keys) if (Object.hasOwn(row, key)) setOwn(out, key, row[key]);
     return out;
 }
 

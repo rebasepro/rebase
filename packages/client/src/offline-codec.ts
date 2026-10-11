@@ -34,6 +34,16 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
     return proto.constructor?.name === "Object";
 }
 
+/**
+ * `out[key] = value`, as an own property whatever the key. Assigned, a key
+ * read from stored data that is literally `__proto__` (which `JSON.parse`
+ * creates as an own property) set the new object's prototype instead, and the
+ * column was gone from the row.
+ */
+export function setOwn(out: Record<string, unknown>, key: string, value: unknown): void {
+    Object.defineProperty(out, key, { value, enumerable: true, writable: true, configurable: true });
+}
+
 function dehydrateValue(value: unknown): unknown {
     if (value === null || value === undefined) return value;
     if (value instanceof GeoPoint) {
@@ -46,7 +56,7 @@ function dehydrateValue(value: unknown): unknown {
     if (Array.isArray(value)) return value.map(dehydrateValue);
     if (isPlainObject(value)) {
         const out: Record<string, unknown> = {};
-        for (const [key, inner] of Object.entries(value)) out[key] = dehydrateValue(inner);
+        for (const [key, inner] of Object.entries(value)) setOwn(out, key, dehydrateValue(inner));
         return out;
     }
     return value;
@@ -62,7 +72,7 @@ function hydrateValue(value: unknown): unknown {
         if (revived !== value) return revived;
         if (!isPlainObject(value)) return value;
         const out: Record<string, unknown> = {};
-        for (const [key, inner] of Object.entries(value)) out[key] = hydrateValue(inner);
+        for (const [key, inner] of Object.entries(value)) setOwn(out, key, hydrateValue(inner));
         return out;
     }
     return value;
