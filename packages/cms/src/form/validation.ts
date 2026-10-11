@@ -401,11 +401,14 @@ function getZodNumberSchema({
             (value: unknown) => value == null || (typeof value === "number" && value < 0),
             { message: `${fieldLabel(property, name)} must be negative` }
         );
-        if (validation.integer) schema = schema.refine(
-            (value: unknown) => value == null || (typeof value === "number" && Number.isInteger(value)),
-            { message: `${fieldLabel(property, name)} must be an integer` }
-        );
     }
+    // An integer column takes a whole number whether or not the property says
+    // `validation.integer`; without it, a fraction reached Postgres and came
+    // back as `Invalid data format` naming no field.
+    if (validation?.integer || isIntegerColumn(property.columnType)) schema = schema.refine(
+        (value: unknown) => value == null || (typeof value === "number" && Number.isInteger(value)),
+        { message: `${fieldLabel(property, name)} must be an integer` }
+    );
     return schema;
 }
 
@@ -469,13 +472,16 @@ function getZodDateSchema({
             );
         }
 
+        // Both bounds are inclusive, and the message says so: it said "after"
+        // the bound, which the bound itself is not, and printed the bound with
+        // `Date.toString()` ("Wed Jan 01 2020 01:00:00 GMT+0100 (…)").
         if (validation.min) schema = schema.refine(
             (value: unknown) => value == null || (value instanceof Date && value >= validation.min!),
-            { message: `${fieldLabel(property, name)} must be after ${validation.min}` }
+            { message: `${fieldLabel(property, name)} must not be before ${formatDateBound(validation.min, property.columnType)}` }
         );
         if (validation.max) schema = schema.refine(
             (value: unknown) => value == null || (value instanceof Date && value <= validation.max!),
-            { message: `${fieldLabel(property, name)} must be before ${validation.max}` }
+            { message: `${fieldLabel(property, name)} must not be after ${formatDateBound(validation.max, property.columnType)}` }
         );
     }
     return schema;
@@ -553,6 +559,32 @@ function getZodBooleanSchema({
 
     }
     return schema;
+}
+
+/** The Postgres number column types that hold whole numbers only. */
+function isIntegerColumn(columnType: string | undefined): boolean {
+    return columnType === "integer" || columnType === "bigint" || columnType === "serial" || columnType === "bigserial";
+}
+
+/** A date bound as a reader writes it: the day for a date column, else an ISO instant. */
+function formatDateBound(bound: Date, columnType: string | undefined): string {
+    const date = bound instanceof Date ? bound : new Date(bound);
+    if (Number.isNaN(date.getTime())) return String(bound);
+    return columnType === "date" ? date.toISOString().slice(0, 10) : date.toISOString();
+}
+
+/**
+ * What `uniqueInArray` compares an item by. Relations and references are
+ * objects built per read, so comparing them by identity never found the same
+ * row linked twice; they compare by the row they point at.
+ */
+function uniqueInArrayKey(value: unknown): unknown {
+    if (value instanceof Date) return `date:${value.getTime()}`;
+    if (typeof value === "object" && value !== null && "id" in value) {
+        const { id, path } = value as { id?: unknown; path?: unknown };
+        if (typeof id === "string" || typeof id === "number") return `row:${typeof path === "string" ? path : ""}:${String(id)}`;
+    }
+    return value;
 }
 
 function hasUniqueInArrayModifier(property: Property): boolean | [string, Property][] {
@@ -670,13 +702,13 @@ function getZodArraySchema({
             if (arrayUniqueFields) {
                 if (typeof arrayUniqueFields === "boolean") {
                     arraySchema = arraySchema.refine(
-                        (values: unknown) => !values || !Array.isArray(values) || values.length === new Set(values).size,
+                        (values: unknown) => !values || !Array.isArray(values) || values.length === new Set(values.map(uniqueInArrayKey)).size,
                         { message: `${fieldLabel(property, name)} should have unique values within the array` }
                     );
                 } else if (Array.isArray(arrayUniqueFields)) {
                     arrayUniqueFields.forEach(([fieldName, childProperty]) => {
                         arraySchema = arraySchema.refine(
-                            (values: unknown) => !values || !Array.isArray(values) || values.length === new Set(values.map((v: unknown) => v && typeof v === "object" ? (v as Record<string, unknown>)[fieldName] : v)).size,
+                            (values: unknown) => !values || !Array.isArray(values) || values.length === new Set(values.map((v: unknown) => uniqueInArrayKey(v && typeof v === "object" ? (v as Record<string, unknown>)[fieldName] : v))).size,
                             { message: `${fieldLabel(property, name)} → ${childProperty.name ?? fieldName}: should have unique values within the array` }
                         );
                     });
@@ -704,7 +736,7 @@ function getZodArraySchema({
         // Handle uniqueInArray at the array level
         if (validation.uniqueInArray) {
             arraySchema = arraySchema.refine(
-                (values: unknown) => !values || !Array.isArray(values) || values.length === new Set(values).size,
+                (values: unknown) => !values || !Array.isArray(values) || values.length === new Set(values.map(uniqueInArrayKey)).size,
                 { message: `${fieldLabel(property, name)} should have unique values within the array` }
             );
         }

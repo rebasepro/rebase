@@ -528,9 +528,14 @@ function collectViolations(
                 }
             }
 
+            // An integer column takes a whole number whether or not the
+            // property says `validation.integer`. Left to Postgres, a fraction
+            // came back as `Invalid data format in "products".` naming no field.
+            const integerColumn = property.columnType === "integer" || property.columnType === "bigint"
+                || property.columnType === "serial" || property.columnType === "bigserial";
             const rules = property.validation;
+            if ((rules?.integer || integerColumn) && !Number.isInteger(num)) into.push({ field: key, code: "integer", message: `'${key}' must be a whole number (received ${num}).` });
             if (!rules) return;
-            if (rules.integer && !Number.isInteger(num)) into.push({ field: key, code: "integer", message: `'${key}' must be a whole number (received ${num}).` });
             if (rules.positive && !(num > 0)) into.push({ field: key, code: "positive", message: `'${key}' must be positive (received ${num}).` });
             if (rules.negative && !(num < 0)) into.push({ field: key, code: "negative", message: `'${key}' must be negative (received ${num}).` });
             if (rules.min !== undefined && num < rules.min) into.push({ field: key, code: "min", message: `'${key}' must be at least ${rules.min} (received ${num}).` });

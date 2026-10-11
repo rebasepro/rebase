@@ -1011,7 +1011,7 @@ describe("bound messages name the bound that failed", () => {
             { type: "date", name: "Due", validation: { min, max } } as DateProperty,
             new Date("2027-06-01T00:00:00Z")
         );
-        expect(message).toEqual(`Due must be before ${max}`);
+        expect(message).toEqual(`Due must not be after ${max.toISOString()}`);
     });
 });
 
