@@ -22,6 +22,7 @@
  */
 import {
     deserializeFilter,
+    deserializeLogicalCondition,
     UnknownFilterOperatorError
 } from "../src/data/filter-dialect";
 import { ALL_WHERE_FILTER_OPS, CANONICAL_TO_REST, NULL_OPS, toCanonicalOp } from "@rebasepro/types";
@@ -187,5 +188,62 @@ describe("toCanonicalOp — a prototype key is not an operator", () => {
         // real operator, never a function.
         expect(decoded).toEqual({ title: ["in", ["valueOf", "x"]] });
         expect(typeof (decoded.title as [unknown, unknown])[0]).toBe("string");
+    });
+});
+
+describe("deserializeLogicalCondition — a misspelled operator inside a group", () => {
+    /**
+     * A leaf whose operator segment does not resolve falls back to an equality
+     * on everything after the column: `title.contains.lph` read as `title ==
+     * "contains.lph"`. Inside `not(...)` that equality matches nothing, so its
+     * negation matched every row — `?not=(title.contains.lph)` answered with
+     * the whole table. Inside `or(...)` the branch silently matched nothing.
+     * The JSON `where` refuses the same operator; the group has to as well.
+     */
+    function rejected(wire: string): UnknownFilterOperatorError {
+        let caught: unknown;
+        try {
+            deserializeLogicalCondition(wire);
+        } catch (e) {
+            caught = e;
+        }
+        expect(caught).toBeInstanceOf(UnknownFilterOperatorError);
+        return caught as UnknownFilterOperatorError;
+    }
+
+    it("refuses a near-miss operator in a negation, naming it and the field", () => {
+        const error = rejected("not(title.contains.lph)");
+        expect(error.operator).toBe("contains");
+        expect(error.field).toBe("title");
+    });
+
+    it("refuses it in a disjunction and a conjunction, at any depth", () => {
+        expect(rejected("or(status.eq.draft,title.startsWith.A)").operator).toBe("startsWith");
+        expect(rejected("and(or(title.===.x,status.eq.a))").operator).toBe("===");
+    });
+
+    it("refuses every respelling and near-miss the tuple reader refuses", () => {
+        for (const op of ["contains", "not_in", "isNull", "=", "~~", "between", "greaterThan"]) {
+            expect(rejected(`not(title.${op}.x)`).operator).toBe(op);
+        }
+    });
+
+    it("keeps an equality whose value has dots", () => {
+        expect(deserializeLogicalCondition("or(version.1.2.3,host.api.example.com)")).toEqual({
+            type: "or",
+            conditions: [
+                { column: "version", operator: "==", value: "1.2.3" },
+                { column: "host", operator: "==", value: "api.example.com" }
+            ]
+        });
+    });
+
+    it("keeps an ambiguous word as part of the value", () => {
+        // `any` is deliberately not on the near-miss list — as an enum value
+        // it is common.
+        expect(deserializeLogicalCondition("not(scope.any.thing)")).toEqual({
+            type: "not",
+            conditions: [{ column: "scope", operator: "==", value: "any.thing" }]
+        });
     });
 });

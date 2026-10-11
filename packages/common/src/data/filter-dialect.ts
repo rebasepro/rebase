@@ -844,6 +844,28 @@ export function serializeLogicalCondition(
 }
 
 /**
+ * The positions of the dots that can separate a leaf's segments.
+ *
+ * Dots inside a list value (`in.(1.5,2.5)`) are not separators. The value
+ * always follows the operator, so the search only needs the region before the
+ * first unescaped paren.
+ */
+function leafSeparators(str: string): number[] {
+    let limit = str.length;
+    for (let i = 0; i < str.length; i++) {
+        if (str[i] === "\\") { i++; continue; }
+        if (str[i] === "(") { limit = i; break; }
+    }
+
+    const dots: number[] = [];
+    for (let i = 0; i < limit; i++) {
+        if (str[i] === "\\") { i++; continue; }
+        if (str[i] === ".") dots.push(i);
+    }
+    return dots;
+}
+
+/**
  * Split a leaf condition into `column`, operator token and value.
  *
  * The naive reading — column is everything before the first dot, operator is
@@ -864,20 +886,7 @@ export function serializeLogicalCondition(
  * written without an operator, which the caller handles.
  */
 function splitLeafCondition(str: string): { column: string; operator: WhereFilterOp; value: string } | undefined {
-    // Dots inside a list value (`in.(1.5,2.5)`) are not separators. The value
-    // always follows the operator, so the search only needs the region before
-    // the first unescaped paren.
-    let limit = str.length;
-    for (let i = 0; i < str.length; i++) {
-        if (str[i] === "\\") { i++; continue; }
-        if (str[i] === "(") { limit = i; break; }
-    }
-
-    const dots: number[] = [];
-    for (let i = 0; i < limit; i++) {
-        if (str[i] === "\\") { i++; continue; }
-        if (str[i] === ".") dots.push(i);
-    }
+    const dots = leafSeparators(str);
 
     // Segment 0 is always the column, and an operator needs a value after it,
     // so a candidate is bounded on both sides by a dot.
@@ -954,6 +963,19 @@ export function deserializeLogicalCondition(
         }
         // "column.value" — no segment resolved as an operator, so this is an
         // equality written without one. The value keeps its dots.
+        //
+        // Unless a segment was plainly meant as an operator: `title.contains.x`
+        // read as `title == "contains.x"` matches nothing, and inside `not(…)`
+        // its negation matched every row — the widened read
+        // `parseWhereParam` exists to avoid. Refused by the same test the
+        // tuple reader applies, so the two spellings of one filter agree.
+        const dots = leafSeparators(str);
+        for (let i = 1; i < dots.length; i++) {
+            const segment = str.substring(dots[i - 1] + 1, dots[i]);
+            if (isOperatorShaped(segment)) {
+                throw new UnknownFilterOperatorError(unescapeWireValue(str.substring(0, dots[i - 1])), segment);
+            }
+        }
         return {
             column: unescapeWireValue(str.substring(0, firstDot)),
             operator: "==",

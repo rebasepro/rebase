@@ -35,7 +35,8 @@ import {
     deserializeFilter,
     serializeLogicalCondition,
     deserializeLogicalCondition,
-    MAX_LOGICAL_NESTING_DEPTH
+    MAX_LOGICAL_NESTING_DEPTH,
+    UnknownFilterOperatorError
 } from "../../src/data/filter-dialect";
 import { serializeOrderBy, deserializeOrderBy } from "../../src/data/sort-dialect";
 
@@ -285,11 +286,14 @@ describe("logical condition codec", () => {
         ), { numRuns: 200 });
     });
 
-    it("parses arbitrary strings without throwing anything but the depth error", () => {
+    it("parses arbitrary strings without throwing anything but the depth error or an operator refusal", () => {
         fc.assert(fc.property(fc.stringMatching(/^[a-z0-9_.,()]{0,50}$/), s => {
             try {
                 deserializeLogicalCondition(s);
             } catch (e) {
+                // A segment that was plainly meant as an operator (`,,`,
+                // `contains`) is refused rather than read as part of a value.
+                if (e instanceof UnknownFilterOperatorError) return;
                 expect((e as Error).message).toMatch(/nest more than/);
             }
         }), { numRuns: RUNS });

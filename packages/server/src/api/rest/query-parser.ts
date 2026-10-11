@@ -98,6 +98,11 @@ function parseLogicalGroup(type: "or" | "and" | "not", raw: unknown): LogicalCon
     try {
         parsed = deserializeLogicalCondition(`${type}(${inner})`);
     } catch (e) {
+        // An operator the dialect does not have is the same refusal the JSON
+        // `where` gives for it, by the same code.
+        if (e instanceof UnknownFilterOperatorError) {
+            throw invalidParam(e.message, e.code, e.details);
+        }
         // The parser refuses a nesting depth no real filter reaches. That is a
         // request problem, and without this it surfaced as a 500 — the
         // unbounded version reached `RangeError: Maximum call stack size

@@ -535,6 +535,14 @@ describe("parseQueryOptions — unknown filter operators", () => {
         // `?title=~~&title=Nope` is the same two-element array one layer up.
         expectBadRequest({ title: ["~~", "Nope"] }, "UNKNOWN_FILTER_OPERATOR");
     });
+
+    it("rejects one inside a logical group, where the fallback widened the read", () => {
+        // Read as `title == "contains.lph"`, the leaf matched nothing — and
+        // `not(...)` of it matched every row.
+        expectBadRequest({ not: "(title.contains.lph)" }, "UNKNOWN_FILTER_OPERATOR");
+        expectBadRequest({ or: "(status.eq.draft,title.startsWith.A)" }, "UNKNOWN_FILTER_OPERATOR");
+        expectBadRequest({ and: "(title.~~.x)" }, "UNKNOWN_FILTER_OPERATOR");
+    });
 });
 
 

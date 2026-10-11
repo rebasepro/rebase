@@ -168,6 +168,11 @@ GET /api/data/products?not=(or(status.eq.draft,status.eq.archived))
 Groups may nest 32 levels deep; past that the request is refused with
 `INVALID_LOGICAL_GROUP`.
 
+A condition inside a group whose operator the dialect does not have —
+`?not=(title.contains.x)` — is a 400 `UNKNOWN_FILTER_OPERATOR`, as it is in a
+JSON `where`. It is not read as an equality on `contains.x`, which inside `not`
+would have matched every row.
+
 A group **narrows** alongside the field filters rather than replacing them — see
 [How the filters combine](#how-the-filters-combine).
 
