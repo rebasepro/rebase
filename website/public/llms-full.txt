@@ -246,8 +246,8 @@ This will analyze your database tables and generate corresponding TypeScript fil
 
 When you open the frontend URL `rebase dev` printed, you'll see the login screen. The **first user** to register automatically becomes an admin — this is the bootstrap flow.
 
-1. Click **Sign Up**
-2. Enter your email and password
+1. The screen opens on **Welcome!**, the form for that first account
+2. Enter your email and password, then click **Create account**
 3. You're in — with full admin access
 
 `rebase init` also wrote `REBASE_ADMIN_EMAIL` and a generated `REBASE_ADMIN_PASSWORD` into `.env`. Those are not your credentials here: `rebase dev` ignores them and says so at boot. They belong to a production boot — `docker compose up`, or anything with `NODE_ENV=production` — where this bootstrap window is closed, because the server answers on a hostname before you have typed anything. See [Your first admin](/docs/getting-started/deployment#your-first-admin).
@@ -546,7 +546,7 @@ The `slug` becomes the URL path in the admin UI and the REST API endpoint (`/api
 1. **You define** collections in `config/collections/`
 2. **The backend** reads them to generate Drizzle schemas and mount REST routes
 3. **The frontend** reads them (via Vite plugin) to render tables, forms, and navigation
-4. **The CLI** reads them to generate migration files with `rebase schema generate`
+4. **The CLI** reads them to generate the Drizzle schema (`rebase schema generate`), the SDK types (`rebase generate-sdk`) and, from that schema, migration files (`rebase db generate`)
 
 While `rebase dev` is running, saving a file under `config/collections/`
 regenerates `backend/src/schema.generated.ts` and the SDK types in
@@ -3637,6 +3637,22 @@ yet, listed so that nobody reads a promise into them:
   Write that filter as `?where={"count":["==",5]}`. The SDK already sends it
   that way.
 
+- **A plain `OPTIONS` to a route with no `OPTIONS` handler is now a 404, not an
+  empty 204.** The CORS middleware answered every `OPTIONS` itself; it now
+  answers only CORS preflights, and any other `OPTIONS` reaches its route.
+  `OPTIONS /api/storage/tus` answers with the TUS capabilities (`Tus-Version`,
+  `Tus-Extension`, `Tus-Max-Size`), as documented. A client or health check
+  that probed a route with `OPTIONS` and read the 204 as "exists" must use the
+  route's real method.
+
+- **A collection set whose tables collide after Postgres's 63-byte name
+  truncation is refused at boot, with the reason.** A table, junction table or
+  enum type whose truncated names are equal used to fail at `db push` with
+  "already exists". Two properties that resolve to the same column (`myTitle`
+  and `my_title`) and a relation `target` written as a string
+  (`target: "authors"`) are refused at config time too, each saying what to
+  write. Rename one of the colliding names.
+
 ##### MCP
 
 - **The remote MCP's `list_collections` reply carries its listing once, in the
@@ -3651,6 +3667,31 @@ yet, listed so that nobody reads a promise into them:
   English it exported, and that kept the Spanish strings in every bundle built
   from the package. `en` is still exported. To change the admin's strings,
   pass overrides through `<Rebase translations={…}>`.
+
+- **`ClientStorageSourceRegistry.getOrDefault(key)` throws for a key that is
+  not registered.** It used to return the default source, so a property naming
+  a source the panel had not loaded yet uploaded to the default bucket. Call
+  `get(key)` where a missing source is expected.
+
+##### Client SDK
+
+- **`client.cron` calls `/api/admin/cron` by default, not the deprecated
+  `/api/cron` alias.** A server that serves only the old path (or a proxy that
+  forwards only it) now answers 404 to the SDK's cron calls. Pass
+  `cron.cronPath` to point the client elsewhere.
+
+- **Offline, `findAll()` and `iterate()` fail with `OFFLINE` on a page this
+  device never fetched, and `count()` with no count cached from the server
+  fails with `OFFLINE`.** They used to return part of the collection as if it
+  were all of it, and a count of the cached rows. Catch `OFFLINE` where the
+  app showed those partial results.
+
+##### UI kit & plugins
+
+- **`TextField` no longer declares `maxRows`, and `MultiSelect` no longer
+  declares `onChange`, `name`, `position`, `endAdornment`, `multiple` or
+  `padding`.** None was ever read, so passing one was a silent no-op and is now
+  a type error. Delete the prop.
 
 #### Added
 
@@ -3686,6 +3727,53 @@ yet, listed so that nobody reads a promise into them:
   `If-Match` checks into the write's own transaction, on a driver that
   declares `checksRowPreconditions`. All three are optional: a driver without
   them keeps the separate reads it had. Both Postgres drivers implement them.
+
+- **`jobs.timeoutMs` bounds one job attempt, and every job, queue and topic
+  handler gets a `signal` aborted at that deadline.** A handler that hangs on a
+  `fetch` can pass the signal on and stop with the attempt.
+
+- **`getSignal(c)` in `@rebasepro/server/functions` is aborted when a custom
+  function's request times out (504).** Pass it to `fetch` so the work stops
+  with the request instead of running on.
+
+##### Client SDK
+
+- **`findById(id, { include })` and `listenById(id, onUpdate, onError,
+  { include })` load relations into the row.** A row subscription carries its
+  `include` to the server, which reads it on every frame, so a live record
+  keeps its relations.
+
+- **`@rebasepro/client` exports the types its calls are written in:
+  `WriteOptions`, `WhereFilterOp`, `WhereFor`, `LogicalCondition`,
+  `AggregateParams`, `AggregateResult`, `IncludeSpec`, `RowOf`/`InsertOf`/
+  `UpdateOf`, `StorageSource` and others.** A helper that wraps `find()` or
+  `update()` no longer has to rebuild them from `Parameters<…>`.
+
+- **`client.offline.status().persisted` says whether the browser agreed to keep
+  the offline database.** It is asked with `navigator.storage.persist()` when
+  the first write is queued. Queued writes are also stamped with a layout
+  version: a write saved by a newer SDK is kept, not replayed by an older one.
+
+##### UI kit & plugins
+
+- **`VirtualTable`, `ListView` and `CardView` accept `undefined` entries in
+  `data` (a row not read yet, drawn as a placeholder) and an
+  `onRowsRendered(range)` callback; `EntityTableController` has `sparseData`
+  and `onRowsRendered`.** A table can hold a sparse window of a large
+  collection (see Changed).
+
+- **The kit has a `HeartIcon`, and gains the accessibility props `Alert`
+  `role`, `Avatar` `onClick`, `ResizablePanels` `dividerAriaLabel` and
+  `ToggleButtonGroup` `aria-label` / `aria-labelledby`.** `DateTimeField`'s
+  `locale` is now applied, as the input's `lang`.
+
+##### CI & tooling
+
+- **Three new gates: `pnpm check:test-types`, `pnpm check:casts` and
+  `pnpm check:test-resolution`.** Type errors in tests are counted per package
+  and may not grow; the count of `as any`, `as never` and `as unknown as` in
+  package source may not grow; and every test runner must import workspace
+  packages from source, not `dist`.
 
 #### Changed
 
@@ -3772,6 +3860,11 @@ yet, listed so that nobody reads a promise into them:
 - **The in-memory rate limiter's cost no longer grows with the limit.** A hit
   near a limit of 100,000 took about 1 ms and takes 0.1 µs; at 1,000, 11 µs →
   0.2 µs. It makes the same decisions.
+
+- **An unknown relation in `include` is a 400 `UNKNOWN_RELATION` even when no
+  row matched.** A typo against an empty table, under a filter that matched
+  nothing, on a read of a missing row, or nested below a relation that loaded
+  nothing answered 200, and became a 400 the first time a row matched.
 
 ##### Postgres
 
@@ -3974,6 +4067,24 @@ yet, listed so that nobody reads a promise into them:
   with three user fields made three list requests on open; it makes none until
   a picker opens.
 
+- **A collection scrolled deep re-reads only the rows near the screen on a
+  realtime update, and coming back to it shows the rows that were on screen at
+  once.** With 10,000 rows held, a write cost 10 reads of 9,950 rows before and
+  costs 1 read of 120 rows. The scroll cache no longer keeps every row ever
+  shown; the rows above load when scrolled to.
+
+- **The cards view mounts only the rows of cards on screen, and a CSV export
+  is written a page at a time.** With 2,000 loaded cards the view held 42,000
+  DOM nodes and holds about 300. Exporting 100,000 rows × 20 columns held about
+  196 MB and holds about 51 MB; the file is unchanged.
+
+- **`buildEntityPropertiesFromData` no longer drops keys starting with `_`**,
+  so a collection created from a Mongo export keeps `_id`. Pass
+  `{ ignoreKey: k => k.startsWith("_") }` to keep the old behaviour.
+
+- **`CollectionViewHeaderAction` and `PropertyAddColumnComponent` are removed.**
+  They were not exported and mounted nowhere.
+
 ##### UI kit & plugins
 
 - **Importing one component from `@rebasepro/ui` bundles that component, not
@@ -4083,6 +4194,12 @@ yet, listed so that nobody reads a promise into them:
   requests after a device slept made 21 round trips, now 11. A custom
   `Transport` can take part through the optional `setTokenRefresher`.
 
+- **The typed object-form `where` checks each value against its column, as the
+  fluent `.where()` does, and `.fields()`, `.vectorSearch()`, `sum`/`avg` and
+  field operations (`$inc`, `$push`, …) accept only what the server
+  accepts.** For example `["array-contains", ["a"]]` on a `string[]` column is
+  now a compile error, where the server refused it at run time.
+
 ##### Storage & email
 
 - **Storage files are streamed instead of read whole, and a Range request
@@ -4178,6 +4295,13 @@ yet, listed so that nobody reads a promise into them:
   checks that `{ cls }`, `{ Button }` and `{ Typography }` each bundle under
   60 kB.
 
+- **`pnpm check:hooks` counts an `exhaustive-deps` disable that has no
+  ` -- reason`; `pnpm check:gates-doc` checks the "Tests" rows against the
+  workflow and every package test script against a register in
+  `docs/gates.md`; `pnpm rls:check --strict-baseline` fails on a stale
+  baseline entry, and CI passes it.** The admin e2e job log lists every
+  Playwright test, flaky ones included.
+
 ##### Auth
 
 - **`/auth/config` and sign-up learn whether any user exists without counting
@@ -4218,6 +4342,47 @@ yet, listed so that nobody reads a promise into them:
   The tag is now compared after the row is locked, so the second write waits
   for the first and gets 412.
 
+- **`like`, `ilike`, `not-like` and `not-ilike` on a string `enum` field match
+  its labels.** They failed with a 500 on every door. On a number, a date or
+  another non-text field they are a 400 `INVALID_FILTER_OPERATOR` instead of a
+  database error. `citext` columns stay case-insensitive.
+
+- **A misspelled operator inside `?or=`, `?and=` or `?not=` is a 400
+  `UNKNOWN_FILTER_OPERATOR`.** `?not=(title.contains.x)` was read as an
+  equality that matched nothing, so the request returned every row.
+
+- **An update that changes nothing writes no history entry, and
+  `changed_fields` no longer lists `id` on every update.** `beforeSave` and
+  `afterSave` receive `previousValues` with the row's key, like `values`.
+
+- **A webhook retry carries the same `X-Webhook-Delivery` as the first
+  attempt, so a receiver can deduplicate at-least-once deliveries.** Queued
+  deliveries send their real `X-Webhook-Attempt` when registered as
+  `ctx => dispatcher.deliverQueuedJob(ctx.payload, ctx)`; every attempt used to
+  say it was attempt 1.
+
+- **A function or cron file with a syntax error is reported as `syntax error
+  at <file>:<line>`.** The boot log told you to move configuration out of
+  module scope, or to use `defineCron`.
+
+- **A request refused for its size names the configured limit, and health
+  probes stay out of the request log.** The message said "Maximum size is 1000
+  bytes" or "512KB" where it said "0MB" or "1MB"; `/api/health` was written to
+  the log on every call.
+
+- **A production boot with several environment problems lists them all at
+  once, not one per restart.** The runtime also refuses a bundle with a static
+  app at a backend path (`/api`, `/health`, …), and logs an error for a static
+  app under a moved `REBASE_BASE_PATH`, which was never served.
+
+- **Two live schema changes applied at once (a double confirm, two tabs) run
+  one after the other.** They interleaved their writes and commits. Live
+  schema editing also works in a repository with no commit yet, and its
+  dirty-tree check sees both paths of a staged rename.
+
+- **`schema generate` warns when a `hasMany` / `hasOne` target declares no
+  foreign-key column back.**
+
 ##### Postgres
 
 - **A server that boots while a long report, transaction or `pg_dump` reads
@@ -4244,6 +4409,20 @@ yet, listed so that nobody reads a promise into them:
   main pool.** They waited for a connection with no limit; they now give up
   after 10 s, and a statement after 30 s.
 
+- **`rebase db push --dry-run` writes nothing of the project's.** It no longer
+  regenerates `src/schema.generated.ts`, and it names, rather than deletes, the
+  `drizzle/*.sql` copies an older release committed. The generator's output
+  is plain text under `NO_COLOR` and when written to a file or pipe.
+
+- **`executeSql` with several statements answers the last statement's rows.**
+  It answered none.
+
+- **A scheduled backup registered on a machine without `pg_dump` /
+  `pg_dumpall` logs an error at boot naming the missing tools.** It failed
+  silently every night. `rebase db backup`, `restore` and `backups list` also
+  build their S3/GCS client with the function the Backups panel uses
+  (`backupStorageFromEnv`, exported from `@rebasepro/server`).
+
 ##### CLI
 
 - **`rebase doctor` and `rebase db push` no longer report every
@@ -4257,6 +4436,53 @@ yet, listed so that nobody reads a promise into them:
   `.rebase-dev-port` was never written, and after 30 s a healthy backend was
   reported as down. A partial line is carried to the next chunk, and flushed
   after 100 ms of quiet so prompts still appear.
+
+- **`rebase db push` and `rebase db generate` no longer end their first step
+  with "You can now run rebase db generate".**
+
+- **A collection that does not evaluate makes `rebase schema generate`,
+  `db push` and `doctor` print the error's message and "Re-run with --debug for
+  the stack trace", not a stack trace.** `--debug` now reaches the driver.
+
+- **A new project's `rebase dev` and builds print no warnings they did not
+  cause.** Vite's "Both esbuild and oxc options were set" and, from
+  `pnpm run example` or an ejected server, dotenv's banner are gone.
+
+- **On a checkout switched to a branch, `rebase db branch create`, `delete`,
+  `info` and `prune` use the main database's branch registry, as `list`
+  does.** A branch created there is recorded where `list` shows it. `create`
+  still copies the branch you are on unless you pass `--from`.
+
+- **`rebase db push`'s banner for making a populated column required offers
+  only remedies that work.** It no longer suggests a default for a column that
+  already exists (a default never fills existing rows); it offers the backfill,
+  and says nothing in the push was applied.
+
+- **`rebase db push` (and `--dry-run`) explains what it cannot do.** A type
+  change PostgreSQL cannot cast gets the `ALTER … USING` to run; a `unique`
+  added over repeated values lists the repeats; and an enum option you removed
+  that the database keeps (PostgreSQL cannot drop an enum label) is named,
+  with how to retire it. `rebase doctor` no longer sends you back to `db push`
+  for it.
+
+- **`rebase db push` renames relation columns that still carry their pre-0.13
+  name (`categorie_id`) the way `rebase dev` does,** instead of listing them as
+  destructive drops.
+
+- **`rebase schema introspect` no longer writes a Kanban board without
+  `orderProperty`.** It warned on every generate; it declares one only when the
+  table has an order-key column.
+
+- **Re-running `rebase skills install` keeps skill files you edited
+  (`--force` replaces them) and removes skills a release retired.** A
+  `.rebase-skills.json` manifest records what was installed. The command no
+  longer promises "the latest skills" on a re-run: it reinstalls the version
+  this CLI pins.
+
+- **The skills tell agents to use the project's own package manager, and the
+  `rebase-basics` skill's MCP reference lists all 42 local tools and the remote
+  `/mcp` endpoint's tools.** The scaffold's agent instructions no longer send
+  `pnpm db:push` at the managed development database, which refuses it.
 
 ##### Admin (CMS & app)
 
@@ -4278,12 +4504,86 @@ yet, listed so that nobody reads a promise into them:
   fails to load.** The failure left the selection uninitialised; the row is now
   logged and left out.
 
+- **Opening a record by its URL, or from its list row, shows its many-to-many
+  values, and saving it no longer unlinks every related row.** Adding a tag in
+  the form unlinked every other tag of the record when its live copy arrived.
+
+- **A browser `afterSave` that throws after the record was saved shows a
+  warning, not a failed save.** A retry no longer creates a duplicate.
+
+- **⌘S and ⌘Z act on the record form you are in.** They acted on the first one
+  opened.
+
+- **`formAutoSave` no longer creates a blank record when a New form is opened,
+  and saves only values that pass the form's validation.**
+
+- **When the server refuses a save, the form marks each field it names.**
+
+- **List, card and board views show a date-only value on its own day.** West
+  of Greenwich a `columnType: "date"` 15th read as the 14th in the date slot
+  and the list's date columns, and a declared `timezone` was ignored there;
+  they now match the table and the form.
+
+- **A record opened from a custom view that asks for full screen opens.** The
+  URL changed and nothing opened, including from a shared link. A pasted
+  `#new_side` link opens one new-record form over the collection, instead of a
+  second full-screen form under the panel.
+
+- **List-view rows open from the keyboard.** Rows are focusable buttons; Enter
+  or Space opens the record.
+
+- **Load errors and board notices use the kit's alert and the reader's
+  language, and "Collection not found", the unsaved-changes prompt of a
+  full-screen record and unnamed filter presets are translated.** They were
+  English "Warning:" / "Error:" banners. "Add existing", the bulk delete
+  button and the filters dialog's count follow the neutral colour rule.
+
+- **A property with a `storageSource` the panel has not loaded yet uploads to
+  that source, never silently to the default bucket.** A field with
+  `storage.public: true` stores public files with stable URLs, and every panel
+  upload names its property so the server can apply its `maxSize` and
+  `acceptedFiles`. `useBackendStorageSource` reports the server's error message
+  instead of "[object Object]".
+
+- **An enum written as a plain list of values in a JS config
+  (`enum: ["draft", "published"]`) fills the admin dropdown, and write
+  validation checks it.** The dropdown was empty.
+
+- **Creating a collection from a CSV or spreadsheet accepts that file's rows.**
+  A `constructor` or `prototype` header no longer crashes the mapping step;
+  repeated headers (`x`, `x_2`) and `_`-prefixed columns such as a Mongo
+  export's `_id` are kept; a text column holding some numbers (`S, M, L, 10,
+  12`) gets an enum that includes them; `email` and `url` are set only when
+  every value is one; and fields inside a map are inferred from their values
+  (enum, required), as top-level fields are.
+
+- **The collections editor's Kanban "Add column" keeps the colour and every
+  other field of the existing columns, refuses a name that is already a
+  column, and shows a failed save.** Duplicating a collection with relations
+  saves; it was refused with "Relation property … has no target collection".
+
 ##### Studio
 
 - **The SQL console's CSV export follows RFC 4180.** Values with commas,
   quotes or line breaks are quoted, with quotes doubled; the header is escaped
   too; NULL is an empty field; each value sits under its own column; and
   objects are written as JSON.
+
+- **On a server that cannot edit collections, the collections editor shows
+  why, instead of a disabled "Add new collection" button.**
+
+- **The SQL console starts one run per Cmd+Enter, and a cell editor saves
+  once.** Cmd+Enter while a query ran started a second run; Enter saved twice,
+  and Escape now saves nothing.
+
+- **The storage browser asks before an upload replaces files of the same name,
+  and an upload or delete that fails part-way still shows what it did.**
+
+- **The panel calls `/api/admin/schema-editor`, `/api/admin/logs` and
+  `/api/admin/cron`, not the deprecated aliases.** The aliases drew
+  `Deprecation` headers on every page load. Cron Jobs, the Logs Explorer and
+  the collections editor are translated, and cron relative times follow the
+  app's language.
 
 ##### Realtime
 
@@ -4292,6 +4592,23 @@ yet, listed so that nobody reads a promise into them:
   `deleteMany` and `batchWrite` on the base driver announced each row inside
   the open transaction, so another instance could refetch the state before the
   commit, and rows that were rolled back were announced.
+
+- **In a split deployment with change capture off (`REALTIME_CDC=off`, or
+  `auto` falling back), writes made by `worker` and `functions` processes reach
+  subscribers on the `api`.**
+
+- **Two replicas left on the in-memory channel bus get the warning that
+  broadcast and presence reach only their own pod, under change capture
+  too.**
+
+- **With change capture off, editing a link's own columns, or saving a to-many
+  relation through the parent, updates live child lists such as
+  `posts/1/tags`.**
+
+- **The socket answers a data frame that names an unknown collection with
+  `NOT_FOUND`, as REST does, and a frame with an unknown `type` with
+  `UNKNOWN_MESSAGE_TYPE`.** They were answered `INTERNAL_ERROR`, or left to
+  time out.
 
 ##### Client SDK
 
@@ -4304,6 +4621,52 @@ yet, listed so that nobody reads a promise into them:
   loop.** A backend that omitted `accessTokenExpiresAt` caused about 1,900
   `/auth/refresh` calls in 15 s, and one before every request. An unstated
   expiry is no longer read as passed; a 401 still refreshes.
+
+- **`functions.invoke()` reads a function that answers with text, CSV or a
+  file: pass `responseType: "text" | "blob" | "response"`.** A non-JSON answer
+  no longer blames `VITE_API_URL` when its content type says it was sent on
+  purpose. `invoke` also refuses a `.` / `..` path segment
+  (`INVALID_FUNCTION_PATH`) that would have reached routes outside the
+  function, such as `/api/admin/...`.
+
+- **Every error the client throws has a `code`.** A proxy's 413/502/500 gets
+  one from its status; a Node client with no `baseUrl` fails with
+  `BASE_URL_REQUIRED` instead of a network error; `storage.getObject()`
+  failures are `RebaseApiError`s with a status.
+
+- **`client.data` answers `"posts" in client.data`, can be turned into a
+  string, and no longer serves `toString` or `constructor` as collections.**
+
+- **`admin.createUser()` types the one-time `temporaryPassword`
+  (and `invitationSent`, `emailDeliveryFailed`) it returns,** and a generated
+  date column takes a `Date` on `create` and `update`. Regenerate with
+  `rebase generate-sdk`.
+
+- **An edit queued offline replays under an idempotency key, so a lost answer
+  can no longer write it again over a colleague's later edit.**
+
+- **A queued delete, or bulk delete, of a row someone else already deleted
+  counts as done instead of putting rows back.** A queued edit of such a row
+  removes it locally instead of restoring it. Offline bulk edits and deletes
+  are no longer undone by a realtime frame that arrives before they replay.
+
+- **Writes that reference a row created offline in another collection follow
+  the id the server assigns it,** and are discarded with it if the server
+  refuses it.
+
+- **An offline page keeps its `limit`, and an offline edit that moves a cached
+  row into a filter shows the row there.** The offline count moves with every
+  queued write, and the offline database's tombstones and query bookkeeping
+  stay bounded.
+
+- **A sync listener that throws no longer aborts the offline replay or runs it
+  a second time without the cross-tab lock.**
+
+- **Queued writes keep `GeoPoint` / `Vector` values across a reload, a
+  `__proto__` column survives the offline database, and a `syncIntervalMs`
+  above about 24.8 days no longer retries in a tight loop.** A tab running an
+  older build that opens an offline database a newer build upgraded keeps
+  working, in memory, instead of failing every call.
 
 ##### Auth
 
@@ -4326,6 +4689,24 @@ yet, listed so that nobody reads a promise into them:
   filter set from outside the header (the URL, a preset, a clear) appeared one
   render late.
 
+- **Accessibility across the kit.** A table header's cells are column headers
+  (`th scope="col"`) and `TableRow` accepts a `ref`; error and warning alerts
+  are announced; a bare avatar is no longer an extra, unnamed tab stop inside
+  the user menu; a grouped select announces each group with its options; an
+  errored date field or multi-select is announced as invalid; split-view
+  dividers resize by touch and from the keyboard; the table filter,
+  view-settings and board "add" icon buttons are named; toggle-button groups
+  are named by what they choose, not "Toggle options"; and a disabled search
+  bar can no longer be typed into.
+
+- **A multi-select's "(Select All)" selects every option, including one whose
+  value is empty, and shows checked when they all are.**
+
+- **The dialog scrim and the popover arrow follow the theme, and a
+  keyboard-opened popover no longer rings its whole panel.** With reduced
+  motion on, dialogs, sheets, popovers, tooltips, collapsing panels and icon
+  buttons no longer animate.
+
 ##### rls-check
 
 - **`policy-authenticated-tautology` reports a rule whose condition is only
@@ -4334,6 +4715,18 @@ yet, listed so that nobody reads a promise into them:
   a high, heuristic finding, so `rls-check` with the default `--fail-on high`
   now exits 1 on such a rule: scope the rule, or skip the check with
   `--skip policy-authenticated-tautology`.
+
+- **A policy role whose name contains a comma is read as one role, and a
+  database is labelled Rebase only if it has the `rebase` schema.** A server
+  with a `rebase_user` role was enough.
+
+- **A check that crashes makes the scan incomplete (exit 2), and a scan with no
+  tables in scope says that nothing was checked.** Both passed silently.
+
+- **The printed fixes for `current-setting-throws`, `rls-enabled-no-policies`
+  and `policy-anonymous-tautology` run when pasted, and `policy-always-true`
+  catches `NOT false`, `1 > 0`, `true OR …` and constants compared through
+  multi-word casts.**
 
 ##### Storage & email
 
@@ -4345,6 +4738,40 @@ yet, listed so that nobody reads a promise into them:
 
 - **A local-storage write that fails part-way no longer leaves a truncated file
   in place of the previous object.**
+
+- **A mistyped S3/GCS bucket or refused credentials answer `502
+  STORAGE_MISCONFIGURED` naming the bucket, and an `allowedMimeTypes` refusal
+  is `400 STORAGE_FILE_TYPE_REFUSED`.** Every file read "not found", every
+  delete succeeded, and the refusal was a 500.
+
+- **A declared bucket with nothing bound is named at boot with the variable to
+  set (`S3_BUCKET__MEDIA`), and its 501 names it too.**
+
+- **Local storage's `/metadata` `customMetadata` holds only the caller's
+  metadata, as on S3 and GCS.**
+
+- **A mail server that accepts the connection and never answers fails the send
+  after 30 s (`smtp.timeoutMs`).** It took nodemailer's two to ten minutes,
+  holding the invite, verification and reset requests that await their mail.
+
+##### Inference
+
+- **`inferTypeFromValue` calls a `Date` a `date`.**
+
+##### MCP
+
+- **On the managed development database, a refused DB tool explains what to do
+  (restart the dev server, or point `DATABASE_URL` at a real Postgres).** It
+  suggested `REBASE_MCP_ALLOW_REMOTE_WRITES`.
+
+- **`cron_list_jobs` reports refused cron jobs and their reasons.** It said the
+  project had none.
+
+##### CI & tooling
+
+- **The headless guard imports the template's preset collections, and
+  `introspect-live` fails under CI when it cannot fetch its pinned dumps or
+  reach a server.** Locally it skips instead of failing.
 
 #### Security
 
@@ -4360,6 +4787,20 @@ yet, listed so that nobody reads a promise into them:
   request in flight at the switch is not reused. A token refresh also starts
   the cache over.
 
+- **The `storageAuthorize` hook is skipped only for the two grants storage
+  makes itself (a public object's read, a download token's read).** An identity
+  that merely has the uid `public` or `download-token`, such as a custom auth
+  adapter's guest, was never asked; it is now asked on every operation, like
+  any user.
+
+- **On S3 and GCS the hook's `bucket` is always `"default"`.** Naming the
+  provider's bucket on an upload, listing, folder or resumable upload passed a
+  hook that judged the bucket.
+
+- **Local storage refuses keys ending in `.metadata.json` (400
+  `INVALID_STORAGE_KEY`).** Such an upload overwrote another file's stored
+  content type and metadata.
+
 ##### Server & REST
 
 - **A one-to-many membership write no longer takes a child that the target's
@@ -4368,6 +4809,9 @@ yet, listed so that nobody reads a promise into them:
   a caller could name a hidden child and take it from its current parent
   wherever RLS allowed the UPDATE. A hidden child is now left alone, as an
   unknown id is, so the answer does not reveal that it exists.
+
+- **A resumable upload can no longer be continued or cancelled by a non-admin
+  user whose uid is `service`.**
 
 ### [0.24.0] - 2026-10-08
 
@@ -14685,6 +15129,10 @@ GET /api/data/products?tags=csa.(electronics,books)
 | `isnull` | Column is `NULL` (`is-null`) | `?deleted_at=isnull.null` |
 | `notnull` | Column is not `NULL` (`is-not-null`) | `?deleted_at=notnull.null` |
 
+The four pattern operators match text. An enum column is matched by its value
+(`?status=like.draft%25`); on a number, a date or any other column that is not
+text they are a 400 `INVALID_FILTER_OPERATOR`.
+
 `isnull` and `notnull` ignore their value — the operator is the whole condition,
 and anything after the dot is discarded. The SDK writes `.null`, so that is the
 spelling you will see on the wire.
@@ -14728,6 +15176,11 @@ GET /api/data/products?not=(or(status.eq.draft,status.eq.archived))
 
 Groups may nest 32 levels deep; past that the request is refused with
 `INVALID_LOGICAL_GROUP`.
+
+A condition inside a group whose operator the dialect does not have —
+`?not=(title.contains.x)` — is a 400 `UNKNOWN_FILTER_OPERATOR`, as it is in a
+JSON `where`. It is not read as an equality on `contains.x`, which inside `not`
+would have matched every row.
 
 A group **narrows** alongside the field filters rather than replacing them — see
 [How the filters combine](#how-the-filters-combine).
@@ -15540,7 +15993,7 @@ When `Database` is supplied, `createRebaseClient` returns a `CreateRebaseClientR
 
 A property key *you* wrote is your key, whatever its shape — nothing renames a name you chose. The two keys that are derived rather than declared, a relation's foreign key and a column read back by introspection, are camelCase.
 
-`Row` describes a read, `Insert` a `create()` and `Update` an `update()` — they are not the same shape. A column that is not required is `T | null` on all three, so a write can clear it; the primary key is always present on a read and never settable on an update; a `belongsTo` target can be written either as the relation (`{ author: 5 }`) or as its foreign key (`{ authorId: 5 }`); and a `hasMany` or `manyToMany` membership is written as a list of target ids or `{ id }` objects (`{ tags: ["t-1"] }`), each carrying a `_pivot` when the junction declares payload columns. A field nobody may write (`access: { write: [] }`) is on neither `Insert` nor `Update`.
+`Row` describes a read, `Insert` a `create()` and `Update` an `update()` — they are not the same shape. A column that is not required is `T | null` on all three, so a write can clear it; the primary key is always present on a read and never settable on an update; a `belongsTo` target can be written either as the relation (`{ author: 5 }`) or as its foreign key (`{ authorId: 5 }`); and a `hasMany` or `manyToMany` membership is written as a list of target ids or `{ id }` objects (`{ tags: ["t-1"] }`), each carrying a `_pivot` when the junction declares payload columns. A field nobody may write (`access: { write: [] }`) is on neither `Insert` nor `Update`. A `date` column reads as an ISO string, and a write takes either that string or a `Date`.
 
 ### Quick Example
 
@@ -16548,7 +17001,7 @@ export const productsCollection = defineCollection({
         }
     },
     admin: {
-        icon: "inventory_2"           // Material icon key
+        icon: "Package"               // Lucide icon name
     }
 });
 
@@ -16589,13 +17042,13 @@ All of the following go inside `admin`.
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
 | `defaultViewMode` | `"list" \| "table" \| "cards" \| "kanban"` | `"list"` | Default view mode |
-| `enabledViews` | `ViewMode[]` | All four | Which view modes are available |
+| `enabledViews` | `ViewMode[]` | The four built-ins plus every declared custom view (kanban only when an `enum` property exists) | Which view modes are available |
 | `kanban` | `KanbanConfig` | — | Kanban configuration (column property). Always pair with `orderProperty` — see [View Modes](/docs/frontend/view-modes) |
 | `orderProperty` | `string` | — | Key of the **string** property holding the drag-and-drop order key. Required for a working Kanban board |
-| `openEntityMode` | `"side_panel" \| "full_screen" \| "split" \| "dialog"` | `"full_screen"` | How entities open for editing |
+| `openEntityMode` | `"side_panel" \| "full_screen" \| "split" \| "dialog"` | From the view: `"split"` for list, `"full_screen"` for table and cards, `"side_panel"` for kanban and custom views | How entities open for editing |
 | `sideDialogWidth` | `number \| string` | — | Width of the side dialog |
 | `inlineEditing` | `boolean` | `true` | Enable inline editing in the spreadsheet view |
-| `defaultSize` | `"xs" \| "s" \| "m" \| "l" \| "xl"` | `"m"` | Default row height in the table |
+| `defaultSize` | `"xs" \| "s" \| "m" \| "l" \| "xl"` | `"m"` | Default density of the list, table and card views (the table's row height) |
 | `pagination` | `boolean \| number` | `true` (50) | Enable pagination and/or set page size |
 | `listProperties` | `string[]` | — | Properties to display in the list view |
 | `propertiesOrder` | `string[]` | — | Column order in the table view |
@@ -16609,7 +17062,7 @@ Inside `admin`, except `history`, which is a backend feature and stays at the to
 
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
-| `formAutoSave` | `boolean` | `false` | Auto-save on field change |
+| `formAutoSave` | `boolean` | `false` | Auto-save two seconds after an edit, once the form validates. A New form is not saved until something is entered. |
 | `localChangesBackup` | `"manual_apply" \| "auto_apply" \| false` | `"manual_apply"` | Backup unsaved changes |
 | `hideIdFromForm` | `boolean` | `false` | Hide the entity ID from the form |
 | `hideIdFromCollection` | `boolean` | `false` | Hide the ID column from the table |
@@ -16796,6 +17249,19 @@ A `fixedFilter` narrows what the panel *asks for*; it is not a boundary. What a
 caller is allowed to read is a [security rule](/docs/collections/security-rules),
 which the database enforces for every caller, panel or not.
 
+### Many collections
+
+Nothing in Rebase caps the number of collections, but two costs grow with it:
+
+- **The admin's first download.** The panel needs its navigation the moment
+  someone signs in, so every collection's config is bundled into what the
+  browser fetches for the login screen — about 2.4 KB minified each, so 200
+  collections add roughly 480 KB, around 80 KB gzipped. What opening a
+  collection needs (the table, the record views, the form) loads only then.
+- **`rebase db push`.** Atlas plans a push by diffing the whole schema, and that
+  grows faster than the table count: at 400 or more tables a push takes tens of
+  seconds — see [how long a push takes](/docs/cli/schema#rebase-db-push).
+
 ### Next Steps
 
 - **[Entity Callbacks](/docs/collections/callbacks)** — Lifecycle hooks for syncing data between collections, validation, side effects
@@ -16820,14 +17286,14 @@ Properties define the columns in your database table and how they are rendered i
 
 | Type | Description | PostgreSQL Column |
 |------|-------------|-------------------|
-| `string` | Text, select, markdown, file upload, URL, email | `varchar`, `text`, `jsonb` |
+| `string` | Text, select, markdown, file upload, URL, email | `text` by default; `varchar`, `char` or `uuid` with `columnType` |
 | `number` | Integer, decimal, currency | `integer`, `numeric`, `bigint`, `serial` |
 | `boolean` | True/false toggle | `boolean` |
 | `date` | Date, datetime, timestamp | `timestamp`, `date` |
-| `array` | Ordered list of values | `jsonb` |
+| `array` | Ordered list of values | A native array (`text[]`, `integer[]`, `numeric[]`, `boolean[]`) when `of` is one string, number or boolean property; `jsonb` otherwise |
 | `map` | Key-value object | `jsonb` |
 | `geopoint` | Latitude/longitude pair | `jsonb` |
-| `reference` | Embedded reference to another entity | `varchar` (stores ID) |
+| `reference` | Embedded reference to another entity | The target's primary-key type (stores its ID) |
 | `relation` | SQL foreign key relation | Uses the `relations` array |
 | `vector` | Embedding, for nearest-neighbour search | `VECTOR(n)` (pgvector) |
 | `binary` | Raw bytes, read and written as base64 | `bytea` |
@@ -17006,7 +17472,9 @@ category: {
 
 Several values out of a fixed set is an **array of an enum string**, not a flag on
 one: the column holds many values, so the property that describes it is the array.
-`columnType: "text[]"` is what makes it one Postgres column rather than a join.
+It is one Postgres column, a `text[]`, rather than a join: an array whose `of`
+is a single string property gets a native array by default, and the
+`columnType` below only says so explicitly.
 
 ```typescript no-verify
 locales: {
@@ -17035,7 +17503,7 @@ locales: {
 | `url` | `boolean` | URL format validation |
 | `storage` | `StorageConfig` | Enable file upload — see [File uploads](/docs/collections/file-uploads) |
 | `enum` | `EnumValues` | Render as select dropdown |
-| `columnType` | `"varchar" \| "text" \| "char" \| "uuid"` | The database column. Defaults to `varchar`, or `uuid` when `isId` says so. `text` for unbounded strings, `char` for fixed width |
+| `columnType` | `"varchar" \| "text" \| "char" \| "uuid"` | The database column. Defaults to `text`, or `uuid` when `isId` says so. `text` for unbounded strings, `char` for fixed width |
 | `isId` | `boolean \| string` | Marks the property as the primary key, and says who fills it: `"manual"` (you do), `"uuid"` (`gen_random_uuid()`), or any other string, used verbatim as the column's SQL default expression — bare (`nanoid()`) or in template form (``"sql`nanoid()`"``). The function has to exist; nothing here creates it. `"increment"` is a **number** strategy and does nothing here, and `"cuid"` is refused at config load |
 | `autoValue` | `"user_on_create" \| "user_on_update"` | Stamp the column with the **uid of the acting user** — on creation only, or on every write. See [Audit columns](#audit-columns) |
 | `userSelect` | `boolean` | Render as a user picker. The value is a plain string column holding the user id — nothing resolves or checks it on the way in. **Admin form only — not enforced by the API or the database.** |
@@ -17542,9 +18010,11 @@ own storage source. Placeholders match whatever the panel would fill in:
 - An upload that also names its property (`collection` + `property`, as
   `putObject({ context })` sends them) is held to that property too. Naming a
   looser property does not unlock a stricter one's path.
+  The panel's uploads (file fields, table cells and markdown images) always
+  name it.
 - A `storagePath` written as a function cannot be read without running it, so
   it has no server-side rule: those limits hold only for uploads that name the
-  property.
+  property, which the panel's do.
 - A path no property claims is held to the source's own limit
   (`STORAGE_MAX_FILE_SIZE`) alone.
 
@@ -17601,24 +18071,43 @@ existing files.
 
 Used with string or number properties to render selects:
 
-```typescript no-verify
-// Simple array
-enum: ["draft", "published", "archived"]
+```typescript
+import type { StringProperty } from "@rebasepro/types";
 
-// With labels
-enum: [
-    { id: "draft", label: "Draft" },
-    { id: "published", label: "Published" },
-    { id: "archived", label: "Archived" }
-]
+// Simple: each value mapped to its label
+const simple: StringProperty = {
+    type: "string",
+    name: "Status",
+    enum: { draft: "Draft", published: "Published", archived: "Archived" }
+};
+
+// As a list, which keeps the order you write
+const listed: StringProperty = {
+    type: "string",
+    name: "Status",
+    enum: [
+        { id: "draft", label: "Draft" },
+        { id: "published", label: "Published" },
+        { id: "archived", label: "Archived" }
+    ]
+};
 
 // With colors (for Kanban columns and chips)
-enum: [
-    { id: "draft", label: "Draft", color: "grayDark" },
-    { id: "published", label: "Published", color: "greenDark" },
-    { id: "archived", label: "Archived", color: "orangeDark" }
-]
+const colored: StringProperty = {
+    type: "string",
+    name: "Status",
+    enum: [
+        { id: "draft", label: "Draft", color: "grayDark" },
+        { id: "published", label: "Published", color: "greenDark" },
+        { id: "archived", label: "Archived", color: "orangeDark" }
+    ]
+};
 ```
+
+A plain list of values, `enum: ["draft", "published", "archived"]`, is not part
+of the type. A JavaScript config that writes one still works: the database enum,
+the generated types and the admin dropdown all read it as those values, each
+its own label.
 
 ### Validation
 
@@ -17669,7 +18158,7 @@ the code that writes it.
 | Rule | Type | Description |
 |------|------|-------------|
 | `required` | `boolean` | The value must be present |
-| `requiredMessage` | `string` | What the form says when it is not. **Admin form only — not enforced by the API or the database.** |
+| `requiredMessage` | `string` | What is said when it is not: by the admin form, and as the `message` of the field's `required` entry in the API's 400. The database's NOT NULL carries no message |
 | `unique` | `boolean` | Only one row in the table may hold this value. The admin form also checks it when saving a value the edit changed, so a duplicate is named on its field before the write |
 | `uniqueInArray` | `boolean` | Only one entry *per array* may hold it. Applies to a direct child of an `array` property, or a first-level child of a `map` inside one. **Admin form only — not enforced by the API or the database.** |
 
@@ -17858,7 +18347,7 @@ one row or many come back, and what a write through it may touch.
 | Kind | The key lives | Returns | Notes |
 |---|---|---|---|
 | `belongsTo` | on **this** table | one | `localKey`, defaults to `<relationName>_id` |
-| `hasOne` | on the **target's** table | one | `foreignKeyOnTarget`, defaults to `<thisCollection>_id` |
+| `hasOne` | on the **target's** table | one | `foreignKeyOnTarget`, defaults to the singular of this collection plus `_id` (`users` → `user_id`) |
 | `hasMany` | on the **target's** table | many | children belong to this parent alone |
 | `manyToMany` | in a **junction table** | many | rows are shared; you own the link |
 | `via` | an explicit `joinPath` | either | read-only; state `cardinality` yourself |
@@ -18519,6 +19008,11 @@ the server has already run `callbacks` before the row reaches the panel, so a
 `browserCallbacks.afterRead` runs *in addition* to it. Write it to be
 idempotent, or don't write it.
 
+A `browserCallbacks.afterSave` runs after the write has been stored, and
+nothing in the browser can roll it back. A throw from it is shown as a warning;
+the save itself is reported as done, so the form does not offer to create the
+record a second time.
+
 ### Defining Callbacks
 
 ```typescript
@@ -18562,7 +19056,7 @@ const articlesCollection = defineCollection({
 
         beforeDelete: async ({ id }) => {
             // Prevent deletion of published articles
-            // Throw to block the deletion
+            // Throw (or return false) to block the deletion
         },
 
         afterRead: async ({ row }) => {
@@ -18758,7 +19252,7 @@ afterRead: async ({
 
 #### `beforeDelete`
 
-Called before a record is deleted. Throw to block deletion.
+Called before a record is deleted. Throw to block deletion, and the caller gets `400 CALLBACK_REJECTED` with your message. Returning `false` blocks it too, as `403 CALLBACK_REJECTED` with no message of yours.
 
 ```typescript
 beforeDelete: async ({
@@ -19906,7 +20400,7 @@ After initialization, these routes are mounted:
 | `/api/meta/contract` | The project's collection schema (needs `schema:read`) |
 | `/api/meta/schema-version` | A version string for that schema (unauthenticated) |
 | `/api/functions/*` | Custom function routes (when `functionsDir` is set) |
-| `/api/cron/*` | Cron job management (`cron:read` / `cron:write`, when `cronsDir` is set) |
+| `/api/admin/cron/*` | Cron job management (`cron:read` / `cron:write`, when `cronsDir` is set) |
 | WebSocket on upgrade | Real-time subscriptions |
 
 ---
@@ -20130,8 +20624,12 @@ The typed SDK turns every one of these into a `RebaseApiError` carrying
 `status`, `code` and `details` — including the failures that never reached a
 server at all. A refused connection, a DNS failure, CORS or an abort arrives as
 `status: 0`, `code: "NETWORK_ERROR"`, with the runtime's own error on `cause`,
-rather than as whatever `fetch` felt like rejecting with. So application code
-catches one class:
+rather than as whatever `fetch` felt like rejecting with. A response with no
+envelope — a proxy's 413, a load balancer's 502 — still gets a `code` from its
+status (`PAYLOAD_TOO_LARGE`, `SERVICE_UNAVAILABLE`, `INTERNAL_ERROR`, …), and a
+client built outside a browser with no `baseUrl` fails with
+`BASE_URL_REQUIRED` rather than a network error. So application code catches
+one class:
 
 ```typescript
 async function setPrice(id: string, price: number) {
@@ -20566,6 +21064,10 @@ GET /api/data/products?tags=csa.(electronics,books)
 | `isnull` | Column is `NULL` (`is-null`) | `?deleted_at=isnull.null` |
 | `notnull` | Column is not `NULL` (`is-not-null`) | `?deleted_at=notnull.null` |
 
+The four pattern operators match text. An enum column is matched by its value
+(`?status=like.draft%25`); on a number, a date or any other column that is not
+text they are a 400 `INVALID_FILTER_OPERATOR`.
+
 `isnull` and `notnull` ignore their value — the operator is the whole condition,
 and anything after the dot is discarded. The SDK writes `.null`, so that is the
 spelling you will see on the wire.
@@ -20609,6 +21111,11 @@ GET /api/data/products?not=(or(status.eq.draft,status.eq.archived))
 
 Groups may nest 32 levels deep; past that the request is refused with
 `INVALID_LOGICAL_GROUP`.
+
+A condition inside a group whose operator the dialect does not have —
+`?not=(title.contains.x)` — is a 400 `UNKNOWN_FILTER_OPERATOR`, as it is in a
+JSON `where`. It is not read as an equality on `contains.x`, which inside `not`
+would have matched every row.
 
 A group **narrows** alongside the field filters rather than replacing them — see
 [How the filters combine](#how-the-filters-combine).
@@ -21830,7 +22337,7 @@ the ID you got. Read the response header.
 | `TOKEN_ALREADY_USED` | 401 | A one-time token was replayed, or a refresh token that was rotated away more than `refreshTokenReuseIntervalSeconds` ago. | Request a fresh one, or sign in again. |
 | `TOKEN_EXPIRED` | 401 | The token is past its lifetime. | Request a fresh one. |
 | `USER_NOT_FOUND` | 404 | No account with that id. | Check the id. |
-| `WEAK_PASSWORD` | 400 | The password does not meet the configured policy. | Choose a stronger one. |
+| `WEAK_PASSWORD` | 400 | The password does not meet the [password policy](/docs/backend/auth-endpoints/#password-policy) (by default 8+ characters with an upper-case letter, a lower-case letter and a digit). | Choose a stronger one. |
 
 ### Data, queries and writes
 
@@ -21867,7 +22374,7 @@ the ID you got. Read the response header.
 | `INVALID_DISTINCT` | 400 | `?distinct=` is not `true` or `false`. | Send one of those; `1` and `0` are accepted too. |
 | `INVALID_FIELD_OPERATION` | 400 | A `$inc` / `$push` / `$pull` / `$merge` was used on a property type it is not defined on, with an operand of the wrong shape, with two operators on one field, misspelled, or on a create — where there is no stored value to operate on. | See [Writing over REST](/docs/backend/writes/#field-operations); the message names the field. |
 | `INVALID_FILTER_FIELD` | 400 | The filter names a property this collection does not have. | Check the spelling against the collection. |
-| `INVALID_FILTER_OPERATOR` | 400 | The operator is not one this property type supports. | See [Querying data](/docs/sdk/querying/). |
+| `INVALID_FILTER_OPERATOR` | 400 | The operator is not one this property type supports — for example `like` on a number or a date. | See [Querying data](/docs/sdk/querying/). |
 | `INVALID_FILTER_VALUE` | 400 | A filter value cannot be read as the type of the column it was compared against: `?id=eq.abc` on an integer key, a label that is not in the enum, a timestamp that is not one, a number past the type's range. `details.dbCode` carries the SQLSTATE. | Send a value of the column's type. |
 | `INVALID_HARD_PARAM` | 400 | `?hard=` is not `true` or `false`. Anything else is refused rather than read as "no" — a typo that soft-deletes when the caller asked to purge leaves them believing the data is gone. | Send `true` or `false`. |
 | `INVALID_INCLUDE` | 400 | `?include=` is malformed: not a valid path list, or nested past the maximum depth. Answered at the boundary rather than escaping the driver as a 500. | See the message; it names the offending path. |
@@ -21910,6 +22417,7 @@ the ID you got. Read the response header.
 | `UNKNOWN_AGGREGATE_FIELD` | 400 | An aggregate or `groupBy` names a field the collection does not have. | Check the spelling; the message lists the valid fields. |
 | `UNKNOWN_FILTER_FIELD` | 400 | The filter names a field this collection — or a relation's target — does not have. | Check the spelling; the message lists the valid fields. |
 | `UNKNOWN_FILTER_OPERATOR` | 400 | The filter names an operator that does not exist. | The message lists every operator. |
+| `UNKNOWN_MESSAGE_TYPE` | 400 | A realtime socket frame has a `type` the server does not handle. Answered as an `ERROR` frame carrying the request's `requestId`, so the request settles instead of timing out. | Check the frame's `type`; the message names it. |
 | `UNKNOWN_ORDER_BY_FIELD` | 400 | The sort names a field this collection does not have. | Check the spelling; the message lists the valid fields. |
 | `PRECONDITION_FAILED` | 412 | An `If-Match` named a version of the row that is no longer current: somebody wrote to it between the read and this write. Nothing was written. | Re-read the row, re-apply the change, and send the new `ETag`. |
 | `UNKNOWN_RESPONSE_FIELD` | 400 | `?fields=` asks for a field the collection does not have. | Check the spelling; the message lists the known fields. |
@@ -21917,7 +22425,7 @@ the ID you got. Read the response header.
 | `UNSUPPORTED_MEDIA_TYPE` | 415 | The `Content-Type` is not one this route accepts. | Send the type the route documents. |
 | `UNSUPPORTED_OPTION` | — | Thrown, not answered: a write through the in-process accessor (`context.data` in a callback, `rebase.data` in a function or cron) was given `ifMatch` or `idempotencyKey`. That door has no precondition check or idempotency store, so the option is refused before anything is written rather than ignored. | Drop the option there, or make the write through the HTTP client, which honours both. |
 | `UNSUPPORTED_RELATION_FILTER` | 400 | The filter crosses a `via` relation, whose join path is authored one way only, so there is nothing to correlate a subquery back to. | Filter from the owning side. |
-| `UNSUPPORTED_RELATION_FILTER_OPERATOR` | 400 | The operator is not defined for that field: a relation with no column on this row is filtered by membership, and case-insensitive matching only applies to text. | See the message; it lists what the field accepts. |
+| `UNSUPPORTED_RELATION_FILTER_OPERATOR` | 400 | The operator is not defined for that field: a relation with no column on this row is filtered by membership, and pattern matching (`like`, `ilike` and their negations) only applies to text. | See the message; it lists what the field accepts. |
 | `VALIDATION_CONSTRAINT` | 400 | A value broke a `validation` rule the property declares — a length, a range, a pattern, a required field. | See the message; it names each violation. |
 | `VALIDATION_EXCLUDED_FIELDS` | 400 | The body writes a column marked `excludeFromApi`, or `access: { write: [] }` — the same rule, two spellings. Those are the server's to set: a password hash, a verification token. Unlike `FIELD_NOT_WRITABLE` this is the same answer for every caller, `admin` included. | Remove the field. See [Field access](/docs/collections/field-access/). |
 | `VALIDATION_INVALID_VALUE` | 400 | A value does not fit its property type. | See the message; it names the property. |
@@ -21958,7 +22466,8 @@ the message names the constraint.
 | `INVALID_STORAGE_KEY` | 400 | The object key is malformed, or escapes its prefix. | Check the key. |
 | `INVALID_TRANSFORM_OPTIONS` | 400 | The image-transform parameters are out of range or contradictory. | See [Storage](/docs/backend/storage/). |
 | `STORAGE_FILE_TOO_LARGE` | 413 | The upload exceeds the `maxSize` the target property declares. Enforced on the server, not only in the browser. `details` carries the property, the limit and the actual size. | Upload a smaller file, or raise `maxSize` on the property. |
-| `STORAGE_FILE_TYPE_REFUSED` | 400 | The upload's type is not in the property's `acceptedFiles`. `details` carries the property, the accepted list and the content type sent. | Upload an accepted type, or widen `acceptedFiles`. |
+| `STORAGE_FILE_TYPE_REFUSED` | 400 | The upload's type is not in the property's `acceptedFiles`, or not in the storage source's own `allowedMimeTypes`. `details` carries the property (or the source's list), the accepted list and the content type sent. | Upload an accepted type, or widen `acceptedFiles` / `allowedMimeTypes`. |
+| `STORAGE_MISCONFIGURED` | 502 | The S3 or GCS bucket this source is configured with does not exist, or the provider refused this deployment's credentials for it. The message names the bucket; `details.reason` is `NoSuchBucket` or the provider's refusal. A missing bucket used to read as "file not found" on every file. | Fix the bucket name (`S3_BUCKET` / `GCS_BUCKET`, `__<KEY>` for a named source) or the credentials' permissions. |
 | `STORAGE_NOT_CONFIGURED` | 501 / 503 | No storage backend is configured on this server, or none is the default and the request names no storage source; the message names the sources that are served (501). A resumable upload whose source disappeared before it finished is a 503. | Configure S3, GCS, or local storage, or name a source with `?storageId=`. |
 | `STORAGE_SOURCE_NOT_CONFIGURED` | 501 | The storage source is declared but has no credentials here. | Set that source's environment variables. |
 | `STORAGE_WRITE_FAILED` | 502 | The storage backend refused or dropped the write. | Check its own logs and credentials. |
@@ -22561,8 +23070,11 @@ So a failed apply is **not an error**. The response says so:
 
 ### Where this works
 
-The dividing line is whether the running server has your **source on disk** —
-not whether it is production.
+Live schema editing rewrites your collection source with the same editor the
+panel's source-only saves use, so it runs where that editor runs: a server with
+your **collection source on disk** (`collectionsDir`) and its schema editor on.
+The schema editor is off under `NODE_ENV=production` unless the server sets
+`schemaEditor: true`, and it needs `ts-morph` installed.
 
 #### MongoDB
 
@@ -22582,19 +23094,21 @@ so rather than leaving you to assume the relational answer.
 | Deployment | Works |
 |---|---|
 | `rebase dev` on your machine | yes |
-| Self-host with the project mounted | yes |
-| Self-host from a built bundle | yes, with `liveSchema.repository` |
-| Rebase Cloud, or any bundle | yes, with `liveSchema.repository` |
+| Self-host with the project and its git working tree mounted | yes, when `NODE_ENV` is not `production`, or with `schemaEditor: true` |
+| A built bundle: a self-host serving a build, or Rebase Cloud | no |
 
-A bundle is compiled output, so there is no collection source in it. Configure
-`liveSchema.repository` and the source is fetched from your repository instead;
-without it the routes answer `SCHEMA_EDITING_NO_REPOSITORY` and say why.
+A bundle is compiled output, so there is no collection source in it, and the
+runtime that serves it turns the schema editor off. `/api/admin/schema/status`
+answers `enabled: false` with the code `SCHEMA_EDITOR_DISABLED`. Edit
+collections in development, commit, and deploy.
 
-#### A deployment with no source on disk
+#### Committing to a remote repository
 
-A bundle is compiled output — every Cloud tenant, and any self-host serving a
-build. There is no collection source for the editor to rewrite, so point it at
-the repository the source actually lives in:
+`liveSchema.repository` makes the server commit each change to a GitHub
+repository through the Git Data API instead of running `git commit` in a
+working tree. It takes effect only on a server whose schema editor is on,
+which means a server with `collectionsDir` on disk (see the table above). A
+built bundle does not read it.
 
 ```typescript no-verify
 initializeRebaseBackend({
@@ -22614,9 +23128,12 @@ initializeRebaseBackend({
 })
 ```
 
-The change is then read from the repository, rewritten with the same editor that
-runs locally, and committed back through the Git Data API — a blob, a tree, a
-commit and a ref update. Nothing is cloned and nothing is left on disk.
+The changed collection file is then read from the repository, rewritten with
+the same editor that runs locally, and committed back through the Git Data API:
+a blob, a tree, a commit and a ref update. Nothing is cloned and nothing is
+left on disk. Only that one file is fetched, so two changes cannot be made in
+this mode: adding a relation that targets another collection, and deleting a
+collection.
 
 `auth` takes a token or a GitHub App installation:
 
@@ -22637,10 +23154,9 @@ project, and no per-customer secret to rotate.
 
 The token needs `contents: read and write` on that repository, and nothing else.
 
-On a machine that has the repository, the commit is a plain `git commit` —
-nothing to authenticate, no token, no network. A deployment without one commits
-through the Git Data API instead, with no clone — see
-[A deployment with no source on disk](#a-deployment-with-no-source-on-disk).
+Without `liveSchema.repository`, the commit is a plain `git commit` in the
+working tree that holds `collectionsDir`: nothing to authenticate, no token, no
+network.
 
 Two things that make it safe to run against a repository somebody else is
 working in:
@@ -22725,6 +23241,7 @@ const backend = await initializeRebaseBackend({
                         ? { user: env.SMTP_USER, pass: env.SMTP_PASS! }
                         : undefined,
                     name: env.SMTP_NAME,               // Optional EHLO/HELO hostname
+                    timeoutMs: 30_000,                 // Connect, greeting and silence limit (the default)
                 },
                 appName: env.APP_NAME,
                 logoUrl: env.EMAIL_LOGO_URL,           // Logo shown atop the default templates
@@ -23694,6 +24211,18 @@ do. See [Roles and scopes](/docs/backend/roles-and-scopes/).
 
 All data API endpoints require a valid `Authorization: Bearer <token>` header when `requireAuth: true` (the default).
 
+#### Password policy
+
+A new password needs at least 8 characters, with an upper-case letter, a
+lower-case letter and a digit. Registration, reset and change refuse one that
+fails with `400 WEAK_PASSWORD`, listing each rule it broke, and so does an
+administrator setting a password with `PUT /api/admin/users/:uid` (as a plain
+`400`). `POST /api/admin/users` does not check a password it is given. Sign-in
+never checks the policy, so an older password keeps working. To set your own rules, pass
+`auth.hooks.validatePasswordStrength` from an [ejected](/docs/backend/authentication/#configuration)
+backend. The first admin seeded from `REBASE_ADMIN_PASSWORD` is held to a
+different rule: at least 12 characters, and nothing else.
+
 #### Response format
 
 Every endpoint that issues a session answers with the same envelope — `register`,
@@ -24290,6 +24819,8 @@ const backend = await initializeRebaseBackend({
 });
 ```
 
+Local storage keeps each object's metadata beside it, as `<key>.metadata.json`, so a key whose last segment ends in `.metadata.json` is refused with `400 INVALID_STORAGE_KEY` on every route. S3 and GCS keep metadata on the object and store any key.
+
 #### S3 Storage
 
 ```typescript no-verify
@@ -24354,7 +24885,7 @@ image: {
 | `POST` | `/api/storage/upload?storageId=<key>` | Upload to a specific named backend |
 | `GET` | `/api/storage/file/*` | Retrieve a file — everything after `/file/` is the object key |
 | `GET` | `/api/storage/file/*?storageId=<key>` | Retrieve a file from a specific backend |
-| `GET` | `/api/storage/metadata/*` | Size, content type and last modification of one object, without its bytes |
+| `GET` | `/api/storage/metadata/*` | Size, content type and custom metadata of one object, without its bytes, plus a short-lived download token when it is private |
 | `POST` | `/api/storage/metadata` | <span class="since-badge" data-since="0.25">Since 0.25</span> The same for up to 100 objects of one source: body `{ keys, storageId? }` |
 | `DELETE` | `/api/storage/file/*` | Delete a file |
 | `GET` | `/api/storage/list` | List objects under a prefix (`prefix`, `bucket`, `maxResults`, `pageToken`, `storageId`). A `maxResults` below 1, or a `pageToken` the source never issued, is `400 INVALID_LIST_OPTIONS` |
@@ -24781,7 +25312,8 @@ Return `false` to deny with a **403**. Throwing also denies — an ownership loo
 
 Worth knowing:
 
-- **The metadata route is where read access is really decided.** It mints the short-lived path-scoped download token that the file route trusts, so the hook gates it there. Requests already carrying such a token, or hitting a declared public path, skip the hook — the token was minted under it and is valid only for its own path.
+- **The metadata route is where read access is really decided.** It mints the short-lived path-scoped download token that the file route trusts, so the hook gates it there. Requests already carrying such a token, or hitting a declared public path, skip the hook — the token was minted under it and is valid only for its own path. Only those two reads skip it: a user your auth adapter happens to call `public` is asked about like anyone else.
+- **One bucket, one name.** On S3 and GCS the hook's `bucket` is always `"default"`, also when a request names the provider's bucket, which reaches the same objects.
 - **A path is public when the key it names is.** The `public/` prefix is tested on the canonical key the route serves — after a leading `default/` bucket segment is read off and `//`, `./` and a leading `/` are folded away — never on the URL as written. `/api/storage/file/notes://public/x.txt` names the private key `notes:/public/x.txt`, and the key `default/public/x.txt` (reached as `/api/storage/file/default/default/public/x.txt`) lies in a folder called `default`; neither is public. In a hook, test the `key` you are handed with `isPublicStorageKey` from `@rebasepro/types` — `isPublicStoragePath` reads a client-side path or URL, and reads both of those as public.
 - **`list` is gated on the prefix.** Listing is how you discover keys nobody told you about.
 - **Resumable (TUS) uploads are gated at create time**, so a denied upload leaves no temp file behind.
@@ -24811,7 +25343,8 @@ storageTriggers: [
         path: "uploads/:uid/**",
         events: ["finalize"],
         handler: async ({ key, params, size, user }) => {
-            await jobs.enqueue("index-upload", { key, uid: params.uid, size });
+            // `indexUpload` is a `queue()` declared in config/resources.ts
+            await indexUpload.enqueue({ key, uid: params.uid, size });
         }
     }
 ]
@@ -24973,7 +25506,7 @@ Client                                                   Rebase Server
 2. **Progress Inquiries (`HEAD`)**: If an upload is interrupted, the client queries the upload URL using a `HEAD` request. The server returns the current byte position in the `Upload-Offset` header.
 3. **Data Appending (`PATCH`)**: The client resumes sending binary data starting at the returned offset with `Content-Type: application/offset+octet-stream`. The server writes each chunk to the temporary file at the byte offset the request declares, which must be the offset the server holds (`409` otherwise). One chunk is received at a time: a `PATCH` that arrives while another for the same upload is still being received — typically a client re-sending a chunk that stalled — is answered `423 UPLOAD_LOCKED`, and the client resumes from the offset `HEAD` reports.
 4. **Finalisation**: When the accumulated `Upload-Offset` matches the declared `Upload-Length`, Rebase reads the completed temporary file, wraps it as a standard JavaScript `File` object, and saves it to the configured storage backend (local disk or S3). The temporary file is then deleted. <span class="since-badge" data-since="0.25">Since 0.25</span> That last `PATCH` answers `Rebase-Upload-Result` with the stored object — `{ key, bucket, storageUrl }`, what `POST /api/storage/upload` answers under `data` — as URI-encoded JSON. A frontend on another origin can read it, and `Location` and `Upload-Offset`, only when the server exposes them in `Access-Control-Expose-Headers`: the Rebase runtime and the ejected backend do; a [custom server](/docs/backend/custom-server/) has to.
-5. **Periodic Sweep**: A background cleaner runs every **60 seconds** to delete orphaned, incomplete temporary uploads that have exceeded the **24-hour** retention threshold — those another process started too, read from the directory.
+5. **Periodic Sweep**: A background cleaner runs every **60 seconds** to delete incomplete temporary uploads that began more than **24 hours** ago — those another process started too, read from the directory.
 
 ### Related
 
@@ -25465,7 +25998,7 @@ The realtime pipeline has three stages:
 └──────────────┘      └────────────────────┘      └──────────────┘
 ```
 
-For multi-instance deployments, Rebase uses PostgreSQL's `LISTEN/NOTIFY` to broadcast changes across server instances. This is handled automatically — a dedicated PostgreSQL connection listens on the `rebase_entity_changes` channel and relays updates to local subscribers.
+For multi-instance deployments, Rebase uses PostgreSQL's `LISTEN/NOTIFY` to carry changes across server instances. This is handled automatically. With [database-level change capture](#database-level-change-capture-cdc) on (the default wherever the database role can create triggers), every instance listens on the `rebase_cdc` channel the capture triggers publish to, so a write is heard whichever process or tool made it. Without capture, each instance announces its own writes on the `rebase_entity_changes` channel, and a dedicated connection on every other instance relays them to its local subscribers.
 
 #### Zero Configuration
 
@@ -25980,7 +26513,7 @@ If the connection can't support it, `auto` logs an informational line instead an
 2. **Capture** — A dedicated, unpooled `LISTEN` client per instance consumes `rebase_cdc`, maps the changed table back to its collection, and feeds the change into the same `RealtimeService` pipeline used by API mutations. Like the cross-instance listener, it prefers `DATABASE_DIRECT_URL` and auto-reconnects.
 3. **RLS-safe delivery** — The raw row from the change stream is **never** forwarded to subscribers. The change is marked invalidated, and each subscription re-reads the row under its **own** auth context. Filtering is therefore per subscriber, never per publisher: a client only ever receives rows its RLS policies permit.
 4. **Cross-instance** — Because every instance observes every commit through the change stream, CDC also *is* the cross-instance channel; the legacy per-mutation `rebase_entity_changes` broadcast is not used while CDC is active.
-5. **De-duplication** — A mutation made through the Rebase API is delivered locally the instant it commits and is also echoed back through the change stream. The originating instance suppresses that echo (a short-lived record of its own emits), so subscribers never see an API write twice.
+5. **De-duplication** — A mutation made through the Rebase API is delivered locally the instant it commits and is also echoed back through the change stream. The originating instance suppresses an echo that arrives within the refetch debounce window (a short-lived record of its own emits), so an API write normally produces one frame. An echo that arrives later than that triggers one more refetch, which delivers the same rows again: harmless, but a subscriber can see an identical frame twice.
 
 #### Requirements & Notes
 
@@ -26739,8 +27272,8 @@ This is the one that bites. A `belongsTo` relation compiles to its resolved
 { on: ["author"], reason: "an author's posts, and the ON DELETE cascade" }
 ```
 
-Writing `author_id` here would work for most properties and quietly index
-nothing for a foreign key, which is the one people reach for. Postgres does not
+Writing `author_id` here is refused at build: it is a column, not a property of
+the collection, and `on` names properties. Postgres does not
 index a foreign key column for you — without this index, both "list this
 author's posts" and the `ON DELETE` cascade are sequential scans.
 
@@ -27006,15 +27539,18 @@ build them differently:
   warning, never a failed boot. A table this boot creates gets its indexes with
   the table, before anything can write to it. Under `REBASE_PROVISION_ONLY` the
   builds run before the process exits, since nothing after it would run them.
-- **`rebase db push` builds them with the rest of the push**, inside Atlas's
-  transaction, so the first push after upgrading runs one `CREATE INDEX` per
-  foreign-key column that lacks one. A plain `CREATE INDEX` blocks writes to
-  that table — reads go on — for as long as the build takes: about 0.4 s at 1M
-  rows and 6 s at 10M on a laptop SSD (`maintenance_work_mem` 64 MB), and
-  proportionally longer on slower storage or wider keys. `--dry-run` lists every
-  one. On a large production table, either let a boot build it concurrently
-  first — the push then finds it in place and plans nothing — or run the
-  push at a quiet moment.
+- **`rebase db push` builds them before it plans**, with the same builder and
+  on the same terms as the boot: `CREATE INDEX CONCURRENTLY`, one at a time,
+  so reads and writes go on while it runs (about 0.4 s at 1M rows and 6 s at
+  10M as a plain build on a laptop SSD, `maintenance_work_mem` 64 MB; a
+  concurrent one takes longer and blocks nothing). Atlas then finds each index
+  in place and plans nothing for it. An index it could not build first — a
+  table another session held for the whole lock budget — is left to Atlas,
+  which builds it inside the push's transaction and so blocks writes to that
+  table for the build; the push says which. A foreign-key column the push
+  itself adds gets its index from Atlas along with the column, before anything
+  is in it. `--dry-run` builds nothing: it names the indexes a real push would
+  build first, and the plan it prints lists them, since they do not exist yet.
 
 ### What is refused, and when
 
@@ -27904,6 +28440,31 @@ jobs: {
 }
 ```
 
+#### A handler that never finishes
+
+The flip side: a handler awaiting a `fetch` that never answers holds its worker
+slot, and its claim, for as long as the process lives — five of them and the
+worker runs nothing else, while `/health` stays green.
+<span class="since-badge" data-since="0.25">Since 0.25</span> Set `timeoutMs` to
+bound one attempt. At the deadline the attempt fails — retried while attempts
+remain, like any throw — its slot is freed, and the handler's `signal` is
+aborted. Pass the signal on, so the work stops too; a handler that ignores it
+keeps running in the background with nothing recording its outcome.
+
+```typescript no-verify
+jobs: {
+    enabled: true,
+    timeoutMs: 120_000,          // one attempt; no limit when left out
+    tasks: {
+        "sync-crm": async ({ payload, signal }) => {
+            await fetch(crmUrl, { method: "POST", body: JSON.stringify(payload), signal });
+        }
+    }
+}
+```
+
+Queue handlers and topic subscriptions get the same `signal` in their context.
+
 ### Several instances
 
 Safe by construction. Workers claim with `SELECT … FOR UPDATE SKIP LOCKED`, so
@@ -27930,13 +28491,15 @@ const { jobQueue } = await initializeRebaseBackend({ jobs: { enabled: true } });
 const dispatcher = new WebhookDispatcher({ jobQueue });
 dispatcher.setWebhooks(myWebhooks);
 
-jobQueue?.register(WEBHOOK_DELIVERY_TASK, ctx => dispatcher.deliverQueuedJob(ctx.payload as never));
+jobQueue?.register(WEBHOOK_DELIVERY_TASK, ctx => dispatcher.deliverQueuedJob(ctx.payload as never, ctx));
 ```
 
 Only the webhook's **id** is stored on the job, never the webhook itself — its
 signing secret would otherwise sit in `rebase.jobs` in cleartext for as long as
 retention keeps the row, and a webhook edited between the enqueue and the
-delivery should go out as it is now.
+delivery should go out as it is now. Passing `ctx` as the second argument makes
+each attempt send its own `X-Webhook-Attempt`; every attempt at one delivery sends
+the same `X-Webhook-Delivery`, so a receiver can deduplicate the retries.
 
 A delivery the dispatcher refuses to send (a loopback, link-local, private or
 non-`http(s)` destination), or one the receiver answers with a redirect, fails
@@ -28012,7 +28575,7 @@ const { message } = await client.functions.invoke<{ message: string }>(
 `RebaseApiError` on a non-2xx — so the function's own error shape reaches the
 caller instead of a bare `fetch` rejection.
 
-Three things it takes beyond the name:
+Four things it takes beyond the name:
 
 ```typescript
 // A different method. The payload is dropped for GET, since GET has no body.
@@ -28024,13 +28587,19 @@ await client.functions.invoke("hello", undefined, { method: "GET", path: "stats"
 
 // A query string. Passed as `path`, with no separator inserted before `?`.
 await client.functions.invoke("reports", undefined, { method: "GET", path: "?days=30" });
+
+// A function that answers text or a file (`c.text(csv)`, `c.body(pdf)`).
+// The answer is read as JSON unless you say otherwise: "text" gives a string,
+// "blob" a Blob, "response" the Response itself with its body unread.
+const csv = await client.functions.invoke<string>("export-orders", undefined, { method: "GET", responseType: "text" });
 ```
 
 :::note
-`client.call("functions/hello", …)` also reaches a function, and does something
-subtly different: it unwraps `res.data` when the response has one. Two ways in
-with two response contracts is a trap — use `functions.invoke`. `call` exists
-for routes mounted outside `/api/functions`, which `invoke` cannot express.
+`client.call("functions/hello", payload)` also reaches a function. It always
+`POST`s, and like `invoke` it returns the body verbatim — neither reaches in for
+a `data` key. Prefer `functions.invoke`, which takes a method, a sub-path and a
+`responseType`; `call` exists for routes mounted outside `/api/functions`, which
+`invoke` cannot express.
 :::
 
 :::important
@@ -28450,7 +29019,7 @@ Custom functions are loaded and mounted **after** `initializeRebaseBackend()` co
 3. **Storage routes** — `/api/storage/*`
 4. **Data routes** — `/api/data/*` (CRUD for collections)
 5. **Custom functions** ← `/api/functions/*`
-6. **Cron jobs** — `/api/cron/*`
+6. **Cron jobs** — `/api/admin/cron/*`
 7. **WebSocket** — Realtime subscriptions
 
 This means your custom functions have access to all initialized services. Register any routes that need to run **before** Rebase on the Hono app directly, prior to calling `initializeRebaseBackend()`:
@@ -28532,7 +29101,7 @@ The router is mounted for the **directory**, not for the functions in it. If eve
 
 Two ceilings apply to `/api/functions/*`:
 
-- **Request timeout** — 30 seconds by default, answering `504` with code `FUNCTION_TIMEOUT`. Configure with `functionsTimeoutMs` (or `REBASE_FUNCTIONS_TIMEOUT_MS`); `0` disables it. The handler cannot be cancelled from the outside, so give outbound HTTP calls an `AbortSignal` — the timeout frees the client and the socket, not the work. That the handler *keeps running* after the 504 is a property of a long-lived Node process, not a guarantee of the contract; anything that must complete belongs in [`waitUntil`](#background-work).
+- **Request timeout** — 30 seconds by default, answering `504` with code `FUNCTION_TIMEOUT`. Configure with `functionsTimeoutMs` (or `REBASE_FUNCTIONS_TIMEOUT_MS`); `0` disables it. The handler cannot be stopped from the outside, but it is told: <span class="since-badge" data-since="0.25">Since 0.25</span> `getSignal(c)` from `@rebasepro/server/functions` is aborted at the moment of the 504, so pass it to `fetch` and anything else that takes a signal (`fetch(url, { signal: getSignal(c) })`). Work not handed the signal carries on — the timeout frees the client and the socket, not the work. That the handler *keeps running* after the 504 is a property of a long-lived Node process, not a guarantee of the contract; anything that must complete belongs in [`waitUntil`](#background-work).
 - **Rate limit** — API-key and signed-in callers share the data API's buckets. Anonymous callers get their own, much looser allowance (3000 per window) because this router is public by default for webhook receivers. Override with `rateLimit.anonymousFunctions`; `null` switches it off.
 
 Unhandled promise rejections are logged rather than fatal: a fire-and-forget call in one function would otherwise end the whole process. Set `REBASE_EXIT_ON_UNHANDLED_REJECTION=1` for Node's default behaviour.
@@ -28758,14 +29327,15 @@ callbacks: {
 }
 ```
 
-```typescript no-verify
+```typescript
+// backend/functions/read-article.ts — served at /api/functions/read-article/:id
 // ✓ The read and the audit row are two operations, and only the second writes.
-import { rebase } from "@rebasepro/server";
+import { defineFunction, getUserId, requireAuth, requireDriver } from "@rebasepro/server/functions";
 
-export default defineFunction("read-article", (app) => {
-    app.get("/:id", async (c) => {
-        const article = await c.var.driver.fetchOne({ path: "articles", id: c.req.param("id") });
-        await rebase.dataAsAdmin.read_log.create({ path: "articles", uid: c.var.user?.uid });
+export default defineFunction((app, { rebase }) => {
+    app.get("/:id", requireAuth, async (c) => {
+        const article = await requireDriver(c).fetchOne({ path: "articles", id: c.req.param("id") });
+        await rebase.dataAsAdmin.read_log.create({ path: "articles", uid: getUserId(c) });
         return c.json(article);
     });
 });
@@ -28932,12 +29502,12 @@ other field held the same value before and after the change, so it is in
 `values` already; storing the whole row twice cost a one-field change to a
 20-field row 1,269 bytes, where it now costs 794.
 
-Entries recorded before 0.24 keep the whole previous row. The entry's `format`
+Entries recorded before 0.25 keep the whole previous row. The entry's `format`
 says which it is:
 
 | `format` | `previous_values` on an update |
 |---|---|
-| `1` (entries from before 0.24) | The whole row before the change |
+| `1` (entries from before 0.25) | The whole row before the change |
 | `2` | The `changed_fields` only, each as the whole row had it |
 
 The admin's history view and a revert read both alike: the view shows each
@@ -29019,7 +29589,7 @@ every deleted one — was not pruned at all. The sweep:
   back short, skipping entries another sweep holds — so a first sweep over a
   large backlog is many short deletes, not one long one;
 - reads an index on `updated_at`, `idx_history_updated_at`. On a database
-  created before 0.24 it is built in the background after the first boot,
+  created before 0.25 it is built in the background after the first boot,
   `CREATE INDEX CONCURRENTLY`, without blocking reads or writes — about a
   second per 2 million entries.
 
@@ -29250,6 +29820,14 @@ command line is a more immediate instruction than a switch made yesterday.
 `.rebase/` is gitignored, so the branch you are on is a fact about your machine
 and never about the project.
 
+<span class="since-badge" data-since="0.25">Since 0.25</span> On a switched
+checkout, `rebase db branch create`, `list`, `info`, `delete` and `prune` work
+on the main database, where the registry is, and say so. `create` still copies
+the branch you are on unless you pass `--from`; it is recorded in the main
+database, so `list` shows it from any checkout. Before 0.25 only `list` did
+this, and a branch created from a switched checkout was recorded in the branch's
+snapshot alone.
+
 Branches are ordinary PostgreSQL databases named after the branch with an `rb_` prefix, so `dev_sandbox` above is the database `rb_dev_sandbox` on the same server.
 
 Creating a branch does **not** change which database your project talks to. `rebase db branch create` makes the copy and stops there; nothing writes to `.env`, and the next `rebase dev` still uses the database it used before. To work against a branch, point `DATABASE_URL` at it yourself — the connection string is the one you already have, with the database name swapped:
@@ -29360,7 +29938,7 @@ and validating half of it.
 :::
 
 **Key behaviors:**
-- Auto-generates ephemeral `JWT_SECRET` and `REBASE_SERVICE_KEY` in development so you can start without manual setup.
+- Generates `JWT_SECRET` and `REBASE_SERVICE_KEY` in development when they are unset, so you can start without manual setup, and caches them in `.rebase-dev-secrets.json` so a restart does not sign anyone out.
 - Blocks auto-generated secrets in production — you must set them explicitly.
 - Validates that `CORS_ORIGINS` or `FRONTEND_URL` is set in production.
 - Refuses an `extend` schema built by a different copy of zod.
@@ -30795,7 +31373,7 @@ The list view is the classic, clean CMS default view mode, showing entities in a
 
 ### Table View
 
-The default view is a high-performance virtualized spreadsheet with:
+The table view is a high-performance virtualized spreadsheet with:
 
 - **Inline editing** — Click any cell to edit in-place
 - **Column resizing** — Drag column headers
@@ -30811,11 +31389,11 @@ Control row height with `defaultSize`:
 
 | Size | Pixels | Best for |
 |------|--------|----------|
-| `"xs"` | 40 | Dense data tables |
-| `"s"` | 54 | Default |
-| `"m"` | 80 | With image thumbnails |
-| `"l"` | 120 | Cards with previews |
-| `"xl"` | 260 | Rich content previews |
+| `"xs"` | 36 | Dense data tables |
+| `"s"` | 42 | Compact text rows |
+| `"m"` | 48 | Default |
+| `"l"` | 96 | Medium image thumbnails |
+| `"xl"` | 160 | Large image thumbnails |
 
 ### Kanban View
 
@@ -32836,7 +33414,7 @@ import { RebaseStudio } from "@rebasepro/studio";
 Whether a *save* lands is the server's decision, not the panel's: the editor
 rewrites collection source files, so it is off under `NODE_ENV=production`, in
 `baas` mode, and on a server with no `collectionsDir`. The panel asks
-`GET /api/schema-editor/status` and shows the reason it gets back beside the
+`GET /api/admin/schema-editor/status` and shows the reason it gets back beside the
 disabled button.
 
 #### Built-in tools
@@ -33082,6 +33660,7 @@ import { Alert } from "@rebasepro/ui";
 | `className` | `string` | — |  |
 | `outerClassName` | `string` | — |  |
 | `style` | `React.CSSProperties` | — |  |
+| `role` | `"alert" \| "status" \| null` | — | The live-region role. Defaults to `alert` for `error` and `warning`, `status` otherwise; `null` for static content. |
 
 ### Example
 
@@ -33205,6 +33784,7 @@ import { Avatar } from "@rebasepro/ui";
 | `outerClassName` | `string` | — |  |
 | `hover` | `boolean` | — |  |
 | `style` | `React.CSSProperties` | — |  |
+| `onClick` | `React.MouseEventHandler<HTMLElement>` | — | Makes the avatar a button. Without it (or a menu trigger's handlers) it is a plain image. |
 
 ### Example
 
@@ -33731,7 +34311,7 @@ import { DateTimeField } from "@rebasepro/ui";
 | `style` | `React.CSSProperties` | — |  |
 | `inputClassName` | `string` | — |  |
 | `invisible` | `boolean` | — |  |
-| `locale` | `string` | — |  |
+| `locale` | `string` | — | BCP 47 locale, set as the input's `lang`. The browser still draws a native date input in its own UI language; this is the hint it may use. |
 | `timezone` | `string` | — | IANA timezone string (e.g., "America/New_York", "Europe/London"). Used to display and input dates in the specified timez |
 
 ### Example
@@ -35640,12 +36220,10 @@ import { MultiSelect } from "@rebasepro/ui";
 | `modalPopover` | `boolean` | — |  |
 | `className` | `string` | — |  |
 | `open` | `boolean` | — |  |
-| `name` | `string` | — |  |
-| `id` | `string` | — |  |
+| `id` | `string` | — | Put on the trigger button, so a `<label htmlFor>` can name it. |
 | `onOpenChange` | `(open: boolean) => void` | — |  |
 | `value` | `T[]` | — |  |
 | `inputClassName` | `string` | — |  |
-| `onChange` | `(event: React.ChangeEvent<HTMLSelectElement, Element>) => void` | — |  |
 | `onValueChange` | `(updatedValue: T[]) => void` | — |  |
 | `placeholder` | `React.ReactNode` | — |  |
 | `size` | `"small" \| "smallest" \| "medium" \| "large"` | — |  |
@@ -35653,13 +36231,9 @@ import { MultiSelect } from "@rebasepro/ui";
 | `label` | `React.ReactNode` | — |  |
 | `disabled` | `boolean` | — |  |
 | `error` | `boolean` | — |  |
-| `position` | `"item-aligned" \| "popper"` | — |  |
-| `endAdornment` | `React.ReactNode` | — |  |
-| `multiple` | `boolean` | — |  |
 | `includeSelectAll` | `boolean` | — |  |
 | `includeClear` | `boolean` | — |  |
 | `inputRef` | `React.Ref` | — |  |
-| `padding` | `boolean` | — |  |
 | `invisible` | `boolean` | — |  |
 | `children` | `React.ReactNode` | yes |  |
 | `renderValues` | `(values: T[]) => React.ReactNode` | — |  |
@@ -36084,6 +36658,7 @@ import { ResizablePanels } from "@rebasepro/ui";
 | `animateLayout` | `boolean` | — |  |
 | `className` | `string` | — |  |
 | `stacked` | `boolean` | — |  |
+| `dividerAriaLabel` | `string` | — | Accessible name of the divider, e.g. "Resize the list". The divider is a focusable `separator`: the arrow keys move it (Shift for a bigger step), and it drags with mouse, touch or pen. |
 
 ### Example
 
@@ -36731,8 +37306,8 @@ import { TableCell } from "@rebasepro/ui";
 | Prop | Type | Required | Description |
 | --- | --- | --- | --- |
 | `children` | `React.ReactNode` | — |  |
-| `header` | `boolean` | — |  |
-| `scope` | `string` | — |  |
+| `header` | `boolean` | — | Render as a header cell (`th`). Implied inside TableHeader. |
+| `scope` | `string` | — | Defaults to `col` for a cell inside TableHeader. |
 | `className` | `string` | — |  |
 | `style` | `React.CSSProperties` | — |  |
 | `align` | `"center" \| "left" \| "right"` | — |  |
@@ -36868,8 +37443,9 @@ import { TableRow } from "@rebasepro/ui";
 | --- | --- | --- | --- |
 | `children` | `React.ReactNode` | — |  |
 | `className` | `string` | — |  |
-| `onClick` | `React.MouseEventHandler<any> & React.MouseEventHandler<HTMLTableRowElement>` | — |  |
+| `onClick` | `React.MouseEventHandler<HTMLTableRowElement>` | — |  |
 | `style` | `React.CSSProperties` | — |  |
+| `ref` | `React.Ref<HTMLTableRowElement>` | — | The rendered `<tr>`, e.g. for an IntersectionObserver. |
 | `id` | `string` | — |  |
 
 ### Example
@@ -37027,7 +37603,6 @@ import { TextField } from "@rebasepro/ui";
 | `inputClassName` | `string` | — |  |
 | `inputStyle` | `React.CSSProperties` | — |  |
 | `inputRef` | `((instance: any) => void) \| React.RefObject<any>` | — |  |
-| `maxRows` | `string \| number` | — | Maximum number of rows to display. |
 | `minRows` | `string \| number` | — | Minimum number of rows to display. |
 | `id` | `string` | — |  |
 | `children` | `React.ReactNode` | — |  |
@@ -37064,6 +37639,8 @@ import { ToggleButtonGroup } from "@rebasepro/ui";
 | `onValueChange` | `(value: string) => void` | yes | Callback when value changes |
 | `options` | `{ value: string; label: string; icon?: React.ReactNode; disabled?: boolean }[]` | yes | Options to display |
 | `className` | `string` | — |  |
+| `aria-label` | `string` | — | Names the group: what it chooses between, e.g. "View mode". |
+| `aria-labelledby` | `string` | — | The id of a visible label that names the group. |
 
 ### Example
 
@@ -37224,6 +37801,8 @@ import { VirtualTable } from "@rebasepro/ui";
 ```
 
 > This component takes no documented props, or its type could not be flattened. See the source.
+
+<span class="since-badge" data-since="0.25">Since 0.25</span> `data` may hold `undefined` at a position: a row that exists but has not been read yet. It is drawn, and its cells are rendered with no `rowData`, so a `cellRenderer` can show a placeholder. `onRowsRendered(range)` is called with the positions in `data` of the rows on screen (not the ones drawn ahead of them), end exclusive, each time they change — while the table is still scrolling to `initialScroll`, the rows there.
 
 ### Example
 
@@ -37394,7 +37973,7 @@ import { CardView } from "@rebasepro/ui";
 
 | Prop | Type | Required | Description |
 | --- | --- | --- | --- |
-| `data` | `T[]` | yes | Virtualized card grid. Generic over the row type T. |
+| `data` | `(T \| undefined)[]` | yes | Virtualized card grid. Generic over the row type T. <span class="since-badge" data-since="0.25">Since 0.25</span> Only the rows of cards on screen, and two either side, are mounted; each row is as tall as its tallest card, measured as it is drawn. A position holding `undefined` is an item that exists but has not been read yet: a placeholder card is drawn in its place, and `renderCard` is not called for it. |
 | `renderCard` | `(item: T, extra: { selected: boolean; highlighted: boolean; onSelectionChange: (selected: boolean) => void; onClick: (e: React.MouseEvent) => void }) => React.ReactNode` | yes |  |
 | `dataLoading` | `boolean` | — |  |
 | `noMoreToLoad` | `boolean` | — |  |
@@ -37411,6 +37990,7 @@ import { CardView } from "@rebasepro/ui";
 | `initialScroll` | `number` | — |  |
 | `size` | `"xs" \| "s" \| "m" \| "l" \| "xl"` | — |  |
 | `emptyComponent` | `React.ReactNode` | — |  |
+| `onRowsRendered` | `(range: { start: number; end: number }) => void` | — | <span class="since-badge" data-since="0.25">Since 0.25</span> Called with the positions in `data` of the cards on screen (the rows of cards on screen, not the ones drawn ahead of them), end exclusive, each time they change. While the grid is still scrolling to `initialScroll`, the cards there. The collection views use it to keep only the rows near the screen current under realtime. |
 
 ### Example
 
@@ -37776,7 +38356,7 @@ import { ListView } from "@rebasepro/ui";
 
 | Prop | Type | Required | Description |
 | --- | --- | --- | --- |
-| `data` | `T[]` | yes | Virtualized list. Generic over the row type T. |
+| `data` | `(T \| undefined)[]` | yes | Virtualized list. Generic over the row type T. <span class="since-badge" data-since="0.25">Since 0.25</span> A position holding `undefined` is a row that exists but has not been read yet: a placeholder row is drawn in its place, and `renderRow` is not called for it. |
 | `renderRow` | `(params: { item: T; index: number; style: React.CSSProperties; className: string; selected: boolean; highlighted: boolean; isLast: boolean; onClick: (e: React.MouseEvent) => void; onSelectionChange: (selected: boolean) => void }) => React.ReactNode` | yes |  |
 | `dataLoading` | `boolean` | — |  |
 | `noMoreToLoad` | `boolean` | — |  |
@@ -37793,6 +38373,7 @@ import { ListView } from "@rebasepro/ui";
 | `onSelectionChange` | `(item: T, selected: boolean) => void` | — |  |
 | `size` | `"xs" \| "s" \| "m" \| "l" \| "xl"` | — |  |
 | `emptyComponent` | `React.ReactNode` | — |  |
+| `onRowsRendered` | `(range: { start: number; end: number }) => void` | — | <span class="since-badge" data-since="0.25">Since 0.25</span> Called with the positions in `data` of the rows on screen (not the ones drawn ahead of them), end exclusive, each time they change. While the list is still scrolling to `initialScroll`, the rows there. The collection views use it to keep only the rows near the screen current under realtime. |
 
 ### Example
 
@@ -38450,7 +39031,7 @@ When `Database` is supplied, `createRebaseClient` returns a `CreateRebaseClientR
 
 A property key *you* wrote is your key, whatever its shape — nothing renames a name you chose. The two keys that are derived rather than declared, a relation's foreign key and a column read back by introspection, are camelCase.
 
-`Row` describes a read, `Insert` a `create()` and `Update` an `update()` — they are not the same shape. A column that is not required is `T | null` on all three, so a write can clear it; the primary key is always present on a read and never settable on an update; a `belongsTo` target can be written either as the relation (`{ author: 5 }`) or as its foreign key (`{ authorId: 5 }`); and a `hasMany` or `manyToMany` membership is written as a list of target ids or `{ id }` objects (`{ tags: ["t-1"] }`), each carrying a `_pivot` when the junction declares payload columns. A field nobody may write (`access: { write: [] }`) is on neither `Insert` nor `Update`.
+`Row` describes a read, `Insert` a `create()` and `Update` an `update()` — they are not the same shape. A column that is not required is `T | null` on all three, so a write can clear it; the primary key is always present on a read and never settable on an update; a `belongsTo` target can be written either as the relation (`{ author: 5 }`) or as its foreign key (`{ authorId: 5 }`); and a `hasMany` or `manyToMany` membership is written as a list of target ids or `{ id }` objects (`{ tags: ["t-1"] }`), each carrying a `_pivot` when the junction declares payload columns. A field nobody may write (`access: { write: [] }`) is on neither `Insert` nor `Update`. A `date` column reads as an ISO string, and a write takes either that string or a `Date`.
 
 ### Quick Example
 
@@ -38577,6 +39158,9 @@ const maybe = await client.data.products.findById(42);
 // Row | undefined
 ```
 
+`findById` takes the relations to load, as `find` does:
+`findById(1, { include: ["tags"] })`.
+
 :::note
 Row-level security makes "no such row" and "not yours to read" the same answer,
 deliberately: a 404 that distinguished them would confirm the row exists.
@@ -38660,6 +39244,11 @@ const { data } = await client.data.products
 The alias column is the **wire** spelling, used in REST query strings. It never
 appears in application code: the SDK and the admin panel both speak the
 canonical operator on the left.
+
+The four pattern operators match text. An `enum` field is matched by its value,
+so `{ status: ["like", "draft%"] }` works on a status stored as a Postgres enum.
+On a number, a date or any other field that is not text they are refused with a
+400 `INVALID_FILTER_OPERATOR`.
 
 #### Where Clause Syntaxes
 
@@ -39207,7 +39796,7 @@ const rows = await client.data.orders
     .findAll();
 ```
 
-Three options shape the walk:
+Four options shape the walk:
 
 | Option | Default | What it does |
 |--------|---------|--------------|
@@ -39716,7 +40305,9 @@ A Postgres collection can opt in to real full-text search by declaring a
 ### Vector Search
 
 For collections with a `vector` property, order rows by similarity to a query
-embedding. Rows come back closest-first, each carrying a `_distance`.
+embedding. Rows come back closest-first, each carrying a `_distance`. The
+distance is the order: an `orderBy` on the same query is ignored. Without a
+`limit` a vector search returns 10 rows, not a listing's 50.
 
 ```typescript
 const { data } = await client.data.docs
@@ -40057,14 +40648,22 @@ hand-written row type has no relations in it to check against, and the server's
 
 #### Relation Names
 
-The relation names you pass to `include()` must match the `relationName` defined in the collection's `relations` array:
+The names you pass to `include()` are the keys of the collection's relation properties:
 
 ```typescript
 // Collection definition
-relations: [
-    { relationName: "author", target: () => usersCollection, ... },
-    { relationName: "categories", target: () => categoriesCollection, ... }
-]
+properties: {
+    author: {
+        type: "relation",
+        name: "Author",
+        relation: { kind: "belongsTo", target: () => usersCollection }
+    },
+    categories: {
+        type: "relation",
+        name: "Categories",
+        relation: { kind: "manyToMany", target: () => categoriesCollection }
+    }
+}
 
 // SDK usage — names must match
 client.data.articles.include("author", "categories").find()
@@ -40394,7 +40993,8 @@ const profile = await client.auth.findUserByEmail("user@example.com");
 ```
 
 Three non-sensitive fields and nothing else — enough to show "you are inviting
-Jane" before an invitation is sent.
+Jane" before an invitation is sent. Opt-in: a signed-in caller only, and a 404
+unless the backend sets `AUTH_ALLOW_USER_LOOKUP=true` (`auth.allowUserLookup`).
 
 ### Multi-Factor Authentication
 
@@ -40603,11 +41203,11 @@ on the generated template gets it for free. Data requests need not wait: one mad
 mid-restore is sent once it settles — as the restored user, or anonymously — so a
 first render never reads a public listing in place of the user's own.
 
-A successful restore also reaches `onAuthStateChange` as `TOKEN_REFRESHED` — it
-*is* a refresh — but a listener alone cannot tell you that the restore finished:
-a boot with no session emits nothing at all, which is indistinguishable from one
-still in progress. Await `isInitialized()` for that question and use the
-listener for changes after it.
+A restore that refreshes (an expired stored token, or cookie mode) reaches
+`onAuthStateChange` as `TOKEN_REFRESHED`; a still-valid stored token is adopted
+silently. So a listener cannot tell you the restore finished: a boot that emits
+nothing is indistinguishable from one still in progress. Await `isInitialized()`
+for that question and use the listener for changes after it.
 
 ### Auth State Listener
 
@@ -40751,10 +41351,9 @@ const config = await client.auth.getAuthConfig();
 //   sessionManagement: boolean,
 //   profileUpdate: boolean,
 //   emailVerification: boolean,
-//   magicLink: boolean,
-//   anonymousLogin: boolean,
-//   enabledProviders: string[],
-//   needsSetup: boolean
+//   magicLink: boolean, emailOtp?: boolean,
+//   anonymousLogin: boolean, enabledProviders: string[],
+//   externalLoginUrl?: string, needsSetup?: boolean, storage?: boolean
 // }
 ```
 
@@ -40947,12 +41546,23 @@ const unsubscribe = client.data
 listenById(
     id: string | number,
     onUpdate: (row: M | undefined) => void,
-    onError?: (error: Error) => void
+    onError?: (error: Error) => void,
+    options?: { include?: IncludeSpec }
 ): () => void   // returns unsubscribe function
 ```
 
 The callback receives a flat row — not an `Entity`, so there is no `.values` —
 and `undefined` when the record is deleted.
+
+Each frame carries the relations `options.include` names, loaded as `find({ include })`
+loads them into each row of a list. A to-many relation not named there is absent
+from the row, not empty:
+
+```typescript
+client.data.posts.listenById(1, (post) => {
+    console.log(post?.tags); // the post's tags, on every update
+}, undefined, { include: ["tags"] });
+```
 
 ### Fluent Query Builder
 
@@ -41291,7 +41901,7 @@ try {
 While the connection is known to be down, a write is not even attempted — it applies locally and queues, so it costs nothing instead of a timeout:
 
 ```typescript
-// Returns immediately, offline or not.
+// While offline, returns at once with the locally applied row.
 const post = await client.data.posts.create({ title: "Draft", status: "draft" });
 
 // Shows up in every matching list, right away.
@@ -41300,7 +41910,7 @@ const drafts = await client.data.posts.where("status", "==", "draft").find();
 
 Rows created offline get a client-generated id, in the type the collection's ids already have: a **negative integer** where they are numbers, a UUID string where they are strings. The sign is the tell — a real key is never negative — so a row that has not reached the server yet is recognisable without a lookup, and `id` still typechecks as whatever the generated `Row` says it is. On a collection this device has never read there is nothing local to read the type off, and the id is a UUID.
 
-If the server assigns its own on replay, the local row and any queued writes still pointing at the temporary id are moved to the real one. Until then, do not persist a temporary id anywhere outside the offline database — a foreign key or a bookmarked URL holding one points at a row that is about to be renumbered.
+If the server assigns its own on replay, the local row and any queued writes still pointing at the temporary id are moved to the real one, in every collection: a post queued with `author_id` set to an author created offline is sent with the id the server gave the author. If the server refuses the author instead, writes that reference it are discarded with it and reported as `DEPENDENCY_REJECTED` (see [When the server says no](#when-the-server-says-no)). Until then, do not persist a temporary id anywhere outside the offline database — a foreign key or a bookmarked URL holding one points at a row that is about to be renumbered.
 
 Writes replay in the order you made them, across collections — so a create in one collection still lands before the row in another that references it.
 
@@ -41353,7 +41963,7 @@ const { online, pending, syncing, lastSyncedAt, lastError } = client.offline!.st
 
 | Method | Purpose |
 |--------|---------|
-| `status()` | Current connectivity, queue depth, sync activity, last error |
+| `status()` | Current connectivity, queue depth, sync activity, last error, and `persisted`: whether the browser agreed to keep the offline database (asked when the first write is queued; `false` means it may be evicted under storage pressure, unsent writes included) |
 | `onStatusChange(fn)` | Subscribe to the above |
 | `onQueueChange(fn)` | Just the number of unsent writes, for a badge |
 | `pending()` | The queued mutations themselves, oldest first. `pending({ orphaned: true })`: the ones queued while signed out — see [Users](#users) |
@@ -41377,7 +41987,9 @@ const client = createRebaseClient({
 });
 ```
 
-The cascade is narrow: an `update` is discarded along with the write it edited, because it can only fail the same way. A later `create` or `delete` for the same row stands on its own and is kept. A discarded write was never sent. It is reported with a `RebaseApiError` whose `code` is `DEPENDENCY_REJECTED` and whose `cause` is the refusal that doomed it, so you can tell it from the write the server actually refused. On 0.23 it carries the refused write's own error instead.
+A row someone else deleted is the one case that is not rolled back. A queued `delete` of it did what it was for, so it counts as synced and is not reported. A queued edit of it is reported, and the row is removed from the local database instead of being restored, because the server no longer has it.
+
+The cascade is narrow: an `update` is discarded along with the write it edited, because it can only fail the same way. A later `create` or `delete` for the same row stands on its own and is kept. A refused `create` of a row created offline also takes with it every queued write, in any collection, whose values reference the row's temporary id. A discarded write was never sent. It is reported with a `RebaseApiError` whose `code` is `DEPENDENCY_REJECTED` and whose `cause` is the refusal that doomed it, so you can tell it from the write the server actually refused. On 0.23 it carries the refused write's own error instead.
 
 Consecutive edits to one row while offline are merged into a single queued write, so a form being typed into does not grow the queue. If the server refuses the merged write over its contents (a 400, 403 or 422 — say, a field removed by a schema change while the user was offline), the engine splits it back into the separate edits and replays each one. Only the edit the server refuses is rolled back and reported; the others are kept.
 
@@ -41386,6 +41998,8 @@ A failure that is merely temporary — a 429, a 503, a dropped connection — is
 ### Multiple tabs
 
 Tabs of the same app share one IndexedDB database, so they share the local rows and the outbox. A write in one appears in the others, and only one tab at a time replays the queue. Nothing to configure.
+
+That last guarantee comes from the browser's [Web Locks API](https://developer.mozilla.org/en-US/docs/Web/API/Web_Locks_API), which exists only in a secure context (HTTPS, or `localhost`) and not in Safari before 15.4 or in some embedded webviews. Without it, every open tab replays the queue when it syncs. Creates, bulk writes, updates and deletes all replay under an idempotency key, so a server that stores keys applies each of them once; what you can see is the same write sent from two tabs.
 
 ### Users
 
@@ -41455,8 +42069,11 @@ The only contract beyond the obvious is that prefix listings come back in lexico
 The client is not a replica of your database, and it does not pretend to be:
 
 - **Only rows the app has read or written are local.** A query the client has never sent can still be answered from what it holds, but the answer may be missing rows the server would have returned. Live results say so via `partial`.
+- **`findAll()` and `iterate()` read only pages the server answered on this device.** A walk goes on for as long as each page says there is more, and only the server can say that. Offline, a walk that needs a page this device never fetched fails with the `OFFLINE` error (`isOfflineError`) instead of returning part of the collection as if it were all of it. On 0.24 it stopped at that page and returned what it had.
+- **`count()` offline needs a count the server gave this device for the same query.** Writes queued since then move it: creates, edits that take a row into or out of the filter, and deletes. Without one it fails with the `OFFLINE` error rather than counting the rows this device happens to hold. On 0.24 it returned that number.
 - **`searchString` is approximated** as a case-insensitive substring scan over cached string fields. The server runs real full-text search over the collection's configured columns.
 - **`include`d relations cannot be evaluated locally** — the related rows live in collections the query never loaded. Such a query is always marked `partial` when answered from the cache.
+- **Conflicts are last-writer-wins, per field, with no detection.** A replayed `update` sends the fields the user changed and nothing else, so fields they did not touch keep whatever the server has. For a field they *did* change, a change someone else made on the server while they were offline is overwritten when the queue replays, and neither user is told. Nothing compares versions on replay.
 - **Replay is at-least-once.** A write that reaches the server but whose response is lost may be sent again. Prefer idempotent writes (`createMany` with `upsert`) where duplicates would matter.
 - **An upsert on a natural key needs the server.** Which row an `onConflict` target names is the server's to find, so `upsert()` on a natural key (or without the row's id), and a `createMany()` with `onConflict` that was never sent, are refused while offline with `OFFLINE_UPSERT_UNSUPPORTED`. An upsert on the primary key, with the key in each row, is queued.
 - **Local reads apply Postgres semantics, not the database's data.** Filters are evaluated the way SQL would — comparisons against `NULL` are unknown, `ORDER BY` puts nulls last ascending and breaks the remaining ties on the row id descending, exactly as the server does — but against the client's copy of the rows, which may be stale.
@@ -42114,12 +42731,18 @@ https://api.example.com/, which is not local. Set REBASE_MCP_ALLOW_REMOTE_WRITES
 to allow destructive tools against remote environments.
 ```
 
-**If no connection string can be resolved at all, the DB tools are refused** —
-an unverifiable target is not a safe one:
+**If no connection string can be resolved at all, the gated DB tools are refused.**
+With no `DATABASE_URL`, the CLI uses the managed development database, which is
+the default for a new project, and the CLI refuses `db push`, `db migrate` and
+`db branch` there itself. The refusal says so and names what works instead. It
+does not suggest the opt-out:
 
 ```text
-Error: Refusing to run "rebase_db_push": no DATABASE_URL could be resolved for
-project "default", so the database it would connect to cannot be verified as local.
+Error: Refusing to run "rebase_db_push": project "default" sets no DATABASE_URL, so the
+CLI would use the managed development database (PGlite, started by `rebase dev`). You
+most likely do not need this tool: the dev server applies the collections to that
+database at boot, additively. After changing a collection, restart it with
+rebase_dev_stop and rebase_dev_start. …
 ```
 
 Only loopback counts as local: `localhost`, `*.localhost`, `127.0.0.0/8`, `::1`.
@@ -42546,18 +43169,25 @@ Commit them. They are part of the repo the same way a lint config is: every
 contributor's assistant then works from the same understanding of the codebase,
 including contributors who never ran the command.
 
-**Re-run the command to update.** Files are overwritten unconditionally, so
-after a Rebase upgrade:
+**Re-run the command to update** after a Rebase upgrade:
 
 ```bash
 rebase skills install --agent all
 ```
 
-Two consequences of "unconditionally": local edits to an installed skill are
-lost on the next run — keep project-specific guidance in
-[`ai-instructions.md`](/docs/ai/instruction-files) instead, which is yours and is
-never overwritten. And skills removed in a newer release are not deleted from
-your repo; only files that still exist get rewritten.
+Each target directory holds a `.rebase-skills.json` manifest of what the
+command wrote, so a re-run can tell an edit from an older release's copy. Commit
+it with the skills.
+
+- A file nobody edited is replaced with the new release's copy.
+- A file you edited is kept, and the command lists it. `--force` replaces it.
+- A skill a newer release no longer ships is removed, unless you edited it.
+  Then it is kept and listed.
+- Files the command never wrote are not touched.
+
+Project-specific guidance still belongs in
+[`ai-instructions.md`](/docs/ai/instruction-files), which is yours. An edited
+skill stops receiving updates until you `--force` it.
 
 The command also works outside a Rebase project, falling back to the working
 directory — useful for a separate frontend repo that talks to a Rebase backend.
@@ -43458,7 +44088,30 @@ rebase db push
   schema change and before any step that can fail, so a push that stops part-way leaves a new table
   denying every request rather than open to it
 - Applies your collections' RLS policies, and **removes policies an earlier push superseded**
+- <span class="since-badge" data-since="0.25">Since 0.25</span> Builds any
+  [foreign-key index Rebase derives](/docs/backend/indexes#foreign-keys-are-indexed-for-you)
+  that an existing table is missing **before** planning, with
+  `CREATE INDEX CONCURRENTLY`, so writes to the table go on during the build;
+  Atlas then finds it in place. `--dry-run` names these and builds nothing
+- <span class="since-badge" data-since="0.25">Since 0.25</span> Stamps the
+  policies it applies the way the server's boot does, so the first boot after a
+  push leaves them alone instead of re-creating every one
+- <span class="since-badge" data-since="0.25">Since 0.25</span> `--dry-run`
+  writes nothing of the project's: `src/schema.generated.ts` is left as it is,
+  and the `drizzle/*.sql` copies an older release committed are named, not
+  deleted. Only the plan's input goes to `.rebase/sql/`, which is not committed
 - Does **not** create migration files
+
+**How long it takes.** Almost all of a push is Atlas computing the plan: it
+builds your desired schema in a scratch database and diffs it against the real
+one, and that cost grows faster than the number of tables — on a quiet laptop
+about 0.25 s per plan at 11 tables, 0.9 s at 111 and 5.5 s at 411. A push that
+changes nothing plans once; one that changes something plans twice (the dry-run
+the destructive-change gate reads, then the apply). So a push on a schema of
+400 or more tables takes tens of seconds, and longer on a busy or slow machine.
+That time is Atlas's, not your database's: the steps around it — generating the
+SQL, the RLS lock, search, triggers, policies, the role — take a few seconds at
+that size, over one connection to your database.
 
 **The files it generates on the way**, all under `.rebase/sql/` in the backend
 directory. `db push` and `db generate` write all five from your collections on
@@ -43775,7 +44428,7 @@ your application's own role is the closest thing to asking the database what you
 | --- | --- |
 | `0` | No findings at or above the `--fail-on` threshold |
 | `1` | At least one finding at or above the threshold |
-| `2` | The scan could not run — bad arguments, connection refused, auth failure, timeout |
+| `2` | The scan could not run — bad arguments, connection refused, auth failure, timeout — or was incomplete: a catalogue read failed or a check crashed (`diagnostics.degraded`). This holds even with `--fail-on none` |
 
 `1` and `2` are deliberately distinct: a broken connection must never look like a clean
 database.
@@ -43956,8 +44609,9 @@ outage. See [rls-enabled-no-policies](#rls-enabled-no-policies).
 
 **Policy grants unconditional access.** Critical.
 
-A permissive policy whose `USING` or `WITH CHECK` expression is a constant truth — `true`,
-`(true)`, `1 = 1`. Permissive policies are ORed together, so a single one of these satisfies
+A permissive policy whose `USING` or `WITH CHECK` expression is a constant truth: `true`,
+`(true)`, `1 = 1`, `1 > 0`, `NOT false`, `true OR <anything>`, or a constant compared with
+itself through a cast. Permissive policies are ORed together, so a single one of these satisfies
 the table's row filter no matter how strict every other policy is.
 
 Like every check, it reports the policy only when a role it applies to can reach the table:
@@ -44004,6 +44658,10 @@ The severity is platform-dependent, and this distinction matters:
   sentinel, the expression is *true for signed-out callers too*. Reported as **critical**.
 - **On an unrecognised platform**, reported as **medium**, since whether it is a hole
   depends on whether your stack uses such a sentinel.
+
+A database counts as Rebase when it has the `rebase` schema. The `rebase_user` role
+does not decide it, because roles belong to the whole server, and a server that hosts a
+Rebase app may hold other databases.
 
 ```sql
 -- Scope to the row's owner rather than to the existence of an id
@@ -44321,7 +44979,7 @@ Like drivers, storage backends are registered in a registry. You can have multip
 | `@rebasepro/forms` | Lightweight React form state management | Frontend |
 | `@rebasepro/plugin-ai` | AI-powered field autocompletion plugin | Frontend |
 | `@rebasepro/plugin-data-import-export` | CSV/JSON/Excel import and export | Frontend |
-| `@rebasepro/inference` | Auto-detect schema from existing database data | Backend/CLI |
+| `@rebasepro/inference` | Infer collection properties from sample rows (the admin's "create a collection from a file" import) | Frontend |
 
 ### Data Flow
 
@@ -46244,9 +46902,9 @@ REBASE_ROLE=all        # the default: everything, one process
 | | `all` | `api` | `functions` | `worker` |
 | --- | :---: | :---: | :---: | :---: |
 | `/api/auth`, `/api/data`, `/api/storage`, `/api/meta` | ✅ | ✅ | — | — |
-| `/api/admin`, `/api/logs`, the schema editor | ✅ | ✅ | — | — |
+| `/api/admin` (logs and the schema editor among it) | ✅ | ✅ | — | — |
 | `/api/functions/*` | ✅ | forwards (see below) | ✅ | — |
-| `/api/cron` (the admin surface) | ✅ | ✅ | — | — |
+| `/api/admin/cron` (the admin surface) | ✅ | ✅ | — | — |
 | `/health`, `/livez`, `/metrics` | ✅ | ✅ | ✅ | ✅ |
 | Serves websockets, consumes change events | ✅ | ✅ | — | — |
 | Creates the schema at boot | ✅ | ✅ | — | — |
@@ -46260,10 +46918,14 @@ Realtime is on the list because it costs something whether or not anyone uses
 it: a process that consumes change events holds a `LISTEN` connection outside
 the pool for as long as it runs, and installs the capture triggers at boot. Only
 a process serving websockets has anyone to deliver to, so the two roles that
-serve none do neither. **Writes made by those processes are still heard** — the
-capture is database triggers, so a change is published by the database rather
-than by whichever process made it. A function that writes a row still wakes up
-every subscriber on the `api`.
+serve none do neither. **Writes made by those processes are still heard.** With
+change capture on, the capture is database triggers, so a change is published by
+the database rather than by whichever process made it. With capture off
+(`REALTIME_CDC=off`, or `auto` falling back because the database role cannot
+create triggers), a `worker` or `functions` process announces each of its own
+writes on the cross-instance channel instead, without holding a `LISTEN`
+connection. Either way, a function that writes a row still wakes up every
+subscriber on the `api`.
 
 ### Docker Compose
 
@@ -46397,8 +47059,9 @@ A `functions` process never runs either. It is scaled by request load and
 replaced at will, and giving it scheduled work would make its replica count mean
 something it should not.
 
-Note that `rebase.jobs.enqueue` keeps working everywhere, including on a process
-that runs no workers — enqueueing is a write, running is a poll loop, and only
+Note that enqueueing — `jobQueue.enqueue`, a declared queue's `enqueue`, a
+topic's `publish` — keeps working everywhere, including on a process that runs
+no workers — enqueueing is a write, running is a poll loop, and only
 the second is what a role turns off.
 
 ### What splitting does not give you
@@ -48456,10 +49119,12 @@ receiver that is down for a day costs rows, not memory. Turn the queue on with
 returned:
 
 ```typescript
-import { WebhookDispatcher, WEBHOOK_DELIVERY_TASK, type RebaseBackendInstance } from "@rebasepro/server";
-
-/** What a queued delivery carries: the webhook's id, never its secret. */
-type QueuedDelivery = Parameters<WebhookDispatcher["deliverQueuedJob"]>[0];
+import {
+    WebhookDispatcher,
+    WEBHOOK_DELIVERY_TASK,
+    type QueuedWebhookDelivery,
+    type RebaseBackendInstance
+} from "@rebasepro/server";
 
 // Call once, with what `initializeRebaseBackend({ …, jobs: { enabled: true } })` returned.
 export function sendOrderWebhooks(backend: RebaseBackendInstance): void {
@@ -48487,8 +49152,9 @@ export function sendOrderWebhooks(backend: RebaseBackendInstance): void {
         }
     ]);
 
-    // The worker side: one attempt per job, and the queue's retries.
-    backend.jobQueue?.register<QueuedDelivery>(WEBHOOK_DELIVERY_TASK, (ctx) => dispatcher.deliverQueuedJob(ctx.payload));
+    // The worker side: one attempt per job, and the queue's retries. Passing
+    // `ctx` lets each attempt send its real `X-Webhook-Attempt`.
+    backend.jobQueue?.register<QueuedWebhookDelivery>(WEBHOOK_DELIVERY_TASK, (ctx) => dispatcher.deliverQueuedJob(ctx.payload, ctx));
 
     backend.setCollectionCallbacks("orders", {
         afterSave: async ({ values, id, status }) => {
@@ -48514,45 +49180,42 @@ deliveries are queued in memory, in the process that made the change. That is si
 enough for a notification you can afford to lose:
 
 ```typescript
-import type { PostgresCollectionConfig } from "@rebasepro/types";
-import { WebhookDispatcher } from "@rebasepro/server";
+import { WebhookDispatcher, type RebaseBackendInstance } from "@rebasepro/server";
 
-// The row shape, so `values.customer_name` is a string rather than nothing.
-type Order = { customer_name: string; total: number };
-
-const dispatcher = new WebhookDispatcher({
-    onDelivery: (result) => {
-        if (!result.success) {
-            console.error(`Webhook ${result.webhookId} failed: ${result.statusCode} ${result.responseBody}`);
+// Server-only, like the version above: call it with what `initializeRebaseBackend` returned.
+export function sendOrderWebhooks(backend: RebaseBackendInstance): void {
+    const dispatcher = new WebhookDispatcher({
+        onDelivery: (result) => {
+            if (!result.success) {
+                console.error(`Webhook ${result.webhookId} failed: ${result.statusCode} ${result.responseBody}`);
+            }
         }
-    }
-});
+    });
 
-dispatcher.setWebhooks([
-    {
-        id: "wh_orders_slack",
-        url: process.env.SLACK_WEBHOOK_URL!,
-        secret: process.env.WEBHOOK_SECRET,
-        events: ["INSERT"],
-        table: "orders",
-        enabled: true
-    }
-]);
+    dispatcher.setWebhooks([
+        {
+            id: "wh_orders_slack",
+            url: process.env.SLACK_WEBHOOK_URL!,
+            secret: process.env.WEBHOOK_SECRET,
+            events: ["INSERT"],
+            table: "orders",
+            enabled: true
+        }
+    ]);
 
-const ordersCollection: PostgresCollectionConfig<Order> = {
-    slug: "orders",
-    name: "Orders",
-    table: "orders",
-    callbacks: {
+    backend.setCollectionCallbacks("orders", {
         afterSave: async ({ values, id, status }) => {
             if (status === "new") {
                 dispatcher.enqueueEntityChange("orders", "INSERT", String(id), values);
             }
         }
-    },
-    properties: { /* ... */ }
-};
+    });
+}
 ```
+
+Keep the dispatcher out of the collection file itself. A collection file is also bundled into the
+admin, in the browser: the build strips its callbacks, but a dispatcher built at the top of the file
+and its `@rebasepro/server` import would ship to every visitor, and fail the admin build.
 
 A crash or a deploy between the commit and the delivery drops the event. Each webhook has its own
 queue, so a receiver that is down delays only its own deliveries, never another webhook's.
@@ -48562,6 +49225,32 @@ with `success: false`, `statusCode: 0`, `attemptNumber: 0` and `responseBody: "q
 the server log says so once. Call `await dispatcher.flush(10_000)` on shutdown: it waits for what
 is queued and resolves `false` if the budget runs out first, because a receiver that is down can
 hold each of its deliveries for up to ~36 seconds of retries.
+
+#### What the receiver gets
+
+Every delivery is a `POST` with a JSON body and these headers:
+
+| Header | Value |
+| --- | --- |
+| `X-Webhook-Id` | The webhook's `id` |
+| `X-Webhook-Event` | `INSERT`, `UPDATE` or `DELETE` |
+| `X-Webhook-Delivery` | One id per delivery, the same on every attempt at it |
+| `X-Webhook-Attempt` | Which attempt this is, from `1` |
+| `X-Webhook-Signature` | `sha256=` and the hex HMAC-SHA256 of the raw body, keyed with the webhook's `secret` (only when it has one) |
+
+Deliveries are at-least-once: a receiver that answered too slowly, or a worker that died after the
+`POST`, means the same delivery arrives again. Deduplicate on `X-Webhook-Delivery`, and check the
+signature over the body exactly as it arrived — before parsing it:
+
+```typescript
+import { createHmac, timingSafeEqual } from "node:crypto";
+
+export function isSignedByRebase(rawBody: string, header: string | null, secret: string): boolean {
+    const expected = Buffer.from(`sha256=${createHmac("sha256", secret).update(rawBody).digest("hex")}`);
+    const received = Buffer.from(header ?? "");
+    return received.length === expected.length && timingSafeEqual(received, expected);
+}
+```
 
 #### Calling an endpoint directly
 

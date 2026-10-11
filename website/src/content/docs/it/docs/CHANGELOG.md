@@ -22,6 +22,22 @@ La traduzione è in arrivo. Il contenuto qui sotto è in inglese.
   Write that filter as `?where={"count":["==",5]}`. The SDK already sends it
   that way.
 
+- **A plain `OPTIONS` to a route with no `OPTIONS` handler is now a 404, not an
+  empty 204.** The CORS middleware answered every `OPTIONS` itself; it now
+  answers only CORS preflights, and any other `OPTIONS` reaches its route.
+  `OPTIONS /api/storage/tus` answers with the TUS capabilities (`Tus-Version`,
+  `Tus-Extension`, `Tus-Max-Size`), as documented. A client or health check
+  that probed a route with `OPTIONS` and read the 204 as "exists" must use the
+  route's real method.
+
+- **A collection set whose tables collide after Postgres's 63-byte name
+  truncation is refused at boot, with the reason.** A table, junction table or
+  enum type whose truncated names are equal used to fail at `db push` with
+  "already exists". Two properties that resolve to the same column (`myTitle`
+  and `my_title`) and a relation `target` written as a string
+  (`target: "authors"`) are refused at config time too, each saying what to
+  write. Rename one of the colliding names.
+
 #### MCP
 
 - **The remote MCP's `list_collections` reply carries its listing once, in the
@@ -36,6 +52,31 @@ La traduzione è in arrivo. Il contenuto qui sotto è in inglese.
   English it exported, and that kept the Spanish strings in every bundle built
   from the package. `en` is still exported. To change the admin's strings,
   pass overrides through `<Rebase translations={…}>`.
+
+- **`ClientStorageSourceRegistry.getOrDefault(key)` throws for a key that is
+  not registered.** It used to return the default source, so a property naming
+  a source the panel had not loaded yet uploaded to the default bucket. Call
+  `get(key)` where a missing source is expected.
+
+#### Client SDK
+
+- **`client.cron` calls `/api/admin/cron` by default, not the deprecated
+  `/api/cron` alias.** A server that serves only the old path (or a proxy that
+  forwards only it) now answers 404 to the SDK's cron calls. Pass
+  `cron.cronPath` to point the client elsewhere.
+
+- **Offline, `findAll()` and `iterate()` fail with `OFFLINE` on a page this
+  device never fetched, and `count()` with no count cached from the server
+  fails with `OFFLINE`.** They used to return part of the collection as if it
+  were all of it, and a count of the cached rows. Catch `OFFLINE` where the
+  app showed those partial results.
+
+#### UI kit & plugins
+
+- **`TextField` no longer declares `maxRows`, and `MultiSelect` no longer
+  declares `onChange`, `name`, `position`, `endAdornment`, `multiple` or
+  `padding`.** None was ever read, so passing one was a silent no-op and is now
+  a type error. Delete the prop.
 
 ### Added
 
@@ -71,6 +112,53 @@ La traduzione è in arrivo. Il contenuto qui sotto è in inglese.
   `If-Match` checks into the write's own transaction, on a driver that
   declares `checksRowPreconditions`. All three are optional: a driver without
   them keeps the separate reads it had. Both Postgres drivers implement them.
+
+- **`jobs.timeoutMs` bounds one job attempt, and every job, queue and topic
+  handler gets a `signal` aborted at that deadline.** A handler that hangs on a
+  `fetch` can pass the signal on and stop with the attempt.
+
+- **`getSignal(c)` in `@rebasepro/server/functions` is aborted when a custom
+  function's request times out (504).** Pass it to `fetch` so the work stops
+  with the request instead of running on.
+
+#### Client SDK
+
+- **`findById(id, { include })` and `listenById(id, onUpdate, onError,
+  { include })` load relations into the row.** A row subscription carries its
+  `include` to the server, which reads it on every frame, so a live record
+  keeps its relations.
+
+- **`@rebasepro/client` exports the types its calls are written in:
+  `WriteOptions`, `WhereFilterOp`, `WhereFor`, `LogicalCondition`,
+  `AggregateParams`, `AggregateResult`, `IncludeSpec`, `RowOf`/`InsertOf`/
+  `UpdateOf`, `StorageSource` and others.** A helper that wraps `find()` or
+  `update()` no longer has to rebuild them from `Parameters<…>`.
+
+- **`client.offline.status().persisted` says whether the browser agreed to keep
+  the offline database.** It is asked with `navigator.storage.persist()` when
+  the first write is queued. Queued writes are also stamped with a layout
+  version: a write saved by a newer SDK is kept, not replayed by an older one.
+
+#### UI kit & plugins
+
+- **`VirtualTable`, `ListView` and `CardView` accept `undefined` entries in
+  `data` (a row not read yet, drawn as a placeholder) and an
+  `onRowsRendered(range)` callback; `EntityTableController` has `sparseData`
+  and `onRowsRendered`.** A table can hold a sparse window of a large
+  collection (see Changed).
+
+- **The kit has a `HeartIcon`, and gains the accessibility props `Alert`
+  `role`, `Avatar` `onClick`, `ResizablePanels` `dividerAriaLabel` and
+  `ToggleButtonGroup` `aria-label` / `aria-labelledby`.** `DateTimeField`'s
+  `locale` is now applied, as the input's `lang`.
+
+#### CI & tooling
+
+- **Three new gates: `pnpm check:test-types`, `pnpm check:casts` and
+  `pnpm check:test-resolution`.** Type errors in tests are counted per package
+  and may not grow; the count of `as any`, `as never` and `as unknown as` in
+  package source may not grow; and every test runner must import workspace
+  packages from source, not `dist`.
 
 ### Changed
 
@@ -157,6 +245,11 @@ La traduzione è in arrivo. Il contenuto qui sotto è in inglese.
 - **The in-memory rate limiter's cost no longer grows with the limit.** A hit
   near a limit of 100,000 took about 1 ms and takes 0.1 µs; at 1,000, 11 µs →
   0.2 µs. It makes the same decisions.
+
+- **An unknown relation in `include` is a 400 `UNKNOWN_RELATION` even when no
+  row matched.** A typo against an empty table, under a filter that matched
+  nothing, on a read of a missing row, or nested below a relation that loaded
+  nothing answered 200, and became a 400 the first time a row matched.
 
 #### Postgres
 
@@ -359,6 +452,24 @@ La traduzione è in arrivo. Il contenuto qui sotto è in inglese.
   with three user fields made three list requests on open; it makes none until
   a picker opens.
 
+- **A collection scrolled deep re-reads only the rows near the screen on a
+  realtime update, and coming back to it shows the rows that were on screen at
+  once.** With 10,000 rows held, a write cost 10 reads of 9,950 rows before and
+  costs 1 read of 120 rows. The scroll cache no longer keeps every row ever
+  shown; the rows above load when scrolled to.
+
+- **The cards view mounts only the rows of cards on screen, and a CSV export
+  is written a page at a time.** With 2,000 loaded cards the view held 42,000
+  DOM nodes and holds about 300. Exporting 100,000 rows × 20 columns held about
+  196 MB and holds about 51 MB; the file is unchanged.
+
+- **`buildEntityPropertiesFromData` no longer drops keys starting with `_`**,
+  so a collection created from a Mongo export keeps `_id`. Pass
+  `{ ignoreKey: k => k.startsWith("_") }` to keep the old behaviour.
+
+- **`CollectionViewHeaderAction` and `PropertyAddColumnComponent` are removed.**
+  They were not exported and mounted nowhere.
+
 #### UI kit & plugins
 
 - **Importing one component from `@rebasepro/ui` bundles that component, not
@@ -468,6 +579,12 @@ La traduzione è in arrivo. Il contenuto qui sotto è in inglese.
   requests after a device slept made 21 round trips, now 11. A custom
   `Transport` can take part through the optional `setTokenRefresher`.
 
+- **The typed object-form `where` checks each value against its column, as the
+  fluent `.where()` does, and `.fields()`, `.vectorSearch()`, `sum`/`avg` and
+  field operations (`$inc`, `$push`, …) accept only what the server
+  accepts.** For example `["array-contains", ["a"]]` on a `string[]` column is
+  now a compile error, where the server refused it at run time.
+
 #### Storage & email
 
 - **Storage files are streamed instead of read whole, and a Range request
@@ -563,6 +680,13 @@ La traduzione è in arrivo. Il contenuto qui sotto è in inglese.
   checks that `{ cls }`, `{ Button }` and `{ Typography }` each bundle under
   60 kB.
 
+- **`pnpm check:hooks` counts an `exhaustive-deps` disable that has no
+  ` -- reason`; `pnpm check:gates-doc` checks the "Tests" rows against the
+  workflow and every package test script against a register in
+  `docs/gates.md`; `pnpm rls:check --strict-baseline` fails on a stale
+  baseline entry, and CI passes it.** The admin e2e job log lists every
+  Playwright test, flaky ones included.
+
 #### Auth
 
 - **`/auth/config` and sign-up learn whether any user exists without counting
@@ -603,6 +727,47 @@ La traduzione è in arrivo. Il contenuto qui sotto è in inglese.
   The tag is now compared after the row is locked, so the second write waits
   for the first and gets 412.
 
+- **`like`, `ilike`, `not-like` and `not-ilike` on a string `enum` field match
+  its labels.** They failed with a 500 on every door. On a number, a date or
+  another non-text field they are a 400 `INVALID_FILTER_OPERATOR` instead of a
+  database error. `citext` columns stay case-insensitive.
+
+- **A misspelled operator inside `?or=`, `?and=` or `?not=` is a 400
+  `UNKNOWN_FILTER_OPERATOR`.** `?not=(title.contains.x)` was read as an
+  equality that matched nothing, so the request returned every row.
+
+- **An update that changes nothing writes no history entry, and
+  `changed_fields` no longer lists `id` on every update.** `beforeSave` and
+  `afterSave` receive `previousValues` with the row's key, like `values`.
+
+- **A webhook retry carries the same `X-Webhook-Delivery` as the first
+  attempt, so a receiver can deduplicate at-least-once deliveries.** Queued
+  deliveries send their real `X-Webhook-Attempt` when registered as
+  `ctx => dispatcher.deliverQueuedJob(ctx.payload, ctx)`; every attempt used to
+  say it was attempt 1.
+
+- **A function or cron file with a syntax error is reported as `syntax error
+  at <file>:<line>`.** The boot log told you to move configuration out of
+  module scope, or to use `defineCron`.
+
+- **A request refused for its size names the configured limit, and health
+  probes stay out of the request log.** The message said "Maximum size is 1000
+  bytes" or "512KB" where it said "0MB" or "1MB"; `/api/health` was written to
+  the log on every call.
+
+- **A production boot with several environment problems lists them all at
+  once, not one per restart.** The runtime also refuses a bundle with a static
+  app at a backend path (`/api`, `/health`, …), and logs an error for a static
+  app under a moved `REBASE_BASE_PATH`, which was never served.
+
+- **Two live schema changes applied at once (a double confirm, two tabs) run
+  one after the other.** They interleaved their writes and commits. Live
+  schema editing also works in a repository with no commit yet, and its
+  dirty-tree check sees both paths of a staged rename.
+
+- **`schema generate` warns when a `hasMany` / `hasOne` target declares no
+  foreign-key column back.**
+
 #### Postgres
 
 - **A server that boots while a long report, transaction or `pg_dump` reads
@@ -629,6 +794,20 @@ La traduzione è in arrivo. Il contenuto qui sotto è in inglese.
   main pool.** They waited for a connection with no limit; they now give up
   after 10 s, and a statement after 30 s.
 
+- **`rebase db push --dry-run` writes nothing of the project's.** It no longer
+  regenerates `src/schema.generated.ts`, and it names, rather than deletes, the
+  `drizzle/*.sql` copies an older release committed. The generator's output
+  is plain text under `NO_COLOR` and when written to a file or pipe.
+
+- **`executeSql` with several statements answers the last statement's rows.**
+  It answered none.
+
+- **A scheduled backup registered on a machine without `pg_dump` /
+  `pg_dumpall` logs an error at boot naming the missing tools.** It failed
+  silently every night. `rebase db backup`, `restore` and `backups list` also
+  build their S3/GCS client with the function the Backups panel uses
+  (`backupStorageFromEnv`, exported from `@rebasepro/server`).
+
 #### CLI
 
 - **`rebase doctor` and `rebase db push` no longer report every
@@ -642,6 +821,53 @@ La traduzione è in arrivo. Il contenuto qui sotto è in inglese.
   `.rebase-dev-port` was never written, and after 30 s a healthy backend was
   reported as down. A partial line is carried to the next chunk, and flushed
   after 100 ms of quiet so prompts still appear.
+
+- **`rebase db push` and `rebase db generate` no longer end their first step
+  with "You can now run rebase db generate".**
+
+- **A collection that does not evaluate makes `rebase schema generate`,
+  `db push` and `doctor` print the error's message and "Re-run with --debug for
+  the stack trace", not a stack trace.** `--debug` now reaches the driver.
+
+- **A new project's `rebase dev` and builds print no warnings they did not
+  cause.** Vite's "Both esbuild and oxc options were set" and, from
+  `pnpm run example` or an ejected server, dotenv's banner are gone.
+
+- **On a checkout switched to a branch, `rebase db branch create`, `delete`,
+  `info` and `prune` use the main database's branch registry, as `list`
+  does.** A branch created there is recorded where `list` shows it. `create`
+  still copies the branch you are on unless you pass `--from`.
+
+- **`rebase db push`'s banner for making a populated column required offers
+  only remedies that work.** It no longer suggests a default for a column that
+  already exists (a default never fills existing rows); it offers the backfill,
+  and says nothing in the push was applied.
+
+- **`rebase db push` (and `--dry-run`) explains what it cannot do.** A type
+  change PostgreSQL cannot cast gets the `ALTER … USING` to run; a `unique`
+  added over repeated values lists the repeats; and an enum option you removed
+  that the database keeps (PostgreSQL cannot drop an enum label) is named,
+  with how to retire it. `rebase doctor` no longer sends you back to `db push`
+  for it.
+
+- **`rebase db push` renames relation columns that still carry their pre-0.13
+  name (`categorie_id`) the way `rebase dev` does,** instead of listing them as
+  destructive drops.
+
+- **`rebase schema introspect` no longer writes a Kanban board without
+  `orderProperty`.** It warned on every generate; it declares one only when the
+  table has an order-key column.
+
+- **Re-running `rebase skills install` keeps skill files you edited
+  (`--force` replaces them) and removes skills a release retired.** A
+  `.rebase-skills.json` manifest records what was installed. The command no
+  longer promises "the latest skills" on a re-run: it reinstalls the version
+  this CLI pins.
+
+- **The skills tell agents to use the project's own package manager, and the
+  `rebase-basics` skill's MCP reference lists all 42 local tools and the remote
+  `/mcp` endpoint's tools.** The scaffold's agent instructions no longer send
+  `pnpm db:push` at the managed development database, which refuses it.
 
 #### Admin (CMS & app)
 
@@ -663,12 +889,86 @@ La traduzione è in arrivo. Il contenuto qui sotto è in inglese.
   fails to load.** The failure left the selection uninitialised; the row is now
   logged and left out.
 
+- **Opening a record by its URL, or from its list row, shows its many-to-many
+  values, and saving it no longer unlinks every related row.** Adding a tag in
+  the form unlinked every other tag of the record when its live copy arrived.
+
+- **A browser `afterSave` that throws after the record was saved shows a
+  warning, not a failed save.** A retry no longer creates a duplicate.
+
+- **⌘S and ⌘Z act on the record form you are in.** They acted on the first one
+  opened.
+
+- **`formAutoSave` no longer creates a blank record when a New form is opened,
+  and saves only values that pass the form's validation.**
+
+- **When the server refuses a save, the form marks each field it names.**
+
+- **List, card and board views show a date-only value on its own day.** West
+  of Greenwich a `columnType: "date"` 15th read as the 14th in the date slot
+  and the list's date columns, and a declared `timezone` was ignored there;
+  they now match the table and the form.
+
+- **A record opened from a custom view that asks for full screen opens.** The
+  URL changed and nothing opened, including from a shared link. A pasted
+  `#new_side` link opens one new-record form over the collection, instead of a
+  second full-screen form under the panel.
+
+- **List-view rows open from the keyboard.** Rows are focusable buttons; Enter
+  or Space opens the record.
+
+- **Load errors and board notices use the kit's alert and the reader's
+  language, and "Collection not found", the unsaved-changes prompt of a
+  full-screen record and unnamed filter presets are translated.** They were
+  English "Warning:" / "Error:" banners. "Add existing", the bulk delete
+  button and the filters dialog's count follow the neutral colour rule.
+
+- **A property with a `storageSource` the panel has not loaded yet uploads to
+  that source, never silently to the default bucket.** A field with
+  `storage.public: true` stores public files with stable URLs, and every panel
+  upload names its property so the server can apply its `maxSize` and
+  `acceptedFiles`. `useBackendStorageSource` reports the server's error message
+  instead of "[object Object]".
+
+- **An enum written as a plain list of values in a JS config
+  (`enum: ["draft", "published"]`) fills the admin dropdown, and write
+  validation checks it.** The dropdown was empty.
+
+- **Creating a collection from a CSV or spreadsheet accepts that file's rows.**
+  A `constructor` or `prototype` header no longer crashes the mapping step;
+  repeated headers (`x`, `x_2`) and `_`-prefixed columns such as a Mongo
+  export's `_id` are kept; a text column holding some numbers (`S, M, L, 10,
+  12`) gets an enum that includes them; `email` and `url` are set only when
+  every value is one; and fields inside a map are inferred from their values
+  (enum, required), as top-level fields are.
+
+- **The collections editor's Kanban "Add column" keeps the colour and every
+  other field of the existing columns, refuses a name that is already a
+  column, and shows a failed save.** Duplicating a collection with relations
+  saves; it was refused with "Relation property … has no target collection".
+
 #### Studio
 
 - **The SQL console's CSV export follows RFC 4180.** Values with commas,
   quotes or line breaks are quoted, with quotes doubled; the header is escaped
   too; NULL is an empty field; each value sits under its own column; and
   objects are written as JSON.
+
+- **On a server that cannot edit collections, the collections editor shows
+  why, instead of a disabled "Add new collection" button.**
+
+- **The SQL console starts one run per Cmd+Enter, and a cell editor saves
+  once.** Cmd+Enter while a query ran started a second run; Enter saved twice,
+  and Escape now saves nothing.
+
+- **The storage browser asks before an upload replaces files of the same name,
+  and an upload or delete that fails part-way still shows what it did.**
+
+- **The panel calls `/api/admin/schema-editor`, `/api/admin/logs` and
+  `/api/admin/cron`, not the deprecated aliases.** The aliases drew
+  `Deprecation` headers on every page load. Cron Jobs, the Logs Explorer and
+  the collections editor are translated, and cron relative times follow the
+  app's language.
 
 #### Realtime
 
@@ -677,6 +977,23 @@ La traduzione è in arrivo. Il contenuto qui sotto è in inglese.
   `deleteMany` and `batchWrite` on the base driver announced each row inside
   the open transaction, so another instance could refetch the state before the
   commit, and rows that were rolled back were announced.
+
+- **In a split deployment with change capture off (`REALTIME_CDC=off`, or
+  `auto` falling back), writes made by `worker` and `functions` processes reach
+  subscribers on the `api`.**
+
+- **Two replicas left on the in-memory channel bus get the warning that
+  broadcast and presence reach only their own pod, under change capture
+  too.**
+
+- **With change capture off, editing a link's own columns, or saving a to-many
+  relation through the parent, updates live child lists such as
+  `posts/1/tags`.**
+
+- **The socket answers a data frame that names an unknown collection with
+  `NOT_FOUND`, as REST does, and a frame with an unknown `type` with
+  `UNKNOWN_MESSAGE_TYPE`.** They were answered `INTERNAL_ERROR`, or left to
+  time out.
 
 #### Client SDK
 
@@ -689,6 +1006,52 @@ La traduzione è in arrivo. Il contenuto qui sotto è in inglese.
   loop.** A backend that omitted `accessTokenExpiresAt` caused about 1,900
   `/auth/refresh` calls in 15 s, and one before every request. An unstated
   expiry is no longer read as passed; a 401 still refreshes.
+
+- **`functions.invoke()` reads a function that answers with text, CSV or a
+  file: pass `responseType: "text" | "blob" | "response"`.** A non-JSON answer
+  no longer blames `VITE_API_URL` when its content type says it was sent on
+  purpose. `invoke` also refuses a `.` / `..` path segment
+  (`INVALID_FUNCTION_PATH`) that would have reached routes outside the
+  function, such as `/api/admin/...`.
+
+- **Every error the client throws has a `code`.** A proxy's 413/502/500 gets
+  one from its status; a Node client with no `baseUrl` fails with
+  `BASE_URL_REQUIRED` instead of a network error; `storage.getObject()`
+  failures are `RebaseApiError`s with a status.
+
+- **`client.data` answers `"posts" in client.data`, can be turned into a
+  string, and no longer serves `toString` or `constructor` as collections.**
+
+- **`admin.createUser()` types the one-time `temporaryPassword`
+  (and `invitationSent`, `emailDeliveryFailed`) it returns,** and a generated
+  date column takes a `Date` on `create` and `update`. Regenerate with
+  `rebase generate-sdk`.
+
+- **An edit queued offline replays under an idempotency key, so a lost answer
+  can no longer write it again over a colleague's later edit.**
+
+- **A queued delete, or bulk delete, of a row someone else already deleted
+  counts as done instead of putting rows back.** A queued edit of such a row
+  removes it locally instead of restoring it. Offline bulk edits and deletes
+  are no longer undone by a realtime frame that arrives before they replay.
+
+- **Writes that reference a row created offline in another collection follow
+  the id the server assigns it,** and are discarded with it if the server
+  refuses it.
+
+- **An offline page keeps its `limit`, and an offline edit that moves a cached
+  row into a filter shows the row there.** The offline count moves with every
+  queued write, and the offline database's tombstones and query bookkeeping
+  stay bounded.
+
+- **A sync listener that throws no longer aborts the offline replay or runs it
+  a second time without the cross-tab lock.**
+
+- **Queued writes keep `GeoPoint` / `Vector` values across a reload, a
+  `__proto__` column survives the offline database, and a `syncIntervalMs`
+  above about 24.8 days no longer retries in a tight loop.** A tab running an
+  older build that opens an offline database a newer build upgraded keeps
+  working, in memory, instead of failing every call.
 
 #### Auth
 
@@ -711,6 +1074,24 @@ La traduzione è in arrivo. Il contenuto qui sotto è in inglese.
   filter set from outside the header (the URL, a preset, a clear) appeared one
   render late.
 
+- **Accessibility across the kit.** A table header's cells are column headers
+  (`th scope="col"`) and `TableRow` accepts a `ref`; error and warning alerts
+  are announced; a bare avatar is no longer an extra, unnamed tab stop inside
+  the user menu; a grouped select announces each group with its options; an
+  errored date field or multi-select is announced as invalid; split-view
+  dividers resize by touch and from the keyboard; the table filter,
+  view-settings and board "add" icon buttons are named; toggle-button groups
+  are named by what they choose, not "Toggle options"; and a disabled search
+  bar can no longer be typed into.
+
+- **A multi-select's "(Select All)" selects every option, including one whose
+  value is empty, and shows checked when they all are.**
+
+- **The dialog scrim and the popover arrow follow the theme, and a
+  keyboard-opened popover no longer rings its whole panel.** With reduced
+  motion on, dialogs, sheets, popovers, tooltips, collapsing panels and icon
+  buttons no longer animate.
+
 #### rls-check
 
 - **`policy-authenticated-tautology` reports a rule whose condition is only
@@ -719,6 +1100,18 @@ La traduzione è in arrivo. Il contenuto qui sotto è in inglese.
   a high, heuristic finding, so `rls-check` with the default `--fail-on high`
   now exits 1 on such a rule: scope the rule, or skip the check with
   `--skip policy-authenticated-tautology`.
+
+- **A policy role whose name contains a comma is read as one role, and a
+  database is labelled Rebase only if it has the `rebase` schema.** A server
+  with a `rebase_user` role was enough.
+
+- **A check that crashes makes the scan incomplete (exit 2), and a scan with no
+  tables in scope says that nothing was checked.** Both passed silently.
+
+- **The printed fixes for `current-setting-throws`, `rls-enabled-no-policies`
+  and `policy-anonymous-tautology` run when pasted, and `policy-always-true`
+  catches `NOT false`, `1 > 0`, `true OR …` and constants compared through
+  multi-word casts.**
 
 #### Storage & email
 
@@ -730,6 +1123,40 @@ La traduzione è in arrivo. Il contenuto qui sotto è in inglese.
 
 - **A local-storage write that fails part-way no longer leaves a truncated file
   in place of the previous object.**
+
+- **A mistyped S3/GCS bucket or refused credentials answer `502
+  STORAGE_MISCONFIGURED` naming the bucket, and an `allowedMimeTypes` refusal
+  is `400 STORAGE_FILE_TYPE_REFUSED`.** Every file read "not found", every
+  delete succeeded, and the refusal was a 500.
+
+- **A declared bucket with nothing bound is named at boot with the variable to
+  set (`S3_BUCKET__MEDIA`), and its 501 names it too.**
+
+- **Local storage's `/metadata` `customMetadata` holds only the caller's
+  metadata, as on S3 and GCS.**
+
+- **A mail server that accepts the connection and never answers fails the send
+  after 30 s (`smtp.timeoutMs`).** It took nodemailer's two to ten minutes,
+  holding the invite, verification and reset requests that await their mail.
+
+#### Inference
+
+- **`inferTypeFromValue` calls a `Date` a `date`.**
+
+#### MCP
+
+- **On the managed development database, a refused DB tool explains what to do
+  (restart the dev server, or point `DATABASE_URL` at a real Postgres).** It
+  suggested `REBASE_MCP_ALLOW_REMOTE_WRITES`.
+
+- **`cron_list_jobs` reports refused cron jobs and their reasons.** It said the
+  project had none.
+
+#### CI & tooling
+
+- **The headless guard imports the template's preset collections, and
+  `introspect-live` fails under CI when it cannot fetch its pinned dumps or
+  reach a server.** Locally it skips instead of failing.
 
 ### Security
 
@@ -745,6 +1172,20 @@ La traduzione è in arrivo. Il contenuto qui sotto è in inglese.
   request in flight at the switch is not reused. A token refresh also starts
   the cache over.
 
+- **The `storageAuthorize` hook is skipped only for the two grants storage
+  makes itself (a public object's read, a download token's read).** An identity
+  that merely has the uid `public` or `download-token`, such as a custom auth
+  adapter's guest, was never asked; it is now asked on every operation, like
+  any user.
+
+- **On S3 and GCS the hook's `bucket` is always `"default"`.** Naming the
+  provider's bucket on an upload, listing, folder or resumable upload passed a
+  hook that judged the bucket.
+
+- **Local storage refuses keys ending in `.metadata.json` (400
+  `INVALID_STORAGE_KEY`).** Such an upload overwrote another file's stored
+  content type and metadata.
+
 #### Server & REST
 
 - **A one-to-many membership write no longer takes a child that the target's
@@ -753,6 +1194,9 @@ La traduzione è in arrivo. Il contenuto qui sotto è in inglese.
   a caller could name a hidden child and take it from its current parent
   wherever RLS allowed the UPDATE. A hidden child is now left alone, as an
   unknown id is, so the answer does not reveal that it exists.
+
+- **A resumable upload can no longer be continued or cancelled by a non-admin
+  user whose uid is `service`.**
 
 ## [0.24.0] - 2026-10-08
 
