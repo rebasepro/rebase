@@ -58,11 +58,12 @@ export function topicJobHandlers(): Record<string, JobHandler<never>> {
     const tasks: Record<string, JobHandler<never>> = {};
     for (const sub of declaredSubscriptions()) {
         const task = topicTaskName(sub.topic, sub.name);
-        tasks[task] = (async (ctx: { payload: unknown; attempt: number }) => {
+        tasks[task] = (async (ctx: { payload: unknown; attempt: number; signal: AbortSignal }) => {
             await sub.handler(ctx.payload, {
                 attempt: ctx.attempt,
                 topic: sub.topic,
-                subscription: sub.name
+                subscription: sub.name,
+                signal: ctx.signal
             });
         }) as JobHandler<never>;
     }

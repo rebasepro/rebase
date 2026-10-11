@@ -89,6 +89,12 @@ export function createJobQueue(store: JobStore, options: JobQueueOptions = {}): 
     const visibilityTimeoutMs = options.visibilityTimeoutMs ?? DEFAULT_VISIBILITY_TIMEOUT_MS;
     const defaultMaxAttempts = options.maxAttempts ?? DEFAULT_MAX_ATTEMPTS;
     const backoff = options.backoff ?? defaultBackoff;
+    const timeoutMs = options.timeoutMs;
+    if (timeoutMs !== undefined && !(Number.isFinite(timeoutMs) && timeoutMs > 0)) {
+        // Zero is the value a "no limit" reading would pick, and NaN what a
+        // mistyped env var parses to; both would fail every attempt at once.
+        throw new Error(`jobs.timeoutMs must be a positive number of milliseconds (got ${String(timeoutMs)}). Leave it out for no limit.`);
+    }
 
     const handlers = new Map<string, JobHandler<never>>();
     for (const [task, handler] of Object.entries(options.tasks ?? {})) {
@@ -177,16 +183,34 @@ export function createJobQueue(store: JobStore, options: JobQueueOptions = {}): 
         }
 
         const releaseClaim = keepClaim(job, claim);
+        const controller = new AbortController();
+        let deadline: NodeJS.Timeout | undefined;
         try {
             try {
-                await handler({
+                const run = Promise.resolve().then(() => handler({
                     id: job.id,
                     task: job.task,
                     payload: job.payload as never,
                     attempt: job.attempts,
-                    maxAttempts: job.maxAttempts
-                } as never);
+                    maxAttempts: job.maxAttempts,
+                    signal: controller.signal
+                } as never));
+                if (timeoutMs === undefined) {
+                    await run;
+                } else {
+                    // A handler that ignores the signal outlives its attempt;
+                    // what it does after is not this attempt's outcome.
+                    run.catch(() => undefined);
+                    await Promise.race([run, new Promise<never>((_, reject) => {
+                        deadline = setTimeout(() => {
+                            const error = new Error(`"${job.task}" timed out after ${timeoutMs}ms (jobs.timeoutMs)`);
+                            controller.abort(error);
+                            reject(error);
+                        }, timeoutMs);
+                    })]);
+                }
             } finally {
+                clearTimeout(deadline);
                 releaseClaim();
             }
             await store.complete(job.id, claim);

@@ -332,8 +332,12 @@ export interface TopicOptions extends DeclareOptions {
  *
  * `attempt` counts from 1. Worth branching on: the first delivery and the
  * fourth are the same call, but the fourth is where it is worth logging loudly.
+ * `signal` is aborted when the attempt runs past the job queue's `timeoutMs`.
  */
-export type TopicHandler<T> = (event: T, context: { attempt: number; topic: string; subscription: string }) => Promise<void> | void;
+export type TopicHandler<T> = (
+    event: T,
+    context: { attempt: number; topic: string; subscription: string; signal: AbortSignal }
+) => Promise<void> | void;
 
 /** A declared subscription, as recorded in the graph and wired at boot. */
 export interface TopicSubscription<T = unknown> {
@@ -625,10 +629,13 @@ export interface QueueOptions extends DeclareOptions {
     maxAttempts?: number;
 }
 
-/** What a queue's handler receives. `attempt` counts from 1. */
+/**
+ * What a queue's handler receives. `attempt` counts from 1; `signal` is
+ * aborted when the attempt runs past the job queue's `timeoutMs`.
+ */
 export type QueueHandler<T> = (
     payload: T,
-    context: { attempt: number; queue: string; jobId: string }
+    context: { attempt: number; queue: string; jobId: string; signal: AbortSignal }
 ) => Promise<void> | void;
 
 /** Per-job options at enqueue time. */

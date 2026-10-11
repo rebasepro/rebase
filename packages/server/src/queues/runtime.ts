@@ -49,11 +49,12 @@ export const DEFAULT_QUEUE_ATTEMPTS = 5;
 export function queueJobHandlers(): Record<string, JobHandler<never>> {
     const tasks: Record<string, JobHandler<never>> = {};
     for (const consumer of declaredQueueConsumers()) {
-        tasks[queueTaskName(consumer.queue)] = (async (ctx: { id: string; payload: unknown; attempt: number }) => {
+        tasks[queueTaskName(consumer.queue)] = (async (ctx: { id: string; payload: unknown; attempt: number; signal: AbortSignal }) => {
             await consumer.handler(ctx.payload, {
                 attempt: ctx.attempt,
                 queue: consumer.queue,
-                jobId: ctx.id
+                jobId: ctx.id,
+                signal: ctx.signal
             });
         }) as JobHandler<never>;
     }

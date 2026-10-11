@@ -65,6 +65,13 @@ export interface JobContext<P = unknown> {
      */
     attempt: number;
     maxAttempts: number;
+    /**
+     * Aborted when the attempt runs past the queue's `timeoutMs`. Pass it to
+     * `fetch` and anything else that takes one: the attempt is failed and its
+     * worker slot freed at the deadline either way, but a handler that ignores
+     * the signal keeps running in the background, unrecorded.
+     */
+    signal: AbortSignal;
 }
 
 /**
@@ -124,6 +131,14 @@ export interface JobQueueOptions {
      * the job when a run finishes gets to record its outcome.
      */
     visibilityTimeoutMs?: number;
+    /**
+     * How long one attempt may run before it is failed (and retried while
+     * attempts remain), in milliseconds. The handler's `signal` is aborted at
+     * the deadline and its worker slot is freed. Default: no limit — a handler
+     * that never settles keeps its slot, and its claim, for as long as the
+     * process lives.
+     */
+    timeoutMs?: number;
     /** Attempts before a job is left `failed`. Default 3. */
     maxAttempts?: number;
     /**

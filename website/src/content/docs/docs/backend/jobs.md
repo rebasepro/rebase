@@ -143,6 +143,31 @@ jobs: {
 }
 ```
 
+### A handler that never finishes
+
+The flip side: a handler awaiting a `fetch` that never answers holds its worker
+slot, and its claim, for as long as the process lives — five of them and the
+worker runs nothing else, while `/health` stays green.
+<span class="since-badge" data-since="0.25">Since 0.25</span> Set `timeoutMs` to
+bound one attempt. At the deadline the attempt fails — retried while attempts
+remain, like any throw — its slot is freed, and the handler's `signal` is
+aborted. Pass the signal on, so the work stops too; a handler that ignores it
+keeps running in the background with nothing recording its outcome.
+
+```typescript no-verify
+jobs: {
+    enabled: true,
+    timeoutMs: 120_000,          // one attempt; no limit when left out
+    tasks: {
+        "sync-crm": async ({ payload, signal }) => {
+            await fetch(crmUrl, { method: "POST", body: JSON.stringify(payload), signal });
+        }
+    }
+}
+```
+
+Queue handlers and topic subscriptions get the same `signal` in their context.
+
 ## Several instances
 
 Safe by construction. Workers claim with `SELECT … FOR UPDATE SKIP LOCKED`, so

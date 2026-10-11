@@ -447,6 +447,60 @@ describe("a job that never finishes", () => {
         expect(store.jobs.find(j => j.task === "stuck")?.status).toBe("running");
     });
 
+    it("fails the attempt at timeoutMs, aborts the handler's signal, and frees the slot", async () => {
+        const store = fakeStore();
+        let signal: AbortSignal | undefined;
+        const queue = createJobQueue(store, {
+            timeoutMs: 30,
+            backoff: () => 60_000,
+            tasks: {
+                stuck: (ctx) => {
+                    signal = ctx.signal;
+                    return hang();
+                }
+            }
+        });
+
+        await queue.enqueue("stuck");
+        // runOnce settles only once every job it claimed has settled — so it
+        // returning at all is the slot coming free.
+        expect(await queue.runOnce()).toBe(1);
+
+        const job = store.jobs[0];
+        expect(job.status).toBe("pending");
+        expect(job.lastError).toMatch(/timed out after 30ms/);
+        expect(signal?.aborted).toBe(true);
+    });
+
+    it("dead-letters a job that timed out on its last attempt", async () => {
+        const store = fakeStore();
+        const queue = createJobQueue(store, { timeoutMs: 10, maxAttempts: 1, tasks: { stuck: hang } });
+
+        await queue.enqueue("stuck");
+        await queue.runOnce();
+
+        expect(store.jobs[0].status).toBe("failed");
+    });
+
+    it("gives every handler a signal that stays live when no timeout is set", async () => {
+        const store = fakeStore();
+        let signal: AbortSignal | undefined;
+        const queue = createJobQueue(store, { tasks: { quick: (ctx) => { signal = ctx.signal; } } });
+
+        await queue.enqueue("quick");
+        await queue.runOnce();
+
+        expect(signal).toBeDefined();
+        expect(signal?.aborted).toBe(false);
+        expect(store.jobs[0].status).toBe("succeeded");
+    });
+
+    it("refuses a timeoutMs that is not a positive number", () => {
+        for (const timeoutMs of [0, -1, Number.NaN]) {
+            expect(() => createJobQueue(fakeStore(), { timeoutMs })).toThrow(/timeoutMs/);
+        }
+    });
+
     it("does not stop the reaper", async () => {
         const store = fakeStore();
         let reaps = 0;
