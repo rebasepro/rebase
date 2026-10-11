@@ -403,7 +403,7 @@ values: prepResult.values },
         if (password) {
             const validation = ops.validatePasswordStrength(password);
             if (!validation.valid) {
-                throw ApiError.badRequest(`Password too weak: ${validation.errors.join(". ")}`);
+                throw ApiError.badRequest(`Password too weak: ${validation.errors.join(". ")}`, "WEAK_PASSWORD");
             }
             passwordHash = await ops.hashPassword(password);
         }

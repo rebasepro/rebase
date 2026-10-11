@@ -79,7 +79,8 @@ export function createResetPasswordRoute(config: ResetPasswordRouteConfig): Hono
             const validation = ops.validatePasswordStrength(chosenPassword);
             if (!validation.valid) {
                 throw ApiError.badRequest(
-                    `Password too weak: ${validation.errors.join(", ")}`
+                    `Password too weak: ${validation.errors.join(", ")}`,
+                    "WEAK_PASSWORD"
                 );
             }
         }
