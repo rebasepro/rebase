@@ -282,6 +282,14 @@ export async function autofillStream(props: {
 }
 
 /** Inline continuation for the rich-text editor. Streams plain text. */
+/**
+ * How many characters of the document the slash autocomplete sends on each
+ * side of the cursor. The hosted service keeps exactly this much and discards
+ * the rest, so sending more costs upload time on every request and buys
+ * nothing.
+ */
+export const MAX_AUTOCOMPLETE_CONTEXT = 8000;
+
 export async function autocompleteStream(props: {
     textBefore?: string;
     textAfter?: string;
@@ -293,8 +301,10 @@ export async function autocompleteStream(props: {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-            textBefore: props.textBefore ?? "",
-            textAfter: props.textAfter ?? ""
+            // The characters nearest the cursor: the end of what is before
+            // it, the start of what is after it.
+            textBefore: (props.textBefore ?? "").slice(-MAX_AUTOCOMPLETE_CONTEXT),
+            textAfter: (props.textAfter ?? "").slice(0, MAX_AUTOCOMPLETE_CONTEXT)
         }),
         signal: props.signal
     });

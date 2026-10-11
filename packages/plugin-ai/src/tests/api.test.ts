@@ -4,6 +4,7 @@ TextDecoder });
 
 import {
     DEFAULT_AI_ENDPOINT,
+    MAX_AUTOCOMPLETE_CONTEXT,
     autocompleteStream,
     autofillStream,
     clearAiStatusCache,
@@ -296,6 +297,32 @@ describe("autocompleteStream", () => {
 
         expect(seen.join("")).toBe("the quick brown fox");
         expect(text).toBe("the quick brown fox");
+    });
+
+    /**
+     * The hosted service keeps 8,000 characters each side of the cursor and
+     * throws the rest away, so uploading a whole long document on every
+     * keystroke pause was bandwidth for nothing.
+     */
+    it("sends at most 8,000 characters each side of the cursor, the ones nearest it", async () => {
+        const sent = async (textBefore: string, textAfter: string) => {
+            const fetchMock = jest.fn().mockResolvedValue(streamingResponse(["event: done\ndata: {}\n\n"]));
+            (global as any).fetch = fetchMock;
+            await autocompleteStream({ textBefore, textAfter, onDelta: () => undefined });
+            return JSON.parse(fetchMock.mock.calls[0][1].body) as { textBefore: string; textAfter: string };
+        };
+
+        expect(MAX_AUTOCOMPLETE_CONTEXT).toBe(8000);
+
+        const before = "b".repeat(100_000 - 3) + "END";
+        const after = "BEG" + "a".repeat(100_000 - 3);
+        const long = await sent(before, after);
+        expect(long.textBefore).toHaveLength(8000);
+        expect(long.textAfter).toHaveLength(8000);
+        expect(long.textBefore.endsWith("END")).toBe(true);
+        expect(long.textAfter.startsWith("BEG")).toBe(true);
+
+        expect(await sent("I saw ", " yesterday")).toEqual({ textBefore: "I saw ", textAfter: " yesterday" });
     });
 });
 

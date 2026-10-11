@@ -166,7 +166,8 @@ Autofill posts the entity's field values to a hosted service to generate a
 suggestion. By default that service is **`https://app.rebase.pro/api/functions/ai`**,
 which Rebase runs — free to use, no configuration, and no credential attached:
 the requests are anonymous, bounded by rate limit rather than by identity. Your
-JWT is not sent.
+JWT is not sent. The editor's slash autocomplete posts text too: up to 8,000
+characters on each side of the cursor, never the whole document.
 
 Whether that is acceptable depends on what is in the fields. Point `endpoint` at
 your own deployment to keep generation inside your infrastructure:
