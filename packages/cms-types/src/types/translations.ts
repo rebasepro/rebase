@@ -587,6 +587,8 @@ export interface RebaseTranslations {
     multiple_deleted: string;
     some_entities_deleted: string;
     error_deleting_entities: string;
+    /** A bulk delete's rows that failed. `{{failed}}`, `{{total}}`, and the first `{{reason}}`. */
+    delete_rows_failed?: string;
     deleted: string;
 
     /**

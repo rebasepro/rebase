@@ -500,6 +500,7 @@ export const it: RebaseTranslations = {
     multiple_deleted: "Eliminazioni multiple",
     some_entities_deleted: "Alcune entità sono state eliminate, ma non tutte",
     error_deleting_entities: "Errore durante l'eliminazione delle entità",
+    delete_rows_failed: "{{failed}} su {{total}} non eliminati. {{reason}}",
     deleted: "eliminata",
     selection_options: "Opzioni di selezione",
     selection_menu_all_loaded: "Tutto in questa pagina",

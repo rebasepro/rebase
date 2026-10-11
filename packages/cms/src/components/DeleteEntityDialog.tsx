@@ -122,13 +122,13 @@ export function DeleteEntityDialog<M extends Record<string, unknown>>({
         console.error(e);
     }, [collection.name]);
 
-    const performDelete = useCallback((entity: Entity<M>): Promise<boolean> =>
+    const performDelete = useCallback((entity: Entity<M>, onFailure: (entity: Entity<any>, e: Error) => void = onDeleteFailure): Promise<boolean> =>
         deleteEntityWithCallbacks({
             data: dataClient,
             entity,
             collection: collection,
             onDeleteSuccess,
-            onDeleteFailure,
+            onDeleteFailure: onFailure,
             context
         }), [dataClient, collection, onDeleteSuccess, onDeleteFailure, context]);
 
@@ -192,6 +192,15 @@ export function DeleteEntityDialog<M extends Record<string, unknown>>({
             return;
         }
 
+        // Collected, not one snackbar per row: a mass refusal (a foreign key
+        // every row trips) queued a toast per row of a delete that can walk
+        // 20,000 of them. The summary below names how many, and the first cause.
+        const failures: Error[] = [];
+        const recordFailure = (_entity: Entity<any>, e: Error) => {
+            failures.push(e);
+            console.error("Error deleting entity", e);
+        };
+
         let results: boolean[] = [];
         try {
             results = await mapWithConcurrency(
@@ -204,7 +213,7 @@ export function DeleteEntityDialog<M extends Record<string, unknown>>({
                 // screen saying so.
                 (entity) => cancelledRef.current.aborted
                     ? Promise.resolve(false)
-                    : performDelete(entity),
+                    : performDelete(entity, recordFailure),
                 (completed, total) => setProgress(t("selection_deleting_progress", {
                     completed: completed.toLocaleString(),
                     total: total.toLocaleString()
@@ -223,6 +232,13 @@ export function DeleteEntityDialog<M extends Record<string, unknown>>({
         onMultipleEntitiesDelete?.(path, entities.filter((_, i) => results[i]));
 
         const deleted = results.filter(Boolean).length;
+        const failedSummary = failures.length > 0
+            ? t("delete_rows_failed", {
+                failed: failures.length.toLocaleString(),
+                total: entities.length.toLocaleString(),
+                reason: failures[0]?.message ?? ""
+            })
+            : undefined;
         if (deleted === entities.length && entities.length > 0) {
             snackbarController.open({
                 type: "success",
@@ -233,12 +249,14 @@ export function DeleteEntityDialog<M extends Record<string, unknown>>({
         } else if (deleted > 0) {
             snackbarController.open({
                 type: "warning",
-                message: t("some_entities_deleted", { collection: collection.name })
+                title: failedSummary ? t("some_entities_deleted", { collection: collection.name }) : undefined,
+                message: failedSummary ?? t("some_entities_deleted", { collection: collection.name })
             });
         } else {
             snackbarController.open({
                 type: "error",
-                message: t("error_deleting_entities", { collection: collection.name })
+                title: failedSummary ? t("error_deleting_entities", { collection: collection.name }) : undefined,
+                message: failedSummary ?? t("error_deleting_entities", { collection: collection.name })
             });
         }
         onClose();

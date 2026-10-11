@@ -505,6 +505,7 @@ export const pt: RebaseTranslations = {
     multiple_deleted: "Exclusão múltipla",
     some_entities_deleted: "Algumas entidades foram excluídas, mas não todas",
     error_deleting_entities: "Erro ao excluir entidades",
+    delete_rows_failed: "{{failed}} de {{total}} não eliminados. {{reason}}",
     deleted: "excluído(a)",
     selection_options: "Opções de seleção",
     selection_menu_all_loaded: "Tudo nesta página",

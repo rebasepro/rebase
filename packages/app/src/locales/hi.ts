@@ -500,6 +500,7 @@ export const hi: RebaseTranslations = {
     multiple_deleted: "कई हटाए गए",
     some_entities_deleted: "कुछ संस्थाएँ हटा दी गई हैं, लेकिन सभी नहीं",
     error_deleting_entities: "संस्थाओं को हटाने में त्रुटि",
+    delete_rows_failed: "{{total}} में से {{failed}} नहीं हटाए गए। {{reason}}",
     deleted: "हटाया गया",
     selection_options: "चयन विकल्प",
     selection_menu_all_loaded: "इस पृष्ठ पर सभी",

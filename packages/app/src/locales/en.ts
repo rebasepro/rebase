@@ -508,6 +508,7 @@ export const en: RebaseTranslations = {
     multiple_deleted: "Multiple deleted",
     some_entities_deleted: "Some of the entities have been deleted, but not all",
     error_deleting_entities: "Error deleting entities",
+    delete_rows_failed: "{{failed}} of {{total}} not deleted. {{reason}}",
     deleted: "Deleted",
     selection_options: "Selection options",
     selection_menu_all_loaded: "All on this page",
