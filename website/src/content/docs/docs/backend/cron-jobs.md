@@ -412,6 +412,10 @@ await client.cron.toggleJob("health-check", false); // pause
 await client.cron.toggleJob("health-check", true);  // resume
 ```
 
+`triggerJob()` waits for the run to finish and answers with its log. A proxy in front of the
+server may cut a long job's answer short (many stop at 60 seconds) while the run itself
+carries on. Read its outcome from `getJobLogs()` then.
+
 `listJobs()` is typed `CronJobListing`: `jobs`, plus the `skipped`,
 `rejected` and `note` fields described under [Jobs that are not there](#jobs-that-are-not-there).
 
