@@ -648,6 +648,11 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
                 collectionsPath ? await getSearchExcludes(collectionsPath) : []
             );
 
+            // A removed enum option plans nothing (no ALTER TYPE … DROP VALUE
+            // exists), so the push would succeed and the database go on
+            // accepting the value. Not a refusal — boot does the same — but said.
+            if (databaseUrl) await reportKeptEnumLabels(databaseUrl, collectionsPath);
+
             // `--dry-run` stops here, having printed the SQL and nothing else.
             //
             // It exists because the only way to see this plan was to trigger
@@ -831,6 +836,22 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
  *
  * @returns `schema.index` of each one missing when this started.
  */
+/** Names the enum labels the database keeps after the collections dropped them. See `schema/enum-labels-kept.ts`. */
+async function reportKeptEnumLabels(databaseUrl: string, collectionsPath: string): Promise<void> {
+    try {
+        const { loadCollections } = await import("./schema/doctor");
+        const { keptEnumLabels, formatKeptEnumLabelsNotice } = await import("./schema/enum-labels-kept");
+        const collections = await loadCollections(path.resolve(process.cwd(), collectionsPath));
+        const kept = await withAppClient(databaseUrl, client => keptEnumLabels(
+            { query: async (text) => ({ rows: (await client.query(text)).rows }) },
+            collections
+        ));
+        if (kept.length > 0) outWarn(chalk.yellow(formatKeptEnumLabelsNotice(kept)));
+    } catch {
+        // A notice, not a gate: not knowing changes nothing the push does.
+    }
+}
+
 async function prebuildForeignKeyIndexes(databaseUrl: string, collectionsPath: string, dryRun: boolean): Promise<string[]> {
     let missing: DeferredIndexBuild[];
     try {

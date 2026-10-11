@@ -878,7 +878,10 @@ export async function checkCollectionsVsDatabase(
                                     expected: expectedValues.join(", "),
                                     actual: dbEnumValues.join(", "),
                                     message: `Enum values for "${colName}" in table "${fullTableName}" are out of sync (${parts.join("; ")}).`,
-                                    fix: "Run `rebase db push` to update the enum"
+                                    fix: extra.length > 0 && missing.length === 0
+                                        // A push cannot remove a label (no ALTER TYPE … DROP VALUE), so it was never the remedy for these.
+                                        ? `PostgreSQL cannot drop an enum label, so \`rebase db push\` leaves ${extra.join(", ")} in place. Harmless unless something still writes it; to retire it, UPDATE its rows to another value, then rewrite the type in a migration (\`rebase db generate\`: CREATE TYPE …, ALTER TABLE … TYPE … USING, DROP TYPE) and \`rebase db migrate\``
+                                        : "Run `rebase db push` to add the missing labels" + (extra.length > 0 ? `; it cannot remove ${extra.join(", ")} (PostgreSQL has no ALTER TYPE … DROP VALUE) — retire those with a migration that rewrites the type` : "")
                                 });
                             }
                         }

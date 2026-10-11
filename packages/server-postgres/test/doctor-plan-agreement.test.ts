@@ -122,6 +122,22 @@ describe("the doctor against the database the planner built", () => {
         expect(issues.some(i => i.category === "missing_enum" && i.column === "kind")).toBe(true);
     });
 
+    it("does not send a removed enum label back to `rebase db push`, which cannot remove it", async () => {
+        const tags = (labels: string[]) => ({
+            slug: "tags",
+            table: "tags",
+            name: "Tags",
+            properties: {
+                id: { type: "string", isId: "uuid" },
+                kind: { type: "string", enum: labels.map(id => ({ id, label: id })) }
+            }
+        }) as unknown as CollectionConfig;
+        await ensureCollectionTables(mockDb!, [tags(["a", "b"])]);
+        const issue = (await issuesOf([tags(["a"])])).find(i => i.category === "enum_value_mismatch");
+        expect(issue?.fix).not.toMatch(/^Run `rebase db push`/);
+        expect(issue?.fix).toContain("DROP TYPE");
+    });
+
     it("reports a key whose type no longer matches the collection's", async () => {
         await ensureCollectionTables(mockDb!, [categories("increment")]);
         const issues = await issuesOf([categories("uuid")]);
