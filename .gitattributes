@@ -30,3 +30,8 @@
 *.ico  binary
 *.woff binary
 *.woff2 binary
+
+# ── Byte-exact fixtures ───────────────────────────────────────────────────────
+# The CSV export writes CRLF between rows and keeps a bare LF inside a quoted
+# cell; these golden files are compared byte for byte, so no conversion.
+packages/cms/test/data_export/__fixtures__/*.csv -text
