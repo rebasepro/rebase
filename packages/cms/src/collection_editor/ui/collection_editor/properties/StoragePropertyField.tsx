@@ -142,7 +142,6 @@ export function StoragePropertyField({
                                 className={"w-full"}
                                 placeholder={"All file types allowed"}
                                 disabled={disabled}
-                                name={acceptedFiles}
                                 value={fileTypesValue ?? []}
                                 onValueChange={handleTypesChange}
                                 label={allFileTypesSelected ? undefined : "Allowed file types"}

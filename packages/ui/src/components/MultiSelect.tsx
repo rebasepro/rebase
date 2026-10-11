@@ -4,7 +4,7 @@ import { CheckIcon, ChevronDownIcon, XIcon } from "lucide-react";
 import { iconSize } from "../icons/Icon";
 import * as PopoverPrimitive from "@radix-ui/react-popover";
 import * as React from "react";
-import { ChangeEvent, Children, useEffect, useState } from "react";
+import { Children, useEffect, useState } from "react";
 import { Command as CommandPrimitive } from "cmdk";
 import { cls } from "../util";
 
@@ -40,12 +40,11 @@ interface MultiSelectProps<T extends MultiSelectValue = string> {
     modalPopover?: boolean;
     className?: string;
     open?: boolean,
-    name?: string,
+    /** Put on the trigger button, so a `<label htmlFor>` can name it. */
     id?: string,
     onOpenChange?: (open: boolean) => void,
     value?: T[],
     inputClassName?: string,
-    onChange?: React.EventHandler<ChangeEvent<HTMLSelectElement>>,
     onValueChange?: (updatedValue: T[]) => void,
     placeholder?: React.ReactNode,
     size?: "smallest" | "small" | "medium" | "large",
@@ -53,13 +52,9 @@ interface MultiSelectProps<T extends MultiSelectValue = string> {
     label?: React.ReactNode | string,
     disabled?: boolean,
     error?: boolean,
-    position?: "item-aligned" | "popper",
-    endAdornment?: React.ReactNode,
-    multiple?: boolean,
     includeSelectAll?: boolean,
     includeClear?: boolean,
     inputRef?: React.Ref<HTMLButtonElement>,
-    padding?: boolean,
     invisible?: boolean,
     /**
      * Whether the trigger draws its own chevron. A table cell turns it off:
@@ -121,6 +116,7 @@ export const MultiSelect = React.forwardRef<
     (
         {
             value,
+            id,
             size = "large",
             label,
             error,
@@ -170,15 +166,21 @@ export const MultiSelect = React.forwardRef<
             setIsPopoverOpen(open ?? false);
         }, [open]);
 
-        const allValues = React.useMemo(() => children
-            ?
-            Children.map(children, (child) => {
-                if (React.isValidElement<MultiSelectItemProps>(child)) {
-                    return child.props.value;
+        // Every option's value, as the strings an option click reports. Not
+        // filtered through `Boolean`: an option whose value is "" is an option.
+        const allValues = React.useMemo(() => {
+            const values: string[] = [];
+            Children.forEach(children, (child) => {
+                if (React.isValidElement<MultiSelectItemProps>(child)
+                    && child.props.value !== undefined && child.props.value !== null) {
+                    values.push(String(child.props.value));
                 }
-                return null;
-            })?.filter(Boolean) ?? []
-            : [], [children]);
+            });
+            return values;
+        }, [children]);
+
+        const allSelected = allValues.length > 0
+            && allValues.every(v => selectedValues.some(s => String(s) === v));
 
         const optionsMap = React.useMemo(() => {
             const map = new Map<string, React.ReactNode>();
@@ -241,7 +243,7 @@ export const MultiSelect = React.forwardRef<
         };
 
         const toggleAll = () => {
-            if (selectedValues.length === allValues.length) {
+            if (allSelected) {
                 handleClear();
             } else {
                 updateValues(allValues);
@@ -278,6 +280,7 @@ export const MultiSelect = React.forwardRef<
                     <MultiSelectTrigger anchorRef={anchorRef}>
                         <button
                             ref={inputRef ?? ref}
+                            id={id}
                             disabled={disabled}
                             aria-label={ariaLabel ?? (typeof label === "string" ? label : undefined)}
                             onClick={handleTogglePopover}
@@ -422,7 +425,7 @@ export const MultiSelect = React.forwardRef<
                                                 )
                                             }
                                         >
-                                            <InnerCheckBox checked={selectedValues.length === allValues.length}/>
+                                            <InnerCheckBox checked={allSelected}/>
                                             <span className={"text-sm text-text-secondary dark:text-text-secondary-dark"}>(Select All)</span>
                                         </CommandPrimitive.Item>}
                                         {children}

@@ -69,7 +69,6 @@ export function VirtualTableSelect(props: {
         <MultiSelect
             inputRef={ref}
             className="w-full h-full p-0 bg-transparent outline-none"
-            position={"item-aligned"}
             disabled={disabled}
             includeClear={false}
             useChips={false}

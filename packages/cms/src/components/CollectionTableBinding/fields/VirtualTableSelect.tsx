@@ -101,7 +101,6 @@ export function VirtualTableSelect(props: {
                 triggerContent={preview}
                 size={"smallest"}
                 className="w-full h-full p-0 bg-transparent outline-none"
-                position={"item-aligned"}
                 disabled={disabled}
                 includeClear={false}
                 anchorRef={anchorRef}

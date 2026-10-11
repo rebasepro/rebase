@@ -257,18 +257,11 @@ export function StringNumberFilterField({
                 {enumValues && multiple &&
                     <MultiSelect
                         size={"medium"}
-                        position={"item-aligned"}
                         value={Array.isArray(internalValue) ? internalValue.map(e => String(e)) : []}
                         disabled={isNullOperation}
                         onValueChange={(value) => {
                             updateFilter(operation, type === "number" ? (value ?? []).map(v => parseInt(v)) : value)
                         }}
-                        multiple={multiple}
-                        endAdornment={internalValue && <IconButton
-                            className="absolute right-2 top-3"
-                            onClick={(e) => updateFilter(operation, undefined)}>
-                            <XIcon/>
-                        </IconButton>}
                     >
                         {enumValues.map((enumConfig) => (
                             <MultiSelectItem key={`select_value_${name}_${enumConfig.id}`}
