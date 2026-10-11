@@ -36,7 +36,9 @@ export type SaveEntityWithCallbacksProps<M extends Record<string, unknown>> = {
  *
  * `afterSave`/`afterSaveError` below are the *caller's* UI callbacks — the
  * form's "close the dialog", the table's "clear the editing state" — and are
- * unrelated to the collection's. Both run: the collection's first.
+ * unrelated to the collection's. Both run: the collection's first. A
+ * collection `afterSave` that throws does not undo the save: the write has
+ * committed, so it is reported as a warning and the caller's `afterSave` runs.
  *
  * @param collection
  * @param path
@@ -115,15 +117,38 @@ export async function saveEntityWithCallbacks<M extends Record<string, unknown>>
         savePromise = accessor.update(entityId!, valuesToSave) as Promise<Entity<M>>;
     }
 
-    return savePromise.then(async (entity) => {
-        // Awaited, and before the caller's: an afterSave that writes a related
-        // row should have finished before the form closes over it.
-        //
-        // `entity.values`, not the values sent: "after save" means the row as
-        // saved, and the two differ whenever the write path adds something. The
-        // auth create response carries `temporaryPassword` / `invitationSent`
-        // beside the columns, and the panel's own injected afterSave — the one
-        // that shows the credentials dialog — can only read them here.
+    let entity: Entity<M>;
+    try {
+        entity = await savePromise;
+    } catch (e) {
+        await browserCallbacks?.afterSaveError?.({
+            collection,
+            path,
+            id: entityId,
+            values: valuesToSave,
+            previousValues,
+            status,
+            error: e as Error,
+            context
+        });
+        if (afterSaveError) afterSaveError(e as Error);
+        throw e;
+    }
+
+    // Awaited, and before the caller's: an afterSave that writes a related
+    // row should have finished before the form closes over it.
+    //
+    // `entity.values`, not the values sent: "after save" means the row as
+    // saved, and the two differ whenever the write path adds something. The
+    // auth create response carries `temporaryPassword` / `invitationSent`
+    // beside the columns, and the panel's own injected afterSave — the one
+    // that shows the credentials dialog — can only read them here.
+    //
+    // The write has committed by now, so a throw here is not a failed save.
+    // It used to be reported as one: the form stayed on "new", and the next
+    // Save created a second row. It is said for what it is, and the save
+    // completes.
+    try {
         await browserCallbacks?.afterSave?.({
             collection,
             path,
@@ -133,21 +158,12 @@ export async function saveEntityWithCallbacks<M extends Record<string, unknown>>
             status,
             context
         });
-        if (afterSave)
-            afterSave(entity);
-        return entity as Entity<M>;
-    }).catch(async (e) => {
-        await browserCallbacks?.afterSaveError?.({
-            collection,
-            path,
-            id: entityId,
-            values: valuesToSave,
-            previousValues,
-            status,
-            error: e,
-            context
-        });
-        if (afterSaveError) afterSaveError(e);
-        throw e;
-    });
+    } catch (e) {
+        const error = e instanceof Error ? e : new Error(String(e));
+        console.error(`afterSave of "${path}" failed after the record was saved`, error);
+        context.snackbarController?.open({ type: "warning", message: error.message });
+    }
+    if (afterSave)
+        afterSave(entity);
+    return entity;
 }

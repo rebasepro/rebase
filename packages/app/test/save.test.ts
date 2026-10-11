@@ -297,6 +297,46 @@ describe("saveEntityWithCallbacks", () => {
             expect(order).toEqual(["collection", "caller"]);
         });
 
+        it("reports a committed write as saved when the collection's afterSave throws", async () => {
+            // A webhook that is down, say. The row is in the database: calling
+            // it a failed save kept the form on "new", and the next click of
+            // Save created a second row.
+            const createFn = jest.fn().mockResolvedValue(mockEntity);
+            const afterSave = jest.fn();
+            const afterSaveError = jest.fn();
+            const collectionAfterSaveError = jest.fn();
+            const open = jest.fn();
+            const consoleError = jest.spyOn(console, "error").mockImplementation(() => undefined);
+
+            const saved = await saveEntityWithCallbacks({
+                collection: withCallbacks({
+                    afterSave: () => { throw new Error("webhook down"); },
+                    afterSaveError: collectionAfterSaveError
+                }),
+                path: "test-collection",
+                entityId: undefined,
+                values: { name: "New Entity" },
+                previousValues: undefined,
+                status: "new",
+                data: createMockData({ create: createFn }),
+                context: { snackbarController: { open, close: jest.fn() } } as unknown as RebaseContext,
+                afterSave,
+                afterSaveError
+            });
+            consoleError.mockRestore();
+
+            expect(saved).toBe(mockEntity);
+            expect(createFn).toHaveBeenCalledTimes(1);
+            expect(afterSave).toHaveBeenCalledWith(mockEntity);
+            expect(afterSaveError).not.toHaveBeenCalled();
+            expect(collectionAfterSaveError).not.toHaveBeenCalled();
+            // The hook's failure is still said, as what it is.
+            expect(open).toHaveBeenCalledWith(expect.objectContaining({
+                type: "warning",
+                message: expect.stringContaining("webhook down")
+            }));
+        });
+
         it("runs afterSaveError when the write itself fails", async () => {
             const afterSaveError = jest.fn();
             const data = createMockData({ create: jest.fn().mockRejectedValue(new Error("DB failure")) });

@@ -81,6 +81,11 @@ the server has already run `callbacks` before the row reaches the panel, so a
 `browserCallbacks.afterRead` runs *in addition* to it. Write it to be
 idempotent, or don't write it.
 
+A `browserCallbacks.afterSave` runs after the write has been stored, and
+nothing in the browser can roll it back. A throw from it is shown as a warning;
+the save itself is reported as done, so the form does not offer to create the
+record a second time.
+
 ## Defining Callbacks
 
 ```typescript
