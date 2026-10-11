@@ -7,7 +7,8 @@ import { getDisplayPropertyKey } from "@rebasepro/app";
 import { getLeadingRelationTitleKey, getTitlePropertyCandidates, looksLikeIdentifierValue } from "@rebasepro/app";
 import { getEntityFromCache } from "@rebasepro/app";
 import { getEntityPreviewKeys } from "../../util/previews";
-import { formatRelativeTime, getValueInPath } from "@rebasepro/utils";
+import { getValueInPath } from "@rebasepro/utils";
+import { formatCollectionDate } from "../../util/format_collection_date";
 import type { AuthController } from "@rebasepro/cms-types";
 import { ChipColorScheme, CHIP_COLORS, CHIP_SEED_KEYS } from "@rebasepro/ui";
 import { useEntityDisplay } from "../../hooks/useEntityDisplay";
@@ -338,27 +339,6 @@ function resolveEntityTitleKey(
     return candidates[0];
 }
 
-// ── Date formatting ───────────────────────────────────────────────────
-
-function formatDateValue(value: unknown): string {
-    if (!value) return "";
-    const date = value instanceof Date ? value : new Date(value as string | number);
-    if (isNaN(date.getTime())) return String(value);
-
-    const now = new Date();
-    // A date slot holds whatever property the collection points it at, which is
-    // as often a due or publish date as a `updated_at`. `formatRelativeTime`
-    // reads the sign, so a scheduled date says "in 3d" instead of "Just now".
-    const relative = formatRelativeTime(date, { now });
-    if (relative) return relative;
-
-    return date.toLocaleDateString(undefined, {
-        month: "short",
-        day: "numeric",
-        year: date.getFullYear() !== now.getFullYear() ? "numeric" : undefined
-    });
-}
-
 // ── Hook: collection-level slot keys ──────────────────────────────────
 
 /**
@@ -511,7 +491,7 @@ value: val };
                 property: prop,
                 propertyKey: dateKey,
                 value: val,
-                formatted: formatDateValue(val)
+                formatted: formatCollectionDate(val, prop) ?? String(val)
             };
         }
     }
@@ -695,7 +675,7 @@ value: resolved.value }
             status: computed("status", status) ?? derived.status,
             date: computedDate
                 ? { ...computedDate,
-formatted: formatDateValue(computedDate.value) }
+formatted: formatCollectionDate(computedDate.value, undefined) ?? String(computedDate.value) }
                 : derived.date,
             tags: computed("tags", tags) ?? derived.tags
         };

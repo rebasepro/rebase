@@ -25,7 +25,8 @@ import { IconForView } from "@rebasepro/app";
 import { getIcon } from "@rebasepro/app";
 import { hasDeclaredDisplay } from "@rebasepro/app";
 import { useTranslation } from "@rebasepro/app";
-import { formatRelativeTime, getValueInPath } from "@rebasepro/utils";
+import { getValueInPath } from "@rebasepro/utils";
+import { formatCollectionDate } from "../../util/format_collection_date";
 import { useCollectionSlotKeys, useEntitySlots, type CollectionSlotKeys, type EntityPreviewSlots } from "./usePreviewSlots";
 import { SlotValue, TagChips } from "./SlotValue";
 import { Highlighted } from "./SearchHighlight";
@@ -302,46 +303,6 @@ function compactValueSummary(value: unknown, property: Property): string | null 
     }
 
     return null;
-}
-
-/**
- * Format a date value for display in the list.
- *
- * A date column holds whatever the developer put in it, so the value is as
- * likely to be ahead of now as behind it. The relative phrase therefore comes
- * from {@link formatRelativeTime}, which reads the sign: a row due this
- * afternoon says "in 2h" rather than the "-1d ago" that flooring a negative
- * difference used to produce.
- */
-function formatDateValue(value: unknown, now: Date = new Date()): string | null {
-    if (!value) return null;
-    let date: Date | null = null;
-    if (value instanceof Date) {
-        date = value;
-    } else if (typeof value === "string" || typeof value === "number") {
-        date = new Date(value);
-    }
-    if (!date || isNaN(date.getTime())) return null;
-
-    const diffMs = now.getTime() - date.getTime();
-    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-
-    // Today and yesterday get their own wording; both are strictly in the past,
-    // because a negative difference floors to -1 and falls through to below.
-    if (diffDays === 0) {
-        return date.toLocaleTimeString(undefined, { hour: "2-digit",
-minute: "2-digit" });
-    }
-    if (diffDays === 1) return "Yesterday";
-
-    const relative = formatRelativeTime(date, { now });
-    if (relative) return relative;
-
-    // Comparing years rather than counting days: a date six weeks back across a
-    // new year needs the year, and one 400 days ahead needs it just as much.
-    return date.toLocaleDateString(undefined, { month: "short",
-day: "numeric",
-year: date.getFullYear() !== now.getFullYear() ? "numeric" : undefined });
 }
 
 /**
@@ -1326,7 +1287,7 @@ function ListCell<M extends Record<string, unknown>>({
     if (property.type === "date") {
         return (
             <Typography variant="caption" className="whitespace-nowrap text-surface-400 dark:text-surface-500 font-medium">
-                {formatDateValue(value) ?? "—"}
+                {formatCollectionDate(value, property) ?? "—"}
             </Typography>
         );
     }
