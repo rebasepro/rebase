@@ -1607,6 +1607,14 @@ export class RebaseWebSocketClient {
         });
     }
 
+    /**
+     * @deprecated Will leave the public `client.ws` type in the next minor.
+     * Not part of the app-facing client: the admin UI's SQL console reaches it
+     * through `<Rebase>`, and it answers only a caller with `database:write`.
+     * App code has no supported SQL or branch path on the client; run SQL
+     * server-side (`isSQLAdmin(driver.admin)`), and use `client.admin` for
+     * users and roles.
+     */
     async executeSql(sql: string, options?: { database?: string, role?: string }): Promise<Record<string, unknown>[]> {
         const response = await this.sendMessage({
             type: "EXECUTE_SQL",
@@ -1705,6 +1713,14 @@ junctions: [],
 policies: [] } as TableMetadata);
     }
 
+    /**
+     * @deprecated Will leave the public `client.ws` type in the next minor.
+     * Not part of the app-facing client: the admin UI's SQL console reaches it
+     * through `<Rebase>`, and it answers only a caller with `database:write`.
+     * App code has no supported SQL or branch path on the client; run SQL
+     * server-side (`isSQLAdmin(driver.admin)`), and use `client.admin` for
+     * users and roles.
+     */
     async createBranch(name: string, options?: { source?: string }): Promise<BranchInfo> {
         const response = await this.sendMessage({
             type: "CREATE_BRANCH",
@@ -1714,6 +1730,14 @@ options }
         return response.branch;
     }
 
+    /**
+     * @deprecated Will leave the public `client.ws` type in the next minor.
+     * Not part of the app-facing client: the admin UI's SQL console reaches it
+     * through `<Rebase>`, and it answers only a caller with `database:write`.
+     * App code has no supported SQL or branch path on the client; run SQL
+     * server-side (`isSQLAdmin(driver.admin)`), and use `client.admin` for
+     * users and roles.
+     */
     async deleteBranch(name: string): Promise<void> {
         await this.sendMessage({
             type: "DELETE_BRANCH",

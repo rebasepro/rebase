@@ -62,7 +62,19 @@ export { RebasePaginationError } from "@rebasepro/common";
 export type { PaginationErrorCode } from "@rebasepro/common";
 
 // Logical-condition helpers for `.where(or(...), and(...))`.
-export { QueryBuilder, or, and, not, cond } from "@rebasepro/common";
+export {
+    /**
+     * @deprecated The engine behind `client.data.<collection>.where(…)`, not an
+     * app-facing API; it will leave `@rebasepro/client` in the next minor. Use
+     * the fluent calls on `client.data` and the `or` / `and` / `not` / `cond`
+     * helpers exported beside it.
+     */
+    QueryBuilder,
+    or,
+    and,
+    not,
+    cond
+} from "@rebasepro/common";
 
 // Files named inside text — a markdown body's images. The text stores a
 // `rebase-storage:` reference, never a URL whose download token expires;
@@ -83,7 +95,15 @@ export type { User, RebaseSession, AuthTokens, AuthChangeEvent, DeviceSession } 
 export type { CreateAdminOptions, ListUsersOptions } from "./admin";
 export type { AdminUser } from "./admin";
 export type { CreateCronOptions } from "./cron";
-export { createBackups, type BackupStream } from "./backups";
+export {
+    /**
+     * @deprecated The factory behind `client.backups`; it will leave
+     * `@rebasepro/client` in the next minor. Use `client.backups`, which is
+     * already wired to this client's transport and session.
+     */
+    createBackups,
+    type BackupStream
+} from "./backups";
 export type { CreateBackupsOptions } from "./backups";
 export type {
     ApiKeyKind,

@@ -62,11 +62,11 @@ of it resolves too: Node has supported `require(esm)` since 22.12.
 | `update(id, data)` | Update a row. Returns `M` |
 | `delete(id)` | Delete a row |
 | `count(params?)` | Count matching rows |
-| `where(col, op, val)` | Start a fluent query — returns `QueryBuilder` |
-| `orderBy(col, dir?)` | Order results — returns `QueryBuilder` |
-| `limit(n)` / `offset(n)` | Pagination — returns `QueryBuilder` |
-| `search(str)` | Text search: a case-insensitive substring match by default, ranked full-text where the collection opts in — returns `QueryBuilder` |
-| `include(...rels)` | Include related rows — returns `QueryBuilder` |
+| `where(col, op, val)` | Start a fluent query — returns a query builder |
+| `orderBy(col, dir?)` | Order results — returns a query builder |
+| `limit(n)` / `offset(n)` | Pagination — returns a query builder |
+| `search(str)` | Text search: a case-insensitive substring match by default, ranked full-text where the collection opts in — returns a query builder |
+| `include(...rels)` | Include related rows — returns a query builder |
 | `listen(params, onUpdate, onError?)` | Realtime subscription (requires WebSocket) |
 | `listenById(id, onUpdate, onError?)` | Realtime single-row subscription |
 | `observe(params, onResult, onError?, options?)` | Live query — local-first when `offline` is on, otherwise fetch + `listen` |
@@ -130,7 +130,8 @@ of it resolves too: Node has supported `require(esm)` since 22.12.
 | `MemoryOfflineStore` | Reference `OfflineStore`; the IndexedDB one is wired automatically |
 | `createCookieStorage(options?)` | Cookie-based auth storage adapter |
 | `createMemoryStorage()` | In-memory auth storage adapter |
-| `QueryBuilder` | Fluent query builder (also re-exported from `@rebasepro/common`) |
+| `or`, `and`, `not`, `cond` | Logical-condition helpers for `.where(…)` |
+| `QueryBuilder`, `createBackups` | **Deprecated**, leaving in the next minor: use `client.data.<collection>.where(…)` and `client.backups` |
 | `FindResult`, `FindParams`, `User`, … | Re-exported from `@rebasepro/types` |
 
 ## Quick Start
