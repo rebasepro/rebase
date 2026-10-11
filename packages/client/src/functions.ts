@@ -54,6 +54,11 @@ import type { FunctionInvokeOptions } from "@rebasepro/types";
  *
  * @internal
  */
+/** Whether a URL path segment is `.` or `..`, percent-encoded or not. */
+function isDotSegment(segment: string): boolean {
+    return /^(?:\.|%2e){1,2}$/i.test(segment);
+}
+
 export function createFunctionsClient(transport: Transport): FunctionsClient {
     return {
         async invoke<T = unknown>(
@@ -79,6 +84,22 @@ export function createFunctionsClient(transport: Transport): FunctionsClient {
                     "Pass anything after it as `options.path` — " +
                     `invoke("${name.split("/")[0]}", payload, { path: "${name.split("/").slice(1).join("/")}" }).`,
                     { code: "INVALID_FUNCTION_NAME", details: { name } }
+                );
+            }
+
+            // `.` and `..` are resolved by `fetch` before the request leaves:
+            // `invoke("x", undefined, { path: "../../admin/users/<uid>",
+            // method: "DELETE" })` reached `/api/admin/users/<uid>`, a route
+            // this method does not describe (and an agent tool built on it
+            // offers). A function's own routes never need one, so a dot
+            // segment — as the name, or anywhere in the path before its query
+            // — is refused, spelled plainly or percent-encoded.
+            const pathPart = (options?.path ?? "").split(/[?#]/)[0];
+            if (isDotSegment(name) || pathPart.split("/").some(isDotSegment)) {
+                throw new RebaseClientError(
+                    `Invalid function route "${name}${options?.path ? ` + ${options.path}` : ""}": ` +
+                    "a `.` or `..` segment would leave /functions/" + name + ".",
+                    { code: "INVALID_FUNCTION_PATH", details: { name, path: options?.path } }
                 );
             }
 

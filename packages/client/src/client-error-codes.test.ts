@@ -81,6 +81,12 @@ describe("a client-side error", () => {
         expect(error.message).toContain("options.path");
     });
 
+    it("INVALID_FUNCTION_PATH — a `..` segment that would leave the function's routes", async () => {
+        const error = await refusal(() => client().functions.invoke("x", undefined, { method: "DELETE", path: "../../admin/users/u1" }));
+
+        expect(error.code).toBe("INVALID_FUNCTION_PATH");
+    });
+
     it("is catchable as a RebaseApiError, with no status", async () => {
         // The documented single `catch`: `RebaseClientError extends
         // RebaseApiError`, and the absent `status` is what says it never

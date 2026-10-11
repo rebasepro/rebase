@@ -97,6 +97,31 @@ describe("functions.invoke — a name is one segment", () => {
         ).rejects.toThrow(/invoke\("storage-provision", payload, \{ path: "a9d4a559" \}\)/);
     });
 
+    // `fetch` resolves dot segments before sending, so a model-chosen path of
+    // `../../admin/users/<uid>` with DELETE reached `/api/admin/users/<uid>`.
+    it.each([
+        ["x", "../../admin/users/u1"],
+        ["x", "a/%2e%2e/%2E%2E/admin"],
+        ["x", "./."],
+        ["..", undefined],
+        ["%2e%2e", undefined]
+    ])("refuses a dot segment that would leave the function (%s, %s)", async (name, path) => {
+        const { transport, calls } = transportSpy();
+        const client = createFunctionsClient(transport as never);
+
+        await expect(client.invoke(name, undefined, { method: "DELETE", path })).rejects.toThrow(/would leave/);
+        expect(calls).toHaveLength(0);
+    });
+
+    it("keeps dots that are not a whole segment, and dots in the query", async () => {
+        const { transport, calls } = transportSpy();
+        const client = createFunctionsClient(transport as never);
+
+        await client.invoke("files", undefined, { method: "GET", path: "v1.2/a..b?next=../x" });
+
+        expect(calls[0].path).toBe("/functions/files/v1.2/a..b?next=../x");
+    });
+
     it("still encodes a name that needs it", async () => {
         const { transport, calls } = transportSpy();
         const client = createFunctionsClient(transport as never);
