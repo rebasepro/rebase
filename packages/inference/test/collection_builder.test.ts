@@ -346,8 +346,12 @@ describe("a field inside a map", () => {
             meta: { status: i % 2 ? "draft" : "published", code: "0012" }
         }));
         const properties = await buildEntityPropertiesFromData(rows, inferType);
-        const nested = (properties.meta as { properties: Properties }).properties;
-        expect(nested.status).toEqual(expect.objectContaining({ enum: properties.status.enum, validation: { required: true } }));
+        const meta = properties.meta;
+        if (meta.type !== "map" || !meta.properties) throw new Error("meta is not a map");
+        const nested = meta.properties;
+        const topEnum = "enum" in properties.status ? properties.status.enum : undefined;
+        expect(topEnum).toBeDefined();
+        expect(nested.status).toEqual(expect.objectContaining({ enum: topEnum, validation: { required: true } }));
         expect(nested.code.type).toBe("string");
     });
 });
