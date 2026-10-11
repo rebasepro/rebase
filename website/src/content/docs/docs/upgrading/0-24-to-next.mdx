@@ -14,8 +14,10 @@ the version that carries them exists on npm. If you installed from npm you are
 on 0.24 and none of this has reached you — read it to know what is coming, and
 come back when you move.
 
-All three come with the performance work: the count switch on REST lists, the
-MCP collection listing, and the admin's translations.
+The first three come with the performance work: the count switch on REST lists,
+the MCP collection listing, and the admin's translations. The rest come from the
+backlog sweep: stricter refusals at boot and on `OPTIONS`, the SDK's cron path
+and offline reads, the storage source registry, and unused UI kit props.
 
 ---
 
@@ -71,3 +73,98 @@ pass `locale`.
 ```bash
 grep -rnE "import \{[^}]*\bes\b[^}]*\} from \"@rebasepro/app\"" --exclude-dir=node_modules .
 ```
+
+## 71. A plain `OPTIONS` to a route with no handler is a 404
+
+The CORS middleware used to answer every `OPTIONS` request itself, with an empty
+`204`. It now answers only CORS preflights (an `OPTIONS` carrying
+`Access-Control-Request-Method`); any other `OPTIONS` reaches its route. A route
+with no `OPTIONS` handler answers `404`. `OPTIONS /api/storage/tus` now returns
+the TUS capabilities (`Tus-Version`, `Tus-Extension`, `Tus-Max-Size`), as the
+docs always said.
+
+**Who is affected:** a client, proxy or health check that probed a route with
+`OPTIONS` and read the `204` as "it exists". Browsers' preflights are
+unchanged.
+
+**What to change:** probe with the route's real method (`HEAD` or `GET`).
+
+## 72. Colliding names are refused at boot, with the reason
+
+A table, junction table or enum type whose names are equal after Postgres's
+63-byte truncation used to fail at `db push` with "already exists". Two
+properties that resolve to the same column (`myTitle` and `my_title`), and a
+relation `target` written as a string (`target: "authors"`), failed later or
+confusingly. Each is now refused when the configuration loads, and the message
+says what to rename or write.
+
+**Who is affected:** a project that declares such a pair. It could not complete
+`db push` before either, so this moves the failure earlier.
+
+**What to change:** rename one of the colliding names, and write a relation
+target as the collection, not its slug:
+
+```diff
+- relation: { kind: "belongsTo", target: "authors" },
++ relation: { kind: "belongsTo", target: () => authors },
+```
+
+## 73. `client.cron` calls `/api/admin/cron`
+
+The SDK's cron client defaulted to `/api/cron`, the deprecated alias. It now
+calls `/api/admin/cron`, where every admin surface lives.
+
+**Who is affected:** a server (or a proxy rule) that serves only the old path.
+The SDK's cron calls answer `404` against it.
+
+**What to change:** upgrade the server with the SDK, or keep the old path
+explicitly:
+
+```ts
+const client = createRebaseClient({ baseUrl, cron: { cronPath: "/api/cron" } });
+```
+
+## 74. Offline reads that cannot be answered in full fail with `OFFLINE`
+
+While offline, `findAll()` and `iterate()` returned the part of the collection
+this device had cached as if it were all of it, and `count()` counted the cached
+rows. A page this device never fetched now fails with `OFFLINE`, and so does a
+`count()` with no count cached from the server.
+
+**Who is affected:** an app that shows those reads offline.
+
+**What to change:** catch the error where the app drew partial results, and
+show what it has with a note, or ask for a page the device already holds.
+
+```ts
+try {
+  rows = await client.data.posts.findAll();
+} catch (e) {
+  if (e instanceof RebaseApiError && e.code === "OFFLINE") rows = cached;
+  else throw e;
+}
+```
+
+## 75. `getOrDefault(key)` throws for an unregistered storage source
+
+`ClientStorageSourceRegistry.getOrDefault(key)` returned the default source for
+a key it did not know, so a property naming a source the panel had not loaded
+yet uploaded to the default bucket. It now throws.
+
+**Who is affected:** code that calls `getOrDefault` with a key it did not
+register. The admin itself no longer does.
+
+**What to change:** register the source first, or use `get(key)`, which returns
+`undefined` for an unknown key, where a missing source is expected.
+
+## 76. `TextField.maxRows` and six `MultiSelect` props are gone
+
+`TextField` declared `maxRows`, and `MultiSelect` declared `onChange`, `name`,
+`position`, `endAdornment`, `multiple` and `padding`. None was ever read, so
+passing one did nothing. They are removed from the types, and passing one is now
+a type error.
+
+**Who is affected:** code that passed one of them. Nothing changes at run time.
+
+**What to change:** delete the prop. For a multi-select's changes use
+`onValueChange`.
