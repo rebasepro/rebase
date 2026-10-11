@@ -271,8 +271,9 @@ outage. See [rls-enabled-no-policies](#rls-enabled-no-policies).
 
 **Policy grants unconditional access.** Critical.
 
-A permissive policy whose `USING` or `WITH CHECK` expression is a constant truth — `true`,
-`(true)`, `1 = 1`. Permissive policies are ORed together, so a single one of these satisfies
+A permissive policy whose `USING` or `WITH CHECK` expression is a constant truth: `true`,
+`(true)`, `1 = 1`, `1 > 0`, `NOT false`, `true OR <anything>`, or a constant compared with
+itself through a cast. Permissive policies are ORed together, so a single one of these satisfies
 the table's row filter no matter how strict every other policy is.
 
 Like every check, it reports the policy only when a role it applies to can reach the table:

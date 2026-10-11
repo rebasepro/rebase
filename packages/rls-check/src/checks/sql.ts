@@ -238,34 +238,117 @@ export function qualifiedNameEndingAt(tokens: SqlToken[], i: number): string[] {
 /**
  * Does this expression normalize to an unconditional truth?
  *
- * Strictly structural: parens and boolean casts are dropped and the *whole*
- * remainder has to be the constant. A substring match on `true` would flag
- * `(is_public = true AND owner = auth.uid())`, which is exactly the kind of
- * false positive this tool cannot afford.
+ * Strictly structural: parens and casts are dropped, and the expression is
+ * folded only where every part is a constant. A substring match on `true`
+ * would flag `(is_public = true AND owner = auth.uid())`, which is exactly the
+ * kind of false positive this tool cannot afford.
+ *
+ * Folded: `true`, `NOT false`, a constant compared with a constant (`1 = 1`,
+ * `1 > 0`, `'a'::character varying = 'a'::character varying`), and `AND` /
+ * `OR` over those — `true OR x` is true whatever `x` is. Only `true`, `1 = 1`
+ * and a one-word cast were, so `NOT false`, `1 > 0` and `true OR …` passed as
+ * scoped policies.
  */
 export function isUnconditionalTrue(expr: string | null | undefined): boolean {
     if (expr == null) return false;
-    const tokens = tokenize(expr).filter(
-        (t) => !(t.kind === "punct" && (t.value === "(" || t.value === ")"))
-    );
+    return foldsTo(withoutCasts(tokenize(expr)), true);
+}
 
-    // Drop `::boolean` / `::bool` casts, which Postgres likes to render.
-    const stripped: SqlToken[] = [];
+/** The words that continue a multi-word type name after `::`. */
+const TYPE_CONTINUATIONS = new Set(["varying", "precision", "with", "without", "time", "zone"]);
+
+function withoutCasts(tokens: SqlToken[]): SqlToken[] {
+    const out: SqlToken[] = [];
     for (let i = 0; i < tokens.length; i++) {
         if (tokens[i].kind === "op" && tokens[i].value === "::") {
-            i++; // skip the type name too
+            i++; // the type name
+            // `character varying`, `double precision`, `timestamp with time zone`
+            while (i + 1 < tokens.length && tokens[i + 1].kind === "ident" && TYPE_CONTINUATIONS.has(tokens[i + 1].value)) i++;
+            // `varchar(10)`, `numeric(10, 2)`
+            if (i + 1 < tokens.length && tokens[i + 1].value === "(") {
+                const close = matchParen(tokens, i + 1);
+                if (close > i) i = close;
+            }
+            // `text[]`
+            while (i + 2 < tokens.length && tokens[i + 1].value === "[" && tokens[i + 2].value === "]") i += 2;
             continue;
         }
-        stripped.push(tokens[i]);
+        out.push(tokens[i]);
     }
+    return out;
+}
 
-    const values = stripped.map((t) => t.value);
-    if (values.length === 1 && values[0] === "true") return true;
-    // `1 = 1`, `'x' = 'x'` — the same constant compared with itself.
-    if (values.length === 3 && values[1] === "=" && values[0] === values[2]) {
-        return stripped[0].kind === "number" || stripped[0].kind === "string";
+/** `tokens` with every pair of parens that wraps all of it removed. */
+function unwrapped(tokens: SqlToken[]): SqlToken[] {
+    let t = tokens;
+    while (t.length >= 2 && t[0].value === "(" && t[0].kind === "punct" && matchParen(t, 0) === t.length - 1) {
+        t = t.slice(1, -1);
     }
-    return false;
+    return t;
+}
+
+/** Split at a keyword that sits outside every paren of `tokens`. */
+function splitTopLevel(tokens: SqlToken[], word: string): SqlToken[][] {
+    const parts: SqlToken[][] = [[]];
+    let depth = 0;
+    for (const token of tokens) {
+        if (token.kind === "punct" && token.value === "(") depth++;
+        if (token.kind === "punct" && token.value === ")") depth--;
+        if (depth === 0 && token.kind === "ident" && !token.quoted && token.value === word) {
+            parts.push([]);
+            continue;
+        }
+        parts[parts.length - 1].push(token);
+    }
+    return parts;
+}
+
+/** Whether the expression is the constant `want` whatever the row and caller. */
+function foldsTo(tokens: SqlToken[], want: boolean): boolean {
+    const t = unwrapped(tokens);
+    if (t.length === 0) return false;
+
+    // OR binds loosest, then AND, then NOT.
+    const ors = splitTopLevel(t, "or");
+    if (ors.length > 1) {
+        return want ? ors.some((part) => foldsTo(part, true)) : ors.every((part) => foldsTo(part, false));
+    }
+    const ands = splitTopLevel(t, "and");
+    if (ands.length > 1) {
+        return want ? ands.every((part) => foldsTo(part, true)) : ands.some((part) => foldsTo(part, false));
+    }
+    if (t[0].kind === "ident" && !t[0].quoted && t[0].value === "not") return foldsTo(t.slice(1), !want);
+
+    if (t.length === 1 && t[0].kind === "ident" && !t[0].quoted) {
+        return t[0].value === (want ? "true" : "false");
+    }
+    const compared = compareConstants(t);
+    return compared !== null && compared === want;
+}
+
+/** `<constant> <op> <constant>`, evaluated, or null when it is not that. */
+function compareConstants(t: SqlToken[]): boolean | null {
+    if (t.length !== 3 || t[1].kind !== "op") return null;
+    const [a, op, b] = [t[0], t[1].value, t[2]];
+    if (a.kind === "number" && b.kind === "number") {
+        const x = Number(a.value);
+        const y = Number(b.value);
+        if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+        switch (op) {
+            case "=": return x === y;
+            case "<>": case "!=": return x !== y;
+            case "<": return x < y;
+            case ">": return x > y;
+            case "<=": return x <= y;
+            case ">=": return x >= y;
+            default: return null;
+        }
+    }
+    if (a.kind === "string" && b.kind === "string") {
+        if (op === "=") return a.value === b.value;
+        if (op === "<>" || op === "!=") return a.value !== b.value;
+    }
+    return null;
 }
 
 /** Words that are never a column reference in a policy predicate. */

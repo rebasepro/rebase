@@ -276,7 +276,14 @@ describe("policy-always-true", () => {
 });
 
 describe("isUnconditionalTrue", () => {
-    it.each(["true", "(true)", " TRUE ", "((true))", "1 = 1", "(1 = 1)", "true::boolean"])(
+    it.each([
+        "true", "(true)", " TRUE ", "((true))", "1 = 1", "(1 = 1)", "true::boolean",
+        // Audit 17 L5: each of these passed as a scoped policy.
+        "(NOT false)", "NOT (1 = 2)", "(true OR (owner_id = auth.uid()))", "((owner_id = auth.uid()) OR true)",
+        "(1 > 0)", "(2 >= 2)", "(1 <> 2)",
+        "('a'::character varying = 'a'::character varying)", "('a'::varchar(10) = 'a'::varchar(10))",
+        "((1 = 1) AND (NOT false))"
+    ])(
         "treats %j as unconditional",
         (expr) => {
             expect(isUnconditionalTrue(expr)).toBe(true);
@@ -289,7 +296,16 @@ describe("isUnconditionalTrue", () => {
         "1 = 2",
         "false",
         "(owner_id IS NOT NULL)",
-        "name = 'true'"
+        "name = 'true'",
+        "(NOT is_archived)",
+        "(false OR (owner_id = auth.uid()))",
+        "((owner_id = auth.uid()) AND true)",
+        "(1 < 0)",
+        "(x BETWEEN 1 AND 2)",
+        "(NOT (NOT is_archived))",
+        "(\"true\")",
+        "(a = a)",
+        "(auth.uid() = auth.uid())"
     ])("leaves %j alone", (expr) => {
         expect(isUnconditionalTrue(expr)).toBe(false);
     });
