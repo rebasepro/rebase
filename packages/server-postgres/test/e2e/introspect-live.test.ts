@@ -18,9 +18,10 @@
  * e2e files do) and otherwise falls back to `INTROSPECT_TEST_DATABASE_URL` —
  * a superuser-capable connection string on any reachable server, which is how
  * it runs on a machine with Postgres installed but no Docker. With neither, the
- * suite skips and says so.
+ * suite skips and says so — except under `CI`, where a skip would read as a
+ * pass, so it fails instead.
  */
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, type TestContext } from "vitest";
 import { execa } from "execa";
 import fs from "node:fs";
 import path from "node:path";
@@ -43,18 +44,41 @@ const CACHE_DIR = path.resolve(__dirname, "..", "..", "node_modules", ".cache", 
  * Fetched rather than committed: they are third-party dumps of a size that does
  * not belong in this repository, and the fixture next to each one already
  * carries everything the offline tests need.
+ *
+ * Pinned to a commit, not a branch. A branch moves under the suite: an upstream
+ * edit reddens CI with no change here, and an upstream rename turns the drift
+ * check into a 404. To move a pin, change the SHA and run this file; the drift
+ * block says whether the committed fixture still describes the new dump.
  */
+const PAGILA = "ce6e114236bb828e5ec0dc835f65f1bf1b9179f5";
+const CHINOOK = "7f67772503d71ba90f19283c38e93923addb43fa";
+const NORTHWIND = "cd0ef28d66369fbe177778e604e4be0f153c9e5c";
 const UPSTREAM = {
     pagila: [
-        "https://raw.githubusercontent.com/devrimgunduz/pagila/master/pagila-schema.sql",
-        "https://raw.githubusercontent.com/devrimgunduz/pagila/master/pagila-data.sql"
+        `https://raw.githubusercontent.com/devrimgunduz/pagila/${PAGILA}/pagila-schema.sql`,
+        `https://raw.githubusercontent.com/devrimgunduz/pagila/${PAGILA}/pagila-data.sql`
     ],
-    chinook: ["https://raw.githubusercontent.com/lerocha/chinook-database/master/ChinookDatabase/DataSources/Chinook_PostgreSql.sql"],
-    northwind: ["https://raw.githubusercontent.com/pthom/northwind_psql/master/northwind.sql"]
+    chinook: [`https://raw.githubusercontent.com/lerocha/chinook-database/${CHINOOK}/ChinookDatabase/DataSources/Chinook_PostgreSql.sql`],
+    northwind: [`https://raw.githubusercontent.com/pthom/northwind_psql/${NORTHWIND}/northwind.sql`]
 } as const;
+
+/** Under CI a skip reads as a pass, so anything that would skip fails instead. */
+const IN_CI = Boolean(process.env.CI);
 
 let admin: { url: string; container?: PgContainer } | undefined;
 let skipReason = "";
+
+/**
+ * Skips a test when there is no server, and says why. Called inside the test,
+ * not as `it.runIf(!skipReason)`: that condition is read when the file is
+ * collected, before `beforeAll` has looked for a server, so it was always true
+ * and a machine with no server failed every test instead of skipping them.
+ */
+function skipWithoutServer(ctx: TestContext): void {
+    if (!skipReason) return;
+    if (IN_CI) throw new Error(`[introspect-live] no PostgreSQL server under CI: ${skipReason}`);
+    ctx.skip(skipReason);
+}
 
 /** Connection string for a database on the server under test. */
 function urlFor(database: string): string {
@@ -96,7 +120,10 @@ async function loadSql(database: string, sqlPath: string, stopOnError = true): P
 /** Downloads a sample dump once, then reuses the copy on disk. */
 async function cachedDownload(url: string): Promise<string | null> {
     fs.mkdirSync(CACHE_DIR, { recursive: true });
-    const target = path.join(CACHE_DIR, path.basename(new URL(url).pathname));
+    // Keyed by the pinned commit, so moving a pin never reads the old dump back.
+    const segments = new URL(url).pathname.split("/");
+    const pin = segments[3]?.slice(0, 12) ?? "unpinned";
+    const target = path.join(CACHE_DIR, `${pin}-${path.basename(new URL(url).pathname)}`);
     if (fs.existsSync(target) && fs.statSync(target).size > 0) return declaw(target);
     try {
         const response = await fetch(url);
@@ -203,7 +230,8 @@ describe("reading a live schema", () => {
         await client.end();
     }, 120_000);
 
-    it.runIf(!skipReason)("reads unique constraints as arrays, not as the literal `{a,b}`", async () => {
+    it("reads unique constraints as arrays, not as the literal `{a,b}`", async (ctx) => {
+        skipWithoutServer(ctx);
         // node-pg has no parser for an array of `name`, so the column list comes
         // back as a string unless the query casts it. Everything downstream
         // indexes it as an array and fails silently if it is not one.
@@ -213,7 +241,8 @@ describe("reading a live schema", () => {
         expect(unique?.column_names).toEqual(["email_unique"]);
     });
 
-    it.runIf(!skipReason)("reads table and column comments", async () => {
+    it("reads table and column comments", async (ctx) => {
+        skipWithoutServer(ctx);
         const { metadata } = await readSchema(DB);
         const table = metadata.comments.find((c) => c.table_name === "constraint_shapes" && c.column_name === null);
         const column = metadata.comments.find((c) => c.column_name === "price");
@@ -221,7 +250,8 @@ describe("reading a live schema", () => {
         expect(column?.comment).toBe("Unit price, before tax.");
     });
 
-    it.runIf(!skipReason)("reads the server's own rendering of every CHECK", async () => {
+    it("reads the server's own rendering of every CHECK", async (ctx) => {
+        skipWithoutServer(ctx);
         const { metadata } = await readSchema(DB);
         const facts = parseCheckConstraints(metadata.checks).get("constraint_shapes");
         expect(facts?.get("price")).toEqual({ moreThan: 0 });
@@ -229,7 +259,8 @@ describe("reading a live schema", () => {
         expect(facts?.get("slug")).toEqual({ lengthMin: 3, lengthMax: 64 });
     });
 
-    it.runIf(!skipReason)("reads generated and identity metadata", async () => {
+    it("reads generated and identity metadata", async (ctx) => {
+        skipWithoutServer(ctx);
         const { metadata } = await readSchema(DB);
         const computed = metadata.columns.find((c) => c.column_name === "computed_total");
         expect(computed?.is_generated).toBe("ALWAYS");
@@ -237,7 +268,8 @@ describe("reading a live schema", () => {
         expect(price?.is_generated).toBe("NEVER");
     });
 
-    it.runIf(!skipReason)("reads the delete rule that states ownership", async () => {
+    it("reads the delete rule that states ownership", async (ctx) => {
+        skipWithoutServer(ctx);
         const { metadata, tables } = await readSchema(DB);
         const childKey = metadata.fks.find((fk) => fk.table_name === "constraint_shapes_child");
         expect(childKey?.delete_rule).toBe("CASCADE");
@@ -247,7 +279,8 @@ describe("reading a live schema", () => {
         expect(child?.owner?.evidence).toBe("cascade-delete");
     });
 
-    it.runIf(!skipReason)("counts rows without scanning past the threshold", async () => {
+    it("counts rows without scanning past the threshold", async (ctx) => {
+        skipWithoutServer(ctx);
         const client = new pg.Client({ connectionString: urlFor(DB) });
         await client.connect();
         try {
@@ -266,7 +299,8 @@ describe("reading a live schema", () => {
         }
     });
 
-    it.runIf(!skipReason)("survives a schema with no tables at all", async () => {
+    it("survives a schema with no tables at all", async (ctx) => {
+        skipWithoutServer(ctx);
         const empty = "rebase_introspect_empty";
         await createDatabase(empty);
         const client = new pg.Client({ connectionString: urlFor(empty) });
@@ -282,7 +316,8 @@ describe("reading a live schema", () => {
         }
     }, 60_000);
 
-    it.runIf(!skipReason)("reads a schema that does not exist as empty rather than erroring", async () => {
+    it("reads a schema that does not exist as empty rather than erroring", async (ctx) => {
+        skipWithoutServer(ctx);
         const client = new pg.Client({ connectionString: urlFor(DB) });
         await client.connect();
         try {
@@ -335,18 +370,21 @@ describe("a partitioned table", () => {
         }
     }, 120_000);
 
-    it.runIf(!skipReason)("returns the parent and none of the partitions", async () => {
+    it("returns the parent and none of the partitions", async (ctx) => {
+        skipWithoutServer(ctx);
         const { metadata } = await readSchema(DB);
         expect(metadata.tables.map((t) => t.table_name).sort()).toEqual(["customers", "payments"]);
     });
 
-    it.runIf(!skipReason)("marks the parent as partitioned", async () => {
+    it("marks the parent as partitioned", async (ctx) => {
+        skipWithoutServer(ctx);
         const { metadata } = await readSchema(DB);
         expect(metadata.tables.find((t) => t.table_name === "payments")?.is_partitioned).toBe(true);
         expect(metadata.tables.find((t) => t.table_name === "customers")?.is_partitioned).toBe(false);
     });
 
-    it.runIf(!skipReason)("attributes the partitions' foreign key to the parent, exactly once", async () => {
+    it("attributes the partitions' foreign key to the parent, exactly once", async (ctx) => {
+        skipWithoutServer(ctx);
         const { metadata } = await readSchema(DB);
         const keys = metadata.fks.filter((fk) => fk.table_name === "payments");
         expect(keys).toHaveLength(1);
@@ -393,10 +431,14 @@ describe("committed fixtures match a freshly loaded database", () => {
      * they relate, and how they classify.
      */
     for (const name of ["pagila", "chinook", "northwind"] as const) {
-        it.runIf(!skipReason)(`${name}`, async () => {
+        it(`${name}`, async (ctx) => {
+            skipWithoutServer(ctx);
             if (!loaded.get(name)) {
-                console.warn(`[introspect-live] skipping ${name}: ${downloadReason || "dump unavailable"}`);
-                return;
+                const why = `[introspect-live] ${name}: ${downloadReason || "dump unavailable"}`;
+                // Under CI an unfetchable dump is a failure: a drift check that
+                // passes whenever it cannot look has stopped checking anything.
+                if (IN_CI) throw new Error(why);
+                ctx.skip(why);
             }
             const { metadata, tables } = await readSchema(`rebase_introspect_${name}`);
             const fixture = JSON.parse(fs.readFileSync(path.join(FIXTURE_DIR, `${name}.json`), "utf-8"));
