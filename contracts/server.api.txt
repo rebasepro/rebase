@@ -772,6 +772,7 @@ interface LazyComponentRef { load }
 interface ListLimitBounds { defaultLimit, maxLimit, vectorDefaultLimit }
 interface LiteralPolicyOperand { kind, value }
 interface LogicalCondition { conditions, type }
+interface LogicalConditionFor { conditions, type }
 interface ManagedCompatibility { eligible, reasons }
 interface ManyToManyRelation { kind, onDelete, onUpdate, overrides, relationName, target, through }
 interface MapProperty { access, callbacks, columnName, columnType, conditions, defaultValue, description, dynamicProps, excludeFromApi, keyValue, metadata, name, properties, propertiesOrder, propertyConfig, type, validation }
@@ -985,6 +986,7 @@ type FieldOperationFor
 type FieldPath
 type FileType
 type FilterCombinationValidProps { collection, databaseId, filterValues, path, sortBy }
+type FilterConditionFor
 type FilterValues
 type FindAllParams
 type FirebaseProperties
@@ -1084,8 +1086,8 @@ class RebasePaginationError { code }
 class RebaseRealtimeChannel { broadcast, enableHistory, history, join, leave, name, onBroadcast, onBroadcast, onError, onPresence, sequence, track, untrack }
 class RebaseWebSocketClient { authenticate, checkUniqueField, count, createBranch, delete, deleteBranch, disconnect, ensureConnected, executeSql, fetchApplicationRoles, fetchAvailableDatabases, fetchAvailableRoles, fetchCollection, fetchCurrentDatabase, fetchOne, fetchTableMetadata, fetchUnmappedTables, getAuthToken, hasSocket, listBranches, listenCollection, listenOne, on, onChannelMessage, onConnectionLost, onReconnect, onStateChange, onUnauthorized, reauthenticate, runSqlScript, save, sendMessage, setAuthTokenGetter, state }
 const STORAGE_REFERENCE_SCHEME
-function and
-function cond
+function and { conditions, type }
+function cond { column, operator, value }
 function createBackups { download, downloadUrl, list, stream }
 function createCookieStorage
 function createMemoryStorage
@@ -1093,8 +1095,8 @@ function createRebaseClient
 function etagOf
 function isOfflineError
 function isStorageReference
-function not
-function or
+function not { conditions, type }
+function or { conditions, type }
 function parseStorageReference
 function resolveStorageReferences
 function storageReference
@@ -1134,7 +1136,9 @@ interface IncludeOptions { count, fields, include, limit, logical, orderBy, wher
 interface ListUsersOptions { limit, offset, orderBy, orderDir, search }
 interface LiveResult { data, error, fromCache, hasPendingWrites, meta, partial }
 interface LogicalCondition { conditions, type }
+interface LogicalConditionFor { conditions, type }
 interface MutationRollback { rows }
+interface ObserveByIdOptions { include, realtime }
 interface ObserveOptions { realtime }
 interface OfflineApi { clear, onQueueChange, onStatusChange, pending, status, sync }
 interface OfflineCacheEntry { cachedAt, value }
@@ -1167,6 +1171,7 @@ type CreateRebaseClientResult
 type CursorSpec
 type FieldOperation
 type FieldPath
+type FilterConditionFor
 type FilterValues
 type FindAllParams
 type FindParams
@@ -1225,7 +1230,7 @@ const assertBeforeQueryIsPostgresOnly
 const buildPropertyCallbacks
 const defaultUsersCollection { auth, callbacks, childCollections, dataSource, databaseId, description, disableDefaultPolicies, engine, history, indexes, metadata, name, ownerId, properties, relations, schema, search, securityRules, singularName, slug, softDelete, strictWrites, table, tenant }
 function aggregateAlias
-function and
+function and { conditions, type }
 function applyDefaultValuesOnCreate
 function authSecretsMissingExclusion
 function buildCollectionFromTableMetadata
@@ -1246,7 +1251,7 @@ function checkOperation
 function classifyTable
 function collectAllPages
 function compileRulePolicies
-function cond
+function cond { column, operator, value }
 function copyCarriesRelation
 function createBatchLoader
 function createConcurrencyLimit
@@ -1316,8 +1321,8 @@ function normalizeEmail
 function normalizeInclude
 function normalizeOrderBy
 function normalizeToEntityRelation
-function not
-function or
+function not { conditions, type }
+function or { conditions, type }
 function paginateFind
 function parseIdValues
 function parseOrderBySpecStrict
