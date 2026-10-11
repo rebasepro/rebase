@@ -14,7 +14,6 @@ import { DEFAULT_ONE_OF_TYPE, DEFAULT_ONE_OF_VALUE, getDefaultValueFor } from "@
 import { getIconForProperty } from "../../util/property_utils";
 import { cls, ExpandablePanel, paperMixin, Select, SelectItem, Typography } from "@rebasepro/ui";
 import { isDisabled, useTranslation } from "@rebasepro/app";
-import { useClearRestoreValue } from "../useClearRestoreValue";
 import { ArrayContainer, ArrayEntryParams } from "../../components/ArrayContainer";
 import { mergeDeep } from "@rebasepro/utils";
 
@@ -49,11 +48,6 @@ export function BlockFieldBinding({
         throw Error("ArrayOneOfField misconfiguration. Property `oneOf` not set");
 
     const expanded = property.admin?.expanded === undefined ? true : property.admin?.expanded;
-    useClearRestoreValue({
-        property,
-        value,
-        setValue
-    });
 
     const [lastAddedId, setLastAddedId] = useState<number | undefined>();
 

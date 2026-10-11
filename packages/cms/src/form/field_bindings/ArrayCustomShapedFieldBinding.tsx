@@ -9,7 +9,6 @@ import { ExpandablePanel, Typography } from "@rebasepro/ui";
 import { getArrayResolvedProperties } from "@rebasepro/common";
 import { isDisabled, isReadOnly } from "@rebasepro/app";
 import { getIconForProperty } from "../../util/property_utils";
-import { useClearRestoreValue } from "../useClearRestoreValue";
 import { useAuthController } from "@rebasepro/app";
 
 /**
@@ -47,12 +46,6 @@ export function ArrayCustomShapedFieldBinding({
     })
 
     const expanded = property.admin?.expanded === undefined ? true : property.admin?.expanded;
-
-    useClearRestoreValue({
-        property,
-        value,
-        setValue
-    });
 
     const title = (<>
         <LabelWithIcon

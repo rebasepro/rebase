@@ -16,7 +16,6 @@ import { PreviewType } from "@rebasepro/cms-types";
 import { FieldHelperText } from "../components/FieldHelperText";
 import { LabelWithIcon } from "../components/LabelWithIcon";
 import { PropertyPreview } from "../../preview";
-import { useClearRestoreValue } from "../useClearRestoreValue";
 import { getIconForProperty } from "../../util/property_utils";
 
 /**
@@ -48,12 +47,6 @@ export function TextFieldBinding<T extends string | number>({
         // and the property has already said what it is.
         url = property.admin?.urlPreview ?? property.url;
     }
-
-    useClearRestoreValue({
-        property,
-        value,
-        setValue
-    });
 
     const displayValue = (value !== undefined && value !== null) ? String(value) : "";
 

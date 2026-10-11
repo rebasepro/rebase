@@ -10,7 +10,6 @@ import { getArrayResolvedProperties, getDefaultValueFor } from "@rebasepro/commo
 import { getIconForProperty } from "../../util/property_utils";
 import { PropertyFieldBinding } from "../PropertyFieldBinding";
 import { ExpandablePanel, Typography } from "@rebasepro/ui";
-import { useClearRestoreValue } from "../useClearRestoreValue";
 import { isDisabled, useAuthController, useTranslation } from "@rebasepro/app";
 import { mergeDeep } from "@rebasepro/utils";
 
@@ -61,12 +60,6 @@ export function RepeatFieldBinding({
     const ofProperty = property.of;
 
     const [lastAddedId, setLastAddedId] = useState<number | undefined>();
-
-    useClearRestoreValue({
-        property,
-        value,
-        setValue
-    });
 
     const buildEntry = ({
         index,

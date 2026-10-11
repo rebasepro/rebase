@@ -5,7 +5,6 @@ import { Button, CheckIcon, cls, defaultBorderMixin, IconButton, PencilIcon, Tex
 
 import { FieldHelperText } from "../components/FieldHelperText";
 import { LabelWithIcon } from "../components/LabelWithIcon";
-import { useClearRestoreValue } from "../useClearRestoreValue";
 import { getIconForProperty } from "../../util/property_utils";
 
 /** Base64, optionally padded. Empty is allowed — that is a cleared field. */
@@ -62,8 +61,6 @@ export function BinaryFieldBinding({
     useEffect(() => {
         setText(typeof value === "string" ? value : "");
     }, [value]);
-
-    useClearRestoreValue({ property, value, setValue });
 
     const handleClear = useCallback((e: React.MouseEvent) => {
         e.stopPropagation();

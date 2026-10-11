@@ -13,7 +13,6 @@ import { EntityPreviewContainer } from "../../components/EntityPreviewBinding";
 import { ReferencePreview } from "../../preview";
 import { IconForView, useTranslation } from "@rebasepro/app";
 import { getIconForProperty } from "../../util/property_utils";
-import { useClearRestoreValue } from "../useClearRestoreValue";
 import { cls } from "@rebasepro/ui";
 import { useCollectionRegistryController } from "../../hooks/navigation/contexts/CollectionRegistryContext";
 import { useReferencePaths } from "../../hooks/useReferencePaths";
@@ -58,12 +57,6 @@ function ReferenceFieldBindingInternal({
 
     const { t } = useTranslation();
     const refValue = value as EntityReference | null | undefined;
-
-    useClearRestoreValue({
-        property,
-        value,
-        setValue
-    });
 
     const validValue = refValue && typeof refValue === "object" && "isEntityReference" in refValue && refValue.isEntityReference();
 

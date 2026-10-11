@@ -9,7 +9,6 @@ import { LabelWithIcon } from "../components/LabelWithIcon";
 import { useCustomizationController } from "@rebasepro/app";
 import { getIconForProperty } from "../../util/property_utils";
 import { DateTimeField } from "@rebasepro/ui";
-import { useClearRestoreValue } from "../useClearRestoreValue";
 import { getDatePropertyMode, getDatePropertyTimezone } from "../../preview/util";
 
 type DateTimeFieldProps = FieldProps<DateProperty>;
@@ -38,12 +37,6 @@ export function DateTimeFieldBinding({
 
     const { locale } = useCustomizationController();
     const internalValue = value || null;
-
-    useClearRestoreValue({
-        property,
-        value,
-        setValue
-    });
 
     return (
         <>

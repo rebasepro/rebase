@@ -9,7 +9,6 @@ import { EnumValuesChip } from "../../preview";
 import { getIconForProperty } from "../../util/property_utils";
 import { enumToObjectEntries, getLabelOrConfigFrom } from "@rebasepro/common";
 import { iconSize, MultiSelect, MultiSelectItem, XIcon } from "@rebasepro/ui";
-import { useClearRestoreValue } from "../useClearRestoreValue";
 
 /**
  * This fields renders a dropdown with multiple selection.
@@ -50,12 +49,6 @@ export function MultiSelectFieldBinding({
         console.error(property);
         throw Error("Field misconfiguration: array field of type string or number needs to have enumValues");
     }
-
-    useClearRestoreValue({
-        property,
-        value,
-        setValue
-    });
 
     const validValue = !!value && Array.isArray(value);
 

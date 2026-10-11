@@ -12,7 +12,6 @@ import { getIconForProperty } from "../../util/property_utils";
 
 import { useTranslation, ErrorView } from "@rebasepro/app";
 import { Button, cls, ExpandablePanel, fieldBackgroundMixin, PencilIcon, Typography } from "@rebasepro/ui";
-import { useClearRestoreValue } from "../useClearRestoreValue";
 import { useCollectionRegistryController } from "../../hooks/navigation/contexts/CollectionRegistryContext";
 import { useReferencePaths } from "../../hooks/useReferencePaths";
 import type { AdminCollection } from "@rebasepro/cms-types";
@@ -50,12 +49,6 @@ export function ArrayOfReferencesFieldBinding({
 
     const expanded = property.admin?.expanded === undefined ? true : property.admin?.expanded;
     const selectedEntityIds = value && Array.isArray(value) ? value.map((ref) => ref.id) : [];
-
-    useClearRestoreValue({
-        property,
-        value,
-        setValue
-    });
 
     const collectionRegistryController = useCollectionRegistryController();
     const { toCollectionPath, referenceTo } = useReferencePaths();

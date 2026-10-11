@@ -8,7 +8,6 @@ import { LabelWithIcon } from "../components/LabelWithIcon";
 import { EnumValuesChip } from "../../preview";
 import { getIconForProperty } from "../../util/property_utils";
 import { cls, IconButton, Select, SelectItem, XIcon } from "@rebasepro/ui";
-import { useClearRestoreValue } from "../useClearRestoreValue";
 import { resolveEnumValues } from "@rebasepro/common";
 
 /**
@@ -35,12 +34,6 @@ export function SelectFieldBinding({
 }: FieldProps<StringProperty | NumberProperty>) {
 
     const enumValues = resolveEnumValues(property.enum ?? []);
-
-    useClearRestoreValue({
-        property,
-        value,
-        setValue
-    });
 
     const handleClearClick = useCallback((e: React.MouseEvent) => {
         e.stopPropagation();

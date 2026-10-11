@@ -39,7 +39,6 @@ import {
     fieldBackgroundMixin,
     Typography
 } from "@rebasepro/ui";
-import { useClearRestoreValue } from "../useClearRestoreValue";
 
 // Height comes from the thumbnails now. It used to be a flat `min-h-[254px]`
 // on top of another 250px inside, so a field holding one small image
@@ -96,12 +95,6 @@ export function StorageUploadFieldBinding({
         storageSource,
         disabled: disabled ?? false,
         onChange: setValue
-    });
-
-    useClearRestoreValue<string | string[]>({
-        property,
-        value: value as string | string[] | null,
-        setValue
     });
 
     return (

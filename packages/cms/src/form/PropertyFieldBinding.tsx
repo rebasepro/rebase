@@ -13,6 +13,7 @@ import { FormexController, getIn, useFormexGetter, useFormexSelector } from "@re
 ;
 import { ReadOnlyFieldBinding } from "./field_bindings/ReadOnlyFieldBinding";
 import { resolveFormProperty } from "./resolve_form_properties";
+import { useClearRestoreValue } from "./useClearRestoreValue";
 
 import { isPropertyBuilder, resolveProperty } from "@rebasepro/common";
 import { isDisabled, isHidden, isReadOnly } from "@rebasepro/app";
@@ -303,6 +304,11 @@ function FieldInternal<CustomProps, M extends Record<string, unknown>>
         formex.setFieldTouched(propertyKey, true, false);
         formex.setFieldValue(otherPropertyKey, value, shouldValidate);
     }, [getFormex, propertyKey]);
+
+    // `disabled: { clearOnDisabled: true }`, for every field: called here and
+    // not in each binding, where six of them never did and a disabled relation
+    // kept its value and saved it.
+    useClearRestoreValue({ property: property as Property, value, setValue });
 
     // A parent that builds `onPropertyChange` inline (an array item's
     // `storeProps`, a map's wrapper) would otherwise hand every child a new

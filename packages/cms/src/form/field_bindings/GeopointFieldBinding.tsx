@@ -5,7 +5,6 @@ import { IconButton, TextField, Trash2Icon } from "@rebasepro/ui";
 
 import { FieldHelperText } from "../components/FieldHelperText";
 import { LabelWithIcon } from "../components/LabelWithIcon";
-import { useClearRestoreValue } from "../useClearRestoreValue";
 import { getIconForProperty } from "../../util/property_utils";
 
 /** Latitude runs −90…90, longitude −180…180. Anything else is not a place. */
@@ -77,8 +76,6 @@ export function GeopointFieldBinding({
         setLatText(next ? String(next.latitude) : "");
         setLngText(next ? String(next.longitude) : "");
     }, [coordinates?.latitude, coordinates?.longitude]);
-
-    useClearRestoreValue({ property, value, setValue });
 
     const commit = useCallback((rawLat: string, rawLng: string) => {
         // Both empty means "no location", which is different from 0,0 — a real

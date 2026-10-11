@@ -15,7 +15,6 @@ import {
 } from "@rebasepro/ui";
 import { FieldHelperText } from "../components/FieldHelperText";
 import { LabelWithIcon } from "../components/LabelWithIcon";
-import { useClearRestoreValue } from "../useClearRestoreValue";
 import { getIconForProperty } from "../../util/property_utils";
 
 /**
@@ -55,12 +54,6 @@ export function VectorFieldBinding({
     useEffect(() => {
         setTextValue(arrayValue.join(", "));
     }, [JSON.stringify(arrayValue)]);
-
-    useClearRestoreValue({
-        property,
-        value,
-        setValue
-    });
 
     const handleClearClick = useCallback((e: React.MouseEvent) => {
         e.stopPropagation();
