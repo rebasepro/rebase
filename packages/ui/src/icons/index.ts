@@ -97,6 +97,7 @@ export {
     Heading1Icon,
     Heading2Icon,
     Heading3Icon,
+    HeartIcon,
     HelpCircleIcon,
     HistoryIcon,
     HomeIcon,

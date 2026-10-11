@@ -1,8 +1,7 @@
 
 "use client";
 
-import { TagIcon } from "lucide-react";
-import React, { useRef } from "react";
+import React from "react";
 import { defaultBorderMixin } from "../styles";
 import { cls } from "../util";
 
@@ -50,6 +49,12 @@ export type TableHeaderProps = {
     className?: string;
 } & React.HTMLAttributes<HTMLTableSectionElement>;
 
+/**
+ * True for a cell rendered inside {@link TableHeader}, so it renders as a
+ * column header (`th scope="col"`) without having to pass `header`.
+ */
+const TableHeaderContext = React.createContext(false);
+
 export const TableHeader = React.memo(({
                                 children,
                                 className,
@@ -64,7 +69,9 @@ export const TableHeader = React.memo(({
             className
         )}
     >
-        {children}
+        <TableHeaderContext.Provider value={true}>
+            {children}
+        </TableHeaderContext.Provider>
     </tr>
     </thead>
 ));
@@ -72,8 +79,10 @@ export const TableHeader = React.memo(({
 export type TableRowProps = {
     children?: React.ReactNode;
     className?: string;
-    onClick?: React.MouseEventHandler<any>;
+    onClick?: React.MouseEventHandler<HTMLTableRowElement>;
     style?: React.CSSProperties;
+    /** The rendered `<tr>`, e.g. for an IntersectionObserver. */
+    ref?: React.Ref<HTMLTableRowElement>;
 } & React.HTMLAttributes<HTMLTableRowElement>;
 
 export const TableRow = React.memo(({
@@ -81,9 +90,11 @@ export const TableRow = React.memo(({
                              className,
                              onClick,
                              style,
+                             ref,
                              ...rest
                          }: TableRowProps) => (
     <tr
+        ref={ref}
         onClick={onClick}
         style={style}
         className={cls(
@@ -99,7 +110,9 @@ export const TableRow = React.memo(({
 
 export type TableCellProps = {
     children?: React.ReactNode;
+    /** Render as a header cell (`th`). Implied inside {@link TableHeader}. */
     header?: boolean;
+    /** Defaults to `col` for a cell inside {@link TableHeader}. */
     scope?: string;
     className?: string;
     style?: React.CSSProperties;
@@ -110,20 +123,20 @@ export type TableCellProps = {
 export const TableCell = React.memo(({
                               children,
                               header = false,
-                              scope = "",
+                              scope,
                               align,
                               className,
                               style,
                               colspan,
                               ...rest
                           }: TableCellProps) => {
-    const ref = useRef<HTMLTableCellElement>(null);
-    const TagIcon = header || getParentName(ref.current) === "TableHeader" ? "th" : "td";
+    const inHeader = React.useContext(TableHeaderContext);
+    const isHeader = header || inHeader;
+    const Tag = isHeader ? "th" : "td";
     return (
-        <TagIcon
-            scope={scope}
+        <Tag
+            scope={scope ?? (inHeader ? "col" : undefined)}
             colSpan={colspan}
-            ref={ref}
             style={style}
             className={cls(
                 "px-4 py-3 text-clip ",
@@ -133,48 +146,9 @@ export const TableCell = React.memo(({
             {...rest}
         >
             {children}
-        </TagIcon>
+        </Tag>
     );
 });
-
-interface ReactFiber {
-    return: ReactFiber;
-    type: string | Function;
-    elementType?: {
-        name?: string;
-    };
-}
-
-// This is highly experimental and might break in the future
-function getParentName(element: HTMLElement | null): string | undefined {
-    if (element) {
-        const key = Object.keys(element).find((key) => {
-            return (
-                key.startsWith("__reactFiber$") ||
-                key.startsWith("__reactInternalInstance$")
-            );
-        });
-        if (key) {
-            // React's internal fibre, reached by the `__reactFiber$<hash>` key
-            // found on the element above. It is not part of any public API and
-            // no type describes it, so this cannot be checked by anything —
-            // which is the standing cost of reading it, and the reason the read
-            // is confined to this one function.
-            const domFiber = (element as unknown as Record<string, ReactFiber>)[key];
-            const getComponentFiber = (fiber: ReactFiber): ReactFiber => {
-                let parentFiber = fiber.return;
-                while (parentFiber && typeof parentFiber.type === "string") {
-                    parentFiber = parentFiber.return;
-                }
-                return parentFiber;
-            };
-            let fiber = getComponentFiber(domFiber);
-            fiber = getComponentFiber(fiber);
-            return fiber?.elementType?.name;
-        }
-    }
-    return undefined;
-}
 
 Table.displayName = "Table";
 TableBody.displayName = "TableBody";
