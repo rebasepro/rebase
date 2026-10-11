@@ -18,6 +18,7 @@ import { LocalStorageController } from "../src/storage/LocalStorageController";
 import { createStorageRoutes } from "../src/storage/routes";
 import { configureJwt } from "../src/auth/jwt";
 import type { StorageAuthorizeContext } from "../src/storage/types";
+import type { AuthenticatedUser } from "@rebasepro/types";
 
 describe("storage per-object authorization", () => {
     let app: Hono<HonoEnv>;
@@ -49,7 +50,7 @@ describe("storage per-object authorization", () => {
         configureJwt({ secret: "test-secret-key-for-jwt-testing-1234567890" });
         calls = [];
         tempDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), "rebase-storage-authz-"));
-        controller = new LocalStorageController({ basePath: tempDir });
+        controller = new LocalStorageController({ type: "local", basePath: tempDir });
 
         for (const owner of ["alice", "bob"]) {
             await controller.putObject({
@@ -123,7 +124,7 @@ describe("storage per-object authorization", () => {
         }
 
         it("is not found, and mints no token, on a store that keeps folder markers", async () => {
-            controller = new FolderMarkerController({ basePath: tempDir });
+            controller = new FolderMarkerController({ type: "local", basePath: tempDir });
             await mount(ownerOnly);
 
             const single = await app.fetch(new Request("http://localhost/api/storage/metadata/default/alice/"));
@@ -278,7 +279,7 @@ describe("storage per-object authorization", () => {
             app.route("/api/storage", createStorageRoutes({
                 controller,
                 requireAuth: true,
-                authAdapter: { verifyRequest: async () => ({ uid, roles: [] }) },
+                authAdapter: { verifyRequest: async (): Promise<AuthenticatedUser> => ({ uid, email: `${uid}@example.test`, roles: [], isAdmin: false }) },
                 authorize: async () => false
             }));
         };

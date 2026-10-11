@@ -90,7 +90,7 @@ async function adminWrites(booted: Booted): Promise<void> {
     const created = await admin.save({ path: TABLE, values: { title: "inserted" }, collection, status: "new" });
     expect(created).toMatchObject({ title: "inserted" });
     const updated = await admin.save({
-        path: TABLE, entityId: String(created.id), values: { title: "updated" }, collection, status: "existing"
+        path: TABLE, id: String(created.id), values: { title: "updated" }, collection, status: "existing"
     });
     expect(updated).toMatchObject({ title: "updated" });
 }
