@@ -610,9 +610,11 @@ export class TusHandler {
         const owner = upload.user?.uid;
         if (owner === undefined || owner === null) return upload;
         if (caller?.uid === owner) return upload;
-        // The platform's own identity and administrators keep operational
-        // access — cancelling a stuck upload is a real support action.
-        if (caller?.uid === "service" || (caller?.roles ?? []).includes("admin")) return upload;
+        // Administrators keep operational access — cancelling a stuck upload
+        // is a real support action — and the platform's own identity is one
+        // (`SERVICE_IDENTITY`, roles ["admin"]). Not a uid of "service": any
+        // auth adapter can hand that out, and it used to reach every upload.
+        if ((caller?.roles ?? []).includes("admin")) return upload;
 
         throw ApiError.notFound("Upload not found");
     }

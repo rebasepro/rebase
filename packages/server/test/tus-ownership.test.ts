@@ -83,6 +83,19 @@ describe("who may continue a resumable upload", () => {
         expect(res.status).toBe(404);
     });
 
+    it("refuses a stranger whose uid merely spells the service identity", async () => {
+        // The platform's own identity is an administrator; that is what keeps
+        // its access. A uid of "service" — any custom auth adapter may hand
+        // one out — is a user like any other.
+        const { ctrl } = controller();
+        const a = app(new TusHandler(scratch, ctrl));
+        const id = await create(a, { uid: "alice" });
+
+        const res = await a.request(`/tus/${id}`, { headers: as({ uid: "service", roles: [] }) });
+
+        expect(res.status).toBe(404);
+    });
+
     it("refuses a stranger finishing the upload under the owner's key", async () => {
         const { ctrl, stored } = controller();
         const a = app(new TusHandler(scratch, ctrl));
