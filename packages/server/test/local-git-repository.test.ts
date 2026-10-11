@@ -99,6 +99,19 @@ describe("createLocalGitRepository", () => {
         expect(await repo().dirtyPaths()).toEqual([]);
     });
 
+    it("lists both sides of a staged rename, whole", async () => {
+        // With -z, a rename is "R  new\0old\0": the original path is a field
+        // of its own with no status prefix. Read as an entry, it lost its first
+        // three characters and the renamed-away file was not reported dirty.
+        fs.mkdirSync(path.join(root, "config"));
+        fs.writeFileSync(path.join(root, "config", "posts.ts"), "export default {};\n");
+        execFileSync("git", ["add", "config/posts.ts"], { cwd: root });
+        execFileSync("git", ["commit", "-q", "-m", "posts"], { cwd: root });
+        execFileSync("git", ["mv", "config/posts.ts", "config/articles.ts"], { cwd: root });
+
+        expect((await repo().dirtyPaths()).sort()).toEqual(["config/articles.ts", "config/posts.ts"]);
+    });
+
     it("writes files, creating directories that do not exist", async () => {
         await repo().writeFiles([
             { path: "drizzle/schema.sql", contents: "CREATE TABLE x();" },

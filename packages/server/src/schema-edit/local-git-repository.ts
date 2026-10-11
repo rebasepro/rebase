@@ -160,11 +160,19 @@ export function createLocalGitRepository(options: LocalGitOptions): SchemaEditRe
             // otherwise rendered quoted and would not match what we staged.
             const out = await git(root, ["status", "--porcelain=v1", "-z"]);
             const paths: string[] = [];
-            for (const entry of out.split("\0")) {
+            const fields = out.split("\0");
+            for (let i = 0; i < fields.length; i++) {
+                const entry = fields[i];
                 if (!entry) continue;
                 // "XY path" — two status characters, a space, then the path.
                 const file = entry.slice(3);
                 if (file) paths.push(file);
+                // A rename or copy is followed by its original path, as a
+                // field of its own with no status in front of it.
+                if (entry[0] === "R" || entry[0] === "C" || entry[1] === "R" || entry[1] === "C") {
+                    const original = fields[++i];
+                    if (original) paths.push(original);
+                }
             }
             return paths;
         },
