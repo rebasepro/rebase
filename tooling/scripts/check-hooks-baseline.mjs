@@ -68,6 +68,40 @@ lines: [] };
     }
 }
 
+/**
+ * A suppression is a finding too, unless it says why.
+ *
+ * The advice below is "if the narrow array is correct, say so with an
+ * eslint-disable comment that gives the reason". Nothing held anyone to the
+ * second half: a bare `// eslint-disable-next-line react-hooks/exhaustive-deps`
+ * took a finding out of this count with no record of whether anyone decided
+ * anything, and 16 of 17 had no reason. A disable carrying ESLint's own
+ * description syntax (`… exhaustive-deps -- why the array is narrow`) is a
+ * decision and leaves the count; one without stays in it, keyed like any other.
+ */
+const UNEXPLAINED = `eslint-disable of ${RULE} with no reason (add " -- <why the array is narrow>")`;
+// A directive, not prose that mentions one: not inside a JSDoc line, and not
+// quoted in backticks.
+const DISABLE = /^(?!\s*\*)(?:.*[^`\w])?(?:\/\/|\/\*)\s*eslint-disable(?:-next-line|-line)?\s[^\n`]*react-hooks\/exhaustive-deps/;
+for (const result of results) {
+    let source;
+    try {
+        source = fs.readFileSync(result.filePath, "utf8");
+    } catch {
+        continue;
+    }
+    if (!source.includes("exhaustive-deps")) continue;
+    const rel = path.relative(ROOT, result.filePath);
+    source.split("\n").forEach((text, index) => {
+        if (!DISABLE.test(text) || / -- \S/.test(text)) return;
+        const key = `${rel}::${UNEXPLAINED}`;
+        const entry = found.get(key) ?? { count: 0, lines: [] };
+        entry.count += 1;
+        entry.lines.push(index + 1);
+        found.set(key, entry);
+    });
+}
+
 const total = [...found.values()].reduce((sum, e) => sum + e.count, 0);
 
 if (update) {
