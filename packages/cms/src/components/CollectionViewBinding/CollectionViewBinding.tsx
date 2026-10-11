@@ -56,6 +56,7 @@ import { SplitListView } from "./SplitListView";
 import { CollectionBoardViewBinding } from "./CollectionBoardViewBinding";
 import { KanbanPropertyOption, ViewModeToggle } from "./ViewModeToggle";
 import {
+    Alert,
     ArrowRightToLineIcon,
     Button,
     cls,
@@ -1402,10 +1403,11 @@ parentEntityIds,
                     — a declared, documented slot with its own props interface —
                     did nothing at all, and a plugin author had no way to tell. */}
                 {pluginErrorView ?? (tableController.dataLoadingError && tableController.data.length > 0 && (
-                    <div className="flex items-center gap-4 px-4 py-2 bg-red-50 dark:bg-red-900/20 border-b border-red-200 dark:border-red-800 flex-shrink-0">
-                        <Typography variant="body2" className="text-red-700 dark:text-red-300 flex-1">
-                            <strong>Warning:</strong> {tableController.dataLoadingError.message || "Failed to update data."}
-                        </Typography>
+                    <div className="px-4 pt-2 flex-shrink-0">
+                        <Alert color="error" size="small">
+                            <strong>{t("error_loading_data")}</strong>
+                            {tableController.dataLoadingError.message ? <>: {tableController.dataLoadingError.message}</> : null}
+                        </Alert>
                     </div>
                 ))}
 

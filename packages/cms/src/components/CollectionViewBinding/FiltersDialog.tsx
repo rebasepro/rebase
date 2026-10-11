@@ -2,7 +2,7 @@
 import type { Property } from "@rebasepro/types";
 import React, { useCallback, useMemo, useState } from "react";
 import { FilterValues, WhereFilterOp } from "@rebasepro/types";
-import { Button, cls, defaultBorderMixin, Dialog, DialogActions, DialogContent, DialogTitle, Typography } from "@rebasepro/ui";
+import { Button, Chip, cls, defaultBorderMixin, Dialog, DialogActions, DialogContent, DialogTitle, Typography } from "@rebasepro/ui";
 import { FilterIcon, VirtualTableWhereFilterOp } from "@rebasepro/ui";
 import { isPropertyFilterable } from "@rebasepro/app";
 import { useCollectionScope, useTranslation } from "@rebasepro/app";
@@ -150,9 +150,9 @@ export function FiltersDialog({
             <DialogTitle className="flex items-center gap-2" variant="h6">
                 {t("filters")}
                 {activeFilterCount > 0 && (
-                    <span className="ml-2 px-2 py-0.5 text-xs rounded-full bg-primary text-white">
+                    <Chip size="small" className="ml-2">
                         {activeFilterCount}
-                    </span>
+                    </Chip>
                 )}
             </DialogTitle>
 
@@ -162,38 +162,33 @@ export function FiltersDialog({
                         {t("no_filterable_properties")}
                     </Typography>
                 ) : (
-                    <table className="w-full border-collapse">
-                        <tbody>
-                            {filterableProperties.map(([propertyKey, property], index) => {
-                                const hasFilter = propertyKey in localFilters;
+                    <div className="grid grid-cols-[160px_minmax(0,1fr)] items-center">
+                        {filterableProperties.map(([propertyKey, property], index) => {
+                            const hasFilter = propertyKey in localFilters;
+                            const rowBorder = index > 0 && cls("border-t", defaultBorderMixin);
+                            return (
+                                <React.Fragment key={propertyKey}>
+                                    {/* Property name on the left */}
+                                    <div className={cls("py-3 pr-4 self-stretch flex items-center", rowBorder)}>
+                                        <Typography
+                                            variant="body2"
+                                            className={cls(
+                                                "font-medium",
+                                                hasFilter && "text-primary"
+                                            )}
+                                        >
+                                            {property.name || propertyKey}
+                                        </Typography>
+                                    </div>
 
-                                return (
-                                    <tr key={propertyKey} className={cls(
-                                        index > 0 && "border-t",
-                                        defaultBorderMixin
-                                    )}>
-                                        {/* Property name on the left */}
-                                        <td className="py-3 pr-4 align-middle w-[160px]">
-                                            <Typography
-                                                variant="body2"
-                                                className={cls(
-                                                    "font-medium",
-                                                    hasFilter && "text-primary"
-                                                )}
-                                            >
-                                                {property.name || propertyKey}
-                                            </Typography>
-                                        </td>
-
-                                        {/* FilterIcon field on the right */}
-                                        <td className="py-3">
-                                            {renderFilterField(propertyKey, property)}
-                                        </td>
-                                    </tr>
-                                );
-                            })}
-                        </tbody>
-                    </table>
+                                    {/* The filter field on the right */}
+                                    <div className={cls("py-3", rowBorder)}>
+                                        {renderFilterField(propertyKey, property)}
+                                    </div>
+                                </React.Fragment>
+                            );
+                        })}
+                    </div>
                 )}
             </DialogContent>
 

@@ -4,6 +4,7 @@ import { Entity, EnumValueConfig, MAX_LIST_LIMIT } from "@rebasepro/types";
 import { EntityTableController, SelectionController, AdminCollection } from "@rebasepro/cms-types";
 import { BoardCardBinding } from "./BoardCardBinding";
 import {
+    Alert,
     Button,
     ChipColorKey,
     ChipColorScheme,
@@ -545,60 +546,61 @@ parentEntityIds,
         <div className="flex-1 flex flex-col overflow-hidden">
             {/* Error banner - only show when no data loaded */}
             {hasError && allEntities.length === 0 && (
-                <div
-                    className="flex items-center gap-4 px-4 py-3 bg-red-50 dark:bg-red-900/20 border-b border-red-200 dark:border-red-800">
-                    <Typography variant="body2" className="text-red-700 dark:text-red-300 flex-1">
-                        <strong>Error:</strong>{" "}
-                        {indexUrl
-                            ? "A Firestore index is required for this query."
-                            : errorMessage}
-                    </Typography>
-                    <Tooltip title={t("refresh_data")}>
-                        <IconButton aria-label={t("refresh_data")}
-                            size="small"
-                            onClick={() => boardDataController.refreshAll()}
-                        >
-                            <RefreshCwIcon size={iconSize.smallest}/>
-                        </IconButton>
-                    </Tooltip>
-                    {indexUrl && (
-                        <Button
-                            size="small"
-                            variant="filled"
-                            color="error"
-                            onClick={() => window.open(indexUrl, "_blank")}
-                        >
-                            {t("create_index")}
-                        </Button>
-                    )}
+                <div className="px-4 pt-2 flex-shrink-0">
+                    <Alert color="error"
+                        size="small"
+                        action={<div className="flex items-center gap-2 shrink-0">
+                            <Tooltip title={t("refresh_data")}>
+                                <IconButton aria-label={t("refresh_data")}
+                                    size="small"
+                                    onClick={() => boardDataController.refreshAll()}
+                                >
+                                    <RefreshCwIcon size={iconSize.smallest}/>
+                                </IconButton>
+                            </Tooltip>
+                            {indexUrl && (
+                                <Button
+                                    size="small"
+                                    variant="outlined"
+                                    onClick={() => window.open(indexUrl, "_blank")}
+                                >
+                                    {t("create_index")}
+                                </Button>
+                            )}
+                        </div>}>
+                        <strong>{t("error_loading_data")}</strong>
+                        {errorMessage ? <>: {errorMessage}</> : null}
+                    </Alert>
                 </div>
             )}
 
             {/* Warning: orderProperty not configured - drag reorder won't persist */}
             {!orderProperty && !dataLoading && (
-                <div
-                    className="flex items-center justify-between gap-4 px-4 py-2 bg-amber-50 dark:bg-amber-900/20 border-b border-amber-200 dark:border-amber-800">
-                    <Typography variant="body2" color="secondary">
+                <div className="px-4 pt-2 flex-shrink-0">
+                    <Alert color="warning"
+                        size="small"
+                        role={null}
+                        action={kanbanSetupSlots.length > 0 ? kanbanSetupSlots[0] : undefined}>
                         {t("kanban_order_not_configured")}
-                    </Typography>
-                    {kanbanSetupSlots.length > 0 && kanbanSetupSlots[0]}
+                    </Alert>
                 </div>
             )}
 
             {/* Backfill info bar - non-blocking */}
             {itemsNeedBackfill && !dataLoading && (
-                <div
-                    className="flex items-center justify-between gap-4 px-4 py-2 bg-amber-50 dark:bg-amber-900/20 border-b border-amber-200 dark:border-amber-800">
-                    <Typography variant="body2" color="secondary">
-                        {t("items_need_backfill")}
-                    </Typography>
-                    <Button
+                <div className="px-4 pt-2 flex-shrink-0">
+                    <Alert color="warning"
                         size="small"
-                        variant="text"
-                        onClick={() => setShowBackfillDialog(true)}
-                    >
-                        {t("initialize")}
-                    </Button>
+                        role={null}
+                        action={<Button
+                            size="small"
+                            variant="text"
+                            onClick={() => setShowBackfillDialog(true)}
+                        >
+                            {t("initialize")}
+                        </Button>}>
+                        {t("items_need_backfill")}
+                    </Alert>
                 </div>
             )}
 

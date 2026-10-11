@@ -106,15 +106,15 @@ export function CollectionViewActions<M extends Record<string, unknown>>({
             startIcon={<Link2Icon size={iconSize.small}/>}
             size="small"
             variant="outlined"
-            color="primary">
-            {t("add_existing") ?? "Add existing"}
+            color="neutral">
+            {t("add_existing")}
         </Button>
-        : <Tooltip title={t("add_existing") ?? "Add existing"}>
+        : <Tooltip title={t("add_existing")}>
             <Button
                 id={`link_entity_${path}`}
                 onClick={onAddExistingClick}
                 variant="outlined"
-                color={compact ? "neutral" : "primary"}
+                color="neutral"
                 size="small">
                 <Link2Icon size={iconSize.small}/>
             </Button>
@@ -149,7 +149,7 @@ export function CollectionViewActions<M extends Record<string, unknown>>({
                 disabled={!multipleDeleteEnabled}
                 startIcon={<RemoveIcon size={iconSize.small} className={"shrink-0"}/>}
                 onClick={onMultipleDeleteClick}
-                color={"primary"}
+                color={"neutral"}
                 className="lg:min-w-20"
             >
                 ({countLabel})
