@@ -417,22 +417,53 @@ export function parseNotNullViolation(text: string): { table: string; column: st
 }
 
 /**
- * The three ways out, because there is no fourth.
+ * Whether the column that refused NOT NULL was being added by this push, read
+ * from the statement Atlas was running: `true` for `ADD COLUMN "<column>"`,
+ * `false` for any other statement that names it (`ALTER COLUMN … SET NOT
+ * NULL`), `null` when the error carried no statement.
+ */
+export function notNullColumnIsNew(stderr: string, column: string): boolean | null {
+    const statement = parseFailedStatement(stderr);
+    if (!statement) return null;
+    const quoted = column.replace(/"/g, "\"\"").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    return new RegExp(`ADD\\s+COLUMN\\s+(?:IF\\s+NOT\\s+EXISTS\\s+)?"${quoted}"`, "i").test(statement);
+}
+
+/**
+ * The ways out, and only the ones that work for this column.
+ *
+ * A `defaultValue` backfills only a column the push is adding: PostgreSQL
+ * fills `ADD COLUMN … NOT NULL DEFAULT …` for every existing row, but `ALTER
+ * COLUMN … SET DEFAULT` touches no row that is already there, so for an
+ * existing column that remedy fails exactly as before. When the error does not
+ * say which it was (`isNew` null), the default is offered with that caveat.
  *
  * Boot-ensure handles this case — it adds the column nullable and sets NOT NULL
  * only when the table is empty — so a push that dies here is strictly worse
- * than the boot that would have run instead, and the developer deserves to be
- * told which of the three they want rather than left with `pq: … contains null
- * values (23502)` and no next step.
+ * than the boot that would have run instead.
  */
 export function formatNotNullViolationBanner(
     violation: { table: string; column: string },
-    rowCount: number | null
+    rowCount: number | null,
+    isNew: boolean | null = null
 ): string {
     const { table, column } = violation;
     const rows = rowCount === null
         ? `  "${table}" already holds rows, and none of them has a value for "${column}".\n`
         : `  "${table}" already holds ${rowCount} row${rowCount === 1 ? "" : "s"}, and they have no value for "${column}".\n`;
+    const backfill =
+        `Backfill by hand first, then push again:\n` +
+        `         ${chalk.gray(`psql "$DATABASE_URL" -c 'UPDATE "${table}" SET "${column}" = … WHERE "${column}" IS NULL;'`)}\n`;
+    const leaveOptional = `Leave it optional — take \`validation.required\` off the property.\n`;
+    const defaultLine = (caveat: string) =>
+        `Give the property a default, so the push can backfill${caveat}:\n` +
+        `         ${chalk.gray(`{ type: "string", defaultValue: "…", validation: { required: true } }`)}\n`;
+    const remedies = isNew === false
+        ? [backfill, leaveOptional]
+        : isNew === true
+            ? [defaultLine(""), backfill, leaveOptional]
+            : [backfill, defaultLine(" (only if this push adds the column — a default never fills rows that already exist)"), leaveOptional];
+    const count = ["", "One way", "Two ways", "Three ways"][remedies.length];
     return (
         `\n` +
         `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
@@ -442,16 +473,13 @@ export function formatNotNullViolationBanner(
         rows +
         `  PostgreSQL will not add the NOT NULL until every one of them does.\n` +
         `\n` +
-        `  Three ways forward:\n` +
+        `  ${count} forward:\n` +
         `\n` +
-        `    1. Give the property a default, so the push can backfill:\n` +
-        `         ${chalk.gray(`{ type: "string", defaultValue: "…", validation: { required: true } }`)}\n` +
-        `    2. Backfill by hand first, then push again:\n` +
-        `         ${chalk.gray(`psql "$DATABASE_URL" -c 'UPDATE "${table}" SET "${column}" = … WHERE "${column}" IS NULL;'`)}\n` +
-        `    3. Leave it optional — take \`validation.required\` off the property.\n` +
+        remedies.map((r, i) => `    ${i + 1}. ${r}`).join("") +
         `\n` +
-        `  ${chalk.gray("Nothing was applied for this column. `rebase dev` would have added it")}\n` +
-        `  ${chalk.gray("nullable instead: boot sets NOT NULL only when it is safe.")}\n` +
+        `  ${chalk.gray("Nothing in this push was applied: Atlas applies it as one transaction.")}\n` +
+        `  ${chalk.gray("`rebase dev` would have kept the column nullable instead:")}\n` +
+        `  ${chalk.gray("boot sets NOT NULL only when it is safe.")}\n` +
         `\n` +
         `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`
     );
@@ -734,7 +762,9 @@ export async function diagnoseAtlasFailure(context: {
         if (enumDrop) return formatEnumLabelDropBanner(enumDrop);
 
         const notNull = parseNotNullViolation(stderr);
-        if (notNull) return formatNotNullViolationBanner(notNull, await countRows(databaseUrl, notNull.table));
+        if (notNull) {
+            return formatNotNullViolationBanner(notNull, await countRows(databaseUrl, notNull.table), notNullColumnIsNew(stderr, notNull.column));
+        }
 
         const generated = parseGeneratedColumnRefusal(stderr);
         if (generated) {

@@ -116,6 +116,50 @@ describe("a required property added to a populated table", () => {
     });
 });
 
+/**
+ * The NOT NULL refusal in the shape the apply reports it: the statement, then
+ * PostgreSQL's error. Making an EXISTING column required plans `ALTER COLUMN
+ * … SET NOT NULL` (plus `SET DEFAULT` once a default is declared); adding a
+ * required column plans `ADD COLUMN … NOT NULL`.
+ */
+const NOT_NULL_EXISTING =
+    "Error: executing statement \"ALTER TABLE \\\"public\\\".\\\"people\\\" ALTER COLUMN \\\"bio\\\" SET NOT NULL, "
+    + "ALTER COLUMN \\\"bio\\\" SET DEFAULT 'none';\": pq: column \"bio\" of relation \"people\" contains null values (23502)";
+const NOT_NULL_ADDED =
+    "Error: executing statement \"ALTER TABLE \\\"public\\\".\\\"people\\\" ADD COLUMN \\\"bio\\\" text NOT NULL;\": "
+    + "pq: column \"bio\" of relation \"people\" contains null values (23502)";
+
+describe("a NOT NULL refusal: only remedies that work for this column", () => {
+    it("does not offer a default for a column that already exists — SET DEFAULT backfills nothing", async () => {
+        const hint = await diagnoseAtlasFailure({
+            domain: "schema",
+            args: ["apply", "--to", "file://.rebase/sql/schema.sql"],
+            stderr: NOT_NULL_EXISTING
+        });
+        expect(hint).toContain('Cannot make "people"."bio" required');
+        expect(hint).not.toContain("defaultValue");
+        expect(hint).toContain('UPDATE "people" SET "bio" = … WHERE "bio" IS NULL');
+        expect(hint).toContain("Two ways forward");
+        expect(hint).toContain("Nothing in this push was applied");
+        expect(hint).not.toContain("for this column");
+    });
+
+    it("offers the default first for a column this push adds", async () => {
+        const hint = await diagnoseAtlasFailure({
+            domain: "schema",
+            args: ["apply", "--to", "file://.rebase/sql/schema.sql"],
+            stderr: NOT_NULL_ADDED
+        });
+        expect(hint).toMatch(/1\. Give the property a default, so the push can backfill:/);
+        expect(hint).toContain("Three ways forward");
+    });
+
+    it("qualifies the default when the error does not say which", async () => {
+        const hint = await diagnoseAtlasFailure({ domain: "schema", args: ["apply"], stderr: NOT_NULL });
+        expect(hint).toContain("only if this push adds the column");
+    });
+});
+
 describe("an enum option id that was renamed", () => {
     it("reads the label and the type out of the error", () => {
         expect(parseEnumLabelDrop(ENUM_DROP)).toEqual({ label: "review", enumType: "posts_status" });
