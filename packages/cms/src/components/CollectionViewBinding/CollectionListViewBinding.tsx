@@ -988,6 +988,16 @@ const ListRow = React.memo(function ListRow<M extends Record<string, unknown>>({
         onClick?.(entity);
     }, [entity, onClick, selected, selectionEnabled, onSelectionChange]);
 
+    // The row is the control that opens the record, as a card is: Enter and
+    // Space on it open it. Keys on the row's own controls (the checkbox, an
+    // action) bubble here too and are theirs, so only the row's own keys act.
+    const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLDivElement>) => {
+        if (e.target !== e.currentTarget) return;
+        if (e.key !== "Enter" && e.key !== " ") return;
+        e.preventDefault();
+        onClick?.(entity);
+    }, [entity, onClick]);
+
     const handleCheckboxClick = useCallback((e: React.MouseEvent) => {
         e.stopPropagation();
     }, []);
@@ -1023,6 +1033,11 @@ const ListRow = React.memo(function ListRow<M extends Record<string, unknown>>({
                         : "hover:bg-surface-hover"
             )}
             onClick={handleClick}
+            onKeyDown={handleKeyDown}
+            role="button"
+            tabIndex={0}
+            aria-current={isActive ? "true" : undefined}
+            data-list-row=""
         >
             {/* Selection Checkbox — its own cell only when it is not riding on
                 the thumbnail. See {@link ListRowProps.combineSelection}. */}
