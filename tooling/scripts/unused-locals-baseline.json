@@ -35,7 +35,6 @@
   "packages/cms/src/collection_editor/ui/EditorEntityAction.tsx::authController": 1,
   "packages/cms/src/collection_editor/ui/HomePageEditorCollectionAction.tsx::authController": 1,
   "packages/cms/src/collection_editor/ui/NewCollectionCard.tsx::authController": 1,
-  "packages/cms/src/collection_editor/ui/PropertyAddColumnComponent.tsx::authController": 1,
   "packages/cms/src/components/CollectionTableBinding/CollectionTableBinding.tsx::updateSize": 1,
   "packages/cms/src/components/CollectionTableBinding/fields/TableRelationField.tsx::relation": 1,
   "packages/cms/src/components/CollectionTableBinding/internal/EntityTableCell.tsx::showExpandIcon": 1,
