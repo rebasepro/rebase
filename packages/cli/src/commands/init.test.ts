@@ -91,6 +91,34 @@ describe("validateProjectName", () => {
 });
 
 describe("template structure", () => {
+    /**
+     * Output a new project prints on its first run that its author did not
+     * cause: Vite 8's "Both esbuild and oxc options were set" on every dev
+     * start and build, and dotenv 17's advertisement banner from
+     * `pnpm run example` and the ejected server.
+     */
+    it("ships no file that makes its own tools print warnings or banners", () => {
+        const viteConfig = fs.readFileSync(path.join(TEMPLATE_DIR, "frontend", "vite.config.ts"), "utf-8");
+        expect(viteConfig).not.toMatch(/^\s*esbuild\s*:/m);
+
+        const templatesRoot = path.dirname(TEMPLATE_DIR);
+        const loud: string[] = [];
+        const walk = (dir: string) => {
+            for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+                if (entry.name === "node_modules") continue;
+                const full = path.join(dir, entry.name);
+                if (entry.isDirectory()) walk(full);
+                else if (/\.[cm]?[jt]sx?$/.test(entry.name)) {
+                    for (const call of fs.readFileSync(full, "utf-8").match(/dotenv\.config\(.*$/gm) ?? []) {
+                        if (!/quiet:\s*true/.test(call)) loud.push(`${path.relative(templatesRoot, full)}: ${call}`);
+                    }
+                }
+            }
+        };
+        walk(templatesRoot);
+        expect(loud).toEqual([]);
+    });
+
     it("contains all required directories", () => {
         expect(fs.existsSync(path.join(TEMPLATE_DIR, "backend"))).toBe(true);
         expect(fs.existsSync(path.join(TEMPLATE_DIR, "frontend"))).toBe(true);

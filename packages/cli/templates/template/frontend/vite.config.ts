@@ -30,9 +30,9 @@ export default defineConfig({
             "@remix-run/router"
         ]
     },
-    esbuild: {
-        logOverride: { "this-is-undefined-in-esm": "silent" }
-    },
+    // No `esbuild` block: Vite 8 transforms with oxc and ignores it, and
+    // having one made every `rebase dev` and build print "Both esbuild and oxc
+    // options were set".
     build: {
         minify: true,
         outDir: "./dist",

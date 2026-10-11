@@ -30,7 +30,8 @@ import { createRebaseClient } from "@rebasepro/client";
 // import { collectionsDictionary, type Database } from "../generated/sdk/database.types";
 
 // Load .env from project root (same file the backend uses)
-dotenv.config({ path: path.resolve(process.cwd(), ".env") });
+// `quiet`: dotenv 17 otherwise prints its own advertisement banner.
+dotenv.config({ path: path.resolve(process.cwd(), ".env"), quiet: true });
 
 // ─── Resolve Backend URL ─────────────────────────────────────────────
 let baseUrl = process.env.REBASE_URL;

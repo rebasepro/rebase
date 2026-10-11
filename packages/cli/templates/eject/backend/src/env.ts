@@ -45,7 +45,7 @@ function findEnvFile(startDir: string): string | undefined {
 // the real process environment flow through.
 const envPath = process.env.DOTENV_CONFIG_PATH || findEnvFile(__dirname);
 if (envPath && fs.existsSync(envPath)) {
-    dotenv.config({ path: envPath });
+    dotenv.config({ path: envPath, quiet: true });
 }
 
 export const env = loadEnv({
