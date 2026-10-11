@@ -1,5 +1,5 @@
 import { AggregateParams, FindParams as TypesFindParams, FindResponse as TypesFindResponse, IMPERSONATE_HEADER, type IncludeSpec, RebaseApiError, SCHEMA_VERSION_HEADER } from "@rebasepro/types";
-import { RESERVED_QUERY_KEYS, serializeFilter, serializeInclude, serializeLogicalCondition, serializeOrderBy } from "@rebasepro/common";
+import { RESERVED_QUERY_KEYS, resolveFindWindow, serializeFilter, serializeInclude, serializeLogicalCondition, serializeOrderBy } from "@rebasepro/common";
 import { parseRebaseJson } from "./reviver";
 
 // The canonical client error now lives in `@rebasepro/types` so every package
@@ -226,6 +226,9 @@ export function assertNoUndefinedFilterValues(where: Record<string, unknown>): v
  */
 function findParamPairs(params?: FindParams): [string, string][] {
     if (!params) return [];
+    // Refuses `page` with `offset` (`PAGE_WITH_OFFSET`) before any request,
+    // with the code the server would answer.
+    resolveFindWindow(params);
     const pairs: [string, string][] = [];
 
     if (params.limit != null) pairs.push(["limit", String(params.limit)]);

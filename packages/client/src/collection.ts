@@ -932,9 +932,9 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
                     // offset it does understand never arrived at all.
                     offset: window.driverOffset,
                     // `page` reaches the server as itself rather than being
-                    // resolved here: `FindParams` says `page` wins over
-                    // `offset`, and two layers each applying that rule is two
-                    // chances to apply it differently.
+                    // resolved into an offset here, so the server resolves the
+                    // window once. A `page` with an `offset` never gets this
+                    // far: `resolveFindWindow` above refuses the pair.
                     page: params?.page,
                     // The three a subscription could not ask for. A `listen()`
                     // is the same query as the `find()` beside it, so it takes
