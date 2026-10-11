@@ -19,6 +19,7 @@ import {
 import { folderKey, listingPrefix } from "./keys";
 import { bufferWebStream, bytesView, webStreamFrom } from "./streams";
 import { ApiError } from "../api/errors";
+import { validateUploadedFile } from "./upload-validation";
 import {
     UploadFileProps,
     UploadFileResult,
@@ -115,7 +116,7 @@ export class GCSStorageController implements StorageController {
         await gcsFile.save(() => byteChunks(file), {
             contentType: file.type,
             metadata: metadata ? { metadata: this.flattenMetadata(metadata) } : undefined
-        });
+        }).catch((error: unknown) => { throw misconfiguredOr(error, usedBucket); });
 
         return {
             key,
@@ -165,7 +166,7 @@ export class GCSStorageController implements StorageController {
             if (isNotFoundError(error)) {
                 return null;
             }
-            throw error;
+            throw misconfiguredOr(error, resolvedBucket);
         }
     }
 
@@ -218,7 +219,7 @@ export class GCSStorageController implements StorageController {
                 if (isNotFoundError(error)) {
                     throw new Error(`The object "${located.key}" changed on every read; try again.`);
                 }
-                throw error;
+                throw misconfiguredOr(error, located.bucket);
             }
 
             const contentType = located.meta.contentType || "application/octet-stream";
@@ -256,7 +257,7 @@ export class GCSStorageController implements StorageController {
             return { ...location, meta };
         } catch (error: unknown) {
             if (isNotFoundError(error)) return null;
-            throw error;
+            throw misconfiguredOr(error, location.bucket);
         }
     }
 
@@ -349,7 +350,14 @@ export class GCSStorageController implements StorageController {
         const client = await this.getClient();
         const gcsFile = client.bucket(resolvedBucket).file(resolvedPath);
 
-        await gcsFile.delete({ ignoreNotFound: true });
+        // Not `ignoreNotFound`: the client ignores every 404 with it, a missing
+        // bucket's included, so a typo in the bucket name deleted "successfully".
+        try {
+            await gcsFile.delete();
+        } catch (error: unknown) {
+            if (isNotFoundError(error)) return;
+            throw misconfiguredOr(error, resolvedBucket);
+        }
     }
 
     async listObjects(prefix: string, options?: {
@@ -369,7 +377,7 @@ export class GCSStorageController implements StorageController {
             maxResults: options?.maxResults ?? 1000,
             pageToken: options?.pageToken,
             autoPaginate: false
-        });
+        }).catch((error: unknown) => { throw misconfiguredOr(error, resolvedBucket); });
 
         // The folder's own marker object is not something in the folder —
         // see `S3StorageController.listObjects`.
@@ -428,24 +436,7 @@ export class GCSStorageController implements StorageController {
      * Validate file before upload
      */
     private validateFile(file: File): void {
-        const maxSize = this.maxFileSize();
-        if (file.size > maxSize) {
-            // An ApiError, so the refusal reaches the caller as what it is. A
-            // plain Error was a 500 on `/upload` and a 502 on TUS — after the
-            // client had sent every byte.
-            throw new ApiError(
-                413,
-                "PAYLOAD_TOO_LARGE",
-                `File size ${file.size} exceeds this storage source's maximum of ${maxSize} bytes.`,
-                { size: file.size, maxFileSize: maxSize }
-            );
-        }
-
-        if (this.config.allowedMimeTypes && this.config.allowedMimeTypes.length > 0) {
-            if (!this.config.allowedMimeTypes.includes(file.type)) {
-                throw new Error(`File type ${file.type} is not allowed. Allowed types: ${this.config.allowedMimeTypes.join(", ")}`);
-            }
-        }
+        validateUploadedFile(file, this.maxFileSize(), this.config.allowedMimeTypes);
     }
 
     /**
@@ -519,8 +510,38 @@ function storedObjectInfo(meta: FileMetadata): StoredObjectInfo {
  */
 function isNotFoundError(error: unknown): boolean {
     if (typeof error !== "object" || error === null) return false;
+    // A missing bucket is a 404 too. Read as a missing object, a typo in the
+    // bucket name made every file "not found" and every delete a success.
+    if (isMissingBucketError(error)) return false;
     const err = error as Record<string, unknown>;
     if (err["code"] === 404) return true;
     if (typeof err["message"] === "string" && /not found/i.test(err["message"])) return true;
     return false;
+}
+
+/** GCS's answer for a bucket that does not exist: a 404 whose message says so. */
+function isMissingBucketError(error: object): boolean {
+    return "message" in error && typeof error.message === "string" && /bucket does not exist/i.test(error.message);
+}
+
+/**
+ * A provider error that says this deployment's storage is misconfigured — the
+ * bucket does not exist, or the credentials may not use it — as a
+ * `502 STORAGE_MISCONFIGURED` naming the bucket; or the error as it was.
+ *
+ * These used to reach the caller as a bare 500 "Internal Server Error".
+ */
+function misconfiguredOr(error: unknown, bucket: string): unknown {
+    if (typeof error !== "object" || error === null) return error;
+    if (isMissingBucketError(error)) {
+        return new ApiError(502, "STORAGE_MISCONFIGURED",
+            `The storage bucket "${bucket}" does not exist. Check the bucket name this source is configured with (GCS_BUCKET, or GCS_BUCKET__<KEY> for a named source).`,
+            { bucket, reason: "NoSuchBucket" });
+    }
+    if ("code" in error && (error.code === 401 || error.code === 403)) {
+        return new ApiError(502, "STORAGE_MISCONFIGURED",
+            `The storage provider refused this deployment's credentials for bucket "${bucket}". Check the service account and its permissions on the bucket.`,
+            { bucket, reason: "AccessDenied" });
+    }
+    return error;
 }

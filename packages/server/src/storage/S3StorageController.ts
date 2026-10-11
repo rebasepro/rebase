@@ -15,6 +15,7 @@ import {
 import { folderKey, listingPrefix } from "./keys";
 import { webStreamFrom } from "./streams";
 import { ApiError } from "../api/errors";
+import { validateUploadedFile } from "./upload-validation";
 import {
     DownloadConfig,
     DownloadMetadata,
@@ -115,24 +116,7 @@ export class S3StorageController implements StorageController {
      * Validate file before upload
      */
     private validateFile(file: File): void {
-        const maxSize = this.maxFileSize();
-        if (file.size > maxSize) {
-            // An ApiError, so the refusal reaches the caller as what it is. A
-            // plain Error was a 500 on `/upload` and a 502 on TUS — after the
-            // client had sent every byte.
-            throw new ApiError(
-                413,
-                "PAYLOAD_TOO_LARGE",
-                `File size ${file.size} exceeds this storage source's maximum of ${maxSize} bytes.`,
-                { size: file.size, maxFileSize: maxSize }
-            );
-        }
-
-        if (this.config.allowedMimeTypes && this.config.allowedMimeTypes.length > 0) {
-            if (!this.config.allowedMimeTypes.includes(file.type)) {
-                throw new Error(`File type ${file.type} is not allowed. Allowed types: ${this.config.allowedMimeTypes.join(", ")}`);
-            }
-        }
+        validateUploadedFile(file, this.maxFileSize(), this.config.allowedMimeTypes);
     }
 
     /**
@@ -166,7 +150,8 @@ export class S3StorageController implements StorageController {
         if (file.size <= MULTIPART_PART_SIZE) {
             // One request from one buffer, as always: a small file is no bigger
             // than a part. `Buffer.from(arrayBuffer)` is a view, not a copy.
-            await client.send(new s3.PutObjectCommand({ ...target, Body: Buffer.from(await file.arrayBuffer()) }));
+            await client.send(new s3.PutObjectCommand({ ...target, Body: Buffer.from(await file.arrayBuffer()) }))
+                .catch((error: unknown) => { throw misconfiguredOr(error, usedBucket); });
         } else {
             await this.putMultipart(target, file);
         }
@@ -197,7 +182,8 @@ export class S3StorageController implements StorageController {
         const client = await this.getClient();
         // At most 10,000 parts: a part grows past 8 MiB only beyond 80 GB.
         const partSize = Math.max(MULTIPART_PART_SIZE, Math.ceil(file.size / MAX_MULTIPART_PARTS));
-        const { UploadId } = await client.send(new s3.CreateMultipartUploadCommand(target));
+        const { UploadId } = await client.send(new s3.CreateMultipartUploadCommand(target))
+            .catch((error: unknown) => { throw misconfiguredOr(error, target.Bucket); });
         if (!UploadId) throw new Error(`S3 did not start a multipart upload for ${target.Key}.`);
         const { Bucket, Key } = target;
         try {
@@ -210,7 +196,7 @@ export class S3StorageController implements StorageController {
             await client.send(new s3.CompleteMultipartUploadCommand({ Bucket, Key, UploadId, MultipartUpload: { Parts: parts } }));
         } catch (error: unknown) {
             await client.send(new s3.AbortMultipartUploadCommand({ Bucket, Key, UploadId })).catch(() => undefined);
-            throw error;
+            throw misconfiguredOr(error, Bucket);
         }
     }
 
@@ -281,14 +267,13 @@ export class S3StorageController implements StorageController {
                 metadata
             };
         } catch (error: unknown) {
-            const s3Error = error as { name?: string; $metadata?: { httpStatusCode?: number } };
-            if (s3Error.name === "NotFound" || s3Error.$metadata?.httpStatusCode === 404) {
+            if (isS3NotFound(error)) {
                 return {
                     url: null,
                     fileNotFound: true
                 };
             }
-            throw error;
+            throw misconfiguredOr(error, resolvedBucket);
         }
     }
 
@@ -343,11 +328,10 @@ export class S3StorageController implements StorageController {
                 lastModified: response.LastModified?.getTime()
             });
         } catch (error: unknown) {
-            const s3Error = error as { name?: string; $metadata?: { httpStatusCode?: number } };
-            if (s3Error.name === "NoSuchKey" || s3Error.$metadata?.httpStatusCode === 404) {
+            if (isS3NotFound(error)) {
                 return null;
             }
-            throw error;
+            throw misconfiguredOr(error, resolvedBucket);
         }
     }
 
@@ -388,7 +372,7 @@ export class S3StorageController implements StorageController {
             };
         } catch (error: unknown) {
             if (isS3NotFound(error)) return null;
-            throw error;
+            throw misconfiguredOr(error, location.bucket);
         }
     }
 
@@ -408,7 +392,7 @@ export class S3StorageController implements StorageController {
             };
         } catch (error: unknown) {
             if (isS3NotFound(error)) return null;
-            throw error;
+            throw misconfiguredOr(error, location.bucket);
         }
     }
 
@@ -438,7 +422,7 @@ export class S3StorageController implements StorageController {
             // it whole: the caller serves a whole object as a 200, which HTTP
             // allows for any range request.
             if (range && isS3RangeNotSatisfiable(error)) return this.getObjectStream(key, { bucket: options?.bucket });
-            throw error;
+            throw misconfiguredOr(error, location.bucket);
         }
         const body = response.Body;
         if (!body) return null;
@@ -491,11 +475,10 @@ export class S3StorageController implements StorageController {
         try {
             await client.send(command);
         } catch (error: unknown) {
-            const s3Error = error as { name?: string; $metadata?: { httpStatusCode?: number } };
-            if (s3Error.name === "NoSuchKey" || s3Error.$metadata?.httpStatusCode === 404) {
+            if (isS3NotFound(error)) {
                 return;
             }
-            throw error;
+            throw misconfiguredOr(error, resolvedBucket);
         }
     }
 
@@ -518,7 +501,8 @@ export class S3StorageController implements StorageController {
             Delimiter: "/" // This gives us folder-like behavior
         });
 
-        const response = await client.send(command);
+        const response = await client.send(command)
+            .catch((error: unknown) => { throw misconfiguredOr(error, resolvedBucket); });
 
         // The folder's own marker — the zero-byte `folder/` object that
         // `POST /folder` writes — is in `Contents` when the listed prefix is
@@ -572,10 +556,41 @@ function s3ErrorFacts(error: unknown): { name?: string; status?: number } {
     return { name, status };
 }
 
-/** A missing object, as `GetObject` (`NoSuchKey`) and `HeadObject` (`NotFound`, no body) report it. */
+/**
+ * A missing object, as `GetObject` (`NoSuchKey`) and `HeadObject` (`NotFound`, no body) report it.
+ *
+ * Not a missing bucket, which is a 404 too: read as a missing object, a typo in
+ * `S3_BUCKET` made every file of the deployment "not found", and a delete
+ * report success. (A `HeadObject` on a missing bucket carries no error name, so
+ * that one call still cannot tell the two apart.)
+ */
 function isS3NotFound(error: unknown): boolean {
     const { name, status } = s3ErrorFacts(error);
+    if (name === "NoSuchBucket") return false;
     return name === "NoSuchKey" || name === "NotFound" || status === 404;
+}
+
+/** What S3 answers when the deployment's configuration, not the request, is wrong. */
+const MISCONFIGURATION_ERRORS = new Set(["NoSuchBucket", "AccessDenied", "InvalidAccessKeyId", "SignatureDoesNotMatch"]);
+
+/**
+ * A provider error that says this deployment's storage is misconfigured, as a
+ * `502 STORAGE_MISCONFIGURED` naming the bucket — or the error as it was.
+ *
+ * These used to reach the caller as a bare 500 "Internal Server Error", with
+ * nothing to say the bucket or its credentials were the problem.
+ */
+function misconfiguredOr(error: unknown, bucket: string): unknown {
+    const { name } = s3ErrorFacts(error);
+    if (!name || !MISCONFIGURATION_ERRORS.has(name)) return error;
+    return new ApiError(
+        502,
+        "STORAGE_MISCONFIGURED",
+        name === "NoSuchBucket"
+            ? `The storage bucket "${bucket}" does not exist. Check the bucket name this source is configured with (S3_BUCKET, or S3_BUCKET__<KEY> for a named source).`
+            : `The storage provider refused this deployment's credentials for bucket "${bucket}" (${name}). Check the access key and its permissions on the bucket.`,
+        { bucket, reason: name }
+    );
 }
 
 function isS3RangeNotSatisfiable(error: unknown): boolean {

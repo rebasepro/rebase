@@ -229,6 +229,7 @@ the ID you got. Read the response header.
 | `UNKNOWN_AGGREGATE_FIELD` | 400 | An aggregate or `groupBy` names a field the collection does not have. | Check the spelling; the message lists the valid fields. |
 | `UNKNOWN_FILTER_FIELD` | 400 | The filter names a field this collection — or a relation's target — does not have. | Check the spelling; the message lists the valid fields. |
 | `UNKNOWN_FILTER_OPERATOR` | 400 | The filter names an operator that does not exist. | The message lists every operator. |
+| `UNKNOWN_MESSAGE_TYPE` | 400 | A realtime socket frame has a `type` the server does not handle. Answered as an `ERROR` frame carrying the request's `requestId`, so the request settles instead of timing out. | Check the frame's `type`; the message names it. |
 | `UNKNOWN_ORDER_BY_FIELD` | 400 | The sort names a field this collection does not have. | Check the spelling; the message lists the valid fields. |
 | `PRECONDITION_FAILED` | 412 | An `If-Match` named a version of the row that is no longer current: somebody wrote to it between the read and this write. Nothing was written. | Re-read the row, re-apply the change, and send the new `ETag`. |
 | `UNKNOWN_RESPONSE_FIELD` | 400 | `?fields=` asks for a field the collection does not have. | Check the spelling; the message lists the known fields. |
@@ -277,7 +278,8 @@ the message names the constraint.
 | `INVALID_STORAGE_KEY` | 400 | The object key is malformed, or escapes its prefix. | Check the key. |
 | `INVALID_TRANSFORM_OPTIONS` | 400 | The image-transform parameters are out of range or contradictory. | See [Storage](/docs/backend/storage/). |
 | `STORAGE_FILE_TOO_LARGE` | 413 | The upload exceeds the `maxSize` the target property declares. Enforced on the server, not only in the browser. `details` carries the property, the limit and the actual size. | Upload a smaller file, or raise `maxSize` on the property. |
-| `STORAGE_FILE_TYPE_REFUSED` | 400 | The upload's type is not in the property's `acceptedFiles`. `details` carries the property, the accepted list and the content type sent. | Upload an accepted type, or widen `acceptedFiles`. |
+| `STORAGE_FILE_TYPE_REFUSED` | 400 | The upload's type is not in the property's `acceptedFiles`, or not in the storage source's own `allowedMimeTypes`. `details` carries the property (or the source's list), the accepted list and the content type sent. | Upload an accepted type, or widen `acceptedFiles` / `allowedMimeTypes`. |
+| `STORAGE_MISCONFIGURED` | 502 | The S3 or GCS bucket this source is configured with does not exist, or the provider refused this deployment's credentials for it. The message names the bucket; `details.reason` is `NoSuchBucket` or the provider's refusal. A missing bucket used to read as "file not found" on every file. | Fix the bucket name (`S3_BUCKET` / `GCS_BUCKET`, `__<KEY>` for a named source) or the credentials' permissions. |
 | `STORAGE_NOT_CONFIGURED` | 501 / 503 | No storage backend is configured on this server, or none is the default and the request names no storage source; the message names the sources that are served (501). A resumable upload whose source disappeared before it finished is a 503. | Configure S3, GCS, or local storage, or name a source with `?storageId=`. |
 | `STORAGE_SOURCE_NOT_CONFIGURED` | 501 | The storage source is declared but has no credentials here. | Set that source's environment variables. |
 | `STORAGE_WRITE_FAILED` | 502 | The storage backend refused or dropped the write. | Check its own logs and credentials. |
