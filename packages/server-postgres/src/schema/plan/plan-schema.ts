@@ -691,6 +691,8 @@ export function planSchema(allCollections: CollectionConfig[], options: PlanOpti
             : planCollectionTable(entry.collection, resolveCollection, triggerFunctionNeeded));
     }
 
+    assertNoTruncationCollisions(tables, enums);
+
     // ── Extensions and functions ─────────────────────────────────────────────
     const extensions: string[] = [];
     const functions: string[] = [];
@@ -728,6 +730,40 @@ export function planSchema(allCollections: CollectionConfig[], options: PlanOpti
         collections,
         options
     };
+}
+
+/**
+ * Refuse two relations — tables, junctions and enum types share one namespace
+ * per schema, because every table owns a row type of its own name — that are
+ * distinct in full but one name after Postgres keeps the first 63 bytes.
+ *
+ * `a_table_with_a_really_long_name_that_goes_on_and_on_and_on_forever` with an
+ * enum column and a many-to-many truncated its table, its enum type and its
+ * junction to the same identifier: the push failed with `type "…" already
+ * exists` and no validator mentioned the length. A name that already works is
+ * never touched — only a collision that cannot be created refuses.
+ */
+function assertNoTruncationCollisions(tables: TablePlan[], enums: EnumPlan[]): void {
+    const owners = new Map<string, string>();
+    const claim = (schema: string, name: string, what: string): void => {
+        const key = `${schema}.${toPostgresIdentifier(name)}`;
+        const first = owners.get(key);
+        if (first === undefined) {
+            owners.set(key, what);
+            return;
+        }
+        throw new Error(
+            `The ${what} and the ${first} both become "${schema}"."${toPostgresIdentifier(name)}" in Postgres, ` +
+            "which keeps only the first 63 bytes of an identifier — and a table, a junction table and an enum " +
+            "type share one namespace (every table owns a row type of its name). The push would fail with " +
+            "\"already exists\". Give the collection a shorter `table`, or the enum's property a shorter " +
+            "`columnName` (an enum type is named <table>_<column>)."
+        );
+    };
+    for (const table of tables) {
+        claim(table.schema, table.table, table.kind === "junction" ? `junction table "${table.table}"` : `table "${table.table}"`);
+    }
+    for (const e of enums) claim(e.schema, e.name, `enum type "${e.name}"`);
 }
 
 /**
