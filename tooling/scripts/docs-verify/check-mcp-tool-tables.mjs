@@ -19,32 +19,45 @@ import {
     MCP_TOOLS_BEGIN
 } from "./mcp-tools.mjs";
 
-const README = "packages/mcp/README.md";
+/**
+ * Every file that carries the generated tool tables. The skill reference is
+ * the one an agent reads; hand-written, it listed 20 of 42 tools and described
+ * `rebase_schema_plan` with arguments it does not take.
+ */
+export const MCP_TOOL_TABLE_FILES = [
+    "packages/mcp/README.md",
+    "tooling/rebase-agent-skills/skills/rebase-basics/references/mcp-tools.md"
+];
 
 export function checkMcpToolTables(root) {
     const findings = [];
-    let current;
-    try {
-        current = readFileSync(path.join(root, README), "utf8");
-    } catch {
-        return { findings: [{ file: README, message: "not found" }], scanned: 0 };
+    const rendered = renderMcpToolTables(root);
+    let scanned = 0;
+    for (const file of MCP_TOOL_TABLE_FILES) {
+        let current;
+        try {
+            current = readFileSync(path.join(root, file), "utf8");
+        } catch {
+            findings.push({ file, message: "not found" });
+            continue;
+        }
+        scanned++;
+        const next = spliceMcpToolTables(current, rendered);
+        if (next === null) {
+            findings.push({
+                file,
+                message:
+                    `no \`${MCP_TOOLS_BEGIN}\` block — the tool tables are hand-written again. ` +
+                    "Restore the markers and run `pnpm generate:mcp-readme`."
+            });
+        } else if (next !== current) {
+            findings.push({
+                file,
+                message:
+                    "the tool tables no longer match `ALL_TOOLS` in packages/mcp/src/index.ts. " +
+                    "Run `pnpm generate:mcp-readme`."
+            });
+        }
     }
-
-    const next = spliceMcpToolTables(current, renderMcpToolTables(root));
-    if (next === null) {
-        findings.push({
-            file: README,
-            message:
-                `no \`${MCP_TOOLS_BEGIN}\` block — the tool tables are hand-written again. ` +
-                "Restore the markers and run `pnpm generate:mcp-readme`."
-        });
-    } else if (next !== current) {
-        findings.push({
-            file: README,
-            message:
-                "the tool tables no longer match `ALL_TOOLS` in packages/mcp/src/index.ts. " +
-                "Run `pnpm generate:mcp-readme`."
-        });
-    }
-    return { findings, scanned: 1 };
+    return { findings, scanned };
 }

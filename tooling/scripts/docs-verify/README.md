@@ -142,6 +142,9 @@ deleted months before, on the page npm shows for the package.
 `check-mcp-tool-tables.mjs` covers the other half of that README. Its eight tool
 tables are generated from `ALL_TOOLS` by `pnpm generate:mcp-readme` and diffed
 here, because a hand-maintained table of forty tools is a table that says six.
+The same block is generated into the agent skill's MCP reference
+(`tooling/rebase-agent-skills/skills/rebase-basics/references/mcp-tools.md`),
+which listed 20 of 42 tools while it was hand-written.
 
 That last group was added because the gap was load-bearing. While every checked
 surface reported zero findings, the then-untracked `AGENT.md` and

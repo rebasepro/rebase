@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /**
- * Write the MCP server's tool tables into `packages/mcp/README.md`.
+ * Write the MCP server's tool tables into `packages/mcp/README.md` and the
+ * agent skill's MCP reference (`MCP_TOOL_TABLE_FILES`).
  *
  * The tables are the part of that README that goes stale by itself: adding a
  * tool to `ALL_TOOLS` is a two-line change, and updating eight markdown tables
@@ -14,22 +15,24 @@ import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { renderMcpToolTables, spliceMcpToolTables, MCP_TOOLS_BEGIN } from "./docs-verify/mcp-tools.mjs";
+import { MCP_TOOL_TABLE_FILES } from "./docs-verify/check-mcp-tool-tables.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
-const README = path.join(ROOT, "packages", "mcp", "README.md");
+const rendered = renderMcpToolTables(ROOT);
+let failed = false;
 
-const current = readFileSync(README, "utf8");
-const next = spliceMcpToolTables(current, renderMcpToolTables(ROOT));
-
-if (next === null) {
-    console.error(`✗ ${path.relative(ROOT, README)} has no \`${MCP_TOOLS_BEGIN}\` block to write into.`);
-    process.exit(1);
+for (const file of MCP_TOOL_TABLE_FILES) {
+    const target = path.join(ROOT, file);
+    const current = readFileSync(target, "utf8");
+    const next = spliceMcpToolTables(current, rendered);
+    if (next === null) {
+        console.error(`✗ ${file} has no \`${MCP_TOOLS_BEGIN}\` block to write into.`);
+        failed = true;
+    } else if (next === current) {
+        console.log(`✓ ${file} tool tables already match ALL_TOOLS.`);
+    } else {
+        writeFileSync(target, next);
+        console.log(`✓ Wrote ${file} tool tables from ALL_TOOLS.`);
+    }
 }
-
-if (next === current) {
-    console.log("✓ packages/mcp/README.md tool tables already match ALL_TOOLS.");
-    process.exit(0);
-}
-
-writeFileSync(README, next);
-console.log("✓ Wrote packages/mcp/README.md tool tables from ALL_TOOLS.");
+if (failed) process.exit(1);

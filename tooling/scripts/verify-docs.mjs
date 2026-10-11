@@ -490,9 +490,9 @@ if (only === "both" || only === "names") {
 if (only === "both" || only === "names") {
     console.log(`\n${YELLOW}━━━ MCP tool tables ━━━${NC}`);
     const { findings: bad } = checkMcpToolTables(ROOT);
-    console.log(`${DIM}Compared packages/mcp/README.md against ALL_TOOLS.${NC}`);
+    console.log(`${DIM}Compared packages/mcp/README.md and the agent skill's MCP reference against ALL_TOOLS.${NC}`);
     if (!bad.length) {
-        console.log(`${GREEN}✓ The npm README's tool tables are the ones the server registers.${NC}`);
+        console.log(`${GREEN}✓ The npm README's and the skill's tool tables are the ones the server registers.${NC}`);
     } else {
         findings += bad.length;
         console.log(`${RED}✗ ${bad.length} generated block(s) out of date:${NC}`);
