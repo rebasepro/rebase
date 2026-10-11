@@ -266,6 +266,16 @@ every single boot because its comparison could never match. Truncating at
 construction changes what this repo *derives* and changes nothing about what any
 deployed database *contains*. That is the test to apply: not "is the new name
 better", but "does any existing database have to change".
+
+The other case where a name may change is a set of names that could never all
+exist. A rule spanning several operations on a table of 42 bytes or more derived
+`<table>_default_admin_write_insert`, `_update` and `_delete`, and all three cut to
+the same 63 bytes. Postgres stored one policy, DELETE, and refused every admin
+INSERT and UPDATE. Only when a rule's names collide like this are they derived
+suffix-first, as `<head>_<hash8>_<op>`. Every name that works today keeps its
+spelling. The next boot or push drops the one truncated policy and creates a
+policy for each operation.
+
 The one thing that is always safe is to *recognise* an old name in order to
 migrate it: `legacyForeignKeyName` exists to be detected, never to be generated,
 and the baseline pins those detections too. Dropping one silently un-migrates
