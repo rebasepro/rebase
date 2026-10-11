@@ -4,7 +4,6 @@
 import React from "react";
 import { describe, expect, jest, test, beforeEach } from "@jest/globals";
 import { fireEvent, render, screen } from "@testing-library/react";
-import "@testing-library/jest-dom";
 
 /**
  * The drawer's CMS / Studio switch is the kit's `ToggleButtonGroup`, not two
@@ -96,12 +95,12 @@ describe("the drawer's CMS / Studio switch", () => {
         const group = screen.getByRole("group", { name: "t:panel_mode" });
         const cms = screen.getByRole("button", { name: "CMS" });
         const studio = screen.getByRole("button", { name: "Studio" });
-        expect(group).toContainElement(cms);
-        expect(cms).toHaveAttribute("aria-pressed", "true");
-        expect(studio).toHaveAttribute("aria-pressed", "false");
+        expect(group.contains(cms)).toBe(true);
+        expect(cms.getAttribute("aria-pressed")).toBe("true");
+        expect(studio.getAttribute("aria-pressed")).toBe("false");
         // A bare <button> inside a form would submit it.
-        expect(cms).toHaveAttribute("type", "button");
-        expect(studio).toHaveAttribute("type", "button");
+        expect(cms.getAttribute("type")).toBe("button");
+        expect(studio.getAttribute("type")).toBe("button");
     });
 
     test("switches mode and navigates", () => {
