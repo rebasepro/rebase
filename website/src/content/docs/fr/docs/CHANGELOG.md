@@ -49,6 +49,20 @@ La traduction est à venir. Le contenu ci-dessous est en anglais.
   Create users with `POST` (or `create`) and change them with `PATCH` (or
   `update`).
 
+- **A read naming both page and offset is refused with `PAGE_WITH_OFFSET`.**
+  The server answers 400, and the client SDK, the in-process `rebase.data` and
+  the offline client refuse it before any request. Before, `page` won silently
+  and the `offset` was never applied, though the docs already said no window
+  parameter is ignored. Send one of them; see the upgrade guide.
+
+#### Postgres
+
+- **On a table whose name is 42 bytes or more, the three default admin-write
+  policies get new names.** They are now `<head>_<hash8>_<op>`, at most 63
+  bytes. The old names never existed in the database: Postgres had kept one
+  truncated policy, which the next boot or `rebase db push` replaces (see
+  Fixed). Only a policy name that collided changes.
+
 #### MCP
 
 - **The remote MCP's `list_collections` reply carries its listing once, in the
@@ -132,6 +146,11 @@ La traduction est à venir. Le contenu ci-dessous est en anglais.
   function's request times out (504).** Pass it to `fetch` so the work stops
   with the request instead of running on.
 
+- **CORS_EXPOSED_HEADERS is exported from `@rebasepro/server`.** A backend
+  that wires its own `cors()` exposes the same headers the runtime does
+  (`ETag`, `Retry-After`, the resumable-upload headers, …) instead of copying
+  the list by hand.
+
 #### Client SDK
 
 - **`findById(id, { include })` and `listenById(id, onUpdate, onError,
@@ -156,6 +175,11 @@ La traduction est à venir. Le contenu ci-dessous est en anglais.
   `and()` group, `FilterConditionFor` and `LogicalConditionFor`, are exported
   too (see Changed).
 
+- **aggregate() takes a typed orderBy, by group key or alias
+  (`AggregateOrderKey`).** For example `orderBy: ["sum_total", "desc"]`. The
+  HTTP client sends it, and the in-process accessor now applies it instead of
+  dropping it.
+
 #### UI kit & plugins
 
 - **`VirtualTable`, `ListView` and `CardView` accept `undefined` entries in
@@ -171,6 +195,14 @@ La traduction est à venir. Le contenu ci-dessous est en anglais.
 
 - **ToggleButtonGroup takes fullWidth.**
 
+- **`UiLabelsProvider` and `useUiLabels()` give the kit's own words in another
+  language:** the list and card notices, the table's error title, the search
+  bar's names and the collection-view checkboxes. English is the default, and
+  nothing changes without a provider.
+
+- **formatRelativeTime takes labels, to say "5m ago" in another language
+  (`RelativeTimeLabels`, `defaultRelativeTimeLabels`).**
+
 #### Admin (CMS & app)
 
 - **Four translation keys name the split-view dividers and the drawer's
@@ -181,6 +213,20 @@ La traduction est à venir. Le contenu ci-dessous est en anglais.
 - **useCreateFormex takes `beforeSubmit`, awaited at the start of a submit,
   before the values are read.** The record form uses it to wait for a file
   that is still uploading (see Fixed).
+
+- **`EntityAction.nameKey` is a translation key for an action's name.** The
+  built-in actions set it.
+
+#### CLI
+
+- **rebase doctor names a junction table no collection declares
+  (orphaned_junction, info).** It shows the `DROP TABLE` fix and never runs
+  it.
+
+- **rebase db generate names the destructive statements in the migration it
+  writes, and `rebase db migrate --refuse-destructive` refuses one.** The flag
+  dry-runs the pending files and exits 1, applying nothing, when one destroys
+  data. Without it, `db migrate` is unchanged.
 
 #### CI & tooling
 
@@ -193,6 +239,9 @@ La traduction est à venir. Le contenu ci-dessous est en anglais.
 - **`pnpm check:auth-sql-tests`: every auth module that issues SQL is run
   against a real database by a test.** A module whose queries only a mock ever
   saw fails the gate.
+
+- **`pnpm check:icon-button-names` fails on any `IconButton` in package source
+  without an accessible name.**
 
 ### Changed
 
@@ -532,6 +581,10 @@ La traduction est à venir. Le contenu ci-dessous est en anglais.
   and building it is linear.** It was rebuilt on every keystroke; it is built
   once per run. At 1,000 blocks a build took 371 ms and takes about 5.
 
+- **The editor's slash autocomplete sends at most 8,000 characters on each
+  side of the cursor (`MAX_AUTOCOMPLETE_CONTEXT`).** That is exactly what the
+  hosted service reads. It used to upload the whole document on every request.
+
 #### Studio
 
 - **The SQL console keeps at most 10,000 rows, or 32 MB of values, of a
@@ -742,6 +795,16 @@ La traduction est à venir. Le contenu ci-dessous est en anglais.
   twice, and a personal API key reads its owner in one statement, not two.** A
   disabled owner's key is still refused.
 
+### Deprecated
+
+#### Client SDK
+
+- **The client.ws admin methods (executeSql, createBranch, deleteBranch),
+  QueryBuilder and createBackups are deprecated, with no removal date.** Use
+  `client.data.<collection>.where(…)` for queries and `client.backups` for
+  backups, and run SQL server-side. The Studio SQL console still uses
+  `client.ws`, so those methods stay until it has another path.
+
 ### Fixed
 
 #### Server & REST
@@ -846,6 +909,13 @@ La traduction est à venir. Le contenu ci-dessous est en anglais.
   silently every night. `rebase db backup`, `restore` and `backups list` also
   build their S3/GCS client with the function the Backups panel uses
   (`backupStorageFromEnv`, exported from `@rebasepro/server`).
+
+- **A table whose name is 42 bytes or more no longer loses its default insert
+  and update policies to Postgres's 63-byte name truncation.** Before, only
+  DELETE survived, and admins could not insert or update. Only names that
+  collided change: they are now `<head>_<hash8>_<op>`, at most 63 bytes. The
+  next boot or `rebase db push` drops the truncated policy and creates one
+  policy per operation.
 
 #### CLI
 
@@ -1038,6 +1108,22 @@ La traduction est à venir. Le contenu ci-dessous est en anglais.
 - **Account settings → Sessions shows each session's address and creation
   time, and names its revoke button, in the user's language.**
 
+- **Importing into the users collection works again.** Rows with a stored id
+  are updated, and the rest are created.
+
+- **The built-in record actions (Edit, Copy, Delete, Remove, Reset password,
+  …) are named in the admin language.**
+
+- **List, card and search labels, and relative dates ("5m ago"), follow the
+  admin language.**
+
+- **Every icon button in the admin and Studio has a translated name, and
+  row-selection checkboxes are named.**
+
+- **An app whose locale prop starts in a language other than English can
+  change it later.** The first language is no longer stored as the user's
+  choice.
+
 #### Studio
 
 - **The SQL console's CSV export follows RFC 4180.** Values with commas,
@@ -1155,6 +1241,16 @@ La traduction est à venir. Le contenu ci-dessous est en anglais.
   than an array throw a RebaseClientError with INVALID_BULK_BODY,** not a
   `TypeError`.
 
+- **A collection whose slug is a reserved name gets a typed accessor.** The
+  slugs `collection`, `then` and `toJSON` generate
+  `client.data.collectionCollection` (and so on), with a warning naming both.
+  The generated `client.data.collection`, `.then` and `.toJSON` never worked;
+  `client.data.collection("<slug>")` still does.
+
+- **upsert() errors no longer carry the bulk route's `Row 0 of 1 (id …)
+  failed:` prefix.** Code, status and details are unchanged, and `createMany`
+  keeps the prefix.
+
 #### Auth
 
 - **An expired access token is logged at debug, not as an ERROR.** These are
@@ -1169,6 +1265,10 @@ La traduction est à venir. Le contenu ci-dessous est en anglais.
   removed.** `DELETE /auth/mfa/unenroll` (`client.auth.mfa.unenroll`) asks for
   an `aal2` session only once the account has a verified factor, the same rule
   as enroll and verify.
+
+- **The admin user update and the admin password reset with a chosen password
+  report a weak password with the WEAK_PASSWORD code.** That is `PUT
+  /api/admin/users/:id` and `POST /api/admin/users/:uid/reset-password`.
 
 #### UI kit & plugins
 
@@ -1227,6 +1327,11 @@ La traduction est à venir. Le contenu ci-dessous est en anglais.
   and `policy-anonymous-tautology` run when pasted, and `policy-always-true`
   catches `NOT false`, `1 > 0`, `true OR …` and constants compared through
   multi-word casts.**
+
+- **A policy that only tests auth.role() = 'authenticated' (or the role claim
+  of auth.jwt(), either way round) is reported like TO authenticated USING
+  (true).** It is critical, under `policy-authenticated-tautology`, and used
+  to give no finding.
 
 #### Storage & email
 
@@ -1301,6 +1406,12 @@ La traduction est à venir. Le contenu ci-dessous est en anglais.
   INVALID_STORAGE_KEY).** Such an upload overwrote another file's stored
   content type and metadata.
 
+- **The metadata of a key ending in / answers 404 on S3 and GCS, as it already
+  did on local storage.** That is `GET /api/storage/metadata/<folder>/` and
+  the same key in `POST /api/storage/metadata`. A `folder/` marker object used
+  to be described and given a download token that read every object under the
+  prefix, while the authorize hook had been asked only about the marker.
+
 #### Server & REST
 
 - **A one-to-many membership write no longer takes a child that the target's
@@ -1312,6 +1423,23 @@ La traduction est à venir. Le contenu ci-dessous est en anglais.
 
 - **A resumable upload can no longer be continued or cancelled by a non-admin
   user whose uid is `service`.**
+
+- **A query naming an excludeFromApi field or relation answers exactly as one
+  naming an unknown field, so the error no longer confirms the field exists.**
+  A filter, sort, `fields`, `include`, aggregate `select` or `groupBy`, or
+  `vector_search` naming one gets the misspelt name's code
+  (`UNKNOWN_FILTER_FIELD`, `UNKNOWN_ORDER_BY_FIELD`, `UNKNOWN_FIELD`,
+  `UNKNOWN_RELATION`, `UNKNOWN_AGGREGATE_FIELD`, `UNKNOWN_VECTOR_PROPERTY`),
+  message and details. No unknown-field answer lists such a field among the
+  valid ones.
+
+- **A filter through a relation (`?author.salary=gt.1`) and an aggregate sort
+  over a relation's field (`orderBy=max(staff.salary)`) are judged by the
+  target's read rule.** Both used to be answered for a caller who may not read
+  the field, which made them a one-predicate-at-a-time oracle.
+
+- **The functions 404 names a file that failed to load only to a signed-in
+  caller.** An anonymous caller gets the plain "No function named …" answer.
 
 ## [0.24.0] - 2026-10-08
 

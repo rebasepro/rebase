@@ -1395,7 +1395,9 @@ come back when you move.
 The first three come with the performance work: the count switch on REST lists,
 the MCP collection listing, and the admin's translations. The rest come from the
 backlog sweep: stricter refusals at boot and on `OPTIONS`, the SDK's cron path
-and offline reads, the storage source registry, and unused UI kit props.
+and offline reads, the storage source registry, unused UI kit props, the
+users-collection upsert, a read naming both `page` and `offset`, and the default
+policy names on long tables.
 
 ---
 
@@ -1569,6 +1571,42 @@ const { data: [found] } = await client.data.users.find({ where: { email: ["==", 
 if (!found) await client.data.users.create(user);
 else await client.data.users.update(String(found.id), user);
 ```
+
+### 78. `page` with `offset` is refused with `PAGE_WITH_OFFSET`
+
+A read naming both `page` and `offset` is now refused. The server answers
+`400 PAGE_WITH_OFFSET`, and the SDK refuses the pair before any request, with a
+`RebaseClientError` carrying the same code: over HTTP, in-process
+(`rebase.data`) and offline. Before, `page` won and the `offset` was dropped
+without a word.
+
+**Who is affected:** code that sends both, for example a `find({ page, offset })`
+or a REST call with `?page=3&offset=40`. Such a read was already only reading
+`page`.
+
+**What to change:** send one of them. To keep what the read returned before,
+drop `offset`.
+
+```diff lang="ts"
+- await client.data.products.find({ page: 3, offset: 40, limit: 20 });
++ await client.data.products.find({ page: 3, limit: 20 });
+```
+
+### 79. Long tables get new default admin-write policy names
+
+On a table whose name is 42 bytes or more, the three default admin-write
+policies (`…_default_admin_write_insert`, `_update` and `_delete`) are now named
+`<head>_<hash8>_<op>`, at most 63 bytes. Postgres keeps 63 bytes of a name, so
+the three old names were cut to the same name and only one policy, the DELETE
+one, existed: admins could not insert or update.
+
+**Who is affected:** a project with a table name of 42 bytes or more, and
+anything that refers to those policies by name, such as a migration or a script
+that drops them. The old names never existed in the database.
+
+**What to change:** nothing for the database. The next boot or `rebase db push`
+drops the truncated policy and creates one policy per operation. Update any
+script that names the old policies.
 
 ## Upgrading 0.23 to 0.24
 
@@ -3633,6 +3671,16 @@ every single boot because its comparison could never match. Truncating at
 construction changes what this repo *derives* and changes nothing about what any
 deployed database *contains*. That is the test to apply: not "is the new name
 better", but "does any existing database have to change".
+
+The other case where a name may change is a set of names that could never all
+exist. A rule spanning several operations on a table of 42 bytes or more derived
+`<table>_default_admin_write_insert`, `_update` and `_delete`, and all three cut to
+the same 63 bytes. Postgres stored one policy, DELETE, and refused every admin
+INSERT and UPDATE. Only when a rule's names collide like this are they derived
+suffix-first, as `<head>_<hash8>_<op>`. Every name that works today keeps its
+spelling. The next boot or push drops the one truncated policy and creates a
+policy for each operation.
+
 The one thing that is always safe is to *recognise* an old name in order to
 migrate it: `legacyForeignKeyName` exists to be detected, never to be generated,
 and the baseline pins those detections too. Dropping one silently un-migrates
@@ -3784,6 +3832,20 @@ yet, listed so that nobody reads a promise into them:
   Create users with `POST` (or `create`) and change them with `PATCH` (or
   `update`).
 
+- **A read naming both page and offset is refused with `PAGE_WITH_OFFSET`.**
+  The server answers 400, and the client SDK, the in-process `rebase.data` and
+  the offline client refuse it before any request. Before, `page` won silently
+  and the `offset` was never applied, though the docs already said no window
+  parameter is ignored. Send one of them; see the upgrade guide.
+
+##### Postgres
+
+- **On a table whose name is 42 bytes or more, the three default admin-write
+  policies get new names.** They are now `<head>_<hash8>_<op>`, at most 63
+  bytes. The old names never existed in the database: Postgres had kept one
+  truncated policy, which the next boot or `rebase db push` replaces (see
+  Fixed). Only a policy name that collided changes.
+
 ##### MCP
 
 - **The remote MCP's `list_collections` reply carries its listing once, in the
@@ -3867,6 +3929,11 @@ yet, listed so that nobody reads a promise into them:
   function's request times out (504).** Pass it to `fetch` so the work stops
   with the request instead of running on.
 
+- **CORS_EXPOSED_HEADERS is exported from `@rebasepro/server`.** A backend
+  that wires its own `cors()` exposes the same headers the runtime does
+  (`ETag`, `Retry-After`, the resumable-upload headers, …) instead of copying
+  the list by hand.
+
 ##### Client SDK
 
 - **`findById(id, { include })` and `listenById(id, onUpdate, onError,
@@ -3891,6 +3958,11 @@ yet, listed so that nobody reads a promise into them:
   `and()` group, `FilterConditionFor` and `LogicalConditionFor`, are exported
   too (see Changed).
 
+- **aggregate() takes a typed orderBy, by group key or alias
+  (`AggregateOrderKey`).** For example `orderBy: ["sum_total", "desc"]`. The
+  HTTP client sends it, and the in-process accessor now applies it instead of
+  dropping it.
+
 ##### UI kit & plugins
 
 - **`VirtualTable`, `ListView` and `CardView` accept `undefined` entries in
@@ -3906,6 +3978,14 @@ yet, listed so that nobody reads a promise into them:
 
 - **ToggleButtonGroup takes fullWidth.**
 
+- **`UiLabelsProvider` and `useUiLabels()` give the kit's own words in another
+  language:** the list and card notices, the table's error title, the search
+  bar's names and the collection-view checkboxes. English is the default, and
+  nothing changes without a provider.
+
+- **formatRelativeTime takes labels, to say "5m ago" in another language
+  (`RelativeTimeLabels`, `defaultRelativeTimeLabels`).**
+
 ##### Admin (CMS & app)
 
 - **Four translation keys name the split-view dividers and the drawer's
@@ -3916,6 +3996,20 @@ yet, listed so that nobody reads a promise into them:
 - **useCreateFormex takes `beforeSubmit`, awaited at the start of a submit,
   before the values are read.** The record form uses it to wait for a file
   that is still uploading (see Fixed).
+
+- **`EntityAction.nameKey` is a translation key for an action's name.** The
+  built-in actions set it.
+
+##### CLI
+
+- **rebase doctor names a junction table no collection declares
+  (orphaned_junction, info).** It shows the `DROP TABLE` fix and never runs
+  it.
+
+- **rebase db generate names the destructive statements in the migration it
+  writes, and `rebase db migrate --refuse-destructive` refuses one.** The flag
+  dry-runs the pending files and exits 1, applying nothing, when one destroys
+  data. Without it, `db migrate` is unchanged.
 
 ##### CI & tooling
 
@@ -3928,6 +4022,9 @@ yet, listed so that nobody reads a promise into them:
 - **`pnpm check:auth-sql-tests`: every auth module that issues SQL is run
   against a real database by a test.** A module whose queries only a mock ever
   saw fails the gate.
+
+- **`pnpm check:icon-button-names` fails on any `IconButton` in package source
+  without an accessible name.**
 
 #### Changed
 
@@ -4267,6 +4364,10 @@ yet, listed so that nobody reads a promise into them:
   and building it is linear.** It was rebuilt on every keystroke; it is built
   once per run. At 1,000 blocks a build took 371 ms and takes about 5.
 
+- **The editor's slash autocomplete sends at most 8,000 characters on each
+  side of the cursor (`MAX_AUTOCOMPLETE_CONTEXT`).** That is exactly what the
+  hosted service reads. It used to upload the whole document on every request.
+
 ##### Studio
 
 - **The SQL console keeps at most 10,000 rows, or 32 MB of values, of a
@@ -4477,6 +4578,16 @@ yet, listed so that nobody reads a promise into them:
   twice, and a personal API key reads its owner in one statement, not two.** A
   disabled owner's key is still refused.
 
+#### Deprecated
+
+##### Client SDK
+
+- **The client.ws admin methods (executeSql, createBranch, deleteBranch),
+  QueryBuilder and createBackups are deprecated, with no removal date.** Use
+  `client.data.<collection>.where(…)` for queries and `client.backups` for
+  backups, and run SQL server-side. The Studio SQL console still uses
+  `client.ws`, so those methods stay until it has another path.
+
 #### Fixed
 
 ##### Server & REST
@@ -4581,6 +4692,13 @@ yet, listed so that nobody reads a promise into them:
   silently every night. `rebase db backup`, `restore` and `backups list` also
   build their S3/GCS client with the function the Backups panel uses
   (`backupStorageFromEnv`, exported from `@rebasepro/server`).
+
+- **A table whose name is 42 bytes or more no longer loses its default insert
+  and update policies to Postgres's 63-byte name truncation.** Before, only
+  DELETE survived, and admins could not insert or update. Only names that
+  collided change: they are now `<head>_<hash8>_<op>`, at most 63 bytes. The
+  next boot or `rebase db push` drops the truncated policy and creates one
+  policy per operation.
 
 ##### CLI
 
@@ -4773,6 +4891,22 @@ yet, listed so that nobody reads a promise into them:
 - **Account settings → Sessions shows each session's address and creation
   time, and names its revoke button, in the user's language.**
 
+- **Importing into the users collection works again.** Rows with a stored id
+  are updated, and the rest are created.
+
+- **The built-in record actions (Edit, Copy, Delete, Remove, Reset password,
+  …) are named in the admin language.**
+
+- **List, card and search labels, and relative dates ("5m ago"), follow the
+  admin language.**
+
+- **Every icon button in the admin and Studio has a translated name, and
+  row-selection checkboxes are named.**
+
+- **An app whose locale prop starts in a language other than English can
+  change it later.** The first language is no longer stored as the user's
+  choice.
+
 ##### Studio
 
 - **The SQL console's CSV export follows RFC 4180.** Values with commas,
@@ -4890,6 +5024,16 @@ yet, listed so that nobody reads a promise into them:
   than an array throw a RebaseClientError with INVALID_BULK_BODY,** not a
   `TypeError`.
 
+- **A collection whose slug is a reserved name gets a typed accessor.** The
+  slugs `collection`, `then` and `toJSON` generate
+  `client.data.collectionCollection` (and so on), with a warning naming both.
+  The generated `client.data.collection`, `.then` and `.toJSON` never worked;
+  `client.data.collection("<slug>")` still does.
+
+- **upsert() errors no longer carry the bulk route's `Row 0 of 1 (id …)
+  failed:` prefix.** Code, status and details are unchanged, and `createMany`
+  keeps the prefix.
+
 ##### Auth
 
 - **An expired access token is logged at debug, not as an ERROR.** These are
@@ -4904,6 +5048,10 @@ yet, listed so that nobody reads a promise into them:
   removed.** `DELETE /auth/mfa/unenroll` (`client.auth.mfa.unenroll`) asks for
   an `aal2` session only once the account has a verified factor, the same rule
   as enroll and verify.
+
+- **The admin user update and the admin password reset with a chosen password
+  report a weak password with the WEAK_PASSWORD code.** That is `PUT
+  /api/admin/users/:id` and `POST /api/admin/users/:uid/reset-password`.
 
 ##### UI kit & plugins
 
@@ -4962,6 +5110,11 @@ yet, listed so that nobody reads a promise into them:
   and `policy-anonymous-tautology` run when pasted, and `policy-always-true`
   catches `NOT false`, `1 > 0`, `true OR …` and constants compared through
   multi-word casts.**
+
+- **A policy that only tests auth.role() = 'authenticated' (or the role claim
+  of auth.jwt(), either way round) is reported like TO authenticated USING
+  (true).** It is critical, under `policy-authenticated-tautology`, and used
+  to give no finding.
 
 ##### Storage & email
 
@@ -5036,6 +5189,12 @@ yet, listed so that nobody reads a promise into them:
   INVALID_STORAGE_KEY).** Such an upload overwrote another file's stored
   content type and metadata.
 
+- **The metadata of a key ending in / answers 404 on S3 and GCS, as it already
+  did on local storage.** That is `GET /api/storage/metadata/<folder>/` and
+  the same key in `POST /api/storage/metadata`. A `folder/` marker object used
+  to be described and given a download token that read every object under the
+  prefix, while the authorize hook had been asked only about the marker.
+
 ##### Server & REST
 
 - **A one-to-many membership write no longer takes a child that the target's
@@ -5047,6 +5206,23 @@ yet, listed so that nobody reads a promise into them:
 
 - **A resumable upload can no longer be continued or cancelled by a non-admin
   user whose uid is `service`.**
+
+- **A query naming an excludeFromApi field or relation answers exactly as one
+  naming an unknown field, so the error no longer confirms the field exists.**
+  A filter, sort, `fields`, `include`, aggregate `select` or `groupBy`, or
+  `vector_search` naming one gets the misspelt name's code
+  (`UNKNOWN_FILTER_FIELD`, `UNKNOWN_ORDER_BY_FIELD`, `UNKNOWN_FIELD`,
+  `UNKNOWN_RELATION`, `UNKNOWN_AGGREGATE_FIELD`, `UNKNOWN_VECTOR_PROPERTY`),
+  message and details. No unknown-field answer lists such a field among the
+  valid ones.
+
+- **A filter through a relation (`?author.salary=gt.1`) and an aggregate sort
+  over a relation's field (`orderBy=max(staff.salary)`) are judged by the
+  target's read rule.** Both used to be answered for a caller who may not read
+  the field, which made them a one-predicate-at-a-time oracle.
+
+- **The functions 404 names a file that failed to load only to a signed-in
+  caller.** An anonymous caller gets the plain "No function named …" answer.
 
 ### [0.24.0] - 2026-10-08
 
@@ -15374,7 +15550,7 @@ key stays correct under either placement.
 
 ### Pagination
 
-Use `limit` and `offset`, or `page`:
+Use `limit` and `offset`, or `page` — one or the other:
 
 ```bash
 # Limit and offset
@@ -15391,6 +15567,9 @@ itself: `INVALID_LIMIT`, `INVALID_OFFSET` (a whole number of 0 or more) and
 `INVALID_PAGE` (a whole number of 1 or more). A window quietly different from
 the one asked for cannot be told apart from having reached the end of the
 collection, which is why none of them is clamped or ignored.
+
+<span class="since-badge" data-since="0.25">Since 0.25</span> For the same reason `page` and `offset` together are a 400
+`PAGE_WITH_OFFSET` rather than one of them quietly winning.
 
 #### Skipping the count
 
@@ -16241,6 +16420,8 @@ When `Database` is supplied, `createRebaseClient` returns a `CreateRebaseClientR
 
 `collectionsDictionary` maps each accessor back to the slug the wire uses. Pass it whenever a slug is not already a valid property name — `my-notes` is reachable as `client.data.myNotes` only because the dictionary says so.
 
+A few names on `client.data` are taken: `collection` is the dynamic `collection(slug)` function, and `then`, `toJSON` and `$$typeof` are left alone for promise and serialisation checks. A collection whose accessor would be one of them is generated as `<name>Collection` — the `collection` slug is `client.data.collectionCollection` — and `generate-sdk` prints a warning naming both. `client.data.collection("collection")` reaches it too.
+
 #### Field names
 
 **A field's name on the wire is its property key**, and the API is camelCase throughout. A `createdAt` property stored in a `created_at` column is `row.createdAt`, and a relation's foreign key is `authorId` even though the column stays `author_id`. `where` and `orderBy` are keyed off the same `Row` type, so what compiles is what the backend answers to.
@@ -16882,7 +17063,9 @@ Naming it anywhere else is refused like a field (see [Queries](#queries)).
 #### Queries
 
 A `where`, `orderBy`, `fields`, aggregate `select` or `groupBy` naming a field you
-cannot read is a **400 `FIELD_NOT_READABLE`**. So is a relation you cannot read
+cannot read is a **400 `FIELD_NOT_READABLE`**. So is a filter through a relation
+on a field of its target you cannot read (`?author.salary=gt.1`), an aggregate
+sort over one (`orderBy=max(staff.salary)`), and a relation you cannot read
 named in a nested path (`/departments/1/members`, `/departments/1/members/7`) or
 an aggregate sort (`orderBy=count(members)`):
 
@@ -16915,6 +17098,15 @@ served off the app, not off the authenticated data router — so field names are
 already public. Hiding the name here would protect nothing and would answer a
 caller's genuine typo with "unknown field", sending them to look for a spelling
 mistake that is not there. **Field names are public; field values are not.**
+
+Except an `excludeFromApi` field's. OpenAPI, `list_collections` and the generated
+SDK leave it out, so its name is not public, and "not readable" would confirm it
+exists. A filter, `orderBy`, `fields`, `include`, aggregate `select` or
+`groupBy`, or `vector_search` naming one gets exactly the answer a misspelt name
+gets — `UNKNOWN_FILTER_FIELD`, `UNKNOWN_ORDER_BY_FIELD`, `UNKNOWN_FIELD`,
+`UNKNOWN_RELATION`, `UNKNOWN_AGGREGATE_FIELD` or `UNKNOWN_VECTOR_PROPERTY`, the
+same message and details — and no unknown-field answer lists it among the valid
+fields.
 
 #### Writes
 
@@ -17303,7 +17495,7 @@ All of the following go inside `admin`.
 | `sideDialogWidth` | `number \| string` | — | Width of the side dialog |
 | `inlineEditing` | `boolean` | `true` | Enable inline editing in the spreadsheet view |
 | `defaultSize` | `"xs" \| "s" \| "m" \| "l" \| "xl"` | `"m"` | Default density of the list, table and card views (the table's row height) |
-| `pagination` | `boolean \| number` | `true` (50) | Enable pagination and/or set page size |
+| `pagination` | `boolean \| number` | `true` (50) | Enable pagination and/or set page size. `false` loads every row; in development the console warns once when that is more than 10,000 rows |
 | `listProperties` | `string[]` | — | Properties to display in the list view |
 | `propertiesOrder` | `string[]` | — | Column order in the table view |
 | `selectionEnabled` | `boolean` | `true` | Enable row selection |
@@ -20401,7 +20593,9 @@ Naming it anywhere else is refused like a field (see [Queries](#queries)).
 #### Queries
 
 A `where`, `orderBy`, `fields`, aggregate `select` or `groupBy` naming a field you
-cannot read is a **400 `FIELD_NOT_READABLE`**. So is a relation you cannot read
+cannot read is a **400 `FIELD_NOT_READABLE`**. So is a filter through a relation
+on a field of its target you cannot read (`?author.salary=gt.1`), an aggregate
+sort over one (`orderBy=max(staff.salary)`), and a relation you cannot read
 named in a nested path (`/departments/1/members`, `/departments/1/members/7`) or
 an aggregate sort (`orderBy=count(members)`):
 
@@ -20434,6 +20628,15 @@ served off the app, not off the authenticated data router — so field names are
 already public. Hiding the name here would protect nothing and would answer a
 caller's genuine typo with "unknown field", sending them to look for a spelling
 mistake that is not there. **Field names are public; field values are not.**
+
+Except an `excludeFromApi` field's. OpenAPI, `list_collections` and the generated
+SDK leave it out, so its name is not public, and "not readable" would confirm it
+exists. A filter, `orderBy`, `fields`, `include`, aggregate `select` or
+`groupBy`, or `vector_search` naming one gets exactly the answer a misspelt name
+gets — `UNKNOWN_FILTER_FIELD`, `UNKNOWN_ORDER_BY_FIELD`, `UNKNOWN_FIELD`,
+`UNKNOWN_RELATION`, `UNKNOWN_AGGREGATE_FIELD` or `UNKNOWN_VECTOR_PROPERTY`, the
+same message and details — and no unknown-field answer lists it among the valid
+fields.
 
 #### Writes
 
@@ -21335,7 +21538,7 @@ key stays correct under either placement.
 
 ### Pagination
 
-Use `limit` and `offset`, or `page`:
+Use `limit` and `offset`, or `page` — one or the other:
 
 ```bash
 # Limit and offset
@@ -21352,6 +21555,9 @@ itself: `INVALID_LIMIT`, `INVALID_OFFSET` (a whole number of 0 or more) and
 `INVALID_PAGE` (a whole number of 1 or more). A window quietly different from
 the one asked for cannot be told apart from having reached the end of the
 collection, which is why none of them is clamped or ignored.
+
+<span class="since-badge" data-since="0.25">Since 0.25</span> For the same reason `page` and `offset` together are a 400
+`PAGE_WITH_OFFSET` rather than one of them quietly winning.
 
 #### Skipping the count
 
@@ -22617,7 +22823,7 @@ the ID you got. Read the response header.
 | `TOKEN_ALREADY_USED` | 401 | A one-time token was replayed, or a refresh token that was rotated away more than `refreshTokenReuseIntervalSeconds` ago. | Request a fresh one, or sign in again. |
 | `TOKEN_EXPIRED` | 401 | The token is past its lifetime. | Request a fresh one. |
 | `USER_NOT_FOUND` | 404 | No account with that id. | Check the id. |
-| `WEAK_PASSWORD` | 400 | The password does not meet the [password policy](/docs/backend/auth-endpoints/#password-policy) (by default 8+ characters with an upper-case letter, a lower-case letter and a digit). | Choose a stronger one. |
+| `WEAK_PASSWORD` | 400 | The password does not meet the [password policy](/docs/backend/auth-endpoints/#password-policy) (by default 8+ characters with an upper-case letter, a lower-case letter and a digit) — on sign-up, a reset or change, and an administrator's `PUT /api/admin/users/:id` or `POST /api/admin/users/:id/reset-password` with a chosen password. | Choose a stronger one. |
 
 ### Data, queries and writes
 
@@ -22637,7 +22843,7 @@ the ID you got. Read the response header.
 | `DB_CONNECT_TIMEOUT` | 503 | Opening a new database connection took longer than `DB_POOL_CONNECT_TIMEOUT`: the database is slow to accept connections, or far away. Sent with `Retry-After`. | Retry; the SDK does. Check the database's load and the network to it. |
 | `DB_PERMISSION_DENIED` | 500 | Postgres refused the statement (`42501`): either a row-level-security policy denying this role, or a missing `GRANT`. | See [Troubleshooting](/docs/troubleshooting/). |
 | `DB_POOL_EXHAUSTED` | 503 | Every pooled database connection stayed busy for `DB_POOL_CONNECT_TIMEOUT`, so this request never reached the database. Load, not a fault; sent with `Retry-After`. The server logs the remedy once a minute. | Retry; the SDK does. Raise `DB_POOL_MAX`, or find the slow queries or long transactions holding connections. |
-| `FIELD_NOT_READABLE` | 400 | A filter, `orderBy`, `fields`, aggregate `select` or `groupBy` names a field this caller's roles cannot read (`access.read`), a nested path or an aggregate sort names a relation they cannot read — or a field operation (`$inc`, `$push`, …) targets one, where a refused bound would reveal the stored value. A field no response can carry has to be one no query can interrogate, or the value is readable one predicate at a time. `details.violations` names each field. | Drop the field from the query, or acquire the role. See [Field access](/docs/collections/field-access/). |
+| `FIELD_NOT_READABLE` | 400 | A filter, `orderBy`, `fields`, aggregate `select` or `groupBy` names a field this caller's roles cannot read (`access.read`), a nested path or an aggregate sort names a relation they cannot read — or a field operation (`$inc`, `$push`, …) targets one, where a refused bound would reveal the stored value. A field no response can carry has to be one no query can interrogate, or the value is readable one predicate at a time. A filter through a relation (`author.salary`) and an aggregate sort over a relation's field (`max(staff.salary)`) are judged by the target's rule. `details.violations` names each field. A field hidden with `excludeFromApi` answers as if it did not exist: a filter, `orderBy`, `fields`, `include`, aggregate `select` or `groupBy`, or `vector_search` naming one gets exactly the answer a misspelt name gets (`UNKNOWN_FILTER_FIELD`, `UNKNOWN_ORDER_BY_FIELD`, `UNKNOWN_FIELD`, `UNKNOWN_RELATION`, `UNKNOWN_AGGREGATE_FIELD` or `UNKNOWN_VECTOR_PROPERTY`), and no unknown-field answer lists one. | Drop the field from the query, or acquire the role. See [Field access](/docs/collections/field-access/). |
 | `FIELD_NOT_WRITABLE` | 400 | The body sets a field this caller's roles cannot write (`access.write`). Refused rather than dropped: a write that discards a field would report success for an edit that did not happen. The same code refuses a write through a parent that sets a relation the caller may not write, and an update that sets a `softDelete` field to a value — only a delete stamps it. `details.violations` names each field. | Remove the field, or acquire the role. A field nobody may write answers `VALIDATION_EXCLUDED_FIELDS` instead. |
 | `IDEMPOTENCY_KEY_IN_PROGRESS` | 409 | An earlier request with the same `Idempotency-Key` is still running. | Retry once it finishes. |
 | `IDEMPOTENCY_KEY_REUSED` | 422 | The same `Idempotency-Key` arrived with a different body. | Use a new key, or send the original body. |
@@ -22676,6 +22882,7 @@ the ID you got. Read the response header.
 | `NOT_FOUND` | 404 | No row with that id in that collection — or one that row-level security hides from this caller. | Check the id, then the collection's `securityRules`. |
 | `UNKNOWN_RELATION` | 400 / 404 | `?include=` names something that is not a relation on the collection. The same code answers **404** when a nested *URL path* names one instead, e.g. `/api/data/authors/1/posts` where `authors` declares none — there the URL names nothing, so it is a not-found rather than a malformed request. | Check the relation's name — the message lists the ones the collection has. A back-reference has to be declared on the parent to be traversable. |
 | `ORDER_BY_FIELD_NOT_SORTABLE` | 400 | The sort names a property that is not sortable. | Sort on a column-backed property. |
+| `PAGE_WITH_OFFSET` | 400 | `?page=` was combined with `?offset=` — or `page` with `offset` in a `find()`, which the client SDK, the in-process `rebase.data` and the offline client refuse with the same code before any request. They describe the same window, and `page` used to win silently over an `offset` the caller then never saw applied. | Send one of them. |
 | `PAYLOAD_TOO_LARGE` | 413 | The body exceeds the configured limit. | Send less, or raise the limit. |
 | `READ_ONLY_TRANSACTION` | 409 | An `afterRead` callback tried to write. A request-scoped read runs in a `READ ONLY` transaction, so neither the callback nor anything it calls may write. | Move the write out of the read: a background job, or `rebase.dataAsAdmin` from a cron job or a custom function. |
 | `RELATION_HAS_NO_PIVOT` | 400 | The write carried a link payload, but the path does not reach its target through a `manyToMany` that declares `through.properties` — so there is no junction row to put it on. | Declare `through.properties` on the relation, or drop the payload from the write. See [Relations](/docs/collections/relations/). |
@@ -22695,7 +22902,7 @@ the ID you got. Read the response header.
 | `TRANSACTION_ABORTED` | 500 | A statement on the write's transaction failed and a callback caught the error. Postgres had already aborted the transaction, so the write was rolled back and nothing was stored. Only a `context.data` create, update or delete the database refused is undone on its own and safe to catch. | Let the failure throw, or check before running the statement. See [Transaction Semantics](/docs/collections/context-data-api/#transaction-semantics). |
 | `UNKNOWN_FIELD` | 400 | `?fields=` names a field the collection does not have. | Check the spelling; the message lists the valid fields. |
 | `UNKNOWN_AGGREGATE_FIELD` | 400 | An aggregate or `groupBy` names a field the collection does not have. | Check the spelling; the message lists the valid fields. |
-| `UNKNOWN_FILTER_FIELD` | 400 | The filter names a field this collection — or a relation's target — does not have. | Check the spelling; the message lists the valid fields. |
+| `UNKNOWN_FILTER_FIELD` | 400 | The filter names a field this collection — or a relation's target — does not have, or one hidden with `excludeFromApi`. | Check the spelling; the message lists the valid fields. |
 | `UNKNOWN_FILTER_OPERATOR` | 400 | The filter names an operator that does not exist. | The message lists every operator. |
 | `UNKNOWN_MESSAGE_TYPE` | 400 | A realtime socket frame has a `type` the server does not handle. Answered as an `ERROR` frame carrying the request's `requestId`, so the request settles instead of timing out. | Check the frame's `type`; the message names it. |
 | `UNKNOWN_ORDER_BY_FIELD` | 400 | The sort names a field this collection does not have. | Check the spelling; the message lists the valid fields. |
@@ -22759,7 +22966,7 @@ the message names the constraint.
 
 | Code | Status | Means | Do |
 | --- | --- | --- | --- |
-| `FUNCTION_NOT_FOUND` | 404 | No function of that name is served — or one is, and its own routes do not cover the path after it. A signed-in caller is also told what *is* served; an anonymous one is not, because that list is an inventory of every custom endpoint. When a file of that name failed to load, the message says so: that is the difference between a typo and a broken deploy. | Check the name against `GET /api/functions`, or the boot log for a file that did not load. |
+| `FUNCTION_NOT_FOUND` | 404 | No function of that name is served — or one is, and its own routes do not cover the path after it. A signed-in caller is also told what *is* served; an anonymous one is not, because that list is an inventory of every custom endpoint. When a file of that name failed to load, the message tells a signed-in caller so, naming the file: that is the difference between a typo and a broken deploy. An anonymous caller gets the plain unknown-name answer, as for a name that matches nothing. | Check the name against `GET /api/functions`, or the boot log for a file that did not load. |
 | `FUNCTION_TIMEOUT` | 504 | The handler exceeded its timeout. It is still running; it cannot be cancelled from here. | Give outbound calls an `AbortSignal`, or raise `REBASE_FUNCTIONS_TIMEOUT_MS`. |
 | `FUNCTIONS_UPSTREAM_UNREACHABLE` | 502 | This process proxies functions to another one, which did not answer. | Check that the functions unit is running. |
 
@@ -25199,8 +25406,8 @@ does not set them.
 `POST /api/storage/upload` answers `201` with the `{ key, bucket, storageUrl }`
 of the stored object under `data`; `GET /api/storage/metadata/*` the object's
 metadata and, for a private object, the short-lived `token`;
-`POST /api/storage/metadata` an object keyed by the paths it was sent, each
-holding what the `GET` would have answered for it (see below);
+`POST /api/storage/metadata` an object keyed by the paths it was sent, each holding what the `GET` would have answered for it (see below).
+A folder is not an object: `/metadata` on a key ending in `/` is `404` on every store, even where S3 or GCS keeps a `folder/` marker, so no download token is minted for a prefix;
 `GET /api/storage/sources` the array of configured sources, with
 `configured: true`. On a deployment with no storage at all, it answers
 `200 {"data": [], "configured": false}`, while every other route answers
@@ -25786,6 +25993,15 @@ Client                                                   Rebase Server
 3. **Data Appending (`PATCH`)**: The client resumes sending binary data starting at the returned offset with `Content-Type: application/offset+octet-stream`. The server writes each chunk to the temporary file at the byte offset the request declares, which must be the offset the server holds (`409` otherwise). One chunk is received at a time: a `PATCH` that arrives while another for the same upload is still being received — typically a client re-sending a chunk that stalled — is answered `423 UPLOAD_LOCKED`, and the client resumes from the offset `HEAD` reports.
 4. **Finalisation**: When the accumulated `Upload-Offset` matches the declared `Upload-Length`, Rebase reads the completed temporary file, wraps it as a standard JavaScript `File` object, and saves it to the configured storage backend (local disk or S3). The temporary file is then deleted. <span class="since-badge" data-since="0.25">Since 0.25</span> That last `PATCH` answers `Rebase-Upload-Result` with the stored object — `{ key, bucket, storageUrl }`, what `POST /api/storage/upload` answers under `data` — as URI-encoded JSON. A frontend on another origin can read it, and `Location` and `Upload-Offset`, only when the server exposes them in `Access-Control-Expose-Headers`: the Rebase runtime and the ejected backend do; a [custom server](/docs/backend/custom-server/) has to.
 5. **Periodic Sweep**: A background cleaner runs every **60 seconds** to delete incomplete temporary uploads that began more than **24 hours** ago — those another process started too, read from the directory.
+
+### Who can reach an upload
+
+An upload started by a signed-in caller answers only to that caller and to administrators;
+anyone else gets `404`, as if the id did not exist. An upload started without a session has no
+owner, so its id is a capability: whoever holds the upload URL can read its progress, append
+to it and cancel it. Keep that URL secret, as you would a download token. Only a deployment
+that runs storage with `requireAuth: false` can start one: with `requireAuth` on, the
+default, a `POST` without a session is refused with `401`.
 
 ### Related
 
@@ -28266,6 +28482,10 @@ await client.cron.toggleJob("health-check", false); // pause
 await client.cron.toggleJob("health-check", true);  // resume
 ```
 
+`triggerJob()` waits for the run to finish and answers with its log. A proxy in front of the
+server may cut a long job's answer short (many stop at 60 seconds) while the run itself
+carries on. Read its outcome from `getJobLogs()` then.
+
 `listJobs()` is typed `CronJobListing`: `jobs`, plus the `skipped`,
 `rejected` and `note` fields described under [Jobs that are not there](#jobs-that-are-not-there).
 
@@ -30407,24 +30627,24 @@ with no `If-Match` — and a 429 loses its `Retry-After`:
 ```typescript
 import express from "express";
 import cors from "cors";
+import { CORS_EXPOSED_HEADERS } from "@rebasepro/server";
 
 const app = express();
 app.use(cors({
     origin: ["https://app.example.com"],
     credentials: true,
-    exposedHeaders: [
-        "ETag", "Retry-After", "X-Request-ID",
-        "X-RateLimit-Limit", "X-RateLimit-Remaining", "X-RateLimit-Reset",
-        "Preference-Applied",
-        // Resumable uploads, which the SDK uses for files over 8 MiB
-        "Location", "Upload-Offset", "Rebase-Upload-Result"
-    ]
+    exposedHeaders: [...CORS_EXPOSED_HEADERS]
 }));
 ```
 
-<span class="since-badge" data-since="0.25">Since 0.25</span> The last three are what a resumable upload answers in. Without them the
-SDK cannot follow one from another origin, and sends every file as one
-multipart request instead.
+<span class="since-badge" data-since="0.25">Since 0.25</span> `CORS_EXPOSED_HEADERS` is the list the runtime itself exposes, so a
+header the SDK starts reading in a later version reaches your frontend without
+a change here. It is `ETag`, `Retry-After`, `X-Request-ID`, the three
+`X-RateLimit-*` headers and `Preference-Applied`, plus `Location`,
+`Upload-Offset` and `Rebase-Upload-Result`, which a resumable upload (files over
+8 MiB) answers in. Without those three the SDK cannot follow an upload from
+another origin, and sends every file as one multipart request instead. On 0.24,
+write the list out by hand.
 
 The Rebase runtime and the ejected backend send this list already. On 0.23
 they expose none of these headers, so a frontend on another origin reads no `ETag`.
@@ -31216,6 +31436,37 @@ table rather than running a second i18n stack beside it.
 
 `t` also returns the key itself when nothing matches, which is the honest
 answer and makes a missing key visible in the UI rather than blank.
+
+### The UI kit's own words
+
+<span class="since-badge" data-since="0.25">Since 0.25</span>
+
+A few strings belong to `@rebasepro/ui` itself rather than to the admin: the
+list and card views' "No entries found", "All 12 entries loaded" and "Error
+loading data", the table's error title, the search bar's names, and relative
+dates such as "5m ago". Inside a Rebase app they come from the same
+translations (`no_entries_found`, `all_entries_loaded`,
+`error_loading_data_message`, `search`, `clear_search`, `relative_*`) and follow
+the language like every other string.
+
+Using the kit on its own, it speaks English until you wrap it in a
+`UiLabelsProvider`. Any label you leave out keeps its English default:
+
+```tsx
+import { UiLabelsProvider } from "@rebasepro/ui";
+
+<UiLabelsProvider labels={{
+    noEntriesFound: "Nessuna voce trovata",
+    allEntriesLoaded: (count) => `Tutte le ${count} voci caricate`,
+    relativeTime: { minutesAgo: (count) => `${count} min fa` }
+}}>
+    <ListView data={rows} renderRow={renderRow}/>
+</UiLabelsProvider>
+```
+
+`useUiLabels()` reads the labels in effect, and `formatRelativeTime` from
+`@rebasepro/utils` takes `labels: useUiLabels().relativeTime` to say a date the
+same way.
 
 ### Group names are not labels
 
@@ -32417,6 +32668,7 @@ Keep this for the one or two actions that are the reason the record is open. The
 | `showActionsInListView` | `false` | `true` shows the action as an icon on each row of the list view |
 | `isEnabled` | — | Return `false` to show the action disabled, as a button or as a menu item |
 | `disabledReason` | — | Says why a disabled action is unavailable: under its name in a menu, and as the tooltip of a disabled button or icon |
+| `nameKey` | — | A translation key for the name. The admin shows its translation in the current language, and `name` where the key has none. The built-in actions set it, so Edit, Copy and Delete follow the admin language |
 
 A disabled action that does not say why reads as broken. `disabledReason` receives the same props as `isEnabled`, so it can name what is missing:
 
@@ -33020,7 +33272,8 @@ Autofill posts the entity's field values to a hosted service to generate a
 suggestion. By default that service is **`https://app.rebase.pro/api/functions/ai`**,
 which Rebase runs — free to use, no configuration, and no credential attached:
 the requests are anonymous, bounded by rate limit rather than by identity. Your
-JWT is not sent.
+JWT is not sent. The editor's slash autocomplete posts text too: up to 8,000
+characters on each side of the cursor, never the whole document.
 
 Whether that is acceptable depends on what is in the fields. Point `endpoint` at
 your own deployment to keep generation inside your infrastructure:
@@ -39307,6 +39560,8 @@ When `Database` is supplied, `createRebaseClient` returns a `CreateRebaseClientR
 
 `collectionsDictionary` maps each accessor back to the slug the wire uses. Pass it whenever a slug is not already a valid property name — `my-notes` is reachable as `client.data.myNotes` only because the dictionary says so.
 
+A few names on `client.data` are taken: `collection` is the dynamic `collection(slug)` function, and `then`, `toJSON` and `$$typeof` are left alone for promise and serialisation checks. A collection whose accessor would be one of them is generated as `<name>Collection` — the `collection` slug is `client.data.collectionCollection` — and `generate-sdk` prints a warning naming both. `client.data.collection("collection")` reaches it too.
+
 #### Field names
 
 **A field's name on the wire is its property key**, and the API is camelCase throughout. A `createdAt` property stored in a `created_at` column is `row.createdAt`, and a relation's foreign key is `authorId` even though the column stays `author_id`. `where` and `orderBy` are keyed off the same `Row` type, so what compiles is what the backend answers to.
@@ -39950,6 +40205,11 @@ if (page1.meta.hasMore) {
 const page = await client.data.products.find({ page: 2, limit: 20 });
 ```
 
+Use one or the other. <span class="since-badge" data-since="0.25">Since 0.25</span> `page` and `offset` together describe the same window
+twice, and the read is refused with `PAGE_WITH_OFFSET` rather than quietly
+applying `page`. The SDK refuses it before any request, over HTTP, in-process and
+offline; the server answers a raw request that sends both with a 400.
+
 `limit` must be a whole number between 1 and 1000. A larger one — or a zero,
 negative, or fractional one — is refused with a 400 `INVALID_LIMIT` rather than
 clamped, because a silently smaller page cannot be told apart from the last one.
@@ -40514,6 +40774,21 @@ GET /api/data/orders/aggregate?select=count()&groupBy=customer&orderBy=count:des
 `offset`, `page` or `orderBy` without a `groupBy`, or a cursor on any aggregate,
 is a `400 INVALID_AGGREGATE_WINDOW`: an ungrouped aggregate has one row, and a
 group is not a row a cursor can continue after.
+
+From the SDK, `aggregate()` takes the same `orderBy` a `find()` does — one
+`[key, "asc" | "desc"]` tuple or a list of them — where the key is a `groupBy`
+column or a result key. Both are typed: on a generated model, a key that is
+neither does not compile. In process (`rebase.data`), the groups come back in
+the same order as over HTTP.
+
+```ts
+const topCustomers = await client.data.orders.aggregate({
+    select: [{ fn: "count" }, { fn: "sum", field: "total" }],
+    groupBy: ["customer"],
+    orderBy: ["sum_total", "desc"],
+    limit: 10
+});
+```
 
 It takes the same filters as the list endpoint, so an aggregate can be narrowed
 the same way a listing is:
@@ -41860,6 +42135,11 @@ client.data.posts.listenById(1, (post) => {
     console.log(post?.tags); // the post's tags, on every update
 }, undefined, { include: ["tags"] });
 ```
+
+**Limits.** A frame is sent when the row itself changes, and each frame reloads its included
+relations. A change to a related row alone sends no frame: editing a tag's name does not
+refresh a post listened to with `include: ["tags"]` until the post changes too. To follow
+the related rows, listen to their collection as well.
 
 ### Fluent Query Builder
 
@@ -44467,6 +44747,11 @@ rebase db generate
 - Compares the Drizzle schema against the current database state
 - Produces timestamped SQL migration files in `drizzle/migrations/`
 - Files can be reviewed, edited, and committed to version control
+- <span class="since-badge" data-since="0.25">Since 0.25</span> Names every
+  statement in the new migration that destroys data, using the check `db push`
+  runs before it applies: a dropped table, column, schema, view or type, a
+  `TRUNCATE`, a column type change that can lose values, or a primary key
+  change. It still writes the file and exits 0, so it warns and does not refuse.
 
 The generated migrations are plain SQL files — you can inspect and modify them before applying.
 
@@ -44482,6 +44767,21 @@ rebase db migrate
 - Reads `drizzle/migrations/` for unapplied migrations
 - Applies them in order to the database
 - Tracks which migrations have been applied
+
+<span class="since-badge" data-since="0.25">Since 0.25</span> `--refuse-destructive`
+makes it refuse instead. It dry-runs the pending migrations first. If any
+statement destroys data, by the same check `db push` and `db generate` use, it
+lists those statements and exits 1. It applies nothing, not even the files
+before that statement. Without the flag, `db migrate` behaves as before and
+applies every pending file:
+
+```bash
+rebase db migrate --refuse-destructive
+```
+
+A migration that rebuilds a search column drops it first, so this flag refuses
+that migration too. Read the list it prints, then run `rebase db migrate`
+without the flag to apply it.
 
 ##### Baselining a database Rebase has already booted
 
@@ -44534,6 +44834,8 @@ Run `doctor` whenever something feels out of sync. It pinpoints exactly where th
 The database comparison needs `DATABASE_URL` (or `ADMIN_CONNECTION_STRING`). Without one, that phase is reported as **skipped** rather than passing, and the run never closes with "All schemas are in sync" — a check that did not happen is not a clean bill of health.
 
 <span class="since-badge" data-since="0.25">Since 0.25</span> It also names every collection with no [`search` block](/docs/backend/search) whose table holds more than about 10,000 rows. A search there — the admin's search box, `.search()`, `?searchString=` — is `ILIKE '%term%'` over the text columns, which no index can serve, so each one reads the whole table, and its count reads it again (about a third of a second at 100,000 rows, growing with the table). The row count is Postgres's own estimate, so the check scans nothing. It is a hint: it does not change the exit code, and nothing is indexed for you.
+
+<span class="since-badge" data-since="0.25">Since 0.25</span> It names an **orphaned junction**: a `public` table shaped like a many-to-many junction that no collection declares. The shape is two columns that together form the primary key, each a foreign key to a collection's table. Renaming or removing a `manyToMany` leaves its old junction behind, because push and boot only create tables, and every link row is still in it. The note is information only, so it does not change the exit code. Its fix is the `DROP TABLE` statement, which `doctor` shows and never runs.
 
 #### `rebase generate-sdk`
 
@@ -44637,6 +44939,7 @@ rebase db migrate
 | Schema file not updating | Check the `--collections` path points to the right directory |
 | Migration shows unexpected changes | Run `rebase doctor` to identify drift |
 | `db push` fails on production | Use `db generate` + `db migrate` instead |
+| A migration must not drop data in CI or production | <span class="since-badge" data-since="0.25">Since 0.25</span> `rebase db migrate --refuse-destructive` exits 1 and applies nothing when a pending statement destroys data |
 | `db migrate` fails with `already exists (42710)` | Boot or `db push` already provisioned the schema — record it with `rebase db migrate --baseline <version>` |
 
 ### Next Steps
@@ -44984,7 +45287,7 @@ the pre-1.0 `auth` schema is still checked.
 
 #### policy-authenticated-tautology
 
-**Policy admits every signed-in caller to every row.** High.
+**Policy admits every signed-in caller to every row.** High; critical for the role-test form below.
 
 The corrected form of the check above — `rebase.uid() IS NOT NULL AND rebase.uid() <>
 'anonymous'` — and the place people stop. It does exclude signed-out callers. What it does
@@ -44996,6 +45299,13 @@ else, which the database stores as `rebase.uid() <> ALL (ARRAY['anonymous', 'ano
 only `policy.registered()` is reported too: its extra `NOT rebase.is_anonymous()` keeps
 guests out and scopes no rows either, so every account that is not a guest reads every
 row. With the default `--fail-on high`, a CI run that scans such a policy now fails.
+
+<span class="since-badge" data-since="0.25">Since 0.25</span> A policy whose expression only
+tests the caller's role — `auth.role() = 'authenticated'`, `(auth.jwt() ->> 'role') =
+'authenticated'`, either way round — is reported under this id too. It is `TO authenticated
+USING (true)` written as an expression, so it gets the severity
+[`policy-always-true`](#policy-always-true) gives that: critical, or high when only the
+`WITH CHECK` of an `UPDATE` policy is the role test.
 
 That is the shape that turns a `users` table into a directory of every address on the
 platform, readable by anyone who signed up — and where registration is open, "anyone who
