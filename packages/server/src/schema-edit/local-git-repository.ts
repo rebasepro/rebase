@@ -142,12 +142,18 @@ export function createLocalGitRepository(options: LocalGitOptions): SchemaEditRe
         root,
 
         async currentBranch(): Promise<string> {
-            const branch = (await git(root, ["rev-parse", "--abbrev-ref", "HEAD"])).trim();
+            // The branch HEAD points at, read from the symbolic ref rather
+            // than resolved through a commit: a repository whose first commit
+            // has not been made yet (a scaffold whose initial commit failed for
+            // want of a git identity) is on a branch with no commit, and
+            // `rev-parse --abbrev-ref HEAD` refuses it as an unknown revision.
+            // Committing there makes the branch's first commit.
+            const branch = (await git(root, ["symbolic-ref", "--short", "-q", "HEAD"]).catch(() => "")).trim();
             // A detached HEAD has no branch to commit onto in any meaningful
             // sense; saying so beats reporting "HEAD" as though it were one.
-            if (branch === "HEAD") {
+            if (!branch) {
                 throw new GitCommandError(
-                    "rev-parse",
+                    "symbolic-ref",
                     "the working tree is on a detached HEAD, so there is no branch to commit to. " +
                     "Check out a branch first."
                 );

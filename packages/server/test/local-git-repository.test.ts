@@ -99,6 +99,23 @@ describe("createLocalGitRepository", () => {
         expect(await repo().dirtyPaths()).toEqual([]);
     });
 
+    it("reports the branch of a repository with no commit yet, and makes its first commit", async () => {
+        const fresh = fs.mkdtempSync(path.join(os.tmpdir(), "rebase-git-unborn-"));
+        try {
+            execFileSync("git", ["init", "-q"], { cwd: fresh });
+            execFileSync("git", ["symbolic-ref", "HEAD", "refs/heads/main"], { cwd: fresh });
+            const unborn = createLocalGitRepository({ root: fresh, author: AUTHOR });
+
+            expect(await unborn.currentBranch()).toBe("main");
+
+            fs.writeFileSync(path.join(fresh, "posts.ts"), "export default {};\n");
+            await unborn.commit(["posts.ts"], "feat(schema): add posts");
+            expect(show(fresh, "log", "--format=%s")).toBe("feat(schema): add posts");
+        } finally {
+            fs.rmSync(fresh, { recursive: true, force: true });
+        }
+    });
+
     it("lists both sides of a staged rename, whole", async () => {
         // With -z, a rename is "R  new\0old\0": the original path is a field
         // of its own with no status prefix. Read as an entry, it lost its first
