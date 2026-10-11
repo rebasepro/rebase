@@ -78,10 +78,11 @@ const csv = await client.functions.invoke<string>("export-orders", undefined, { 
 ```
 
 :::note
-`client.call("functions/hello", …)` also reaches a function, and does something
-subtly different: it unwraps `res.data` when the response has one. Two ways in
-with two response contracts is a trap — use `functions.invoke`. `call` exists
-for routes mounted outside `/api/functions`, which `invoke` cannot express.
+`client.call("functions/hello", payload)` also reaches a function. It always
+`POST`s, and like `invoke` it returns the body verbatim — neither reaches in for
+a `data` key. Prefer `functions.invoke`, which takes a method, a sub-path and a
+`responseType`; `call` exists for routes mounted outside `/api/functions`, which
+`invoke` cannot express.
 :::
 
 :::important
