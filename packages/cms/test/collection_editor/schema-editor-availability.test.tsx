@@ -14,7 +14,7 @@ import { useLocalCollectionsConfigController } from "../../src/collection_editor
  * editor, and every save came back `404 Not Found` in a snackbar.
  */
 
-const STATUS_URL = "https://api.example.com/api/schema-editor/status";
+const STATUS_URL = "https://api.example.com/api/admin/schema-editor/status";
 
 function mockStatus(status: number, body: unknown) {
     const fetchMock = jest.fn(async (url: string) => {
@@ -130,7 +130,7 @@ describe("collection editing follows the backend, not the bundle", () => {
         ));
 
         await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
-            "https://api.example.com/backend/schema-editor/status",
+            "https://api.example.com/backend/admin/schema-editor/status",
             expect.anything()
         ));
     });

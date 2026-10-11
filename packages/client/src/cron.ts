@@ -6,7 +6,7 @@ export interface CreateCronOptions {
 }
 
 export function createCron(transport: Transport, options?: CreateCronOptions) {
-    const cronPath = options?.cronPath || "/cron";
+    const cronPath = options?.cronPath || "/admin/cron";
 
     async function listJobs(): Promise<CronJobListing> {
         return transport.request<CronJobListing>(cronPath, { method: "GET" });

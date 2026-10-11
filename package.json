@@ -73,6 +73,7 @@
     "check:test-scripts": "node tooling/scripts/check-test-scripts.mjs",
     "check:tsconfig-entries": "node tooling/scripts/check-tsconfig-entries.mjs",
     "check:control-chars": "node tooling/scripts/check-control-chars.mjs",
+    "check:legacy-api-paths": "node tooling/scripts/check-legacy-api-paths.mjs",
     "check:untranslated": "node tooling/scripts/check-untranslated.mjs",
     "check:locale-parity": "node tooling/scripts/check-locale-parity.mjs",
     "check:jsdoc-coverage": "node tooling/scripts/check-jsdoc-coverage.mjs",

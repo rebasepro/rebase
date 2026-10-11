@@ -38,7 +38,7 @@ describe("saveSecurityRulesToCodebase", () => {
         });
 
         expect(calls).toHaveLength(1);
-        expect(calls[0].url).toBe("http://localhost:3001/api/schema-editor/collection/save");
+        expect(calls[0].url).toBe("http://localhost:3001/api/admin/schema-editor/collection/save");
         expect((calls[0].init.headers as Record<string, string>).Authorization).toBe("Bearer a-token");
     });
 

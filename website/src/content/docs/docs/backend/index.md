@@ -116,7 +116,7 @@ After initialization, these routes are mounted:
 | `/api/meta/contract` | The project's collection schema (needs `schema:read`) |
 | `/api/meta/schema-version` | A version string for that schema (unauthenticated) |
 | `/api/functions/*` | Custom function routes (when `functionsDir` is set) |
-| `/api/cron/*` | Cron job management (`cron:read` / `cron:write`, when `cronsDir` is set) |
+| `/api/admin/cron/*` | Cron job management (`cron:read` / `cron:write`, when `cronsDir` is set) |
 | WebSocket on upgrade | Real-time subscriptions |
 
 ---

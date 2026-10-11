@@ -66,7 +66,7 @@ import { RebaseStudio } from "@rebasepro/studio";
 Whether a *save* lands is the server's decision, not the panel's: the editor
 rewrites collection source files, so it is off under `NODE_ENV=production`, in
 `baas` mode, and on a server with no `collectionsDir`. The panel asks
-`GET /api/schema-editor/status` and shows the reason it gets back beside the
+`GET /api/admin/schema-editor/status` and shows the reason it gets back beside the
 disabled button.
 
 ### Built-in tools

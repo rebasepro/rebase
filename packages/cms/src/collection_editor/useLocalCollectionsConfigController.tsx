@@ -72,7 +72,7 @@ export function useLocalCollectionsConfigController(
         : (clientOrUrl?.baseUrl ?? "");
     const clientApiPath = (typeof clientOrUrl === "object" && clientOrUrl !== null && clientOrUrl.apiPath)
         || DEFAULT_API_PATH;
-    const editorUrl = `${String(clientBaseUrl).replace(/\/$/, "")}${clientApiPath}/schema-editor`;
+    const editorUrl = `${String(clientBaseUrl).replace(/\/$/, "")}${clientApiPath}/admin/schema-editor`;
 
     const resolveToken = async (): Promise<string | null> => {
         let token = optionsRef.current?.getAuthToken ? await optionsRef.current.getAuthToken() : null;

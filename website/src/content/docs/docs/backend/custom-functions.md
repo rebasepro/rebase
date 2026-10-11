@@ -496,7 +496,7 @@ Custom functions are loaded and mounted **after** `initializeRebaseBackend()` co
 3. **Storage routes** — `/api/storage/*`
 4. **Data routes** — `/api/data/*` (CRUD for collections)
 5. **Custom functions** ← `/api/functions/*`
-6. **Cron jobs** — `/api/cron/*`
+6. **Cron jobs** — `/api/admin/cron/*`
 7. **WebSocket** — Realtime subscriptions
 
 This means your custom functions have access to all initialized services. Register any routes that need to run **before** Rebase on the Hono app directly, prior to calling `initializeRebaseBackend()`:

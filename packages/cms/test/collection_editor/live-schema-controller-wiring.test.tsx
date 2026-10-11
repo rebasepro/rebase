@@ -50,7 +50,7 @@ function mockBackend() {
             await liveStatusHeld;
             return json({ enabled: true, canPlan: true, canApply: true, repository: "/repo" });
         }
-        if (String(url).endsWith("/api/schema-editor/status")) {
+        if (String(url).endsWith("/api/admin/schema-editor/status")) {
             return json({ enabled: true });
         }
         if (String(url).endsWith("/api/admin/schema/plan")) {

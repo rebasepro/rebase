@@ -32,7 +32,7 @@ import { RebaseNavigation } from "../../src/components/RebaseNavigation";
  */
 
 const API = "https://api.example.com/api";
-const REFUSED = ["/storage/sources", "/admin/schema/status", "/schema-editor/status"];
+const REFUSED = ["/storage/sources", "/admin/schema/status", "/admin/schema-editor/status"];
 
 const posts = {
     slug: "posts",
@@ -83,7 +83,7 @@ function serve(backend: Backend) {
         if (path === "/auth/scopes") return json({ scopes: [], held: backend.held });
         if (path === "/storage/sources") return json({ data: [], configured: backend.storage });
         if (path === "/admin/schema/status") return json({ enabled: false, canPlan: false, canApply: false });
-        if (path === "/schema-editor/status") return json({ enabled: false });
+        if (path === "/admin/schema-editor/status") return json({ enabled: false });
         return json({ error: { message: `unexpected ${path}` } }, 404);
     }) as unknown as typeof fetch;
 }
@@ -203,7 +203,7 @@ describe("the shell's requests on load", () => {
         await mountShell({ held: ["schema:read", "schema:write"], storage: false });
 
         expect(asked("/admin/schema/status")).toBe(true);
-        expect(asked("/schema-editor/status")).toBe(true);
+        expect(asked("/admin/schema-editor/status")).toBe(true);
         expect(asked("/storage/sources")).toBe(false);
     });
 

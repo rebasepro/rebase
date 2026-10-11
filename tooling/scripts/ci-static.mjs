@@ -259,6 +259,13 @@ made grep and ripgrep classify the file as binary and skip it in silence:
 search anyone ran, and an empty result reads exactly like "no matches".`
     },
     {
+        run: "check:legacy-api-paths",
+        why: `The shipped panel called three admin surfaces by the legacy aliases the
+server keeps for old callers — \`/api/schema-editor\`, \`/api/logs\`, and the
+SDK's \`/api/cron\` — drawing Deprecation headers on every page load, and set
+to break the day the aliases are removed as documented.`
+    },
+    {
         run: "check:floors",
         why: `Six manifests said Node 20, four said 20.10, one said 20, seven said
 nothing, the dogfood app said 18 and five translated quickstarts told

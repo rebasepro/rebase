@@ -36,7 +36,7 @@ describe("createCron", () => {
 
             const result = await cron.listJobs();
 
-            expect(transport.request).toHaveBeenCalledWith("/cron", { method: "GET" });
+            expect(transport.request).toHaveBeenCalledWith("/admin/cron", { method: "GET" });
             expect(result).toEqual({ jobs: [] });
         });
     });
@@ -48,7 +48,7 @@ describe("createCron", () => {
 
             await cron.getJob("my-job");
 
-            expect(transport.request).toHaveBeenCalledWith("/cron/my-job", { method: "GET" });
+            expect(transport.request).toHaveBeenCalledWith("/admin/cron/my-job", { method: "GET" });
         });
 
         it("encodes special characters in job ID", async () => {
@@ -58,7 +58,7 @@ describe("createCron", () => {
             await cron.getJob("job with spaces");
 
             expect(transport.request).toHaveBeenCalledWith(
-                "/cron/job%20with%20spaces",
+                "/admin/cron/job%20with%20spaces",
                 { method: "GET" }
             );
         });
@@ -73,7 +73,7 @@ job: {} });
             await cron.triggerJob("my-job");
 
             expect(transport.request).toHaveBeenCalledWith(
-                "/cron/my-job/trigger",
+                "/admin/cron/my-job/trigger",
                 { method: "POST" }
             );
         });
@@ -87,7 +87,7 @@ job: {} });
             await cron.getJobLogs("my-job");
 
             expect(transport.request).toHaveBeenCalledWith(
-                "/cron/my-job/logs",
+                "/admin/cron/my-job/logs",
                 { method: "GET" }
             );
         });
@@ -99,7 +99,7 @@ job: {} });
             await cron.getJobLogs("my-job", { limit: 5 });
 
             expect(transport.request).toHaveBeenCalledWith(
-                "/cron/my-job/logs?limit=5",
+                "/admin/cron/my-job/logs?limit=5",
                 { method: "GET" }
             );
         });
@@ -113,7 +113,7 @@ job: {} });
             await cron.toggleJob("my-job", true);
 
             expect(transport.request).toHaveBeenCalledWith(
-                "/cron/my-job",
+                "/admin/cron/my-job",
                 {
                     method: "PUT",
                     body: JSON.stringify({ enabled: true })
@@ -128,7 +128,7 @@ job: {} });
             await cron.toggleJob("my-job", false);
 
             expect(transport.request).toHaveBeenCalledWith(
-                "/cron/my-job",
+                "/admin/cron/my-job",
                 {
                     method: "PUT",
                     body: JSON.stringify({ enabled: false })

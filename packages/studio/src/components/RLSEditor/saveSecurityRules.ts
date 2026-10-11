@@ -23,7 +23,7 @@ export async function saveSecurityRulesToCodebase(options: {
     const token = getAuthToken ? await getAuthToken() : null;
     if (token) headers["Authorization"] = `Bearer ${token}`;
 
-    const response = await fetch(`${apiBase}/schema-editor/collection/save`, {
+    const response = await fetch(`${apiBase}/admin/schema-editor/collection/save`, {
         method: "POST",
         headers,
         // Only the rules change here. `partial` says so: read as a

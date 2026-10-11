@@ -267,7 +267,7 @@ export function useLogTail(filters: LogTailFilters, limit = 200): LogTail {
         const poll = async () => {
             if (cancelled) return;
             try {
-                const resp = await fetch(`${apiBase}/logs?${query}`, { headers: await authHeaders() });
+                const resp = await fetch(`${apiBase}/admin/logs?${query}`, { headers: await authHeaders() });
                 if (cancelled) return;
                 if (!resp.ok) {
                     setError(await failureMessage(resp));
@@ -298,7 +298,7 @@ export function useLogTail(filters: LogTailFilters, limit = 200): LogTail {
             if (cancelled) return;
             controller = new AbortController();
             try {
-                const resp = await fetch(`${apiBase}/logs/stream?${query}`, {
+                const resp = await fetch(`${apiBase}/admin/logs/stream?${query}`, {
                     headers: { ...await authHeaders(),
                         Accept: "text/event-stream" },
                     signal: controller.signal

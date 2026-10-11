@@ -30,9 +30,9 @@ REBASE_ROLE=all        # the default: everything, one process
 | | `all` | `api` | `functions` | `worker` |
 | --- | :---: | :---: | :---: | :---: |
 | `/api/auth`, `/api/data`, `/api/storage`, `/api/meta` | ✅ | ✅ | — | — |
-| `/api/admin`, `/api/logs`, the schema editor | ✅ | ✅ | — | — |
+| `/api/admin` (logs and the schema editor among it) | ✅ | ✅ | — | — |
 | `/api/functions/*` | ✅ | forwards (see below) | ✅ | — |
-| `/api/cron` (the admin surface) | ✅ | ✅ | — | — |
+| `/api/admin/cron` (the admin surface) | ✅ | ✅ | — | — |
 | `/health`, `/livez`, `/metrics` | ✅ | ✅ | ✅ | ✅ |
 | Serves websockets, consumes change events | ✅ | ✅ | — | — |
 | Creates the schema at boot | ✅ | ✅ | — | — |
