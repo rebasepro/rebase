@@ -664,6 +664,129 @@ export function formatGeneratedColumnRefusalBanner(
     );
 }
 
+/**
+ * PostgreSQL refusing a retype it has no implicit cast for (42804): `string` →
+ * `number`, `time` → `date`, an array back to a string. Atlas reports it from
+ * the dry-run's analysis as well as from the apply, so without this a
+ * `--dry-run` died with the raw error and showed no plan at all.
+ */
+export function parseUncastableRetype(text: string): { column: string; type: string; statement: string | null } | null {
+    const match = /column "((?:[^"]|"")+)" cannot be cast automatically to type ([^\n(]+?)\s*(?:\(42804\)|$|\n)/m.exec(text);
+    if (!match) return null;
+    return { column: match[1], type: match[2].trim(), statement: parseFailedStatement(text) };
+}
+
+/** The `ALTER … USING` a developer would run, and the other ways past it. Boot's drift report says the same. */
+export function formatUncastableRetypeBanner(refusal: { column: string; type: string; statement: string | null }): string {
+    const { column, type, statement } = refusal;
+    const target = statement ? failedStatementTable(statement) : null;
+    const table = target ? `${target.schema ? `"${target.schema}".` : ""}"${target.table}"` : "<table>";
+    const quotedColumn = `"${column.replace(/"/g, "\"\"")}"`;
+    return (
+        `\n` +
+        `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+        `  ❌  ${table}.${quotedColumn} cannot be converted to ${type} automatically\n` +
+        `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+        `\n` +
+        `  The collection now declares this column as ${type}, and PostgreSQL has\n` +
+        `  no implicit conversion from what the column holds today. Atlas stops\n` +
+        `  at the first such statement — ${chalk.yellow("nothing in this push was applied")}, and a\n` +
+        `  --dry-run cannot show the rest of the plan until this one is settled.\n` +
+        `\n` +
+        `  Three ways forward:\n` +
+        `\n` +
+        `    1. Convert the values yourself, saying how, then push again:\n` +
+        `         ${chalk.gray(`ALTER TABLE ${table} ALTER COLUMN ${quotedColumn} TYPE ${type} USING ${quotedColumn}::${type};`)}\n` +
+        `       ${chalk.gray("(adjust the USING expression to whatever turns each old value into a new one)")}\n` +
+        `    2. Add a new property for the new type, copy the values over with an\n` +
+        `       UPDATE, then remove the old property.\n` +
+        `    3. Keep the column as it is — put the property's type back, or pin the\n` +
+        `       database type with ${chalk.bold("columnType")}.\n` +
+        `\n` +
+        `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`
+    );
+}
+
+/**
+ * A unique constraint or index PostgreSQL could not build because the rows
+ * already repeat a value (23505). The DETAIL naming the value does not survive
+ * Atlas, so the duplicates are read back from the table.
+ */
+export function parseUniqueBuildFailure(text: string): { index: string; statement: string | null; columns: string[] } | null {
+    const match = /could not create unique index "((?:[^"]|"")+)"/.exec(text);
+    if (!match) return null;
+    const statement = parseFailedStatement(text);
+    let columns: string[] = [];
+    if (statement) {
+        const list = /UNIQUE\s*\(([^)]*)\)/i.exec(statement)
+            ?? /\bON\s+(?:ONLY\s+)?(?:"(?:[^"]|"")+"|[A-Za-z_][\w$]*)(?:\.(?:"(?:[^"]|"")+"|[A-Za-z_][\w$]*))?\s*(?:USING\s+\w+\s*)?\(([^)]*)\)/i.exec(statement);
+        if (list) {
+            columns = [...list[1].matchAll(/"((?:[^"]|"")+)"|([A-Za-z_][\w$]*)/g)]
+                .map(m => (m[1] ?? m[2]).replace(/""/g, "\""));
+        }
+    }
+    return { index: match[1], statement, columns };
+}
+
+/** Up to five repeated values, read from the database, or `[]` when we cannot say. */
+async function duplicateValues(
+    databaseUrl: string | undefined,
+    target: { schema?: string; table: string } | null,
+    columns: string[]
+): Promise<{ values: string; count: number }[]> {
+    if (!databaseUrl || !target || columns.length === 0) return [];
+    const ident = (name: string) => `"${name.replace(/"/g, "\"\"")}"`;
+    const table = `${target.schema ? `${ident(target.schema)}.` : ""}${ident(target.table)}`;
+    const cols = columns.map(ident).join(", ");
+    try {
+        const { Client } = await import("pg");
+        const client = new Client({ connectionString: databaseUrl, connectionTimeoutMillis: 5000 });
+        await client.connect();
+        try {
+            // Identifiers from the failed statement, quoted; no value is interpolated.
+            const res = await client.query<{ values: string; count: number }>(
+                `SELECT concat_ws(', ', ${columns.map(c => `${ident(c)}::text`).join(", ")}) AS "values", count(*)::int AS "count"
+                 FROM ${table} GROUP BY ${cols} HAVING count(*) > 1 ORDER BY count(*) DESC LIMIT 5`);
+            return res.rows;
+        } finally {
+            await client.end();
+        }
+    } catch {
+        return [];
+    }
+}
+
+export function formatUniqueBuildFailureBanner(
+    failure: { index: string; statement: string | null; columns: string[] },
+    duplicates: { values: string; count: number }[]
+): string {
+    const target = failure.statement ? failedStatementTable(failure.statement) : null;
+    const table = target ? `${target.schema ? `"${target.schema}".` : ""}"${target.table}"` : "<table>";
+    const cols = failure.columns.length > 0 ? failure.columns.map(c => `"${c}"`).join(", ") : "<column>";
+    const listed = duplicates.length > 0
+        ? `  Repeated values:\n` + duplicates.map(d => `    ${chalk.bold(d.values)}  ${chalk.gray(`× ${d.count}`)}`).join("\n") + `\n\n`
+        : "";
+    return (
+        `\n` +
+        `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+        `  ❌  Cannot make ${table} (${cols}) unique: rows already repeat a value\n` +
+        `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+        `\n` +
+        listed +
+        `  PostgreSQL will not build "${failure.index}" while two rows share a\n` +
+        `  value, and Atlas applies a push as one transaction — ${chalk.yellow("nothing in")}\n` +
+        `  ${chalk.yellow("this push was applied.")}\n` +
+        `\n` +
+        `  Find them:\n` +
+        `    ${chalk.gray(`SELECT ${cols}, count(*) FROM ${table} GROUP BY ${cols} HAVING count(*) > 1;`)}\n` +
+        `\n` +
+        `  Then change or delete the repeats and push again, or take ${chalk.bold("unique")} off\n` +
+        `  the property.\n` +
+        `\n` +
+        `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`
+    );
+}
+
 /** How many rows a table holds, or `null` when we cannot say. */
 async function countRows(databaseUrl: string | undefined, table: string): Promise<number | null> {
     if (!databaseUrl) return null;
@@ -764,6 +887,15 @@ export async function diagnoseAtlasFailure(context: {
         const notNull = parseNotNullViolation(stderr);
         if (notNull) {
             return formatNotNullViolationBanner(notNull, await countRows(databaseUrl, notNull.table), notNullColumnIsNew(stderr, notNull.column));
+        }
+
+        const uncastable = parseUncastableRetype(stderr);
+        if (uncastable) return formatUncastableRetypeBanner(uncastable);
+
+        const unique = parseUniqueBuildFailure(stderr);
+        if (unique) {
+            const target = unique.statement ? failedStatementTable(unique.statement) : null;
+            return formatUniqueBuildFailureBanner(unique, await duplicateValues(databaseUrl, target, unique.columns));
         }
 
         const generated = parseGeneratedColumnRefusal(stderr);

@@ -28,7 +28,10 @@ import {
     parseAlreadyProvisioned,
     parseEnumLabelDrop,
     parseFailedStatement,
-    parseNotNullViolation
+    formatUniqueBuildFailureBanner,
+    parseNotNullViolation,
+    parseUncastableRetype,
+    parseUniqueBuildFailure
 } from "../src/cli-errors";
 
 const ALREADY_EXISTS_TYPE =
@@ -217,6 +220,68 @@ describe("a retype a generated column stands in the way of", () => {
         expect(banner).toContain("public.people.search_vector");
         expect(banner).toContain('reads "nickname"');
         expect(banner).toContain('ALTER TABLE "public"."people" DROP COLUMN "search_vector";');
+    });
+});
+
+/** The dry-run's analysis spelling (unquoted statement) — a `time` property changed to a `date`. */
+const UNCASTABLE_DRY_RUN =
+    "Error: analyzing plan: executing statement: ALTER TABLE \"public\".\"people\" ALTER COLUMN \"wake_at\" TYPE date;: "
+    + "pq: column \"wake_at\" cannot be cast automatically to type date (42804)";
+
+/** `unique: true` added to a property whose rows already repeat a value. */
+const UNIQUE_ON_DUPLICATES =
+    "Error: executing statement \"ALTER TABLE \\\"public\\\".\\\"people\\\" ADD CONSTRAINT \\\"people_nickname_key\\\" UNIQUE (\\\"nickname\\\");\": "
+    + "pq: could not create unique index \"people_nickname_key\" (23505)";
+
+describe("a retype PostgreSQL has no implicit cast for (42804)", () => {
+    it("reads the column, the type and the statement", () => {
+        expect(parseUncastableRetype(UNCASTABLE_DRY_RUN)).toEqual({
+            column: "wake_at",
+            type: "date",
+            statement: 'ALTER TABLE "public"."people" ALTER COLUMN "wake_at" TYPE date;'
+        });
+    });
+
+    it("prints the ALTER … USING to run and the other ways past it, on the dry-run too", async () => {
+        const hint = await diagnoseAtlasFailure({
+            domain: "schema",
+            args: ["apply", "--to", "file://.rebase/sql/schema.sql", "--dry-run"],
+            stderr: UNCASTABLE_DRY_RUN
+        });
+        expect(hint).toContain('ALTER TABLE "public"."people" ALTER COLUMN "wake_at" TYPE date USING "wake_at"::date;');
+        expect(hint).toContain("nothing in this push was applied");
+        expect(hint).toContain("columnType");
+    });
+});
+
+describe("a unique constraint over rows that already repeat a value (23505)", () => {
+    it("reads the index, the table and the columns out of the statement", () => {
+        const failure = parseUniqueBuildFailure(UNIQUE_ON_DUPLICATES);
+        expect(failure?.index).toBe("people_nickname_key");
+        expect(failure?.columns).toEqual(["nickname"]);
+        expect(parseUniqueBuildFailure(
+            'Error: executing statement "CREATE UNIQUE INDEX \\"t_a_b\\" ON \\"public\\".\\"t\\" (\\"a\\", \\"b\\");": pq: could not create unique index "t_a_b" (23505)'
+        )?.columns).toEqual(["a", "b"]);
+    });
+
+    it("gives the query that finds the repeats, and the way forward", async () => {
+        const hint = await diagnoseAtlasFailure({
+            domain: "schema",
+            args: ["apply", "--to", "file://.rebase/sql/schema.sql"],
+            stderr: UNIQUE_ON_DUPLICATES
+        });
+        expect(hint).toContain('Cannot make "public"."people" ("nickname") unique');
+        expect(hint).toContain('SELECT "nickname", count(*) FROM "public"."people" GROUP BY "nickname" HAVING count(*) > 1;');
+        expect(hint).toContain("nothing in");
+    });
+
+    it("lists the repeated values when the database could say which", () => {
+        const banner = formatUniqueBuildFailureBanner(
+            { index: "people_nickname_key", statement: null, columns: ["nickname"] },
+            [{ values: "bob", count: 3 }]
+        );
+        expect(banner).toContain("bob");
+        expect(banner).toContain("× 3");
     });
 });
 
