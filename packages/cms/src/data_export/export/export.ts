@@ -120,6 +120,10 @@ function getExportHeaderGroups(properties: Properties,
 
     const groups: ExportHeaderGroup[] = [{ headers: [{ label: "id", key: "id" }] }];
     for (const childKey of propertiesOrder ?? Object.keys(properties)) {
+        // The first column already is the id. A collection that declares its
+        // key as a property named `id` wrote it twice, and the import refuses
+        // a file with a duplicate header.
+        if (childKey === "id") continue;
         const property = properties[childKey];
         if (!property) {
             console.warn("Property not found", childKey, properties);
