@@ -22,12 +22,12 @@ La traduzione è in arrivo. Il contenuto qui sotto è in inglese.
   Write that filter as `?where={"count":["==",5]}`. The SDK already sends it
   that way.
 
-- **A plain `OPTIONS` to a route with no `OPTIONS` handler is now a 404, not an
-  empty 204.** The CORS middleware answered every `OPTIONS` itself; it now
-  answers only CORS preflights, and any other `OPTIONS` reaches its route.
+- **A plain OPTIONS to a route with no OPTIONS handler is now a 404, not an
+  empty 204.** The CORS middleware answered every OPTIONS itself; it now
+  answers only CORS preflights, and any other OPTIONS reaches its route.
   `OPTIONS /api/storage/tus` answers with the TUS capabilities (`Tus-Version`,
   `Tus-Extension`, `Tus-Max-Size`), as documented. A client or health check
-  that probed a route with `OPTIONS` and read the 204 as "exists" must use the
+  that probed a route with OPTIONS and read the 204 as "exists" must use the
   route's real method.
 
 - **A collection set whose tables collide after Postgres's 63-byte name
@@ -60,22 +60,22 @@ La traduzione è in arrivo. Il contenuto qui sotto è in inglese.
 
 #### Client SDK
 
-- **`client.cron` calls `/api/admin/cron` by default, not the deprecated
+- **client.cron calls `/api/admin/cron` by default, not the deprecated
   `/api/cron` alias.** A server that serves only the old path (or a proxy that
   forwards only it) now answers 404 to the SDK's cron calls. Pass
   `cron.cronPath` to point the client elsewhere.
 
-- **Offline, `findAll()` and `iterate()` fail with `OFFLINE` on a page this
-  device never fetched, and `count()` with no count cached from the server
-  fails with `OFFLINE`.** They used to return part of the collection as if it
-  were all of it, and a count of the cached rows. Catch `OFFLINE` where the
+- **Offline, findAll() and iterate() fail with OFFLINE on a page this
+  device never fetched, and count() with no count cached from the server
+  fails with OFFLINE.** They used to return part of the collection as if it
+  were all of it, and a count of the cached rows. Catch OFFLINE where the
   app showed those partial results.
 
 #### UI kit & plugins
 
-- **`TextField` no longer declares `maxRows`, and `MultiSelect` no longer
-  declares `onChange`, `name`, `position`, `endAdornment`, `multiple` or
-  `padding`.** None was ever read, so passing one was a silent no-op and is now
+- **TextField no longer declares maxRows, and MultiSelect no longer
+  declares onChange, name, position, endAdornment, multiple or
+  padding.** None was ever read, so passing one was a silent no-op and is now
   a type error. Delete the prop.
 
 ### Added
@@ -114,7 +114,7 @@ La traduzione è in arrivo. Il contenuto qui sotto è in inglese.
   them keeps the separate reads it had. Both Postgres drivers implement them.
 
 - **`jobs.timeoutMs` bounds one job attempt, and every job, queue and topic
-  handler gets a `signal` aborted at that deadline.** A handler that hangs on a
+  handler gets a signal aborted at that deadline.** A handler that hangs on a
   `fetch` can pass the signal on and stop with the attempt.
 
 - **`getSignal(c)` in `@rebasepro/server/functions` is aborted when a custom
@@ -125,13 +125,13 @@ La traduzione è in arrivo. Il contenuto qui sotto è in inglese.
 
 - **`findById(id, { include })` and `listenById(id, onUpdate, onError,
   { include })` load relations into the row.** A row subscription carries its
-  `include` to the server, which reads it on every frame, so a live record
+  include to the server, which reads it on every frame, so a live record
   keeps its relations.
 
 - **`@rebasepro/client` exports the types its calls are written in:
-  `WriteOptions`, `WhereFilterOp`, `WhereFor`, `LogicalCondition`,
-  `AggregateParams`, `AggregateResult`, `IncludeSpec`, `RowOf`/`InsertOf`/
-  `UpdateOf`, `StorageSource` and others.** A helper that wraps `find()` or
+  `WriteOptions`, `WhereFilterOp`, `WhereFor`, LogicalCondition,
+  AggregateParams, AggregateResult, IncludeSpec, RowOf/InsertOf/
+  UpdateOf, `StorageSource` and others.** A helper that wraps `find()` or
   `update()` no longer has to rebuild them from `Parameters<…>`.
 
 - **`client.offline.status().persisted` says whether the browser agreed to keep
@@ -143,13 +143,13 @@ La traduzione è in arrivo. Il contenuto qui sotto è in inglese.
 
 - **`VirtualTable`, `ListView` and `CardView` accept `undefined` entries in
   `data` (a row not read yet, drawn as a placeholder) and an
-  `onRowsRendered(range)` callback; `EntityTableController` has `sparseData`
+  `onRowsRendered(range)` callback; EntityTableController has `sparseData`
   and `onRowsRendered`.** A table can hold a sparse window of a large
   collection (see Changed).
 
-- **The kit has a `HeartIcon`, and gains the accessibility props `Alert`
-  `role`, `Avatar` `onClick`, `ResizablePanels` `dividerAriaLabel` and
-  `ToggleButtonGroup` `aria-label` / `aria-labelledby`.** `DateTimeField`'s
+- **The kit has a `HeartIcon`, and gains the accessibility props Alert
+  `role`, Avatar `onClick`, ResizablePanels `dividerAriaLabel` and
+  ToggleButtonGroup `aria-label` / `aria-labelledby`.** `DateTimeField`'s
   `locale` is now applied, as the input's `lang`.
 
 #### CI & tooling
@@ -246,7 +246,7 @@ La traduzione è in arrivo. Il contenuto qui sotto è in inglese.
   near a limit of 100,000 took about 1 ms and takes 0.1 µs; at 1,000, 11 µs →
   0.2 µs. It makes the same decisions.
 
-- **An unknown relation in `include` is a 400 `UNKNOWN_RELATION` even when no
+- **An unknown relation in include is a 400 UNKNOWN_RELATION even when no
   row matched.** A typo against an empty table, under a filter that matched
   nothing, on a read of a missing row, or nested below a relation that loaded
   nothing answered 200, and became a 400 the first time a row matched.
@@ -463,11 +463,11 @@ La traduzione è in arrivo. Il contenuto qui sotto è in inglese.
   DOM nodes and holds about 300. Exporting 100,000 rows × 20 columns held about
   196 MB and holds about 51 MB; the file is unchanged.
 
-- **`buildEntityPropertiesFromData` no longer drops keys starting with `_`**,
+- **buildEntityPropertiesFromData no longer drops keys starting with _**,
   so a collection created from a Mongo export keeps `_id`. Pass
   `{ ignoreKey: k => k.startsWith("_") }` to keep the old behaviour.
 
-- **`CollectionViewHeaderAction` and `PropertyAddColumnComponent` are removed.**
+- **CollectionViewHeaderAction and PropertyAddColumnComponent are removed.**
   They were not exported and mounted nowhere.
 
 #### UI kit & plugins
@@ -579,9 +579,9 @@ La traduzione è in arrivo. Il contenuto qui sotto è in inglese.
   requests after a device slept made 21 round trips, now 11. A custom
   `Transport` can take part through the optional `setTokenRefresher`.
 
-- **The typed object-form `where` checks each value against its column, as the
-  fluent `.where()` does, and `.fields()`, `.vectorSearch()`, `sum`/`avg` and
-  field operations (`$inc`, `$push`, …) accept only what the server
+- **The typed object-form where checks each value against its column, as the
+  fluent `.where()` does, and `.fields()`, `.vectorSearch()`, sum/avg and
+  field operations ($inc, $push, …) accept only what the server
   accepts.** For example `["array-contains", ["a"]]` on a `string[]` column is
   now a compile error, where the server refused it at run time.
 
@@ -680,10 +680,10 @@ La traduzione è in arrivo. Il contenuto qui sotto è in inglese.
   checks that `{ cls }`, `{ Button }` and `{ Typography }` each bundle under
   60 kB.
 
-- **`pnpm check:hooks` counts an `exhaustive-deps` disable that has no
+- **`pnpm check:hooks` counts an exhaustive-deps disable that has no
   ` -- reason`; `pnpm check:gates-doc` checks the "Tests" rows against the
   workflow and every package test script against a register in
-  `docs/gates.md`; `pnpm rls:check --strict-baseline` fails on a stale
+  docs/gates.md; `pnpm rls:check --strict-baseline` fails on a stale
   baseline entry, and CI passes it.** The admin e2e job log lists every
   Playwright test, flaky ones included.
 
@@ -727,20 +727,20 @@ La traduzione è in arrivo. Il contenuto qui sotto è in inglese.
   The tag is now compared after the row is locked, so the second write waits
   for the first and gets 412.
 
-- **`like`, `ilike`, `not-like` and `not-ilike` on a string `enum` field match
+- **`like`, `ilike`, not-like and not-ilike on a string `enum` field match
   its labels.** They failed with a 500 on every door. On a number, a date or
   another non-text field they are a 400 `INVALID_FILTER_OPERATOR` instead of a
   database error. `citext` columns stay case-insensitive.
 
 - **A misspelled operator inside `?or=`, `?and=` or `?not=` is a 400
-  `UNKNOWN_FILTER_OPERATOR`.** `?not=(title.contains.x)` was read as an
+  UNKNOWN_FILTER_OPERATOR.** `?not=(title.contains.x)` was read as an
   equality that matched nothing, so the request returned every row.
 
 - **An update that changes nothing writes no history entry, and
-  `changed_fields` no longer lists `id` on every update.** `beforeSave` and
+  changed_fields no longer lists `id` on every update.** `beforeSave` and
   `afterSave` receive `previousValues` with the row's key, like `values`.
 
-- **A webhook retry carries the same `X-Webhook-Delivery` as the first
+- **A webhook retry carries the same X-Webhook-Delivery as the first
   attempt, so a receiver can deduplicate at-least-once deliveries.** Queued
   deliveries send their real `X-Webhook-Attempt` when registered as
   `ctx => dispatcher.deliverQueuedJob(ctx.payload, ctx)`; every attempt used to
@@ -799,7 +799,7 @@ La traduzione è in arrivo. Il contenuto qui sotto è in inglese.
   `drizzle/*.sql` copies an older release committed. The generator's output
   is plain text under `NO_COLOR` and when written to a file or pipe.
 
-- **`executeSql` with several statements answers the last statement's rows.**
+- **executeSql with several statements answers the last statement's rows.**
   It answered none.
 
 - **A scheduled backup registered on a machine without `pg_dump` /
@@ -833,8 +833,8 @@ La traduzione è in arrivo. Il contenuto qui sotto è in inglese.
   cause.** Vite's "Both esbuild and oxc options were set" and, from
   `pnpm run example` or an ejected server, dotenv's banner are gone.
 
-- **On a checkout switched to a branch, `rebase db branch create`, `delete`,
-  `info` and `prune` use the main database's branch registry, as `list`
+- **On a checkout switched to a branch, rebase db branch create, `delete`,
+  `info` and prune use the main database's branch registry, as `list`
   does.** A branch created there is recorded where `list` shows it. `create`
   still copies the branch you are on unless you pass `--from`.
 
@@ -899,7 +899,7 @@ La traduzione è in arrivo. Il contenuto qui sotto è in inglese.
 - **⌘S and ⌘Z act on the record form you are in.** They acted on the first one
   opened.
 
-- **`formAutoSave` no longer creates a blank record when a New form is opened,
+- **formAutoSave no longer creates a blank record when a New form is opened,
   and saves only values that pass the form's validation.**
 
 - **When the server refuses a save, the form marks each field it names.**
@@ -936,7 +936,7 @@ La traduzione è in arrivo. Il contenuto qui sotto è in inglese.
 
 - **Creating a collection from a CSV or spreadsheet accepts that file's rows.**
   A `constructor` or `prototype` header no longer crashes the mapping step;
-  repeated headers (`x`, `x_2`) and `_`-prefixed columns such as a Mongo
+  repeated headers (`x`, `x_2`) and _-prefixed columns such as a Mongo
   export's `_id` are kept; a text column holding some numbers (`S, M, L, 10,
   12`) gets an enum that includes them; `email` and `url` are set only when
   every value is one; and fields inside a map are inferred from their values
@@ -1014,7 +1014,7 @@ La traduzione è in arrivo. Il contenuto qui sotto è in inglese.
   (`INVALID_FUNCTION_PATH`) that would have reached routes outside the
   function, such as `/api/admin/...`.
 
-- **Every error the client throws has a `code`.** A proxy's 413/502/500 gets
+- **Every error the client throws has a code.** A proxy's 413/502/500 gets
   one from its status; a Node client with no `baseUrl` fails with
   `BASE_URL_REQUIRED` instead of a network error; `storage.getObject()`
   failures are `RebaseApiError`s with a status.
@@ -1022,8 +1022,8 @@ La traduzione è in arrivo. Il contenuto qui sotto è in inglese.
 - **`client.data` answers `"posts" in client.data`, can be turned into a
   string, and no longer serves `toString` or `constructor` as collections.**
 
-- **`admin.createUser()` types the one-time `temporaryPassword`
-  (and `invitationSent`, `emailDeliveryFailed`) it returns,** and a generated
+- **admin.createUser() types the one-time `temporaryPassword`
+  (and invitationSent, emailDeliveryFailed) it returns,** and a generated
   date column takes a `Date` on `create` and `update`. Regenerate with
   `rebase generate-sdk`.
 
@@ -1047,8 +1047,8 @@ La traduzione è in arrivo. Il contenuto qui sotto è in inglese.
 - **A sync listener that throws no longer aborts the offline replay or runs it
   a second time without the cross-tab lock.**
 
-- **Queued writes keep `GeoPoint` / `Vector` values across a reload, a
-  `__proto__` column survives the offline database, and a `syncIntervalMs`
+- **Queued writes keep GeoPoint / Vector values across a reload, a
+  __proto__ column survives the offline database, and a syncIntervalMs
   above about 24.8 days no longer retries in a tight loop.** A tab running an
   older build that opens an offline database a newer build upgraded keeps
   working, in memory, instead of failing every call.
@@ -1108,7 +1108,7 @@ La traduzione è in arrivo. Il contenuto qui sotto è in inglese.
 - **A check that crashes makes the scan incomplete (exit 2), and a scan with no
   tables in scope says that nothing was checked.** Both passed silently.
 
-- **The printed fixes for `current-setting-throws`, `rls-enabled-no-policies`
+- **The printed fixes for current-setting-throws, rls-enabled-no-policies
   and `policy-anonymous-tautology` run when pasted, and `policy-always-true`
   catches `NOT false`, `1 > 0`, `true OR …` and constants compared through
   multi-word casts.**
@@ -1132,7 +1132,7 @@ La traduzione è in arrivo. Il contenuto qui sotto è in inglese.
 - **A declared bucket with nothing bound is named at boot with the variable to
   set (`S3_BUCKET__MEDIA`), and its 501 names it too.**
 
-- **Local storage's `/metadata` `customMetadata` holds only the caller's
+- **Local storage's `/metadata` customMetadata holds only the caller's
   metadata, as on S3 and GCS.**
 
 - **A mail server that accepts the connection and never answers fails the send
@@ -1141,7 +1141,7 @@ La traduzione è in arrivo. Il contenuto qui sotto è in inglese.
 
 #### Inference
 
-- **`inferTypeFromValue` calls a `Date` a `date`.**
+- **inferTypeFromValue calls a `Date` a `date`.**
 
 #### MCP
 
@@ -1155,7 +1155,7 @@ La traduzione è in arrivo. Il contenuto qui sotto è in inglese.
 #### CI & tooling
 
 - **The headless guard imports the template's preset collections, and
-  `introspect-live` fails under CI when it cannot fetch its pinned dumps or
+  introspect-live fails under CI when it cannot fetch its pinned dumps or
   reach a server.** Locally it skips instead of failing.
 
 ### Security
@@ -1183,7 +1183,7 @@ La traduzione è in arrivo. Il contenuto qui sotto è in inglese.
   hook that judged the bucket.
 
 - **Local storage refuses keys ending in `.metadata.json` (400
-  `INVALID_STORAGE_KEY`).** Such an upload overwrote another file's stored
+  INVALID_STORAGE_KEY).** Such an upload overwrote another file's stored
   content type and metadata.
 
 #### Server & REST
