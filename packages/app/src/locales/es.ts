@@ -731,6 +731,7 @@ export const es: RebaseTranslations = {
     reset_mfa_confirm: "Restablecer",
     reset_mfa_success: "Verificación en dos pasos restablecida",
     account_access_title: "Acceso a la cuenta",
+    account_access_action: "Desactivar o activar la cuenta",
     account_disabled_label: "Cuenta desactivada",
     account_disabled_description: "Una cuenta desactivada no puede iniciar sesión, y todas sus sesiones y tokens dejan de funcionar al instante. Sus datos se conservan; vuelve a activarla para devolverle el acceso.",
     account_disabled_success: "Cuenta desactivada",

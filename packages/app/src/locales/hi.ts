@@ -723,6 +723,7 @@ export const hi: RebaseTranslations = {
     reset_mfa_confirm: "रीसेट करें",
     reset_mfa_success: "दो-चरणीय सत्यापन रीसेट हो गया",
     account_access_title: "खाते की पहुँच",
+    account_access_action: "खाता अक्षम या सक्षम करें",
     account_disabled_label: "खाता निष्क्रिय",
     account_disabled_description: "निष्क्रिय खाता साइन इन नहीं कर सकता, और उसके सभी सत्र और टोकन तुरंत काम करना बंद कर देते हैं। उसका डेटा बना रहता है; पहुँच लौटाने के लिए इसे फिर से चालू करें।",
     account_disabled_success: "खाता निष्क्रिय किया गया",

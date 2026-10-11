@@ -7,7 +7,7 @@ import { Entity } from "@rebasepro/types";
 import { RebaseContext } from "@rebasepro/cms-types";
 import type { EntityFormActionsProps } from "../types/components/EntityFormActionsProps";
 import { copyEntityAction, deleteEntityAction, unlinkEntityAction } from "./common/default_entity_actions";
-import { mergeEntityActions, resolveEntityActionState } from "../util/entity_actions";
+import { entityActionName, mergeEntityActions, resolveEntityActionState } from "../util/entity_actions";
 import { resolveEntityAction } from "../util/resolutions";
 import { Button, CircularProgress, cls, defaultBorderMixin, DialogActions, IconButton, LoadingButton, Tooltip, Typography } from "@rebasepro/ui";
 import { AlertCircleIcon, iconSize } from "@rebasepro/ui";
@@ -263,10 +263,12 @@ function EntityActionButton({
     props: EntityActionClickProps<Record<string, unknown>>
 }) {
     const snackbarController = useSnackbarController();
+    const { t } = useTranslation();
+    const name = entityActionName(action, t);
     const [loading, setLoading] = React.useState(false);
     return <Tooltip
-        title={disabledReason ? `${action.name}: ${disabledReason}` : action.name}>
-        <IconButton aria-label={action.name}
+        title={disabledReason ? `${name}: ${disabledReason}` : name}>
+        <IconButton aria-label={name}
             disabled={!enabled}
             onClick={(event) => {
                 console.debug("Executing action", action.key, props);
@@ -288,7 +290,7 @@ function EntityActionButton({
                                 .finally(() => setLoading(false));
                         } else {
                             snackbarController.open({
-                                message: `Action ${action.name} executed successfully`,
+                                message: `Action ${name} executed successfully`,
                                 type: "success"
                             });
                         }

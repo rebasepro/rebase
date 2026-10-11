@@ -33,7 +33,7 @@ import { Highlighted } from "./SearchHighlight";
 import { useSearchExplanation, MatchExplanation, fieldLabel } from "./SearchExplanation";
 import { useAdminContext } from "../../hooks/useAdminContext";
 import { resolveEntityAction } from "../../util/resolutions";
-import { resolveEntityActionState } from "../../util/entity_actions";
+import { entityActionName, resolveEntityActionState } from "../../util/entity_actions";
 import { getSortablePropertyOptions } from "../CollectionTableBinding/column_utils";
 import { getResolvedPropertyInPath } from "../../util/property_utils";
 
@@ -960,6 +960,7 @@ const ListRow = React.memo(function ListRow<M extends Record<string, unknown>>({
     selectionController?: SelectionController<M>;
     openEntityMode?: "side_panel" | "full_screen" | "split" | "dialog";
 }) {
+    const { t } = useTranslation();
     // ── Resolve slots ──
     // A hook now, not a pure call: a `display` resolver may have to fetch what
     // fills a slot, so the row subscribes to the result and re-renders when it
@@ -1206,13 +1207,14 @@ const ListRow = React.memo(function ListRow<M extends Record<string, unknown>>({
                         };
                         // Asked here as the record's own action bar asks it.
                         const { enabled, disabledReason } = resolveEntityActionState(action, clickProps);
+                        const name = entityActionName(action, t);
                         // Wrapped when disabled: the icon then takes no pointer
                         // events, and the tooltip saying why has to open anyway.
                         return (
                             <Tooltip key={action.key ?? index}
-                                title={disabledReason ? `${action.name}: ${disabledReason}` : action.name}
+                                title={disabledReason ? `${name}: ${disabledReason}` : name}
                                 asChild={enabled}>
-                                <IconButton aria-label={action.name}
+                                <IconButton aria-label={name}
                                     size="small"
                                     disabled={!enabled}
                                     onClick={(e: React.MouseEvent) => {

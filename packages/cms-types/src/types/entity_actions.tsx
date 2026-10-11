@@ -19,6 +19,16 @@ export interface EntityAction<M extends Record<string, unknown> = Record<string,
     name: string;
 
     /**
+     * Translation key for the name, looked up in the admin's translations
+     * (`RebaseTranslations`, or keys you add through the `translations` prop).
+     * When set, the admin shows the translated text and falls back to
+     * {@link name} where the key has no translation; when not, it shows
+     * {@link name} as written. The built-in actions set it (`"edit"`,
+     * `"copy"`, `"delete"`, …), so their names follow the admin language.
+     */
+    nameKey?: string;
+
+    /**
      * Key of the action. You only need to provide this if you want to
      * override the default actions, or if you are not passing the action
      * directly to the `entityActions` prop of a collection.

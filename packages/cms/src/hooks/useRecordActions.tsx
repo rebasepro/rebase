@@ -2,9 +2,9 @@ import type { EntityAction, EntityActionClickProps, AdminCollection } from "@reb
 import type { Entity } from "@rebasepro/types";
 import { useCallback, useMemo } from "react";
 import { useNavigate } from "react-router";
-import { getIcon, useCustomizationController, usePermissions, useSnackbarController } from "@rebasepro/app";
+import { getIcon, useCustomizationController, usePermissions, useSnackbarController, useTranslation } from "@rebasepro/app";
 import { copyEntityAction, deleteEntityAction, unlinkEntityAction } from "../components/common/default_entity_actions";
-import { mergeEntityActions, placeEntityActions, resolveEntityActionState, type PlacedEntityActions } from "../util/entity_actions";
+import { entityActionName, mergeEntityActions, placeEntityActions, resolveEntityActionState, type PlacedEntityActions } from "../util/entity_actions";
 import { resolveEntityAction } from "../util/resolutions";
 import { useChildViewSource } from "./useChildViewSource";
 import { useUrlController } from "./navigation/contexts/UrlContext";
@@ -43,6 +43,7 @@ export function useRecordActions<M extends Record<string, unknown>>({
     const { canCreate, canDelete } = usePermissions();
     const customizationController = useCustomizationController();
     const snackbarController = useSnackbarController();
+    const { t } = useTranslation();
 
     // Rows shared through a junction: the delete action here removes the link,
     // because that is what the server does for this path.
@@ -87,13 +88,13 @@ export function useRecordActions<M extends Record<string, unknown>>({
             console.error("Error executing action", action.key ?? action.name, error);
             snackbarController.open({
                 type: "error",
-                message: `${action.name}: ${error instanceof Error ? error.message : String(error)}`
+                message: `${entityActionName(action, t)}: ${error instanceof Error ? error.message : String(error)}`
             });
         };
 
         const items = actions.map((action, index): RecordActionItem & Pick<EntityAction, "collapsed"> => ({
             key: action.key ?? `${action.name}_${index}`,
-            name: action.name,
+            name: entityActionName(action, t),
             icon: getIcon(action.icon, undefined, undefined, "smallest"),
             collapsed: action.collapsed,
             ...resolveEntityActionState(action, clickProps),
@@ -113,7 +114,7 @@ export function useRecordActions<M extends Record<string, unknown>>({
         }));
 
         return placeEntityActions(items);
-    }, [actions, clickProps, snackbarController]);
+    }, [actions, clickProps, snackbarController, t]);
 }
 
 /**

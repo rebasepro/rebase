@@ -731,6 +731,7 @@ export const en: RebaseTranslations = {
     reset_mfa_confirm: "Reset",
     reset_mfa_success: "Two-step verification reset",
     account_access_title: "Account access",
+    account_access_action: "Disable or enable account",
     account_disabled_label: "Account disabled",
     account_disabled_description: "A disabled account cannot sign in, and every session and token it holds stops working at once. Its data stays; switch it back on to restore access.",
     account_disabled_success: "Account disabled",

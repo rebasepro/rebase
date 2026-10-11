@@ -9,9 +9,14 @@ export function mergeEntityActions(currentActions: EntityAction[], newActions: E
     currentActions.forEach(action => {
         const newAction = newActions.find(a => a.key === action.key);
         if (newAction) {
-            const mergedAction = {
+            const mergedAction: EntityAction = {
                 ...action,
                 ...newAction
+            };
+            // An override that renames a built-in without a key of its own
+            // shows its own name, not the built-in's translation.
+            if (newAction.name !== undefined && newAction.nameKey === undefined) {
+                delete mergedAction.nameKey;
             }
             updatedActions.push(mergedAction);
         } else {
@@ -25,6 +30,15 @@ export function mergeEntityActions(currentActions: EntityAction[], newActions: E
     });
     return updatedActions;
 
+}
+
+/**
+ * The name an action shows: its {@link EntityAction.nameKey} translated, with
+ * its `name` where the key has no translation, or its `name` as written.
+ */
+export function entityActionName(action: Pick<EntityAction, "name" | "nameKey">,
+    t: (key: string, vars?: Record<string, string | number>) => string): string {
+    return action.nameKey ? t(action.nameKey, { defaultValue: action.name }) : action.name;
 }
 
 const genericKeys = ["edit", "copy"];

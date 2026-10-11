@@ -84,6 +84,7 @@ Keep this for the one or two actions that are the reason the record is open. The
 | `showActionsInListView` | `false` | `true` shows the action as an icon on each row of the list view |
 | `isEnabled` | — | Return `false` to show the action disabled, as a button or as a menu item |
 | `disabledReason` | — | Says why a disabled action is unavailable: under its name in a menu, and as the tooltip of a disabled button or icon |
+| `nameKey` | — | A translation key for the name. The admin shows its translation in the current language, and `name` where the key has none. The built-in actions set it, so Edit, Copy and Delete follow the admin language |
 
 A disabled action that does not say why reads as broken. `disabledReason` receives the same props as `isEnabled`, so it can name what is missing:
 

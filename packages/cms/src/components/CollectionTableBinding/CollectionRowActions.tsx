@@ -21,7 +21,7 @@ import { getIcon } from "@rebasepro/app";
 import { getEntityFromCache } from "@rebasepro/app";
 import { getLocalChangesBackup } from "@rebasepro/app";
 import { useAdminContext } from "../../hooks/useAdminContext";
-import { placeEntityActions, resolveEntityActionState } from "../../util/entity_actions";
+import { entityActionName, placeEntityActions, resolveEntityActionState } from "../../util/entity_actions";
 import { ActionMenuLabel } from "../common/ActionMenuLabel";
 
 /**
@@ -169,11 +169,13 @@ export const CollectionRowActions = function CollectionRowActions({
                     {uncollapsedActions.map((action, index) => {
                         const isEditAction = action.key === "edit";
                         const { enabled, disabledReason } = actionState(action);
+                        const name = entityActionName(action, t);
                         const tooltip = isEditAction && hasDraft
                             ? t("unsaved_local_changes")
-                            : disabledReason ? `${action.name}: ${disabledReason}` : action.name;
+                            : disabledReason ? `${name}: ${disabledReason}` : name;
 
                         let iconButton = <IconButton
+                            aria-label={name}
                             disabled={!enabled}
                             onClick={(event: MouseEvent) => {
                                 event.stopPropagation();
@@ -222,7 +224,7 @@ export const CollectionRowActions = function CollectionRowActions({
                                                 action.onClick(clickProps);
                                             }}>
                                             {getIcon(action.icon, undefined, undefined, "smallest")}
-                                            <ActionMenuLabel name={action.name} disabledReason={disabledReason}/>
+                                            <ActionMenuLabel name={entityActionName(action, t)} disabledReason={disabledReason}/>
                                         </MenuItem>;
                                     })}
                                 </React.Fragment>

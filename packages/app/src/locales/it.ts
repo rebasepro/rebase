@@ -723,6 +723,7 @@ export const it: RebaseTranslations = {
     reset_mfa_confirm: "Reimposta",
     reset_mfa_success: "Verifica in due passaggi reimpostata",
     account_access_title: "Accesso all'account",
+    account_access_action: "Disattiva o attiva l'account",
     account_disabled_label: "Account disattivato",
     account_disabled_description: "Un account disattivato non può accedere, e tutte le sue sessioni e i suoi token smettono subito di funzionare. I suoi dati restano; riattivalo per ripristinare l'accesso.",
     account_disabled_success: "Account disattivato",

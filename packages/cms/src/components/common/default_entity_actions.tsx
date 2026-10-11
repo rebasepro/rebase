@@ -48,6 +48,7 @@ export const editEntityAction: EntityAction = {
     icon: <PencilIcon size={iconSize.smallest}/>,
     key: "edit",
     name: "Edit",
+    nameKey: "edit",
     collapsed: false,
     isEnabled: ({ entity }) => Boolean(entity),
     onClick({
@@ -114,6 +115,7 @@ export const editEntityAction: EntityAction = {
 export const copyEntityAction: EntityAction = {
     icon: <CopyIcon size={iconSize.smallest}/>,
     name: "Copy",
+    nameKey: "copy",
     key: "copy",
     isEnabled: ({ entity }) => Boolean(entity),
     onClick({
@@ -175,17 +177,20 @@ export const copyEntityAction: EntityAction = {
 function buildRemoveEntityAction({
     key,
     name,
+    nameKey,
     icon,
     variant
 }: {
     key: string;
     name: string;
+    nameKey: string;
     icon: React.ReactElement;
     variant: "delete" | "unlink";
 }): EntityAction {
     return {
         icon,
         name,
+        nameKey,
         key,
         isEnabled: ({ entity }) => Boolean(entity),
         onClick({
@@ -241,6 +246,7 @@ function buildRemoveEntityAction({
 export const deleteEntityAction: EntityAction = buildRemoveEntityAction({
     key: "delete",
     name: "Delete",
+    nameKey: "delete",
     icon: <Trash2Icon size={iconSize.smallest}/>,
     variant: "delete"
 });
@@ -252,6 +258,7 @@ export const deleteEntityAction: EntityAction = buildRemoveEntityAction({
 export const unlinkEntityAction: EntityAction = buildRemoveEntityAction({
     key: "unlink",
     name: "Remove",
+    nameKey: "remove",
     icon: <Unlink2Icon size={iconSize.smallest}/>,
     variant: "unlink"
 });
@@ -418,6 +425,7 @@ export function ResetPasswordActionDialog({
 export const resetPasswordAction: EntityAction = {
     icon: <KeyRoundIcon size={iconSize.smallest}/>,
     name: "Reset Password",
+    nameKey: "reset_password",
     key: "reset_password",
     collapsed: false,
     showActionsInListView: true,
@@ -639,6 +647,7 @@ export function AccountAccessDialog({
 export const resetMfaAction: EntityAction = {
     icon: <ShieldIcon size={iconSize.smallest}/>,
     name: "Reset two-step verification",
+    nameKey: "reset_mfa_title",
     key: "reset_mfa",
     isEnabled: ({ entity, context }) => Boolean(entity) && callerHoldsScope(context?.authController, "users:write"),
     onClick({ entity, context }): Promise<void> {
@@ -660,6 +669,7 @@ export const resetMfaAction: EntityAction = {
 export const accountAccessAction: EntityAction = {
     icon: <LockIcon size={iconSize.smallest}/>,
     name: "Disable or enable account",
+    nameKey: "account_access_action",
     key: "account_access",
     isEnabled: ({ entity, context }) => Boolean(entity)
         && callerHoldsScope(context?.authController, "users:write")

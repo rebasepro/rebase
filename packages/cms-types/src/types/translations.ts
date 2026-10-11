@@ -818,6 +818,8 @@ export interface RebaseTranslations {
     reset_mfa_confirm?: string;
     reset_mfa_success?: string;
     account_access_title?: string;
+    /** The name of the "Disable or enable account" action on a user. */
+    account_access_action?: string;
     account_disabled_label?: string;
     account_disabled_description?: string;
     account_disabled_success?: string;

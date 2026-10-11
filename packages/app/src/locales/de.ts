@@ -723,6 +723,7 @@ export const de: RebaseTranslations = {
     reset_mfa_confirm: "Zurücksetzen",
     reset_mfa_success: "Zwei-Schritt-Verifizierung zurückgesetzt",
     account_access_title: "Kontozugang",
+    account_access_action: "Konto deaktivieren oder aktivieren",
     account_disabled_label: "Konto deaktiviert",
     account_disabled_description: "Ein deaktiviertes Konto kann sich nicht anmelden, und alle seine Sitzungen und Tokens funktionieren sofort nicht mehr. Seine Daten bleiben erhalten; schalte es wieder ein, um den Zugang wiederherzustellen.",
     account_disabled_success: "Konto deaktiviert",
