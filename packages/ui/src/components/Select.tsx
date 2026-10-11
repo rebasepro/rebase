@@ -493,16 +493,17 @@ export const SelectGroup = React.memo(function SelectGroup({
     children,
     className
 }: SelectGroupProps) {
-    return <>
-        <SelectPrimitive.Group
+    // The items go inside the group and the label is Radix's own, so the
+    // `role="group"` holds its options and is named by the label.
+    return <SelectPrimitive.Group className="mt-6 first:mt-2">
+        <SelectPrimitive.Label
             className={cls(
-                "text-xs text-surface-accent-900 dark:text-white uppercase tracking-wider font-semibold mt-6 first:mt-2",
+                "text-xs text-surface-accent-900 dark:text-white uppercase tracking-wider font-semibold",
                 "px-2 py-2",
                 className
             )}>
             {label}
-        </SelectPrimitive.Group>
-
+        </SelectPrimitive.Label>
         {children}
-    </>;
+    </SelectPrimitive.Group>;
 });
