@@ -72,7 +72,10 @@ no `app/` directory:
 
 ## 2. Verify pnpm
 
-Rebase uses pnpm exclusively as its package manager. Never use npm or yarn.
+A new Rebase project is a pnpm workspace, or an npm one when pnpm is missing or
+the developer chose npm. In an existing project, use the manager whose lockfile
+is there (`pnpm-lock.yaml` or `package-lock.json`), and skip this step for an
+npm project.
 
 - **Action**: Run `pnpm --version`.
 - **Handling**: If pnpm is not installed:

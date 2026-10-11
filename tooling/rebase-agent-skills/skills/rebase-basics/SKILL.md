@@ -42,7 +42,7 @@ Please complete these setup steps before proceeding, and remember your progress 
 
 Please adhere to these principles when working with Rebase, as they ensure reliability and consistency:
 
-1. **Use pnpm exclusively:** Rebase uses pnpm as its package manager. Never use `npm` or `yarn`. All commands should use `pnpm run`, `pnpm install`, `pnpm add`, etc.
+1. **Use the project's package manager:** `rebase init` scaffolds a pnpm workspace, or an npm one when pnpm is not available or the developer chose npm. Look for the lockfile (`pnpm-lock.yaml` or `package-lock.json`) and use that manager for every command: `pnpm add` / `npm install`, `pnpm run` / `npm run`, `pnpm exec rebase` / `npx rebase`. Never mix the two in one project.
 
 2. **Never convert to `any`:** TypeScript strictness is critical. Never use `as any` type assertions. Use proper typing, `unknown`, or explicit type narrowing instead.
 
