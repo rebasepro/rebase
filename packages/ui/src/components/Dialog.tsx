@@ -147,7 +147,7 @@ export const Dialog = ({
 
                     <DialogPrimitive.Overlay
                         ref={setOverlayEl}
-                        className={cls("fixed inset-0 transition-opacity ease-in-out duration-200 bg-black/50 dark:bg-black/60 backdrop-blur-sm",
+                        className={cls("fixed inset-0 transition-opacity ease-in-out duration-200 bg-surface-scrim backdrop-blur-sm",
                             displayed && open ? "opacity-100" : "opacity-0",
                             "z-50 fixed top-0 left-0 w-full h-full"
                         )}

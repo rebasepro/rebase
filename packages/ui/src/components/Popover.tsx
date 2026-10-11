@@ -2,7 +2,7 @@
 import React from "react";
 import * as PopoverPrimitive from "@radix-ui/react-popover";
 
-import { paperMixin } from "../styles";
+import { focusedDisabled, paperMixin } from "../styles";
 import { cls } from "../util";
 import { useInjectStyles } from "../hooks";
 import { usePortalContainer } from "../hooks/PortalContainerContext";
@@ -76,7 +76,9 @@ export function Popover({
                 // `z-50`, the floating layer — see the note in `Menu`. Below it
                 // a popover opened from inside a dialog or a side panel is
                 // painted under the thing that owns its trigger.
-                className={cls(paperMixin,
+                // `focusedDisabled`, as Menu and Select: the panel takes focus
+                // when opened from the keyboard and is not a control to ring.
+                className={cls(paperMixin, focusedDisabled,
                     "PopoverContent z-50", className)}
                 side={side}
                 sideOffset={sideOffset}
@@ -90,7 +92,7 @@ export function Popover({
                 onMouseLeave={onMouseLeave}>
 
                 {children}
-                <PopoverPrimitive.Arrow className="fill-white dark:fill-surface-900"/>
+                <PopoverPrimitive.Arrow className="fill-surface-card"/>
             </PopoverPrimitive.Content>
         </PopoverPrimitive.Portal>
     </PopoverPrimitive.Root>;
