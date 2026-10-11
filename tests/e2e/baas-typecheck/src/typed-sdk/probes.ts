@@ -155,3 +155,18 @@ export async function includeProbes(): Promise<void> {
     // @ts-expect-error — nested: not a relation of authors
     await posts.find({ include: { author: { include: { postz: true } } } });
 }
+
+/**
+ * SDK-17: a date column takes a `Date` on a write. `JSON.stringify` sends it as
+ * the ISO string the server stores, and the column was typed `string` only, so
+ * the natural `create({ publishedAt: new Date() })` was a compile error. The
+ * row a read returns still carries the string — that is what arrives.
+ */
+export async function dateWriteProbes(): Promise<string | null | undefined> {
+    await posts.create({ title: "t", publishedAt: new Date() });
+    await posts.update("p1", { publishedAt: new Date() });
+    const created = await posts.create({ title: "t", publishedAt: "2026-10-11T00:00:00.000Z" });
+    // @ts-expect-error — a number is not a date the server reads
+    await posts.update("p1", { publishedAt: 1 });
+    return created.publishedAt;
+}

@@ -254,8 +254,8 @@ function buildAccessors(collections: CollectionConfig[]): Map<string, string> {
 }
 
 /**
- * A column's type on a write: its own type, or `null` too when it is not
- * required.
+ * A column's type on a write: its own type (a date also as a `Date`), or
+ * `null` too when it is not required.
  *
  * `Row` has typed a non-required column `T | null` for a while; its write twins
  * did not, so the one way to clear a value — `update(id, { publishedAt: null })`,
@@ -264,7 +264,11 @@ function buildAccessors(collections: CollectionConfig[]): Map<string, string> {
  * A primary key is never null, required or not.
  */
 function writableType(prop: Property, tsType: string): string {
-    return prop.validation?.required || isPrimaryKey(prop) ? tsType : `${tsType} | null`;
+    // A date is written as a `Date` as readily as an ISO string: the client
+    // sends it through `JSON.stringify`, which spells it as the ISO string the
+    // server stores. `Row` keeps `string`, because that is what a read returns.
+    const written = prop.type === "date" ? `${tsType} | Date` : tsType;
+    return prop.validation?.required || isPrimaryKey(prop) ? written : `${written} | null`;
 }
 
 /** One emitted `key: type;` line, already indented. */

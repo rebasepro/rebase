@@ -17,13 +17,13 @@ export interface Database {
       id?: number;
       name: string;
       salary?: number | null;
-      createdAt?: string | null;
+      createdAt?: string | Date | null;
       posts?: Array<string | { id: string }>;
     };
     Update: {
       name?: string;
       salary?: number | null;
-      createdAt?: string | null;
+      createdAt?: string | Date | null;
       posts?: Array<string | { id: string }>;
     };
     Relations: {
@@ -86,7 +86,7 @@ export interface Database {
       views?: number | null;
       tagsList?: Array<string> | null;
       embedding?: number[] | null;
-      publishedAt?: string | null;
+      publishedAt?: string | Date | null;
       authorId?: number | null;
       author?: number | null;
       tags?: Array<string | { id: string; _pivot?: { position?: number | null; } }>;
@@ -98,7 +98,7 @@ export interface Database {
       views?: number | null;
       tagsList?: Array<string> | null;
       embedding?: number[] | null;
-      publishedAt?: string | null;
+      publishedAt?: string | Date | null;
       authorId?: number | null;
       author?: number | null;
       tags?: Array<string | { id: string; _pivot?: { position?: number | null; } }>;
