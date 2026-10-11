@@ -318,7 +318,12 @@ export class CollectionRegistry {
             }
         } else if ((newProperty.type === "string" || newProperty.type === "number") && newProperty.enum) {
             const stringOrNumberProperty = newProperty as StringProperty | NumberProperty;
-            if (typeof stringOrNumberProperty.enum === "object" && !Array.isArray(stringOrNumberProperty.enum)) {
+            if (Array.isArray(stringOrNumberProperty.enum)) {
+                // A plain list of values (`["draft", "published"]`, from a JS
+                // config) becomes `{ id, label }` entries here, once, so no
+                // reader downstream meets a bare string.
+                stringOrNumberProperty.enum = enumToObjectEntries(stringOrNumberProperty.enum);
+            } else if (typeof stringOrNumberProperty.enum === "object") {
                 stringOrNumberProperty.enum = enumToObjectEntries(stringOrNumberProperty.enum)?.filter((value) => value && (value.id || value.id === 0) && value.label) ?? [];
             }
         } else if (newProperty.type === "relation") {

@@ -280,7 +280,7 @@ export interface ManyToManyRelation extends RelationBase {
          *     through: {
          *         table: "org_members",
          *         properties: {
-         *             role: { type: "string", enum: ["owner", "admin", "member"],
+         *             role: { type: "string", enum: { owner: "Owner", admin: "Admin", member: "Member" },
          *                     defaultValue: "member", validation: { required: true } },
          *             joinedAt: { type: "date", autoValue: "on_create" }
          *         }
