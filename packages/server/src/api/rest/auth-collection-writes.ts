@@ -22,6 +22,7 @@ import type {
 } from "@rebasepro/types";
 import type { FieldViewer } from "@rebasepro/common";
 import { completeUserCreation } from "../../auth/admin-user-ops";
+import { ApiError } from "../errors";
 import { assertKnownWriteFields, assertWriteValuesValid } from "./write-validation";
 
 /** Whether `collection` is the auth collection — its rows are the users. */
@@ -48,6 +49,36 @@ export function createsUsers(
     collection: CollectionConfig
 ): adapter is UserCreatingAdapter {
     return !!adapter?.prepareUserCreation && isAuthCollection(collection);
+}
+
+/**
+ * Refuse an upsert on the auth collection.
+ *
+ * An upsert is a create or an update, decided inside the write by whether the
+ * row is already there, and on the auth collection the two follow different
+ * rules: a create sets the password and sends the invitation
+ * ({@link createUserThroughAuthCollection}), an update may not demote the last
+ * administrator and normalizes the email ({@link prepareAuthCollectionUpdates}).
+ * Neither can be applied before the branch is known, so an upsert took
+ * neither — `{ id: <the last admin>, roles: ["viewer"] }` demoted them.
+ *
+ * Only where the adapter administers users; with no such step there is no
+ * rule for an upsert to miss. `where` prefixes the message (`Operation 3`).
+ */
+export function assertNoUserUpsert(
+    adapter: AuthAdapter | undefined,
+    collection: CollectionConfig,
+    where?: string
+): void {
+    if (!isAuthCollection(collection)) return;
+    if (!adapter?.prepareUserCreation && !adapter?.prepareUserUpdates) return;
+    throw ApiError.badRequest(
+        `${where ? `${where}: ` : ""}An upsert is not accepted on "${collection.slug}", whose rows are the users. ` +
+        "It creates or updates depending on whether the row exists, and the two follow different rules: a create " +
+        "sets the password and sends the invitation, an update may not demote the last administrator. " +
+        "Send the create with POST and the update with PATCH.",
+        "INVALID_CONFLICT_TARGET"
+    );
 }
 
 /**

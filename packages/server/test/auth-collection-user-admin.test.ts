@@ -31,7 +31,8 @@ const users = {
     auth: { enabled: true },
     properties: {
         id: { name: "ID", type: "string", isId: "uuid" },
-        email: { name: "Email", type: "string" },
+        // Unique, as in the default users collection: a valid conflict target.
+        email: { name: "Email", type: "string", validation: { unique: true } },
         displayName: { name: "Name", type: "string", columnName: "display_name" },
         roles: { name: "Roles", type: "array", of: { name: "Role", type: "string" } }
     }
@@ -422,5 +423,42 @@ describe("creating users through the data API's bulk doors", () => {
 
         expect(res.status).toBe(500);
         expect(sent).toEqual([]);
+    });
+});
+
+/**
+ * An upsert on the auth collection is a create or an update, decided inside the
+ * write by whether the row exists, and the two follow different rules: a
+ * create hashes the password and invites, an update may not demote the last
+ * administrator. Neither can be applied before the branch is known, so an
+ * upsert took neither: `{ id: <the last admin>, roles: ["viewer"] }` upserted
+ * through `/bulk` demoted them, and the insert branch wrote a user with no
+ * password and the email as typed.
+ */
+describe("an upsert on the users collection", () => {
+    it.each([
+        ["POST /bulk", "POST", "/users/bulk", { rows: [{ id: "admin-1", email: "a@b.c", displayName: "A", roles: ["viewer"] }], upsert: true }],
+        ["POST /bulk on a unique key", "POST", "/users/bulk", { rows: [{ email: "a@b.c", displayName: "A", roles: ["viewer"] }], upsert: true, onConflict: ["email"] }],
+        ["_batch", "POST", "/_batch", { operations: [{ op: "upsert", collection: "users", id: "admin-1", values: { email: "a@b.c", displayName: "A", roles: ["viewer"] } }] }],
+        ["POST ?on_conflict", "POST", "/users?on_conflict=email", { email: "a@b.c", displayName: "A", roles: ["viewer"] }]
+    ])("is refused through %s, before anything is written", async (_door, method, path, body) => {
+        const { app, writes } = harness({ admins: ["admin-1"] });
+
+        const res = await send(app, method, path, body);
+
+        expect(res.status).toBe(400);
+        const error = await errorOf(res);
+        expect(error.code).toBe("INVALID_CONFLICT_TARGET");
+        expect(error.message).toContain("users");
+        expect(writes()).toHaveLength(0);
+    });
+
+    it("is still an upsert on every other collection", async () => {
+        const { app, writes } = harness({ admins: ["admin-1"] });
+
+        const res = await send(app, "POST", "/posts/bulk", { rows: [{ id: 1, title: "x" }], upsert: true });
+
+        expect(res.status).toBe(200);
+        expect(writes()[0][1]).toMatchObject({ upsert: true });
     });
 });

@@ -45,6 +45,8 @@ jest.mock("@rebasepro/server", () => ({
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     assertUserCreationBodyValid: require("../../server/src/api/rest/auth-collection-writes").assertUserCreationBodyValid,
     // eslint-disable-next-line @typescript-eslint/no-require-imports
+    assertNoUserUpsert: require("../../server/src/api/rest/auth-collection-writes").assertNoUserUpsert,
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     createUserThroughAuthCollection: require("../../server/src/api/rest/auth-collection-writes").createUserThroughAuthCollection
 }));
 
@@ -598,5 +600,18 @@ describe("a socket write to the auth collection", () => {
 
         expect(last()).toMatchObject({ type: "ERROR" });
         expect(userAdmin.finalizeUserCreation).not.toHaveBeenCalled();
+    });
+
+    it("refuses an upsert on the auth collection: it may be a create or an update, and each has its own rules", async () => {
+        const { send, last } = await connect();
+
+        await send({
+            type: "SAVE", requestId: "u",
+            payload: { path: "users", id: "admin-1", status: "new", upsert: true, values: { email: "a@b.c", roles: ["viewer"] } }
+        });
+
+        expect(last()).toMatchObject({ type: "ERROR", payload: { error: { code: "INVALID_CONFLICT_TARGET" } } });
+        expect(writes).toEqual([]);
+        expect(userAdmin.prepareUserCreation).not.toHaveBeenCalled();
     });
 });

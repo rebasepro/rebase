@@ -37,9 +37,9 @@ const newProduct = await client.data.products.create(
 Insert the row, or update the one already occupying its key:
 
 ```typescript
-await client.data.users.upsert(
-    { email: "ada@example.com", name: "Ada" },
-    { onConflict: ["email"] }
+await client.data.products.upsert(
+    { sku: "LAMP-01", name: "Desk lamp", price: 39 },
+    { onConflict: ["sku"] }
 );
 ```
 
@@ -65,6 +65,13 @@ that do exist, rather than an error raised from inside a transaction.
 
 The `on_create` timestamp and the `user_on_create` creator of a row that already
 existed are left alone: a conflict means its creation is a fact about the past.
+
+`upsert()` on the users collection (the one with `auth` enabled) is refused
+with a 400 (`INVALID_CONFLICT_TARGET`), and so is `createMany` with `upsert`
+there. Creating a user and changing one follow different rules — a create
+hashes the password and sends the invitation, an update may not demote the last
+administrator — and an upsert only learns which it is inside the write. Call
+`create` or `update` instead.
 
 ### Update
 

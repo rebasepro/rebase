@@ -15,6 +15,7 @@ import { ETAG_HEADER, IF_MATCH_HEADER, assertIfMatch, rowETag } from "./etag";
 import { assertRefsResolvable, parseBatchBody, type ParsedBatchOperation } from "./batch";
 import { httpMethodToOperation, type DataOperation } from "../../auth/api-keys/http-operation";
 import {
+    assertNoUserUpsert,
     assertUserCreationBodyValid,
     completeUserCreations,
     createUserThroughAuthCollection,
@@ -349,6 +350,7 @@ export class RestApiGenerator {
                     operation.op === "delete" ? "delete" : "write"
                 );
                 const collection = bySlug.get(operation.collection)!;
+                if (operation.op === "upsert") assertNoUserUpsert(this.authAdapter, collection, `Operation ${index}`);
                 if (!operation.values) return;
                 if (operation.op === "create" && createsUsers(this.authAdapter, collection)) {
                     // A user creation, as on `POST /users`: what it consumes,
@@ -1070,6 +1072,7 @@ export class RestApiGenerator {
             collection,
             { where: "`on_conflict`" }
         );
+        if (onConflict) assertNoUserUpsert(this.authAdapter, collection);
 
         // Auth signups carry credential fields (`password`, provider
         // bits) that the users collection does not declare as columns —
@@ -1578,6 +1581,7 @@ export class RestApiGenerator {
             if (body.upsert !== undefined && typeof body.upsert !== "boolean") {
                 throw ApiError.badRequest("`upsert` must be a boolean.", "INVALID_BULK_BODY");
             }
+            if (body.upsert === true) assertNoUserUpsert(this.authAdapter, resolvedCollection);
             // Checked whether or not `upsert` is set, so naming a target and
             // forgetting the flag is an error rather than a silently ignored
             // field that turns a re-runnable import into a duplicating one.
@@ -1598,7 +1602,7 @@ export class RestApiGenerator {
 
             // On the auth collection, each row is a user creation, as on
             // `POST /users`: the adapter's step, not a plain insert. (An
-            // upsert is not one: it may update a user instead.)
+            // upsert there was refused above: it may update a user instead.)
             const userAdapter = body.upsert !== true && createsUsers(this.authAdapter, resolvedCollection)
                 ? this.authAdapter
                 : undefined;

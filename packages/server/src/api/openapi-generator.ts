@@ -810,8 +810,10 @@ description: "Whether more records exist beyond this page" },
                             "INSERT ... ON CONFLICT DO UPDATE. They must carry a declared uniqueness " +
                             "guarantee — `validation.unique`, a `unique` index, or the primary key — " +
                             "or the request is refused with a 400 naming the targets that do exist. " +
-                            "Left off, this is a plain insert and a duplicate key still raises.",
-                        example: "email"
+                            "Left off, this is a plain insert and a duplicate key still raises. " +
+                            "Refused (400 `INVALID_CONFLICT_TARGET`) on the auth collection, whose rows are " +
+                            "the users: create them with a plain POST and change them with PATCH.",
+                        example: "sku"
                     },
                     preferHeader
                 ],
@@ -896,7 +898,9 @@ description: "Whether more records exist beyond this page" },
                                     rows: { type: "array", items: { $ref: `#/components/schemas/${schemaName}Input` } },
                                     upsert: {
                                         type: "boolean",
-                                        description: "Write each row as INSERT ... ON CONFLICT DO UPDATE."
+                                        description:
+                                            "Write each row as INSERT ... ON CONFLICT DO UPDATE. Refused " +
+                                            "(400 `INVALID_CONFLICT_TARGET`) on the auth collection, whose rows are the users."
                                     },
                                     onConflict: {
                                         type: "array",

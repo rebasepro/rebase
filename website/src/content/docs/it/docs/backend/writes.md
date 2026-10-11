@@ -151,13 +151,13 @@ rotta bulk accetta lo stesso target come `onConflict` insieme a `upsert: true`,
 e lo stesso vale per ogni operazione di `upsert` all'interno di un batch.
 
 ```bash
-curl -X POST '/api/data/users?on_conflict=email' \
-     -d '{"email": "ada@example.com", "name": "Ada"}'
+curl -X POST '/api/data/products?on_conflict=sku' \
+     -d '{"sku": "LAMP-01", "name": "Desk lamp", "price": 39}'
 
-curl -X POST /api/data/users/bulk -d '{
+curl -X POST /api/data/products/bulk -d '{
   "rows": [ … ],
   "upsert": true,
-  "onConflict": ["tenant_id", "slug"]
+  "onConflict": ["tenant_id", "sku"]
 }'
 ```
 

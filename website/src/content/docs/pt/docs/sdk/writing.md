@@ -38,9 +38,9 @@ const newProduct = await client.data.products.create(
 Insira a linha ou atualize aquela que já ocupa sua chave:
 
 ```typescript
-await client.data.users.upsert(
-    { email: "ada@example.com", name: "Ada" },
-    { onConflict: ["email"] }
+await client.data.products.upsert(
+    { sku: "LAMP-01", name: "Desk lamp", price: 39 },
+    { onConflict: ["sku"] }
 );
 ```
 

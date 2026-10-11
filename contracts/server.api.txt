@@ -72,6 +72,7 @@ function assertFieldOpsValid
 function assertIfMatch
 function assertNestedWriteAllowed
 function assertNoFieldOpsOnCreate
+function assertNoUserUpsert
 function assertQueryFieldsReadable
 function assertUploadWithinPathLimits
 function assertUploadWithinPropertyLimits

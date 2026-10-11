@@ -1560,6 +1560,10 @@ export interface SDKCollectionClient<
      * `unique` index. Anything else is a 400 rather than a Postgres error
      * raised half-way through a transaction.
      *
+     * Refused (400 `INVALID_CONFLICT_TARGET`) on the auth collection, whose
+     * rows are the users: a create and an update of a user follow different
+     * rules, and an upsert only learns which it is inside the write.
+     *
      * The `on_create` timestamp of a row that already existed is left alone: a
      * conflict means the row's creation is a fact about the past, and a nightly
      * re-import that reset `createdAt` on everything it touched would take
@@ -1567,9 +1571,9 @@ export interface SDKCollectionClient<
      *
      * @example
      * ```ts
-     * await client.data.users.upsert(
-     *     { email: "a@b.c", name: "Ada" },
-     *     { onConflict: ["email"] }
+     * await client.data.products.upsert(
+     *     { sku: "LAMP-01", name: "Desk lamp" },
+     *     { onConflict: ["sku"] }
      * );
      * ```
      */

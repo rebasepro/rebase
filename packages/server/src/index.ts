@@ -223,7 +223,7 @@ export { assertNestedWriteAllowed } from "./api/rest/nested-write-access";
 export type { NestedWriteHop, NestedWriteKind } from "./api/rest/nested-write-access";
 // A create on the auth collection is a user creation, whichever door it comes
 // through; the socket creates users through the same two steps REST does.
-export { assertUserCreationBodyValid, createUserThroughAuthCollection } from "./api/rest/auth-collection-writes";
+export { assertNoUserUpsert, assertUserCreationBodyValid, createUserThroughAuthCollection } from "./api/rest/auth-collection-writes";
 export { ETAG_HEADER, IF_MATCH_HEADER, assertIfMatch, rowETag, versionProperty } from "./api/rest/etag";
 
 // =============================================================================

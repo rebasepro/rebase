@@ -29,6 +29,17 @@
   (`target: "authors"`) are refused at config time too, each saying what to
   write. Rename one of the colliding names.
 
+- **An upsert on the users (auth) collection is refused with a 400
+  `INVALID_CONFLICT_TARGET`.** It skipped both rule sets: the create rules
+  (password hashing, email normalization, `onCreateUser`, the invitation) and
+  the update rules (the last administrator cannot be demoted). A `/bulk` upsert
+  of `{ id: <the last admin>, roles: ["viewer"] }` demoted them, and an inserted
+  row had no password and the email as typed. The refusal covers `?on_conflict=`,
+  `/bulk` with `upsert: true`, a `_batch` `upsert` operation, the SDK's
+  `upsert()` and `createMany(…, { upsert: true })`, and the realtime socket.
+  Create users with `POST` (or `create`) and change them with `PATCH` (or
+  `update`).
+
 #### MCP
 
 - **The remote MCP's `list_collections` reply carries its listing once, in the

@@ -146,19 +146,19 @@ the request-level validation.
 
 ### Upsert on a natural key
 
-`POST /api/data/:slug?on_conflict=email` inserts the row, or updates the one
-that already holds that email, instead of failing on it. The bulk route takes
+`POST /api/data/:slug?on_conflict=sku` inserts the row, or updates the one
+that already holds that SKU, instead of failing on it. The bulk route takes
 the same target as `onConflict` beside `upsert: true`, and so does each `upsert`
 operation of a batch.
 
 ```bash
-curl -X POST '/api/data/users?on_conflict=email' \
-     -d '{"email": "ada@example.com", "name": "Ada"}'
+curl -X POST '/api/data/products?on_conflict=sku' \
+     -d '{"sku": "LAMP-01", "name": "Desk lamp", "price": 39}'
 
-curl -X POST /api/data/users/bulk -d '{
+curl -X POST /api/data/products/bulk -d '{
   "rows": [ … ],
   "upsert": true,
-  "onConflict": ["tenant_id", "slug"]
+  "onConflict": ["tenant_id", "sku"]
 }'
 ```
 
@@ -176,6 +176,16 @@ ignoring it turns a re-runnable import into a duplicating one.
 `?on_conflict=` is refused on a nested create (`INVALID_CONFLICT_TARGET`). The
 row it matched could live under another parent, and the upsert would move it
 under this one. Send the upsert to the collection's own route.
+
+The users collection (the one with `auth` enabled) refuses an upsert on every
+door — `?on_conflict=`, `/bulk` with `upsert: true`, a `_batch` `upsert`
+operation, the SDK's `upsert()` and the realtime socket — with a `400`
+(`INVALID_CONFLICT_TARGET`). Its rows are the users, and creating one and
+changing one follow different rules: a create hashes the password, normalizes
+the email, runs `onCreateUser` and sends the invitation, and an update may not
+demote the last administrator. An upsert only learns which it is inside the
+write, too late to apply either. Create users with a plain `POST` and change
+them with `PATCH`.
 
 An upsert that meets a stored row is an update of it. The server reads the row
 the key names, in the caller's scope and inside the write's transaction, and

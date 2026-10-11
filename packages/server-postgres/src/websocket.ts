@@ -15,7 +15,7 @@ import type { User } from "@rebasepro/types";
 import { WebSocketServer, WebSocket, type RawData } from "ws";
 import type { Server, IncomingMessage } from "http";
 import { inspect } from "util";
-import { extractUserFromToken, AccessTokenPayload, safeCompare, resolveRequireAuth, assertWriteRequestValid, assertFieldOpsValid, assertNoFieldOpsOnCreate, declaredErrorAnswer, RUNTIME_DEFAULT_MAX_BODY_SIZE, ApiError, resolveConflictTarget, assertNestedWriteAllowed, assertUserCreationBodyValid, createUserThroughAuthCollection, type NestedWriteKind } from "@rebasepro/server";
+import { extractUserFromToken, AccessTokenPayload, safeCompare, resolveRequireAuth, assertWriteRequestValid, assertFieldOpsValid, assertNoFieldOpsOnCreate, declaredErrorAnswer, RUNTIME_DEFAULT_MAX_BODY_SIZE, ApiError, resolveConflictTarget, assertNestedWriteAllowed, assertNoUserUpsert, assertUserCreationBodyValid, createUserThroughAuthCollection, type NestedWriteKind } from "@rebasepro/server";
 import { logger, getAccessModel, decideImpersonation, type ImpersonationCredential } from "@rebasepro/server";
 
 /**
@@ -1316,8 +1316,11 @@ colors: true }));
                         // A create on the auth collection is a user creation,
                         // as on `POST /users`: the adapter's step, not a plain
                         // insert, and the body checked against what that step
-                        // consumes (`password` is not a column). An upsert is
-                        // not one: it may update a user instead.
+                        // consumes (`password` is not a column). An upsert
+                        // there is refused, as over HTTP: it may be a create or
+                        // an update, and each has its own rules.
+                        const upsertedUsers = request.upsert === true ? authCollectionAt(request.path) : undefined;
+                        if (upsertedUsers) assertNoUserUpsert(authAdapter, upsertedUsers);
                         const usersCollection = request.status !== "existing" && request.upsert !== true && authAdapter?.prepareUserCreation
                             ? authCollectionAt(request.path)
                             : undefined;

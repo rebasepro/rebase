@@ -169,3 +169,24 @@ a type error.
 
 **What to change:** delete the prop. For a multi-select's changes use
 `onValueChange`.
+
+## 77. An upsert on the users collection is refused
+
+The users collection (the one with `auth` enabled) now answers a 400
+`INVALID_CONFLICT_TARGET` to an upsert, on every door: `?on_conflict=`, `/bulk`
+with `upsert: true`, a `_batch` `upsert` operation, the SDK's `upsert()` and
+`createMany(…, { upsert: true })`, and the realtime socket. An upsert only
+learns inside the write whether it creates or updates, so it applied neither
+set of rules: no password hashing, email normalization, `onCreateUser` or
+invitation on a create, and no last-administrator check on an update.
+
+**Who is affected:** code that upserts users, for example a sync that ran
+`client.data.users.upsert(row, { onConflict: ["email"] })`.
+
+**What to change:** look the user up, then create or update.
+
+```ts
+const existing = await client.data.users.find({ where: { email: ["==", row.email] }, limit: 1 });
+if (existing.data.length === 0) await client.data.users.create(row);
+else await client.data.users.update(existing.data[0].id, row);
+```

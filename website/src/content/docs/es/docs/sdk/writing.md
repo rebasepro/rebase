@@ -39,9 +39,9 @@ const newProduct = await client.data.products.create(
 Inserta la fila o actualiza la que ya esté ocupando su clave:
 
 ```typescript
-await client.data.users.upsert(
-    { email: "ada@example.com", name: "Ada" },
-    { onConflict: ["email"] }
+await client.data.products.upsert(
+    { sku: "LAMP-01", name: "Desk lamp", price: 39 },
+    { onConflict: ["sku"] }
 );
 ```
 

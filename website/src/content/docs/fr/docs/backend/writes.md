@@ -92,13 +92,13 @@ Une opération obéit à la `validation` de la propriété comme une valeur. Les
 `POST /api/data/:slug?on_conflict=email` insère la ligne, ou met à jour celle qui détient déjà cet email, au lieu d'échouer sur elle. La route bulk prend la même cible sous le nom `onConflict` aux côtés de `upsert: true`, tout comme chaque opération `upsert` d'un lot (batch).
 
 ```bash
-curl -X POST '/api/data/users?on_conflict=email' \
-     -d '{"email": "ada@example.com", "name": "Ada"}'
+curl -X POST '/api/data/products?on_conflict=sku' \
+     -d '{"sku": "LAMP-01", "name": "Desk lamp", "price": 39}'
 
-curl -X POST /api/data/users/bulk -d '{
+curl -X POST /api/data/products/bulk -d '{
   "rows": [ … ],
   "upsert": true,
-  "onConflict": ["tenant_id", "slug"]
+  "onConflict": ["tenant_id", "sku"]
 }'
 ```
 
