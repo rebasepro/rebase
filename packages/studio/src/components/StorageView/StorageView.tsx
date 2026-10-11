@@ -263,7 +263,8 @@ function UploadDialog({
     open: boolean;
     currentPath: string;
     onClose: () => void;
-    onUpload: (files: File[]) => Promise<void>;
+    /** `false` when nothing was uploaded and the dialog should stay open. */
+    onUpload: (files: File[]) => Promise<boolean>;
 }) {
     const { t } = useTranslation();
     const [uploading, setUploading] = useState(false);
@@ -283,9 +284,10 @@ function UploadDialog({
         setUploading(true);
         setError(null);
         try {
-            await onUpload(selectedFiles);
-            setSelectedFiles([]);
-            onClose();
+            if (await onUpload(selectedFiles)) {
+                setSelectedFiles([]);
+                onClose();
+            }
         } catch (err) {
             setError(err instanceof Error ? err.message : t("studio_storage_upload_failed"));
         } finally {
@@ -909,8 +911,34 @@ export const StorageView = () => {
         }
     }, [handleNavigate, openPreview]);
 
-    // Upload files
-    const handleUpload = useCallback(async (uploadFiles: File[]) => {
+    /**
+     * Files an upload would write over, waiting for the person to say whether
+     * it should. `answer` settles the upload that asked.
+     */
+    const [replacePrompt, setReplacePrompt] = useState<{ names: string[]; answer: (replace: boolean) => void } | null>(null);
+
+    /**
+     * Whether `uploadFiles` may go ahead: at once when none of them has the
+     * name of a file in the folder, and otherwise once the person says to
+     * replace those. An upload is a put, and a put over an existing key
+     * replaces the file without a trace.
+     */
+    const mayReplace = useCallback((uploadFiles: File[]): Promise<boolean> => {
+        const listed = new Set(files.map(file => file.name));
+        const names = [...new Set(uploadFiles.map(file => file.name))].filter(name => listed.has(name));
+        if (names.length === 0) return Promise.resolve(true);
+        return new Promise(resolve => setReplacePrompt({
+            names,
+            answer: (replace) => {
+                setReplacePrompt(null);
+                resolve(replace);
+            }
+        }));
+    }, [files]);
+
+    // Upload files. `false` when the person chose not to replace a file.
+    const handleUpload = useCallback(async (uploadFiles: File[]): Promise<boolean> => {
+        if (!(await mayReplace(uploadFiles))) return false;
         try {
             for (const file of uploadFiles) {
                 const key = currentPath ? `${currentPath}/${file.name}` : file.name;
@@ -928,7 +956,8 @@ export const StorageView = () => {
             type: "success",
             message: t("studio_storage_files_uploaded", { count: uploadFiles.length })
         });
-    }, [currentPath, snackbarController, fetchContents, t]);
+        return true;
+    }, [currentPath, snackbarController, fetchContents, mayReplace, t]);
 
     // Create new folder
     const handleCreateFolder = useCallback(async () => {
@@ -991,24 +1020,14 @@ message: e instanceof Error ? e.message : String(e) });
     const handleDropFiles = useCallback(async (droppedFiles: File[]) => {
         if (droppedFiles.length === 0) return;
         try {
-            for (const file of droppedFiles) {
-                const key = currentPath ? `${currentPath}/${file.name}` : file.name;
-                await storageSourceRef.current.putObject({ file,
-key });
-            }
-            snackbarController.open({
-                type: "success",
-                message: t("studio_storage_files_uploaded", { count: droppedFiles.length })
-            });
+            await handleUpload(droppedFiles);
         } catch (e) {
             snackbarController.open({
                 type: "error",
                 message: e instanceof Error ? e.message : String(e)
             });
-        } finally {
-            await fetchContents(currentPath);
         }
-    }, [currentPath, snackbarController, fetchContents, t]);
+    }, [handleUpload, snackbarController]);
 
     const {
         getRootProps: getDropRootProps,
@@ -1152,7 +1171,7 @@ message: e instanceof Error ? e.message : String(e) });
     useEffect(() => {
         const handler = (e: KeyboardEvent) => {
             // Don't handle shortcuts when a dialog is open
-            if (deleteDialogOpen || uploadDialogOpen || newFolderDialogOpen) return;
+            if (deleteDialogOpen || uploadDialogOpen || newFolderDialogOpen || replacePrompt) return;
             // Nor a key a layer above already acted on — Escape that closed a
             // menu must not also clear the selection.
             if (isKeyHandled(e)) return;
@@ -1178,7 +1197,7 @@ message: e instanceof Error ? e.message : String(e) });
         };
         window.addEventListener("keydown", handler);
         return () => window.removeEventListener("keydown", handler);
-    }, [handleSelectAll, selectedPaths, deleteDialogOpen, uploadDialogOpen, newFolderDialogOpen]);
+    }, [handleSelectAll, selectedPaths, deleteDialogOpen, uploadDialogOpen, newFolderDialogOpen, replacePrompt]);
 
     // Handle refresh
     const handleRefresh = useCallback(() => {
@@ -1743,6 +1762,35 @@ message: e instanceof Error ? e.message : String(e) });
                 onClose={() => setUploadDialogOpen(false)}
                 onUpload={handleUpload}
             />
+
+            {/* Replace confirmation, for an upload over existing files */}
+            <Dialog
+                open={replacePrompt !== null}
+                onOpenChange={(open) => {
+                    if (!open) replacePrompt?.answer(false);
+                }}
+            >
+                <DialogTitle hidden>{t("studio_storage_replace_title")}</DialogTitle>
+                <DialogContent>
+                    <Typography variant="subtitle1" className="font-semibold mb-2">
+                        {t("studio_storage_replace_question", { count: replacePrompt?.names.length ?? 0 })}
+                    </Typography>
+                    <Typography variant="body2" color="secondary">
+                        {t("studio_storage_replace_body", {
+                            count: replacePrompt?.names.length ?? 0,
+                            names: replacePrompt?.names.join(", ") ?? ""
+                        })}
+                    </Typography>
+                </DialogContent>
+                <DialogActions>
+                    <Button variant="text" onClick={() => replacePrompt?.answer(false)}>
+                        {t("studio_storage_cancel")}
+                    </Button>
+                    <Button variant="filled" onClick={() => replacePrompt?.answer(true)}>
+                        {t("studio_storage_replace")}
+                    </Button>
+                </DialogActions>
+            </Dialog>
 
             {/* Delete confirmation dialog */}
             <Dialog

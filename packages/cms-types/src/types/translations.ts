@@ -1570,6 +1570,12 @@ export interface RebaseTranslations {
     studio_storage_items_deleted_one?: string;
     studio_storage_delete_incomplete?: string;
     studio_storage_delete_incomplete_one?: string;
+    studio_storage_replace_title?: string;
+    studio_storage_replace_question?: string;
+    studio_storage_replace_question_one?: string;
+    studio_storage_replace_body?: string;
+    studio_storage_replace_body_one?: string;
+    studio_storage_replace?: string;
     studio_storage_new_folder_title?: string;
     studio_storage_folder_name?: string;
     studio_storage_folder_name_placeholder?: string;

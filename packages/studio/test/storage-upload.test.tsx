@@ -3,7 +3,7 @@
  */
 import React from "react";
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import type { StorageListResult } from "@rebasepro/types";
 import { useEnTranslation } from "./en-translation";
 
@@ -68,6 +68,15 @@ async function drop(names: string[]) {
     });
 }
 
+/** The dialog box holding `text`, and its `answer` button pressed. */
+async function answer(text: string, button: string) {
+    let box: HTMLElement | null = (await screen.findByText(text)).parentElement;
+    while (box && !within(box).queryByRole("button", { name: button })) box = box.parentElement;
+    if (!box) throw new Error(`no "${button}" beside "${text}"`);
+    const pressed = within(box).getByRole("button", { name: button });
+    await act(async () => { fireEvent.click(pressed); });
+}
+
 const errors = () => snackbarOpen.mock.calls
     .map(([arg]) => arg as { type: string; message: string })
     .filter(call => call.type === "error")
@@ -87,5 +96,52 @@ describe("uploading in the storage browser", () => {
 
         await waitFor(() => expect(errors()).toEqual(["upload of second.txt refused"]));
         expect(await screen.findByText("first.txt")).toBeTruthy();
+    });
+});
+
+/**
+ * An upload is a put, and a put over an existing name replaced the file
+ * without a word.
+ */
+describe("uploading over a file that is already there", () => {
+    beforeEach(() => {
+        snackbarOpen.mockClear();
+    });
+
+    it("asks first, and replaces nothing when told not to", async () => {
+        store = folder(["report.pdf"]);
+        render(<StorageView/>);
+        await screen.findByText("report.pdf");
+
+        await drop(["report.pdf", "notes.txt"]);
+
+        expect(await screen.findByText("Replace 1 file?")).toBeTruthy();
+        expect(screen.getByText(/“report.pdf” is already in this folder/)).toBeTruthy();
+        expect(store.putObject).not.toHaveBeenCalled();
+
+        await answer("Replace 1 file?", "Cancel");
+        expect(store.putObject).not.toHaveBeenCalled();
+    });
+
+    it("replaces once told to", async () => {
+        store = folder(["report.pdf"]);
+        render(<StorageView/>);
+        await screen.findByText("report.pdf");
+
+        await drop(["report.pdf"]);
+        await answer("Replace 1 file?", "Replace");
+
+        await waitFor(() => expect(store.putObject).toHaveBeenCalledTimes(1));
+    });
+
+    it("does not ask when every name is new", async () => {
+        store = folder(["report.pdf"]);
+        render(<StorageView/>);
+        await screen.findByText("report.pdf");
+
+        await drop(["notes.txt"]);
+
+        await waitFor(() => expect(store.putObject).toHaveBeenCalledTimes(1));
+        expect(screen.queryByText(/Replace 1 file/)).toBeNull();
     });
 });
