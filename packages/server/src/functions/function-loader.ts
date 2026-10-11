@@ -4,6 +4,7 @@ import { pathToFileURL } from "url";
 import { Hono } from "hono";
 import { logger } from "../utils/logger.js";
 import { nativeDynamicImport, type ModuleImporter } from "../utils/dynamic-import.js";
+import { describeLoadFailure, SYNTAX_ERROR_ADVICE } from "../utils/load-failure.js";
 
 export interface LoadedFunction {
     /** Endpoint name derived from filename (e.g., "send-invoice") */
@@ -173,7 +174,7 @@ app: result as Hono });
                 const message =
                     err instanceof Error ? err.message : String(err);
                 logger.error(`[functions] Failed to load ${file}: ${message}`);
-                problems.push(`${file} (threw: ${message})`);
+                problems.push(describeLoadFailure(file, err));
             }
         }
     }
@@ -187,6 +188,9 @@ app: result as Hono });
         // `defineFunction`, an author rewrites a file whose export was already
         // correct and gets the same failure.
         const advice: string[] = [];
+        if (problems.some(p => p.includes("(syntax error"))) {
+            advice.push(SYNTAX_ERROR_ADVICE);
+        }
         if (problems.some(p => p.includes("(threw:"))) {
             advice.push(
                 "  A file that threw ran at import time. Read configuration *inside* a handler " +

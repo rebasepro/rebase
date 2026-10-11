@@ -4,6 +4,7 @@ import { pathToFileURL } from "url";
 import { declareCron, type CronJobDefinition, type CronResourceOptions } from "@rebasepro/types";
 import { logger } from "../utils/logger.js";
 import { nativeDynamicImport, type ModuleImporter } from "../utils/dynamic-import.js";
+import { describeLoadFailure, SYNTAX_ERROR_ADVICE } from "../utils/load-failure.js";
 
 export interface LoadedCronJob {
     /** Job ID derived from filename (e.g. "cleanup-sessions"). */
@@ -145,7 +146,7 @@ definition });
             } catch (err: unknown) {
                 const message =
                     err instanceof Error ? err.message : String(err);
-                problems.push(`${file} (threw: ${message})`);
+                problems.push(describeLoadFailure(file, err));
                 // At `debug`: the aggregate warning below lists every problem
                 // by file, so this line was the same text a second time — and
                 // when the throw is a Zod error, that text is ten lines of
@@ -157,10 +158,17 @@ definition });
     }
 
     if (problems.length > 0) {
+        // Advice keyed to what went wrong, as the functions loader does:
+        // `defineCron` is the remedy for a wrong export shape, not for a typo.
+        const syntax = problems.some(p => p.includes("(syntax error"));
+        const other = problems.some(p => !p.includes("(syntax error"));
         logger.warn(
             `[cron] ${problems.length} cron file(s) were skipped and will NOT be scheduled:\n` +
             problems.map((p) => `  - ${p}`).join("\n") + "\n" +
-            "  Fix these or author them with `defineCron(...)` for a typed, compile-checked contract."
+            [
+                ...(syntax ? [SYNTAX_ERROR_ADVICE] : []),
+                ...(other ? ["  Fix these or author them with `defineCron(...)` for a typed, compile-checked contract."] : [])
+            ].join("\n")
         );
     }
 
