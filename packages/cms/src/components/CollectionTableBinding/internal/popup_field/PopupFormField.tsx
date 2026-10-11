@@ -2,7 +2,7 @@ import type { Properties } from "@rebasepro/types";
 
 import type { FormContext, PropertyFieldBindingProps } from "../../../../types/fields";
 import type { Property } from "@rebasepro/types";
-import React, { useCallback, useEffect, useLayoutEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useLayoutEffect, useState } from "react";
 
 import { Button, DialogActions, IconButton, Portal, Typography, XIcon } from "@rebasepro/ui";
 
@@ -11,6 +11,7 @@ import { PluginProviderStack } from "@rebasepro/app";
 import { Formex, FormexController, getIn, useCreateFormex } from "@rebasepro/forms";
 import { useDraggable } from "./useDraggable";
 import { applyValueTransforms, CustomFieldValidator, getEntitySchema } from "../../../../form/validation";
+import { cellValidationProperties } from "../../../../form/resolve_cell_property";
 import { useWindowSize } from "./useWindowSize";
 import { getPropertyInPath } from "../../../../util/property_utils";
 import { PropertyFieldBinding, zodToFormErrors } from "../../../../form";
@@ -39,29 +40,6 @@ interface PopupFormFieldProps<M extends Record<string, unknown>> {
      * @param params
      */
     onCellValueChange?: (params: OnCellValueChangeParams<any, any>) => Promise<void> | void;
-}
-
-/**
- * The properties that judge one cell: the property at `propertyKey`, under the
- * maps its key goes through, and nothing beside it.
- *
- * A spread map's child is `address.street`, a path into `properties` rather
- * than a key of it; looked up as a key it found nothing, and the popup
- * validated nothing. The maps on the way carry only the edited child and none
- * of their own rules: the popup shows one field, and an error anywhere else
- * would block the save where no one could see it.
- */
-function propertiesOfCell(properties: Properties, propertyKey: string): Properties {
-    if (propertyKey in properties) return { [propertyKey]: properties[propertyKey] };
-    const dot = propertyKey.indexOf(".");
-    if (dot === -1) return {};
-    const mapKey = propertyKey.slice(0, dot);
-    const map = properties[mapKey];
-    if (map?.type !== "map" || !map.properties) return {};
-    const children = propertiesOfCell(map.properties, propertyKey.slice(dot + 1));
-    return Object.keys(children).length > 0
-        ? { [mapKey]: { type: "map", properties: children } }
-        : {};
 }
 
 export function PopupFormField<M extends Record<string, unknown>>(props: PopupFormFieldProps<M>) {
@@ -222,13 +200,20 @@ export function PopupFormFieldInternal<M extends Record<string, unknown>>({
         [windowSize, cellRect, updatePopupLocation, popupLocation]
     );
 
-    const validationSchema = useMemo(() => {
-        if (!collection || !entityId) return;
+    // Built per validation, from the properties resolved against the values
+    // the popup holds: a `conditions` rule or a `dynamicProps` validation
+    // depends on them, as it does in the record form.
+    const validationSchemaFor = (values: Partial<M>) => {
+        if (!collection || !entityId || !propertyKey) return undefined;
         return getEntitySchema(
             entityId,
-            propertyKey ? propertiesOfCell(collection.properties, propertyKey as string) : {},
+            cellValidationProperties<M>(collection.properties, propertyKey as string, values, entity?.values, entityId, {
+                path,
+                authController,
+                propertyConfigs: customizationController.propertyConfigs
+            }),
             customFieldValidator);
-    }, [collection, entityId, propertyKey, customFieldValidator]);
+    };
 
     const adaptResize = useCallback(() => {
         // When the popup resizes, we want to re-evaluate its position
@@ -276,6 +261,7 @@ export function PopupFormFieldInternal<M extends Record<string, unknown>>({
     const formex = useCreateFormex<M>({
         initialValues: (entity?.values ?? {}) as EntityValues<M>,
         validation: async (values) => {
+            const validationSchema = validationSchemaFor(values);
             if (!validationSchema) return {};
             const result = await validationSchema.safeParseAsync(values);
             if (result.success) return {};

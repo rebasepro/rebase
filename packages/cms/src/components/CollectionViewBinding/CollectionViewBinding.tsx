@@ -76,6 +76,7 @@ import { getSubcollectionColumnId } from "../CollectionTableBinding/internal/com
 import { copyEntityAction, deleteEntityAction, editEntityAction, unlinkEntityAction } from "../common/default_entity_actions";
 import { PopupFormField } from "../CollectionTableBinding/internal/popup_field/PopupFormField";
 import { GetPropertyForProps } from "../CollectionTableBinding/CollectionTableBindingProps";
+import { resolveCellProperty } from "../../form/resolve_cell_property";
 import { DeleteEntityDialog } from "../DeleteEntityDialog";
 import { useSelectionController } from "./useSelectionController";
 import { CollectionViewStartActions } from "./CollectionViewStartActions";
@@ -857,9 +858,15 @@ parentEntityIds: parentEntityIds ?? EMPTY_ARRAY,
                 property = getPropertyInPath(resolvedCollection.properties, propertyKey);
             }
 
-            // In v4, properties are already resolved, so we return them directly
-            return property ?? null;
-        }, [collection.properties, resolvedCollection.properties]);
+            if (!property) return null;
+            // A `conditions` rule or a `dynamicProps` result depends on the
+            // row, and the inline editor is judged by it as the form is.
+            return resolveCellProperty(property, propertyKey, entity as Entity<Record<string, unknown>>, {
+                path,
+                authController,
+                propertyConfigs: customizationController.propertyConfigs
+            });
+        }, [collection.properties, resolvedCollection.properties, path, authController, customizationController.propertyConfigs]);
 
         // Use a collection with local propertiesOrder for optimistic UI updates
         const collectionWithLocalOrder = useMemo(() => {
