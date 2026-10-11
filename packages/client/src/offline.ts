@@ -18,6 +18,7 @@ import {
     MemoryOfflineStore,
     OfflineStore,
     PendingMutation,
+    QUEUE_SCHEMA_VERSION,
     createMutationId
 } from "./offline-store";
 import {
@@ -125,6 +126,14 @@ export interface OfflineStatus {
     lastSyncedAt?: number;
     /** The last replay rejection, if any. */
     lastError?: string;
+    /**
+     * Whether the browser agreed to keep the offline database through storage
+     * pressure (`navigator.storage.persist()`), asked when the first write is
+     * queued. `false` means it may be evicted — on Safari, after seven days
+     * without a visit — and unsent writes with it; a UI can warn. Unset until
+     * asked, and where there is nothing to ask.
+     */
+    persisted?: boolean;
 }
 
 export type { LiveResult, ObserveOptions, RowSnapshotMeta } from "./collection";
@@ -546,6 +555,8 @@ export class OfflineManager {
     private refreshPending = new Set<string>();
     private revCounter = 0;
     private disposed = false;
+    /** Whether {@link requestPersistence} has asked. */
+    private persistenceRequested = false;
     private currentStatus: OfflineStatus = { online: true, syncing: false, pending: 0 };
     private readonly channel?: BroadcastChannel;
     private readonly tabId = createMutationId();
@@ -2083,7 +2094,12 @@ data: u.data as AnyRow })),
             // are back — but it must not join the queue that now replays
             // under someone else's credentials.
             if (!this.isCurrent(ticket)) {
-                const orphan: PendingMutation = { ...mutation, mutationId: createMutationId(), queuedAt: Date.now() };
+                const orphan: PendingMutation = {
+                    ...mutation,
+                    mutationId: createMutationId(),
+                    queuedAt: Date.now(),
+                    schemaVersion: QUEUE_SCHEMA_VERSION
+                };
                 await this.store.enqueue(`${ticket.scope}|${orphan.mutationId}`, orphan);
                 return;
             }
@@ -2102,6 +2118,9 @@ data: u.data as AnyRow })),
                     // first request, which an edit merged in here predates —
                     // so the edit stays a write of its own.
                     && tail.sent === undefined
+                    // Nor into an entry a newer version wrote: this one cannot
+                    // vouch for what it would be merging into.
+                    && (tail.schemaVersion ?? 1) <= QUEUE_SCHEMA_VERSION
                     && tail.collection === mutation.collection
                     && (tail.type === "create" || tail.type === "update")
                     && tail.id === mutation.id) {
@@ -2156,16 +2175,32 @@ data: u.data as AnyRow })),
             const full: PendingMutation = {
                 ...mutation,
                 mutationId: createMutationId(),
-                queuedAt: Date.now()
+                queuedAt: Date.now(),
+                schemaVersion: QUEUE_SCHEMA_VERSION
             };
             await this.store.enqueue(this.queueKey(full), full);
             this.queue.push(full);
             this.afterQueueChange();
+            this.requestPersistence();
         });
         // The chain must survive a failed enqueue, or every later write dies
         // on the same stale rejection.
         this.enqueueChain = result.catch(() => undefined);
         return result;
+    }
+
+    /**
+     * Ask the browser to keep the offline database, once, when there is first
+     * something in it worth keeping. Without it IndexedDB is best-effort
+     * storage, evicted under pressure (and by Safari after seven days without
+     * a visit) with the unsent writes in it.
+     */
+    private requestPersistence(): void {
+        if (this.persistenceRequested || !(this.store instanceof IndexedDBOfflineStore)) return;
+        this.persistenceRequested = true;
+        const storage = (globalThis as { navigator?: { storage?: { persist?: () => Promise<boolean> } } }).navigator?.storage;
+        if (typeof storage?.persist !== "function") return;
+        storage.persist().then((persisted) => this.patchStatus({ persisted }), () => undefined);
     }
 
     private hasPending(slug: string, id: string | number): boolean {
@@ -2255,6 +2290,16 @@ data: u.data as AnyRow })),
             // Stops at a change of user: the queue in memory is theirs now.
             while (this.queue.length > 0 && !this.disposed && this.isCurrent(ticket)) {
                 const op = this.queue[0];
+                // Written by a newer version of the SDK, in a layout this one
+                // may misread. It waits — with everything behind it, which may
+                // depend on it — for a client that can replay it.
+                if ((op.schemaVersion ?? 1) > QUEUE_SCHEMA_VERSION) {
+                    this.patchStatus({
+                        lastError: `A queued write was saved by a newer version of the SDK (layout ${String(op.schemaVersion)}); ` +
+                            "it is kept, and replays once this page runs that version."
+                    });
+                    break;
+                }
                 touched.add(op.collection);
                 // Held across `drop` as well as `replay`: between the ACK and
                 // the dequeue the op is still in `queue`, still the tail, and

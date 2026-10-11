@@ -100,6 +100,13 @@ export interface PendingMutation {
         onConflict?: readonly string[];
     };
     queuedAt: number;
+    /**
+     * The layout this entry was written in — {@link QUEUE_SCHEMA_VERSION} at
+     * the time. Absent on entries from before it was stamped, which are
+     * version 1. An entry from a newer layout is never replayed by an older
+     * client: it waits for a client that can read it.
+     */
+    schemaVersion?: number;
     /** How many times replay has been attempted (diagnostics for a stuck queue). */
     attempts?: number;
     /** The last replay failure's message, when there was one. */
@@ -107,6 +114,13 @@ export interface PendingMutation {
     /** Local state to restore if the server rejects this mutation. */
     rollback?: MutationRollback;
 }
+
+/**
+ * The layout of a {@link PendingMutation} this SDK writes and can replay.
+ * Bump it with any change an older client would misread, so that client stops
+ * at the entry instead of replaying it blindly.
+ */
+export const QUEUE_SCHEMA_VERSION = 1;
 
 export interface OfflineStore {
     getCache(key: string): Promise<OfflineCacheEntry | undefined>;
@@ -261,6 +275,40 @@ function transactionDone(tx: IDBTransaction): Promise<void> {
  */
 export class IndexedDBOfflineStore implements OfflineStore {
     private dbPromise?: Promise<IDBDatabase>;
+    /**
+     * Where everything goes once the database turns out to belong to a newer
+     * version of the SDK — see {@link backend}.
+     */
+    private fallback?: MemoryOfflineStore;
+
+    /**
+     * The database, or the in-memory stand-in when it cannot be opened at
+     * this version.
+     *
+     * A tab still running an older build (a stale tab, a rolled-back deploy)
+     * that opens a database a newer build upgraded gets a `VersionError` —
+     * and every read and every write after it failed with an opaque
+     * IndexedDB rejection, so the app went down instead of degrading. It now
+     * works in memory for the life of the page, says so once, and leaves the
+     * newer build's data alone.
+     */
+    private async backend(): Promise<IDBDatabase | MemoryOfflineStore> {
+        if (this.fallback) return this.fallback;
+        try {
+            return await this.open();
+        } catch (error) {
+            if ((error as { name?: string } | null)?.name !== "VersionError") throw error;
+            if (!this.fallback) {
+                console.warn(
+                    "[rebase offline] The offline database on this device was written by a newer version of the " +
+                    "SDK. This page keeps its offline data in memory only, and leaves that database untouched; " +
+                    "reload to pick up the newer version."
+                );
+                this.fallback = new MemoryOfflineStore();
+            }
+            return this.fallback;
+        }
+    }
 
     private open(): Promise<IDBDatabase> {
         if (!this.dbPromise) {
@@ -304,25 +352,30 @@ export class IndexedDBOfflineStore implements OfflineStore {
         return this.dbPromise;
     }
 
-    private async store(name: string, mode: IDBTransactionMode): Promise<IDBObjectStore> {
-        const db = await this.open();
+    private async store(db: IDBDatabase, name: string, mode: IDBTransactionMode): Promise<IDBObjectStore> {
         return db.transaction(name, mode).objectStore(name);
     }
 
     async getCache(key: string): Promise<OfflineCacheEntry | undefined> {
-        const store = await this.store(CACHE_STORE, "readonly");
+        const db = await this.backend();
+        if (db instanceof MemoryOfflineStore) return db.getCache(key);
+        const store = await this.store(db, CACHE_STORE, "readonly");
         const entry = await requestToPromise(store.get(key));
         return entry as OfflineCacheEntry | undefined;
     }
 
     async setCache(key: string, entry: OfflineCacheEntry): Promise<void> {
-        const store = await this.store(CACHE_STORE, "readwrite");
+        const db = await this.backend();
+        if (db instanceof MemoryOfflineStore) return db.setCache(key, entry);
+        const store = await this.store(db, CACHE_STORE, "readwrite");
         await requestToPromise(store.put(entry, key));
     }
 
     async setCacheMany(entries: { key: string; entry: OfflineCacheEntry }[]): Promise<void> {
         if (entries.length === 0) return;
-        const store = await this.store(CACHE_STORE, "readwrite");
+        const db = await this.backend();
+        if (db instanceof MemoryOfflineStore) return db.setCacheMany(entries);
+        const store = await this.store(db, CACHE_STORE, "readwrite");
         for (const { key, entry } of entries) store.put(entry, key);
         // One commit for the whole batch: a `find` writing 200 rows must not
         // be 200 round-trips through the transaction queue.
@@ -331,13 +384,17 @@ export class IndexedDBOfflineStore implements OfflineStore {
 
     async deleteCache(keys: string[]): Promise<void> {
         if (keys.length === 0) return;
-        const store = await this.store(CACHE_STORE, "readwrite");
+        const db = await this.backend();
+        if (db instanceof MemoryOfflineStore) return db.deleteCache(keys);
+        const store = await this.store(db, CACHE_STORE, "readwrite");
         for (const key of keys) store.delete(key);
         await transactionDone(store.transaction);
     }
 
     async listCache(prefix: string): Promise<{ key: string; cachedAt: number }[]> {
-        const store = await this.store(CACHE_STORE, "readonly");
+        const db = await this.backend();
+        if (db instanceof MemoryOfflineStore) return db.listCache(prefix);
+        const store = await this.store(db, CACHE_STORE, "readonly");
         const [keys, entries] = await Promise.all([
             requestToPromise(store.getAllKeys(prefixRange(prefix))),
             requestToPromise(store.getAll(prefixRange(prefix)))
@@ -349,7 +406,9 @@ export class IndexedDBOfflineStore implements OfflineStore {
     }
 
     async listCacheEntries(prefix: string): Promise<OfflineCacheRecord[]> {
-        const store = await this.store(CACHE_STORE, "readonly");
+        const db = await this.backend();
+        if (db instanceof MemoryOfflineStore) return db.listCacheEntries(prefix);
+        const store = await this.store(db, CACHE_STORE, "readonly");
         const [keys, entries] = await Promise.all([
             requestToPromise(store.getAllKeys(prefixRange(prefix))),
             requestToPromise(store.getAll(prefixRange(prefix)))
@@ -361,17 +420,23 @@ export class IndexedDBOfflineStore implements OfflineStore {
     }
 
     async enqueue(key: string, mutation: PendingMutation): Promise<void> {
-        const store = await this.store(QUEUE_STORE, "readwrite");
+        const db = await this.backend();
+        if (db instanceof MemoryOfflineStore) return db.enqueue(key, mutation);
+        const store = await this.store(db, QUEUE_STORE, "readwrite");
         await requestToPromise(store.put(mutation, key));
     }
 
     async dequeue(key: string): Promise<void> {
-        const store = await this.store(QUEUE_STORE, "readwrite");
+        const db = await this.backend();
+        if (db instanceof MemoryOfflineStore) return db.dequeue(key);
+        const store = await this.store(db, QUEUE_STORE, "readwrite");
         await requestToPromise(store.delete(key));
     }
 
     async listQueue(prefix: string): Promise<PendingMutation[]> {
-        const store = await this.store(QUEUE_STORE, "readonly");
+        const db = await this.backend();
+        if (db instanceof MemoryOfflineStore) return db.listQueue(prefix);
+        const store = await this.store(db, QUEUE_STORE, "readonly");
         // getAll on a key range returns values in key order, which is the
         // FIFO guarantee this interface promises.
         const entries = await requestToPromise(store.getAll(prefixRange(prefix)));
@@ -379,9 +444,11 @@ export class IndexedDBOfflineStore implements OfflineStore {
     }
 
     async clear(prefix: string): Promise<void> {
-        const cache = await this.store(CACHE_STORE, "readwrite");
+        const db = await this.backend();
+        if (db instanceof MemoryOfflineStore) return db.clear(prefix);
+        const cache = await this.store(db, CACHE_STORE, "readwrite");
         await requestToPromise(cache.delete(prefixRange(prefix)));
-        const queue = await this.store(QUEUE_STORE, "readwrite");
+        const queue = await this.store(db, QUEUE_STORE, "readwrite");
         await requestToPromise(queue.delete(prefixRange(prefix)));
     }
 }

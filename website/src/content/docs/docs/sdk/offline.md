@@ -122,7 +122,7 @@ const { online, pending, syncing, lastSyncedAt, lastError } = client.offline!.st
 
 | Method | Purpose |
 |--------|---------|
-| `status()` | Current connectivity, queue depth, sync activity, last error |
+| `status()` | Current connectivity, queue depth, sync activity, last error, and `persisted`: whether the browser agreed to keep the offline database (asked when the first write is queued; `false` means it may be evicted under storage pressure, unsent writes included) |
 | `onStatusChange(fn)` | Subscribe to the above |
 | `onQueueChange(fn)` | Just the number of unsent writes, for a badge |
 | `pending()` | The queued mutations themselves, oldest first. `pending({ orphaned: true })`: the ones queued while signed out — see [Users](#users) |

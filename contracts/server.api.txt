@@ -1120,11 +1120,11 @@ interface OfflineCacheEntry { cachedAt, value }
 interface OfflineCacheRecord { cachedAt, key, value }
 interface OfflineConfig { crossTab, maxCachedQueriesPerCollection, maxCachedRowsPerCollection, maxRetries, onSyncError, store, syncIntervalMs }
 interface OfflineQueueOptions { orphaned }
-interface OfflineStatus { lastError, lastSyncedAt, online, pending, syncing }
+interface OfflineStatus { lastError, lastSyncedAt, online, pending, persisted, syncing }
 interface OfflineStore { clear, deleteCache, dequeue, enqueue, getCache, listCache, listCacheEntries, listQueue, setCache, setCacheMany }
 interface PageWalkOptions { cursor, maxPages, pageSize }
 interface PaginationMeta { hasMore, limit, nextCursor, offset, total }
-interface PendingMutation { attempts, collection, data, generatedId, id, ids, lastError, mutationId, parts, queuedAt, rollback, sent, type, updates, upsert }
+interface PendingMutation { attempts, collection, data, generatedId, id, ids, lastError, mutationId, parts, queuedAt, rollback, schemaVersion, sent, type, updates, upsert }
 interface PresenceDiff { joins, leaves }
 interface RebaseClientConfig { anonymous, apiPath, baseUrl, fetch, headers, impersonate, onUnauthorized, realtime, schemaVersion, storageUrlOrigin, token, websocketUrl }
 interface RebaseSession { accessToken, expiresAt, refreshToken, user }
