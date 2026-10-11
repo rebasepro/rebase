@@ -2351,10 +2351,19 @@ export class PostgresBackendDriver implements DataDriver {
 
     async updateRelationPivot({ path, targetId, pivot }: UpdateRelationPivotProps): Promise<void> {
         await this.dataService.updateRelationPivot(path, targetId, pivot);
-        // The junction row itself is what changed, and CDC on that table already
-        // reaches the subscribers of `<parent>/<id>/<relation>` — the same route
-        // a link or an unlink takes. Nothing extra to emit here; a second notify
-        // would only duplicate the frame CDC is about to deliver.
+        // The junction row itself is what changed. Under change capture the
+        // junction table's trigger reaches the subscribers of
+        // `<parent>/<id>/<relation>` — the same route a link or an unlink
+        // takes — and a notify here would only duplicate that frame. Without
+        // capture nothing else will: a live list of a post's tags never saw
+        // the edited link columns.
+        if (this.realtimeService.isCdcActive()) return;
+        const notification = { path, id: String(targetId), row: { _rebase_invalidated: true }, databaseId: undefined };
+        if (this._deferNotifications) {
+            this._pendingNotifications.push(notification);
+        } else {
+            await this.realtimeService.notifyUpdate(notification.path, notification.id, notification.row);
+        }
     }
 
     async checkUniqueField(
