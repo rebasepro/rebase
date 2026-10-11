@@ -349,7 +349,12 @@ export function renderReport(result: ScanResult, options: RenderOptions): string
         out.push(degraded.length > 0
             // Not "no findings": the scan did not finish looking.
             ? style.yellow("No findings from the checks that ran — but the scan was incomplete. See above.")
-            : style.green("No findings. Every table, view and policy in scope passed all checks."));
+            : result.stats.tables === 0
+                // Nothing in scope passed nothing: a scan of the wrong
+                // database, or of a schema that is not there, said "passed all
+                // checks".
+                ? style.yellow("No tables in scope, so nothing was checked. Is this the right database, and the right --schema?")
+                : style.green("No findings. Every table, view and policy in scope passed all checks."));
         out.push("");
     }
 

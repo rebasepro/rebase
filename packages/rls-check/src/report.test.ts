@@ -792,3 +792,20 @@ describe("exitCodeFor", () => {
         expect(text.match(/Exit code \d/g)).toEqual([`Exit code ${code}`]);
     });
 });
+
+describe("a scan with no tables in scope", () => {
+    // A scan of the wrong database (or a --schema that is not there) printed
+    // "Every table, view and policy in scope passed all checks".
+    it("says nothing was checked, not that everything passed", () => {
+        const out = renderReport(
+            result({ findings: [], stats: { schemas: 1, tables: 0, policies: 0, tablesWithoutRls: 0, checksRun: 15 } }),
+            { color: false, failOn: "high" as const, width: 88 }
+        );
+        expect(out).toContain("No tables in scope, so nothing was checked");
+        expect(out).not.toContain("passed all checks");
+    });
+
+    it("still says the tables passed when there were some", () => {
+        expect(renderReport(result({ findings: [] }), { color: false, failOn: "high" as const, width: 88 })).toContain("passed all checks");
+    });
+});
