@@ -53,6 +53,9 @@ function useUserSelector({ pageSize = DEFAULT_PAGE_SIZE, enabled = true }: {
     const [items, setItems] = useState<UserSelectorItem[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [hasMore, setHasMore] = useState(true);
+    // Why the list could not be loaded. Swallowed, a 403 or a 500 read as
+    // "No users found.", which is a claim about the installation.
+    const [error, setError] = useState<Error | undefined>();
     const [currentSearch, setCurrentSearch] = useState("");
     const offsetRef = useRef(0);
     const userCacheRef = useRef<Map<string, User>>(new Map());
@@ -85,7 +88,11 @@ function useUserSelector({ pageSize = DEFAULT_PAGE_SIZE, enabled = true }: {
             const response = await fetch(`${apiBase}/admin/users?${params}`, {
                 headers: token ? { Authorization: `Bearer ${token}` } : {}
             });
-            if (!response.ok) throw new Error("Failed to fetch users");
+            if (!response.ok) {
+                const body = await response.json().catch(() => undefined) as { error?: { message?: string } | string; message?: string } | undefined;
+                const reason = typeof body?.error === "object" ? body.error.message : body?.error ?? body?.message;
+                throw new Error(reason || `HTTP ${response.status}`);
+            }
             const data = await response.json();
             if (superseded()) return;
             const rows: Record<string, unknown>[] = data.data ?? data.users ?? [];
@@ -104,11 +111,13 @@ function useUserSelector({ pageSize = DEFAULT_PAGE_SIZE, enabled = true }: {
 label: user.displayName ?? user.email ?? user.uid,
 user };
             });
+            setError(undefined);
             setItems(prev => append ? [...prev, ...newItems] : newItems);
             setHasMore(newItems.length >= pageSize);
             offsetRef.current = offset + newItems.length;
-        } catch {
+        } catch (e: unknown) {
             if (superseded()) return;
+            setError(e instanceof Error ? e : new Error(String(e)));
             setHasMore(false);
         } finally {
             if (!superseded()) setIsLoading(false);
@@ -148,6 +157,7 @@ user };
     }, []);
 
     return { items,
+error,
 isLoading,
 hasMore,
 search,
@@ -177,6 +187,8 @@ export interface UserSelectorProps {
     searchPlaceholder?: string;
     noResultsText?: string;
     loadingText?: string;
+    /** Leads the message shown when the list of users cannot be loaded. */
+    errorText?: string;
     /** See `RelationSelector`'s `open`. */
     open?: boolean;
     onOpenChange?: (open: boolean) => void;
@@ -204,6 +216,7 @@ export const UserSelector = React.forwardRef<
             searchPlaceholder = "Search users...",
             noResultsText = "No users found.",
             loadingText = "Loading...",
+            errorText = "Could not load users",
             open: openProp,
             onOpenChange,
             triggerContent,
@@ -223,6 +236,7 @@ export const UserSelector = React.forwardRef<
 
         const {
             items: availableItems,
+            error: listError,
             isLoading: isLoadingList,
             hasMore,
             search,
@@ -538,7 +552,13 @@ export const UserSelector = React.forwardRef<
                                                 className="ml-2 text-sm text-text-secondary dark:text-text-secondary-dark">{loadingText}</span>
                                         </div>
                                     )}
-                                    {!isLoading && availableItems.length === 0 && (
+                                    {!isLoading && availableItems.length === 0 && listError && (
+                                        <div role="alert"
+                                            className="px-4 py-6 text-center text-text-secondary dark:text-text-secondary-dark">
+                                            {`${errorText}: ${listError.message}`}
+                                        </div>
+                                    )}
+                                    {!isLoading && availableItems.length === 0 && !listError && (
                                         <CommandPrimitive.Empty
                                             className="px-4 py-6 text-center text-text-secondary dark:text-text-secondary-dark">
                                             {noResultsText}
