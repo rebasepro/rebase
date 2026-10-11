@@ -1436,3 +1436,54 @@ describe("a projected read", () => {
         expect(await posts.findById(2)).toEqual(server.rows.get("2"));
     });
 });
+
+/**
+ * A row created offline in one collection and referenced by a row created
+ * offline in another (audit 34, M5). The queue was ordered across collections
+ * for this case, but the id the server assigned the parent, and a refusal of
+ * the parent, reached only the parent's own collection.
+ */
+describe("writes in another collection that reference a row created offline", () => {
+    it("are re-pointed at the id the server assigned the parent", async () => {
+        const server = createFakeServer();
+        const { manager, wrap } = createManager(server);
+        const authors = wrap("authors");
+        const posts = wrap("posts");
+
+        server.state.online = false;
+        const author = await authors.create({ name: "Ada" });
+        await posts.create({ title: "hello", author_id: author.id, meta: { by: author.id } }, "p1");
+        server.idRewrites.set(String(author.id), "srv-42");
+
+        server.state.online = true;
+        await manager.sync();
+
+        expect(server.table("posts").get("p1")).toMatchObject({ author_id: "srv-42", meta: { by: "srv-42" } });
+        expect(await posts.findById("p1")).toMatchObject({ author_id: "srv-42" });
+    });
+
+    it("are discarded with the parent when the server refuses it, and say why", async () => {
+        const server = createFakeServer();
+        const onSyncError = jest.fn<(error: Error, mutation: PendingMutation) => void>();
+        const { manager, wrap } = createManager(server, { onSyncError });
+        const authors = wrap("authors");
+        const posts = wrap("posts");
+
+        server.state.online = false;
+        const author = await authors.create({ name: "" });
+        await posts.create({ title: "hello", author_id: author.id }, "p1");
+        await posts.create({ title: "unrelated" }, "p2");
+        server.rejections.set(`create:${String(author.id)}`, new RebaseApiError("name is required", { status: 400 }));
+
+        server.state.online = true;
+        await manager.sync();
+
+        expect(server.table("posts").has("p1")).toBe(false);
+        expect(server.table("posts").has("p2")).toBe(true);
+        expect(onSyncError).toHaveBeenCalledTimes(2);
+        const [, child] = onSyncError.mock.calls;
+        expect(child[1].collection).toBe("posts");
+        expect((child[0] as RebaseApiError).code).toBe("DEPENDENCY_REJECTED");
+        expect(await manager.api.pending()).toHaveLength(0);
+    });
+});

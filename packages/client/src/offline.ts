@@ -219,6 +219,56 @@ function isFieldRefusal(error: unknown): boolean {
     return error.status === 400 || error.status === 403 || error.status === 422;
 }
 
+/**
+ * `value` with every occurrence of `from` replaced by `to`, walking plain
+ * objects and arrays — and whether anything was replaced.
+ *
+ * Only ever called with an id the SDK minted for an offline create (a UUID, or
+ * a negative number from the clock), which nothing but a reference to that row
+ * can equal. That is what makes replacing by value sound without knowing which
+ * columns are references.
+ */
+function replaceMintedId(value: unknown, from: string | number, to: string | number): { value: unknown; changed: boolean } {
+    if (value === from) return { value: to, changed: true };
+    if (Array.isArray(value)) {
+        let changed = false;
+        const out = value.map((item) => {
+            const replaced = replaceMintedId(item, from, to);
+            changed ||= replaced.changed;
+            return replaced.value;
+        });
+        return changed ? { value: out, changed } : { value, changed };
+    }
+    if (isPlainObject(value)) {
+        let changed = false;
+        const out: AnyRow = {};
+        for (const [key, item] of Object.entries(value as AnyRow)) {
+            const replaced = replaceMintedId(item, from, to);
+            changed ||= replaced.changed;
+            out[key] = replaced.value;
+        }
+        return changed ? { value: out, changed } : { value, changed };
+    }
+    return { value, changed: false };
+}
+
+/**
+ * A plain object from any realm — a queued payload read back from the store is
+ * a structured clone, whose `Object.prototype` need not be this one. A class
+ * instance (a `GeoPoint`, a `Date`) is not walked.
+ */
+function isPlainObject(value: unknown): value is AnyRow {
+    if (value === null || typeof value !== "object") return false;
+    const proto = Object.getPrototypeOf(value);
+    return proto === null || Object.getPrototypeOf(proto) === null;
+}
+
+/** Whether a queued write's payload mentions `id` anywhere — see {@link replaceMintedId}. */
+function mentionsMintedId(op: PendingMutation, id: string | number): boolean {
+    const payloads: unknown[] = [op.data, ...(op.updates ?? []).map((u) => u.data)];
+    return payloads.some((payload) => replaceMintedId(payload, id, "").changed);
+}
+
 /** The server has no such row — deleted by someone else, or never visible to this user. */
 function isNotFoundError(error: unknown): boolean {
     return error instanceof RebaseApiError && error.status === 404;
@@ -2394,9 +2444,34 @@ data: u.data as AnyRow })),
             const queue = this.isCurrent(ticket)
                 ? this.queue
                 : await this.store.listQueue(`${ticket.scope}|`).catch(() => []);
+            // A minted id names nothing but this row, so wherever another
+            // queued write carries it — a post's `author_id`, in any
+            // collection — it is a reference to this row, and has to follow it.
+            // The queue is ordered across collections for exactly this case;
+            // the id used to be moved only in the row's own collection, so the
+            // post replayed pointing at an author that never existed.
+            const minted = op.type === "create" && op.generatedId === true;
             for (const queued of queue) {
-                if (queued.collection !== slug) continue;
                 let dirty = false;
+                if (minted && queued !== op) {
+                    const data = replaceMintedId(queued.data, localId, serverId);
+                    if (data.changed) {
+                        queued.data = data.value as PendingMutation["data"];
+                        dirty = true;
+                    }
+                    if (queued.updates) {
+                        const updates = replaceMintedId(queued.updates.map((u) => u.data), localId, serverId);
+                        if (updates.changed) {
+                            const values = updates.value as AnyRow[];
+                            queued.updates = queued.updates.map((u, i) => ({ id: u.id, data: values[i] }));
+                            dirty = true;
+                        }
+                    }
+                }
+                if (queued.collection !== slug) {
+                    if (dirty) await this.store.enqueue(`${ticket.scope}|${queued.mutationId}`, queued).catch(() => undefined);
+                    continue;
+                }
                 if (queued.id !== undefined && String(queued.id) === oldKey) {
                     queued.id = serverId;
                     if (queued.data && !Array.isArray(queued.data)) {
@@ -2470,8 +2545,21 @@ data: u.data as AnyRow })),
 
         const doomed: PendingMutation[] = [op];
         const orphaned = new Set(ids);
+        // Rows created offline that the server will now never have. A write
+        // anywhere in the queue that references one — a post whose author's
+        // create was refused — can only fail on the reference, or worse, be
+        // written pointing at nothing. See `replaceMintedId` for why matching
+        // by value is sound for a minted id.
+        const neverCreated: (string | number)[] = op.type === "create" && op.generatedId === true && op.id !== undefined
+            ? [op.id]
+            : [];
         const position = this.queue.indexOf(op);
         for (const later of this.queue.slice(position + 1)) {
+            if (neverCreated.some((id) => mentionsMintedId(later, id))) {
+                doomed.push(later);
+                if (later.type === "create" && later.generatedId === true && later.id !== undefined) neverCreated.push(later.id);
+                continue;
+            }
             if (later.collection !== op.collection) continue;
             const hit = this.idsOf(later).filter((id) => orphaned.has(id));
             if (hit.length === 0) continue;
@@ -2481,6 +2569,19 @@ data: u.data as AnyRow })),
 
         for (const dropped of doomed) await this.drop(dropped, ticket);
         if (!this.isCurrent(ticket)) return;
+
+        // A write discarded for its reference was applied to rows of its own,
+        // possibly in another collection; put those back as well.
+        const touched = new Set([op.collection]);
+        for (const dropped of doomed) {
+            if (dropped === op || !neverCreated.length || dropped.collection === op.collection && dropped.type === "update") continue;
+            touched.add(dropped.collection);
+            for (const [idKey, previous] of Object.entries(dropped.rollback?.rows ?? {})) {
+                const restored = this.applyPendingToRow(dropped.collection, idKey, previous ?? undefined);
+                if (restored === undefined) this.removeLocalRow(dropped.collection, idKey, ticket);
+                else this.setLocalRow(dropped.collection, idKey, restored, ticket);
+            }
+        }
 
         // An edit refused because its row is gone on the server: the row the
         // edit started from is not there to restore. Putting it back showed a
@@ -2496,8 +2597,10 @@ data: u.data as AnyRow })),
         }
 
         this.patchStatus({ lastError: error.message });
-        this.notifyCollection(op.collection);
-        this.scheduleRefresh(op.collection);
+        for (const slug of touched) {
+            this.notifyCollection(slug);
+            this.scheduleRefresh(slug);
+        }
         // The refused write is reported with the server's answer; the ones
         // discarded along with it were never sent, and say so — with that
         // answer as their cause, so "why" is one property away.
