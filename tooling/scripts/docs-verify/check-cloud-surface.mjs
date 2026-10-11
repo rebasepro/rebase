@@ -27,6 +27,8 @@ const CLOUD_INDEX = "packages/cli/src/commands/cloud/index.ts";
 const ACTION_HELP_SOURCE = "packages/cli/src/commands/cloud/action-help.ts";
 const CLOUD_PAGE = "website/src/content/docs/docs/deployment/cloud.md";
 const CLI_PAGE = "website/src/content/docs/docs/cli/index.md";
+/** `rebase cloud` has its own CLI reference page, split out of `cli/index.md`. */
+const CLI_CLOUD_PAGE = "website/src/content/docs/docs/cli/cloud.md";
 
 /** The heading whose table is the index of the family. */
 const TABLE_HEADING = "## The rest of the surface";
@@ -228,7 +230,7 @@ function checkDocumentedInvocations(root, groups) {
     const findings = [];
     const pages = actionHelpPages(root);
 
-    for (const file of [CLI_PAGE, CLOUD_PAGE]) {
+    for (const file of [CLI_PAGE, CLI_CLOUD_PAGE, CLOUD_PAGE]) {
         const text = read(root, file);
         for (const { raw, words } of cloudInvocations(text)) {
             const group = words[0];

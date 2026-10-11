@@ -1,5 +1,5 @@
 ---
-sourceHash: d2f6e11d9e4f2f6e
+sourceHash: 852d6c98d8475f3b
 title: Rebase Cloud
 sidebar_label: Rebase Cloud
 description: O Rebase Cloud é o mesmo Rebase, operado para você. O que é, como um projeto se conecta e faz deploy, e o que o beta privado ainda não inclui.
@@ -206,7 +206,7 @@ O preço de um projeto é calculado a partir do que ele reserva, e não por um p
 fixo. O comando `compute` exibe cada parâmetro e a cotação detalhada do próprio
 control plane para eles. (`rebase cloud resources` é uma coisa diferente: os
 bancos de dados e buckets que o código declara e se cada um está provisionado —
-consulte a [referência da CLI](/docs/cli/#rebase-cloud).)
+consulte a [referência da CLI](/docs/cli/cloud/).)
 
 ```bash
 rebase cloud compute

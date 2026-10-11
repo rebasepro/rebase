@@ -1,5 +1,5 @@
 ---
-sourceHash: 6d4b5fe12fe09451
+sourceHash: 83b3a13a151d0cd7
 title: Índice de endpoints
 sidebar_label: Índice de endpoints
 description: Cada ruta HTTP que monta un backend de Rebase — datos, autenticación, almacenamiento, administración, meta — con el control de acceso de cada una y la página que la explica.
@@ -36,10 +36,10 @@ lista fija. `:slug` es el `slug` de una colección.
 | Método | Ruta | Gate | Más |
 |---|---|---|---|
 | `GET` | `/api/data/collections` | session | [API REST](/docs/backend/api/) |
-| `GET` | `/api/data/:slug` | RLS | [Consultas](/docs/backend/api/#filtering) |
+| `GET` | `/api/data/:slug` | RLS | [Consultas](/docs/backend/filtering/) |
 | `POST` | `/api/data/:slug` | RLS | [API REST](/docs/backend/api/) |
 | `POST` | `/api/data/:slug/query` | RLS | El listado, con los parámetros de consulta en el cuerpo — [Consultas demasiado largas para una URL](/docs/backend/vector-search/#queries-too-long-for-a-url) |
-| `GET` | `/api/data/:slug/count` | RLS | [Consultas](/docs/backend/api/#filtering) |
+| `GET` | `/api/data/:slug/count` | RLS | [Consultas](/docs/backend/filtering/) |
 | `POST` | `/api/data/:slug/count` | RLS | El conteo, con los parámetros de consulta en el cuerpo — [Consultas demasiado largas para una URL](/docs/backend/vector-search/#queries-too-long-for-a-url) |
 | `GET` | `/api/data/:slug/aggregate` | RLS | [API REST](/docs/backend/api/#rest-endpoints) |
 | `GET` | `/api/data/:slug/:id` | RLS | [API REST](/docs/backend/api/) |

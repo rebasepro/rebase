@@ -218,7 +218,7 @@ project. `rebase cloud tokens revoke <id> --yes` stops it at once.
 A project is priced from what it reserves, not from a tier. `compute` prints
 every dial and the control plane's own itemised quote for them. (`rebase cloud
 resources` is a different thing: the databases and buckets the code declares,
-and whether each is provisioned — see the [CLI reference](/docs/cli/#rebase-cloud).)
+and whether each is provisioned — see the [CLI reference](/docs/cli/cloud/).)
 
 ```bash
 rebase cloud compute

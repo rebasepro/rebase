@@ -1,5 +1,5 @@
 ---
-sourceHash: 1789995e7e1e6bf9
+sourceHash: a8d023c7c5248446
 title: Self-Hosting
 sidebar_label: Self-Hosting
 description: Esegui Rebase ovunque con l'immagine di runtime ufficiale e il bundle del tuo progetto — Docker Compose, Fly, Railway o un semplice VPS.
@@ -254,7 +254,7 @@ della data source (`source="(default)"` in un progetto che non dichiara data sou
 pool sano lo tiene vicino a zero. Una coda che
 cresce con il traffico significa che le richieste sono in attesa di connessioni — il più delle volte
 tenute da callback di scrittura che attendono qualcosa di lento; vedi
-[Un callback tiene una connessione](/docs/collections/callbacks/#a-callback-holds-a-connection).
+[Un callback tiene una connessione](/docs/collections/context-data-api/#a-callback-holds-a-connection).
 
 ## Header di sicurezza
 

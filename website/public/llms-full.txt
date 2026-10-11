@@ -1515,6 +1515,7 @@ rows. A page this device never fetched now fails with `OFFLINE`, and so does a
 show what it has with a note, or ask for a page the device already holds.
 
 ```ts
+let rows;
 try {
   rows = await client.data.posts.findAll();
 } catch (e) {
@@ -15177,149 +15178,7 @@ curl -H "Authorization: Bearer <service-key>" \
      https://api.example.com/api/data/products
 ```
 
-### Filtering
-
-Use PostgREST-style query parameters to filter results. The format is `?field=operator.value`:
-
-```bash
-# Exact match
-GET /api/data/products?active=eq.true
-
-# Comparison operators
-GET /api/data/products?price=gt.100
-GET /api/data/products?price=lte.50
-
-# Multiple filters (AND)
-GET /api/data/products?active=eq.true&price=gt.10
-
-# IN operator — match any value in a set
-GET /api/data/products?status=in.(draft,published)
-
-# NOT IN
-GET /api/data/products?status=nin.(archived,deleted)
-
-# Array contains
-GET /api/data/products?tags=cs.electronics
-
-# Array contains any
-GET /api/data/products?tags=csa.(electronics,books)
-```
-
-#### Filter Operators
-
-| Operator | Meaning | Example |
-|----------|---------|---------|
-| `eq` | Equals (`==`) | `?active=eq.true` |
-| `neq` | Not equals (`!=`) | `?status=neq.draft` |
-| `gt` | Greater than (`>`) | `?price=gt.100` |
-| `gte` | Greater or equal (`>=`) | `?price=gte.100` |
-| `lt` | Less than (`<`) | `?price=lt.50` |
-| `lte` | Less or equal (`<=`) | `?price=lte.50` |
-| `in` | In array | `?status=in.(a,b,c)` |
-| `nin` | Not in array | `?status=nin.(a,b)` |
-| `cs` | Array contains | `?tags=cs.value` |
-| `csa` | Array contains any | `?tags=csa.(a,b)` |
-| `like` | Pattern match, case-sensitive (`like`) | `?sku=like.AB-%` |
-| `ilike` | Pattern match, case-insensitive (`ilike`) | `?name=ilike.%widget%` |
-| `nlike` | Does not match the pattern (`not-like`) | `?sku=nlike.TMP-%` |
-| `nilike` | Does not match, case-insensitively (`not-ilike`) | `?name=nilike.%test%` |
-| `isnull` | Column is `NULL` (`is-null`) | `?deleted_at=isnull.null` |
-| `notnull` | Column is not `NULL` (`is-not-null`) | `?deleted_at=notnull.null` |
-
-The four pattern operators match text. An enum column is matched by its value
-(`?status=like.draft%25`); on a number, a date or any other column that is not
-text they are a 400 `INVALID_FILTER_OPERATOR`.
-
-`isnull` and `notnull` ignore their value — the operator is the whole condition,
-and anything after the dot is discarded. The SDK writes `.null`, so that is the
-spelling you will see on the wire.
-
-:::caution[`eq.null` is the four-character string, not `IS NULL`]
-`?deleted_at=eq.null` searches for the literal text `null`. SQL `= NULL` is
-never true, so there is no reading of `eq.null` that could mean the null test —
-use `isnull` for that. The SDK serializes `.where("deleted_at", "==", null)` as
-`isnull.null` for exactly this reason.
-:::
-
-#### Logical Operators
-
-Use `or`, `and` and `not` for complex conditions:
-
-```bash
-# OR: match products that are either cheap or on sale
-GET /api/data/products?or=(price.lt.10,on_sale.eq.true)
-
-# AND: explicit conjunction
-GET /api/data/products?and=(active.eq.true,price.gt.0)
-
-# NOT: everything that is not a discontinued in-stock item
-GET /api/data/products?not=(discontinued.eq.true,stock.gt.0)
-```
-
-`not` negates the **conjunction** of its conditions: `not(a)` is `NOT a`, and
-`not(a,b)` is `NOT (a AND b)`. It compiles to a real SQL `NOT (...)` rather than
-to inverted operators — SQL is three-valued, so `NOT (a AND b)` and
-`(NOT a) OR (NOT b)` stop agreeing the moment a NULL is involved. A negation
-therefore **includes rows whose column is NULL**, which is what `NOT` means; AND
-a `notnull` alongside it if that is not what you want.
-
-**One group per request: `or` wins over `and`, and both over `not`.** They are
-three spellings of the same slot, not three filters. Nest instead:
-
-```bash
-GET /api/data/products?or=(price.lt.10,and(active.eq.true,price.gt.0))
-GET /api/data/products?not=(or(status.eq.draft,status.eq.archived))
-```
-
-Groups may nest 32 levels deep; past that the request is refused with
-`INVALID_LOGICAL_GROUP`.
-
-A condition inside a group whose operator the dialect does not have —
-`?not=(title.contains.x)` — is a 400 `UNKNOWN_FILTER_OPERATOR`, as it is in a
-JSON `where`. It is not read as an equality on `contains.x`, which inside `not`
-would have matched every row.
-
-A group **narrows** alongside the field filters rather than replacing them — see
-[How the filters combine](#how-the-filters-combine).
-
-#### The `where` JSON dialect
-
-The field filters above are one of two ways to send a filter. The other is a
-single JSON object, which is what the OpenAPI document publishes on every
-`GET /api/data/{slug}` and what the nested subcollection routes take:
-
-```bash
-GET /api/data/products?where={"status":["==","active"],"price":[">=",100]}
-```
-
-Each key is a field, each value a canonical `[operator, value]` tuple — the same
-tuples the SDK writes. A value may also be a pre-serialized dot-string
-(`{"status":"eq.active"}`) or a bare scalar (`{"status":"active"}`); all three
-compile to the same condition.
-
-The difference worth knowing: **JSON carries types.** `?price=gte.100` sends the
-string `"100"` and the driver casts it by column type, while
-`?where={"price":[">=",100]}` sends a number. For a column whose text and
-numeric readings differ — a version string, a zero-padded code — that is the
-parameter to reach for.
-
-A malformed `where` is a 400 `INVALID_WHERE`, not a silently dropped filter:
-dropping it would run the read unfiltered and return everything row-level
-security happens to allow.
-
-#### How the filters combine
-
-`?field=op.value`, `?where=`, `?or=`/`?and=` and `?searchString=` are
-independent, and every one of them that is present must match:
-
-```text
-(field filters and `where`, AND-ed together)
-  AND (the logical group)
-  AND (the search string)
-```
-
-There is no way to OR one against another. Anything that is not a plain AND of
-those groups belongs inside a single `or=`/`and=` tree.
+Filtering a list — `?field=op.value` operators, `or`/`and` groups, the `where` JSON dialect and how they combine — has [its own page](/docs/backend/filtering).
 
 ### Sorting
 
@@ -15713,6 +15572,155 @@ document is at `GET /api/docs`, with Swagger UI at `/api/swagger` when
 - **[Collections](/docs/collections)** — Define your data schema
 - **[Security Rules (RLS)](/docs/collections/security-rules)** — Control access per row
 
+## REST API filtering
+
+Use PostgREST-style query parameters to filter results. The format is `?field=operator.value`:
+
+```bash
+# Exact match
+GET /api/data/products?active=eq.true
+
+# Comparison operators
+GET /api/data/products?price=gt.100
+GET /api/data/products?price=lte.50
+
+# Multiple filters (AND)
+GET /api/data/products?active=eq.true&price=gt.10
+
+# IN operator — match any value in a set
+GET /api/data/products?status=in.(draft,published)
+
+# NOT IN
+GET /api/data/products?status=nin.(archived,deleted)
+
+# Array contains
+GET /api/data/products?tags=cs.electronics
+
+# Array contains any
+GET /api/data/products?tags=csa.(electronics,books)
+```
+
+### Filter Operators
+
+| Operator | Meaning | Example |
+|----------|---------|---------|
+| `eq` | Equals (`==`) | `?active=eq.true` |
+| `neq` | Not equals (`!=`) | `?status=neq.draft` |
+| `gt` | Greater than (`>`) | `?price=gt.100` |
+| `gte` | Greater or equal (`>=`) | `?price=gte.100` |
+| `lt` | Less than (`<`) | `?price=lt.50` |
+| `lte` | Less or equal (`<=`) | `?price=lte.50` |
+| `in` | In array | `?status=in.(a,b,c)` |
+| `nin` | Not in array | `?status=nin.(a,b)` |
+| `cs` | Array contains | `?tags=cs.value` |
+| `csa` | Array contains any | `?tags=csa.(a,b)` |
+| `like` | Pattern match, case-sensitive (`like`) | `?sku=like.AB-%` |
+| `ilike` | Pattern match, case-insensitive (`ilike`) | `?name=ilike.%widget%` |
+| `nlike` | Does not match the pattern (`not-like`) | `?sku=nlike.TMP-%` |
+| `nilike` | Does not match, case-insensitively (`not-ilike`) | `?name=nilike.%test%` |
+| `isnull` | Column is `NULL` (`is-null`) | `?deleted_at=isnull.null` |
+| `notnull` | Column is not `NULL` (`is-not-null`) | `?deleted_at=notnull.null` |
+
+The four pattern operators match text. An enum column is matched by its value
+(`?status=like.draft%25`); on a number, a date or any other column that is not
+text they are a 400 `INVALID_FILTER_OPERATOR`.
+
+`isnull` and `notnull` ignore their value — the operator is the whole condition,
+and anything after the dot is discarded. The SDK writes `.null`, so that is the
+spelling you will see on the wire.
+
+:::caution[`eq.null` is the four-character string, not `IS NULL`]
+`?deleted_at=eq.null` searches for the literal text `null`. SQL `= NULL` is
+never true, so there is no reading of `eq.null` that could mean the null test —
+use `isnull` for that. The SDK serializes `.where("deleted_at", "==", null)` as
+`isnull.null` for exactly this reason.
+:::
+
+### Logical Operators
+
+Use `or`, `and` and `not` for complex conditions:
+
+```bash
+# OR: match products that are either cheap or on sale
+GET /api/data/products?or=(price.lt.10,on_sale.eq.true)
+
+# AND: explicit conjunction
+GET /api/data/products?and=(active.eq.true,price.gt.0)
+
+# NOT: everything that is not a discontinued in-stock item
+GET /api/data/products?not=(discontinued.eq.true,stock.gt.0)
+```
+
+`not` negates the **conjunction** of its conditions: `not(a)` is `NOT a`, and
+`not(a,b)` is `NOT (a AND b)`. It compiles to a real SQL `NOT (...)` rather than
+to inverted operators — SQL is three-valued, so `NOT (a AND b)` and
+`(NOT a) OR (NOT b)` stop agreeing the moment a NULL is involved. A negation
+therefore **includes rows whose column is NULL**, which is what `NOT` means; AND
+a `notnull` alongside it if that is not what you want.
+
+**One group per request: `or` wins over `and`, and both over `not`.** They are
+three spellings of the same slot, not three filters. Nest instead:
+
+```bash
+GET /api/data/products?or=(price.lt.10,and(active.eq.true,price.gt.0))
+GET /api/data/products?not=(or(status.eq.draft,status.eq.archived))
+```
+
+Groups may nest 32 levels deep; past that the request is refused with
+`INVALID_LOGICAL_GROUP`.
+
+A condition inside a group whose operator the dialect does not have —
+`?not=(title.contains.x)` — is a 400 `UNKNOWN_FILTER_OPERATOR`, as it is in a
+JSON `where`. It is not read as an equality on `contains.x`, which inside `not`
+would have matched every row.
+
+A group **narrows** alongside the field filters rather than replacing them — see
+[How the filters combine](#how-the-filters-combine).
+
+### The `where` JSON dialect
+
+The field filters above are one of two ways to send a filter. The other is a
+single JSON object, which is what the OpenAPI document publishes on every
+`GET /api/data/{slug}` and what the nested subcollection routes take:
+
+```bash
+GET /api/data/products?where={"status":["==","active"],"price":[">=",100]}
+```
+
+Each key is a field, each value a canonical `[operator, value]` tuple — the same
+tuples the SDK writes. A value may also be a pre-serialized dot-string
+(`{"status":"eq.active"}`) or a bare scalar (`{"status":"active"}`); all three
+compile to the same condition.
+
+The difference worth knowing: **JSON carries types.** `?price=gte.100` sends the
+string `"100"` and the driver casts it by column type, while
+`?where={"price":[">=",100]}` sends a number. For a column whose text and
+numeric readings differ — a version string, a zero-padded code — that is the
+parameter to reach for.
+
+A malformed `where` is a 400 `INVALID_WHERE`, not a silently dropped filter:
+dropping it would run the read unfiltered and return everything row-level
+security happens to allow.
+
+### How the filters combine
+
+`?field=op.value`, `?where=`, `?or=`/`?and=` and `?searchString=` are
+independent, and every one of them that is present must match:
+
+```text
+(field filters and `where`, AND-ed together)
+  AND (the logical group)
+  AND (the search string)
+```
+
+There is no way to OR one against another. Anything that is not a plain AND of
+those groups belongs inside a single `or=`/`and=` tree.
+
+### Next Steps
+
+- **[REST API](/docs/backend/api)** — Endpoints, sorting, pagination and relation inclusion
+- **[Querying Data](/docs/sdk/querying)** — The same filters from the typed SDK
+
 ## Writing over REST
 
 The verbs are on the [REST API](/docs/backend/api/) page. This one is about the
@@ -15982,7 +15990,7 @@ one batch holds its locks for the whole transaction. Every operation's callbacks
 run inside it, one after another, so a slow hook is paid once per row with the
 transaction open: 100 rows whose `beforeSave` awaits 50 ms hold one connection,
 and the locks of every row written so far, for 5.3 s. The same holds for a
-`/bulk` write. See [A callback holds a connection](/docs/collections/callbacks/#a-callback-holds-a-connection). A driver that cannot make
+`/bulk` write. See [A callback holds a connection](/docs/collections/context-data-api/#a-callback-holds-a-connection). A driver that cannot make
 the batch atomic answers `BATCH_UNSUPPORTED` rather than falling back to a loop
 of single writes — which would give neither the atomicity nor the single round
 trip a batch is reached for.
@@ -19229,7 +19237,7 @@ where this sits among the other options.
 Called before a record is written to the database. Return the modified values.
 On Postgres it runs inside the write's transaction, which has already begun, so
 it holds a pooled connection for as long as it runs — see [A callback holds a
-connection](#a-callback-holds-a-connection).
+connection](/docs/collections/context-data-api#a-callback-holds-a-connection).
 
 ```typescript
 beforeSave: async ({
@@ -19284,7 +19292,7 @@ is the browser-safe one, and it is the same class the typed SDK throws.
 
 #### `afterSave`
 
-Called after the row is written and before the commit, inside the same transaction. A throw rolls the save back — see [Transaction Semantics](#transaction-semantics).
+Called after the row is written and before the commit, inside the same transaction. A throw rolls the save back — see [Transaction Semantics](/docs/collections/context-data-api#transaction-semantics).
 
 ```typescript
 afterSave: async ({
@@ -19395,197 +19403,7 @@ properties: {
 }
 ```
 
-### The `context.data` API
-
-Every callback receives a `context` object that includes `context.data` — a unified data access layer for performing **cross-collection operations** from within lifecycle hooks.
-
-#### Accessing Collections
-
-`context.data` uses a JavaScript Proxy, so you can access any collection by its slug as a property:
-
-```typescript
-afterSave: async ({ values, id, context }) => {
-    // Dynamic property access — works for any collection slug
-    const jobs = context.data.jobs;
-    const users = context.data.users;
-
-    // Alternatively, use the .collection() method for dynamic slugs
-    const collectionName = "jobs";
-    const accessor = context.data.collection(collectionName);
-}
-```
-
-#### Available Methods
-
-Each collection accessor (`context.data.<slug>`) provides these methods:
-
-| Method | Signature | Description |
-|--------|-----------|-------------|
-| `.find()` | `find(params?: FindParams) → FindResponse` | Query entities with filters, sorting, and pagination |
-| `.findById()` | `findById(id: string \| number) → Entity \| undefined` | Fetch a single entity by ID |
-| `.create()` | `create(data: Partial<Values>, id?: string) → Entity` | Create a new entity |
-| `.update()` | `update(id: string \| number, data: Partial<Values>) → Entity` | Update an existing entity |
-| `.delete()` | `delete(id: string \| number) → void` | Delete a record |
-| `.count()` | `count(params?: FindParams) → number` | Count matching entities |
-| `.listen()` | `listen(params, onUpdate, onError?) → unsubscribe` | Real-time subscription (where supported) |
-| `.listenById()` | `listenById(id, onUpdate, onError?) → unsubscribe` | Listen to a single entity |
-
-#### Querying with `.find()`
-
-The `find()` method filters with `[operator, value]` tuples — the typed form of
-the `?status=eq.published` query string the REST API reads:
-
-```typescript
-afterSave: async ({ values, context }) => {
-    // Equality
-    const { data: activeJobs } = await context.data.jobs.find({
-        where: { status: ["==", "published"] },
-        limit: 10,
-        orderBy: ["createdAt", "desc"]
-    });
-
-    // Several conditions, AND-ed
-    const { data: expensiveJobs } = await context.data.jobs.find({
-        where: {
-            salary: [">=", 100000],
-            role: ["in", ["admin", "manager"]]
-        }
-    });
-}
-```
-
-#### Creating Entities
-
-`.create()` and `.update()` take the values to write, with the signatures above.
-[Syncing Data Between Collections](#syncing-data-between-collections) uses both:
-an approved submission creates a published job and is linked back to it.
-
-#### Security: which privileges `context.data` runs with
-
-:::important
-**`context.data` inherits the privileges of whatever triggered the callback.** It is not a fixed trust level.
-
-- Triggered by a **user request** (REST, realtime, an admin-panel edit) → **user-scoped**. The callback runs inside the RLS-bound transaction opened for that request, so policies apply to reads *and* writes. A callback cannot see a row its caller could not.
-- Triggered by **`rebase.dataAsAdmin` or a cron job** (the same singleton) → **admin-scoped**, not unscoped. That driver is scoped as `{ uid: "service", roles: ["admin"] }`, so the callback still runs on an RLS-bound transaction — your policies are evaluated, against that identity.
-- Triggered by **the base driver** (built-in auth flows, migrations) → **unscoped**. It runs on the owner connection and bypasses RLS.
-:::
-
-This matters most in the direction that fails quietly. RLS *filters*, it does not raise — so a callback that reads a sibling row will find it when an admin task saves and may find nothing when an end user saves, with no error either way. Write callbacks that tolerate an empty result, or reach for the admin plane deliberately:
-
-```typescript
-afterSave: async ({ context }) => {
-    // User-scoped when a user triggered this save: RLS applies.
-    await context.data.audit_logs.create({ action: "approved" });
-
-    // Deliberately admin-scoped — for work the caller genuinely may not see,
-    // such as an audit trail they must not be able to read or edit. Note this
-    // is an admin's reach, not a bypass: a collection whose only rule is
-    // `policy.serverContext()` stays closed to it, since that compiles to
-    // `rebase.uid() IS NULL` and this accessor's uid is `service`.
-    // `dataAsAdmin` is always there server-side; its type allows for the
-    // browser SDK, which has none — hence the `!`.
-    await context.client.dataAsAdmin!.audit_logs.create({ action: "approved" });
-}
-```
-
-:::caution[`dataAsAdmin` is a second connection, not part of this write]
-On Postgres, `context.client.dataAsAdmin` inside a request's callback runs in a
-transaction of its own, on another pooled connection, while the triggering
-write's transaction is still open. So it commits on its own, and stays if the
-write rolls back. It also cannot see the row being saved, which is not committed
-yet, and must not write it:
-
-- An admin write with a foreign key back to that row (an `audit_logs.article_id`
-  that references `articles`) fails its key check, and the caller's write fails
-  with it.
-- An admin write to the row being saved, or to any row this write has locked,
-  waits for the write's lock while the write waits for the callback. Postgres
-  cannot see that as a deadlock, so the request hangs until `statement_timeout`
-  (30 seconds by default) and then fails.
-
-For a record that has to reference the row, write it with `context.data`, which
-rides the write's transaction, or enqueue a [job](/docs/backend/jobs): a job
-enqueued from the callback commits with the write, and its handler runs after
-the commit.
-:::
-
-:::caution[This page used to say the opposite]
-Earlier versions of this page stated that callbacks always bypass RLS and have "full database access regardless of the triggering user's permissions". That was wrong, and wrong in the unsafe direction — it invited callbacks written on the assumption that they could always see everything.
-
-The behaviour above is verified end-to-end against Postgres by the `"scopes context.data to the caller when a callback runs on a user request"` case in `@rebasepro/server-postgres`' RLS-enforcement suite.
-:::
-
-#### Transaction Semantics
-
-:::important
-**A callback's `context.data` writes are part of the write that triggered it.** On Postgres, `beforeSave`, the save and `afterSave` — or `beforeDelete`, the delete and `afterDelete` — run inside one transaction, each callback awaited before the commit, and `context.data` writes through that same transaction.
-:::
-
-So the triggering write and everything its callbacks wrote commit together or not at all:
-
-- A throw from `afterSave` or `afterDelete` rolls the triggering write back, along with every `context.data` write the callbacks made. The caller is answered **400 `CALLBACK_REJECTED`** with `details.stage` naming the hook — or with the error's own status when it carries one: a `RebaseApiError` you threw, a unique violation's 409.
-- Realtime subscribers hear about the row only after the commit, so a write that rolled back is never announced.
-- A callback holds the transaction open while it runs, so a slow one is a lock held and a pooled connection tied up — `beforeSave` and `beforeDelete` as much as the `after` hooks. See [A callback holds a connection](#a-callback-holds-a-connection).
-- A `context.data` write runs the target collection's callbacks too, so an `afterSave` that updates its own row runs itself again. Writes nested more than 16 deep are refused with **500 `CALLBACK_RECURSION`**, naming the hook and the collection, and the whole write rolls back. Make such a write conditional, as the example below does.
-
-Let a failure throw when the triggering write should not survive it. Catch it when it should, but only around a `context.data` **write**: a create, update or delete the database refuses (a unique or foreign key violation, a trigger) is undone on its own, and the rest commits.
-
-Any other statement that fails on the write's transaction — a lookup, the read an update or delete makes to find its row (an id the key column cannot hold), a job enqueue the database refused — aborts that transaction in Postgres, and catching the error in JavaScript does not undo that. The write is refused with **500 `TRANSACTION_ABORTED`** and nothing is stored, rather than answering success for a write that was rolled back. Let such a failure throw, or check for the condition before running the statement.
-
-```typescript
-afterSave: async ({ values, id, status, context }) => {
-    // The update below saves this collection again, which runs this callback
-    // again: act on creates only, or it never stops.
-    if (status !== "new") return;
-    try {
-        await context.data.jobs.create({ title: values.title, status: "published" });
-    } catch (error) {
-        // Only the failed create is undone. The submission and this marker commit.
-        await context.data.job_submissions.update(id, {
-            promotion_status: "failed",
-            promotion_error: String(error)
-        });
-    }
-}
-```
-
-Work that has to leave the database — an email, a webhook, a call to a third-party API — does not belong in the callback body. It would hold the transaction open for a network round trip, and nothing can take it back when the write rolls back. Enqueue a [job](/docs/backend/jobs) for it, or do it after the write returns: publish on a [realtime channel](/docs/backend/realtime), or use `waitUntil` in a [custom function](/docs/backend/custom-functions). [Hooks](/docs/backend/hooks#side-effects-that-must-not-hold-the-transaction) says which fits.
-
-On MongoDB none of this holds. That driver runs the same callbacks without a transaction, so the write is already stored when `afterSave` runs, and a throw there reports the failure without undoing it.
-
-#### A callback holds a connection
-
-On Postgres a write runs on one connection checked out of the database pool,
-and every callback runs on it: `beforeSave` and `beforeDelete` after the
-transaction has begun, `afterSave` and `afterDelete` before it commits. For as
-long as a callback runs — awaiting a lookup, a computation, anything — that
-connection serves nothing else, and the locks the write has taken stay taken:
-in `afterSave`, the row just written; in a bulk or [`_batch`](/docs/backend/writes/#cross-collection-batches)
-write, every row the transaction wrote before it.
-
-The cost is the callback's own duration, and concurrent writes add it up:
-
-- The pool holds 20 connections by default (`DB_POOL_MAX`). 25 saves at once
-  whose `beforeSave` awaited 300 ms made an unrelated one-row read take 290 ms,
-  nearly all of it spent waiting for a connection.
-- A bulk create of 100 rows whose `beforeSave` awaits 50 ms is one transaction
-  open for 5.3 s, holding its connection and the locks of every row written so
-  far for all of it.
-
-So:
-
-- Keep anything slow out of callbacks. A call to another service belongs in a
-  [job](/docs/backend/jobs), or after the write returns.
-- Look up what a hook needs before the write when you can — in the client, or
-  in a [custom function](/docs/backend/custom-functions) that then writes.
-- Send rows whose hooks are slow in smaller bulks.
-- If many slow hooks run at once by design, raise `DB_POOL_MAX`, within what
-  the database's `max_connections` allows for every instance.
-- <span class="since-badge" data-since="0.25">Since 0.25</span> With
-  `REBASE_METRICS=true`, `/metrics` reports `rebase_db_pool_wait_ms`: how long
-  each query waited for a connection. A healthy pool keeps it near zero; a tail
-  that grows with traffic is requests queueing for connections that callbacks
-  hold. See [Metrics](/docs/deployment/self-hosting/#metrics).
+Every callback also gets `context.data`, a data layer for reading and writing other collections from inside the hook — see [The `context.data` API](/docs/collections/context-data-api).
 
 ### Syncing Data Between Collections
 
@@ -19662,6 +19480,198 @@ so `context.client.data` is a compile error.
 - **[Security Rules](/docs/collections/security-rules)** — Row Level Security
 - **[Entity History](/docs/backend/history)** — Audit trail
 - **[Custom Functions](/docs/backend/custom-functions)** — Add custom API endpoints
+
+## The context.data API
+
+Every callback receives a `context` object that includes `context.data` — a unified data access layer for performing **cross-collection operations** from within lifecycle hooks.
+
+### Accessing Collections
+
+`context.data` uses a JavaScript Proxy, so you can access any collection by its slug as a property:
+
+```typescript
+afterSave: async ({ values, id, context }) => {
+    // Dynamic property access — works for any collection slug
+    const jobs = context.data.jobs;
+    const users = context.data.users;
+
+    // Alternatively, use the .collection() method for dynamic slugs
+    const collectionName = "jobs";
+    const accessor = context.data.collection(collectionName);
+}
+```
+
+### Available Methods
+
+Each collection accessor (`context.data.<slug>`) provides these methods:
+
+| Method | Signature | Description |
+|--------|-----------|-------------|
+| `.find()` | `find(params?: FindParams) → FindResponse` | Query entities with filters, sorting, and pagination |
+| `.findById()` | `findById(id: string \| number) → Entity \| undefined` | Fetch a single entity by ID |
+| `.create()` | `create(data: Partial<Values>, id?: string) → Entity` | Create a new entity |
+| `.update()` | `update(id: string \| number, data: Partial<Values>) → Entity` | Update an existing entity |
+| `.delete()` | `delete(id: string \| number) → void` | Delete a record |
+| `.count()` | `count(params?: FindParams) → number` | Count matching entities |
+| `.listen()` | `listen(params, onUpdate, onError?) → unsubscribe` | Real-time subscription (where supported) |
+| `.listenById()` | `listenById(id, onUpdate, onError?) → unsubscribe` | Listen to a single entity |
+
+### Querying with `.find()`
+
+The `find()` method filters with `[operator, value]` tuples — the typed form of
+the `?status=eq.published` query string the REST API reads:
+
+```typescript
+afterSave: async ({ values, context }) => {
+    // Equality
+    const { data: activeJobs } = await context.data.jobs.find({
+        where: { status: ["==", "published"] },
+        limit: 10,
+        orderBy: ["createdAt", "desc"]
+    });
+
+    // Several conditions, AND-ed
+    const { data: expensiveJobs } = await context.data.jobs.find({
+        where: {
+            salary: [">=", 100000],
+            role: ["in", ["admin", "manager"]]
+        }
+    });
+}
+```
+
+### Creating Entities
+
+`.create()` and `.update()` take the values to write, with the signatures above.
+[Syncing Data Between Collections](/docs/collections/callbacks#syncing-data-between-collections) uses both:
+an approved submission creates a published job and is linked back to it.
+
+### Security: which privileges `context.data` runs with
+
+:::important
+**`context.data` inherits the privileges of whatever triggered the callback.** It is not a fixed trust level.
+
+- Triggered by a **user request** (REST, realtime, an admin-panel edit) → **user-scoped**. The callback runs inside the RLS-bound transaction opened for that request, so policies apply to reads *and* writes. A callback cannot see a row its caller could not.
+- Triggered by **`rebase.dataAsAdmin` or a cron job** (the same singleton) → **admin-scoped**, not unscoped. That driver is scoped as `{ uid: "service", roles: ["admin"] }`, so the callback still runs on an RLS-bound transaction — your policies are evaluated, against that identity.
+- Triggered by **the base driver** (built-in auth flows, migrations) → **unscoped**. It runs on the owner connection and bypasses RLS.
+:::
+
+This matters most in the direction that fails quietly. RLS *filters*, it does not raise — so a callback that reads a sibling row will find it when an admin task saves and may find nothing when an end user saves, with no error either way. Write callbacks that tolerate an empty result, or reach for the admin plane deliberately:
+
+```typescript
+afterSave: async ({ context }) => {
+    // User-scoped when a user triggered this save: RLS applies.
+    await context.data.audit_logs.create({ action: "approved" });
+
+    // Deliberately admin-scoped — for work the caller genuinely may not see,
+    // such as an audit trail they must not be able to read or edit. Note this
+    // is an admin's reach, not a bypass: a collection whose only rule is
+    // `policy.serverContext()` stays closed to it, since that compiles to
+    // `rebase.uid() IS NULL` and this accessor's uid is `service`.
+    // `dataAsAdmin` is always there server-side; its type allows for the
+    // browser SDK, which has none — hence the `!`.
+    await context.client.dataAsAdmin!.audit_logs.create({ action: "approved" });
+}
+```
+
+:::caution[`dataAsAdmin` is a second connection, not part of this write]
+On Postgres, `context.client.dataAsAdmin` inside a request's callback runs in a
+transaction of its own, on another pooled connection, while the triggering
+write's transaction is still open. So it commits on its own, and stays if the
+write rolls back. It also cannot see the row being saved, which is not committed
+yet, and must not write it:
+
+- An admin write with a foreign key back to that row (an `audit_logs.article_id`
+  that references `articles`) fails its key check, and the caller's write fails
+  with it.
+- An admin write to the row being saved, or to any row this write has locked,
+  waits for the write's lock while the write waits for the callback. Postgres
+  cannot see that as a deadlock, so the request hangs until `statement_timeout`
+  (30 seconds by default) and then fails.
+
+For a record that has to reference the row, write it with `context.data`, which
+rides the write's transaction, or enqueue a [job](/docs/backend/jobs): a job
+enqueued from the callback commits with the write, and its handler runs after
+the commit.
+:::
+
+:::caution[This page used to say the opposite]
+Earlier versions of this page stated that callbacks always bypass RLS and have "full database access regardless of the triggering user's permissions". That was wrong, and wrong in the unsafe direction — it invited callbacks written on the assumption that they could always see everything.
+
+The behaviour above is verified end-to-end against Postgres by the `"scopes context.data to the caller when a callback runs on a user request"` case in `@rebasepro/server-postgres`' RLS-enforcement suite.
+:::
+
+### Transaction Semantics
+
+:::important
+**A callback's `context.data` writes are part of the write that triggered it.** On Postgres, `beforeSave`, the save and `afterSave` — or `beforeDelete`, the delete and `afterDelete` — run inside one transaction, each callback awaited before the commit, and `context.data` writes through that same transaction.
+:::
+
+So the triggering write and everything its callbacks wrote commit together or not at all:
+
+- A throw from `afterSave` or `afterDelete` rolls the triggering write back, along with every `context.data` write the callbacks made. The caller is answered **400 `CALLBACK_REJECTED`** with `details.stage` naming the hook — or with the error's own status when it carries one: a `RebaseApiError` you threw, a unique violation's 409.
+- Realtime subscribers hear about the row only after the commit, so a write that rolled back is never announced.
+- A callback holds the transaction open while it runs, so a slow one is a lock held and a pooled connection tied up — `beforeSave` and `beforeDelete` as much as the `after` hooks. See [A callback holds a connection](#a-callback-holds-a-connection).
+- A `context.data` write runs the target collection's callbacks too, so an `afterSave` that updates its own row runs itself again. Writes nested more than 16 deep are refused with **500 `CALLBACK_RECURSION`**, naming the hook and the collection, and the whole write rolls back. Make such a write conditional, as the example below does.
+
+Let a failure throw when the triggering write should not survive it. Catch it when it should, but only around a `context.data` **write**: a create, update or delete the database refuses (a unique or foreign key violation, a trigger) is undone on its own, and the rest commits.
+
+Any other statement that fails on the write's transaction — a lookup, the read an update or delete makes to find its row (an id the key column cannot hold), a job enqueue the database refused — aborts that transaction in Postgres, and catching the error in JavaScript does not undo that. The write is refused with **500 `TRANSACTION_ABORTED`** and nothing is stored, rather than answering success for a write that was rolled back. Let such a failure throw, or check for the condition before running the statement.
+
+```typescript
+afterSave: async ({ values, id, status, context }) => {
+    // The update below saves this collection again, which runs this callback
+    // again: act on creates only, or it never stops.
+    if (status !== "new") return;
+    try {
+        await context.data.jobs.create({ title: values.title, status: "published" });
+    } catch (error) {
+        // Only the failed create is undone. The submission and this marker commit.
+        await context.data.job_submissions.update(id, {
+            promotion_status: "failed",
+            promotion_error: String(error)
+        });
+    }
+}
+```
+
+Work that has to leave the database — an email, a webhook, a call to a third-party API — does not belong in the callback body. It would hold the transaction open for a network round trip, and nothing can take it back when the write rolls back. Enqueue a [job](/docs/backend/jobs) for it, or do it after the write returns: publish on a [realtime channel](/docs/backend/realtime), or use `waitUntil` in a [custom function](/docs/backend/custom-functions). [Hooks](/docs/backend/hooks#side-effects-that-must-not-hold-the-transaction) says which fits.
+
+On MongoDB none of this holds. That driver runs the same callbacks without a transaction, so the write is already stored when `afterSave` runs, and a throw there reports the failure without undoing it.
+
+### A callback holds a connection
+
+On Postgres a write runs on one connection checked out of the database pool,
+and every callback runs on it: `beforeSave` and `beforeDelete` after the
+transaction has begun, `afterSave` and `afterDelete` before it commits. For as
+long as a callback runs — awaiting a lookup, a computation, anything — that
+connection serves nothing else, and the locks the write has taken stay taken:
+in `afterSave`, the row just written; in a bulk or [`_batch`](/docs/backend/writes/#cross-collection-batches)
+write, every row the transaction wrote before it.
+
+The cost is the callback's own duration, and concurrent writes add it up:
+
+- The pool holds 20 connections by default (`DB_POOL_MAX`). 25 saves at once
+  whose `beforeSave` awaited 300 ms made an unrelated one-row read take 290 ms,
+  nearly all of it spent waiting for a connection.
+- A bulk create of 100 rows whose `beforeSave` awaits 50 ms is one transaction
+  open for 5.3 s, holding its connection and the locks of every row written so
+  far for all of it.
+
+So:
+
+- Keep anything slow out of callbacks. A call to another service belongs in a
+  [job](/docs/backend/jobs), or after the write returns.
+- Look up what a hook needs before the write when you can — in the client, or
+  in a [custom function](/docs/backend/custom-functions) that then writes.
+- Send rows whose hooks are slow in smaller bulks.
+- If many slow hooks run at once by design, raise `DB_POOL_MAX`, within what
+  the database's `max_connections` allows for every instance.
+- <span class="since-badge" data-since="0.25">Since 0.25</span> With
+  `REBASE_METRICS=true`, `/metrics` reports `rebase_db_pool_wait_ms`: how long
+  each query waited for a connection. A healthy pool keeps it near zero; a tail
+  that grows with traffic is requests queueing for connections that callbacks
+  hold. See [Metrics](/docs/deployment/self-hosting/#metrics).
 
 ## Security Rules (RLS)
 
@@ -21112,149 +21122,7 @@ curl -H "Authorization: Bearer <service-key>" \
      https://api.example.com/api/data/products
 ```
 
-### Filtering
-
-Use PostgREST-style query parameters to filter results. The format is `?field=operator.value`:
-
-```bash
-# Exact match
-GET /api/data/products?active=eq.true
-
-# Comparison operators
-GET /api/data/products?price=gt.100
-GET /api/data/products?price=lte.50
-
-# Multiple filters (AND)
-GET /api/data/products?active=eq.true&price=gt.10
-
-# IN operator — match any value in a set
-GET /api/data/products?status=in.(draft,published)
-
-# NOT IN
-GET /api/data/products?status=nin.(archived,deleted)
-
-# Array contains
-GET /api/data/products?tags=cs.electronics
-
-# Array contains any
-GET /api/data/products?tags=csa.(electronics,books)
-```
-
-#### Filter Operators
-
-| Operator | Meaning | Example |
-|----------|---------|---------|
-| `eq` | Equals (`==`) | `?active=eq.true` |
-| `neq` | Not equals (`!=`) | `?status=neq.draft` |
-| `gt` | Greater than (`>`) | `?price=gt.100` |
-| `gte` | Greater or equal (`>=`) | `?price=gte.100` |
-| `lt` | Less than (`<`) | `?price=lt.50` |
-| `lte` | Less or equal (`<=`) | `?price=lte.50` |
-| `in` | In array | `?status=in.(a,b,c)` |
-| `nin` | Not in array | `?status=nin.(a,b)` |
-| `cs` | Array contains | `?tags=cs.value` |
-| `csa` | Array contains any | `?tags=csa.(a,b)` |
-| `like` | Pattern match, case-sensitive (`like`) | `?sku=like.AB-%` |
-| `ilike` | Pattern match, case-insensitive (`ilike`) | `?name=ilike.%widget%` |
-| `nlike` | Does not match the pattern (`not-like`) | `?sku=nlike.TMP-%` |
-| `nilike` | Does not match, case-insensitively (`not-ilike`) | `?name=nilike.%test%` |
-| `isnull` | Column is `NULL` (`is-null`) | `?deleted_at=isnull.null` |
-| `notnull` | Column is not `NULL` (`is-not-null`) | `?deleted_at=notnull.null` |
-
-The four pattern operators match text. An enum column is matched by its value
-(`?status=like.draft%25`); on a number, a date or any other column that is not
-text they are a 400 `INVALID_FILTER_OPERATOR`.
-
-`isnull` and `notnull` ignore their value — the operator is the whole condition,
-and anything after the dot is discarded. The SDK writes `.null`, so that is the
-spelling you will see on the wire.
-
-:::caution[`eq.null` is the four-character string, not `IS NULL`]
-`?deleted_at=eq.null` searches for the literal text `null`. SQL `= NULL` is
-never true, so there is no reading of `eq.null` that could mean the null test —
-use `isnull` for that. The SDK serializes `.where("deleted_at", "==", null)` as
-`isnull.null` for exactly this reason.
-:::
-
-#### Logical Operators
-
-Use `or`, `and` and `not` for complex conditions:
-
-```bash
-# OR: match products that are either cheap or on sale
-GET /api/data/products?or=(price.lt.10,on_sale.eq.true)
-
-# AND: explicit conjunction
-GET /api/data/products?and=(active.eq.true,price.gt.0)
-
-# NOT: everything that is not a discontinued in-stock item
-GET /api/data/products?not=(discontinued.eq.true,stock.gt.0)
-```
-
-`not` negates the **conjunction** of its conditions: `not(a)` is `NOT a`, and
-`not(a,b)` is `NOT (a AND b)`. It compiles to a real SQL `NOT (...)` rather than
-to inverted operators — SQL is three-valued, so `NOT (a AND b)` and
-`(NOT a) OR (NOT b)` stop agreeing the moment a NULL is involved. A negation
-therefore **includes rows whose column is NULL**, which is what `NOT` means; AND
-a `notnull` alongside it if that is not what you want.
-
-**One group per request: `or` wins over `and`, and both over `not`.** They are
-three spellings of the same slot, not three filters. Nest instead:
-
-```bash
-GET /api/data/products?or=(price.lt.10,and(active.eq.true,price.gt.0))
-GET /api/data/products?not=(or(status.eq.draft,status.eq.archived))
-```
-
-Groups may nest 32 levels deep; past that the request is refused with
-`INVALID_LOGICAL_GROUP`.
-
-A condition inside a group whose operator the dialect does not have —
-`?not=(title.contains.x)` — is a 400 `UNKNOWN_FILTER_OPERATOR`, as it is in a
-JSON `where`. It is not read as an equality on `contains.x`, which inside `not`
-would have matched every row.
-
-A group **narrows** alongside the field filters rather than replacing them — see
-[How the filters combine](#how-the-filters-combine).
-
-#### The `where` JSON dialect
-
-The field filters above are one of two ways to send a filter. The other is a
-single JSON object, which is what the OpenAPI document publishes on every
-`GET /api/data/{slug}` and what the nested subcollection routes take:
-
-```bash
-GET /api/data/products?where={"status":["==","active"],"price":[">=",100]}
-```
-
-Each key is a field, each value a canonical `[operator, value]` tuple — the same
-tuples the SDK writes. A value may also be a pre-serialized dot-string
-(`{"status":"eq.active"}`) or a bare scalar (`{"status":"active"}`); all three
-compile to the same condition.
-
-The difference worth knowing: **JSON carries types.** `?price=gte.100` sends the
-string `"100"` and the driver casts it by column type, while
-`?where={"price":[">=",100]}` sends a number. For a column whose text and
-numeric readings differ — a version string, a zero-padded code — that is the
-parameter to reach for.
-
-A malformed `where` is a 400 `INVALID_WHERE`, not a silently dropped filter:
-dropping it would run the read unfiltered and return everything row-level
-security happens to allow.
-
-#### How the filters combine
-
-`?field=op.value`, `?where=`, `?or=`/`?and=` and `?searchString=` are
-independent, and every one of them that is present must match:
-
-```text
-(field filters and `where`, AND-ed together)
-  AND (the logical group)
-  AND (the search string)
-```
-
-There is no way to OR one against another. Anything that is not a plain AND of
-those groups belongs inside a single `or=`/`and=` tree.
+Filtering a list — `?field=op.value` operators, `or`/`and` groups, the `where` JSON dialect and how they combine — has [its own page](/docs/backend/filtering).
 
 ### Sorting
 
@@ -21648,6 +21516,155 @@ document is at `GET /api/docs`, with Swagger UI at `/api/swagger` when
 - **[Collections](/docs/collections)** — Define your data schema
 - **[Security Rules (RLS)](/docs/collections/security-rules)** — Control access per row
 
+## REST API filtering
+
+Use PostgREST-style query parameters to filter results. The format is `?field=operator.value`:
+
+```bash
+# Exact match
+GET /api/data/products?active=eq.true
+
+# Comparison operators
+GET /api/data/products?price=gt.100
+GET /api/data/products?price=lte.50
+
+# Multiple filters (AND)
+GET /api/data/products?active=eq.true&price=gt.10
+
+# IN operator — match any value in a set
+GET /api/data/products?status=in.(draft,published)
+
+# NOT IN
+GET /api/data/products?status=nin.(archived,deleted)
+
+# Array contains
+GET /api/data/products?tags=cs.electronics
+
+# Array contains any
+GET /api/data/products?tags=csa.(electronics,books)
+```
+
+### Filter Operators
+
+| Operator | Meaning | Example |
+|----------|---------|---------|
+| `eq` | Equals (`==`) | `?active=eq.true` |
+| `neq` | Not equals (`!=`) | `?status=neq.draft` |
+| `gt` | Greater than (`>`) | `?price=gt.100` |
+| `gte` | Greater or equal (`>=`) | `?price=gte.100` |
+| `lt` | Less than (`<`) | `?price=lt.50` |
+| `lte` | Less or equal (`<=`) | `?price=lte.50` |
+| `in` | In array | `?status=in.(a,b,c)` |
+| `nin` | Not in array | `?status=nin.(a,b)` |
+| `cs` | Array contains | `?tags=cs.value` |
+| `csa` | Array contains any | `?tags=csa.(a,b)` |
+| `like` | Pattern match, case-sensitive (`like`) | `?sku=like.AB-%` |
+| `ilike` | Pattern match, case-insensitive (`ilike`) | `?name=ilike.%widget%` |
+| `nlike` | Does not match the pattern (`not-like`) | `?sku=nlike.TMP-%` |
+| `nilike` | Does not match, case-insensitively (`not-ilike`) | `?name=nilike.%test%` |
+| `isnull` | Column is `NULL` (`is-null`) | `?deleted_at=isnull.null` |
+| `notnull` | Column is not `NULL` (`is-not-null`) | `?deleted_at=notnull.null` |
+
+The four pattern operators match text. An enum column is matched by its value
+(`?status=like.draft%25`); on a number, a date or any other column that is not
+text they are a 400 `INVALID_FILTER_OPERATOR`.
+
+`isnull` and `notnull` ignore their value — the operator is the whole condition,
+and anything after the dot is discarded. The SDK writes `.null`, so that is the
+spelling you will see on the wire.
+
+:::caution[`eq.null` is the four-character string, not `IS NULL`]
+`?deleted_at=eq.null` searches for the literal text `null`. SQL `= NULL` is
+never true, so there is no reading of `eq.null` that could mean the null test —
+use `isnull` for that. The SDK serializes `.where("deleted_at", "==", null)` as
+`isnull.null` for exactly this reason.
+:::
+
+### Logical Operators
+
+Use `or`, `and` and `not` for complex conditions:
+
+```bash
+# OR: match products that are either cheap or on sale
+GET /api/data/products?or=(price.lt.10,on_sale.eq.true)
+
+# AND: explicit conjunction
+GET /api/data/products?and=(active.eq.true,price.gt.0)
+
+# NOT: everything that is not a discontinued in-stock item
+GET /api/data/products?not=(discontinued.eq.true,stock.gt.0)
+```
+
+`not` negates the **conjunction** of its conditions: `not(a)` is `NOT a`, and
+`not(a,b)` is `NOT (a AND b)`. It compiles to a real SQL `NOT (...)` rather than
+to inverted operators — SQL is three-valued, so `NOT (a AND b)` and
+`(NOT a) OR (NOT b)` stop agreeing the moment a NULL is involved. A negation
+therefore **includes rows whose column is NULL**, which is what `NOT` means; AND
+a `notnull` alongside it if that is not what you want.
+
+**One group per request: `or` wins over `and`, and both over `not`.** They are
+three spellings of the same slot, not three filters. Nest instead:
+
+```bash
+GET /api/data/products?or=(price.lt.10,and(active.eq.true,price.gt.0))
+GET /api/data/products?not=(or(status.eq.draft,status.eq.archived))
+```
+
+Groups may nest 32 levels deep; past that the request is refused with
+`INVALID_LOGICAL_GROUP`.
+
+A condition inside a group whose operator the dialect does not have —
+`?not=(title.contains.x)` — is a 400 `UNKNOWN_FILTER_OPERATOR`, as it is in a
+JSON `where`. It is not read as an equality on `contains.x`, which inside `not`
+would have matched every row.
+
+A group **narrows** alongside the field filters rather than replacing them — see
+[How the filters combine](#how-the-filters-combine).
+
+### The `where` JSON dialect
+
+The field filters above are one of two ways to send a filter. The other is a
+single JSON object, which is what the OpenAPI document publishes on every
+`GET /api/data/{slug}` and what the nested subcollection routes take:
+
+```bash
+GET /api/data/products?where={"status":["==","active"],"price":[">=",100]}
+```
+
+Each key is a field, each value a canonical `[operator, value]` tuple — the same
+tuples the SDK writes. A value may also be a pre-serialized dot-string
+(`{"status":"eq.active"}`) or a bare scalar (`{"status":"active"}`); all three
+compile to the same condition.
+
+The difference worth knowing: **JSON carries types.** `?price=gte.100` sends the
+string `"100"` and the driver casts it by column type, while
+`?where={"price":[">=",100]}` sends a number. For a column whose text and
+numeric readings differ — a version string, a zero-padded code — that is the
+parameter to reach for.
+
+A malformed `where` is a 400 `INVALID_WHERE`, not a silently dropped filter:
+dropping it would run the read unfiltered and return everything row-level
+security happens to allow.
+
+### How the filters combine
+
+`?field=op.value`, `?where=`, `?or=`/`?and=` and `?searchString=` are
+independent, and every one of them that is present must match:
+
+```text
+(field filters and `where`, AND-ed together)
+  AND (the logical group)
+  AND (the search string)
+```
+
+There is no way to OR one against another. Anything that is not a plain AND of
+those groups belongs inside a single `or=`/`and=` tree.
+
+### Next Steps
+
+- **[REST API](/docs/backend/api)** — Endpoints, sorting, pagination and relation inclusion
+- **[Querying Data](/docs/sdk/querying)** — The same filters from the typed SDK
+
 ## Writing over REST
 
 The verbs are on the [REST API](/docs/backend/api/) page. This one is about the
@@ -21917,7 +21934,7 @@ one batch holds its locks for the whole transaction. Every operation's callbacks
 run inside it, one after another, so a slow hook is paid once per row with the
 transaction open: 100 rows whose `beforeSave` awaits 50 ms hold one connection,
 and the locks of every row written so far, for 5.3 s. The same holds for a
-`/bulk` write. See [A callback holds a connection](/docs/collections/callbacks/#a-callback-holds-a-connection). A driver that cannot make
+`/bulk` write. See [A callback holds a connection](/docs/collections/context-data-api/#a-callback-holds-a-connection). A driver that cannot make
 the batch atomic answers `BATCH_UNSUPPORTED` rather than falling back to a loop
 of single writes — which would give neither the atomicity nor the single round
 trip a batch is reached for.
@@ -22509,7 +22526,7 @@ the ID you got. Read the response header.
 | `TENANT_IMMUTABLE` | 400 | A write would move a row from one tenant to another. A row cannot change tenant. `details.violations` names the field. | Create the row in the other tenant and delete this one, or write with a role in `tenant.bypassRoles`. |
 | `TENANT_MISMATCH` | 400 | The write names a tenant this caller does not belong to; the database would refuse it as well. | Write into a tenant the caller belongs to, or authenticate as one that belongs to it. |
 | `TENANT_REQUIRED` | 400 | The collection is tenant-scoped and the tenant cannot be inferred: the request carries none, or the caller belongs to several. | Send the tenant field explicitly, or authenticate as a caller belonging to exactly one. |
-| `TRANSACTION_ABORTED` | 500 | A statement on the write's transaction failed and a callback caught the error. Postgres had already aborted the transaction, so the write was rolled back and nothing was stored. Only a `context.data` create, update or delete the database refused is undone on its own and safe to catch. | Let the failure throw, or check before running the statement. See [Transaction Semantics](/docs/collections/callbacks/#transaction-semantics). |
+| `TRANSACTION_ABORTED` | 500 | A statement on the write's transaction failed and a callback caught the error. Postgres had already aborted the transaction, so the write was rolled back and nothing was stored. Only a `context.data` create, update or delete the database refused is undone on its own and safe to catch. | Let the failure throw, or check before running the statement. See [Transaction Semantics](/docs/collections/context-data-api/#transaction-semantics). |
 | `UNKNOWN_FIELD` | 400 | `?fields=` names a field the collection does not have. | Check the spelling; the message lists the valid fields. |
 | `UNKNOWN_AGGREGATE_FIELD` | 400 | An aggregate or `groupBy` names a field the collection does not have. | Check the spelling; the message lists the valid fields. |
 | `UNKNOWN_FILTER_FIELD` | 400 | The filter names a field this collection — or a relation's target — does not have. | Check the spelling; the message lists the valid fields. |
@@ -22676,10 +22693,10 @@ list. `:slug` is a collection's `slug`.
 | Method | Path | Gate | More |
 |---|---|---|---|
 | `GET` | `/api/data/collections` | session | [REST API](/docs/backend/api/) |
-| `GET` | `/api/data/:slug` | RLS | [Querying](/docs/backend/api/#filtering) |
+| `GET` | `/api/data/:slug` | RLS | [Querying](/docs/backend/filtering/) |
 | `POST` | `/api/data/:slug` | RLS | [REST API](/docs/backend/api/) |
 | `POST` | `/api/data/:slug/query` | RLS | The listing, query parameters in the body — [Queries too long for a URL](/docs/backend/vector-search/#queries-too-long-for-a-url) |
-| `GET` | `/api/data/:slug/count` | RLS | [Querying](/docs/backend/api/#filtering) |
+| `GET` | `/api/data/:slug/count` | RLS | [Querying](/docs/backend/filtering/) |
 | `POST` | `/api/data/:slug/count` | RLS | The count, query parameters in the body — [Queries too long for a URL](/docs/backend/vector-search/#queries-too-long-for-a-url) |
 | `GET` | `/api/data/:slug/aggregate` | RLS | [REST API](/docs/backend/api/#rest-endpoints) |
 | `GET` | `/api/data/:slug/:id` | RLS | [REST API](/docs/backend/api/) |
@@ -25440,8 +25457,7 @@ storageTriggers: [
         path: "uploads/:uid/**",
         events: ["finalize"],
         handler: async ({ key, params, size, user }) => {
-            // `indexUpload` is a `queue()` declared in config/resources.ts
-            await indexUpload.enqueue({ key, uid: params.uid, size });
+            await indexUpload.enqueue({ key, uid: params.uid, size }); // a `queue()` in config/resources.ts
         }
     }
 ]
@@ -43828,135 +43844,9 @@ for something to be provisioned that nobody asked for.
 
 To see what the platform holds for a project against what its code declares,
 and to remove a provisioned database the code no longer names, see
-`rebase cloud resources` below.
+[`rebase cloud resources`](/docs/cli/cloud#resources).
 
-#### `rebase cloud`
-
-Everything to do with Rebase Cloud, which is in private beta. See the
-[Rebase Cloud guide](/docs/deployment/cloud/) for what it is and what the beta
-does not include.
-
-Every group answers `--help`, and `--help` never runs the command. Most commands
-act on the linked project in `.rebase/cloud.json`; `--project <id>` operates on
-one without linking.
-
-Three options apply everywhere: `--json` for machine-readable output (also the
-default when piped, or with `REBASE_JSON=1`), `--url <origin>` to target a
-specific control plane (or `REBASE_CLOUD_URL`), and `--project, -p <id>`.
-
-##### Auth
-
-```bash
-rebase cloud login      # sign in to the control plane
-rebase cloud logout     # sign out
-rebase cloud whoami     # the current session, or what REBASE_TOKEN may do
-rebase cloud tokens create --can deploy,logs   # a token for CI, shown once
-```
-
-##### Project link
-
-```bash
-rebase cloud link         # link this directory to a cloud project
-rebase cloud link [url]   # or straight at a backend: no control plane, no login, and the rest of the family refuses until you unlink
-rebase cloud unlink       # remove the link
-rebase cloud use [org]    # select the active organization
-rebase cloud open         # open the dashboard in a browser
-```
-
-##### Projects
-
-```bash
-rebase cloud projects list
-rebase cloud projects create [--link]
-rebase cloud projects info [id]
-rebase cloud projects delete [id]
-```
-
-##### Deploy and observe
-
-```bash
-rebase cloud deploy [app] [--source .]   # deploy an app and stream build logs
-rebase cloud logs [--runtime] [-f]       # build logs, or the running process's
-rebase cloud deployments list [--limit N|--all]
-rebase cloud rollback [id] [-y]          # back to a successful deploy
-rebase cloud cancel [-y]                 # cancel the in-flight build
-rebase cloud start | stop | restart [-y] # stop and restart need -y
-rebase cloud status                      # one-glance project status
-rebase cloud metrics                     # live CPU / memory / disk
-rebase cloud debug [health|logs|…]       # diagnose a deployment, read-only
-```
-
-`deploy` with no app name deploys the backend. A backend bundle
-deploy also uploads the project's source — what git tracks, never a `.env` — so a
-platform upgrade can rebuild it; `--no-source` skips that once, and `cloud settings set
---platform-rebuilds off` stops it and deletes the stored copy. `--allow-downgrade` deploys an older release.
-
-##### Config
-
-```bash
-rebase cloud env list | set | unset | reveal | pull
-rebase cloud domains list | add <domain> | verify [domain] | remove <domain>
-rebase cloud extensions list | enable | disable
-rebase cloud settings show | set        # name, branch, repo, subdomain, rebuilds
-```
-
-##### Organizations
-
-```bash
-rebase cloud orgs list | create | members
-```
-
-##### Databases
-
-```bash
-rebase cloud db list | create | info | connect | test
-rebase cloud db backup list | create | restore | status | download
-rebase cloud db pitr status | restore | cutover | discard
-```
-
-`db connect` opens a local port that *is* the managed database (no public
-endpoint) until Ctrl-C; `--reveal` adds the password. Owner or admin only.
-
-##### Resources
-
-What the platform holds for the project, against what its code declares.
-
-```bash
-rebase cloud resources                       # each database and bucket: declared? provisioned?
-rebase cloud resources prune database <key>  # remove one the code no longer declares
-```
-
-A deploy never removes a provisioned database when its declaration goes — that
-would be data deleted by a push. It keeps, binds and bills it until somebody
-prunes it by name.
-
-##### Compute
-
-What the project reserves, and what that costs.
-
-```bash
-rebase cloud compute            # the current reservation and its monthly cost
-rebase cloud compute set        # change it
-```
-
-`compute set` takes `--cpu`, `--memory`, `--replicas`, `--spot`,
-`--scale-to-zero`, `--db-instances`, `--db-cpu`, `--db-memory`,
-`--storage`, `--autoscale-max`, `--autoscale-cpu-target` and `--no-autoscale`.
-There are no plan tiers: everything is priced per resource. See
-[Rebase Cloud](/docs/deployment/cloud/).
-
-##### Storage, webhooks, clusters and billing
-
-```bash
-rebase cloud storage             # list storage buckets
-rebase cloud storage create      # provision platform-managed storage
-rebase cloud storage attach      # attach your own S3-compatible bucket
-rebase cloud webhooks list | create | delete
-rebase cloud clusters list | add | verify   # the clusters tenants run on; `add` registers one from a kubeconfig
-rebase cloud billing             # the billing account and card on file
-rebase cloud billing setup       # attach a card, one-time, opens a browser
-rebase cloud billing checkout    # a Stripe session for one project
-```
+`rebase cloud` — every command for Rebase Cloud: auth, project link, deploys, config, databases, resources, compute and more — has [its own page](/docs/cli/cloud).
 
 #### `rebase generate-sdk`
 
@@ -44073,6 +43963,134 @@ the other two change it. If you never ran `init`, nothing was ever collected.
 - **[Schema Generation](/docs/cli/schema/#production-workflow)** — The migration workflow, from collection edit to production
 - **[Schema as Code](/docs/architecture/schema-as-code)** — How schema generation works
 - **[Quickstart](/docs/getting-started/quickstart)** — Get started
+
+## rebase cloud
+
+Everything to do with Rebase Cloud, which is in private beta. See the
+[Rebase Cloud guide](/docs/deployment/cloud/) for what it is and what the beta
+does not include.
+
+Every group answers `--help`, and `--help` never runs the command. Most commands
+act on the linked project in `.rebase/cloud.json`; `--project <id>` operates on
+one without linking.
+
+Three options apply everywhere: `--json` for machine-readable output (also the
+default when piped, or with `REBASE_JSON=1`), `--url <origin>` to target a
+specific control plane (or `REBASE_CLOUD_URL`), and `--project, -p <id>`.
+
+### Auth
+
+```bash
+rebase cloud login      # sign in to the control plane
+rebase cloud logout     # sign out
+rebase cloud whoami     # the current session, or what REBASE_TOKEN may do
+rebase cloud tokens create --can deploy,logs   # a token for CI, shown once
+```
+
+### Project link
+
+```bash
+rebase cloud link         # link this directory to a cloud project
+rebase cloud link [url]   # or straight at a backend: no control plane, no login, and the rest of the family refuses until you unlink
+rebase cloud unlink       # remove the link
+rebase cloud use [org]    # select the active organization
+rebase cloud open         # open the dashboard in a browser
+```
+
+### Projects
+
+```bash
+rebase cloud projects list
+rebase cloud projects create [--link]
+rebase cloud projects info [id]
+rebase cloud projects delete [id]
+```
+
+### Deploy and observe
+
+```bash
+rebase cloud deploy [app] [--source .]   # deploy an app and stream build logs
+rebase cloud logs [--runtime] [-f]       # build logs, or the running process's
+rebase cloud deployments list [--limit N|--all]
+rebase cloud rollback [id] [-y]          # back to a successful deploy
+rebase cloud cancel [-y]                 # cancel the in-flight build
+rebase cloud start | stop | restart [-y] # stop and restart need -y
+rebase cloud status                      # one-glance project status
+rebase cloud metrics                     # live CPU / memory / disk
+rebase cloud debug [health|logs|…]       # diagnose a deployment, read-only
+```
+
+`deploy` with no app name deploys the backend. A backend bundle
+deploy also uploads the project's source — what git tracks, never a `.env` — so a
+platform upgrade can rebuild it; `--no-source` skips that once, and `cloud settings set
+--platform-rebuilds off` stops it and deletes the stored copy. `--allow-downgrade` deploys an older release.
+
+### Config
+
+```bash
+rebase cloud env list | set | unset | reveal | pull
+rebase cloud domains list | add <domain> | verify [domain] | remove <domain>
+rebase cloud extensions list | enable | disable
+rebase cloud settings show | set        # name, branch, repo, subdomain, rebuilds
+```
+
+### Organizations
+
+```bash
+rebase cloud orgs list | create | members
+```
+
+### Databases
+
+```bash
+rebase cloud db list | create | info | connect | test
+rebase cloud db backup list | create | restore | status | download
+rebase cloud db pitr status | restore | cutover | discard
+```
+
+`db connect` opens a local port that *is* the managed database (no public
+endpoint) until Ctrl-C; `--reveal` adds the password. Owner or admin only.
+
+### Resources
+
+What the platform holds for the project, against what its code declares.
+
+```bash
+rebase cloud resources                       # each database and bucket: declared? provisioned?
+rebase cloud resources prune database <key>  # remove one the code no longer declares
+```
+
+A deploy never removes a provisioned database when its declaration goes — that
+would be data deleted by a push. It keeps, binds and bills it until somebody
+prunes it by name.
+
+### Compute
+
+What the project reserves, and what that costs.
+
+```bash
+rebase cloud compute            # the current reservation and its monthly cost
+rebase cloud compute set        # change it
+```
+
+`compute set` takes `--cpu`, `--memory`, `--replicas`, `--spot`,
+`--scale-to-zero`, `--db-instances`, `--db-cpu`, `--db-memory`,
+`--storage`, `--autoscale-max`, `--autoscale-cpu-target` and `--no-autoscale`.
+There are no plan tiers: everything is priced per resource. See
+[Rebase Cloud](/docs/deployment/cloud/).
+
+### Storage, webhooks, clusters and billing
+
+```bash
+rebase cloud storage             # list storage buckets
+rebase cloud storage create      # provision platform-managed storage
+rebase cloud storage attach      # attach your own S3-compatible bucket
+rebase cloud webhooks list | create | delete
+rebase cloud clusters list | add | verify   # the clusters tenants run on; `add` registers one from a kubeconfig
+rebase cloud billing             # the billing account and card on file
+rebase cloud billing setup       # attach a card, one-time, opens a browser
+rebase cloud billing checkout    # a Stripe session for one project
+```
 
 ## Schema Generation
 
@@ -46446,7 +46464,7 @@ project. `rebase cloud tokens revoke <id> --yes` stops it at once.
 A project is priced from what it reserves, not from a tier. `compute` prints
 every dial and the control plane's own itemised quote for them. (`rebase cloud
 resources` is a different thing: the databases and buckets the code declares,
-and whether each is provisioned — see the [CLI reference](/docs/cli/#rebase-cloud).)
+and whether each is provisioned — see the [CLI reference](/docs/cli/cloud/).)
 
 ```bash
 rebase cloud compute
@@ -46925,7 +46943,7 @@ source key (`source="(default)"` in a project that declares no data sources). A
 healthy pool keeps it near zero. A tail that
 grows with traffic means requests are queueing for connections — most often
 held by write callbacks that await something slow; see
-[A callback holds a connection](/docs/collections/callbacks/#a-callback-holds-a-connection).
+[A callback holds a connection](/docs/collections/context-data-api/#a-callback-holds-a-connection).
 
 ### Security headers
 

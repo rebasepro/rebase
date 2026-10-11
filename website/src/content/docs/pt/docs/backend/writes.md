@@ -1,5 +1,5 @@
 ---
-sourceHash: c633bea42c0d4aa9
+sourceHash: 2969a9944ef12fb9
 title: Escrita via REST
 sidebar_label: Escrita via REST
 description: Chaves de idempotência, escritas condicionais com ETag e If-Match, operações de campo, upserts em chave natural, return=minimal e lotes entre coleções.
@@ -266,7 +266,7 @@ retém seus bloqueios durante toda a transação. Os callbacks de cada operaçã
 rodam dentro dela, um após o outro, de modo que um hook lento é pago uma vez por linha
 com a transação aberta: 100 linhas cujo `beforeSave` aguarda 50 ms seguram uma conexão,
 e os bloqueios de todas as linhas escritas até então, por 5,3 s. O mesmo vale para uma
-escrita em `/bulk`. Veja [Um callback segura uma conexão](/docs/collections/callbacks/#a-callback-holds-a-connection). Um driver incapaz de tornar o lote atômico
+escrita em `/bulk`. Veja [Um callback segura uma conexão](/docs/collections/context-data-api/#a-callback-holds-a-connection). Um driver incapaz de tornar o lote atômico
 responde com `BATCH_UNSUPPORTED` em vez de recorrer a um loop de escritas individuais — o que
 não ofereceria nem a atomicidade nem o round trip único buscados ao usar um lote.
 

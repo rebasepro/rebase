@@ -1,5 +1,5 @@
 ---
-sourceHash: bd71f5042541d9e5
+sourceHash: e0ea7eaf72bbb3c5
 title: Codes d'erreur
 sidebar_label: Codes d'erreur
 description: Tous les codes d'erreur qu'un backend Rebase peut renvoyer, avec leur statut HTTP, leur signification et la marche à suivre — ainsi que l'enveloppe de réponse, X-Request-ID et les règles applicables aux détails.
@@ -201,7 +201,7 @@ Envoyer le vôtre permet à une trace de traverser les sauts réseau : une passe
 | `TENANT_IMMUTABLE` | 400 | Une écriture déplacerait une ligne d'un tenant à un autre. Une ligne ne peut pas changer de tenant. `details.violations` indique le champ en cause. | Créez la ligne dans l'autre tenant et supprimez la ligne actuelle, ou écrivez avec un rôle présent dans `tenant.bypassRoles`. |
 | `TENANT_MISMATCH` | 400 | L'écriture cible un tenant auquel cet appelant n'appartient pas ; la base de données la rejetterait également. | Écrivez dans un tenant auquel l'appelant est rattaché, ou authentifiez-vous en tant que membre de celui-ci. |
 | `TENANT_REQUIRED` | 400 | La collection est compartimentée par tenant et celui-ci ne peut être déduit : la requête n'en fournit aucun ou l'appelant appartient à plusieurs d'entre eux. | Précisez explicitement le champ du tenant, ou authentifiez-vous sous une identité rattachée à un seul tenant. |
-| `TRANSACTION_ABORTED` | 500 | Une instruction exécutée dans la transaction de l'écriture a échoué et un callback a intercepté l'erreur. Postgres avait déjà interrompu la transaction : l'écriture a donc été annulée et rien n'a été enregistré. Seule une création, mise à jour ou suppression `context.data` que la base de données a refusée est annulée d'elle-même et peut être interceptée sans risque. | Laissez l'échec se propager, ou vérifiez la condition avant d'exécuter l'instruction. Voir [Sémantique des transactions](/docs/collections/callbacks/#transaction-semantics). |
+| `TRANSACTION_ABORTED` | 500 | Une instruction exécutée dans la transaction de l'écriture a échoué et un callback a intercepté l'erreur. Postgres avait déjà interrompu la transaction : l'écriture a donc été annulée et rien n'a été enregistré. Seule une création, mise à jour ou suppression `context.data` que la base de données a refusée est annulée d'elle-même et peut être interceptée sans risque. | Laissez l'échec se propager, ou vérifiez la condition avant d'exécuter l'instruction. Voir [Sémantique des transactions](/docs/collections/context-data-api/#transaction-semantics). |
 | `UNKNOWN_FIELD` | 400 | `?fields=` cible un champ inexistant dans la collection. | Vérifiez l'orthographe ; le message énumère les champs valides. |
 | `UNKNOWN_AGGREGATE_FIELD` | 400 | Un agrégat ou un `groupBy` mentionne un champ inexistant dans la collection. | Vérifiez l'orthographe ; le message énumère les champs valides. |
 | `UNKNOWN_FILTER_FIELD` | 400 | Le filtre indique un champ inexistant dans cette collection (ou dans la cible d'une relation). | Vérifiez l'orthographe ; le message énumère les champs valides. |

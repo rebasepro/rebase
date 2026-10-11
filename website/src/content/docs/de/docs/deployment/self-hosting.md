@@ -1,5 +1,5 @@
 ---
-sourceHash: 1789995e7e1e6bf9
+sourceHash: a8d023c7c5248446
 title: Self-Hosting
 sidebar_label: Self-Hosting
 description: Führen Sie Rebase überall mit dem offiziellen Runtime-Image und Ihrem Projekt-Bundle aus – Docker Compose, Fly, Railway oder auf einem einfachen VPS.
@@ -380,7 +380,7 @@ Datenquelle (`source="(default)"` in einem Projekt, das keine Datenquellen dekla
 gesunder Pool hält ihn nahe null. Ein Tail, der
 mit dem Traffic wächst, bedeutet, dass Anfragen auf Verbindungen warten — meist
 gehalten von Schreib-Callbacks, die etwas Langsames abwarten; siehe
-[Ein Callback hält eine Verbindung](/docs/collections/callbacks/#a-callback-holds-a-connection).
+[Ein Callback hält eine Verbindung](/docs/collections/context-data-api/#a-callback-holds-a-connection).
 
 ## Sicherheits-Header
 

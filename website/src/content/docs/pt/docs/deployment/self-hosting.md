@@ -1,5 +1,5 @@
 ---
-sourceHash: 1789995e7e1e6bf9
+sourceHash: a8d023c7c5248446
 title: Auto-Hospedagem
 sidebar_label: Auto-Hospedagem
 description: Execute o Rebase em qualquer lugar com a imagem de runtime oficial e o bundle do seu projeto — Docker Compose, Fly, Railway ou uma VPS comum.
@@ -259,7 +259,7 @@ de dados (`source="(default)"` em um projeto que não declara fontes de dados). 
 pool saudável o mantém perto de zero. Uma cauda que
 cresce com o tráfego significa requisições na fila por conexões — na maioria das vezes
 seguradas por callbacks de escrita que aguardam algo lento; veja
-[Um callback segura uma conexão](/docs/collections/callbacks/#a-callback-holds-a-connection).
+[Um callback segura uma conexão](/docs/collections/context-data-api/#a-callback-holds-a-connection).
 
 ## Cabeçalhos de segurança
 

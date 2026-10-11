@@ -1,5 +1,5 @@
 ---
-sourceHash: 6d4b5fe12fe09451
+sourceHash: 83b3a13a151d0cd7
 title: Index des points de terminaison
 sidebar_label: Index des points de terminaison
 description: Chaque route HTTP montée par un backend Rebase — données, auth, stockage, admin, méta — avec son contrôle d'accès et la page qui l'explique.
@@ -36,10 +36,10 @@ liste fixe. `:slug` est le `slug` d'une collection.
 | Méthode | Chemin | Contrôle | En savoir plus |
 |---|---|---|---|
 | `GET` | `/api/data/collections` | session | [API REST](/docs/backend/api/) |
-| `GET` | `/api/data/:slug` | RLS | [Requêtage](/docs/backend/api/#filtering) |
+| `GET` | `/api/data/:slug` | RLS | [Requêtage](/docs/backend/filtering/) |
 | `POST` | `/api/data/:slug` | RLS | [API REST](/docs/backend/api/) |
 | `POST` | `/api/data/:slug/query` | RLS | La liste, paramètres de requête dans le corps — [Requêtes trop longues pour une URL](/docs/backend/vector-search/#queries-too-long-for-a-url) |
-| `GET` | `/api/data/:slug/count` | RLS | [Requêtage](/docs/backend/api/#filtering) |
+| `GET` | `/api/data/:slug/count` | RLS | [Requêtage](/docs/backend/filtering/) |
 | `POST` | `/api/data/:slug/count` | RLS | Le comptage, paramètres de requête dans le corps — [Requêtes trop longues pour une URL](/docs/backend/vector-search/#queries-too-long-for-a-url) |
 | `GET` | `/api/data/:slug/aggregate` | RLS | [API REST](/docs/backend/api/#rest-endpoints) |
 | `GET` | `/api/data/:slug/:id` | RLS | [API REST](/docs/backend/api/) |

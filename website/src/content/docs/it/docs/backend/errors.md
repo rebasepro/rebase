@@ -1,5 +1,5 @@
 ---
-sourceHash: bd71f5042541d9e5
+sourceHash: e0ea7eaf72bbb3c5
 title: Codici di errore
 sidebar_label: Codici di errore
 description: Tutti i codici di errore che un backend Rebase può restituire, con il rispettivo stato HTTP, il significato e come gestirli — oltre all'envelope di risposta, X-Request-ID e le regole di details.
@@ -227,7 +227,7 @@ non dare per scontato che l'ID inviato sia quello ottenuto. Leggi l'header della
 | `TENANT_IMMUTABLE` | 400 | Una scrittura sposterebbe una riga da un tenant a un altro. Una riga non può cambiare tenant. `details.violations` indica il campo. | Crea la riga nell'altro tenant ed elimina questa, oppure esegui la scrittura con un ruolo presente in `tenant.bypassRoles`. |
 | `TENANT_MISMATCH` | 400 | La scrittura specifica un tenant a cui questo chiamante non appartiene; anche il database la rifiuterebbe. | Scrivi in un tenant di cui il chiamante fa parte, oppure autenticati con un'identità che vi appartenga. |
 | `TENANT_REQUIRED` | 400 | La collection è limitata a un tenant (tenant-scoped) e il tenant non può essere dedotto: la richiesta non ne specifica alcuno, oppure il chiamante appartiene a più tenant. | Invia il campo tenant in modo esplicito, oppure autenticati come chiamante appartenente a un solo tenant. |
-| `TRANSACTION_ABORTED` | 500 | Un'istruzione sulla transazione della scrittura è fallita e un callback ha intercettato l'errore. Postgres aveva già interrotto la transazione, quindi la scrittura è stata annullata e non è stato memorizzato nulla. Solo una `context.data` create, update o delete rifiutata dal database viene annullata da sola ed è sicuro intercettarla. | Lascia che l'errore venga propagato, oppure effettua un controllo prima di eseguire l'istruzione. Consulta [Semantica delle transazioni](/docs/collections/callbacks/#transaction-semantics). |
+| `TRANSACTION_ABORTED` | 500 | Un'istruzione sulla transazione della scrittura è fallita e un callback ha intercettato l'errore. Postgres aveva già interrotto la transazione, quindi la scrittura è stata annullata e non è stato memorizzato nulla. Solo una `context.data` create, update o delete rifiutata dal database viene annullata da sola ed è sicuro intercettarla. | Lascia che l'errore venga propagato, oppure effettua un controllo prima di eseguire l'istruzione. Consulta [Semantica delle transazioni](/docs/collections/context-data-api/#transaction-semantics). |
 | `UNKNOWN_FIELD` | 400 | `?fields=` specifica un campo non presente nella collection. | Verifica la correttezza del nome; il messaggio elenca i campi validi. |
 | `UNKNOWN_AGGREGATE_FIELD` | 400 | Un aggregato o `groupBy` specifica un campo non presente nella collection. | Verifica la correttezza del nome; il messaggio elenca i campi validi. |
 | `UNKNOWN_FILTER_FIELD` | 400 | Il filtro specifica un campo non presente in questa collection — o nella destinazione di una relazione. | Verifica la correttezza del nome; il messaggio elenca i campi validi. |

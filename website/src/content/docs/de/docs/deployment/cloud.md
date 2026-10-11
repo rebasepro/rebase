@@ -1,5 +1,5 @@
 ---
-sourceHash: d2f6e11d9e4f2f6e
+sourceHash: 852d6c98d8475f3b
 title: Rebase Cloud
 sidebar_label: Rebase Cloud
 description: Rebase Cloud ist dasselbe Rebase, für Sie betrieben. Was es ist, wie ein Projekt verknüpft und bereitgestellt wird und was die Private Beta noch nicht enthält.
@@ -155,7 +155,7 @@ Zwei Dinge bleiben bei einer angemeldeten Person:
 
 ## Compute und die Kosten
 
-Der Preis eines Projekts richtet sich nach den reservierten Ressourcen, nicht nach einem Tarif. `compute` gibt jeden Einstellwert und das aufgeschlüsselte Preisangebot der Control Plane dafür aus. (`rebase cloud resources` ist etwas anderes: die Datenbanken und Buckets, die der Code deklariert, und ob jede davon bereitgestellt ist – siehe [CLI-Referenz](/docs/cli/#rebase-cloud).)
+Der Preis eines Projekts richtet sich nach den reservierten Ressourcen, nicht nach einem Tarif. `compute` gibt jeden Einstellwert und das aufgeschlüsselte Preisangebot der Control Plane dafür aus. (`rebase cloud resources` ist etwas anderes: die Datenbanken und Buckets, die der Code deklariert, und ob jede davon bereitgestellt ist – siehe [CLI-Referenz](/docs/cli/cloud/).)
 
 ```bash
 rebase cloud compute

@@ -35,10 +35,10 @@ list. `:slug` is a collection's `slug`.
 | Method | Path | Gate | More |
 |---|---|---|---|
 | `GET` | `/api/data/collections` | session | [REST API](/docs/backend/api/) |
-| `GET` | `/api/data/:slug` | RLS | [Querying](/docs/backend/api/#filtering) |
+| `GET` | `/api/data/:slug` | RLS | [Querying](/docs/backend/filtering/) |
 | `POST` | `/api/data/:slug` | RLS | [REST API](/docs/backend/api/) |
 | `POST` | `/api/data/:slug/query` | RLS | The listing, query parameters in the body — [Queries too long for a URL](/docs/backend/vector-search/#queries-too-long-for-a-url) |
-| `GET` | `/api/data/:slug/count` | RLS | [Querying](/docs/backend/api/#filtering) |
+| `GET` | `/api/data/:slug/count` | RLS | [Querying](/docs/backend/filtering/) |
 | `POST` | `/api/data/:slug/count` | RLS | The count, query parameters in the body — [Queries too long for a URL](/docs/backend/vector-search/#queries-too-long-for-a-url) |
 | `GET` | `/api/data/:slug/aggregate` | RLS | [REST API](/docs/backend/api/#rest-endpoints) |
 | `GET` | `/api/data/:slug/:id` | RLS | [REST API](/docs/backend/api/) |

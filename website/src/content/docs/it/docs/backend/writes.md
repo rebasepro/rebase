@@ -1,5 +1,5 @@
 ---
-sourceHash: c633bea42c0d4aa9
+sourceHash: 2969a9944ef12fb9
 title: Scrittura tramite REST
 sidebar_label: Scrittura tramite REST
 description: Chiavi di idempotenza, scritture condizionali con ETag e If-Match, operazioni sui campi, upsert su chiave naturale, return=minimal e batch tra collezioni.
@@ -282,7 +282,7 @@ errore di battitura all'operazione 40 comporterebbe altrimenti il rollback delle
 
 Il limite massimo di operazioni è lo stesso di una scrittura bulk (1000 per
 impostazione predefinita), poiché un batch mantiene attivi i propri lock per
-l'intera durata della transazione. I callback di ogni operazione vengono eseguiti al suo interno, uno dopo l'altro, quindi un hook lento si paga una volta per riga con la transazione aperta: 100 righe il cui `beforeSave` attende 50 ms tengono una connessione, e i lock di ogni riga scritta finora, per 5,3 s. Lo stesso vale per una scrittura `/bulk`. Vedi [Un callback tiene una connessione](/docs/collections/callbacks/#a-callback-holds-a-connection). Un driver che non può rendere il batch atomico
+l'intera durata della transazione. I callback di ogni operazione vengono eseguiti al suo interno, uno dopo l'altro, quindi un hook lento si paga una volta per riga con la transazione aperta: 100 righe il cui `beforeSave` attende 50 ms tengono una connessione, e i lock di ogni riga scritta finora, per 5,3 s. Lo stesso vale per una scrittura `/bulk`. Vedi [Un callback tiene una connessione](/docs/collections/context-data-api/#a-callback-holds-a-connection). Un driver che non può rendere il batch atomico
 risponde con `BATCH_UNSUPPORTED` invece di ricorrere a un ciclo di scritture singole
 — il che non garantirebbe né l'atomicità né il singolo round-trip per cui si
 utilizza un batch.

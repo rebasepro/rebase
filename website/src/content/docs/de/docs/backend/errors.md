@@ -1,5 +1,5 @@
 ---
-sourceHash: bd71f5042541d9e5
+sourceHash: e0ea7eaf72bbb3c5
 title: Fehlercodes
 sidebar_label: Fehlercodes
 description: Jeder Fehlercode, den ein Rebase-Backend zurückgeben kann, mit seinem HTTP-Status, seiner Bedeutung und Lösungsansätzen – plus Response-Envelope, X-Request-ID und den Details-Regeln.
@@ -202,7 +202,7 @@ Einen eigenen Header zu senden stellt sicher, dass ein Trace über Hops hinweg e
 | `TENANT_IMMUTABLE` | 400 | Ein Schreibvorgang würde eine Zeile von einem Mandanten zu einem anderen verschieben. Eine Zeile kann den Mandanten nicht wechseln. `details.violations` nennt das Feld. | Erstellen Sie die Zeile im anderen Mandanten und löschen Sie diese, oder schreiben Sie mit einer Rolle in `tenant.bypassRoles`. |
 | `TENANT_MISMATCH` | 400 | Der Schreibvorgang gibt einen Mandanten an, zu dem dieser Aufrufer nicht gehört; die Datenbank würde ihn ebenfalls ablehnen. | Schreiben Sie in einen Mandanten, zu dem der Aufrufer gehört, oder authentifizieren Sie sich als jemand, der dazu gehört. |
 | `TENANT_REQUIRED` | 400 | Die Collection ist mandantenbezogen und der Mandant kann nicht abgeleitet werden: Der Request enthält keinen, oder der Aufrufer gehört zu mehreren. | Senden Sie das Mandantenfeld explizit oder authentifizieren Sie sich als Aufrufer, der genau einem Mandanten angehört. |
-| `TRANSACTION_ABORTED` | 500 | Eine Anweisung auf der Transaktion des Schreibvorgangs ist fehlgeschlagen, und ein Callback hat den Fehler abgefangen. Postgres hatte die Transaktion bereits abgebrochen, daher wurde der Schreibvorgang zurückgerollt und nichts gespeichert. Nur ein `context.data`-Create, -Update oder -Delete, das die Datenbank abgelehnt hat, wird für sich allein rückgängig gemacht und darf abgefangen werden. | Lassen Sie den Fehler werfen, oder prüfen Sie vor dem Ausführen der Anweisung. Siehe [Transaktionssemantik](/docs/collections/callbacks/#transaction-semantics). |
+| `TRANSACTION_ABORTED` | 500 | Eine Anweisung auf der Transaktion des Schreibvorgangs ist fehlgeschlagen, und ein Callback hat den Fehler abgefangen. Postgres hatte die Transaktion bereits abgebrochen, daher wurde der Schreibvorgang zurückgerollt und nichts gespeichert. Nur ein `context.data`-Create, -Update oder -Delete, das die Datenbank abgelehnt hat, wird für sich allein rückgängig gemacht und darf abgefangen werden. | Lassen Sie den Fehler werfen, oder prüfen Sie vor dem Ausführen der Anweisung. Siehe [Transaktionssemantik](/docs/collections/context-data-api/#transaction-semantics). |
 | `UNKNOWN_FIELD` | 400 | `?fields=` benennt ein Feld, das die Collection nicht besitzt. | Überprüfen Sie die Schreibweise; die Nachricht listet die gültigen Felder auf. |
 | `UNKNOWN_AGGREGATE_FIELD` | 400 | Ein Aggregat oder `groupBy` benennt ein Feld, das die Collection nicht besitzt. | Überprüfen Sie die Schreibweise; die Nachricht listet die gültigen Felder auf. |
 | `UNKNOWN_FILTER_FIELD` | 400 | Der Filter benennt ein Feld, das diese Collection – oder das Ziel einer Relation – nicht besitzt. | Überprüfen Sie die Schreibweise; die Nachricht listet die gültigen Felder auf. |

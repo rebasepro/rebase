@@ -73,7 +73,7 @@ const PARAM_DOC_GLOBS = [
  *
  * Narrow on purpose. `GET /api/data/products?price=gt.100` is a **column**
  * filter and correct — the parser falls through to a field filter for any key it
- * does not reserve (`query-parser.ts`), so the operator tables in `backend/api.md`
+ * does not reserve (`query-parser.ts`), so the operator tables in `backend/filtering.md`
  * (`| `gt` | Greater than | `?price=gt.100` |`) must not be flagged. What is
  * never correct is a row saying "the parameter is called `filter`" when the
  * parser reserves no such key: `?filter=` was read as a filter on a column named

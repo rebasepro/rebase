@@ -1,5 +1,5 @@
 ---
-sourceHash: 6d4b5fe12fe09451
+sourceHash: 83b3a13a151d0cd7
 title: Endpunkt-Index
 sidebar_label: Endpunkt-Index
 description: Jede HTTP-Route, die ein Rebase-Backend mountet – Daten, Authentifizierung, Speicher, Admin, Meta – mit dem jeweiligen Gate und der Seite, die sie erklärt.
@@ -36,10 +36,10 @@ Liste. `:slug` ist der `slug` einer Collection.
 | Methode | Pfad | Gate | Mehr |
 |---|---|---|---|
 | `GET` | `/api/data/collections` | session | [REST API](/docs/backend/api/) |
-| `GET` | `/api/data/:slug` | RLS | [Abfragen](/docs/backend/api/#filtering) |
+| `GET` | `/api/data/:slug` | RLS | [Abfragen](/docs/backend/filtering/) |
 | `POST` | `/api/data/:slug` | RLS | [REST API](/docs/backend/api/) |
 | `POST` | `/api/data/:slug/query` | RLS | Die Auflistung, Query-Parameter im Body — [Abfragen, die für eine URL zu lang sind](/docs/backend/vector-search/#queries-too-long-for-a-url) |
-| `GET` | `/api/data/:slug/count` | RLS | [Abfragen](/docs/backend/api/#filtering) |
+| `GET` | `/api/data/:slug/count` | RLS | [Abfragen](/docs/backend/filtering/) |
 | `POST` | `/api/data/:slug/count` | RLS | Die Zählung, Query-Parameter im Body — [Abfragen, die für eine URL zu lang sind](/docs/backend/vector-search/#queries-too-long-for-a-url) |
 | `GET` | `/api/data/:slug/aggregate` | RLS | [REST API](/docs/backend/api/#rest-endpoints) |
 | `GET` | `/api/data/:slug/:id` | RLS | [REST API](/docs/backend/api/) |

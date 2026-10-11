@@ -1,5 +1,5 @@
 ---
-sourceHash: bd71f5042541d9e5
+sourceHash: e0ea7eaf72bbb3c5
 title: Códigos de erro
 sidebar_label: Códigos de erro
 description: Todos os códigos de erro que um backend Rebase pode retornar, com seu status HTTP, significado e o que fazer a respeito — além do envelope de resposta, X-Request-ID e as regras de details.
@@ -229,7 +229,7 @@ ID recebido. Leia o cabeçalho de resposta.
 | `TENANT_IMMUTABLE` | 400 | Uma escrita moveria uma linha de um tenant para outro. Uma linha não pode mudar de tenant. `details.violations` informa o campo. | Crie a linha no outro tenant e exclua esta, ou realize a escrita com uma role em `tenant.bypassRoles`. |
 | `TENANT_MISMATCH` | 400 | A escrita especifica um tenant ao qual este chamador não pertence; o banco de dados também a recusaria. | Grave em um tenant ao qual o chamador pertença ou autentique-se como um usuário desse tenant. |
 | `TENANT_REQUIRED` | 400 | A collection tem escopo por tenant e o tenant não pode ser inferido: a requisição não contém nenhum ou o chamador pertence a vários. | Envie o campo do tenant explicitamente ou autentique-se como um chamador que pertença a exatamente um. |
-| `TRANSACTION_ABORTED` | 500 | Uma instrução na transação da escrita falhou e um callback capturou o erro. O Postgres já havia abortado a transação, então a escrita foi revertida e nada foi armazenado. Só um create, update ou delete de `context.data` que o banco de dados recusou é desfeito por conta própria e pode ser capturado com segurança. | Deixe a falha ser lançada, ou verifique antes de executar a instrução. Consulte [Semântica de Transações](/docs/collections/callbacks/#transaction-semantics). |
+| `TRANSACTION_ABORTED` | 500 | Uma instrução na transação da escrita falhou e um callback capturou o erro. O Postgres já havia abortado a transação, então a escrita foi revertida e nada foi armazenado. Só um create, update ou delete de `context.data` que o banco de dados recusou é desfeito por conta própria e pode ser capturado com segurança. | Deixe a falha ser lançada, ou verifique antes de executar a instrução. Consulte [Semântica de Transações](/docs/collections/context-data-api/#transaction-semantics). |
 | `UNKNOWN_FIELD` | 400 | `?fields=` especifica um campo que a collection não possui. | Verifique a ortografia; a mensagem lista os campos válidos. |
 | `UNKNOWN_AGGREGATE_FIELD` | 400 | Uma agregação ou `groupBy` especifica um campo que a collection não possui. | Verifique a ortografia; a mensagem lista os campos válidos. |
 | `UNKNOWN_FILTER_FIELD` | 400 | O filtro especifica um campo que esta collection — ou o destino de uma relação — não possui. | Verifique a ortografia; a mensagem lista os campos válidos. |

@@ -1,5 +1,5 @@
 ---
-sourceHash: bd71f5042541d9e5
+sourceHash: e0ea7eaf72bbb3c5
 title: Códigos de error
 sidebar_label: Códigos de error
 description: Todos los códigos de error que un backend de Rebase puede devolver, con su estado HTTP, qué significan y qué hacer al respecto; además del envelope de respuesta, X-Request-ID y las reglas de details.
@@ -231,7 +231,7 @@ que enviaste es el ID que obtuviste. Lee la cabecera de respuesta.
 | `TENANT_IMMUTABLE` | 400 | Una escritura movería una fila de un tenant a otro. Una fila no puede cambiar de tenant. `details.violations` nombra el campo. | Crea la fila en el otro tenant y elimina esta, o escribe con un rol en `tenant.bypassRoles`. |
 | `TENANT_MISMATCH` | 400 | La escritura especifica un tenant al que este cliente no pertenece; la base de datos también la rechazaría. | Escribe en un tenant al que pertenezca el cliente, o autentícate como alguien que pertenezca a él. |
 | `TENANT_REQUIRED` | 400 | La colección está restringida por tenant y este no puede inferirse: la solicitud no incluye ninguno o el cliente pertenece a varios. | Envía el campo del tenant explícitamente, o autentícate como un cliente que pertenezca exactamente a uno. |
-| `TRANSACTION_ABORTED` | 500 | Una sentencia en la transacción de la escritura falló y un callback capturó el error. Postgres ya había abortado la transacción, así que la escritura se revirtió y no se almacenó nada. Solo una creación, actualización o eliminación de `context.data` que la base de datos rechazó se deshace por sí sola y es segura de capturar. | Deja que el fallo se lance, o haz la comprobación antes de ejecutar la sentencia. Consulta [Semántica de transacciones](/docs/collections/callbacks/#transaction-semantics). |
+| `TRANSACTION_ABORTED` | 500 | Una sentencia en la transacción de la escritura falló y un callback capturó el error. Postgres ya había abortado la transacción, así que la escritura se revirtió y no se almacenó nada. Solo una creación, actualización o eliminación de `context.data` que la base de datos rechazó se deshace por sí sola y es segura de capturar. | Deja que el fallo se lance, o haz la comprobación antes de ejecutar la sentencia. Consulta [Semántica de transacciones](/docs/collections/context-data-api/#transaction-semantics). |
 | `UNKNOWN_FIELD` | 400 | `?fields=` nombra un campo que la colección no tiene. | Comprueba la ortografía; el mensaje lista los campos válidos. |
 | `UNKNOWN_AGGREGATE_FIELD` | 400 | Un agregado o `groupBy` nombra un campo que la colección no tiene. | Comprueba la ortografía; el mensaje lista los campos válidos. |
 | `UNKNOWN_FILTER_FIELD` | 400 | El filtro nombra un campo que esta colección —o el destino de una relación— no tiene. | Comprueba la ortografía; el mensaje lista los campos válidos. |

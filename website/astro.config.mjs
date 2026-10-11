@@ -140,6 +140,7 @@ export default defineConfig({
                     items: [
                         { label: "Headless setup", slug: "docs/getting-started/headless" },
                         { label: "REST API", slug: "docs/backend/api" },
+                        { label: "REST API filtering", slug: "docs/backend/filtering" },
                         { label: "Writing over REST", slug: "docs/backend/writes" },
                         { label: "Typed SDK", slug: "docs/sdk" },
                         { label: "Security Rules (RLS)", slug: "docs/collections/security-rules" },
@@ -158,6 +159,7 @@ export default defineConfig({
                         { label: "Relations", slug: "docs/collections/relations" },
                         { label: "Soft delete", slug: "docs/collections/soft-delete" },
                         { label: "Entity Callbacks", slug: "docs/collections/callbacks" },
+                        { label: "The context.data API", slug: "docs/collections/context-data-api" },
                         { label: "Security Rules (RLS)", slug: "docs/collections/security-rules" },
                         { label: "Field access", slug: "docs/collections/field-access" }
                     ]
@@ -169,6 +171,7 @@ export default defineConfig({
                         { label: "Backend Setup", slug: "docs/backend" },
                         { label: "Extending the server", slug: "docs/backend/extending" },
                         { label: "REST API", slug: "docs/backend/api" },
+                        { label: "REST API filtering", slug: "docs/backend/filtering" },
                         { label: "Writing over REST", slug: "docs/backend/writes" },
                         { label: "API keys", slug: "docs/backend/api-keys" },
                         { label: "Error codes", slug: "docs/backend/errors" },
@@ -277,6 +280,7 @@ export default defineConfig({
                     collapsed: true,
                     items: [
                         { label: "CLI Commands", slug: "docs/cli" },
+                        { label: "rebase cloud", slug: "docs/cli/cloud" },
                         { label: "Schema Generation", slug: "docs/cli/schema" },
                         { label: "rls-check (RLS audit)", slug: "docs/rls-check" }
                     ]

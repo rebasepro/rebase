@@ -1,5 +1,5 @@
 ---
-sourceHash: c633bea42c0d4aa9
+sourceHash: 2969a9944ef12fb9
 title: Escritura a través de REST
 sidebar_label: Escritura a través de REST
 description: Claves de idempotencia, escrituras condicionales con ETag e If-Match, operaciones de campo, upserts sobre clave natural, return=minimal y lotes entre colecciones.
@@ -163,6 +163,6 @@ Esta es la razón por la que existe este endpoint en lugar de ser un bucle: la c
 
 La estructura, las colecciones desconocidas, los campos desconocidos, las restricciones de valores, las operaciones de campo, los objetivos de conflicto y la accesibilidad de `$ref` se determinan antes de que se inicie la transacción. Un lote es de tipo todo o nada, y encontrar un error tipográfico en la operación 40 costaría, de lo contrario, la reversión de las 39 escrituras anteriores.
 
-Está limitado al mismo número de operaciones que una escritura masiva (1000 por defecto), ya que un lote mantiene sus bloqueos durante toda la transacción. Los callbacks de cada operación se ejecutan dentro de ella, uno tras otro, así que un hook lento se paga una vez por fila con la transacción abierta: 100 filas cuyo `beforeSave` espera 50 ms retienen una conexión, y los bloqueos de cada fila escrita hasta el momento, durante 5,3 s. Lo mismo vale para una escritura `/bulk`. Consulta [Un callback retiene una conexión](/docs/collections/callbacks/#a-callback-holds-a-connection). Un controlador que no pueda hacer que el lote sea atómico responderá con `BATCH_UNSUPPORTED` en lugar de recurrir a un bucle de escrituras individuales — lo que no proporcionaría ni la atomicidad ni el único viaje de ida y vuelta por los que se recurre a un lote.
+Está limitado al mismo número de operaciones que una escritura masiva (1000 por defecto), ya que un lote mantiene sus bloqueos durante toda la transacción. Los callbacks de cada operación se ejecutan dentro de ella, uno tras otro, así que un hook lento se paga una vez por fila con la transacción abierta: 100 filas cuyo `beforeSave` espera 50 ms retienen una conexión, y los bloqueos de cada fila escrita hasta el momento, durante 5,3 s. Lo mismo vale para una escritura `/bulk`. Consulta [Un callback retiene una conexión](/docs/collections/context-data-api/#a-callback-holds-a-connection). Un controlador que no pueda hacer que el lote sea atómico responderá con `BATCH_UNSUPPORTED` en lugar de recurrir a un bucle de escrituras individuales — lo que no proporcionaría ni la atomicidad ni el único viaje de ida y vuelta por los que se recurre a un lote.
 
 Un `update` o `delete` que haga referencia a una fila inexistente hace fallar a todo el lote con un `404`, por la misma razón por la que se rechaza una escritura parcial en cualquier otro lugar: el estado aplicado a medias es un estado sin una buena recuperación.

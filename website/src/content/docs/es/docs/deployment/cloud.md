@@ -1,5 +1,5 @@
 ---
-sourceHash: d2f6e11d9e4f2f6e
+sourceHash: 852d6c98d8475f3b
 title: Rebase Cloud
 sidebar_label: Rebase Cloud
 description: Rebase Cloud es el mismo Rebase, operado para ti. Qué es, cómo se vincula y despliega un proyecto, y qué no incluye todavía la beta privada.
@@ -155,7 +155,7 @@ Dos cosas siguen en manos de una persona con la sesión iniciada:
 
 ## Cómputo y cuánto cuesta
 
-El precio de un proyecto se calcula en función de lo que reserva, no de un plan o nivel (tier). `compute` muestra cada parámetro de configuración y el presupuesto desglosado del propio plano de control para ellos. (`rebase cloud resources` es algo diferente: las bases de datos y buckets que el código declara, y si cada uno está aprovisionado; consulta la [referencia de la CLI](/docs/cli/#rebase-cloud)).
+El precio de un proyecto se calcula en función de lo que reserva, no de un plan o nivel (tier). `compute` muestra cada parámetro de configuración y el presupuesto desglosado del propio plano de control para ellos. (`rebase cloud resources` es algo diferente: las bases de datos y buckets que el código declara, y si cada uno está aprovisionado; consulta la [referencia de la CLI](/docs/cli/cloud/)).
 
 ```bash
 rebase cloud compute

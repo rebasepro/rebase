@@ -1,5 +1,5 @@
 ---
-sourceHash: 1789995e7e1e6bf9
+sourceHash: a8d023c7c5248446
 title: Autoalojamiento
 sidebar_label: Autoalojamiento
 description: Ejecuta Rebase en cualquier lugar con la imagen oficial del runtime y el bundle de tu proyecto — Docker Compose, Fly, Railway o un VPS básico.
@@ -380,7 +380,7 @@ datos (`source="(default)"` en un proyecto que no declara orígenes de datos). U
 pool sano lo mantiene cerca de cero. Una cola que
 crece con el tráfico significa que las solicitudes esperan conexiones — casi siempre
 retenidas por callbacks de escritura que esperan algo lento; consulta
-[Un callback retiene una conexión](/docs/collections/callbacks/#a-callback-holds-a-connection).
+[Un callback retiene una conexión](/docs/collections/context-data-api/#a-callback-holds-a-connection).
 
 ## Cabeceras de seguridad
 

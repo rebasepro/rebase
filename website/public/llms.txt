@@ -52,6 +52,7 @@
 - [Changelog](https://rebase.pro/docs/changelog): Every released change to Rebase — new features, fixes, and the breaking changes each version asks you to migrate.
 - [Backend only (headless)](https://rebase.pro/docs/getting-started/headless): Run Rebase as a headless Backend-as-a-Service over your own PostgreSQL — a REST API, auth, storage and realtime, with no admin panel and no collection files.
 - [REST API](https://rebase.pro/docs/backend/api): Auto-generated REST API endpoints for every collection, with filtering, sorting, pagination, and relation inclusion.
+- [REST API filtering](https://rebase.pro/docs/backend/filtering): Filter REST list requests with PostgREST-style operators, or/and groups and the where JSON dialect, and see how the filters combine.
 - [Writing over REST](https://rebase.pro/docs/backend/writes): Idempotency keys, conditional writes with ETag and If-Match, field operations, upserts on a natural key, return=minimal, and cross-collection batches.
 - [Typed SDK — Getting Started](https://rebase.pro/docs/sdk): Install and configure the Rebase typed SDK to interact with your backend from any JavaScript or TypeScript application.
 - [Security Rules (RLS)](https://rebase.pro/docs/collections/security-rules): Define Row Level Security policies for your collections using convenience shortcuts or raw SQL expressions.
@@ -64,11 +65,13 @@
 - [Relations](https://rebase.pro/docs/collections/relations): Define one-to-one, one-to-many, and many-to-many SQL relations between collections with foreign keys, junction tables, and multi-hop joins.
 - [Soft delete](https://rebase.pro/docs/collections/soft-delete): Turn delete into a timestamp, hide stamped rows from every read, and restore them with an ordinary update.
 - [Entity Callbacks](https://rebase.pro/docs/collections/callbacks): Use lifecycle callbacks to run custom logic when entities are created, updated, read, or deleted. Includes the context.data API for cross-collection operations.
+- [The context.data API](https://rebase.pro/docs/collections/context-data-api): Read and write other collections from inside a callback with context.data — its methods, the privileges it runs with, transaction semantics, and the connection a callback holds.
 - [Security Rules (RLS)](https://rebase.pro/docs/collections/security-rules): Define Row Level Security policies for your collections using convenience shortcuts or raw SQL expressions.
 - [Field access](https://rebase.pro/docs/collections/field-access): Per-property read and write permissions by role. A caller the row's security rules let through still does not receive a field their roles cannot read.
 - [Backend Overview](https://rebase.pro/docs/backend): The Rebase backend provides a complete server with REST API, authentication, storage, WebSocket real-time, and entity history — all initialized with a single function call.
 - [Rebase doesn't do X](https://rebase.pro/docs/backend/extending): The server-side extension ladder — declaration, collection callback, custom function, your own routes, your own server, eject — with what each one can and cannot reach.
 - [REST API](https://rebase.pro/docs/backend/api): Auto-generated REST API endpoints for every collection, with filtering, sorting, pagination, and relation inclusion.
+- [REST API filtering](https://rebase.pro/docs/backend/filtering): Filter REST list requests with PostgREST-style operators, or/and groups and the where JSON dialect, and see how the filters combine.
 - [Writing over REST](https://rebase.pro/docs/backend/writes): Idempotency keys, conditional writes with ETag and If-Match, field operations, upserts on a natural key, return=minimal, and cross-collection batches.
 - [API keys](https://rebase.pro/docs/backend/api-keys): Long-lived keys for scripts, CI, agents and integrations: service keys and personal keys, the scopes they hold, how they compose with row-level security, and the routes that manage them.
 - [Error codes](https://rebase.pro/docs/backend/errors): Every error code a Rebase backend can return, with its HTTP status, what it means and what to do about it — plus the response envelope, X-Request-ID and the details rules.
@@ -232,6 +235,7 @@
 - [Agent Skills](https://rebase.pro/docs/ai/skills): rebase skills install writes 21 Rebase reference skills into your repo, in the layout your AI assistant expects — Cursor, Claude Code, Windsurf, Gemini CLI and Antigravity.
 - [AI Instruction Files](https://rebase.pro/docs/ai/instruction-files): Every scaffolded Rebase project ships ai-instructions.md plus three-line pointer files for Claude, Cursor, Windsurf, Copilot and AGENTS.md — one source of truth, many filenames.
 - [CLI Reference](https://rebase.pro/docs/cli): Rebase CLI commands for project initialization, schema generation, database migrations, and SDK generation.
+- [rebase cloud](https://rebase.pro/docs/cli/cloud): The command groups for Rebase Cloud in the CLI — auth, project link, deploys, config, organizations, databases, resources, compute, storage, webhooks, clusters and billing.
 - [Schema Generation](https://rebase.pro/docs/cli/schema): Generate Drizzle ORM schemas from collection definitions, create SQL migrations, and keep your database in sync with the Rebase CLI.
 - [rls-check](https://rebase.pro/docs/rls-check): Audit row-level security on any PostgreSQL database — Supabase, Neon, RDS, or your own server. Read-only, no signup, no Rebase required.
 - [Architecture Overview](https://rebase.pro/docs/architecture): Understand how Rebase's backend, frontend, typed SDK, and database integrate to form a complete Backend-as-a-Service.

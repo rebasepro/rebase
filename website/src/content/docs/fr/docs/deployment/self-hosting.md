@@ -1,5 +1,5 @@
 ---
-sourceHash: 1789995e7e1e6bf9
+sourceHash: a8d023c7c5248446
 title: Auto-hébergement
 sidebar_label: Auto-hébergement
 description: Exécutez Rebase n'importe où avec l'image runtime officielle et le bundle de votre projet — Docker Compose, Fly, Railway ou un simple VPS.
@@ -251,7 +251,7 @@ de données (`source="(default)"` dans un projet qui ne déclare aucune source d
 maintient près de zéro. Une traîne qui grandit avec le trafic signifie que des requêtes font la queue
 pour des connexions — le plus souvent retenues par des callbacks d'écriture qui attendent quelque chose
 de lent ; voir
-[Un callback retient une connexion](/docs/collections/callbacks/#a-callback-holds-a-connection).
+[Un callback retient une connexion](/docs/collections/context-data-api/#a-callback-holds-a-connection).
 
 ## En-têtes de sécurité
 
