@@ -88,6 +88,8 @@ export function fakeServer() {
         },
         async deleteMany(ids: (string | number)[], options?: Record<string, unknown>) {
             check("deleteMany", ids, undefined, options);
+            // As the real route does: one missing id refuses the whole batch.
+            if (ids.some((id) => !rows.has(String(id)))) throw new RebaseApiError("Not found", { status: 404, code: "NOT_FOUND" });
             for (const id of ids) rows.delete(String(id));
         },
         async count(params?: unknown) {

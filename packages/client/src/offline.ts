@@ -2583,7 +2583,24 @@ data: u.data as AnyRow })),
             await this.ingestReplaced(op, op.id!, row, ticket);
         } else if (op.type === "deleteMany") {
             const ids = op.ids ?? [];
-            await inner.deleteMany(ids, { idempotencyKey: op.mutationId });
+            try {
+                await inner.deleteMany(ids, { idempotencyKey: op.mutationId });
+            } catch (error) {
+                // The batch is refused whole when one of its rows is already
+                // gone — deleted by someone else while this one was queued.
+                // That row is as gone as the user wanted it; the rest are
+                // deleted one at a time, each under a key of its own, and a
+                // row that is gone by then counts as deleted too. Treated as a
+                // refusal, every row of the batch was put back.
+                if (!isNotFoundError(error)) throw error;
+                for (const id of ids) {
+                    try {
+                        await inner.delete(id, { idempotencyKey: `${op.mutationId}:${String(id)}` });
+                    } catch (rowError) {
+                        if (!isNotFoundError(rowError)) throw rowError;
+                    }
+                }
+            }
             for (const id of ids) this.removeLocalRow(op.collection, id, ticket, true);
         } else if (op.type === "delete") {
             // A delete's request is its id, which nothing rewrites once it has

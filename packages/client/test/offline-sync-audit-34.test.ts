@@ -383,3 +383,23 @@ describe("a bulk delete queued offline, under a server row arriving", () => {
         await expect(posts.findById("1")).resolves.toBeUndefined();
     });
 });
+
+describe("a bulk delete replayed after one of its rows was deleted elsewhere (M2, bulk)", () => {
+    it("deletes the rest instead of putting every row back", async () => {
+        const server = fakeServer();
+        for (const id of ["1", "2", "3"]) server.rows.set(id, { id });
+        const errors: Error[] = [];
+        const { offline, posts } = manager(server, { onSyncError: (error) => errors.push(error) });
+        await posts.find();
+        setNavigatorOnLine(false);
+        await posts.deleteMany(["1", "2"]);
+        setNavigatorOnLine(true);
+        server.rows.delete("1");
+
+        expect(await offline.sync()).toEqual({ flushed: 1, remaining: 0 });
+        expect(errors).toEqual([]);
+        expect([...server.rows.keys()]).toEqual(["3"]);
+        server.state.online = false;
+        await expect(posts.findById("2")).resolves.toBeUndefined();
+    });
+});
