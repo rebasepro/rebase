@@ -436,6 +436,34 @@ __type: "relation" };
 }
 
 /**
+ * A row snapshot with every relation in it reduced to its reference — target
+ * path and id, `__type` kept — and the related row's values dropped.
+ *
+ * What a history entry stores and serves. The history route is gated on
+ * reading the row, not the rows it points at, so a snapshot that embedded the
+ * admin's `{ __type: "relation", data: { values } }` envelope handed whoever
+ * may read `posts` history the `authors` columns too. Entries are written as
+ * the stored row now, which holds no envelope; this keeps it that way for any
+ * path that hands one in, and reads entries recorded before.
+ *
+ * Walks maps and arrays, since a relation can sit inside either. Anything that
+ * is not an envelope comes back as it was.
+ */
+export function withRelationReferencesOnly<T>(value: T): T {
+    if (Array.isArray(value)) return value.map(item => withRelationReferencesOnly(item)) as T;
+    if (value === null || typeof value !== "object" || value instanceof Date) return value;
+    const obj = value as Record<string, unknown>;
+    if (obj.__type === "relation" || obj.__type === "reference") {
+        const { data: _related, ...reference } = obj;
+        return reference as T;
+    }
+    if (Object.getPrototypeOf(obj) !== Object.prototype && Object.getPrototypeOf(obj) !== null) return value;
+    return Object.fromEntries(
+        Object.entries(obj).map(([key, item]) => [key, withRelationReferencesOnly(item)])
+    ) as T;
+}
+
+/**
  * Create a hydrated relation reference that includes the full entity data.
  * Used when entity data has been pre-fetched (e.g., via batch loading or JOINs).
  */

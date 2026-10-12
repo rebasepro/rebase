@@ -72,6 +72,13 @@ const ordersCollection = defineCollection({
 The values are the row as the REST API serves it: its columns, dates as
 timestamps, a `belongsTo` as its foreign key. That is what a revert writes back.
 
+An entry never holds a related row's values. Reading a row's history needs only
+read access to that row, not to the rows it points at, so a relation is kept as
+a reference — `{ "__type": "relation", "id", "path" }` — and nothing more.
+Entries that older versions recorded with the related row embedded (a delete
+used to store the admin panel's view of the row) are served the same way: the
+history endpoint drops the embedded values before it answers.
+
 On a collection with [soft delete](/docs/collections/soft-delete/), a delete is
 recorded as `delete` and a restore (the update setting the soft-delete field
 back to `null`) as `update`. A row's history stays readable while the row is in

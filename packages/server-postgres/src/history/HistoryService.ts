@@ -9,7 +9,7 @@ export type {
     HistoryRetentionConfig
 } from "@rebasepro/types";
 import type { RecordHistoryParams, FetchHistoryOptions, HistoryRetentionConfig } from "@rebasepro/types";
-import { firstSqlRow, sqlRows } from "@rebasepro/common";
+import { firstSqlRow, sqlRows, withRelationReferencesOnly } from "@rebasepro/common";
 import { currentWriteScope } from "../services/write-transaction-scope";
 import { RECORD_HISTORY_FUNCTION, type HistoryTableState } from "./ensure-history-table";
 
@@ -94,14 +94,12 @@ export class HistoryService {
      * *extra* history, which is not a loss and is fixed by the next write.
      */
     async recordHistory(params: RecordHistoryParams): Promise<void> {
-        const {
-            tableName,
-            id,
-            action,
-            values,
-            previousValues,
-            updatedBy
-        } = params;
+        const { tableName, id, action, updatedBy } = params;
+        // A relation is stored as its reference, never the related row's
+        // values: reading this row's history is not reading the rows it
+        // points at. See `withRelationReferencesOnly`.
+        const values = params.values ? withRelationReferencesOnly(params.values) : params.values;
+        const previousValues = params.previousValues ? withRelationReferencesOnly(params.previousValues) : params.previousValues;
 
         const changedFields = previousValues && values
             ? findChangedFields(previousValues, values)

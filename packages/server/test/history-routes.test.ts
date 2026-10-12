@@ -139,3 +139,36 @@ describe("POST /:slug/:id/history/:historyId/revert", () => {
         expect(save).not.toHaveBeenCalled();
     });
 });
+
+// Calls 2026-10-12 (P7, DD-4c): entries recorded before the delete stopped
+// reading the admin view model hold `{ __type: "relation", data: { values } }`
+// envelopes carrying the related row. The list serves them as references only.
+describe("GET /:slug/:id/history serves relations as references", () => {
+    it("drops the related row's values from a legacy entry, in both snapshots", async () => {
+        const envelope = { __type: "relation", id: 7, path: "authors", data: { id: 7, path: "authors", values: { email: "a@b.c" } } };
+        const historyService: HistoryService = {
+            fetchHistory: jest.fn().mockResolvedValue({
+                data: [{
+                    id: "h1", entity_id: "post-1", table_name: "posts", action: "delete",
+                    values: { title: "Hi", author: envelope, readers: [envelope] },
+                    previous_values: { author: envelope }
+                }],
+                total: 1
+            }),
+            fetchHistoryEntry: jest.fn()
+        };
+        const registry = { getCollections: () => [collection("posts")] } as unknown as BackendCollectionRegistry;
+        const scopedDriver = { fetchOne: jest.fn(async ({ id }: { id: string }) => ({ id })) } as unknown as DataDriver;
+        const app = new Hono<HonoEnv>();
+        app.use("/*", async (c, next) => { c.set("driver", scopedDriver); await next(); });
+        app.route("/api/data", createHistoryRoutes({ historyService, registry, driver: {} as DataDriver }));
+
+        const res = await app.request("/api/data/posts/post-1/history");
+        expect(res.status).toBe(200);
+        const body = await res.json() as { data: Array<{ values: Record<string, unknown>; previous_values: Record<string, unknown> }> };
+        const ref = { __type: "relation", id: 7, path: "authors" };
+        expect(body.data[0].values).toEqual({ title: "Hi", author: ref, readers: [ref] });
+        expect(body.data[0].previous_values).toEqual({ author: ref });
+        expect(JSON.stringify(body)).not.toContain("a@b.c");
+    });
+});

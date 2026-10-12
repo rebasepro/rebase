@@ -5,7 +5,7 @@ import { ApiError, errorHandler } from "../api/errors";
 import { resolveListLimitParam } from "../api/rest/query-parser";
 import { CollectionConfig, DataDriver, scopeGrants } from "@rebasepro/types";
 import { httpMethodToOperation } from "../auth/api-keys/http-operation";
-import { type FieldViewer, restrictedFieldNames } from "@rebasepro/common";
+import { type FieldViewer, restrictedFieldNames, withRelationReferencesOnly } from "@rebasepro/common";
 import { requestViewer } from "../api/rest/field-access-query";
 import { assertNoClosedFields } from "../api/rest/write-validation";
 
@@ -40,7 +40,6 @@ function stripHistoryValues(
     viewer: { roles?: readonly string[] } | undefined
 ): Record<string, unknown>[] {
     const { refused } = restrictedFieldNames(collection, viewer, "read");
-    if (refused.size === 0) return entries;
 
     return entries.map(entry => {
         const stripped: Record<string, unknown> = { ...entry };
@@ -49,7 +48,10 @@ function stripHistoryValues(
             if (!isPlainValues(snapshot)) continue;
             const kept: Record<string, unknown> = {};
             for (const [field, value] of Object.entries(snapshot)) {
-                if (!refused.has(field)) kept[field] = value;
+                // An entry recorded before deletes stopped reading the admin
+                // view model embeds each related row; the caller may read this
+                // row, not those. Served as references, like new entries.
+                if (!refused.has(field)) kept[field] = withRelationReferencesOnly(value);
             }
             stripped[key] = kept;
         }

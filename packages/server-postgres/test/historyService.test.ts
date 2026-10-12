@@ -141,6 +141,30 @@ tags: [{ id: 2 }] }
             expect(serializedSql).toContain("ARRAY[");
         });
 
+        // Calls 2026-10-12 (P7, DD-4c): a snapshot stores a relation as its
+        // target and id, never the related row's values — whoever may read
+        // `posts` history must not read `authors` columns out of it.
+        it("stores a relation as a reference, without the related row's values", async () => {
+            await historyService.recordHistory({
+                tableName: "posts",
+                id: "1",
+                action: "delete",
+                values: {
+                    title: "Hello",
+                    author: { __type: "relation", id: 7, path: "authors", data: { id: 7, path: "authors", values: { email: "a@b.c", salary: 9 } } },
+                    meta: { tags: [{ __type: "relation", id: "t1", path: "tags", data: { values: { secret: "x" } } }] }
+                }
+            });
+
+            const { params } = renderSql(db.execute.mock.calls[0][0]);
+            const stored = JSON.parse(params[3] as string);
+            expect(stored).toEqual({
+                title: "Hello",
+                author: { __type: "relation", id: 7, path: "authors" },
+                meta: { tags: [{ __type: "relation", id: "t1", path: "tags" }] }
+            });
+        });
+
         it("should properly perform query during entity creation (insert)", async () => {
             await historyService.recordHistory({
                 tableName: "posts",
