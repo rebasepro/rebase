@@ -118,6 +118,7 @@ a collection reaches none of this. See [Roles and scopes](/docs/backend/roles-an
 | `POST` | `/api/admin/bootstrap` | none, and only while no admin exists | Refused in production — see [First User Bootstrap](/docs/backend/authentication/#first-user-bootstrap) |
 | `GET` | `/api/admin/users` | `users:read` | User management |
 | `POST` | `/api/admin/users` | `users:write` | User management. Roles beyond the caller's own are refused |
+| `GET` | `/api/admin/users/pick` | `users:read`, or write access to a collection with a `userSelect` field | The [user picker's read](/docs/backend/auth-endpoints/): id, name, email and avatar only. A collection whose write rules are raw SQL does not count |
 | `GET` | `/api/admin/users/:uid` | `users:read` | User management |
 | `PUT` | `/api/admin/users/:uid` | `users:write` | Refused for an account that holds more than the caller |
 | `DELETE` | `/api/admin/users/:uid` | `users:write` | Refused for an account that holds more than the caller |

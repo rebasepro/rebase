@@ -133,24 +133,18 @@ so on S3 it is absent and `/api/storage/metadata/*` still says. A folder in
 `prefixes` carries none of them, nor does a custom `StorageController` that
 does not set them.
 
-`POST /api/storage/upload` answers `201` with the `{ key, bucket, storageUrl }`
-of the stored object under `data`; `GET /api/storage/metadata/*` the object's
-metadata and, for a private object, the short-lived `token`;
-`POST /api/storage/metadata` an object keyed by the paths it was sent, each holding what the `GET` would have answered for it (see below).
-A folder is not an object: `/metadata` on a key ending in `/` is `404` on every store, even where S3 or GCS keeps a `folder/` marker, so no download token is minted for a prefix;
-`GET /api/storage/sources` the array of configured sources, with
-`configured: true`. On a deployment with no storage at all, it answers
-`200 {"data": [], "configured": false}`, while every other route answers
-`501 STORAGE_NOT_CONFIGURED`. `GET /api/auth/config` reports the same
-fact as `storage: false`, so a client can skip asking.
-`GET /api/storage/sources` is public: it answers without a token even when
-`requireAuth` is on. It names the sources (their key, engine, transport and
-label) and never a file, and the client SDK reads it to wire up its sources,
-which can happen before anyone has signed in. An app that reads a `direct`
-source anonymously needs it too. Every route that lists, reads or writes a file
-keeps its auth.
-`DELETE /api/storage/file/*` and `POST /api/storage/folder` carry only a
-`message`, since there is nothing to return.
+`POST /api/storage/upload` answers `201` with the `{ key, bucket, storageUrl }` of the stored object under `data`;
+`GET /api/storage/metadata/*` the object's metadata and, for a private object, the short-lived `token`; `POST
+/api/storage/metadata` an object keyed by the paths it was sent, each holding what the `GET` would have answered for
+it (see below). A folder is not an object: `/metadata` on a key ending in `/` is `404` on every store, even where S3
+or GCS keeps a `folder/` marker, so no download token is minted for a prefix; `GET /api/storage/sources` the array of
+configured sources, with `configured: true`. On a deployment with no storage at all, it answers `200 {"data": [],
+"configured": false}`, while every other route answers `501 STORAGE_NOT_CONFIGURED`. `GET /api/auth/config` reports
+the same fact as `storage: false`, so a client can skip asking. `GET /api/storage/sources` is public: it answers
+without a token even when `requireAuth` is on. It names the sources (their key, engine, transport and label) and never
+a file, and the client SDK reads it to wire up its sources, which can happen before anyone has signed in. An app that
+reads a `direct` source anonymously needs it too. Every route that lists, reads or writes a file keeps its auth.
+`DELETE /api/storage/file/*` and `POST /api/storage/folder` carry only a `message`, since there is nothing to return.
 
 On S3 and GCS, a `bucket` has to be one the source serves, on writes as on
 reads: an upload, a `POST /api/storage/folder` or a TUS upload naming any other
