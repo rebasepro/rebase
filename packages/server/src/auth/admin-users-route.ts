@@ -18,7 +18,7 @@ import { normalizeEmail } from "@rebasepro/common";
 import { ApiError, errorHandler } from "../api/errors";
 import type { AuthRepository } from "./interfaces";
 import { createRequireAuth } from "./middleware";
-import { assertMayGrantRoles, assertMayManageAccount, requireScope } from "./access";
+import { assertMayGrantRoles, assertMayManageAccount, callerIsAdmin, requireScope } from "./access";
 import type { AuthHooks } from "./auth-hooks";
 import { resolveAuthHooks } from "./auth-hooks";
 import {
@@ -298,13 +298,15 @@ offset: 0 });
             throw ApiError.conflict("A user with this email already exists");
         }
 
+        // A chosen password is held to the password policy; an administrator
+        // importing accounts may waive it with `skipPasswordPolicy: true`.
         const prepResult = await prepareAdminUserValues(body, {
             authRepo,
             emailService,
             emailConfig,
             resolvedHooks: ops,
             collectionAuthConfig
-        });
+        }, { mayWaivePasswordPolicy: callerIsAdmin(c) });
 
         // `beforeUserCreate` runs here too.
         //

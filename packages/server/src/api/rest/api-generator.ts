@@ -27,6 +27,7 @@ import {
     type UserCreatingAdapter
 } from "./auth-collection-writes";
 import { apiHiddenFieldNames, findRelation, getJunctionConfigForRelation, getTableName, resolveCollectionRelations, resolvePrimaryKeys } from "@rebasepro/common";
+import type { FieldViewer } from "@rebasepro/common";
 import {
     createIdempotencyStore,
     IDEMPOTENCY_HEADER,
@@ -411,7 +412,7 @@ export class RestApiGenerator {
                     // last, once every check that can refuse the batch has.
                     for (const creation of userCreations) {
                         const operation = operations[creation.index];
-                        const [prepared] = await prepareUserCreations(creation.adapter, creation.collection, [operation.values!]);
+                        const [prepared] = await prepareUserCreations(creation.adapter, creation.collection, [operation.values!], batchViewer);
                         operation.values = prepared.values;
                         creations.push(prepared);
                     }
@@ -827,9 +828,10 @@ export class RestApiGenerator {
         adapter: UserCreatingAdapter,
         path: string,
         collection: CollectionConfig,
-        rows: Record<string, unknown>[]
+        rows: Record<string, unknown>[],
+        caller: FieldViewer
     ): Promise<{ data: Record<string, unknown>[]; meta: { written: number } }> {
-        const prepared = await prepareUserCreations(adapter, collection, rows);
+        const prepared = await prepareUserCreations(adapter, collection, rows, caller);
         const written = await driver.saveMany!({
             path,
             rows: prepared.map(creation => creation.values),
@@ -1095,7 +1097,7 @@ export class RestApiGenerator {
 
         // A create on the auth collection is a user creation, through the
         // same steps as `POST /admin/users` and MCP's `create_document`.
-        const created = await createUserThroughAuthCollection(this.authAdapter, collection, body, values => driver.save({
+        const created = await createUserThroughAuthCollection(this.authAdapter, collection, body, requestViewer(c), values => driver.save({
             path,
             values,
             collection: address.driverCollection,
@@ -1630,7 +1632,7 @@ export class RestApiGenerator {
             });
 
             if (userAdapter) {
-                return c.json(await this.createUsers(driver, userAdapter, path, resolvedCollection, rows));
+                return c.json(await this.createUsers(driver, userAdapter, path, resolvedCollection, rows, requestViewer(c)));
             }
 
             // A client that never sees the response cannot know whether the

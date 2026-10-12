@@ -227,7 +227,7 @@ async function createUser(
         assertNoFieldOpsOnCreate(body, "A create");
     });
     const driver = await scopedDriver(ctx);
-    const created = await createUserThroughAuthCollection(adapter, collection, body, values => driver.save({
+    const created = await createUserThroughAuthCollection(adapter, collection, body, viewerOf(ctx), values => driver.save({
         path: collectionPath(collection),
         collection,
         values,

@@ -42,7 +42,7 @@ const bodies = Array.from({ length: 12 }, (_, i) => ({ email: `u${i}@example.com
 describe("prepareUserCreations", () => {
     it("prepares independent creations several at a time, and answers in the order given", async () => {
         const { adapter, stats } = countingAdapter({ validate: true, extraFields: ["password"], independent: true });
-        const prepared = await prepareUserCreations(adapter, usersCollection, bodies);
+        const prepared = await prepareUserCreations(adapter, usersCollection, bodies, { roles: ["admin"] });
 
         expect(prepared.map(result => result.values.email)).toEqual(bodies.map(body => body.email));
         expect(prepared.every(result => result.values.prepared === true)).toBe(true);
@@ -53,7 +53,7 @@ describe("prepareUserCreations", () => {
     it("prepares one at a time, in order, when the adapter does not say they are independent", async () => {
         for (const contract of [undefined, { validate: false, extraFields: [] }]) {
             const { adapter, stats } = countingAdapter(contract);
-            await prepareUserCreations(adapter, usersCollection, bodies);
+            await prepareUserCreations(adapter, usersCollection, bodies, { roles: ["admin"] });
             expect(stats().maxInFlight).toBe(1);
             expect(stats().started).toEqual(bodies.map(body => body.email));
         }

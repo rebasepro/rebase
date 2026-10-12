@@ -568,7 +568,9 @@ describe("a socket write to the auth collection", () => {
 
         await send({ type: "SAVE", requestId: "c", payload: { path: "users", status: "new", values: { email: " Ann@Example.COM " } } });
 
-        expect(userAdmin.prepareUserCreation).toHaveBeenCalledWith({ email: " Ann@Example.COM " }, { enabled: true });
+        // The session is an administrator's, so the socket lets it waive the
+        // password policy, as REST does.
+        expect(userAdmin.prepareUserCreation).toHaveBeenCalledWith({ email: " Ann@Example.COM " }, { enabled: true }, { mayWaivePasswordPolicy: true });
         expect(writes).toEqual([expect.objectContaining({
             path: "users", status: "new", values: { email: "ann@example.com", passwordHash: "hashed:generated" }
         })]);

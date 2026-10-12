@@ -171,7 +171,7 @@ interface RebaseCMS {
     listUsers(options?: ListUsersOptions): Promise<UsersPage>;
     listUsersPaginated(options?: ListUsersOptions): Promise<UsersPage>;
     getUser(userId: string): Promise<{ user: AdminUser }>;
-    createUser(data: { email: string; displayName?: string; password?: string; roles?: string[] }): Promise<{ user: AdminUser }>;
+    createUser(data: { email: string; displayName?: string; password?: string; roles?: string[]; skipPasswordPolicy?: boolean }): Promise<{ user: AdminUser }>;
     updateUser(userId: string, data: { email?: string; displayName?: string; password?: string; roles?: string[] }): Promise<{ user: AdminUser }>;
     deleteUser(userId: string): Promise<{ success: boolean }>;
     bootstrap(): Promise<{ success: boolean; message: string; user: { uid: string; roles: string[] } }>;

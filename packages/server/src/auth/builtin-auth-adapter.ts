@@ -34,7 +34,7 @@ import { isBootstrapWindowOpen, isUserTableEmpty } from "./registration-policy";
 import { createResetPasswordRoute } from "./reset-password-admin";
 import { createAdminRolesRoute } from "./admin-roles-route";
 import { createAdminUsersRoute } from "./admin-users-route";
-import { prepareAdminUserValues, finalizeAdminUserCreation, authCollectionUserAdmin } from "./admin-user-ops";
+import { prepareAdminUserValues, finalizeAdminUserCreation, authCollectionUserAdmin, SKIP_PASSWORD_POLICY_FIELD } from "./admin-user-ops";
 import type { AuthRepository, OAuthProvider } from "./interfaces";
 import type { AuthHooks, ResolvedAuthHooks } from "./auth-hooks";
 import { resolveAuthHooks } from "./auth-hooks";
@@ -393,7 +393,7 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
             return router;
         },
 
-        async prepareUserCreation(values, collectionAuth) {
+        async prepareUserCreation(values, collectionAuth, options) {
             const parsedCollectionAuth = collectionAuth as import("@rebasepro/types").AuthCollectionConfig | undefined;
             return prepareAdminUserValues(values, {
                 authRepo: authRepository,
@@ -401,7 +401,7 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
                 emailConfig,
                 resolvedHooks: resolvedOps,
                 collectionAuthConfig: parsedCollectionAuth ?? collectionAuthConfig
-            });
+            }, options);
         },
 
         describeUserCreationContract(collectionAuth) {
@@ -417,13 +417,14 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
                 return { validate: false, extraFields: [] };
             }
 
-            // The built-in path consumes exactly one field the users table does
-            // not declare: `password`, which it hashes into `passwordHash` and
-            // deletes. Everything else it spreads through untouched, so
-            // everything else has to be a real column.
+            // The built-in path consumes exactly two fields the users table
+            // does not declare: `password`, which it hashes into `passwordHash`
+            // and deletes, and `skipPasswordPolicy`, which it reads and drops.
+            // Everything else it spreads through untouched, so everything else
+            // has to be a real column.
             // No hook runs, so creations may be prepared at once — unless the
             // hash is the application's, which may not be reentrant.
-            return { validate: true, extraFields: ["password"], independent: !authHooks?.hashPassword };
+            return { validate: true, extraFields: ["password", SKIP_PASSWORD_POLICY_FIELD], independent: !authHooks?.hashPassword };
         },
 
         async finalizeUserCreation(entity, clearPassword) {

@@ -77,8 +77,16 @@ All data API endpoints require a valid `Authorization: Bearer <token>` header wh
 A new password needs at least 8 characters, with an upper-case letter, a
 lower-case letter and a digit. Registration, reset and change refuse one that
 fails with `400 WEAK_PASSWORD`, listing each rule it broke, and so does an
-administrator setting a password with `PUT /api/admin/users/:uid` (as a plain
-`400`). `POST /api/admin/users` does not check a password it is given. Sign-in
+administrator choosing a password: `POST /api/admin/users`, a create on the
+users collection through the data API (`POST /api/data/users`, its `/bulk`, a
+socket or MCP write), `PUT /api/admin/users/:uid` and
+`POST /api/admin/users/:uid/reset-password`.
+
+To create accounts whose passwords another system set, such as an import, send
+`skipPasswordPolicy: true` in the create body (on each row of a `/bulk`). The
+server honours it only for an administrator or the service key; from anyone
+else it waives nothing, and the refusal says so. It is never stored. The admin
+panel's import sends it for every row that carries a `password`. Sign-in
 never checks the policy, so an older password keeps working. To set your own rules, pass
 `auth.hooks.validatePasswordStrength` from an [ejected](/docs/backend/authentication/#configuration)
 backend. The first admin seeded from `REBASE_ADMIN_PASSWORD` is held to a

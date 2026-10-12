@@ -618,7 +618,9 @@ name: "Original Name" })
             expect(mockPrepare).toHaveBeenCalledWith(
                 expect.objectContaining({ email: "original@example.com",
 name: "Original Name" }),
-                undefined // auth: true → collectionAuthConfig is undefined
+                undefined, // auth: true → collectionAuthConfig is undefined
+                // No caller set on this request, so nobody to waive the policy.
+                { mayWaivePasswordPolicy: false }
             );
             expect(mockDriver.save).toHaveBeenCalledWith(
                 expect.objectContaining({

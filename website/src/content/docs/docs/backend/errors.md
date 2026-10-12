@@ -149,7 +149,7 @@ the ID you got. Read the response header.
 | `TOKEN_ALREADY_USED` | 401 | A one-time token was replayed, or a refresh token that was rotated away more than `refreshTokenReuseIntervalSeconds` ago. | Request a fresh one, or sign in again. |
 | `TOKEN_EXPIRED` | 401 | The token is past its lifetime. | Request a fresh one. |
 | `USER_NOT_FOUND` | 404 | No account with that id. | Check the id. |
-| `WEAK_PASSWORD` | 400 | The password does not meet the [password policy](/docs/backend/auth-endpoints/#password-policy) (by default 8+ characters with an upper-case letter, a lower-case letter and a digit) — on sign-up, a reset or change, and an administrator's `PUT /api/admin/users/:id` or `POST /api/admin/users/:id/reset-password` with a chosen password. | Choose a stronger one. |
+| `WEAK_PASSWORD` | 400 | The password does not meet the [password policy](/docs/backend/auth-endpoints/#password-policy) (by default 8+ characters with an upper-case letter, a lower-case letter and a digit) — on sign-up, a reset or change, and an administrator's chosen password: `POST /api/admin/users`, a create on the users collection through the data API, `PUT /api/admin/users/:id` or `POST /api/admin/users/:id/reset-password`. | Choose a stronger one. An administrator importing accounts may send `skipPasswordPolicy: true` on a create. |
 
 ## Data, queries and writes
 

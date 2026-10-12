@@ -22,6 +22,7 @@ import type {
     AuthCollectionConfig,
     AuthCollectionContext,
     UserCreationFinalizeResult,
+    UserCreationOptions,
     UserCreationPrepareResult
 } from "@rebasepro/types";
 import { ApiError } from "../api/errors";
@@ -121,6 +122,45 @@ function buildCollectionContext(ctx: AdminUserContext): AuthCollectionContext {
 }
 
 /**
+ * The body field with which an administrator waives the password policy for
+ * one create — an import of accounts whose passwords another system chose.
+ * An instruction to the door, never data: it reaches neither the row nor a
+ * create hook.
+ */
+export const SKIP_PASSWORD_POLICY_FIELD = "skipPasswordPolicy";
+
+/**
+ * Hold a create body's chosen `password` to the password policy, as
+ * registration and every other door that sets a password are, and return the
+ * body without {@link SKIP_PASSWORD_POLICY_FIELD}.
+ *
+ * The flag waives the policy only when the door says the caller may waive it
+ * (`options.mayWaivePasswordPolicy`, an administrator); from anyone else it
+ * waives nothing, and a refusal says so.
+ *
+ * @throws ApiError 400 `WEAK_PASSWORD`
+ */
+export function enforceCreationPasswordPolicy(
+    body: Record<string, unknown>,
+    resolvedHooks: Pick<ResolvedAuthHooks, "validatePasswordStrength">,
+    options?: UserCreationOptions
+): Record<string, unknown> {
+    const { [SKIP_PASSWORD_POLICY_FIELD]: skipRequested, ...rest } = body;
+    const waived = skipRequested === true && options?.mayWaivePasswordPolicy === true;
+    const password = rest.password;
+    if (!waived && typeof password === "string" && password !== "") {
+        const validation = resolvedHooks.validatePasswordStrength(password);
+        if (!validation.valid) {
+            const refusedWaiver = skipRequested === true
+                ? `. \`${SKIP_PASSWORD_POLICY_FIELD}\` is honoured only for administrators and the service key`
+                : "";
+            throw ApiError.badRequest(`Password too weak: ${validation.errors.join(". ")}${refusedWaiver}`, "WEAK_PASSWORD");
+        }
+    }
+    return rest;
+}
+
+/**
  * Prepare user values for an admin-initiated user creation.
  *
  * Resolution order:
@@ -128,13 +168,18 @@ function buildCollectionContext(ctx: AdminUserContext): AuthCollectionContext {
  * 2. Backend-level `AuthHooks.onAdminCreateUser` — global override
  * 3. Built-in default — generate password → hash → normalize email
  *
+ * Before any of them, a chosen password is held to the password policy
+ * ({@link enforceCreationPasswordPolicy}).
+ *
  * The caller is responsible for persisting (via `driver.save()`).
  */
 export async function prepareAdminUserValues(
-    body: Record<string, unknown>,
-    ctx: AdminUserContext
+    rawBody: Record<string, unknown>,
+    ctx: AdminUserContext,
+    options?: UserCreationOptions
 ): Promise<AdminUserPrepareResult> {
     const { resolvedHooks, collectionAuthConfig } = ctx;
+    const body = enforceCreationPasswordPolicy(rawBody, resolvedHooks, options);
 
     // 1. Collection-level hook (closest to the data)
     if (collectionAuthConfig?.onCreateUser) {

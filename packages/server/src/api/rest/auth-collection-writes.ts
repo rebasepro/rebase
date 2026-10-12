@@ -14,10 +14,12 @@
  * Every function here leaves any other collection, and an adapter without the
  * step, exactly as it was: the rows are then written as any table's.
  */
+import { hasAdminRole } from "@rebasepro/types";
 import type {
     AuthAdapter,
     CollectionConfig,
     UserCreationFinalizeResult,
+    UserCreationOptions,
     UserCreationPrepareResult
 } from "@rebasepro/types";
 import type { FieldViewer } from "@rebasepro/common";
@@ -110,14 +112,20 @@ export function assertUserCreationBodyValid(
  * through the adapter's `prepareUserCreation` (the password hashed or
  * generated, the email normalized, the collection's `onCreateUser`), in order.
  * The `values` of each result are what the door writes.
+ *
+ * `caller` is who the door is writing for: an administrator may waive the
+ * password policy for an import (`skipPasswordPolicy: true`), anyone else may
+ * not.
  */
 export async function prepareUserCreations(
     adapter: UserCreatingAdapter,
     collection: CollectionConfig,
-    bodies: readonly Record<string, unknown>[]
+    bodies: readonly Record<string, unknown>[],
+    caller: FieldViewer
 ): Promise<UserCreationPrepareResult[]> {
     const auth = collectionAuthConfig(collection);
-    const prepare = (body: Record<string, unknown>) => adapter.prepareUserCreation(body, auth);
+    const options: UserCreationOptions = { mayWaivePasswordPolicy: hasAdminRole(caller.roles) };
+    const prepare = (body: Record<string, unknown>) => adapter.prepareUserCreation(body, auth, options);
     // Several at a time when the adapter says each preparation touches only
     // its own result: the built-in one hashes a password (scrypt, ~30 ms, on
     // libuv's thread pool), and a 1,000-row bulk did that one after another
@@ -194,9 +202,9 @@ export async function completeUserCreations(
 }
 
 /**
- * Create one user through the auth collection: {@link prepareUserCreations},
- * then `save` (the door's own driver write), then
- * {@link completeUserCreations}.
+ * Create one user through the auth collection, for `caller`:
+ * {@link prepareUserCreations}, then `save` (the door's own driver write),
+ * then {@link completeUserCreations}.
  *
  * `undefined` when the create is not a user creation ({@link createsUsers}) —
  * the door then writes the row as any other.
@@ -205,11 +213,12 @@ export async function createUserThroughAuthCollection(
     adapter: AuthAdapter | undefined,
     collection: CollectionConfig,
     body: Record<string, unknown>,
+    caller: FieldViewer,
     save: (values: Record<string, unknown>) => Promise<Record<string, unknown>>
 ): Promise<{ row: Record<string, unknown>; delivery: UserCreationFinalizeResult } | undefined> {
     if (!createsUsers(adapter, collection)) return undefined;
 
-    const prepared = await prepareUserCreations(adapter, collection, [body]);
+    const prepared = await prepareUserCreations(adapter, collection, [body], caller);
     const row = await save(prepared[0].values);
     const [delivery] = await completeUserCreations(adapter, prepared, [row]);
     return { row, delivery };

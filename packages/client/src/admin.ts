@@ -52,8 +52,13 @@ export function createAdmin(transport: Transport, options?: CreateAdminOptions) 
      * Create an account. When the server could not send an invitation (no
      * email configured, or the send failed) the answer carries the generated
      * `temporaryPassword` — returned this once and never again.
+     *
+     * A chosen `password` is held to the password policy (`WEAK_PASSWORD`).
+     * `skipPasswordPolicy: true` waives it, for an import of accounts whose
+     * passwords another system chose; the server honours it only for an
+     * administrator or the service key.
      */
-    async function createUser(data: { email: string, displayName?: string, password?: string, roles?: string[] }) {
+    async function createUser(data: { email: string, displayName?: string, password?: string, roles?: string[], skipPasswordPolicy?: boolean }) {
         return transport.request<{ user: AdminUser; temporaryPassword?: string; invitationSent?: boolean; emailDeliveryFailed?: boolean }>(adminPath + "/users", {
             method: "POST",
             body: JSON.stringify(data)

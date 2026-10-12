@@ -329,6 +329,24 @@ export interface UserCreationPrepareResult {
 }
 
 /**
+ * What the door creating a user knows about its caller, for
+ * `AuthAdapter.prepareUserCreation()`.
+ *
+ * @group Auth
+ */
+export interface UserCreationOptions {
+    /**
+     * Whether the caller may waive the password policy with
+     * `skipPasswordPolicy: true` in the body. The doors set it for an
+     * administrator (the service key signs in as one) and for nobody else, so
+     * an adapter that reads the flag is taking an administrator at their word —
+     * an import of accounts whose passwords were set under another system's
+     * rules. Absent, the flag waives nothing.
+     */
+    mayWaivePasswordPolicy?: boolean;
+}
+
+/**
  * What a create body for an auth collection may name beyond the collection's
  * own declared fields — see `AuthAdapter.describeUserCreationContract()`.
  *
@@ -570,13 +588,18 @@ export interface AuthAdapter {
      *
      * If not implemented, the collection saves values as-is (no password hashing).
      *
+     * A chosen `password` is held to the password policy unless the body says
+     * `skipPasswordPolicy: true` and `options.mayWaivePasswordPolicy` is set.
+     *
      * @param values - Raw request body from the client.
      * @param collectionAuth - The parsed `AuthCollectionConfig` from the collection (if `auth` is an object).
+     * @param options - What the door knows about its caller.
      * @returns Processed values ready for `driver.save()`, plus metadata for the post-save step.
      */
     prepareUserCreation?(
         values: Record<string, unknown>,
-        collectionAuth?: unknown
+        collectionAuth?: unknown,
+        options?: UserCreationOptions
     ): Promise<UserCreationPrepareResult>;
 
     /**

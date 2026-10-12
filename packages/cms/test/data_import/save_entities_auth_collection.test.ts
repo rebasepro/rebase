@@ -110,4 +110,82 @@ describe("an import into the auth collection", () => {
 
         expect(calls).toEqual([{ op: "updateMany", rows: 1 }]);
     });
+
+    /**
+     * The server holds a chosen password to the password policy, and an
+     * administrator may waive it for an import: the accounts in the file had
+     * their passwords set under another system's rules. The import says so for
+     * the rows that carry a password, and only for those.
+     */
+    test("asks the server to waive the password policy for the rows that carry a password", async () => {
+        const sent: Record<string, unknown>[] = [];
+        const accessor = {
+            async create() {
+                throw new Error("not used");
+            },
+            async update() {
+                throw new Error("not used");
+            },
+            async find() {
+                return { data: [] };
+            },
+            async createMany(rows: Record<string, unknown>[]) {
+                sent.push(...rows);
+                return rows.map(row => ({ id: row.id, path: "users", values: row }));
+            }
+        };
+        const dataClient = { collection: () => accessor } as unknown as RebaseData;
+
+        await saveImportedEntities(dataClient, "users", [
+            row(undefined, { email: "a@example.com", password: "legacy" }),
+            row(undefined, { email: "b@example.com" })
+        ], { collection: users });
+
+        expect(sent).toEqual([
+            { email: "a@example.com", password: "legacy", skipPasswordPolicy: true },
+            { email: "b@example.com" }
+        ]);
+    });
+
+    test("asks for the waiver one row at a time too, where the data source has no bulk create", async () => {
+        const sent: Record<string, unknown>[] = [];
+        const accessor = {
+            async create(values: Record<string, unknown>) {
+                sent.push(values);
+                return { id: "new", path: "users", values };
+            },
+            async update() {
+                throw new Error("not used");
+            }
+        };
+        const dataClient = { collection: () => accessor } as unknown as RebaseData;
+
+        await saveImportedEntities(dataClient, "users", [
+            row(undefined, { email: "a@example.com", password: "legacy" })
+        ], { collection: users });
+
+        expect(sent).toEqual([{ email: "a@example.com", password: "legacy", skipPasswordPolicy: true }]);
+    });
+
+    test("never adds the flag on a collection that is not the users", async () => {
+        const sent: Record<string, unknown>[] = [];
+        const accessor = {
+            async create() {
+                throw new Error("not used");
+            },
+            async update() {
+                throw new Error("not used");
+            },
+            async createMany(rows: Record<string, unknown>[]) {
+                sent.push(...rows);
+                return rows.map(row => ({ id: row.id, path: "accounts", values: row }));
+            }
+        };
+        const dataClient = { collection: () => accessor } as unknown as RebaseData;
+        const accounts = { ...(users as object), slug: "accounts", auth: undefined } as never;
+
+        await saveImportedEntities(dataClient, "accounts", [row(undefined, { email: "a@example.com", password: "x" })], { collection: accounts });
+
+        expect(sent).toEqual([{ email: "a@example.com", password: "x" }]);
+    });
 });

@@ -54,7 +54,7 @@ describe("email normalization agreement", () => {
 
     it("the admin create path stores what the lookup path searches for", async () => {
         const prepared = await prepareAdminUserValues(
-            { email: MESSY, password: "correct-horse-battery-staple" },
+            { email: MESSY, password: "Correct-horse-battery-5taple" },
             ctx()
         );
 
@@ -67,11 +67,11 @@ describe("email normalization agreement", () => {
 
     it("a stray space cannot create a second account for one address", async () => {
         const withSpace = await prepareAdminUserValues(
-            { email: MESSY, password: "correct-horse-battery-staple" },
+            { email: MESSY, password: "Correct-horse-battery-5taple" },
             ctx()
         );
         const without = await prepareAdminUserValues(
-            { email: CLEAN, password: "correct-horse-battery-staple" },
+            { email: CLEAN, password: "Correct-horse-battery-5taple" },
             ctx()
         );
 

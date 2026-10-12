@@ -150,6 +150,17 @@ function isAuthCollection(collection: CollectionConfig | undefined): boolean {
 }
 
 /**
+ * The row a user creation takes. A row that carries a `password` asks the
+ * server to waive its password policy (`skipPasswordPolicy`): the accounts in
+ * an import had their passwords set under another system's rules. The server
+ * honours it only for an administrator.
+ */
+function toUserCreationRow(entity: Partial<Entity<any>>): Record<string, unknown> {
+    const row = toBulkRow(entity);
+    return typeof row.password === "string" && row.password !== "" ? { ...row, skipPasswordPolicy: true } : row;
+}
+
+/**
  * A batch split by whether each row's id is stored: the rows whose id is
  * stored are updates — the given columns are written, the rest keep their
  * values, as the per-row path and the preview's "overwritten" say — and the
@@ -183,7 +194,7 @@ async function writeUpdatesAndCreates(accessor: CollectionAccessor,
     const creates = batch.map((entity, index) => ({ entity, index })).filter(({ entity }) => !isUpdate(entity));
     if (creates.length === 0) return;
     try {
-        const rows = creates.map(({ entity }) => toBulkRow(entity));
+        const rows = creates.map(({ entity }) => isAuthCollection(collection) ? toUserCreationRow(entity) : toBulkRow(entity));
         await (upsert ? createMany(rows, { upsert: true }) : createMany(rows));
     } catch (e) {
         // "Row 1" of the rows sent is "Row <n>" of the batch.
@@ -244,9 +255,13 @@ async function writeBatch(accessor: CollectionAccessor,
     // Sequential, not `Promise.all`: a rejected write does not cancel its
     // siblings, so a parallel batch commits an indeterminate subset of itself
     // and nobody can say which rows landed.
+    const usersCollection = !!collection && isAuthCollection(collection);
     for (const entity of batch) {
         try {
-            await accessor.create(entity.values ?? {}, entity.id);
+            const values = usersCollection
+                ? toUserCreationRow({ values: entity.values })
+                : entity.values ?? {};
+            await accessor.create(values, entity.id);
         } catch (e) {
             // Without `/bulk` there is no upsert, so the preview's promise is
             // honoured the only way left: a row that collided on an id the user

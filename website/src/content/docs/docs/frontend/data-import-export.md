@@ -64,6 +64,10 @@ The collection's own rules — required fields, enum options, unique values — 
 
 A row whose id is already in the collection updates that record: the columns the file carries are written, and the others keep their stored values, so a file of `id,price` reprices existing products without repeating their required fields. A new row still needs every required field. A batch that mixes updates and new rows is written as two requests, so a refused new row can leave that batch's updates saved; **Retry** writes them again with the same values.
 
+### Importing users
+
+A new row in the users collection is a user creation: a `password` column is hashed, never stored as written, and a row without one gets a generated password or an invitation, as when an administrator adds a user. The passwords in such a file were usually set under another system's rules, so the import asks the server to skip the [password policy](/docs/backend/auth-endpoints/#password-policy) for those rows. The server agrees only when you are an administrator; anyone else importing users is held to the policy, and a weak password stops the import with `WEAK_PASSWORD`.
+
 ### Creating a collection from a file
 
 When you create a collection from a file, each column's type is inferred from its values. A column is a number only if every value in it is a number or text that converts to one exactly, so a column of zip codes, product codes with leading zeros, long SKUs or phone numbers stays text. A column that mixes types (numbers and words, booleans and numbers) is text. Blank cells do not count, so a mostly empty column is not marked required.

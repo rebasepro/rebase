@@ -197,6 +197,14 @@ export function callerScopes(c: Context<HonoEnv>): string[] {
     return scopesForRoles(rolesOf(user), configured);
 }
 
+/**
+ * Whether this request's caller holds the `admin` role. The service key signs
+ * in as one.
+ */
+export function callerIsAdmin(c: Context<HonoEnv>): boolean {
+    return hasAdminRole(rolesOf(c.get("user")));
+}
+
 /** Does this request's caller hold `scope`, on `target` when one is given? */
 export function hasScope(c: Context<HonoEnv>, scope: string, target?: string): boolean {
     return scopeGrants(callerScopes(c), scope, target);

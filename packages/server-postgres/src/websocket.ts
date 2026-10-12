@@ -1324,11 +1324,10 @@ colors: true }));
                         const usersCollection = request.status !== "existing" && request.upsert !== true && authAdapter?.prepareUserCreation
                             ? authCollectionAt(request.path)
                             : undefined;
+                        const caller = { roles: clientSessions.get(clientId)?.user?.roles ?? ["anon"] };
                         if (usersCollection) {
                             const body = (request.values ?? {}) as Record<string, unknown>;
-                            assertUserCreationBodyValid(authAdapter, usersCollection, body, {
-                                roles: clientSessions.get(clientId)?.user?.roles ?? ["anon"]
-                            });
+                            assertUserCreationBodyValid(authAdapter, usersCollection, body, caller);
                             assertNoFieldOpsOnCreate(body, "A create");
                         } else {
                             assertWriteRequest(request.path, request.values as Record<string, unknown>, request.status);
@@ -1360,7 +1359,7 @@ colors: true }));
                         // does: the row, and whether an invitation went out or
                         // the temporary password that did not.
                         const created = usersCollection
-                            ? await createUserThroughAuthCollection(authAdapter, usersCollection, (values ?? {}) as Record<string, unknown>, write)
+                            ? await createUserThroughAuthCollection(authAdapter, usersCollection, (values ?? {}) as Record<string, unknown>, caller, write)
                             : undefined;
                         const row = created ? { ...created.row, ...created.delivery } : await write(values);
                         wsDebug("💾 [WebSocket Server] SAVE_ENTITY result:", inspect(row, { depth: null,

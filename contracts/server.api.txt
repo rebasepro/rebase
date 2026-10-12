@@ -919,6 +919,7 @@ interface UploadPropertyContext { collection, property }
 interface UploadedFileContext { entityId, file, path, property, propertyKey, storage, values }
 interface UpsertOptions { idempotencyKey, ifMatch, onConflict, returning }
 interface UserCreationFinalizeResult { emailDeliveryFailed, invitationSent, temporaryPassword }
+interface UserCreationOptions { mayWaivePasswordPolicy }
 interface UserCreationPrepareResult { clearPassword, hookHandledEmail, invitationSent, values }
 interface UserCreationWriteContract { extraFields, independent, validate }
 interface UserManagementAdapter { createUser, deleteUser, getUserById, getUserRoles, listUsers, setUserRoles, updateUser }
