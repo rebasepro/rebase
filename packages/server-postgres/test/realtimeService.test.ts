@@ -237,7 +237,7 @@ subscriptionId: "sub-1" }
                 expect.objectContaining({ filter: expected }),
                 undefined
             );
-            expect(realtimeService.subscriptions.get("sub-1").collectionRequest.filter).toEqual(expected);
+            expect(realtimeService.subscriptions.get("sub-1")?.collectionRequest?.filter).toEqual(expected);
         });
 
         it("refuses an unknown operator by name instead of subscribing", async () => {

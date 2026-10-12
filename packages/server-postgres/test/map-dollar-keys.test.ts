@@ -48,6 +48,13 @@ function driver(): PostgresBackendDriver {
     return new PostgresBackendDriver(orm, new RealtimeService(orm, registry), registry);
 }
 
+/** The key a save answered with, narrowed to what `save` takes back. */
+function idOf(row: Record<string, unknown>): string | number {
+    const id = row.id;
+    if (typeof id !== "string" && typeof id !== "number") throw new Error(`save answered no id: ${JSON.stringify(row)}`);
+    return id;
+}
+
 async function storedSchema(): Promise<unknown> {
     const result = await db.query<{ schema: unknown }>("SELECT schema FROM docs");
     return result.rows[0]?.schema;
@@ -73,13 +80,13 @@ describe("a map value with `$` keys", () => {
     it("is stored as sent on an update, a single `$` key included", async () => {
         const created = await driver().save({ path: "docs", status: "new", collection: docs, values: { views: 0 } });
         await driver().save({
-            path: "docs", id: created.id, status: "existing", collection: docs,
+            path: "docs", id: idOf(created), status: "existing", collection: docs,
             values: { schema: { $ref: "#/defs/a" } }
         });
         expect(await storedSchema()).toEqual({ $ref: "#/defs/a" });
 
         await driver().save({
-            path: "docs", id: created.id, status: "existing", collection: docs,
+            path: "docs", id: idOf(created), status: "existing", collection: docs,
             values: { schema: { $comment: "only key" } }
         });
         expect(await storedSchema()).toEqual({ $comment: "only key" });
@@ -88,7 +95,7 @@ describe("a map value with `$` keys", () => {
     it("is still an operation when it is one real operator", async () => {
         const created = await driver().save({ path: "docs", status: "new", collection: docs, values: { schema: { a: 1 } } });
         await driver().save({
-            path: "docs", id: created.id, status: "existing", collection: docs,
+            path: "docs", id: idOf(created), status: "existing", collection: docs,
             values: { schema: { $merge: { b: 2 } } }
         });
         expect(await storedSchema()).toEqual({ a: 1, b: 2 });
@@ -97,7 +104,7 @@ describe("a map value with `$` keys", () => {
     it("leaves a misspelled operator on a number refused", async () => {
         const created = await driver().save({ path: "docs", status: "new", collection: docs, values: { views: 1 } });
         await expect(driver().save({
-            path: "docs", id: created.id, status: "existing", collection: docs,
+            path: "docs", id: idOf(created), status: "existing", collection: docs,
             values: { views: { $incr: 1 } }
         })).rejects.toMatchObject({ code: "INVALID_FIELD_OPERATION" });
     });
