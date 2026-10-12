@@ -43,7 +43,7 @@ import { buildBaasSchema, readCatalogueSchema } from "./schema/catalogue-schema"
 import { diffGeneratedSchemaAgainstCatalogue, warnOnGeneratedSchemaDrift } from "./schema/generated-schema-diff";
 import type { TableMeta } from "./schema/introspect-db-logic";
 import { detectConnectionPosture, ensureAppRole, ensureAppRoleGrants, revokeUserRoleSql, validatePolicyPgRoles, warnOnAnonymousGrants, warnOnLegacyRlsFunctions, warnOnRoleSchemaCollision, REBASE_USER_ROLE, type RawSqlRunner } from "./security/rls-enforcement";
-import { provisionTriggerCdc, refreshInstalledCdcFunction, type CdcTableRef } from "./services/cdc/trigger-cdc";
+import { provisionTriggerCdc, settleInstalledCapture, type CdcTableRef } from "./services/cdc/trigger-cdc";
 import { collectJunctionLinks } from "./services/cdc/junction-tables";
 import { collectionKeyColumns } from "./services/cdc/identity-columns";
 import { createChannelBus, resolveChannelBusSetting } from "./services/channel-bus";
@@ -1068,19 +1068,32 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
             }
 
             // Triggers an earlier boot attached keep firing whether or not this
-            // one provisions capture, so a function from a version that sent
-            // whole rows has to be replaced even when capture is off — any
-            // login can LISTEN to what it sends. Only a function that is
-            // already there: nothing is installed here.
+            // one provisions capture. With capture switched off they are taken
+            // off the tables: each write ran one and announced itself on a
+            // channel nothing listens to. Otherwise (capture wanted, not
+            // installed this boot) a function from a version that sent whole
+            // rows is replaced — any login can LISTEN to what it sends. Nothing
+            // is installed here either way.
             if (realtimeProvisions && !cdcFunctionCurrent) {
+                const capture = cdcMode === "off" ? "off" : "not-provisioned";
                 try {
-                    await refreshInstalledCdcFunction(cdcRunSql);
+                    const settled = await settleInstalledCapture(cdcRunSql, { capture });
+                    if ("removed" in settled && settled.removed > 0) {
+                        logger.info(
+                            `ℹ️ [CDC] REALTIME_CDC=off: removed the change-capture triggers an earlier boot attached ` +
+                            `(${settled.removed}). Realtime is app-level; unset REALTIME_CDC to capture changes again.`
+                        );
+                    }
                 } catch (err) {
                     logger.warn(
-                        "⚠️ [CDC] A change-capture trigger function from an earlier boot is installed and could not be " +
-                        "brought up to date. Older versions of it send every changed row on a channel any database " +
-                        "login can LISTEN to; if capture is not wanted, remove it with " +
-                        "`DROP FUNCTION rebase.rebase_cdc_notify() CASCADE`.",
+                        capture === "off"
+                            ? "⚠️ [CDC] REALTIME_CDC=off, but the change-capture triggers an earlier boot attached could not be " +
+                              "removed; they keep firing on every write. Remove them with " +
+                              "`DROP FUNCTION rebase.rebase_cdc_notify() CASCADE; DROP FUNCTION rebase.rebase_cdc_notify_statement() CASCADE`."
+                            : "⚠️ [CDC] A change-capture trigger function from an earlier boot is installed and could not be " +
+                              "brought up to date. Older versions of it send every changed row on a channel any database " +
+                              "login can LISTEN to; if capture is not wanted, set REALTIME_CDC=off, or remove it with " +
+                              "`DROP FUNCTION rebase.rebase_cdc_notify() CASCADE`.",
                         { detail: err instanceof Error ? err.message : String(err) }
                     );
                 }

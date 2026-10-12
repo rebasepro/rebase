@@ -12,7 +12,8 @@
  * function, attached the old way, to collection tables, a junction with a key
  * of its own, and an auth-shaped table the boot does not re-attach. Then it
  * boots the real bootstrapper over it — once with capture on, once with
- * `REALTIME_CDC=off` — and listens as a role with no grants.
+ * `REALTIME_CDC=off`, which removes the triggers — and listens as a role with
+ * no grants.
  *
  * Requires Docker.
  */
@@ -231,9 +232,12 @@ describe("A database instrumented by an older version (E2E)", () => {
         for (const event of heard) expect(event.row).toMatchObject({ post_id: "p1", tag_id: "t1" });
     }, 120_000);
 
-    it("sends only identities after one boot with REALTIME_CDC=off, which leaves the old triggers attached", async () => {
+    // A boot with capture off removes the triggers (calls 2026-10-12, S3),
+    // the auth-shaped table's included: the functions go with CASCADE, so
+    // nothing is left to send anything, rows or identities.
+    it("sends nothing after one boot with REALTIME_CDC=off, which takes the old triggers off", async () => {
         await instrumentTheOldWay(urlFor("cdc_off"));
         await boot("cdc_off", "off");
-        assertIdentityOnly(await listenAsGrantlessRole("cdc_off"));
+        expect(await listenAsGrantlessRole("cdc_off")).toEqual([]);
     }, 120_000);
 });

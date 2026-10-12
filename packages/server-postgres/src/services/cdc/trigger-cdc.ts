@@ -608,6 +608,58 @@ export async function refreshInstalledCdcFunction(run: RawSqlRunner): Promise<bo
 }
 
 /**
+ * Take change capture off the database: detach every capture trigger and drop
+ * both functions. Returns how many triggers were attached.
+ *
+ * For `REALTIME_CDC=off`. Capture switched off used to leave the triggers in
+ * place, so every write to every instrumented table still ran one and sent a
+ * notification on a channel nothing listened to. Nothing depends on them once
+ * capture is off: a process without capture announces its own writes on the
+ * cross-instance channel, and the instances that serve realtime listen there.
+ *
+ * `DROP FUNCTION … CASCADE` takes the triggers with it in one statement. It
+ * waits for each table's lock like any trigger DDL, so it runs with the boot's
+ * lock budget and is retried on a lock timeout; a database still contended
+ * after that keeps its triggers and the caller reports it.
+ */
+export async function removeTriggerCdc(run: RawSqlRunner): Promise<number> {
+    const rows = await run(
+        "SELECT count(*)::int AS n FROM pg_trigger t " +
+        `WHERE t.tgfoid IN (${ROW_FUNCTION_OID}, ${STATEMENT_FUNCTION_OID})`
+    );
+    const attached = Number(rows[0]?.n ?? 0);
+    const functions = await run(
+        `SELECT ${ROW_FUNCTION_OID} IS NOT NULL AS row_installed, ${STATEMENT_FUNCTION_OID} IS NOT NULL AS statement_installed`
+    );
+    if (attached === 0 && functions[0]?.row_installed !== true && functions[0]?.statement_installed !== true) return 0;
+    await attachWithLockBudget(
+        run,
+        `DROP FUNCTION IF EXISTS ${CDC_TRIGGER_FUNCTION}() CASCADE;
+` +
+        `DROP FUNCTION IF EXISTS ${CDC_STATEMENT_FUNCTION}() CASCADE;`
+    );
+    return attached;
+}
+
+/**
+ * What a boot that does not provision capture does with capture an earlier
+ * boot installed.
+ *
+ *  - `capture: "off"` — `REALTIME_CDC=off` — removes it ({@link removeTriggerCdc}).
+ *  - `capture: "not-provisioned"` — capture is wanted but this boot could not
+ *    install it (no direct URL, `auto` fell back) — leaves the triggers and
+ *    brings the functions up to date ({@link refreshInstalledCdcFunction}),
+ *    since they keep firing.
+ */
+export async function settleInstalledCapture(
+    run: RawSqlRunner,
+    options: { capture: "off" | "not-provisioned" }
+): Promise<{ removed: number } | { refreshed: boolean }> {
+    if (options.capture === "off") return { removed: await removeTriggerCdc(run) };
+    return { refreshed: await refreshInstalledCdcFunction(run) };
+}
+
+/**
  * The columns a table's trigger is attached with: its primary key, read from
  * the catalogue, then each requested column the table actually has — and the
  * table's `relkind`, which decides its level.

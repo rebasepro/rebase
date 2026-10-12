@@ -55,6 +55,10 @@ writes on the cross-instance channel instead, without holding a `LISTEN`
 connection. Either way, a function that writes a row still wakes up every
 subscriber on the `api`.
 
+Give every process the same `REALTIME_CDC`. A process that owns the schema
+with `REALTIME_CDC=off` removes the capture triggers at boot, and an `api`
+still set to `auto` would then listen for changes nobody announces.
+
 ## Docker Compose
 
 Two services from one image, one bundle and one database:
