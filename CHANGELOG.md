@@ -46,6 +46,15 @@
   and the `offset` was never applied, though the docs already said no window
   parameter is ignored. Send one of them; see the upgrade guide.
 
+- **An empty string on a required string field is refused like a missing
+  value.** Every write door (REST create, update, `/bulk`, upsert and batch,
+  the realtime socket, MCP) answers `400 VALIDATION_CONSTRAINT` with the
+  `required` violation, on creates and on updates, even where the field has a
+  `defaultValue`: a default fills an absent key, not an empty one. A
+  collection with a `beforeSave` keeps its exemption, since the hook may fill
+  the value. The admin panel already writes `null` for a cleared field. See
+  the upgrade guide.
+
 #### Postgres
 
 - **On a table whose name is 42 bytes or more, the three default admin-write
@@ -93,6 +102,28 @@
   declares onChange, name, position, endAdornment, multiple or
   padding.** None was ever read, so passing one was a silent no-op and is now
   a type error. Delete the prop.
+
+#### Auth
+
+- **A session lasts 30 days of inactivity by default, whichever way the server
+  starts.** The runtime (`JWT_REFRESH_EXPIRES_IN`) defaulted to 400 days while
+  `initializeRebaseBackend` and the scaffold's `.env.example` used 30, so how
+  long a session lasted depended on the entry point. The refresh token is
+  still sliding: an active user is never signed out. Set
+  `JWT_REFRESH_EXPIRES_IN=400d` (or `auth.refreshExpiresIn`) to keep the
+  longer window.
+
+- **An administrator's chosen password is held to the password policy
+  (`400 WEAK_PASSWORD`).** On `POST /api/admin/users` and on every create on
+  the users collection through the data API (REST, `/bulk`, batch, MCP, the
+  socket), as registration, resets and `PUT /api/admin/users/:uid` already
+  were. On a `/bulk` the message names the row (`Row <n>: `), like the bulk's
+  other row errors, so the admin panel's import can say which line failed. An
+  import may send `skipPasswordPolicy: true` on a create; the server honours
+  it only for an administrator or the service key, and never stores it. The
+  admin panel's import sends it for rows that carry a `password`.
+  `AuthAdapter.prepareUserCreation` takes an optional third argument,
+  `UserCreationOptions { mayWaivePasswordPolicy }`.
 
 ### Added
 
@@ -233,6 +264,34 @@
 
 - **`pnpm check:icon-button-names` fails on any `IconButton` in package source
   without an accessible name.**
+
+#### Auth
+
+- **`GET /api/admin/users/pick`, the user picker's read.** It answers id,
+  display name, email and avatar per user, nothing else, to `users:read`
+  holders and to anyone who may write a collection with a `userSelect` field,
+  so an editor's user picker is no longer empty and a picked user shows by
+  name instead of a bare id. A collection whose write rules are raw SQL cannot
+  be judged ahead and does not count: there only `users:read` holders can
+  pick. New type `PickedUser`.
+
+#### rls-check
+
+- **An unconditional policy that nothing can reach yet is reported as latent
+  `info`.** For example `USING (true) TO anon` on a table anon holds no
+  privilege on, or in a schema it has no USAGE on. Postgres answers
+  "permission denied" today, so it is not an exposure, but one `GRANT` would
+  make it critical with no change to the policy. It is reported under
+  `policy-always-true` at `info`, titled "latent", with what is missing and
+  the fix. Info is below every `--fail-on` except `info`, so default runs are
+  unaffected.
+
+#### Studio
+
+- **The property editor warns when a smaller max narrows a varchar or char
+  column.** On those column types `validation.max` is the column's width, so
+  lowering it is a DDL change: `rebase db push` asks before it narrows a
+  column, and the change fails while a stored value is longer.
 
 ### Changed
 
@@ -424,6 +483,22 @@
   History retention is resolved per rule rather than cached per channel name,
   and the prune throttle forgets expired entries: 20,000 invented names at
   3,600 a minute left 40,000 entries, now fewer than 6,000.
+
+- **`REALTIME_CDC=off` removes the change-capture triggers an earlier boot
+  installed.** The process that owns the schema drops both capture functions,
+  and the triggers with them, and logs how many. Give every process the same
+  `REALTIME_CDC`: a schema owner set to `off` beside an `api` left on `auto`
+  leaves the `api` listening for nothing.
+
+- **The realtime socket reads a filter the way REST, MCP and the SDK do.** A
+  two-element value array is an implicit `in`, and an unknown operator is an
+  `UNKNOWN_FILTER_OPERATOR` refusal, on list, count and subscription frames.
+
+- **Frames arriving on one socket while its identity check is in flight share
+  that check.** Each used to query the auth store, which a client
+  re-subscribing after a reconnect did once per subscription. Nothing is
+  cached past the flight and nothing is shared across sockets; a demotion
+  during a shared lookup is seen one frame later.
 
 #### Admin (CMS & app)
 
@@ -737,6 +812,11 @@
   store takes part through the optional `JobStore.sweepExpired()` and
   `CronStore.sweepClaims()`.
 
+- **A job attempt times out after 15 minutes when `jobs.timeoutMs` is not
+  set.** The worker names the default in one log line at start. Set
+  `jobs.timeoutMs` for longer jobs, or `0` for no limit (it used to be
+  refused).
+
 #### MCP
 
 - **Every MCP tool answers in compact JSON, and the collection listing is sent
@@ -861,6 +941,19 @@
 - **`schema generate` warns when a `hasMany` / `hasOne` target declares no
   foreign-key column back.**
 
+- **A `map` property can store objects whose keys start with `$`.** JSON
+  Schema's `$schema` and `$id`, or a MongoDB export, were refused as
+  misspelled field operations. On a map, only a single-key object whose key is
+  a real operator (`{ "$merge": … }`) is an operation; other types still
+  refuse a misspelled one. The offline client has no schema, so it keeps the
+  strict reading while offline.
+
+- **Reverting to a history entry recorded before 0.24 writes the row's
+  columns.** It answered 400 `VALIDATION_UNKNOWN_FIELDS`. An embedded owning
+  relation goes back as its foreign key, and `meta.dropped_fields` in the
+  answer names every other key it left out. A masked value (`********`)
+  cannot be told apart and is still written back.
+
 #### Postgres
 
 - **A server that boots while a long report, transaction or `pg_dump` reads
@@ -907,6 +1000,13 @@
   collided change: they are now `<head>_<hash8>_<op>`, at most 63 bytes. The
   next boot or `rebase db push` drops the truncated policy and creates one
   policy per operation.
+
+- **Boot gives an `isId: "uuid"` key the default its table is missing.** A
+  table adopted with `rebase schema introspect`, or created by hand, could
+  carry a uuid key with no default, and every create there failed on a NULL
+  primary key. The next boot now sets `DEFAULT gen_random_uuid()`, as it
+  already did for the implicit key. A SQL strategy's key is still left alone,
+  because its function may not exist yet.
 
 #### CLI
 
@@ -1114,6 +1214,13 @@
 - **An app whose locale prop starts in a language other than English can
   change it later.** The first language is no longer stored as the user's
   choice.
+
+- **A table cell shows validation only after you edit it.** A stored value
+  that fails a column's rule (a rule added later, or a row written over the
+  API or by SQL) drew a red border and an error tooltip on every cell holding
+  one as soon as the table rendered. Cells now judge a value once it is
+  edited, as the record form does. An invalid edit is still flagged and not
+  saved.
 
 #### Studio
 
@@ -1431,6 +1538,20 @@
 
 - **The functions 404 names a file that failed to load only to a signed-in
   caller.** An anonymous caller gets the plain "No function named …" answer.
+
+- **History entries never expose a related row's values.** Relations are
+  stored and served as `{ __type, id, path }` references. Delete entries
+  recorded before 0.24, which embedded the related row, are served with the
+  embedded values removed, and the recorder strips an embedded row before it
+  stores an entry. New `withRelationReferencesOnly` in `@rebasepro/common`.
+
+### Documentation
+
+#### Storage & email
+
+- **`GET /api/storage/sources` is public on purpose, and the storage page says
+  why.** It names the configured sources, never a file; listing and reading
+  files still need a caller. A test holds it public.
 
 ## [0.24.0] - 2026-10-08
 

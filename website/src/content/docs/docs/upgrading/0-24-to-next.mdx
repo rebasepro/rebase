@@ -19,7 +19,9 @@ the MCP collection listing, and the admin's translations. The rest come from the
 backlog sweep: stricter refusals at boot and on `OPTIONS`, the SDK's cron path
 and offline reads, the storage source registry, unused UI kit props, the
 users-collection upsert, a read naming both `page` and `offset`, and the default
-policy names on long tables.
+policy names on long tables. The last three are product calls: the default
+session length, the password policy on an administrator's chosen password, and
+an empty string on a required field.
 
 ---
 
@@ -229,3 +231,75 @@ that drops them. The old names never existed in the database.
 **What to change:** nothing for the database. The next boot or `rebase db push`
 drops the truncated policy and creates one policy per operation. Update any
 script that names the old policies.
+
+## 80. Sessions last 30 days of inactivity by default
+
+The refresh token's default lifetime is now 30 days on every entry point. A
+server started with the `rebase-server` runtime (or `rebase start`) used 400
+days whenever `JWT_REFRESH_EXPIRES_IN` was unset; a hand-written
+`initializeRebaseBackend` already used 30.
+
+The lifetime is sliding: every refresh issues a token good for another 30
+days, so a user who opens the app at least once a month stays signed in. A
+user idle for longer signs in again. Tokens issued before the upgrade keep the
+expiry they were issued with until their next refresh.
+
+**Who is affected:** a deployment on the runtime that never set
+`JWT_REFRESH_EXPIRES_IN`, whose users return less than once a month.
+
+**What to change:** nothing, to take the new default. To keep the previous
+behaviour, set it explicitly:
+
+```bash
+JWT_REFRESH_EXPIRES_IN=400d
+```
+
+or `auth: { refreshExpiresIn: "400d" }` in an ejected backend. Browsers cap
+the refresh cookie at 400 days, so a longer value buys nothing in cookie mode.
+
+## 81. An administrator's chosen password must meet the password policy
+
+`POST /api/admin/users` and a create on the users collection through the data
+API (`POST /api/data/users`, `/bulk`, a batch, MCP `create_document`, a socket
+save) now refuse a `password` that fails the policy with `400 WEAK_PASSWORD`,
+as sign-up, resets and `PUT /api/admin/users/:uid` already did. Nothing is
+written and no create hook runs. On a `/bulk`, the message starts
+`Row <n>: `, like the bulk's other row errors. A create without a password is
+unchanged: a password is generated, or an invitation sent.
+
+**Who is affected:** code that creates users with a password chosen elsewhere,
+such as an import or a sync from another system.
+
+**What to change:** to import accounts whose passwords were set elsewhere, send
+`skipPasswordPolicy: true` in each create body (on each row of a `/bulk`), as
+an administrator or with the service key:
+
+```ts
+await client.admin.createUser({ email, password: legacyPassword, skipPasswordPolicy: true });
+```
+
+From any other caller the flag waives nothing. It is never stored and never
+reaches `onCreateUser` or `onAdminCreateUser`. The admin panel's import sends
+it for you on rows that carry a `password`. A custom `AuthAdapter` receives
+the decision as the new third argument of `prepareUserCreation`
+(`{ mayWaivePasswordPolicy }`); an adapter that ignores it keeps its current
+behaviour. To change the policy itself, pass `auth.hooks.validatePasswordStrength`.
+
+## 82. An empty string on a required string field is refused
+
+A write that sends `""` for a `string` property with `validation.required` now
+answers `400 VALIDATION_CONSTRAINT`, with a `details.violations` entry
+`{ field, code: "required" }`: the same answer as a missing value. This applies
+to creates and updates on every door (REST, bulk, batch, upsert, the realtime
+socket, MCP), and even when the property has a `defaultValue`, since a default
+fills an absent key, not an empty one. The admin panel already writes `null`
+for a cleared field, so it is unaffected.
+
+**Who is affected:** code that writes `""` to a required string field, for
+example a form or an import that sends every column whether filled or not.
+
+**What to change:** send a value, omit the key on create when a `defaultValue`
+should apply, or drop `required` from fields that may legitimately be empty.
+Collections that declare a `beforeSave` are not checked at the boundary (the
+hook may fill the value), as before. Server code writing in-process
+(`rebase.data`) is not affected.
