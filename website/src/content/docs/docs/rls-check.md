@@ -276,9 +276,12 @@ A permissive policy whose `USING` or `WITH CHECK` expression is a constant truth
 itself through a cast. Permissive policies are ORed together, so a single one of these satisfies
 the table's row filter no matter how strict every other policy is.
 
-Like every check, it reports the policy only when a role it applies to can reach the table:
+Like every check, it reports an exposure only when a role it applies to can reach the table:
 holds the privilege its command needs, and `USAGE` on the schema. `USING (true) TO anon` on a
 table `anon` holds nothing on is answered "permission denied" before the policy is consulted.
+That policy is reported as **info**, titled *latent*: nothing reaches the table through it
+today, and one `GRANT` would make it a critical exposure with no change to the policy. Info is
+below every `--fail-on` except `info`, so it never fails a default run.
 
 When only the `WITH CHECK` of an `UPDATE` policy is constant — `USING (user_id = rebase.uid())
 WITH CHECK (true)` — it is **high**: `USING` still decides which rows can be touched, and the

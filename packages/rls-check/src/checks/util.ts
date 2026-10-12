@@ -182,7 +182,7 @@ export function policyTargetsExposedRole(snapshot: DbSnapshot, policy: DbPolicy)
 }
 
 /** The privileges a policy's command is exercised with. */
-const COMMAND_PRIVILEGES: Record<PolicyCommand, Privilege[]> = {
+export const COMMAND_PRIVILEGES: Record<PolicyCommand, Privilege[]> = {
     ALL: DML,
     SELECT: ["SELECT"],
     INSERT: ["INSERT"],

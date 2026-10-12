@@ -13,12 +13,15 @@
 import { describe, expect, it } from "vitest";
 
 import { DEFAULT_ROLES, foreignKey, grant, policy, role, snapshot, table } from "../../test/fixtures/snapshot";
-import type { DbSnapshot } from "../types";
+import type { DbSnapshot, Finding } from "../types";
 import { junctionTableUnprotected } from "./junction-table-unprotected";
 import { policyAlwaysTrue } from "./policy-always-true";
 import { policyAnonymousTautology } from "./policy-anonymous-tautology";
 import { policyAuthenticatedTautology } from "./policy-authenticated-tautology";
 import { rlsDisabled } from "./rls-disabled";
+
+/** What a check calls an exposure: anything above the `info` a latent finding is. */
+const exposures = (findings: Finding[]): Finding[] => findings.filter((f) => f.severity !== "info");
 
 describe("a policy check reports only a table its roles can reach", () => {
     const withGrants = (grants: DbSnapshot["grants"], command: "SELECT" | "INSERT" | "ALL" = "SELECT") =>
@@ -36,13 +39,13 @@ describe("a policy check reports only a table its roles can reach", () => {
         });
 
     it("policy-always-true: not without a grant", () => {
-        expect(policyAlwaysTrue.run(withGrants([]))).toEqual([]);
+        expect(exposures(policyAlwaysTrue.run(withGrants([])))).toEqual([]);
         expect(policyAlwaysTrue.run(withGrants([grant("public", "notes", "anon", ["SELECT"])]))).toHaveLength(1);
     });
 
     it("policy-always-true: not when the grant is for another command", () => {
         expect(
-            policyAlwaysTrue.run(withGrants([grant("public", "notes", "anon", ["SELECT"])], "INSERT"))
+            exposures(policyAlwaysTrue.run(withGrants([grant("public", "notes", "anon", ["SELECT"])], "INSERT")))
         ).toEqual([]);
         expect(
             policyAlwaysTrue.run(withGrants([grant("public", "notes", "anon", ["INSERT"])], "INSERT"))
@@ -51,7 +54,7 @@ describe("a policy check reports only a table its roles can reach", () => {
 
     it("policy-always-true: not when the grant goes to a role the policy does not apply to", () => {
         expect(
-            policyAlwaysTrue.run(withGrants([grant("public", "notes", "authenticated", ["SELECT"])]))
+            exposures(policyAlwaysTrue.run(withGrants([grant("public", "notes", "authenticated", ["SELECT"])])))
         ).toEqual([]);
     });
 
@@ -152,5 +155,61 @@ describe("a role without USAGE on the schema reaches nothing in it", () => {
 
     it("assumes USAGE on a schema it has no record of", () => {
         expect(rlsDisabled.run(hidden([{ schema: "public", grantee: "PUBLIC" }]))).toHaveLength(1);
+    });
+});
+
+/**
+ * An unconditional policy no exposed role can reach the table through yet is
+ * silent as an exposure, which is what the docs promise. It is still one
+ * GRANT away from a critical one — a `GRANT SELECT … TO anon` in a later
+ * migration makes it live with nothing else changed — so it is reported as
+ * `info`, "latent", below every `--fail-on` but `info`.
+ */
+describe("policy-always-true reports an unconditional policy nobody can reach yet as latent info", () => {
+    const open = (grants: DbSnapshot["grants"], extra: Partial<DbSnapshot> = {}, roles = ["anon"]) =>
+        snapshot({
+            relations: [table("public", "notes", { rlsEnabled: true })],
+            policies: [policy("public", "notes", "open", { roles, using: "true" })],
+            grants,
+            ...extra
+        });
+
+    it("is info, not an exposure, when the role holds no privilege for the command", () => {
+        const findings = policyAlwaysTrue.run(open([]));
+        expect(findings).toHaveLength(1);
+        const [f] = findings;
+        expect(f.id).toBe("policy-always-true");
+        expect(f.severity).toBe("info");
+        expect(f.title).toContain("latent");
+        expect(f.target.policy).toBe("open");
+        expect(f.detail).toContain("SELECT");
+        expect(f.impact).toContain("permission denied");
+        expect(f.impact).toContain("GRANT");
+        expect(f.fix).toContain('ALTER POLICY "open" ON "public"."notes"');
+    });
+
+    it("is info when the role holds the privilege but not USAGE on the schema", () => {
+        const [f] = policyAlwaysTrue.run(open(
+            [grant("public", "notes", "anon", ["SELECT"])],
+            { schemaUsage: [{ schema: "public", grantee: "postgres" }] }
+        ));
+        expect(f.severity).toBe("info");
+        expect(f.detail).toContain("USAGE");
+    });
+
+    it("becomes the critical exposure once the grant is there", () => {
+        const [f] = policyAlwaysTrue.run(open([grant("public", "notes", "anon", ["SELECT"])]));
+        expect(f.severity).toBe("critical");
+        expect(f.title).not.toContain("latent");
+    });
+
+    it("says nothing for a policy that names no exposed role", () => {
+        expect(policyAlwaysTrue.run(open([], {}, ["service_role"]))).toEqual([]);
+    });
+
+    it("says nothing for a policy that scopes its rows", () => {
+        const scoped = open([]);
+        scoped.policies[0].using = "(user_id = auth.uid())";
+        expect(policyAlwaysTrue.run(scoped)).toEqual([]);
     });
 });

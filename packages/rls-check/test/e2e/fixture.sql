@@ -543,7 +543,8 @@ GRANT SELECT ON public.vuln_current_setting TO authenticated;
 -- ---------------------------------------------------------------------------
 
 -- `USING (true) TO anon`, and anon holds nothing on the table: anon gets
--- "permission denied" before the policy is ever consulted.
+-- "permission denied" before the policy is ever consulted. It is reported as
+-- latent `info` only: one GRANT away from a critical, never an exposure today.
 CREATE TABLE public.secure_true_ungranted (
     id    uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     body  text

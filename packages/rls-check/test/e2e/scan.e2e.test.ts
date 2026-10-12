@@ -89,7 +89,6 @@ const SECURE_OBJECTS = [
     "secure_ledger_view_invoker_t",
     "secure_anon_insert_nocheck",
     "secure_anon_delete_nousing",
-    "secure_true_ungranted",
     "secure_post_tags_ungranted",
     "secure_no_schema_usage"
 ];
@@ -391,6 +390,16 @@ describe.skipIf(!dockerAvailable)("rls-check against a real PostgreSQL", () => {
         await expect(
             querySqlAs(container.connectionString, "anon", "SELECT * FROM hidden_ops.secure_no_schema_usage")
         ).rejects.toThrow(/permission denied for schema/);
+    });
+
+    it("reports the ungranted USING (true) as latent info, and as nothing worse", () => {
+        // anon gets "permission denied" today (asserted above); one GRANT would
+        // make the policy a critical exposure with nothing else changed.
+        expect(
+            full.findings
+                .filter((finding) => objectName(finding) === "secure_true_ungranted")
+                .map((finding) => [finding.id, finding.severity])
+        ).toEqual([["policy-always-true", "info"]]);
     });
 
     it("grades a constant WITH CHECK under a scoped or absent USING high, not critical", () => {

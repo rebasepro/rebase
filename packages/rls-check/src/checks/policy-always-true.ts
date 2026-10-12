@@ -3,13 +3,17 @@ import type { Check, DbPolicy, DbSnapshot, Finding, Severity } from "../types";
 import { isUnconditionalTrue } from "./sql";
 import {
     callerIdCall,
+    COMMAND_PRIVILEGES,
+    DML,
     finding,
+    hasSchemaUsage,
     isPublicRole,
     isRebaseManagedPolicy,
     listAnd,
     managedPolicyFix,
     policiesFor,
     policyReachedBy,
+    policyTargetsExposedRole,
     qi,
     qrel,
     relationAt,
@@ -47,13 +51,17 @@ export const policyAlwaysTrue: Check = {
             if (!snapshot.schemas.includes(policy.schema)) continue;
             if (!policy.permissive) continue;
 
-            const exposed = policyReachedBy(snapshot, policy);
-            if (exposed.length === 0) continue;
-
             const clauses: string[] = [];
             if (isUnconditionalTrue(policy.using)) clauses.push("USING");
             if (isUnconditionalTrue(policy.withCheck)) clauses.push("WITH CHECK");
             if (clauses.length === 0) continue;
+
+            const exposed = policyReachedBy(snapshot, policy);
+            if (exposed.length === 0) {
+                const latent = latentFinding(snapshot, policy, clauses, uidCall);
+                if (latent) findings.push(latent);
+                continue;
+            }
 
             const { severity, gate, checkOnly } = unconditionalReading(snapshot, policy, clauses);
             const rel = relationAt(snapshot, policy.schema, policy.table);
@@ -125,6 +133,66 @@ export const policyAlwaysTrue: Check = {
         return findings;
     }
 };
+
+/**
+ * An unconditional policy aimed at an exposed role that cannot reach the table
+ * yet: it holds no privilege the command needs, or no USAGE on the schema.
+ *
+ * Postgres answers "permission denied" before the policy is consulted, so it is
+ * not an exposure, and every other finding here claims one. It is one GRANT
+ * away from being a critical one, though, with nothing else changed — a later
+ * migration's `GRANT SELECT … TO anon` turns it on. So it is `info`: shown, and
+ * below every `--fail-on` except `info` itself.
+ */
+function latentFinding(
+    snapshot: DbSnapshot,
+    policy: DbPolicy,
+    clauses: string[],
+    uidCall: string
+): Finding | undefined {
+    const named = policyTargetsExposedRole(snapshot, policy);
+    if (named.length === 0) return undefined;
+    const privileges = COMMAND_PRIVILEGES[policy.command] ?? DML;
+    const usageRoles = (role: string): string[] =>
+        isPublicRole(role) ? snapshot.exposedRoles : [role];
+    const noUsage = named.every((role) =>
+        usageRoles(role).every((r) => !hasSchemaUsage(snapshot, policy.schema, r)));
+    const blocker = noUsage
+        ? `${listAnd(named)} ${named.length === 1 ? "has" : "have"} no USAGE on schema ${qi(policy.schema)}`
+        : `${listAnd(named)} ${named.length === 1 ? "holds" : "hold"} no ${privileges.join("/")} ` +
+          `on ${policy.schema}.${policy.table}`;
+    const grant = noUsage
+        ? `GRANT USAGE ON SCHEMA ${qi(policy.schema)}`
+        : `GRANT ${privileges[0]} ON ${qrel(policy.schema, policy.table)}`;
+    return finding({
+        id: ID,
+        severity: "info",
+        confidence: "certain",
+        title:
+            `Policy "${policy.name}" on ${policy.schema}.${policy.table} is ${listAnd(clauses)} (true) ` +
+            `for ${listAnd(named)} — latent: ${blocker}`,
+        target: { schema: policy.schema, table: policy.table, policy: policy.name },
+        detail:
+            `This permissive ${policy.command} policy's ${listAnd(clauses)} expression is a constant truth ` +
+            `for ${listAnd(named)}, but ${blocker}, so the policy is never consulted for them today. ` +
+            `Nothing about the policy itself limits them.`,
+        impact:
+            `None today: Postgres answers "permission denied" before the policy is consulted. ` +
+            `A \`${grant}\` to ${listAnd(named)} — in a later migration, or by a platform default — makes ` +
+            `this a critical exposure at once, with no change to the policy.`,
+        fix: isRebaseManagedPolicy(snapshot, policy)
+            ? managedPolicyFix(
+                policy,
+                `replace the rule that grants unconditional ${policy.command === "SELECT" ? "reads" : "access"} ` +
+                `with one that scopes the rows — \`ownerField\`, \`roles\`, or a \`condition\``
+            )
+            : `-- Scope it before anything grants access, e.g.:\n` +
+            `ALTER POLICY ${qi(policy.name)} ON ${qrel(policy.schema, policy.table)}\n` +
+            `    ${clauses.includes("USING") ? `USING (user_id = ${uidCall})` : `WITH CHECK (user_id = ${uidCall})`};\n` +
+            `-- or drop it if nothing should reach the table this way:\n` +
+            `-- DROP POLICY ${qi(policy.name)} ON ${qrel(policy.schema, policy.table)};`
+    });
+}
 
 /**
  * How bad an unconditional clause on `policy` is, by the command it governs and
