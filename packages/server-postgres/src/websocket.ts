@@ -750,6 +750,38 @@ export function createPostgresWebSocket(
         return "live";
     }
 
+    /** The per-frame check in flight on each socket, and what it asks. */
+    const frameChecks = new Map<string, { credential: string; impersonate?: string; outcome: Promise<"live" | "ended" | "unavailable"> }>();
+
+    /**
+     * {@link recheckIdentity} for a frame, shared by the frames of one socket
+     * that arrive while it is in flight.
+     *
+     * A client that reconnects after a deploy re-sends all its subscriptions
+     * at once, and each frame asked the auth store the same question at the
+     * same moment: a thousand clients with ten subscriptions were ten thousand
+     * lookups where a thousand answer. A frame that arrives while this
+     * socket's check of the same credential and impersonation target is under
+     * way waits for that answer instead. The answer is the flight's only:
+     * dropped as it settles, so the next frame asks afresh. What this trades
+     * is bounded by one lookup: a demotion that lands while the shared lookup
+     * runs is seen by the next frame rather than by these.
+     */
+    function recheckIdentityForFrame(clientId: string): Promise<"live" | "ended" | "unavailable"> {
+        const session = clientSessions.get(clientId);
+        const credential = session?.credential;
+        if (!session || !credential) return recheckIdentity(clientId);
+        const inFlight = frameChecks.get(clientId);
+        if (inFlight && inFlight.credential === credential && inFlight.impersonate === session.impersonate) {
+            return inFlight.outcome;
+        }
+        const outcome = recheckIdentity(clientId).finally(() => {
+            if (frameChecks.get(clientId)?.outcome === outcome) frameChecks.delete(clientId);
+        });
+        frameChecks.set(clientId, { credential, impersonate: session.impersonate, outcome });
+        return outcome;
+    }
+
     /**
      * A socket's whole allowance of fetching realtime frames: the default, or
      * the realtime service's subscription ceiling where a deployment raised
@@ -1035,7 +1067,7 @@ roles: verifiedUser.roles }
                     const session = clientSessions.get(clientId);
                     if (session?.user && session.credential
                         && Date.now() - session.checkedAt >= (CHANNEL_MESSAGE_TYPES.has(type) ? CHANNEL_RECHECK_MIN_MS : 0)) {
-                        const outcome = await recheckIdentity(clientId);
+                        const outcome = await recheckIdentityForFrame(clientId);
                         if (outcome === "ended") return;
                         if (outcome === "unavailable") {
                             sendError("ERROR", "ROLE_LOOKUP_FAILED", "Could not verify your permissions. Please try again.");

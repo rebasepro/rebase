@@ -233,3 +233,65 @@ describe("the identity sweep", () => {
         expect(second.ws.close).not.toHaveBeenCalled();
     });
 });
+
+// Calls 2026-10-12 (S10, D-RT-6): every data frame re-reads the socket's
+// identity before it runs. A client re-subscribing after a deploy sends its
+// subscriptions at once, and each asked the auth store the same question
+// concurrently — ten subscriptions, ten lookups. Frames that arrive while one
+// check of the same credential is in flight now share it. Nothing outlives
+// the flight: the next frame after it asks again.
+describe("the per-frame identity check", () => {
+    const subscribe = (i: number) => ({ type: "subscribe_collection", requestId: `s${i}`, payload: { path: "posts", subscriptionId: `sub-${i}` } });
+
+    it("asks once for frames that arrive while a check is in flight", async () => {
+        const socket = await signedIn("t1");
+        asked = [];
+        held.add("t1");
+
+        const frames = Array.from({ length: 10 }, (_, i) => socket.send(subscribe(i)));
+        await settle();
+        expect(asked).toEqual(["t1"]);
+
+        held.delete("t1");
+        await releaseAll();
+        await Promise.all(frames);
+        expect(asked).toEqual(["t1"]);
+        expect(socket.ws.close).not.toHaveBeenCalled();
+    });
+
+    it("keeps no answer past its flight: the next frame asks again", async () => {
+        const socket = await signedIn("t1");
+        asked = [];
+        await socket.send(subscribe(1));
+        await socket.send(subscribe(2));
+        expect(asked).toEqual(["t1", "t1"]);
+    });
+
+    it("refuses every frame that waited on a check that found the credential revoked", async () => {
+        const socket = await signedIn("t1");
+        asked = [];
+        held.add("t1");
+        const frames = Array.from({ length: 3 }, (_, i) => socket.send(subscribe(i)));
+        await settle();
+        accounts.delete("t1");
+        await releaseAll();
+        await Promise.all(frames);
+
+        expect(asked).toEqual(["t1"]);
+        expect(socket.ws.close).toHaveBeenCalledWith(4001, expect.any(String));
+        expect(socket.frames().some(f => f.payload?.error?.code === "SESSION_ENDED")).toBe(true);
+    });
+
+    it("shares a check only within one socket, never across sockets", async () => {
+        const first = await signedIn("t1");
+        const second = await signedIn("t1");
+        asked = [];
+        held.add("t1");
+        const frames = [first.send(subscribe(1)), first.send(subscribe(2)), second.send(subscribe(3))];
+        await settle();
+        held.delete("t1");
+        await releaseAll();
+        await Promise.all(frames);
+        expect(asked).toEqual(["t1", "t1"]);
+    });
+});
