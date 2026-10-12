@@ -90,6 +90,11 @@ in a callback, a seed script. What holds there is what the database enforces —
 of a `varchar` or `char` column. Anything else your server code writes, check in
 the code that writes it.
 
+The admin panel checks the same rules before it saves, in the record form and in
+the collection table's inline editor. A table cell judges a value once you edit
+it: a stored value that fails a rule added later shows no error in the table
+until someone edits that cell.
+
 ### Every type
 
 | Rule | Type | Description |

@@ -124,6 +124,11 @@ export const PropertyTableCell = React.memo<PropertyTableCellProps<any>>(
         const [error, setError] = useState<Error | undefined>();
         const [validationError, setValidationError] = useState<Error | undefined>();
         const [savedTimestamp, setSavedTimestamp] = useState<number>(0);
+        // Whether the user has edited what the cell holds. Only an edited value
+        // is judged: a stored value that fails a rule added later is the
+        // record's state, not something the user did, and drawing it red on
+        // every row as the table renders said otherwise.
+        const [edited, setEdited] = useState(false);
 
         const onValueUpdated = useCallback(() => {
             setSavedTimestamp(Date.now());
@@ -143,6 +148,7 @@ export const PropertyTableCell = React.memo<PropertyTableCellProps<any>>(
             () => {
                 if (!equal(value, internalValueRef.current)) {
                     setValidationError(undefined);
+                    setEdited(false);
                     setInternalValue(value);
                     internalValueRef.current = value;
                     onValueUpdated();
@@ -200,18 +206,22 @@ export const PropertyTableCell = React.memo<PropertyTableCellProps<any>>(
 
         // What the cell holds, judged by its column's schema — the only two
         // things the result depends on. It also re-ran for every new row
-        // object a realtime frame brought, changed or not.
+        // object a realtime frame brought, changed or not. Only once edited.
         useEffect(() => {
+            if (!edited) return;
+            let current = true;
             validation
                 .safeParseAsync(internalValue)
                 .then((result) => {
+                    if (!current) return;
                     if (result.success) {
                         setValidationError(undefined);
                     } else {
                         setValidationError(result.error);
                     }
                 });
-        }, [internalValue, validation]);
+            return () => { current = false; };
+        }, [edited, internalValue, validation]);
 
         // Saves the row at once, so only an edit may call it. The table shows
         // what is stored: a disabled property's `clearOnDisabled` belongs to
@@ -224,6 +234,7 @@ export const PropertyTableCell = React.memo<PropertyTableCellProps<any>>(
             } else {
                 updatedValue = newValue;
             }
+            setEdited(true);
             setInternalValue(updatedValue);
             saveValues(updatedValue);
         };
