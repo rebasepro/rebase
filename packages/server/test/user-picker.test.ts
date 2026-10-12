@@ -197,6 +197,72 @@ describe("GET /users/pick", () => {
         expect((await get("reader-1", "/users/pick")).status).toBe(200);
     });
 
+    /**
+     * A rule written as SQL the policy model cannot read cannot be judged
+     * before the row exists. Read optimistically, as the admin panel's form
+     * gate reads it, any signed-in person could list every user's name and
+     * email through such a collection. For the picker it counts as refusing.
+     */
+    describe("a collection whose rules are raw SQL", () => {
+        const RAW = "current_setting('app.flag', true) = 'on'";
+        const withRules = (securityRules: unknown[]) => ({
+            ...(posts as object),
+            slug: "notes",
+            securityRules
+        } as unknown as CollectionConfig);
+
+        it("does not count as writable: an editor is refused", async () => {
+            configureUserPicking(() => [withRules([{ operations: ["insert", "update"], using: RAW }])]);
+            const { get } = app();
+
+            expect((await get("ed-1", "/users/pick")).status).toBe(403);
+        });
+
+        it("is refused when only the WITH CHECK half is raw", async () => {
+            configureUserPicking(() => [withRules([
+                { operations: ["insert", "update"], roles: ["editor"], withCheck: RAW }
+            ])]);
+            const { get } = app();
+
+            expect((await get("ed-1", "/users/pick")).status).toBe(403);
+        });
+
+        it("is refused when a raw restrictive rule sits over a granting one", async () => {
+            configureUserPicking(() => [withRules([
+                { operations: ["insert", "update"], roles: ["editor"] },
+                { operations: ["insert", "update"], mode: "restrictive", using: RAW }
+            ])]);
+            const { get } = app();
+
+            expect((await get("ed-1", "/users/pick")).status).toBe(403);
+        });
+
+        it("still answers when a readable rule grants beside the raw one", async () => {
+            configureUserPicking(() => [withRules([
+                { operations: ["insert", "update"], using: RAW },
+                { operations: ["insert", "update"], roles: ["editor"] }
+            ])]);
+            const { get } = app();
+
+            expect((await get("ed-1", "/users/pick")).status).toBe(200);
+        });
+
+        it("still answers a rule that only depends on the row (an owner field)", async () => {
+            configureUserPicking(() => [withRules([{ operations: ["insert", "update"], ownerField: "assignee" }])]);
+            const { get } = app();
+
+            expect((await get("ed-1", "/users/pick")).status).toBe(200);
+        });
+
+        it("still answers whoever holds users:read", async () => {
+            configureUserPicking(() => [withRules([{ operations: ["insert", "update"], using: RAW }])]);
+            configureAccess({ model: { roles: { editor: { scopes: ["users:read"] } }, scopes: {} } });
+            const { get } = app();
+
+            expect((await get("ed-1", "/users/pick")).status).toBe(200);
+        });
+    });
+
     it("leaves the administrator's list where it was: an editor still cannot read GET /users", async () => {
         configureUserPicking(() => [posts]);
         const { get } = app();
