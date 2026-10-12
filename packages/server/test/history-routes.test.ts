@@ -172,3 +172,83 @@ describe("GET /:slug/:id/history serves relations as references", () => {
         expect(JSON.stringify(body)).not.toContain("a@b.c");
     });
 });
+
+// Calls 2026-10-12 (S8): entries recorded before 229f61720 stored the row as
+// `afterRead` showed it, computed fields included, and deletes before
+// 1bad8f5b5 stored the admin view model, relations as envelopes. A revert to
+// one answered 400 VALIDATION_UNKNOWN_FIELDS. It now writes the row's columns,
+// drops the rest, and names what it dropped.
+describe("reverting an entry that holds keys the row has no column for", () => {
+    const authors = { name: "authors", slug: "authors", properties: { id: { type: "number", isId: "increment" } } } as unknown as CollectionConfig;
+    const posts = {
+        name: "posts",
+        slug: "posts",
+        history: true,
+        properties: {
+            id: { type: "string", isId: "uuid" },
+            title: { type: "string" },
+            author: { type: "relation", relationName: "author" },
+            comments: { type: "relation", relationName: "comments" }
+        },
+        relations: [
+            { kind: "belongsTo", relationName: "author", target: () => authors, localKey: "author_id" },
+            { kind: "hasMany", relationName: "comments", target: () => authors, foreignKeyOnTarget: "post_id" }
+        ]
+    } as unknown as CollectionConfig;
+
+    function mountWith(values: Record<string, unknown>) {
+        const save = jest.fn().mockResolvedValue({ id: "post-1" });
+        const historyService: HistoryService = {
+            fetchHistory: jest.fn().mockResolvedValue({ data: [], total: 0 }),
+            fetchHistoryEntry: jest.fn().mockResolvedValue({ id: "h1", entity_id: "post-1", table_name: "posts", values })
+        };
+        const registry = { getCollections: () => [posts] } as unknown as BackendCollectionRegistry;
+        // The REST row: its columns, the owning relation as its foreign key.
+        const scopedDriver = {
+            restFetchService: { fetchOneForRest: jest.fn(async () => ({ id: "post-1", title: "now", authorId: 2 })) },
+            save
+        } as unknown as DataDriver;
+        const app = new Hono<HonoEnv>();
+        app.use("/*", async (c, next) => { c.set("driver", scopedDriver); await next(); });
+        app.route("/api/data", createHistoryRoutes({ historyService, registry, driver: {} as DataDriver }));
+        return { app, save };
+    }
+
+    it("drops a computed field and a to-many relation, and says which", async () => {
+        const { app, save } = mountWith({
+            id: "post-1",
+            title: "then",
+            authorId: 1,
+            displayName: "Then, by Ada",
+            comments: [{ __type: "relation", id: 4, path: "comments" }]
+        });
+
+        const res = await revert(app, "/api/data/posts/post-1/history/h1/revert");
+
+        expect(res.status).toBe(200);
+        expect(save).toHaveBeenCalledWith(expect.objectContaining({ values: { id: "post-1", title: "then", authorId: 1 } }));
+        const body = await res.json() as { meta: { reverted_from: string; dropped_fields?: string[] } };
+        expect(body.meta).toEqual({ reverted_from: "h1", dropped_fields: ["displayName", "comments"] });
+    });
+
+    it("writes an owning relation's envelope back as its foreign key", async () => {
+        const { app, save } = mountWith({
+            title: "then",
+            author: { __type: "relation", id: 1, path: "authors", data: { values: { email: "a@b.c" } } }
+        });
+
+        const res = await revert(app, "/api/data/posts/post-1/history/h1/revert");
+
+        expect(res.status).toBe(200);
+        expect(save).toHaveBeenCalledWith(expect.objectContaining({ values: { title: "then", authorId: 1 } }));
+        const body = await res.json() as { meta: Record<string, unknown> };
+        expect(body.meta).toEqual({ reverted_from: "h1" });
+    });
+
+    it("leaves an entry of columns as it is", async () => {
+        const { app, save } = mountWith({ id: "post-1", title: "then", authorId: null });
+        const res = await revert(app, "/api/data/posts/post-1/history/h1/revert");
+        expect(res.status).toBe(200);
+        expect(save).toHaveBeenCalledWith(expect.objectContaining({ values: { id: "post-1", title: "then", authorId: null } }));
+    });
+});

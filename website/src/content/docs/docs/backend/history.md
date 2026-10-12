@@ -152,6 +152,22 @@ Returns a list of history entries for a specific entity, ordered by most recent 
 }
 ```
 
+```
+POST /api/data/:slug/:entityId/history/:historyId/revert
+```
+
+Writes the entry's `values` back to the row through the normal save path, so the
+revert is itself recorded as an `update`. It answers the saved row under `data`
+and `meta.reverted_from`, the entry's id.
+
+Entries written by older versions can hold keys the row has no column for: a
+field an `afterRead` computed (before 0.24, a save recorded the row as
+`afterRead` showed it), or a relation stored as the admin panel's view of it.
+A revert writes the row's columns and leaves those keys out, an owning
+relation going back as its foreign key, and names what it left out in
+`meta.dropped_fields`. A value an old `afterRead` masked (`********`) has a
+column, so it is written back as it was recorded.
+
 ## Retention Configuration
 
 | Setting | Default | Description |

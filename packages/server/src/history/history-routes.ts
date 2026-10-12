@@ -3,9 +3,9 @@ import { HonoEnv } from "../api/types";
 import { BackendCollectionRegistry } from "../collections/BackendCollectionRegistry";
 import { ApiError, errorHandler } from "../api/errors";
 import { resolveListLimitParam } from "../api/rest/query-parser";
-import { CollectionConfig, DataDriver, scopeGrants } from "@rebasepro/types";
+import { CollectionConfig, DataDriver, scopeGrants, type ResolvedBelongsTo } from "@rebasepro/types";
 import { httpMethodToOperation } from "../auth/api-keys/http-operation";
-import { type FieldViewer, restrictedFieldNames, withRelationReferencesOnly } from "@rebasepro/common";
+import { type FieldViewer, fieldKeyForColumn, resolveCollectionRelations, restrictedFieldNames, withRelationReferencesOnly } from "@rebasepro/common";
 import { requestViewer } from "../api/rest/field-access-query";
 import { assertNoClosedFields } from "../api/rest/write-validation";
 
@@ -144,6 +144,58 @@ function withoutDateEnvelopes(values: Record<string, unknown>): Record<string, u
         key,
         isPlainValues(value) && value.__type === "date" ? value.value ?? null : value
     ]));
+}
+
+/**
+ * A stored version narrowed to the row's columns, and what was left out.
+ *
+ * An entry is the stored row today, so this changes nothing about one. Older
+ * entries are not: before 229f61720 a save recorded the row as `afterRead`
+ * showed it, so a computed field (the docs' `displayName`) was in every
+ * version, and before 1bad8f5b5 a delete recorded the admin view model, each
+ * relation an envelope under the relation's name. A revert handed those keys
+ * to the driver, which has no column for them: 400 VALIDATION_UNKNOWN_FIELDS
+ * for a version the history list offered.
+ *
+ * The columns are the keys of `current`, the REST row the route just read.
+ * An owning relation's envelope goes back as its foreign key, which is how a
+ * new entry holds it. Any other key — a computed field, a to-many relation,
+ * which no entry restores — is dropped and named, so the caller is told the
+ * revert was partial rather than finding out. A field the caller cannot read
+ * is not in `current`, and is left to {@link restorableValues}. A masked value
+ * an old `afterRead` recorded (`********`) has a column, and nothing here can
+ * tell it from data: it is written back as it was stored.
+ */
+function columnValuesOf(
+    stored: Record<string, unknown>,
+    current: Record<string, unknown>,
+    collection: CollectionConfig,
+    viewer: FieldViewer
+): { values: Record<string, unknown>; dropped: string[] } {
+    const unreadable = restrictedFieldNames(collection, viewer, "read").refused;
+    /** Owning relation name → the foreign key's wire name. */
+    const foreignKeyOf = new Map<string, string>();
+    for (const [name, relation] of Object.entries(resolveCollectionRelations(collection))) {
+        if (relation.kind === "belongsTo") {
+            foreignKeyOf.set(name, fieldKeyForColumn(collection, (relation as ResolvedBelongsTo).localKey));
+        }
+    }
+
+    const values: Record<string, unknown> = {};
+    const dropped: string[] = [];
+    for (const [key, value] of Object.entries(stored)) {
+        if (key in current || unreadable.has(key)) {
+            values[key] = value;
+            continue;
+        }
+        const foreignKey = foreignKeyOf.get(key);
+        if (foreignKey && foreignKey in current && !(foreignKey in stored)) {
+            values[foreignKey] = isPlainValues(value) ? value.id ?? null : value ?? null;
+            continue;
+        }
+        dropped.push(key);
+    }
+    return { values, dropped };
 }
 
 function isPlainValues(value: unknown): value is Record<string, unknown> {
@@ -353,7 +405,15 @@ export function createHistoryRoutes(params: {
         if (!isPlainValues(historyEntry.values)) {
             throw ApiError.badRequest("Cannot revert: history entry has no stored values");
         }
-        const values = restorableValues(withoutDateEnvelopes(historyEntry.values), current, collection, requestViewer(c));
+        const viewer = requestViewer(c);
+        // Narrowed to columns only where `current` is the REST row: a driver
+        // without the REST read hands back its own rendering, whose keys are
+        // not the columns.
+        const restRow = Boolean((c.get("driver") as DataDriver | undefined)?.restFetchService);
+        const { values: columnValues, dropped } = restRow
+            ? columnValuesOf(withoutDateEnvelopes(historyEntry.values), current, collection, viewer)
+            : { values: withoutDateEnvelopes(historyEntry.values), dropped: [] };
+        const values = restorableValues(columnValues, current, collection, viewer);
 
         // Revert by saving through the normal driver path — this will
         // itself create another history entry, giving a full audit trail.
@@ -378,7 +438,12 @@ export function createHistoryRoutes(params: {
 
         return c.json({
             data: savedEntity,
-            meta: { reverted_from: historyId }
+            meta: {
+                reverted_from: historyId,
+                // Keys of the stored version the row has no column for, left
+                // out of the write. Only on an entry an older version recorded.
+                ...(dropped.length > 0 ? { dropped_fields: dropped } : {})
+            }
         });
     });
 
