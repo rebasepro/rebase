@@ -108,7 +108,7 @@ until someone edits that cell.
 
 | Rule | Type | Description |
 |------|------|-------------|
-| `min` / `max` | `number` | Fewest / most characters, inclusive. With `columnType: "varchar"` or `"char"`, `max` also sizes the column (`VARCHAR(max)`), so lowering it on a table that already holds longer rows is a migration the database refuses. The default column is `TEXT`, which `max` leaves unbounded — the bound is then the server's [request check](#where-validation-runs) alone |
+| `min` / `max` | `number` | Fewest / most characters, inclusive. With `columnType: "varchar"` or `"char"`, `max` also sizes the column (`VARCHAR(max)`), so lowering it on a table that already holds longer rows is a migration the database refuses, and the collection editor warns when an edit lowers it. The default column is `TEXT`, which `max` leaves unbounded — the bound is then the server's [request check](#where-validation-runs) alone |
 | `length` | `number` | Exactly this many characters — a country code, a fixed-width reference |
 | `matches` | `string \| RegExp` | A pattern the whole value must match. A string is compiled per request, so one that will not compile is rejected at boot rather than quietly becoming no rule |
 | `matchesMessage` | `string` | What the form says when `matches` fails |

@@ -774,6 +774,7 @@ export const hi: RebaseTranslations = {
     exact_length: "सटीक लंबाई",
     min_length: "न्यूनतम लंबाई",
     max_length: "अधिकतम लंबाई",
+    varchar_narrowing_warning: "सहेजने पर यह {{columnType}} कॉलम {{max}} अक्षरों तक छोटा हो जाता है। rebase db push कॉलम छोटा करने से पहले पूछता है, और जब तक कोई संग्रहीत मान लंबा है, बदलाव विफल होता है।",
     matches_regex: "रेजेक्स से मेल खाता है",
     not_valid_regexp: "वैध रेगुलर एक्सप्रेशन नहीं है",
     regex_helper: "उदा. /^\\d+$/ केवल अंकों के लिए",

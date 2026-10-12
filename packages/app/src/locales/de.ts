@@ -774,6 +774,7 @@ export const de: RebaseTranslations = {
     exact_length: "Exakte Länge",
     min_length: "Mindestlänge",
     max_length: "Maximale Länge",
+    varchar_narrowing_warning: "Beim Speichern wird diese {{columnType}}-Spalte auf {{max}} Zeichen verkürzt. rebase db push fragt nach, bevor eine Spalte verkürzt wird, und die Änderung schlägt fehl, solange ein gespeicherter Wert länger ist.",
     matches_regex: "Entspricht Regex",
     not_valid_regexp: "Kein gültiger regulärer Ausdruck",
     regex_helper: "z.B. /^\\d+$/ nur für Ziffern",

@@ -782,6 +782,7 @@ export const en: RebaseTranslations = {
     exact_length: "Exact length",
     min_length: "Min length",
     max_length: "Max length",
+    varchar_narrowing_warning: "Saving narrows this {{columnType}} column to {{max}} characters. rebase db push asks before it narrows a column, and the change fails while a stored value is longer.",
     matches_regex: "Matches regex",
     not_valid_regexp: "Not a valid regexp",
     regex_helper: "e.g. /^\\d+$/ for digits only",

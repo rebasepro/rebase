@@ -873,6 +873,7 @@ export interface RebaseTranslations {
     exact_length: string;
     min_length: string;
     max_length: string;
+    varchar_narrowing_warning: string;
     matches_regex: string;
     not_valid_regexp: string;
     regex_helper: string;

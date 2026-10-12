@@ -782,6 +782,7 @@ export const es: RebaseTranslations = {
     exact_length: "Longitud exacta",
     min_length: "Longitud mínima",
     max_length: "Longitud máxima",
+    varchar_narrowing_warning: "Al guardar, esta columna {{columnType}} se reduce a {{max}} caracteres. rebase db push pregunta antes de reducir una columna, y el cambio falla mientras haya un valor guardado más largo.",
     matches_regex: "Coincide con regex",
     not_valid_regexp: "No es una expresión regular válida",
     regex_helper: "ej. /^\\d+$/ solo para dígitos",
