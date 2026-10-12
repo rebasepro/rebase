@@ -57,9 +57,25 @@ describe("planning an additive schema ensure", () => {
     it("is a no-op against a database that is already current", () => {
         const existing: ExistingSchema = {
             tables: new Map([["public.posts", new Set(["id", "title", "views", "status"])]]),
-            enums: new Set(["public.posts_status"])
+            enums: new Set(["public.posts_status"]),
+            // Current includes the `isId: "uuid"` key's default (f378bab8f).
+            columnDefaults: new Set(["public.posts.id"])
         };
         expect(planCollectionSchemaEnsure([posts], existing).actions).toEqual([]);
+    });
+
+    it("gives an isId \"uuid\" key the default it is missing, and only then (f378bab8f)", () => {
+        const tables = new Map([["public.posts", new Set(["id", "title", "views", "status"])]]);
+        const enums = new Set(["public.posts_status"]);
+
+        expect(planCollectionSchemaEnsure([posts], { tables, enums, columnDefaults: new Set() }).actions).toEqual([{
+            kind: "set-default",
+            target: "public.posts.id",
+            sql: `ALTER TABLE "public"."posts" ALTER COLUMN "id" SET DEFAULT gen_random_uuid();`
+        }]);
+        expect(planCollectionSchemaEnsure([posts], {
+            tables, enums, columnDefaults: new Set(["public.posts.id"])
+        }).actions).toEqual([]);
     });
 
     it("skips an enum type that already exists, since CREATE TYPE has no IF NOT EXISTS", () => {
@@ -72,7 +88,12 @@ describe("planning an additive schema ensure", () => {
         // The core safety property. This runs unattended against customer data
         // with nobody reading a diff, so a column the collections no longer
         // mention must be left alone, not dropped.
-        const existing = withTable("public.posts", ["id", "title", "legacy_column", "another_old_one"]);
+        const existing: ExistingSchema = {
+            ...withTable("public.posts", ["id", "title", "legacy_column", "another_old_one"]),
+            // The key already has its default, so the one ALTER COLUMN boot may
+            // write (SET DEFAULT on a uuid key that lacks it) has nothing to do.
+            columnDefaults: new Set(["public.posts.id"])
+        };
         const sql = planCollectionSchemaEnsure([posts], existing).statements.join("\n");
 
         expect(sql).not.toMatch(/\bDROP\b/i);
@@ -187,6 +208,7 @@ describe("planning an additive schema ensure", () => {
                 ["public.posts_tags", new Set(["post_id", "tag_id"])]
             ]),
             enums: new Set(["public.posts_status"]),
+            columnDefaults: new Set(["public.posts.id"]),
             constraints: new Set([
                 "public.posts_tags.posts_tags_post_id_fkey",
                 "public.posts_tags.posts_tags_tag_id_fkey"
@@ -267,6 +289,7 @@ describe("constraints the configuration asks for", () => {
         const plan = planCollectionSchemaEnsure([optional], {
             tables: new Map([["public.authors", new Set(["id", "name"])]]),
             enums: new Set(),
+            columnDefaults: new Set(["public.authors.id"]),
             notNullColumns: new Set(["public.authors.name"]),
             populatedTables: new Set()
         });
@@ -277,6 +300,7 @@ describe("constraints the configuration asks for", () => {
         const plan = planCollectionSchemaEnsure([optional], {
             tables: new Map([["public.authors", new Set(["id", "name"])]]),
             enums: new Set(),
+            columnDefaults: new Set(["public.authors.id"]),
             notNullColumns: new Set(["public.authors.name"]),
             populatedTables: new Set(["public.authors"])
         }, { constraints: "converge" });
@@ -291,6 +315,7 @@ describe("constraints the configuration asks for", () => {
         const plan = planCollectionSchemaEnsure([required], {
             tables: new Map([["public.authors", new Set(["id", "name"])]]),
             enums: new Set(),
+            columnDefaults: new Set(["public.authors.id"]),
             notNullColumns: new Set(),
             populatedTables: new Set()
         }, { constraints: "converge" });
@@ -305,6 +330,7 @@ describe("constraints the configuration asks for", () => {
         const plan = planCollectionSchemaEnsure([required], {
             tables: new Map([["public.authors", new Set(["id", "name"])]]),
             enums: new Set(),
+            columnDefaults: new Set(["public.authors.id"]),
             notNullColumns: new Set(),
             populatedTables: new Set(["public.authors"])
         }, { constraints: "converge" });
