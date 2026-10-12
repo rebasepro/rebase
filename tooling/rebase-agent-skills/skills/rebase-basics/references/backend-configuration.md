@@ -75,7 +75,7 @@ A scaffolded project does not build this object: `rebase dev` and the published 
 | `collection` | `CollectionConfig` | `defaultUsersCollection` | The collection used for auth users |
 | `jwtSecret` | `string` | — | JWT signing secret (≥32 chars) |
 | `accessExpiresIn` | `string` | `"1h"` | Access token TTL |
-| `refreshExpiresIn` | `string` | `"30d"` | Refresh token TTL. The **runtime** passes `JWT_REFRESH_EXPIRES_IN` instead, whose own default is `"400d"`, so this `"30d"` is only what a hand-written `initializeRebaseBackend` call falls back to |
+| `refreshExpiresIn` | `string` | `"30d"` | Refresh token TTL. Sliding — each rotation re-ups it. The **runtime** passes `JWT_REFRESH_EXPIRES_IN`, which also defaults to `"30d"` |
 | `requireAuth` | `boolean` | `true` | Require authentication for data routes |
 | `allowRegistration` | `boolean` | `false` | Allow public user registration |
 | `serviceKey` | `string` | — | Static secret for server-to-server auth (≥32 chars) |

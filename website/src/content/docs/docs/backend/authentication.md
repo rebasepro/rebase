@@ -86,7 +86,7 @@ const backend = await initializeRebaseBackend({
 | `signingKeys` | `JwtSigningKeyConfig[]` | — | Asymmetric signing keys — see [Asymmetric Tokens and JWKS](/docs/backend/auth-endpoints/#asymmetric-tokens-and-jwks) |
 | `activeKid` | `string` | first key | Which of `signingKeys` mints new tokens |
 | `accessExpiresIn` | `string` | `1h` | Access-token lifetime |
-| `refreshExpiresIn` | `string` | `30d` | Refresh-token lifetime. Sliding: each rotation re-ups it. The runtime passes `JWT_REFRESH_EXPIRES_IN`, whose own default is `400d` |
+| `refreshExpiresIn` | `string` | `30d` | Refresh-token lifetime. Sliding: each rotation re-ups it, so this is how long a session survives **inactivity**. The runtime passes `JWT_REFRESH_EXPIRES_IN`, which defaults to `30d` too. Browsers cap the refresh cookie at 400 days, so a longer value buys nothing in cookie mode |
 | `refreshTokenReuseIntervalSeconds` | `number` | `10` | How long a refresh token that was rotated away still mints a sibling of its session, so a client that lost a refresh answer is not signed out |
 | `refreshTokenReuse` | `"reject" \| "revoke-session"` | `"reject"` | What a refresh token presented after that window does. `"reject"` refuses it (`TOKEN_ALREADY_USED`) and logs it, and the session stands: this is not reuse detection, since whoever refreshed first keeps the session. `"revoke-session"` ends the whole sign-in on such a replay (`SESSION_REVOKED`), as GoTrue does, and the owner signs in again. `AUTH_REFRESH_TOKEN_REUSE` |
 | `requireAuth` | `boolean` | `true` | Require a session for the data API |

@@ -157,13 +157,19 @@ export function customClaimsOf(decoded: Record<string, unknown>): Record<string,
     return Object.keys(claims).length > 0 ? claims : undefined;
 }
 
+/**
+ * How long a refresh token survives inactivity when no lifetime is configured.
+ * Sliding: every rotation re-ups it, so an active user stays signed in.
+ */
+export const DEFAULT_REFRESH_EXPIRES_IN = "30d";
+
 let jwtConfig: JwtConfig = {
     secret: "",
     accessExpiresIn: "1h",
-    // 400 days, sliding — see getRefreshTokenTtlMs. A 30-day default meant a
-    // user who took a summer off came back signed out, which nobody asked for
-    // and which neither of the auth services people compare us to does.
-    refreshExpiresIn: "400d"
+    // 30 days, sliding — see getRefreshTokenTtlMs. The runtime's
+    // JWT_REFRESH_EXPIRES_IN and initializeRebaseBackend's fallback say the
+    // same, so a session lasts as long whichever way the server was started.
+    refreshExpiresIn: DEFAULT_REFRESH_EXPIRES_IN
 };
 
 /**
@@ -515,7 +521,7 @@ export async function verifyAccessToken(token: string): Promise<AccessTokenPaylo
 }
 
 /**
- * Generate a random refresh token. Long-lived: 400 days by default, sliding —
+ * Generate a random refresh token. Long-lived: 30 days by default, sliding —
  * see {@link getRefreshTokenTtlMs}.
  */
 export function generateRefreshToken(): string {
@@ -538,7 +544,7 @@ export function hashRefreshToken(token: string): Promise<string> {
 export const MAX_COOKIE_AGE_MS = 400 * 24 * 60 * 60 * 1000;
 
 /** Fallback when `refreshExpiresIn` is unset. {@link configureJwt} refuses an unparseable one. */
-const DEFAULT_REFRESH_TTL_MS = MAX_COOKIE_AGE_MS;
+const DEFAULT_REFRESH_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
 /**
  * How long a refresh token is valid for, in milliseconds.

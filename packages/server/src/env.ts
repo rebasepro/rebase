@@ -171,8 +171,8 @@ export const rebaseEnvSchema = z.object({
     JWT_ACCESS_EXPIRES_IN: z.string().default("1h"),
     // Sliding: every rotation re-ups it, so this governs how long a session
     // survives INACTIVITY, not how long it survives. 400d is the ceiling any
-    // browser will honour on the cookie that carries it.
-    JWT_REFRESH_EXPIRES_IN: z.string().default("400d"),
+    // browser will honour on the cookie that carries it; the default is 30d.
+    JWT_REFRESH_EXPIRES_IN: z.string().default("30d"),
     GOOGLE_CLIENT_ID: z.string().optional(),
     GOOGLE_CLIENT_SECRET: z.string().optional(),
     REBASE_SERVICE_KEY: z.string().optional(),

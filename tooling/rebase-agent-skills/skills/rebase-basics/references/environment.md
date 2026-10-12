@@ -70,7 +70,7 @@ Everything `rebaseEnvSchema` declares — what an **ejected** project's own
 | `ADMIN_CONNECTION_STRING` | `string` (URL) | — | No | Admin-level DB connection |
 | `JWT_SECRET` | `string` (≥32 chars) | Auto-generated in dev | **Yes** (prod) | JWT signing secret |
 | `JWT_ACCESS_EXPIRES_IN` | `string` | `"1h"` | No | Access token TTL |
-| `JWT_REFRESH_EXPIRES_IN` | `string` | `"400d"` | No | Refresh token TTL. Sliding — each rotation re-ups it |
+| `JWT_REFRESH_EXPIRES_IN` | `string` | `"30d"` | No | Refresh token TTL. Sliding — each rotation re-ups it |
 | `JWT_PRIVATE_KEY` | `string` (PEM) | — | No | Sign access tokens asymmetrically (RS256). Accepts a real-newline PEM, a `\n`-escaped PEM, or base64 of the whole PEM |
 | `JWT_KEY_ID` | `string` | `"default"` | No | The `kid` naming `JWT_PRIVATE_KEY` in the token header and the JWKS |
 | `REBASE_SERVICE_KEY` | `string` | Auto-generated in dev | No | Static key for server-to-server auth |

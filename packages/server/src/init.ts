@@ -116,6 +116,7 @@ import { injectCallbackClient } from "./init/callback-client";
 import { handGlobalCallbacksTo } from "./init/global-callbacks";
 import { installUnhandledRejectionHandler } from "./init/process-safety";
 import { configureJwt, hasAsymmetricSigningKey, isJwtConfigured } from "./auth";
+import { DEFAULT_REFRESH_EXPIRES_IN } from "./auth/jwt";
 import { createJwksRoutes } from "./auth/jwks-routes";
 import { readRuntimeVersion } from "./boot/version-skew";
 import { supportsRlsScoping } from "./auth/rls-scope";
@@ -1556,7 +1557,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
                 configureJwt({
                     secret: safeAuthConfig.jwtSecret,
                     accessExpiresIn: safeAuthConfig.accessExpiresIn || "1h",
-                    refreshExpiresIn: safeAuthConfig.refreshExpiresIn || "30d",
+                    refreshExpiresIn: safeAuthConfig.refreshExpiresIn || DEFAULT_REFRESH_EXPIRES_IN,
                     signingKeys: safeAuthConfig.signingKeys,
                     activeKid: safeAuthConfig.activeKid
                 });
