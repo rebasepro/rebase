@@ -1,5 +1,5 @@
 ---
-sourceHash: 83b3a13a151d0cd7
+sourceHash: 330defe6fc90f0fa
 title: Indice degli endpoint
 sidebar_label: Indice degli endpoint
 description: Ogni route HTTP montata da un backend Rebase — data, auth, storage, admin, meta — con il relativo gate e la pagina che la descrive.
@@ -119,6 +119,7 @@ una collection non può accedere a nulla di tutto questo. Vedi [Ruoli e scope](/
 | `POST` | `/api/admin/bootstrap` | none, e solo finché non esiste alcun admin | Rifiutato in produzione — vedi [Bootstrap del primo utente](/docs/backend/authentication/#first-user-bootstrap) |
 | `GET` | `/api/admin/users` | `users:read` | Gestione utenti |
 | `POST` | `/api/admin/users` | `users:write` | Gestione utenti. I ruoli oltre a quelli del chiamante vengono rifiutati |
+| `GET` | `/api/admin/users/pick` | `users:read`, oppure accesso in scrittura a una collection con un campo `userSelect` | La [lettura del selettore utenti](/docs/backend/auth-endpoints/): solo id, nome, email e avatar. Una collection le cui regole di scrittura sono SQL grezzo non conta |
 | `GET` | `/api/admin/users/:uid` | `users:read` | Gestione utenti |
 | `PUT` | `/api/admin/users/:uid` | `users:write` | Rifiutato per un account che possiede più del chiamante |
 | `DELETE` | `/api/admin/users/:uid` | `users:write` | Rifiutato per un account che possiede più del chiamante |

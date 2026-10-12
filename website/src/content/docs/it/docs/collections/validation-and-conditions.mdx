@@ -1,5 +1,5 @@
 ---
-sourceHash: aa008173a34fc3e9
+sourceHash: e218de0d114db9f6
 title: Validazione e condizioni
 sidebar_label: Validazione e condizioni
 description: "Valori enum, regole di validazione per proprietà e campi condizionali che rendono una proprietà obbligatoria, disabilitata o nascosta in base ai valori dell'entità stessa."
@@ -90,11 +90,17 @@ database applica — `required` (NOT NULL), `unique` (un indice univoco), il tip
 di un enum e la larghezza di una colonna `varchar` o `char`. Qualsiasi altra
 cosa scritta dal tuo codice server va controllata nel codice che la scrive.
 
+Il pannello di amministrazione controlla le stesse regole prima di salvare, nel
+form del record e nell'editor in linea della tabella della collection. Una cella
+della tabella giudica un valore una volta che lo modifichi: un valore memorizzato
+che viola una regola aggiunta in seguito non mostra alcun errore nella tabella
+finché qualcuno non modifica quella cella.
+
 ### Tutti i tipi
 
 | Regola | Tipo | Descrizione |
 |------|------|-------------|
-| `required` | `boolean` | Il valore deve essere presente |
+| `required` | `boolean` | Il valore deve essere presente. Su una `string`, `""` conta come assente: l'API la rifiuta a ogni scrittura, una creazione o un aggiornamento, con la stessa violazione `required` (a meno che la collection abbia un `beforeSave`, che può compilarla) |
 | `requiredMessage` | `string` | Cosa viene detto quando non è presente: dal modulo di amministrazione, e come `message` della voce `required` del campo nel 400 dell'API. Il NOT NULL del database non porta alcun messaggio |
 | `unique` | `boolean` | Solo una riga nella tabella può contenere questo valore. Il modulo di amministrazione lo controlla anche quando salva un valore che la modifica ha cambiato, così un duplicato viene segnalato sul suo campo prima della scrittura |
 | `uniqueInArray` | `boolean` | Solo una voce *per array* può contenerlo. Si applica a un figlio diretto di una proprietà `array`, o a un figlio di primo livello di una `map` al suo interno. **Solo modulo di amministrazione — non applicato dall'API o dal database.** |
@@ -103,7 +109,7 @@ cosa scritta dal tuo codice server va controllata nel codice che la scrive.
 
 | Regola | Tipo | Descrizione |
 |------|------|-------------|
-| `min` / `max` | `number` | Numero minimo / massimo di caratteri, inclusi. Con `columnType: "varchar"` o `"char"`, `max` definisce anche la dimensione della colonna (`VARCHAR(max)`), quindi ridurlo su una tabella che contiene già righe più lunghe è una migrazione che il database rifiuterà. La colonna predefinita è `TEXT`, che `max` lascia senza limite — il vincolo resta allora solo il [controllo della richiesta](#dove-viene-eseguita-la-validazione) del server |
+| `min` / `max` | `number` | Numero minimo / massimo di caratteri, inclusi. Con `columnType: "varchar"` o `"char"`, `max` definisce anche la dimensione della colonna (`VARCHAR(max)`), quindi ridurlo su una tabella che contiene già righe più lunghe è una migrazione che il database rifiuterà, e l'editor di collection avvisa quando una modifica lo riduce. La colonna predefinita è `TEXT`, che `max` lascia senza limite — il vincolo resta allora solo il [controllo della richiesta](#dove-viene-eseguita-la-validazione) del server |
 | `length` | `number` | Esattamente questo numero di caratteri — un codice paese, un riferimento a lunghezza fissa |
 | `matches` | `string \| RegExp` | Un pattern che l'intero valore deve rispettare. Una stringa viene compilata per richiesta, quindi una che non si compila viene rifiutata all'avvio anziché trasformarsi silenziosamente in nessuna regola |
 | `matchesMessage` | `string` | Cosa mostra il modulo quando `matches` fallisce |

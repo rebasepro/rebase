@@ -1,5 +1,5 @@
 ---
-sourceHash: 83b3a13a151d0cd7
+sourceHash: 330defe6fc90f0fa
 title: Índice de endpoints
 sidebar_label: Índice de endpoints
 description: Cada ruta HTTP que monta un backend de Rebase — datos, autenticación, almacenamiento, administración, meta — con el control de acceso de cada una y la página que la explica.
@@ -122,6 +122,7 @@ puede acceder a nada de esto. Consulte [Roles y alcances](/docs/backend/roles-an
 | `POST` | `/api/admin/bootstrap` | none, y solo mientras no exista ningún administrador | Rechazado en producción — consulte [Bootstrap del primer usuario](/docs/backend/authentication/#first-user-bootstrap) |
 | `GET` | `/api/admin/users` | `users:read` | Gestión de usuarios |
 | `POST` | `/api/admin/users` | `users:write` | Gestión de usuarios. Se rechazan los roles que van más allá de los del propio emisor |
+| `GET` | `/api/admin/users/pick` | `users:read`, o acceso de escritura a una colección con un campo `userSelect` | La [lectura del selector de usuarios](/docs/backend/auth-endpoints/): solo id, nombre, correo y avatar. Una colección cuyas reglas de escritura son SQL en bruto no cuenta |
 | `GET` | `/api/admin/users/:uid` | `users:read` | Gestión de usuarios |
 | `PUT` | `/api/admin/users/:uid` | `users:write` | Se rechaza para una cuenta que tiene más que el emisor |
 | `DELETE` | `/api/admin/users/:uid` | `users:write` | Se rechaza para una cuenta que tiene más que el emisor |

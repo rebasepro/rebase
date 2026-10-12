@@ -1,5 +1,5 @@
 ---
-sourceHash: a30d441e176f5d1c
+sourceHash: 03c3a22014b05f70
 title: Tâches en arrière-plan
 sidebar_label: Tâches en arrière-plan
 description: Une file d'attente de tâches durable, basée sur Postgres — des traitements qui survivent à un redémarrage, réessayés avec un backoff, avec conservation des échecs plutôt que leur abandon.
@@ -108,15 +108,18 @@ jobs: {
 L'envers du décor : un gestionnaire qui attend un `fetch` qui ne répond jamais conserve son emplacement de
 worker, et sa réservation, tant que le processus vit — avec cinq d'entre eux, le worker n'exécute plus rien
 d'autre, alors que `/health` reste vert.
-<span class="since-badge" data-since="0.25">Depuis 0.25</span> Définissez `timeoutMs` pour borner une tentative. À l'échéance, la tentative échoue — retentée tant
+<span class="since-badge" data-since="0.25">Depuis 0.25</span> `timeoutMs` borne une tentative. À l'échéance, la tentative échoue — retentée tant
 qu'il reste des tentatives, comme n'importe quelle exception — son emplacement est libéré, et le `signal`
 du gestionnaire est interrompu. Transmettez le signal, pour que le travail s'arrête lui aussi ; un
 gestionnaire qui l'ignore continue de s'exécuter en arrière-plan sans que rien n'enregistre son résultat.
 
+S'il est omis, il vaut 15 minutes (`900_000`), et le worker l'indique dans une ligne de journal au démarrage.
+Une tâche qui dure légitimement plus longtemps définit sa propre valeur, et `timeoutMs: 0` supprime la limite.
+
 ```typescript no-verify
 jobs: {
     enabled: true,
-    timeoutMs: 120_000,          // one attempt; no limit when left out
+    timeoutMs: 120_000,          // one attempt; 15 minutes when left out, 0 for no limit
     tasks: {
         "sync-crm": async ({ payload, signal }) => {
             await fetch(crmUrl, { method: "POST", body: JSON.stringify(payload), signal });

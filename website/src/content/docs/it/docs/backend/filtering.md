@@ -1,5 +1,5 @@
 ---
-sourceHash: 8f9daaf34155e283
+sourceHash: ebc75b9bd33595a6
 title: Filtraggio nell'API REST
 sidebar_label: Filtraggio
 description: Filtra le liste dell'API REST con operatori in stile PostgREST, gruppi or/and e il dialetto JSON where, e scopri come si combinano i filtri.
@@ -103,7 +103,12 @@ I filtri di campo sopra descritti sono uno dei due modi per inviare un filtro. L
 GET /api/data/products?where={"status":["==","active"],"price":[">=",100]}
 ```
 
-Ogni chiave è un campo, ogni valore è una tupla canonica `[operator, value]` — le stesse tuple scritte dall'SDK. Un valore può anche essere una stringa con notazione a punto pre-serializzata (`{"status":"eq.active"}`) o uno scalare semplice (`{"status":"active"}`); tutte e tre le varianti compilano nella stessa condizione.
+Ogni chiave è un campo, ogni valore è una tupla canonica `[operator, value]` — le stesse tuple scritte dall'SDK. Un valore può anche essere una stringa con notazione a punto pre-serializzata (`{"status":"eq.active"}`) o uno scalare semplice (`{"status":"active"}`); tutte e tre le varianti compilano nella stessa condizione. Un array di valori semplici è un `in` implicito: `{"category":["electronics","gadgets"]}` si legge come
+`["in", ["electronics","gadgets"]]`, mentre un primo elemento che ha la forma di un operatore ma non è un operatore reale
+(`["!!","x"]`) è un 400 `UNKNOWN_FILTER_OPERATOR`.
+
+Lo stesso oggetto viene letto allo stesso modo ovunque arrivi: qui, nel `where` dell'SDK, in una query MCP e nel
+`filter` del socket realtime — nelle sue richieste di elenco e di conteggio e nelle sue sottoscrizioni live.
 
 La differenza fondamentale da conoscere: **JSON trasporta i tipi.** `?price=gte.100` invia la stringa `"100"` e il driver ne effettua il cast in base al tipo di colonna, mentre `?where={"price":[">=",100]}` invia un numero. Per una colonna la cui interpretazione testuale e numerica differisce — una stringa di versione, un codice con padding di zeri — questo è il parametro a cui affidarsi.
 

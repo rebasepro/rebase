@@ -1,5 +1,5 @@
 ---
-sourceHash: 53bd9f35a923ce72
+sourceHash: a3e5fa2b319b73d8
 title: Relazioni
 sidebar_label: Relazioni
 description: Definisci relazioni SQL uno-a-uno, uno-a-molti e molti-a-molti tra collezioni con chiavi esterne, tabelle di giunzione e join multi-hop.
@@ -235,6 +235,14 @@ intestazione accanto a una colonna che già mostrava i figli, quindi viene
 eliminato. Nascondi la colonna della relazione
 (`admin: { hideFromCollection: true }`) e il pulsante torna, così la relazione
 non esce mai del tutto dalla tabella.
+
+Nascondere la colonna non ferma il recupero. La lettura dell'elenco della collezione
+incorpora ogni relazione che una proprietà dichiara, nascosta o no, quindi il codice
+che legge le righe dell'elenco — `additionalFields`, entity action, collection action
+tramite `tableController.data`, slot dei plugin, `browserCallbacks.afterRead` — vi
+trova le righe correlate. Una relazione dichiarata solo nell'array `relations` della
+collezione, senza proprietà, non viene incorporata nell'elenco: le sue righe si
+caricano quando si apre la sua scheda.
 
 Se vuoi comunque il selettore in linea, chiedilo:
 

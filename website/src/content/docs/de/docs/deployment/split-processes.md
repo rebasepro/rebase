@@ -1,5 +1,5 @@
 ---
-sourceHash: a46a7358b856be2f
+sourceHash: e616e5caaa9bd29f
 title: Aufteilen in mehrere Prozesse
 sidebar_label: Prozesse aufteilen
 description: Führen Sie ein Bundle als mehrere zusammenarbeitende Prozesse aus – eine API, eine Functions-Ebene, ein Worker – aus demselben veröffentlichten Runtime-Image, damit eine rechenintensive benutzerdefinierte Funktion nicht mehr mit der Daten-API konkurriert.
@@ -54,6 +54,10 @@ anlegen darf) meldet ein `worker`- oder `functions`-Prozess jeden seiner eigenen
 Schreibvorgänge stattdessen auf dem instanzübergreifenden Kanal, ohne eine `LISTEN`-Verbindung
 zu halten. In beiden Fällen weckt eine Funktion, die eine Zeile schreibt, weiterhin
 jeden Abonnenten auf der `api` auf.
+
+Geben Sie jedem Prozess dasselbe `REALTIME_CDC`. Ein Prozess, der das Schema besitzt, entfernt mit
+`REALTIME_CDC=off` beim Start die Capture-Trigger, und eine `api`, die weiter auf `auto` steht, würde
+dann auf Änderungen lauschen, die niemand ankündigt.
 
 ## Docker Compose
 

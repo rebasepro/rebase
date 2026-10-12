@@ -1,5 +1,5 @@
 ---
-sourceHash: 53bd9f35a923ce72
+sourceHash: a3e5fa2b319b73d8
 title: Relations
 sidebar_label: Relations
 description: Définir les relations SQL un-à-un, un-à-plusieurs et plusieurs-à-plusieurs entre les collections avec des clés étrangères, des tables de jonction et des jointures multi-sauts.
@@ -233,6 +233,12 @@ le même intitulé à côté d'une colonne montrant déjà les enfants : il est 
 supprimé. Masquez la colonne de la relation
 (`admin: { hideFromCollection: true }`) et le bouton revient, de sorte que la
 relation ne disparaît jamais entièrement du tableau.
+
+Masquer la colonne n'empêche pas la récupération. La lecture de liste de la collection embarque toutes les relations
+qu'une propriété déclare, masquées ou non : le code qui lit les lignes de liste — `additionalFields`, les actions
+d'entité, les actions de collection via `tableController.data`, les slots de plugin, `browserCallbacks.afterRead` —
+y trouve donc les lignes liées. Une relation déclarée uniquement dans le tableau `relations` de la collection, sans
+propriété, n'est pas embarquée dans la liste ; ses lignes se chargent à l'ouverture de son onglet.
 
 Si vous voulez quand même le sélecteur en ligne, demandez-le :
 

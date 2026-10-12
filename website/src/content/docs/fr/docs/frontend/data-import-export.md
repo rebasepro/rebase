@@ -1,5 +1,5 @@
 ---
-sourceHash: 66aded96fdd7fc98
+sourceHash: 488d01a16707cd87
 title: Import et export de données
 sidebar_label: Import et export de données
 description: Importez des données depuis des fichiers CSV, JSON et Excel dans vos collections, et exportez les données de vos collections au format CSV ou JSON avec des champs calculés optionnels.
@@ -64,6 +64,10 @@ L'aperçu liste chaque cellule qui ne se convertit pas, par colonne, avec leur n
 Les propres règles de la collection — champs obligatoires, options d'énumération, valeurs uniques — sont vérifiées par le serveur au fur et à mesure que les lignes sont écrites, par lots pouvant atteindre 500 lignes (moins lorsque les lignes sont larges, afin qu'une requête reste sous environ 1 Mo). Un lot est enregistré en entier ou pas du tout. Si une ligne est refusée, l'importation s'arrête et la désigne ; les lots qui la précèdent sont déjà enregistrés, et **Retry** reprend à partir de la première ligne du lot de la ligne refusée.
 
 Une ligne dont l'id existe déjà dans la collection met à jour cet enregistrement : les colonnes présentes dans le fichier sont écrites, les autres conservent leurs valeurs stockées, si bien qu'un fichier `id,price` réévalue des produits existants sans répéter leurs champs obligatoires. Une nouvelle ligne exige toujours tous les champs obligatoires. Un lot qui mêle mises à jour et nouvelles lignes est écrit en deux requêtes, de sorte qu'une nouvelle ligne refusée peut laisser les mises à jour de ce lot enregistrées ; **Retry** les réécrit avec les mêmes valeurs.
+
+### Importer des utilisateurs
+
+Une nouvelle ligne dans la collection des utilisateurs est une création d'utilisateur : une colonne `password` est hachée, jamais stockée telle quelle, et une ligne qui n'en a pas reçoit un mot de passe généré ou une invitation, comme lorsqu'un administrateur ajoute un utilisateur. Les mots de passe d'un tel fichier ont généralement été définis selon les règles d'un autre système : l'import demande donc au serveur d'ignorer la [politique de mot de passe](/docs/backend/auth-endpoints/#password-policy) pour ces lignes. Le serveur n'accepte que si vous êtes administrateur ; toute autre personne qui importe des utilisateurs est soumise à la politique, et un mot de passe faible arrête l'import avec `WEAK_PASSWORD`.
 
 ### Créer une collection à partir d'un fichier
 

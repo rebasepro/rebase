@@ -1,5 +1,5 @@
 ---
-sourceHash: b570d8e8623a5d35
+sourceHash: 242a8a8a99d7ef2d
 title: Códigos de error
 sidebar_label: Códigos de error
 description: Todos los códigos de error que un backend de Rebase puede devolver, con su estado HTTP, qué significan y qué hacer al respecto; además del envelope de respuesta, X-Request-ID y las reglas de details.
@@ -155,7 +155,7 @@ que enviaste es el ID que obtuviste. Lee la cabecera de respuesta.
 | `TOKEN_ALREADY_USED` | 401 | Se reutilizó un token de un solo uso, o llegó un refresh token que se rotó hace más de `refreshTokenReuseIntervalSeconds`. | Solicita uno nuevo, o vuelve a iniciar sesión. |
 | `TOKEN_EXPIRED` | 401 | El token ha superado su tiempo de vida. | Solicita uno nuevo. |
 | `USER_NOT_FOUND` | 404 | No hay cuenta con ese id. | Verifica el id. |
-| `WEAK_PASSWORD` | 400 | La contraseña no cumple con la [política de contraseñas](/docs/backend/auth-endpoints/#password-policy) (por defecto, 8 o más caracteres con una mayúscula, una minúscula y un dígito) — al registrarse, al restablecerla o cambiarla, y en `PUT /api/admin/users/:id` o `POST /api/admin/users/:id/reset-password` de un administrador con una contraseña elegida. | Elige una más robusta. |
+| `WEAK_PASSWORD` | 400 | La contraseña no cumple con la [política de contraseñas](/docs/backend/auth-endpoints/#password-policy) (por defecto, 8 o más caracteres con una mayúscula, una minúscula y un dígito) — al registrarse, al restablecerla o cambiarla, y en la contraseña elegida por un administrador: `POST /api/admin/users`, una creación en la colección de usuarios a través de la API de datos, `PUT /api/admin/users/:id` o `POST /api/admin/users/:id/reset-password`. | Elige una más robusta. Un administrador que importa cuentas puede enviar `skipPasswordPolicy: true` en una creación. |
 
 ## Datos, consultas y escrituras
 

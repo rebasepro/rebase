@@ -1,5 +1,5 @@
 ---
-sourceHash: a30d441e176f5d1c
+sourceHash: 03c3a22014b05f70
 title: Hintergrund-Jobs
 sidebar_label: Hintergrund-Jobs
 description: Eine dauerhafte, Postgres-gestützte Job-Warteschlange – Aufgaben, die einen Neustart überstehen, mit Backoff wiederholt werden und bei denen Fehler aufbewahrt statt verworfen werden.
@@ -95,12 +95,14 @@ jobs: {
 ### Ein Handler, der nie fertig wird
 
 Die Kehrseite: Ein Handler, der auf ein `fetch` wartet, das nie antwortet, hält seinen Worker-Slot und seinen Claim, solange der Prozess lebt – bei fünf davon führt der Worker nichts anderes mehr aus, während `/health` grün bleibt.
-<span class="since-badge" data-since="0.25">Seit 0.25</span> Setzen Sie `timeoutMs`, um einen Versuch zu begrenzen. Mit Ablauf der Frist schlägt der Versuch fehl — er wird wiederholt, solange Versuche übrig sind, wie bei jedem Throw —, sein Slot wird frei, und das `signal` des Handlers wird abgebrochen. Reichen Sie das Signal weiter, damit auch die Arbeit stoppt; ein Handler, der es ignoriert, läuft im Hintergrund weiter, ohne dass etwas sein Ergebnis aufzeichnet.
+<span class="since-badge" data-since="0.25">Seit 0.25</span> `timeoutMs` begrenzt einen Versuch. Mit Ablauf der Frist schlägt der Versuch fehl — er wird wiederholt, solange Versuche übrig sind, wie bei jedem Throw —, sein Slot wird frei, und das `signal` des Handlers wird abgebrochen. Reichen Sie das Signal weiter, damit auch die Arbeit stoppt; ein Handler, der es ignoriert, läuft im Hintergrund weiter, ohne dass etwas sein Ergebnis aufzeichnet.
+
+Ohne Angabe sind es 15 Minuten (`900_000`), und der Worker meldet das beim Start in einer Logzeile. Ein Job, der legitim länger läuft, setzt seinen eigenen Wert, und `timeoutMs: 0` hebt das Limit auf.
 
 ```typescript no-verify
 jobs: {
     enabled: true,
-    timeoutMs: 120_000,          // one attempt; no limit when left out
+    timeoutMs: 120_000,          // one attempt; 15 minutes when left out, 0 for no limit
     tasks: {
         "sync-crm": async ({ payload, signal }) => {
             await fetch(crmUrl, { method: "POST", body: JSON.stringify(payload), signal });

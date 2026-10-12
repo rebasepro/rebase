@@ -1,5 +1,5 @@
 ---
-sourceHash: 76a511b15a0fae61
+sourceHash: 53f453267ae3e21c
 title: Authentification
 sidebar_label: Authentification
 description: Configurez l'authentification JWT, les fournisseurs OAuth, les e-mails SMTP, la protection contre les bots et la collection d'utilisateurs sur le backend Rebase.
@@ -87,7 +87,7 @@ const backend = await initializeRebaseBackend({
 | `signingKeys` | `JwtSigningKeyConfig[]` | — | Clés de signature asymétriques — voir [Jetons asymétriques et JWKS](/docs/backend/auth-endpoints/#asymmetric-tokens-and-jwks) |
 | `activeKid` | `string` | première clé | Clé parmi `signingKeys` utilisée pour générer de nouveaux jetons |
 | `accessExpiresIn` | `string` | `1h` | Durée de vie du jeton d'accès |
-| `refreshExpiresIn` | `string` | `30d` | Durée de vie du jeton de rafraîchissement. Glissante : chaque rotation la renouvelle. Le runtime transmet `JWT_REFRESH_EXPIRES_IN`, dont la valeur par défaut est de `400d` |
+| `refreshExpiresIn` | `string` | `30d` | Durée de vie du jeton de rafraîchissement. Glissante : chaque rotation la renouvelle, c'est donc la durée pendant laquelle une session survit à l'**inactivité**. Le runtime transmet `JWT_REFRESH_EXPIRES_IN`, dont la valeur par défaut est aussi `30d`. Les navigateurs plafonnent le cookie de rafraîchissement à 400 jours : une valeur plus longue n'apporte rien en mode cookie |
 | `refreshTokenReuseIntervalSeconds` | `number` | `10` | Pendant combien de temps un jeton de rafraîchissement remplacé par rotation génère encore un jumeau de sa session, afin qu'un client qui a perdu la réponse d'un rafraîchissement ne soit pas déconnecté |
 | `refreshTokenReuse` | `"reject" \| "revoke-session"` | `"reject"` | Ce que fait un jeton de rafraîchissement présenté après cette fenêtre. `"reject"` le refuse (`TOKEN_ALREADY_USED`) et le journalise, et la session subsiste : ce n'est pas une détection de réutilisation, puisque celui qui a rafraîchi le premier garde la session. `"revoke-session"` met fin à toute la connexion lors d'une telle répétition (`SESSION_REVOKED`), comme le fait GoTrue, et le titulaire se reconnecte. `AUTH_REFRESH_TOKEN_REUSE` |
 | `requireAuth` | `boolean` | `true` | Exiger une session pour l'API de données |

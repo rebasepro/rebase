@@ -1,5 +1,5 @@
 ---
-sourceHash: a30d441e176f5d1c
+sourceHash: 03c3a22014b05f70
 title: Tarefas em Segundo Plano
 sidebar_label: Tarefas em Segundo Plano
 description: Uma fila de jobs durável, baseada em Postgres — trabalho que sobrevive a reinicializações, com novas tentativas usando backoff e falhas mantidas em vez de descartadas.
@@ -111,16 +111,20 @@ jobs: {
 O outro lado da moeda: um handler que aguarda um `fetch` que nunca responde segura seu
 slot de worker, e sua reivindicação, enquanto o processo viver — cinco deles e o
 worker não executa mais nada, enquanto o `/health` continua verde.
-<span class="since-badge" data-since="0.25">Desde 0.25</span> Defina `timeoutMs` para
-limitar uma tentativa. No prazo final a tentativa falha — repetida enquanto restarem
+<span class="since-badge" data-since="0.25">Desde 0.25</span> `timeoutMs`
+limita uma tentativa. No prazo final a tentativa falha — repetida enquanto restarem
 tentativas, como qualquer exceção —, seu slot é liberado e o `signal` do handler é
 abortado. Repasse o signal, para que o trabalho também pare; um handler que o ignora
 continua em execução em segundo plano sem que nada registre seu resultado.
 
+Se omitido, são 15 minutos (`900_000`), e o worker avisa isso em uma linha de log
+quando inicia. Um job que legitimamente roda por mais tempo define seu próprio valor,
+e `timeoutMs: 0` remove o limite.
+
 ```typescript no-verify
 jobs: {
     enabled: true,
-    timeoutMs: 120_000,          // one attempt; no limit when left out
+    timeoutMs: 120_000,          // one attempt; 15 minutes when left out, 0 for no limit
     tasks: {
         "sync-crm": async ({ payload, signal }) => {
             await fetch(crmUrl, { method: "POST", body: JSON.stringify(payload), signal });

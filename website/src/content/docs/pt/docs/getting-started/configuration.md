@@ -1,5 +1,5 @@
 ---
-sourceHash: 9793c6efe5a375a7
+sourceHash: 36738ccb08826775
 title: Ambiente e Configuração
 sidebar_label: Configuração
 description: Todas as variáveis de ambiente e opções de configuração para projetos Rebase.
@@ -104,7 +104,7 @@ respostas.
 | `JWT_PRIVATE_KEY` | Chave privada PEM para assinar tokens de acesso assimetricamente (RS256), de modo que qualquer entidade com o JWKS possa verificar uma sessão sem poder emitir uma. Aceita uma PEM com quebras de linha reais, uma PEM com escapes `\n` ou base64 de toda a PEM. Sem ela, os tokens permanecem em HS256. | — |
 | `JWT_KEY_ID` | Nomeia `JWT_PRIVATE_KEY` no cabeçalho do token e no JWKS. Altere sempre que a chave mudar — a rotação depende de o antigo e o novo serem distinguíveis. | `default` |
 | `JWT_ACCESS_EXPIRES_IN` | Tempo de vida do token de acesso | `1h` |
-| `JWT_REFRESH_EXPIRES_IN` | Tempo de vida do token de refresh. Deslizante — cada rotação o renova, portanto isso governa quanto tempo uma sessão sobrevive à **inatividade**. | `400d` |
+| `JWT_REFRESH_EXPIRES_IN` | Tempo de vida do token de refresh. Deslizante — cada rotação o renova, portanto isso governa quanto tempo uma sessão sobrevive à **inatividade**. Defina `400d` para sessões que sobrevivam a uma longa ausência; os navegadores limitam o cookie de refresh nesse valor. | `30d` |
 | `ALLOW_REGISTRATION` | Permitir o registro de novos usuários (`true`/`false`). Fora de produção, o **primeiro** usuário sempre pode se registrar, independentemente do que esteja definido aqui — uma tabela de usuários vazia precisa admitir alguém, e esse alguém se torna o administrador. Em produção (`NODE_ENV=production`), essa janela é fechada: uma tabela vazia recusa o registro de bootstrap com `SETUP_REQUIRED`, uma primeira conta criada através do registro aberto é uma conta comum, e o administrador é definido com `REBASE_ADMIN_EMAIL` abaixo ou atribuído com a service key. O `.env.example` do scaffold define como `true`; o padrão do framework é desativado. | `false` |
 | `DISABLE_SELF_REGISTRATION` | Chave de emergência (kill switch). Fecha a janela de bootstrap do primeiro usuário que `ALLOW_REGISTRATION=false` deixa deliberadamente aberta fora de produção, de modo que o registro seja bloqueado mesmo em um banco de dados vazio. Combine com `REBASE_ADMIN_EMAIL` abaixo, ou a implantação não terá como produzir seu primeiro chamador autenticado. Todo artefato de implantação distribuído define isso. | — |
 | `REBASE_ADMIN_EMAIL` | E-mail da primeira conta de administrador, criada na inicialização **enquanto a tabela de usuários ainda estiver vazia** e nunca depois disso. É assim que uma implantação em produção obtém seu administrador: o operador define a primeira conta em vez de disputar uma corrida com a internet por ela. A inicialização emite aviso quando a tabela está vazia em produção e isso não está configurado. | — |

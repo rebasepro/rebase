@@ -1,5 +1,5 @@
 ---
-sourceHash: 53bd9f35a923ce72
+sourceHash: a3e5fa2b319b73d8
 title: Beziehungen
 sidebar_label: Beziehungen
 description: Definieren Sie Eins-zu-Eins-, Eins-zu-Viele- und Viele-zu-Viele-SQL-Beziehungen zwischen Sammlungen mit Fremdschlüsseln, Verbindungstabellen und Multi-Hop-Joins.
@@ -240,6 +240,13 @@ dieselbe Überschrift neben einer Spalte, die die Kinder bereits zeigt — sie
 entfällt daher. Blenden Sie die Spalte der Beziehung aus
 (`admin: { hideFromCollection: true }`), und die Taste kommt zurück, sodass die
 Beziehung nie ganz aus der Tabelle fällt.
+
+Das Ausblenden der Spalte verhindert das Laden nicht. Der Listen-Read der Collection bettet jede
+Beziehung ein, die eine Eigenschaft deklariert, ausgeblendet oder nicht; Code, der Listenzeilen liest –
+`additionalFields`, Entity-Actions, Collection-Actions über `tableController.data`, Plugin-Slots,
+`browserCallbacks.afterRead` –, findet die verknüpften Zeilen daher dort. Eine Beziehung, die nur im
+`relations`-Array der Collection ohne Eigenschaft deklariert ist, wird in der Liste nicht eingebettet;
+ihre Zeilen laden, wenn ihr Tab geöffnet wird.
 
 Wenn Sie den Inline-Picker trotzdem wollen, verlangen Sie ihn:
 

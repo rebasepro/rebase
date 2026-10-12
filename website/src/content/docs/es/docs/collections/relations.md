@@ -1,5 +1,5 @@
 ---
-sourceHash: 53bd9f35a923ce72
+sourceHash: a3e5fa2b319b73d8
 title: Relaciones
 sidebar_label: Relaciones
 description: Define relaciones SQL uno a uno, uno a muchos y muchos a muchos entre colecciones con claves foráneas, tablas de unión y uniones multi-salto.
@@ -232,6 +232,14 @@ en una relación declarada como propiedad ese botón repetía el mismo encabezad
 junto a una columna que ya mostraba los hijos, así que se descarta. Oculta la
 columna de la relación (`admin: { hideFromCollection: true }`) y el botón
 vuelve, de modo que la relación nunca desaparece del todo de la tabla.
+
+Ocultar la columna no impide la carga. La lectura del listado de la colección incrusta
+todas las relaciones que declara una propiedad, ocultas o no, así que el código que lee
+las filas del listado — `additionalFields`, acciones de entidad, acciones de colección a
+través de `tableController.data`, slots de plugins, `browserCallbacks.afterRead` —
+encuentra ahí las filas relacionadas. Una relación declarada solo en el array `relations`
+de la colección, sin propiedad, no se incrusta en el listado; sus filas se cargan al abrir
+su pestaña.
 
 Si aun así quieres el selector en línea, pídelo:
 

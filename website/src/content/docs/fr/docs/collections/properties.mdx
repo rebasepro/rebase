@@ -1,5 +1,5 @@
 ---
-sourceHash: 8a336726f6416a25
+sourceHash: 4b29623fe71430bc
 title: Propriétés
 sidebar_label: Propriétés
 description: Les types de propriétés définissent le type de données, la validation et le rendu de l'interface utilisateur pour chaque champ d'une collection. Rebase prend en charge les types string, number, boolean, date, array, map, reference, relation et geopoint.
@@ -83,7 +83,7 @@ price: {
 | `admin.readOnly` | `boolean` | Empêche la modification |
 | `admin.disabled` | `boolean \| PropertyDisabledConfig` | Désactive avec infobulle optionnelle |
 | `admin.filledByServer` | `boolean` | Le serveur remplit le champ lorsqu'un nouvel enregistrement le laisse vide (un hook `beforeSave`). Le formulaire laisse passer une création sans lui ; il reste requis à l'édition, et les propres vérifications du serveur continuent de s'appliquer |
-| `admin.hideFromCollection` | `boolean` | Masque de la vue en tableau |
+| `admin.hideFromCollection` | `boolean` | Masque de la vue en tableau. Affichage uniquement : les lignes liées d'une propriété de relation masquée sont tout de même embarquées dans la lecture de liste (voir [Relations](/docs/collections/relations)) |
 | `admin.columnWidth` | `number` | Largeur de colonne en pixels (vue en tableau) |
 | `admin.span` | `1 \| 2 \| 3 \| 4` | Largeur du champ sur la grille de formulaire à quatre colonnes |
 | `admin.Field` | `React.ComponentType` | Composant de champ personnalisé |
@@ -254,7 +254,7 @@ locales: {
 | `columnType` | `"varchar" \| "text" \| "char" \| "uuid"` | La colonne de base de données. Par défaut `text`, ou `uuid` lorsque `isId` l'indique. `text` pour les chaînes sans limite de taille, `char` pour une longueur fixe |
 | `isId` | `boolean \| string` | Marque la propriété comme clé primaire et indique qui la renseigne : `"manual"` (vous-même), `"uuid"` (`gen_random_uuid()`), ou toute autre chaîne, utilisée textuellement comme expression SQL par défaut de la colonne — brute (`nanoid()`) ou sous forme de template (``"sql`nanoid()`"``). La fonction doit exister ; rien ici ne la crée. `"increment"` est une stratégie pour les **nombres** et ne fait rien ici, et `"cuid"` est refusé au chargement de la configuration |
 | `autoValue` | `"user_on_create" \| "user_on_update"` | Marque la colonne avec l'**uid de l'utilisateur actif** — à la création uniquement, ou à chaque écriture. Voir [Colonnes d'audit](#colonnes-daudit) |
-| `userSelect` | `boolean` | Rendu sous forme de sélecteur d'utilisateur. La valeur est une simple colonne de chaîne contenant l'identifiant de l'utilisateur — rien ne la résout ni ne la vérifie à l'entrée. **Formulaire d'administration uniquement — non appliqué par l'API ou la base de données.** |
+| `userSelect` | `boolean` | Rendu sous forme de sélecteur d'utilisateur. La valeur est une simple colonne de chaîne contenant l'identifiant de l'utilisateur — rien ne la résout ni ne la vérifie à l'entrée. **Formulaire d'administration uniquement — non appliqué par l'API ou la base de données.** Le sélecteur liste les noms, e-mails et avatars des utilisateurs à quiconque peut écrire dans la collection, via [`GET /api/admin/users/pick`](/docs/backend/auth-endpoints/), sans la portée `users:read`. Une collection dont les règles d'écriture sont en SQL brut ne compte pas, car elles ne peuvent pas être jugées à l'avance : là, seuls les détenteurs de `users:read` peuvent choisir. |
 | `admin.previewAsTag` | `boolean` | Affiche cette chaîne sous forme de tag dans les aperçus |
 | `admin.clearable` | `boolean` | Ajoute une icône pour effacer la valeur (définir sur null) |
 | `admin.urlPreview` | `PreviewType` | Comment afficher une chaîne contenant une URL : un lien, ou un aperçu d'image, d'audio ou de vidéo intégré. Présentation uniquement — le fait que la valeur *soit* une URL dépend de l'indicateur `url` sur la propriété, à partir duquel le contrat OpenAPI est généré |
@@ -308,6 +308,8 @@ d'unicité sur plusieurs colonnes plutôt que l'identité de la ligne, il s'agit
 chargement de la configuration.
 
 Une collection dont aucune propriété ne revendique `isId` reçoit sa propre colonne `id` : `TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text`. La base de données la remplit, si bien qu'une ligne créée depuis le panneau d'administration, l'API REST ou le SDK n'a besoin d'aucune clé, et une clé que vous envoyez vous-même est utilisée telle quelle. Une table créée avant l'existence de cette valeur par défaut la reçoit au démarrage suivant. Sur la 0.23 la colonne n'a aucune valeur par défaut, et une création qui n'envoie aucune clé échoue.
+
+Il en va de même pour une clé `isId: "uuid"` déclarée dont la table n'a pas de valeur par défaut — une table adoptée avec `rebase schema introspect`, ou créée à la main : le démarrage suivant définit `DEFAULT gen_random_uuid()`. Le démarrage ne définit la valeur par défaut d'aucune autre clé déclarée. La fonction d'une stratégie SQL peut ne pas exister encore : ajoutez donc cette valeur par défaut vous-même, ou laissez `rebase db push` l'appliquer.
 :::
 
 ## Propriétés numériques (Number)

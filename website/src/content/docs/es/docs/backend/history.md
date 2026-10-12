@@ -1,5 +1,5 @@
 ---
-sourceHash: a62053f25d91d42c
+sourceHash: 4952ad745ea2bab4
 title: Historial de entidades
 sidebar_label: Historial de entidades
 description: Realiza un seguimiento de cada cambio en tus entidades con un registro de auditoría completo — quién cambió qué, cuándo y la entidad completa antes y después.
@@ -73,6 +73,13 @@ const ordersCollection = defineCollection({
 Los valores son la fila tal como la sirve la API REST: sus columnas, las fechas
 como timestamps, una `belongsTo` como su clave foránea. Eso es lo que escribe
 de vuelta un revert.
+
+Una entrada nunca contiene los valores de una fila relacionada. Leer el historial de una
+fila solo requiere acceso de lectura a esa fila, no a las filas a las que apunta, así que
+una relación se guarda como una referencia — `{ "__type": "relation", "id", "path" }` — y
+nada más. Las entradas que versiones anteriores registraron con la fila relacionada
+incrustada (un borrado solía guardar la vista de la fila del panel de administración) se
+sirven igual: el endpoint de historial descarta los valores incrustados antes de responder.
 
 En una colección con [soft delete](/docs/collections/soft-delete/), un borrado
 se registra como `delete` y una restauración (la actualización que devuelve el
@@ -149,6 +156,22 @@ Devuelve una lista de entradas del historial para una entidad específica, orden
     "meta": { "total": 1, "limit": 20, "offset": 0, "hasMore": false }
 }
 ```
+
+```
+POST /api/data/:slug/:entityId/history/:historyId/revert
+```
+
+Vuelve a escribir los `values` de la entrada en la fila por la vía de guardado normal, así
+que el revert se registra a su vez como un `update`. Responde con la fila guardada bajo
+`data` y con `meta.reverted_from`, el id de la entrada.
+
+Las entradas escritas por versiones anteriores pueden contener claves para las que la fila
+no tiene columna: un campo que calculó un `afterRead` (antes de 0.24, un guardado registraba
+la fila tal como la mostraba `afterRead`), o una relación guardada como la vista que de ella
+tiene el panel de administración. Un revert escribe las columnas de la fila y omite esas
+claves, devolviendo una relación propietaria como su clave foránea, y nombra lo que omitió
+en `meta.dropped_fields`. Un valor que un `afterRead` antiguo enmascaró (`********`) sí tiene
+columna, así que se escribe de vuelta tal como se registró.
 
 ## Configuración de retención
 

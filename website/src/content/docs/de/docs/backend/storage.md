@@ -1,5 +1,5 @@
 ---
-sourceHash: 2ea983a97d1ca602
+sourceHash: 0b9f331306c3360e
 title: Storage-Konfiguration
 sidebar_label: Storage-Konfiguration
 description: Konfigurieren Sie lokales Dateisystem, S3-kompatible oder GCS/Firebase Storage-Backends für Datei-Uploads, Bilder und Medien.
@@ -128,7 +128,7 @@ image: {
 `POST /api/storage/upload` antwortet mit `201` und den `{ key, bucket, storageUrl }` des gespeicherten Objekts unter `data`; `GET /api/storage/metadata/*` mit den Metadaten des Objekts und, bei einem privaten Objekt, dem kurzlebigen `token`;
 `POST /api/storage/metadata` mit einem Objekt, das nach den gesendeten Pfaden benannt ist und jeweils enthält, was das `GET` dafür geantwortet hätte (siehe unten).
 Ein Ordner ist kein Objekt: `/metadata` auf einem Schlüssel, der auf `/` endet, ist auf jedem Store `404`, auch dort, wo S3 oder GCS einen `folder/`-Marker führt, sodass für ein Präfix kein Download-Token ausgestellt wird;
-`GET /api/storage/sources` mit dem Array der konfigurierten Quellen und `configured: true`. Auf einem Deployment ganz ohne Storage antwortet es mit `200 {"data": [], "configured": false}`, während jede andere Route mit `501 STORAGE_NOT_CONFIGURED` antwortet. `GET /api/auth/config` meldet dasselbe als `storage: false`, sodass ein Client gar nicht erst fragen muss. `DELETE /api/storage/file/*` und `POST /api/storage/folder` übertragen lediglich eine `message`, da es nichts zurückzugeben gibt.
+`GET /api/storage/sources` mit dem Array der konfigurierten Quellen und `configured: true`. Auf einem Deployment ganz ohne Storage antwortet es mit `200 {"data": [], "configured": false}`, während jede andere Route mit `501 STORAGE_NOT_CONFIGURED` antwortet. `GET /api/auth/config` meldet dasselbe als `storage: false`, sodass ein Client gar nicht erst fragen muss. `GET /api/storage/sources` ist öffentlich: Es antwortet ohne Token, auch wenn `requireAuth` aktiv ist. Es nennt die Quellen (ihren Schlüssel, ihre Engine, ihren Transport und ihr Label) und nie eine Datei, und das Client-SDK liest es, um seine Quellen einzurichten, was geschehen kann, bevor sich jemand angemeldet hat. Auch eine App, die eine `direct`-Quelle anonym liest, braucht es. Jede Route, die eine Datei auflistet, liest oder schreibt, behält ihre Authentifizierung. `DELETE /api/storage/file/*` und `POST /api/storage/folder` übertragen lediglich eine `message`, da es nichts zurückzugeben gibt.
 
 Bei S3 und GCS muss ein `bucket` einer sein, den die Quelle bedient, bei Schreib- wie bei Lesezugriffen: Ein Upload, ein `POST /api/storage/folder` oder ein TUS-Upload, der einen anderen Bucket nennt, antwortet mit `404 UNKNOWN_STORAGE_SOURCE`, wie die Auflistung. Lokaler Storage legt einen Bucket weiterhin beim ersten Schreiben an.
 

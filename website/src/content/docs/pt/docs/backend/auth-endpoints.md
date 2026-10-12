@@ -1,5 +1,5 @@
 ---
-sourceHash: 609d0bdbbaabe6b1
+sourceHash: 5e6e22317b5f9d21
 title: Endpoints de autenticação e tokens
 sidebar_label: Endpoints de autenticação
 description: As rotas de autenticação que o backend do Rebase disponibiliza, seus formatos de resposta, autenticação multifator, o contexto de banco de dados que uma política visualiza, JWKS e chaves de serviço.
@@ -55,13 +55,14 @@ Todos os endpoints de autenticação são montados em `/api/auth/`:
 
 O gerenciamento administrativo de usuários e papéis (roles) é uma **superfície separada**, montada em
 `/api/admin/` em vez de `/api/auth/`. Ler requer o escopo `users:read` e
-alterar requer `users:write`. Um admin e a chave de serviço têm os dois; o mesmo vale para uma
+alterar requer `users:write`, exceto a leitura restrita do seletor de usuários abaixo. Um admin e a chave de serviço têm os dois; o mesmo vale para uma
 role que os declara. Ninguém pode alterar uma conta que tenha mais do que ele próprio.
 Consulte [Papéis e escopos](/docs/backend/roles-and-scopes/).
 
 | Método | Caminho | Descrição |
 |--------|---------|-----------|
 | `GET` | `/api/admin/users` | Listar usuários (paginado). `?search=` corresponde a uma parte do e-mail ou do nome de exibição, sem diferenciar maiúsculas de minúsculas. No Postgres, também corresponde a qualquer papel que o usuário tenha e ao uid; no MongoDB, continua correspondendo apenas ao e-mail e ao nome de exibição |
+| `GET` | `/api/admin/users/pick` | A leitura do seletor de usuários: `uid`, `displayName`, `email` e `photoURL` de cada usuário, nada além disso. Aceita `?search=`, `?limit=` (25 por padrão) e `?offset=`, ou `?ids=a,b` para os usuários que um valor armazenado nomeia. Responde a `users:read` e também a quem pode escrever em uma coleção com um campo [`userSelect`](/docs/collections/properties/) — para que um editor possa preenchê-lo. Uma regra escrita como SQL bruto (`using` / `withCheck` que o modelo de políticas não consegue ler) não pode ser avaliada de antemão, então conta como recusa aqui: em uma coleção assim, só quem tem `users:read` pode escolher. Qualquer outra pessoa recebe `403 SCOPE_MISSING` |
 | `POST` | `/api/admin/users` | Criar um usuário |
 | `GET` | `/api/admin/users/:uid` | Ler um usuário |
 | `PUT` | `/api/admin/users/:uid` | Atualizar um usuário. `{ disabled: true }` desliga a conta sem excluí-la: todo login e refresh é recusado (`ACCOUNT_DISABLED`), suas sessões terminam e todo token que ela possui é recusado; `false` a liga de volta |
@@ -78,9 +79,18 @@ Todos os endpoints da API de dados requerem um cabeçalho `Authorization: Bearer
 Uma senha nova precisa ter pelo menos 8 caracteres, com uma letra maiúscula, uma
 minúscula e um dígito. O registro, a redefinição e a alteração recusam uma senha que
 falhe, com `400 WEAK_PASSWORD`, listando cada regra violada, e o mesmo vale para um
-administrador que define uma senha com `PUT /api/admin/users/:uid` (como um `400`
-simples). `POST /api/admin/users` não verifica a senha que recebe. O login nunca
-verifica a política, então uma senha antiga continua funcionando. Para definir suas
+administrador que escolhe uma senha: `POST /api/admin/users`, uma criação na coleção
+de usuários pela API de dados (`POST /api/data/users`, seu `/bulk`, uma escrita por
+socket ou MCP), `PUT /api/admin/users/:uid` e
+`POST /api/admin/users/:uid/reset-password`. Em um `/bulk`, a mensagem começa com
+`Row <n>: ` (contando a partir de 0), como os outros erros de linha do bulk.
+
+Para criar contas cujas senhas outro sistema definiu, como em uma importação, envie
+`skipPasswordPolicy: true` no corpo da criação (em cada linha de um `/bulk`). O
+servidor só o respeita para um administrador ou a chave de serviço; para qualquer
+outra pessoa ele não dispensa nada, e a recusa diz isso. Ele nunca é armazenado. A
+importação do painel de administração o envia para cada linha que traz um `password`.
+O login nunca verifica a política, então uma senha antiga continua funcionando. Para definir suas
 próprias regras, passe `auth.hooks.validatePasswordStrength` a partir de um backend
 [ejetado](/docs/backend/authentication/#configuration). O primeiro admin criado a partir de
 `REBASE_ADMIN_PASSWORD` segue uma regra diferente: pelo menos 12 caracteres, e nada mais.

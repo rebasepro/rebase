@@ -1,5 +1,5 @@
 ---
-sourceHash: 76a511b15a0fae61
+sourceHash: 53f453267ae3e21c
 title: Autenticação
 sidebar_label: Autenticação
 description: Configure a autenticação JWT, provedores OAuth, e-mail SMTP, proteção contra bots e a coleção de usuários no backend do Rebase.
@@ -87,7 +87,7 @@ const backend = await initializeRebaseBackend({
 | `signingKeys` | `JwtSigningKeyConfig[]` | — | Chaves de assinatura assimétricas — consulte [Tokens Assimétricos e JWKS](/docs/backend/auth-endpoints/#asymmetric-tokens-and-jwks) |
 | `activeKid` | `string` | primeira chave | Qual chave de `signingKeys` emite novos tokens |
 | `accessExpiresIn` | `string` | `1h` | Tempo de vida do token de acesso |
-| `refreshExpiresIn` | `string` | `30d` | Tempo de vida do refresh token. Deslizante: cada rotação o renova. O runtime passa `JWT_REFRESH_EXPIRES_IN`, cujo padrão próprio é `400d` |
+| `refreshExpiresIn` | `string` | `30d` | Tempo de vida do refresh token. Deslizante: cada rotação o renova, então este é o tempo que uma sessão sobrevive à **inatividade**. O runtime passa `JWT_REFRESH_EXPIRES_IN`, que também tem `30d` como padrão. Os navegadores limitam o cookie de refresh a 400 dias, então um valor maior não adianta nada no modo cookie |
 | `refreshTokenReuseIntervalSeconds` | `number` | `10` | Por quanto tempo um refresh token que foi rotacionado ainda emite um irmão da sua sessão, de modo que um cliente que perdeu uma resposta de refresh não seja desconectado |
 | `refreshTokenReuse` | `"reject" \| "revoke-session"` | `"reject"` | O que um refresh token apresentado depois dessa janela faz. `"reject"` o recusa (`TOKEN_ALREADY_USED`) e registra o fato, e a sessão permanece: isso não é detecção de reuso, já que quem fez o refresh primeiro mantém a sessão. `"revoke-session"` encerra todo o login nesse replay (`SESSION_REVOKED`), como o GoTrue faz, e o proprietário faz login novamente. `AUTH_REFRESH_TOKEN_REUSE` |
 | `requireAuth` | `boolean` | `true` | Exigir uma sessão para a API de dados |

@@ -1,5 +1,5 @@
 ---
-sourceHash: aa008173a34fc3e9
+sourceHash: e218de0d114db9f6
 title: Validierung und Bedingungen
 sidebar_label: Validierung & Bedingungen
 description: "Enum-Werte, Validierungsregeln pro Eigenschaft und die bedingten Felder, die eine Eigenschaft basierend auf den Werten der Entität als erforderlich, deaktiviert oder ausgeblendet festlegen."
@@ -91,11 +91,16 @@ erzwingt — `required` (NOT NULL), `unique` (ein Unique-Index), der Typ eines E
 einer `varchar`- oder `char`-Spalte. Alles andere, das Ihr Servercode schreibt, prüfen Sie im Code,
 der es schreibt.
 
+Das Admin-Panel prüft dieselben Regeln vor dem Speichern, im Datensatzformular und im Inline-Editor
+der Collection-Tabelle. Eine Tabellenzelle beurteilt einen Wert, sobald Sie ihn bearbeiten: Ein
+gespeicherter Wert, der eine später hinzugefügte Regel verletzt, zeigt in der Tabelle keinen Fehler,
+bis jemand diese Zelle bearbeitet.
+
 ### Alle Typen
 
 | Regel | Typ | Beschreibung |
 |-------|-----|--------------|
-| `required` | `boolean` | Der Wert muss vorhanden sein |
+| `required` | `boolean` | Der Wert muss vorhanden sein. Bei einem `string` gilt `""` als nicht vorhanden: Die API lehnt es bei jedem Schreibvorgang ab, ob Erstellung oder Aktualisierung, mit derselben `required`-Verletzung (es sei denn, die Collection hat ein `beforeSave`, das es füllen darf) |
 | `requiredMessage` | `string` | Was angezeigt wird, wenn er fehlt: vom Admin-Formular und als `message` des `required`-Eintrags des Felds im 400 der API. Das NOT NULL der Datenbank trägt keine Meldung |
 | `unique` | `boolean` | Nur eine Zeile in der Tabelle darf diesen Wert enthalten. Das Admin-Formular prüft dies auch beim Speichern eines Werts, den die Bearbeitung geändert hat, sodass ein Duplikat vor dem Schreibvorgang an seinem Feld benannt wird |
 | `uniqueInArray` | `boolean` | Nur ein Eintrag *pro Array* darf ihn enthalten. Gilt für ein direktes Kind einer `array`-Eigenschaft oder ein Kind der ersten Ebene einer `map` darin. **Nur im Admin-Formular – wird nicht von der API oder der Datenbank erzwungen.** |
@@ -104,7 +109,7 @@ der es schreibt.
 
 | Regel | Typ | Beschreibung |
 |-------|-----|--------------|
-| `min` / `max` | `number` | Mindest- / Höchstanzahl von Zeichen, inklusive. Mit `columnType: "varchar"` oder `"char"` bestimmt `max` auch die Spaltengröße (`VARCHAR(max)`); eine Verringerung auf einer Tabelle, die bereits längere Zeilen enthält, ist eine Migration, die die Datenbank verweigert. Die Standardspalte ist `TEXT`, die `max` unbegrenzt lässt — die Grenze liegt dann allein in der [Anfrageprüfung](#wo-die-validierung-ausgeführt-wird) des Servers |
+| `min` / `max` | `number` | Mindest- / Höchstanzahl von Zeichen, inklusive. Mit `columnType: "varchar"` oder `"char"` bestimmt `max` auch die Spaltengröße (`VARCHAR(max)`); eine Verringerung auf einer Tabelle, die bereits längere Zeilen enthält, ist eine Migration, die die Datenbank verweigert, und der Collection-Editor warnt, wenn eine Änderung ihn senkt. Die Standardspalte ist `TEXT`, die `max` unbegrenzt lässt — die Grenze liegt dann allein in der [Anfrageprüfung](#wo-die-validierung-ausgeführt-wird) des Servers |
 | `length` | `number` | Genau diese Anzahl von Zeichen – ein Ländercode, eine Referenz mit fester Breite |
 | `matches` | `string \| RegExp` | Ein Muster, dem der gesamte Wert entsprechen muss. Ein String wird pro Anfrage kompiliert; ein nicht kompilierbarer String wird daher beim Start abgelehnt, anstatt stillschweigend ignoriert zu werden |
 | `matchesMessage` | `string` | Was das Formular anzeigt, wenn `matches` fehlschlägt |

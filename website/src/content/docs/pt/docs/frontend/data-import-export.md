@@ -1,5 +1,5 @@
 ---
-sourceHash: 66aded96fdd7fc98
+sourceHash: 488d01a16707cd87
 title: Importação e Exportação de Dados
 sidebar_label: Importação e Exportação de Dados
 description: Importe dados de arquivos CSV, JSON e Excel para suas coleções e exporte dados de coleções para CSV ou JSON com campos computados opcionais.
@@ -64,6 +64,10 @@ A pré-visualização lista cada célula que não é convertida, por coluna, com
 As próprias regras da coleção — campos obrigatórios, opções de enum, valores únicos — são verificadas pelo servidor conforme as linhas são gravadas, em lotes de até 500 linhas (menos quando as linhas são largas, para que uma requisição fique abaixo de cerca de 1 MB). Um lote é salvo por inteiro ou não é salvo. Se uma linha for recusada, a importação para e a identifica; os lotes anteriores a ela já estão salvos, e **Tentar novamente** retoma a partir da primeira linha do lote da linha recusada.
 
 Uma linha cujo id já está na coleção atualiza esse registro: as colunas que o arquivo traz são gravadas e as demais mantêm seus valores armazenados, então um arquivo `id,price` reajusta o preço de produtos existentes sem repetir seus campos obrigatórios. Uma linha nova ainda precisa de todos os campos obrigatórios. Um lote que mistura atualizações e linhas novas é gravado como duas requisições, então uma linha nova recusada pode deixar as atualizações desse lote salvas; **Tentar novamente** as grava de novo com os mesmos valores.
+
+### Importando usuários
+
+Uma linha nova na coleção de usuários é a criação de um usuário: uma coluna `password` tem o hash calculado, nunca é armazenada como foi escrita, e uma linha sem ela recebe uma senha gerada ou um convite, como quando um administrador adiciona um usuário. As senhas em um arquivo assim geralmente foram definidas sob as regras de outro sistema, então a importação pede ao servidor que dispense a [política de senhas](/docs/backend/auth-endpoints/#password-policy) para essas linhas. O servidor só concorda quando você é administrador; qualquer outra pessoa que importe usuários fica sujeita à política, e uma senha fraca interrompe a importação com `WEAK_PASSWORD`.
 
 ### Criando uma coleção a partir de um arquivo
 

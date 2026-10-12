@@ -1,5 +1,5 @@
 ---
-sourceHash: 83b3a13a151d0cd7
+sourceHash: 330defe6fc90f0fa
 title: Índice de endpoints
 sidebar_label: Índice de endpoints
 description: Cada rota HTTP montada por um backend Rebase — dados, autenticação, armazenamento, administração, meta — com a restrição de acesso (gate) de cada uma e a página que a explica.
@@ -119,6 +119,7 @@ uma coleção não acessa nada disso. Consulte [Papéis e escopos](/docs/backend
 | `POST` | `/api/admin/bootstrap` | none, e apenas enquanto nenhum administrador existir | Recusado em produção — consulte [First User Bootstrap](/docs/backend/authentication/#first-user-bootstrap) |
 | `GET` | `/api/admin/users` | `users:read` | Gerenciamento de usuários |
 | `POST` | `/api/admin/users` | `users:write` | Gerenciamento de usuários. Roles além das do próprio chamador são recusadas |
+| `GET` | `/api/admin/users/pick` | `users:read`, ou acesso de escrita a uma coleção com um campo `userSelect` | A [leitura do seletor de usuários](/docs/backend/auth-endpoints/): apenas id, nome, e-mail e avatar. Uma coleção cujas regras de escrita são SQL bruto não conta |
 | `GET` | `/api/admin/users/:uid` | `users:read` | Gerenciamento de usuários |
 | `PUT` | `/api/admin/users/:uid` | `users:write` | Recusado para uma conta que tem mais do que o chamador |
 | `DELETE` | `/api/admin/users/:uid` | `users:write` | Recusado para uma conta que tem mais do que o chamador |

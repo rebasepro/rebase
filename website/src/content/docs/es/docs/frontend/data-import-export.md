@@ -1,5 +1,5 @@
 ---
-sourceHash: 66aded96fdd7fc98
+sourceHash: 488d01a16707cd87
 title: Importación y exportación de datos
 sidebar_label: Importación y exportación de datos
 description: Importa datos de archivos CSV, JSON y Excel a tus colecciones, y exporta datos de colecciones a CSV o JSON con campos calculados opcionales.
@@ -64,6 +64,10 @@ La vista previa enumera cada celda que no se convierte, por columna, con cuánta
 Las propias reglas de la colección — campos obligatorios, opciones de enum, valores únicos — las comprueba el servidor a medida que se escriben las filas, en lotes de hasta 500 filas (menos cuando las filas son anchas, para que una solicitud se mantenga por debajo de aproximadamente 1 MB). Un lote se guarda completo o no se guarda. Si se rechaza una fila, la importación se detiene y la identifica; los lotes anteriores ya están guardados, y **Retry** continúa desde la primera fila del lote de la fila rechazada.
 
 Una fila cuyo id ya está en la colección actualiza ese registro: se escriben las columnas que trae el archivo y las demás conservan sus valores guardados, de modo que un archivo `id,price` reajusta el precio de los productos existentes sin repetir sus campos obligatorios. Una fila nueva sigue necesitando todos los campos obligatorios. Un lote que mezcla actualizaciones y filas nuevas se escribe como dos solicitudes, así que una fila nueva rechazada puede dejar guardadas las actualizaciones de ese lote; **Retry** las escribe de nuevo con los mismos valores.
+
+### Importar usuarios
+
+Una fila nueva en la colección de usuarios es una creación de usuario: una columna `password` se cifra con hash y nunca se almacena tal como se escribió, y una fila sin ella recibe una contraseña generada o una invitación, igual que cuando un administrador añade un usuario. Las contraseñas de un archivo así solían fijarse bajo las reglas de otro sistema, por lo que la importación le pide al servidor que omita la [política de contraseñas](/docs/backend/auth-endpoints/#password-policy) para esas filas. El servidor lo acepta solo si eres administrador; cualquier otra persona que importe usuarios se rige por la política, y una contraseña débil detiene la importación con `WEAK_PASSWORD`.
 
 ### Crear una colección a partir de un archivo
 

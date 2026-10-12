@@ -1,5 +1,5 @@
 ---
-sourceHash: 9793c6efe5a375a7
+sourceHash: 36738ccb08826775
 title: Umgebung & Konfiguration
 sidebar_label: Konfiguration
 description: Alle Umgebungsvariablen und Konfigurationsoptionen für Rebase-Projekte.
@@ -103,7 +103,7 @@ zu stellen und die Antworten zu lesen.
 | `JWT_PRIVATE_KEY` | Privater PEM-Schlüssel zum asymmetrischen Signieren von Zugriffstokens (RS256), sodass jeder im Besitz des JWKS eine Sitzung verifizieren kann, ohne selbst Tokens erstellen zu können. Akzeptiert ein PEM mit echten Zeilenumbrüchen, ein PEM mit `\n`-Escapes oder Base64 des gesamten PEM. Ohne diese Angabe bleiben Tokens HS256. | — |
 | `JWT_KEY_ID` | Benennt `JWT_PRIVATE_KEY` im Token-Header und im JWKS. Ändern Sie diesen Wert jedes Mal, wenn der Schlüssel geändert wird – die Schlüsselrotation erfordert, dass alt und neu unterscheidbar sind. | `default` |
 | `JWT_ACCESS_EXPIRES_IN` | Lebensdauer des Access Tokens | `1h` |
-| `JWT_REFRESH_EXPIRES_IN` | Lebensdauer des Refresh Tokens. Gleitend – jede Rotation verlängert sie, dieser Wert regelt also, wie lange eine Sitzung **Inaktivität** übersteht. | `400d` |
+| `JWT_REFRESH_EXPIRES_IN` | Lebensdauer des Refresh Tokens. Gleitend – jede Rotation verlängert sie, dieser Wert regelt also, wie lange eine Sitzung **Inaktivität** übersteht. Setzen Sie `400d` für Sitzungen, die eine lange Abwesenheit überdauern; Browser begrenzen das Refresh-Cookie dort. | `30d` |
 | `ALLOW_REGISTRATION` | Neuen Benutzern die Registrierung erlauben (`true`/`false`). Außerhalb der Produktion kann sich der **erste** Benutzer immer registrieren, unabhängig von diesem Wert – eine leere Benutzertabelle muss jemanden zulassen, und dieser jemand wird Administrator. In der Produktion (`NODE_ENV=production`) ist dieses Fenster geschlossen: Eine leere Tabelle verweigert die Bootstrap-Registrierung mit `SETUP_REQUIRED`, ein über die offene Registrierung erstelltes erstes Konto ist ein gewöhnliches Konto, und der Administrator wird unten mit `REBASE_ADMIN_EMAIL` benannt oder mit dem Service-Schlüssel zugewiesen. Die Datei `.env.example` des Scaffolds setzt dies auf `true`; der Standardwert des Frameworks ist deaktiviert. | `false` |
 | `DISABLE_SELF_REGISTRATION` | Notfallschalter. Schließt das Bootstrap-Fenster für den ersten Benutzer, das `ALLOW_REGISTRATION=false` außerhalb der Produktion absichtlich offen lässt, sodass die Registrierung selbst bei einer leeren Datenbank gesperrt ist. Kombinieren Sie dies mit `REBASE_ADMIN_EMAIL` unten, andernfalls hat das Deployment keine Möglichkeit, seinen ersten angemeldeten Aufrufer zu erstellen. Jedes ausgelieferte Deployment-Artefakt setzt diese Variable. | — |
 | `REBASE_ADMIN_EMAIL` | E-Mail-Adresse des ersten Admin-Kontos, das beim Start erstellt wird, **solange die Benutzertabelle noch leer ist**, und danach nie wieder. Auf diese Weise erhält ein Produktions-Deployment seinen Administrator: Der Betreiber benennt das erste Konto, anstatt darum mit dem Internet um die Wette zu laufen. Der Start warnt, wenn die Tabelle in Produktion leer und diese Variable nicht gesetzt ist. | — |

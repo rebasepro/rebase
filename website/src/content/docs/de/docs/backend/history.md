@@ -1,5 +1,5 @@
 ---
-sourceHash: a62053f25d91d42c
+sourceHash: 4952ad745ea2bab4
 title: Entitätshistorie
 sidebar_label: Entitätshistorie
 description: Verfolgen Sie jede Änderung an Ihren Entitäten mit einem vollständigen Audit-Trail – wer hat was wann geändert, inklusive vollständigem Vorher-/Nachher-Zustand.
@@ -72,6 +72,13 @@ const ordersCollection = defineCollection({
 
 Die Werte sind die Zeile, so wie die REST-API sie liefert: ihre Spalten, Daten als Zeitstempel, eine `belongsTo`-Relation als ihr Fremdschlüssel. Das ist es, was ein Revert zurückschreibt.
 
+Ein Eintrag enthält nie die Werte einer verknüpften Zeile. Um die Historie einer Zeile zu lesen,
+genügt Lesezugriff auf diese Zeile, nicht auf die Zeilen, auf die sie zeigt; deshalb wird eine
+Relation als Referenz gespeichert – `{ "__type": "relation", "id", "path" }` – und nicht mehr.
+Einträge, die ältere Versionen mit eingebetteter verknüpfter Zeile aufgezeichnet haben (ein Löschen
+speicherte früher die Sicht des Admin-Panels auf die Zeile), werden genauso ausgeliefert: Der
+History-Endpunkt entfernt die eingebetteten Werte, bevor er antwortet.
+
 Bei einer Collection mit [Soft Delete](/docs/collections/soft-delete/) wird ein Löschen als `delete` aufgezeichnet und eine Wiederherstellung (das Update, das das Soft-Delete-Feld wieder auf `null` setzt) als `update`. Die Historie einer Zeile bleibt lesbar, während sich die Zeile im Papierkorb befindet, und ein Revert auf eine Version von vor dem Löschen stellt sie wieder her.
 
 ### Was `previous_values` enthält
@@ -142,6 +149,22 @@ Gibt eine Liste von Historie-Einträgen für eine bestimmte Entität zurück, ab
     "meta": { "total": 1, "limit": 20, "offset": 0, "hasMore": false }
 }
 ```
+
+```
+POST /api/data/:slug/:entityId/history/:historyId/revert
+```
+
+Schreibt die `values` des Eintrags über den normalen Speicherpfad in die Zeile zurück, sodass der
+Revert selbst als `update` aufgezeichnet wird. Die Antwort enthält die gespeicherte Zeile unter `data`
+und in `meta.reverted_from` die ID des Eintrags.
+
+Von älteren Versionen geschriebene Einträge können Schlüssel enthalten, für die die Zeile keine Spalte
+hat: ein Feld, das ein `afterRead` berechnet hat (vor 0.24 zeichnete ein Speichern die Zeile so auf,
+wie `afterRead` sie zeigte), oder eine Relation, die als Sicht des Admin-Panels auf sie gespeichert
+wurde. Ein Revert schreibt die Spalten der Zeile und lässt diese Schlüssel weg, wobei eine besitzende
+Relation als ihr Fremdschlüssel zurückgeht, und nennt in `meta.dropped_fields`, was er weggelassen hat.
+Ein Wert, den ein altes `afterRead` maskiert hat (`********`), hat eine Spalte und wird daher so
+zurückgeschrieben, wie er aufgezeichnet wurde.
 
 ## Retention-Konfiguration
 

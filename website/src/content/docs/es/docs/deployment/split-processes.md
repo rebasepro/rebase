@@ -1,5 +1,5 @@
 ---
-sourceHash: a46a7358b856be2f
+sourceHash: e616e5caaa9bd29f
 title: División en varios procesos
 sidebar_label: Procesos divididos
 description: Ejecute un bundle como varios procesos cooperativos —una API, una capa de funciones, un worker— desde la misma imagen de runtime publicada, para que una función personalizada pesada deje de competir con la API de datos.
@@ -55,6 +55,10 @@ crear disparadores), un proceso `worker` o `functions` anuncia cada una de sus p
 escrituras en el canal entre instancias, sin mantener una conexión
 `LISTEN`. En ambos casos, una función que escribe una fila sigue despertando a todos los
 suscriptores en la `api`.
+
+Dale a todos los procesos el mismo `REALTIME_CDC`. Un proceso propietario del esquema con
+`REALTIME_CDC=off` elimina los triggers de captura al arrancar, y una `api` que siga en
+`auto` quedaría escuchando cambios que nadie anuncia.
 
 ## Docker Compose
 

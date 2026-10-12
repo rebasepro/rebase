@@ -1,5 +1,5 @@
 ---
-sourceHash: 609d0bdbbaabe6b1
+sourceHash: 5e6e22317b5f9d21
 title: Endpoints d'authentification et jetons
 sidebar_label: Endpoints d'authentification
 description: Les routes d'authentification montées par le backend Rebase, le format de leurs réponses, l'authentification multifacteur, le contexte de base de données vu par une politique, JWKS et clés de service.
@@ -55,13 +55,14 @@ Tous les endpoints d'authentification sont montés sur `/api/auth/` :
 
 La gestion administrative des utilisateurs et des rôles est une **surface distincte**, montée sur
 `/api/admin/` plutôt que sur `/api/auth/`. La lecture exige la portée `users:read` et
-la modification `users:write`. Un administrateur et la clé de service détiennent les deux ; un
+la modification `users:write`, à l'exception de la lecture restreinte du sélecteur d'utilisateurs ci-dessous. Un administrateur et la clé de service détiennent les deux ; un
 rôle qui les déclare aussi. Personne ne peut modifier un compte qui détient plus que lui.
 Voir [Rôles et portées](/docs/backend/roles-and-scopes/).
 
 | Méthode | Chemin | Description |
 |--------|------|-------------|
 | `GET` | `/api/admin/users` | Lister les utilisateurs (paginé). `?search=` correspond à une partie, sans tenir compte de la casse, de l'e-mail ou du nom affiché. Sur Postgres, il correspond aussi à n'importe quel rôle que détient l'utilisateur, et à l'uid ; sur MongoDB, il ne correspond toujours qu'à l'e-mail et au nom affiché |
+| `GET` | `/api/admin/users/pick` | La lecture du sélecteur d'utilisateurs : `uid`, `displayName`, `email` et `photoURL` par utilisateur, rien d'autre. Accepte `?search=`, `?limit=` (25 par défaut) et `?offset=`, ou `?ids=a,b` pour les utilisateurs qu'une valeur stockée désigne. Répond à `users:read`, et aussi à quiconque peut écrire dans une collection ayant un champ [`userSelect`](/docs/collections/properties/) — un éditeur peut ainsi en renseigner un. Une règle écrite en SQL brut (`using` / `withCheck` que le modèle de politiques ne sait pas lire) ne peut pas être jugée à l'avance : elle compte donc comme un refus ici, et sur une telle collection seuls les détenteurs de `users:read` peuvent choisir. Tout autre reçoit `403 SCOPE_MISSING` |
 | `POST` | `/api/admin/users` | Créer un utilisateur |
 | `GET` | `/api/admin/users/:uid` | Obtenir un utilisateur |
 | `PUT` | `/api/admin/users/:uid` | Mettre à jour un utilisateur. `{ disabled: true }` désactive le compte sans le supprimer : toute connexion et tout rafraîchissement sont refusés (`ACCOUNT_DISABLED`), ses sessions prennent fin et chaque jeton qu'il détient est refusé ; `false` le réactive |
@@ -78,9 +79,16 @@ Tous les endpoints de l'API de données nécessitent un en-tête `Authorization:
 Un nouveau mot de passe doit comporter au moins 8 caractères, avec une majuscule, une
 minuscule et un chiffre. L'inscription, la réinitialisation et le changement refusent
 un mot de passe qui ne respecte pas ces règles avec `400 WEAK_PASSWORD`, en listant chaque règle enfreinte, et
-il en va de même pour un administrateur qui définit un mot de passe avec `PUT /api/admin/users/:uid` (sous la forme
-d'un simple `400`). `POST /api/admin/users` ne vérifie pas le mot de passe qu'on lui fournit. La connexion
-ne vérifie jamais la politique, de sorte qu'un ancien mot de passe continue de fonctionner. Pour définir vos propres règles, passez
+il en va de même pour un administrateur qui choisit un mot de passe : `POST /api/admin/users`, une création dans
+la collection des utilisateurs via l'API de données (`POST /api/data/users`, son `/bulk`, une écriture par socket ou
+MCP), `PUT /api/admin/users/:uid` et `POST /api/admin/users/:uid/reset-password`. Sur un `/bulk`, le message commence
+par `Row <n>: ` (compté à partir de 0), comme les autres erreurs de ligne du bulk.
+
+Pour créer des comptes dont les mots de passe ont été fixés par un autre système, comme lors d'un import, envoyez
+`skipPasswordPolicy: true` dans le corps de la création (sur chaque ligne d'un `/bulk`). Le serveur ne le respecte
+que pour un administrateur ou la clé de service ; de la part de tout autre, il ne dispense de rien, et le refus
+le dit. Il n'est jamais stocké. L'import du panneau d'administration l'envoie pour chaque ligne qui porte un
+`password`. La connexion ne vérifie jamais la politique, de sorte qu'un ancien mot de passe continue de fonctionner. Pour définir vos propres règles, passez
 `auth.hooks.validatePasswordStrength` depuis un backend [éjecté](/docs/backend/authentication/#configuration).
 Le premier administrateur créé à partir de `REBASE_ADMIN_PASSWORD` est soumis à une
 autre règle : au moins 12 caractères, et rien d'autre.

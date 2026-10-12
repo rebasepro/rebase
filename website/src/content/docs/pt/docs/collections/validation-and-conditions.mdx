@@ -1,5 +1,5 @@
 ---
-sourceHash: aa008173a34fc3e9
+sourceHash: e218de0d114db9f6
 title: Validação e condições
 sidebar_label: Validação & condições
 description: "Valores de enum, regras de validação por propriedade e os campos condicionais que tornam uma propriedade obrigatória, desativada ou oculta com base nos próprios valores da entidade."
@@ -92,11 +92,16 @@ callback, um script de seed. O que vale ali é o que o banco de dados impõe —
 largura de uma coluna `varchar` ou `char`. Qualquer outra coisa que seu código
 de servidor grave, verifique no próprio código que a escreve.
 
+O painel de administração verifica as mesmas regras antes de salvar, no formulário do registro
+e no editor inline da tabela da coleção. Uma célula da tabela julga um valor assim que você o
+edita: um valor armazenado que falha em uma regra adicionada depois não mostra nenhum erro na
+tabela até que alguém edite essa célula.
+
 ### Todos os tipos
 
 | Regra | Tipo | Descrição |
 |------|------|-------------|
-| `required` | `boolean` | O valor deve estar presente |
+| `required` | `boolean` | O valor deve estar presente. Em uma `string`, `""` conta como ausente: a API a recusa em toda escrita, uma criação ou uma atualização, com a mesma violação de `required` (a menos que a coleção tenha um `beforeSave`, que pode preenchê-la) |
 | `requiredMessage` | `string` | O que é dito quando não está: pelo formulário de admin, e como a `message` da entrada `required` do campo no 400 da API. O NOT NULL do banco de dados não carrega nenhuma mensagem |
 | `unique` | `boolean` | Apenas uma linha na tabela pode ter este valor. O formulário de admin também o verifica ao salvar um valor que a edição alterou, de modo que um duplicado é indicado no seu próprio campo antes da gravação |
 | `uniqueInArray` | `boolean` | Apenas uma entrada *por array* pode contê-lo. Aplica-se a um filho direto de uma propriedade `array`, ou a um filho de primeiro nível de um `map` dentro de um. **Apenas formulário de admin — não aplicado pela API ou pelo banco de dados.** |
@@ -105,7 +110,7 @@ de servidor grave, verifique no próprio código que a escreve.
 
 | Regra | Tipo | Descrição |
 |------|------|-------------|
-| `min` / `max` | `number` | Quantidade mínima / máxima de caracteres, inclusivo. Com `columnType: "varchar"` ou `"char"`, `max` também dimensiona a coluna (`VARCHAR(max)`), portanto diminuí-lo em uma tabela que já contém linhas mais longas é uma migração que o banco de dados recusa. A coluna padrão é `TEXT`, que `max` deixa sem limite — o limite então fica apenas a cargo da [verificação de requisição](#onde-a-validação-é-executada) do servidor |
+| `min` / `max` | `number` | Quantidade mínima / máxima de caracteres, inclusivo. Com `columnType: "varchar"` ou `"char"`, `max` também dimensiona a coluna (`VARCHAR(max)`), portanto diminuí-lo em uma tabela que já contém linhas mais longas é uma migração que o banco de dados recusa, e o editor de coleções avisa quando uma edição o diminui. A coluna padrão é `TEXT`, que `max` deixa sem limite — o limite então fica apenas a cargo da [verificação de requisição](#onde-a-validação-é-executada) do servidor |
 | `length` | `number` | Exatamente essa quantidade de caracteres — um código de país, uma referência de largura fixa |
 | `matches` | `string \| RegExp` | Um padrão com o qual todo o valor deve corresponder. Uma string é compilada por requisição, portanto, uma que não compilar é rejeitada na inicialização em vez de silenciosamente se tornar nenhuma regra |
 | `matchesMessage` | `string` | O que o formulário exibe quando `matches` falha |

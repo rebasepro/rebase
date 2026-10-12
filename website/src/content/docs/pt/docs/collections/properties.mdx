@@ -1,5 +1,5 @@
 ---
-sourceHash: 8a336726f6416a25
+sourceHash: 4b29623fe71430bc
 title: Propriedades
 sidebar_label: Propriedades
 description: Os tipos de propriedade definem o tipo de dados, a validação e a renderização de interface do usuário para cada campo em uma coleção. O Rebase suporta os tipos string, number, boolean, date, array, map, reference, relation e geopoint.
@@ -83,7 +83,7 @@ price: {
 | `admin.readOnly` | `boolean` | Impede a edição |
 | `admin.disabled` | `boolean \| PropertyDisabledConfig` | Desativa com tooltip opcional |
 | `admin.filledByServer` | `boolean` | O servidor preenche o campo quando um novo registro o deixa vazio (um hook `beforeSave`). O formulário permite criar sem ele; permanece obrigatório na edição, e as próprias verificações do servidor continuam valendo |
-| `admin.hideFromCollection` | `boolean` | Oculta da visualização em tabela |
+| `admin.hideFromCollection` | `boolean` | Oculta da visualização em tabela. Apenas exibição: as linhas relacionadas de uma propriedade de relação oculta continuam embutidas na leitura de lista (veja [Relações](/docs/collections/relations)) |
 | `admin.columnWidth` | `number` | Largura da coluna em pixels (visualização em tabela) |
 | `admin.span` | `1 \| 2 \| 3 \| 4` | Largura do campo na grade de formulário de quatro colunas |
 | `admin.Field` | `React.ComponentType` | Componente de campo personalizado |
@@ -256,7 +256,7 @@ locales: {
 | `columnType` | `"varchar" \| "text" \| "char" \| "uuid"` | A coluna do banco de dados. O padrão é `text`, ou `uuid` quando `isId` assim definir. `text` para strings sem limite, `char` para tamanho fixo |
 | `isId` | `boolean \| string` | Marca a propriedade como a chave primária e especifica quem a preenche: `"manual"` (você), `"uuid"` (`gen_random_uuid()`) ou qualquer outra string, usada textualmente como a expressão padrão SQL da coluna — simples (`nanoid()`) ou em formato de template (``"sql`nanoid()`"``). A função precisa existir; nada aqui a cria. `"increment"` é uma estratégia de **number** e não faz nada aqui, e `"cuid"` é recusado no carregamento da configuração |
 | `autoValue` | `"user_on_create" \| "user_on_update"` | Grava na coluna o **uid do usuário atuante** — apenas na criação ou a cada gravação. Consulte [Colunas de auditoria](#colunas-de-auditoria) |
-| `userSelect` | `boolean` | Renderiza como um seletor de usuário. O valor é uma coluna de string simples contendo o ID do usuário — nada o resolve ou verifica na entrada. **Apenas formulário administrativo — não imposto pela API ou pelo banco de dados.** |
+| `userSelect` | `boolean` | Renderiza como um seletor de usuário. O valor é uma coluna de string simples contendo o ID do usuário — nada o resolve ou verifica na entrada. **Apenas formulário administrativo — não imposto pela API ou pelo banco de dados.** O seletor lista nomes, e-mails e avatares de usuários para qualquer pessoa que possa escrever na coleção, por meio de [`GET /api/admin/users/pick`](/docs/backend/auth-endpoints/), sem o escopo `users:read`. Uma coleção cujas regras de escrita são SQL bruto não conta, pois elas não podem ser avaliadas de antemão: nela só quem tem `users:read` pode escolher. |
 | `admin.previewAsTag` | `boolean` | Renderiza esta string como uma tag nas pré-visualizações |
 | `admin.clearable` | `boolean` | Adiciona um ícone para limpar o valor (definir como null) |
 | `admin.urlPreview` | `PreviewType` | Como renderizar uma string que armazena uma URL: um link ou uma prévia inline de imagem, áudio ou vídeo. Apenas apresentação — se o valor *é* uma URL depende da flag `url` na propriedade, a partir da qual o contrato OpenAPI é gerado |
@@ -314,6 +314,12 @@ preenche, então uma linha criada pelo painel admin, pela API REST ou pelo SDK
 não precisa de chave, e uma chave que você envia é usada como está. Uma tabela
 criada antes de esse default existir o recebe no próximo arranque. Na 0.23 a
 coluna não tem default, e uma criação que não envia chave falha.
+
+O mesmo vale para uma chave `isId: "uuid"` declarada cuja tabela não tem default — uma
+tabela adotada com `rebase schema introspect`, ou criada à mão: o próximo arranque define
+`DEFAULT gen_random_uuid()`. O arranque não define o default de nenhuma outra chave declarada.
+A função de uma estratégia SQL pode ainda não existir, então adicione esse default você
+mesmo, ou deixe o `rebase db push` aplicá-lo.
 :::
 
 ## Propriedades Number

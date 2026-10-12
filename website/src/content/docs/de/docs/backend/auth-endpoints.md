@@ -1,5 +1,5 @@
 ---
-sourceHash: 609d0bdbbaabe6b1
+sourceHash: 5e6e22317b5f9d21
 title: Auth-Endpunkte und Tokens
 sidebar_label: Auth-Endpunkte
 description: Die Authentifizierungs-Routen, die das Rebase-Backend bereitstellt, ihre Antwortstrukturen, Multi-Faktor-Authentifizierung, der Datenbankkontext für Richtlinien, JWKS und Service-Schlüssel.
@@ -53,11 +53,12 @@ Alle Auth-Endpunkte sind unter `/api/auth/` eingebunden:
 | `DELETE` | `/api/auth/mfa/unenroll` | Faktor entfernen (erfordert eine `aal2`-Sitzung, sobald das Konto einen verifizierten Faktor hat) |
 | `POST` | `/api/auth/mfa/recovery-codes` | Die Wiederherstellungscodes des Aufrufers durch zehn neue ersetzen (erfordert eine `aal2`-Sitzung) |
 
-Die administrative Benutzer- und Rollenverwaltung ist eine **separate Schnittstelle**, die unter `/api/admin/` statt `/api/auth/` eingebunden ist. Lesen braucht den Scope `users:read`, Ändern braucht `users:write`. Ein Admin und der Service-Schlüssel halten beide; ebenso eine Rolle, die sie deklariert. Niemand darf ein Konto ändern, das mehr hält als er selbst. Siehe [Rollen und Scopes](/docs/backend/roles-and-scopes/).
+Die administrative Benutzer- und Rollenverwaltung ist eine **separate Schnittstelle**, die unter `/api/admin/` statt `/api/auth/` eingebunden ist. Lesen braucht den Scope `users:read`, Ändern braucht `users:write`, mit Ausnahme des schmalen Lesezugriffs der Benutzerauswahl weiter unten. Ein Admin und der Service-Schlüssel halten beide; ebenso eine Rolle, die sie deklariert. Niemand darf ein Konto ändern, das mehr hält als er selbst. Siehe [Rollen und Scopes](/docs/backend/roles-and-scopes/).
 
 | Methode | Pfad | Beschreibung |
 |--------|------|-------------|
 | `GET` | `/api/admin/users` | Benutzer auflisten (paginiert). `?search=` findet einen Teil der E-Mail-Adresse oder des Anzeigenamens, ohne Beachtung der Groß-/Kleinschreibung. Auf Postgres findet es außerdem jede Rolle, die der Benutzer hält, und die uid; auf MongoDB findet es weiterhin nur E-Mail-Adresse und Anzeigenamen |
+| `GET` | `/api/admin/users/pick` | Der Lesezugriff der Benutzerauswahl: je Benutzer `uid`, `displayName`, `email` und `photoURL`, sonst nichts. Nimmt `?search=`, `?limit=` (standardmäßig 25) und `?offset=`, oder `?ids=a,b` für die Benutzer, die ein gespeicherter Wert nennt. Antwortet bei `users:read` und außerdem jedem, der eine Collection mit einem [`userSelect`](/docs/collections/properties/)-Feld beschreiben darf, sodass auch ein Editor eines ausfüllen kann. Eine Regel, die als rohes SQL geschrieben ist (`using` / `withCheck`, die das Policy-Modell nicht lesen kann), lässt sich nicht vorab beurteilen und zählt hier daher als ablehnend: Bei einer solchen Collection können nur Inhaber von `users:read` auswählen. Alle anderen erhalten `403 SCOPE_MISSING` |
 | `POST` | `/api/admin/users` | Benutzer erstellen |
 | `GET` | `/api/admin/users/:uid` | Einzelnen Benutzer abrufen |
 | `PUT` | `/api/admin/users/:uid` | Einzelnen Benutzer aktualisieren. `{ disabled: true }` schaltet das Konto ab, ohne es zu löschen: Jede Anmeldung und jedes Refresh wird abgelehnt (`ACCOUNT_DISABLED`), seine Sitzungen enden und jedes Token, das es hält, wird abgelehnt; `false` schaltet es wieder ein |
@@ -74,9 +75,18 @@ Alle Daten-API-Endpunkte erfordern einen gültigen `Authorization: Bearer <token
 Ein neues Passwort braucht mindestens 8 Zeichen, mit einem Großbuchstaben, einem
 Kleinbuchstaben und einer Ziffer. Registrierung, Zurücksetzen und Ändern lehnen ein
 Passwort ab, das dies nicht erfüllt, mit `400 WEAK_PASSWORD` und listen jede verletzte
-Regel auf; dasselbe gilt, wenn ein Administrator mit `PUT /api/admin/users/:uid` ein
-Passwort setzt (als einfaches `400`). `POST /api/admin/users` prüft ein übergebenes
-Passwort nicht. Die Anmeldung prüft die Richtlinie nie, sodass ein älteres Passwort
+Regel auf; dasselbe gilt, wenn ein Administrator ein Passwort wählt:
+`POST /api/admin/users`, eine Erstellung in der Users-Collection über die Daten-API
+(`POST /api/data/users`, deren `/bulk`, ein Socket- oder MCP-Schreibzugriff),
+`PUT /api/admin/users/:uid` und `POST /api/admin/users/:uid/reset-password`. Bei einem
+`/bulk` beginnt die Meldung mit `Row <n>: ` (ab 0 gezählt), wie die übrigen Zeilenfehler
+des Bulks.
+
+Um Konten anzulegen, deren Passwörter ein anderes System gesetzt hat, etwa bei einem
+Import, senden Sie `skipPasswordPolicy: true` im Create-Body (bei einem `/bulk` in jeder
+Zeile). Der Server beachtet es nur für einen Administrator oder den Service-Schlüssel;
+von jedem anderen hebt es nichts auf, und die Ablehnung sagt das. Es wird nie gespeichert.
+Der Import im Admin-Panel sendet es für jede Zeile, die ein `password` enthält. Die Anmeldung prüft die Richtlinie nie, sodass ein älteres Passwort
 weiter funktioniert. Um eigene Regeln festzulegen, übergib
 `auth.hooks.validatePasswordStrength` von einem [ejected](/docs/backend/authentication/#configuration)
 Backend. Für den ersten Admin, der aus `REBASE_ADMIN_PASSWORD` angelegt wird, gilt

@@ -1,5 +1,5 @@
 ---
-sourceHash: 9793c6efe5a375a7
+sourceHash: 36738ccb08826775
 title: Ambiente e configurazione
 sidebar_label: Configurazione
 description: Tutte le variabili d'ambiente e le opzioni di configurazione per i progetti Rebase.
@@ -100,7 +100,7 @@ autenticate contro il server di sviluppo con la sua sessione e leggerne le rispo
 | `JWT_PRIVATE_KEY` | Chiave privata PEM per la firma asimmetrica dei token di accesso (RS256), in modo che chiunque disponga del JWKS possa verificare una sessione senza poterla generare. Accetta un PEM con newline reali, un PEM con caratteri di escape `\n` o il base64 dell'intero PEM. Senza di essa i token rimangono HS256. | — |
 | `JWT_KEY_ID` | Specifica il `JWT_PRIVATE_KEY` nell'header del token e nel JWKS. Modificarlo a ogni cambio della chiave — la rotazione si basa sulla capacità di distinguere la vecchia chiave dalla nuova. | `default` |
 | `JWT_ACCESS_EXPIRES_IN` | Durata del token di accesso | `1h` |
-| `JWT_REFRESH_EXPIRES_IN` | Durata del token di refresh. A scorrimento — ogni rotazione la rinnova, determinando quindi quanto a lungo una sessione sopravvive all'**inattività**. | `400d` |
+| `JWT_REFRESH_EXPIRES_IN` | Durata del token di refresh. A scorrimento — ogni rotazione la rinnova, determinando quindi quanto a lungo una sessione sopravvive all'**inattività**. Imposta `400d` per sessioni che sopravvivano a una lunga assenza; i browser limitano lì il cookie di refresh. | `30d` |
 | `ALLOW_REGISTRATION` | Consente la registrazione di nuovi utenti (`true`/`false`). Al di fuori della produzione, il **primo** utente può sempre registrarsi indipendentemente da questo valore — una tabella utenti vuota deve permettere l'ingresso a qualcuno, e quel qualcuno diventa l'amministratore. In produzione (`NODE_ENV=production`) questa finestra è chiusa: una tabella vuota rifiuta la registrazione di bootstrap con `SETUP_REQUIRED`, il primo account creato tramite registrazione aperta è un account ordinario, e l'amministratore viene indicato con `REBASE_ADMIN_EMAIL` sotto o assegnato con la service key. Il file `.env.example` dello scaffold la imposta su `true`; il valore predefinito del framework è disattivato. | `false` |
 | `DISABLE_SELF_REGISTRATION` | Kill switch. Chiude la finestra di bootstrap del primo utente che `ALLOW_REGISTRATION=false` lascia intenzionalmente aperta al di fuori della produzione, bloccando la registrazione anche in caso di database vuoto. Da associare a `REBASE_ADMIN_EMAIL` sotto, altrimenti il deployment non avrà modo di produrre il suo primo utente autenticato. Impostato da ogni artefatto di deployment distribuito. | — |
 | `REBASE_ADMIN_EMAIL` | Email del primo account amministratore, creato all'avvio **quando la tabella degli utenti è ancora vuota** e mai successivamente. È così che un deployment di produzione ottiene il proprio amministratore: l'operatore designa il primo account anziché fare a gara con Internet per crearlo. L'avvio genera un avviso se la tabella è vuota in produzione e questa variabile non è impostata. | — |

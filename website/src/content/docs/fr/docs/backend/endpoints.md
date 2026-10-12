@@ -1,5 +1,5 @@
 ---
-sourceHash: 83b3a13a151d0cd7
+sourceHash: 330defe6fc90f0fa
 title: Index des points de terminaison
 sidebar_label: Index des points de terminaison
 description: Chaque route HTTP montée par un backend Rebase — données, auth, stockage, admin, méta — avec son contrôle d'accès et la page qui l'explique.
@@ -119,6 +119,7 @@ une collection ne peut accéder à rien de tout cela. Voir [Rôles et portées](
 | `POST` | `/api/admin/bootstrap` | none, et uniquement si aucun admin n'existe | Refusé en production — voir [Initialisation du premier utilisateur](/docs/backend/authentication/#first-user-bootstrap) |
 | `GET` | `/api/admin/users` | `users:read` | Gestion des utilisateurs |
 | `POST` | `/api/admin/users` | `users:write` | Gestion des utilisateurs. Les rôles au-delà de ceux de l'appelant sont refusés |
+| `GET` | `/api/admin/users/pick` | `users:read`, ou accès en écriture à une collection ayant un champ `userSelect` | La [lecture du sélecteur d'utilisateurs](/docs/backend/auth-endpoints/) : id, nom, e-mail et avatar uniquement. Une collection dont les règles d'écriture sont en SQL brut ne compte pas |
 | `GET` | `/api/admin/users/:uid` | `users:read` | Gestion des utilisateurs |
 | `PUT` | `/api/admin/users/:uid` | `users:write` | Refusé pour un compte qui détient plus que l'appelant |
 | `DELETE` | `/api/admin/users/:uid` | `users:write` | Refusé pour un compte qui détient plus que l'appelant |

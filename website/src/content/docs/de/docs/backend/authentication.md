@@ -1,5 +1,5 @@
 ---
-sourceHash: 76a511b15a0fae61
+sourceHash: 53f453267ae3e21c
 title: Authentifizierung
 sidebar_label: Authentifizierung
 description: Konfigurieren Sie JWT-Authentifizierung, OAuth-Provider, SMTP-E-Mail, Bot-Schutz und die Users-Collection im Rebase-Backend.
@@ -87,7 +87,7 @@ const backend = await initializeRebaseBackend({
 | `signingKeys` | `JwtSigningKeyConfig[]` | — | Asymmetrische Signierschlüssel — siehe [Asymmetrische Tokens und JWKS](/docs/backend/auth-endpoints/#asymmetric-tokens-and-jwks) |
 | `activeKid` | `string` | erster Schlüssel | Welcher Schlüssel aus `signingKeys` neue Tokens signiert |
 | `accessExpiresIn` | `string` | `1h` | Lebensdauer des Access-Tokens |
-| `refreshExpiresIn` | `string` | `30d` | Lebensdauer des Refresh-Tokens. Gleitend: Jede Rotation verlängert ihn wieder. Die Runtime übergibt `JWT_REFRESH_EXPIRES_IN`, dessen eigener Standardwert `400d` ist |
+| `refreshExpiresIn` | `string` | `30d` | Lebensdauer des Refresh-Tokens. Gleitend: Jede Rotation verlängert ihn wieder, daher bestimmt dieser Wert, wie lange eine Sitzung **Inaktivität** übersteht. Die Runtime übergibt `JWT_REFRESH_EXPIRES_IN`, dessen Standardwert ebenfalls `30d` ist. Browser begrenzen das Refresh-Cookie auf 400 Tage, ein längerer Wert bringt im Cookie-Modus also nichts |
 | `refreshTokenReuseIntervalSeconds` | `number` | `10` | Wie lange ein Refresh-Token, das bereits rotiert wurde, noch ein Geschwister seiner Sitzung ausstellt, damit ein Client, der eine Refresh-Antwort verloren hat, nicht abgemeldet wird |
 | `refreshTokenReuse` | `"reject" \| "revoke-session"` | `"reject"` | Was mit einem Refresh-Token passiert, das nach diesem Zeitfenster vorgelegt wird. `"reject"` lehnt es ab (`TOKEN_ALREADY_USED`) und protokolliert es, und die Sitzung bleibt bestehen: Dies ist keine Wiederverwendungserkennung, denn wer zuerst aktualisiert hat, behält die Sitzung. `"revoke-session"` beendet bei einer solchen Wiederholung die gesamte Anmeldung (`SESSION_REVOKED`), wie es GoTrue tut, und der Besitzer meldet sich erneut an. `AUTH_REFRESH_TOKEN_REUSE` |
 | `requireAuth` | `boolean` | `true` | Erfordert eine Sitzung für die Daten-API |

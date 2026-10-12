@@ -1,5 +1,5 @@
 ---
-sourceHash: a46a7358b856be2f
+sourceHash: e616e5caaa9bd29f
 title: Suddivisione in più processi
 sidebar_label: Processi separati
 description: Esegui un unico bundle suddiviso in vari processi cooperanti — un'API, un livello per le funzioni, un worker — a partire dalla stessa immagine di runtime pubblicata, evitando che una funzione custom pesante competa con l'API dati.
@@ -55,6 +55,10 @@ creare trigger), un processo `worker` o `functions` annuncia invece ogni propria
 scrittura sul canale cross-istanza, senza tenere una connessione `LISTEN`.
 In entrambi i casi, una funzione che scrive una riga attiva comunque ogni
 subscriber sull'`api`.
+
+Dai a ogni processo lo stesso `REALTIME_CDC`. Un processo che possiede lo schema
+con `REALTIME_CDC=off` rimuove i trigger di cattura all'avvio, e un `api`
+ancora impostato su `auto` resterebbe in ascolto di modifiche che nessuno annuncia.
 
 ## Docker Compose
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: 83b3a13a151d0cd7
+sourceHash: 330defe6fc90f0fa
 title: Endpunkt-Index
 sidebar_label: Endpunkt-Index
 description: Jede HTTP-Route, die ein Rebase-Backend mountet – Daten, Authentifizierung, Speicher, Admin, Meta – mit dem jeweiligen Gate und der Seite, die sie erklärt.
@@ -119,6 +119,7 @@ der auf eine Collection beschränkt ist, erreicht nichts davon. Siehe [Rollen un
 | `POST` | `/api/admin/bootstrap` | none, und nur solange kein Admin existiert | In der Produktion verweigert – siehe [First User Bootstrap](/docs/backend/authentication/#first-user-bootstrap) |
 | `GET` | `/api/admin/users` | `users:read` | Benutzerverwaltung |
 | `POST` | `/api/admin/users` | `users:write` | Benutzerverwaltung. Rollen über die eigenen des Aufrufers hinaus werden abgelehnt |
+| `GET` | `/api/admin/users/pick` | `users:read` oder Schreibzugriff auf eine Collection mit einem `userSelect`-Feld | Der [Lesezugriff der Benutzerauswahl](/docs/backend/auth-endpoints/): nur ID, Name, E-Mail und Avatar. Eine Collection, deren Schreibregeln rohes SQL sind, zählt nicht |
 | `GET` | `/api/admin/users/:uid` | `users:read` | Benutzerverwaltung |
 | `PUT` | `/api/admin/users/:uid` | `users:write` | Abgelehnt für ein Konto, das mehr hält als der Aufrufer |
 | `DELETE` | `/api/admin/users/:uid` | `users:write` | Abgelehnt für ein Konto, das mehr hält als der Aufrufer |

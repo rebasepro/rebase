@@ -1,5 +1,5 @@
 ---
-sourceHash: f214eaa0ccfb78a2
+sourceHash: 64977a5e5f9b13d2
 title: Escrita via REST
 sidebar_label: Escrita via REST
 description: Chaves de idempotência, escritas condicionais com ETag e If-Match, operações de campo, upserts em chave natural, return=minimal e lotes entre coleções.
@@ -131,7 +131,18 @@ e não se perde.
 Exatamente um operador por campo. Um operador em um tipo de propriedade para o qual não foi
 definido, um `$operator` desconhecido ou um operando com formato incorreto resulta em um `400`
 (`INVALID_FIELD_OPERATION`) indicando o nome do campo — um erro de digitação nunca é gravado
-na coluna como um documento JSON. As operações se aplicam apenas a atualizações: em uma linha
+na coluna como um documento JSON.
+
+Um `map` é a exceção, porque seu valor *é* um documento JSON e pode trazer chaves `$` próprias — o
+`$schema` e o `$id` de um JSON Schema, uma exportação do MongoDB. Em um `map`, só um objeto com exatamente
+uma chave que seja um dos operadores acima é uma operação; qualquer outro objeto é armazenado como foi
+enviado, chaves `$` incluídas. Assim, `{ "meta": { "$merge": { … } } }` mescla, e
+`{ "meta": { "$schema": "https://json-schema.org/draft/2020-12/schema" } }` é armazenado. Um operador com
+erro de digitação em um `map` também é, portanto, armazenado; em qualquer outro tipo continua sendo recusado.
+O cliente offline não tem schema para distinguir um `map` de qualquer outra coisa, então, enquanto está
+offline, ele recusa esse valor como uma operação de campo; envie-o quando a conexão voltar.
+
+As operações se aplicam apenas a atualizações: em uma linha
 que ainda não existe não há nada sobre o que operar, portanto elas são recusadas em `POST`,
 em criações via `/bulk` e em upserts.
 

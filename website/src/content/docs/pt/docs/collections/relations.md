@@ -1,5 +1,5 @@
 ---
-sourceHash: 53bd9f35a923ce72
+sourceHash: a3e5fa2b319b73d8
 title: Relações
 sidebar_label: Relações
 description: Defina relações SQL um-para-um, um-para-muitos e muitos-para-muitos entre coleções com chaves estrangeiras, tabelas de junção e junções multi-salto.
@@ -231,6 +231,13 @@ declarada por propriedade esse botão repetia o mesmo cabeçalho ao lado de uma
 coluna que já mostrava os filhos, então ele é descartado. Oculte a coluna da
 relação (`admin: { hideFromCollection: true }`) e o botão volta, de modo que a
 relação nunca some de vez da tabela.
+
+Ocultar a coluna não impede a busca. A leitura de lista da coleção embute toda relação que
+uma propriedade declara, oculta ou não, então o código que lê as linhas da lista —
+`additionalFields`, entity actions, collection actions via `tableController.data`, slots
+de plugin, `browserCallbacks.afterRead` — encontra as linhas relacionadas ali. Uma relação
+declarada apenas no array `relations` da coleção, sem propriedade, não é embutida na
+lista; suas linhas carregam quando a aba dela abre.
 
 Se você quiser o seletor inline mesmo assim, peça por ele:
 

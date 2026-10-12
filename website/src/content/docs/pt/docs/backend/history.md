@@ -1,5 +1,5 @@
 ---
-sourceHash: a62053f25d91d42c
+sourceHash: 4952ad745ea2bab4
 title: Histórico de Entidades
 sidebar_label: Histórico de Entidades
 description: Rastreie todas as alterações em suas entidades com uma trilha de auditoria completa — quem alterou o quê, quando e a entidade completa antes/depois.
@@ -74,6 +74,14 @@ Os valores são a linha como a API REST a serve: suas colunas, datas como
 timestamps, um `belongsTo` como sua chave estrangeira. É isso que um revert
 grava de volta.
 
+Uma entrada nunca guarda os valores de uma linha relacionada. Ler o histórico de uma
+linha exige apenas acesso de leitura a essa linha, não às linhas para as quais ela
+aponta, então uma relação é mantida como referência — `{ "__type": "relation", "id", "path" }` —
+e nada mais. As entradas que versões antigas registraram com a linha relacionada
+embutida (uma exclusão costumava armazenar a visão da linha do painel de administração)
+são servidas da mesma forma: o endpoint de histórico descarta os valores embutidos antes
+de responder.
+
 Em uma coleção com [soft delete](/docs/collections/soft-delete/), uma exclusão
 é registrada como `delete` e uma restauração (a atualização que redefine o
 campo de soft delete para `null`) como `update`. O histórico de uma linha
@@ -147,6 +155,22 @@ Retorna uma lista de entradas de histórico para uma entidade específica, orden
     "meta": { "total": 1, "limit": 20, "offset": 0, "hasMore": false }
 }
 ```
+
+```
+POST /api/data/:slug/:entityId/history/:historyId/revert
+```
+
+Grava os `values` da entrada de volta na linha pelo caminho normal de salvamento, de modo que
+o revert é ele próprio registrado como um `update`. Responde com a linha salva em `data`
+e `meta.reverted_from`, o id da entrada.
+
+Entradas gravadas por versões antigas podem conter chaves para as quais a linha não tem coluna:
+um campo que um `afterRead` calculou (antes da 0.24, um salvamento registrava a linha como o
+`afterRead` a mostrava), ou uma relação armazenada como a visão dela no painel de administração.
+Um revert grava as colunas da linha e deixa essas chaves de fora, com uma relação própria
+voltando como sua chave estrangeira, e nomeia o que deixou de fora em
+`meta.dropped_fields`. Um valor que um `afterRead` antigo mascarou (`********`) tem uma
+coluna, então é gravado de volta como foi registrado.
 
 ## Configuração de Retenção
 

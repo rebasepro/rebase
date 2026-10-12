@@ -1,5 +1,5 @@
 ---
-sourceHash: f214eaa0ccfb78a2
+sourceHash: 64977a5e5f9b13d2
 title: Escritura a través de REST
 sidebar_label: Escritura a través de REST
 description: Claves de idempotencia, escrituras condicionales con ETag e If-Match, operaciones de campo, upserts sobre clave natural, return=minimal y lotes entre colecciones.
@@ -83,7 +83,11 @@ curl -X PATCH /api/data/posts/p1 -d '{
 
 El beneficio principal es la lectura que el emisor ya no necesita hacer. Expresar `views + 1` como un valor implica leerlo primero, y dos peticiones que lean `4`, sumen uno y escriban `5` terminarán con `5` — sin que ninguna de las dos respuestas indique que se perdió un incremento. Al compilarse dentro de la sentencia, la aritmética se ejecuta dentro del bloqueo de la fila y no puede perderse.
 
-Exactamente un operador por campo. Un operador sobre un tipo de propiedad para el que no está definido, un `$operator` desconocido o un operando con un formato incorrecto resulta en un `400` (`INVALID_FIELD_OPERATION`) indicando el campo — un error tipográfico nunca se escribe en la columna como un documento JSON. Las operaciones se aplican únicamente a actualizaciones: en una fila que aún no existe no hay nada sobre lo que operar, por lo que se rechazan en `POST`, en creaciones `/bulk` y en upserts.
+Exactamente un operador por campo. Un operador sobre un tipo de propiedad para el que no está definido, un `$operator` desconocido o un operando con un formato incorrecto resulta en un `400` (`INVALID_FIELD_OPERATION`) indicando el campo — un error tipográfico nunca se escribe en la columna como un documento JSON.
+
+Un `map` es la excepción, porque su valor *es* un documento JSON y puede traer claves `$` propias — el `$schema` y el `$id` de un JSON Schema, una exportación de MongoDB. En un `map`, solo un objeto con exactamente una clave que sea uno de los operadores anteriores es una operación; cualquier otro objeto se almacena tal como se envió, claves `$` incluidas. Así, `{ "meta": { "$merge": { … } } }` fusiona, y `{ "meta": { "$schema": "https://json-schema.org/draft/2020-12/schema" } }` se almacena. Por tanto, un operador mal escrito en un `map` también se almacena; en cualquier otro tipo se sigue rechazando. El cliente sin conexión no tiene esquema para distinguir un `map` de cualquier otra cosa, así que sin conexión rechaza ese valor como una operación de campo; envíalo cuando vuelva la conexión.
+
+Las operaciones se aplican únicamente a actualizaciones: en una fila que aún no existe no hay nada sobre lo que operar, por lo que se rechazan en `POST`, en creaciones `/bulk` y en upserts.
 
 Una operación responde a la `validation` de la propiedad igual que un valor. Los elementos añadidos se juzgan con las reglas del elemento, las claves fusionadas con las propiedades del mapa y el valor que una operación *produce* con los límites declarados: `min`, `max`, `moreThan`, `lessThan`, `positive` y `negative` de un número, y el mínimo y máximo de elementos (`min`, `max`) de un array. Esta última comprobación es una condición del mismo `UPDATE`, no una lectura previa. Con `stock: { validation: { min: 0 } }`, `{ "stock": { "$inc": -1 } }` tiene éxito mientras el stock sea al menos 1 y se rechaza en 0 con el mismo `400` (`VALIDATION_CONSTRAINT`) que recibe `{ "stock": -1 }`, indicando el campo y el límite. Dos decrementos concurrentes de un stock de 1 no pueden tener éxito ambos, porque el segundo se evalúa contra la fila que confirmó el primero. Un número sin valor cuenta como `0` y un array sin valor como vacío. Una operación rechazada no escribe nada, ni siquiera los valores simples que la acompañan en el cuerpo. Como la comprobación forma parte de la sentencia, también se aplica a las escrituras en proceso a través de `rebase.data`, que omiten la validación a nivel de petición.
 

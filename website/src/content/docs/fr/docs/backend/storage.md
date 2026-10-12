@@ -1,5 +1,5 @@
 ---
-sourceHash: 2ea983a97d1ca602
+sourceHash: 0b9f331306c3360e
 title: Configuration du stockage
 sidebar_label: Configuration du stockage
 description: Configurez des backends de stockage sur système de fichiers local, compatibles S3 ou GCS/Firebase Storage pour les téléversements de fichiers, les images et les médias.
@@ -139,7 +139,7 @@ de l'objet et, pour un objet privé, le `token` à courte durée de vie ;
 `POST /api/storage/metadata` un objet indexé par les chemins qui ont été envoyés, chacun contenant ce que
 le `GET` aurait répondu pour lui (voir ci-dessous).
 Un dossier n'est pas un objet : `/metadata` sur une clé se terminant par `/` répond `404` sur tous les stockages, même là où S3 ou GCS conserve un marqueur `folder/`, si bien qu'aucun jeton de téléchargement n'est généré pour un préfixe ;
-`GET /api/storage/sources` renvoie le tableau des sources configurées, avec `configured: true`. Sur un déploiement sans aucun stockage, il répond `200 {"data": [], "configured": false}`, tandis que toutes les autres routes répondent `501 STORAGE_NOT_CONFIGURED`. `GET /api/auth/config` signale la même chose avec `storage: false`, si bien qu'un client peut se dispenser de demander.
+`GET /api/storage/sources` renvoie le tableau des sources configurées, avec `configured: true`. Sur un déploiement sans aucun stockage, il répond `200 {"data": [], "configured": false}`, tandis que toutes les autres routes répondent `501 STORAGE_NOT_CONFIGURED`. `GET /api/auth/config` signale la même chose avec `storage: false`, si bien qu'un client peut se dispenser de demander. `GET /api/storage/sources` est public : il répond sans jeton même lorsque `requireAuth` est activé. Il nomme les sources (leur clé, leur moteur, leur transport et leur libellé) et jamais un fichier, et le SDK client le lit pour câbler ses sources, ce qui peut arriver avant que quiconque se soit connecté. Une application qui lit anonymement une source `direct` en a aussi besoin. Toute route qui liste, lit ou écrit un fichier conserve son authentification.
 `DELETE /api/storage/file/*` et `POST /api/storage/folder` ne transportent qu'un
 `message`, puisqu'il n'y a rien à retourner.
 

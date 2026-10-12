@@ -1,5 +1,5 @@
 ---
-sourceHash: a62053f25d91d42c
+sourceHash: 4952ad745ea2bab4
 title: Cronologia entità
 sidebar_label: Cronologia entità
 description: Traccia ogni modifica apportata alle tue entità con un audit trail completo — chi ha modificato cosa, quando e l'entità completa prima/dopo.
@@ -74,6 +74,15 @@ I valori sono la riga come la serve l'API REST: le sue colonne, le date come
 timestamp, un `belongsTo` come la sua foreign key. È ciò che un revert scrive
 indietro.
 
+Una voce non contiene mai i valori di una riga correlata. Leggere la cronologia di
+una riga richiede solo l'accesso in lettura a quella riga, non alle righe a cui
+punta, quindi una relazione viene conservata come riferimento —
+`{ "__type": "relation", "id", "path" }` — e nient'altro. Le voci che versioni
+precedenti hanno registrato con la riga correlata incorporata (un'eliminazione
+memorizzava la vista della riga del pannello di amministrazione) vengono servite
+allo stesso modo: l'endpoint della cronologia scarta i valori incorporati prima di
+rispondere.
+
 Su una collection con [soft delete](/docs/collections/soft-delete/), una
 eliminazione viene registrata come `delete` e un ripristino (l'aggiornamento che
 riporta il campo di soft delete a `null`) come `update`. La cronologia di una
@@ -147,6 +156,22 @@ Restituisce un elenco di voci di cronologia per un'entità specifica, ordinate a
     "meta": { "total": 1, "limit": 20, "offset": 0, "hasMore": false }
 }
 ```
+
+```
+POST /api/data/:slug/:entityId/history/:historyId/revert
+```
+
+Riscrive i `values` della voce sulla riga attraverso il normale percorso di salvataggio,
+quindi il revert viene a sua volta registrato come `update`. Risponde con la riga salvata
+sotto `data` e con `meta.reverted_from`, l'id della voce.
+
+Le voci scritte da versioni precedenti possono contenere chiavi per cui la riga non ha
+colonna: un campo calcolato da un `afterRead` (prima della 0.24, un salvataggio registrava la
+riga come la mostrava `afterRead`), o una relazione memorizzata come vista della riga del
+pannello di amministrazione. Un revert scrive le colonne della riga e lascia fuori quelle
+chiavi, con una relazione di proprietà che torna come foreign key, e nomina ciò che ha
+lasciato fuori in `meta.dropped_fields`. Un valore che un vecchio `afterRead` aveva
+mascherato (`********`) ha una colonna, quindi viene riscritto così com'era stato registrato.
 
 ## Configurazione della retention
 

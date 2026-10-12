@@ -1,5 +1,5 @@
 ---
-sourceHash: a30d441e176f5d1c
+sourceHash: 03c3a22014b05f70
 title: Job in background
 sidebar_label: Job in background
 description: Una coda di job persistente basata su Postgres — lavoro che sopravvive a un riavvio, ritentato con backoff, con i fallimenti conservati anziché eliminati.
@@ -110,16 +110,20 @@ jobs: {
 Il rovescio della medaglia: un handler in attesa di una `fetch` che non risponde mai tiene
 occupato il suo slot di worker, e la sua presa in carico, finché il processo è in vita — con cinque
 di questi il worker non esegue nient'altro, mentre `/health` resta verde.
-<span class="since-badge" data-since="0.25">Da 0.25</span> Imposta `timeoutMs` per
-limitare un tentativo. Alla scadenza il tentativo fallisce — ritentato finché restano
+<span class="since-badge" data-since="0.25">Da 0.25</span> `timeoutMs`
+limita un tentativo. Alla scadenza il tentativo fallisce — ritentato finché restano
 tentativi, come qualsiasi throw — il suo slot viene liberato, e il `signal` dell'handler
 viene interrotto. Passa il signal a chi di dovere, così anche il lavoro si ferma; un handler che lo ignora
 continua a girare in background senza che nulla ne registri l'esito.
 
+Se omesso, vale 15 minuti (`900_000`), e il worker lo dice con una riga di log
+all'avvio. Un job che legittimamente dura di più imposta un proprio valore, e
+`timeoutMs: 0` rimuove il limite.
+
 ```typescript no-verify
 jobs: {
     enabled: true,
-    timeoutMs: 120_000,          // one attempt; no limit when left out
+    timeoutMs: 120_000,          // one attempt; 15 minutes when left out, 0 for no limit
     tasks: {
         "sync-crm": async ({ payload, signal }) => {
             await fetch(crmUrl, { method: "POST", body: JSON.stringify(payload), signal });

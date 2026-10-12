@@ -1,5 +1,5 @@
 ---
-sourceHash: b570d8e8623a5d35
+sourceHash: 242a8a8a99d7ef2d
 title: Codes d'erreur
 sidebar_label: Codes d'erreur
 description: Tous les codes d'erreur qu'un backend Rebase peut renvoyer, avec leur statut HTTP, leur signification et la marche à suivre — ainsi que l'enveloppe de réponse, X-Request-ID et les règles applicables aux détails.
@@ -126,7 +126,7 @@ Envoyer le vôtre permet à une trace de traverser les sauts réseau : une passe
 | `TOKEN_ALREADY_USED` | 401 | Un jeton à usage unique a été rejoué, ou un refresh token qui a été remplacé par rotation il y a plus de `refreshTokenReuseIntervalSeconds`. | Demandez-en un nouveau, ou reconnectez-vous. |
 | `TOKEN_EXPIRED` | 401 | Le jeton a dépassé sa durée de validité. | Demandez-en un nouveau. |
 | `USER_NOT_FOUND` | 404 | Aucun compte avec cet identifiant. | Vérifiez l'identifiant. |
-| `WEAK_PASSWORD` | 400 | Le mot de passe ne respecte pas la [politique de mot de passe](/docs/backend/auth-endpoints/#password-policy) (par défaut, 8 caractères ou plus avec une majuscule, une minuscule et un chiffre) — à l'inscription, lors d'une réinitialisation ou d'un changement, et pour un `PUT /api/admin/users/:id` ou un `POST /api/admin/users/:id/reset-password` d'administrateur avec un mot de passe choisi. | Choisissez un mot de passe plus robuste. |
+| `WEAK_PASSWORD` | 400 | Le mot de passe ne respecte pas la [politique de mot de passe](/docs/backend/auth-endpoints/#password-policy) (par défaut, 8 caractères ou plus avec une majuscule, une minuscule et un chiffre) — à l'inscription, lors d'une réinitialisation ou d'un changement, et pour le mot de passe choisi par un administrateur : `POST /api/admin/users`, une création dans la collection des utilisateurs via l'API de données, `PUT /api/admin/users/:id` ou `POST /api/admin/users/:id/reset-password`. | Choisissez un mot de passe plus robuste. Un administrateur qui importe des comptes peut envoyer `skipPasswordPolicy: true` à la création. |
 
 ## Données, requêtes et écritures
 

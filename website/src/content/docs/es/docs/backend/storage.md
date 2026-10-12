@@ -1,5 +1,5 @@
 ---
-sourceHash: 2ea983a97d1ca602
+sourceHash: 0b9f331306c3360e
 title: Configuración de almacenamiento
 sidebar_label: Configuración de almacenamiento
 description: Configure backends de sistema de archivos local, compatibles con S3 o GCS/Firebase Storage para la subida de archivos, imágenes y contenido multimedia.
@@ -140,7 +140,7 @@ del objeto y, para un objeto privado, el `token` de corta duración;
 `POST /api/storage/metadata` un objeto indexado por las rutas que se enviaron, cada una
 con lo que habría respondido el `GET` para ella (véase más abajo).
 Una carpeta no es un objeto: `/metadata` sobre una clave que termina en `/` es `404` en todos los almacenes, incluso donde S3 o GCS mantienen un marcador `folder/`, así que nunca se acuña un token de descarga para un prefijo;
-`GET /api/storage/sources` devuelve el array de orígenes configurados, con `configured: true`. En un despliegue sin ningún almacenamiento, responde `200 {"data": [], "configured": false}`, mientras que todas las demás rutas responden `501 STORAGE_NOT_CONFIGURED`. `GET /api/auth/config` informa de lo mismo como `storage: false`, así que un cliente puede ahorrarse la pregunta.
+`GET /api/storage/sources` devuelve el array de orígenes configurados, con `configured: true`. En un despliegue sin ningún almacenamiento, responde `200 {"data": [], "configured": false}`, mientras que todas las demás rutas responden `501 STORAGE_NOT_CONFIGURED`. `GET /api/auth/config` informa de lo mismo como `storage: false`, así que un cliente puede ahorrarse la pregunta. `GET /api/storage/sources` es público: responde sin token incluso con `requireAuth` activado. Nombra los orígenes (su clave, motor, transporte y etiqueta) y nunca un archivo, y el SDK cliente lo lee para configurar sus orígenes, lo que puede ocurrir antes de que alguien haya iniciado sesión. Una app que lee un origen `direct` de forma anónima también lo necesita. Toda ruta que lista, lee o escribe un archivo conserva su autenticación.
 `DELETE /api/storage/file/*` y `POST /api/storage/folder` solo contienen un
 `message`, ya que no hay nada que devolver.
 

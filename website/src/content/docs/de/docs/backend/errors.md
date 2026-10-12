@@ -1,5 +1,5 @@
 ---
-sourceHash: b570d8e8623a5d35
+sourceHash: 242a8a8a99d7ef2d
 title: Fehlercodes
 sidebar_label: Fehlercodes
 description: Jeder Fehlercode, den ein Rebase-Backend zurückgeben kann, mit seinem HTTP-Status, seiner Bedeutung und Lösungsansätzen – plus Response-Envelope, X-Request-ID und den Details-Regeln.
@@ -126,7 +126,7 @@ Einen eigenen Header zu senden stellt sicher, dass ein Trace über Hops hinweg e
 | `TOKEN_ALREADY_USED` | 401 | Ein Einmal-Token wurde wiederholt verwendet, oder ein Refresh-Token, das vor mehr als `refreshTokenReuseIntervalSeconds` rotiert wurde. | Fordern Sie ein neues an, oder melden Sie sich erneut an. |
 | `TOKEN_EXPIRED` | 401 | Das Token hat seine Gültigkeitsdauer überschritten. | Fordern Sie ein neues an. |
 | `USER_NOT_FOUND` | 404 | Kein Konto mit dieser ID. | Überprüfen Sie die ID. |
-| `WEAK_PASSWORD` | 400 | Das Passwort entspricht nicht der [Passwort-Richtlinie](/docs/backend/auth-endpoints/#password-policy) (standardmäßig 8+ Zeichen mit einem Großbuchstaben, einem Kleinbuchstaben und einer Ziffer) — bei der Registrierung, einem Zurücksetzen oder Ändern sowie bei `PUT /api/admin/users/:id` oder `POST /api/admin/users/:id/reset-password` eines Administrators mit einem gewählten Passwort. | Wählen Sie ein stärkeres Passwort. |
+| `WEAK_PASSWORD` | 400 | Das Passwort entspricht nicht der [Passwort-Richtlinie](/docs/backend/auth-endpoints/#password-policy) (standardmäßig 8+ Zeichen mit einem Großbuchstaben, einem Kleinbuchstaben und einer Ziffer) — bei der Registrierung, einem Zurücksetzen oder Ändern sowie bei einem von einem Administrator gewählten Passwort: `POST /api/admin/users`, eine Erstellung in der Users-Collection über die Daten-API, `PUT /api/admin/users/:id` oder `POST /api/admin/users/:id/reset-password`. | Wählen Sie ein stärkeres Passwort. Ein Administrator, der Konten importiert, darf bei einer Erstellung `skipPasswordPolicy: true` senden. |
 
 ## Daten, Abfragen und Schreibvorgänge
 

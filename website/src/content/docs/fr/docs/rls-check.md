@@ -1,5 +1,5 @@
 ---
-sourceHash: 93d644977e36c23b
+sourceHash: 275426a0cc4a1023
 slug: fr/docs/rls-check
 title: rls-check
 description: Auditez la sécurité au niveau des lignes (RLS) sur n'importe quelle base de données PostgreSQL — Supabase, Neon, RDS ou votre propre serveur. En lecture seule, sans inscription, sans Rebase requis.
@@ -275,10 +275,13 @@ Une stratégie permissive dont l'expression `USING` ou `WITH CHECK` est une cons
 elle-même à travers un cast. Les stratégies permissives sont combinées avec un opérateur OU (OR), de sorte qu'une seule d'entre
 elles suffit à satisfaire le filtre de ligne de la table, quelle que soit la rigueur de toutes les autres stratégies.
 
-Comme pour chaque vérification, la stratégie n'est signalée que lorsqu'un rôle auquel elle s'applique peut
+Comme pour chaque vérification, une exposition n'est signalée que lorsqu'un rôle auquel elle s'applique peut
 atteindre la table : qu'il détient le privilège requis par sa commande, et `USAGE` sur le schéma. `USING (true)
 TO anon` sur une table sur laquelle `anon` ne détient rien répond « permission denied » avant même que la
 stratégie ne soit consultée.
+Cette stratégie est signalée comme **info**, intitulée *latent* : rien n'atteint la table à travers elle aujourd'hui,
+et un seul `GRANT` en ferait une exposition critique sans aucun changement de la stratégie. Info est en dessous de
+tout `--fail-on` sauf `info`, de sorte qu'elle ne fait jamais échouer une exécution par défaut.
 
 Lorsque seul le `WITH CHECK` d'une stratégie `UPDATE` est constant — `USING (user_id = rebase.uid())
 WITH CHECK (true)` — c'est **élevé** : `USING` continue de décider quelles lignes peuvent être touchées, et

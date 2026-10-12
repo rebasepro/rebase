@@ -1,5 +1,5 @@
 ---
-sourceHash: 9793c6efe5a375a7
+sourceHash: 36738ccb08826775
 title: Entorno y configuración
 sidebar_label: Configuración
 description: Todas las variables de entorno y opciones de configuración para proyectos Rebase.
@@ -103,7 +103,7 @@ respuestas.
 | `JWT_PRIVATE_KEY` | Clave privada PEM para firmar tokens de acceso de forma asimétrica (RS256), de modo que cualquiera que posea el JWKS pueda verificar una sesión sin poder emitir una. Acepta un PEM con saltos de línea reales, un PEM con secuencias de escape `\n`, o en base64 de todo el PEM. Sin ella, los tokens permanecen en HS256. | — |
 | `JWT_KEY_ID` | Identifica la `JWT_PRIVATE_KEY` en el encabezado del token y en el JWKS. Cámbialo cada vez que la clave cambie; la rotación depende de que la clave antigua y la nueva sean distinguibles. | `default` |
 | `JWT_ACCESS_EXPIRES_IN` | Tiempo de vida del token de acceso | `1h` |
-| `JWT_REFRESH_EXPIRES_IN` | Tiempo de vida del token de actualización (refresh token). Deslizante: cada rotación lo renueva, por lo que determina cuánto tiempo sobrevive una sesión ante la **inactividad**. | `400d` |
+| `JWT_REFRESH_EXPIRES_IN` | Tiempo de vida del token de actualización (refresh token). Deslizante: cada rotación lo renueva, por lo que determina cuánto tiempo sobrevive una sesión ante la **inactividad**. Fija `400d` para sesiones que sobrevivan a una larga ausencia; los navegadores limitan la cookie de actualización ahí. | `30d` |
 | `ALLOW_REGISTRATION` | Permite el registro de nuevos usuarios (`true`/`false`). Fuera de producción, el **primer** usuario siempre puede registrarse, sin importar este valor: una tabla de usuarios vacía debe admitir a alguien, y ese alguien se convierte en el administrador. En producción (`NODE_ENV=production`) esa ventana se cierra: una tabla vacía rechaza el registro de arranque inicial con `SETUP_REQUIRED`, una primera cuenta creada mediante registro abierto es una cuenta ordinaria, y el administrador se especifica con `REBASE_ADMIN_EMAIL` a continuación o se asigna con la clave de servicio. El archivo `.env.example` de la plantilla lo establece en `true`; el valor predeterminado del framework es desactivado. | `false` |
 | `DISABLE_SELF_REGISTRATION` | Mecanismo de bloqueo total. Cierra la ventana de arranque del primer usuario que `ALLOW_REGISTRATION=false` deja deliberadamente abierta fuera de producción, por lo que el registro se cierra incluso ante una base de datos vacía. Combínalo con `REBASE_ADMIN_EMAIL` a continuación, o el despliegue no tendrá forma de producir su primer usuario autenticado. Todos los artefactos de despliegue suministrados lo activan. | — |
 | `REBASE_ADMIN_EMAIL` | Correo electrónico de la primera cuenta de administrador, creada al iniciar **mientras la tabla de usuarios aún esté vacía** y nunca después. Así es como un despliegue de producción obtiene su administrador: el operador define la primera cuenta en lugar de competir por ella públicamente en internet. El arranque advierte si la tabla está vacía en producción y esto no está configurado. | — |

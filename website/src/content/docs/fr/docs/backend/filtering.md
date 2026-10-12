@@ -1,5 +1,5 @@
 ---
-sourceHash: 8f9daaf34155e283
+sourceHash: ebc75b9bd33595a6
 title: Filtrage dans l'API REST
 sidebar_label: Filtrage
 description: Filtrez les listes de l'API REST avec des opérateurs de style PostgREST, des groupes or/and et le dialecte JSON where, et voyez comment les filtres se combinent.
@@ -103,7 +103,12 @@ Les filtres de champ ci-dessus sont l'une des deux manières d'envoyer un filtre
 GET /api/data/products?where={"status":["==","active"],"price":[">=",100]}
 ```
 
-Chaque clé est un champ, chaque valeur est un tuple canonique `[opérateur, valeur]` — les mêmes tuples que le SDK produit. Une valeur peut également être une chaîne avec point pré-sérialisée (`{"status":"eq.active"}`) ou un scalaire brut (`{"status":"active"}`) ; tous les trois compilent vers la même condition.
+Chaque clé est un champ, chaque valeur est un tuple canonique `[opérateur, valeur]` — les mêmes tuples que le SDK produit. Une valeur peut également être une chaîne avec point pré-sérialisée (`{"status":"eq.active"}`) ou un scalaire brut (`{"status":"active"}`) ; tous les trois compilent vers la même condition. Un tableau de valeurs simples est un `in` implicite : `{"category":["electronics","gadgets"]}` se lit comme
+`["in", ["electronics","gadgets"]]`, tandis qu'un premier élément en forme d'opérateur mais qui n'est pas un véritable
+opérateur (`["!!","x"]`) donne une 400 `UNKNOWN_FILTER_OPERATOR`.
+
+Le même objet est lu de la même façon où qu'il arrive : ici, dans le `where` du SDK, dans une requête MCP, et dans le
+`filter` du socket temps réel — ses requêtes de liste et de comptage et ses abonnements en direct.
 
 La différence notable : **le JSON transporte les types.** `?price=gte.100` envoie la chaîne `"100"` et le pilote la convertit selon le type de la colonne, tandis que `?where={"price":[">=",100]}` envoie un nombre. Pour une colonne dont les interprétations textuelles et numériques diffèrent — une chaîne de version, un code préfixé de zéros — c'est le paramètre à privilégier.
 

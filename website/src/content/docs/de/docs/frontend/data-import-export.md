@@ -1,5 +1,5 @@
 ---
-sourceHash: 66aded96fdd7fc98
+sourceHash: 488d01a16707cd87
 title: Datenimport & -export
 sidebar_label: Datenimport & -export
 description: Importieren Sie Daten aus CSV-, JSON- und Excel-Dateien in Ihre Collections und exportieren Sie Collection-Daten nach CSV oder JSON mit optionalen berechneten Feldern.
@@ -82,6 +82,10 @@ Wird eine Zeile abgelehnt, stoppt der Import und benennt sie; die Batches davor 
 gespeichert, und **Retry** setzt ab der ersten Zeile des Batches der abgelehnten Zeile fort.
 
 Eine Zeile, deren ID bereits in der Collection existiert, aktualisiert diesen Datensatz: Die Spalten, die die Datei enthält, werden geschrieben, die übrigen behalten ihre gespeicherten Werte. So setzt eine Datei mit `id,price` die Preise bestehender Produkte neu, ohne deren Pflichtfelder zu wiederholen. Eine neue Zeile braucht weiterhin alle Pflichtfelder. Ein Batch, der Aktualisierungen und neue Zeilen mischt, wird als zwei Anfragen geschrieben, sodass eine abgelehnte neue Zeile die Aktualisierungen dieses Batches gespeichert zurücklassen kann; **Retry** schreibt sie erneut mit denselben Werten.
+
+### Benutzer importieren
+
+Eine neue Zeile in der Users-Collection ist eine Benutzeranlage: Eine `password`-Spalte wird gehasht und nie so gespeichert, wie sie geschrieben wurde, und eine Zeile ohne Passwort erhält ein generiertes Passwort oder eine Einladung, wie wenn ein Administrator einen Benutzer hinzufügt. Die Passwörter in einer solchen Datei wurden meist nach den Regeln eines anderen Systems gesetzt, daher bittet der Import den Server, die [Passwort-Richtlinie](/docs/backend/auth-endpoints/#password-policy) für diese Zeilen zu überspringen. Der Server stimmt nur zu, wenn Sie Administrator sind; wer sonst Benutzer importiert, unterliegt der Richtlinie, und ein schwaches Passwort stoppt den Import mit `WEAK_PASSWORD`.
 
 ### Eine Collection aus einer Datei erstellen
 

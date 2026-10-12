@@ -1,5 +1,5 @@
 ---
-sourceHash: 609d0bdbbaabe6b1
+sourceHash: 5e6e22317b5f9d21
 title: Endpoint e token di autenticazione
 sidebar_label: Endpoint di autenticazione
 description: Le route di autenticazione montate dal backend Rebase, la struttura delle loro risposte, l'autenticazione a più fattori, il contesto del database visibile a una policy, JWKS e chiavi di servizio.
@@ -55,13 +55,14 @@ Tutti gli endpoint di autenticazione sono montati su `/api/auth/`:
 
 La gestione amministrativa di utenti e ruoli è una **superficie separata**, montata su
 `/api/admin/` anziché `/api/auth/`. La lettura richiede lo scope `users:read` e
-la modifica richiede `users:write`. Un admin e la chiave di servizio (service key) li possiedono entrambi; li possiede
+la modifica richiede `users:write`, tranne la lettura ristretta del selettore utenti qui sotto. Un admin e la chiave di servizio (service key) li possiedono entrambi; li possiede
 anche un ruolo che li dichiara. Nessuno può modificare un account che possiede più di quanto possieda
 lui. Vedi [Ruoli e scope](/docs/backend/roles-and-scopes/).
 
 | Metodo | Percorso | Descrizione |
 |--------|------|-------------|
 | `GET` | `/api/admin/users` | Elenca gli utenti (con paginazione). `?search=` trova una parte dell'email o del nome visualizzato, senza distinzione tra maiuscole e minuscole. Su Postgres trova anche qualsiasi ruolo che l'utente possiede, e l'uid; su MongoDB trova ancora solo email e nome visualizzato |
+| `GET` | `/api/admin/users/pick` | La lettura del selettore utenti: `uid`, `displayName`, `email` e `photoURL` per ogni utente, nient'altro. Accetta `?search=`, `?limit=` (25 per impostazione predefinita) e `?offset=`, oppure `?ids=a,b` per gli utenti che un valore memorizzato nomina. Risponde a `users:read`, e anche a chiunque possa scrivere una collection con un campo [`userSelect`](/docs/collections/properties/), così un editor può compilarlo. Una regola scritta come SQL grezzo (`using` / `withCheck` che il modello di policy non sa leggere) non può essere valutata in anticipo, quindi qui conta come un rifiuto: su una collection di questo tipo possono scegliere solo i titolari di `users:read`. Chiunque altro riceve `403 SCOPE_MISSING` |
 | `POST` | `/api/admin/users` | Crea un utente |
 | `GET` | `/api/admin/users/:uid` | Legge un singolo utente |
 | `PUT` | `/api/admin/users/:uid` | Aggiorna un singolo utente. `{ disabled: true }` disattiva l'account senza eliminarlo: ogni accesso e refresh viene rifiutato (`ACCOUNT_DISABLED`), le sue sessioni terminano e ogni token che possiede viene rifiutato; `false` lo riattiva |
@@ -78,10 +79,20 @@ Tutti gli endpoint delle API dati richiedono un header `Authorization: Bearer <t
 Una nuova password richiede almeno 8 caratteri, con una lettera maiuscola, una
 minuscola e una cifra. Registrazione, reimpostazione e modifica rifiutano una
 password che non le rispetta con `400 WEAK_PASSWORD`, elencando ogni regola
-infranta, e lo stesso fa un amministratore che imposta una password con
-`PUT /api/admin/users/:uid` (come un semplice `400`). `POST /api/admin/users`
-non controlla una password che gli viene data. L'accesso non verifica mai la
-policy, quindi una password più vecchia continua a funzionare. Per impostare
+infranta, e lo stesso fa un amministratore che sceglie una password:
+`POST /api/admin/users`, una creazione sulla collection degli utenti tramite la
+data API (`POST /api/data/users`, il suo `/bulk`, una scrittura via socket o
+MCP), `PUT /api/admin/users/:uid` e
+`POST /api/admin/users/:uid/reset-password`. Su un `/bulk`, il messaggio inizia
+con `Row <n>: ` (contando da 0), come gli altri errori di riga del bulk.
+
+Per creare account le cui password sono state impostate da un altro sistema,
+come in un'importazione, invia `skipPasswordPolicy: true` nel corpo della
+creazione (su ogni riga di un `/bulk`). Il server lo rispetta solo per un
+amministratore o per la chiave di servizio; per chiunque altro non rinuncia a
+nulla, e il rifiuto lo dice. Non viene mai memorizzato. L'importazione del
+pannello di amministrazione lo invia per ogni riga che contiene una `password`.
+L'accesso non verifica mai la policy, quindi una password più vecchia continua a funzionare. Per impostare
 regole tue, passa `auth.hooks.validatePasswordStrength` da un backend
 [ejected](/docs/backend/authentication/#configuration). Il primo admin creato da
 `REBASE_ADMIN_PASSWORD` è soggetto a una regola diversa: almeno 12 caratteri, e

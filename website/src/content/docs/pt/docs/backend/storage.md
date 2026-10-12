@@ -1,5 +1,5 @@
 ---
-sourceHash: 2ea983a97d1ca602
+sourceHash: 0b9f331306c3360e
 title: Configuração de Armazenamento
 sidebar_label: Configuração de Armazenamento
 description: Configure backends de armazenamento em sistema de arquivos local, compatíveis com S3 ou GCS/Firebase Storage para uploads de arquivos, imagens e mídia.
@@ -140,7 +140,7 @@ do objeto e, para um objeto privado, o `token` de curta duração;
 o `POST /api/storage/metadata` um objeto indexado pelos caminhos que foram enviados, cada
 um contendo o que o `GET` teria respondido para ele (veja abaixo).
 Uma pasta não é um objeto: `/metadata` em uma chave terminada em `/` retorna `404` em todos os stores, mesmo onde o S3 ou o GCS mantêm um marcador `folder/`, de modo que nenhum token de download é emitido para um prefixo;
-o `GET /api/storage/sources` retorna o array de fontes configuradas, com `configured: true`. Em uma implantação sem nenhum armazenamento, ele responde `200 {"data": [], "configured": false}`, enquanto todas as outras rotas respondem `501 STORAGE_NOT_CONFIGURED`. O `GET /api/auth/config` informa o mesmo como `storage: false`, para que um cliente não precise perguntar.
+o `GET /api/storage/sources` retorna o array de fontes configuradas, com `configured: true`. Em uma implantação sem nenhum armazenamento, ele responde `200 {"data": [], "configured": false}`, enquanto todas as outras rotas respondem `501 STORAGE_NOT_CONFIGURED`. O `GET /api/auth/config` informa o mesmo como `storage: false`, para que um cliente não precise perguntar. O `GET /api/storage/sources` é público: responde sem token mesmo com `requireAuth` ligado. Ele nomeia as fontes (sua chave, engine, transporte e rótulo) e nunca um arquivo, e o SDK cliente o lê para configurar suas fontes, o que pode acontecer antes de alguém ter feito login. Um app que lê uma fonte `direct` anonimamente também precisa dele. Toda rota que lista, lê ou escreve um arquivo mantém sua autenticação.
 O `DELETE /api/storage/file/*` e o `POST /api/storage/folder` trazem apenas uma
 `message`, já que não há nada a retornar.
 

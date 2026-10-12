@@ -1,5 +1,5 @@
 ---
-sourceHash: 609d0bdbbaabe6b1
+sourceHash: 5e6e22317b5f9d21
 title: Endpoints y tokens de autenticación
 sidebar_label: Endpoints de autenticación
 description: Las rutas de autenticación que monta el backend de Rebase, las estructuras de sus respuestas, autenticación multifactor, el contexto de base de datos que ve una directiva, JWKS y claves de servicio.
@@ -53,11 +53,12 @@ Todos los endpoints de autenticación están montados en `/api/auth/`:
 | `DELETE` | `/api/auth/mfa/unenroll` | Eliminar un factor (requiere una sesión `aal2` una vez que la cuenta tiene un factor verificado) |
 | `POST` | `/api/auth/mfa/recovery-codes` | Sustituir los códigos de recuperación del emisor por diez nuevos (requiere una sesión `aal2`) |
 
-La gestión administrativa de usuarios y roles es una **superficie independiente**, montada en `/api/admin/` en lugar de `/api/auth/`. Leer necesita el alcance `users:read` y cambiar necesita `users:write`. Un administrador y la clave de servicio tienen ambos; también los tiene un rol que los declare. Nadie puede cambiar una cuenta que tenga más que él. Consulte [Roles y alcances](/docs/backend/roles-and-scopes/).
+La gestión administrativa de usuarios y roles es una **superficie independiente**, montada en `/api/admin/` en lugar de `/api/auth/`. Leer necesita el alcance `users:read` y cambiar necesita `users:write`, salvo la lectura acotada del selector de usuarios que figura a continuación. Un administrador y la clave de servicio tienen ambos; también los tiene un rol que los declare. Nadie puede cambiar una cuenta que tenga más que él. Consulte [Roles y alcances](/docs/backend/roles-and-scopes/).
 
 | Método | Ruta | Descripción |
 |--------|------|-------------|
 | `GET` | `/api/admin/users` | Listar usuarios (paginado). `?search=` coincide, sin distinguir mayúsculas de minúsculas, con una parte del correo electrónico o del nombre visible. En Postgres también coincide con cualquier rol que tenga el usuario, y con el uid; en MongoDB sigue coincidiendo solo con el correo electrónico y el nombre visible |
+| `GET` | `/api/admin/users/pick` | La lectura del selector de usuarios: `uid`, `displayName`, `email` y `photoURL` por usuario, nada más. Admite `?search=`, `?limit=` (25 por defecto) y `?offset=`, o `?ids=a,b` para los usuarios que nombra un valor almacenado. La responde `users:read`, y también cualquiera que pueda escribir en una colección con un campo [`userSelect`](/docs/collections/properties/), para que un editor pueda rellenarlo. Una regla escrita como SQL en bruto (`using` / `withCheck` que el modelo de políticas no puede leer) no se puede juzgar de antemano, así que aquí cuenta como una negativa: en una colección así solo pueden elegir quienes tengan `users:read`. Cualquier otro recibe `403 SCOPE_MISSING` |
 | `POST` | `/api/admin/users` | Crear un usuario |
 | `GET` | `/api/admin/users/:uid` | Leer un usuario |
 | `PUT` | `/api/admin/users/:uid` | Actualizar un usuario. `{ disabled: true }` deshabilita la cuenta sin eliminarla: todo inicio de sesión y toda renovación se rechazan (`ACCOUNT_DISABLED`), sus sesiones terminan y se rechaza todo token que tenga; `false` la vuelve a habilitar |
@@ -74,8 +75,17 @@ Todos los endpoints de la API de datos requieren una cabecera `Authorization: Be
 Una contraseña nueva necesita al menos 8 caracteres, con una mayúscula, una minúscula y un
 dígito. El registro, el restablecimiento y el cambio rechazan una que no lo cumpla con
 `400 WEAK_PASSWORD`, listando cada regla incumplida, y lo mismo hace un administrador que
-fija una contraseña con `PUT /api/admin/users/:uid` (como un `400` simple).
-`POST /api/admin/users` no comprueba una contraseña que se le da. El inicio de sesión nunca
+elige una contraseña: `POST /api/admin/users`, una creación en la colección de usuarios a
+través de la API de datos (`POST /api/data/users`, su `/bulk`, una escritura por socket o por
+MCP), `PUT /api/admin/users/:uid` y `POST /api/admin/users/:uid/reset-password`. En un
+`/bulk`, el mensaje empieza por `Row <n>: ` (contando desde 0), como los demás errores de
+fila del bulk.
+
+Para crear cuentas cuyas contraseñas fijó otro sistema, como en una importación, envía
+`skipPasswordPolicy: true` en el cuerpo de la creación (en cada fila de un `/bulk`). El
+servidor lo respeta solo para un administrador o la clave de servicio; de cualquier otro no
+exime de nada, y el rechazo lo dice. Nunca se almacena. La importación del panel de
+administración lo envía en cada fila que trae un `password`. El inicio de sesión nunca
 comprueba la política, así que una contraseña anterior sigue funcionando. Para fijar tus
 propias reglas, pasa `auth.hooks.validatePasswordStrength` desde un backend
 [ejected](/docs/backend/authentication/#configuration). El primer administrador sembrado

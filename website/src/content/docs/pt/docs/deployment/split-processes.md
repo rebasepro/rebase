@@ -1,5 +1,5 @@
 ---
-sourceHash: a46a7358b856be2f
+sourceHash: e616e5caaa9bd29f
 title: Divisão em vários processos
 sidebar_label: Processos Divididos
 description: Execute um bundle como vários processos cooperantes — uma API, uma camada de funções, um worker — a partir da mesma imagem de runtime publicada, para que uma função customizada pesada deixe de concorrer com a API de dados.
@@ -37,6 +37,8 @@ REBASE_ROLE=all        # the default: everything, one process
 Health e métricas estão em todas as roles, sem exceção. Um processo que um orquestrador não consegue sondar é um processo que ele não consegue atualizar.
 
 O Realtime está na lista porque tem um custo, quer alguém o utilize ou não: um processo que consome eventos de alteração mantém uma conexão `LISTEN` fora do pool enquanto estiver em execução e instala os triggers de captura na inicialização. Apenas um processo que serve websockets tem alguém para quem entregar, portanto as duas roles que não servem nenhum não fazem nenhuma das duas coisas. **As gravações feitas por esses processos ainda são detectadas.** Com a captura de alterações ligada, a captura é feita por triggers de banco de dados, de modo que uma alteração é publicada pelo banco de dados em vez de qualquer processo que a tenha feito. Com a captura desligada (`REALTIME_CDC=off`, ou `auto` recorrendo a isso porque a role do banco de dados não pode criar triggers), um processo `worker` ou `functions` anuncia cada uma de suas próprias gravações no canal entre instâncias, sem manter uma conexão `LISTEN`. De qualquer modo, uma função que grava uma linha ainda acorda todos os assinantes na `api`.
+
+Dê a todos os processos o mesmo `REALTIME_CDC`. Um processo que é dono do schema com `REALTIME_CDC=off` remove os triggers de captura na inicialização, e uma `api` ainda configurada como `auto` passaria a escutar alterações que ninguém anuncia.
 
 ## Docker Compose
 

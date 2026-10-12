@@ -1,5 +1,5 @@
 ---
-sourceHash: 93d644977e36c23b
+sourceHash: 275426a0cc4a1023
 slug: pt/docs/rls-check
 title: rls-check
 description: Audite a segurança em nível de linha (RLS) em qualquer banco de dados PostgreSQL — Supabase, Neon, RDS ou seu próprio servidor. Somente leitura, sem cadastro, sem necessidade de Rebase.
@@ -278,10 +278,13 @@ Uma policy permissiva cuja expressão `USING` ou `WITH CHECK` é uma verdade con
 consigo mesma por meio de um cast. As policies permissivas são combinadas com o operador OR, portanto basta uma delas para satisfazer
 o filtro de linhas da tabela, não importa quão restritivas sejam todas as outras policies.
 
-Como toda verificação, ela relata a policy apenas quando uma role à qual ela se aplica pode
+Como toda verificação, ela relata uma exposição apenas quando uma role à qual ela se aplica pode
 alcançar a tabela: possui o privilégio que seu comando exige, e `USAGE` no schema.
 `USING (true) TO anon` em uma tabela sobre a qual `anon` não possui nada é respondido com
 "permission denied" antes mesmo de a policy ser consultada.
+Essa policy é relatada como **info**, com o título *latent*: nada alcança a tabela por ela hoje,
+e um único `GRANT` a tornaria uma exposição crítica sem qualquer mudança na policy. Info está
+abaixo de todo `--fail-on` exceto `info`, então nunca faz uma execução padrão falhar.
 
 Quando apenas o `WITH CHECK` de uma policy `UPDATE` é constante — `USING (user_id = rebase.uid())
 WITH CHECK (true)` — isso é **alto**: o `USING` ainda decide quais linhas podem ser tocadas, mas o

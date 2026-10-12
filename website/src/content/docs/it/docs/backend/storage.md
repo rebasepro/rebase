@@ -1,5 +1,5 @@
 ---
-sourceHash: 2ea983a97d1ca602
+sourceHash: 0b9f331306c3360e
 title: Configurazione dello Storage
 sidebar_label: Configurazione dello Storage
 description: Configura backend di storage su filesystem locale, compatibili con S3 o GCS/Firebase Storage per il caricamento di file, immagini e contenuti multimediali.
@@ -139,7 +139,7 @@ dell'oggetto archiviato sotto `data`; `GET /api/storage/metadata/*` con i metada
 e, per un oggetto privato, il `token` di breve durata;
 `POST /api/storage/metadata` con un oggetto indicizzato dai percorsi che gli sono stati inviati, ciascuno con ciò che la `GET` avrebbe risposto per esso (vedi sotto).
 Una cartella non è un oggetto: `/metadata` su una chiave che termina con `/` è `404` su ogni store, anche dove S3 o GCS conservano un marcatore `folder/`, quindi nessun token di download viene emesso per un prefisso;
-`GET /api/storage/sources` con l'array delle sorgenti configurate e `configured: true`. Su un deployment senza alcuno storage risponde `200 {"data": [], "configured": false}`, mentre ogni altra route risponde `501 STORAGE_NOT_CONFIGURED`. `GET /api/auth/config` riporta lo stesso dato come `storage: false`, così un client può evitare di chiedere.
+`GET /api/storage/sources` con l'array delle sorgenti configurate e `configured: true`. Su un deployment senza alcuno storage risponde `200 {"data": [], "configured": false}`, mentre ogni altra route risponde `501 STORAGE_NOT_CONFIGURED`. `GET /api/auth/config` riporta lo stesso dato come `storage: false`, così un client può evitare di chiedere. `GET /api/storage/sources` è pubblica: risponde senza token anche quando `requireAuth` è attivo. Nomina le sorgenti (chiave, engine, trasporto ed etichetta) e mai un file, e l'SDK client la legge per configurare le proprie sorgenti, cosa che può avvenire prima che qualcuno abbia effettuato l'accesso. Un'app che legge anonimamente una sorgente `direct` ne ha bisogno a sua volta. Ogni route che elenca, legge o scrive un file mantiene la propria autenticazione.
 `DELETE /api/storage/file/*` e `POST /api/storage/folder` contengono solo un
 `message`, poiché non c'è nulla da restituire.
 

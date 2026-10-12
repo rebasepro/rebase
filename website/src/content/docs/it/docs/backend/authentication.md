@@ -1,5 +1,5 @@
 ---
-sourceHash: 76a511b15a0fae61
+sourceHash: 53f453267ae3e21c
 title: Autenticazione
 sidebar_label: Autenticazione
 description: Configura l'autenticazione JWT, i provider OAuth, le email SMTP, la protezione dai bot e la collection users sul backend Rebase.
@@ -87,7 +87,7 @@ const backend = await initializeRebaseBackend({
 | `signingKeys` | `JwtSigningKeyConfig[]` | — | Chiavi di firma asimmetriche — vedi [Token asimmetrici e JWKS](/docs/backend/auth-endpoints/#asymmetric-tokens-and-jwks) |
 | `activeKid` | `string` | prima chiave | Quale chiave di `signingKeys` emette i nuovi token |
 | `accessExpiresIn` | `string` | `1h` | Durata dell'access token |
-| `refreshExpiresIn` | `string` | `30d` | Durata del refresh token. Scorrevole: ogni rotazione la rinnova. Il runtime passa `JWT_REFRESH_EXPIRES_IN`, il cui valore predefinito è `400d` |
+| `refreshExpiresIn` | `string` | `30d` | Durata del refresh token. Scorrevole: ogni rotazione la rinnova, quindi indica per quanto una sessione sopravvive all'**inattività**. Il runtime passa `JWT_REFRESH_EXPIRES_IN`, il cui valore predefinito è anch'esso `30d`. I browser limitano il cookie di refresh a 400 giorni, quindi un valore più lungo non serve a nulla in modalità cookie |
 | `refreshTokenReuseIntervalSeconds` | `number` | `10` | Per quanto tempo un refresh token che è stato ruotato continua a emettere un gemello della sua sessione, in modo che un client che ha perso la risposta di un refresh non venga disconnesso |
 | `refreshTokenReuse` | `"reject" \| "revoke-session"` | `"reject"` | Cosa succede a un refresh token presentato dopo quella finestra. `"reject"` lo rifiuta (`TOKEN_ALREADY_USED`) e lo registra nei log, e la sessione resta in piedi: non si tratta di una rilevazione del riutilizzo, poiché chi ha effettuato il refresh per primo mantiene la sessione. `"revoke-session"` termina l'intero accesso in caso di un simile replay (`SESSION_REVOKED`), come fa GoTrue, e il titolare accede di nuovo. `AUTH_REFRESH_TOKEN_REUSE` |
 | `requireAuth` | `boolean` | `true` | Richiede una sessione per le API dei dati |

@@ -1,5 +1,5 @@
 ---
-sourceHash: a46a7358b856be2f
+sourceHash: e616e5caaa9bd29f
 title: Séparation en plusieurs processus
 sidebar_label: Processus séparés
 description: Exécutez un seul bundle sous forme de plusieurs processus coopérants — une API, un niveau de fonctions, un worker — à partir de la même image d'exécution publiée, afin qu'une fonction personnalisée lourde ne vienne plus concurrencer l'API de données.
@@ -54,6 +54,10 @@ rabat parce que le rôle de base de données ne peut pas créer de déclencheurs
 `functions` annonce plutôt chacune de ses propres écritures sur le canal inter-instances, sans conserver de
 connexion `LISTEN`. Dans les deux cas, une fonction qui écrit une ligne réveille tout de même
 chaque abonné sur l'`api`.
+
+Donnez le même `REALTIME_CDC` à chaque processus. Un processus qui possède le schéma avec `REALTIME_CDC=off` retire
+les déclencheurs de capture au démarrage, et une `api` encore réglée sur `auto` écouterait alors des changements que
+personne n'annonce.
 
 ## Docker Compose
 

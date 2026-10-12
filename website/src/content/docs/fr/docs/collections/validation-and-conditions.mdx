@@ -1,5 +1,5 @@
 ---
-sourceHash: aa008173a34fc3e9
+sourceHash: e218de0d114db9f6
 title: Validation et conditions
 sidebar_label: Validation & conditions
 description: "Valeurs d'énumération, règles de validation par propriété et champs conditionnels qui rendent une propriété requise, désactivée ou masquée en fonction des valeurs de l'entité elle-même."
@@ -82,11 +82,13 @@ properties: {
 
 Le serveur vérifie `validation` à la frontière de la requête — REST, le socket temps réel et MCP — sur ce que l'appelant a envoyé, avant l'exécution de `beforeSave`, et répond à une écriture qui enfreint une règle par une 400 nommant chaque champ en défaut. Le code serveur qui écrit en interne au processus est de confiance et n'est **pas** vérifié par rapport à ces règles : `rebase.data` et `rebase.dataAsAdmin` dans une fonction ou une tâche cron, `context.data` dans un callback, un script de seed. Ce qui s'applique là-bas est ce que la base de données impose elle-même — `required` (NOT NULL), `unique` (un index unique), le type d'un enum, et la largeur d'une colonne `varchar` ou `char`. Tout ce que votre code serveur écrit d'autre, vérifiez-le dans le code qui l'écrit.
 
+Le panneau d'administration vérifie les mêmes règles avant d'enregistrer, dans le formulaire d'enregistrement et dans l'éditeur en ligne du tableau de la collection. Une cellule du tableau juge une valeur une fois que vous la modifiez : une valeur stockée qui enfreint une règle ajoutée plus tard n'affiche aucune erreur dans le tableau tant que quelqu'un n'a pas modifié cette cellule.
+
 ### Tous les types
 
 | Règle | Type | Description |
 |------|------|-------------|
-| `required` | `boolean` | La valeur doit être présente |
+| `required` | `boolean` | La valeur doit être présente. Sur une `string`, `""` compte comme absente : l'API la refuse à toute écriture, création ou mise à jour, avec la même violation `required` (sauf si la collection a un `beforeSave`, qui peut la remplir) |
 | `requiredMessage` | `string` | Le message affiché lorsqu'elle est absente : par le formulaire d'administration, et comme `message` de l'entrée `required` du champ dans le 400 de l'API. Le NOT NULL de la base de données ne porte aucun message |
 | `unique` | `boolean` | Une seule ligne dans la table peut avoir cette valeur. Le formulaire d'administration la vérifie aussi lors de l'enregistrement d'une valeur que la modification a changée, de sorte qu'un doublon est signalé sur son champ avant l'écriture |
 | `uniqueInArray` | `boolean` | Une seule entrée *par tableau* peut l'avoir. S'applique à un enfant direct d'une propriété `array`, ou à un enfant de premier niveau d'un `map` à l'intérieur de celui-ci. **Formulaire d'administration uniquement — non appliqué par l'API ou la base de données.** |
@@ -95,7 +97,7 @@ Le serveur vérifie `validation` à la frontière de la requête — REST, le so
 
 | Règle | Type | Description |
 |------|------|-------------|
-| `min` / `max` | `number` | Nombre minimum / maximum de caractères, inclusif. Avec `columnType: "varchar"` ou `"char"`, `max` dimensionne également la colonne (`VARCHAR(max)`), donc le réduire sur une table contenant déjà des lignes plus longues est une migration que la base de données refusera. La colonne par défaut est `TEXT`, que `max` laisse illimitée — la limite n'est alors imposée que par la [vérification de requête](#où-sexécute-la-validation) du serveur |
+| `min` / `max` | `number` | Nombre minimum / maximum de caractères, inclusif. Avec `columnType: "varchar"` ou `"char"`, `max` dimensionne également la colonne (`VARCHAR(max)`), donc le réduire sur une table contenant déjà des lignes plus longues est une migration que la base de données refusera, et l'éditeur de collection avertit lorsqu'une modification le réduit. La colonne par défaut est `TEXT`, que `max` laisse illimitée — la limite n'est alors imposée que par la [vérification de requête](#où-sexécute-la-validation) du serveur |
 | `length` | `number` | Exactement ce nombre de caractères — un code pays, une référence à longueur fixe |
 | `matches` | `string \| RegExp` | Un motif que la valeur entière doit respecter. Une chaîne est compilée par requête, donc une chaîne qui ne compile pas est rejetée au démarrage plutôt que de devenir silencieusement une règle inactive |
 | `matchesMessage` | `string` | Le message affiché par le formulaire lorsque `matches` échoue |

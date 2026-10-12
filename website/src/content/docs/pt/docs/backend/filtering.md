@@ -1,5 +1,5 @@
 ---
-sourceHash: 8f9daaf34155e283
+sourceHash: ebc75b9bd33595a6
 title: Filtragem na API REST
 sidebar_label: Filtragem
 description: Filtre as listas da API REST com operadores no estilo PostgREST, grupos or/and e o dialeto JSON where, e veja como os filtros se combinam.
@@ -121,7 +121,13 @@ GET /api/data/products?where={"status":["==","active"],"price":[">=",100]}
 Cada chave é um campo e cada valor é uma tupla canônica `[operador, valor]` — as mesmas
 tuplas que o SDK escreve. Um valor também pode ser uma string pré-serializada com ponto
 (`{"status":"eq.active"}`) ou um escalar simples (`{"status":"active"}`); todos os três
-compilam para a mesma condição.
+compilam para a mesma condição. Um array de valores simples é um `in` implícito: `{"category":["electronics","gadgets"]}` é lido como
+`["in", ["electronics","gadgets"]]`, enquanto um primeiro elemento com forma de operador
+que não é um operador real (`["!!","x"]`) é um 400 `UNKNOWN_FILTER_OPERATOR`.
+
+O mesmo objeto é lido da mesma forma onde quer que chegue: aqui, no `where` do SDK,
+em uma consulta MCP e no `filter` do socket de realtime — suas requisições de lista e
+contagem e suas assinaturas ao vivo.
 
 A diferença que vale a pena conhecer: **o JSON carrega tipos.** `?price=gte.100` envia a
 string `"100"` e o driver faz a conversão de tipo (cast) pelo tipo da coluna, enquanto

@@ -1,5 +1,5 @@
 ---
-sourceHash: 8f9daaf34155e283
+sourceHash: ebc75b9bd33595a6
 title: Filterung in der REST-API
 sidebar_label: Filterung
 description: Listenabfragen über REST mit Operatoren im PostgREST-Stil, or/and-Gruppen und dem JSON-Dialekt where filtern – und wie die Filter zusammenwirken.
@@ -124,7 +124,14 @@ GET /api/data/products?where={"status":["==","active"],"price":[">=",100]}
 Jeder Schlüssel ist ein Feld, jeder Wert ein kanonisches `[operator, value]`-Tupel —
 dieselben Tupel, die auch das SDK schreibt. Ein Wert kann auch ein vor-serialisierter
 Punkt-String (`{"status":"eq.active"}`) oder ein einfacher Skalar (`{"status":"active"}`)
-sein; alle drei kompilieren zur selben Bedingung.
+sein; alle drei kompilieren zur selben Bedingung. Ein Array aus einfachen Werten ist ein
+implizites `in`: `{"category":["electronics","gadgets"]}` wird gelesen als
+`["in", ["electronics","gadgets"]]`, während ein erstes Element in Operatorform, das
+kein echter Operator ist (`["!!","x"]`), ein 400 `UNKNOWN_FILTER_OPERATOR` ergibt.
+
+Dasselbe Objekt wird überall gleich gelesen, wo es ankommt: hier, im `where` des SDK,
+in einer MCP-Abfrage und im `filter` des Realtime-Sockets – bei dessen Listen- und
+Zählanfragen und seinen Live-Subscriptions.
 
 Der wissenswerte Unterschied: **JSON überträgt Typen.** `?price=gte.100` sendet
 die Zeichenkette `"100"` und der Treiber castet sie anhand des Spaltentyps, während

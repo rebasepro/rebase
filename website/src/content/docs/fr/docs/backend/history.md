@@ -1,5 +1,5 @@
 ---
-sourceHash: a62053f25d91d42c
+sourceHash: 4952ad745ea2bab4
 title: Historique des entités
 sidebar_label: Historique des entités
 description: Suivez chaque modification apportée à vos entités avec une piste d'audit complète — qui a modifié quoi, quand, et l'entité complète avant/après.
@@ -74,6 +74,13 @@ Les valeurs sont la ligne telle que l'API REST la fournit : ses colonnes, les
 dates en timestamps, une relation `belongsTo` sous sa clé étrangère. C'est ce
 qu'un retour en arrière (revert) réécrit.
 
+Une entrée ne contient jamais les valeurs d'une ligne liée. Lire l'historique d'une ligne exige seulement
+l'accès en lecture à cette ligne, pas aux lignes vers lesquelles elle pointe : une relation est donc conservée
+comme une référence — `{ "__type": "relation", "id", "path" }` — et rien de plus. Les entrées que d'anciennes
+versions ont enregistrées avec la ligne liée embarquée (une suppression stockait autrefois la vue de la ligne
+du panneau d'administration) sont servies de la même façon : l'endpoint d'historique retire les valeurs
+embarquées avant de répondre.
+
 Sur une collection avec le [soft delete](/docs/collections/soft-delete/), une
 suppression est enregistrée comme `delete` et une restauration (la mise à jour
 qui remet le champ de soft delete à `null`) comme `update`. L'historique d'une
@@ -145,6 +152,21 @@ Renvoie une liste d'entrées d'historique pour une entité spécifique, triées 
     "meta": { "total": 1, "limit": 20, "offset": 0, "hasMore": false }
 }
 ```
+
+```
+POST /api/data/:slug/:entityId/history/:historyId/revert
+```
+
+Réécrit les `values` de l'entrée dans la ligne par le chemin de sauvegarde normal : le retour en arrière est donc
+lui-même enregistré comme un `update`. Il répond avec la ligne enregistrée sous `data` et, dans
+`meta.reverted_from`, l'id de l'entrée.
+
+Les entrées écrites par d'anciennes versions peuvent contenir des clés pour lesquelles la ligne n'a pas de colonne :
+un champ calculé par un `afterRead` (avant la 0.24, une sauvegarde enregistrait la ligne telle que `afterRead` la
+montrait), ou une relation stockée sous la forme de la vue du panneau d'administration. Un retour en arrière écrit
+les colonnes de la ligne et laisse ces clés de côté, une relation propriétaire revenant sous sa clé étrangère, et
+nomme ce qu'il a laissé de côté dans `meta.dropped_fields`. Une valeur qu'un ancien `afterRead` masquait
+(`********`) a une colonne : elle est donc réécrite telle qu'elle a été enregistrée.
 
 ## Configuration de la rétention
 
