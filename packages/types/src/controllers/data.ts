@@ -1226,7 +1226,7 @@ export function isFieldOperation(value: unknown, propertyType?: string): boolean
 
 /** True when any value in a write payload is (or is attempting to be) one. @group Data */
 export function hasFieldOperation(values: Record<string, unknown> | undefined): boolean {
-    return !!values && Object.values(values).some(isFieldOperation);
+    return !!values && Object.values(values).some((value) => isFieldOperation(value));
 }
 
 export type FieldOperation =
