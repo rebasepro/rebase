@@ -313,6 +313,12 @@ row created from the admin panel, the REST API or the SDK needs no key, and a ke
 you do send is used as given. A table created before this default existed gets
 it at the next boot. On 0.23 the column has no default, and a create that sends
 no key fails.
+
+The same goes for a declared `isId: "uuid"` key whose table has no default — a
+table adopted with `rebase schema introspect`, or created by hand: the next boot sets
+`DEFAULT gen_random_uuid()`. Boot sets no other declared key's default. A SQL
+strategy's function may not exist yet, so add that default yourself, or let
+`rebase db push` apply it.
 :::
 
 ## Number Properties

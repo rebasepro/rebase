@@ -434,6 +434,16 @@ export interface EnsurePlan {
 const isKeyColumn = (table: TablePlan, column: ColumnPlan): boolean =>
     !column.columnOwnedByProperty && table.primaryKey.includes(column.column);
 
+/**
+ * A declared key whose default is the built-in uuid generator: the default
+ * `isId: "uuid"` plans. It is the one declared-key default boot sets on an
+ * existing table, because it is the one that cannot fail there.
+ */
+const isUuidKeyDefault = (column: ColumnPlan): boolean =>
+    column.source.kind === "property" &&
+    column.default?.kind === "sql" &&
+    column.default.expression === "gen_random_uuid()";
+
 /** Which pass a column belongs to. The order below is the order they run in. */
 const isScalarProperty = (table: TablePlan, column: ColumnPlan): boolean =>
     (column.source.kind === "property" || column.source.kind === "implicit-id") && !isKeyColumn(table, column);
@@ -815,8 +825,15 @@ export function diffPlanAgainstCatalogue(
         // with the table, so the only thing to plan is the default a table
         // made before the key had one is missing — without it, nothing can
         // insert a row there: no door sends a key that is not a property.
+        //
+        // A declared uuid key (`isId: "uuid"`) is the same case: no door sends
+        // it, and a table adopted by introspection or made by hand may lack
+        // its default. Only the built-in generator is converged. A SQL
+        // strategy's function may not exist yet, and setting it here would
+        // turn an insert-time failure into a boot failure.
         for (const column of table.columns) {
-            if (column.source.kind !== "implicit-id" || !column.primaryKey) continue;
+            if (!column.primaryKey) continue;
+            if (column.source.kind !== "implicit-id" && !isUuidKeyDefault(column)) continue;
             if (existing.tables.get(table.qualified)?.has(column.column) !== true) continue;
             planMissingDefault(table, column);
         }
