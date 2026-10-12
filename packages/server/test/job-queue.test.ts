@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, jest } from "@jest/globals";
 import { createJobQueue, defaultBackoff, PermanentJobError } from "../src/jobs";
 import type { JobRecord } from "../src/jobs";
 import type { JobStore } from "../src/jobs";
+import { logger } from "../src/utils/logger";
 
 /**
  * The worker's decisions, away from Postgres.
@@ -482,7 +483,7 @@ describe("a job that never finishes", () => {
         expect(store.jobs[0].status).toBe("failed");
     });
 
-    it("gives every handler a signal that stays live when no timeout is set", async () => {
+    it("gives every handler a signal that stays live when it finishes in time", async () => {
         const store = fakeStore();
         let signal: AbortSignal | undefined;
         const queue = createJobQueue(store, { tasks: { quick: (ctx) => { signal = ctx.signal; } } });
@@ -495,9 +496,80 @@ describe("a job that never finishes", () => {
         expect(store.jobs[0].status).toBe("succeeded");
     });
 
-    it("refuses a timeoutMs that is not a positive number", () => {
-        for (const timeoutMs of [0, -1, Number.NaN]) {
+    it("refuses a timeoutMs that is negative or not a number", () => {
+        for (const timeoutMs of [-1, Number.NaN, Number.POSITIVE_INFINITY]) {
             expect(() => createJobQueue(fakeStore(), { timeoutMs })).toThrow(/timeoutMs/);
+        }
+    });
+
+    // Calls 2026-10-12 (P4): a handler that never settles used to hold its slot
+    // for the life of the process unless `jobs.timeoutMs` was set. The default
+    // is now 15 minutes; `0` is the explicit opt-out.
+    it("fails an attempt at 15 minutes when timeoutMs is left out", async () => {
+        jest.useFakeTimers();
+        try {
+            const store = fakeStore();
+            let signal: AbortSignal | undefined;
+            const queue = createJobQueue(store, {
+                backoff: () => 60 * 60_000,
+                tasks: { stuck: (ctx) => { signal = ctx.signal; return hang(); } }
+            });
+            await queue.enqueue("stuck");
+            let settled = false;
+            const run = queue.runOnce().then(() => { settled = true; });
+
+            await jest.advanceTimersByTimeAsync(15 * 60_000 - 1);
+            expect(settled).toBe(false);
+            expect(signal?.aborted).toBe(false);
+
+            await jest.advanceTimersByTimeAsync(1);
+            await run;
+            expect(signal?.aborted).toBe(true);
+            expect(store.jobs[0].status).toBe("pending");
+            expect(store.jobs[0].lastError).toMatch(/timed out after 900000ms/);
+        } finally {
+            jest.useRealTimers();
+        }
+    });
+
+    it("sets no limit when timeoutMs is 0", async () => {
+        jest.useFakeTimers();
+        try {
+            const store = fakeStore();
+            let signal: AbortSignal | undefined;
+            const queue = createJobQueue(store, {
+                timeoutMs: 0,
+                tasks: { stuck: (ctx) => { signal = ctx.signal; return hang(); } }
+            });
+            await queue.enqueue("stuck");
+            let settled = false;
+            void queue.runOnce().then(() => { settled = true; });
+
+            await jest.advanceTimersByTimeAsync(24 * 60 * 60_000);
+            expect(settled).toBe(false);
+            expect(signal?.aborted).toBe(false);
+            expect(store.jobs[0].status).toBe("running");
+        } finally {
+            jest.useRealTimers();
+        }
+    });
+
+    it("names the default timeout once at start, and only when it applies", async () => {
+        const info = jest.spyOn(logger, "info").mockImplementation(() => undefined);
+        const defaulted = createJobQueue(fakeStore(), { pollIntervalMs: 60 * 60_000 });
+        const explicit = createJobQueue(fakeStore(), { pollIntervalMs: 60 * 60_000, timeoutMs: 1_000 });
+        const unlimited = createJobQueue(fakeStore(), { pollIntervalMs: 60 * 60_000, timeoutMs: 0 });
+        try {
+            defaulted.start();
+            const lines = () => info.mock.calls.filter(([message]) => /jobs\.timeoutMs/.test(message)).length;
+            expect(lines()).toBe(1);
+            expect(info.mock.calls.find(([message]) => /jobs\.timeoutMs/.test(message))?.[0]).toMatch(/15 minutes/);
+            explicit.start();
+            unlimited.start();
+            expect(lines()).toBe(1);
+        } finally {
+            await Promise.all([defaulted.stop(0), explicit.stop(0), unlimited.stop(0)]);
+            info.mockRestore();
         }
     });
 

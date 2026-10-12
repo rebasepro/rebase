@@ -134,9 +134,10 @@ export interface JobQueueOptions {
     /**
      * How long one attempt may run before it is failed (and retried while
      * attempts remain), in milliseconds. The handler's `signal` is aborted at
-     * the deadline and its worker slot is freed. Default: no limit — a handler
-     * that never settles keeps its slot, and its claim, for as long as the
-     * process lives.
+     * the deadline and its worker slot is freed. Default: 15 minutes
+     * (900000), named in one log line when the worker starts. `0` is no
+     * limit — a handler that never settles then keeps its slot, and its
+     * claim, for as long as the process lives.
      */
     timeoutMs?: number;
     /** Attempts before a job is left `failed`. Default 3. */

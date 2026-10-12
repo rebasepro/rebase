@@ -18,6 +18,15 @@ const DEFAULT_VISIBILITY_TIMEOUT_MS = 5 * 60_000;
 const DEFAULT_MAX_ATTEMPTS = 3;
 
 /**
+ * How long one attempt may run when `jobs.timeoutMs` is left out. Without a
+ * bound, a handler awaiting a socket that never answers held its worker slot
+ * and its claim for the life of the process, with `/health` green. Fifteen
+ * minutes is far past any job that is merely slow, and a job meant to run
+ * longer says so with its own `timeoutMs` — or `0`, for no limit.
+ */
+export const DEFAULT_JOB_TIMEOUT_MS = 15 * 60_000;
+
+/**
  * The longest an idle worker goes without looking for work.
  *
  * An idle worker used to claim every 2 seconds, forever: about 45,000 round
@@ -89,12 +98,16 @@ export function createJobQueue(store: JobStore, options: JobQueueOptions = {}): 
     const visibilityTimeoutMs = options.visibilityTimeoutMs ?? DEFAULT_VISIBILITY_TIMEOUT_MS;
     const defaultMaxAttempts = options.maxAttempts ?? DEFAULT_MAX_ATTEMPTS;
     const backoff = options.backoff ?? defaultBackoff;
-    const timeoutMs = options.timeoutMs;
-    if (timeoutMs !== undefined && !(Number.isFinite(timeoutMs) && timeoutMs > 0)) {
-        // Zero is the value a "no limit" reading would pick, and NaN what a
-        // mistyped env var parses to; both would fail every attempt at once.
-        throw new Error(`jobs.timeoutMs must be a positive number of milliseconds (got ${String(timeoutMs)}). Leave it out for no limit.`);
+    const configuredTimeoutMs = options.timeoutMs;
+    if (configuredTimeoutMs !== undefined && !(Number.isFinite(configuredTimeoutMs) && configuredTimeoutMs >= 0)) {
+        // NaN is what a mistyped env var parses to; it would fail every
+        // attempt at once.
+        throw new Error(`jobs.timeoutMs must be a number of milliseconds, or 0 for no limit (got ${String(configuredTimeoutMs)}).`);
     }
+    /** `undefined` means no limit: only an explicit `0` asks for that. */
+    const timeoutMs = configuredTimeoutMs === undefined
+        ? DEFAULT_JOB_TIMEOUT_MS
+        : configuredTimeoutMs === 0 ? undefined : configuredTimeoutMs;
 
     const handlers = new Map<string, JobHandler<never>>();
     for (const [task, handler] of Object.entries(options.tasks ?? {})) {
@@ -207,6 +220,9 @@ export function createJobQueue(store: JobStore, options: JobQueueOptions = {}): 
                             controller.abort(error);
                             reject(error);
                         }, timeoutMs);
+                        // A deadline is not work: it must not hold a process
+                        // open that is otherwise done.
+                        deadline.unref?.();
                     })]);
                 }
             } finally {
@@ -412,6 +428,12 @@ export function createJobQueue(store: JobStore, options: JobQueueOptions = {}): 
             running = true;
             idleIntervalMs = pollIntervalMs;
             logger.info(`[jobs] Worker started (concurrency ${concurrency}, poll ${pollIntervalMs}ms, up to ${idleCeilingMs}ms while idle)`);
+            if (configuredTimeoutMs === undefined) {
+                logger.info(
+                    `[jobs] Each attempt is limited to ${DEFAULT_JOB_TIMEOUT_MS / 60_000} minutes, the default jobs.timeoutMs. ` +
+                    "Set jobs.timeoutMs to change it, or 0 for no limit."
+                );
+            }
             void reap();
             reapTimer = setInterval(() => { void reap(); }, visibilityTimeoutMs * REAP_INTERVAL_FACTOR);
             reapTimer.unref?.();
