@@ -7,7 +7,7 @@ import { isNestedPath, resolveNestedPath } from "./services/nested-path";
 import type { PostgresCollectionRegistry } from "./collections/PostgresCollectionRegistry";
 import type { CollectionConfig, DataDriver, DeleteProps, FetchCollectionProps, FetchOneProps, SaveProps, TableMetadata, BranchInfo, AuthAdapter, DataRateLimitCaller, RealtimeProvider, RealtimeSocketOptions, WebSocketMessage } from "@rebasepro/types";
 import type { SqlScriptResult } from "@rebasepro/types";
-import { redactSqlLiterals } from "@rebasepro/common";
+import { deserializeFilter, redactSqlLiterals, UnknownFilterOperatorError } from "@rebasepro/common";
 import { budgetSendBuffers, reapSilentSockets, terminateIfBacklogged } from "./services/socket-liveness";
 import { ANONYMOUS_USER_ID, hasAdminRole, isSQLAdmin, isSchemaAdmin, resolveClientListLimit, ListLimitError, scopeGrants, scopesForRoles, type AdminScope } from "@rebasepro/types";
 import type { User } from "@rebasepro/types";
@@ -443,6 +443,25 @@ function connectionOrigin(request: IncomingMessage | undefined): Omit<DataRateLi
         },
         socketAddress: request?.socket?.remoteAddress
     };
+}
+
+/**
+ * A request frame with its `filter` decoded by the codec every other door uses.
+ *
+ * REST, MCP and the in-process SDK read `where` through `deserializeFilter`,
+ * so `{ title: ["foo", "bar"] }` is an implicit `in` and `["!!", "x"]` is
+ * refused by name. The socket handed the frame's filter to the driver raw,
+ * which read the first element as an operator: one filter, two meanings,
+ * depending on the transport. A typed `[op, value]` tuple decodes to itself.
+ */
+function withDecodedFilter(request: FetchCollectionProps): FetchCollectionProps {
+    if (!request?.filter) return request;
+    try {
+        return { ...request, filter: deserializeFilter(request.filter) };
+    } catch (e) {
+        if (e instanceof UnknownFilterOperatorError) throw ApiError.badRequest(e.message, e.code, e.details);
+        throw e;
+    }
 }
 
 /**
@@ -1253,7 +1272,7 @@ roles: verifiedUser.roles }
                 switch (type) {
                     case "FETCH_COLLECTION": {
                         wsDebug("📋 [WebSocket Server] Processing FETCH_COLLECTION request");
-                        const request: FetchCollectionProps = payload;
+                        const request: FetchCollectionProps = withDecodedFilter(payload);
                         assertReadRequest(request.path, request);
                         const delegate = await getScopedDelegate();
                         // Bound the client-supplied limit with the SAME guarantee
@@ -1442,7 +1461,7 @@ colors: true }));
                         // ever make `total` describe fewer rows than the collection
                         // holds — the page size is the caller's business, the total
                         // is not.
-                        const request: FetchCollectionProps = payload;
+                        const request: FetchCollectionProps = withDecodedFilter(payload);
                         assertReadRequest(request.path, request);
                         const delegate = await getScopedDelegate();
                         const count = await delegate.count!(request);

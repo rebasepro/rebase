@@ -9,7 +9,7 @@ import { Pool } from "pg";
 import { sql as drizzleSql } from "drizzle-orm";
 import { RealtimeProvider, CollectionSubscriptionConfig, SingleSubscriptionConfig, DrizzleClient } from "../interfaces";
 import { PostgresCollectionRegistry } from "../collections/PostgresCollectionRegistry";
-import { buildPropertyCallbacks, getTableName, normalizeDriverOrderBy, OrderBySpecError, parseOrderBySpecStrict, requireCallbackCollection } from "@rebasepro/common";
+import { buildPropertyCallbacks, deserializeFilter, getTableName, normalizeDriverOrderBy, OrderBySpecError, parseOrderBySpecStrict, requireCallbackCollection, UnknownFilterOperatorError } from "@rebasepro/common";
 import { applyAuthContext } from "../security/rls-enforcement";
 import { withFieldViewer } from "./field-viewer";
 import { buildJunctionLinkMap, type JunctionLink } from "./cdc/junction-tables";
@@ -1408,6 +1408,20 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
                 return;
             }
 
+            // The filter, read by the codec every other door uses — REST,
+            // MCP, the socket's request frames, the in-process SDK — so a
+            // two-element value array is an implicit `in` here too, and an
+            // operator-shaped typo is refused by name rather than compiled.
+            let filter: FilterValues<string> | undefined;
+            try {
+                filter = request.filter ? deserializeFilter(request.filter) : undefined;
+            } catch (e) {
+                if (!(e instanceof UnknownFilterOperatorError)) throw e;
+                logger.warn(`[RealtimeService] Refused subscription to '${request.path}': ${e.message}`);
+                this.sendError(clientId, e.message, subscriptionId, e.code);
+                return;
+            }
+
             // No filter, sort or projection over a field the subscriber may not
             // read — the rule `GET` and the socket's request frames apply. The
             // strip keeps the value out of every frame; a subscription filtered
@@ -1419,7 +1433,7 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
             // went unchecked while every refetch applied it.
             try {
                 assertReadRequestReadable(
-                    { ...request, orderBy },
+                    { ...request, filter, orderBy },
                     collection,
                     { roles: authContext?.roles ?? ["anon"] }
                 );
@@ -1432,7 +1446,7 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
 
             // Store subscription with full request parameters and auth context for RLS
             const collectionRequest: StoredCollectionRequest = {
-                filter: request.filter,
+                filter,
                 logical: request.logical,
                 orderBy,
                 order: request.order,

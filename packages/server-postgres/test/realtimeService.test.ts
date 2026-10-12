@@ -217,6 +217,47 @@ subscriptionId: "sub-1" }
         });
     });
 
+    // Calls 2026-10-12 (S2, DD-11): the socket decodes `filter` through the
+    // codec REST, MCP and the in-process SDK use, so one filter means one
+    // thing on every door — a two-element value array is an implicit `in`,
+    // and an operator-shaped typo is refused by name.
+    describe("Subscription filter dialect", () => {
+        it("reads a two-element value array as an implicit `in`, as the other doors do", async () => {
+            const ws = new MockWebSocket() as any;
+            realtimeService.addClient("client-1", ws);
+
+            await realtimeService.handleClientMessage("client-1", {
+                type: "subscribe_collection",
+                payload: { path: "posts", subscriptionId: "sub-1", filter: { title: ["foo", "bar"], id: [">", 2] } }
+            });
+
+            const expected = { title: ["in", ["foo", "bar"]], id: [">", 2] };
+            expect(mockFetchCollection).toHaveBeenCalledWith(
+                "posts",
+                expect.objectContaining({ filter: expected }),
+                undefined
+            );
+            expect(realtimeService.subscriptions.get("sub-1").collectionRequest.filter).toEqual(expected);
+        });
+
+        it("refuses an unknown operator by name instead of subscribing", async () => {
+            const ws = new MockWebSocket() as any;
+            realtimeService.addClient("client-1", ws);
+
+            await realtimeService.handleClientMessage("client-1", {
+                type: "subscribe_collection",
+                payload: { path: "posts", subscriptionId: "sub-1", filter: { title: ["!!", "x"] } }
+            });
+
+            expect(mockFetchCollection).not.toHaveBeenCalled();
+            expect(realtimeService.subscriptions.has("sub-1")).toBe(false);
+            const sent = ws.send.mock.calls.map((c: unknown[]) => JSON.parse(c[0] as string));
+            const error = sent.find((m: { type: string }) => m.type === "error");
+            expect(error.subscriptionId).toBe("sub-1");
+            expect(error.payload.error.code).toBe("UNKNOWN_FILTER_OPERATOR");
+        });
+    });
+
     describe("Collection Synchronization", () => {
         it("triggers debounced refetch and omits dummy rows on PG_NOTIFY invalidation", async () => {
             const ws = new MockWebSocket() as any;

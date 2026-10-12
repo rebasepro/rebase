@@ -120,7 +120,13 @@ GET /api/data/products?where={"status":["==","active"],"price":[">=",100]}
 Each key is a field, each value a canonical `[operator, value]` tuple — the same
 tuples the SDK writes. A value may also be a pre-serialized dot-string
 (`{"status":"eq.active"}`) or a bare scalar (`{"status":"active"}`); all three
-compile to the same condition.
+compile to the same condition. An array of plain values is an implicit `in`: `{"category":["electronics","gadgets"]}` reads as
+`["in", ["electronics","gadgets"]]`, while an operator-shaped first element that
+is not a real operator (`["!!","x"]`) is a 400 `UNKNOWN_FILTER_OPERATOR`.
+
+The same object is read the same way wherever it arrives: here, in the SDK's
+`where`, in an MCP query, and in the realtime socket's `filter` — its list and
+count requests and its live subscriptions.
 
 The difference worth knowing: **JSON carries types.** `?price=gte.100` sends the
 string `"100"` and the driver casts it by column type, while
