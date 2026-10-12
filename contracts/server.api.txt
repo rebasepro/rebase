@@ -26,6 +26,7 @@ class WebhookDispatcher { deliverQueuedJob, enqueueEntityChange, flush, onEntity
 const ACCOUNT_SCOPED_STORAGE_BASES
 const BATCH_REF_KEY
 const CONCURRENT_DDL_SQLSTATES
+const CORS_EXPOSED_HEADERS
 const DEFAULT_DRIVER_ID
 const DEFAULT_MAX_FILE_SIZE
 const DEFAULT_STORAGE_ID
@@ -625,7 +626,7 @@ interface AfterDeleteProps { collection, context, id, path, row }
 interface AfterReadProps { collection, context, path, row }
 interface AfterSaveProps { collection, context, id, path, previousValues, status, values }
 interface AggregateMeta { hasMore, limit, offset }
-interface AggregateParams { groupBy, limit, logical, offset, searchString, select, where }
+interface AggregateParams { groupBy, limit, logical, offset, orderBy, searchString, select, where }
 interface AggregateResult { meta }
 interface AndPolicyExpression { kind, operands }
 interface ApiKeyMasked { created_at, created_by, expires_at, id, key_prefix, kind, last_used_at, name, owner_uid, rate_limit, revoked_at, roles, scopes, updated_at }
@@ -933,6 +934,8 @@ type AdminCollectionKey
 type AdminPropertyKey
 type AdminScope
 type AfterSaveErrorProps
+type AggregateAlias
+type AggregateOrderKey
 type AggregateRow
 type AggregateSelect
 type AnyCollectionConfig
@@ -1102,7 +1105,7 @@ function resolveStorageReferences
 function storageReference
 interface AdminUser { createdAt, disabled, displayName, email, metadata, photoURL, providerId, roles, uid, updatedAt }
 interface AggregateMeta { hasMore, limit, offset }
-interface AggregateParams { groupBy, limit, logical, offset, searchString, select, where }
+interface AggregateParams { groupBy, limit, logical, offset, orderBy, searchString, select, where }
 interface AggregateResult { meta }
 interface ApiKeyMasked { created_at, created_by, expires_at, id, key_prefix, kind, last_used_at, name, owner_uid, rate_limit, revoked_at, roles, scopes, updated_at }
 interface ApiKeyWithSecret { created_at, created_by, expires_at, id, key, key_prefix, kind, last_used_at, name, owner_uid, rate_limit, revoked_at, roles, scopes, updated_at }
@@ -1219,6 +1222,7 @@ const DOWNLOAD_METADATA_BATCH_MAX
 const DOWNLOAD_URL_CONCURRENCY
 const JUNCTION_TABLES_SQL
 const MAX_LOGICAL_NESTING_DEPTH
+const PAGE_WITH_OFFSET_MESSAGE
 const REBASE_INTERNAL_PREFIXES
 const REBASE_INTERNAL_SCHEMAS
 const REBASE_INTERNAL_TABLES
@@ -1231,6 +1235,7 @@ const buildPropertyCallbacks
 const defaultUsersCollection { auth, callbacks, childCollections, dataSource, databaseId, description, disableDefaultPolicies, engine, history, indexes, metadata, name, ownerId, properties, relations, schema, search, securityRules, singularName, slug, softDelete, strictWrites, table, tenant }
 function aggregateAlias
 function and { conditions, type }
+function apiHiddenFieldNames
 function applyDefaultValuesOnCreate
 function authSecretsMissingExclusion
 function buildCollectionFromTableMetadata
@@ -1308,6 +1313,7 @@ function getTableName
 function getTableVarName
 function getTenantConfig
 function hasFieldAccessRules
+function includableRelationNames
 function includePaths
 function isAddressableId
 function isJunctionBackedRelation
@@ -1329,6 +1335,7 @@ function parseOrderBySpecStrict
 function policyToPostgres
 function policyToSecurityRule
 function primaryOrderBy
+function queryableFieldNames
 function reconcileCursorOrder
 function redactSqlLiterals
 function registerConditionOperations
@@ -1379,10 +1386,18 @@ function topLevelIncludeNames
 function traverseValueProperty
 function traverseValuesProperties
 function unavailableStorageSource
+function unknownAggregateField
+function unknownFilterField
+function unknownIncludeRelation
+function unknownOrderByField
+function unknownProjectionField
+function unknownRelationTargetField
+function unknownVectorProperty
 function untrustedEnvelope
 function updateDateAutoValues
 function updateUserAutoValues
 function uploadResumable
+function vectorPropertyNames
 function wrapAsEntityData
 function wrapAsSdkData
 interface AnonymousGrantRisk { detail, explanation, pattern }
@@ -1414,6 +1429,7 @@ interface RoutedRebaseDataParams { defaultData, resolveKey, sources }
 interface RuleConditions { usingExpr, withCheckExpr }
 interface TenantWriteInput { bypass, callerTenants, callerTenantsComplete, previousValues, slug, status, tenant, values }
 interface TenantWriteRefusal { code, field, message }
+interface UnknownFieldAnswer { code, details, message }
 type AuthContext
 type DataSourceRegistry
 type DownloadMetadataBatchEntry
@@ -1434,6 +1450,7 @@ type UnknownResolution
 ## @rebasepro/utils
 const MAX_SEARCH_TERMS
 const defaultDateFormat
+const defaultRelativeTimeLabels { daysAgo, hoursAgo, inAMoment, inDays, inHours, inMinutes, justNow, minutesAgo }
 const isArrayValue
 const isEmptyArray
 const isFunction
@@ -1459,6 +1476,7 @@ function getPolicyNameHash
 function getPolicyNamesForRule
 function getPolicyNamesForRules
 function getPolicyOperations
+function getPolicySupersededNames
 function getValueInPath
 function getWebStorage
 function hashString
@@ -1501,8 +1519,9 @@ function writeStoredJson
 function writeStoredString
 interface WebStorageLike { getItem, removeItem, setItem }
 type ArrayValuesCount
-type FormatRelativeTimeOptions { maxMs, now }
+type FormatRelativeTimeOptions { labels, maxMs, now }
 type ReadStoredJsonOptions { accept, fallback, storage }
+type RelativeTimeLabels { daysAgo, hoursAgo, inAMoment, inDays, inHours, inMinutes, justNow, minutesAgo }
 
 ## @rebasepro/server/functions
 class ApiError { badRequest, code, conflict, details, expected, forbidden, internal, notFound, serviceUnavailable, statusCode, unauthenticated, unauthorized }
