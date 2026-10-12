@@ -662,7 +662,7 @@ answers.
 | `JWT_PRIVATE_KEY` | PEM private key for signing access tokens asymmetrically (RS256), so anything holding the JWKS can verify a session without being able to mint one. Accepts a PEM with real newlines, a PEM with `\n` escapes, or base64 of the whole PEM. Without it tokens stay HS256. | — |
 | `JWT_KEY_ID` | Names `JWT_PRIVATE_KEY` in the token header and in the JWKS. Change it whenever the key changes — rotation depends on old and new being distinguishable. | `default` |
 | `JWT_ACCESS_EXPIRES_IN` | Access token lifetime | `1h` |
-| `JWT_REFRESH_EXPIRES_IN` | Refresh token lifetime. Sliding — every rotation re-ups it, so this governs how long a session survives **inactivity**. | `400d` |
+| `JWT_REFRESH_EXPIRES_IN` | Refresh token lifetime. Sliding — every rotation re-ups it, so this governs how long a session survives **inactivity**. Set `400d` for sessions that outlast a long absence; browsers cap the refresh cookie there. | `30d` |
 | `ALLOW_REGISTRATION` | Allow new users to register (`true`/`false`). Outside production the **first** user can always register, whatever this says — an empty user table has to admit somebody, and that somebody becomes the admin. In production (`NODE_ENV=production`) that window is closed: an empty table refuses the bootstrap registration with `SETUP_REQUIRED`, a first account created through open registration is an ordinary account, and the admin is named with `REBASE_ADMIN_EMAIL` below or assigned with the service key. The scaffold's `.env.example` sets it to `true`; the framework default is off. | `false` |
 | `DISABLE_SELF_REGISTRATION` | Kill switch. Closes the first-user bootstrap window that `ALLOW_REGISTRATION=false` deliberately leaves open outside production, so registration is shut even against an empty database. Pair it with `REBASE_ADMIN_EMAIL` below, or the deployment has no way to produce its first signed-in caller. Every shipped deployment artifact sets it. | — |
 | `REBASE_ADMIN_EMAIL` | Email of the first admin account, created at boot **while the user table is still empty** and never afterwards. This is how a production deployment gets its admin: the operator names the first account instead of racing the internet for it. Boot warns when the table is empty in production and this is unset. | — |
@@ -1397,7 +1397,9 @@ the MCP collection listing, and the admin's translations. The rest come from the
 backlog sweep: stricter refusals at boot and on `OPTIONS`, the SDK's cron path
 and offline reads, the storage source registry, unused UI kit props, the
 users-collection upsert, a read naming both `page` and `offset`, and the default
-policy names on long tables.
+policy names on long tables. The last three are product calls: the default
+session length, the password policy on an administrator's chosen password, and
+an empty string on a required field.
 
 ---
 
@@ -1607,6 +1609,78 @@ that drops them. The old names never existed in the database.
 **What to change:** nothing for the database. The next boot or `rebase db push`
 drops the truncated policy and creates one policy per operation. Update any
 script that names the old policies.
+
+### 80. Sessions last 30 days of inactivity by default
+
+The refresh token's default lifetime is now 30 days on every entry point. A
+server started with the `rebase-server` runtime (or `rebase start`) used 400
+days whenever `JWT_REFRESH_EXPIRES_IN` was unset; a hand-written
+`initializeRebaseBackend` already used 30.
+
+The lifetime is sliding: every refresh issues a token good for another 30
+days, so a user who opens the app at least once a month stays signed in. A
+user idle for longer signs in again. Tokens issued before the upgrade keep the
+expiry they were issued with until their next refresh.
+
+**Who is affected:** a deployment on the runtime that never set
+`JWT_REFRESH_EXPIRES_IN`, whose users return less than once a month.
+
+**What to change:** nothing, to take the new default. To keep the previous
+behaviour, set it explicitly:
+
+```bash
+JWT_REFRESH_EXPIRES_IN=400d
+```
+
+or `auth: { refreshExpiresIn: "400d" }` in an ejected backend. Browsers cap
+the refresh cookie at 400 days, so a longer value buys nothing in cookie mode.
+
+### 81. An administrator's chosen password must meet the password policy
+
+`POST /api/admin/users` and a create on the users collection through the data
+API (`POST /api/data/users`, `/bulk`, a batch, MCP `create_document`, a socket
+save) now refuse a `password` that fails the policy with `400 WEAK_PASSWORD`,
+as sign-up, resets and `PUT /api/admin/users/:uid` already did. Nothing is
+written and no create hook runs. On a `/bulk`, the message starts
+`Row <n>: `, like the bulk's other row errors. A create without a password is
+unchanged: a password is generated, or an invitation sent.
+
+**Who is affected:** code that creates users with a password chosen elsewhere,
+such as an import or a sync from another system.
+
+**What to change:** to import accounts whose passwords were set elsewhere, send
+`skipPasswordPolicy: true` in each create body (on each row of a `/bulk`), as
+an administrator or with the service key:
+
+```ts
+await client.admin.createUser({ email, password: legacyPassword, skipPasswordPolicy: true });
+```
+
+From any other caller the flag waives nothing. It is never stored and never
+reaches `onCreateUser` or `onAdminCreateUser`. The admin panel's import sends
+it for you on rows that carry a `password`. A custom `AuthAdapter` receives
+the decision as the new third argument of `prepareUserCreation`
+(`{ mayWaivePasswordPolicy }`); an adapter that ignores it keeps its current
+behaviour. To change the policy itself, pass `auth.hooks.validatePasswordStrength`.
+
+### 82. An empty string on a required string field is refused
+
+A write that sends `""` for a `string` property with `validation.required` now
+answers `400 VALIDATION_CONSTRAINT`, with a `details.violations` entry
+`{ field, code: "required" }`: the same answer as a missing value. This applies
+to creates and updates on every door (REST, bulk, batch, upsert, the realtime
+socket, MCP), and even when the property has a `defaultValue`, since a default
+fills an absent key, not an empty one. The admin panel already writes `null`
+for a cleared field, so it is unaffected.
+
+**Who is affected:** code that writes `""` to a required string field, for
+example a form or an import that sends every column whether filled or not.
+
+**What to change:** send a value, omit the key on create when a `defaultValue`
+should apply, or drop `required` from fields that may legitimately be empty.
+Collections that declare a `beforeSave` are not checked at the boundary (the
+hook may fill the value), as before. Server code writing in-process
+(`rebase.data`) is not affected.
 
 ## Upgrading 0.23 to 0.24
 
@@ -3838,6 +3912,15 @@ yet, listed so that nobody reads a promise into them:
   and the `offset` was never applied, though the docs already said no window
   parameter is ignored. Send one of them; see the upgrade guide.
 
+- **An empty string on a required string field is refused like a missing
+  value.** Every write door (REST create, update, `/bulk`, upsert and batch,
+  the realtime socket, MCP) answers `400 VALIDATION_CONSTRAINT` with the
+  `required` violation, on creates and on updates, even where the field has a
+  `defaultValue`: a default fills an absent key, not an empty one. A
+  collection with a `beforeSave` keeps its exemption, since the hook may fill
+  the value. The admin panel already writes `null` for a cleared field. See
+  the upgrade guide.
+
 ##### Postgres
 
 - **On a table whose name is 42 bytes or more, the three default admin-write
@@ -3885,6 +3968,28 @@ yet, listed so that nobody reads a promise into them:
   declares onChange, name, position, endAdornment, multiple or
   padding.** None was ever read, so passing one was a silent no-op and is now
   a type error. Delete the prop.
+
+##### Auth
+
+- **A session lasts 30 days of inactivity by default, whichever way the server
+  starts.** The runtime (`JWT_REFRESH_EXPIRES_IN`) defaulted to 400 days while
+  `initializeRebaseBackend` and the scaffold's `.env.example` used 30, so how
+  long a session lasted depended on the entry point. The refresh token is
+  still sliding: an active user is never signed out. Set
+  `JWT_REFRESH_EXPIRES_IN=400d` (or `auth.refreshExpiresIn`) to keep the
+  longer window.
+
+- **An administrator's chosen password is held to the password policy
+  (`400 WEAK_PASSWORD`).** On `POST /api/admin/users` and on every create on
+  the users collection through the data API (REST, `/bulk`, batch, MCP, the
+  socket), as registration, resets and `PUT /api/admin/users/:uid` already
+  were. On a `/bulk` the message names the row (`Row <n>: `), like the bulk's
+  other row errors, so the admin panel's import can say which line failed. An
+  import may send `skipPasswordPolicy: true` on a create; the server honours
+  it only for an administrator or the service key, and never stores it. The
+  admin panel's import sends it for rows that carry a `password`.
+  `AuthAdapter.prepareUserCreation` takes an optional third argument,
+  `UserCreationOptions { mayWaivePasswordPolicy }`.
 
 #### Added
 
@@ -4025,6 +4130,34 @@ yet, listed so that nobody reads a promise into them:
 
 - **`pnpm check:icon-button-names` fails on any `IconButton` in package source
   without an accessible name.**
+
+##### Auth
+
+- **`GET /api/admin/users/pick`, the user picker's read.** It answers id,
+  display name, email and avatar per user, nothing else, to `users:read`
+  holders and to anyone who may write a collection with a `userSelect` field,
+  so an editor's user picker is no longer empty and a picked user shows by
+  name instead of a bare id. A collection whose write rules are raw SQL cannot
+  be judged ahead and does not count: there only `users:read` holders can
+  pick. New type `PickedUser`.
+
+##### rls-check
+
+- **An unconditional policy that nothing can reach yet is reported as latent
+  `info`.** For example `USING (true) TO anon` on a table anon holds no
+  privilege on, or in a schema it has no USAGE on. Postgres answers
+  "permission denied" today, so it is not an exposure, but one `GRANT` would
+  make it critical with no change to the policy. It is reported under
+  `policy-always-true` at `info`, titled "latent", with what is missing and
+  the fix. Info is below every `--fail-on` except `info`, so default runs are
+  unaffected.
+
+##### Studio
+
+- **The property editor warns when a smaller max narrows a varchar or char
+  column.** On those column types `validation.max` is the column's width, so
+  lowering it is a DDL change: `rebase db push` asks before it narrows a
+  column, and the change fails while a stored value is longer.
 
 #### Changed
 
@@ -4216,6 +4349,22 @@ yet, listed so that nobody reads a promise into them:
   History retention is resolved per rule rather than cached per channel name,
   and the prune throttle forgets expired entries: 20,000 invented names at
   3,600 a minute left 40,000 entries, now fewer than 6,000.
+
+- **`REALTIME_CDC=off` removes the change-capture triggers an earlier boot
+  installed.** The process that owns the schema drops both capture functions,
+  and the triggers with them, and logs how many. Give every process the same
+  `REALTIME_CDC`: a schema owner set to `off` beside an `api` left on `auto`
+  leaves the `api` listening for nothing.
+
+- **The realtime socket reads a filter the way REST, MCP and the SDK do.** A
+  two-element value array is an implicit `in`, and an unknown operator is an
+  `UNKNOWN_FILTER_OPERATOR` refusal, on list, count and subscription frames.
+
+- **Frames arriving on one socket while its identity check is in flight share
+  that check.** Each used to query the auth store, which a client
+  re-subscribing after a reconnect did once per subscription. Nothing is
+  cached past the flight and nothing is shared across sockets; a demotion
+  during a shared lookup is seen one frame later.
 
 ##### Admin (CMS & app)
 
@@ -4529,6 +4678,11 @@ yet, listed so that nobody reads a promise into them:
   store takes part through the optional `JobStore.sweepExpired()` and
   `CronStore.sweepClaims()`.
 
+- **A job attempt times out after 15 minutes when `jobs.timeoutMs` is not
+  set.** The worker names the default in one log line at start. Set
+  `jobs.timeoutMs` for longer jobs, or `0` for no limit (it used to be
+  refused).
+
 ##### MCP
 
 - **Every MCP tool answers in compact JSON, and the collection listing is sent
@@ -4653,6 +4807,19 @@ yet, listed so that nobody reads a promise into them:
 - **`schema generate` warns when a `hasMany` / `hasOne` target declares no
   foreign-key column back.**
 
+- **A `map` property can store objects whose keys start with `$`.** JSON
+  Schema's `$schema` and `$id`, or a MongoDB export, were refused as
+  misspelled field operations. On a map, only a single-key object whose key is
+  a real operator (`{ "$merge": … }`) is an operation; other types still
+  refuse a misspelled one. The offline client has no schema, so it keeps the
+  strict reading while offline.
+
+- **Reverting to a history entry recorded before 0.24 writes the row's
+  columns.** It answered 400 `VALIDATION_UNKNOWN_FIELDS`. An embedded owning
+  relation goes back as its foreign key, and `meta.dropped_fields` in the
+  answer names every other key it left out. A masked value (`********`)
+  cannot be told apart and is still written back.
+
 ##### Postgres
 
 - **A server that boots while a long report, transaction or `pg_dump` reads
@@ -4699,6 +4866,13 @@ yet, listed so that nobody reads a promise into them:
   collided change: they are now `<head>_<hash8>_<op>`, at most 63 bytes. The
   next boot or `rebase db push` drops the truncated policy and creates one
   policy per operation.
+
+- **Boot gives an `isId: "uuid"` key the default its table is missing.** A
+  table adopted with `rebase schema introspect`, or created by hand, could
+  carry a uuid key with no default, and every create there failed on a NULL
+  primary key. The next boot now sets `DEFAULT gen_random_uuid()`, as it
+  already did for the implicit key. A SQL strategy's key is still left alone,
+  because its function may not exist yet.
 
 ##### CLI
 
@@ -4906,6 +5080,13 @@ yet, listed so that nobody reads a promise into them:
 - **An app whose locale prop starts in a language other than English can
   change it later.** The first language is no longer stored as the user's
   choice.
+
+- **A table cell shows validation only after you edit it.** A stored value
+  that fails a column's rule (a rule added later, or a row written over the
+  API or by SQL) drew a red border and an error tooltip on every cell holding
+  one as soon as the table rendered. Cells now judge a value once it is
+  edited, as the record form does. An invalid edit is still flagged and not
+  saved.
 
 ##### Studio
 
@@ -5223,6 +5404,20 @@ yet, listed so that nobody reads a promise into them:
 
 - **The functions 404 names a file that failed to load only to a signed-in
   caller.** An anonymous caller gets the plain "No function named …" answer.
+
+- **History entries never expose a related row's values.** Relations are
+  stored and served as `{ __type, id, path }` references. Delete entries
+  recorded before 0.24, which embedded the related row, are served with the
+  embedded values removed, and the recorder strips an embedded row before it
+  stores an entry. New `withRelationReferencesOnly` in `@rebasepro/common`.
+
+#### Documentation
+
+##### Storage & email
+
+- **`GET /api/storage/sources` is public on purpose, and the storage page says
+  why.** It names the configured sources, never a file; listing and reading
+  files still need a caller. A test holds it public.
 
 ### [0.24.0] - 2026-10-08
 
@@ -16006,7 +16201,13 @@ GET /api/data/products?where={"status":["==","active"],"price":[">=",100]}
 Each key is a field, each value a canonical `[operator, value]` tuple — the same
 tuples the SDK writes. A value may also be a pre-serialized dot-string
 (`{"status":"eq.active"}`) or a bare scalar (`{"status":"active"}`); all three
-compile to the same condition.
+compile to the same condition. An array of plain values is an implicit `in`: `{"category":["electronics","gadgets"]}` reads as
+`["in", ["electronics","gadgets"]]`, while an operator-shaped first element that
+is not a real operator (`["!!","x"]`) is a 400 `UNKNOWN_FILTER_OPERATOR`.
+
+The same object is read the same way wherever it arrives: here, in the SDK's
+`where`, in an MCP query, and in the realtime socket's `filter` — its list and
+count requests and its live subscriptions.
 
 The difference worth knowing: **JSON carries types.** `?price=gte.100` sends the
 string `"100"` and the driver casts it by column type, while
@@ -16160,7 +16361,20 @@ and cannot lose.
 Exactly one operator per field. An operator on a property type it is not defined
 on, an unknown `$operator`, or an operand of the wrong shape is a `400`
 (`INVALID_FIELD_OPERATION`) naming the field — a misspelling is never written to
-the column as a JSON document. Operations apply to updates only: over a row that
+the column as a JSON document.
+
+A `map` is the exception, because its value *is* a JSON document and may carry
+`$` keys of its own — a JSON Schema's `$schema` and `$id`, a MongoDB export. On a
+`map`, only an object with exactly one key that is one of the operators above is
+an operation; any other object is stored as sent, `$` keys and all. So
+`{ "meta": { "$merge": { … } } }` merges, and
+`{ "meta": { "$schema": "https://json-schema.org/draft/2020-12/schema" } }` is
+stored. A misspelled operator on a `map` is therefore stored too; on every other
+type it is still refused. The offline client has no schema to tell a `map` from
+anything else, so while offline it refuses such a value as a field operation;
+send it once the connection is back.
+
+Operations apply to updates only: over a row that
 does not exist yet there is nothing to operate on, so they are refused on
 `POST`, on `/bulk` creates, and on upserts.
 
@@ -17795,7 +18009,7 @@ price: {
 | `admin.readOnly` | `boolean` | Prevent editing |
 | `admin.disabled` | `boolean \| PropertyDisabledConfig` | Disable with optional tooltip |
 | `admin.filledByServer` | `boolean` | The server fills the field when a new record leaves it empty (a `beforeSave` hook). The form lets a create through without it; it stays required on edit, and the server's own checks still apply |
-| `admin.hideFromCollection` | `boolean` | Hide from table view |
+| `admin.hideFromCollection` | `boolean` | Hide from table view. Display only: a hidden relation property's related rows are still embedded in the list read (see [Relations](/docs/collections/relations)) |
 | `admin.columnWidth` | `number` | Column width in pixels (table view) |
 | `admin.span` | `1 \| 2 \| 3 \| 4` | Field width over the four-column form grid |
 | `admin.Field` | `React.ComponentType` | Custom field component |
@@ -17952,7 +18166,7 @@ locales: {
 | `columnType` | `"varchar" \| "text" \| "char" \| "uuid"` | The database column. Defaults to `text`, or `uuid` when `isId` says so. `text` for unbounded strings, `char` for fixed width |
 | `isId` | `boolean \| string` | Marks the property as the primary key, and says who fills it: `"manual"` (you do), `"uuid"` (`gen_random_uuid()`), or any other string, used verbatim as the column's SQL default expression — bare (`nanoid()`) or in template form (``"sql`nanoid()`"``). The function has to exist; nothing here creates it. `"increment"` is a **number** strategy and does nothing here, and `"cuid"` is refused at config load |
 | `autoValue` | `"user_on_create" \| "user_on_update"` | Stamp the column with the **uid of the acting user** — on creation only, or on every write. See [Audit columns](#audit-columns) |
-| `userSelect` | `boolean` | Render as a user picker. The value is a plain string column holding the user id — nothing resolves or checks it on the way in. **Admin form only — not enforced by the API or the database.** |
+| `userSelect` | `boolean` | Render as a user picker. The value is a plain string column holding the user id — nothing resolves or checks it on the way in. **Admin form only — not enforced by the API or the database.** The picker lists users' names, emails and avatars to anyone who may write the collection, through [`GET /api/admin/users/pick`](/docs/backend/auth-endpoints/), without the `users:read` scope. A collection whose write rules are raw SQL does not count, since they cannot be judged ahead: there only `users:read` holders can pick. |
 | `admin.previewAsTag` | `boolean` | Render this string as a tag in previews |
 | `admin.clearable` | `boolean` | Add an icon to clear the value (set to null) |
 | `admin.urlPreview` | `PreviewType` | How to render a string that holds a URL: a link, or an inline image, audio or video preview. Presentation only — whether the value *is* a URL is the `url` flag on the property, which is what the OpenAPI contract is generated from |
@@ -18010,6 +18224,12 @@ row created from the admin panel, the REST API or the SDK needs no key, and a ke
 you do send is used as given. A table created before this default existed gets
 it at the next boot. On 0.23 the column has no default, and a create that sends
 no key fails.
+
+The same goes for a declared `isId: "uuid"` key whose table has no default — a
+table adopted with `rebase schema introspect`, or created by hand: the next boot sets
+`DEFAULT gen_random_uuid()`. Boot sets no other declared key's default. A SQL
+strategy's function may not exist yet, so add that default yourself, or let
+`rebase db push` apply it.
 :::
 
 ### Number Properties
@@ -18599,11 +18819,16 @@ in a callback, a seed script. What holds there is what the database enforces —
 of a `varchar` or `char` column. Anything else your server code writes, check in
 the code that writes it.
 
+The admin panel checks the same rules before it saves, in the record form and in
+the collection table's inline editor. A table cell judges a value once you edit
+it: a stored value that fails a rule added later shows no error in the table
+until someone edits that cell.
+
 #### Every type
 
 | Rule | Type | Description |
 |------|------|-------------|
-| `required` | `boolean` | The value must be present |
+| `required` | `boolean` | The value must be present. On a `string`, `""` counts as absent: the API refuses it on every write, a create or an update, with the same `required` violation (unless the collection has a `beforeSave`, which may fill it) |
 | `requiredMessage` | `string` | What is said when it is not: by the admin form, and as the `message` of the field's `required` entry in the API's 400. The database's NOT NULL carries no message |
 | `unique` | `boolean` | Only one row in the table may hold this value. The admin form also checks it when saving a value the edit changed, so a duplicate is named on its field before the write |
 | `uniqueInArray` | `boolean` | Only one entry *per array* may hold it. Applies to a direct child of an `array` property, or a first-level child of a `map` inside one. **Admin form only — not enforced by the API or the database.** |
@@ -18612,7 +18837,7 @@ the code that writes it.
 
 | Rule | Type | Description |
 |------|------|-------------|
-| `min` / `max` | `number` | Fewest / most characters, inclusive. With `columnType: "varchar"` or `"char"`, `max` also sizes the column (`VARCHAR(max)`), so lowering it on a table that already holds longer rows is a migration the database refuses. The default column is `TEXT`, which `max` leaves unbounded — the bound is then the server's [request check](#where-validation-runs) alone |
+| `min` / `max` | `number` | Fewest / most characters, inclusive. With `columnType: "varchar"` or `"char"`, `max` also sizes the column (`VARCHAR(max)`), so lowering it on a table that already holds longer rows is a migration the database refuses, and the collection editor warns when an edit lowers it. The default column is `TEXT`, which `max` leaves unbounded — the bound is then the server's [request check](#where-validation-runs) alone |
 | `length` | `number` | Exactly this many characters — a country code, a fixed-width reference |
 | `matches` | `string \| RegExp` | A pattern the whole value must match. A string is compiled per request, so one that will not compile is rejected at boot rather than quietly becoming no rule |
 | `matchesMessage` | `string` | What the form says when `matches` fails |
@@ -18947,6 +19172,14 @@ relation that button repeated the same heading beside a column already showing
 the children, so it is dropped. Hide the relation's column
 (`admin: { hideFromCollection: true }`) and the button comes back, so the
 relation never falls out of the table entirely.
+
+Hiding the column does not stop the fetch. The collection's list read embeds
+every relation a property declares, hidden or not, so code that reads list
+rows — `additionalFields`, entity actions, collection actions through
+`tableController.data`, plugin slots, `browserCallbacks.afterRead` — finds the
+related rows there. A relation declared only in the collection's `relations`
+array, with no property, is not embedded in the list; its rows load when its
+tab opens.
 
 If you want the inline picker anyway, ask for it:
 
@@ -21994,7 +22227,13 @@ GET /api/data/products?where={"status":["==","active"],"price":[">=",100]}
 Each key is a field, each value a canonical `[operator, value]` tuple — the same
 tuples the SDK writes. A value may also be a pre-serialized dot-string
 (`{"status":"eq.active"}`) or a bare scalar (`{"status":"active"}`); all three
-compile to the same condition.
+compile to the same condition. An array of plain values is an implicit `in`: `{"category":["electronics","gadgets"]}` reads as
+`["in", ["electronics","gadgets"]]`, while an operator-shaped first element that
+is not a real operator (`["!!","x"]`) is a 400 `UNKNOWN_FILTER_OPERATOR`.
+
+The same object is read the same way wherever it arrives: here, in the SDK's
+`where`, in an MCP query, and in the realtime socket's `filter` — its list and
+count requests and its live subscriptions.
 
 The difference worth knowing: **JSON carries types.** `?price=gte.100` sends the
 string `"100"` and the driver casts it by column type, while
@@ -22148,7 +22387,20 @@ and cannot lose.
 Exactly one operator per field. An operator on a property type it is not defined
 on, an unknown `$operator`, or an operand of the wrong shape is a `400`
 (`INVALID_FIELD_OPERATION`) naming the field — a misspelling is never written to
-the column as a JSON document. Operations apply to updates only: over a row that
+the column as a JSON document.
+
+A `map` is the exception, because its value *is* a JSON document and may carry
+`$` keys of its own — a JSON Schema's `$schema` and `$id`, a MongoDB export. On a
+`map`, only an object with exactly one key that is one of the operators above is
+an operation; any other object is stored as sent, `$` keys and all. So
+`{ "meta": { "$merge": { … } } }` merges, and
+`{ "meta": { "$schema": "https://json-schema.org/draft/2020-12/schema" } }` is
+stored. A misspelled operator on a `map` is therefore stored too; on every other
+type it is still refused. The offline client has no schema to tell a `map` from
+anything else, so while offline it refuses such a value as a field operation;
+send it once the connection is back.
+
+Operations apply to updates only: over a row that
 does not exist yet there is nothing to operate on, so they are refused on
 `POST`, on `/bulk` creates, and on upserts.
 
@@ -22823,7 +23075,7 @@ the ID you got. Read the response header.
 | `TOKEN_ALREADY_USED` | 401 | A one-time token was replayed, or a refresh token that was rotated away more than `refreshTokenReuseIntervalSeconds` ago. | Request a fresh one, or sign in again. |
 | `TOKEN_EXPIRED` | 401 | The token is past its lifetime. | Request a fresh one. |
 | `USER_NOT_FOUND` | 404 | No account with that id. | Check the id. |
-| `WEAK_PASSWORD` | 400 | The password does not meet the [password policy](/docs/backend/auth-endpoints/#password-policy) (by default 8+ characters with an upper-case letter, a lower-case letter and a digit) — on sign-up, a reset or change, and an administrator's `PUT /api/admin/users/:id` or `POST /api/admin/users/:id/reset-password` with a chosen password. | Choose a stronger one. |
+| `WEAK_PASSWORD` | 400 | The password does not meet the [password policy](/docs/backend/auth-endpoints/#password-policy) (by default 8+ characters with an upper-case letter, a lower-case letter and a digit) — on sign-up, a reset or change, and an administrator's chosen password: `POST /api/admin/users`, a create on the users collection through the data API, `PUT /api/admin/users/:id` or `POST /api/admin/users/:id/reset-password`. | Choose a stronger one. An administrator importing accounts may send `skipPasswordPolicy: true` on a create. |
 
 ### Data, queries and writes
 
@@ -23149,6 +23401,7 @@ a collection reaches none of this. See [Roles and scopes](/docs/backend/roles-an
 | `POST` | `/api/admin/bootstrap` | none, and only while no admin exists | Refused in production — see [First User Bootstrap](/docs/backend/authentication/#first-user-bootstrap) |
 | `GET` | `/api/admin/users` | `users:read` | User management |
 | `POST` | `/api/admin/users` | `users:write` | User management. Roles beyond the caller's own are refused |
+| `GET` | `/api/admin/users/pick` | `users:read`, or write access to a collection with a `userSelect` field | The [user picker's read](/docs/backend/auth-endpoints/): id, name, email and avatar only. A collection whose write rules are raw SQL does not count |
 | `GET` | `/api/admin/users/:uid` | `users:read` | User management |
 | `PUT` | `/api/admin/users/:uid` | `users:write` | Refused for an account that holds more than the caller |
 | `DELETE` | `/api/admin/users/:uid` | `users:write` | Refused for an account that holds more than the caller |
@@ -23755,7 +24008,7 @@ const backend = await initializeRebaseBackend({
 | `signingKeys` | `JwtSigningKeyConfig[]` | — | Asymmetric signing keys — see [Asymmetric Tokens and JWKS](/docs/backend/auth-endpoints/#asymmetric-tokens-and-jwks) |
 | `activeKid` | `string` | first key | Which of `signingKeys` mints new tokens |
 | `accessExpiresIn` | `string` | `1h` | Access-token lifetime |
-| `refreshExpiresIn` | `string` | `30d` | Refresh-token lifetime. Sliding: each rotation re-ups it. The runtime passes `JWT_REFRESH_EXPIRES_IN`, whose own default is `400d` |
+| `refreshExpiresIn` | `string` | `30d` | Refresh-token lifetime. Sliding: each rotation re-ups it, so this is how long a session survives **inactivity**. The runtime passes `JWT_REFRESH_EXPIRES_IN`, which defaults to `30d` too. Browsers cap the refresh cookie at 400 days, so a longer value buys nothing in cookie mode |
 | `refreshTokenReuseIntervalSeconds` | `number` | `10` | How long a refresh token that was rotated away still mints a sibling of its session, so a client that lost a refresh answer is not signed out |
 | `refreshTokenReuse` | `"reject" \| "revoke-session"` | `"reject"` | What a refresh token presented after that window does. `"reject"` refuses it (`TOKEN_ALREADY_USED`) and logs it, and the session stands: this is not reuse detection, since whoever refreshed first keeps the session. `"revoke-session"` ends the whole sign-in on such a replay (`SESSION_REVOKED`), as GoTrue does, and the owner signs in again. `AUTH_REFRESH_TOKEN_REUSE` |
 | `requireAuth` | `boolean` | `true` | Require a session for the data API |
@@ -24680,13 +24933,14 @@ All auth endpoints are mounted at `/api/auth/`:
 
 Administrative user and role management is a **separate surface**, mounted at
 `/api/admin/` rather than `/api/auth/`. Reading needs the `users:read` scope and
-changing needs `users:write`. An admin and the service key hold both; so does a
+changing needs `users:write`, except the user picker's narrow read below. An admin and the service key hold both; so does a
 role that declares them. Nobody may change an account that holds more than they
 do. See [Roles and scopes](/docs/backend/roles-and-scopes/).
 
 | Method | Path | Description |
 |--------|------|-------------|
 | `GET` | `/api/admin/users` | List users (paginated). `?search=` matches a case-insensitive part of the email or display name. On Postgres it also matches any role the user holds, and the uid; on MongoDB it still matches email and display name only |
+| `GET` | `/api/admin/users/pick` | The user picker's read: `uid`, `displayName`, `email` and `photoURL` per user, nothing else. Takes `?search=`, `?limit=` (25 by default) and `?offset=`, or `?ids=a,b` for the users a stored value names. Answers `users:read`, and also anyone who may write a collection with a [`userSelect`](/docs/collections/properties/) field — so an editor can fill one in. A rule written as raw SQL (`using` / `withCheck` the policy model cannot read) cannot be judged ahead, so it counts as refusing here: on such a collection only `users:read` holders can pick. Anyone else gets `403 SCOPE_MISSING` |
 | `POST` | `/api/admin/users` | Create a user |
 | `GET` | `/api/admin/users/:uid` | Read one user |
 | `PUT` | `/api/admin/users/:uid` | Update one user. `{ disabled: true }` switches the account off without deleting it: every sign-in and refresh is refused (`ACCOUNT_DISABLED`), its sessions end and every token it holds is refused; `false` switches it back on |
@@ -24703,8 +24957,17 @@ All data API endpoints require a valid `Authorization: Bearer <token>` header wh
 A new password needs at least 8 characters, with an upper-case letter, a
 lower-case letter and a digit. Registration, reset and change refuse one that
 fails with `400 WEAK_PASSWORD`, listing each rule it broke, and so does an
-administrator setting a password with `PUT /api/admin/users/:uid` (as a plain
-`400`). `POST /api/admin/users` does not check a password it is given. Sign-in
+administrator choosing a password: `POST /api/admin/users`, a create on the
+users collection through the data API (`POST /api/data/users`, its `/bulk`, a
+socket or MCP write), `PUT /api/admin/users/:uid` and
+`POST /api/admin/users/:uid/reset-password`. On a `/bulk`, the message starts
+`Row <n>: ` (counted from 0), like the bulk's other row errors.
+
+To create accounts whose passwords another system set, such as an import, send
+`skipPasswordPolicy: true` in the create body (on each row of a `/bulk`). The
+server honours it only for an administrator or the service key; from anyone
+else it waives nothing, and the refusal says so. It is never stored. The admin
+panel's import sends it for every row that carries a `password`. Sign-in
 never checks the policy, so an older password keeps working. To set your own rules, pass
 `auth.hooks.validatePasswordStrength` from an [ejected](/docs/backend/authentication/#configuration)
 backend. The first admin seeded from `REBASE_ADMIN_PASSWORD` is held to a
@@ -25403,18 +25666,18 @@ so on S3 it is absent and `/api/storage/metadata/*` still says. A folder in
 `prefixes` carries none of them, nor does a custom `StorageController` that
 does not set them.
 
-`POST /api/storage/upload` answers `201` with the `{ key, bucket, storageUrl }`
-of the stored object under `data`; `GET /api/storage/metadata/*` the object's
-metadata and, for a private object, the short-lived `token`;
-`POST /api/storage/metadata` an object keyed by the paths it was sent, each holding what the `GET` would have answered for it (see below).
-A folder is not an object: `/metadata` on a key ending in `/` is `404` on every store, even where S3 or GCS keeps a `folder/` marker, so no download token is minted for a prefix;
-`GET /api/storage/sources` the array of configured sources, with
-`configured: true`. On a deployment with no storage at all, it answers
-`200 {"data": [], "configured": false}`, while every other route answers
-`501 STORAGE_NOT_CONFIGURED`. `GET /api/auth/config` reports the same
-fact as `storage: false`, so a client can skip asking.
-`DELETE /api/storage/file/*` and `POST /api/storage/folder` carry only a
-`message`, since there is nothing to return.
+`POST /api/storage/upload` answers `201` with the `{ key, bucket, storageUrl }` of the stored object under `data`;
+`GET /api/storage/metadata/*` the object's metadata and, for a private object, the short-lived `token`; `POST
+/api/storage/metadata` an object keyed by the paths it was sent, each holding what the `GET` would have answered for
+it (see below). A folder is not an object: `/metadata` on a key ending in `/` is `404` on every store, even where S3
+or GCS keeps a `folder/` marker, so no download token is minted for a prefix; `GET /api/storage/sources` the array of
+configured sources, with `configured: true`. On a deployment with no storage at all, it answers `200 {"data": [],
+"configured": false}`, while every other route answers `501 STORAGE_NOT_CONFIGURED`. `GET /api/auth/config` reports
+the same fact as `storage: false`, so a client can skip asking. `GET /api/storage/sources` is public: it answers
+without a token even when `requireAuth` is on. It names the sources (their key, engine, transport and label) and never
+a file, and the client SDK reads it to wire up its sources, which can happen before anyone has signed in. An app that
+reads a `direct` source anonymously needs it too. Every route that lists, reads or writes a file keeps its auth.
+`DELETE /api/storage/file/*` and `POST /api/storage/folder` carry only a `message`, since there is nothing to return.
 
 On S3 and GCS, a `bucket` has to be one the source serves, on writes as on
 reads: an upload, a `POST /api/storage/folder` or a TUS upload naming any other
@@ -26952,7 +27215,7 @@ WebSocket subscriptions automatically respect Row-Level Security (RLS) policies.
 
 1. The WebSocket connection authenticates using the same JWT token as the REST API.
 2. Every subscription refetch runs inside a PostgreSQL transaction with `set_config('app.user_id', ...)` and `set_config('app.user_roles', ...)` — ensuring RLS policies are enforced.
-3. The identity is checked again for as long as the socket is open, not only when it authenticates. Before each frame the server asks what an HTTP request would ask: is the token still valid, was its session signed out or revoked, does the account still exist, and which roles does it hold now. Channel frames are asked at most once a second. A socket that only listens is asked at least every 30 seconds, and a token stops being honoured at the instant it expires. A role taken away applies from the next frame, to reads, writes and open subscriptions alike. A socket whose identity has ended receives an `AUTH_ERROR` frame with the code `SESSION_ENDED` or `TOKEN_EXPIRED` and is closed with code `4001`. The SDK authenticates its socket again each time it refreshes its token; a new token for the same identity (the same user id, roles, guest flag and claims) leaves the open subscriptions as they are, and one for a different identity refetches each of them as it. After a `4001` it reconnects with the session it holds then, or with none. A client speaking the protocol directly has to send a fresh token in `AUTHENTICATE` before the old one expires.
+3. The identity is checked again for as long as the socket is open, not only when it authenticates. Before each frame the server asks what an HTTP request would ask: is the token still valid, was its session signed out or revoked, does the account still exist, and which roles does it hold now. Channel frames are asked at most once a second. Frames that arrive on one socket while its check is still under way — a client re-sending its subscriptions after a reconnect — share that check rather than each asking again; the next frame after it settles asks afresh. A socket that only listens is asked at least every 30 seconds, and a token stops being honoured at the instant it expires. A role taken away applies from the next frame (or, for a frame that shared a check already under way, from the one after), to reads, writes and open subscriptions alike. A socket whose identity has ended receives an `AUTH_ERROR` frame with the code `SESSION_ENDED` or `TOKEN_EXPIRED` and is closed with code `4001`. The SDK authenticates its socket again each time it refreshes its token; a new token for the same identity (the same user id, roles, guest flag and claims) leaves the open subscriptions as they are, and one for a different identity refetches each of them as it. After a `4001` it reconnects with the session it holds then, or with none. A client speaking the protocol directly has to send a fresh token in `AUTHENTICATE` before the old one expires.
 
 This means each socket only receives updates for records its authenticated identity may see.
 
@@ -26984,7 +27247,7 @@ CDC is controlled by the `REALTIME_CDC` environment variable:
 | `auto` *(default)* | Enable database-level capture where the connection supports it; **silently fall back** to application-level realtime otherwise. Zero-config. |
 | `trigger` | Force trigger-based capture. Works on any PostgreSQL, including managed instances without logical replication. Warns (rather than silently falling back) if it can't provision. |
 | `wal` | Prefer WAL logical replication. Not yet bundled — degrades to `trigger` and logs the active mode. |
-| `off` | Application-level realtime only. Use this to avoid the per-write trigger overhead on write-heavy workloads. |
+| `off` | Application-level realtime only. Use this to avoid the per-write trigger overhead on write-heavy workloads. A boot with `off` that owns the schema also **removes** the capture triggers and functions an earlier boot installed, and logs how many it took off; unset it and the next boot installs them again. |
 
 On boot you'll see a log line stating the active mode, e.g.:
 
@@ -27002,7 +27265,7 @@ If the connection can't support it, `auto` logs an informational line instead an
 
 #### How It Works
 
-1. **Self-provisioning** — At startup (server/owner context), Rebase installs idempotent `AFTER INSERT/UPDATE/DELETE/TRUNCATE` triggers on each managed table. They fire once per statement and emit change notifications on the `rebase_cdc` channel that name the changed rows by their key — the primary key, plus the two id columns for a many-to-many junction table — and carry **no other column**. A statement that changed many rows names them in batches of about a thousand keys, so a 1M-row `UPDATE` sends about 1,000 notifications rather than a million; a statement that changed one row sends one notification, and one that changed none sends nothing. A `TRUNCATE` is announced as a change to every row of the collection. A partitioned table keeps one trigger per row, because PostgreSQL copies a row trigger onto every partition and a write made straight to a partition is still seen. PostgreSQL puts no privilege on `LISTEN`, so any role that can connect to the database can read this channel; it learns which keys changed, never what they hold. A key too large for PostgreSQL's 8&nbsp;KB `NOTIFY` limit is sent as no key (a change to the whole collection, which every list and single-row subscription on it refetches), so CDC can never abort the triggering write. The functions are replaced on every boot that provisions, so a database instrumented by an older version — whose trigger sent whole rows — is brought up to date by the next boot, `REALTIME_CDC=off` included.
+1. **Self-provisioning** — At startup (server/owner context), Rebase installs idempotent `AFTER INSERT/UPDATE/DELETE/TRUNCATE` triggers on each managed table. They fire once per statement and emit change notifications on the `rebase_cdc` channel that name the changed rows by their key — the primary key, plus the two id columns for a many-to-many junction table — and carry **no other column**. A statement that changed many rows names them in batches of about a thousand keys, so a 1M-row `UPDATE` sends about 1,000 notifications rather than a million; a statement that changed one row sends one notification, and one that changed none sends nothing. A `TRUNCATE` is announced as a change to every row of the collection. A partitioned table keeps one trigger per row, because PostgreSQL copies a row trigger onto every partition and a write made straight to a partition is still seen. PostgreSQL puts no privilege on `LISTEN`, so any role that can connect to the database can read this channel; it learns which keys changed, never what they hold. A key too large for PostgreSQL's 8&nbsp;KB `NOTIFY` limit is sent as no key (a change to the whole collection, which every list and single-row subscription on it refetches), so CDC can never abort the triggering write. The functions are replaced on every boot that provisions, so a database instrumented by an older version — whose trigger sent whole rows — is brought up to date by the next boot; a boot with `REALTIME_CDC=off` removes them instead.
 
    <span class="since-badge" data-since="0.25">Since 0.25</span> **Upgrading.** A database instrumented by a version before batching has one trigger per row; the first boot of a newer version replaces it with the per-statement triggers. For 24 hours after that, the new triggers still send one notification per row, as the old ones did, so instances of the older version still running during a rolling deploy (or after a rollback) hear every row. After the window they batch. Every version that batches reads both shapes.
 2. **Capture** — A dedicated, unpooled `LISTEN` client per instance consumes `rebase_cdc`, maps the changed table back to its collection, and feeds the change into the same `RealtimeService` pipeline used by API mutations. Like the cross-instance listener, it prefers `DATABASE_DIRECT_URL` and auto-reconnects.
@@ -28944,16 +29207,20 @@ jobs: {
 The flip side: a handler awaiting a `fetch` that never answers holds its worker
 slot, and its claim, for as long as the process lives — five of them and the
 worker runs nothing else, while `/health` stays green.
-<span class="since-badge" data-since="0.25">Since 0.25</span> Set `timeoutMs` to
-bound one attempt. At the deadline the attempt fails — retried while attempts
+<span class="since-badge" data-since="0.25">Since 0.25</span> `timeoutMs`
+bounds one attempt. At the deadline the attempt fails — retried while attempts
 remain, like any throw — its slot is freed, and the handler's `signal` is
 aborted. Pass the signal on, so the work stops too; a handler that ignores it
 keeps running in the background with nothing recording its outcome.
 
+Left out, it is 15 minutes (`900_000`), and the worker says so in one log line
+when it starts. A job that legitimately runs longer sets its own value, and
+`timeoutMs: 0` removes the limit.
+
 ```typescript no-verify
 jobs: {
     enabled: true,
-    timeoutMs: 120_000,          // one attempt; no limit when left out
+    timeoutMs: 120_000,          // one attempt; 15 minutes when left out, 0 for no limit
     tasks: {
         "sync-crm": async ({ payload, signal }) => {
             await fetch(crmUrl, { method: "POST", body: JSON.stringify(payload), signal });
@@ -29988,6 +30255,13 @@ const ordersCollection = defineCollection({
 The values are the row as the REST API serves it: its columns, dates as
 timestamps, a `belongsTo` as its foreign key. That is what a revert writes back.
 
+An entry never holds a related row's values. Reading a row's history needs only
+read access to that row, not to the rows it points at, so a relation is kept as
+a reference — `{ "__type": "relation", "id", "path" }` — and nothing more.
+Entries that older versions recorded with the related row embedded (a delete
+used to store the admin panel's view of the row) are served the same way: the
+history endpoint drops the embedded values before it answers.
+
 On a collection with [soft delete](/docs/collections/soft-delete/), a delete is
 recorded as `delete` and a restore (the update setting the soft-delete field
 back to `null`) as `update`. A row's history stays readable while the row is in
@@ -30060,6 +30334,22 @@ Returns a list of history entries for a specific entity, ordered by most recent 
     "meta": { "total": 1, "limit": 20, "offset": 0, "hasMore": false }
 }
 ```
+
+```
+POST /api/data/:slug/:entityId/history/:historyId/revert
+```
+
+Writes the entry's `values` back to the row through the normal save path, so the
+revert is itself recorded as an `update`. It answers the saved row under `data`
+and `meta.reverted_from`, the entry's id.
+
+Entries written by older versions can hold keys the row has no column for: a
+field an `afterRead` computed (before 0.24, a save recorded the row as
+`afterRead` showed it), or a relation stored as the admin panel's view of it.
+A revert writes the row's columns and leaves those keys out, an owning
+relation going back as its foreign key, and names what it left out in
+`meta.dropped_fields`. A value an old `afterRead` masked (`********`) has a
+column, so it is written back as it was recorded.
 
 ### Retention Configuration
 
@@ -32999,6 +33289,10 @@ The preview lists every cell that does not convert, per column, with how many th
 The collection's own rules — required fields, enum options, unique values — are checked by the server as the rows are written, in batches of up to 500 rows (fewer when the rows are wide, so a request stays under about 1 MB). A batch is saved whole or not at all. If a row is refused, the import stops and names it; the batches before it are already saved, and **Retry** resumes from the first row of the refused row's batch.
 
 A row whose id is already in the collection updates that record: the columns the file carries are written, and the others keep their stored values, so a file of `id,price` reprices existing products without repeating their required fields. A new row still needs every required field. A batch that mixes updates and new rows is written as two requests, so a refused new row can leave that batch's updates saved; **Retry** writes them again with the same values.
+
+#### Importing users
+
+A new row in the users collection is a user creation: a `password` column is hashed, never stored as written, and a row without one gets a generated password or an invitation, as when an administrator adds a user. The passwords in such a file were usually set under another system's rules, so the import asks the server to skip the [password policy](/docs/backend/auth-endpoints/#password-policy) for those rows. The server agrees only when you are an administrator; anyone else importing users is held to the policy, and a weak password stops the import with `WEAK_PASSWORD`.
 
 #### Creating a collection from a file
 
@@ -45222,9 +45516,12 @@ A permissive policy whose `USING` or `WITH CHECK` expression is a constant truth
 itself through a cast. Permissive policies are ORed together, so a single one of these satisfies
 the table's row filter no matter how strict every other policy is.
 
-Like every check, it reports the policy only when a role it applies to can reach the table:
+Like every check, it reports an exposure only when a role it applies to can reach the table:
 holds the privilege its command needs, and `USAGE` on the schema. `USING (true) TO anon` on a
 table `anon` holds nothing on is answered "permission denied" before the policy is consulted.
+That policy is reported as **info**, titled *latent*: nothing reaches the table through it
+today, and one `GRANT` would make it a critical exposure with no change to the policy. Info is
+below every `--fail-on` except `info`, so it never fails a default run.
 
 When only the `WITH CHECK` of an `UPDATE` policy is constant — `USING (user_id = rebase.uid())
 WITH CHECK (true)` — it is **high**: `USING` still decides which rows can be touched, and the
@@ -47541,6 +47838,10 @@ create triggers), a `worker` or `functions` process announces each of its own
 writes on the cross-instance channel instead, without holding a `LISTEN`
 connection. Either way, a function that writes a row still wakes up every
 subscriber on the `api`.
+
+Give every process the same `REALTIME_CDC`. A process that owns the schema
+with `REALTIME_CDC=off` removes the capture triggers at boot, and an `api`
+still set to `auto` would then listen for changes nobody announces.
 
 ### Docker Compose
 
