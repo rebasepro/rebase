@@ -1400,6 +1400,7 @@ function updateDateAutoValues
 function updateUserAutoValues
 function uploadResumable
 function vectorPropertyNames
+function withRelationReferencesOnly
 function wrapAsEntityData
 function wrapAsSdkData
 interface AnonymousGrantRisk { detail, explanation, pattern }
