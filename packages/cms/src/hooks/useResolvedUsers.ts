@@ -6,7 +6,7 @@ import { apiBaseOf, useAuthController, useRebaseClient } from "@rebasepro/app";
  * Resolves the auth users behind `userSelect` values.
  *
  * A collection view can ask for dozens of ids at once — one per row — so
- * lookups are coalesced into a single `GET /api/users?ids=…` per tick and
+ * lookups are coalesced into a single `GET /api/admin/users/pick?ids=…` per tick and
  * cached per base URL. Ids that resolve to nothing are remembered too, so a
  * dangling reference is not retried on every render.
  */
@@ -36,14 +36,15 @@ async function fetchUsers(apiBase: string, ids: string[], token: string | undefi
     for (const id of ids) resolved.set(id, null);
 
     const params = new URLSearchParams({ ids: ids.join(",") });
-    // Same route as the selector — see the note there; `/api/users` is a 404,
-    // so every `userSelect` value rendered as a bare id.
-    const response = await fetch(`${apiBase}/admin/users?${params}`, {
+    // The picker's read, as the selector uses: anyone who may fill in a
+    // `userSelect` field may see who its value names.
+    const response = await fetch(`${apiBase}/admin/users/pick?${params}`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {}
     });
     if (!response.ok) {
-        // A non-admin viewer gets a 403 here. Treat it as "unresolvable" rather
-        // than an error: callers fall back to showing the raw value.
+        // A caller who may write no collection with a user field gets a 403
+        // here. Treat it as "unresolvable" rather than an error: callers fall
+        // back to showing the raw value.
         return resolved;
     }
     const data = await response.json();

@@ -216,6 +216,20 @@ describe("UserSelector fetches its list on open", () => {
         expect(listRequests(urls)).toHaveLength(1);
     });
 
+    it("lists and resolves through the picker's read, which an editor may call", async () => {
+        // `/admin/users` needs `users:read`; an editor filling in the field
+        // holds none, and their picker came back empty.
+        const urls = mockFetch(async () => ({ users: [user("u-1", "Ada Lovelace")] }));
+
+        const { container } = render(<UserSelector value="u-1"/>);
+        await act(async () => {
+            fireEvent.click(container.querySelector("[data-user-selector-trigger]")!);
+        });
+
+        await waitFor(() => expect(urls.length).toBeGreaterThanOrEqual(2));
+        for (const url of urls) expect(url).toMatch(/\/admin\/users\/pick\?/);
+    });
+
     it("with a value, resolves just that user while closed", async () => {
         const urls = mockFetch(async (url) => url.includes("ids=u-147")
             ? { users: [user("u-147", "Grace Hopper")] }

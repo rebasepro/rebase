@@ -80,12 +80,11 @@ function useUserSelector({ pageSize = DEFAULT_PAGE_SIZE, enabled = true }: {
                 offset: String(offset)
             });
             if (searchStr) params.set("search", searchStr);
-            // `/admin/users`, not `/users`. `apiBaseOf` returns the API root
-            // (`/api`), and the users endpoint lives under the auth adapter's
-            // admin router — `/api/users` is a 404, which is why this list was
-            // always empty. The collection route `/api/data/users` would answer,
-            // but it serves the raw row, `passwordHash` included.
-            const response = await fetch(`${apiBase}/admin/users?${params}`, {
+            // The picker's own read, `/admin/users/pick`: id, name, email and
+            // avatar, for anyone who may write a collection with a user field.
+            // `/admin/users` needs `users:read`, which an editor does not
+            // hold, so their picker was always empty.
+            const response = await fetch(`${apiBase}/admin/users/pick?${params}`, {
                 headers: token ? { Authorization: `Bearer ${token}` } : {}
             });
             if (!response.ok) {

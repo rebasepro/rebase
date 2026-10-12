@@ -117,6 +117,7 @@ import { handGlobalCallbacksTo } from "./init/global-callbacks";
 import { installUnhandledRejectionHandler } from "./init/process-safety";
 import { configureJwt, hasAsymmetricSigningKey, isJwtConfigured } from "./auth";
 import { DEFAULT_REFRESH_EXPIRES_IN } from "./auth/jwt";
+import { configureUserPicking } from "./auth/user-picking";
 import { createJwksRoutes } from "./auth/jwks-routes";
 import { readRuntimeVersion } from "./boot/version-skew";
 import { supportsRlsScoping } from "./auth/rls-scope";
@@ -1486,6 +1487,10 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
     const accessCollections = explicitAuthCollection ? [explicitAuthCollection, ...activeCollections] : activeCollections;
     const accessModel = accessModelFromCollections(accessCollections);
     configureAccess({ model: accessModel });
+    // The user picker answers whoever may write a collection with a
+    // `userSelect` field — judged on the collections as they are now, so a
+    // live schema edit is what counts.
+    configureUserPicking(() => collectionRegistry.getRawCollections());
     const declaredAuth = accessCollections.find(collection => collection.auth === true
         || (typeof collection.auth === "object" && collection.auth !== null && collection.auth.enabled === true))?.auth;
     const personalKeysEnabled = typeof declaredAuth === "object" && declaredAuth !== null && declaredAuth.personalKeys === true;

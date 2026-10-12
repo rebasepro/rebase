@@ -790,6 +790,7 @@ interface PageWalkOptions { cursor, maxPages, pageSize }
 interface PaginationMeta { hasMore, limit, nextCursor, offset, total }
 interface ParsedScope { scope, target }
 interface PersonalKeysAPI { createKey, listKeys, listScopes, revokeKey }
+interface PickedUser { displayName, email, photoURL, uid }
 interface PostgresCollectionConfig { auth, callbacks, childCollections, dataSource, databaseId, description, disableDefaultPolicies, engine, history, indexes, metadata, name, ownerId, properties, relations, schema, search, securityRules, singularName, slug, softDelete, strictWrites, table, tenant }
 interface PostgresPolicy { cmd, permissive, policyname, qual, roles, status, tablename, with_check }
 interface PresenceDiffMessage { channel, error, joins, leaves, payload, requestId, row, rows, subscriptionId, type }

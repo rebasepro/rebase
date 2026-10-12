@@ -3,6 +3,7 @@
  *
  * Mounts:
  *   GET /users
+ *   GET /users/pick
  *   GET /users/:uid
  *   POST /users
  *   PUT /users/:uid
@@ -19,6 +20,7 @@ import { ApiError, errorHandler } from "../api/errors";
 import type { AuthRepository } from "./interfaces";
 import { createRequireAuth } from "./middleware";
 import { assertMayGrantRoles, assertMayManageAccount, callerIsAdmin, requireScope } from "./access";
+import { mayPickUsers } from "./user-picking";
 import type { AuthHooks } from "./auth-hooks";
 import { resolveAuthHooks } from "./auth-hooks";
 import {
@@ -33,7 +35,7 @@ import {
 import { replaceUserPassword, revokeAllSessions } from "./token-revocation";
 import type { EmailService, EmailConfig } from "../email";
 import type { HonoEnv } from "../api/types";
-import type { AdminUser, AuthCollectionConfig } from "@rebasepro/types";
+import type { AdminUser, AuthCollectionConfig, PickedUser } from "@rebasepro/types";
 import { resolveListLimitParam } from "../api/rest/query-parser";
 import { logger } from "../utils/logger";
 
@@ -268,6 +270,49 @@ offset: 0 });
             limit: result.limit,
             offset: result.offset
         });
+    });
+
+    /**
+     * The user picker's read: who a `userSelect` field can name, as id, name,
+     * email and avatar — nothing an administrator's list carries beyond that.
+     * Open to anyone who may write a collection with such a field, as well as
+     * to `users:read` ({@link mayPickUsers}). Registered before `/users/:uid`,
+     * which would otherwise take `pick` for an id.
+     *
+     * `?ids=a,b` resolves the users a stored value names; otherwise a page of
+     * `?search=`, `?limit=` (25 by default) and `?offset=`.
+     */
+    router.get("/users/pick", async (c) => {
+        if (!mayPickUsers(c)) {
+            throw new ApiError(403, "SCOPE_MISSING",
+                "Picking a user needs write access to a collection with a user field, or the \"users:read\" scope.",
+                { requiredScope: "users:read" });
+        }
+        const toPickedUser = (u: { id: string; email: string; displayName?: string | null; photoUrl?: string | null }): PickedUser => ({
+            uid: u.id,
+            email: u.email,
+            displayName: u.displayName ?? null,
+            photoURL: u.photoUrl ?? null
+        });
+
+        const idsParam = c.req.query("ids");
+        if (idsParam !== undefined) {
+            const ids = [...new Set(idsParam.split(",").map(id => id.trim()).filter(Boolean))]
+                .slice(0, MAX_USER_IDS_PER_LOOKUP);
+            const found = await Promise.all(ids.map(id => authRepo.getUserById(id)));
+            const users = found.filter((u): u is NonNullable<typeof u> => !!u).map(toPickedUser);
+            return c.json({ users, limit: ids.length, offset: 0 });
+        }
+
+        const limit = resolveListLimitParam(c.req.query("limit"), { defaultLimit: 25 });
+        const offsetParam = c.req.query("offset");
+        const offset = offsetParam ? Math.max(0, parseInt(offsetParam, 10) || 0) : 0;
+        const result = await authRepo.listUsersPaginated({
+            limit,
+            offset,
+            search: c.req.query("search") || undefined
+        });
+        return c.json({ users: result.users.map(toPickedUser), limit: result.limit, offset: result.offset });
     });
 
     router.get("/users/:uid", requireScope("users:read"), async (c) => {

@@ -54,13 +54,14 @@ All auth endpoints are mounted at `/api/auth/`:
 
 Administrative user and role management is a **separate surface**, mounted at
 `/api/admin/` rather than `/api/auth/`. Reading needs the `users:read` scope and
-changing needs `users:write`. An admin and the service key hold both; so does a
+changing needs `users:write`, except the user picker's narrow read below. An admin and the service key hold both; so does a
 role that declares them. Nobody may change an account that holds more than they
 do. See [Roles and scopes](/docs/backend/roles-and-scopes/).
 
 | Method | Path | Description |
 |--------|------|-------------|
 | `GET` | `/api/admin/users` | List users (paginated). `?search=` matches a case-insensitive part of the email or display name. On Postgres it also matches any role the user holds, and the uid; on MongoDB it still matches email and display name only |
+| `GET` | `/api/admin/users/pick` | The user picker's read: `uid`, `displayName`, `email` and `photoURL` per user, nothing else. Takes `?search=`, `?limit=` (25 by default) and `?offset=`, or `?ids=a,b` for the users a stored value names. Answers `users:read`, and also anyone who may write a collection with a [`userSelect`](/docs/collections/properties/) field — so an editor can fill one in. Anyone else gets `403 SCOPE_MISSING` |
 | `POST` | `/api/admin/users` | Create a user |
 | `GET` | `/api/admin/users/:uid` | Read one user |
 | `PUT` | `/api/admin/users/:uid` | Update one user. `{ disabled: true }` switches the account off without deleting it: every sign-in and refresh is refused (`ACCOUNT_DISABLED`), its sessions end and every token it holds is refused; `false` switches it back on |

@@ -166,6 +166,19 @@ export interface AdminUser {
 }
 
 /**
+ * A user as the user picker sees one (`GET /admin/users/pick`): who the person
+ * is, and nothing about their account — no roles, no status, no timestamps.
+ *
+ * @group Admin
+ */
+export interface PickedUser {
+    uid: string;
+    email: string;
+    displayName: string | null;
+    photoURL: string | null;
+}
+
+/**
  * Client-side Admin API interface.
  * Provides user management operations.
  * @group Admin
