@@ -222,6 +222,21 @@ force: true });
             expect(body.data).toContainEqual({ key: "(default)", engine: "local", transport: "server", label: "Local" });
             expect(body.data).toContainEqual({ key: "firebase", engine: "firebase", transport: "direct", label: "Firebase Storage" });
         });
+
+        // Decided 2026-10-12 (P3): the listing stays public on purpose. It names
+        // the sources, never a file, and the client bootstraps its source registry
+        // from it before anyone signs in (an anonymous app may read a `direct`
+        // source). Every file route still needs auth — asserted alongside.
+        it("answers an anonymous caller even when the file routes require auth", async () => {
+            const authApp = new Hono<HonoEnv>();
+            authApp.onError(errorHandler);
+            authApp.route("/api/storage", createStorageRoutes({ controller, requireAuth: true }));
+
+            const sources = await authApp.fetch(new Request("http://localhost/api/storage/sources"));
+            expect(sources.status).toBe(200);
+            const list = await authApp.fetch(new Request("http://localhost/api/storage/list?prefix=photos/"));
+            expect(list.status).toBe(401);
+        });
     });
 
     describe("DELETE /file/*", () => {

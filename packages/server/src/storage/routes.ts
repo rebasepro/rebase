@@ -1585,6 +1585,11 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
     /**
      * GET /sources — list all registered storage backends.
      * The client can bootstrap its StorageSourceRegistry from this endpoint.
+     *
+     * Public on purpose, whatever `requireAuth` says: it names the sources
+     * (key, engine, transport, label), never a file, and the client may read
+     * it before anyone has signed in. Every route that touches a file keeps its
+     * auth. Documented in `backend/storage.md`.
      */
     router.get("/sources", (c) => {
         const byKey = new Map<string, { key: string; engine: string; transport: "server" | "direct"; label?: string }>();

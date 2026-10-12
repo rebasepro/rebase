@@ -143,6 +143,12 @@ A folder is not an object: `/metadata` on a key ending in `/` is `404` on every 
 `200 {"data": [], "configured": false}`, while every other route answers
 `501 STORAGE_NOT_CONFIGURED`. `GET /api/auth/config` reports the same
 fact as `storage: false`, so a client can skip asking.
+`GET /api/storage/sources` is public: it answers without a token even when
+`requireAuth` is on. It names the sources (their key, engine, transport and
+label) and never a file, and the client SDK reads it to wire up its sources,
+which can happen before anyone has signed in. An app that reads a `direct`
+source anonymously needs it too. Every route that lists, reads or writes a file
+keeps its auth.
 `DELETE /api/storage/file/*` and `POST /api/storage/folder` carry only a
 `message`, since there is nothing to return.
 
