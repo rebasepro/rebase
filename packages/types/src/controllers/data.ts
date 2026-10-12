@@ -1197,10 +1197,13 @@ export const BATCH_REF_KEY = "$ref";
  * one, which is the case worth catching.
  *
  * Any `$`-prefixed key counts, because `{ $increment: 1 }` written to a number
- * column as a JSON document is the failure this exists to prevent. No collection
- * can declare a column whose value legitimately has a key beginning with `$`: a
- * `map` property's sub-keys are declared, and `$` is not valid in the
- * identifiers the DDL generators emit.
+ * column as a JSON document is the failure this exists to prevent.
+ *
+ * Except on a `map` (pass `propertyType`): a map's value is a JSON document,
+ * and one may legitimately carry `$` keys — a JSON Schema's `$schema`, a
+ * MongoDB-style export. There, only a single-key object whose key is one of
+ * {@link FIELD_OPERATORS} is an operation, and anything else is data. A caller
+ * that does not know the property type gets the strict reading.
  *
  * The one exception is `{ $ref: … }`, the batch's backward reference. It stands
  * where a *value* goes and is resolved to one before the row is written, so it
@@ -1209,12 +1212,15 @@ export const BATCH_REF_KEY = "$ref";
  *
  * @group Data
  */
-export function isFieldOperation(value: unknown): boolean {
+export function isFieldOperation(value: unknown, propertyType?: string): boolean {
     if (typeof value !== "object" || value === null || Array.isArray(value) || value instanceof Date) {
         return false;
     }
     const keys = Object.keys(value);
     if (keys.length === 1 && keys[0] === BATCH_REF_KEY) return false;
+    if (propertyType === "map") {
+        return keys.length === 1 && (FIELD_OPERATORS as readonly string[]).includes(keys[0]);
+    }
     return keys.some((key) => key.startsWith("$"));
 }
 

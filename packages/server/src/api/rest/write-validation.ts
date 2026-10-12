@@ -182,7 +182,8 @@ function assertFieldOpsReadable(
     where: string,
     viewer: FieldViewer | undefined
 ): void {
-    const operated = Object.keys(values).filter(key => isFieldOperation(values[key]));
+    const properties = (collection.properties ?? {}) as Record<string, Property>;
+    const operated = Object.keys(values).filter(key => isFieldOperation(values[key], properties[key]?.type));
     if (operated.length === 0) return;
     const { refused } = restrictedFieldNames(collection, viewer, "read");
     const named = operated.filter(key => refused.has(key));
@@ -446,7 +447,7 @@ function collectViolations(
     // has nothing to say about a value that is not there.
     if (value === null || value === undefined) return;
 
-    if (isFieldOperation(value) && typeof value === "object") {
+    if (isFieldOperation(value, property.type) && typeof value === "object") {
         collectFieldOperationViolations(key, property, value, into);
         return;
     }

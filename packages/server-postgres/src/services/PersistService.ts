@@ -435,7 +435,10 @@ export class PersistService {
         // `serializeDataToServer` would read `{ $inc: 1 }` on a number column
         // as a value to coerce, and `sanitizeAndConvertDates` would hand the
         // marker object to the column as data.
-        const { values: plainValues, fieldOps } = splitFieldOps(effectiveValues as Record<string, unknown>);
+        const { values: plainValues, fieldOps } = splitFieldOps(
+            effectiveValues as Record<string, unknown>,
+            collection.properties
+        );
         const fieldOpKeys = Object.keys(fieldOps);
         if (fieldOpKeys.length > 0) {
             // An operation describes a change to a value that is already

@@ -357,7 +357,7 @@ export class RestApiGenerator {
                     // A user creation, as on `POST /users`: what it consumes,
                     // `password` included, is the adapter's to say.
                     assertUserCreationBodyValid(this.authAdapter, collection, operation.values, batchViewer);
-                    assertNoFieldOpsOnCreate(operation.values, `Operation ${index}`);
+                    assertNoFieldOpsOnCreate(operation.values, `Operation ${index}`, collection);
                     userCreations.push({ index, adapter: this.authAdapter, collection });
                     return;
                 }
@@ -374,7 +374,7 @@ export class RestApiGenerator {
                 } else {
                     // A create or an upsert may insert, so there is no stored
                     // value for an operation to act on.
-                    assertNoFieldOpsOnCreate(operation.values, `Operation ${index}`);
+                    assertNoFieldOpsOnCreate(operation.values, `Operation ${index}`, collection);
                 }
                 if (operation.op === "upsert") {
                     operation.onConflict = resolveConflictTarget(
@@ -1090,7 +1090,7 @@ export class RestApiGenerator {
         if (!isAuthCollection(collection)) {
             assertKnownWriteFields(body, collection, { viewer: requestViewer(c) });
             assertWriteValuesValid(body, collection, { status: "new" });
-            assertNoFieldOpsOnCreate(body, "A create");
+            assertNoFieldOpsOnCreate(body, "A create", collection);
         } else {
             assertUserCreationBodyValid(this.authAdapter, collection, body, requestViewer(c));
         }
@@ -1628,7 +1628,7 @@ export class RestApiGenerator {
                 // This route inserts (or upserts), and an operation over a
                 // value that is not there yet has nothing to mean. Refused here
                 // rather than in the driver so the message names the row.
-                assertNoFieldOpsOnCreate(row, `Row ${rowIndex} of a bulk create`);
+                assertNoFieldOpsOnCreate(row, `Row ${rowIndex} of a bulk create`, resolvedCollection);
             });
 
             if (userAdapter) {

@@ -372,3 +372,54 @@ describe("the parser", () => {
         expect(parseFieldOp("when", new Date())).toBeUndefined();
     });
 });
+
+// Calls 2026-10-12 (S1, DD-13 option a): on a `map` property, only a
+// single-key object whose key is a real operator is an operation. Any other
+// `$`-keyed object is data — a JSON Schema document (`$schema`, `$id`), a
+// MongoDB-style export — and is stored as sent. Every other property type
+// keeps the typo protection: `{ $incr: 1 }` on a number is still a 400.
+describe("a map value whose keys start with `$`", () => {
+    it("is stored as data, one key or several", async () => {
+        const { app, saves } = createHarness();
+
+        const one = await patch(app, { meta: { $schema: "https://json-schema.org/draft/2020-12/schema" } });
+        expect(one.status).toBe(200);
+        expect(saves[0].values).toEqual({ meta: { $schema: "https://json-schema.org/draft/2020-12/schema" } });
+
+        const several = await patch(app, { meta: { $id: "x", $comment: "y", plain: 1 } });
+        expect(several.status).toBe(200);
+        expect(saves[1].values).toEqual({ meta: { $id: "x", $comment: "y", plain: 1 } });
+    });
+
+    it("is data on a create too, where an operation would be refused", async () => {
+        const { app, saves } = createHarness();
+        const res = await post(app, { id: "p2", title: "x", meta: { $schema: "s" } });
+        expect(res.status).toBe(201);
+        expect(saves[0].values).toEqual(expect.objectContaining({ meta: { $schema: "s" } }));
+    });
+
+    it("is still an operation when its one key is a real operator", async () => {
+        const { app, saves } = createHarness();
+
+        const merge = await patch(app, { meta: { $merge: { seen: true } } });
+        expect(merge.status).toBe(200);
+        expect(saves[0].values).toEqual({ meta: { $merge: { seen: true } } });
+
+        const inc = await patch(app, { meta: { $inc: 1 } });
+        expect(inc.status).toBe(400);
+        expect((await errorOf(inc)).code).toBe("INVALID_FIELD_OPERATION");
+    });
+
+    it("keeps refusing a misspelled operator on every other type", async () => {
+        const { app } = createHarness();
+        const res = await patch(app, { views: { $incr: 1 } });
+        expect(res.status).toBe(400);
+        expect((await errorOf(res)).code).toBe("INVALID_FIELD_OPERATION");
+    });
+
+    it("is split as data by the parser the driver uses, given the properties", () => {
+        const { values, fieldOps } = splitFieldOps({ meta: { $schema: "s" }, views: { $inc: 1 } }, posts.properties);
+        expect(values).toEqual({ meta: { $schema: "s" } });
+        expect(fieldOps).toEqual({ views: { operator: "$inc", operand: 1 } });
+    });
+});

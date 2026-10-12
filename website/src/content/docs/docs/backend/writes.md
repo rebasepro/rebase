@@ -125,7 +125,20 @@ and cannot lose.
 Exactly one operator per field. An operator on a property type it is not defined
 on, an unknown `$operator`, or an operand of the wrong shape is a `400`
 (`INVALID_FIELD_OPERATION`) naming the field — a misspelling is never written to
-the column as a JSON document. Operations apply to updates only: over a row that
+the column as a JSON document.
+
+A `map` is the exception, because its value *is* a JSON document and may carry
+`$` keys of its own — a JSON Schema's `$schema` and `$id`, a MongoDB export. On a
+`map`, only an object with exactly one key that is one of the operators above is
+an operation; any other object is stored as sent, `$` keys and all. So
+`{ "meta": { "$merge": { … } } }` merges, and
+`{ "meta": { "$schema": "https://json-schema.org/draft/2020-12/schema" } }` is
+stored. A misspelled operator on a `map` is therefore stored too; on every other
+type it is still refused. The offline client has no schema to tell a `map` from
+anything else, so while offline it refuses such a value as a field operation;
+send it once the connection is back.
+
+Operations apply to updates only: over a row that
 does not exist yet there is nothing to operate on, so they are refused on
 `POST`, on `/bulk` creates, and on upserts.
 

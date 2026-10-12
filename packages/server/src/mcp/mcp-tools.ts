@@ -187,7 +187,7 @@ function writableValues(
     const values = valuesObject(raw);
     asToolError(() => {
         assertWriteRequestValid(values, collection, { status, viewer: viewerOf(ctx) });
-        if (status === "new") assertNoFieldOpsOnCreate(values, "A create");
+        if (status === "new") assertNoFieldOpsOnCreate(values, "A create", collection);
         else assertFieldOpsValid(values, collection);
     });
     return values;
@@ -224,7 +224,7 @@ async function createUser(
     const body = valuesObject(args.data);
     asToolError(() => {
         assertUserCreationBodyValid(adapter, collection, body, viewerOf(ctx));
-        assertNoFieldOpsOnCreate(body, "A create");
+        assertNoFieldOpsOnCreate(body, "A create", collection);
     });
     const driver = await scopedDriver(ctx);
     const created = await createUserThroughAuthCollection(adapter, collection, body, viewerOf(ctx), values => driver.save({

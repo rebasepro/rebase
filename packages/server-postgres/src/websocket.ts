@@ -1328,7 +1328,7 @@ colors: true }));
                         if (usersCollection) {
                             const body = (request.values ?? {}) as Record<string, unknown>;
                             assertUserCreationBodyValid(authAdapter, usersCollection, body, caller);
-                            assertNoFieldOpsOnCreate(body, "A create");
+                            assertNoFieldOpsOnCreate(body, "A create", usersCollection);
                         } else {
                             assertWriteRequest(request.path, request.values as Record<string, unknown>, request.status);
                         }

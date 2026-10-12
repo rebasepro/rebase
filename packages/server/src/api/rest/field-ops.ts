@@ -1,4 +1,4 @@
-import { CollectionConfig, FieldOperation, FIELD_OPERATORS, isFieldOperation, Property } from "@rebasepro/types";
+import { CollectionConfig, FieldOperation, FIELD_OPERATORS, isFieldOperation, Properties, Property } from "@rebasepro/types";
 import { ApiError } from "../errors";
 
 /**
@@ -58,20 +58,26 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
  */
 export const looksLikeFieldOp = isFieldOperation;
 
-/** True when any value in the payload is (or is attempting to be) an operation. */
-export function hasFieldOps(values: Record<string, unknown> | undefined): boolean {
+/**
+ * True when any value in the payload is (or is attempting to be) an operation.
+ * With `properties`, a `map` value is one only when it is `{ <operator>: … }`;
+ * see `isFieldOperation`.
+ */
+export function hasFieldOps(values: Record<string, unknown> | undefined, properties?: Properties): boolean {
     if (!values) return false;
-    return Object.values(values).some(looksLikeFieldOp);
+    return Object.entries(values).some(([key, value]) => looksLikeFieldOp(value, properties?.[key]?.type));
 }
 
 /**
  * Parse one value as an operation, or report why it is not a legal one.
  *
  * Returns `undefined` for an ordinary value. Throws for a value that reads as
- * an operation and is malformed, so a typo cannot be written as data.
+ * an operation and is malformed, so a typo cannot be written as data. Given
+ * the field's `property`, a `map` value with `$` keys is data unless it is a
+ * single real operator.
  */
-export function parseFieldOp(key: string, value: unknown): ParsedFieldOp | undefined {
-    if (!looksLikeFieldOp(value)) return undefined;
+export function parseFieldOp(key: string, value: unknown, property?: Property): ParsedFieldOp | undefined {
+    if (!looksLikeFieldOp(value, property?.type)) return undefined;
     const entries = Object.entries(value as Record<string, unknown>);
     if (entries.length !== 1) {
         throw ApiError.badRequest(
@@ -98,15 +104,18 @@ export function parseFieldOp(key: string, value: unknown): ParsedFieldOp | undef
  * The two travel together in one body — `{ title: "x", views: { $inc: 1 } }` is
  * a single `PATCH` — and are applied in one statement, so a caller never has to
  * choose between setting a column and incrementing another.
+ *
+ * Pass the collection's `properties`: without them a `map` value carrying `$`
+ * keys reads as a (malformed) operation rather than as the document it is.
  */
-export function splitFieldOps(values: Record<string, unknown>): {
+export function splitFieldOps(values: Record<string, unknown>, properties?: Properties): {
     values: Record<string, unknown>;
     fieldOps: Record<string, ParsedFieldOp>;
 } {
     const plain: Record<string, unknown> = {};
     const fieldOps: Record<string, ParsedFieldOp> = {};
     for (const [key, value] of Object.entries(values ?? {})) {
-        const op = parseFieldOp(key, value);
+        const op = parseFieldOp(key, value, properties?.[key]);
         if (op) fieldOps[key] = op;
         else plain[key] = value;
     }
@@ -144,7 +153,7 @@ export function assertFieldOpsValid(
     const properties = (collection.properties ?? {}) as Record<string, Property>;
 
     for (const [key, value] of Object.entries(values ?? {})) {
-        const op = parseFieldOp(key, value);
+        const op = parseFieldOp(key, value, properties[key]);
         if (!op) continue;
 
         const property = properties[key];
@@ -194,12 +203,17 @@ export function assertFieldOpsValid(
  * are meaningless on an insert — `views + 1` over a row that does not exist yet
  * is just `1`, and accepting it would make `$inc` mean two different things
  * depending on a race the caller cannot observe.
+ *
+ * `collection` decides how a `map` value is read (see {@link splitFieldOps});
+ * every request boundary has it and passes it.
  */
 export function assertNoFieldOpsOnCreate(
     values: Record<string, unknown>,
-    context: string
+    context: string,
+    collection?: CollectionConfig
 ): void {
-    const offending = Object.entries(values ?? {}).filter(([key, value]) => parseFieldOp(key, value));
+    const properties: Properties | undefined = collection?.properties;
+    const offending = Object.entries(values ?? {}).filter(([key, value]) => parseFieldOp(key, value, properties?.[key]));
     if (offending.length === 0) return;
     throw ApiError.badRequest(
         `${context} cannot carry field operations (${offending.map(([key]) => `'${key}'`).join(", ")}). ` +
