@@ -700,7 +700,12 @@ function isCallerSupplied(property: Property): boolean {
 }
 
 /**
- * Collect the `required` properties a create leaves unset.
+ * Collect the `required` properties a write leaves unset or sends empty.
+ *
+ * On every write, a required `string` sent as `""` is a `required` violation,
+ * as a missing value is on a create: an empty title is no more a title than an
+ * absent one, and `NOT NULL` lets `""` through. A create (`create: true`) also
+ * reports the required keys it leaves out or sends as `null`.
  *
  * `required` used to be left entirely to the database's NOT NULL, and that is
  * two problems rather than one. The 400 names the *column* (`author_id`), not
@@ -718,9 +723,14 @@ function collectMissingRequired(
     values: Record<string, unknown>,
     collection: CollectionConfig,
     into: WriteViolation[],
-    /** Prefix for the reported field path, for values nested under a `_pivot`. */
-    at?: string
+    options: {
+        /** The write inserts the row, so an absent key is certainly absent. */
+        create: boolean;
+        /** Prefix for the reported field path, for values nested under a `_pivot`. */
+        at?: string;
+    }
 ): void {
+    const { create, at } = options;
     // A `beforeSave` can supply a required field, and this runs before it. The
     // canonical case is a slug derived from a title — the reference app's own
     // `posts` does exactly that — and demanding `slug` in the request refuses a
@@ -752,10 +762,16 @@ function collectMissingRequired(
 
     for (const [key, property] of Object.entries(properties)) {
         if (!property?.validation?.required) continue;
-        if (!isCallerSupplied(property)) continue;
-        if (supplied(key)) continue;
-        const alias = relationAlias.get(key);
-        if (alias && supplied(alias)) continue;
+        // Sent empty: the caller supplied the key, so no `defaultValue` fills
+        // it, and the row would store `""`.
+        const sentEmpty = property.type === "string" && values[key] === "";
+        if (!sentEmpty) {
+            if (!create) continue;
+            if (!isCallerSupplied(property)) continue;
+            if (supplied(key)) continue;
+            const alias = relationAlias.get(key);
+            if (alias && supplied(alias)) continue;
+        }
 
         const field = at ? `${at}.${key}` : key;
         into.push({
@@ -780,11 +796,13 @@ function collectMissingRequired(
  * from that spec believed the server was checking. Enum membership, `email` and
  * `url` were published the same way and enforced the same amount.
  *
- * `required` is checked only when `options.status` says this write creates a
- * row. A `PATCH` legitimately omits keys — this function sees one request's
- * values, not the row they land on — so demanding them there would refuse every
- * partial update. Callers that do not pass a status get the old behaviour and
- * leave `required` to the database's NOT NULL.
+ * A missing `required` key is checked only when `options.status` says this
+ * write creates a row. A `PATCH` legitimately omits keys — this function sees
+ * one request's values, not the row they land on — so demanding them there
+ * would refuse every partial update. Callers that do not pass a status get the
+ * old behaviour and leave a missing key to the database's NOT NULL. A required
+ * string sent as `""` is refused on every write, whatever the status: NOT NULL
+ * would store it.
  *
  * A value of the wrong *type* is not this function's business — that reaches
  * Postgres, which types every column and gives a 400 through the driver's
@@ -817,6 +835,7 @@ export function assertWriteValuesValid(
     const properties = collection.properties;
     if (!properties || !values) return;
 
+    const isCreate = options?.status === "new" || options?.status === "copy";
     const violations: WriteViolation[] = [];
     for (const [key, value] of Object.entries(values)) {
         const property = (properties as Record<string, Property>)[key];
@@ -835,7 +854,8 @@ export function assertWriteValuesValid(
     // parent row does not exist, so neither does any of its links, and every
     // element is an insert — that is the one case where a missing required
     // payload column is certainly missing. Everywhere else the database's NOT
-    // NULL has the last word, exactly as it does for a `PATCH` of a row.
+    // NULL has the last word, exactly as it does for a `PATCH` of a row. A
+    // required pivot string sent as `""` is refused on every write.
     for (const [key, junction] of junctionsWithPayload(collection)) {
         for (const { index, pivot } of pivotsIn(values[key])) {
             const at = `${key}[${index}].${JUNCTION_PIVOT_KEY}`;
@@ -843,15 +863,11 @@ export function assertWriteValuesValid(
                 const property = (junction.properties as Record<string, Property>)?.[pivotKey];
                 if (property) collectViolations(`${at}.${pivotKey}`, property, pivotValue, violations);
             }
-            if (options?.status === "new" || options?.status === "copy") {
-                collectMissingRequired(pivot, junction, violations, at);
-            }
+            collectMissingRequired(pivot, junction, violations, { create: isCreate, at });
         }
     }
 
-    if (options?.status === "new" || options?.status === "copy") {
-        collectMissingRequired(values, collection, violations);
-    }
+    collectMissingRequired(values, collection, violations, { create: isCreate });
 
     if (violations.length === 0) return;
 

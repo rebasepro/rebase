@@ -283,6 +283,65 @@ describe("required on create", () => {
     });
 });
 
+// Calls 2026-10-12 (P5, D2 b): an empty string on a required string is
+// refused like a missing value. The form already writes NULL for a cleared
+// field; an API caller sending `""` stored an empty required title.
+describe("an empty string on a required string", () => {
+    const posts: CollectionConfig = {
+        slug: "posts",
+        name: "Posts",
+        table: "posts",
+        properties: {
+            id: { type: "number", isId: "increment" },
+            title: { type: "string", validation: { required: true } },
+            slug: { type: "string", validation: { required: true }, defaultValue: "untitled" },
+            subtitle: { type: "string" },
+            tags: { type: "array", of: { type: "string" } }
+        }
+    };
+
+    it("is refused on a create, as the required violation", () => {
+        const error = thrown(() => assertWriteValuesValid({ title: "" }, posts, { status: "new" }));
+        expect(error.statusCode).toBe(400);
+        expect(details(error).violations).toEqual([
+            expect.objectContaining({ field: "title", code: "required", message: "'title' is required." })
+        ]);
+    });
+
+    it("is refused on an update and without a status, where a missing key is not", () => {
+        for (const options of [{ status: "existing" as const }, undefined]) {
+            const error = thrown(() => assertWriteValuesValid({ title: "" }, posts, options));
+            expect(details(error).violations).toEqual([expect.objectContaining({ field: "title", code: "required" })]);
+            expect(() => assertWriteValuesValid({ subtitle: "x" }, posts, options)).not.toThrow();
+        }
+    });
+
+    it("is refused even where a defaultValue would have filled a missing key", () => {
+        // A `defaultValue` applies to an absent key; `""` is stored as sent.
+        const error = thrown(() => assertWriteValuesValid({ title: "Hi", slug: "" }, posts, { status: "new" }));
+        expect(details(error).violations).toEqual([expect.objectContaining({ field: "slug", code: "required" })]);
+    });
+
+    it("is reported once on a create, not as both missing and empty", () => {
+        const error = thrown(() => assertWriteValuesValid({ title: "" }, posts, { status: "copy" }));
+        expect(details(error).violations?.filter(v => v.field === "title")).toHaveLength(1);
+    });
+
+    it("is still accepted on a string that is not required", () => {
+        expect(() => assertWriteValuesValid({ title: "Hi", subtitle: "" }, posts, { status: "new" })).not.toThrow();
+        expect(() => assertWriteValuesValid({ subtitle: "" }, posts, { status: "existing" })).not.toThrow();
+    });
+
+    it("steps aside, like a missing value, for a collection whose beforeSave may fill it", () => {
+        const withHook = {
+            ...posts,
+            callbacks: { beforeSave: ({ values }: { values: Record<string, unknown> }) => values }
+        } as CollectionConfig;
+        expect(() => assertWriteValuesValid({ title: "" }, withHook, { status: "new" })).not.toThrow();
+        expect(() => assertWriteValuesValid({ title: "" }, withHook, { status: "existing" })).not.toThrow();
+    });
+});
+
 describe("the 400 carries structured violations alongside the message list", () => {
     const products: CollectionConfig = {
         slug: "products",
