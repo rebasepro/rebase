@@ -81,7 +81,8 @@ fails with `400 WEAK_PASSWORD`, listing each rule it broke, and so does an
 administrator choosing a password: `POST /api/admin/users`, a create on the
 users collection through the data API (`POST /api/data/users`, its `/bulk`, a
 socket or MCP write), `PUT /api/admin/users/:uid` and
-`POST /api/admin/users/:uid/reset-password`.
+`POST /api/admin/users/:uid/reset-password`. On a `/bulk`, the message starts
+`Row <n>: ` (counted from 0), like the bulk's other row errors.
 
 To create accounts whose passwords another system set, such as an import, send
 `skipPasswordPolicy: true` in the create body (on each row of a `/bulk`). The

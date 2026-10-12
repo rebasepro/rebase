@@ -116,16 +116,27 @@ export function assertUserCreationBodyValid(
  * `caller` is who the door is writing for: an administrator may waive the
  * password policy for an import (`skipPasswordPolicy: true`), anyone else may
  * not.
+ *
+ * `nameRows` is set by a bulk door: a refusal of one body (a `WEAK_PASSWORD`,
+ * a hook's 4xx) is then prefixed `Row <index>: `, as the bulk's other row
+ * errors are, so an import can say which line of its file failed.
  */
 export async function prepareUserCreations(
     adapter: UserCreatingAdapter,
     collection: CollectionConfig,
     bodies: readonly Record<string, unknown>[],
-    caller: FieldViewer
+    caller: FieldViewer,
+    nameRows = false
 ): Promise<UserCreationPrepareResult[]> {
     const auth = collectionAuthConfig(collection);
     const options: UserCreationOptions = { mayWaivePasswordPolicy: hasAdminRole(caller.roles) };
-    const prepare = (body: Record<string, unknown>) => adapter.prepareUserCreation(body, auth, options);
+    const prepare = async (body: Record<string, unknown>, index: number) => {
+        try {
+            return await adapter.prepareUserCreation(body, auth, options);
+        } catch (error) {
+            throw nameRows ? withRowIndex(error, index) : error;
+        }
+    };
     // Several at a time when the adapter says each preparation touches only
     // its own result: the built-in one hashes a password (scrypt, ~30 ms, on
     // libuv's thread pool), and a 1,000-row bulk did that one after another
@@ -138,10 +149,19 @@ export async function prepareUserCreations(
     // Otherwise one at a time: a create hook may send an email or write
     // elsewhere, and its side effects should happen in the order the rows
     // were given.
-    for (const body of bodies) {
-        prepared.push(await prepare(body));
+    for (const [index, body] of bodies.entries()) {
+        prepared.push(await prepare(body, index));
     }
     return prepared;
+}
+
+/** A caller's refusal of one bulk row, its message prefixed with the row. */
+function withRowIndex(error: unknown, rowIndex: number): unknown {
+    if (!(error instanceof ApiError) || error.statusCode >= 500) return error;
+    if (error.message.startsWith("Row ")) return error;
+    const named = new ApiError(error.statusCode, error.code, `Row ${rowIndex}: ${error.message}`, error.details, error.expected);
+    named.stack = error.stack;
+    return named;
 }
 
 /** libuv's thread pool size: how many hashes can actually run at once. */
@@ -151,7 +171,7 @@ function threadPoolWidth(): number {
 }
 
 /** `items` through `fn`, at most `limit` at a time, answered in the order given. */
-async function mapInOrder<T, R>(items: readonly T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+async function mapInOrder<T, R>(items: readonly T[], limit: number, fn: (item: T, index: number) => Promise<R>): Promise<R[]> {
     const results = new Array<R>(items.length);
     let next = 0;
     // One failure fails the batch; the other workers stop taking rows.
@@ -160,7 +180,7 @@ async function mapInOrder<T, R>(items: readonly T[], limit: number, fn: (item: T
         while (!failed && next < items.length) {
             const index = next++;
             try {
-                results[index] = await fn(items[index]);
+                results[index] = await fn(items[index], index);
             } catch (error) {
                 failed = true;
                 throw error;

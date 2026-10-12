@@ -119,16 +119,17 @@ const errorOf = async (res: Response) => (await res.json() as { error: { code: s
 
 /** One user's body, as each door takes it. */
 const DOORS = [
-    { name: "POST /api/admin/users", path: "/api/admin/users", ok: 201, wrap: (row: Record<string, unknown>) => row },
-    { name: "POST /api/data/users", path: "/api/data/users", ok: 201, wrap: (row: Record<string, unknown>) => row },
-    { name: "POST /api/data/users/bulk", path: "/api/data/users/bulk", ok: 200, wrap: (row: Record<string, unknown>) => ({ rows: [row] }) }
+    { name: "POST /api/admin/users", path: "/api/admin/users", ok: 201, where: "", wrap: (row: Record<string, unknown>) => row },
+    { name: "POST /api/data/users", path: "/api/data/users", ok: 201, where: "", wrap: (row: Record<string, unknown>) => row },
+    // A bulk names the row, as its other row errors do.
+    { name: "POST /api/data/users/bulk", path: "/api/data/users/bulk", ok: 200, where: "Row 0: ", wrap: (row: Record<string, unknown>) => ({ rows: [row] }) }
 ];
 
 describe("an administrator creating a user with a chosen password", () => {
     beforeAll(() => configureJwt({ secret: SECRET, accessExpiresIn: "1h" }));
     afterEach(() => configureAccess({ model: EMPTY_ACCESS_MODEL }));
 
-    describe.each(DOORS)("$name", ({ path, ok, wrap }) => {
+    describe.each(DOORS)("$name", ({ path, ok, where, wrap }) => {
         it("refuses a weak password with 400 WEAK_PASSWORD and creates nobody", async () => {
             const { post, created, saved } = harness();
             const res = await post("admin-1", path, wrap({ email: "new@example.com", password: WEAK }));
@@ -136,7 +137,7 @@ describe("an administrator creating a user with a chosen password", () => {
             expect(res.status).toBe(400);
             const error = await errorOf(res);
             expect(error.code).toBe("WEAK_PASSWORD");
-            expect(error.message).toMatch(/^Password too weak: /);
+            expect(error.message.startsWith(`${where}Password too weak: `)).toBe(true);
             expect(created).toHaveLength(0);
             expect(saved).toHaveLength(0);
         });
@@ -176,6 +177,24 @@ describe("an administrator creating a user with a chosen password", () => {
             expect(created).toHaveLength(0);
             expect(saved).toHaveLength(0);
         });
+    });
+
+    it("names the bulk row whose password is weak, as the bulk's other row errors do", async () => {
+        const { post, saved } = harness();
+        const res = await post("admin-1", "/api/data/users/bulk", {
+            rows: [
+                { email: "a@example.com", password: STRONG },
+                { email: "b@example.com", password: STRONG },
+                { email: "c@example.com", password: WEAK }
+            ]
+        });
+
+        expect(res.status).toBe(400);
+        const error = await errorOf(res);
+        expect(error.code).toBe("WEAK_PASSWORD");
+        // What the admin panel's import reads to say which line of the file failed.
+        expect(error.message).toMatch(/^Row 2: Password too weak: /);
+        expect(saved).toHaveLength(0);
     });
 
     it("holds a create hook's body to the policy too, and hands the hook no flag", async () => {

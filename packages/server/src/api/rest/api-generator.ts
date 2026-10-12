@@ -831,7 +831,7 @@ export class RestApiGenerator {
         rows: Record<string, unknown>[],
         caller: FieldViewer
     ): Promise<{ data: Record<string, unknown>[]; meta: { written: number } }> {
-        const prepared = await prepareUserCreations(adapter, collection, rows, caller);
+        const prepared = await prepareUserCreations(adapter, collection, rows, caller, true);
         const written = await driver.saveMany!({
             path,
             rows: prepared.map(creation => creation.values),
