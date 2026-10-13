@@ -91,11 +91,11 @@ backend.attachRealtime(server);
 backend.start();                                 // crons, job workers, sweeps
 ```
 
-`initializeRebaseBackend` stays, and it is now five calls to exactly those public methods. That is the essay's "one shallow step": when the shortcut stops fitting, you open it, copy it and change one line.
+`initializeRebaseBackend` stays, and its body is now six calls to public functions and methods, readable in one screen. That is the essay's "one shallow step": when the shortcut stops fitting, you open it, copy it and change one line.
 
 The DDL that used to run as a side effect is now a required `provision` option. It is an option rather than a later step because the Postgres driver reads your tables while it opens, so they have to exist first. `provision: false` creates nothing, which leaves the schema to your own migration step.
 
-**State moves onto the instance.** Each backend carries its own JWT configuration, access model and stores, so two backends in one process work and tests no longer reset globals. The module-level helpers keep working against the backend `initializeRebaseBackend` installed.
+**State moves onto the instance.** Each backend carries its own signing keys, access model, API keys and rate limits, and its own `rebase` client. Inside a function, both `ctx.rebase` and the imported `rebase` mean the backend serving the request, so two backends in one process stay out of each other's way. A test that builds its own backend no longer resets globals. The module-level helpers (`verifyAccessToken`, the `rebase` import outside a request) keep working against a process default, which `initializeRebaseBackend` installs for you and `setDefaultBackend` installs by hand.
 
 **Functions and cron jobs become values.** `functions: { hello }` and `crons: { "nightly-report": job }` sit beside `collections: [...]`. The directory loaders return exactly those values, so the folder convention is a convenience over the value form rather than the only door.
 
