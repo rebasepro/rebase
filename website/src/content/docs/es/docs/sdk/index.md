@@ -68,7 +68,7 @@ rebase generate-sdk
 ```
 
 Mientras `rebase dev` está en ejecución no hace falta: regenera los tipos en `generated/sdk/` al arrancar y en cada guardado bajo `config/collections/`. Ejecuta el comando tú mismo en CI, en un repositorio de frontend que no tiene colecciones (`rebase generate-sdk --from link`), o en cualquier lugar donde `rebase dev` no se esté ejecutando.
-para la regeneración: en 0.23, `rebase dev` deja los tipos del SDK como están, así que ejecuta
+En 0.23, `rebase dev` deja los tipos del SDK como están, así que ejecuta
 el comando después de cada cambio de colección.
 
 Luego pasa el parámetro de tipo `Database` a `createRebaseClient` para obtener autocompletado completo:

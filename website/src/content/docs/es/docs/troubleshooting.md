@@ -113,6 +113,24 @@ En un tenant gestionado de Cloud, `db push` no puede conectarse a la base de dat
 
 Si una tabla existe pero una columna no, la causa habitual es un archivo de colección editado sin regenerar: ejecuta `rebase schema generate` y haz push de nuevo.
 
+## `Error: EOF` de `db push` en la base de datos gestionada
+
+```
+Error: EOF
+✗ atlas schema apply --to file://.rebase/sql/schema.sql --dry-run failed.
+```
+
+La base de datos de desarrollo gestionada admite unas pocas conexiones a la vez, y un
+`rebase dev` en ejecución mantiene algunas. Atlas, que planifica el push, abre dos
+más, y una se cerró bajo sus pies. No se aplicó nada, así que el comando se puede
+volver a ejecutar sin riesgo; el servidor de desarrollo cierra las conexiones inactivas
+tras 30 segundos. Si sigue fallando, detén `rebase dev` mientras haces push.
+
+<span class="since-badge" data-since="0.25">Desde 0.25</span> El push cierra sus
+propias conexiones antes de que arranque Atlas, lo que le deja margen en el caso
+habitual, y el error dice lo que pasó. En la 0.24 el primer push tras arrancar
+`rebase dev` falla a menudo así, solo con las dos líneas de arriba.
+
 ## El puerto ya está en uso
 
 ```

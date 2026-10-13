@@ -328,8 +328,8 @@ to allow destructive tools against remote environments.
 
 **Si no se puede resolver ninguna cadena de conexión, las herramientas de base de datos con barrera son rechazadas.**
 Sin `DATABASE_URL`, la CLI usa la base de datos de desarrollo gestionada, que es la
-predeterminada en un proyecto nuevo, y la propia CLI rechaza `db push`, `db migrate` y
-`db branch` allí. El rechazo lo dice y nombra lo que sí funciona. No sugiere la
+predeterminada en un proyecto nuevo, y la barrera rechaza allí sus cuatro herramientas de
+base de datos. El rechazo explica por qué y nombra lo que sí funciona. No sugiere la
 desactivación de la barrera:
 
 ```text
@@ -339,6 +339,10 @@ most likely do not need this tool: the dev server applies the collections to tha
 database at boot, additively. After changing a collection, restart it with
 rebase_dev_stop and rebase_dev_start. …
 ```
+
+<span class="since-badge" data-since="0.25">Desde 0.25</span> Desde una terminal,
+`rebase db push` y `rebase db migrate` sí se ejecutan en esa base de datos; solo se
+rechazan las herramientas de MCP. En la 0.24 la CLI también las rechaza allí.
 
 Solo loopback cuenta como local: `localhost`, `*.localhost`, `127.0.0.0/8`, `::1`.
 Los rangos privados como `10.x` y `192.168.x` **no** lo hacen; es tan probable que sean

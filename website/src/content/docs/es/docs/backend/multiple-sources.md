@@ -227,20 +227,34 @@ El motor proviene de la declaración, por lo que no hay ningún `STORAGE_TYPE` q
 
 #### Qué bucket recibe una subida no calificada
 
+<span class="since-badge" data-since="0.25">Desde 0.25</span>
+
 Una propiedad de almacenamiento que no especifica ningún `storageSource` escribe en el bucket
-**predeterminado**, y un proyecto con buckets con nombre debe indicar cuál es ese bucket. Puede
-declarar el bucket con la clave predeterminada —`export const uploads = bucket();`— o marcar
-uno de los buckets con nombre:
+**predeterminado**. Declarar buckets con nombre nunca lo mueve. El bucket predeterminado
+conserva su propia configuración, sea lo que sea lo que declare `config/resources.ts`:
+`STORAGE_TYPE`, `STORAGE_PATH` (`./uploads` si no está definida) y las variables `S3_*` /
+`GCS_*` sin sufijo. Añadir `bucket("media", { engine: "s3" })` a un proyecto que ya tiene
+archivos en `./uploads` los deja donde están y se siguen sirviendo. `media` lee sus propias
+variables `__MEDIA` y, en desarrollo, hace de sustituto como su propio directorio,
+`uploads__media`.
+
+Para enviar a un bucket con nombre las subidas no calificadas, márquelo:
 
 ```ts
 export const media = bucket("media", { engine: "s3", default: true });
 ```
 
-Sin ninguna de las dos opciones, el arranque promueve el primer bucket con nombre declarado y muestra una advertencia,
-indicando ambas soluciones. Elija una de ellas: una promoción decide dónde terminan los archivos de un usuario
-según el orden de declaración, y da respuestas diferentes a cada lado de un despliegue,
-debido a que el bucket local que development usa de sustituto se descarta en producción
-y la promoción no.
+El bucket predeterminado pasa entonces a *ser* `media`. Los archivos que tenía el
+predeterminado se quedan donde están y ya no se sirven a través de él, así que cópielos
+primero: `rebase storage move --from "(default)" --to media`.
+
+Dos orígenes no pueden compartir una ubicación. Si un bucket con nombre se resolviera en el
+directorio del predeterminado (o en uno dentro de él), o en el mismo bucket de almacenamiento
+de objetos en el mismo endpoint, el arranque se niega y nombra la variable que hay que cambiar.
+
+En la 0.24, un proyecto que declara solo buckets con nombre tiene el primero declarado
+promovido a predeterminado en el arranque, con una advertencia, de modo que añadir
+`bucket("media")` mueve el predeterminado a `uploads__media`.
 
 ### Múltiples buckets en una sola cuenta
 
@@ -388,11 +402,13 @@ escribe en `/storage/uploads__media`. Monte el volumen en su directorio padre,
 `STORAGE_PATH`. `STORAGE_PATH__MEDIA` define el directorio de un bucket
 de forma explícita. Consulte [Autoalojamiento](/docs/deployment/self-hosting/#file-storage).
 
-Una consecuencia que conviene conocer si declara buckets explícitamente: no se inventa ningún bucket
-predeterminado para usted. Declarar únicamente `bucket("media")` significa que no hay ningún
-bucket predeterminado, y una propiedad que no especifique uno no tendrá a dónde ir —de forma
-deliberada, e idéntica en desarrollo y en producción. Añada también `bucket()`
-si desea tener uno.
+<span class="since-badge" data-since="0.25">Desde 0.25</span> Declarar buckets no cambia
+el bucket predeterminado. Con solo `bucket("media")` declarado, el predeterminado sigue
+leyendo sus propias variables. En desarrollo es `./uploads`. En producción, sin vincular,
+está desactivado como cualquier bucket sin vincular: las subidas que no especifican ningún
+`storageSource` responden `501 STORAGE_NOT_CONFIGURED`. El arranque lo dice una vez, con
+ambas soluciones: vincularlo (`STORAGE_TYPE=s3` y `S3_BUCKET`, o `STORAGE_TYPE=gcs` y
+`GCS_BUCKET`), o marcar un bucket con nombre como `default: true`.
 
 En desarrollo, un bucket declarado que no esté vinculado a nada es un directorio local —`uploads__media`
 junto al `uploads` predeterminado— sin importar el motor que declare, por lo que

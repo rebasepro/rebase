@@ -205,10 +205,10 @@ ninguno lo advertía.
 
 Las miniaturas de imágenes almacenadas en el panel de administración utilizan este endpoint: la vista previa
 en tabla o tarjeta solicita una reproducción webp de aproximadamente el doble de su tamaño renderizado (96–800px)
-en lugar del original. `sharp` es una dependencia opcional; sin ella, la
-transformación responde 500, por lo que el panel comprueba una vez por carga de página, con una sola
-solicitud de reproducción, y muestra los originales si el servidor no puede redimensionar. Los archivos
-SVG y GIF siempre se muestran tal como son.
+en lugar del original. Los archivos SVG y GIF siempre se muestran tal como son.
+`sharp` es opcional: <span class="since-badge" data-since="0.25">Desde 0.25</span>
+sin él, una solicitud de transformación recibe el original, y el backend avisa una vez
+de que hay que ejecutar `pnpm add sharp` en `backend/` (en la 0.24 responde 500, y el panel muestra los originales).
 
 ### Rendimiento y caché LRU
 
@@ -286,8 +286,7 @@ subida reanudable se rechaza al crearse, antes de su primer fragmento; y
 `OPTIONS /api/storage/tus` lo anuncia como `Tus-Max-Size` — para el origen
 especificado por `?storageId=`, o el predeterminado en caso contrario.
 
-Para `STORAGE_MAX_FILE_SIZE`: en la versión 0.23 solo el `maxFileSize` del origen define
-el límite, y la variable no se lee.
+En la versión 0.23 solo el `maxFileSize` del origen define el límite; `STORAGE_MAX_FILE_SIZE` no se lee.
 
 ```bash
 STORAGE_MAX_FILE_SIZE=209715200          # (default): 200 MB
@@ -343,7 +342,8 @@ tópicos en conjunto.
 
 Cada origen se configura a partir de los **mismos nombres de variable acompañados de su propio
 sufijo**. El origen predeterminado no lleva sufijo, por lo que un proyecto con un solo bucket continúa
-usando los nombres simples mostrados anteriormente y no necesita declarar absolutamente nada:
+usando los nombres simples mostrados anteriormente y no necesita declarar absolutamente nada, y declarar
+buckets con nombre a su lado no los cambia (<span class="since-badge" data-since="0.25">Desde 0.25</span>, [detalles](/docs/backend/multiple-sources/#which-bucket-receives-an-unqualified-upload)):
 
 ```bash
 S3_BUCKET=app-uploads             # (default)

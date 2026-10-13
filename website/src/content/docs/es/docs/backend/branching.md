@@ -208,6 +208,14 @@ Se sitúa entre el shell y el archivo del proyecto en el orden de resolución:
 2. `DATABASE_URL` en el entorno del shell
 3. **la rama a la que está cambiado este checkout**
 4. `DATABASE_URL` en el archivo `.env` del proyecto
+5. `--docker`, o el último `rebase dev` que se ejecutó con él
+6. la base de datos de desarrollo gestionada
+
+<span class="since-badge" data-since="0.25">Desde 0.25</span> El peldaño 5 sigue al
+último `rebase dev --docker`, así que un comando de rama posterior no necesita su propio
+`--docker`, y un `--docker` que un peldaño superior anula no inicia ningún contenedor y
+avisa de que se ignoró. En la 0.24 solo cuenta la opción, y una anulada igualmente inicia
+el contenedor.
 
 Una rama debe tener mayor precedencia que `.env`; de lo contrario, cambiar de rama no tendría efecto en ningún proyecto que defina `DATABASE_URL`. No debe anular a los dos primeros, ya que una opción en la línea de comandos es una instrucción más inmediata que un cambio de rama realizado ayer.
 
@@ -238,7 +246,7 @@ La ramificación **no** funciona con la base de datos de desarrollo administrada
 
 PGlite sirve exactamente una sola base de datos. Ejecutar `CREATE DATABASE ... TEMPLATE` sobre ella crea una entrada en el catálogo pero no copia nada, por lo que la "rama" resuelve a la misma base de datos de la que fue clonada: las escrituras que crees aisladas terminarán en tu base de datos de desarrollo y no habrá una segunda copia a la que volver.
 
-Utiliza la ramificación contra un servidor real: tu propio PostgreSQL mediante `DATABASE_URL`, o bien `rebase dev --docker`.
+Utiliza la ramificación contra un servidor real: tu propio PostgreSQL mediante `DATABASE_URL`, o bien `rebase dev --docker`, al que siguen entonces los comandos de rama.
 
 ---
 
@@ -268,6 +276,6 @@ Dado que las ramas son bases de datos de PostgreSQL independientes, no puedes ej
 
 ## Relacionado
 
-- [Comandos de la CLI](/docs/cli/) — `rebase db branch` y sus opciones
+- [Comandos de base de datos](/docs/cli/database/#rebase-db-branch) — `rebase db branch` y sus opciones
 - [Generación de esquemas](/docs/cli/schema/) — cómo se produce el esquema que copia una rama
 - [Entorno y configuración](/docs/getting-started/configuration/) — `DATABASE_URL` y la prioridad de una rama seleccionada

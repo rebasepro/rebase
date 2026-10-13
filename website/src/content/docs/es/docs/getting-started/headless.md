@@ -65,8 +65,9 @@ No hay ninguna en el código. El servidor lee el esquema de tu base de datos al
 arrancar y sirve las tablas que encuentra, de modo que la API sigue tus
 migraciones: cambia el esquema y los endpoints cambiarán con él.
 
-Una tabla se sirve una vez que cuenta con un modelo de autorización: seguridad a
-nivel de fila (RLS) habilitada, además de al menos una política:
+Una tabla se sirve una vez que la seguridad a nivel de fila está habilitada en ella.
+Sin ninguna política se sirve y no devuelve filas, y el arranque lo advierte; una
+política la abre:
 
 ```sql
 ALTER TABLE your_table ENABLE ROW LEVEL SECURITY;
@@ -81,8 +82,8 @@ de políticas, y [rls-check](/docs/rls-check/) para auditar lo que tus política
 realmente permiten.
 
 Una tabla sin RLS se **omite**, deliberadamente: cada solicitud autenticada se
-ejecuta como `rebase_user`, por lo que servir una tabla sin políticas entregaría
-cada fila a cualquier usuario que haya iniciado sesión. Cada tabla omitida se
+ejecuta como `rebase_user`, por lo que servir una tabla que la seguridad a nivel de fila
+no protege entregaría cada fila a cualquier usuario que haya iniciado sesión. Cada tabla omitida se
 menciona durante el arranque junto con el SQL que la protegería.
 
 :::note
@@ -167,9 +168,14 @@ Tres cosas lo resuelven, en el orden en que conviene verificarlas:
 
 1. **La base de datos no tiene tablas.** Créalas — una migración, SQL simple o
    un archivo de colección más `rebase db push` — y reinicia.
-2. **Las tablas no tienen una política RLS**, por lo que el arranque las omitió.
-   El registro de arranque menciona cada una. Añade una política, como se indicó
-   anteriormente.
+2. **Las tablas no tienen la seguridad a nivel de fila habilitada**, por lo que el
+   arranque las omitió. El registro de arranque menciona cada una, con el SQL.
+   Habilítala y añade una política, como se indicó anteriormente.
+   <span class="since-badge" data-since="0.25">Desde 0.25</span> La respuesta también
+   lo dice: su mensaje nombra las tablas y da el
+   `ALTER TABLE … ENABLE ROW LEVEL SECURITY` para ellas, y
+   `details.unprotectedTables` las enumera. En la 0.24 dice que la base de datos no
+   tiene tablas.
 3. **`DATABASE_URL` apunta a un lugar diferente** al que crees. `rebase status`
    imprime los tres archivos que determinan a qué accede el backend.
 

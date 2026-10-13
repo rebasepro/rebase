@@ -163,7 +163,10 @@ El commit no incluye SQL. `rebase db push` y `rebase db generate` escriben el su
 En 0.23 el commit también incluía `drizzle/schema.sql`, `drizzle/policies.sql` y
 `drizzle/search.sql`, escritos en la raíz del proyecto.
 
-El mensaje del commit describe el cambio en lugar de limitarse a anunciarlo, y se atribuye a la persona que lo realizó. Un cambio de esquema con autor y un diff en el historial de tu proyecto es algo que ni Firebase ni Supabase ofrecen: sus ediciones de tablas son invisibles para tu repositorio.
+El mensaje del commit describe el cambio en lugar de limitarse a anunciarlo, y se atribuye a la persona que lo realizó, con el nombre visible y el correo de la cuenta (un usuario sin ninguno de los dos se confirma como `<uid>@users.noreply.rebase.pro`).
+<span class="since-badge" data-since="0.25">Desde 0.25</span> En la 0.24, los commits de la autenticación integrada llevan el uid como nombre.
+
+Un cambio de esquema con autor y un diff en el historial de tu proyecto es algo que ni Firebase ni Supabase ofrecen: sus ediciones de tablas son invisibles para tu repositorio.
 
 ## Quién puede aplicar cambios
 

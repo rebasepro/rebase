@@ -32,7 +32,7 @@ rebase db backup --out ./backups
 rebase db backup --out s3://my-private-bucket/backups
 
 # List what you have
-rebase db backups list --out ./backups
+rebase db backups list
 
 # Restore into a FRESH database (does not touch the live one)
 rebase db restore ./backups/rebase-app-20260714T030000Z.dump \
@@ -40,8 +40,20 @@ rebase db restore ./backups/rebase-app-20260714T030000Z.dump \
 ```
 
 La cadena de conexión proviene del entorno de tu proyecto, como en cualquier
-otro comando [`rebase db`](/docs/cli/): `DATABASE_URL`, recurriendo a
+otro comando [`rebase db`](/docs/cli/database/): `DATABASE_URL`, recurriendo a
 `ADMIN_CONNECTION_STRING` si falta.
+
+<span class="since-badge" data-since="0.25">Desde 0.25</span> Un `--out` relativo,
+el `./backups` predeterminado y una ruta de dump que se da a `rebase db restore`
+se resuelven respecto al directorio desde el que ejecutas `rebase`, normalmente la
+raíz del proyecto, así que `rebase db backup` y `rebase db backups list` coinciden
+en un mismo lugar. Un `BACKUP_DESTINATION` relativo se resuelve respecto al directorio
+del backend, donde el servidor también lo lee. Los tres comandos rechazan una opción
+que no admiten antes de ejecutar nada, y nombran la que probablemente querías. La
+contraseña llega a `pg_dump`, `pg_dumpall` y `pg_restore` en `PGPASSWORD`, nunca en su
+línea de comandos, así que ningún mensaje de error ni lista de procesos la muestra.
+En la 0.24 el valor predeterminado era `backend/backups`, una opción mal escrita se
+ignoraba, y una restauración fallida imprimía la cadena de conexión con su contraseña.
 
 ## Qué es una copia de seguridad
 
@@ -52,7 +64,7 @@ lo que usan la retención y el listado para ordenar.
 
 | Opción | Descripción |
 | --- | --- |
-| `--out`, `-o` | Una ruta local, o una URL `s3://bucket/prefix` / `gs://bucket/prefix`. Por defecto usa `$BACKUP_DESTINATION`, y luego `./backups`. |
+| `--out`, `-o` | Una ruta local, o una URL `s3://bucket/prefix` / `gs://bucket/prefix`. Por defecto usa `$BACKUP_DESTINATION`, y luego `./backups` en el directorio desde el que ejecutas `rebase`. |
 | `--exclude-schema <s>` | Omite un esquema del dump (repetible). Nunca omitas `rebase` — ver más abajo. |
 | `--no-owner` | Omite las instrucciones de propiedad, para restaurar como un rol distinto. |
 | `--enable-row-security` | Vuelca los datos como sujeto administrador en lugar de fallar por la seguridad a nivel de fila. **Puede producir un dump parcial** — consulta [Seguridad a nivel de fila](#seguridad-a-nivel-de-fila-y-el-dump-que-queda-corto-en-silencio). |
@@ -90,6 +102,11 @@ que llaman tus políticas de RLS y los triggers de captura de cambios. Un dump
 sin él no tiene usuarios, y no se puede restaurar en una base de datos vacía
 en absoluto: las tablas que sí contiene tienen políticas que llaman a
 funciones que no están.
+
+<span class="since-badge" data-since="0.25">Desde 0.25</span> Como contiene cada
+contraseña y cada hash de clave, un dump local y su `.globals.sql` se crean legibles
+solo por su propietario (0600), antes de que `pg_dump` escriba en ellos; los archivos
+locales de una copia programada también. En la 0.24 son 0644.
 
 ## Copias de seguridad programadas
 
@@ -157,8 +174,7 @@ eliminación solo afecta a los archivos cuyo nombre coincide con el patrón de
 copia de seguridad; cualquier otra cosa que comparta el bucket o el prefijo
 se deja intacta.
 
-El cron ejecuta `pg_dump` dentro del proceso del servidor.
-la imagen oficial
+El cron ejecuta `pg_dump` dentro del proceso del servidor. La imagen oficial
 del runtime (`rebasepro/server`, consulta [Autoalojamiento](/docs/deployment/self-hosting/))
 incluye las herramientas de cliente de PostgreSQL 18 para esto;
 en la 0.23 y anteriores no tenía ninguna, y cada ejecución programada fallaba
@@ -262,13 +278,12 @@ tamaño y hora. **Download** descarga el dump; **Roles file** descarga su
 marcada **No roles file** no tiene archivo asociado: recrea sus roles a mano
 antes de restaurarla en un Postgres nuevo.
 
-encima de la
-lista se informa de la tarea de copia de seguridad programada y su última
-ejecución. Una ejecución fallida se muestra como un error con su mensaje, así
-que una copia de seguridad nocturna que no puede ejecutarse es visible donde
+Encima de la lista, el panel informa de la tarea de copia de seguridad programada
+y de su última ejecución. Una ejecución fallida se muestra como un error con su
+mensaje, así que una copia de seguridad nocturna que no puede ejecutarse es visible donde
 se listan las copias, no solo en el panel de Cron Jobs.
 
-lo que dice sobre la tarea:
+Lo que dice sobre la tarea:
 
 - **Last scheduled backup** es la última ejecución que hizo la programación.
   Una ejecución iniciada a mano desde entonces (**Run Now** en Cron Jobs) tiene
@@ -286,7 +301,7 @@ lo que dice sobre la tarea:
   panel lo dice, en lugar de decir que la copia de seguridad aún no se ha
   ejecutado.
 
-la lista la lee
+La lista la lee
 el proceso del servidor que responde a `GET /api/admin/backups`, y ese no
 siempre es el proceso que ejecuta la programación:
 

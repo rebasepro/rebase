@@ -313,7 +313,7 @@ Cada clave se comprueba contra quien la crea, igual en ambas rutas:
 
 | Rechazo | Cuándo |
 |---|---|
-| `400 INVALID_SCOPES` | Un alcance está mal formado, es desconocido o lleva un destino que no admite. `details.validScopes` enumera todos los válidos |
+| `400 INVALID_SCOPES` | Un alcance está mal formado, es desconocido o lleva un destino que no admite. `details.validScopes` enumera los alcances que una clave puede tener. <span class="since-badge" data-since="0.25">Desde 0.25</span> Deja fuera `keys:*`, que ninguna clave puede tener; en la 0.24 los enumera |
 | `400 UNKNOWN_SCOPE_TARGET` | Un destino nombra una colección, un origen de almacenamiento o una función que este backend no sirve |
 | `400 KEY_MANAGEMENT_SCOPE` | Se pidió `keys:read` o `keys:write` |
 | `403 SCOPE_EXCEEDS_CREATOR` | Un alcance que el creador no tiene. Una clave nunca tiene más que la cuenta que la creó |

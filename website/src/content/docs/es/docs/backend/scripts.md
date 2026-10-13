@@ -19,7 +19,10 @@ como un objeto, en dos lugares:
 - **`openRebase`**, el mismo objeto en un script o en una prueba tuyos.
 
 Ambos abren la base de datos sin cambiarla: no se crea ninguna tabla, rol, trigger ni
-función, y no queda nada en ejecución. El objeto tiene el
+función. El `close()` de un script termina lo que abrió `openRebase`. En la base de
+datos de desarrollo gestionada, `rebase console` inicia esa base de datos cuando no
+está en ejecución y la deja en marcha después, como hacen los comandos `rebase db`;
+`rebase db stop` la detiene. El objeto tiene el
 vocabulario que una [función personalizada](/docs/backend/custom-functions/) recibe del
 servidor, `dataAsAdmin` y `sql`, de modo que un fragmento de código pasa sin cambios entre una función, un script
 y la consola.
@@ -56,6 +59,11 @@ de desarrollo gestionada la tiene iniciada primero. El historial de lo que escri
 guarda en `.rebase/console_history`, que el `.gitignore` del scaffold ya
 deja fuera.
 
+La entrada canalizada se ejecuta línea a línea, cada una después de que el `await` de
+la anterior se haya resuelto, así que la transcripción de arriba funciona como
+`printf '…\n…\n' | rebase console`. Todo lo que viene después de `.exit` se ignora, y los
+valores solo se colorean en una terminal. Todo lo que la consola registra va a stderr.
+
 ### Un solo fragmento: `--eval`
 
 <span class="since-badge" data-since="0.25">Desde 0.25</span>
@@ -70,9 +78,9 @@ rebase console -e "rebase.sql('select count(*) from posts')" | jq .
 rebase console -e "const u = await rebase.withAuth({ uid: 'u1', roles: ['user'] }); return (await u.data.posts.find()).data"
 ```
 
-Lo que la resolución de la base de datos tiene que decir va a stderr, de modo que stdout contiene el
-resultado y nada más. Un fragmento que lanza un error imprime el error en stderr y
-termina con código `1`.
+Todo lo que la consola registra, diga lo que diga `LOG_LEVEL`, va a stderr, de modo que
+stdout contiene el resultado y nada más. Un fragmento que lanza un error imprime el error
+en stderr y termina con código `1`.
 
 ### Opciones
 
@@ -88,19 +96,32 @@ termina con código `1`.
 <span class="since-badge" data-since="0.25">Desde 0.25</span>
 
 `openRebase` de `@rebasepro/server-postgres` es lo que llama la consola. Úsalo
-en un script, un seed, una corrección de datos o una prueba:
+en un script, un seed, una corrección de datos o una prueba. En un proyecto scaffold,
+pon el script bajo `backend/`, por ejemplo `backend/scripts/publish-drafts.ts`: el
+workspace del backend es el que depende de `@rebasepro/server-postgres`, y un script
+en la carpeta `scripts/` de la raíz no puede importarlo.
 
 ```typescript
 import { openRebase } from "@rebasepro/server-postgres";
-import { collections } from "../config/collections";
+import { collections } from "../../config/collections";
 
 const rebase = await openRebase({ databaseUrl: process.env.DATABASE_URL!, collections });
 
 const { data: drafts } = await rebase.dataAsAdmin.posts.find({ where: { status: ["==", "draft"] } });
 console.log(`${drafts.length} drafts`);
-await rebase.dataAsAdmin.posts.update("42", { status: "archived" });
+for (const draft of drafts) {
+    await rebase.dataAsAdmin.posts.update(String(draft.id), { status: "published" });
+}
 
 await rebase.close();
+```
+
+Ejecútalo desde `backend/`. `rebase db url` imprime la URL de la base de datos que usa
+el proyecto, incluida la de desarrollo gestionada:
+
+```bash
+cd backend
+DATABASE_URL="$(pnpm exec rebase db url)" pnpm exec tsx scripts/publish-drafts.ts
 ```
 
 | Miembro | Qué hace |
@@ -125,6 +146,13 @@ Sus opciones:
 tu script, y ajustes como `REBASE_DB_POOL_MAX` o `REALTIME_CDC` no cambian
 nada aquí.
 
+Sus accesores se tipan con el `Database` que registra `rebase generate-sdk --register`,
+como el `rebase` de una función, así que una colección, un campo o un valor de enum mal
+escritos en un script son un error de tipos. Sin un registro, nómbralo en cada llamada
+con `openRebase<Database>({ … })`; `OpenedRebase<Database>` es el tipo que hay que dar a
+un helper que recibe uno. Sin ninguno de los dos, las filas no tienen tipo, por eso el
+primer ejemplo convierte `draft.id` con `String()`.
+
 ### Comprobar qué puede ver un usuario
 
 <span class="since-badge" data-since="0.25">Desde 0.25</span>
@@ -133,7 +161,7 @@ nada aquí.
 
 ```typescript
 import { openRebase } from "@rebasepro/server-postgres";
-import { collections } from "../config/collections";
+import { collections } from "../../config/collections";
 
 const rebase = await openRebase({ databaseUrl: process.env.DATABASE_URL!, collections });
 const ada = await rebase.withAuth({ uid: "ada", roles: ["user"] });
@@ -157,7 +185,7 @@ sin filtrar. Ejecuta antes `rebase db push`, o arranca el servidor una vez.
 import { after, before, test } from "node:test";
 import assert from "node:assert/strict";
 import { openRebase, type OpenedRebase } from "@rebasepro/server-postgres";
-import { collections } from "../config/collections";
+import { collections } from "../../config/collections";
 
 let rebase: OpenedRebase;
 before(async () => {
@@ -170,6 +198,13 @@ test("a user only sees their own posts", async () => {
     const { data } = await ada.data.posts.find();
     assert.ok(data.every(post => post.author_id === "ada"));
 });
+```
+
+Ejecútala desde `backend/` con el ejecutor de pruebas de Node, apuntando `TEST_DATABASE_URL`
+a una base de datos sobre la que haya arrancado un servidor de Rebase:
+
+```bash
+TEST_DATABASE_URL="$(pnpm exec rebase db url)" pnpm exec tsx --test scripts/posts.test.ts
 ```
 
 Lo mismo funciona con Vitest o Jest.

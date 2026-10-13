@@ -31,7 +31,10 @@ my-app/
 ├── .env                    # Generated for you: JWT_SECRET, a database password, a free port
 ├── rebase.json             # Which apps this repository contains, and how each is built
 ├── package.json            # Root workspace config
+├── tsconfig.json           # Typechecks scripts/; each workspace typechecks on its own
 ├── docker-compose.yml      # Self-hosting: Postgres + the published runtime image
+├── scripts/
+│   └── example.ts          # The SDK end to end against the running backend: `pnpm example`
 │
 ├── config/                 # Shared by the backend and the admin panel
 │   ├── index.ts            # Re-exports `collections`; the runtime reads `storageAuthorize` from here
@@ -54,6 +57,11 @@ my-app/
     ├── src/main.tsx
     └── vite.config.ts
 ```
+
+`tsc --noEmit` en la raíz comprueba `scripts/`; en `config/`, `backend/` o
+`frontend/` comprueba ese workspace. <span class="since-badge" data-since="0.25">Desde 0.25</span>
+En la 0.24 la raíz no tiene `tsconfig.json`, y `tsc` allí imprime su ayuda y no
+comprueba nada.
 
 :::note[No existe `backend/src/index.ts`]
 Ni tampoco un `Dockerfile`. Un proyecto generado declara `runtime: "managed"` en
@@ -147,7 +155,7 @@ su proyecto. Lo que contiene `backend/` es el código que el runtime recoge:
 |---|---|
 | `backend/functions/` | Rutas personalizadas, montadas automáticamente en `/api/functions/<filename>` |
 | `backend/crons/` | Tareas programadas, detectadas de la misma manera (créelo cuando necesite una) |
-| `backend/src/schema.generated.ts` | El esquema de Drizzle, regenerado a partir de sus colecciones en cada ejecución de `rebase dev` y `rebase build` |
+| `backend/src/schema.generated.ts` | El esquema de Drizzle de sus colecciones: lo escribe `rebase init`, y se regenera en cada ejecución de `rebase dev` y `rebase build` |
 
 El runtime configura:
 
@@ -215,8 +223,8 @@ regenera `backend/src/schema.generated.ts` y los tipos del SDK en
 que falten. Fuera de `rebase dev`, los pasos equivalentes son
 `rebase schema generate` y `rebase generate-sdk`.
 
-para los tipos del SDK: en 0.23, `rebase dev` solo regenera el
-esquema, y `rebase generate-sdk` es un paso aparte.
+En 0.23, `rebase dev` solo regenera el esquema, y `rebase generate-sdk`
+es un paso aparte.
 
 ## Próximos pasos
 

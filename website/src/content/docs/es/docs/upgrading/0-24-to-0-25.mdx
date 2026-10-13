@@ -19,7 +19,8 @@ de directivas predeterminadas en tablas largas. Las últimas tres son decisiones
 predeterminada de la sesión, la directiva de contraseñas para una contraseña elegida por el administrador, y
 una cadena vacía en un campo obligatorio. Le siguen tres eliminaciones: dos exportaciones del cliente
 que solo eran motores internos, un hook del admin que nada necesita y una opción de almacenamiento que
-no llegaba a ningún cliente.
+no llegaba a ningún cliente. La última es el origen de almacenamiento predeterminado,
+que declarar un bucket con nombre ya no mueve.
 
 :::note[Comportamiento modificado y nombres obsoletos]
 0.25 también cambia lo que hacen algunas llamadas existentes, sin romper la compatibilidad. Revisa
@@ -368,3 +369,29 @@ como una propiedad desconocida. Nunca definió la duración de una URL recibida 
 Para cambiar cuánto tiempo funciona la URL de un archivo privado, define `storageDownloadTokenTtl`
 (en segundos; `STORAGE_DOWNLOAD_TOKEN_TTL` en un despliegue en bundle). El código del servidor que
 llama directamente a `controller.getSignedUrl()` obtiene una URL válida por una hora.
+
+## 86. Declarar un bucket con nombre ya no mueve el origen de almacenamiento predeterminado
+
+Un proyecto que declaraba solo buckets con nombre en `config/resources.ts`, como
+`bucket("media", { engine: "s3" })`, tenía el primero promovido a predeterminado:
+las subidas cuya propiedad no especifica ningún `storageSource` iban a él. Ahora el
+predeterminado siempre lee su propia configuración, sea lo que sea lo que se declare:
+`STORAGE_TYPE`, `STORAGE_PATH` (o `./uploads`) y las `S3_*` / `GCS_*` sin sufijo.
+
+Si esas subidas deben seguir yendo al bucket con nombre, indícalo:
+
+```ts
+// config/resources.ts
+export const media = bucket("media", { engine: "s3", default: true });
+```
+
+Sin la marca, en producción esas subidas responden
+`501 STORAGE_NOT_CONFIGURED` hasta que el predeterminado se vincule (`STORAGE_TYPE=s3` y
+`S3_BUCKET`, o `STORAGE_TYPE=gcs` y `GCS_BUCKET`), y el arranque registra una advertencia
+que nombra ambas soluciones. Los archivos que escribió el predeterminado promovido están en el bucket con nombre;
+con la marca se sirven a través del predeterminado como antes. En desarrollo, los
+archivos que ya están en `./uploads` vuelven a servirse.
+
+El arranque también rechaza dos orígenes que se resuelven en un mismo directorio (o uno dentro de
+otro), o en un mismo bucket en un mismo endpoint. Dale al origen con nombre una ubicación
+propia (`STORAGE_PATH__MEDIA`, `S3_BUCKET__MEDIA`), o márcalo como el predeterminado.
