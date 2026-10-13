@@ -58,6 +58,7 @@ import {
     describeConflict
 } from "./schema/generated-column-conflicts";
 import { stripCarvedOutStatements } from "./schema/carved-out-migration";
+import { finishNewMigration } from "./schema/migration-post-process";
 import { acceptsExcludeFlag, buildAtlasArgs, migrateApplyArgs, takesDevUrl } from "./schema/atlas-argv";
 import { ScratchDatabase } from "./cli-scratch-database";
 import { applyPoliciesFile, applyPushPlan, stampableTables, type PolicyStamping } from "./cli-push";
@@ -495,100 +496,117 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
         // the `CREATE SCHEMA` rewrite and the policy append did not, so every
         // `db generate` that found nothing to diff still grew the last
         // migration by another copy of the policies.
-        try {
-            const migrationsDir = path.resolve(process.cwd(), "drizzle", "migrations");
-            if (fs.existsSync(migrationsDir) && wroteNewMigration) {
-                const files = fs.readdirSync(migrationsDir);
-                const sqlFiles = files
-                    .filter(f => f.endsWith(".sql"))
-                    .sort();
-                if (sqlFiles.length > 0) {
-                    const newestMigrationFile = path.join(migrationsDir, sqlFiles[sqlFiles.length - 1]);
-
-                    // Make CREATE SCHEMA idempotent so it doesn't conflict with
-                    // --revisions-schema (Atlas pre-creates the rebase schema
-                    // for its revision table before running migrations).
-                    let migrationContent = fs.readFileSync(newestMigrationFile, "utf-8");
-                    migrationContent = migrationContent.replace(
-                        /CREATE SCHEMA (?!IF NOT EXISTS)("[^"]+");/g,
-                        "CREATE SCHEMA IF NOT EXISTS $1;"
-                    );
-                    // Atlas never writes the search or vector objects into a
-                    // migration — it is not shown them — so a migration
-                    // replayed against a fresh database would build every table
-                    // except the parts that make search and vector search work.
-                    // Appending, because these are `ALTER TABLE ... ADD COLUMN`
-                    // over the tables the migration just created.
-                    //
-                    // Vector first: `vector.sql` may open with
-                    // `CREATE EXTENSION vector`, so prerequisites lead, which is
-                    // the order a reader of the migration expects. Nothing in
-                    // search depends on it either way.
-                    const vectorContent = readVectorDdl();
-                    if (vectorContent) {
-                        migrationContent = `${migrationContent}\n\n${vectorContent}`;
-                        out(chalk.gray("  ✓ Appended vector DDL to the migration"));
-                    }
-
-                    const searchContent = readSearchDdl();
-                    if (searchContent) {
-                        // The same refusal `db push` works around, but decided
-                        // here and written into the file: this migration runs
-                        // later, somewhere else, against a database nobody can
-                        // inspect from this machine. A column retyped by the
-                        // statements above cannot be retyped while the search
-                        // column reads it, and the appended DDL below runs too
-                        // late to help — so the drop is prepended and the
-                        // rebuild is the append that was already happening.
-                        //
-                        // Derived from the collections rather than a catalogue:
-                        // `searchColumnDependencies` knows which columns each
-                        // block reads, which is all the decision needs.
-                        const { searchColumnDependencies } = await import("./schema/generate-postgres-ddl-logic");
-                        const migrationConflicts = findGeneratedColumnConflicts(
-                            parseColumnMutations(migrationContent),
-                            searchColumnDependencies(await loadCollectionsForCli(collectionsPath))
-                        );
-                        const preamble = migrationDropPreamble(migrationConflicts);
-                        if (preamble) {
-                            migrationContent = `${preamble}\n${migrationContent}`;
-                            for (const conflict of migrationConflicts) {
-                                out(chalk.gray(`  ✓ ${describeConflict(conflict)} is dropped and rebuilt inside the migration`));
-                            }
-                        }
-                        migrationContent = `${migrationContent}\n\n${searchContent}`;
-                        out(chalk.gray("  ✓ Appended search DDL to the migration"));
-                    }
-
-                    // Last of the three: a trigger needs its table and its
-                    // column, and both arrive above.
-                    const triggersContent = readTriggersDdl();
-                    if (triggersContent) {
-                        migrationContent = `${migrationContent}\n\n${triggersContent}`;
-                        out(chalk.gray("  ✓ Appended `updated_at` triggers to the migration"));
-                    }
-
-                    fs.writeFileSync(newestMigrationFile, migrationContent, "utf-8");
-
-                    // Append RLS policies, preceded by the RLS bootstrap so the
-                    // migration is self-contained: Atlas replays migrations
-                    // against a clean dev database where `rebase.uid()` would
-                    // not otherwise exist.
-                    const policiesFile = path.join(generatedSqlDir(), "policies.sql");
-                    if (fs.existsSync(policiesFile)) {
-                        const policiesContent = fs.readFileSync(policiesFile, "utf-8");
-                        fs.appendFileSync(newestMigrationFile, "\n\n" + RLS_BOOTSTRAP_SQL + "\n" + policiesContent);
-                        out(chalk.gray(`  ✓ Appended RLS policies to migration file: ${path.basename(newestMigrationFile)}`));
-
-                        // Re-hash the migration directory
-                        out(chalk.gray("  Re-hashing migration files..."));
-                        await runAtlas("migrate", ["hash", "--dir", "file://drizzle/migrations"], collectionsPath);
-                        out(chalk.gray("  ✓ Migration directory checksum updated successfully."));
-                    }
+        //
+        // A failure here takes the migration back out and stops: see
+        // `finishNewMigration`. Atlas's half creates the tables, the append
+        // locks them, and a migration with only the first half applies cleanly.
+        const migrationsDir = path.resolve(process.cwd(), "drizzle", "migrations");
+        const newestSql = fs.existsSync(migrationsDir) && wroteNewMigration
+            ? fs.readdirSync(migrationsDir).filter(f => f.endsWith(".sql")).sort().at(-1)
+            : undefined;
+        if (newestSql) {
+            const newestMigrationFile = path.join(migrationsDir, newestSql);
+            const finished = await finishNewMigration(newestMigrationFile, async () => {
+                // Make CREATE SCHEMA idempotent so it doesn't conflict with
+                // --revisions-schema (Atlas pre-creates the rebase schema
+                // for its revision table before running migrations).
+                let migrationContent = fs.readFileSync(newestMigrationFile, "utf-8");
+                migrationContent = migrationContent.replace(
+                    /CREATE SCHEMA (?!IF NOT EXISTS)("[^"]+");/g,
+                    "CREATE SCHEMA IF NOT EXISTS $1;"
+                );
+                // Atlas never writes the search or vector objects into a
+                // migration — it is not shown them — so a migration
+                // replayed against a fresh database would build every table
+                // except the parts that make search and vector search work.
+                // Appending, because these are `ALTER TABLE ... ADD COLUMN`
+                // over the tables the migration just created.
+                //
+                // Vector first: `vector.sql` may open with
+                // `CREATE EXTENSION vector`, so prerequisites lead, which is
+                // the order a reader of the migration expects. Nothing in
+                // search depends on it either way.
+                const vectorContent = readVectorDdl();
+                if (vectorContent) {
+                    migrationContent = `${migrationContent}\n\n${vectorContent}`;
+                    out(chalk.gray("  ✓ Appended vector DDL to the migration"));
                 }
+
+                const searchContent = readSearchDdl();
+                if (searchContent) {
+                    // The same refusal `db push` works around, but decided
+                    // here and written into the file: this migration runs
+                    // later, somewhere else, against a database nobody can
+                    // inspect from this machine. A column retyped by the
+                    // statements above cannot be retyped while the search
+                    // column reads it, and the appended DDL below runs too
+                    // late to help — so the drop is prepended and the
+                    // rebuild is the append that was already happening.
+                    //
+                    // Derived from the collections rather than a catalogue:
+                    // `searchColumnDependencies` knows which columns each
+                    // block reads, which is all the decision needs.
+                    const { searchColumnDependencies } = await import("./schema/generate-postgres-ddl-logic");
+                    const migrationConflicts = findGeneratedColumnConflicts(
+                        parseColumnMutations(migrationContent),
+                        searchColumnDependencies(await loadCollectionsForCli(collectionsPath))
+                    );
+                    const preamble = migrationDropPreamble(migrationConflicts);
+                    if (preamble) {
+                        migrationContent = `${preamble}\n${migrationContent}`;
+                        for (const conflict of migrationConflicts) {
+                            out(chalk.gray(`  ✓ ${describeConflict(conflict)} is dropped and rebuilt inside the migration`));
+                        }
+                    }
+                    migrationContent = `${migrationContent}\n\n${searchContent}`;
+                    out(chalk.gray("  ✓ Appended search DDL to the migration"));
+                }
+
+                // Last of the three: a trigger needs its table and its
+                // column, and both arrive above.
+                const triggersContent = readTriggersDdl();
+                if (triggersContent) {
+                    migrationContent = `${migrationContent}\n\n${triggersContent}`;
+                    out(chalk.gray("  ✓ Appended `updated_at` triggers to the migration"));
+                }
+
+                fs.writeFileSync(newestMigrationFile, migrationContent, "utf-8");
+
+                // Append RLS policies, preceded by the RLS bootstrap so the
+                // migration is self-contained: Atlas replays migrations
+                // against a clean dev database where `rebase.uid()` would
+                // not otherwise exist.
+                const policiesFile = path.join(generatedSqlDir(), "policies.sql");
+                if (fs.existsSync(policiesFile)) {
+                    const policiesContent = fs.readFileSync(policiesFile, "utf-8");
+                    fs.appendFileSync(newestMigrationFile, "\n\n" + RLS_BOOTSTRAP_SQL + "\n" + policiesContent);
+                    out(chalk.gray(`  ✓ Appended RLS policies to migration file: ${path.basename(newestMigrationFile)}`));
+
+                    // Re-hash the migration directory
+                    out(chalk.gray("  Re-hashing migration files..."));
+                    await runAtlas("migrate", ["hash", "--dir", "file://drizzle/migrations"], collectionsPath, { throwOnFailure: true });
+                    out(chalk.gray("  ✓ Migration directory checksum updated successfully."));
+                }
+            }, async () => {
+                await runAtlas("migrate", ["hash", "--dir", "file://drizzle/migrations"], collectionsPath, { throwOnFailure: true });
+            });
+            if (!finished.ok) {
+                outError(chalk.red(`\n  ✗ Could not finish ${newestSql}: ${finished.error}`));
+                outError(chalk.gray(
+                    "    Atlas's half of a migration creates the tables; the part that failed adds their\n" +
+                    "    row-level security, policies, search, vector and trigger DDL. Applied alone, it\n" +
+                    "    would serve the new tables with no row filtering."
+                ));
+                outError(chalk.gray(finished.removed
+                    ? `    ${newestSql} was removed. Fix the cause and run \`rebase db generate\` again.`
+                    : `    ${newestSql} could not be removed — delete it by hand before \`rebase db migrate\`.`));
+                if (finished.rehashError) {
+                    outError(chalk.gray(
+                        `    Re-hashing failed too (${finished.rehashError}); run \`atlas migrate hash\` or generate again.`
+                    ));
+                }
+                process.exit(1);
             }
-        } catch (err) {
-            outWarn(chalk.yellow(`  ⚠️  Failed to append policies or re-hash migration: ${err instanceof Error ? err.message : String(err)}`));
         }
 
         if (!wroteNewMigration) {
