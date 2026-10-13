@@ -41,14 +41,29 @@ of it resolves too: Node has supported `require(esm)` since 22.12.
 | Option | Type | Default | Description |
 |---|---|---|---|
 | `baseUrl` | `string` | `""` | Backend URL (e.g. `http://localhost:3001`) |
-| `token` | `string` | — | Static auth token |
+| `token` | `string` | — | Auth token, read each time one is needed (so it may be declared as a getter) until `setToken()` or a sign-in replaces it |
 | `apiPath` | `string` | `"/api"` | API path prefix |
 | `fetch` | `typeof fetch` | `globalThis.fetch` | Custom fetch implementation |
-| `onUnauthorized` | `() => Promise<boolean>` | auto-refresh | Handler for 401 responses |
+| `onUnauthorized` | `() => Promise<boolean>` | auto-refresh | Handler for a refused token, over HTTP (401) and on the realtime socket |
 | `websocketUrl` | `string` | derived from `baseUrl` | WebSocket URL for realtime |
 | `realtime` | `boolean` | `true` | Open the WebSocket — `false` lets a one-shot script exit |
 | `collections` | `Record<string, string>` | — | Maps accessor names to collection slugs |
 | `offline` | `boolean \| OfflineConfig` | `false` | Local-first sync — see [the docs](https://rebase.pro/docs/sdk/offline) |
+
+### Tokens
+
+| Method | Description |
+|---|---|
+| `setAuthTokenGetter(getter)` | Ask `getter` for the token each time one is needed: every HTTP request and every time the realtime socket authenticates. This is how a host signing users in with its own provider (Clerk, Firebase Auth, its own session) authenticates the client. It comes before the client's own session and the `token` option |
+| `setToken(token)` | Send this token from now on, over HTTP and on the socket |
+| `setOnUnauthorized(handler)` | Answer a refused token, on HTTP and the socket; resolve `true` to retry |
+| `resolveToken()` | The token the next request would carry |
+
+Installing a getter or calling `setToken()` rebuilds an open socket so it authenticates as the new credential. `client.ws.setAuthTokenGetter()` is deprecated: it still works, warns once, and reaches only the socket.
+
+```ts
+client.setAuthTokenGetter(() => clerk.session?.getToken() ?? Promise.resolve(null));
+```
 
 ### Collection Client
 

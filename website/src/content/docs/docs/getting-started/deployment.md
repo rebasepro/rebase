@@ -321,9 +321,17 @@ const router = createBrowserRouter([
 ], { basename });
 ```
 
-The admin needs a **data router** — `createBrowserRouter`, not the plain
-`BrowserRouter` — because unsaved-changes blocking uses `useBlocker`, which only
-the data router provides.
+Keep the admin on a **data router** — `createBrowserRouter` with
+`<RouterProvider>`, as the scaffold does. Under it, a record with unsaved
+changes also stops in-app navigation (a link in the drawer, the browser's back
+button) and asks first, through `useBlocker`, which only a data router
+provides.
+
+<span class="since-badge" data-since="0.25">Since 0.25</span> The admin also
+runs under a plain `<BrowserRouter>`. There the unsaved-changes guard falls
+back to the browser's own leave-page prompt, which covers a reload, closing the
+tab or typing a URL; navigating inside the app goes ahead without asking. On
+0.24 the admin throws outside a data router.
 
 **Backend** — if you move the API too, update its base path:
 
@@ -370,8 +378,9 @@ const router = isAdmin
 root.render(<RouterProvider router={router}/>);
 ```
 
-One router for both halves, because the admin needs the data router anyway and
-there is no reason for the product app to be on a different one.
+One router for both halves: the admin is better off on a data router, which
+lets unsaved changes stop in-app navigation, and there is no reason for the
+product app to be on a different one.
 
 The backend needs no changes for this pattern — the API stays at `/api` and the SPA
 catch-all serves `index.html` for both `/` and `/admin/*`.

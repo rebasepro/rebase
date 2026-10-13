@@ -67,7 +67,7 @@ This package is **framework-agnostic** in the sense that it doesn't depend on an
 | `useRebaseContext` | Access the top-level Rebase context |
 | `useDialogsController` | Programmatic dialog management |
 | `useSnackbarController` | Show snackbar notifications |
-| `useModeController` / `useBuildModeController` | Light/dark mode |
+| `useModeController` / `useBuildModeController` | Light/dark mode: `mode` and `setMode("light" \| "dark" \| "system")`. To let your app own the theme, pass its own controller as `<Rebase modeController>`; `useBuildModeController({ enabled: false })` builds one that touches nothing outside React |
 | `useStorageSource` | Storage source from context |
 | `useRebaseClient` | Access the `RebaseClient` instance |
 | `useLargeLayout` | Responsive layout breakpoint hook |

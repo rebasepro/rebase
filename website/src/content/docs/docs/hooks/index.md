@@ -442,7 +442,7 @@ function CustomAction() {
 
 ## `useUnsavedChangesDialog`
 
-Prevent navigation or page unload when form data has unsaved changes. It automatically intercepts internal React Router navigation via `useBlocker` as well as browser-level reloads via `beforeunload`.
+Prevent navigation or page unload when form data has unsaved changes. It asks before a reload or a closed tab (`beforeunload`) and, inside the admin under a React Router data router (`createBrowserRouter`), before in-app navigation too, via `useBlocker`. Under any other router, such as a plain `<BrowserRouter>`, only the browser-level prompt applies.
 
 ```typescript
 import { useUnsavedChangesDialog } from "@rebasepro/app";

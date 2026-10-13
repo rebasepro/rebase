@@ -36,6 +36,28 @@ authController.getAuthToken() // Get current JWT for API calls
 
 Pass the `authController` to the Rebase navigation controller to gate the entire admin panel behind authentication.
 
+## Your Own Auth Provider
+
+<span class="since-badge" data-since="0.25">Since 0.25</span> On 0.24 the
+getter authenticates HTTP requests only, and the panel's realtime socket stays
+anonymous.
+
+If your app signs users in with its own provider (Clerk, Firebase Auth, a
+session of its own), give the client you pass to `<Rebase client>` a token
+getter. The panel's HTTP requests and its realtime socket both send what it
+returns, so live collection views run as the same user:
+
+```typescript
+client.setAuthTokenGetter(() => clerk.session?.getToken() ?? Promise.resolve(null));
+```
+
+The `authController` beside it then reports your provider's signed-in user
+(an `AuthController` from `@rebasepro/cms-types`) instead of wrapping
+`client.auth`. The backend has to accept the token too: see
+[Custom auth adapters](/docs/backend/auth-adapters), and
+[Using your own auth provider](/docs/sdk/authentication#using-your-own-auth-provider)
+for the client side in full.
+
 ## Login View
 
 The `LoginView` component provides a complete login and registration form:

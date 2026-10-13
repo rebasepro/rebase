@@ -253,7 +253,7 @@ The WebSocket client handles authentication automatically:
 - `client.ws.state` is the connection's state — `idle`, `connecting`, `connected`, `reconnecting`, `disconnected` or `closed` — and `client.ws.onStateChange(listener)` is told every change. `disconnected` is the state in which `CONNECTION_LOST` has been reported.
 - Requests sent over the socket are **at-most-once**. One that was sent when the connection dropped fails with `CONNECTION_LOST` and is never sent again, since the server may already have run it. One that is still waiting for a socket after 30 seconds fails with `REQUEST_TIMEOUT` without being sent.
 
-for everything in the list after sign-out. On 0.23 the client gives up after
+Everything in the list after sign-out arrived in 0.24. On 0.23 the client gives up after
 five failed reconnection attempts, queues requests made while disconnected and
 sends them on reconnect, has no `client.ws.state`, and the server never closes a
 socket whose session has ended.
@@ -277,7 +277,43 @@ const unsubscribe = client.data.orders.listen(
 );
 ```
 
-No manual token management is needed — the integration between `client.auth` and the WebSocket layer is handled internally.
+### Which token the socket sends
+
+<span class="since-badge" data-since="0.25">Since 0.25</span> On 0.24 the
+socket uses only the client's own session and the `token` option: a getter
+installed with `client.setAuthTokenGetter()` never reaches it, so a host using
+its own auth provider gets an anonymous socket.
+
+The socket authenticates with the same token an HTTP request would carry. That
+is the getter installed with `client.setAuthTokenGetter()` first; when there is
+none, or it answers `null` or throws, it is the token the client holds: its
+session's, one set with `client.setToken()`, or the `token` option. With the
+built-in `client.auth` there is nothing to wire.
+
+For an external auth provider (Clerk, Firebase Auth, a session of your own),
+install the getter once. It covers HTTP and the socket:
+
+```typescript
+client.setAuthTokenGetter(() => provider.getToken());
+
+// Optional: let the provider recover a refused token, on HTTP and the socket alike.
+client.setOnUnauthorized(async () => {
+    await provider.refresh();
+    return true; // retry with the token resolved again
+});
+```
+
+- `client.setOnUnauthorized(handler)` answers a refused token on both: a 401
+  over HTTP, and an auth error on the socket. Resolve `true` to retry with the
+  token resolved again. It replaces the client's own session refresh.
+- Installing a getter, or calling `client.setToken()`, rebuilds an open socket:
+  the new one authenticates with the new credential and re-sends every live
+  subscription and channel as it, and nothing the previous identity held
+  carries over. With no socket open, the next one authenticates itself.
+- `client.ws.setAuthTokenGetter()` is deprecated. It still works, replacing
+  only the socket's getter, and warns once. Use `client.setAuthTokenGetter()`.
+
+See [Using your own auth provider](/docs/sdk/authentication#using-your-own-auth-provider).
 
 ### The connection is lazy
 

@@ -36,7 +36,9 @@ of it resolves too: Node has supported `require(esm)` since 22.12.
 | `DrawerFooterActions` | Footer action buttons inside the drawer |
 | `SideDialogs` | Stacked side-panel dialog system |
 | `AdminModeSyncer` | Syncs the admin mode (`"cms"` \| `"studio"`) with the current route |
-| `CollectionPanel` | Standalone collection browser panel |
+| `CollectionPanel` | Standalone collection browser panel — by slug, or with the collection as a value (`collection={postsCollection}`), anywhere under `<Rebase>` and a router |
+| `EntityFormPanel` | One record's form, loaded by `entityId` (or new without one) and saved through `<Rebase>`'s data layer, with `onSaved` and `onClose` |
+| `CollectionsProvider` | The minimal scope for those two in a page of your own app: a registry of the collections you pass, and the side panels records open in. No `RebaseCMS`, `RebaseNavigation` or `RebaseShell` needed; any React Router router |
 
 ### Entity & Collection Views
 

@@ -8,7 +8,7 @@ description: Override default UI components with custom implementations at the a
 
 Rebase allows you to override default UI components with your own custom implementations. This implements a Docusaurus-style component swizzling model that supports two customization patterns:
 - **Eject mode** (default): Your component fully replaces the built-in one.
-- **Wrap mode** (`wrap: true`): Your component wraps the original. The built-in component is passed as the `OriginalComponent` prop so you can render it inside your custom layout/logic.
+- **Wrap mode** (`wrap: true`): Your component wraps the original. What it wraps (usually the built-in component) is passed as the `OriginalComponent` prop so you can render it inside your custom layout/logic.
 
 Component overrides can be applied **globally** at the application level (on the `<Rebase>` provider) or **locally** at the collection level (inside individual collection definitions).
 
@@ -85,7 +85,7 @@ export const productsCollection = defineCollection({
 });
 ```
 
-The wrapping component lives with the rest of your frontend code, and receives the built-in one as `OriginalComponent`:
+The wrapping component lives with the rest of your frontend code, and receives what it wraps as `OriginalComponent` — the built-in component, unless your app overrides it too (see [When both scopes override a component](#when-both-scopes-override-a-component)):
 
 ```tsx
 // frontend/src/ProductsEmptyState.tsx
@@ -108,6 +108,21 @@ export default function ProductsEmptyState({ OriginalComponent, ...props }: {
 Each module needs a **default export**. The collections Vite plugin rewrites a path into a lazy import, so the component is its own chunk and loads the first time the override renders. That rewrite covers the files inside the configured `collectionsDir`. A path in a file outside it reaches the admin as a bare string: the console says so, and the built-in component renders in its place. Outside `collectionsDir`, write the lazy import yourself: `Component: () => import("../../frontend/src/ProductCustomForm")`.
 
 A direct reference (`Component: ProductCustomForm`) also works, but only in a collection file nothing on the server loads, because importing the component also imports React and everything it pulls in.
+
+### When both scopes override a component
+
+<span class="since-badge" data-since="0.25">Since 0.25</span> On 0.24 a collection's wrapper always receives the built-in component, and the app-level override is skipped inside that collection.
+
+The two scopes compose. The app-level override (`<Rebase components>`) is applied to the built-in component first, and the collection's (`admin.components`) is applied to the result:
+
+| App level | Collection level | What renders inside that collection |
+|---|---|---|
+| any | none | what renders everywhere else: the app-level override, or the built-in component |
+| none | wrap | the collection's wrapper around the built-in component |
+| replace or wrap | wrap | the collection's wrapper around the app-level override, passed as `OriginalComponent` |
+| any | replace | the collection's component alone; it replaces both |
+
+So a collection can add something around a component your app already customises without losing that customisation. To drop the app-level version for one collection, replace instead of wrapping.
 
 ---
 
