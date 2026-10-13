@@ -188,6 +188,112 @@ describe("anonymous-write-allowed", () => {
         expect(f.fix).not.toContain('FROM "anon"');
     });
 
+    it("flags a policy aimed at a role anon inherits", () => {
+        // `TO app_writer` reaches anon when anon is a member of app_writer; a
+        // check that compared names only scanned this clean.
+        const findings = anonymousWriteAllowed.run(
+            snapshot({
+                relations: [table("public", "comments", { rlsEnabled: true, columns: ["id", "user_id"] })],
+                roles: [
+                    ...DEFAULT_ROLES.filter((r) => r.name !== "anon"),
+                    role("anon", { memberOf: ["app_writer"] }),
+                    role("app_writer")
+                ],
+                policies: [
+                    policy("public", "comments", "p", { command: "INSERT", roles: ["app_writer"], withCheck: "true" })
+                ],
+                grants: [grant("public", "comments", "app_writer", ["INSERT"])]
+            })
+        );
+
+        expect(findings).toHaveLength(1);
+        expect(findings[0].confidence).toBe("certain");
+        expect(findings[0].detail).toContain("anon");
+        expect(findings[0].fix).toContain('REVOKE INSERT ON "public"."comments" FROM "app_writer";');
+    });
+
+    it("does NOT flag a policy aimed at a role no anonymous role inherits", () => {
+        expect(
+            anonymousWriteAllowed.run(
+                snapshot({
+                    relations: [table("public", "comments", { rlsEnabled: true })],
+                    roles: [...DEFAULT_ROLES, role("app_writer")],
+                    policies: [
+                        policy("public", "comments", "p", { command: "INSERT", roles: ["app_writer"], withCheck: "true" })
+                    ],
+                    grants: [grant("public", "comments", "app_writer", ["INSERT"])]
+                })
+            )
+        ).toEqual([]);
+    });
+
+    /**
+     * Rebase has no `anon` role: every request runs as `rebase_user`, a
+     * signed-out one too when the API admits it (`AUTH_REQUIRE=false`), and
+     * every guest account. The database cannot see that switch, so the
+     * finding is heuristic — but it is a finding, where the check used to be
+     * blind on Rebase altogether.
+     */
+    describe("on Rebase", () => {
+        const rebaseDb = (p: ReturnType<typeof policy>, grantee = "rebase_user", platform: "rebase" | "unknown" = "rebase") =>
+            snapshot({
+                platform,
+                exposedRoles: ["PUBLIC", "rebase_user"],
+                roles: [role("postgres", { canLogin: true, superuser: true }), role("rebase_user")],
+                relations: [table("public", "comments", { rlsEnabled: true, columns: ["id", "user_id"] })],
+                policies: [p],
+                grants: [grant("public", "comments", grantee, ["SELECT", "INSERT", "UPDATE", "DELETE"])]
+            });
+
+        it("flags a write policy for every role whose check accepts any row, as heuristic", () => {
+            const findings = anonymousWriteAllowed.run(
+                rebaseDb(policy("public", "comments", "comments_insert_x", { command: "INSERT", withCheck: "true" }))
+            );
+
+            expect(findings).toHaveLength(1);
+            expect(findings[0].severity).toBe("high");
+            expect(findings[0].confidence).toBe("heuristic");
+            expect(findings[0].detail).toContain("rebase_user");
+            expect(findings[0].detail).toContain("AUTH_REQUIRE");
+        });
+
+        it("flags one aimed at rebase_user by name", () => {
+            const [f] = anonymousWriteAllowed.run(
+                rebaseDb(policy("public", "comments", "p", { command: "ALL", roles: ["rebase_user"], using: "true" }))
+            );
+
+            expect(f.title).toContain("insert, update and delete");
+        });
+
+        it("does NOT flag a write scoped to the caller", () => {
+            expect(
+                anonymousWriteAllowed.run(
+                    rebaseDb(policy("public", "comments", "p", {
+                        command: "INSERT",
+                        withCheck: "(user_id = rebase.uid())"
+                    }))
+                )
+            ).toEqual([]);
+        });
+
+        it("does NOT treat rebase_user as anonymous on a database that is not a Rebase app", () => {
+            expect(
+                anonymousWriteAllowed.run(
+                    rebaseDb(policy("public", "comments", "p", { command: "INSERT", withCheck: "true" }), "rebase_user", "unknown")
+                )
+            ).toEqual([]);
+        });
+
+        it("is certain when a named anonymous role holds the write too", () => {
+            const snap = rebaseDb(policy("public", "comments", "p", { command: "INSERT", withCheck: "true" }));
+            snap.roles = [...snap.roles, role("anon")];
+            snap.grants.push(grant("public", "comments", "anon", ["INSERT"]));
+
+            const [f] = anonymousWriteAllowed.run(snap);
+            expect(f.confidence).toBe("certain");
+        });
+    });
+
     it("does NOT flag a restrictive policy", () => {
         const findings = anonymousWriteAllowed.run(
             scenario([

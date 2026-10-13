@@ -13,6 +13,8 @@ import { callerIdCall,
     qi,
     qrel,
     revokesReaching,
+    rolesUsableBy,
+    sameRole,
     type Privilege
 } from "./util";
 
@@ -71,12 +73,14 @@ export const anonymousWriteAllowed: Check = {
             // Which write privileges those identities genuinely hold on the table.
             const granted = new Set<Privilege>();
             const grantedTo: string[] = [];
-            for (const role of identities) {
+            let certain = false;
+            for (const { role, conditional } of identities) {
                 const held = effectivePrivileges(snapshot, policy.schema, policy.table, role);
                 const hit = wanted.filter((p) => held.has(p));
                 if (hit.length === 0) continue;
                 hit.forEach((p) => granted.add(p));
                 grantedTo.push(isPublicRole(role) ? "PUBLIC" : role);
+                if (!conditional) certain = true;
             }
             if (granted.size === 0) continue;
 
@@ -87,7 +91,10 @@ export const anonymousWriteAllowed: Check = {
                 finding({
                     id: ID,
                     severity: "high",
-                    confidence: "certain",
+                    // Only `rebase_user` reached it: whether a signed-out caller
+                    // arrives as that role is the deployment's switch, which the
+                    // catalog does not hold.
+                    confidence: certain ? "certain" : "heuristic",
                     title:
                         `${policy.schema}.${policy.table} accepts unauthenticated ` +
                         `${listAnd(verbs)} via policy "${policy.name}"`,
@@ -98,7 +105,14 @@ export const anonymousWriteAllowed: Check = {
                         `${listAnd(commands)} is a constant truth, so every row satisfies it. ` +
                         `${listAnd(grantedTo)} also ${grantedTo.length > 1 ? "hold" : "holds"} ` +
                         `${listAnd(commands)} on the table, so both the privilege check and the row ` +
-                        `check pass for a request that carries no credentials.`,
+                        `check pass for a request that carries no credentials.` +
+                        (certain
+                            ? ""
+                            : ` On Rebase every request runs as ${REBASE_REQUEST_ROLE} — a signed-out one ` +
+                              `too when the API admits it (\`AUTH_REQUIRE=false\`, or \`auth.requireAuth: false\`), ` +
+                              `and every guest account from anonymous sign-in. The database cannot see that ` +
+                              `switch, so this is heuristic: with the API gate on and guests off, only ` +
+                              `signed-in users reach the policy — and they can still ${listAnd(verbs)} any row.`),
                     impact:
                         `An unauthenticated caller reaching this database over an API can ` +
                         `${listAnd(verbs)} rows in ${policy.schema}.${policy.table} at will — inserting ` +
@@ -124,6 +138,18 @@ export const anonymousWriteAllowed: Check = {
     }
 };
 
+/** The role a Rebase app runs every request as, signed-in or not. */
+const REBASE_REQUEST_ROLE = "rebase_user";
+
+interface AnonymousIdentity {
+    role: string;
+    /**
+     * Anonymous only when the deployment admits signed-out callers — Rebase's
+     * `rebase_user`, which the API gate decides about, not the database.
+     */
+    conditional: boolean;
+}
+
 /**
  * Which unauthenticated identities a policy's TO list actually covers.
  *
@@ -131,17 +157,42 @@ export const anonymousWriteAllowed: Check = {
  * so the privileges that matter are the ones held by whichever anonymous roles
  * this database has (plus anything granted to PUBLIC). Resolving that is the
  * difference between catching `TO public` + `GRANT … TO anon` and missing it.
+ *
+ * A named role covers an anonymous one that is a member of it: `TO app_writer`
+ * applies to `anon` when anon inherits app_writer, which a comparison of names
+ * missed. And on Rebase, which has no `anon`, the role a signed-out request
+ * runs as is `rebase_user` — so a Rebase database used to scan clean here
+ * whatever its write policies said.
  */
-function anonymousIdentities(snapshot: DbSnapshot, policyRoles: string[]): string[] {
-    const named = policyRoles.filter((r) => ANONYMOUS_ROLES.includes(r.toLowerCase()));
-    if (named.length === 0) return [];
-    if (!named.some(isPublicRole)) return named;
+function anonymousIdentities(snapshot: DbSnapshot, policyRoles: string[]): AnonymousIdentity[] {
+    const present = snapshot.roles.map((r) => r.name);
+    const anonymous = present.filter((name) => ANONYMOUS_ROLES.includes(name.toLowerCase()) && !isPublicRole(name));
+    const rebaseRequest = snapshot.platform === "rebase"
+        ? present.filter((name) => sameRole(name, REBASE_REQUEST_ROLE))
+        : [];
 
-    const present = snapshot.roles
-        .map((r) => r.name)
-        .filter((name) => ANONYMOUS_ROLES.includes(name.toLowerCase()) && !isPublicRole(name));
+    const out = new Map<string, AnonymousIdentity>();
+    const add = (role: string, conditional: boolean) => {
+        const key = role.toLowerCase();
+        const seen = out.get(key);
+        if (!seen || (seen.conditional && !conditional)) out.set(key, { role, conditional });
+    };
+    const covers = (member: string, target: string) =>
+        sameRole(member, target) || rolesUsableBy(snapshot, member).has(target.toLowerCase());
 
-    return ["public", ...present];
+    for (const target of policyRoles) {
+        if (isPublicRole(target)) {
+            add("public", false);
+            anonymous.forEach((r) => add(r, false));
+            rebaseRequest.forEach((r) => add(r, true));
+            continue;
+        }
+        if (ANONYMOUS_ROLES.includes(target.toLowerCase())) add(target, false);
+        anonymous.filter((r) => covers(r, target)).forEach((r) => add(r, false));
+        rebaseRequest.filter((r) => covers(r, target)).forEach((r) => add(r, true));
+    }
+
+    return [...out.values()];
 }
 
 /**

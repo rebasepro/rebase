@@ -1,6 +1,6 @@
 import type { Check, DbRelation, DbSnapshot, DbView, Finding } from "../types";
 
-import { exposedGrantees, finding, listAnd, qi, qrel, relationAt, revokesReaching } from "./util";
+import { exposedGrantees, finding, listAnd, qi, qrel, relationAt, revokesReaching, roleNamed, rolesUsableBy } from "./util";
 
 const ID = "view-bypasses-rls";
 
@@ -9,6 +9,20 @@ export function protectedBaseTables(snapshot: DbSnapshot, view: DbView): DbRelat
     return view.dependsOn
         .map((d) => relationAt(snapshot, d.schema, d.table))
         .filter((r): r is DbRelation => Boolean(r?.rlsEnabled));
+}
+
+/**
+ * Whether `owner` reads `base` past its policies: as a superuser, with
+ * BYPASSRLS, or as the table's owner (a member of the owning role counts, as
+ * Postgres counts it) while FORCE ROW LEVEL SECURITY is off. A role the
+ * catalog read did not return is assumed to — the scan must not go quiet on
+ * what it could not see.
+ */
+export function ownerReadsPast(snapshot: DbSnapshot, owner: string, base: DbRelation): boolean {
+    const role = roleNamed(snapshot, owner);
+    if (!role) return true;
+    if (role.superuser || role.bypassRls) return true;
+    return !base.rlsForced && rolesUsableBy(snapshot, owner).has(base.owner.toLowerCase());
 }
 
 /**
@@ -24,6 +38,12 @@ export function protectedBaseTables(snapshot: DbSnapshot, view: DbView): DbRelat
  * Before PG 15 the option does not exist, which means every view behaves this
  * way. That is worth saying, but it is not evidence that *this* view is a
  * mistake, so those findings are marked heuristic.
+ *
+ * The owner is *normally* exempt, not always. A view owned by a role the base
+ * tables' policies do apply to returns what those policies give that role —
+ * to every caller alike, which may be nothing at all. Still reported, because
+ * the rows do not depend on who asks, but heuristic: whether it hands out more
+ * than a caller should see depends on the owner's policies.
  */
 export const viewBypassesRls: Check = {
     id: ID,
@@ -54,12 +74,19 @@ export const viewBypassesRls: Check = {
 
             const roles = exposed.map((e) => e.role);
             const legacy = view.securityInvoker === null;
+            const ownerConstrained = !baseTables.some((base) => ownerReadsPast(snapshot, view.owner, base));
+            const constrainedNote =
+                ` ${view.owner} is itself subject to the policies on ${listAnd(bases)} — it is not a ` +
+                `superuser, holds no BYPASSRLS and ${bases.length > 1 ? "owns none of them" : "does not own it"} ` +
+                `without FORCE ROW LEVEL SECURITY — so the view returns the rows those policies give ` +
+                `${view.owner}, to every caller alike. That may be fewer rows than a caller should see, or ` +
+                `more; it is never the caller's own view of the table.`;
 
             findings.push(
                 finding({
                     id: ID,
                     severity: "critical",
-                    confidence: legacy ? "heuristic" : "certain",
+                    confidence: legacy || ownerConstrained ? "heuristic" : "certain",
                     title:
                         `View ${view.schema}.${view.name} reads ${listAnd(bases)} without ` +
                         `security_invoker and is readable by ${listAnd(roles)}`,
@@ -69,13 +96,16 @@ export const viewBypassesRls: Check = {
                           `\`security_invoker\` view option does not exist — every view runs with its ` +
                           `owner's privileges. This view is owned by ${view.owner} and selects from ` +
                           `${listAnd(bases)}, which ${bases.length > 1 ? "have" : "has"} row-level ` +
-                          `security enabled. Unless ${view.owner} is itself constrained by those ` +
-                          `policies (it is not, unless FORCE ROW LEVEL SECURITY is set), the view ` +
-                          `returns rows the policies would have filtered out.`
+                          `security enabled.` +
+                          (ownerConstrained
+                              ? constrainedNote
+                              : ` ${view.owner} reads past those policies, so the view returns rows the ` +
+                                `policies would have filtered out.`)
                         : `The view is owned by ${view.owner} and \`security_invoker\` is not set, so its ` +
                           `query executes with ${view.owner}'s privileges rather than the caller's. ` +
                           `Row-level security on ${listAnd(bases)} is evaluated for ${view.owner}, not ` +
-                          `for the role that selected from the view.`,
+                          `for the role that selected from the view.` +
+                          (ownerConstrained ? constrainedNote : ""),
                     impact:
                         `If this view is reachable over an API as ${listAnd(roles)}, a caller reads rows ` +
                         `from ${listAnd(bases)} that the policies on ${bases.length > 1 ? "those tables" : "that table"} ` +

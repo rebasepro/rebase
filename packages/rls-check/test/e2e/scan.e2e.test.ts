@@ -67,6 +67,8 @@ const EXPECTED: { id: string; object: string }[] = [
     { id: "view-bypasses-rls", object: "vuln_ledger_view" },
     { id: "matview-bypasses-rls", object: "vuln_ledger_matview" },
     { id: "anonymous-write-allowed", object: "vuln_anon_write" },
+    { id: "anonymous-write-allowed", object: "vuln_anon_write_member" },
+    { id: "view-bypasses-rls", object: "vuln_ledger_view_constrained_owner" },
     { id: "unqualified-column-in-subquery", object: "vuln_unqualified" },
     { id: "junction-table-unprotected", object: "vuln_post_tags" },
     { id: "rls-enabled-not-forced", object: "vuln_not_forced" },
@@ -171,6 +173,16 @@ describe.skipIf(!dockerAvailable)("rls-check against a real PostgreSQL", () => {
             matches.map(objectName),
             `"${id}" did not point at ${object}`
         ).toContain(object);
+    });
+
+    it("grades a view by its owner: certain past the policies, heuristic when they bind it", () => {
+        const graded = (view: string) =>
+            full.findings.find((finding) => finding.id === "view-bypasses-rls" && objectName(finding) === view)
+                ?.confidence;
+
+        // Owned by the container superuser, which FORCE cannot constrain.
+        expect(graded("vuln_ledger_view")).toBe("certain");
+        expect(graded("vuln_ledger_view_constrained_owner")).toBe("heuristic");
     });
 
     it("emits every check id in the catalog at least once", () => {

@@ -317,6 +317,16 @@ GRANT SELECT ON public.protected_ledger TO authenticated;
 CREATE VIEW public.vuln_ledger_view AS SELECT * FROM public.protected_ledger;
 GRANT SELECT ON public.vuln_ledger_view TO anon, authenticated;
 
+-- view-bypasses-rls, owner subject to the policies: ledger_reporter is no
+-- superuser, holds no BYPASSRLS and does not own protected_ledger, so the view
+-- returns what the policies give ledger_reporter — to every caller alike.
+-- Reported, but heuristic rather than a certain bypass.
+CREATE ROLE ledger_reporter NOLOGIN;
+GRANT SELECT ON public.protected_ledger TO ledger_reporter;
+CREATE VIEW public.vuln_ledger_view_constrained_owner AS SELECT * FROM public.protected_ledger;
+ALTER VIEW public.vuln_ledger_view_constrained_owner OWNER TO ledger_reporter;
+GRANT SELECT ON public.vuln_ledger_view_constrained_owner TO anon, authenticated;
+
 -- The same view made safe, spelled every way Postgres accepts a boolean. It
 -- stores the option verbatim (`security_invoker=1`), and a scanner that only
 -- read `true`/`on` called each of these a critical bypass.
@@ -356,6 +366,20 @@ ALTER TABLE public.vuln_anon_write FORCE ROW LEVEL SECURITY;
 CREATE POLICY vuln_anon_write_insert ON public.vuln_anon_write
     FOR INSERT TO anon WITH CHECK (true);
 GRANT INSERT ON public.vuln_anon_write TO anon;
+
+-- anonymous-write-allowed through membership: the policy names app_writer, and
+-- anon is a member of it. A check that compared role names scanned this clean.
+CREATE ROLE app_writer NOLOGIN;
+GRANT app_writer TO anon;
+CREATE TABLE public.vuln_anon_write_member (
+    id    uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    body  text
+);
+ALTER TABLE public.vuln_anon_write_member ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.vuln_anon_write_member FORCE ROW LEVEL SECURITY;
+CREATE POLICY vuln_anon_write_member_insert ON public.vuln_anon_write_member
+    FOR INSERT TO app_writer WITH CHECK (true);
+GRANT INSERT ON public.vuln_anon_write_member TO app_writer;
 
 -- A write policy with no clause is not one whose clause is true. Postgres ORs
 -- the expressions permissive policies have and denies when there are none, so

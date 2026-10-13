@@ -401,6 +401,13 @@ On PostgreSQL below 15 the option does not exist at all, so every such view beha
 way. There the finding is reported as heuristic, and the fix is to move the logic into a
 function or upgrade.
 
+The owner is normally exempt from the base table's policies, but not always. When the view's
+owner is not a superuser, holds no `BYPASSRLS`, and does not own the base table (or owns it
+with `FORCE ROW LEVEL SECURITY`), the policies apply to the owner. The view then returns the
+rows those policies give the owner, to every caller alike. That can be fewer rows than a
+caller should see, or more. The finding is still reported, because the rows do not depend on
+who asks, but as heuristic rather than certain. The fix is the same.
+
 ### matview-bypasses-rls
 
 **Materialized view exposes RLS-protected data.** High.
@@ -427,6 +434,17 @@ The "accepts any row" condition is essential and deliberately narrow. Supabase g
 and `authenticated` full DML by default, so a policy targeting those roles is not by itself
 a problem — a textbook `FOR INSERT TO public WITH CHECK (user_id = auth.uid())` is correct
 and is not reported.
+
+A policy reaches an unauthenticated caller through `TO public`, through a role named
+`anon` or `web_anon`, or through a role that one of those is a member of: `TO app_writer`
+counts when `anon` inherits `app_writer`.
+
+On Rebase there is no `anon` role. Every request runs as `rebase_user`, including a
+signed-out one when the API admits it (`AUTH_REQUIRE=false`, or `auth.requireAuth: false`)
+and every guest account from anonymous sign-in. The database cannot see that setting, so on
+Rebase a write that only `rebase_user` reaches is reported as heuristic. With the API gate on
+and guest sign-in off, only signed-in users reach the policy, and they can still write any
+row. Scope the collection's write rule to the caller (an `ownerField`) or to `roles`.
 
 ### unqualified-column-in-subquery
 
