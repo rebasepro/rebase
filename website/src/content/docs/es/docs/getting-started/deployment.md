@@ -289,7 +289,17 @@ const router = createBrowserRouter([
 ], { basename });
 ```
 
-El panel necesita un **data router** — `createBrowserRouter`, no el simple `BrowserRouter` — porque el bloqueo de cambios sin guardar usa `useBlocker`, que solo proporciona el data router.
+Mantén el panel en un **data router** — `createBrowserRouter` con
+`<RouterProvider>`, como hace el scaffold. Bajo él, un registro con cambios sin guardar
+también detiene la navegación dentro de la aplicación (un enlace del drawer, el botón
+de retroceso del navegador) y pregunta primero, mediante `useBlocker`, que solo un data router
+proporciona.
+
+<span class="since-badge" data-since="0.25">Desde 0.25</span> El panel también
+funciona bajo un simple `<BrowserRouter>`. Allí la protección contra cambios sin guardar
+recurre al aviso propio del navegador al abandonar la página, que cubre una recarga, cerrar la
+pestaña o escribir una URL; navegar dentro de la aplicación continúa sin preguntar. En
+0.24 el panel lanza un error fuera de un data router.
 
 **Backend** — si también mueves la API, actualiza su ruta base:
 
@@ -336,7 +346,8 @@ const router = isAdmin
 root.render(<RouterProvider router={router}/>);
 ```
 
-Un único router para ambas mitades: el panel necesita el data router de todas formas, y no hay razón para que la app de producto esté en otro.
+Un único router para ambas mitades: al panel le conviene un data router, que
+permite que los cambios sin guardar detengan la navegación dentro de la aplicación, y no hay razón para que la app de producto esté en otro.
 
 El backend no necesita cambios para este patrón — la API permanece en `/api` y el catch-all de la SPA
 sirve `index.html` tanto para `/` como para `/admin/*`.

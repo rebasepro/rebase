@@ -20,6 +20,10 @@ CDC se controla mediante la variable de entorno `REALTIME_CDC`:
 | `wal` | Prefiere la replicación lógica WAL. Aún no está incluida: pasa a `trigger` y registra el modo activo. |
 | `off` | Solo tiempo real a nivel de aplicación. Úsalo para evitar la sobrecarga de triggers por escritura en cargas de trabajo intensivas en escritura. Un arranque con `off` que es propietario del esquema también **elimina** los triggers y funciones de captura que instaló un arranque anterior, y registra cuántos quitó; quita el valor y el siguiente arranque los instala de nuevo. |
 
+<span class="since-badge" data-since="0.25">Desde 0.25</span> El mismo ajuste es la
+opción `realtime.cdc` del adaptador de Postgres, para un servidor que lo configura en
+código. `REALTIME_CDC`, cuando está definida, tiene prioridad.
+
 Al arrancar verás una línea de registro que indica el modo activo, por ejemplo:
 
 ```
@@ -46,7 +50,9 @@ Si la conexión no lo soporta, `auto` muestra en su lugar una línea informativa
 
 ## Requisitos y notas
 
-- CDC requiere una cadena de conexión directa (`DATABASE_DIRECT_URL` o la conexión principal) para el cliente `LISTEN`: los agrupadores de conexiones (connection poolers) en modo transacción no admiten sesiones `LISTEN` de larga duración.
+<span class="since-badge" data-since="0.25">Desde 0.25</span> `directConnectionString` es la opción del adaptador; en 0.24 usa `DATABASE_DIRECT_URL`.
+
+- CDC requiere una cadena de conexión directa (`DATABASE_DIRECT_URL`, el `directConnectionString` del adaptador o la conexión principal) para el cliente `LISTEN`: los agrupadores de conexiones (connection poolers) en modo transacción no admiten sesiones `LISTEN` de larga duración.
 - Los triggers solo se instalan en tablas respaldadas por una colección registrada. Las escrituras en tablas no asignadas se ignoran.
 - Una colección cuya tabla aún no ha sido migrada se omite con una advertencia en lugar de bloquear CDC para el resto.
 - La transmisión por replicación lógica nativa de WAL (`wal2json`/`pgoutput`) está prevista; hoy en día `REALTIME_CDC=wal` se degrada a la vía basada en triggers, que proporciona una cobertura equivalente a nivel de base de datos.

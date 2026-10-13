@@ -43,6 +43,10 @@ REBASE_ROLE=all        # the default: everything, one process
 El estado de salud (health) y las métricas están en cada rol sin excepción. Un proceso que un
 orquestador no puede sondear es un proceso que no puede actualizar progresivamente (roll).
 
+<span class="since-badge" data-since="0.25">Desde 0.25</span> `GET /api/auth/config`,
+lo que lee la pantalla de inicio de sesión, sigue al resto de `/api/auth`: solo lo sirven `api` y
+`all`. En 0.24 un proceso `functions` o `worker` también lo respondía.
+
 Realtime está en la lista porque tiene un coste, lo use alguien o no:
 un proceso que consume eventos de cambio mantiene una conexión `LISTEN` fuera
 del pool durante todo el tiempo que se ejecuta, e instala los disparadores de captura en el arranque. Solo
@@ -149,6 +153,15 @@ configuración predeterminada se negará a iniciar, y mostrará un mensaje indic
 y luego escribe en él en dos pasos separados, por lo que los procesos que arrancan al mismo tiempo
 colisionan; y un despliegue donde varios compiten por aprovisionar el mismo
 esquema no es algo que nadie haya diseñado intencionadamente.
+
+<span class="since-badge" data-since="0.25">Desde 0.25</span> En un
+[servidor personalizado](/docs/backend/custom-server/), la misma decisión es la opción
+`provision` de `createRebaseBackend`: `true` en el proceso que es dueño del
+esquema, y `{ collections: false, realtime: false }` en todos los demás, que
+aun así conservan las tablas propias del framework. `REBASE_MIGRATE_ON_BOOT=none`
+desactiva allí también el esquema de colecciones. El trabajo en segundo plano se decide
+del mismo modo: un proceso que nunca llama a `start()` no ejecuta ningún programador de cron ni
+workers de trabajos, y uno que lo hace ejecuta los que le concede su opción `ownership`.
 
 ## Servir una función por proceso
 

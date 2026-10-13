@@ -9,7 +9,7 @@ description: Sobrescribe componentes de interfaz de usuario predeterminados con 
 
 Rebase te permite sobrescribir los componentes de interfaz de usuario predeterminados con tus propias implementaciones personalizadas. Esto implementa un modelo de "component swizzling" al estilo de Docusaurus que admite dos patrones de personalización:
 - **Modo eject** (predeterminado): Tu componente reemplaza por completo al componente integrado.
-- **Modo wrap** (`wrap: true`): Tu componente envuelve al original. El componente integrado se pasa como la prop `OriginalComponent` para que puedas renderizarlo dentro de tu estructura/lógica personalizada.
+- **Modo wrap** (`wrap: true`): Tu componente envuelve al original. Lo que envuelve (normalmente el componente integrado) se pasa como la prop `OriginalComponent` para que puedas renderizarlo dentro de tu estructura/lógica personalizada.
 
 Las sobrescrituras de componentes se pueden aplicar de forma **global** a nivel de aplicación (en el proveedor `<Rebase>`) o de forma **local** a nivel de colección (dentro de las definiciones de colecciones individuales).
 
@@ -86,7 +86,7 @@ export const productsCollection = defineCollection({
 });
 ```
 
-El componente contenedor reside con el resto de tu código de frontend, y recibe el componente integrado como `OriginalComponent`:
+El componente contenedor reside con el resto de tu código de frontend, y recibe lo que envuelve como `OriginalComponent` — el componente integrado, a menos que tu aplicación también lo sobrescriba (consulta [Cuando ambos alcances sobrescriben un componente](#cuando-ambos-alcances-sobrescriben-un-componente)):
 
 ```tsx
 // frontend/src/ProductsEmptyState.tsx
@@ -109,6 +109,21 @@ export default function ProductsEmptyState({ OriginalComponent, ...props }: {
 Cada módulo necesita una **exportación por defecto** (default export). El plugin de Vite para colecciones reescribe una ruta convirtiéndola en una importación perezosa (lazy import), de modo que el componente forme su propio chunk y se cargue la primera vez que la sobrescritura se renderice. Dicha reescritura cubre los archivos dentro del `collectionsDir` configurado. Una ruta en un archivo fuera de este llega al admin como una cadena simple: la consola lo advertirá, y el componente integrado se renderizará en su lugar. Fuera de `collectionsDir`, escribe la importación perezosa tú mismo: `Component: () => import("../../frontend/src/ProductCustomForm")`.
 
 Una referencia directa (`Component: ProductCustomForm`) también funciona, pero solo en un archivo de colección que nada en el servidor cargue, ya que importar el componente también importa React y todo lo que este arrastre consigo.
+
+### Cuando ambos alcances sobrescriben un componente
+
+<span class="since-badge" data-since="0.25">Desde 0.25</span> En 0.24 el contenedor (wrapper) de una colección siempre recibe el componente integrado, y la sobrescritura a nivel de aplicación se omite dentro de esa colección.
+
+Los dos alcances se componen. La sobrescritura a nivel de aplicación (`<Rebase components>`) se aplica primero al componente integrado, y la de la colección (`admin.components`) se aplica al resultado:
+
+| Nivel de aplicación | Nivel de colección | Qué se renderiza dentro de esa colección |
+|---|---|---|
+| cualquiera | ninguno | lo que se renderiza en todos los demás sitios: la sobrescritura a nivel de aplicación, o el componente integrado |
+| ninguno | wrap | el contenedor de la colección alrededor del componente integrado |
+| replace o wrap | wrap | el contenedor de la colección alrededor de la sobrescritura a nivel de aplicación, pasada como `OriginalComponent` |
+| cualquiera | replace | el componente de la colección por sí solo; reemplaza a ambos |
+
+Así, una colección puede añadir algo alrededor de un componente que tu aplicación ya personaliza sin perder esa personalización. Para descartar la versión a nivel de aplicación en una colección, reemplaza en lugar de envolver.
 
 ---
 

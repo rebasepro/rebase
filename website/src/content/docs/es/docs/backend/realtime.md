@@ -29,6 +29,14 @@ Para despliegues de múltiples instancias, Rebase utiliza `LISTEN/NOTIFY` de Pos
 
 El tiempo real está habilitado de forma predeterminada. No hay ningún indicador que activar ni ningún servicio que iniciar: si tu servidor de Rebase está en ejecución, el endpoint de WebSocket estará disponible.
 
+### Qué ruta responde el socket
+
+<span class="since-badge" data-since="0.25">Desde 0.25</span> En 0.24 el socket acepta cada actualización (upgrade) de WebSocket del servidor, sea cual sea su ruta.
+
+El socket responde a las actualizaciones de una sola ruta: la ruta base de la API sin un `/api` final, es decir, `/` para una API en `/api`. Es donde marca el SDK: se conecta a su `baseUrl`, mientras que sus solicitudes HTTP van a `${baseUrl}/api`. Una actualización a cualquier otra ruta se deja a los demás oyentes `upgrade` del servidor, de modo que tu aplicación puede ejecutar su propio servidor WebSocket en el mismo `http.Server`. Sin otro oyente, esa actualización recibe un `404`.
+
+En un [servidor personalizado](/docs/backend/custom-server/), `backend.attachRealtime(server, { path })` establece la ruta, y el `realtime.path` del adaptador de Postgres anula la que el servidor derivó.
+
 > Por defecto, Rebase también emite eventos en tiempo real para las escrituras realizadas **fuera** de la API (mediante `psql`, otro servicio o el editor SQL de Studio) siempre que la conexión a la base de datos lo admita; consulta [captura de cambios a nivel de base de datos](/docs/backend/realtime-cdc/).
 
 ## Suscripciones del SDK tipado

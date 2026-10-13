@@ -443,7 +443,7 @@ function CustomAction() {
 
 ## `useUnsavedChangesDialog`
 
-Impide la navegación o la descarga de la página cuando un formulario tiene cambios sin guardar. Intercepta automáticamente la navegación interna de React Router mediante `useBlocker`, así como las recargas a nivel de navegador mediante `beforeunload`.
+Impide la navegación o la descarga de la página cuando un formulario tiene cambios sin guardar. Pregunta antes de una recarga o de cerrar la pestaña (`beforeunload`) y, dentro del panel bajo un data router de React Router (`createBrowserRouter`), también antes de la navegación dentro de la aplicación, mediante `useBlocker`. Bajo cualquier otro router, como un simple `<BrowserRouter>`, solo se aplica el aviso a nivel de navegador.
 
 ```typescript
 import { useUnsavedChangesDialog } from "@rebasepro/app";

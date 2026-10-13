@@ -223,7 +223,7 @@ El cliente WebSocket gestiona la autenticación automáticamente:
 - `client.ws.state` es el estado de la conexión — `idle`, `connecting`, `connected`, `reconnecting`, `disconnected` o `closed` — y `client.ws.onStateChange(listener)` se notifica de cada cambio. `disconnected` es el estado en el que se ha informado `CONNECTION_LOST`.
 - Las solicitudes enviadas por el socket son **como mucho una vez**. Una que se envió cuando la conexión se cayó falla con `CONNECTION_LOST` y nunca se reenvía, ya que el servidor puede haberla ejecutado ya. Una que sigue esperando un socket tras 30 segundos falla con `REQUEST_TIMEOUT` sin llegar a enviarse.
 
-para todo lo de la lista posterior a cerrar sesión. En 0.23 el cliente se rinde tras
+Todo lo de la lista posterior a cerrar sesión llegó en 0.24. En 0.23 el cliente se rinde tras
 cinco intentos de reconexión fallidos, pone en cola las solicitudes hechas mientras está desconectado y
 las envía al reconectar, no tiene `client.ws.state`, y el servidor nunca cierra un
 socket cuya sesión haya terminado.
@@ -247,7 +247,43 @@ const unsubscribe = client.data.orders.listen(
 );
 ```
 
-No se requiere una gestión manual de tokens: la integración entre `client.auth` y la capa WebSocket se maneja internamente.
+### Qué token envía el socket
+
+<span class="since-badge" data-since="0.25">Desde 0.25</span> En 0.24 el
+socket usa solo la sesión propia del cliente y la opción `token`: un getter
+instalado con `client.setAuthTokenGetter()` nunca llega a él, así que un anfitrión que use
+su propio proveedor de autenticación obtiene un socket anónimo.
+
+El socket se autentica con el mismo token que llevaría una solicitud HTTP. Ese
+es primero el getter instalado con `client.setAuthTokenGetter()`; cuando no hay
+ninguno, o responde `null` o lanza un error, es el token que tiene el cliente: el de su
+sesión, uno definido con `client.setToken()`, o la opción `token`. Con el
+`client.auth` integrado no hay nada que conectar.
+
+Para un proveedor de autenticación externo (Clerk, Firebase Auth, una sesión propia),
+instala el getter una sola vez. Cubre HTTP y el socket:
+
+```typescript
+client.setAuthTokenGetter(() => provider.getToken());
+
+// Optional: let the provider recover a refused token, on HTTP and the socket alike.
+client.setOnUnauthorized(async () => {
+    await provider.refresh();
+    return true; // retry with the token resolved again
+});
+```
+
+- `client.setOnUnauthorized(handler)` responde a un token rechazado en ambos: un 401
+  por HTTP, y un error de autenticación en el socket. Resuelve `true` para reintentar con el
+  token resuelto de nuevo. Reemplaza la renovación de sesión propia del cliente.
+- Instalar un getter, o llamar a `client.setToken()`, reconstruye un socket abierto:
+  el nuevo se autentica con la nueva credencial y vuelve a enviar cada suscripción
+  y canal activos como ella, y nada de lo que tenía la identidad anterior
+  se conserva. Sin ningún socket abierto, el siguiente se autentica por sí mismo.
+- `client.ws.setAuthTokenGetter()` está deprecado. Sigue funcionando, reemplazando
+  solo el getter del socket, y avisa una vez. Usa `client.setAuthTokenGetter()`.
+
+Consulta [Usar tu propio proveedor de autenticación](/docs/sdk/authentication#using-your-own-auth-provider).
 
 ### La conexión es diferida (lazy)
 

@@ -498,6 +498,49 @@ const client = createRebaseClient({
 });
 ```
 
+## Usar tu propio proveedor de autenticación
+
+<span class="since-badge" data-since="0.25">Desde 0.25</span> En 0.24 un getter de
+token autentica solo las solicitudes HTTP, y el socket de tiempo real sigue siendo
+anónimo.
+
+Cuando los usuarios inician sesión con un proveedor propio (Clerk, Firebase Auth, o una
+sesión que tu aplicación ya tiene), `client.auth` no interviene. Dale en su lugar al cliente un
+getter para el token del proveedor. Se le pregunta cada vez que se
+necesita un token: en cada solicitud HTTP, y cada vez que el socket de tiempo real
+se autentica.
+
+```typescript
+import { createRebaseClient } from "@rebasepro/client";
+
+const client = createRebaseClient({ baseUrl: import.meta.env.VITE_API_URL });
+
+client.setAuthTokenGetter(() => clerk.session?.getToken() ?? Promise.resolve(null));
+
+// Optional: let Clerk recover a refused token, on HTTP and the socket alike.
+client.setOnUnauthorized(async () => {
+    await clerk.session?.reload();
+    return true;
+});
+
+// The socket authenticates as the Clerk user.
+client.data.posts.listen({}, (response) => render(response.data));
+```
+
+- El getter tiene prioridad sobre la sesión propia del cliente. Cuando responde `null` o
+  lanza un error, el cliente envía el token que tenga, si lo hay: el de su sesión, uno
+  definido con `client.setToken()`, o la opción `token`.
+- La opción `token` se lee cada vez que se necesita un token, hasta que `setToken()` o
+  un inicio de sesión la reemplaza, así que puede declararse como un getter
+  (`get token() { return currentToken; }`).
+- `setOnUnauthorized` cubre un 401 por HTTP y un error de autenticación en el socket,
+  y reemplaza la renovación de sesión propia del cliente.
+
+El backend tiene que verificar el token del proveedor: consulta
+[Adaptadores de autenticación personalizados](/docs/backend/auth-adapters). En el panel de administración, define
+el getter en el cliente que pasas a `<Rebase client>`
+([Tu propio proveedor de autenticación](/docs/frontend/authentication#your-own-auth-provider)).
+
 ## Estructura del objeto de usuario
 
 ```typescript

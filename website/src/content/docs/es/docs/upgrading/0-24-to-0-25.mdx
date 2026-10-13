@@ -21,6 +21,37 @@ y una cadena vacía en un campo obligatorio. A continuación siguen tres elimina
 cliente que solo eran motores, un hook del admin que nadie necesita y una opción de almacenamiento que
 no llegaba a ningún cliente.
 
+:::note[Comportamiento modificado y nombres deprecados]
+0.25 también cambia lo que hacen algunas llamadas existentes, sin romperlas. Compruebe
+estos puntos si su aplicación depende del comportamiento anterior:
+
+- **Los envoltorios de campo de los plugins se componen.** El `fieldBuilder.wrap` de cada plugin se renderiza,
+  cada uno alrededor del campo que dejaron los plugins anteriores, en lugar de solo el último.
+- **Las sobrescrituras de componentes se componen.** La sobrescritura `wrap: true` de una colección recibe
+  la sobrescritura de la aplicación del mismo componente como `OriginalComponent`, no el
+  componente integrado.
+- **`rebase.auth`, `rebase.admin`, `rebase.functions` y `rebase.cron` en el
+  servidor alcanzan las rutas del backend dentro del proceso,** así que el middleware que haya añadido a
+  su propia aplicación Hono ya no se ejecuta en ellas.
+- **El socket de tiempo real responde solo a su propia ruta** (`/` para una API en `/api`).
+  Un cliente que marcaba otra ruta en el mismo servidor recibe un 404, o su propio
+  oyente `upgrade`.
+- **El socket obtiene su token como lo hace HTTP,** así que `client.setAuthTokenGetter()`
+  ahora lo autentica, y tras cerrar sesión ya no recurre a la
+  opción `token`.
+
+Estos nombres siguen funcionando, avisan una vez en tiempo de ejecución y tienen un reemplazo:
+
+| Deprecado | Use |
+|---|---|
+| `loadFunctionsFromDirectory`, `loadFunctionsWithDiagnostics` | `loadFunctions(dir, { onSkip })` |
+| `loadCronJobsFromDirectory`, `loadCronJobsWithDiagnostics` | `loadCrons(dir, { onSkip })`, y luego `declareCrons(crons)` donde el par antiguo los declaraba |
+| `client.ws.setAuthTokenGetter()` | `client.setAuthTokenGetter()` |
+| `hooks.modifyCollectionAsync` del plugin (nunca se llamaba) | `hooks.modifyCollection`, con los datos obtenidos antes de que se renderice `<Rebase>` |
+| `lifecycle.onCollectionChange` del plugin (nunca se llamaba) | `context.data.collection(slug).listen(…)` desde `lifecycle.onMount` |
+| `DatabaseAdapter.mountRoutes`, `BackendBootstrapper.mountRoutes` (nunca se llamaban) | una factoría de rutas que su aplicación monta |
+:::
+
 ---
 
 ## 68. Un filtro sobre una columna llamada `count` va dentro de `?where=`

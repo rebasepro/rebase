@@ -202,6 +202,24 @@ psql "$(rebase db url)"
 
 La base de datos de desarrollo gestionada es el caso que necesita esto: `.env` deja `DATABASE_URL` comentada a propósito, y el puerto se deriva de la ruta del proyecto, por lo que nada en el disco la nombra. Cuando has definido una `DATABASE_URL` propia, eso es lo que imprime — el orden de resolución es el mismo que sigue cualquier otro comando. Inicia la base de datos gestionada si aún no se está ejecutando.
 
+### `rebase console`
+
+<span class="since-badge" data-since="0.25">Desde 0.25</span>
+
+Un REPL de Node con los datos del proyecto abiertos, o un solo fragmento ejecutado con `-e`:
+
+```bash
+rebase console
+rebase console -e "rebase.dataAsAdmin.posts.find({ limit: 5 })"
+```
+
+`rebase` (`dataAsAdmin`, `sql`, `withAuth(user)`) y `collections` están en
+el ámbito, y `await` de nivel superior funciona. La base de datos se resuelve como
+la resuelve `rebase db push`, y abrirla no cambia nada en ella. Con `-e`, el resultado
+esperado (con `await`) se imprime como JSON en stdout y un `throw` termina con código `1`. Flags: `--eval`/`-e`,
+`--collections`/`-c`, `--database-url`, `--docker`. Consulta
+[Scripts y la consola](/docs/backend/scripts/).
+
 ### `rebase db stop` / `rebase db reset`
 
 Solo para la base de datos de desarrollo gestionada:

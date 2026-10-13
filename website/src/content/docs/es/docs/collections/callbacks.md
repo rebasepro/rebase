@@ -130,6 +130,66 @@ const articlesCollection = defineCollection({
 });
 ```
 
+## Combinar conjuntos de callbacks
+
+<span class="since-badge" data-since="0.25">Desde 0.25</span> En 0.24, combina los
+conjuntos a mano.
+
+Una colección tiene un solo objeto `callbacks`. Cuando varias responsabilidades quieren
+cada una un hook, como las marcas de tiempo, un registro de auditoría y un alcance de
+tenant, escribe cada una como su propio conjunto y combínalas con `composeCallbacks`:
+
+```typescript
+import { composeCallbacks, defineCollection } from "@rebasepro/cms-types";
+import type { CollectionCallbacks } from "@rebasepro/types";
+
+const timestamps: CollectionCallbacks = {
+    beforeSave: ({ values, status }) => ({
+        ...values,
+        ...(status === "new" ? { createdAt: new Date().toISOString() } : {}),
+        updatedAt: new Date().toISOString()
+    })
+};
+
+const auditTrail: CollectionCallbacks = {
+    afterSave: async ({ context, id, status }) => {
+        await context.data.audit_log.create({ entity: "articles", entityId: String(id), action: status });
+    }
+};
+
+export default defineCollection({
+    slug: "articles",
+    name: "Articles",
+    table: "articles",
+    properties: {
+        title: { name: "Title", type: "string" },
+        createdAt: { name: "Created at", type: "string" },
+        updatedAt: { name: "Updated at", type: "string" }
+    },
+    callbacks: composeCallbacks(timestamps, auditTrail)
+});
+```
+
+Los conjuntos se ejecutan en el orden dado, y cada hook se combina como el backend
+combina sus propios niveles [global](/docs/backend/hooks), de colección y de propiedad:
+
+| Hook | Combinación |
+|---|---|
+| `beforeSave` | Encadenado: cada conjunto ve los valores que devolvió el anterior, fusionados de forma superficial sobre lo que recibió |
+| `afterRead` | Encadenado: cada conjunto recibe la fila que devolvió el anterior |
+| `beforeQuery` | Unido con AND: cada conjunto ve la consulta de quien llama, y una fila debe pasar todas las restricciones |
+| `beforeDelete` | Cualquier `false` veta la eliminación; todos los conjuntos se ejecutan igualmente |
+| `afterSave`, `afterDelete` | Se ejecutan en orden, cada uno con `await`; un `throw` detiene el resto |
+| `afterSaveError` | Se ejecutan en orden; un `throw` no detiene al siguiente conjunto, y el primer error se vuelve a lanzar al final |
+
+Un hook está en el resultado solo si algún conjunto lo tiene, y un conjunto
+`undefined` se omite. `composeCallbacks` también se exporta desde `@rebasepro/server` y
+`@rebasepro/common`.
+
+Adjuntar callbacks después del arranque con `backend.setCollectionCallbacks(slug,
+callbacks)` **reemplaza** los que declaró la colección. Para añadir los tuyos a
+ellos, pasa `composeCallbacks(declared, yours)`.
+
 ## Referencia de callbacks
 
 ### `beforeQuery`
@@ -375,6 +435,46 @@ Otros patrones entre colecciones:
 - **Registro de auditoría**: Usa `afterSave` / `afterDelete` para escribir en una colección de registro de auditoría
 - **Contadores**: Usa `afterSave` / `afterDelete` para actualizar campos de recuento en entidades relacionadas
 
+## Probar un callback
+
+<span class="since-badge" data-since="0.25">Desde 0.25</span>
+
+Un callback es una función simple de un objeto de props, así que una prueba unitaria la
+llama. `createCallContext` construye la prop `context`: los campos que pasas se usan
+tal cual, y cualquiera que omitas es un sustituto que lanza un error en el primer uso,
+nombrándose a sí mismo, de modo que una prueba aporta solo lo que el hook realmente toca.
+
+```typescript
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { createCallContext } from "@rebasepro/server";
+import type { User } from "@rebasepro/types";
+import articlesCollection from "../config/collections/articles";
+
+const editor: User = {
+    uid: "u1", displayName: null, email: null, photoURL: null,
+    providerId: "password", isAnonymous: false, roles: ["editor"]
+};
+
+test("beforeSave derives the slug from the title", async () => {
+    const values = await articlesCollection.callbacks!.beforeSave!({
+        collection: articlesCollection,
+        path: "articles",
+        status: "new",
+        values: { title: "Hello World" },
+        context: createCallContext({ user: editor })
+    });
+    assert.equal(values.slug, "hello-world");
+});
+```
+
+Un hook que lee o escribe a través de `context.data` necesita un driver: pasa
+`createCallContext({ data: buildSdkData(driver) })`, con `buildSdkData` de
+`@rebasepro/common` y cualquier `DataDriver`, incluido uno en memoria. `user`
+queda ausente salvo que lo pases, como ocurre en una escritura sin quien llama, de modo que
+una rama `if (context.user)` se prueba con honestidad. Para ejecutar los hooks contra una base
+de datos real, consulta [Scripts y la consola](/docs/backend/scripts/).
+
 ## Referencia completa de Context
 
 Cada callback recibe un objeto `context` de tipo `RebaseCallContext`:
@@ -394,7 +494,8 @@ interface RebaseCallContext {
 }
 ```
 
-Realiza consultas a través de `context.data`. `context.client` no tiene `data`: en el lado del servidor es el singleton `rebase`, cuyo único plano de datos es `dataAsAdmin` con alcance de administrador, por lo que `context.client.data` genera un error de compilación.
+Realiza consultas a través de `context.data`. `context.client` no tiene `data`: en el lado del servidor es el singleton `rebase`, cuyo único plano de datos es `dataAsAdmin` con alcance de administrador, por lo que `context.client.data` genera un error de compilación. Para construir uno de estos
+para una prueba, consulta [Probar un callback](#probar-un-callback).
 
 ## Próximos pasos
 
