@@ -275,11 +275,16 @@ export interface PluginLifecycle {
 
 /**
  * Configuration for wrapping form field components.
+ *
+ * Wrappers from several plugins compose, in plugin order: each plugin's `wrap`
+ * is handed, as `params.Field`, the field as the plugins before it left it. The
+ * first plugin's wrapper ends up closest to the field, the last one's
+ * outermost.
  * @group Plugins
  */
 export interface FieldBuilderConfig {
     /**
-     * Returns a wrapped field component, or null to skip wrapping.
+     * Returns a component wrapping `params.Field`, or null to leave it as it is.
      */
     wrap: <T>(params: PluginFieldBuilderParams) => React.ComponentType<FieldProps<Property>> | null;
 
@@ -326,6 +331,7 @@ export type PluginFieldBuilderParams<M extends Record<string, unknown> = Record<
     fieldConfigId: string;
     propertyKey: string;
     property: Property;
+    /** The field to wrap: the built-in one, or the previous plugins' wrapper of it. */
     Field: React.ComponentType<FieldProps<Property, unknown, M>>;
     plugin: RebasePlugin;
     path?: string;

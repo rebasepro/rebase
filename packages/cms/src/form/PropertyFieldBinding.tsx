@@ -454,8 +454,12 @@ function useWrappedComponent<T, M extends Record<string, unknown> = Record<strin
     }: UseWrappedComponentParams<M>
 ): ComponentType<FieldProps<Property, unknown, M>> | null {
 
+    // A fold, in plugin order: each plugin's `wrap` is handed the field as the
+    // plugins before it left it, so every wrapper renders — the first plugin's
+    // closest to the field, the last one's outermost. A plugin that returns
+    // null, or is not `enabled` for this field, passes it on unchanged.
     const wrapperRef = useRef<ComponentType<FieldProps<Property, unknown, M>> | null>((() => {
-        let Wrapper: ComponentType<FieldProps<Property, unknown, M>> | null = null;
+        let Wrapped: ComponentType<FieldProps<Property, unknown, M>> | null = null;
         if (plugins) {
             plugins.forEach((plugin) => {
                 const fieldId = getFieldId(property);
@@ -464,21 +468,21 @@ function useWrappedComponent<T, M extends Record<string, unknown> = Record<strin
                         fieldConfigId: fieldId,
                         propertyKey,
                         property,
-                        Field: Component as ComponentType<CoreFieldProps<Property, unknown, Record<string, unknown>>>,
+                        Field: (Wrapped ?? Component) as ComponentType<CoreFieldProps<Property, unknown, Record<string, unknown>>>,
                         plugin,
                         path,
                         collection: collection as AdminCollection | undefined
                     };
                     const enabled = plugin.fieldBuilder.enabled?.(params);
                     if (enabled === undefined || enabled)
-                        Wrapper = (plugin.fieldBuilder.wrap(params) as ComponentType<FieldProps<Property, unknown, M>> | null) ?? Wrapper;
+                        Wrapped = (plugin.fieldBuilder.wrap(params) as ComponentType<FieldProps<Property, unknown, M>> | null) ?? Wrapped;
                 }
                 if (!fieldId) {
                     console.warn("INTERNAL: Field id not found for property", property);
                 }
             });
         }
-        return Wrapper;
+        return Wrapped;
     })());
 
     return wrapperRef.current;

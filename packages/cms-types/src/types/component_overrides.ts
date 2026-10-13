@@ -138,6 +138,10 @@ export interface FilterFieldBindingProps {
  *   built-in component is passed as `OriginalComponent` in props, so you can
  *   render it inside your custom layout/logic.
  *
+ * A collection's override applies on top of the app's (`<Rebase components>`)
+ * for the same name: a collection wrapper's `OriginalComponent` is the app's
+ * override when there is one, and a collection replacement replaces both.
+ *
  * @example
  * ```tsx
  * // Eject — full replacement
@@ -177,8 +181,9 @@ export interface ComponentOverride<P = Record<string, unknown>> {
      * what now keeps the class swept.
      *
      * When `wrap` is true, an additional `OriginalComponent` prop is injected
-     * containing the default component, allowing you to render it within
-     * your custom wrapper.
+     * containing the component this override applies to — the built-in one,
+     * or for a collection override, the app's override of it — allowing you
+     * to render it within your custom wrapper.
      */
     Component: ReactComponentRef<P>;
 
