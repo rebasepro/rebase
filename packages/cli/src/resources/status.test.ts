@@ -96,6 +96,9 @@ describe("what a project declares, against what the environment binds", () => {
         expect(nightly.bindings).toEqual([]);
         const hello = find(statusOf({ DATABASE_URL: "postgres://x/y" }), "function", "hello");
         expect(hello.state).toBe("ready");
+        // Where it is mounted, by its own name: this line printed the literal
+        // `/api/functions/<name>` for every function in the project.
+        expect(hello.detail).toBe("mounted at /api/functions/hello");
     });
 
     it("reports a kind this runtime cannot bind, rather than skipping it", () => {

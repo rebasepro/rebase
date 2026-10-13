@@ -220,12 +220,15 @@ const bucketResolver: ResourceResolver = {
     }
 };
 
-/** A kind that is configuration by declaration alone. */
-function codeOnly(kind: string, detail: string): ResourceResolver {
+/**
+ * A kind that is configuration by declaration alone. `detail` may name the
+ * declaration — a function's line says where *it* is mounted, not where one is.
+ */
+function codeOnly(kind: string, detail: string | ((declaration: ResourceDeclaration) => string)): ResourceResolver {
     return {
         kind,
         reads: [],
-        resolve: () => ({ state: "code", detail })
+        resolve: (declaration) => ({ state: "code", detail: typeof detail === "function" ? detail(declaration) : detail })
     };
 }
 
@@ -234,7 +237,7 @@ registerResourceResolver(bucketResolver);
 registerResourceResolver(codeOnly("topic", "rows on the durable job queue in this project's database"));
 registerResourceResolver(codeOnly("queue", "rows on the durable job queue in this project's database"));
 registerResourceResolver(codeOnly("cron", "scheduled in-process; each slot claimed once per deployment"));
-registerResourceResolver(codeOnly("function", "mounted at /api/functions/<name>"));
+registerResourceResolver(codeOnly("function", (declaration) => `mounted at /api/functions/${declaration.key}`));
 
 /**
  * Every kind `@rebasepro/types` registers that this runtime cannot bind.
