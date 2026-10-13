@@ -260,9 +260,35 @@ type TypedDataLayer<DB> = {
  * typed collection accessors when a `DB` schema generic is supplied.
  */
 export type CreateRebaseClientResult<DB = Record<string, unknown>> = Omit<RebaseClient<DB>, "data" | "email"> & {
+    /**
+     * Send this token from now on, over HTTP and on the realtime socket. An
+     * open socket is rebuilt to authenticate with it. A token getter, when one
+     * is installed, still comes first.
+     */
     setToken: (token: string | null) => void;
+    /**
+     * Ask `getter` for the token each time one is needed — every HTTP request
+     * and every time the realtime socket authenticates. This is how a host
+     * that signs users in with its own provider (Clerk, Firebase Auth, a
+     * session of its own) authenticates the client:
+     *
+     * ```ts
+     * client.setAuthTokenGetter(() => clerk.session?.getToken() ?? Promise.resolve(null));
+     * ```
+     *
+     * It comes before the client's own session and the `token` option, which
+     * are used when it answers `null` or throws. An open socket is rebuilt to
+     * authenticate through it.
+     */
     setAuthTokenGetter: (getter: () => Promise<string | null>) => void;
+    /**
+     * Answer a refused credential — a 401 over HTTP, an auth error on the
+     * socket — with `handler`; resolve `true` to have the request or
+     * subscription retried with the token resolved again. Replaces the
+     * client's own session refresh.
+     */
     setOnUnauthorized: (handler: () => Promise<boolean>) => void;
+    /** The token the next request would carry, resolved as it would be. */
     resolveToken: () => Promise<string | null>;
     auth: ReturnType<typeof createAuth>;
     admin: ReturnType<typeof createAdmin>;
@@ -508,32 +534,33 @@ export function createRebaseClient<DB = Record<string, unknown>>(options: Create
         );
     }
 
+    /**
+     * What a refused credential is answered with, on HTTP and on the socket:
+     * the handler passed as `onUnauthorized` or set with `setOnUnauthorized()`,
+     * otherwise the auth module's `handleUnauthorized` — not a bare
+     * `refreshSession`, so that a refresh the server rejects outright drops the
+     * session and emits SIGNED_OUT instead of leaving every view rendering
+     * "Invalid or expired token". One variable so that setting it reaches
+     * both: a host whose own auth provider can mint a fresh token says so once.
+     */
+    let onUnauthorized: () => Promise<boolean> = options.onUnauthorized ?? (() => auth.handleUnauthorized());
+    transport.setOnUnauthorized(() => onUnauthorized());
+
     let ws: RebaseWebSocketClient | undefined;
     /** One channel object per name — see `realtime.channel`. */
     const realtimeChannels = new Map<string, RebaseRealtimeChannel>();
     if (resolvedWsUrl) {
-        const wsOnUnauthorized = options.onUnauthorized || (() => auth.handleUnauthorized());
-
         ws = new RebaseWebSocketClient({
             websocketUrl: resolvedWsUrl,
-            getAuthToken: async () => {
-                let session = auth.getSession();
-                if (session && session.expiresAt <= Date.now() + 10000) {
-                    try {
-                        session = await auth.refreshSession();
-                    } catch (e) {
-                        // Whatever session there is now — not the one read
-                        // before the refresh. A refresh that failed because
-                        // the user signed out meanwhile would otherwise hand
-                        // the socket the signed-out account's token. One that
-                        // only failed to reach the server leaves the session in
-                        // place, and its token is still worth trying.
-                        session = auth.getSession();
-                    }
-                }
-                return session?.accessToken || options.token || "";
-            },
-            onUnauthorized: wsOnUnauthorized,
+            // The socket's token is the one an HTTP request would carry now,
+            // resolved by the same function: a token getter installed with
+            // `setAuthTokenGetter()`, otherwise the token held — the session's,
+            // refreshed first when it is about to expire, one set with
+            // `setToken()`, or the `token` option. Resolving it separately is
+            // how a host signing users in with its own provider got an
+            // authenticated HTTP client and an anonymous socket.
+            getAuthToken: () => transport.resolveToken(),
+            onUnauthorized: () => onUnauthorized(),
             impersonate: options.impersonate
         });
 
@@ -572,23 +599,17 @@ export function createRebaseClient<DB = Record<string, unknown>>(options: Create
                 // is not a request for realtime, and dialling here would undo
                 // lazy connect for every app with a login. A socket opened
                 // later authenticates itself from `getAuthToken` on open.
+                //
+                // With the token HTTP would now send: the session's, unless a
+                // token getter is installed, which HTTP asks first.
                 if (session?.accessToken && ws.hasSocket) {
-                    ws.authenticate(session.accessToken).catch(console.warn);
+                    const socket = ws;
+                    transport.resolveToken()
+                        .then((token) => (token && socket.hasSocket ? socket.authenticate(token) : undefined))
+                        .catch(console.warn);
                 }
             }
         });
-    }
-
-    // Register transport callback for 401s after auth is instantiated.
-    // IMPORTANT: We must use transport.setOnUnauthorized() here — NOT set
-    // options.onUnauthorized — because the transport was already created above
-    // and captured the (undefined) value from the config closure.
-    if (!options.onUnauthorized) {
-        // `handleUnauthorized` (not a bare `refreshSession`) so that a refresh
-        // the server rejects outright drops the session and emits SIGNED_OUT —
-        // otherwise the app keeps thinking it is signed in and every view just
-        // renders "Invalid or expired token".
-        transport.setOnUnauthorized(() => auth.handleUnauthorized());
     }
 
     /**
@@ -702,6 +723,23 @@ export function createRebaseClient<DB = Record<string, unknown>>(options: Create
                 });
             });
         }
+    }
+
+    /**
+     * `setToken()` or `setAuthTokenGetter()` changed the credential HTTP
+     * sends, and a socket may be open as whoever the previous one named.
+     *
+     * Rebuilt rather than re-authenticated, as on a change of account: a raw
+     * token does not say whose it is, and a new socket carries nothing the
+     * previous identity held — on the server or in this client's cache. It
+     * authenticates on open with the token HTTP now sends and re-sends every
+     * live subscription and channel as it. With no socket there is nothing to
+     * do: one opened later authenticates itself.
+     */
+    function credentialChanged(): void {
+        if (!ws?.hasSocket) return;
+        ws.disconnect();
+        ws.ensureConnected();
     }
 
     const collectionClients = new Map<string, CollectionClient<Record<string, unknown>>>();
@@ -855,9 +893,17 @@ export function createRebaseClient<DB = Record<string, unknown>>(options: Create
             // the opposite of what this method exists to guarantee.
             auth.stopAutoRefresh();
         },
-        setToken: transport.setToken,
-        setAuthTokenGetter: transport.setAuthTokenGetter,
-        setOnUnauthorized: transport.setOnUnauthorized,
+        setToken: (token: string | null) => {
+            transport.setToken(token);
+            credentialChanged();
+        },
+        setAuthTokenGetter: (getter: () => Promise<string | null>) => {
+            transport.setAuthTokenGetter(getter);
+            credentialChanged();
+        },
+        setOnUnauthorized: (handler: () => Promise<boolean>) => {
+            onUnauthorized = handler;
+        },
         resolveToken: transport.resolveToken,
         baseUrl: transport.baseUrl,
         apiPath: transport.apiPath,

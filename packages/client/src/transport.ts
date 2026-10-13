@@ -27,6 +27,11 @@ export interface RebaseClientConfig {
      * service key instead, which resolves to `{ uid: "service", roles: ["admin"] }`
      * and **bypasses RLS**: there is no user to constrain those queries, so scope
      * them explicitly.
+     *
+     * Read each time a request or the realtime socket needs a token, until
+     * `setToken()` or a sign-in replaces it — so it may be declared as a getter.
+     * A token getter installed with `setAuthTokenGetter()` comes first; this is
+     * what is sent when it answers nothing.
      */
     token?: string;
     /**
@@ -609,7 +614,19 @@ export function createTransport(config: RebaseClientConfig, environment?: Transp
             "`apiPath` if the server really does mount the API one level deeper."
         );
     }
-    let token = config.token;
+    /**
+     * The token `setToken` last set — the auth module sets it on every sign-in,
+     * refresh and sign-out — or, until anything has, `config.token`.
+     *
+     * `config.token` is read each time a token is needed rather than copied
+     * here once, so a config that declares `token` as a getter hands over what
+     * its source holds at that moment: the Rebase console lends its own,
+     * background-refreshed session to a tenant client that way. The realtime
+     * socket resolves its token through this transport, so the two read it
+     * alike.
+     */
+    let setTokenValue: { token: string | undefined } | undefined;
+    const heldToken = (): string | undefined => (setTokenValue ? setTokenValue.token : config.token);
     let tokenGetter: (() => Promise<string | null>) | undefined;
     let tokenRefresher: TokenRefresher | undefined;
     let onUnauthorizedHandler = config.onUnauthorized;
@@ -765,7 +782,7 @@ export function createTransport(config: RebaseClientConfig, environment?: Transp
             } catch (e) {
                 // Ignore error, fallback to static token if any
             }
-            return token;
+            return heldToken();
         }
         const pending = tokenRefresher?.();
         if (pending) {
@@ -778,7 +795,7 @@ export function createTransport(config: RebaseClientConfig, environment?: Transp
                 // best thing to send.
             }
         }
-        return token;
+        return heldToken();
     }
 
     /** The body as JSON, `{}` for none, `undefined` when it is there and is not JSON. */
@@ -819,7 +836,7 @@ headers: getHeaders(activeToken, init) });
             if (isTokenRefusal(parseBody(readText) ?? {})) {
                 const retried = await onUnauthorizedHandler();
                 if (retried) {
-                    let retryToken = token;
+                    let retryToken = heldToken();
                     if (tokenGetter) {
                         try {
                             const fetched = await tokenGetter();
@@ -889,7 +906,7 @@ headers: getHeaders(retryToken, init) });
     return {
         request,
         requestRaw,
-        setToken(newToken: string | null) { token = newToken || undefined; },
+        setToken(newToken: string | null) { setTokenValue = { token: newToken || undefined }; },
         setAuthTokenGetter(getter: () => Promise<string | null>) { tokenGetter = getter; },
         setOnUnauthorized(handler: () => Promise<boolean>) { onUnauthorizedHandler = handler; },
         setTokenRefresher(refresher: TokenRefresher | null) { tokenRefresher = refresher ?? undefined; },
@@ -897,7 +914,7 @@ headers: getHeaders(retryToken, init) });
         get apiPath() { return apiPath; },
         get storageUrlOrigin() { return config.storageUrlOrigin?.replace(/\/$/, "") || undefined; },
         get fetchFn() { return fetchFn; },
-        getHeaders: (init?: RequestInit) => getHeaders(token, init),
+        getHeaders: (init?: RequestInit) => getHeaders(heldToken(), init),
         resolveToken: async () => (await tokenForRequest()) || null
     };
 }

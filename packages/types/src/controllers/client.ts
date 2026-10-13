@@ -342,7 +342,12 @@ export interface RebaseWebSocket {
     disconnect(): void;
     /** Send an authentication token to the server. */
     authenticate(token: string): Promise<void>;
-    /** Set a function that lazily resolves the auth token for auto-authentication. */
+    /**
+     * Set a function that lazily resolves the auth token for auto-authentication.
+     *
+     * @deprecated Use `client.setAuthTokenGetter()` instead, which authenticates
+     * HTTP requests and this socket together. Will be removed in a future release.
+     */
     setAuthTokenGetter(getter: () => Promise<string | null>): void;
     /** Listen for connection lifecycle events. */
     on(event: "connect" | "disconnect" | "reconnect" | "error", cb: (...args: unknown[]) => void): () => void;

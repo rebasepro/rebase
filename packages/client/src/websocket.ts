@@ -17,7 +17,7 @@ import {
     RebaseApiError,
     type RealtimeConnectionState
 } from "@rebasepro/types";
-import { buildCompositeId, COMPOSITE_ID_SEPARATOR, withETag, type PrimaryKeyInfo } from "@rebasepro/common";
+import { buildCompositeId, COMPOSITE_ID_SEPARATOR, warnDeprecated, withETag, type PrimaryKeyInfo } from "@rebasepro/common";
 import { parseRebaseJson } from "./reviver";
 import { unref } from "@rebasepro/utils";
 import { readSqlScriptResult } from "./sql-script";
@@ -159,7 +159,10 @@ type QueuedFrame = Record<string, unknown> & {
 
 export interface RebaseWebSocketConfig {
     websocketUrl: string;
-    /** Optional auth token getter for WebSocket authentication */
+    /**
+     * Where the token the socket authenticates with comes from, asked each
+     * time it authenticates. A falsy answer leaves it anonymous.
+     */
     getAuthToken?: () => Promise<string | null>;
     /** Optional WebSocket constructor to override globalThis.WebSocket (e.g. for Node environments) */
     WebSocket?: typeof WebSocket;
@@ -275,6 +278,11 @@ function isChannelMessage(message: WebSocketMessage): message is ChannelMessage 
 export class RebaseWebSocketClient {
     private websocketUrl: string;
     private ws: WebSocket | null = null;
+    /**
+     * Where the socket's token comes from. A client built by
+     * `createRebaseClient()` resolves it through the HTTP transport, so
+     * `client.setAuthTokenGetter()` and `client.setToken()` reach both.
+     */
     public getAuthToken?: () => Promise<string | null>;
     private listeners = new Map<string, Set<(...args: unknown[]) => void>>();
 
@@ -681,13 +689,23 @@ export class RebaseWebSocketClient {
     }
 
     /**
-     * Set the auth token getter function
+     * Replace where this socket's token comes from, and authenticate an open,
+     * unauthenticated socket with it.
+     *
+     * @deprecated Use `client.setAuthTokenGetter()` instead — on a client from
+     * `createRebaseClient()` the socket already resolves its token through it,
+     * together with HTTP, and setting one here splits the two. Will be removed
+     * in a future release.
      */
     setAuthTokenGetter(getAuthToken: () => Promise<string | null>): void {
+        warnDeprecated(
+            "RebaseWebSocketClient.setAuthTokenGetter",
+            "`client.ws.setAuthTokenGetter()` is deprecated; use `client.setAuthTokenGetter()`, " +
+            "which authenticates HTTP requests and the realtime socket together."
+        );
         this.getAuthToken = getAuthToken;
         // Auto-authenticate if we are already connected but didn't have the token getter yet
         if (this.isConnected && !this.isAuthenticated && !this.authPromise) {
-            console.debug("WebSocket auto-authenticating after token getter set");
             this.getAuthToken().then(token => {
                 if (!this.ws) return; // Prevent memory leaks / actions after disconnect
                 if (token) {

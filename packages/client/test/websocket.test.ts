@@ -5,6 +5,7 @@ import { rebaseReviver } from "../src/reviver";
 // The WS client now throws the unified RebaseApiError. Aliased to `ApiError`
 // so the existing instanceof/code assertions below read unchanged.
 import { RebaseApiError as ApiError } from "@rebasepro/types";
+import { resetDeprecationWarningsForTests } from "@rebasepro/common";
 
 /**
  * The key columns the server sends alongside a collection's rows. Rows carry no
@@ -282,11 +283,17 @@ code: "AUTH_FAILED" } }
             await expect(authPromise).rejects.toThrow("Invalid token");
         });
 
-        it("setAuthTokenGetter authenticates a socket that is already open", async () => {
-            // Asserting `client.getAuthToken === getter` only restates the
-            // assignment. What the setter is for is the useEffect ordering
-            // where the token arrives *after* connect: the socket must then
-            // authenticate itself rather than sit there anonymous.
+        /**
+         * Deprecated: `client.setAuthTokenGetter()` reaches the socket now.
+         * The socket-level setter keeps working — the useEffect ordering where
+         * the token arrives *after* connect, and the socket must then
+         * authenticate itself rather than sit there anonymous — and says once
+         * what replaces it.
+         */
+        it("setAuthTokenGetter (deprecated) still authenticates an open socket, and warns once", async () => {
+            resetDeprecationWarningsForTests();
+            const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
+            warn.mockClear();
             const client = createClient();
             await jest.advanceTimersByTimeAsync(10); // let the socket open
             const ws = getWs();
@@ -294,13 +301,16 @@ code: "AUTH_FAILED" } }
 
             const getter = jest.fn(async () => "new-token");
             client.setAuthTokenGetter(getter);
+            client.setAuthTokenGetter(getter);
             await jest.advanceTimersByTimeAsync(0);
 
             expect(getter).toHaveBeenCalled();
             expect(ws.sentMessages.map(m => JSON.parse(m))).toContainEqual(
-                expect.objectContaining({ type: "AUTHENTICATE",
-payload: { token: "new-token" } })
+                expect.objectContaining({ type: "AUTHENTICATE", payload: { token: "new-token" } })
             );
+            const deprecations = warn.mock.calls.filter(call => String(call[0]).includes("setAuthTokenGetter"));
+            expect(deprecations).toHaveLength(1);
+            expect(String(deprecations[0][0])).toContain("client.setAuthTokenGetter()");
         });
     });
 
@@ -1745,30 +1755,25 @@ id: "1" }, onUpdate, onError);
         /**
          * Helper: create a client that is connected and has a token getter,
          * but is NOT yet authenticated.  This mimics the startup race where the
-         * ConfigControllerProvider fires a request before the WS has authed.
-         *
-         * NOTE: `setAuthTokenGetter` auto-triggers an auth attempt when the WS
-         * is already connected.  We flush that call and clear the mock so that
-         * subsequent call-count assertions only reflect the `ensureAuthenticated`
-         * path triggered by data requests.
+         * ConfigControllerProvider fires a request before the WS has authed:
+         * the socket opens while the app's auth has no token to give yet, and
+         * `getter` only starts answering afterwards. The call-count assertions
+         * below then reflect only the `ensureAuthenticated` path triggered by
+         * data requests.
          */
         async function setupWithTokenGetter(
             getter: jest.Mock<() => Promise<string>>
         ) {
-            // Create client WITHOUT a built-in getAuthToken so onopen doesn't auto-auth
-            const client = createClient();
+            let ready = false;
+            // Not `async`: the getter's own promise is handed over, so the
+            // retry timing below counts the same microtasks it always did.
+            const client = createClient({ getAuthToken: () => (ready ? getter() : Promise.resolve(null)) });
             jest.runAllTimers(); // open the WS
             await Promise.resolve(); // flush microtasks
-
-            // Now install the getter *after* connect (mimics useEffect ordering).
-            // This fires an auto-auth attempt asynchronously via getAuthToken().then(...)
-            client.setAuthTokenGetter(getter);
-
-            // Flush the auto-auth microtask so it resolves / rejects
             await Promise.resolve();
             await Promise.resolve();
+            ready = true;
 
-            // Reset the mock so tests only count ensureAuthenticated calls
             getter.mockClear();
 
             return { client,

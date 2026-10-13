@@ -383,9 +383,13 @@ export function createAuth(transport: Transport, options?: CreateAuthOptions) {
      * round trip of latency each.
      *
      * The refresh is {@link refreshSession}, so a burst of requests shares one
-     * (the one started at load included). A refresh that fails, or one whose
-     * session ended while it ran, hands back the token the request would have
-     * carried anyway: the 401 path then does exactly what it always did.
+     * (the one started at load included). A refresh that fails hands back the
+     * token the request would have carried anyway: the 401 path then does
+     * exactly what it always did. One whose session ended while it ran hands
+     * back nothing, so the transport sends what it holds now — no token after
+     * a sign-out, the new account's after a sign-in — and never the token of
+     * the account that has gone. The realtime socket authenticates through
+     * this same path.
      */
     function tokenForRequest(): Promise<string | undefined> | undefined {
         if (refreshOwnRequests > 0) return undefined;
@@ -403,8 +407,8 @@ export function createAuth(transport: Transport, options?: CreateAuthOptions) {
         if (authFlowMode !== "cookie" && !session.refreshToken) return undefined;
         const epoch = sessionEpoch;
         return refreshSession().then(
-            (fresh) => (epoch === sessionEpoch ? fresh.accessToken : session.accessToken),
-            () => session.accessToken
+            (fresh) => (epoch === sessionEpoch ? fresh.accessToken : undefined),
+            () => (epoch === sessionEpoch ? session.accessToken : undefined)
         );
     }
     transport.setTokenRefresher?.(tokenForRequest);
