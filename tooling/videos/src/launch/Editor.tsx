@@ -46,11 +46,13 @@ const COLLECTION = "products";
 const SUFFIX = ".find({";
 
 export const TIMING = {
-    typeStart: 14,
-    popup: 52,
-    pick: [52, 66, 80, 94],
-    accept: 110,
-    listen: [148, 194] as [number, number],
+    // Typed fast so the completion list (and its callout) is up early and
+    // stays up long enough to read; it closes on the second downbeat.
+    typeStart: 4,
+    popup: 34,
+    pick: [34, 54, 74, 94],
+    accept: 120,
+    listen: [152, 196] as [number, number],
     toast: 204,
 };
 

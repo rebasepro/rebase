@@ -38,13 +38,20 @@ const Callouts: React.FC<{ items: CalloutSpec[] }> = ({ items }) => (
 
 /**
  * The beats every verb section keeps: the camera finds the first point on
- * the downbeat and its callout lands on beat two; on bar two the first
- * callout is already gone, the camera moves on the downbeat and the second
- * callout lands on beat two. One thing on screen at a time, all on the beat.
+ * the downbeat and its callout lands just before beat two; it holds until
+ * the bar is nearly out, the camera moves on as it fades, and the second
+ * callout lands as the move settles. One thing on screen at a time.
+ *
+ * Each callout used to run from beat two to fourteen frames before the bar,
+ * which left "Typed SDK" readable for about a second — too little for a
+ * label and its sentence (Francesco, 2026-10-13). Now each one gets about
+ * 1.5 s at full strength.
  */
-const A_ON = BEAT;
-const A_OFF = BAR - 14;
-const B_ON = BAR + BEAT;
+const A_ON = BEAT - LEAD;
+const A_OFF = BAR - 4;
+/** The camera leaves A once it has faded, and B arrives when it has landed. */
+const MOVE_AT = BAR + 4;
+const B_ON = BAR + 14;
 
 function beats(
     a: Omit<CalloutSpec, "at" | "until"> & { scale: number },
@@ -57,7 +64,7 @@ function beats(
         ],
         focus: [
             { at: 0, target: a.target, scale: a.scale },
-            { at: BAR, target: b.target, scale: b.scale },
+            { at: MOVE_AT, target: b.target, scale: b.scale },
         ],
     };
 }
