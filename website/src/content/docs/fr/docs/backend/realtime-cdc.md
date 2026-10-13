@@ -20,6 +20,10 @@ Le CDC est contrôlé par la variable d'environnement `REALTIME_CDC` :
 | `wal` | Préférer la réplication logique WAL. Pas encore inclus — se rabat sur `trigger` et journalise le mode actif. |
 | `off` | Temps réel au niveau applicatif uniquement. À utiliser pour éviter la surcharge liée aux déclencheurs sur les charges de travail à forte intensité d'écriture. Un démarrage avec `off` qui possède le schéma **retire** aussi les déclencheurs et fonctions de capture qu'un démarrage antérieur a installés, et journalise combien il en a retiré ; retirez `off` et le démarrage suivant les réinstalle. |
 
+<span class="since-badge" data-since="0.25">Depuis 0.25</span> Ce même paramètre est
+l'option `realtime.cdc` de l'adaptateur Postgres, pour un serveur qui le configure dans
+le code. `REALTIME_CDC`, lorsqu'elle est définie, l'emporte.
+
 Au démarrage, vous verrez une ligne de log indiquant le mode actif, par ex. :
 
 ```
@@ -46,7 +50,9 @@ Si la connexion ne le prend pas en charge, `auto` consigne une ligne d'informati
 
 ## Prérequis & Remarques
 
-- Le CDC nécessite une chaîne de connexion directe (`DATABASE_DIRECT_URL` ou la connexion principale) pour le client `LISTEN` — les gestionnaires de pools de connexions (connection poolers) en mode transaction ne prennent pas en charge les sessions `LISTEN` de longue durée.
+<span class="since-badge" data-since="0.25">Depuis 0.25</span> `directConnectionString` est l'option de l'adaptateur ; en 0.24, utilisez `DATABASE_DIRECT_URL`.
+
+- Le CDC nécessite une chaîne de connexion directe (`DATABASE_DIRECT_URL`, le `directConnectionString` de l'adaptateur, ou la connexion principale) pour le client `LISTEN` — les gestionnaires de pools de connexions (connection poolers) en mode transaction ne prennent pas en charge les sessions `LISTEN` de longue durée.
 - Les déclencheurs ne sont installés que sur les tables adossées à une collection enregistrée. Les écritures sur des tables non associées sont ignorées.
 - Une collection dont la table n'a pas encore fait l'objet d'une migration est ignorée avec un avertissement au lieu de bloquer le CDC pour le reste.
 - Le streaming natif par réplication logique WAL (`wal2json`/`pgoutput`) est prévu ; aujourd'hui, `REALTIME_CDC=wal` se rabat sur la méthode basée sur les déclencheurs, qui fournit une couverture équivalente au niveau de la base de données.

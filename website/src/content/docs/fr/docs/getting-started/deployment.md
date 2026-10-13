@@ -43,7 +43,7 @@ un pooler de connexions, et l'exécution des fonctions et du worker de tâches
 comme processus distincts.
 
 ```bash
-rebase build          # produit ./dist-bundle
+rebase build          # produces ./dist-bundle
 docker compose up -d
 ```
 
@@ -290,7 +290,17 @@ const router = createBrowserRouter([
 ], { basename });
 ```
 
-L'administration a besoin d'un **data router** — `createBrowserRouter`, pas le simple `BrowserRouter` — car le blocage des modifications non enregistrées utilise `useBlocker`, que seul le data router fournit.
+Gardez l'administration sur un **data router** — `createBrowserRouter` avec
+`<RouterProvider>`, comme le fait le scaffold. Sous celui-ci, un enregistrement comportant des modifications
+non enregistrées arrête aussi la navigation dans l'application (un lien du tiroir, le bouton
+retour du navigateur) et demande d'abord confirmation, via `useBlocker`, que seul un data router
+fournit.
+
+<span class="since-badge" data-since="0.25">Depuis 0.25</span> L'administration fonctionne aussi
+sous un simple `<BrowserRouter>`. Dans ce cas, la garde des modifications non enregistrées
+se rabat sur l'invite de sortie de page propre au navigateur, qui couvre un rechargement, la fermeture de
+l'onglet ou la saisie d'une URL ; la navigation à l'intérieur de l'application se poursuit sans demander. En
+0.24, l'administration lève une exception en dehors d'un data router.
 
 **Backend** — si vous déplacez aussi l'API, mettez à jour son chemin de base :
 
@@ -337,7 +347,7 @@ const router = isAdmin
 root.render(<RouterProvider router={router}/>);
 ```
 
-Un seul routeur pour les deux moitiés : l'administration a de toute façon besoin du data router, et rien ne justifie que l'app produit soit sur un autre.
+Un seul routeur pour les deux moitiés : l'administration est mieux sur un data router, qui permet aux modifications non enregistrées d'arrêter la navigation dans l'application, et rien ne justifie que l'app produit soit sur un autre.
 
 Le backend ne nécessite aucune modification pour ce modèle — l'API reste à `/api` et le catch-all de la SPA
 sert `index.html` à la fois pour `/` et `/admin/*`.

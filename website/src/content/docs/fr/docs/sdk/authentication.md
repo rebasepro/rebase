@@ -485,6 +485,49 @@ const client = createRebaseClient({
 });
 ```
 
+## Utiliser votre propre fournisseur d'authentification
+
+<span class="since-badge" data-since="0.25">Depuis 0.25</span> En 0.24, un getter de
+jeton n'authentifie que les requêtes HTTP, et le socket temps réel reste
+anonyme.
+
+Lorsque les utilisateurs se connectent avec un fournisseur qui vous est propre (Clerk, Firebase Auth, ou une
+session que votre application possède déjà), `client.auth` n'intervient pas. Donnez plutôt au client un
+getter pour le jeton du fournisseur. Il est sollicité chaque fois qu'un jeton est
+nécessaire : pour chaque requête HTTP, et chaque fois que le socket temps réel
+s'authentifie.
+
+```typescript
+import { createRebaseClient } from "@rebasepro/client";
+
+const client = createRebaseClient({ baseUrl: import.meta.env.VITE_API_URL });
+
+client.setAuthTokenGetter(() => clerk.session?.getToken() ?? Promise.resolve(null));
+
+// Optional: let Clerk recover a refused token, on HTTP and the socket alike.
+client.setOnUnauthorized(async () => {
+    await clerk.session?.reload();
+    return true;
+});
+
+// The socket authenticates as the Clerk user.
+client.data.posts.listen({}, (response) => render(response.data));
+```
+
+- Le getter l'emporte sur la session propre du client. Lorsqu'il répond `null` ou
+  lève une exception, le client envoie le jeton qu'il détient, le cas échéant : celui de sa session, un jeton défini
+  avec `client.setToken()`, ou l'option `token`.
+- L'option `token` est relue chaque fois qu'un jeton est nécessaire, jusqu'à ce que `setToken()` ou
+  une connexion la remplace ; elle peut donc être déclarée comme un getter
+  (`get token() { return currentToken; }`).
+- `setOnUnauthorized` couvre un 401 en HTTP et une erreur d'authentification sur le socket,
+  et remplace le rafraîchissement de session propre au client.
+
+Le backend doit vérifier le jeton du fournisseur : voir
+[Adaptateurs d'authentification personnalisés](/docs/backend/auth-adapters). Dans le panneau d'administration, définissez
+le getter sur le client que vous passez à `<Rebase client>`
+([Votre propre fournisseur d'authentification](/docs/frontend/authentication#your-own-auth-provider)).
+
 ## Structure de l'objet utilisateur
 
 ```typescript

@@ -29,6 +29,14 @@ Pour les déploiements multi-instances, Rebase utilise le mécanisme `LISTEN/NOT
 
 Le temps réel est activé par défaut. Il n'y a aucun paramètre à modifier ni aucun service à démarrer — si votre serveur Rebase fonctionne, le point de terminaison WebSocket est disponible.
 
+### Le chemin auquel répond le socket
+
+<span class="since-badge" data-since="0.25">Depuis 0.25</span> En 0.24, le socket prend chaque mise à niveau WebSocket du serveur, quel que soit son chemin.
+
+Le socket répond aux mises à niveau (upgrades) sur un seul chemin : le chemin de base de l'API privé d'un éventuel `/api` final, soit `/` pour une API à `/api`. C'est là que le SDK se connecte : il se connecte à son `baseUrl`, tandis que ses requêtes HTTP vont à `${baseUrl}/api`. Une mise à niveau vers tout autre chemin est laissée aux autres écouteurs `upgrade` du serveur, de sorte que votre application peut faire tourner son propre serveur WebSocket sur le même `http.Server`. Sans autre écouteur, une telle mise à niveau reçoit la réponse `404`.
+
+Dans un [serveur personnalisé](/docs/backend/custom-server/), `backend.attachRealtime(server, { path })` définit le chemin, et le `realtime.path` de l'adaptateur Postgres remplace celui que le serveur a déduit.
+
 > Par défaut, Rebase émet également des événements en temps réel pour les écritures effectuées **en dehors** de l'API (via `psql`, un autre service ou l'éditeur SQL de Studio) dès que la connexion à la base de données le permet — voir [capture de données modifiées au niveau de la base de données](/docs/backend/realtime-cdc/).
 
 ## Abonnements avec le SDK typé

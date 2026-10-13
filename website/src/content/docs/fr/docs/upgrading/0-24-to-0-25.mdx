@@ -21,6 +21,37 @@ une chaîne vide dans un champ obligatoire. Trois suppressions suivent : deux ex
 qui n'étaient que des moteurs, un hook d'administration dont personne n'a besoin, et une option de stockage
 qui n'atteignait aucun client.
 
+:::note[Comportement modifié et noms dépréciés]
+La 0.25 change aussi ce que font quelques appels existants, sans les casser. Vérifiez
+ces points si votre application repose sur l'ancien comportement :
+
+- **Les wrappers de champ des plugins se composent.** Le `fieldBuilder.wrap` de chaque plugin s'affiche,
+  chacun autour du champ tel que les plugins précédents l'ont laissé, au lieu du seul dernier.
+- **Les surcharges de composants se composent.** La surcharge `wrap: true` d'une collection reçoit
+  la surcharge de l'application du même composant comme `OriginalComponent`, et non le
+  composant intégré.
+- **`rebase.auth`, `rebase.admin`, `rebase.functions` et `rebase.cron` côté
+  serveur atteignent les routes du backend en processus,** de sorte que les middlewares que vous avez ajoutés à
+  votre propre application Hono ne s'exécutent plus sur elles.
+- **Le socket temps réel ne répond qu'à son propre chemin** (`/` pour une API à `/api`).
+  Un client qui se connectait à un autre chemin sur le même serveur reçoit un 404, ou votre propre
+  écouteur `upgrade`.
+- **Le socket reçoit son jeton comme le fait HTTP,** si bien que `client.setAuthTokenGetter()`
+  l'authentifie désormais, et qu'après une déconnexion il ne se rabat plus sur
+  l'option `token`.
+
+Ces noms fonctionnent toujours, avertissent une seule fois à l'exécution, et ont un remplaçant :
+
+| Déprécié | À utiliser |
+|---|---|
+| `loadFunctionsFromDirectory`, `loadFunctionsWithDiagnostics` | `loadFunctions(dir, { onSkip })` |
+| `loadCronJobsFromDirectory`, `loadCronJobsWithDiagnostics` | `loadCrons(dir, { onSkip })`, puis `declareCrons(crons)` là où l'ancienne paire les déclarait |
+| `client.ws.setAuthTokenGetter()` | `client.setAuthTokenGetter()` |
+| `hooks.modifyCollectionAsync` d'un plugin (jamais appelé) | `hooks.modifyCollection`, avec les données récupérées avant le rendu de `<Rebase>` |
+| `lifecycle.onCollectionChange` d'un plugin (jamais appelé) | `context.data.collection(slug).listen(…)` depuis `lifecycle.onMount` |
+| `DatabaseAdapter.mountRoutes`, `BackendBootstrapper.mountRoutes` (jamais appelés) | une fabrique de routes que votre application monte |
+:::
+
 ---
 
 ## 68. Un filtre sur une colonne nommée `count` va dans `?where=`

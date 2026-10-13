@@ -1,0 +1,196 @@
+---
+title: Scripts et console
+sidebar_label: Scripts et console
+description: Ouvrez les données d'un projet depuis un script, un test ou un REPL avec openRebase, ou depuis le terminal avec rebase console. Pas de serveur, pas de modification du schéma.
+---
+
+## Vue d'ensemble
+
+<span class="since-badge" data-since="0.25">Depuis 0.25</span> En 0.24, il n'existe
+ni `openRebase` ni `rebase console` : un script doit construire un backend, ou
+appeler l'API REST d'un serveur en cours d'exécution.
+
+Pour consulter quelques lignes, en corriger une, essayer un filtre ou vérifier ce qu'une stratégie laisse
+voir à un utilisateur, vous ne devriez pas avoir à démarrer un serveur. Rebase vous donne les données du projet
+sous la forme d'un objet, à deux endroits :
+
+- **`rebase console`**, un REPL Node dans votre terminal avec le projet ouvert ;
+- **`openRebase`**, le même objet dans un script ou un test qui vous appartient.
+
+Les deux ouvrent la base de données sans la modifier : aucune table, aucun rôle, aucun déclencheur ni
+aucune fonction n'est créé, et rien ne reste en cours d'exécution. L'objet a le
+vocabulaire qu'une [fonction personnalisée](/docs/backend/custom-functions/) reçoit du
+serveur, `dataAsAdmin` et `sql`, de sorte qu'un extrait de code passe tel quel d'une fonction à un script
+puis à la console.
+
+## `rebase console`
+
+<span class="since-badge" data-since="0.25">Depuis 0.25</span>
+
+Lancez-la dans votre projet :
+
+```bash
+rebase console
+```
+
+```text
+> const { data } = await rebase.dataAsAdmin.posts.find({ limit: 3 })
+> data.map(p => p.title)
+[ 'Hello', 'Second post', 'Draft' ]
+> const ada = await rebase.withAuth({ uid: "ada", roles: ["user"] })
+> (await ada.data.posts.find()).data.length
+1
+```
+
+Deux noms sont dans la portée, et l'`await` de premier niveau fonctionne :
+
+| Nom | Ce que c'est |
+|---|---|
+| `rebase` | Ce que renvoie [`openRebase`](#openrebase) : `dataAsAdmin`, `sql`, `withAuth(user)` et `close()` |
+| `collections` | Les collections du projet, chargées comme les charge `rebase db push` |
+
+La console ouvre le projet comme le fait `rebase db push` : le même `.env`,
+la même base de données et les mêmes collections. Un projet qui utilise la base de développement
+managée la voit démarrer d'abord. L'historique de ce que vous avez tapé est
+conservé dans `.rebase/console_history`, que le `.gitignore` du scaffold
+exclut déjà.
+
+### Un extrait : `--eval`
+
+<span class="since-badge" data-since="0.25">Depuis 0.25</span>
+
+`rebase console -e "<code>"` exécute un seul morceau de code au lieu du REPL. La valeur d'une
+expression, ou le `return` du corps d'une fonction, est attendue (awaited) puis affichée
+en JSON sur stdout, de sorte que la sortie peut être redirigée dans un pipe :
+
+```bash
+rebase console -e "rebase.dataAsAdmin.posts.find({ limit: 5 })"
+rebase console -e "rebase.sql('select count(*) from posts')" | jq .
+rebase console -e "const u = await rebase.withAuth({ uid: 'u1', roles: ['user'] }); return (await u.data.posts.find()).data"
+```
+
+Ce que la résolution de la base de données a à dire va sur stderr, de sorte que stdout contient
+le résultat et rien d'autre. Un extrait qui lève une exception affiche l'erreur sur stderr et
+se termine avec le code `1`.
+
+### Options
+
+| Option | Ce qu'elle fait |
+|---|---|
+| `--eval`, `-e` | Exécute ce code à la place du REPL, affiche son résultat attendu en JSON, et sort avec le code 1 s'il lève une exception |
+| `--collections`, `-c` | Chemin du répertoire des collections, s'il diffère de celui du projet |
+| `--database-url` | Ouvre cette base de données plutôt que celle du projet |
+| `--docker` | Utilise la base de données de docker compose, en la démarrant si nécessaire |
+
+## `openRebase`
+
+<span class="since-badge" data-since="0.25">Depuis 0.25</span>
+
+`openRebase`, de `@rebasepro/server-postgres`, est ce qu'appelle la console. Utilisez-le
+dans un script, un seed, une correction de données ou un test :
+
+```typescript
+import { openRebase } from "@rebasepro/server-postgres";
+import { collections } from "../config/collections";
+
+const rebase = await openRebase({ databaseUrl: process.env.DATABASE_URL!, collections });
+
+const { data: drafts } = await rebase.dataAsAdmin.posts.find({ where: { status: ["==", "draft"] } });
+console.log(`${drafts.length} drafts`);
+await rebase.dataAsAdmin.posts.update("42", { status: "archived" });
+
+await rebase.close();
+```
+
+| Membre | Ce qu'il fait |
+|---|---|
+| `dataAsAdmin` | Toutes les collections, lues et écrites avec l'identité de service du serveur (`{ uid: "service", roles: ["admin"] }`) : administrateur, et toujours évaluées par vos stratégies RLS, exactement comme `rebase.dataAsAdmin` dans une fonction |
+| `sql(query, { params })` | SQL brut sur la connexion propriétaire, avec la même convention d'appel que `rebase.sql` dans une fonction |
+| `withAuth(user)` | Se résout en `{ data }` : les collections telles que cet utilisateur les voit. Chaque lecture et chaque écriture s'exécute sous son identité, filtrée par la sécurité au niveau des lignes, comme le serait une requête HTTP de cet utilisateur |
+| `collections` | Les collections avec lesquelles il a été ouvert |
+| `close()` | Termine le pool de connexions créé par `openRebase`. Peut être appelé deux fois sans risque |
+
+Ses options :
+
+| Option | Ce qu'elle fait |
+|---|---|
+| `databaseUrl` | La base de données à ouvrir. `openRebase` crée le pool et `close()` le termine |
+| `connection` | Une connexion Drizzle que vous détenez déjà (`createPostgresDatabaseConnection(url).db`), à la place de `databaseUrl`. Elle reste la vôtre : `close()` la laisse ouverte |
+| `collections` | Les collections du projet. Un tableau vide les lit plutôt depuis la base de données, comme le fait un serveur sans fichiers de collections, et les sert en lecture seule |
+| `pool` | Les paramètres du pool, avec `databaseUrl` |
+| `dataSourceKey` | La source de données dont ces collections sont servies. Par défaut `(default)` |
+
+`openRebase` ne lit aucune variable d'environnement. Le `DATABASE_URL` ci-dessus est lu par
+votre script, et des paramètres comme `REBASE_DB_POOL_MAX` ou `REALTIME_CDC` ne changent
+rien ici.
+
+### Vérifier ce qu'un utilisateur peut voir
+
+<span class="since-badge" data-since="0.25">Depuis 0.25</span>
+
+`withAuth` est le moyen le plus rapide de tester une règle de sécurité sur des données réelles :
+
+```typescript
+import { openRebase } from "@rebasepro/server-postgres";
+import { collections } from "../config/collections";
+
+const rebase = await openRebase({ databaseUrl: process.env.DATABASE_URL!, collections });
+const ada = await rebase.withAuth({ uid: "ada", roles: ["user"] });
+const { data } = await ada.data.posts.find();
+console.log(data.every(post => post.author_id === "ada"));
+```
+
+Un utilisateur est `{ uid, roles?, isAnonymous?, claims? }` ; les `claims` sont ce que
+`rebase.jwt()` lit dans une stratégie.
+
+`withAuth` s'exécute sous le rôle restreint qu'un démarrage de serveur crée (`rebase_user`).
+Sur une base de données où aucun serveur Rebase n'a démarré, ce rôle n'existe pas, et
+les requêtes `withAuth` échouent avec l'erreur de rôle inconnu de Postgres plutôt que de s'exécuter
+sans filtre. Lancez d'abord `rebase db push`, ou démarrez le serveur une fois.
+
+### Dans un test
+
+<span class="since-badge" data-since="0.25">Depuis 0.25</span>
+
+```typescript
+import { after, before, test } from "node:test";
+import assert from "node:assert/strict";
+import { openRebase, type OpenedRebase } from "@rebasepro/server-postgres";
+import { collections } from "../config/collections";
+
+let rebase: OpenedRebase;
+before(async () => {
+    rebase = await openRebase({ databaseUrl: process.env.TEST_DATABASE_URL!, collections });
+});
+after(() => rebase.close());
+
+test("a user only sees their own posts", async () => {
+    const ada = await rebase.withAuth({ uid: "ada", roles: ["user"] });
+    const { data } = await ada.data.posts.find();
+    assert.ok(data.every(post => post.author_id === "ada"));
+});
+```
+
+Cela fonctionne de la même façon sous Vitest ou Jest.
+
+### Ce qu'il laisse de côté
+
+<span class="since-badge" data-since="0.25">Depuis 0.25</span>
+
+`openRebase` ouvre la couche de données et rien d'autre. Il ne démarre aucun temps réel, de sorte que
+ses écritures ne sont pas annoncées aux requêtes en direct. Il n'attache aucun service d'historique,
+de sorte qu'une écriture sur une collection avec `history: true` n'enregistre aucune entrée d'historique.
+Le stockage, l'e-mail, l'administration de l'authentification et vos fonctions n'y figurent pas.
+
+Lorsqu'un script a aussi besoin de ceux-là, construisez le backend sans le servir :
+`createRebaseBackend({ …, provision: false })` vous donne `backend.rebase`, le
+client complet en processus, sans rien monter ni rien démarrer. Voir
+[le backend sans serveur](/docs/backend/custom-server/#the-backend-without-a-server).
+Pour tester un callback de collection sans aucune base de données, appelez-le avec
+[`createCallContext`](/docs/collections/callbacks/#testing-a-callback).
+
+## Voir aussi
+
+- [Intégration de serveur personnalisé](/docs/backend/custom-server/) — le backend sous forme de pièces publiques
+- [Référence de la CLI](/docs/cli/) — toutes les commandes `rebase`
+- [Règles de sécurité](/docs/collections/security-rules/) — ce par quoi `withAuth` est filtré

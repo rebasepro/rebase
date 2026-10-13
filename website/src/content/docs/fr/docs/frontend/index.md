@@ -62,7 +62,7 @@ vous n'avez que les outils de développement. Pour agencer le shell manuellement
 
 `<Rebase>` est le provider racine qui rend toutes les fonctionnalités de Rebase disponibles pour les composants enfants via le contexte. Il accepte :
 
-L'intégralité des vingt-deux propriétés — le tableau n'en listait auparavant que dix, dont deux
+L'intégralité des vingt-trois propriétés — le tableau n'en listait auparavant que dix, dont deux
 n'étaient même jamais lues par le composant :
 
 <!-- rebase-props:start -->
@@ -88,6 +88,7 @@ n'étaient même jamais lues par le composant :
 | `collectionViews` | Modes de vue de collection personnalisés, accessibles à toute collection par `key` |
 | `entityActions` | Actions globales d'entité |
 | `effectiveRoleController` | Simuler un rôle différent lorsque le mode dev est activé |
+| `modeController` | <span class="since-badge" data-since="0.25">Depuis 0.25</span> Confier à Rebase le mode clair/sombre de l'application hôte ; Rebase ne touche alors jamais à `<html>`, à `prefers-color-scheme` ni à localStorage — voir [Styles](#styles) |
 | `translations` | Remplacer ou étendre n'importe quelle chaîne de l'interface, indexée par locale — voir [Traductions](/docs/frontend/i18n) |
 | `components` | Remplacer les composants intégrés — voir [Remplacements de composants](/docs/frontend/component-overrides) |
 <!-- rebase-props:end -->
@@ -135,6 +136,83 @@ const { data: entities } = await data.collection("posts").find();
 entities[0].values.title;
 ```
 
+## Une collection ou un enregistrement dans une page qui vous appartient
+
+<span class="since-badge" data-since="0.25">Depuis 0.25</span> En 0.24,
+`CollectionPanel` ne prend qu'un `path` enregistré et affiche « Collection not
+found » en dehors de l'arbre d'administration complet, et `EntityFormPanel` et
+`CollectionsProvider` n'existent pas.
+
+Vous n'avez pas besoin de toute l'administration pour afficher une seule table. `<CollectionPanel>` prend
+la collection comme valeur et fonctionne n'importe où sous `<Rebase>` et un routeur
+React Router, sans `<RebaseCMS>`, `<RebaseNavigation>` ni `<RebaseShell>` :
+
+```tsx
+import { Rebase, useRebaseAuthController } from "@rebasepro/app";
+import { CollectionPanel } from "@rebasepro/cms";
+import { postsCollection } from "../config/collections/posts";
+// Plus BrowserRouter, or any other router, from "react-router".
+
+export function App() {
+    const authController = useRebaseAuthController({ client });
+
+    return (
+        <Rebase client={client} authController={authController}>
+            <BrowserRouter>
+                <MyPageLayout>
+                    <CollectionPanel collection={postsCollection}/>
+                </MyPageLayout>
+            </BrowserRouter>
+        </Rebase>
+    );
+}
+```
+
+Un enregistrement s'ouvre par-dessus votre page, dans un panneau latéral ou une boîte de dialogue, et jamais par URL :
+aucune route d'administration ne sert la page, de sorte que `full_screen` et `split` s'ouvrent comme un panneau
+latéral, et `useUrlController().routesMounted` vaut `false` pour vos propres
+composants à cet endroit. N'importe quel routeur convient : un simple `<BrowserRouter>`, un
+`<MemoryRouter>`, ou un routeur de données (data router). Un routeur reste requis. Un routeur de données
+permet aussi à un enregistrement comportant des modifications non enregistrées d'interrompre la navigation dans l'application ; avec les
+autres, seule l'invite de sortie de page du navigateur le protège. Enveloppez le panneau dans `<RebaseAuthGate>` si la page
+doit d'abord afficher la connexion de Rebase.
+
+`<EntityFormPanel>` fait de même pour le formulaire d'un enregistrement. Il charge l'enregistrement
+par `entityId`, l'enregistre via la couche de données de `<Rebase>` comme le fait le formulaire propre à
+l'administration, et appelle `onSaved` après chaque enregistrement. Omettez `entityId` pour créer un
+enregistrement. `onClose` est appelé lorsque le formulaire demande à être quitté, par exemple après
+la suppression de son enregistrement :
+
+```tsx
+<EntityFormPanel
+    collection={postsCollection}
+    entityId={postId}
+    onSaved={({ entity }) => console.log("saved", entity.id)}
+    onClose={() => navigate("/posts")}/>
+```
+
+Les deux apportent leur propre `CollectionsProvider` lorsqu'aucun n'existe au-dessus d'eux. C'est
+l'étape située en dessous, et vous pouvez la monter vous-même pour partager une seule portée entre
+plusieurs panneaux, ou pour utiliser les pièces de plus bas niveau (`CollectionViewBinding`,
+`useSidePanel`) qui s'y trouvent. À l'intérieur, un panneau peut nommer sa collection par `path` :
+
+```tsx
+import { CollectionPanel, CollectionsProvider } from "@rebasepro/cms";
+
+const collections = [postsCollection, authorsCollection];
+
+<CollectionsProvider collections={collections}>
+    <CollectionPanel path="posts"/>
+    <CollectionPanel path="authors"/>
+</CollectionsProvider>
+```
+
+`CollectionsProvider` contient un registre des collections que vous lui confiez, avec les
+`modifyCollection` et `injectCollections` de vos plugins appliqués comme dans l'administration,
+ainsi que les panneaux latéraux et boîtes de dialogue dans lesquels s'ouvrent les enregistrements, et la
+garde contre les modifications non enregistrées. Gardez le tableau `collections` stable : une constante de module,
+ou `useMemo`.
+
 ## Avancé : mise en page manuelle
 
 Tout ce qui suit remplace `<RebaseShell>`. Vous n'en avez besoin que si la mise en page
@@ -165,6 +243,11 @@ L'ordre est fixe : `RebaseAuthGate → RebaseNavigation → RebaseRouteDefs → 
 rien en dessous ne s'affiche pour un visiteur non authentifié ; `RebaseNavigation` construit
 les contrôleurs de navigation, d'URL et de registre de collections lus par `RebaseRouteDefs`
 et chaque vue de collection, de sorte qu'utiliser `RebaseRouteDefs` en dehors lèvera une exception.
+<span class="since-badge" data-since="0.25">Depuis 0.25</span> Pour intégrer une
+vue de collection ou un formulaire d'enregistrement dans une page qui vous appartient, sans les routes de
+l'administration, le `CollectionsProvider`, plus léger, construit ces contrôleurs
+à la place — voir
+[Une collection ou un enregistrement dans une page qui vous appartient](#une-collection-ou-un-enregistrement-dans-une-page-qui-vous-appartient).
 
 Chaque couche est utilisable séparément. `<RebaseAuthGate>` seul protège votre propre application
 derrière l'authentification de Rebase. Remplacez `<RebaseLayout>` par votre propre composant pour conserver le
@@ -245,12 +328,28 @@ const urlController = useBuildUrlController({
 
 #### `useBuildModeController`
 
-Gère le thème clair/sombre :
+Gère le thème clair/sombre. Tant qu'il est activé, il possède le thème de la page : il place
+la classe `dark` sur `<html>`, suit `prefers-color-scheme` jusqu'à ce que l'utilisateur
+choisisse un mode, et mémorise ce choix dans localStorage.
 
 ```typescript
 const modeController = useBuildModeController();
-// Provides: modeController.mode ("light" | "dark"), modeController.toggleMode()
+
+modeController.mode;             // "light" | "dark"
+modeController.setMode("dark");  // "light" | "dark" | "system" — "system" follows the OS again
 ```
+
+`<Rebase>` en construit un lui-même.
+
+<span class="since-badge" data-since="0.25">Depuis 0.25</span> Lorsque le
+composant qui l'utilise se démonte, il retire la classe `dark` qu'il a ajoutée ; une classe `dark`
+déjà présente sur la page reste. Construisez le vôtre
+au-dessus de `<Rebase>` uniquement lorsque des composants extérieurs à celui-ci ont aussi besoin du mode, et confiez-le
+avec la [prop `modeController`](#styles), pour qu'il n'y ait qu'un seul contrôleur
+et non deux. `useBuildModeController({ enabled: false })` construit un contrôleur
+inerte : il garde `mode` dans l'état React et ne touche ni classe, ni media query,
+ni localStorage. Lorsque votre application possède déjà le thème, vous n'avez pas besoin de ce
+hook du tout : passez votre propre contrôleur comme `modeController`.
 
 #### `useBuildAdminModeController`
 
@@ -332,7 +431,7 @@ Pour placer une vue dans le **Studio** plutôt que dans le CMS, passez-la à
 Rebase utilise **Tailwind CSS v4** et prend en charge les modes clair et sombre. Personnalisez via :
 
 - **Propriétés personnalisées CSS (variables)** — Remplacer les design tokens
-- **`ModeControllerProvider`** — Contrôler le mode clair/sombre
+- **`<Rebase modeController>`** — Confier à Rebase le mode clair/sombre de votre application
 - **Configuration Tailwind** — Personnalisation Tailwind standard
 
 ```css
@@ -343,6 +442,54 @@ Rebase utilise **Tailwind CSS v4** et prend en charge les modes clair et sombre.
     --font-mono: "JetBrains Mono", monospace;
 }
 ```
+
+### Mode clair et sombre
+
+Par défaut, `<Rebase>` possède le thème de la page : il place la classe `dark` sur
+`<html>`, suit `prefers-color-scheme` jusqu'à ce que l'utilisateur choisisse un mode dans
+l'administration, et mémorise ce choix dans localStorage.
+
+<span class="since-badge" data-since="0.25">Depuis 0.25</span> Lorsque `<Rebase>`
+se démonte, il retire la classe `dark` qu'il a ajoutée ; une classe déjà présente sur la page
+reste. En 0.24, la classe reste en place.
+
+<span class="since-badge" data-since="0.25">Depuis 0.25</span> Lorsque votre application
+a déjà un thème, passez-le comme `modeController`. Rebase y lit `mode`,
+appelle son `setMode` depuis son propre sélecteur de thème, et ne touche jamais à `<html>`,
+à `prefers-color-scheme` ni à localStorage :
+
+```tsx
+import { useEffect, useMemo, useState } from "react";
+import { Rebase, type ModeController } from "@rebasepro/app";
+
+export function App() {
+    const [mode, setMode] = useState<"light" | "dark">("light");
+    const modeController = useMemo<ModeController>(() => ({
+        mode,
+        setMode: (next) => setMode(next === "dark" ? "dark" : "light")
+    }), [mode]);
+
+    // Your app applies the mode, as it does for the rest of the page.
+    useEffect(() => {
+        document.documentElement.classList.toggle("dark", mode === "dark");
+    }, [mode]);
+
+    return (
+        <Rebase client={client} modeController={modeController}>
+            <MyAdmin/>
+        </Rebase>
+    );
+}
+```
+
+Le CSS du scaffold applique le mode sombre sous tout élément portant la classe `dark`
+(`@custom-variant dark (&:where(.dark, .dark *))`). Les panneaux latéraux, les boîtes de dialogue et les
+menus s'affichent dans un portail sur `<body>` : placez donc la classe sur `<html>` ou `<body>`
+plutôt que sur un wrapper autour de `<Rebase>`.
+
+Envelopper `<Rebase>` dans un `ModeControllerProvider` ne produit pas cet effet :
+`<Rebase>` fournit un contrôleur qui lui est propre à l'intérieur. En 0.24, la prop
+n'existe pas, et il n'y a aucun moyen de confier à `<Rebase>` le mode de votre application.
 
 ## Prochaines étapes
 

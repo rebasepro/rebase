@@ -16,13 +16,16 @@ La règle incarnée par cette échelle : **chaque échelon vous coûte quelque c
 
 ## L'échelle
 
+<span class="since-badge" data-since="0.25">Depuis 0.25</span> `createRebaseBackend`, à l'échelon 5,
+est nouveau ; en 0.24, cet échelon se limite au driver seul.
+
 | # | Échelon | Ce qu'il atteint | Ce qu'il n'atteint **pas** | Le coût à ce niveau |
 |---|---|---|---|---|
 | 1 | **Déclaration** — une propriété, une relation, un index, un bloc `search`, une règle de sécurité | Le schéma, le SDK généré, le panneau d'administration, le planificateur de migration | Tout ce qui doit exécuter du code | Aucun. C'est la voie privilégiée |
 | 2 | **Callback de collection** — `beforeQuery`, `afterRead`, `beforeSave`, `afterSave`, `beforeDelete`, `afterDelete` | Chaque lecture et écriture d'une collection, sur tous les transports, au sein de la transaction propre à la requête | Les requêtes qui ne touchent aucune collection ; l'enveloppe de réponse ; tout ce qui est asynchrone par rapport à l'écriture | S'exécute sur le chemin critique (hot path), maintenant la transaction ouverte |
 | 3 | **Fonction personnalisée** — une application Hono dans `functions/` | Sa propre URL, avec l'authentification résolue, le driver restreint à l'appelant et `rebase` à disposition | Les routes natives `/api/data`. Elle se situe *à côté*, pas devant | Une surface d'autorisation supplémentaire ; aucune méthode SDK n'est générée pour elle |
 | 4 | **Vos propres routes et middlewares** sur l'application Hono | Tout ce qui est HTTP, y compris les chemins qui s'exécutent *avant* les routeurs de Rebase | Le driver et l'identité de l'appelant, à moins de protéger la route vous-même | En dehors de tout routeur Rebase : aucun middleware d'authentification n'a été exécuté |
-| 5 | **Votre propre serveur** — intégrer le driver dans Express, Fastify ou un simple serveur `http` | L'adaptateur de données et le temps réel, dans un processus que vous avez écrit | Tout ce que configure `initializeRebaseBackend` : routes d'authentification, stockage, jobs, cron, API d'administration, le serveur MCP | Vous assemblez le backend. Rebase est ici une bibliothèque, pas un coordinateur |
+| 5 | **Votre propre serveur** — construire le backend avec `createRebaseBackend` et monter les groupes de routes voulus, ou intégrer le driver seul dans Express, Fastify ou un simple serveur `http` | Chaque groupe de routes, au chemin que vous choisissez, et le processus qui démarre les timers ; tout en bas, l'adaptateur de données et le temps réel seuls | Avec le driver seul : tout le reste, des routes d'authentification et du stockage jusqu'à cron et l'API d'administration | Vous appelez chacune des étapes que `initializeRebaseBackend` faisait pour vous |
 | 6 | **`rebase eject`** | Le point d'entrée et le `Dockerfile`, dans votre dépôt | — | **Les mises à niveau du runtime de la plateforme n'atteignent plus ce projet.** CORS, câblage de l'authentification, stockage et arrêt deviennent votre responsabilité |
 
 :::tip[Deux échelons sont souvent ignorés sans raison]
@@ -103,7 +106,7 @@ Une lecture n'est délibérément *pas* restreinte : la vérification d'unicité
 
 **Portée :** une URL sous `/api/functions`.
 
-Une application Hono dans `backend/functions/`, découverte par son nom de fichier de la même manière que les collections et les tâches cron. Le middleware d'authentification a déjà été exécuté lorsque votre gestionnaire est atteint, le driver est restreint au périmètre de l'appelant, et `rebase` est disponible pour le stockage, les e-mails, les jobs et `dataAsAdmin`.
+Une application Hono dans `backend/functions/`, découverte par son nom de fichier de la même manière que les collections et les tâches cron, ou passée comme valeur (`functions: { promote }`). Le middleware d'authentification a déjà été exécuté lorsque votre gestionnaire est atteint, le driver est restreint au périmètre de l'appelant, et `rebase` est disponible pour le stockage, les e-mails, les jobs et `dataAsAdmin`.
 
 ```typescript
 // backend/functions/promote.ts
@@ -126,7 +129,7 @@ export default defineFunction((app, { rebase }) => {
 
 **Portée :** l'application Hono, avant que Rebase n'intervienne.
 
-`initializeRebaseBackend` prend l'application que vous lui passez, donc tout ce que vous enregistrez sur cette application *avant* de l'appeler s'exécute avant chaque routeur Rebase — voir [Route Registration Order](/docs/backend/custom-functions#route-registration-order) pour la structure.
+`initializeRebaseBackend` prend l'application que vous lui passez, donc tout ce que vous enregistrez sur cette application *avant* de l'appeler s'exécute avant chaque routeur Rebase — voir [Route Registration Order](/docs/backend/custom-functions#route-registration-order) pour la structure. Un groupe de routes que vous montez vous-même depuis `backend.routes` (échelon 5) n'est pas l'une de ces routes : il porte son propre middleware d'authentification.
 
 :::caution[Aucun middleware d'authentification ne s'y est exécuté]
 Une route enregistrée de cette manière est **en dehors** de tout routeur Rebase : `getDriver(c)` n'est pas défini et rien n'a vérifié de jeton. Protégez-la avec `requireAuth` importé depuis **`@rebasepro/server`** — la racine du package — qui vérifie le jeton lui-même, puis avec `requireAdmin` ou `requireScope` issus du même import pour décider de ce que l'appelant peut faire. Les gardes exportés depuis `@rebasepro/server/functions` lisent une identité qu'un routeur Rebase a déjà résolue, et renvoient une 500 plutôt que de feindre qu'elle existe.
@@ -140,13 +143,41 @@ Un piège de Hono bon à connaître, car il est silencieux : `app.use("/*", guar
 
 **Portée :** le processus.
 
-`@rebasepro/server-postgres` est agnostique vis-à-vis du framework : il dépend de Drizzle et du module `http.Server` de Node, et de rien d'autre. Vous pouvez donc intégrer l'adaptateur de données et le temps réel dans Express, Fastify ou du simple Node, et vous passer totalement du coordinateur.
+<span class="since-badge" data-since="0.25">Depuis 0.25</span>
+`initializeRebaseBackend` est un raccourci au-dessus de quatre appels publics, et cet échelon consiste à
+les appeler vous-même. `createRebaseBackend` construit le backend et ne monte, ne démarre et n'écoute
+rien. `backend.routes` contient chaque groupe de routes sous la forme d'une sous-application Hono que
+vous pouvez monter seule, à n'importe quel chemin. `mount`, `attachRealtime` et `start` font le reste,
+si vous le souhaitez :
+
+```typescript
+const backend = await createRebaseBackend({ database: adapter, auth, collections, provision: true });
+
+app.route("/v2/data", backend.routes.data());   // only the parts you want,
+app.route("/v2/auth", backend.routes.auth());   // at the paths you want
+await backend.attachRealtime(server);
+backend.start();                                // cron, job workers, sweeps
+```
+
+Un groupe porte son propre contexte d'authentification, ses limites de débit et sa barrière d'administration, de sorte que
+`getDriver(c)` fonctionne dans un groupe monté n'importe où. Ce qu'il ne porte pas, c'est le middleware
+global que `mount()` ajoute : la limite de taille du corps, la compression, la protection CSRF et
+l'enveloppe d'erreur sont à ajouter vous-même lorsque vous montez les groupes un par un.
+
+Un cran plus bas, `@rebasepro/server-postgres` est agnostique vis-à-vis du framework : il dépend de
+Drizzle et du module `http.Server` de Node, et de rien d'autre, de sorte que vous pouvez intégrer le driver de données
+et le temps réel dans Express, Fastify ou du simple Node et vous passer totalement du serveur
+Rebase.
 
 → [Custom Server Integration](/docs/backend/custom-server)
 
-**Ce qu'il ne peut pas atteindre :** tout ce que `initializeRebaseBackend` configure, c'est-à-dire l'essentiel du backend — les routes d'authentification et le rafraîchissement des tokens, le stockage, la file de jobs, cron, l'API d'administration avec laquelle Studio communique, le serveur MCP, l'enveloppe d'erreur, la pile de middlewares. Chacun de ces éléments peut être assemblé manuellement ; aucun ne s'assemble tout seul. Rebase est une bibliothèque à cet échelon, pas un coordinateur.
+**Ce qu'il ne peut pas atteindre :** avec `createRebaseBackend`, rien n'est hors de portée ; vous prenez en charge l'ordre
+des appels. Avec le driver seul, tout ce que le serveur configure est à construire vous-même : les routes d'authentification et le
+rafraîchissement des tokens, le stockage, la file de jobs, cron, l'API d'administration avec laquelle Studio communique, le serveur MCP, l'enveloppe
+d'erreur et la pile de middlewares.
 
-Optez pour cette solution lorsque vous avez un serveur existant qui doit rester le point d'entrée. Si votre besoin réel est une simple route personnalisée, cela relève de l'échelon 3 ou 4, avec une surface d'exposition bien moindre.
+Optez pour cette solution lorsque vous avez un serveur existant qui doit rester le point d'entrée, ou lorsque
+seule une partie du backend a sa place dans ce processus. Si votre besoin réel est une simple route personnalisée, cela relève de l'échelon 3 ou 4, avec une surface d'exposition bien moindre.
 
 ## 6. `rebase eject`
 

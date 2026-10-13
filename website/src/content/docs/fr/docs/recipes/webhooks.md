@@ -89,6 +89,13 @@ Seul l'id du webhook est stocké dans le job, si bien que son secret de signatur
 redirection, est placé en dead-letter après une seule tentative avec la raison ; tout le reste est réessayé
 comme n'importe quel job. Voir [Webhooks durables](/docs/backend/jobs#durable-webhooks).
 
+`setCollectionCallbacks` **remplace** les callbacks que la collection `orders`
+déclare. Si elle en déclare, conservez-les :
+<span class="since-badge" data-since="0.25">Depuis 0.25</span> passez
+`composeCallbacks(declared, { afterSave })`, avec `composeCallbacks` issu de
+`@rebasepro/server` et `declared` les `callbacks` propres à la collection. Voir
+[Combiner des ensembles de callbacks](/docs/collections/callbacks/#combining-callback-sets).
+
 ### Sans file de jobs
 
 Omettez `jobQueue` — ou utilisez un pilote sans SQL, où le backend n'en a pas — et les livraisons sont mises

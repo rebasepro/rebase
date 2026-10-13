@@ -9,7 +9,7 @@ description: Remplacez les composants d'interface utilisateur par défaut par de
 
 Rebase vous permet de surcharger les composants d'interface utilisateur (UI) par défaut avec vos propres implémentations personnalisées. Cela implémente un modèle de swizzling de composants inspiré de Docusaurus qui prend en charge deux modèles de personnalisation :
 - **Mode Eject** (par défaut) : Votre composant remplace intégralement le composant intégré.
-- **Mode Wrap** (`wrap: true`) : Votre composant enveloppe l'original. Le composant intégré est transmis sous forme de prop `OriginalComponent`, ce qui vous permet de l'afficher au sein de votre disposition ou logique personnalisée.
+- **Mode Wrap** (`wrap: true`) : Votre composant enveloppe l'original. Ce qu'il enveloppe (en général le composant intégré) est transmis sous forme de prop `OriginalComponent`, ce qui vous permet de l'afficher au sein de votre disposition ou logique personnalisée.
 
 Les surcharges de composants peuvent être appliquées **globalement** au niveau de l'application (sur le fournisseur `<Rebase>`) ou **localement** au niveau de la collection (dans les définitions individuelles de collections).
 
@@ -86,7 +86,7 @@ export const productsCollection = defineCollection({
 });
 ```
 
-Le composant enveloppant réside avec le reste de votre code frontend et reçoit le composant intégré sous le nom `OriginalComponent` :
+Le composant enveloppant réside avec le reste de votre code frontend et reçoit ce qu'il enveloppe sous le nom `OriginalComponent` — le composant intégré, sauf si votre application le surcharge aussi (voir [Quand les deux portées surchargent un composant](#quand-les-deux-portées-surchargent-un-composant)) :
 
 ```tsx
 // frontend/src/ProductsEmptyState.tsx
@@ -109,6 +109,21 @@ export default function ProductsEmptyState({ OriginalComponent, ...props }: {
 Chaque module a besoin d'un **export par défaut** (`default export`). Le plugin Vite des collections réécrit un chemin en un import paresseux, de sorte que le composant constitue son propre bloc (chunk) et se charge la première fois que la surcharge est rendue. Cette réécriture concerne les fichiers situés dans le `collectionsDir` configuré. Un chemin dans un fichier en dehors de celui-ci parvient à l'interface d'administration sous la forme d'une chaîne brute : la console le signale, et le composant intégré s'affiche à sa place. En dehors de `collectionsDir`, écrivez vous-même l'import paresseux : `Component: () => import("../../frontend/src/ProductCustomForm")`.
 
 Une référence directe (`Component: ProductCustomForm`) fonctionne également, mais uniquement dans un fichier de collection que le serveur ne charge pas, car importer le composant importe également React ainsi que toutes ses dépendances.
+
+### Quand les deux portées surchargent un composant
+
+<span class="since-badge" data-since="0.25">Depuis 0.25</span> En 0.24, le wrapper d'une collection reçoit toujours le composant intégré, et la surcharge au niveau de l'application est ignorée dans cette collection.
+
+Les deux portées se composent. La surcharge au niveau de l'application (`<Rebase components>`) est appliquée d'abord au composant intégré, puis celle de la collection (`admin.components`) est appliquée au résultat :
+
+| Niveau application | Niveau collection | Ce qui s'affiche dans cette collection |
+|---|---|---|
+| n'importe lequel | aucun | ce qui s'affiche partout ailleurs : la surcharge au niveau de l'application, ou le composant intégré |
+| aucun | wrap | le wrapper de la collection autour du composant intégré |
+| remplacement ou wrap | wrap | le wrapper de la collection autour de la surcharge au niveau de l'application, transmise comme `OriginalComponent` |
+| n'importe lequel | remplacement | le composant de la collection seul ; il remplace les deux |
+
+Une collection peut donc ajouter quelque chose autour d'un composant que votre application personnalise déjà, sans perdre cette personnalisation. Pour abandonner la version au niveau de l'application pour une seule collection, remplacez au lieu d'envelopper.
 
 ---
 

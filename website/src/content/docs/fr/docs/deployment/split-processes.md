@@ -43,6 +43,10 @@ REBASE_ROLE=all        # the default: everything, one process
 Les endpoints de santé (health) et de métriques sont présents sur chaque rôle sans exception. Un processus qu'un
 orchestrateur ne peut pas sonder est un processus qu'il ne peut pas mettre à jour de manière progressive (rolling update).
 
+<span class="since-badge" data-since="0.25">Depuis 0.25</span> `GET /api/auth/config`,
+ce que lit l'écran de connexion, suit le reste de `/api/auth` : seuls `api` et
+`all` le servent. En 0.24, un processus `functions` ou `worker` y répondait aussi.
+
 Le temps réel figure sur cette liste car il a un coût, que quelqu'un l'utilise
 ou non : un processus qui consomme des événements de changement conserve une connexion `LISTEN` en dehors
 du pool tant qu'il est en cours d'exécution, et installe les déclencheurs (triggers) de capture au démarrage. Seul
@@ -148,6 +152,15 @@ valeur par défaut refusera de démarrer, avec un message explicite. L'instructi
 puis y écrit en deux étapes distinctes, de sorte que des processus démarrant simultanément
 entrent en collision — et un déploiement où plusieurs d'entre eux entrent en concurrence pour provisionner le même
 schéma n'est souhaitable pour personne.
+
+<span class="since-badge" data-since="0.25">Depuis 0.25</span> Dans un
+[serveur personnalisé](/docs/backend/custom-server/), la même décision est l'option
+`provision` de `createRebaseBackend` : `true` dans le processus qui possède le
+schéma, et `{ collections: false, realtime: false }` dans tous les autres, qui
+conservent malgré tout les tables propres au framework. `REBASE_MIGRATE_ON_BOOT=none`
+désactive là aussi le schéma des collections. Le travail en arrière-plan se décide de la même manière :
+un processus qui n'appelle jamais `start()` n'exécute ni planificateur cron ni workers de jobs,
+et un processus qui l'appelle exécute ceux que lui donne son option `ownership`.
 
 ## Desservir une seule fonction par processus
 
