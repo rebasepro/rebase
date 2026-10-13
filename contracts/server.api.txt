@@ -378,7 +378,7 @@ interface RefreshTokenInfo { aal, createdAt, expiresAt, id, ipAddress, method, r
 interface RefreshTokenSession { aal, id, method, rotatedFrom, startedAt }
 interface ResolveContext { defaultBasePath, production }
 interface ResolveStorageOptions { production }
-interface ResolvedDataSourceConfig { adminConnectionString, connectionString, driverPackage, engine, isDefault, key, poolConfig, readConnectionString }
+interface ResolvedDataSourceConfig { adminConnectionString, connectionString, directConnectionString, driverPackage, engine, isDefault, key, poolConfig, readConnectionString }
 interface ResourceResolver { accountScoped, kind, reads, resolve }
 interface RlsAudit { runNow, start, status, stop }
 interface RlsAuditConfig { connectionString, enabled, intervalMs, runOnBoot, scan, schemas, statementTimeoutMs, warnAtSeverity }
