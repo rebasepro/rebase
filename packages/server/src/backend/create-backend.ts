@@ -169,6 +169,7 @@ import type { MetricsHistory } from "../metrics/history-recorder.js";
 import type { ProvisionOptions, RebaseAuthConfig, RebaseBackendOptions } from "./options";
 import type { BackendServices } from "./services";
 import { runInBackendScope, type BackendScope } from "./scope";
+import { noCollectionsCause } from "./no-collections";
 
 /**
  * A backend's HTTP surface, one route group at a time.
@@ -645,6 +646,9 @@ export async function createRebaseBackend(options: RebaseBackendOptions): Promis
     let defaultDriverId = DEFAULT_DRIVER_ID;
 
     let defaultDriverResult: InitializedDriver | undefined = undefined;
+    // Tables a driver found while deriving collections and did not serve, for
+    // the answer the data API gives when it then has nothing to serve.
+    const unprotectedTables: { schema: string; table: string }[] = [];
 
     /** What each bootstrapper's `initializeDriver` returned, by bootstrapper. */
     const driverResults = new Map<BackendBootstrapper, InitializedDriver>();
@@ -793,6 +797,9 @@ export async function createRebaseBackend(options: RebaseBackendOptions): Promis
         // into it by whatever the database happens to contain.
         if (introspectCollections && driverResult.collections?.length) {
             activeCollections = [...activeCollections, ...driverResult.collections];
+        }
+        if (introspectCollections && driverResult.unprotectedTables?.length) {
+            unprotectedTables.push(...driverResult.unprotectedTables);
         }
 
         if ((b.id || bootstrapper.type) === defaultDriverId || !defaultDriverResult) {
@@ -2454,7 +2461,8 @@ export async function createRebaseBackend(options: RebaseBackendOptions): Promis
     } else {
         // No collections and no tables to derive them from — the state a fresh
         // `--headless` project starts in, since it declares nothing and the
-        // database is empty.
+        // database is empty — or tables the driver would not serve, because
+        // row-level security is off on every one; then the answer names them.
         //
         // Without this the data surface is simply absent, so Hono's default
         // answers: a bare `404 Not Found` in `text/plain`. That reads as a typo
@@ -2467,14 +2475,16 @@ export async function createRebaseBackend(options: RebaseBackendOptions): Promis
         // storage this resolves by creating a table rather than by configuring
         // the deployment. Same reasoning as `storageStub` above, different verb.
         const emptyDataStub = new Hono<HonoEnv>();
-        emptyDataStub.all("/*", (c) => c.json({
+        const emptyDataAnswer = {
             error: {
-                message: "This project serves no collections yet. It declares none in code, and " +
-                    "the database has no tables to derive them from. Create tables — a migration, " +
-                    "SQL, or a collection file plus `rebase db push` — and restart.",
-                code: "NO_COLLECTIONS"
+                message: `This project serves no collections yet. ${noCollectionsCause(unprotectedTables)}`,
+                code: "NO_COLLECTIONS",
+                ...(unprotectedTables.length > 0 && {
+                    details: { unprotectedTables: unprotectedTables.map(({ schema, table }) => `${schema}.${table}`) }
+                })
             }
-        }, 404));
+        };
+        emptyDataStub.all("/*", (c) => c.json(emptyDataAnswer, 404));
         dataSurface = emptyDataStub;
     }
 
@@ -3512,7 +3522,8 @@ export async function createRebaseBackend(options: RebaseBackendOptions): Promis
                 requireAuth: resolveRequireAuth(config.auth),
                 adminGate: adminGate("schema:read"),
                 generate: openApiGenerator,
-                announce
+                announce,
+                unprotectedTables
             });
         }
 

@@ -1395,6 +1395,16 @@ export interface InitializedDriver {
      */
     collections?: import("./collections").CollectionConfig[];
 
+    /**
+     * Tables the driver found while deriving {@link collections} and did not
+     * serve, because row-level security is disabled on them and so they have
+     * no authorization model (`baas.unprotectedTables` left at `"exclude"`).
+     *
+     * The server names them when it has nothing to serve: "the database has
+     * no tables" is untrue of a database whose tables were all skipped.
+     */
+    unprotectedTables?: { schema: string; table: string }[];
+
     /** The underlying database connection (for lifecycle management). */
     connection?: DatabaseConnection;
 

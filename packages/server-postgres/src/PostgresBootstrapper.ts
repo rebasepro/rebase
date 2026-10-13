@@ -560,6 +560,9 @@ export async function openPostgresDriver(
     // No collection files and no generated drizzle schema exist, so read
     // the live database and build both from what is actually there.
     let introspectedCollections: CollectionConfig[] | undefined;
+    // The tables skipped for having no authorization model, for the server to
+    // name if it then has nothing to serve.
+    let skippedUnprotected: { schema: string; table: string }[] | undefined;
     let introspectedTables: Record<string, PgTable> | undefined;
     let introspectedRelations: Record<string, Relations> | undefined;
     if (introspectCollections && (!collections || collections.length === 0)) {
@@ -595,6 +598,7 @@ export async function openPostgresDriver(
                     "\n      Set baas.unprotectedTables: \"serve\" to expose them regardless."
                 );
                 for (const t of unprotected) schema.tablesMap.delete(t);
+                skippedUnprotected = unprotected.map((table) => ({ schema: pgSchemaName, table }));
             }
         }
         if (policyless.length > 0) {
@@ -1286,6 +1290,7 @@ foundIn: (tablesByName.get(checkName) ?? []).filter(s => s !== schemaName) });
         // Only set in baas mode — tells the server which collections the
         // database turned out to have.
         collections: introspectedCollections,
+        ...(skippedUnprotected && { unprotectedTables: skippedUnprotected }),
         internals
     };
 }

@@ -2,6 +2,7 @@ import { Hono, type MiddlewareHandler } from "hono";
 import { CollectionConfig } from "@rebasepro/types";
 import { HonoEnv } from "../api/types";
 import { logger } from "../utils/logger";
+import { noCollectionsCause } from "../backend/no-collections";
 
 /** The OpenAPI document builder, loaded on demand — see {@link loadOpenApiGenerator}. */
 export type OpenApiGenerator = typeof import("../api/openapi-generator").generateOpenApiSpec;
@@ -33,13 +34,18 @@ export interface OpenApiDocsOptions {
     generate: OpenApiGenerator | undefined;
     /** Whether to log where Swagger UI is. Default `true`. */
     announce?: boolean;
+    /**
+     * Tables the driver skipped for having row-level security disabled, which
+     * the answer names when there are no collections to document.
+     */
+    unprotectedTables?: readonly { schema: string; table: string }[];
 }
 
 /**
  * Serve the OpenAPI document, and Swagger UI outside production.
  */
 export function mountOpenApiDocs(app: Hono<HonoEnv>, basePath: string, options: OpenApiDocsOptions): void {
-    const { enableSwagger, serverCollections, requireAuth, adminGate, generate } = options;
+    const { enableSwagger, serverCollections, requireAuth, adminGate, generate, unprotectedTables = [] } = options;
     if (serverCollections.length === 0) {
         // Still routed, and still a 404 — but one that says which 404 it is.
         //
@@ -53,9 +59,7 @@ export function mountOpenApiDocs(app: Hono<HonoEnv>, basePath: string, options: 
         const explain = (c: { json: (v: unknown, s: number) => Response }) => c.json({
             error: {
                 message: "This project serves no collections yet, so there is no API to document. " +
-                    "It declares none in code, and the database has no tables to derive them from. " +
-                    "Create tables — a migration, SQL, or a collection file plus `rebase db push` — " +
-                    "and restart.",
+                    noCollectionsCause(unprotectedTables),
                 code: "NO_COLLECTIONS"
             }
         }, 404);
