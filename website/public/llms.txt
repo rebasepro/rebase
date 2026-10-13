@@ -89,13 +89,16 @@
 - [MongoDB](https://rebase.pro/docs/backend/mongodb): @rebasepro/server-mongo runs Rebase on MongoDB: a complete data driver, change-stream realtime and snapshot history — and no row-level security.
 - [Realtime & WebSocket](https://rebase.pro/docs/backend/realtime): Real-time data synchronization, broadcast channels, and presence tracking via WebSocket.
 - [Realtime across instances](https://rebase.pro/docs/backend/realtime-transports): How broadcast channels and presence survive more than one server process: the LISTEN/NOTIFY bus, what each instance owns, and writing your own transport.
+- [Database change capture](https://rebase.pro/docs/backend/realtime-cdc): Realtime events for every committed write, however it was made: the capture triggers, the REALTIME_CDC setting, and what they need.
 - [Search](https://rebase.pro/docs/backend/search): How .search() behaves by default, and how to opt a Postgres collection in to ranked full-text search over the fields you name — including JSONB and array content.
 - [Vector Search](https://rebase.pro/docs/backend/vector-search): Nearest-neighbour search over a vector property through the REST API — the query parameters, thresholds, embeddings too long for a URL, and how filters behave on an HNSW index.
 - [Indexes](https://rebase.pro/docs/backend/indexes): Declare ordinary Postgres indexes on a collection — btree, GIN and BRIN, partial, composite, covering and unique — and why a hand-written one used to disappear.
 - [Cron Jobs](https://rebase.pro/docs/backend/cron-jobs): Schedule recurring background tasks with Rebase's built-in cron job system. Define jobs as TypeScript files, monitor them in Studio, and manage them via the REST API.
+- [Cron Jobs API](https://rebase.pro/docs/backend/cron-jobs-api): List, trigger, pause and resume cron jobs over the REST API, or with the typed SDK's client.cron.
 - [Cron across instances](https://rebase.pro/docs/backend/cron-across-instances): How cron jobs behave with more than one server process: one run per slot, a slot a restart dropped, a pause every replica honours, and runs that never overlap.
 - [Background Jobs](https://rebase.pro/docs/backend/jobs): A durable, Postgres-backed job queue — work that survives a restart, retried with backoff, with failures kept rather than dropped.
 - [Custom Functions](https://rebase.pro/docs/backend/custom-functions): Add custom Hono API endpoints alongside your Rebase CRUD routes. Auto-discovered from a directory, with full access to the backend instance.
+- [Typed server-side data](https://rebase.pro/docs/backend/typed-server-data): Register your generated Database type once, and context.data, rebase.dataAsAdmin and the rebase a function or cron receives are typed from it: rows, filters, sorts, includes and write inputs.
 - [Global Backend Hooks](https://rebase.pro/docs/backend/hooks): Apply cross-cutting lifecycle callbacks to every collection at the server level using CollectionCallbacks.
 - [Entity History](https://rebase.pro/docs/backend/history): Track every change to your entities with a full audit trail — who changed what, when, and the complete before/after entity.
 - [Database Branching](https://rebase.pro/docs/backend/branching): Create isolated database branches for development, staging, and testing using PostgreSQL's CREATE DATABASE ... TEMPLATE — instant, full-fidelity copies with zero downtime.
@@ -226,6 +229,7 @@
 - [Aggregates and search](https://rebase.pro/docs/sdk/aggregates-and-search): Count, sum and group with the SDK, filter inside JSON columns, and run full-text and vector search from the client.
 - [Querying relations](https://rebase.pro/docs/sdk/relations): Include related entities in a query, and read a child collection through its parent with the SDK's relation accessors.
 - [Authentication](https://rebase.pro/docs/sdk/authentication): Client-side authentication with the Rebase SDK — email/password sign-in, OAuth providers, session management, and auth state listeners.
+- [Multi-Factor Authentication](https://rebase.pro/docs/sdk/multi-factor-authentication): TOTP factors with the Rebase SDK: enrolling one, the second step of a sign-in, recovery codes, and removing a factor.
 - [Realtime Subscriptions](https://rebase.pro/docs/sdk/realtime): Subscribe to live data changes with the Rebase typed SDK using WebSocket-based realtime listeners.
 - [Offline & Local-First Sync](https://rebase.pro/docs/sdk/offline): Enable the Rebase typed SDK's local-first sync engine — a local row database, instant offline writes with rollback, and reactive live queries.
 - [Storage & Files](https://rebase.pro/docs/sdk/storage): Upload, download, list, and delete files using the Rebase typed SDK's storage module.
