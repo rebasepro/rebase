@@ -213,7 +213,9 @@ jobs:
   # source-only runner in a way that reads as a real regression.
   unit:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # Build plus every package's unit suite: ~19.5 min on 2026-10-09, over 20 after
+    # the 10-11/13 sweeps added ~1,000 tests. The limit catches a hang, not a slow suite.
+    timeout-minutes: 35
 
     steps:
       - name: Checkout
