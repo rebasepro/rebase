@@ -5,6 +5,7 @@ import {
     storageReference,
     storageReferencesForDownloadUrls,
     storageTargetOfDownloadUrl,
+    storageTargetsInText,
     STORAGE_REFERENCE_SCHEME
 } from "../src/controllers/storage";
 
@@ -212,5 +213,11 @@ describe("download URLs saved in text before references", () => {
         const text = `![a](${legacy("posts/cover.png")} "Cover") and ![b](https://cdn.example.com/b.png)`;
         expect(storageReferencesForDownloadUrls(text))
             .toBe(`![a](${storageReference("posts/cover.png")} "Cover") and ![b](https://cdn.example.com/b.png)`);
+    });
+
+    it("are listed with the references, for whoever needs to know which files a text uses", () => {
+        const text = `![a](${legacy("posts/old.png")}) ![b](${storageReference("b.png", "media")}) ![c](https://cdn.example.com/c.png)`;
+        expect(storageTargetsInText(text)).toEqual([{ key: "b.png", storageId: "media" }, { key: "posts/old.png" }]);
+        expect(storageTargetsInText("no files here")).toEqual([]);
     });
 });

@@ -142,7 +142,8 @@ nothing removes the previous one: two rows can hold the same key, so the
 panel cannot know a file is unused. Objects no row points at stay in the
 bucket, and are billed, until you delete them — from Studio's storage browser,
 with `client.storage.deleteObject(key)`, or with a lifecycle rule on the
-bucket.
+bucket. `rebase storage orphans` lists the files no row names, and deletes them
+with `--delete` — see [the CLI](/docs/cli/#rebase-storage).
 
 ### Moving a property to another storage source
 
@@ -150,9 +151,9 @@ A file field stores the object's key, not its source. Changing a property's
 `storageSource` points every existing value at the new source, where those
 keys do not exist, so previews of files uploaded before the change answer
 "not found". Copy the objects to the new source under the same keys before
-changing the property — with the provider's own tooling, such as
-`aws s3 sync` or `gcloud storage cp` — or keep the old source for the
-existing files.
+changing the property — `rebase storage move --from <old> --to <new> --prefix
+<storagePath>`, or the provider's own tooling, such as `aws s3 sync` or
+`gcloud storage cp` — or keep the old source for the existing files.
 
 ## Next Steps
 

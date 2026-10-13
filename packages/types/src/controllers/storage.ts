@@ -297,6 +297,20 @@ function downloadUrlsIn(text: string): Map<string, string> {
 }
 
 /**
+ * Every object `text` names: its storage references, and the private files'
+ * download URLs saved in it before references existed. An object named more
+ * than once may be listed more than once.
+ *
+ * @group Models
+ */
+export function storageTargetsInText(text: string): StorageReferenceTarget[] {
+    const references = text.includes(STORAGE_REFERENCE_SCHEME) ? text.match(STORAGE_REFERENCE_PATTERN) ?? [] : [];
+    return [...references, ...downloadUrlsIn(text).values()]
+        .map((reference) => parseStorageReference(reference))
+        .filter((target): target is StorageReferenceTarget => target !== null);
+}
+
+/**
  * `text` with every private file's download URL replaced by the storage
  * reference for its object — for rewriting text saved before references, so
  * it stores what new text stores. Any other URL is left as it is.

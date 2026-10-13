@@ -446,6 +446,35 @@ roles beside `service`, `--expires-in` takes days and `--expires-at` an ISO date
 The key's scopes and the row-level security of the identity it acts as both apply.
 See [API keys](/docs/backend/api-keys/).
 
+### `rebase storage`
+
+<span class="since-badge" data-since="0.25">Since 0.25</span> Whole-store
+maintenance of stored files, through the running backend with
+`REBASE_SERVICE_KEY` from `.env`:
+
+```bash
+rebase storage orphans                         # files no row names
+rebase storage orphans --source media --delete # and delete them, after asking
+rebase storage move --from "(default)" --to media --prefix avatars
+rebase storage move --from "(default)" --to media --prefix avatars --delete-source
+```
+
+`orphans` reads every row of every collection, soft-deleted rows included, and
+lists the files of one source (`--source`, the default source when left out)
+that no string in any row names: a key, a URL, a `rebase-storage:` reference in
+a text. Files newer than `--older-than` hours (24 by default) are left out,
+because the admin panel uploads a file before the row that names it is saved.
+`--delete` asks before it deletes (`--yes` skips the question, and is required
+with no terminal), the server finds the files again first, and nothing is
+deleted while a collection cannot be read. Files that only your own tables
+outside collections name look unused: check before deleting.
+
+`move` copies the files under `--prefix` to another source under the same keys,
+a page at a time. A file the target already holds at the same size is skipped,
+so a stopped move resumes by running it again; `--delete-source` deletes each
+file from the source once the target holds it. Both need `database:read`, and
+deleting or moving `database:write`, which the service key holds.
+
 ### `rebase skills install`
 
 Install the Rebase reference skills for your AI coding assistants — every `--agent` above:

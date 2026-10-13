@@ -613,6 +613,7 @@ function storageObjectPath
 function storageReference
 function storageReferencesForDownloadUrls
 function storageTargetOfDownloadUrl
+function storageTargetsInText
 function summarizeRoles
 function summarizeScopes
 function toCanonicalOp
@@ -1107,6 +1108,7 @@ function resolveStorageReferences
 function storageReference
 function storageReferencesForDownloadUrls
 function storageTargetOfDownloadUrl
+function storageTargetsInText
 interface AdminUser { createdAt, disabled, displayName, email, metadata, photoURL, providerId, roles, uid, updatedAt }
 interface AggregateMeta { hasMore, limit, offset }
 interface AggregateParams { groupBy, limit, logical, offset, orderBy, searchString, select, where }

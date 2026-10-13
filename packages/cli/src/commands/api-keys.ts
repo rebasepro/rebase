@@ -49,7 +49,8 @@ export const API_KEYS_SUBCOMMANDS = ["list", "get", "create", "revoke", "scopes"
  */
 const loadEnv = readEnvFile;
 
-function resolveBaseUrl(env: Record<string, string>, projectRoot?: string): string {
+/** The running backend's URL. Shared with `rebase storage`. */
+export function resolveBaseUrl(env: Record<string, string>, projectRoot?: string): string {
     // An explicit override always wins.
     if (env.REBASE_BASE_URL) return env.REBASE_BASE_URL;
 

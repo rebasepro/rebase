@@ -75,7 +75,8 @@ export {
     isStorageReference,
     STORAGE_REFERENCE_SCHEME,
     storageTargetOfDownloadUrl,
-    storageReferencesForDownloadUrls
+    storageReferencesForDownloadUrls,
+    storageTargetsInText
 } from "@rebasepro/types";
 export type { StorageReferenceTarget, StorageReferenceResolver } from "@rebasepro/types";
 

@@ -128,6 +128,7 @@ import { DEFAULT_REFRESH_EXPIRES_IN } from "./auth/jwt";
 import { configureUserPicking } from "./auth/user-picking";
 import { createJwksRoutes } from "./auth/jwks-routes";
 import { readRuntimeVersion } from "./boot/version-skew";
+import { createStorageMaintenanceRoutes } from "./storage/maintenance-routes";
 import { supportsRlsScoping } from "./auth/rls-scope";
 import { createOAuthStore } from "./mcp/oauth-store";
 import { createOAuthRoutes, grantIdentityFromRepository } from "./mcp/oauth-routes";
@@ -2739,6 +2740,26 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
             },
             isProduction
         );
+
+        // `rebase storage orphans` and `rebase storage move`: every object of a
+        // source against every row, and copies between sources. Whole-store
+        // operations past every storage policy, so admin-only: reading every
+        // row is `database:read`, deleting or copying files `database:write`.
+        if (surfaces.admin) {
+            const maintenanceRouter = new Hono<HonoEnv>();
+            applyAdminGate(maintenanceRouter, "Storage maintenance", { read: "database:read", write: "database:write" });
+            maintenanceRouter.route("/", createStorageMaintenanceRoutes({
+                registry: storageRegistry,
+                controller: storageController,
+                collections: () => collectionRegistry.getRawCollections(),
+                // Unscoped: a row a policy hides from the admin still names its files.
+                driverFor: (collection) => {
+                    const key = resolveDataSource(collection, dataSourceRegistry).key;
+                    return !key || key === DEFAULT_DRIVER_ID ? defaultDriver : driverRegistry.get(key);
+                }
+            }));
+            config.app.route(`${basePath}/admin/storage`, maintenanceRouter);
+        }
 
         const storageRoutes = createStorageRoutes({
             controller: storageController,

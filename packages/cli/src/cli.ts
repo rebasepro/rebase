@@ -53,7 +53,7 @@ export const ROOT_FLAGS = {
  * literal under this name: `help-coverage.test.ts`, `printed-commands.test.ts`
  * and the docs verifier read it out of this file's source.
  */
-const namespacedCommands = ["init", "schema", "db", "dev", "build", "start", "auth", "doctor", "skills", "api-keys", "cloud", "apps", "eject", "generate-sdk", "telemetry", "resources", "status", "upgrade", "normalize-imports"];
+const namespacedCommands = ["init", "schema", "db", "dev", "build", "start", "auth", "doctor", "skills", "api-keys", "storage", "cloud", "apps", "eject", "generate-sdk", "telemetry", "resources", "status", "upgrade", "normalize-imports"];
 
 /** The words a command group dispatches, and the other spellings it accepts for them. */
 interface CommandVocabulary {
@@ -79,6 +79,7 @@ async function commandVocabulary(command: string): Promise<CommandVocabulary> {
         case "auth": return { subcommands: (await import("./commands/auth")).AUTH_SUBCOMMANDS, aliases: {} };
         case "skills": return { subcommands: (await import("./commands/skills")).SKILLS_SUBCOMMANDS, aliases: {} };
         case "api-keys": return { subcommands: (await import("./commands/api-keys")).API_KEYS_SUBCOMMANDS, aliases: {} };
+        case "storage": return { subcommands: (await import("./commands/storage")).STORAGE_SUBCOMMANDS, aliases: {} };
         case "apps": return { subcommands: (await import("./commands/apps")).APPS_SUBCOMMANDS, aliases: {} };
         case "telemetry": return { subcommands: (await import("./commands/telemetry")).TELEMETRY_SUBCOMMANDS, aliases: {} };
         case "cloud": {
@@ -419,6 +420,12 @@ async function dispatch(
             break;
         }
 
+        case "storage": {
+            const { storageCommand } = await import("./commands/storage");
+            await storageCommand(effectiveSubcommand, args);
+            break;
+        }
+
         case "cloud": {
             const { cloudCommand } = await import("./commands/cloud");
             await cloudCommand(effectiveSubcommand, args);
@@ -499,6 +506,10 @@ ${chalk.green.bold("API Keys")}
   ${chalk.blue.bold("api-keys revoke")}         Revoke an API key
   ${chalk.blue.bold("api-keys scopes")}         List the scopes a key can hold
   ${chalk.blue.bold("api-keys")} ${chalk.gray("--help")}         Show API key command help
+
+${chalk.green.bold("Stored files")}
+  ${chalk.blue.bold("storage orphans")}         List the stored files no row names ${chalk.gray("(--delete to delete)")}
+  ${chalk.blue.bold("storage move")}            Copy a folder of files to another storage source
 
 ${chalk.green.bold("Usage sharing")}
   ${chalk.blue.bold("telemetry")}               Anonymous usage sharing (opt-in, off by default)
