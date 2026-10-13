@@ -53,6 +53,12 @@ const instance = await initializeRebaseBackend({
 });
 ```
 
+<span class="since-badge" data-since="0.25">Since 0.25</span> That one call is
+a shortcut over public steps: `createRebaseBackend` builds the backend, and
+`mount`, `attachRealtime` and `start` serve it. To mount only some route groups,
+put them at other paths, or leave the timers to another process, call the steps
+yourself. See [Custom Server Integration](/docs/backend/custom-server/).
+
 ## Where each option lives
 
 That call is the **ejected** shape — the one you write yourself after `rebase
@@ -67,8 +73,8 @@ Both paths reach the same `RebaseBackendConfig`. This is the whole map.
 |---|---|
 | `basePath` | `REBASE_BASE_PATH` (default `/api`) |
 | `collections`, `collectionsDir` | the `config/collections/` directory, declared by `rebase.json` |
-| `functionsDir` | `backend/functions/` |
-| `cronsDir` | `backend/crons/` |
+| `functions`, `functionsDir` | `backend/functions/` |
+| `crons`, `cronsDir` | `backend/crons/` |
 | `bootstrappers`, `database` | `DATABASE_URL`, plus a `database("<key>")` declaration in `config/resources.ts` for every database beyond the default |
 | `auth` | `JWT_SECRET`, the `OAUTH_*` variables, and `config/collections/users` |
 | `storage` | the `STORAGE_*` variables, plus a `bucket("<key>")` declaration in `config/resources.ts` for every bucket beyond the default |
@@ -115,9 +121,9 @@ After initialization, these routes are mounted:
 | `/api/swagger` | Swagger UI (dev mode, when `enableSwagger: true`) |
 | `/api/meta/contract` | The project's collection schema (needs `schema:read`) |
 | `/api/meta/schema-version` | A version string for that schema (unauthenticated) |
-| `/api/functions/*` | Custom function routes (when `functionsDir` is set) |
-| `/api/admin/cron/*` | Cron job management (`cron:read` / `cron:write`, when `cronsDir` is set) |
-| WebSocket on upgrade | Real-time subscriptions |
+| `/api/functions/*` | Custom function routes (when `functions` or `functionsDir` is set) |
+| `/api/admin/cron/*` | Cron job management (`cron:read` / `cron:write`, when `crons` or `cronsDir` is set) |
+| WebSocket on upgrade | Real-time subscriptions, on `/` for an API at `/api` |
 
 ---
 
@@ -214,10 +220,12 @@ interface RebaseBackendConfig {
     // OpenAPI/Swagger
     enableSwagger?: boolean;
 
-    // Custom API endpoints
+    // Custom API endpoints: values, or a directory of files (not both)
+    functions?: Record<string, FunctionApp>;  // { "send-invoice": app } → /api/functions/send-invoice
     functionsDir?: string;    // Auto-load Hono routes from a directory
 
-    // Scheduled tasks
+    // Scheduled tasks: values, or a directory of files (not both)
+    crons?: Record<string, CronJobDefinition>; // { "nightly-report": defineCron(…) }
     cronsDir?: string;         // Auto-load cron jobs from a directory
     cronPersistence?: boolean; // Write run logs to rebase.cron_logs (default: true)
 
@@ -254,7 +262,9 @@ disagree with the runtime about what this process is.
 
 ## The Backend Instance
 
-`initializeRebaseBackend` returns a `RebaseBackendInstance` with access to internal services:
+`initializeRebaseBackend` returns the backend it built, already mounted and
+started. Its type is `RebaseBackendInstance`, which is `RebaseBackend`, the
+type `createRebaseBackend` returns:
 
 ```typescript
 const instance = await initializeRebaseBackend(config);
@@ -268,8 +278,16 @@ instance.storageController   // Default storage
 instance.storageRegistry     // All storage backends
 instance.collectionRegistry  // Collection metadata
 instance.history?.historyService // Entity history
-instance.cronScheduler       // Cron job scheduler (when cronsDir is set)
+instance.cronScheduler       // Cron job scheduler (when crons or cronsDir is set)
+instance.jobQueue            // Durable job queue (when jobs are enabled)
+instance.setCollectionCallbacks(slug, callbacks) // Replace a collection's callbacks
+instance.shutdown()          // Drain and stop; also closes the server it was given
 ```
+
+<span class="since-badge" data-since="0.25">Since 0.25</span> It also carries
+`rebase`, the in-process client, `fetch(request)`, and `routes`, the route
+groups as Hono sub-apps; see
+[Custom Server Integration](/docs/backend/custom-server/).
 
 > **Note:** While the `instance` exposes these internal services, application code (such as custom functions and cron jobs) should use the global `rebase` singleton from `@rebasepro/server` to interact with the backend API.
 
@@ -304,7 +322,7 @@ that name, so an invented one does not fail: it silently matches nothing.
 
 ## WebSocket
 
-The WebSocket server attaches to the same HTTP server and provides real-time subscriptions:
+The WebSocket server attaches to the same HTTP server and provides real-time subscriptions. <span class="since-badge" data-since="0.25">Since 0.25</span> It answers upgrades on one path, `/` for an API at `/api`, where the SDK dials, and leaves every other path to your own `upgrade` listeners; on 0.24 it takes every upgrade on the server:
 
 - Subscribe to **collection changes** — get notified when any entity in a collection is created, updated, or deleted
 - Subscribe to **entity changes** — get notified when a specific entity changes

@@ -86,6 +86,13 @@ destination the dispatcher refuses, or a receiver that answers with a redirect, 
 after one attempt with the reason; anything else is retried like any job. See
 [Durable webhooks](/docs/backend/jobs#durable-webhooks).
 
+`setCollectionCallbacks` **replaces** the callbacks the `orders` collection
+declares. If it declares some, keep them:
+<span class="since-badge" data-since="0.25">Since 0.25</span> pass
+`composeCallbacks(declared, { afterSave })`, with `composeCallbacks` from
+`@rebasepro/server` and `declared` the collection's own `callbacks`. See
+[Combining callback sets](/docs/collections/callbacks/#combining-callback-sets).
+
 ### Without a job queue
 
 Leave out `jobQueue` — or run on a driver with no SQL, where the backend has none — and the

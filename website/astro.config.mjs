@@ -202,7 +202,8 @@ export default defineConfig({
                         { label: "Global Hooks", slug: "docs/backend/hooks" },
                         { label: "Entity History", slug: "docs/backend/history" },
                         { label: "Database Branching", slug: "docs/backend/branching" },
-                        { label: "Custom Server Integration", slug: "docs/backend/custom-server" }
+                        { label: "Custom Server Integration", slug: "docs/backend/custom-server" },
+                        { label: "Scripts and the Console", slug: "docs/backend/scripts" }
                     ]
                 },
                 {

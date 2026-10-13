@@ -206,8 +206,8 @@ ships), `STORAGE_PUBLIC_READ`, or `STORAGE_ALLOW_ANY_AUTHENTICATED`.
 | `DB_POOL_MAX` | Maximum pooled connections | `20` |
 | `DB_POOL_IDLE_TIMEOUT` | Milliseconds an idle connection is kept | `30000` |
 | `DB_POOL_CONNECT_TIMEOUT` | Milliseconds to wait for a connection | `10000` |
-| `DATABASE_DIRECT_URL` | Direct (non-pooled) connection. [Realtime](/docs/backend/realtime) needs one: `LISTEN`/`NOTIFY` does not survive a transaction pooler such as PgBouncer, and without it change notifications are disabled with a warning rather than silently lost. The [job worker](/docs/backend/jobs) holds its wake-up `LISTEN` on it too. | — |
-| `DATABASE_READ_URL` | Read replica. Reads go there when it is set and differs from `DATABASE_URL`; if the connection fails, everything falls back to the primary with a warning. | — |
+| `DATABASE_DIRECT_URL` | Direct (non-pooled) connection. [Realtime](/docs/backend/realtime) needs one: `LISTEN`/`NOTIFY` does not survive a transaction pooler such as PgBouncer, and without it change notifications are disabled with a warning rather than silently lost. The [job worker](/docs/backend/jobs) holds its wake-up `LISTEN` on it too. <span class="since-badge" data-since="0.25">Since 0.25</span> Fills the Postgres adapter's `directConnectionString` when that is unset. | — |
+| `DATABASE_READ_URL` | Read replica. Reads go there when it is set and differs from `DATABASE_URL`; if the connection fails, everything falls back to the primary with a warning. <span class="since-badge" data-since="0.25">Since 0.25</span> Fills the Postgres adapter's `readConnectionString` when that is unset; on 0.24 that option is ignored. | — |
 | `REBASE_DB_POOL_MAX` | A ceiling on every pool in the process, applied whatever each one asked for. Plain digits only: a malformed value is ignored rather than silently serializing the server. | — |
 
 ### Runtime behaviour
@@ -229,7 +229,7 @@ image. A project that has ejected owns these decisions in its own code instead.
 | `REBASE_METRICS_TOKEN` | Bearer token guarding `/metrics`. Unset leaves the endpoint open to anything that can reach the port — fine on a private network, not on a public one, and the boot logs say so. | — |
 | `REBASE_MIGRATE_ON_BOOT` | What the runtime may do to the schema at boot. `ensure` (the default, everywhere — production included) runs the **additive** pass: create missing tables, columns and enum types, never drop or rewrite one. `none` touches nothing. The published image accepts only those two and **refuses to boot on `push`**. In a [split deployment](/docs/deployment/split-processes) exactly one process may provision, so every other role must set `none` or refuse to boot. | `ensure` |
 | `REBASE_REQUIRE_SCHEMA_MATCH` | Refuse to boot when the database was last provisioned from a different set of collections than this process was built from. Unset (or anything other than `true`/`1`) warns instead. | warn |
-| `REALTIME_CDC` | Database-level change capture: `auto` (enable where the connection supports it, silently fall back otherwise), `trigger` (force it, warn if impossible), `wal` (degrades to `trigger` today), `off`. See [Realtime](/docs/backend/realtime-cdc/). | `auto` |
+| `REALTIME_CDC` | Database-level change capture: `auto` (enable where the connection supports it, silently fall back otherwise), `trigger` (force it, warn if impossible), `wal` (degrades to `trigger` today), `off`. See [Realtime](/docs/backend/realtime-cdc/). <span class="since-badge" data-since="0.25">Since 0.25</span> Wins over `realtime.cdc`. | `auto` |
 | `REALTIME_CHANNEL_BUS` | Cross-instance transport for broadcast channels and presence: `memory` or `postgres`. Ignored when `realtime.bus` was given a constructed transport. | `memory` |
 | `REALTIME_MAX_SUBSCRIPTIONS_PER_SOCKET` | How many subscriptions one realtime socket may hold; the next is refused with `TOO_MANY_SUBSCRIPTIONS`. A positive whole number — anything else stops the server at boot. Wins over `realtime.maxSubscriptionsPerSocket`. See [Realtime](/docs/backend/realtime#what-a-write-costs-and-the-limits). | `1000` |
 | `REALTIME_MAX_SOCKETS_PER_USER` | <span class="since-badge" data-since="0.25">Since 0.25</span> How many realtime sockets one user may hold open on one server instance. The next one's sign-in is refused with `TOO_MANY_SOCKETS` and the socket closed (4002); the SDK keeps retrying, so it gets in when another closes. A positive whole number — anything else stops the server at boot. Wins over `realtime.maxSocketsPerUser`. | No ceiling |
@@ -477,6 +477,11 @@ await initializeRebaseBackend({
     }
 });
 ```
+
+<span class="since-badge" data-since="0.25">Since 0.25</span> The same options,
+without `app`, `server` and `basePath` and with a required `provision`, build a
+backend that serves nothing until you mount it: `createRebaseBackend`. See
+[Custom Server Integration](/docs/backend/custom-server/).
 
 ### Changing `basePath`
 

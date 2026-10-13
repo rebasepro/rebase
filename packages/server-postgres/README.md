@@ -50,6 +50,9 @@ Implements the Rebase `DatabaseAdapter` / `BackendBootstrapper` interfaces for P
 |--------|-------------|
 | `createPostgresAdapter(config)` | Creates a `DatabaseAdapter` for use with `initializeRebaseBackend({ database: ... })`. Recommended API. |
 | `createPostgresBootstrapper(config)` | Lower-level `BackendBootstrapper` factory. Used internally by the adapter. |
+| `openPostgresDriver(pgConfig, init)` | Opens the data driver from explicit settings, reading no environment variable; `provision: false` opens it with no DDL. What the adapter runs at boot. New in 0.25. |
+| `postgresDriverConfigFromEnv(config, env?)` | Reads `DATABASE_READ_URL`, `DATABASE_DIRECT_URL` and the `REALTIME_*` variables into a driver config, as the server's boot does. New in 0.25. |
+| `openRebase({ databaseUrl, collections })` | A project's data from a script, a test or a REPL: `dataAsAdmin`, `sql`, `withAuth(user)` and `close()`. No server, no DDL, no environment reads. `rebase console` is built on it. New in 0.25. |
 | `createPostgresDatabaseConnection(url, schema?, poolConfig?)` | Creates a production-grade pooled Drizzle connection. Returns `{ db, pool, connectionString }`. |
 | `createDirectDatabaseConnection(url, schema?, poolConfig?)` | Non-pooled connection for LISTEN/NOTIFY and advisory locks (bypasses PgBouncer). |
 | `createReadReplicaConnection(url, schema?, poolConfig?)` | Read-only connection for routing reads to replicas. |
@@ -97,6 +100,19 @@ process.on("SIGTERM", async () => {
   await pool.end();
 });
 ```
+
+## From a script
+
+```typescript
+import { openRebase } from "@rebasepro/server-postgres";
+
+const rebase = await openRebase({ databaseUrl: process.env.DATABASE_URL!, collections });
+const { data } = await rebase.dataAsAdmin.posts.find({ limit: 10 });
+const ada = await rebase.withAuth({ uid: "ada", roles: ["user"] });   // what Ada's RLS lets her see
+await rebase.close();
+```
+
+See [Scripts and the Console](https://rebase.pro/docs/backend/scripts).
 
 ## Connection Pool Defaults
 

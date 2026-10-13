@@ -19,6 +19,10 @@ CDC is controlled by the `REALTIME_CDC` environment variable:
 | `wal` | Prefer WAL logical replication. Not yet bundled — degrades to `trigger` and logs the active mode. |
 | `off` | Application-level realtime only. Use this to avoid the per-write trigger overhead on write-heavy workloads. A boot with `off` that owns the schema also **removes** the capture triggers and functions an earlier boot installed, and logs how many it took off; unset it and the next boot installs them again. |
 
+<span class="since-badge" data-since="0.25">Since 0.25</span> The same setting is
+the Postgres adapter's `realtime.cdc` option, for a server that configures it in
+code. `REALTIME_CDC`, when set, wins.
+
 On boot you'll see a log line stating the active mode, e.g.:
 
 ```
@@ -45,7 +49,9 @@ If the connection can't support it, `auto` logs an informational line instead an
 
 ## Requirements & Notes
 
-- CDC requires a direct connection string (`DATABASE_DIRECT_URL` or the primary connection) for the `LISTEN` client — connection poolers in transaction mode do not support long-lived `LISTEN` sessions.
+<span class="since-badge" data-since="0.25">Since 0.25</span> `directConnectionString` is the adapter option; on 0.24 use `DATABASE_DIRECT_URL`.
+
+- CDC requires a direct connection string (`DATABASE_DIRECT_URL`, the adapter's `directConnectionString`, or the primary connection) for the `LISTEN` client — connection poolers in transaction mode do not support long-lived `LISTEN` sessions.
 - Triggers are installed only on tables backed by a registered collection. Writes to unmapped tables are ignored.
 - A collection whose table has not yet been migrated is skipped with a warning rather than blocking CDC for the rest.
 - Native WAL logical-replication streaming (`wal2json`/`pgoutput`) is planned; today `REALTIME_CDC=wal` degrades to the trigger-based path, which provides equivalent database-level coverage.

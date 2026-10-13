@@ -42,6 +42,10 @@ REBASE_ROLE=all        # the default: everything, one process
 Health and metrics are on every role without exception. A process an
 orchestrator cannot probe is a process it cannot roll.
 
+<span class="since-badge" data-since="0.25">Since 0.25</span> `GET /api/auth/config`,
+what the sign-in screen reads, follows the rest of `/api/auth`: only `api` and
+`all` serve it. On 0.24 a `functions` or `worker` process answered it too.
+
 Realtime is on the list because it costs something whether or not anyone uses
 it: a process that consumes change events holds a `LISTEN` connection outside
 the pool for as long as it runs, and installs the capture triggers at boot. Only
@@ -148,6 +152,15 @@ default refuses to start, and says so. `CREATE … IF NOT EXISTS` reads the cata
 and then writes to it as two separate steps, so processes booting together do
 collide — and a deployment where several of them race to provision the same
 schema is not one anybody designed.
+
+<span class="since-badge" data-since="0.25">Since 0.25</span> In a
+[custom server](/docs/backend/custom-server/), the same decision is the
+`provision` option of `createRebaseBackend`: `true` in the process that owns the
+schema, and `{ collections: false, realtime: false }` in every other one, which
+still keeps the framework's own tables. `REBASE_MIGRATE_ON_BOOT=none` turns the
+collection schema off there as well. Background work is decided the same way:
+a process that never calls `start()` runs no cron scheduler and no job workers,
+and one that does runs those its `ownership` option gives it.
 
 ## Serving one function per process
 

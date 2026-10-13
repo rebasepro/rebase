@@ -20,6 +20,37 @@ an empty string on a required field. Three removals follow: two client exports
 that were only engines, an admin hook nothing needs, and a storage option that
 reached no client.
 
+:::note[Changed behaviour and deprecated names]
+0.25 also changes what a few existing calls do, without breaking them. Check
+these if your app relies on the old behaviour:
+
+- **Plugin field wrappers compose.** Every plugin's `fieldBuilder.wrap` renders,
+  each around the field the plugins before it left, instead of only the last.
+- **Component overrides compose.** A collection's `wrap: true` override receives
+  the app's override of the same component as `OriginalComponent`, not the
+  built-in one.
+- **`rebase.auth`, `rebase.admin`, `rebase.functions` and `rebase.cron` on the
+  server reach the backend's routes in-process,** so middleware you added to
+  your own Hono app no longer runs on them.
+- **The realtime socket answers its own path only** (`/` for an API at `/api`).
+  A client that dialled another path on the same server gets a 404, or your own
+  `upgrade` listener.
+- **The socket gets its token as HTTP does,** so `client.setAuthTokenGetter()`
+  now authenticates it, and after a sign-out it no longer falls back to the
+  `token` option.
+
+These names still work, warn once at runtime, and have a replacement:
+
+| Deprecated | Use |
+|---|---|
+| `loadFunctionsFromDirectory`, `loadFunctionsWithDiagnostics` | `loadFunctions(dir, { onSkip })` |
+| `loadCronJobsFromDirectory`, `loadCronJobsWithDiagnostics` | `loadCrons(dir, { onSkip })`, then `declareCrons(crons)` where the old pair declared them |
+| `client.ws.setAuthTokenGetter()` | `client.setAuthTokenGetter()` |
+| plugin `hooks.modifyCollectionAsync` (never called) | `hooks.modifyCollection`, with the data fetched before `<Rebase>` renders |
+| plugin `lifecycle.onCollectionChange` (never called) | `context.data.collection(slug).listen(…)` from `lifecycle.onMount` |
+| `DatabaseAdapter.mountRoutes`, `BackendBootstrapper.mountRoutes` (never called) | a route factory your app mounts |
+:::
+
 ---
 
 ## 68. A filter on a column named `count` goes inside `?where=`

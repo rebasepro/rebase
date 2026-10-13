@@ -97,7 +97,7 @@ See [Runtime portability](#runtime-portability) for the full contract.
 
 :::note[Where this goes]
 **Managed runtime:** nothing to configure — the runtime discovers `backend/functions/` on its own (`entry.functions` in `rebase.json` if you moved it). `REBASE_FUNCTIONS_ONLY` / `REBASE_FUNCTIONS_EXCLUDE` narrow which ones a process serves.
-**Ejected:** `initializeRebaseBackend({ functionsDir })` in `backend/src/index.ts`.
+**Ejected:** `initializeRebaseBackend({ functionsDir })`, or `functions` (below), in `backend/src/index.ts`.
 :::
 
 Enable custom functions by adding `functionsDir` to your backend config:
@@ -117,6 +117,24 @@ Rebase will:
 2. Validate each default export is a Hono app (duck-typed via `.fetch()` + `.routes`)
 3. Mount each app at `/api/functions/<filename>`
 4. Apply the auth middleware (see [Authentication](#authentication-and-context-propagation) below)
+
+### Functions as values
+
+<span class="since-badge" data-since="0.25">Since 0.25</span> On 0.24 functions come from a directory only.
+
+A directory is one way to produce what the server serves: a record from URL segment to Hono app. Pass that record yourself as `functions`, or read a directory into it with `loadFunctions`:
+
+```typescript
+import path from "path";
+import { initializeRebaseBackend, loadFunctions } from "@rebasepro/server";
+import sendInvoice from "../functions/send-invoice";
+
+await initializeRebaseBackend({ app, server, functions: { "send-invoice": sendInvoice } }); // → /api/functions/send-invoice
+// the same as functionsDir:
+await initializeRebaseBackend({ app, server, functions: await loadFunctions(path.resolve(__dirname, "../functions")) });
+```
+
+Give `functions` or `functionsDir`, not both: the boot refuses the pair. `loadFunctions(dir, { onSkip })` hands you each file it skipped, with the reason. `loadFunctionsFromDirectory` and `loadFunctionsWithDiagnostics` still work, are deprecated, and warn once. On its own, the functions group mounts at any path with `app.route("/hooks", backend.routes.functions())`, and `getUser(c)` and `getDriver(c)` work inside it; see [Custom Server Integration](/docs/backend/custom-server/#mounting-only-the-groups-you-want).
 
 ## File Naming and Route Mapping
 
@@ -171,33 +189,11 @@ export default function () {
 
 ## Under the Hood: The Duck-Typing Loader
 
-When compiling codebases with multiple nested directories or in monorepos, you may run into **Hono package duplication**.
-
-If the Rebase framework depends on one Hono version and your local function directory resolves to another, standard class inheritance checks (`exported instanceof Hono`) will fail because their prototypes exist in separate memory spaces.
-
-To prevent false negatives and reject loading functioning routers, Rebase uses a duck-typed validator (`isHonoLike`):
-- It verifies the exported object is a non-null `object`.
-- It checks that the object exposes a `.fetch` method (required to route requests).
-- It verifies that `.routes` is an `array`.
-
-```typescript no-verify
-function isHonoLike(obj: unknown): boolean {
-    if (!obj || typeof obj !== "object") return false;
-    const record = obj as Record<string, unknown>;
-    return typeof record.fetch === "function" && Array.isArray(record.routes);
-}
-```
+In a monorepo your functions may resolve a different copy of Hono from the one Rebase uses, and then `exported instanceof Hono` is false for a working router. So the loader checks the shape instead (`isHonoLike`): a non-null object with a `.fetch` method and a `.routes` array.
 
 ### ES Module Compiler Escape
 
-To import TypeScript and JavaScript files dynamically on both Windows and Posix systems, the loader converts file paths to standard file URIs via `pathToFileURL(filePath).href`.
-
-To prevent TypeScript compilation from rewriting native ESM dynamic imports (`import(url)`) into CommonJS `require()` calls (which would throw errors at runtime under ESM runtimes), Rebase executes a runtime compiler escape:
-
-```typescript no-verify
-const dynamicImport = new Function("url", "return import(url)");
-const mod = await dynamicImport(fileUrl);
-```
+The loader turns each file path into a file URL (`pathToFileURL(filePath).href`), so it imports on Windows and POSIX alike, and calls `import(url)` through `new Function("url", "return import(url)")`, so a TypeScript build cannot rewrite it into a `require()` that fails under ESM.
 
 ---
 

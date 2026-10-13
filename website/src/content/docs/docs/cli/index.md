@@ -238,6 +238,24 @@ of your own, that is what this prints — the resolution order is the same one
 every other command follows. It starts the managed database if it is not
 already running.
 
+### `rebase console`
+
+<span class="since-badge" data-since="0.25">Since 0.25</span>
+
+A Node REPL with the project's data open, or one snippet run with `-e`:
+
+```bash
+rebase console
+rebase console -e "rebase.dataAsAdmin.posts.find({ limit: 5 })"
+```
+
+`rebase` (`dataAsAdmin`, `sql`, `withAuth(user)`) and `collections` are in
+scope, and top-level `await` works. The database is resolved as `rebase db push`
+resolves it, and opening it changes nothing in it. With `-e`, the awaited result
+is printed as JSON on stdout and a throw exits `1`. Flags: `--eval`/`-e`,
+`--collections`/`-c`, `--database-url`, `--docker`. See
+[Scripts and the Console](/docs/backend/scripts/).
+
 ### `rebase db stop` / `rebase db reset`
 
 For the managed development database only:

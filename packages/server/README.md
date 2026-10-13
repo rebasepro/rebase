@@ -20,13 +20,17 @@ This is the central orchestrator for any Rebase backend. It provides the framewo
 
 | Export | Description |
 |--------|-------------|
-| `initializeRebaseBackend(config)` | Main entry point. Wires up drivers, auth, storage, API routes, cron, and custom functions. Returns a `RebaseBackendInstance`. |
+| `initializeRebaseBackend(config)` | The one-call boot: `createRebaseBackend`, then `mount`, `attachRealtime` and `start`. Returns the backend, already serving. |
+| `createRebaseBackend(options)` | Builds the backend (drivers, auth, storage, route groups, the in-process client) and mounts, starts and listens to nothing. `provision` (`true`, `false` or `{ collections, realtime }`) decides what it may change in the database. New in 0.25. |
+| `RebaseBackend` | What both return: `routes.auth/data/storage/functions/admin/cron/meta()` (each a mountable Hono sub-app), `mount(app, { basePath })`, `attachRealtime(server, { path })`, `start()`, `shutdown()`, `fetch(request)`, `rebase`, and the services (`driver`, `cronScheduler`, `jobQueue`, …). |
 | `rebase` | Server-side singleton — a `RebaseServerClient` (from `@rebasepro/types`): the client without `data`, plus `dataAsAdmin`. Available after init. Admin-scoped access to data (RLS is evaluated as the service identity, not skipped), auth, email, and storage. |
 | `loadEnv()` | Validates `process.env` against the Rebase env schema (Zod). Auto-generates dev secrets. Supports `extend` for custom vars. |
 | `serveSPA(app, config)` | Mounts SPA static-file serving + index.html fallback on a Hono app. |
 | `RebaseBackendConfig` | Config type for `initializeRebaseBackend`. |
 | `RebaseAuthConfig` | Auth config type (JWT, OAuth providers, hooks, service key). |
-| `RebaseBackendInstance` | Return type — includes `driver`, `healthCheck()`, `shutdown()`, `cronScheduler`, `storageController`, etc. |
+| `RebaseBackendInstance` | `initializeRebaseBackend`'s return type, the same as `RebaseBackend`. |
+| `loadFunctions(dir)` / `loadCrons(dir)` | Read a directory of function or cron files into the `functions` / `crons` option values (`{ [name]: app }`, `{ [id]: definition }`). `declareCrons(crons)` records crons in the resource graph. New in 0.25; `loadFunctionsFromDirectory`, `loadFunctionsWithDiagnostics`, `loadCronJobsFromDirectory` and `loadCronJobsWithDiagnostics` are deprecated. |
+| `composeCallbacks(...sets)` / `createCallContext(partial)` | Combine sets of collection callbacks the way the backend's tiers combine; build the `context` a callback receives, to call one from a test. New in 0.25. |
 | `RebaseEnv` | Zod-inferred type of validated environment variables. |
 | `z` | The runtime's own Zod instance. Build `loadEnv({ extend })` schemas with this one — a schema from a second copy of zod is silently ignored. |
 | `_setRebaseMock` / `_resetRebaseMock` | Test helpers to mock the `rebase` singleton (NODE_ENV=test only). |
@@ -87,6 +91,27 @@ serveSPA(app, { frontendPath: "./frontend/dist" });
 
 server.listen(env.PORT);
 ```
+
+`initializeRebaseBackend` is a shortcut. One step under it, each part is a call
+you make, so you can mount only some route groups, at paths of your own, or
+leave the timers to another process (0.25+):
+
+```typescript
+import { createRebaseBackend } from "@rebasepro/server";
+import { createPostgresAdapter } from "@rebasepro/server-postgres";
+
+const backend = await createRebaseBackend({
+  database: createPostgresAdapter({ connection: db, schema: { tables, enums, relations } }),
+  collections: myCollections,
+  auth: { jwtSecret: env.JWT_SECRET },
+  provision: true
+});
+app.route("/api/data", backend.routes.data());   // or backend.mount(app, { basePath: "/api" })
+await backend.attachRealtime(server);
+backend.start();                                 // cron, job workers, sweeps
+```
+
+See [Custom Server Integration](https://rebase.pro/docs/backend/custom-server).
 
 ## Related Packages
 

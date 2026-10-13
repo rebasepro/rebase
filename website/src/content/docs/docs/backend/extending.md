@@ -22,13 +22,16 @@ longer reach your project. So climb only as far as you have to.
 
 ## The ladder
 
+<span class="since-badge" data-since="0.25">Since 0.25</span> Rung 5's
+`createRebaseBackend` is new; on 0.24 that rung is the driver alone.
+
 | # | Rung | Reaches | Does **not** reach | Cost of being here |
 |---|---|---|---|---|
 | 1 | **Declaration** — a property, a relation, an index, a `search` block, a security rule | The schema, the generated SDK, the admin panel, the migration planner | Anything that has to run code | None. This is the supported path |
 | 2 | **Collection callback** — `beforeQuery`, `afterRead`, `beforeSave`, `afterSave`, `beforeDelete`, `afterDelete` | Every read and write of one collection, on every transport, inside the request's own transaction | Requests that touch no collection; the response envelope; anything asynchronous to the write | Runs on the hot path, holding the transaction open |
 | 3 | **Custom function** — a Hono app in `functions/` | Its own URL, with auth resolved, the driver scoped to the caller and `rebase` in hand | The built-in `/api/data` routes. It sits *beside* them, not in front | One more surface to authorize; no SDK method is generated for it |
 | 4 | **Your own routes and middleware** on the Hono app | Anything HTTP, including paths that run *before* Rebase's routers | The driver and the caller's identity, unless you guard the route yourself | Outside every Rebase router: no auth middleware has run |
-| 5 | **Your own server** — embed the driver in Express, Fastify or plain `http` | The data adapter and realtime, in a process you wrote | Everything `initializeRebaseBackend` wires up: auth routes, storage, jobs, cron, admin API, the MCP server | You assemble the backend. Rebase is a library here, not a coordinator |
+| 5 | **Your own server** — build the backend with `createRebaseBackend` and mount the route groups you want, or embed the driver alone in Express, Fastify or plain `http` | Each route group, at the path you choose, and which process starts the timers; at the bottom, the data adapter and realtime alone | With the driver alone: everything else, from auth routes and storage to cron and the admin API | You call each step `initializeRebaseBackend` made for you |
 | 6 | **`rebase eject`** | The entrypoint and the `Dockerfile`, in your repository | — | **Platform runtime upgrades stop reaching this project.** CORS, auth wiring, storage and shutdown become yours |
 
 :::tip[Two rungs are commonly skipped for no reason]
@@ -150,7 +153,7 @@ that is not Postgres. Redaction that works on every engine is `afterRead`.
 **Scope:** one URL under `/api/functions`.
 
 A Hono app in `backend/functions/`, discovered by filename the way collections
-and cron jobs are. Auth middleware has already run when your handler is reached,
+and cron jobs are, or passed as a value (`functions: { promote }`). Auth middleware has already run when your handler is reached,
 the driver is scoped to the caller, and `rebase` is in hand for storage, email,
 jobs and `dataAsAdmin`.
 
@@ -181,7 +184,8 @@ method; callers reach it with `client.functions.invoke(...)` or plain `fetch`.
 `initializeRebaseBackend` takes the app you pass it, so anything you register on
 that app *before* calling it runs before every Rebase router — see
 [Route Registration Order](/docs/backend/custom-functions#route-registration-order)
-for the shape.
+for the shape. A route group you mount yourself from `backend.routes` (rung 5)
+is not one of these routes: it carries its own auth middleware.
 
 :::caution[No auth middleware has run there]
 A route registered this way is **outside** every Rebase router, so
@@ -206,22 +210,43 @@ a thing a Rebase router did.
 
 **Scope:** the process.
 
-`@rebasepro/server-postgres` is framework-agnostic: it depends on Drizzle and
-Node's `http.Server` and nothing else. So you can embed the data adapter and
-realtime into Express, Fastify or plain Node and skip the coordinator entirely.
+<span class="since-badge" data-since="0.25">Since 0.25</span>
+`initializeRebaseBackend` is a shortcut over four public calls, and this rung
+is calling them yourself. `createRebaseBackend` builds the backend and mounts,
+starts and listens to nothing. `backend.routes` holds each route group as a
+Hono sub-app you can mount alone, at any path. `mount`, `attachRealtime` and
+`start` do the rest, if you want them:
+
+```typescript
+const backend = await createRebaseBackend({ database: adapter, auth, collections, provision: true });
+
+app.route("/v2/data", backend.routes.data());   // only the parts you want,
+app.route("/v2/auth", backend.routes.auth());   // at the paths you want
+await backend.attachRealtime(server);
+backend.start();                                // cron, job workers, sweeps
+```
+
+A group carries its own auth context, rate limits and admin gate, so
+`getDriver(c)` works in a group mounted anywhere. What it does not carry is the
+process-wide middleware `mount()` adds: the body limit, compression, CSRF and
+the error envelope are yours to add when you mount groups one by one.
+
+One step further down, `@rebasepro/server-postgres` is framework-agnostic: it
+depends on Drizzle and Node's `http.Server` and nothing else, so you can embed
+the data driver and realtime in Express, Fastify or plain Node and leave the
+Rebase server out entirely.
 
 → [Custom Server Integration](/docs/backend/custom-server)
 
-**What it cannot reach:** everything `initializeRebaseBackend` wires up, which
-is most of the backend — the auth routes and token refresh, storage, the job
-queue, cron, the admin API the Studio talks to, the MCP server, the error
-envelope, the middleware stack. Each of those is available to assemble by hand;
-none of them assembles itself. Rebase is a library at this rung, not a
-coordinator.
+**What it cannot reach:** with `createRebaseBackend`, nothing is out of reach;
+you take on the order of the calls. With the driver alone, everything the
+server wires up is yours to build: the auth routes and token refresh, storage,
+the job queue, cron, the admin API the Studio talks to, the MCP server, the
+error envelope and the middleware stack.
 
-Reach for it when you have an existing server that must stay the entrypoint. If
-what you actually want is one custom route, that is rung 3 or 4, at a fraction
-of the surface.
+Reach for it when you have an existing server that must stay the entrypoint, or
+when only part of the backend belongs in this process. If what you actually
+want is one custom route, that is rung 3 or 4, at a fraction of the surface.
 
 ## 6. `rebase eject`
 
