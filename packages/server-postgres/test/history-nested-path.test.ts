@@ -59,6 +59,7 @@ function driverOver(pglite: PGlite): PostgresBackendDriver {
     registry.registerRelations?.(docsRelations, "docs");
     const orm = drizzle(pglite, { schema: { owners: ownersTable, docs: docsTable, ownersRelations, docsRelations } }) as never;
     const history = {
+        assertRecordable: () => undefined,
         recordHistory: async (p: { tableName: string; id: string; action: string }) => {
             recorded.push({ tableName: p.tableName, id: String(p.id), action: p.action });
         }

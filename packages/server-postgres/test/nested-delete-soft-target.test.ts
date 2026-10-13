@@ -101,6 +101,7 @@ function driverOver(pglite: PGlite): PostgresBackendDriver {
         schema: { posts: postsTable, tags: tagsTable, labels: labelsTable, comments: commentsTable, posts_tags: postsTagsTable, posts_labels: postsLabelsTable }
     }) as never;
     const history = {
+        assertRecordable: () => undefined,
         recordHistory: async (p: { tableName: string; id: string; action: string }) => {
             recorded.push({ tableName: p.tableName, id: String(p.id), action: p.action });
         }

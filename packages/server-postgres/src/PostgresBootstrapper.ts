@@ -36,7 +36,7 @@ import { assertAuthSchemaCompatible, probeAuthSchema, resolveAuthSchema } from "
 import { AuthSchemaTables, PostgresAuthRepository, UserService } from "./auth/services";
 import { createAuthSchema } from "./schema/auth-schema";
 import { HistoryService } from "./history/HistoryService";
-import { ensureHistoryIndexes, ensureHistoryTableExists, readHistoryTableState } from "./history/ensure-history-table";
+import { ensureHistoryIndexes, ensureHistoryTableExists, historyUnavailableReason, readHistoryTableState } from "./history/ensure-history-table";
 import { patchPgArrayNullSafety } from "./utils/pg-array-null-patch";
 import { patchPgNumericToNumber } from "./utils/pg-numeric-number-patch";
 import { buildCollectionsFromSchema, introspectSchema, readRlsStatus } from "./schema/introspect-runtime";
@@ -1512,7 +1512,14 @@ schemaHealthCheck: () => probeAuthSchema(db, resolveAuthSchema(authCollection)) 
             // read, not made — and builds no index.
             if (internals.provisioned === false) {
                 const retention = typeof config === "object" ? config.retention : undefined;
-                return { historyService: new HistoryService(db, retention ? { ttlDays: retention } : undefined, await readHistoryTableState(db)) };
+                const state = await readHistoryTableState(db);
+                return {
+                    historyService: new HistoryService(db, retention ? { ttlDays: retention } : undefined, {
+                        inTransaction: state.inTransaction,
+                        entryFormat: state.entryFormat,
+                        unavailable: historyUnavailableReason(state, { requireTransaction: false })
+                    })
+                };
             }
 
             const { BOOT_LOCK_TIMEOUT_MS } = await import("./schema/boot-ddl");

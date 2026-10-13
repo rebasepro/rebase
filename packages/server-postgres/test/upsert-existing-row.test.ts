@@ -81,6 +81,7 @@ function driverOver(pglite: PGlite, user?: User): PostgresBackendDriver {
     registry.registerTable(docsTable, "docs");
     const orm = drizzle(pglite, { schema: { docs: docsTable } }) as never;
     const history = {
+        assertRecordable: () => undefined,
         recordHistory: async (p: { tableName: string; id: string; action: string }) => {
             recorded.push({ tableName: p.tableName, id: String(p.id), action: p.action });
         }

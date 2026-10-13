@@ -65,12 +65,12 @@ isId: true },
 
     let driver: PostgresBackendDriver;
     let realtimeService: { notifyUpdate: jest.Mock };
-    let historyService: { recordHistory: jest.Mock };
+    let historyService: { recordHistory: jest.Mock; assertRecordable: () => void };
 
     /** Stand the driver up over a `dataService.save` that returns `savedRow`. */
     const setup = (savedRow: Record<string, unknown>) => {
         realtimeService = { notifyUpdate: jest.fn().mockResolvedValue(undefined) };
-        historyService = { recordHistory: jest.fn() };
+        historyService = { recordHistory: jest.fn(), assertRecordable: () => undefined };
 
         driver = new PostgresBackendDriver(
             {} as any,

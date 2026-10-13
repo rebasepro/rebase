@@ -1,7 +1,8 @@
 /**
  * E2E: `openRebase` opens a project's data from a script — reads and writes,
  * a user's view under row-level security, `close()` — and changes nothing in
- * the database by opening it.
+ * the database by opening it. A write to a `history: true` collection is
+ * audited as a server write is, or refused where it could not be.
  *
  * Opening a driver used to mean the server's boot in miniature: it created the
  * restricted role requests run as, the branch-metadata table, channel-history
@@ -24,6 +25,7 @@ import type { CollectionConfig } from "@rebasepro/types";
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
 import { createPostgresBootstrapper, createPostgresDatabaseConnection, openRebase, type OpenedRebase } from "../../src/index.js";
 import { consoleCommand } from "../../src/cli-console.js";
+import { HistoryService } from "../../src/history/HistoryService.js";
 
 const notesCollection: CollectionConfig = {
     name: "Notes",
@@ -41,6 +43,48 @@ const notesCollection: CollectionConfig = {
         title: { name: "Title", type: "string" }
     }
 };
+
+/** An audited collection: every write leaves an entry in `rebase.entity_history`. */
+const ledgerCollection: CollectionConfig = {
+    name: "Ledger",
+    slug: "ledger",
+    table: "ledger",
+    history: true,
+    securityRules: [
+        { name: "owner_select", operation: "select", ownerField: "ownerId" },
+        { name: "owner_insert", operation: "insert", ownerField: "ownerId" },
+        { name: "owner_update", operation: "update", ownerField: "ownerId" },
+        { name: "owner_delete", operation: "delete", ownerField: "ownerId" }
+    ],
+    properties: {
+        id: { name: "ID", type: "string", isId: "uuid" },
+        ownerId: { name: "Owner", type: "string", columnName: "owner_id", validation: { required: true } },
+        amount: { name: "Amount", type: "number" }
+    }
+};
+
+/**
+ * What a server boot does to a fresh database: the collections' tables, the
+ * RLS runtime and policies, the restricted role — and, with `history`, the
+ * history table and its function.
+ */
+async function provision(url: string, collections: CollectionConfig[], options: { history: boolean }): Promise<void> {
+    const conn = createPostgresDatabaseConnection(url);
+    try {
+        const bootstrapper = createPostgresBootstrapper({ connectionString: url, connection: conn.db });
+        const driverResult = await bootstrapper.initializeDriver({
+            collections,
+            realtime: { subscribe: false, provision: false }
+        });
+        await bootstrapper.ensureCollectionSchema!(collections, driverResult);
+        await bootstrapper.ensureRlsRuntime!(driverResult);
+        await bootstrapper.ensureCollectionPolicies!(collections, driverResult);
+        await bootstrapper.finalizeSecurityPosture!(driverResult);
+        if (options.history) await bootstrapper.initializeHistory!(true, driverResult);
+    } finally {
+        await conn.pool.end();
+    }
+}
 
 /** Connections from openRebase's own pool carry this name, so they can be counted. */
 const APP_NAME = "open-rebase-e2e";
@@ -88,6 +132,7 @@ describe("openRebase (E2E)", () => {
         await setup.connect();
         await setup.query("CREATE DATABASE untouched");
         await setup.query("CREATE DATABASE app");
+        await setup.query("CREATE DATABASE unaudited");
         await setup.end();
     }, 180_000);
 
@@ -163,7 +208,13 @@ describe("openRebase (E2E)", () => {
                 const auth = await bootstrapper.initializeAuth!({}, driverResult);
                 expect(auth?.userService).toBeDefined();
                 const history = await bootstrapper.initializeHistory!(true, driverResult);
-                expect(history?.historyService).toBeDefined();
+                // Attached, and refusing writes to audited collections up
+                // front: there is no table to record into, and none is made.
+                const service = history?.historyService;
+                expect(service).toBeInstanceOf(HistoryService);
+                if (service instanceof HistoryService) {
+                    expect(() => service.assertRecordable("notes")).toThrow(/rebase\.entity_history table/);
+                }
                 await bootstrapper.finalizeSecurityPosture!(driverResult);
             } finally {
                 await conn.pool.end();
@@ -191,28 +242,13 @@ describe("openRebase (E2E)", () => {
         let before: Record<string, string[]>;
 
         beforeAll(async () => {
-            // What a server's boot does to a fresh database: tables, the RLS
-            // runtime, policies and the restricted role.
             const url = urlFor(container, "app");
-            const conn = createPostgresDatabaseConnection(url);
-            try {
-                const bootstrapper = createPostgresBootstrapper({ connectionString: url, connection: conn.db });
-                const driverResult = await bootstrapper.initializeDriver({
-                    collections: [notesCollection],
-                    realtime: { subscribe: false, provision: false }
-                });
-                await bootstrapper.ensureCollectionSchema!([notesCollection], driverResult);
-                await bootstrapper.ensureRlsRuntime!(driverResult);
-                await bootstrapper.ensureCollectionPolicies!([notesCollection], driverResult);
-                await bootstrapper.finalizeSecurityPosture!(driverResult);
-            } finally {
-                await conn.pool.end();
-            }
+            await provision(url, [notesCollection, ledgerCollection], { history: true });
 
             observer = new pg.Client({ connectionString: url });
             await observer.connect();
             before = await catalogue(observer);
-            rebase = await openRebase({ databaseUrl: urlFor(container, "app", APP_NAME), collections: [notesCollection] });
+            rebase = await openRebase({ databaseUrl: urlFor(container, "app", APP_NAME), collections: [notesCollection, ledgerCollection] });
         }, 120_000);
 
         afterAll(async () => {
@@ -239,6 +275,72 @@ describe("openRebase (E2E)", () => {
             await expect(ada.data.notes.create({ ownerId: "bob", title: "forged" })).rejects.toThrow();
             expect(await rebase.sql("SELECT count(*)::int AS n FROM public.notes WHERE title = 'forged'"))
                 .toEqual([{ n: 0 }]);
+        });
+
+        it("records history for dataAsAdmin and withAuth writes, as a server write would, with who made them", async () => {
+            const entries = async () => (await observer.query<{ entity_id: string; action: string; updated_by: string }>(
+                "SELECT entity_id, action, updated_by FROM rebase.entity_history WHERE table_name = 'ledger' ORDER BY updated_at, action"
+            )).rows;
+
+            const byAdmin = await rebase.dataAsAdmin.ledger.create({ ownerId: "bob", amount: 10 });
+            const ada = await rebase.withAuth({ uid: "ada", roles: ["user"] });
+            const byAda = await ada.data.ledger.create({ ownerId: "ada", amount: 5 });
+            await ada.data.ledger.update(String(byAda.id), { amount: 7 });
+            const gone = await ada.data.ledger.create({ ownerId: "ada", amount: 1 });
+            await ada.data.ledger.delete(String(gone.id));
+
+            const recorded = [
+                { entity_id: String(byAdmin.id), action: "create", updated_by: "service" },
+                { entity_id: String(byAda.id), action: "create", updated_by: "ada" },
+                { entity_id: String(byAda.id), action: "update", updated_by: "ada" },
+                { entity_id: String(gone.id), action: "create", updated_by: "ada" },
+                { entity_id: String(gone.id), action: "delete", updated_by: "ada" }
+            ];
+            expect(await entries()).toEqual(recorded);
+
+            // On the write's transaction: a batch that fails on its second
+            // row — Bob's, which Ada's policy refuses — leaves neither row nor
+            // the first row's entry.
+            await expect(ada.data.ledger.createMany([
+                { ownerId: "ada", amount: 1 },
+                { ownerId: "bob", amount: 2 }
+            ])).rejects.toThrow();
+            expect(await entries()).toEqual(recorded);
+            expect(await rebase.sql("SELECT count(*)::int AS n FROM public.ledger")).toEqual([{ n: 2 }]);
+        });
+
+        it("prunes nothing — the retention is the server's setting, which a script does not know", async () => {
+            // An entry older than the default retention (90 days), which a
+            // server configured to keep a year of history still holds.
+            const row = await rebase.dataAsAdmin.ledger.create({ ownerId: "bob", amount: 1 });
+            await observer.query(
+                "UPDATE rebase.entity_history SET updated_at = now() - interval '200 days' WHERE table_name = 'ledger' AND entity_id = $1",
+                [String(row.id)]
+            );
+            await rebase.dataAsAdmin.ledger.update(String(row.id), { amount: 2 });
+            // A prune runs after the write returns, unawaited: give one the time to land.
+            await new Promise(resolve => setTimeout(resolve, 500));
+            const { rows } = await observer.query<{ action: string }>(
+                "SELECT action FROM rebase.entity_history WHERE table_name = 'ledger' AND entity_id = $1 ORDER BY updated_at",
+                [String(row.id)]
+            );
+            expect(rows.map(entry => entry.action)).toEqual(["create", "update"]);
+        });
+
+        it("refuses writes where entries could not ride the write's transaction — the function is missing", async () => {
+            const signature = "rebase.record_history(text, text, text, text[], jsonb, jsonb, text, smallint)";
+            await observer.query(`ALTER FUNCTION ${signature} RENAME TO record_history_hidden`);
+            const unready = await openRebase({ databaseUrl: urlFor(container, "app"), collections: [notesCollection, ledgerCollection] });
+            try {
+                await expect(unready.dataAsAdmin.ledger.create({ ownerId: "bob", amount: 1 }))
+                    .rejects.toMatchObject({ code: "HISTORY_UNAVAILABLE", message: expect.stringMatching(/rebase\.record_history function/) });
+                // Only the audited collection is refused.
+                await expect(unready.dataAsAdmin.notes.find()).resolves.toBeDefined();
+                await expect(unready.dataAsAdmin.ledger.find()).resolves.toBeDefined();
+            } finally {
+                await unready.close();
+                await observer.query("ALTER FUNCTION rebase.record_history_hidden(text, text, text, text[], jsonb, jsonb, text, smallint) RENAME TO record_history");
+            }
         });
 
         it("finalizeSecurityPosture grants nothing after a provision: false open", async () => {
@@ -270,20 +372,26 @@ describe("openRebase (E2E)", () => {
 
         describe("rebase console --eval (the driver's half)", () => {
             let collectionsDir: string;
+            /** A project whose one collection keeps history. */
+            let auditedDir: string;
 
             beforeAll(() => {
                 // A project's collections directory, loaded by the loader `db push` uses.
                 collectionsDir = fs.mkdtempSync(path.join(os.tmpdir(), "rebase-console-"));
                 fs.writeFileSync(path.join(collectionsDir, "package.json"), JSON.stringify({ type: "module" }));
                 fs.writeFileSync(path.join(collectionsDir, "notes.js"), `export default ${JSON.stringify(notesCollection)};\n`);
+                auditedDir = fs.mkdtempSync(path.join(os.tmpdir(), "rebase-console-"));
+                fs.writeFileSync(path.join(auditedDir, "package.json"), JSON.stringify({ type: "module" }));
+                fs.writeFileSync(path.join(auditedDir, "ledger.js"), `export default ${JSON.stringify(ledgerCollection)};\n`);
             });
 
             afterAll(() => {
                 fs.rmSync(collectionsDir, { recursive: true, force: true });
+                fs.rmSync(auditedDir, { recursive: true, force: true });
             });
 
             /** One `rebase console --eval`, as the driver runs it: exit code and both streams. */
-            async function evalInConsole(code: string): Promise<{ code: number; stdout: string; stderr: string }> {
+            async function evalInConsole(code: string, dir = collectionsDir): Promise<{ code: number; stdout: string; stderr: string }> {
                 const stdout: string[] = [];
                 const stderr: string[] = [];
                 const log = vi.spyOn(console, "log").mockImplementation((...args: unknown[]) => { stdout.push(args.join(" ")); });
@@ -291,7 +399,7 @@ describe("openRebase (E2E)", () => {
                 vi.stubEnv("DATABASE_URL", urlFor(container, "app"));
                 vi.stubEnv("LOG_LEVEL", "error");
                 try {
-                    const exit = await consoleCommand(["console", "--eval", code, "--collections", collectionsDir]);
+                    const exit = await consoleCommand(["console", "--eval", code, "--collections", dir]);
                     return { code: exit, stdout: stdout.join("\n"), stderr: stderr.join("\n") };
                 } finally {
                     vi.unstubAllEnvs();
@@ -320,6 +428,19 @@ describe("openRebase (E2E)", () => {
                 expect(JSON.parse((await evalInConsole("collections.map(c => c.slug)")).stdout)).toEqual(["notes"]);
                 const counted = await evalInConsole("rebase.sql('SELECT count(*)::int AS n FROM public.notes WHERE owner_id = $1', { params: ['ada'] })");
                 expect(JSON.parse(counted.stdout)).toEqual([{ n: 1 }]);
+            });
+
+            it("records history for a write to an audited collection, as the service", async () => {
+                const result = await evalInConsole(
+                    "const row = await rebase.dataAsAdmin.ledger.create({ ownerId: 'bob', amount: 4 });\nreturn row.id;",
+                    auditedDir
+                );
+                expect(result).toMatchObject({ code: 0 });
+                const { rows } = await observer.query<{ action: string; updated_by: string }>(
+                    "SELECT action, updated_by FROM rebase.entity_history WHERE table_name = 'ledger' AND entity_id = $1",
+                    [String(JSON.parse(result.stdout))]
+                );
+                expect(rows).toEqual([{ action: "create", updated_by: "service" }]);
             });
 
             it("without --eval, is a REPL with rebase in scope and top-level await", async () => {
@@ -371,6 +492,66 @@ describe("openRebase (E2E)", () => {
             }
             expect(left).toBe(0);
             await expect(rebase.dataAsAdmin.notes.find()).rejects.toThrow();
+        });
+    });
+
+    describe("on a database provisioned without history", () => {
+        let rebase: OpenedRebase;
+        let unaudited: pg.Client;
+        let before: Record<string, string[]>;
+        /** Every hook that ran: a refused write must run none. */
+        const ran: string[] = [];
+
+        beforeAll(async () => {
+            const url = urlFor(container, "unaudited");
+            await provision(url, [ledgerCollection], { history: false });
+            unaudited = new pg.Client({ connectionString: url });
+            await unaudited.connect();
+            await unaudited.query("INSERT INTO public.ledger (owner_id, amount) VALUES ('ada', 1)");
+            before = await catalogue(unaudited);
+            rebase = await openRebase({
+                databaseUrl: url,
+                collections: [{
+                    ...ledgerCollection,
+                    callbacks: {
+                        beforeSave: ({ values }) => { ran.push("beforeSave"); return values; },
+                        afterSave: () => { ran.push("afterSave"); },
+                        afterSaveError: () => { ran.push("afterSaveError"); },
+                        beforeDelete: () => { ran.push("beforeDelete"); },
+                        afterDelete: () => { ran.push("afterDelete"); }
+                    }
+                }]
+            });
+        }, 120_000);
+
+        afterAll(async () => {
+            await rebase?.close();
+            await unaudited?.end().catch(() => {});
+        });
+
+        it("refuses a write to an audited collection with HISTORY_UNAVAILABLE, naming what is missing, and writes nothing", async () => {
+            const refused = { code: "HISTORY_UNAVAILABLE", message: expect.stringMatching(/history: true[\s\S]*rebase\.entity_history table[\s\S]*provision: true/) };
+            await expect(rebase.dataAsAdmin.ledger.create({ ownerId: "bob", amount: 3 })).rejects.toMatchObject(refused);
+            const ada = await rebase.withAuth({ uid: "ada", roles: ["user"] });
+            const [row] = (await ada.data.ledger.find()).data;
+            await expect(ada.data.ledger.create({ ownerId: "ada", amount: 4 })).rejects.toMatchObject(refused);
+            await expect(ada.data.ledger.update(String(row.id), { amount: 9 })).rejects.toMatchObject(refused);
+            await expect(ada.data.ledger.delete(String(row.id))).rejects.toMatchObject(refused);
+
+            expect((await unaudited.query("SELECT owner_id, amount::int AS amount FROM public.ledger")).rows)
+                .toEqual([{ owner_id: "ada", amount: 1 }]);
+            expect(ran).toEqual([]);
+        });
+
+        it("still reads it, as the service and as a user", async () => {
+            expect((await rebase.dataAsAdmin.ledger.find()).data).toHaveLength(1);
+            const ada = await rebase.withAuth({ uid: "ada", roles: ["user"] });
+            expect((await ada.data.ledger.find()).data.map(row => row.amount)).toEqual([1]);
+        });
+
+        it("has created nothing — no history table, no function", async () => {
+            expect(await catalogue(unaudited)).toEqual(before);
+            expect(before.tables).not.toContain("rebase.entity_history");
         });
     });
 });

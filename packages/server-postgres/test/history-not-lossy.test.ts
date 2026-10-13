@@ -1,5 +1,7 @@
 import { CollectionConfig } from "@rebasepro/types";
+import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { HistoryService } from "../src/history/HistoryService";
+import { historyUnavailableReason } from "../src/history/ensure-history-table";
 import { DrizzleClient } from "../src/interfaces";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
@@ -68,6 +70,41 @@ describe("history is not lossy", () => {
         });
     });
 
+    describe("HistoryService as a process that does not provision builds it", () => {
+        it("refuses the entry up front, naming what is missing and how to provision it, and writes nothing", async () => {
+            const db = { execute: jest.fn().mockResolvedValue({}) };
+            const service = new HistoryService(db as unknown as NodePgDatabase, undefined, {
+                unavailable: "the rebase.entity_history table"
+            });
+
+            expect(() => service.assertRecordable("ledger")).toThrow(/"ledger"[\s\S]*rebase\.entity_history table[\s\S]*provision: true/);
+            await expect(service.recordHistory({ tableName: "ledger", id: "1", action: "create", values: { amount: 1 } }))
+                .rejects.toMatchObject({ code: "HISTORY_UNAVAILABLE" });
+            expect(db.execute).not.toHaveBeenCalled();
+        });
+
+        it("records without pruning when told the retention is not its to apply", async () => {
+            // `openRebase` does not know the retention the project's server is
+            // configured with; pruning to the default would delete entries the
+            // server keeps. One statement — the entry — and no DELETE after it.
+            const db = { execute: jest.fn().mockResolvedValue({}) };
+            const service = new HistoryService(db as unknown as NodePgDatabase, undefined, { pruneOnRecord: false });
+            await service.recordHistory({ tableName: "posts", id: "1", action: "create", values: { title: "new" } });
+            await new Promise((resolve) => setImmediate(resolve));
+            expect(db.execute).toHaveBeenCalledTimes(1);
+        });
+
+        it("names what is missing: the table, then — when entries must ride the write — its function", () => {
+            const table = { tableExists: false, inTransaction: false, entryFormat: 1 as const };
+            const noFunction = { tableExists: true, inTransaction: false, entryFormat: 2 as const };
+            const ready = { tableExists: true, inTransaction: true, entryFormat: 2 as const };
+            expect(historyUnavailableReason(table, { requireTransaction: false })).toBe("the rebase.entity_history table");
+            expect(historyUnavailableReason(noFunction, { requireTransaction: true })).toBe("the rebase.record_history function");
+            expect(historyUnavailableReason(noFunction, { requireTransaction: false })).toBeUndefined();
+            expect(historyUnavailableReason(ready, { requireTransaction: true })).toBeUndefined();
+        });
+    });
+
     describe("PostgresBackendDriver", () => {
         const registry = new PostgresCollectionRegistry();
         const posts: CollectionConfig = {
@@ -89,7 +126,7 @@ describe("history is not lossy", () => {
                 registry,
                 undefined,
                 undefined,
-                { recordHistory } as unknown as HistoryService
+                { recordHistory, assertRecordable: () => undefined } as unknown as HistoryService
             );
             jest.spyOn(driver.dataService, "save")
                 .mockImplementation(async (_p, values) => ({ id: 1, ...(values as object) }) as any);

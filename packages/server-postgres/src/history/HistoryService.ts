@@ -1,6 +1,6 @@
 import { sql } from "drizzle-orm";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
-import { logger } from "@rebasepro/server";
+import { ApiError, logger } from "@rebasepro/server";
 import type { EntityHistoryEntry } from "@rebasepro/types";
 
 export type {
@@ -50,15 +50,53 @@ export class HistoryService {
      */
     private readonly entryFormat: 1 | 2;
 
+    /**
+     * What the database lacks for history to be recorded, when it lacks
+     * something — `the rebase.entity_history table`. Set for a driver opened
+     * without provisioning on a database no boot with history has prepared:
+     * writes to a `history: true` collection are then refused before they
+     * start (see {@link assertRecordable}), rather than made without their
+     * audit entries.
+     */
+    private readonly unavailable?: string;
+
+    /**
+     * Whether recording an entry also prunes that row's history to
+     * {@link retention}. Off for a process that does not know the retention the
+     * project's server is configured with — `openRebase` — which would
+     * otherwise delete entries the server keeps. What it leaves is pruned by
+     * the server: the row's next write, and the hourly sweep.
+     */
+    private readonly pruneOnRecord: boolean;
+
     constructor(
         private db: NodePgDatabase,
         retention?: Partial<HistoryRetentionConfig>,
-        options?: Partial<HistoryTableState>
+        options?: Partial<HistoryTableState> & { unavailable?: string; pruneOnRecord?: boolean }
     ) {
         this.retention = { ...DEFAULT_RETENTION,
 ...retention };
         this.inTransaction = options?.inTransaction === true;
         this.entryFormat = options?.entryFormat === 2 ? 2 : 1;
+        this.unavailable = options?.unavailable;
+        this.pruneOnRecord = options?.pruneOnRecord !== false;
+    }
+
+    /**
+     * Refuse a write to `collection` (a `history: true` collection's slug)
+     * when its entry could not be recorded. Called by the driver before the
+     * write runs anything — hooks included — so a refused write has no side
+     * effects. Reads are never refused.
+     */
+    assertRecordable(collection: string): void {
+        if (!this.unavailable) return;
+        throw ApiError.serviceUnavailable(
+            `Collection "${collection}" keeps history (\`history: true\`), but this database has no ` +
+            `${this.unavailable} — no backend with history enabled has provisioned it. The write was refused ` +
+            "rather than made without its audit entry; reads still work. Provision it by starting the backend " +
+            "once with `history` enabled and `provision: true` (`rebase dev` does).",
+            "HISTORY_UNAVAILABLE"
+        );
     }
 
     /**
@@ -95,6 +133,7 @@ export class HistoryService {
      */
     async recordHistory(params: RecordHistoryParams): Promise<void> {
         const { tableName, id, action, updatedBy } = params;
+        this.assertRecordable(tableName);
         // A relation is stored as its reference, never the related row's
         // values: reading this row's history is not reading the rows it
         // points at. See `withRelationReferencesOnly`.
@@ -170,6 +209,7 @@ export class HistoryService {
         // Non-blocking prune for this specific row. Outside the try, and
         // deliberately not awaited: a prune that fails leaves *extra* history,
         // which is not a loss and is fixed by the next write to this row.
+        if (!this.pruneOnRecord) return;
         this.pruneEntity(tableName, id).catch(err =>
             logger.error("History prune failed", { error: err })
         );

@@ -22,6 +22,8 @@ import {
 import { buildSdkData, createAccessorSlugResolver } from "@rebasepro/common";
 import { createPostgresDatabaseConnection, type PostgresPoolConfig } from "./connection";
 import { openPostgresDriver } from "./PostgresBootstrapper";
+import { HistoryService } from "./history/HistoryService";
+import { historyUnavailableReason, readHistoryTableState } from "./history/ensure-history-table";
 
 /** Who a request runs as: what row-level security policies read. */
 export interface RebaseIdentity {
@@ -106,10 +108,13 @@ function userFor(identity: RebaseIdentity): User {
  * ```
  *
  * Opening changes nothing in the database: no table, role, trigger or
- * function is created. A `withAuth` request on a connection that bypasses
- * row-level security runs as the restricted role a server boot provisions;
- * against a database no server has booted on, it fails rather than run
- * unfiltered.
+ * function is created. A write to a `history: true` collection records its
+ * entry as a server write does, on the write's transaction; on a database no
+ * backend with history has provisioned, such writes are refused with
+ * `HISTORY_UNAVAILABLE` (reads are not) rather than made without their audit
+ * entry. A `withAuth` request on a connection that bypasses row-level
+ * security runs as the restricted role a server boot provisions; against a
+ * database no server has booted on, it fails rather than run unfiltered.
  */
 export async function openRebase(options: OpenRebaseOptions): Promise<OpenedRebase> {
     if (!options.databaseUrl && !options.connection) {
@@ -147,6 +152,30 @@ export async function openRebase(options: OpenRebaseOptions): Promise<OpenedReba
 
     const driver = opened.internals.driver;
     const registry = opened.internals.registry;
+
+    // A `history: true` collection is audited from a script exactly as from
+    // the server: the same service, the entry on the write's transaction,
+    // recorded as whoever the write runs as. Nothing is created for it — the
+    // table and its function are read — and where an earlier boot never made
+    // them, writes to those collections are refused up front instead of going
+    // unaudited. Reads are unaffected. Entries are not pruned here: the
+    // retention is the server's setting, which a script does not know, and
+    // pruning to the default could delete entries the server keeps.
+    const collections = opened.collections ?? options.collections;
+    if (collections.some(collection => collection.history)) {
+        try {
+            const state = await readHistoryTableState(opened.internals.db);
+            driver.historyService = new HistoryService(opened.internals.db, undefined, {
+                inTransaction: state.inTransaction,
+                entryFormat: state.entryFormat,
+                unavailable: historyUnavailableReason(state, { requireTransaction: true }),
+                pruneOnRecord: false
+            });
+        } catch (error) {
+            await owned?.pool.end().catch(() => undefined);
+            throw error;
+        }
+    }
     const resolveAccessor = createAccessorSlugResolver(() => registry.getCollections());
     const dataAs = async (identity: RebaseIdentity): Promise<RebaseSdkData> =>
         buildSdkData(await driver.withAuth(userFor(identity)), { resolveAccessor });
@@ -157,7 +186,7 @@ export async function openRebase(options: OpenRebaseOptions): Promise<OpenedReba
 
     return {
         dataAsAdmin,
-        collections: opened.collections ?? options.collections,
+        collections,
         async sql(query, sqlOptions) {
             if (!isSQLAdmin(admin)) throw new Error("This driver cannot run raw SQL.");
             return admin.executeSql(query, sqlOptions && {

@@ -1248,6 +1248,9 @@ export class PostgresBackendDriver implements DataDriver {
             propertyCallbacks
         } = this.resolveCollectionCallbacks(collection, path);
         if (declaresAnyHook(callbacks, globalCallbacks, propertyCallbacks)) currentWriteScope()?.noteApplicationCode();
+        // Before anything runs, hooks included: a write whose audit entry
+        // cannot be recorded is refused, not made and rolled back.
+        if (resolvedCollection?.history) this.historyService?.assertRecordable(resolvedCollection.slug);
 
         // An upsert that finds its row is an update of that row, and runs as
         // one: the update gate, `beforeSave` told "existing" with the stored
@@ -2131,6 +2134,13 @@ export class PostgresBackendDriver implements DataDriver {
         } = this.resolveCollectionCallbacks(collection, targetPath);
         if (declaresAnyHook(callbacks, globalCallbacks, propertyCallbacks)) currentWriteScope()?.noteApplicationCode();
 
+        // Through a many-to-many path the target row is not what is deleted —
+        // see `unlinking` below — and an unlink is no entry in its history.
+        const hop = isNestedPath(targetPath) ? resolveNestedPath(targetPath, this.registry) : undefined;
+        const unlinking = hop !== undefined && isJunctionBackedRelation(hop.relation);
+        // Before anything runs, as `save` does.
+        if (resolvedCollection?.history && !unlinking) this.historyService?.assertRecordable(resolvedCollection.slug);
+
         // The row being deleted is read here, from the database, by this
         // driver — which on a user request is bound to that user's
         // transaction, so the read sees what their policies let them see. It
@@ -2252,8 +2262,6 @@ export class PostgresBackendDriver implements DataDriver {
         // persistence layer's rule for a junction). Its collection's soft
         // delete says how *its* rows are removed, which this is not — stamped
         // here, it trashed the tag for every post and re-asserted the link.
-        const hop = isNestedPath(targetPath) ? resolveNestedPath(targetPath, this.registry) : undefined;
-        const unlinking = hop !== undefined && isJunctionBackedRelation(hop.relation);
         const softDelete = hard || unlinking
             ? undefined
             : resolveSoftDelete(resolvedCollection as CollectionConfig | undefined);

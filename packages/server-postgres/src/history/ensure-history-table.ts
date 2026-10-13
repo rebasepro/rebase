@@ -168,15 +168,32 @@ export async function ensureHistoryTableExists(db: NodePgDatabase, options: Boot
  * What an earlier boot left in place, read without changing anything — for a
  * driver opened without provisioning. Entries go on the write's transaction
  * when the function for the table's entry format is there, and the format is
- * `2` when the table has its `format` column.
+ * `2` when the table has its `format` column. `tableExists` is false on a
+ * database no boot with history has provisioned.
  */
-export async function readHistoryTableState(db: NodePgDatabase): Promise<HistoryTableState> {
+export async function readHistoryTableState(db: NodePgDatabase): Promise<HistoryTableState & { tableExists: boolean }> {
     const entryFormat: 1 | 2 = await formatColumnExists(db) ? 2 : 1;
     const signature = entryFormat === 2 ? RECORD_HISTORY_SIGNATURE : LEGACY_RECORD_HISTORY_SIGNATURE;
-    const rows = sqlRows<{ present: boolean }>(await db.execute(sql`
-        SELECT to_regprocedure(${signature}) IS NOT NULL AS present
+    const rows = sqlRows<{ table: boolean; fn: boolean }>(await db.execute(sql`
+        SELECT to_regclass('rebase.entity_history') IS NOT NULL AS "table",
+               to_regprocedure(${signature}) IS NOT NULL AS fn
     `));
-    return { inTransaction: rows[0]?.present === true, entryFormat };
+    return { inTransaction: rows[0]?.fn === true, entryFormat, tableExists: rows[0]?.table === true };
+}
+
+/**
+ * Why history cannot be recorded on a database {@link readHistoryTableState}
+ * read, or `undefined` when it can. `requireTransaction` also counts a
+ * missing {@link RECORD_HISTORY_FUNCTION}: without it an entry would commit on
+ * its own instead of with its row.
+ */
+export function historyUnavailableReason(
+    state: HistoryTableState & { tableExists: boolean },
+    options: { requireTransaction: boolean }
+): string | undefined {
+    if (!state.tableExists) return "the rebase.entity_history table";
+    if (options.requireTransaction && !state.inTransaction) return `the ${RECORD_HISTORY_FUNCTION} function`;
+    return undefined;
 }
 
 const ADD_FORMAT_COLUMN = "ALTER TABLE rebase.entity_history ADD COLUMN IF NOT EXISTS format SMALLINT NOT NULL DEFAULT 1";

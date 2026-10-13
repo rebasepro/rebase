@@ -60,7 +60,7 @@ describe("hooks and history see the stored row, not afterRead's view of it", () 
             new PostgresCollectionRegistry(),
             undefined,
             undefined,
-            { recordHistory } as unknown as HistoryService
+            { recordHistory, assertRecordable: () => undefined } as unknown as HistoryService
         );
         jest.spyOn(driver.dataService, "save").mockResolvedValue({ ...STORED } as never);
         jest.spyOn(driver.dataService, "getFetchService").mockReturnValue({
