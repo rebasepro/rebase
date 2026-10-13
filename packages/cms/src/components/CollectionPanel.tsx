@@ -1,10 +1,14 @@
 
 import type { ViewMode, AdminCollection } from "@rebasepro/cms-types";
-import React, { useMemo } from "react";
+import React, { useContext, useMemo } from "react";
 import { CollectionViewBinding } from "./CollectionViewBinding/CollectionViewBinding";
 import { useCollectionRegistryController } from "../hooks/navigation/contexts/CollectionRegistryContext";
-import { Typography } from "@rebasepro/ui";
+import { useNavigationStateController } from "../hooks/navigation/contexts/NavigationStateContext";
+import { useUrlController } from "../hooks/navigation/contexts/UrlContext";
+import { CircularProgressCenter, Typography } from "@rebasepro/ui";
 import { useComponentOverride, CollectionScopeProvider } from "@rebasepro/app";
+import { CollectionsScopeContext, isRegistered } from "./CollectionsScopeContext";
+import { CollectionsProvider } from "./CollectionsProvider";
 
 /**
  * Props for the {@link CollectionPanel} component.
@@ -13,17 +17,42 @@ import { useComponentOverride, CollectionScopeProvider } from "@rebasepro/app";
  * designed for embedding collection views inside custom pages (home pages,
  * dashboards, entity detail views, etc.).
  *
- * At minimum, provide the `path` (collection slug). All other props are optional
- * overrides that take precedence over the collection's default configuration.
+ * Name the collection by `path` (one registered with `<RebaseCMS>`, or with a
+ * {@link CollectionsProvider} above), or hand it over as a value with
+ * `collection`. All other props are optional overrides that take precedence
+ * over the collection's default configuration.
  *
  * @group Components
  */
-export type CollectionPanelProps = {
-    /**
-     * The collection slug / path to display (e.g. "tasks", "clients").
-     * The collection must be registered in the Rebase context.
-     */
-    path: string;
+export type CollectionPanelProps = CollectionPanelOptions & (
+    | {
+        /**
+         * The collection slug / path to display (e.g. "tasks", "clients"),
+         * registered with `<RebaseCMS>` or a {@link CollectionsProvider}.
+         */
+        path: string;
+        /** The collection itself, when it is not registered. */
+        collection?: AdminCollection;
+    }
+    | {
+        /**
+         * The collection to display, as a value — a `defineCollection` config
+         * or a resolved collection. Where no CMS navigation is mounted above,
+         * the panel brings its own {@link CollectionsProvider} for it, so it
+         * works anywhere under `<Rebase>` and a router.
+         */
+        collection: AdminCollection;
+        /** Defaults to `collection.slug`. */
+        path?: string;
+    }
+);
+
+/**
+ * The display options of a {@link CollectionPanel}.
+ *
+ * @group Components
+ */
+export type CollectionPanelOptions = {
 
     /**
      * Optional title displayed above the collection.
@@ -74,7 +103,7 @@ export type CollectionPanelProps = {
  * A high-level, reusable wrapper for embedding a Rebase collection view
  * inside custom pages (dashboards, home pages, entity detail views, etc.).
  *
- * Usage:
+ * Usage inside the CMS, by registered slug:
  * ```tsx
  * import { CollectionPanel } from "@rebasepro/cms";
  *
@@ -92,6 +121,17 @@ export type CollectionPanelProps = {
  *         </div>
  *     );
  * }
+ * ```
+ *
+ * Usage in a page of your own app, with the collection as a value — no
+ * `<RebaseCMS>`, `<RebaseNavigation>` or `<RebaseShell>` needed, and any
+ * React Router router will do. Records open in a side panel over the page:
+ * ```tsx
+ * <Rebase client={client} authController={authController}>
+ *     <BrowserRouter>
+ *         <CollectionPanel collection={postsCollection} />
+ *     </BrowserRouter>
+ * </Rebase>
  * ```
  *
  * @group Components
@@ -125,20 +165,52 @@ function CollectionPanelInner({
 }
 
 export function CollectionPanel(props: CollectionPanelProps) {
+    const inScope = useContext(CollectionsScopeContext);
+    const collectionRegistry = useCollectionRegistryController();
+    const navigationState = useNavigationStateController();
+    const collection = props.collection;
+    const ownCollections = useMemo(() => collection ? [collection] : [], [collection]);
+
+    // A collection handed over as a value brings its own scope where there is
+    // none above — or where the one above has settled without it, since a
+    // collection the data layer does not know gives its rows no address.
+    const needsOwnScope = collection !== undefined && (!inScope
+        || (!navigationState.loading && !isRegistered(collectionRegistry.collections, props.path ?? collection.slug)));
+    if (needsOwnScope) {
+        return (
+            <CollectionsProvider collections={ownCollections}>
+                <CollectionPanelInScope {...props}/>
+            </CollectionsProvider>
+        );
+    }
+    return <CollectionPanelInScope {...props}/>;
+}
+
+function CollectionPanelInScope(props: CollectionPanelProps) {
     const {
-        path,
         viewMode,
         sort,
         limit,
         openEntityMode,
         className,
-        collectionOverrides
+        collectionOverrides,
+        collection: collectionProp
     } = props;
+    const path = props.path ?? collectionProp?.slug ?? "";
     const collectionRegistry = useCollectionRegistryController();
-    const registeredCollection = collectionRegistry.getCollection(path);
+    const navigationState = useNavigationStateController();
+    const urlController = useUrlController();
+    // The registry's copy, also for a collection handed over as a value: it
+    // carries the user's saved overrides and the plugins' changes. Not asked
+    // before it has been filled.
+    const lookUp = collectionRegistry.initialised || !navigationState.loading;
+    const baseCollection = useMemo(
+        () => lookUp ? collectionRegistry.getCollection(path) : undefined,
+        [lookUp, collectionRegistry, path]);
+    const routesMounted = urlController.routesMounted !== false;
 
     const mergedCollection = useMemo(() => {
-        if (!registeredCollection) return undefined;
+        if (!baseCollection) return undefined;
 
         // Build overrides object from shorthand props + explicit overrides
         const propOverrides: Record<string, unknown> = {};
@@ -147,14 +219,23 @@ export function CollectionPanel(props: CollectionPanelProps) {
         if (limit) propOverrides.pagination = limit;
         if (openEntityMode) propOverrides.openEntityMode = openEntityMode;
 
-        return {
-            ...registeredCollection,
+        const merged = {
+            ...baseCollection,
             ...(collectionOverrides ?? {}),
             ...propOverrides
         } as AdminCollection;
-    }, [registeredCollection, collectionOverrides, viewMode, sort, limit, openEntityMode]);
+        // Without CMS routes a record has no page of its own, nor a split
+        // beside the list that a URL selects: it opens over the page.
+        if (!routesMounted && merged.openEntityMode !== "dialog") {
+            merged.openEntityMode = "side_panel";
+        }
+        return merged;
+    }, [baseCollection, collectionOverrides, viewMode, sort, limit, openEntityMode, routesMounted]);
 
     if (!mergedCollection) {
+        if (navigationState.loading) {
+            return <div className={className}><CircularProgressCenter/></div>;
+        }
         return (
             <div className={className}>
                 <Typography variant="body2" color="secondary">
@@ -167,6 +248,7 @@ export function CollectionPanel(props: CollectionPanelProps) {
     const content = (
         <CollectionPanelInner
             {...props}
+            path={path}
             mergedCollection={mergedCollection}
         />
     );

@@ -67,6 +67,16 @@ export type UrlController = {
      * @param {NavigateOptions} [options] - Optional configuration settings for navigation, such as replace behavior or state data.
      */
     navigate: (to: string, options?: NavigateOptions) => void;
+
+    /**
+     * Whether the CMS's own routes (`<RebaseShell>` / `<RebaseRouteDefs>`)
+     * serve this app's URLs. `false` under a `CollectionsProvider` — a
+     * collection or a record embedded in a page of the host app — where no URL
+     * leads to a record: records then open in a side panel or a dialog over
+     * the page, and the controls that would leave it for a CMS route are not
+     * offered. Absent means the routes are mounted.
+     */
+    routesMounted?: boolean;
 };
 
 /**

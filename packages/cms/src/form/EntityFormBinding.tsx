@@ -329,7 +329,8 @@ export function EntityFormBinding<M extends Record<string, unknown>>({
             entity={entity}
             initialStatus={initialStatus}
             initialDirtyValues={initialDirtyValues}
-            onSaved={onSaved}
+            // Not handed down: `onSubmit` above reports the save, for Save and
+            // autosave alike. The form reporting it too called it twice.
             onValuesModified={onValuesModified}
             onEntityChange={onEntityChange}
             onStatusChange={onStatusChange}

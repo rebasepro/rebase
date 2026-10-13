@@ -34,6 +34,7 @@ import { UrlContext } from "../hooks/navigation/contexts/UrlContext";
 import { NavigationStateContext } from "../hooks/navigation/contexts/NavigationStateContext";
 
 import { SidePanelProvider } from "./SidePanelProvider";
+import { CollectionsScopeContext } from "./CollectionsScopeContext";
 import { prefetchRecordViews } from "./lazy_record_views";
 
 // Collection editor internals — used when collectionEditor is enabled
@@ -307,6 +308,7 @@ export function RebaseNavigation({ children }: RebaseNavigationProps) {
     // consumer (list/entity views, references, board, import/export, and
     // `context.data`) is routed to the correct driver by collection path.
     const navigationContent = (
+        <CollectionsScopeContext.Provider value={true}>
         <RebaseDataContext.Provider value={routedData}>
         <CustomizationControllerContext.Provider value={enrichedCustomizationController}>
         <StudioBridgeRegistryProvider>
@@ -328,6 +330,7 @@ export function RebaseNavigation({ children }: RebaseNavigationProps) {
         </StudioBridgeRegistryProvider>
         </CustomizationControllerContext.Provider>
         </RebaseDataContext.Provider>
+        </CollectionsScopeContext.Provider>
     );
 
     // ── Wrap with ConfigControllerProvider when collection editor is enabled ──

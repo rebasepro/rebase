@@ -62,13 +62,18 @@ export {
     RebaseRouteDefs,
     SideDialogs,
     useApp,
-    CollectionPanel
+    CollectionPanel,
+    CollectionsProvider,
+    EntityFormPanel
 } from "./components";
 export type {
     EntityViewBindingProps,
     SelectionProps,
     SelectableTableProps,
     CollectionPanelProps,
+    CollectionPanelOptions,
+    CollectionsProviderProps,
+    EntityFormPanelProps,
     DrawerNavigationGroupProps,
     DrawerNavigationItemProps
 } from "./components";

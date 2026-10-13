@@ -52,7 +52,13 @@ export function navigateToEntity({
         replace?: boolean;
     }) {
 
-    if (openEntityMode === "side_panel" || openEntityMode === "dialog") {
+    // No CMS route serves this page (a collection embedded in the host app's
+    // own page): there is no URL to go to, so the record opens over the page.
+    const mode = navigation.routesMounted === false && openEntityMode !== "dialog"
+        ? "side_panel"
+        : openEntityMode;
+
+    if (mode === "side_panel" || mode === "dialog") {
 
         sidePanelController.open({
             entityId,
@@ -60,7 +66,7 @@ export function navigateToEntity({
             copy,
             selectedTab,
             collection,
-            updateUrl: openEntityMode !== "dialog",
+            updateUrl: mode !== "dialog",
             onClose,
             onUpdate,
             defaultValues

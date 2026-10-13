@@ -157,7 +157,13 @@ width: newWidth };
         sideDialogsController.close();
     }, [sideDialogsController]);
 
-    const open = useCallback((props: SidePanelBindingProps<any>) => {
+    // Where no CMS route serves the page, a panel is an overlay and nothing
+    // more: it writes no URL (one would lead nowhere) and offers no way to a
+    // full-screen route that does not exist.
+    const routesMounted = urlController.routesMounted !== false;
+
+    const open = useCallback((propsIn: SidePanelBindingProps<any>) => {
+        const props = routesMounted ? propsIn : { ...propsIn, updateUrl: false, allowFullScreen: false };
 
         if (props.copy && !props.entityId) {
             throw Error("If you want to copy a entity you need to provide a entityId");
@@ -183,9 +189,10 @@ width: newWidth };
                 authController
             ));
 
-    }, [sideDialogsController, urlController.buildUrlCollectionPath, urlController.resolveDatabasePathsFrom, smallLayout, authController.user]);
+    }, [sideDialogsController, urlController.buildUrlCollectionPath, urlController.resolveDatabasePathsFrom, smallLayout, authController.user, routesMounted]);
 
-    const replace = useCallback((props: SidePanelBindingProps<any>) => {
+    const replace = useCallback((propsIn: SidePanelBindingProps<any>) => {
+        const props = routesMounted ? propsIn : { ...propsIn, updateUrl: false, allowFullScreen: false };
 
         if (props.copy && !props.entityId) {
             throw Error("If you want to copy a entity you need to provide a entityId");
@@ -193,7 +200,7 @@ width: newWidth };
 
         sideDialogsController.replace(propsToSidePanel(props, urlController.buildUrlCollectionPath, urlController.resolveDatabasePathsFrom, smallLayout, customizationController, authController));
 
-    }, [urlController.buildUrlCollectionPath, urlController.resolveDatabasePathsFrom, sideDialogsController, smallLayout, authController.user]);
+    }, [urlController.buildUrlCollectionPath, urlController.resolveDatabasePathsFrom, sideDialogsController, smallLayout, authController.user, routesMounted]);
 
     return useMemo(() => ({
         close,

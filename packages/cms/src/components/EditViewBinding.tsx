@@ -269,13 +269,14 @@ export function EditViewBinding<M extends Record<string, unknown>>({
             <div className="flex flex-col items-center gap-2 text-center">
                 <Typography variant="label">{t("entity_not_found")}</Typography>
                 <Typography variant="body2" color="secondary">{t("entity_not_found_body")}</Typography>
-                <Button
+                {/* No CMS route serves an embedded page, so there is no collection to go back to. */}
+                {urlController.routesMounted !== false && <Button
                     variant="text"
                     component={Link}
                     to={urlController.buildUrlCollectionPath(props.path)}
                 >
                     {t("back_to_collection", { name: props.collection.name ?? props.path })}
-                </Button>
+                </Button>}
             </div>
         </CenteredView>;
     }
