@@ -62,6 +62,11 @@ const asService = { headers: { authorization: `Bearer ${SERVICE_KEY}` } };
 /** One probe per mount point, mapped to the surface that owns it. */
 const PROBES: ReadonlyArray<{ surface: RuntimeSurface; url: string; method?: string }> = [
     { surface: "auth", url: "/api/auth/login", method: "POST" },
+    // The capabilities document the login screen reads. It used to be mounted
+    // whenever `auth` was configured, so a `functions` or `worker` process —
+    // auth surface off — still answered it, from a process no ingress routes
+    // sign-in traffic to.
+    { surface: "auth", url: "/api/auth/config" },
     { surface: "auth", url: "/.well-known/jwks.json" },
     { surface: "data", url: "/api/data/jobs" },
     { surface: "data", url: "/api/docs" },

@@ -1916,13 +1916,19 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         // It also says whether storage is configured. The admin panel reads
         // this document on every load, so the flag spares it asking
         // `/storage/sources` on a deployment with no bucket.
-        config.app.get(`${basePath}/auth/config`, defaultAuthLimiter, async (c) => {
-            const capabilities = await authAdapter!.getCapabilities();
-            return c.json({
-                ...capabilities,
-                storage: Boolean(storageRegistry || storageController)
-            } satisfies AuthConfigDocument);
-        });
+        //
+        // Part of the auth surface like every other `/auth` route: a process
+        // that serves no sign-in (a `functions` or `worker` role) has no login
+        // screen to describe, and no ingress sends it that traffic.
+        if (surfaces.auth) {
+            config.app.get(`${basePath}/auth/config`, defaultAuthLimiter, async (c) => {
+                const capabilities = await authAdapter!.getCapabilities();
+                return c.json({
+                    ...capabilities,
+                    storage: Boolean(storageRegistry || storageController)
+                } satisfies AuthConfigDocument);
+            });
+        }
 
         if (!isAuthAdapter(config.auth)) {
             const safeAuthConfig = config.auth as RebaseAuthConfig;
