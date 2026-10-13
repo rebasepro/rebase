@@ -187,7 +187,7 @@ const MOUNTS = new Map([
     // forwards to a functions process. Neither has a path of its own.
     ["packages/server/src/functions/define-function.ts#app", null],
     ["packages/server/src/functions/proxy.ts#router", null],
-    // `mountWithLegacyAlias`'s forwarder, and the adapter's optional extra
+    // `deprecatedAlias`'s forwarder, and the adapter's optional extra
     // router: both re-serve routes that are already counted where they are
     // defined.
     ["packages/server/src/api/mount.ts#alias", null],

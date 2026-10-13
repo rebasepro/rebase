@@ -171,10 +171,10 @@ admin-only siblings — user management, roles, password resets — live under
 scope: `/auth/keys`, a person's own API keys, and `/auth/scopes`, the scope
 catalogue. Neither is an admin surface — each answers about the caller only.
 
-**The client SDK still calls the legacy paths.** `@rebasepro/client` defaults
-`cronPath` to `/cron`, not `/admin/cron`. An SDK that moved first would break
-against every server already deployed, and the alias in §8 means the old path
-works indefinitely. The SDK moves at a major, together with the aliases.
+**The client SDK calls the moved paths; older SDKs still call the legacy ones.**
+`@rebasepro/client` defaults `cronPath` to `/admin/cron`. Every SDK released
+before that default changed still calls `/cron`, so the alias in §8 stays until
+those clients are gone, and is removed at a major.
 
 ## 8. Moving a surface that has shipped
 
