@@ -214,7 +214,9 @@ It sits between the shell and the project file in the resolution order:
 
 <span class="since-badge" data-since="0.25">Since 0.25</span> Rung 5 follows the
 last `rebase dev --docker`, so a branch command after it needs no `--docker` of
-its own. On 0.24 only the flag counts.
+its own, and a `--docker` that a rung above it outranks starts no container and
+says it was ignored. On 0.24 only the flag counts, and an outranked one still
+starts the container.
 
 A branch has to outrank `.env` or switching would do nothing on any project that
 sets `DATABASE_URL`; it must not outrank the two above it, because a flag on this
@@ -285,6 +287,6 @@ Because branches are separate PostgreSQL databases, you cannot perform SQL `JOIN
 
 ## Related
 
-- [CLI Commands](/docs/cli/) — `rebase db branch` and its flags
+- [Database Commands](/docs/cli/database/#rebase-db-branch) — `rebase db branch` and its flags
 - [Schema Generation](/docs/cli/schema/) — how the schema a branch copies is produced
 - [Environment & Configuration](/docs/getting-started/configuration/) — `DATABASE_URL`, and what a switched branch outranks

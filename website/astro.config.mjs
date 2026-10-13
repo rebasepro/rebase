@@ -285,6 +285,7 @@ export default defineConfig({
                     collapsed: true,
                     items: [
                         { label: "CLI Commands", slug: "docs/cli" },
+                        { label: "Database Commands", slug: "docs/cli/database" },
                         { label: "rebase cloud", slug: "docs/cli/cloud" },
                         { label: "Schema Generation", slug: "docs/cli/schema" },
                         { label: "rls-check (RLS audit)", slug: "docs/rls-check" }

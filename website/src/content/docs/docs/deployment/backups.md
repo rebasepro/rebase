@@ -37,7 +37,7 @@ rebase db restore ./backups/rebase-app-20260714T030000Z.dump \
 ```
 
 The connection string comes from your project's environment, as for every
-other [`rebase db` command](/docs/cli/): `DATABASE_URL`, falling
+other [`rebase db` command](/docs/cli/database/): `DATABASE_URL`, falling
 back to `ADMIN_CONNECTION_STRING`.
 
 <span class="since-badge" data-since="0.25">Since 0.25</span> A relative

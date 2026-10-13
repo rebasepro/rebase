@@ -329,12 +329,17 @@ types are yours to regenerate.
 | `-c`, `--collections` | Collections directory (default: `config/collections/`); relative paths are resolved from where you run the command. `--collections-dir` is accepted too. |
 | `-o`, `--output` | Output directory for the SDK (default: `generated/sdk/`) |
 | `--from <link\|url>` | Read the schema from a running project instead of local source. `link` uses this checkout's linked project. |
-| `--token` | Bearer token for the contract endpoint (default: `$REBASE_SERVICE_KEY`) |
+| `--token` | Bearer token for the contract endpoint (default: `$REBASE_SERVICE_KEY` from the shell; `.env` is not read) |
 
 `--from` is what lets a repository that contains no collections — a separate
 frontend, a second web app, a mobile app — generate a typed client from the
 project it talks to. `REBASE_SERVICE_KEY` is only sent to the project this
-checkout is linked to; pass `--token` explicitly for any other host.
+checkout is linked to; pass `--token` explicitly for any other host. The key in
+`.env` belongs to your local backend and is never sent.
+<span class="since-badge" data-since="0.25">Since 0.25</span> A refusal says
+which of these happened: a refused `--token`, a refused shell key, a key
+withheld from a host that is not linked, a key only in `.env`, or no key at all.
+On 0.24 it always says to pass `--token` or set `REBASE_SERVICE_KEY`.
 
 **Usage after generation:**
 

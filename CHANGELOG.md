@@ -1235,6 +1235,12 @@
   instead of `rebase db backup ./backups`. `rebase db restore` refuses more than
   one backup.
 
+- **The manifest the CLI infers for a project leaves out what equals a default,
+  and spells the build for the project's package manager.** `synthesizeManifest`
+  (`@rebasepro/cli`) writes `spa`, `functions` and `crons` only when they differ
+  from their defaults, and builds the static app with pnpm in a pnpm project.
+  The inferred static app is still named `web`.
+
 #### Client SDK
 
 - **Walking a collection seeks by cursor and skips the count on every page.**
@@ -1812,6 +1818,48 @@
 - **`rebase db pull` keeps both connection strings' passwords off `pg_dump`'s
   and `pg_restore`'s command lines**, where any process listing could read them;
   each tool gets its password in `PGPASSWORD`.
+
+- **`rebase apps init --force` on a scaffolded project writes back the
+  `rebase.json` the scaffold ships.** It keeps each app's name, `path` and `cms`
+  from the file it replaces, infers the rest, builds the static app with the
+  project's package manager, and names a declared app it no longer finds
+  instead of dropping it.
+
+- **A project without a `rebase.json` builds its frontend with its own package
+  manager.** The inferred build command was always
+  `npm run build --workspace frontend`, even in a pnpm project.
+
+- **`rebase apps init <name>` is refused.** It never registered one app: it
+  ignored the name and inferred the whole manifest.
+
+- **A `--docker` that a `DATABASE_URL` outranks no longer starts the compose
+  container,** on `rebase dev`, the `rebase db` commands and `rebase console`.
+  `dev` also pushed the schema into that container while the backend ran on the
+  other database. One line now says `--docker` was ignored, and why.
+
+- **`rebase init` accepts only a `postgres://` or `postgresql://` connection
+  string as the database.** The prompt asks again (typing `n` used to write
+  `DATABASE_URL=n`), and `--database-url` with anything else is refused before
+  anything is written.
+
+- **Interactive `rebase init` refuses a directory that already holds files
+  before it asks anything,** and checks a typed project name as it is typed.
+
+- **`rebase generate-sdk --from <url>` says why the contract endpoint refused:**
+  a key in `.env` is not sent, the shell's `REBASE_SERVICE_KEY` goes only to the
+  linked project, or the token sent was refused. It always said "set
+  REBASE_SERVICE_KEY".
+
+- **`rebase auth reset-password` prints the backend's refusal, a weak password
+  say, as its message and code**, not as the raw JSON body. Both paths label a
+  generated password `Password:`.
+
+- **`rebase console --collections` and `rebase doctor --collections` with a
+  missing path no longer warn that applying it would drop every table.** Each
+  says what it did not do instead.
+
+- **`rebase dev` says when it regenerated an out-of-date
+  `backend/src/schema.generated.ts`.**
 
 #### Admin (CMS & app)
 
@@ -2443,6 +2491,28 @@
 - **`rebase schema stale` is documented**, on the CLI reference and the schema
   page, and `rebase db branch delete` is documented as refusing the branch you
   are on (it said it returned you to the main database).
+
+- **The database commands have their own page,** "Database Commands"
+  (`/docs/cli/database/`): push, generate and migrate, backups, pull, the
+  connection string, the managed database and branches. The CLI reference
+  lists them and links there.
+
+- **The compatibility page says what a Since badge means on a canary.** A
+  canary such as `0.24.1-canary.g<commit>` is built from `main` and carries what
+  the badges for the next minor describe; its users read "On 0.24 there is
+  none" as applying to them.
+
+- **The CLI reference lists the api-keys get command, the database flags of
+  db push, and what branch prune does with no terminal.** `rebase db push`
+  takes `--database-url` and `--docker`, as `generate`, `migrate`, `branch`,
+  `backup` and `restore` do.
+
+- **The agent skill and the MCP page no longer say the CLI refuses db push on
+  the managed database.** The MCP gate still refuses its database tools there;
+  the CLI runs `db push` and `db migrate`.
+
+- **The custom-server page no longer tells you not to declare zod** while the
+  scaffold declares it, at the runtime's range: keep the two ranges equal.
 
 ## [0.24.0] - 2026-10-08
 
