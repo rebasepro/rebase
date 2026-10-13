@@ -2041,6 +2041,35 @@ export type InsertOf<T> = T extends { Insert: infer I extends Record<string, unk
 export type UpdateOf<T> = T extends { Update: infer U extends Record<string, unknown> } ? U : Partial<RowOf<T>>;
 
 /**
+ * The slugs a generated `Database` declares, from the `Slug` each entry
+ * carries beside the accessor codegen chose for it.
+ * @group Data
+ */
+export type SlugOf<DB> = {
+    [K in keyof DB]: DB[K] extends { Slug: infer S extends string } ? S : never
+}[keyof DB];
+
+/** The generated `Database` entry whose `Slug` is `S`. */
+type EntryOfSlug<DB, S extends string> = DB[{
+    [K in keyof DB]: DB[K] extends { Slug: S } ? K : never
+}[keyof DB]];
+
+/**
+ * `collection(slug)` for a slug the registered `Database` declares: the same
+ * typed client as the slug's accessor (`collection("my-notes")` is
+ * `myNotes`). A slug it does not declare, or one computed at runtime, is
+ * served by the untyped overload.
+ */
+type TypedSlugCollection<DB> = {
+    collection<S extends SlugOf<DB>>(slug: S): SDKCollectionClient<
+        RowOf<EntryOfSlug<DB, S>>,
+        InsertOf<EntryOfSlug<DB, S>>,
+        UpdateOf<EntryOfSlug<DB, S>>,
+        IncludeOf<EntryOfSlug<DB, S>, DB>
+    >;
+};
+
+/**
  * Note on the untyped branch below: its index signature is
  * `SDKCollectionClient`, NOT `SDKCollectionClient | ((slug: string) => …)`.
  *
@@ -2060,7 +2089,11 @@ export type UpdateOf<T> = T extends { Update: infer U extends Record<string, unk
  * compile for any of them. Do not restore the arm; use `collection(slug)` if a
  * caller genuinely needs the by-slug function.
  */
-export type RebaseSdkData<DB = unknown> = {
+export type RebaseSdkData<DB = unknown> = (
+    // Typed first, so a literal slug the `Database` declares picks this
+    // overload; any other string falls through to the untyped one below.
+    unknown extends DB ? unknown : TypedSlugCollection<DB>
+) & {
     /**
      * Get a flat collection accessor by slug.
      *

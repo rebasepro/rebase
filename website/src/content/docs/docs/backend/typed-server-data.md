@@ -99,7 +99,10 @@ generated file (`order_items` is `orderItems`).
 The server resolves those names through the registered collections, so a
 `my-notes` collection stored in a `notes` table is `context.data.myNotes`.
 
-`collection(slug)` stays untyped on purpose, for a slug you compute at runtime.
+`collection(slug)` with a slug the `Database` declares is typed the same way:
+`context.data.collection("my-notes")` is `context.data.myNotes`. A slug you
+compute at runtime, or one the schema does not declare, gets the untyped
+client.
 
 ## One function, without the registration
 
