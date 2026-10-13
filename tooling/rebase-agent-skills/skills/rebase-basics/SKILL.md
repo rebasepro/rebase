@@ -263,7 +263,10 @@ await rebase.close();
 - Opening changes nothing in the database and reads no environment variable.
   `withAuth` against a database no server has booted on fails rather than run
   unfiltered.
-- A write made this way records no entity history.
+- A write to a `history: true` collection records its history entry the way a
+  server write does: in the write's transaction, as whoever the write ran as.
+  On a database with no history table (no backend with history has booted on
+  it), those writes are refused with `HISTORY_UNAVAILABLE`. Reads still work.
 
 `rebase console` opens the same object in a Node REPL, with `rebase` and the
 project's `collections` in scope and top-level await. It finds the database the

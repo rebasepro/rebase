@@ -627,6 +627,16 @@
   than run unfiltered. From `@rebasepro/server-postgres`; see "Scripts and the
   Console".
 
+- **Writes through `openRebase` and `rebase console` record entity history.**
+  A write to a `history: true` collection gets its entry the way a server
+  write does: in the write's transaction, so a write that rolls back leaves no
+  entry, and as the identity it ran as (`service` for `dataAsAdmin`, the
+  user's `uid` under `withAuth`). Nothing is created for it. If the history
+  table or its `rebase.record_history` function is missing, writes to those
+  collections are refused with `HISTORY_UNAVAILABLE` before any callback runs,
+  and reads still work. A script prunes no entries, because retention is the
+  server's setting.
+
 - **`openPostgresDriver` and `postgresDriverConfigFromEnv` are the driver open
   and the boot's environment reading, as two public pieces.**
   `createPostgresAdapter` is one step above them, and `openPostgresDriver`
@@ -1517,7 +1527,9 @@
 
 - **A backend created with provision false no longer creates or migrates the
   auth tables, creates the history table and its function, or re-grants the
-  request role after the driver opens.**
+  request role after the driver opens.** On a database without the history
+  table, it refuses writes to `history: true` collections with
+  `HISTORY_UNAVAILABLE` before any callback runs.
 
 - **`readConnectionString` on the Postgres adapter config is honoured.** It
   was declared and ignored, and only `DATABASE_READ_URL` worked.

@@ -173,14 +173,35 @@ test("a user only sees their own posts", async () => {
 
 The same works under Vitest or Jest.
 
+### Collections with history
+
+<span class="since-badge" data-since="0.25">Since 0.25</span>
+
+A write to a collection with [`history: true`](/docs/backend/history/) records
+its entry the way a server write does. The entry is written in the row's own
+transaction, so a write that rolls back leaves no entry. It is recorded as the
+identity the write ran as: `service` for `dataAsAdmin`, the user's `uid` under
+`withAuth`. Writes from `rebase console` are recorded the same way.
+
+`openRebase` creates nothing to record into. If no backend with history has
+booted on the database, the `rebase.entity_history` table is missing. A write to
+a collection with history is then refused with
+[`HISTORY_UNAVAILABLE`](/docs/backend/errors/#data-queries-and-writes) before
+any of its callbacks run, and the message names what is missing. Reads work as
+usual. Boot the backend once with history on (`rebase dev` does), and the writes
+go through.
+
+Entries are recorded, never pruned. Retention is a server setting a script
+cannot see, so the server prunes them as usual: when it next writes the entity,
+and in its hourly sweep.
+
 ### What it leaves out
 
 <span class="since-badge" data-since="0.25">Since 0.25</span>
 
 `openRebase` opens the data layer and nothing else. It starts no realtime, so
-its writes are not announced to live queries. It attaches no history service,
-so a write to a collection with `history: true` records no history entry.
-Storage, email, auth administration and your functions are not on it.
+its writes are not announced to live queries. Storage, email, auth
+administration and your functions are not on it.
 
 When a script needs those too, build the backend without serving it:
 `createRebaseBackend({ …, provision: false })` gives you `backend.rebase`, the
