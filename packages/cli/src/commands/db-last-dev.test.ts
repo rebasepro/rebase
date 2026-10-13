@@ -83,6 +83,17 @@ describe("rebase db url, after rebase dev --docker", () => {
         expect(stderr.join("\n")).toContain("rebase dev --docker");
     });
 
+    it("says --docker is ignored when .env names a database, prints that one, and starts no container", async () => {
+        const mine = "postgresql://u:pw@localhost:5432/mine";
+        fs.writeFileSync(path.join(state.root, ".env"), `DATABASE_URL=${mine}\nDATABASE_PASSWORD=s3cret\n`);
+
+        await dbCommand("url", ["node", "rebase", "db", "url", "--docker"]);
+
+        expect(stdout).toEqual([mine]);
+        expect(stderr.join("\n")).toContain("--docker is ignored: DATABASE_URL in .env outranks it");
+        expect(ensureSpy).not.toHaveBeenCalled();
+    });
+
     it("goes back to the managed database once `rebase dev` runs without --docker", async () => {
         recordLastDevDatabase(state.root, "docker");
         recordLastDevDatabase(state.root, "managed");

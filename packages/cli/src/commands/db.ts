@@ -1103,19 +1103,20 @@ async function anonymizeTarget(
  */
 export async function ensureDockerDatabase(projectRoot: string, rawArgs: readonly string[]): Promise<void> {
     const { ensureDevDatabase } = await import("../utils/dev-preflight");
-    const { readEnvFile } = await import("../utils/project");
-    const { resolveComposeUrl, resolveProjectDatabase } = await import("../dev-db/prepare");
+    const { resolveProjectDatabase } = await import("../dev-db/prepare");
 
     // `--docker` on this command line, or on the last `rebase dev`: a command
     // that follows the remembered choice reaches the same container, so it has
     // to be up for the same reason. Only when that choice is the one that wins —
-    // a DATABASE_URL anywhere outranks it, and then there is nothing to start.
-    if (!rawArgs.includes("--docker")) {
-        const resolved = resolveProjectDatabase(projectRoot, { flagUrl: readFlagValue(rawArgs, "--database-url") });
-        if (resolved.kind !== "docker") return;
-    }
+    // a DATABASE_URL anywhere outranks it, typed flag or not, and then there is
+    // nothing to start: `prepareDatabaseEnv` says the flag was ignored.
+    const resolved = resolveProjectDatabase(projectRoot, {
+        flagUrl: readFlagValue(rawArgs, "--database-url"),
+        flagDocker: rawArgs.includes("--docker")
+    });
+    if (resolved.kind !== "docker") return;
 
-    const composeUrl = resolveComposeUrl(projectRoot, readEnvFile(projectRoot));
+    const composeUrl = resolved.url;
     if (!composeUrl) {
         // `prepareDatabaseEnv` raises the full message a moment later; saying
         // it twice would be worse than saying it once, in its own words.

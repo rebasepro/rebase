@@ -67,7 +67,11 @@ vi.mock("../dev-db/prepare", () => ({
     managedNotices: () => [],
     DEV_DATABASE_KIND_ENV: "REBASE_DEV_DATABASE_KIND",
     devDatabaseKind: () => "external" as const,
-    resolveProjectDatabase: () => ({ kind: "external" as const, url: PARENT_URL, source: "env-file" as const }),
+    // `--docker` wins, as it does on a stock scaffold, whose .env names no
+    // DATABASE_URL; without it the checkout's own database does.
+    resolveProjectDatabase: (_root: string, options?: { flagDocker?: boolean }) => options?.flagDocker
+        ? { kind: "docker" as const, source: "docker" as const, url: composeUrl }
+        : { kind: "external" as const, url: PARENT_URL, source: "env-file" as const },
     resolveActiveBranch: () => null,
     resolveComposeUrl: () => composeUrl
 }));

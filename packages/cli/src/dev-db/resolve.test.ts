@@ -11,7 +11,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { describeDevDatabase, resolveDevDatabase } from "./resolve";
+import { describeDevDatabase, outrankedDockerFlagNotice, resolveDevDatabase } from "./resolve";
 
 const URL_A = "postgresql://user:pw@staging.example.com:5432/app";
 const URL_B = "postgresql://user:pw@localhost:5433/other";
@@ -114,6 +114,54 @@ describe("resolveDevDatabase", () => {
                 source: "environment"
             });
         });
+    });
+});
+
+/**
+ * A `--docker` typed on the command line and then outranked says so.
+ *
+ * The order is documented and stays as it is, but a flag that changes nothing
+ * without a word reads as a flag that works: `rebase dev --docker` printed
+ * "your database (DATABASE_URL in .env)" and `rebase db url --docker` printed
+ * the `.env` URL, and neither mentioned the flag at all.
+ */
+describe("outrankedDockerFlagNotice", () => {
+    const COMPOSE_URL = "postgresql://rebase_app:pw@127.0.0.1:5435/rebase?sslmode=disable";
+    const notice = (input: Parameters<typeof resolveDevDatabase>[0]) =>
+        outrankedDockerFlagNotice(resolveDevDatabase(input), input?.flagDocker);
+
+    it("names DATABASE_URL in .env, and how to reach Docker instead", () => {
+        expect(notice({ flagDocker: true, envFile: { DATABASE_URL: URL_B }, composeUrl: COMPOSE_URL })).toBe(
+            "--docker is ignored: DATABASE_URL in .env outranks it. Comment that line out to use Postgres in Docker."
+        );
+    });
+
+    it("names DATABASE_URL in the shell", () => {
+        expect(notice({ flagDocker: true, env: { DATABASE_URL: URL_A }, composeUrl: COMPOSE_URL }))
+            .toMatch(/^--docker is ignored: DATABASE_URL in the environment outranks it\. Unset it/);
+    });
+
+    it("names --database-url", () => {
+        expect(notice({ flagDocker: true, flagUrl: URL_A, composeUrl: COMPOSE_URL }))
+            .toMatch(/^--docker is ignored: --database-url outranks it\./);
+    });
+
+    it("names the branch this checkout is switched to", () => {
+        expect(notice({ flagDocker: true, branch: { name: "feat", url: URL_B }, envFile: { DATABASE_URL: URL_A } }))
+            .toMatch(/^--docker is ignored: branch "feat" \(rebase db branch switch\) outranks it\./);
+    });
+
+    it("is one line", () => {
+        expect(notice({ flagDocker: true, envFile: { DATABASE_URL: URL_B } })).not.toContain("\n");
+    });
+
+    it("says nothing when --docker is what was used", () => {
+        expect(notice({ flagDocker: true, composeUrl: COMPOSE_URL })).toBeNull();
+    });
+
+    it("says nothing when --docker was not typed, whatever the last `rebase dev` did", () => {
+        expect(notice({ lastDevDocker: true, envFile: { DATABASE_URL: URL_B }, composeUrl: COMPOSE_URL })).toBeNull();
+        expect(notice({ envFile: { DATABASE_URL: URL_B } })).toBeNull();
     });
 });
 

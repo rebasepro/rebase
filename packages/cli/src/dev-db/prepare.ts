@@ -29,7 +29,7 @@ import { branchUrl, databaseNameOf, readActiveBranch } from "./branch-pointer";
 import { readLastDevDocker } from "./last-dev-database";
 import { MANAGED_LIMITATIONS, MANAGED_POOL_MAX } from "./constraints";
 import { ensureManagedDatabase } from "./daemon";
-import { type DevDatabase, describeDevDatabase, resolveDevDatabase } from "./resolve";
+import { type DevDatabase, describeDevDatabase, outrankedDockerFlagNotice, resolveDevDatabase } from "./resolve";
 
 export interface PrepareOptions {
     /** `--database-url <url>`. */
@@ -113,9 +113,10 @@ export function resolveActiveBranch(
  * The compose `db` service's connection string for this project, or null.
  *
  * Read here rather than in `resolve.ts` so the ordering there stays pure, and
- * exported so `rebase dev` can hand the same URL to the preflight that starts
- * the container — the preflight decides "local, and not running" from a DSN,
- * so without one `--docker` asked for a container nothing ever started.
+ * exported for the commands that feed the resolver themselves (`rebase status`,
+ * `db branch switch`). The preflight that starts the container takes the URL
+ * from {@link resolveProjectDatabase}, so it starts one only when the order
+ * picks Docker.
  */
 export function resolveComposeUrl(projectRoot: string, envFile: Record<string, string>): string | null {
     const composePath = path.join(projectRoot, "docker-compose.yml");
@@ -209,6 +210,11 @@ export async function prepareDatabaseEnv(
     const database = resolveProjectDatabase(projectRoot, options);
 
     const description = describeDevDatabase(database);
+
+    // Said even on a quiet command: `rebase db url --docker` is quiet, and its
+    // progress goes to stderr, which is where a flag it did not follow belongs.
+    const outranked = outrankedDockerFlagNotice(database, options.flagDocker);
+    if (outranked) options.onProgress?.(outranked);
 
     if (database.kind === "external" && (database.source === "branch" || database.source === "flag")) {
         // The two external cases that MUST be exported. `environment` and

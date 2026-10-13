@@ -160,6 +160,32 @@ export function resolveDevDatabase(input: ResolveDevDatabaseInput = {}): DevData
     return { kind: "managed", source: "managed" };
 }
 
+/**
+ * The line to print when `--docker` was typed and a connection string outranked
+ * it, or null when it was not typed or was what this command used.
+ *
+ * The order stays as documented: asking for Docker says how to get a database,
+ * and a `DATABASE_URL` that already names one wins. But a flag on this command
+ * line that changes nothing without a word reads as a flag that worked. Only the
+ * typed flag is reported — the last `rebase dev --docker` standing in for it is
+ * a default, and losing to `.env` is what a default does.
+ */
+export function outrankedDockerFlagNotice(database: DevDatabase, flagDocker: boolean | undefined): string | null {
+    if (!flagDocker || database.kind !== "external") return null;
+    const ignored = "--docker is ignored:";
+    switch (database.source) {
+        case "flag":
+            return `${ignored} --database-url outranks it.`;
+        case "environment":
+            return `${ignored} DATABASE_URL in the environment outranks it. Unset it to use Postgres in Docker.`;
+        case "branch":
+            return `${ignored} branch "${database.branch}" (rebase db branch switch) outranks it. ` +
+                "`rebase db branch switch --off` returns to the database in .env.";
+        case "env-file":
+            return `${ignored} DATABASE_URL in .env outranks it. Comment that line out to use Postgres in Docker.`;
+    }
+}
+
 /** One line for the startup banner, naming both the database and why. */
 export function describeDevDatabase(database: DevDatabase): string {
     switch (database.kind) {

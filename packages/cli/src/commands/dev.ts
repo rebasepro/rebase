@@ -28,7 +28,7 @@ import {
     DEV_DATABASE_KIND_ENV,
     managedNotices,
     prepareDatabaseEnv,
-    resolveComposeUrl,
+    resolveProjectDatabase,
     type PreparedDatabase
 } from "../dev-db/prepare";
 import { resolveCliEntry, resolveSpawn } from "../dev-db/daemon";
@@ -52,7 +52,6 @@ import {
     findBackendDir,
     findFrontendDir,
     findEnvFile,
-    readEnvFile,
     resolveTsx,
     validateTsxInstallation,
     getActiveBackendPlugin,
@@ -1239,7 +1238,18 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
      * which is the failure the flag exists to produce.
      */
     let prepared: PreparedDatabase | null = null;
+    const flagUrl = typeof args["--database-url"] === "string" ? args["--database-url"] : null;
     if (!frontendOnly) {
+        // `--docker` names a container, not a connection string, and the
+        // preflight is what starts it — but only when the order picks Docker. A
+        // DATABASE_URL outranks the flag, and the preflight used to start the
+        // container and push the schema into it while the backend ran elsewhere.
+        // Pure, so deciding costs nothing; `prepareDatabaseEnv` reaches the same
+        // answer and says the flag was ignored.
+        const resolved = args["--docker"]
+            ? resolveProjectDatabase(projectRoot, { flagUrl, flagDocker: true, followLastDev: false })
+            : null;
+        const dockerUrl = resolved?.kind === "docker" ? resolved.url ?? undefined : undefined;
         ({ schemaGeneration, database: prepared } = await overlapDevStartup({
             // Side by side: they read the same collections and write different
             // files, so the SDK costs nothing on top of the schema.
@@ -1247,16 +1257,11 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
             preflight: () => runDatabasePreflight({
                 projectRoot,
                 disabled: noDb,
-                // `--docker` names a container, not a connection string, and the
-                // preflight is what starts it. Derived from the compose file so the
-                // two halves agree on which database "the docker one" is.
-                databaseUrl: args["--docker"]
-                    ? resolveComposeUrl(projectRoot, readEnvFile(projectRoot)) ?? undefined
-                    : undefined
+                databaseUrl: dockerUrl
             }),
             database: startsBackend && !noDb
                 ? async () => prepareDatabaseEnv(projectRoot, {
-                    flagUrl: typeof args["--database-url"] === "string" ? args["--database-url"] : null,
+                    flagUrl,
                     flagDocker: Boolean(args["--docker"]),
                     // This run's flags are the choice; the record below is
                     // what the other commands follow.
@@ -2109,7 +2114,8 @@ ${chalk.green.bold("Which database")}
   starting the container if nothing is listening on its port, and pushing
   the schema when this command is what started it. Its connection string
   is derived from the compose file and ${chalk.gray("DATABASE_PASSWORD")} in .env — the same
-  string .env carries, commented out, as ${chalk.gray("DATABASE_URL")}.
+  string .env carries, commented out, as ${chalk.gray("DATABASE_URL")}. Any of 1–4
+  outranks it, and then nothing is started and a line says ${chalk.blue("--docker")} was ignored.
 
   The choice is remembered: after ${chalk.blue("rebase dev --docker")}, ${chalk.cyan("rebase db url")}, ${chalk.cyan("db push")},
   ${chalk.cyan("console")} and the rest use the Docker database too, at rule 5. The next

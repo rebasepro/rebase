@@ -135,6 +135,30 @@ describe("an explicit database", () => {
         expect(fs.existsSync(path.join(root, ".rebase"))).toBe(false);
     });
 
+    it("says --docker is ignored when DATABASE_URL in .env outranks it, and uses that one", async () => {
+        writeComposeFile();
+        writeEnvFile("DATABASE_URL=postgresql://u:pw@localhost:5432/mine\nDATABASE_PASSWORD=s3cret\n");
+        const progress: string[] = [];
+
+        const prepared = await prepareDatabaseEnv(root, { flagDocker: true, onProgress: line => progress.push(line) });
+
+        expect(prepared.database).toMatchObject({ kind: "external", source: "env-file" });
+        expect(prepared.env).toEqual({});
+        expect(progress).toEqual([
+            "--docker is ignored: DATABASE_URL in .env outranks it. Comment that line out to use Postgres in Docker."
+        ]);
+    });
+
+    it("says it on a quiet command too, which is how `rebase db url` asks", async () => {
+        writeComposeFile();
+        writeEnvFile("DATABASE_URL=postgresql://u:pw@localhost:5432/mine\n");
+        const progress: string[] = [];
+
+        await prepareDatabaseEnv(root, { flagDocker: true, quiet: true, onProgress: line => progress.push(line) });
+
+        expect(progress.join("\n")).toContain("--docker is ignored");
+    });
+
     it("refuses --docker when there is no compose db service to reach", async () => {
         await expect(prepareDatabaseEnv(root, { flagDocker: true }))
             .rejects.toThrow(/--docker needs a docker-compose\.yml/);

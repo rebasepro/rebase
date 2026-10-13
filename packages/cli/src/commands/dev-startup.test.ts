@@ -39,6 +39,8 @@ let generation = deferred<void>();
 type PrepareCall = { additionalKeys?: readonly string[]; followLastDev?: boolean };
 const prepareDatabaseEnv = vi.fn<(root: string, options: PrepareCall) => Promise<PreparedDatabase>>();
 const runDriverSchemaCommand = vi.fn<(argv: string[], options?: { quiet?: boolean }) => Promise<void>>();
+/** The DSN each `--docker` preflight decided from. */
+const preflightUrls: Array<string | undefined> = [];
 
 vi.mock("../utils/project", async importOriginal => {
     const actual = await importOriginal<typeof import("../utils/project")>();
@@ -74,7 +76,10 @@ vi.mock("../utils/dev-preflight", async importOriginal => {
         // Only what a test says is busy: the pinned port is free, and the
         // liveness poll never runs long enough to matter.
         probeTcp: async (_host: string, port: number) => busyPorts.has(port),
-        ensureDevDatabase: async () => ({ action: "no-dsn" as const })
+        ensureDevDatabase: async (options: { databaseUrl?: string }) => {
+            preflightUrls.push(options.databaseUrl);
+            return { action: "no-dsn" as const };
+        }
     };
 });
 
@@ -284,6 +289,65 @@ describe("rebase dev's start-up", () => {
         expect(fs.existsSync(record)).toBe(false);
         expect(logged.mock.calls.map(call => call.map(String).join(" ")).join("\n"))
             .toContain("The last `rebase dev` ran on Postgres in Docker");
+    });
+
+    it("starts and pushes to no container when a DATABASE_URL outranks --docker", async () => {
+        // The backend runs on the DATABASE_URL; the preflight used to start the
+        // compose container anyway and push the schema into it, because it was
+        // handed the compose URL whenever --docker was typed.
+        fs.writeFileSync(path.join(scratch, "docker-compose.yml"), [
+            "services:",
+            "  db:",
+            "    environment:",
+            "      POSTGRES_USER: rebase_app",
+            "      POSTGRES_PASSWORD: pw",
+            "      POSTGRES_DB: rebase",
+            "    ports:",
+            "      - \"5435:5432\"",
+            ""
+        ].join("\n"));
+        vi.stubEnv("DATABASE_URL", "postgresql://u:pw@staging.example.com:5432/app");
+        preflightUrls.length = 0;
+        try {
+            const run = devCommand(["node", "rebase", "dev", "--backend-only", "--docker", "--port", "45127"]);
+            generation.resolve();
+            await vi.waitFor(() => expect(spawned.some(s => s.file === "/bin/true")).toBe(true));
+            for (const child of spawned) child.end();
+            await run;
+        } finally {
+            vi.unstubAllEnvs();
+        }
+
+        expect(preflightUrls).toHaveLength(1);
+        expect(preflightUrls[0] ?? "").not.toContain(":5435/");
+    });
+
+    it("hands the --docker preflight the compose URL when Docker is what it runs on", async () => {
+        fs.writeFileSync(path.join(scratch, "docker-compose.yml"), [
+            "services:",
+            "  db:",
+            "    environment:",
+            "      POSTGRES_USER: rebase_app",
+            "      POSTGRES_PASSWORD: pw",
+            "      POSTGRES_DB: rebase",
+            "    ports:",
+            "      - \"5435:5432\"",
+            ""
+        ].join("\n"));
+        const shell = process.env.DATABASE_URL;
+        delete process.env.DATABASE_URL;
+        preflightUrls.length = 0;
+        try {
+            const run = devCommand(["node", "rebase", "dev", "--backend-only", "--docker", "--port", "45128"]);
+            generation.resolve();
+            await vi.waitFor(() => expect(spawned.some(s => s.file === "/bin/true")).toBe(true));
+            for (const child of spawned) child.end();
+            await run;
+        } finally {
+            if (shell !== undefined) process.env.DATABASE_URL = shell;
+        }
+
+        expect(preflightUrls).toEqual([expect.stringContaining("@127.0.0.1:5435/rebase")]);
     });
 
     it("starts no database under --no-db, and still generates", async () => {
