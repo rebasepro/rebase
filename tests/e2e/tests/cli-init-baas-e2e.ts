@@ -11,6 +11,7 @@
  */
 import * as fs from "fs";
 import * as path from "path";
+import { spawnSync } from "child_process";
 
 import {
     execa,
@@ -173,6 +174,21 @@ async function run() {
         const reactInstalled = fs.existsSync(path.join(projectPath, "node_modules", "react"))
             || fs.existsSync(path.join(projectPath, "backend", "node_modules", "react"));
         check("no react in the install tree", !reactInstalled);
+
+        // Every workspace compiles itself, with the tsconfig and dependencies
+        // it was scaffolded with. `config/` could not: its tsconfig pins
+        // `types: ["node"]`, the overlay's package.json declared no
+        // `@types/node`, and `tsc` stopped on TS2688 one command after init.
+        // The root compiles `scripts/`.
+        for (const dir of [".", "config", "backend"]) {
+            const tsc = spawnSync("pnpm", ["exec", "tsc", "--noEmit"], {
+                cwd: path.join(projectPath, dir),
+                env: cleanEnv,
+                encoding: "utf8"
+            });
+            check(`${dir === "." ? "the project root" : `${dir}/`} typechecks on its own`, tsc.status === 0,
+                `${tsc.stdout}${tsc.stderr}`.trim().split("\n").slice(0, 3).join(" | "));
+        }
 
         // ── 4. Seed a schema the project has never seen ──────────────────
         console.log("\n🌱 Step 4: Creating tables the project was never told about...");

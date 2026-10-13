@@ -22,6 +22,7 @@
     "devDependencies": {
         "@rebasepro/cli": "workspace:*",
         "@rebasepro/types": "workspace:*",
+        "@types/node": "^22.19.4",
         "tsx": "^4.20.6",
         "typescript": "^6.0.3"
     },

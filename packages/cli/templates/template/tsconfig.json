@@ -1,0 +1,25 @@
+{
+  // The project root's own program: `scripts/`, which no workspace compiles.
+  //
+  // frontend/, backend/ and config/ each typecheck on their own, with the
+  // tsconfig in that folder — `cd backend && tsc --noEmit` — and this file
+  // does not reach into them: it would compile their code under options that
+  // are not theirs. Without it, `tsc --noEmit` here printed tsc's help and
+  // exited 0, which reads as a passing check of nothing.
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    // Pinned, as every workspace's tsconfig is: unset, tsc sweeps every
+    // `node_modules/@types` it can reach, the pnpm virtual store included.
+    "types": ["node"]
+  },
+  "include": ["scripts/**/*"]
+}

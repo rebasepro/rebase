@@ -147,6 +147,19 @@ describe("the documented first run", () => {
         expect(read.rows.map((r: { title: string }) => r.title)).toContain("Hello from the first run");
     });
 
+    it("typechecks at the project root, and in config/ and backend/ on their own", async () => {
+        // The root had no tsconfig, so `tsc --noEmit` there printed tsc's help
+        // and exited 0 — a green check of nothing, while `scripts/` was in no
+        // program at all. It now compiles `scripts/`, and fails on a type error
+        // there. Each workspace compiles itself with its own tsconfig.
+        for (const dir of [".", "config", "backend"]) {
+            const tsc = await execa("pnpm", ["exec", "tsc", "--noEmit"], { cwd: path.join(projectDir, dir), env, reject: false });
+            expect(tsc.exitCode, `${dir}: ${tsc.stdout}${tsc.stderr}`).toBe(0);
+        }
+        const listed = await execa("pnpm", ["exec", "tsc", "--noEmit", "--listFilesOnly"], { cwd: projectDir, env });
+        expect(listed.stdout).toContain(path.join("scripts", "example.ts"));
+    });
+
     it("hands the first registered account the admin role, as the quickstart says", () => {
         // The precondition the rule rests on: an empty user table when the
         // reader arrives. Asserting the role alone would still pass if some

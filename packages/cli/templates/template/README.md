@@ -81,11 +81,17 @@ docker compose up -d db
 │   └── src/            # Generated database schema
 ├── config/             # Shared collection definitions
 │   └── collections/    # Schema-as-Code TypeScript files
+├── scripts/            # Scripts that call the API, e.g. example.ts
 ├── rebase.json         # Which apps this repository contains
 ├── docker-compose.yml  # Self-hosting stack (Postgres + the Rebase runtime)
 ├── .env.example        # Environment variable reference
+├── tsconfig.json       # Typechecks scripts/ only
 └── package.json        # Root workspace config
 ```
+
+Each workspace typechecks on its own, with its own `tsconfig.json`:
+`cd backend && npx tsc --noEmit`, and the same in `config/` and `frontend/`.
+`tsc --noEmit` at the root checks `scripts/`.
 
 There is no Dockerfile, and that is deliberate: `rebase build` produces a
 **bundle** — your compiled collections, functions, crons and admin assets — and
