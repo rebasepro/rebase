@@ -17,6 +17,7 @@ import {
     type CommentRow,
     type EnumValue,
     type ForeignKeyRow,
+    type PolicyRow,
     type PrimaryKeyRow,
     type SchemaMetadata,
     type TableColumn,
@@ -129,6 +130,20 @@ export function comment(table: string, columnName: string | null, text: string):
     return { table_name: table, column_name: columnName, comment: text };
 }
 
+/** A row-level security policy as `pg_policies` reports it; `FOR ALL TO public`, permissive, unless overridden. */
+export function rlsPolicy(table: string, name: string, overrides: Partial<PolicyRow> = {}): PolicyRow {
+    return {
+        table_name: table,
+        policy_name: name,
+        permissive: "PERMISSIVE",
+        roles: ["public"],
+        cmd: "ALL",
+        qual: null,
+        with_check: null,
+        ...overrides
+    };
+}
+
 export interface TableSpec {
     name: string;
     columns: TableColumn[];
@@ -143,6 +158,7 @@ export interface SchemaSpec {
     comments?: CommentRow[];
     enumValues?: EnumValue[];
     rowCounts?: Record<string, number>;
+    policies?: PolicyRow[];
 }
 
 /** Assembles a `SchemaMetadata` plus the table map every entry point wants. */
@@ -165,6 +181,7 @@ export function buildSchema(spec: SchemaSpec): LoadedSchema {
         uniques: spec.uniques ?? [],
         checks: spec.checks ?? [],
         comments: spec.comments ?? [],
+        ...(spec.policies && { policies: spec.policies }),
         rowCounts: spec.rowCounts ?? {}
     };
 

@@ -7,6 +7,7 @@
  * and consumed directly by tests.
  */
 import { firstFreeKey, toPostgresIdentifier, toWireKey } from "@rebasepro/utils";
+import { getGeneratedPolicyNames, policyToSecurityRule } from "@rebasepro/common";
 import { inferPropertyFromData } from "./introspect-db-inference";
 import { humanize } from "./introspect-db-naming";
 import { mapPgType } from "./introspect-db-types";
@@ -110,6 +111,22 @@ export interface CommentRow {
     comment: string;
 }
 
+/** A row-level security policy, as `pg_policies` reports it. */
+export interface PolicyRow {
+    table_name: string;
+    policy_name: string;
+    /** `PERMISSIVE` or `RESTRICTIVE`. */
+    permissive: string;
+    /** The `TO` list: database roles, `public` for every role. */
+    roles: string[];
+    /** `SELECT`, `INSERT`, `UPDATE`, `DELETE` or `ALL`. */
+    cmd: string;
+    /** The `USING` expression, as Postgres renders it back. */
+    qual: string | null;
+    /** The `WITH CHECK` expression, as Postgres renders it back. */
+    with_check: string | null;
+}
+
 /**
  * Everything one introspection run reads from the database.
  *
@@ -134,6 +151,11 @@ export interface SchemaMetadata {
     indexes?: IndexRow[];
     checks: CheckConstraintRow[];
     comments: CommentRow[];
+    /**
+     * The row-level security policies on the introspected tables. Absent when
+     * the caller did not read them, and then no collection is given rules.
+     */
+    policies?: PolicyRow[];
     /**
      * Row counts for the tables that needed one, capped — see `countRowsUpTo`.
      * Absent for every table introspection never had a reason to count.
@@ -706,6 +728,60 @@ export interface GenerationContext {
      * does not resolve.
      */
     skippedTables?: ReadonlySet<string>;
+}
+
+/**
+ * The table's row-level security policies, as the collection's `securityRules`.
+ *
+ * A table's policies are its access model, and a collection that describes
+ * none leaves every one of them an "orphan": `doctor` fails on it, every push
+ * warns about it, and a push drops one whose name has the shape an unnamed
+ * rule compiles to (`<table>_<op>_<hash>`, which is every rule on a database
+ * Rebase built). Described here, each is recreated from its rule as it was.
+ *
+ * Read back with `policyToSecurityRule` — what Studio's "Import from table"
+ * and "Import to codebase" use — so the `TO` list, the mode and both clauses
+ * come back as they are. The framework's own defaults
+ * (`<table>_default_admin_read` and friends) are left out: every collection is
+ * given them anyway, and described twice they would be written twice.
+ */
+function renderSecurityRules(tableName: string, policies: readonly PolicyRow[]): string {
+    const injected = getGeneratedPolicyNames({ name: tableName, slug: tableName, table: tableName, properties: {} });
+    const own = policies.filter((policy) => policy.table_name === tableName && !injected.has(policy.policy_name));
+    if (own.length === 0) return "";
+
+    const rules = own.map((policy) => {
+        const rule = policyToSecurityRule({
+            policyname: policy.policy_name,
+            cmd: toPolicyCommand(policy.cmd),
+            permissive: policy.permissive.toUpperCase() === "RESTRICTIVE" ? "RESTRICTIVE" : "PERMISSIVE",
+            roles: policy.roles,
+            qual: policy.qual,
+            with_check: policy.with_check
+        });
+        const fields = Object.entries(rule).map(([key, value]) => {
+            const rendered = Array.isArray(value)
+                ? `[${value.map((item) => quote(String(item))).join(", ")}]`
+                : quote(String(value));
+            return `            ${key}: ${rendered}`;
+        });
+        return `\n        {\n${fields.join(",\n")}\n        },`;
+    });
+    return "\n    // The table's row-level security policies, read from the database. `rebase db push`" +
+        "\n    // recreates each from its rule, so a policy is changed here from now on." +
+        `\n    securityRules: [${rules.join("")}\n    ],`;
+}
+
+/** `pg_policies.cmd`, narrowed to the commands a policy can have. */
+function toPolicyCommand(cmd: string): "SELECT" | "INSERT" | "UPDATE" | "DELETE" | "ALL" | undefined {
+    switch (cmd.toUpperCase()) {
+        case "SELECT": return "SELECT";
+        case "INSERT": return "INSERT";
+        case "UPDATE": return "UPDATE";
+        case "DELETE": return "DELETE";
+        case "ALL": return "ALL";
+        default: return undefined;
+    }
 }
 
 /** Adds entries to a property's `validation` block, creating it if absent. */
@@ -1469,6 +1545,8 @@ export function generateCollectionFile(
         ? `\n    relations: [${relationsOutput}\n    ],`
         : "";
 
+    const securityRulesBlock = renderSecurityRules(tableName, context.metadata?.policies ?? []);
+
     const sortedPropertiesOrder = sortPropertiesOrder(orderEntries);
     for (const key of sortedPropertiesOrder) {
         propsOutput += propertyBlocks.get(key) || "";
@@ -1555,7 +1633,7 @@ export function generateCollectionFile(
     // decision the reader may disagree with. Naming the evidence tells them
     // which line to delete when they do.
     const classificationNote = classification && classification.role !== "entity"
-        ? `\n// Introspected as a ${commentText(classification.role)}: ${commentText(classification.reason)}.\n`
+        ? `\n// Introspected as ${/^[aeiou]/.test(classification.role) ? "an" : "a"} ${commentText(classification.role)}: ${commentText(classification.reason)}.\n`
         : "";
 
     // What `rebase db push` would change, said where the reader looks first.
@@ -1589,7 +1667,7 @@ ${open}
     slug: ${quote(tableName)},
     table: ${quote(tableName)},${schemaBlock}${descriptionBlock}${searchBlock}
     properties: {${propsOutput}
-    },${relationsBlock}${adminBlock}
+    },${relationsBlock}${securityRulesBlock}${adminBlock}
 ${close}
 
 export default ${collectionVarName};

@@ -468,9 +468,24 @@ export function formatPolicyDrift(drift: PolicyDrift): string {
         lines.push("    Run `rebase db push` to apply them.");
     }
     if (drift.orphaned.length > 0) {
+        // Two different things share this list, and they want opposite
+        // advice. A name of the shape an unnamed rule compiles to is a rule
+        // edited since: the next push drops it. Any other name was written by
+        // hand or by another tool, and may be the table's whole access model —
+        // "left behind by an earlier push" was false of it, and telling its
+        // author to drop it would take that access away.
+        const superseded = drift.orphaned.filter((p) => isGeneratedPolicyName(p.name, p.table));
+        const unowned = drift.orphaned.filter((p) => !isGeneratedPolicyName(p.name, p.table));
         lines.push("  Orphaned — in the database, described by no collection:");
         for (const p of drift.orphaned) lines.push(`    • ${p.schema}.${p.table} → "${p.name}" (${p.command} TO ${p.roles.join(", ")})`);
-        lines.push("    Left behind by an earlier push. These still filter rows.");
+        if (superseded.length > 0) {
+            lines.push(`    ${superseded.map((p) => `"${p.name}"`).join(", ")}: left behind by an earlier push, when its rule changed. The next \`rebase db push\` drops it.`);
+        }
+        if (unowned.length > 0) {
+            lines.push(`    ${unowned.map((p) => `"${p.name}"`).join(", ")}: written by hand or by another tool, and still in force.`);
+            lines.push("    To keep one, describe it in its collection's `securityRules` (Studio's RLS view imports it);");
+            lines.push("    if it is stale, drop it by hand.");
+        }
     }
     if (drift.diverged.length > 0) {
         lines.push("  Diverged — same policy, different definition:");

@@ -1314,7 +1314,8 @@ async function reconcilePolicies(databaseUrl: string, collectionsPath: string): 
                 for (const p of kept) {
                     outWarn(chalk.yellow(`       • ${p.schema}.${p.table} → "${p.name}" (${p.command} TO ${p.roles.join(", ")})`));
                 }
-                outWarn(chalk.yellow("       These still grant access. Drop them by hand if they are stale."));
+                outWarn(chalk.yellow("       Each is still in force. To keep one, describe it in its collection's `securityRules`"));
+                outWarn(chalk.yellow("       (Studio's RLS view imports it); if it is stale, drop it by hand."));
             }
 
             // Missing/diverged are not push's to fix, but staying silent about

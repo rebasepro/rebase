@@ -312,7 +312,7 @@ describe("properties generated from a schema that declares constraints", () => {
     it("files a cascading child under its parent", () => {
         const child = shapes.files.get("constraint_shapes_child")!;
         expect(child).toContain("hideFromNavigation: true");
-        expect(child).toContain("Introspected as a owned-child");
+        expect(child).toContain("Introspected as an owned-child");
         expect(child).toContain("ON DELETE CASCADE");
     });
 });
@@ -444,7 +444,7 @@ describe("a required enum column", () => {
 describe("the classification note", () => {
     it("states the role and the evidence for a non-entity", () => {
         const details = northwind.files.get("order_details")!;
-        expect(details).toContain("// Introspected as a owned-child:");
+        expect(details).toContain("// Introspected as an owned-child:");
         expect(details).toContain("primary key made only of foreign keys");
     });
 

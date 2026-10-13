@@ -363,6 +363,44 @@ function classifyJunction(table: string, context: AnalysisContext): TableClassif
 }
 
 /**
+ * A policy expression that reads who is asking: the `app.uid` setting every
+ * request runs with, `rebase.uid()` (or the retired `auth.uid()`), the JWT,
+ * or the session's own role.
+ */
+const CALLER_IDENTITY = /current_setting\(\s*'app\.(uid|user_id|jwt)'|\b(rebase|auth)\.(uid|jwt)\s*\(|\bcurrent_user\b|\bsession_user\b/i;
+
+/**
+ * The tables whose row-level security hands each caller rows of their own,
+ * with the policies that do it.
+ *
+ * Structure in the sense this module means: a policy is a rule the database
+ * enforces, and one that compares a row to the caller's identity says the rows
+ * belong to users. That is the app's data. A young database holds three
+ * customers and one order; by row count the customers are "a 3-row code list"
+ * and the orders a child reached only through them, and both go missing from
+ * the navigation of the app that owns them.
+ */
+function callerScopedTables(metadata: SchemaMetadata): Map<string, string[]> {
+    const scoped = new Map<string, string[]>();
+    for (const policy of metadata.policies ?? []) {
+        if (!CALLER_IDENTITY.test(policy.qual ?? "") && !CALLER_IDENTITY.test(policy.with_check ?? "")) continue;
+        scoped.set(policy.table_name, [...(scoped.get(policy.table_name) ?? []), policy.policy_name]);
+    }
+    return scoped;
+}
+
+/** An entity because its policies give each user their own rows — see {@link callerScopedTables}. */
+function classifyCallerScoped(table: string, perCaller: Map<string, string[]>): TableClassification | null {
+    const policies = perCaller.get(table);
+    if (!policies) return null;
+    return {
+        table,
+        role: "entity",
+        reason: `its row-level security gives each user their own rows (${policies.join(", ")}), so they are the app's data`
+    };
+}
+
+/**
  * A small, referenced, self-contained code list.
  *
  * Requires: something references it, it references nothing, it carries few and
@@ -518,10 +556,12 @@ export function classifyTables(
 ): Map<string, TableClassification> {
     const context = buildContext(metadata, tables);
     const result = new Map<string, TableClassification>();
+    const perCaller = callerScopedTables(metadata);
 
     for (const table of tables.keys()) {
         const classification =
             classifyJunction(table, context) ??
+            classifyCallerScoped(table, perCaller) ??
             classifyLookup(table, context) ??
             classifyOwnedChild(table, context) ?? {
                 table,

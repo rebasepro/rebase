@@ -19,6 +19,7 @@ import type {
     IndexRow,
     CheckConstraintRow,
     CommentRow,
+    PolicyRow,
     SchemaMetadata
 } from "./introspect-db-logic";
 
@@ -328,6 +329,27 @@ export const COMMENTS_QUERY = `
 `;
 
 /**
+ * Every row-level security policy in the schema, as `pg_policies` reports it.
+ *
+ * A table's policies are its access model. Introspection that leaves them out
+ * generates collections describing no rules, and the database's own policies
+ * then read as orphans: `doctor` fails on them, and a `db push` drops any
+ * whose name has the shape an unnamed rule compiles to.
+ */
+export const POLICIES_QUERY = `
+    SELECT tablename AS table_name,
+           policyname AS policy_name,
+           permissive,
+           roles,
+           cmd,
+           qual,
+           with_check
+    FROM pg_policies
+    WHERE schemaname = $1
+    ORDER BY tablename, policyname
+`;
+
+/**
  * Counts a table's rows, stopping once the answer can only be "more than
  * `limit`".
  *
@@ -376,6 +398,7 @@ export async function readSchemaMetadata(
     const indexes = await client.query<IndexRow>(INDEXES_QUERY, [schema]);
     const checks = await client.query<CheckConstraintRow>(CHECK_CONSTRAINTS_QUERY, [schema]);
     const comments = await client.query<CommentRow>(COMMENTS_QUERY, [schema]);
+    const policies = await client.query<PolicyRow>(POLICIES_QUERY, [schema]);
 
     // A column list scoped to the schema still names tables this run excludes —
     // views, partitions, the drizzle bookkeeping tables. Narrow every row set to
@@ -398,6 +421,13 @@ export async function readSchemaMetadata(
         indexes: scoped(indexes.rows),
         checks: scoped(checks.rows),
         comments: scoped(comments.rows),
+        policies: scoped(policies.rows).map((policy) => ({
+            ...policy,
+            // node-postgres yields `name[]` as an array; some drivers hand back "{a,b}".
+            roles: Array.isArray(policy.roles)
+                ? policy.roles
+                : String(policy.roles ?? "").replace(/^\{|\}$/g, "").split(",").filter(Boolean)
+        })),
         rowCounts: {}
     };
 }
