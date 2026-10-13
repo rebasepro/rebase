@@ -227,7 +227,7 @@ describe("building a backend does nothing on its own", () => {
         expect(typeof backend.rebase.sql).toBe("function");
         expect(backend.rebase.email.isConfigured()).toBe(false);
         // The control plane reaches this backend's own routes in-process.
-        const invoked = await backend.rebase.functions.invoke<{ user: string | null }>("whoami", undefined, { method: "GET" });
+        const invoked = await backend.rebase.functions?.invoke<{ user: string | null }>("whoami", undefined, { method: "GET" });
         expect(invoked).toMatchObject({ user: "service" });
     });
 });

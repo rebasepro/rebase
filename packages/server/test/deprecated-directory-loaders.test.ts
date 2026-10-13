@@ -22,7 +22,7 @@ import { requireImporter } from "./helpers/require-importer";
 const FUNCTIONS_DIR = path.join(__dirname, "fixtures", "functions");
 const CRONS_DIR = path.join(__dirname, "fixtures", "crons");
 
-let warn: ReturnType<typeof jest.spyOn>;
+let warn: jest.SpiedFunction<typeof console.warn>;
 
 beforeEach(() => {
     resetDeprecationWarningsForTests();

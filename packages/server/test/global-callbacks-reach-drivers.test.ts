@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import type { CollectionCallbacks, CollectionConfig, DatabaseAdapter } from "@rebasepro/types";
-import { CollectionRegistry } from "@rebasepro/common";
+import { jest } from "@jest/globals";
+import { CollectionRegistry, composeCallbacks } from "@rebasepro/common";
 
 import { initializeRebaseBackend } from "../src/init";
 
@@ -115,5 +116,26 @@ describe("setCollectionCallbacks", () => {
         const backend = await boot(adapter());
 
         expect(() => backend.setCollectionCallbacks("leads", { beforeQuery: () => undefined })).not.toThrow();
+    });
+
+    it("replaces what the collection declared, says so, and names composeCallbacks as the way to keep it", async () => {
+        const declared: CollectionCallbacks = { beforeSave: ({ values }) => values };
+        const backend = await boot(adapter(), { collections: [collection("leads", { callbacks: declared })] });
+        const warn = jest.spyOn(console, "warn").mockImplementation(() => undefined);
+
+        backend.setCollectionCallbacks("leads", { afterSave: () => undefined });
+        const warned = warn.mock.calls.map(call => String(call[0])).join("\n");
+        expect(warned).toMatch(/replaced 'beforeSave'/);
+        expect(warned).toMatch(/composeCallbacks\(declared, mine\)/);
+
+        // Replacement is the contract — the cloud relies on it — so the
+        // collection now carries exactly what was attached.
+        expect(Object.keys(backend.collectionRegistry.get("leads")?.callbacks ?? {})).toEqual(["afterSave"]);
+
+        // Composed, nothing is dropped and nothing is said.
+        warn.mockClear();
+        backend.setCollectionCallbacks("leads", composeCallbacks(declared, { afterSave: () => undefined }));
+        expect(warn.mock.calls.map(call => String(call[0])).join("\n")).not.toMatch(/replaced/);
+        warn.mockRestore();
     });
 });
