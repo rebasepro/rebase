@@ -113,13 +113,38 @@ describe("the error handler, with the database unreachable", () => {
         expect((await res.json() as { error: { code: string } }).error.code).toBe("DATABASE_UNAVAILABLE");
     });
 
-    it("keeps another service's refused connection a 500 that does not blame the database", async () => {
-        const errors: string[] = [];
-        jest.spyOn(logger, "error").mockImplementation((message: string) => { errors.push(message); });
-        jest.spyOn(logger, "warn").mockImplementation(() => undefined);
-        const res = await appThrowing(new TypeError("fetch failed", { cause: refused("10.0.0.9", 443) })).request("/x");
+    // It answered `500` with the errno as the code — `ECONNREFUSED` for an S3
+    // call, which is not a code, and `INTERNAL_ERROR` for a `fetch()`, which
+    // says the server broke when a service it calls was down.
+    it("answers another service's refused connection 503 SERVICE_UNAVAILABLE, without blaming the database", async () => {
+        const logged: string[] = [];
+        jest.spyOn(logger, "error").mockImplementation((message: string) => { logged.push(message); });
+        jest.spyOn(logger, "warn").mockImplementation((message: string) => { logged.push(message); });
+        const otherServices = [
+            new TypeError("fetch failed", { cause: refused("10.0.0.9", 443) }),
+            Object.assign(refused("10.0.0.9", 9000), { $metadata: { attempts: 3 } }),
+            new Error("upload failed", { cause: Object.assign(new AggregateError([refused("::1", 9000), refused("127.0.0.1", 9000)], ""), { code: "ECONNREFUSED" }) }),
+            new TypeError("fetch failed", { cause: Object.assign(new Error("getaddrinfo ENOTFOUND api.example.test"), { code: "ENOTFOUND", syscall: "getaddrinfo", hostname: "api.example.test" }) })
+        ];
+        for (const error of otherServices) {
+            const res = await appThrowing(error).request("/x");
+            expect(res.status).toBe(503);
+            const body = await res.json() as { error: { code: string; message: string } };
+            expect(body.error.code).toBe("SERVICE_UNAVAILABLE");
+            // The host is the operator's to read, in the log, not the caller's.
+            expect(body.error.message).not.toMatch(/10\.0\.0\.9|127\.0\.0\.1|example\.test|ECONN|ENOTFOUND/);
+            expect(body.error.message).toMatch(/could not be reached/);
+        }
+        expect(logged.join("\n")).not.toMatch(/database/i);
+        expect(logged.join("\n")).toMatch(/ECONNREFUSED at 10\.0\.0\.9:443/);
+        expect(logged.join("\n")).toMatch(/ENOTFOUND for api\.example\.test/);
+        jest.restoreAllMocks();
+    });
+
+    it("leaves an error that only names a socket code, with no system call behind it, as it was", async () => {
+        jest.spyOn(logger, "error").mockImplementation(() => undefined);
+        const res = await appThrowing(new Error("upload failed", { cause: { code: "ECONNRESET" } })).request("/x");
         expect(res.status).toBe(500);
-        expect(errors.join("\n")).not.toMatch(/database/i);
         jest.restoreAllMocks();
     });
 });

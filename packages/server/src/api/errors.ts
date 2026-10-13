@@ -264,11 +264,12 @@ function databaseReport(error: object, depth = 0): boolean | undefined {
 }
 
 /**
- * The operator's half of an unreachable database, in a few words: the socket
- * failure and the host it names (`ECONNREFUSED at 127.0.0.1:5432`), or what
- * the database or its client said about the connection.
+ * The operator's half of a connection that failed — to the database, or to a
+ * service a request called — in a few words: the socket failure and the host
+ * it names (`ECONNREFUSED at 127.0.0.1:5432`), or what the database or its
+ * client said about the connection.
  */
-function describeUnreachableDatabase(error: unknown, depth = 0): string {
+function describeConnectionFailure(error: unknown, depth = 0): string {
     if (typeof error !== "object" || error === null || depth > 8) return "the connection failed";
     const code = Reflect.get(error, "code");
     const message = Reflect.get(error, "message");
@@ -284,11 +285,31 @@ function describeUnreachableDatabase(error: unknown, depth = 0): string {
         return typeof code === "string" ? `${message} (${code})` : message;
     }
     const inner = Reflect.get(error, "errors");
-    if (Array.isArray(inner) && inner.length > 0) return describeUnreachableDatabase(inner[0], depth + 1);
+    if (Array.isArray(inner) && inner.length > 0) return describeConnectionFailure(inner[0], depth + 1);
     const cause = Reflect.get(error, "cause");
-    if (typeof cause === "object" && cause !== null) return describeUnreachableDatabase(cause, depth + 1);
+    if (typeof cause === "object" && cause !== null) return describeConnectionFailure(cause, depth + 1);
     return typeof code === "string" ? code : "the connection failed";
 }
+
+/**
+ * Is there a Node socket failure under this error, anywhere down its cause
+ * chain?
+ *
+ * Asked only once {@link isDatabaseUnreachable} has said no, so what it finds
+ * belongs to another service: a `fetch()` to some other host (`fetch failed`,
+ * its `cause` the socket's error), an S3 call that cannot connect (the AWS SDK
+ * hands back the socket's own error with `$metadata` on it), or anything else
+ * wrapping one. An error that only carries a socket code, with no system call
+ * behind it, is not one.
+ */
+function hasUpstreamSocketFailure(error: unknown, depth = 0): boolean {
+    if (typeof error !== "object" || error === null || depth > 8) return false;
+    return isSocketFailure(error) || hasUpstreamSocketFailure(Reflect.get(error, "cause"), depth + 1);
+}
+
+/** What a caller is told when a service the request needs cannot be reached. The host stays in the log. */
+const UPSTREAM_UNAVAILABLE_MESSAGE =
+    "A service this request depends on could not be reached, so it was not served. Retry shortly.";
 
 /** What a caller is told when the database cannot be reached. Retryable, and not about them. */
 export const DATABASE_UNAVAILABLE_MESSAGE =
@@ -714,6 +735,11 @@ export const errorHandler: ErrorHandler<HonoEnv> = (err, c) => {
     // Ahead of every SQLSTATE arm below: `57P01` is a SQLSTATE too, and it
     // says the connection is gone, not that the statement was wrong.
     const unreachable = !poolFailure && isDatabaseUnreachable(error);
+    // A socket failure that is not the database's is another service's: a
+    // `fetch()`, an S3 call. It answered `500` with the errno as the code
+    // (`ECONNREFUSED`), or `INTERNAL_ERROR` — a server fault, for a service it
+    // calls being down.
+    const upstream = !poolFailure && !unreachable && !dbError && hasUpstreamSocketFailure(error);
 
     if (poolFailure) {
         code = poolFailure;
@@ -726,10 +752,14 @@ export const errorHandler: ErrorHandler<HonoEnv> = (err, c) => {
     } else if (unreachable) {
         code = "DATABASE_UNAVAILABLE";
         statusCode = 503;
-        const reason = describeUnreachableDatabase(error);
+        const reason = describeConnectionFailure(error);
         logMessage = `The database could not be reached: ${reason}.`;
         warnDatabaseUnreachable(reason);
         c.header("Retry-After", String(DATABASE_RETRY_AFTER_SECONDS));
+    } else if (upstream) {
+        code = "SERVICE_UNAVAILABLE";
+        statusCode = 503;
+        logMessage = `A service this request depends on could not be reached: ${describeConnectionFailure(error)}.`;
     } else if (resolvedCause && (resolvedCause.code === "ENETUNREACH" || resolvedCause.code === "ECONNREFUSED")) {
         // Some other service: a database that cannot be reached is the arm
         // above, so this one does not say "database".
@@ -893,6 +923,8 @@ export const errorHandler: ErrorHandler<HonoEnv> = (err, c) => {
         clientMessage = "The database is busy: no connection was free in time. Retry shortly.";
     } else if (unreachable) {
         clientMessage = DATABASE_UNAVAILABLE_MESSAGE;
+    } else if (upstream) {
+        clientMessage = UPSTREAM_UNAVAILABLE_MESSAGE;
     } else if (code === "DB_PERMISSION_DENIED") {
         const ungranted = missingGrant(dbError?.message);
         clientMessage = ungranted
