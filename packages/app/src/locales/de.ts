@@ -127,6 +127,7 @@ export const de: RebaseTranslations = {
     error_before_saving: "Fehler bei der Datenvorbereitung",
     error_after_saving: "Fehler im Nachspeichervorgang",
     error_saving_entity: "Fehler beim Speichern des Eintrags",
+    error_record_changed_elsewhere: "Dieser Datensatz wurde geändert, seit Sie ihn geöffnet haben. Ihre Änderungen bleiben erhalten: Prüfen Sie die als anderswo aktualisiert markierten Felder und speichern Sie erneut.",
     entity_does_not_exist: "Dieser Eintrag existiert nicht in der Datenbank",
     form_modified: "Dieses Formular wurde geändert",
     form_in_sync: "Das aktuelle Formular ist mit der Datenbank synchron",

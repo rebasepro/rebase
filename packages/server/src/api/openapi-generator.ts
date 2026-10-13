@@ -1618,6 +1618,15 @@ function updateOperation(
         responses: {
             200: {
                 description: "Updated entity",
+                headers: {
+                    ETag: {
+                        schema: { type: "string" },
+                        description:
+                            "The version this write produced — the tag a `GET` of the row now answers. Send " +
+                            "it as `If-Match` on the next write to chain conditional edits without reading " +
+                            "the row back. Absent on an answer replayed from an `Idempotency-Key`."
+                    }
+                },
                 content: {
                     "application/json": {
                         schema: { $ref: `#/components/schemas/${schemaName}` }

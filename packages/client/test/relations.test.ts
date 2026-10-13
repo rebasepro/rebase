@@ -523,7 +523,7 @@ name: "B" });
         mockRequest.mockResolvedValueOnce({ id: "x/y",
 title: "U" });
         await c.update("x/y", { title: "U" });
-        expect(mockRequest).toHaveBeenCalledWith("/data/posts/x%2Fy", expect.any(Object));
+        expect(mockRequest).toHaveBeenCalledWith("/data/posts/x%2Fy", expect.any(Object), expect.any(Object));
     });
     it("delete calls correct endpoint", async () => {
         const c = createCollectionClient<PostModel>(transport, "posts");

@@ -101,6 +101,8 @@ const unsubscribe = client.data.products.listenById(
 
 The callback receives `Entity<M> | undefined`. A value of `undefined` means the entity was deleted.
 
+<span class="since-badge" data-since="0.25">Since 0.25</span> **Each frame carries the row's version.** `etagOf(row)` is the `ETag` a `GET` of the row answers, so an edit made against what a frame showed can be saved with `ifMatch: etagOf(row)` and is refused with `412` if the row has moved on (see [Conditional writes](/docs/backend/writes/)). On the wire, the SDK's `subscribe_one` asks with `etag: true`, and each `single_update` frame for a row that exists carries `"etag"` beside `"row"`. A server that predates this ignores the ask and sends no tag, and a client that does not ask gets frames without one.
+
 ### Unsubscribing
 
 Both `listen()` and `listenById()` return an unsubscribe function. Call it to stop receiving updates and clean up server-side resources:

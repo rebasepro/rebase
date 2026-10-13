@@ -39,6 +39,18 @@ export interface Entity<M extends Record<string, unknown> = Record<string, unkno
     searchMatches?: SearchMatch[];
 
     /**
+     * The version of the row this entity was read at: the `ETag` the read
+     * reported, for a `findById`, a `PATCH` answer or a live row frame. A
+     * form saves with it as `If-Match`, so a write made against a version
+     * someone has since replaced is refused instead of reverting their change.
+     *
+     * Absent for a row from a list, from a cache, or from a server or data
+     * source that does not report versions — a save then is unconditional,
+     * as it always was.
+     */
+    etag?: string;
+
+    /**
      * Which driver this entity belongs to (e.g., 'postgres', 'firestore').
      * If not specified, the default driver is assumed.
      */

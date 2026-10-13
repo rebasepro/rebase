@@ -94,6 +94,14 @@ export interface SingleUpdateMessage extends WebSocketMessage {
     type: "single_update";
     subscriptionId: string;
     row: Record<string, unknown> | null;
+    /**
+     * The row's version: the `ETag` a `GET /:id` of it answers, to send back
+     * as `If-Match` on a `PATCH` or `DELETE`. Sent only to a `subscribe_one`
+     * that asked with `etag: true`, and never beside a `null` row. A server
+     * that predates it ignores the ask and sends no tag; a client that does
+     * not ask gets frames without one.
+     */
+    etag?: string;
 }
 
 /**

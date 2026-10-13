@@ -162,6 +162,22 @@ row from `find()`, from the offline cache, or from a server that sends no
 `ETag` — and passing `undefined` sends no precondition, so the call above
 degrades to an ordinary update rather than throwing.
 
+<span class="since-badge" data-since="0.25">Since 0.25</span> A row from `update()` carries the version that write produced, so
+conditional edits chain without a read in between. A row a `listenById()`
+callback receives carries the version that frame shows:
+
+```typescript
+import { etagOf } from "@rebasepro/client";
+
+let shown: Record<string, unknown> | undefined;
+client.data.posts.listenById(1, (post) => {
+    shown = post; // etagOf(shown) is the version this frame shows
+});
+
+// On save: refused with 412 if the row has moved on since that frame
+await client.data.posts.update(1, { title: "New" }, { ifMatch: etagOf(shown) });
+```
+
 From a browser on another origin — a Vite frontend on its own port, an `app.`
 host calling an `api.` host — the `ETag` is readable only because the server
 names it in `Access-Control-Expose-Headers`. The Rebase runtime does, along

@@ -2,6 +2,7 @@ import { CollectionAccessor, DataDriver, DEFAULT_VECTOR_LIST_LIMIT, Entity, Enti
 import { toSnakeCase, toWireKey } from "@rebasepro/utils";
 import { cursorToStartAfter, decodeCursor, reconcileCursorOrder } from "./cursor";
 import { mergeIncludeSpecs } from "./include-spec";
+import { etagOf } from "./row-etag";
 import { QueryBuilder } from "./query_builder";
 import { collectAllPages, paginateFind, resolveFindWindow } from "./paginate";
 import { normalizeOrderBy } from "./sort-dialect";
@@ -268,6 +269,9 @@ function rowToEntity<M extends Record<string, unknown>>(
     // them. Left inside, `_matches` would show up in the record inspector as a
     // field the collection never declared.
     const { _matches, ...values } = row as Record<string, unknown> & { _matches?: SearchMatch[] };
+    // The version the read reported rides on the row out of sight (see
+    // `withETag`); the entity carries it in the open, beside `values`.
+    const etag = etagOf(row);
 
     return {
         id: primaryKeys.length > 0
@@ -275,7 +279,8 @@ function rowToEntity<M extends Record<string, unknown>>(
             : row.id as string | number,
         path: slug,
         values: (toViewModel ? toViewModel(values) : values) as EntityValues<M>,
-        ...(_matches ? { searchMatches: _matches } : {})
+        ...(_matches ? { searchMatches: _matches } : {}),
+        ...(etag ? { etag } : {})
     };
 }
 
@@ -1204,8 +1209,10 @@ function toEntityAccessor<M extends Record<string, unknown>>(
                 return rows.map((row) => rowToEntity<M>(row, slug, getPks(), toViewModel));
             }
             : undefined,
-        async update(id: string | number, data: Partial<EntityValues<M>>): Promise<Entity<M>> {
-            const row = await sdk.update(id, data as Partial<M>);
+        async update(id: string | number, data: Partial<EntityValues<M>>, options?: { ifMatch?: string }): Promise<Entity<M>> {
+            const row = options?.ifMatch
+                ? await sdk.update(id, data as Partial<M>, { ifMatch: options.ifMatch })
+                : await sdk.update(id, data as Partial<M>);
             if (!row) throw new Error(`Update returned no data for id ${id}`);
             return rowToEntity<M>(row, slug, getPks(), toViewModel);
         },

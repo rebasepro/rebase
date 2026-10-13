@@ -1181,6 +1181,14 @@ export class RestApiGenerator {
                 status: "existing",
                 ...(precondition ? { precondition } : {})
             });
+            // The version just written, so the caller's next conditional
+            // write can name it without reading the row back. Hashed from the
+            // row this write answers with, which is the rendering a `GET`
+            // hashes — a read after the commit could already be someone
+            // else's version, and handing that out with this body would let
+            // the next `If-Match` pass over a change the caller never saw.
+            const etag = await rowETag(entity as Record<string, unknown> | undefined, collection);
+            if (etag) c.header(ETAG_HEADER, etag);
             return this.formatResponse(entity);
         }, (result) => prefersMinimal(c)
             ? minimalResponse()

@@ -14,7 +14,7 @@ import { applyAuthContext } from "../security/rls-enforcement";
 import { withFieldViewer } from "./field-viewer";
 import { buildJunctionLinkMap, type JunctionLink } from "./cdc/junction-tables";
 import { collectionKeyColumns } from "./cdc/identity-columns";
-import { ApiError, logger, rawQueryLoggingEnabled } from "@rebasepro/server";
+import { ApiError, logger, rawQueryLoggingEnabled, rowETag } from "@rebasepro/server";
 import { assertReadRequestReadable } from "./read-field-access";
 import { sanitizeErrorForClient } from "../utils/pg-error-utils";
 import { CdcListener, type CdcChangeEvent } from "./cdc/CdcListener";
@@ -193,7 +193,15 @@ type StoredCollectionRequest = {
     distinct?: boolean;
 };
 
-type RealTimeListenEntityProps = ListenOneProps & { subscriptionId: string };
+type RealTimeListenEntityProps = ListenOneProps & {
+    subscriptionId: string;
+    /**
+     * Ask for the row's `ETag` on every `single_update` frame. Opt-in, so a
+     * client that does not read it costs nothing, and a server that predates
+     * it ignores it — the client then gets frames without a tag, as before.
+     */
+    etag?: boolean;
+};
 
 /**
  * What an in-process listener asks for: the read, and who it reads as.
@@ -245,6 +253,8 @@ type Subscription = {
      * `include` a `findById` takes. A list keeps its own in `collectionRequest`.
      */
     include?: IncludeSpec;
+    /** A single-row subscriber that asked for the row's `ETag` on every frame. */
+    etag?: boolean;
     // Auth context for RLS — when set, refetches run in a transaction
     // with set_config('app.uid', ...) / set_config('app.user_roles', ...)
     authContext?: SubscriptionAuthContext;
@@ -298,6 +308,8 @@ type SubscriptionGroup = {
     collectionRequest?: StoredCollectionRequest;
     /** The relations a single-row group's read loads. See {@link Subscription.include}. */
     include?: IncludeSpec;
+    /** Whether the group's frames carry the row's `ETag`. See {@link Subscription.etag}. */
+    etag?: boolean;
     authContext?: SubscriptionAuthContext;
     /** The subscriptions in the group, by internal key. */
     members: Set<string>;
@@ -757,7 +769,7 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
     private groupKeyFor(
         key: string,
         shared: boolean,
-        target: { type: "collection" | "single"; path: string; id?: string | number; collectionRequest?: StoredCollectionRequest; include?: IncludeSpec; authContext?: SubscriptionAuthContext }
+        target: { type: "collection" | "single"; path: string; id?: string | number; collectionRequest?: StoredCollectionRequest; include?: IncludeSpec; etag?: boolean; authContext?: SubscriptionAuthContext }
     ): string {
         if (!shared) return `listener\u0000${key}`;
         return canonicalJson({
@@ -767,6 +779,9 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
             // Two readers of one row asking for different relations are two
             // reads: one frame cannot answer both.
             include: target.type === "single" ? target.include : undefined,
+            // A frame with a tag and one without are two frames. Left out
+            // when not asked, so those groups keep the key they always had.
+            etag: target.type === "single" && target.etag === true ? true : undefined,
             request: target.type === "collection" ? (target.collectionRequest ?? {}) : undefined,
             principal: principalOf(target.authContext)
         });
@@ -791,7 +806,7 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
                 key: subscription.groupKey,
                 path: subscription.path,
                 type: subscription.type,
-                ...(subscription.type === "single" ? { id: String(subscription.id), include: subscription.include } : {}),
+                ...(subscription.type === "single" ? { id: String(subscription.id), include: subscription.include, etag: subscription.etag } : {}),
                 collectionRequest: subscription.collectionRequest,
                 authContext: subscription.authContext,
                 members: new Set(),
@@ -994,7 +1009,7 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
                     this.sendDataFrame(target.subscription, "collection_update", frame);
                 }
             } else {
-                const row = (await this.fetchEntityWithAuth(group.path, group.id!, group.authContext, group.include)) ?? null;
+                const { row, etag } = await this.fetchEntityFrame(group.path, group.id!, group.authContext, group.include, group.etag === true);
                 let frame: { body: string; digest: string } | undefined;
                 for (const target of targets) {
                     if (!target.canDeliver()) continue;
@@ -1002,7 +1017,7 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
                         target.callback(row);
                         continue;
                     }
-                    frame ??= this.dataFrame(this.singleFrameTail(row));
+                    frame ??= this.dataFrame(this.singleFrameTail(row, etag));
                     this.sendDataFrame(target.subscription, "single_update", frame);
                 }
             }
@@ -1547,7 +1562,14 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
             // first frame did: without one, a row's frames carried no to-many
             // relation at all, and the record form opened by URL showed a
             // many-to-many field empty — saving it then unlinked every row.
-            const target = { type: "single" as const, path: request.path, id: request.id, include: request.include, authContext };
+            const target = {
+                type: "single" as const,
+                path: request.path,
+                id: request.id,
+                include: request.include,
+                ...(request.etag === true && { etag: true }),
+                authContext
+            };
             const subscription: Subscription = {
                 subscriptionId,
                 clientId,
@@ -1564,15 +1586,16 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
             canDeliver = this.beginDelivery(key, subscription);
 
             // Send initial data
-            const row = await this.fetchEntityWithAuth(
+            const { row, etag } = await this.fetchEntityFrame(
                 request.path,
                 String(request.id),
                 authContext,
-                request.include
+                request.include,
+                subscription.etag === true
             );
 
             if (canDeliver()) {
-                this.sendDataFrame(subscription, "single_update", this.dataFrame(this.singleFrameTail(row || null)));
+                this.sendDataFrame(subscription, "single_update", this.dataFrame(this.singleFrameTail(row, etag)));
             }
 
         } catch (error) {
@@ -2125,6 +2148,41 @@ roles: ["anon"] };
     }
 
     /**
+     * A `single_update` frame's row, and — when the subscriber asked — the
+     * `ETag` a `GET /:id` of the same row answers.
+     *
+     * The tag names the row, not the read: `GET` hashes the row as
+     * `restFetchService.fetchOneForRest` serves it with no `include`, and a
+     * write's `If-Match` is compared against that same rendering. A frame
+     * whose relations are loaded therefore takes its tag from a second read
+     * without them, read first — as `GET /:id?include=` does — so a write
+     * landing between the two leaves the tag older than the body (a 412 the
+     * client recovers from) and never newer, which would let an edit made
+     * against the older body pass over a change it never saw.
+     */
+    private async fetchEntityFrame(
+        path: string,
+        id: string,
+        authContext: SubscriptionAuthContext | undefined,
+        include: IncludeSpec | undefined,
+        withETag: boolean
+    ): Promise<{ row: Record<string, unknown> | null; etag?: string }> {
+        if (!withETag) return { row: (await this.fetchEntityWithAuth(path, id, authContext, include)) ?? null };
+        const loadsRelations = include !== undefined && !(Array.isArray(include) && include.length === 0);
+        const tagged = loadsRelations ? await this.fetchEntityWithAuth(path, id, authContext) : undefined;
+        const row = (await this.fetchEntityWithAuth(path, id, authContext, include)) ?? null;
+        if (!row) return { row };
+        let collection: CollectionConfig | undefined;
+        try {
+            collection = this.registry.getCollectionByPath(path);
+        } catch {
+            collection = undefined;
+        }
+        const etag = await rowETag(loadsRelations ? tagged : row, collection);
+        return { row, ...(etag && { etag }) };
+    }
+
+    /**
      * Fetch a single row with optional RLS auth context.
      */
     private async fetchEntityWithAuth(
@@ -2251,8 +2309,8 @@ roles: ["anon"] };
     }
 
     /** Everything in a `single_update` frame after its subscription id. */
-    private singleFrameTail(row: Record<string, unknown> | null): string {
-        const tail: Omit<SingleUpdateMessage, "type" | "subscriptionId"> = { row };
+    private singleFrameTail(row: Record<string, unknown> | null, etag?: string): string {
+        const tail: Omit<SingleUpdateMessage, "type" | "subscriptionId"> = { row, ...(row && etag && { etag }) };
         return JSON.stringify(tail).slice(1);
     }
 

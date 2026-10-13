@@ -135,6 +135,7 @@ export const es: RebaseTranslations = {
     error_before_saving: "Error al preparar los datos",
     error_after_saving: "Error en el proceso posterior al guardado",
     error_saving_entity: "Error al guardar la entidad",
+    error_record_changed_elsewhere: "Este registro ha cambiado desde que lo abriste. Tus cambios se conservan: revisa los campos marcados como actualizados en otro lugar y vuelve a guardar.",
     entity_does_not_exist: "Esta entidad no existe en la base de datos",
     form_modified: "Este formulario ha sido modificado",
     form_in_sync: "El formulario actual está sincronizado con la base de datos",

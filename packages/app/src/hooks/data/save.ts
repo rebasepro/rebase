@@ -13,6 +13,13 @@ export type SaveEntityWithCallbacksProps<M extends Record<string, unknown>> = {
     previousValues?: Partial<EntityValues<M>>;
     collection?: AdminCollection<M>;
     status: EntityStatus;
+    /**
+     * The version the edit was made against — the edited entity's
+     * {@link Entity.etag}. An update is then refused with `412
+     * PRECONDITION_FAILED` if the record has changed since, rather than
+     * writing over the change. Ignored for a create.
+     */
+    ifMatch?: string;
     afterSave?: (updatedEntity: Entity<M>) => void,
     afterSaveError?: (e: Error) => void
 }
@@ -59,6 +66,7 @@ export async function saveEntityWithCallbacks<M extends Record<string, unknown>>
     values,
     previousValues,
     status,
+    ifMatch,
     data,
     context,
     afterSave,
@@ -114,7 +122,9 @@ export async function saveEntityWithCallbacks<M extends Record<string, unknown>>
     if (status === "new" || status === "copy") {
         savePromise = accessor.create(valuesToSave, entityId) as Promise<Entity<M>>;
     } else {
-        savePromise = accessor.update(entityId!, valuesToSave) as Promise<Entity<M>>;
+        savePromise = (ifMatch
+            ? accessor.update(entityId!, valuesToSave, { ifMatch })
+            : accessor.update(entityId!, valuesToSave)) as Promise<Entity<M>>;
     }
 
     let entity: Entity<M>;

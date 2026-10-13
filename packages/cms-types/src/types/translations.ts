@@ -237,6 +237,8 @@ export interface RebaseTranslations {
     error_after_saving: string;
     /** Snackbar title when the save itself fails */
     error_saving_entity: string;
+    /** A save refused because the record changed since the form opened it (`412`). */
+    error_record_changed_elsewhere: string;
     /** Alert shown when the entity does not exist in the database */
     entity_does_not_exist: string;
     /** Tooltip when the form has unsaved modifications */

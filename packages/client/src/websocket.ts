@@ -17,7 +17,7 @@ import {
     RebaseApiError,
     type RealtimeConnectionState
 } from "@rebasepro/types";
-import { buildCompositeId, COMPOSITE_ID_SEPARATOR, type PrimaryKeyInfo } from "@rebasepro/common";
+import { buildCompositeId, COMPOSITE_ID_SEPARATOR, withETag, type PrimaryKeyInfo } from "@rebasepro/common";
 import { parseRebaseJson } from "./reviver";
 import { readSqlScriptResult } from "./sql-script";
 import type { SqlScriptResult } from "@rebasepro/types";
@@ -1220,7 +1220,12 @@ export class RebaseWebSocketClient {
                 const entitySub = this.singleSubscriptions.get(subscriptionKey);
                 if (entitySub) {
                     const wireEntity = message.row ?? null;
-                    const row = wireEntity ? (wireEntity as Record<string, unknown>) : null;
+                    // The row's version, when the server tags its frames (see
+                    // `sendEntitySubscribe`): kept on the row the way a
+                    // `findById` keeps it, so `etagOf(row)` is the `If-Match`
+                    // of an edit made against exactly this frame.
+                    const etag = "etag" in message && typeof message.etag === "string" ? message.etag : undefined;
+                    const row = wireEntity ? withETag(wireEntity as Record<string, unknown>, etag) : null;
                     // Cache the latest data with optimizations
                     entitySub.latestData = row;
                     entitySub.lastUpdated = Date.now();
@@ -2175,7 +2180,11 @@ onError });
             requestId: backendSubscriptionId,
             payload: {
                 ...subscription.props,
-                subscriptionId: backendSubscriptionId
+                subscriptionId: backendSubscriptionId,
+                // Ask for the row's `ETag` on every frame. A server that
+                // predates it ignores the key and sends untagged frames, which
+                // read as rows with no version — what they were before.
+                etag: true
             }
         }).catch(error => {
             const current = this.singleSubscriptions.get(subscriptionKey);

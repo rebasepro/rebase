@@ -127,6 +127,7 @@ export const fr: RebaseTranslations = {
     error_before_saving: "Erreur lors de la préparation des données",
     error_after_saving: "Erreur dans le traitement post-sauvegarde",
     error_saving_entity: "Erreur lors de l'enregistrement de l'entité",
+    error_record_changed_elsewhere: "Cet enregistrement a été modifié depuis que vous l'avez ouvert. Vos modifications sont conservées : vérifiez les champs marqués comme mis à jour ailleurs, puis enregistrez à nouveau.",
     entity_does_not_exist: "Cette entité n'existe pas dans la base de données",
     form_modified: "Ce formulaire a été modifié",
     form_in_sync: "Le formulaire actuel est synchronisé avec la base de données",

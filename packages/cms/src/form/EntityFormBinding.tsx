@@ -211,6 +211,10 @@ export function EntityFormBinding<M extends Record<string, unknown>>({
                 previousValues: entity?.values,
                 collection,
                 status,
+                // The version the form's baseline is — it follows the live
+                // record, tag and all — so a save made against a version that
+                // someone has since replaced is refused, not written over it.
+                ifMatch: status === "existing" ? entity?.etag : undefined,
                 data: dataClient,
                 context,
                 afterSave: (updatedEntity: Entity<M>) => {
@@ -232,10 +236,18 @@ export function EntityFormBinding<M extends Record<string, unknown>>({
                     }
                 },
                 afterSaveError: (e: Error) => {
+                    // Refused because the record moved on between the last
+                    // version the form saw and this save. The new version is
+                    // on its way over the listener, and the form rebases the
+                    // edit onto it, marking what changed underneath.
+                    // Read by code, not `instanceof`: the error can come from
+                    // another copy of the types package.
+                    const changedElsewhere = typeof e === "object" && e !== null
+                        && "code" in e && e.code === "PRECONDITION_FAILED";
                     snackbarController.open({
                         type: "error",
                         title: t("error_saving_entity"),
-                        message: e?.message
+                        message: changedElsewhere ? t("error_record_changed_elsewhere") : e?.message
                     });
                     console.error("Error saving entity", path, entityId, e);
                 }

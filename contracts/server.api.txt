@@ -737,7 +737,7 @@ interface EffectiveRoleController { effectiveRole, setEffectiveRole }
 interface EmailSendOptions { headers, html, replyTo, subject, text, to }
 interface EmailSendResult { accepted, messageId, rejected }
 interface EmailService { isConfigured, send, verifyConnection }
-interface Entity { databaseId, driver, id, path, searchMatches, values }
+interface Entity { databaseId, driver, etag, id, path, searchMatches, values }
 interface EntityChildView { collection, key, source }
 interface EntityHistoryEntry { action, changed_fields, entity_id, format, id, previous_values, table_name, updated_at, updated_by, values }
 interface EntityReferenceProps { databaseId, driver, id, path }
@@ -880,7 +880,7 @@ interface SecurityRuleBase { mode, name, operation, operations, pgRoles, roles }
 interface SerializedCollectionRef
 interface ServerContextPolicyExpression { kind }
 interface SingleSubscriptionConfig { clientId, id, path }
-interface SingleUpdateMessage { channel, error, payload, requestId, row, rows, subscriptionId, type }
+interface SingleUpdateMessage { channel, error, etag, payload, requestId, row, rows, subscriptionId, type }
 interface SqlCursor { close, columns, read }
 interface SqlScriptColumn { name, source, type }
 interface SqlScriptColumnSource { column, schema, table }
@@ -1223,6 +1223,7 @@ const DEFAULT_SOFT_DELETE_FIELD
 const DEFAULT_STRING_COLUMN_LENGTH
 const DOWNLOAD_METADATA_BATCH_MAX
 const DOWNLOAD_URL_CONCURRENCY
+const ETAG_KEY
 const JUNCTION_TABLES_SQL
 const MAX_LOGICAL_NESTING_DEPTH
 const PAGE_WITH_OFFSET_MESSAGE
@@ -1282,6 +1283,7 @@ function effectiveAccess
 function embedParentExpression
 function encodeCursor
 function enumToObjectEntries
+function etagOf
 function evaluateCondition
 function evaluatePolicy
 function fieldKeyForColumn
@@ -1401,6 +1403,7 @@ function updateDateAutoValues
 function updateUserAutoValues
 function uploadResumable
 function vectorPropertyNames
+function withETag
 function withRelationReferencesOnly
 function wrapAsEntityData
 function wrapAsSdkData

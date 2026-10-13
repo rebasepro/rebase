@@ -1,6 +1,7 @@
 export * from "./util";
 export * from "./collections";
 export * from "./data/buildRebaseData";
+export * from "./data/row-etag";
 export * from "./data/buildRoutedRebaseData";
 export * from "./data/resolveDataSource";
 export * from "./data/query_builder";

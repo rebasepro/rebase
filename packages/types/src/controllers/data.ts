@@ -622,9 +622,14 @@ export interface CollectionAccessor<M extends Record<string, unknown> = Record<s
 
     /**
      * Update an existing record by ID.
+     *
+     * `options.ifMatch` is the version the edit was made against
+     * ({@link Entity.etag}): the write is refused with `412
+     * PRECONDITION_FAILED` when the row has changed since. A data source that
+     * cannot check one ignores it, and the write is unconditional.
      * @returns The updated entity
      */
-    update(id: string | number, data: Partial<EntityValues<M>>): Promise<Entity<M>>;
+    update(id: string | number, data: Partial<EntityValues<M>>, options?: { ifMatch?: string }): Promise<Entity<M>>;
 
     /**
      * Update many records in a single transaction.

@@ -127,6 +127,7 @@ export const hi: RebaseTranslations = {
     error_before_saving: "डेटा तैयार करने में त्रुटि",
     error_after_saving: "सहेजने के बाद की प्रक्रिया में त्रुटि",
     error_saving_entity: "प्रविष्टि सहेजने में त्रुटि",
+    error_record_changed_elsewhere: "आपके खोलने के बाद यह रिकॉर्ड बदल गया है। आपके बदलाव सुरक्षित हैं: कहीं और अपडेट किए गए के रूप में चिह्नित फ़ील्ड देखें, फिर दोबारा सहेजें।",
     entity_does_not_exist: "यह प्रविष्टि डेटाबेस में मौजूद नहीं है",
     form_modified: "इस फ़ॉर्म में बदलाव किए गए हैं",
     form_in_sync: "वर्तमान फ़ॉर्म डेटाबेस के साथ सिंक में है",

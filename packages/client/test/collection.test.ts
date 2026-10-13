@@ -255,8 +255,9 @@ title: "Updated" });
 
             expect(result).toEqual({ id: 1,
 title: "Updated" });
+            // The third argument collects the response's ETag (see `etagOf`).
             expect(mockRequest).toHaveBeenCalledWith("/data/posts/1", { method: "PATCH",
-body: JSON.stringify(patch) });
+body: JSON.stringify(patch) }, expect.any(Object));
         });
 
         it("encodes special characters in update ID", async () => {
@@ -265,7 +266,7 @@ body: JSON.stringify(patch) });
 title: "Updated" });
 
             await client.update("x/y", { title: "Updated" });
-            expect(mockRequest).toHaveBeenCalledWith("/data/posts/x%2Fy", expect.any(Object));
+            expect(mockRequest).toHaveBeenCalledWith("/data/posts/x%2Fy", expect.any(Object), expect.any(Object));
         });
     });
 
@@ -320,7 +321,7 @@ title: "Updated" });
             expect(mockRequest).toHaveBeenCalledWith("/data/posts/1", expect.objectContaining({
                 method: "PATCH",
                 headers: { "Idempotency-Key": "attempt-1" }
-            }));
+            }), expect.any(Object));
         });
 
         it("sends no header when no key was given", async () => {

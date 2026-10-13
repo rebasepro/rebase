@@ -37,7 +37,7 @@ import {
     type RelationAggregateSort,
     RebaseClientError
 } from "@rebasepro/types";
-import { collectAllPages, normalizeOrderBy, paginateFind, resolveFindWindow } from "@rebasepro/common";
+import { collectAllPages, etagOf, normalizeOrderBy, paginateFind, resolveFindWindow, withETag } from "@rebasepro/common";
 
 import { SDKQueryBuilder } from "./sdk_query_builder";
 
@@ -244,42 +244,9 @@ function isCountReadAsFilter(error: unknown): boolean {
     return typeof details === "object" && details !== null && "field" in details && details.field === "count";
 }
 
-/**
- * Where a fetched row's version is kept.
- *
- * Non-enumerable, so it does not appear in `Object.keys`, in `JSON.stringify`,
- * in a spread into an update body, or in the generated `Row` type — a row's
- * version is a fact about the *response*, not a column, and putting it in the
- * row proper would mean the server having to strip it back off every write.
- *
- * A string key rather than a symbol so it survives the structured clone an
- * offline store or a worker boundary does… which it does not, and that is the
- * honest position: an etag is per-read, and a row that has been through a cache
- * has not been read from the server. `etagOf` answers `undefined` there, and a
- * conditional write without a tag is an unconditional one.
- */
-const ETAG_KEY = "__etag";
-
-/**
- * The version of a row, when it came straight from a read that reported one.
- *
- * ```ts
- * const post = await client.data.posts.get(1);
- * await client.data.posts.update(1, { title: "New" }, { ifMatch: etagOf(post) });
- * ```
- *
- * `undefined` for a row from `find()` (a list response carries one ETag at
- * most, and it would not be this row's), from the offline cache, or from a
- * server that does not send them. Passing `undefined` as `ifMatch` sends no
- * precondition, so the call above degrades to an ordinary update rather than
- * failing — which is the right default, and the reason to read this at the call
- * site where the choice is visible.
- */
-export function etagOf(row: unknown): string | undefined {
-    if (!row || typeof row !== "object") return undefined;
-    const value = (row as Record<string, unknown>)[ETAG_KEY];
-    return typeof value === "string" ? value : undefined;
-}
+// `etagOf` lives in `@rebasepro/common` with `withETag`, because the admin's
+// entity layer reads the same tag and cannot depend on this package.
+export { etagOf };
 
 /**
  * The headers a write's options ask for.
@@ -298,18 +265,6 @@ function writeHeaders(options?: WriteOptions): { headers: Record<string, string>
     // than assuming a 204.
     if (options?.returning === false) headers["Prefer"] = "return=minimal";
     return Object.keys(headers).length > 0 ? { headers } : undefined;
-}
-
-/** Attach a version to a row without making it part of the row. */
-function withETag<T>(row: T, etag: string | undefined): T {
-    if (!etag || !row || typeof row !== "object") return row;
-    Object.defineProperty(row, ETAG_KEY, {
-        value: etag,
-        enumerable: false,
-        configurable: true,
-        writable: true
-    });
-    return row;
 }
 
 /**
@@ -756,12 +711,15 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
          * never sends it.
          */
         async update(id: string | number, data: Partial<M> | UpdateValues<Partial<M>>, options?: WriteOptions) {
+            const meta: ResponseMeta = {};
             const raw = await transport.request<Record<string, unknown>>(`${basePath}/${encodeURIComponent(String(id))}`, {
                 method: "PATCH",
                 body: JSON.stringify(data),
                 ...writeHeaders(options)
-            });
-            return raw as M;
+            }, meta);
+            // The version this write produced, so `etagOf(updated)` chains
+            // the next conditional write without reading the row back.
+            return withETag(raw as M, meta.etag);
         },
 
         async updateMany(

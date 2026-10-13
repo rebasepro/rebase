@@ -135,6 +135,7 @@ export const en: RebaseTranslations = {
     error_before_saving: "Error preparing data",
     error_after_saving: "Error in post-save hook",
     error_saving_entity: "Error saving entity",
+    error_record_changed_elsewhere: "This record changed since you opened it. Your edits are kept: review the fields marked as updated elsewhere, then save again.",
     entity_does_not_exist: "This entity does not exist in the database",
     form_modified: "This form has been modified",
     form_in_sync: "The current form is in sync with the database",

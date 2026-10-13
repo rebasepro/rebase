@@ -71,6 +71,10 @@ the `204`.
 `GET`. Send it back as `If-Match` on a later `PATCH` or `DELETE` and the write is
 refused with `412` if the row has changed in between.
 
+<span class="since-badge" data-since="0.25">Since 0.25</span> A successful `PATCH` answers with the `ETag` of the version it wrote,
+so the next conditional write needs no read first. A live row subscription
+carries the same tag on every frame (see [Realtime](/docs/backend/realtime/)).
+
 ```bash
 # read
 curl -i /api/data/docs/d1
@@ -91,6 +95,10 @@ The tag is derived from a `date` property with `autoValue: "on_update"` when the
 collection declares one — that column already *is* a version — and from a stable
 hash of the row otherwise. `If-Match: *` asserts only that the row exists.
 Nothing is written when the precondition fails.
+
+<span class="since-badge" data-since="0.25">Since 0.25</span> The admin's record form saves with `If-Match`: a save made against a version
+someone has since replaced is refused, the form says so, and the edit stays in
+the form, rebased onto the new version with the conflicting fields marked.
 
 The tag is compared inside the write's own transaction, after the row is
 locked. Two writes carrying the same tag cannot both pass: the second waits for
