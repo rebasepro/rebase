@@ -846,6 +846,7 @@ export const hi: RebaseTranslations = {
     editor_cancel: "रद्द करें",
     editor_remove_link: "लिंक हटाएं",
     editor_paste_or_type_link: "लिंक पेस्ट करें या टाइप करें",
+    editor_invalid_url: "यह लिंक नहीं है — example.com जैसा पूरा पता आज़माएँ",
     editor_open_in_new_window: "नई विंडो में खोलें",
     editor_bold: "बोल्ड",
     editor_italic: "इटैलिक",

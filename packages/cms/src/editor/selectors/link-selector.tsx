@@ -1,5 +1,5 @@
-import { useEffect, useRef } from "react";
-import { Button, CheckIcon, cls, focusedDisabled, iconSize, Popover, TextField, Trash2Icon } from "@rebasepro/ui";
+import { useEffect, useRef, useState } from "react";
+import { Button, CheckIcon, cls, focusedDisabled, iconSize, Popover, TextField, Trash2Icon, Typography } from "@rebasepro/ui";
 import { useTranslation } from "@rebasepro/app";
 import { useProseMirrorContext } from "../hooks/useProseMirrorContext";
 import { getMarkAttributes, isMarkActive, setMark, unsetMark } from "../utils/prosemirror-utils";
@@ -39,25 +39,40 @@ export const LinkSelector = ({
     const { state, view } = useProseMirrorContext();
     const { t } = useTranslation();
 
-    // Autofocus on input by default
+    const [error, setError] = useState<string | null>(null);
+    // `TextField` is controlled: a `defaultValue` alone left the box reset to
+    // empty on every keystroke, so no link could be typed into it.
+    const [value, setValue] = useState("");
+
+    const href = state ? (getMarkAttributes(state, schema.marks.link).href || "") : "";
+
+    // Opening the box shows the selection's link, with no error, and focuses it
     useEffect(() => {
-        if (open && inputRef.current) {
-            inputRef.current.focus();
-        }
+        if (!open) return;
+        setError(null);
+        setValue(href);
+        inputRef.current?.focus();
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- seeded once per opening; the selection's link is read at that moment
     }, [open]);
 
     if (!state || !view) return null;
 
     const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
-        const value = inputRef.current?.value;
+        // The popover renders in a portal, but React still sends its events up
+        // the component tree: without this the record form around the editor
+        // receives the submit and saves.
+        e.stopPropagation();
         if (!value) return;
         const url = getUrlFromString(value);
-        if (url) {
-            setMark(schema.marks.link, { href: url })(view.state, view.dispatch);
-            view.focus();
-            onOpenChange(false);
+        if (!url) {
+            setError(t("editor_invalid_url"));
+            return;
         }
+        setError(null);
+        setMark(schema.marks.link, { href: url })(view.state, view.dispatch);
+        view.focus();
+        onOpenChange(false);
     };
 
     const handleRemoveLink = () => {
@@ -67,7 +82,6 @@ export const LinkSelector = ({
     };
 
     const isActive = isMarkActive(state, schema.marks.link);
-    const href = getMarkAttributes(state, schema.marks.link).href || "";
 
     return (
         <Popover modal={true}
@@ -85,14 +99,20 @@ export const LinkSelector = ({
             </Button>}>
             <form
                 onSubmit={handleSubmit}
-                className="flex p-1 gap-1"
+                className="flex flex-col p-1 gap-1"
             >
+                <div className="flex gap-1">
                 <TextField
                     inputRef={inputRef}
                     autoFocus={open}
                     aria-label={t("editor_paste_or_type_link")}
                     placeholder={t("editor_paste_or_type_link")}
-                    defaultValue={href}
+                    value={value}
+                    onChange={(e) => {
+                        setValue(e.target.value);
+                        if (error) setError(null);
+                    }}
+                    error={!!error}
                     size="small"
                     className="flex-grow text-surface-900 dark:text-white"
                     inputClassName={cls("bg-transparent p-1 text-sm outline-none", focusedDisabled)}
@@ -115,6 +135,12 @@ export const LinkSelector = ({
                         variant={"text"}>
                         <CheckIcon size={iconSize.small}/>
                     </Button>
+                )}
+                </div>
+                {error && (
+                    <Typography variant="caption" color="error" className="px-1">
+                        {error}
+                    </Typography>
                 )}
             </form>
         </Popover>

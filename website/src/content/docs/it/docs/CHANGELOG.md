@@ -1337,6 +1337,12 @@ La traduzione è in arrivo. Il contenuto qui sotto è in inglese.
 
 #### Admin (CMS & app)
 
+- **The markdown editor's link box takes a link, and pressing Enter in it no longer
+  saves the record.** The box reset to empty on every keystroke, so no link could be
+  typed or edited, and its submit went on through the popover to the record form
+  around the editor, which saved. Text that is not a link now gets a message instead
+  of being ignored.
+
 - **The record form checks `validation.unique` when saving a changed value.**
   It built the check and never ran it, so a duplicate was left to the server
   to refuse. A duplicate is now an error on that field. It is one lookup per

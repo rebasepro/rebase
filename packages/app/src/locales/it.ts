@@ -846,6 +846,7 @@ export const it: RebaseTranslations = {
     editor_cancel: "Annulla",
     editor_remove_link: "Rimuovi link",
     editor_paste_or_type_link: "Incolla o digita il link",
+    editor_invalid_url: "Non è un link: prova un indirizzo completo come example.com",
     editor_open_in_new_window: "Apri in una nuova finestra",
     editor_bold: "Grassetto",
     editor_italic: "Corsivo",
