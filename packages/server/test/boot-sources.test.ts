@@ -137,6 +137,36 @@ describe("resolveDataSources", () => {
         expect(resolved[0].poolConfig).toEqual({ max: 42 });
         expect(resolved[1].poolConfig).toEqual({ max: 5 });
     });
+
+    // The direct URL is where a source holds its LISTEN. The bare variable is
+    // the default database's, so a second source that inherited it listened
+    // on the wrong database and its realtime feed went silent.
+    it("reads the direct and read URLs per source, never the default's for a named one", () => {
+        const definitions: DataSourceDefinition[] = [
+            { key: "(default)", engine: "postgres" },
+            { key: "analytics", engine: "postgres" },
+            { key: "audit", engine: "postgres" }
+        ];
+        const resolved = resolveDataSources(
+            {
+                DATABASE_URL: "postgres://pooler/app",
+                DATABASE_DIRECT_URL: "postgres://db/app",
+                DATABASE_READ_URL: "postgres://replica/app",
+                DATABASE_URL__ANALYTICS: "postgres://pooler/analytics",
+                DATABASE_DIRECT_URL__ANALYTICS: "postgres://db/analytics",
+                DATABASE_READ_URL__ANALYTICS: "postgres://replica/analytics",
+                DATABASE_URL__AUDIT: "postgres://pooler/audit"
+            },
+            definitions
+        );
+
+        expect(resolved[0].directConnectionString).toBe("postgres://db/app");
+        expect(resolved[0].readConnectionString).toBe("postgres://replica/app");
+        expect(resolved[1].directConnectionString).toBe("postgres://db/analytics");
+        expect(resolved[1].readConnectionString).toBe("postgres://replica/analytics");
+        expect(resolved[2].directConnectionString).toBeUndefined();
+        expect(resolved[2].readConnectionString).toBeUndefined();
+    });
 });
 
 describe("resolveStorageBackend", () => {

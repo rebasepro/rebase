@@ -20,6 +20,7 @@ import {
     type HistoryConfig,
     InitializedDriver,
     RealtimeProvider,
+    resourceEnvSuffix,
     type RealtimeChannelsConfig,
     type RealtimeSocketOptions
 } from "@rebasepro/types";
@@ -53,7 +54,25 @@ import { configureUnknownFilterFields, type UnknownFilterFieldsMode } from "./ut
 export interface PostgresDriverConfig {
     connectionString?: string;
     adminConnectionString?: string;
+    /**
+     * This database's read replica. Unset, the default source reads
+     * `DATABASE_READ_URL` and any other source has none — see
+     * {@link resolveSourceUrls}.
+     */
     readConnectionString?: string;
+    /**
+     * A direct (non-pooled) URL to this database, for the connections that
+     * hold a `LISTEN`: change capture, cross-instance realtime, the Postgres
+     * channel bus and `admin.listen`. A transaction-mode pooler such as
+     * PgBouncer does not keep a `LISTEN`, so behind one this has to name the
+     * database itself.
+     *
+     * Unset, the default source reads `DATABASE_DIRECT_URL` and any other
+     * source listens on its own `connectionString` — see
+     * {@link resolveSourceUrls}. The managed runtime resolves
+     * `DATABASE_DIRECT_URL__<KEY>` into this for each source.
+     */
+    directConnectionString?: string;
     connection?: unknown;
     /**
      * The project's generated Drizzle module, for **diagnostics only**.
@@ -204,6 +223,38 @@ export function describeSchemaDriftCause(
         "  Resolve that reason — the drift is its consequence, not a separate",
         "  problem, and re-running a migration tool will not change it."
     ];
+}
+
+/**
+ * The URLs one source's driver opens besides its pool: the read replica, and
+ * the direct connection its `LISTEN`s are held on.
+ *
+ * The bare `DATABASE_READ_URL` and `DATABASE_DIRECT_URL` belong to the default
+ * source. Both used to be read here for every source, so a second database
+ * (`database("analytics")`) held its change-capture `LISTEN` on the default
+ * database — where none of its notifications are sent, so its realtime feed
+ * was silent — and read through the default's replica. A keyed source gets
+ * the URLs its config names, and otherwise its own connection and no replica.
+ *
+ * The default source still falls back to the environment: an application that
+ * builds this adapter itself passes a `connectionString` and nothing else, and
+ * has always had those two variables honoured.
+ *
+ * Exported for its own test; the caller needs a live database.
+ */
+export function resolveSourceUrls(
+    pgConfig: Pick<PostgresDriverConfig, "connectionString" | "readConnectionString" | "directConnectionString">,
+    sourceKey: string,
+    env: Record<string, string | undefined> = process.env
+): { readUrl?: string; directUrl?: string } {
+    const isDefault = sourceKey === DEFAULT_DATA_SOURCE_KEY;
+    return {
+        readUrl: pgConfig.readConnectionString || (isDefault ? env.DATABASE_READ_URL : undefined) || undefined,
+        directUrl: pgConfig.directConnectionString
+            || (isDefault ? env.DATABASE_DIRECT_URL : undefined)
+            || pgConfig.connectionString
+            || undefined
+    };
 }
 
 /**
@@ -776,9 +827,11 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
             const recountMinRows = tuning("REALTIME_RECOUNT_MIN_ROWS", pgConfig.realtime?.recountMinRows, "realtime.recountMinRows", "rows");
             if (recountMinRows !== undefined) realtimeService.recountMinRows = recountMinRows;
 
+            // This source's own replica and direct URL, never the default's.
+            const { readUrl, directUrl } = resolveSourceUrls(pgConfig, sourceKey);
+
             // Initialize read replica connection if configured
             let readDb: import("drizzle-orm/node-postgres").NodePgDatabase<any> | undefined;
-            const readUrl = process.env.DATABASE_READ_URL;
             if (readUrl && readUrl !== pgConfig.connectionString) {
                 try {
                     const { createReadReplicaConnection } = await import("./connection");
@@ -793,6 +846,7 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
                 ? new DatabasePoolManager(pgConfig.adminConnectionString)
                 : undefined;
             const driver = new PostgresBackendDriver(schemaAwareDb, realtimeService, registry, undefined, poolManager);
+            driver.listenConnectionString = directUrl;
             realtimeService.setDataDriver(driver);
 
             // ── RLS enforcement (user context) ───────────────────────────────
@@ -929,8 +983,7 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
             }
 
             // ── Realtime change source ───────────────────────────────────────
-            // Prefer DATABASE_DIRECT_URL to bypass PgBouncer for LISTEN/NOTIFY.
-            const directUrl = process.env.DATABASE_DIRECT_URL || pgConfig.connectionString;
+            // `directUrl` (resolved above) bypasses PgBouncer for LISTEN/NOTIFY.
 
             // ── Cross-instance channel bus ───────────────────────────────────
             // Entity changes already span instances (CDC / LISTEN below).
@@ -991,7 +1044,8 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
             let cdcFunctionCurrent = false;
 
             if (wantsCdc && !directUrl) {
-                const reason = "no direct database connection is available for the realtime LISTEN client (set DATABASE_DIRECT_URL)";
+                const reason = "no direct database connection is available for the realtime LISTEN client " +
+                    `(set DATABASE_DIRECT_URL${resourceEnvSuffix(sourceKey)})`;
                 if (explicitCdc) logger.warn(`⚠️ [CDC] REALTIME_CDC=${cdcMode} but ${reason} — using app-level realtime.`);
                 else logger.info(`ℹ️ [CDC] Using app-level realtime — ${reason}.`);
             } else if (wantsCdc && directUrl) {

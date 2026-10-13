@@ -383,6 +383,7 @@ export async function initializeDataSource(
         connectionString: connection.connectionString ?? source.connectionString,
         adminConnectionString: source.adminConnectionString || source.connectionString,
         readConnectionString: source.readConnectionString,
+        directConnectionString: source.directConnectionString,
         ...(source.isDefault && schema ? { schema } : {})
     });
 
