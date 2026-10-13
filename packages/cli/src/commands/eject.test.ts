@@ -10,6 +10,7 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 import { fileURLToPath } from "url";
+import ts from "typescript";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ejectCommand, renderPayload } from "./eject";
 import { loadManifest, writeManifest } from "../manifest";
@@ -402,6 +403,40 @@ describe("the ejected payload", () => {
         const call = /serveSPA\(app, \{ frontendPath: path\.resolve\(__dirname, "([^"]+)"\)/.exec(source);
         expect(call).not.toBeNull();
         expect(path.resolve(COMPILED_DIR, call![1])).toBe("/app/frontend/dist");
+    });
+
+    it("keeps local uploads in the project's uploads/, from source and compiled alike", async () => {
+        // `path.resolve(__dirname, "../../uploads")` is `<project>/uploads` from
+        // `backend/src` and `backend/dist/uploads` from the compiled file, which
+        // the next `pnpm run build` wipes. The root is found by its rebase.json.
+        manifestWith("managed");
+
+        await run();
+
+        const source = fs.readFileSync(path.join(scratch, "backend/src/index.ts"), "utf8");
+        expect(source).toMatch(/storageSources,\s*(\/\/[^\n]*\n\s*)*path\.join\(projectRoot, "uploads"\)/);
+        expect(source).toMatch(/portFileDir: projectRoot/);
+        expect(source).not.toMatch(/__dirname, "\.\.\/\.\.\/uploads"/);
+
+        // The emitted function itself, run against both layouts.
+        const helper = /function findProjectRoot\(from: string\): string \{[\s\S]*?\n\}\n/.exec(source);
+        expect(helper).not.toBeNull();
+        const { outputText } = ts.transpileModule(`${helper![0]}\nexport { findProjectRoot };`, {
+            compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 }
+        });
+        const exported: { findProjectRoot?: (from: string) => string } = {};
+        new Function("exports", "fs", "path", outputText)(exported, fs, path);
+        const findProjectRoot = exported.findProjectRoot!;
+
+        const project = fs.mkdtempSync(path.join(os.tmpdir(), "rebase-eject-root-"));
+        fs.writeFileSync(path.join(project, "rebase.json"), "{}");
+        const sourceDir = path.join(project, "backend", "src");
+        const compiledDir = path.join(project, "backend", "dist", "backend", "src");
+        fs.mkdirSync(sourceDir, { recursive: true });
+        fs.mkdirSync(compiledDir, { recursive: true });
+        expect(findProjectRoot(sourceDir)).toBe(project);
+        expect(findProjectRoot(compiledDir)).toBe(project);
+        fs.rmSync(project, { recursive: true, force: true });
     });
 
     it("imports only symbols the runtime packages actually export", async () => {

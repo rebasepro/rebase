@@ -36,6 +36,22 @@ import usersCollection from "../../config/collections/users";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+/**
+ * The project root: the nearest directory holding `rebase.json`.
+ *
+ * Walked up to rather than counted, because this file runs from two depths —
+ * `backend/src` under `rebase dev`, `backend/dist/backend/src` compiled — and
+ * a fixed `../..` from the compiled file is `backend/dist`, where local uploads
+ * then landed and the next build wiped them.
+ */
+function findProjectRoot(from: string): string {
+    for (let dir = from; ; dir = path.dirname(dir)) {
+        if (fs.existsSync(path.join(dir, "rebase.json"))) return dir;
+        if (path.dirname(dir) === dir) return path.resolve(from, "../..");
+    }
+}
+const projectRoot = findProjectRoot(__dirname);
+
 // Which databases and buckets this project has, read from the declarations in
 // `config/resources.ts`. One declaration site, so this process, the platform
 // and the frontend all read the same list. A project that declares none gets
@@ -225,7 +241,9 @@ pass: env.SMTP_PASS! }
         storage: resolveStorageSources(
             process.env,
             storageSources,
-            path.resolve(__dirname, "../../uploads")
+            // `<project>/uploads`, from source and compiled alike — where
+            // `rebase dev` keeps them too. `STORAGE_PATH` overrides it.
+            path.join(projectRoot, "uploads")
         ),
         // Storage is not under row-level security, so this hook IS its access
         // model — the server refuses to boot in production without one, because
@@ -299,7 +317,6 @@ pass: env.SMTP_PASS! }
 
     if (!isProduction) {
         // Dev mode: retry the next port if the current one is in use
-        const projectRoot = path.resolve(__dirname, "../..");
         const actualPort = await listenWithPortRetry(server, PORT, { portFileDir: projectRoot, serviceKey: env.REBASE_SERVICE_KEY });
 
         // Clean up port file on exit
