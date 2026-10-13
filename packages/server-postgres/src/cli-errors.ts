@@ -364,20 +364,37 @@ export function reportCommandFailure(error: unknown): void {
 /**
  * `migrate apply` refusing because the database already has the schema.
  *
- * `42710` (duplicate_object) and `42P07` (duplicate_table) are what a migration
- * hits when boot-ensure — or a `db push` — has already provisioned the objects
- * it was going to create. Since boot-ensure provisions *every* production
+ * `42710` (duplicate_object), `42P07` (duplicate_table), `42701`
+ * (duplicate_column) and `42P06` (duplicate_schema) are what a migration hits
+ * when boot-ensure — or a `db push` — has already provisioned the objects it
+ * was going to create. Since boot-ensure provisions *every* production
  * database, this is the normal case rather than the exotic one, and the raw
  * failure (`pq: type "posts_status" already exists (42710)`, then `sql/migrate:
  * write revision: … current transaction is aborted`) names no way forward.
+ *
+ * `42701` is the everyday one in development: `rebase dev` adds a new
+ * column at boot, `db generate` writes the migration that adds it, and
+ * `db migrate` then finds it there. A column is named `table.column`.
  */
 export function parseAlreadyProvisioned(text: string): { object: string; code: string } | null {
-    const withCode = /(?:type|relation|constraint|schema) "([^"]+)" already exists \((42710|42P07)\)/.exec(text);
+    const column = /column "([^"]+)" of relation "([^"]+)" already exists/.exec(text);
+    if (column && /42701/.test(text)) return { object: `${column[2]}.${column[1]}`, code: "42701" };
+
+    const withCode = /(?:type|relation|constraint|schema) "([^"]+)" already exists \((42710|42P07|42P06)\)/.exec(text);
     if (withCode) return { object: withCode[1], code: withCode[2] };
     // Some Atlas builds keep the SQLSTATE on a following line instead.
     const bare = /(?:type|relation|constraint|schema) "([^"]+)" already exists/.exec(text);
-    if (bare && /42710|42P07/.test(text)) return { object: bare[1], code: /42P07/.test(text) ? "42P07" : "42710" };
+    const code = /42P07|42P06|42710/.exec(text)?.[0];
+    if (bare && code) return { object: bare[1], code };
     return null;
+}
+
+/**
+ * The migration Atlas was running when it failed: `from version "<v>"` in
+ * `sql/migrate: executing statement "…" from version "20261013201353": …`.
+ */
+export function parseFailedMigrationVersion(text: string): string | null {
+    return /from version "([^"]+)"/.exec(text)?.[1] ?? null;
 }
 
 /**
@@ -387,8 +404,17 @@ export function parseAlreadyProvisioned(text: string): { object: string; code: s
  * ours — it writes the revision row Atlas reads, so every later `rebase db
  * migrate` is an ordinary one.
  */
-export function formatBaselineRemedy(version: string | null, object?: string): string {
+export function formatBaselineRemedy(version: string | null, object?: string, failedVersion?: string | null): string {
     const versionToken = version ?? "<version>";
+    // Named too when it is not the newest: marking the newest also skips the
+    // migrations after the one that failed, which boot may not have covered
+    // (a data migration, an index written by hand).
+    const onlyTheFailedOne = failedVersion && failedVersion !== version
+        ? `  To mark only the migration that failed, and run the ones after it:\n` +
+          `\n` +
+          `    ${chalk.bold.green(`rebase db migrate --baseline ${failedVersion}`)}\n` +
+          `\n`
+        : "";
     return (
         `\n` +
         `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
@@ -399,7 +425,7 @@ export function formatBaselineRemedy(version: string | null, object?: string): s
         `  Nothing is wrong with the migration — the database was provisioned\n` +
         `  another way. Every Rebase boot ensures the schema, and ${chalk.bold("rebase db push")}\n` +
         `  applies it directly, so a database that has ever run either one is\n` +
-        `  ahead of a migration history that was never recorded.\n` +
+        `  ahead of the migrations recorded on it.\n` +
         `\n` +
         `  Record where it already is, then migrate normally:\n` +
         `\n` +
@@ -410,6 +436,7 @@ export function formatBaselineRemedy(version: string | null, object?: string): s
         `  the migration file describing what is in the database now. Migrations\n` +
         `  after it run; it and everything before it are marked done.\n` +
         `\n` +
+        onlyTheFailedOne +
         `  On a database nothing has ever booted against, none of this is needed.\n` +
         `\n` +
         `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`
@@ -882,7 +909,11 @@ export async function diagnoseAtlasFailure(context: {
     if (domain === "migrate" && args.includes("apply")) {
         const provisioned = parseAlreadyProvisioned(stderr);
         if (provisioned) {
-            return formatBaselineRemedy(context.latestMigrationVersion ?? null, provisioned.object);
+            return formatBaselineRemedy(
+                context.latestMigrationVersion ?? null,
+                provisioned.object,
+                parseFailedMigrationVersion(stderr)
+            );
         }
     }
 

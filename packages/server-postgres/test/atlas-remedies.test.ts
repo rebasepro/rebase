@@ -27,6 +27,7 @@ import {
     formatNotNullViolationBanner,
     parseAlreadyProvisioned,
     parseEnumLabelDrop,
+    parseFailedMigrationVersion,
     parseFailedStatement,
     formatUniqueBuildFailureBanner,
     parseNotNullViolation,
@@ -42,6 +43,16 @@ const ALREADY_EXISTS_TYPE =
 const ALREADY_EXISTS_TABLE =
     "Error: sql/migrate: executing statement \"CREATE TABLE \\\"widgets\\\" (\\\"id\\\" serial);\" "
     + "from version \"20260101000000\": pq: relation \"widgets\" already exists (42P07)";
+
+/**
+ * The development loop's version, from Atlas 1.2.3 against PostgreSQL 16:
+ * `rebase dev` added `subtitle` at boot, `db generate` wrote the migration
+ * adding it, and `db migrate` found it there.
+ */
+const ALREADY_EXISTS_COLUMN =
+    "Error: sql/migrate: executing statement \"ALTER TABLE posts ADD COLUMN subtitle text;\" "
+    + "from version \"20261013201353\": pq: column \"subtitle\" of relation \"posts\" already exists (42701)\n"
+    + "sql/migrate: write revision: pq: current transaction is aborted, commands ignored until end of transaction block (25P02)";
 
 const NOT_NULL =
     "Error: pq: column \"colour\" of relation \"tags\" contains null values (23502)";
@@ -73,6 +84,50 @@ describe("a migration against a database boot has already provisioned", () => {
         expect(hint).toContain("rebase db migrate --baseline 20260906101530");
         expect(hint).toContain("already has the schema");
         expect(hint).toContain("posts_status");
+    });
+
+    it("recognises 42701 on a column boot already added, naming table and column", () => {
+        expect(parseAlreadyProvisioned(ALREADY_EXISTS_COLUMN)).toEqual({ object: "posts.subtitle", code: "42701" });
+    });
+
+    it("recognises 42P06 on a schema", () => {
+        expect(parseAlreadyProvisioned("Error: pq: schema \"rebase\" already exists (42P06)"))
+            .toEqual({ object: "rebase", code: "42P06" });
+    });
+
+    it("gives the baseline remedy for an existing column, as it does for a type", async () => {
+        const hint = await diagnoseAtlasFailure({
+            domain: "migrate",
+            args: ["apply", "--dir", "file://drizzle/migrations"],
+            stderr: ALREADY_EXISTS_COLUMN,
+            latestMigrationVersion: "20261013201353"
+        });
+
+        expect(hint).toContain("rebase db migrate --baseline 20261013201353");
+        expect(hint).toContain("posts.subtitle");
+    });
+
+    it("reads which migration failed", () => {
+        expect(parseFailedMigrationVersion(ALREADY_EXISTS_COLUMN)).toBe("20261013201353");
+        expect(parseFailedMigrationVersion("Error: pq: something else")).toBeNull();
+    });
+
+    it("also names the failed migration when it is not the newest, so the later ones can still run", async () => {
+        const hint = await diagnoseAtlasFailure({
+            domain: "migrate",
+            args: ["apply", "--dir", "file://drizzle/migrations"],
+            stderr: ALREADY_EXISTS_COLUMN,
+            latestMigrationVersion: "20261014090000"
+        });
+
+        expect(hint).toContain("rebase db migrate --baseline 20261014090000");
+        expect(hint).toContain("To mark only the migration that failed");
+        expect(hint).toContain("rebase db migrate --baseline 20261013201353");
+    });
+
+    it("names one command when the failed migration is the newest", () => {
+        expect(formatBaselineRemedy("20261013201353", "posts.subtitle", "20261013201353"))
+            .not.toContain("To mark only the migration that failed");
     });
 
     it("still prints a typeable shape when no migration file is on disk", () => {

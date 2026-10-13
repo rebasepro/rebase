@@ -84,7 +84,7 @@ export function buildAtlasArgs(invocation: AtlasInvocation): string[] {
     } else if (domain === "migrate") {
         if (args.includes("diff")) {
             argv.push("--dev-url", devUrl);
-        } else if (args.includes("apply") || args.includes("status")) {
+        } else if (args.includes("apply") || args.includes("status") || args.includes("set")) {
             argv.push("--url", url, "--revisions-schema", "rebase");
             // Measured against the pinned binary: `sql/migrate: baseline and
             // allow-dirty are mutually exclusive`. `--baseline` is the caller's

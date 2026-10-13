@@ -320,4 +320,51 @@ describe("Database migration E2E", () => {
         expect(applied.exitCode).toBe(0);
         expect(await doneExists()).toBe(false);
     }, 180_000);
+
+    // ── Scenario 4: A column boot already added, on a database with a history ──
+
+    /**
+     * The development loop: `rebase dev` adds a new column at boot, `db
+     * generate` writes the migration that adds it, and `db migrate` finds it
+     * there (42701). The remedy is `--baseline <version>`, and on a database
+     * that already records migrations Atlas ignored `apply --baseline` without
+     * a word: the CLI printed "Recording … as already applied" and the same
+     * 42701 came back.
+     */
+    it("marks a migration boot already applied with --baseline, on a database that has a history", async () => {
+        const cliScript = resolveCliScript();
+        const tsxBin = path.join(monorepoRoot, "node_modules", ".bin", "tsx");
+        const run = (...args: string[]) => execa(tsxBin, [cliScript, ...args], { cwd: workDir, env, all: true, reject: false });
+        const recorded = async () => (await dbClient.query(
+            "SELECT version FROM rebase.atlas_schema_revisions ORDER BY version"
+        )).rows.map((row: { version: string }) => row.version);
+
+        fs.writeFileSync(path.join(collectionsDir, "tasks.js"), tasksCollectionJs()
+            .replace(/\n\s*done:.*\n/, "\n        priority: { name: \"Priority\", type: \"number\" }\n"));
+        // What boot does with a new property: the column, before any migration.
+        await dbClient.query("ALTER TABLE tasks ADD COLUMN priority numeric");
+        const generated = await run("db", "generate", "--collections", collectionsDir, "add_priority");
+        expect(generated.exitCode).toBe(0);
+        const migrations = fs.readdirSync(path.join(workDir, "drizzle", "migrations")).filter(f => f.endsWith(".sql")).sort();
+        const version = /^(\d+)/.exec(migrations.at(-1) ?? "")?.[1] ?? "";
+        expect(version).not.toBe("");
+        const before = await recorded();
+        expect(before.length).toBeGreaterThan(0);
+
+        const failed = await run("db", "migrate");
+        expect(failed.exitCode).toBe(1);
+        expect(failed.all).toContain("42701");
+        expect(failed.all).toContain(`rebase db migrate --baseline ${version}`);
+
+        const baselined = await run("db", "migrate", "--baseline", version);
+        expect(baselined.all).toContain("Marking every migration up to");
+        expect(baselined.all).not.toContain("42701");
+        expect(baselined.exitCode).toBe(0);
+        expect(await recorded()).toEqual([...before, version]);
+
+        const again = await run("db", "migrate", "--baseline", version);
+        expect(again.exitCode).toBe(0);
+        expect(again.all).toContain(`Nothing to record: this database already records migrations up to ${version}`);
+        expect(again.all).not.toContain("Recording");
+    }, 240_000);
 });

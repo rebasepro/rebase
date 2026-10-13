@@ -118,6 +118,16 @@ describe("the connection flags each subcommand needs", () => {
         expect(argv).toEqual(["migrate", "status", "--url", URL, "--revisions-schema", "rebase"]);
     });
 
+    it("`migrate set` gets the target and the revisions schema, so it edits the history `migrate apply` reads", () => {
+        // `db migrate --baseline` runs it on a database that already has a
+        // history, where Atlas ignores `apply --baseline`.
+        const argv = build("migrate", ["set", "20261013201353", "--dir", "file://drizzle/migrations"], []);
+        expect(argv).toEqual([
+            "migrate", "set", "20261013201353", "--dir", "file://drizzle/migrations",
+            "--url", URL, "--revisions-schema", "rebase"
+        ]);
+    });
+
     it("`migrate hash` needs no connection at all", () => {
         expect(build("migrate", ["hash", "--dir", "file://drizzle/migrations"], []))
             .toEqual(["migrate", "hash", "--dir", "file://drizzle/migrations"]);

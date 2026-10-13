@@ -60,6 +60,7 @@ import { stripCarvedOutStatements } from "./schema/carved-out-migration";
 import { finishNewMigration } from "./schema/migration-post-process";
 import { acceptsExcludeFlag, buildAtlasArgs, migrateApplyArgs, takesDevUrl } from "./schema/atlas-argv";
 import { CommandStopped, ScratchDatabase } from "./cli-scratch-database";
+import { describeBaselinePlan, latestRecordedMigration, planBaseline } from "./schema/migrate-baseline";
 import { promptConfirm } from "./cli-prompt";
 import { applyPoliciesFile, applyPushPlan, stampableTables, type PolicyStamping } from "./cli-push";
 import { unexpectedBranchArgs } from "./branch-argv";
@@ -879,19 +880,26 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
             });
         } else if (subcommand === "migrate") {
             const databaseUrl = process.env.DATABASE_URL;
-            // `--baseline <version>` is relayed to Atlas as its own: it records
-            // the version as already applied and starts from the next one. The
-            // database a Rebase boot has provisioned is exactly the case it is
-            // for, and without it `migrate apply` there is unusable — see
-            // `formatBaselineRemedy`, which is what prints when it is missing.
+            // `--baseline <version>` records the version as already applied and
+            // starts from the next one. The database a Rebase boot has
+            // provisioned is exactly the case it is for, and without it
+            // `migrate apply` there is unusable — see `formatBaselineRemedy`,
+            // which is what prints when it is missing. Atlas's own `--baseline`
+            // does it on a database with no revision history and ignores it in
+            // silence on one that has any, so the history is read first and
+            // `planBaseline` picks the way that works.
             const baseline = argsList["--baseline"];
+            const baselinePlan = baseline
+                ? planBaseline(baseline, databaseUrl ? await latestRecordedMigration(databaseUrl) : null)
+                : null;
+            const atlasBaseline = baselinePlan?.kind === "atlas-baseline" ? baseline : undefined;
             // Opt-in, and first: a refused run writes nothing at all. Atlas's
             // own dry-run lists exactly the statements the apply would run, in
             // the files still pending — the same reading `db push` gates on.
             if (argsList["--refuse-destructive"] === true) {
                 const plan = await runAtlas(
                     "migrate",
-                    [...migrateApplyArgs(argsList._, baseline), "--dry-run"],
+                    [...migrateApplyArgs(argsList._, atlasBaseline), "--dry-run"],
                     collectionsPath,
                     { captureStdout: true }
                 );
@@ -911,11 +919,18 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
             if (databaseUrl) {
                 await ensureAuthSchemaAndFunctions(databaseUrl);
             }
-            if (baseline) {
-                out(chalk.gray(`  Recording ${baseline} as already applied, then migrating from the next one.`));
+            if (baseline && baselinePlan) {
+                out(chalk.gray(`  ${describeBaselinePlan(baseline, baselinePlan)}`));
                 out("");
+                if (baselinePlan.kind === "set") {
+                    await runAtlas("migrate", ["set", baseline, "--dir", "file://drizzle/migrations"], collectionsPath);
+                }
             }
-            await runAtlas("migrate", migrateApplyArgs(argsList._, baseline), collectionsPath);
+            await runAtlas(
+                "migrate",
+                migrateApplyArgs(argsList._, atlasBaseline),
+                collectionsPath
+            );
             if (databaseUrl) {
                 await ensureRlsUserRole(databaseUrl);
                 await retireLegacyAuthSchema(databaseUrl);
