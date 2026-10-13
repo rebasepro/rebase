@@ -20,8 +20,8 @@
  * actually declares (main/module/types/bin/exports), so it stays correct as
  * those change instead of hardcoding dist/index.d.ts.
  */
-import { existsSync, readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { join, relative, resolve } from "node:path";
 
 const pkgDir = process.cwd();
 const pkg = JSON.parse(readFileSync(resolve(pkgDir, "package.json"), "utf8"));
@@ -202,6 +202,47 @@ quietly, and the failure surfaces somewhere that never mentions the library.
 `);
         process.exit(1);
     }
+}
+
+/**
+ * No built file may carry Vite's browser stub for a Node built-in.
+ *
+ * A library build resolves a bare `import readline from "readline"` that the
+ * externals list does not name to `__vite-browser-external`: an empty object.
+ * The build succeeds, every unit test passes (they import the source), and the
+ * published package dies at the call site with `readline.createInterface is
+ * not a function`, which is how every confirmation prompt in the Postgres
+ * driver's CLI reached users. Checked in what was emitted, because the
+ * externals list is the thing that gets edited.
+ */
+const BROWSER_STUB = /__vite-browser-external|__vite_browser_external|__viteBrowserExternal/;
+
+function emittedScripts(dir) {
+    const found = [];
+    if (!existsSync(dir)) return found;
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+        const full = join(dir, entry.name);
+        if (entry.isDirectory()) found.push(...emittedScripts(full));
+        else if (/\.(js|mjs|cjs)$/.test(entry.name)) found.push(full);
+    }
+    return found;
+}
+
+const stubbed = emittedScripts(resolve(pkgDir, "dist"))
+    .filter(file => BROWSER_STUB.test(readFileSync(file, "utf8")))
+    .map(file => relative(pkgDir, file));
+
+if (stubbed.length > 0) {
+    console.error(`\n\x1b[31m✖ ${pkg.name} replaced a Node built-in with Vite's browser stub\x1b[0m in ${stubbed.length} file${stubbed.length === 1 ? "" : "s"}:\n`);
+    for (const file of stubbed) console.error(`    ${file}`);
+    console.error(`
+The stub is an empty object, so the import resolves and the first call on it
+throws at runtime: \`readline.createInterface is not a function\`. A Node
+built-in reached the bundler without being marked external. Externalize every
+built-in with \`isBuiltin\` from "node:module" in this package's vite.config.ts,
+or import it as "node:<name>".
+`);
+    process.exit(1);
 }
 
 const suffix = redirects.length > 0

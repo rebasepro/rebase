@@ -1,3 +1,4 @@
+import { isBuiltin } from "node:module";
 import path from "path";
 
 import { defaultServerConditions, defineConfig } from "vite";
@@ -54,8 +55,13 @@ const isExternal = (id: string) => {
 
     // Externalize only deps the consumer app explicitly installs
     if (CONSUMER_EXTERNALS.some(ext => id === ext || id.startsWith(ext + "/"))) return true;
-    // Externalize Node built-ins
-    if (["fs", "path", "url", "util", "crypto", "http", "https", "net", "tls", "stream", "events", "os", "child_process", "buffer", "assert", "dns", "zlib", "querystring", "process", "module", "worker_threads", "v8", "vm", "string_decoder", "node:"].some(b => id === b || id.startsWith("node:") || id.startsWith(b + "/"))) return true;
+    // Externalize Node built-ins: every one Node itself knows, not a list kept
+    // by hand. A built-in this misses is not inlined. Vite swaps it for its
+    // `__vite-browser-external` stub, an empty object, and the build still
+    // succeeds; the first symptom is `readline.createInterface is not a
+    // function` at a user's confirmation prompt. `assert-build-output.mjs`
+    // fails a build that emits the stub.
+    if (id.startsWith("node:") || isBuiltin(id)) return true;
     // Inline everything else — createRequire banner handles require() for CJS deps
     return false;
 };
