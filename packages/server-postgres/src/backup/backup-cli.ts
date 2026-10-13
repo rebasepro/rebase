@@ -16,6 +16,7 @@ import { out as print, outWarn, outError } from "../cli-output";
 import { parseCommandFlags } from "../cli-flags";
 import { redactConnectionPasswords } from "../utils/connection-string";
 import { promptConfirm } from "../cli-prompt";
+import { checkDatabaseConnectivity } from "../cli-errors";
 import type { StorageController } from "@rebasepro/server";
 import {
     BackupDestination,
@@ -204,6 +205,11 @@ export async function backupCommand(rawArgs: string[]): Promise<void> {
     print(chalk.gray(`  Destination: ${out}`));
     print("");
 
+    // A database that is not running is said the way `db push` says it — the
+    // host, the port and what to start — before pg_dump's version probe meets
+    // it as a bare `connect ECONNREFUSED`.
+    await checkDatabaseConnectivity(connectionString);
+
     // Version pre-flight (doctor-style).
     const pf = await preflight("pg_dump", connectionString);
     if (!pf.compatible) {
@@ -345,6 +351,9 @@ export async function restoreCommand(rawArgs: string[]): Promise<void> {
     print(chalk.gray(`  Source:  ${backupArg}`));
     print(chalk.gray(`  Target:  ${targetDb ?? "(from DATABASE_URL)"}`));
     print("");
+
+    // Before anything is downloaded, and in `db push`'s words: see backupCommand.
+    await checkDatabaseConnectivity(baseConnection);
 
     // Resolve the local file to restore from (download object-storage keys).
     // Also resolve the `.globals.sql` roles sidecar so cluster roles can be

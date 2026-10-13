@@ -1398,16 +1398,23 @@ async function branchCommand(rawArgs: string[]): Promise<void> {
     const { drizzle } = await import("drizzle-orm/node-postgres");
     const { Pool } = await import("pg");
 
+    // A database that is not running is said the way `db push` says it, not
+    // as the Drizzle wrapper of whatever statement met it first.
+    await checkDatabaseConnectivity(databaseUrl);
+
     const pool = new Pool({ connectionString: databaseUrl,
 max: 3 });
     const db = drizzle(pool);
     const poolManager = new DatabasePoolManager(databaseUrl);
     const branchService = new BranchService(db, poolManager);
 
-    // Ensure metadata table exists
-    await branchService.ensureBranchMetadataTable();
-
     try {
+        // The registry table, for the actions that write to it. `list` and
+        // `info` only read, and run no DDL: a database without the table has
+        // no branches.
+        if (branchAction === "create" || branchAction === "delete" || branchAction === "prune") {
+            await branchService.ensureBranchMetadataTable();
+        }
         switch (branchAction) {
             case "create": {
                 const name = rawArgs[3];
@@ -1437,7 +1444,7 @@ max: 3 });
             }
 
             case "list": {
-                const branches = await branchService.listBranches();
+                const branches = await branchService.hasBranchRegistry() ? await branchService.listBranches() : [];
                 out("");
                 if (branches.length === 0) {
                     out(chalk.gray("  No branches found. Create one with: rebase db branch create <name>"));
@@ -1479,7 +1486,7 @@ max: 3 });
                     out(chalk.gray("  Usage: rebase db branch info <name>"));
                     process.exit(1);
                 }
-                const info = await branchService.getBranchInfo(name);
+                const info = await branchService.hasBranchRegistry() ? await branchService.getBranchInfo(name) : undefined;
                 out("");
                 if (!info) {
                     // Exit 1, like `delete` on a branch that is not there.

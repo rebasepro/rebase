@@ -190,6 +190,20 @@ export class BranchService {
     }
 
     /**
+     * Whether the `rebase.branches` registry exists. A database that has never
+     * had a branch made on it may not have it, and reading it there is an
+     * empty answer, not an error — nor a reason to create it. The CLI's `list`
+     * and `info` ask this rather than running the DDL that creates it.
+     */
+    async hasBranchRegistry(): Promise<boolean> {
+        const result = await (await this.home.registry()).execute(
+            sql`SELECT to_regclass('rebase.branches') IS NOT NULL AS present`
+        );
+        const [row] = result.rows;
+        return row !== undefined && Reflect.get(row, "present") === true;
+    }
+
+    /**
      * Ensure the `rebase.branches` metadata table exists in the default database.
      * Idempotent — safe to call on every startup.
      */
