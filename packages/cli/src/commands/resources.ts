@@ -32,7 +32,8 @@ ${chalk.bold("rebase resources")} — what this project needs
   ${chalk.blue("rebase resources")}            List them, declared and implicit
   ${chalk.blue("rebase resources --write")}    Regenerate ${RESOURCE_GRAPH_FILENAME}
   ${chalk.blue("rebase resources --check")}    Fail if the committed graph is stale
-  ${chalk.blue("rebase resources --json")}     The same set, machine-readable
+  ${chalk.blue("rebase resources --json")}     The same set, machine-readable; with --check or --write,
+                               their result too (a failed check is an error envelope, exit 1)
 
 A resource is declared in config code — ${chalk.gray('database("analytics"), bucket("media"), topic("signups")')} —
 and never in ${RESOURCE_GRAPH_FILENAME}, which is generated from those declarations so a host
@@ -161,21 +162,17 @@ export async function resourcesCommand(rawArgs: string[]): Promise<void> {
         return;
     }
 
-    if (asJson) {
-        // The projection, so this and `rebase status --json` describe the same
-        // set. `version` is kept so a reader of either can tell them apart from
-        // a future shape.
-        console.log(JSON.stringify({ version: graph.version, resources: projectResourceGraph(graph) }, null, 2));
-        return;
-    }
+    // The projection, so this and `rebase status --json` describe the same
+    // set. `version` is kept so a reader of either can tell them apart from a
+    // future shape. `--check` and `--write` add what they did to it: `--json`
+    // changes how the answer is printed, never which question is answered — it
+    // used to return here, so `--check --json` exited 0 on any drift and
+    // `--write --json` wrote nothing.
+    const projection = () => ({ version: graph.version, resources: projectResourceGraph(graph) });
 
     if (flags["--check"]) {
         const committed = readResourceGraphFile(projectRoot);
         const expected = serializeResourceGraph(graph);
-        if (committed === expected) {
-            console.log(chalk.green(`✓ ${RESOURCE_GRAPH_FILENAME} matches the declarations.`));
-            return;
-        }
         // Declaring nothing and having no file is a consistent state, not a
         // stale one. The file records declarations; a project with none has
         // nothing to record, and its default database and bucket are implicit
@@ -185,11 +182,30 @@ export async function resourcesCommand(rawArgs: string[]): Promise<void> {
         // This mattered the moment the check was put in a gate: it would have
         // failed this repository's own reference app, which declares nothing,
         // and every scaffolded project until someone declared a second bucket.
-        if (committed === null && graph.resources.length === 0) {
-            console.log(chalk.gray("✓ Nothing declared, so there is nothing to record."));
+        const status = committed === expected
+            ? "current"
+            : committed === null && graph.resources.length === 0 ? "nothing-declared" : null;
+
+        if (status !== null) {
+            if (asJson) {
+                console.log(JSON.stringify({ ...projection(), check: { file: RESOURCE_GRAPH_FILENAME, status } }, null, 2));
+                return;
+            }
+            console.log(status === "current"
+                ? chalk.green(`✓ ${RESOURCE_GRAPH_FILENAME} matches the declarations.`)
+                : chalk.gray("✓ Nothing declared, so there is nothing to record."));
             return;
         }
-        console.error(chalk.red(`\n✗ ${RESOURCE_GRAPH_FILENAME} is ${committed === null ? "missing" : "stale"}.\n`));
+
+        const state = committed === null ? "missing" : "stale";
+        if (asJson) {
+            failAsJson(
+                `${RESOURCE_GRAPH_FILENAME} is ${state}.`,
+                `resource_graph_${state}`,
+                "Regenerate it with `rebase resources --write`, and commit it."
+            );
+        }
+        console.error(chalk.red(`\n✗ ${RESOURCE_GRAPH_FILENAME} is ${state}.\n`));
         console.error(
             "  A host reads this file to decide what to provision, so a stale one means the\n" +
             "  console offers one set of resources while the runtime asks for another.\n"
@@ -201,9 +217,19 @@ export async function resourcesCommand(rawArgs: string[]): Promise<void> {
 
     if (flags["--write"]) {
         const { changed, file } = writeResourceGraphFile(projectRoot, graph);
+        const relative = path.relative(projectRoot, file);
+        if (asJson) {
+            console.log(JSON.stringify({ ...projection(), written: { file: relative, changed } }, null, 2));
+            return;
+        }
         console.log(changed
-            ? chalk.green(`✓ Wrote ${path.relative(projectRoot, file)}`)
-            : chalk.gray(`${path.relative(projectRoot, file)} already matched the declarations.`));
+            ? chalk.green(`✓ Wrote ${relative}`)
+            : chalk.gray(`${relative} already matched the declarations.`));
+        return;
+    }
+
+    if (asJson) {
+        console.log(JSON.stringify(projection(), null, 2));
         return;
     }
 
