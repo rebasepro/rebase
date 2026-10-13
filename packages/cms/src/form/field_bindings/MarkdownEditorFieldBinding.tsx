@@ -22,6 +22,7 @@ import type { RichTextEditorProps } from "../../editor";
 import { resolveStorageFilenameString, resolveStoragePathString } from "@rebasepro/common";
 import { randomString } from "@rebasepro/utils";
 import { useImageSrcResolver } from "../../hooks/useStorageReferenceResolver";
+import { useProvidedEditorAIController } from "../../contexts/EditorAIControllerContext";
 
 // Lazy-load ProseMirror editor + markdown parser/serializer (~300KB)
 // Only fetched when a markdown field is actually rendered.
@@ -108,6 +109,10 @@ export function MarkdownEditorFieldBinding({
 
     // How the editor shows an image the text names by reference.
     const resolveImageSrc = useImageSrcResolver();
+
+    // The AI continuation a plugin gives the form's markdown fields, if any;
+    // the field's own `editorProps.aiController`, spread below, wins.
+    const aiController = useProvidedEditorAIController();
 
     const entityValues = context.values;
     const entityId = context.entityId;
@@ -236,6 +241,7 @@ export function MarkdownEditorFieldBinding({
             return storageReference(result.key, storageSourceKey);
         }}
         resolveImageSrc={resolveImageSrc}
+        aiController={aiController}
         {...editorProps}
     />
     </Suspense>;

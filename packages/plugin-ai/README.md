@@ -114,6 +114,13 @@ A non-2xx answer to `/autofill` or `/autocomplete` carries its message as
 
 ### Editor AI Autocomplete
 
+The plugin gives every markdown field in a form the **Autocomplete** slash
+command on its own, behind the same gate as Autofill (`GET /status` available,
+and `getConfigForPath` allowing the collection). It does this through
+`EditorAIControllerProvider` from `@rebasepro/cms`; a field whose
+`customProps.editorProps.aiController` names one keeps its own. The hook below
+is for a rich-text editor you render yourself:
+
 ```tsx
 import { useEditorAIController } from "@rebasepro/plugin-ai";
 

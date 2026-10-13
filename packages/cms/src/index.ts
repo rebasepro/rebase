@@ -3,6 +3,8 @@ export * from "./types";
 // Editor types only — the full ProseMirror editor (RichTextEditor) is a heavy import (~300 KB)
 // and is available as a separate entry point: @rebasepro/cms/editor
 export type { RichTextEditorProps, RichTextEditorTextSize, JSONContent, EditorAIController } from "./editor";
+// The markdown field's AI controller, as a plugin gives it to a form (light: no editor import).
+export { EditorAIControllerProvider, useProvidedEditorAIController } from "./contexts/EditorAIControllerContext";
 export * from "./form";
 export * from "./preview";
 export * from "./routes";

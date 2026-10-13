@@ -40,7 +40,8 @@ import { DataEnhancementController } from "../types/data_enhancement_controller"
  */
 
 jest.mock("@rebasepro/cms", () => ({
-    getFieldId: (property: { type?: string }) => (property?.type === "string" ? "text_field" : "number_field")
+    getFieldId: (property: { type?: string }) => (property?.type === "string" ? "text_field" : "number_field"),
+    EditorAIControllerProvider: ({ children }: { children: unknown }) => children
 }));
 
 const COLLECTION = {

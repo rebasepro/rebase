@@ -30,7 +30,8 @@ import type { Properties } from "@rebasepro/types";
  */
 
 jest.mock("@rebasepro/cms", () => ({
-    getFieldId: (property: { type?: string }) => (property?.type === "string" ? "text_field" : "number_field")
+    getFieldId: (property: { type?: string }) => (property?.type === "string" ? "text_field" : "number_field"),
+    EditorAIControllerProvider: ({ children }: { children: unknown }) => children
 }));
 
 jest.mock("../utils/properties", () => {

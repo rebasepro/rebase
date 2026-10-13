@@ -159,6 +159,14 @@ import { useDataEnhancementPlugin } from "@rebasepro/plugin-ai";
 const enhancementPlugin = useDataEnhancementPlugin();
 ```
 
+It adds an Autofill action to every form, and an **Autocomplete** slash command
+to every markdown field, which continues the text from the cursor. Both appear
+only where the plugin is enabled: the service reports itself available and
+`getConfigForPath` (when you pass one) allows the collection. A field whose
+`customProps.editorProps.aiController` names a controller of its own uses that
+one. Another plugin can give markdown fields a controller the same way, with
+`EditorAIControllerProvider` from `@rebasepro/cms` in a form-scoped provider.
+
 ![Data enhancement](/img/data_enhancement.png)
 
 :::caution[This one sends data off your machine]

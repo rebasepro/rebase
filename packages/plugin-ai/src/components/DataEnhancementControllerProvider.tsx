@@ -9,6 +9,7 @@ import {
 } from "../types/data_enhancement_controller";
 import { CollectionConfig, User } from "@rebasepro/types";
 import { PluginFormActionProps } from "@rebasepro/cms-types";
+import { EditorAIControllerProvider } from "@rebasepro/cms";
 import { useAuthController } from "@rebasepro/app";
 import { autofillStream, fetchAiStatusCached, fetchPromptSuggestions } from "../api";
 import { getSimplifiedProperties } from "../utils/properties";
@@ -349,7 +350,12 @@ selected }))
     return (
         <DataEnhancementControllerContext.Provider
             value={dataEnhancementController}>
-            {children}
+            {/* The form's markdown fields continue text through the same
+                service, behind the same gate as Autofill: nothing until the
+                service is available and the host allows this collection. */}
+            <EditorAIControllerProvider controller={enabled ? editorAIController : undefined}>
+                {children}
+            </EditorAIControllerProvider>
         </DataEnhancementControllerContext.Provider>
     );
 }
