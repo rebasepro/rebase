@@ -305,7 +305,7 @@ interface EnqueueOptions { delayMs, idempotencyKey, maxAttempts }
 interface ErrorResponse { error }
 interface FetchCollectionOptions { collection, databaseId, filter, limit, offset, order, orderBy, searchString, startAfter }
 interface FunctionUser { email, roles, uid }
-interface GCSStorageConfig { allowedMimeTypes, bucket, credentials, keyFilename, maxFileSize, projectId, signedUrlExpiration, type }
+interface GCSStorageConfig { allowedMimeTypes, bucket, credentials, keyFilename, maxFileSize, projectId, type }
 interface GoogleProviderConfig { clientId, clientSecret }
 interface ImageTransformOptions { fit, format, height, quality, width }
 interface ImpersonationRequest { audit, caller, credential, requestedUid, resolveUser }
@@ -363,7 +363,7 @@ interface RlsAuditConfig { connectionString, enabled, intervalMs, runOnBoot, sca
 interface RlsAuditStatus { enabled, lastError, lastRunAt, reason, result }
 interface RlsScanFinding { id, severity, target, title }
 interface RlsScanResult { database, findings, scannedAt, stats }
-interface S3StorageConfig { accessKeyId, allowedMimeTypes, bucket, endpoint, forcePathStyle, maxFileSize, region, secretAccessKey, signedUrlExpiration, type }
+interface S3StorageConfig { accessKeyId, allowedMimeTypes, bucket, endpoint, forcePathStyle, maxFileSize, region, secretAccessKey, type }
 interface SMTPConfig { auth, host, maxConnections, name, port, secure, timeoutMs }
 interface SchemaProvisioningOptions { provision }
 interface SearchOptions { collection, databaseId, filter, limit, order, orderBy }

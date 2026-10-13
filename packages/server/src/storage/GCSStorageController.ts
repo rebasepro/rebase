@@ -181,10 +181,10 @@ export class GCSStorageController implements StorageController {
         }
 
         const client = await this.getClient();
-        const expiresIn = this.config.signedUrlExpiration ?? 3600;
+        // Good for an hour. Server-side callers only: no route hands it out.
         const [url] = await client.bucket(metadata.bucket).file(metadata.fullPath).getSignedUrl({
             action: "read",
-            expires: Date.now() + expiresIn * 1000
+            expires: Date.now() + 3600 * 1000
         });
 
         return {

@@ -63,7 +63,6 @@ The `storage` option in `initializeRebaseBackend()` accepts three forms:
 | `forcePathStyle` | `boolean` | Auto-enabled when `endpoint` is set | Use path-style URLs (required for MinIO) |
 | `maxFileSize` | `number` | `52428800` (50 MB) | Maximum file size in bytes |
 | `allowedMimeTypes` | `string[]` | `undefined` (all allowed) | Restrict uploads to these MIME types |
-| `signedUrlExpiration` | `number` | `3600` | Signed URL expiry in seconds |
 
 ### GCSStorageConfig
 
@@ -74,7 +73,6 @@ The `storage` option in `initializeRebaseBackend()` accepts three forms:
 | `projectId` | `string` | `undefined` | Google Cloud project ID (auto-detected from credentials if omitted) |
 | `maxFileSize` | `number` | `52428800` (50 MB) | Maximum file size in bytes |
 | `allowedMimeTypes` | `string[]` | `undefined` (all allowed) | Restrict uploads to these MIME types |
-| `signedUrlExpiration` | `number` | `3600` | Signed URL expiry in seconds |
 
 > **IMPORTANT FOR AGENTS:** GCS requires `@google-cloud/storage` as a peer dependency. Install it: `pnpm add @google-cloud/storage`. Authentication uses Application Default Credentials — set the `GOOGLE_APPLICATION_CREDENTIALS` environment variable to point to a service account key file, or rely on the default credentials when running on GCP.
 
@@ -187,7 +185,6 @@ const backend = await initializeRebaseBackend({
         secretAccessKey: process.env.S3_SECRET_ACCESS_KEY!,
         endpoint: process.env.S3_ENDPOINT,       // For MinIO, R2, etc.
         forcePathStyle: true,                     // Required for MinIO
-        signedUrlExpiration: 3600,                // URL expiry in seconds
     },
 });
 ```

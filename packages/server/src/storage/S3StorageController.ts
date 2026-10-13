@@ -250,8 +250,8 @@ export class S3StorageController implements StorageController {
                 Key: resolvedPath
             });
 
-            const expiresIn = this.config.signedUrlExpiration ?? 3600;
-            const url = await presigner.getSignedUrl(client, getCommand, { expiresIn });
+            // Good for an hour. Server-side callers only: no route hands it out.
+            const url = await presigner.getSignedUrl(client, getCommand, { expiresIn: 3600 });
 
             const metadata: DownloadMetadata = {
                 bucket: resolvedBucket,

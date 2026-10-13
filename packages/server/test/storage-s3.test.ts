@@ -163,9 +163,8 @@ describe("S3StorageController", () => {
             expect(result.metadata?.fullPath).toBe("uploads/test.txt");
         });
 
-        it("honours a configured signed-URL expiry and an s3:// bucket override", async () => {
-            const scoped = new S3StorageController({ ...defaultConfig,
-signedUrlExpiration: 60 });
+        it("signs for an hour and honours an s3:// bucket override", async () => {
+            const scoped = new S3StorageController(defaultConfig);
             mockSend.mockResolvedValueOnce({
                 ContentType: "text/plain",
                 ContentLength: 1,
@@ -182,7 +181,7 @@ signedUrlExpiration: 60 });
             expect(getSignedUrl).toHaveBeenCalledWith(
                 expect.anything(),
                 expect.any(GetObjectCommand),
-                { expiresIn: 60 }
+                { expiresIn: 3600 }
             );
         });
 

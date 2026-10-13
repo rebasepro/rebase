@@ -56,8 +56,6 @@ export interface S3StorageConfig {
     maxFileSize?: number;
     /** Allowed MIME types (if not set, all types allowed) */
     allowedMimeTypes?: string[];
-    /** URL expiration time in seconds for signed URLs (default: 3600) */
-    signedUrlExpiration?: number;
 }
 
 /**
@@ -77,8 +75,6 @@ export interface GCSStorageConfig {
     maxFileSize?: number;
     /** Allowed MIME types */
     allowedMimeTypes?: string[];
-    /** Signed URL expiration in seconds (default: 3600) */
-    signedUrlExpiration?: number;
 }
 
 /**
@@ -135,7 +131,12 @@ export interface StorageController {
     putObject(props: UploadFileProps, options?: PutObjectOptions): Promise<UploadFileResult>;
 
     /**
-     * Get a download URL (signed URL equivalent) for an object
+     * Get a download URL (signed URL equivalent) for an object.
+     *
+     * For server-side code only: no route hands this URL to a client. A
+     * client reads a private object through `/file/*` with the download
+     * token `GET /metadata/*` mints. The built-in S3 and GCS controllers sign
+     * it for an hour.
      */
     getSignedUrl(key: string, bucket?: string): Promise<DownloadConfig>;
 
