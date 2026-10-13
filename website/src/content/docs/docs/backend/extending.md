@@ -211,7 +211,7 @@ a thing a Rebase router did.
 **Scope:** the process.
 
 <span class="since-badge" data-since="0.25">Since 0.25</span>
-`initializeRebaseBackend` is a shortcut over four public calls, and this rung
+`initializeRebaseBackend` is a shortcut over a few public calls, and this rung
 is calling them yourself. `createRebaseBackend` builds the backend and mounts,
 starts and listens to nothing. `backend.routes` holds each route group as a
 Hono sub-app you can mount alone, at any path. `mount`, `attachRealtime` and

@@ -648,6 +648,8 @@ The `shutdown(timeoutMs?: number, options?: { server })` method (default timeout
 >
 > const backend = await initializeRebaseBackend({ ... });
 > ```
+>
+> `configureJwt` sets the **process default** that the module-level helpers (`verifyAccessToken`, `extractUserFromToken`, …) answer for. From 0.25, a backend given `auth.jwtSecret` signs and verifies with its own keys (`backend.services.jwt`), whatever the default holds; a backend with no secret of its own (an `AuthAdapter`) follows the default.
 
 ## Important Notes
 

@@ -1,7 +1,11 @@
 # The `rebase` singleton
 
 Once `initializeRebaseBackend()` has completed — and inside every request, cron
-run and job a backend serves — a server-side singleton is available:
+run and job a backend serves — a server-side singleton is available. Which
+backend it is depends on where it is read (0.25+): inside a request, cron run or
+job, the backend serving it; anywhere else, the **process default**, which
+`initializeRebaseBackend` sets to its backend and `setDefaultBackend(backend)`
+sets to one built with `createRebaseBackend` (which sets nothing itself):
 
 ```typescript
 import { rebase } from "@rebasepro/server";
@@ -12,8 +16,9 @@ import { rebase } from "@rebasepro/server";
 ### How It Works
 
 The singleton is a JavaScript `Proxy` object. Any property access on `rebase.*` is intercepted:
-- If a backend is running, the access is forwarded to that backend's in-process client — the object a backend exposes as `backend.rebase`.
-- If the server **has not** been initialized yet, a descriptive error is thrown: `"rebase.<prop>: server not initialized yet"`.
+- Inside a request, cron run or job a backend serves, the access is forwarded to that backend's in-process client — the object it exposes as `backend.rebase`. `ctx.rebase` in a function or cron is the same object. Two backends in one process each see themselves (0.25+).
+- Anywhere else it is forwarded to the process default's client (`setDefaultBackend`, or `initializeRebaseBackend`).
+- If there is neither, a descriptive error is thrown: `"rebase.<prop>: server not initialized yet"`. A script that built a backend with `createRebaseBackend` either calls `setDefaultBackend(backend)` or uses `backend.rebase` directly.
 - The proxy is **read-only** — attempting to assign `rebase.anything = value` throws.
 
 The singleton has **two planes**, and they do not work the same way:

@@ -79,6 +79,11 @@ const app = new Hono<HonoEnv>();
 app.route("/hooks", backend.routes.functions());   // /hooks/send-invoice
 ```
 
+Inside a function this backend serves, `rebase` (imported or from the
+`defineFunction` context) is this backend, even with several backends in one
+process (0.25+). Outside its requests, `rebase` is the process default: call
+`setDefaultBackend(backend)` if code outside requests imports it.
+
 ## Creating a Function
 
 Use `defineFunction` — it gives you a pre-typed Hono app plus the `rebase`

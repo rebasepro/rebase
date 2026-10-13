@@ -11,12 +11,13 @@ They take the same options; what differs is who mounts and starts it.
   workers, sweeps), and returns the backend. This is what an ejected project's
   entry point calls.
 - **`createRebaseBackend(options)`** (new in 0.25) — builds the same backend and
-  mounts, starts and listens to **nothing**. `initializeRebaseBackend` is this
-  followed by `backend.mount(app, { basePath })`, `await backend.attachRealtime(server)`
-  and `backend.start()`, plus the process-wide setup a backend built by hand
-  leaves to you (a `process.on("unhandledRejection")` handler that logs instead
-  of exiting). Drop to it when the shortcut stops fitting: only some route
-  groups, another path, timers in another process, or no server at all.
+  mounts, starts and listens to **nothing**, and writes no process global.
+  `initializeRebaseBackend` is exactly `installUnhandledRejectionHandler()`,
+  `createRebaseBackend(…)`, `setDefaultBackend(backend)`,
+  `backend.mount(app, { basePath })`, `await backend.attachRealtime(server)` and
+  `backend.start()`. Drop to it when the shortcut stops fitting: only some route
+  groups, another path, timers in another process, two backends in one process,
+  or no server at all.
 
 A scaffolded project builds neither: `rebase dev` and the published runtime boot
 from the bundle, reading collections and hooks from `config/` and everything else
@@ -154,6 +155,8 @@ Both calls return a `RebaseBackend`. `RebaseBackendInstance`, the name
 | `attachRealtime(server, { path })` | `Promise<void>` | New in 0.25. Attach the realtime socket. It answers upgrades on `path` only — by default the `mount()` base path minus `/api` (`/api` → `/`, where the SDK dials) — and leaves other upgrades to the server's other listeners. Once only |
 | `start()` | `void` | New in 0.25. Start the timers: cron scheduler, job workers, expired-token and history-retention sweeps, metrics sampler, RLS audit — each where `ownership` gives it to this process. Idempotent |
 | `fetch(request)` | `Promise<Response>` | New in 0.25. The whole backend as one fetch handler, laid out at `/api` — for tests and scripts, no server or port: `backend.fetch(new Request("http://local/api/data/posts"))` |
+| `services` | `BackendServices` | New in 0.25. The backend's own state: `jwt` (a `JwtService`: sign/verify sessions, JWKS, download tokens), `access` (access model + key-owner resolver), `apiKeyStore`, `rateLimitStore`, `authLimiters`, `collections()`, `topics`, `queues` |
+| `verifyCredential(token)` | `Promise<VerifiedCredential \| null>` | New in 0.25. Check a session token or an `rk_` API key against this backend's keys, store and access model: `{ uid, roles, scopes, kind }` |
 | `driver` | `DataDriver` | The default data driver |
 | `driverRegistry` | `DriverRegistry` | Registry of all initialized drivers |
 | `realtimeService` | `RealtimeProvider` | Default realtime provider |
@@ -248,9 +251,18 @@ another path, attach no socket, or leave `start()` to another process.
 import { createServer } from "node:http";
 import { Hono } from "hono";
 import { getRequestListener } from "@hono/node-server";
-import { createRebaseBackend, installShutdownHandlers, loadFunctions, type HonoEnv } from "@rebasepro/server";
+import {
+    createRebaseBackend,
+    installShutdownHandlers,
+    installUnhandledRejectionHandler,
+    loadFunctions,
+    setDefaultBackend,
+    type HonoEnv
+} from "@rebasepro/server";
 import { createPostgresAdapter, createPostgresDatabaseConnection } from "@rebasepro/server-postgres";
 import collections from "../config/collections";
+
+installUnhandledRejectionHandler();          // log a stray rejection instead of exiting (process-wide)
 
 const { db, pool, connectionString } = createPostgresDatabaseConnection(process.env.DATABASE_URL!);
 const app = new Hono<HonoEnv>();
@@ -265,6 +277,7 @@ const backend = await createRebaseBackend({
     provision: true                                     // required: may it run DDL?
 });
 
+setDefaultBackend(backend);                 // `import { rebase }` and the module-level helpers answer for it
 backend.mount(app, { basePath: "/api" });   // or: app.route("/v2/data", backend.routes.data())
 await backend.attachRealtime(server);        // the socket answers on "/" for an API at /api
 backend.start();                             // crons, job workers, sweeps
@@ -282,6 +295,33 @@ carries its own auth context, rate limits and admin gate, so `getUser(c)` and
 hygiene in front of every group: request ids, the global body limit,
 compression, CSRF, the request log and the JSON error envelope. Mounting groups
 one by one, add your own (`hono/body-limit`, `app.onError(errorHandler)`).
+
+### Each backend owns its state; the module-level API answers for the default (0.25+)
+
+`createRebaseBackend` writes no process global. A backend keeps its JWT keys,
+access model, API-key store, rate limiters, collections and topic/queue runtimes
+in `backend.services` (`jwt`, `access`, `apiKeyStore`, `rateLimitStore`,
+`authLimiters`, `collections()`, `topics`, `queues`), so two backends in one
+process each sign, verify, judge scopes and count limits for themselves.
+A backend given no `auth.jwtSecret` (an `AuthAdapter`) follows the process
+default's JWT config.
+
+- `rebase` (imported, or `ctx.rebase`), topic `publish` and queue `enqueue`
+  resolve to the backend **serving** the current request, cron run or job.
+  Anywhere else they answer for the **process default**.
+- The process default is set by `setDefaultBackend(backend)`;
+  `initializeRebaseBackend` and the bundle boot set it to their backend.
+  `configureJwt` / `configureAccess` still set its JWT config / access model
+  directly. The module-level helpers (`verifyAccessToken`, `getAccessModel`,
+  `verifyCredential`, `extractUserFromToken`, …) answer for the default.
+- `backend.verifyCredential(token)` checks a session token or an `rk_` key
+  against that backend: `{ uid, roles, scopes, kind }` or `null`.
+- `backend.services.jwt.generateAccessToken(uid, roles)` mints a session for that
+  backend (tests, a custom login). `createJwtService({ secret })` builds a
+  JWT service on its own.
+- A route of your own outside the groups is judged by a backend once
+  `c.set("services", backend.services)` runs before its guards (`requireAuth`,
+  `requireScope` from `@rebasepro/server`); unset, they use the default.
 
 With `provision: false` and no server, the same call is how a test or a script
 gets a whole backend: `backend.rebase.dataAsAdmin`, or `backend.fetch(request)`

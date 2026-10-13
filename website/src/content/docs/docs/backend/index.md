@@ -54,10 +54,13 @@ const instance = await initializeRebaseBackend({
 ```
 
 <span class="since-badge" data-since="0.25">Since 0.25</span> That one call is
-a shortcut over public steps: `createRebaseBackend` builds the backend, and
-`mount`, `attachRealtime` and `start` serve it. To mount only some route groups,
-put them at other paths, or leave the timers to another process, call the steps
-yourself. See [Custom Server Integration](/docs/backend/custom-server/).
+a shortcut over public steps: `installUnhandledRejectionHandler` keeps a stray
+rejection from ending the process, `createRebaseBackend` builds the backend,
+`setDefaultBackend` makes it the one the module-level API answers for, and
+`mount`, `attachRealtime` and `start` serve it. To mount only some route
+groups, put them at other paths, leave the timers to another process, or run
+two backends in one process, call the steps yourself. See
+[Custom Server Integration](/docs/backend/custom-server/).
 
 ## Where each option lives
 
@@ -285,11 +288,12 @@ instance.shutdown()          // Drain and stop; also closes the server it was gi
 ```
 
 <span class="since-badge" data-since="0.25">Since 0.25</span> It also carries
-`rebase`, the in-process client, `fetch(request)`, and `routes`, the route
-groups as Hono sub-apps; see
+`rebase`, the in-process client, `fetch(request)`, `routes`, the route groups
+as Hono sub-apps, `services`, its own JWT keys, access model, API-key store and
+rate limiters, and `verifyCredential(token)`; see
 [Custom Server Integration](/docs/backend/custom-server/).
 
-> **Note:** While the `instance` exposes these internal services, application code (such as custom functions and cron jobs) should use the global `rebase` singleton from `@rebasepro/server` to interact with the backend API.
+> **Note:** While the `instance` exposes these internal services, application code (such as custom functions and cron jobs) should use the `rebase` singleton from `@rebasepro/server` to interact with the backend API. <span class="since-badge" data-since="0.25">Since 0.25</span> Inside a request, cron run or job, `rebase` is the backend serving it; elsewhere it is the process default, which `initializeRebaseBackend` sets to its backend.
 
 ## REST API
 

@@ -216,6 +216,14 @@ pieces you can call yourself:
   `app.route("/hooks", backend.routes.functions())` — `routes.auth()`, `data()`,
   `storage()`, `functions()`, `admin()`, `cron()`, `meta()`. `backend.fetch(request)`
   serves the whole API with no server, and `backend.rebase` is the in-process client.
+- **A backend built by hand writes no process global** (0.25+): its JWT keys,
+  access model, API keys and limits are in `backend.services`, so two backends
+  in one process stay two. `import { rebase }` / `ctx.rebase` resolve to the
+  backend serving the request, cron run or job, and elsewhere to the process
+  default — `setDefaultBackend(backend)`, which `initializeRebaseBackend` calls
+  for you (its other added step is `installUnhandledRejectionHandler()`).
+  `backend.verifyCredential(token)` checks a session or `rk_` key against one
+  backend.
 - **`provision` is required on `createRebaseBackend`:** `true` creates what the
   backend serves (tables, RLS policies, change capture), `false` changes nothing
   in the database (a script, a test, a second process), and
@@ -321,7 +329,7 @@ Read these when you need them, not before.
 
 ### Singleton Errors
 
-- **`rebase.<prop>: server not initialized yet`:** You are accessing the `rebase` singleton at module import time or before `initializeRebaseBackend()` (or `createRebaseBackend()`) has completed. Move the access inside a handler, hook, or function body. A standalone script has no backend to wait for: use `openRebase` (see *Exploring data from a script*).
+- **`rebase.<prop>: server not initialized yet`:** You are accessing the `rebase` singleton at module import time, or before `initializeRebaseBackend()` has completed, or outside any request of a backend built with `createRebaseBackend()` that was never made the default (`setDefaultBackend(backend)`, 0.25+). Move the access inside a handler, hook, or function body, or use `backend.rebase`. A standalone script has no backend to wait for: use `openRebase` (see *Exploring data from a script*).
 - **`Cannot set rebase.<prop> directly`:** The singleton is read-only. You cannot assign properties to it.
 - **`_setRebaseMock can only be called in a test environment`:** Set `NODE_ENV=test` before calling `_setRebaseMock()`.
 

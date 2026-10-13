@@ -78,25 +78,34 @@ exported.
 `initializeRebaseBackend` is these calls, and nothing else:
 
 ```typescript
-import { createRebaseBackend } from "@rebasepro/server";
+import { createRebaseBackend, installUnhandledRejectionHandler, setDefaultBackend } from "@rebasepro/server";
 
+installUnhandledRejectionHandler();
 const backend = await createRebaseBackend({ ...options, provision: true });
+setDefaultBackend(backend);
 backend.mount(app, { basePath: "/api" });
 await backend.attachRealtime(server);
 backend.start();
 ```
 
-It also installs the process-wide `unhandledRejection` handler, and the
-`shutdown()` it returns closes the server it was given. Here is the same thing
-written out in a server of your own, ready to change:
+The `shutdown()` it returns also closes the server it was given. Here is the
+same thing written out in a server of your own, ready to change:
 
 ```typescript
 import { createServer } from "node:http";
 import { Hono } from "hono";
 import { getRequestListener } from "@hono/node-server";
-import { createRebaseBackend, installShutdownHandlers, type HonoEnv } from "@rebasepro/server";
+import {
+    createRebaseBackend,
+    installShutdownHandlers,
+    installUnhandledRejectionHandler,
+    setDefaultBackend,
+    type HonoEnv
+} from "@rebasepro/server";
 import { createPostgresAdapter, createPostgresDatabaseConnection } from "@rebasepro/server-postgres";
 import { collections } from "./collections";
+
+installUnhandledRejectionHandler();
 
 const app = new Hono<HonoEnv>();
 const server = createServer({ maxHeaderSize: 64 * 1024 }, getRequestListener(app.fetch));
@@ -109,6 +118,7 @@ const backend = await createRebaseBackend({
     provision: true
 });
 
+setDefaultBackend(backend);
 backend.mount(app, { basePath: "/api" });
 await backend.attachRealtime(server);
 backend.start();
@@ -129,6 +139,8 @@ of the rest is a call you make, or leave out:
 
 | Call | What it does | Leave it out and |
 |---|---|---|
+| `installUnhandledRejectionHandler()` | Logs a promise rejection nothing handled, such as a fire-and-forget call in a custom function, instead of letting Node end the process. Process-wide, so it is the process's decision, not a backend's. Returns a function that uninstalls it, or `undefined` when one was already installed or `REBASE_EXIT_ON_UNHANDLED_REJECTION` is set. | an unhandled rejection ends the process, Node's default |
+| `setDefaultBackend(backend)` | Makes this backend the [process default](#several-backends-in-one-process): what `import { rebase }` and the rest of the module-level API answer for outside the requests, cron runs and jobs a backend serves | that API has no backend to answer for there |
 | `backend.mount(app, { basePath })` | Every route group under `basePath` (default `/api`), behind the process-wide middleware: request ids, the body limit, compression, CSRF, the request log, and the JSON envelope for errors and unknown paths. Also the JWKS document, the MCP server, the OpenAPI docs and the legacy route aliases. | nothing is served over HTTP; `backend.rebase` and `backend.fetch` still work |
 | `backend.attachRealtime(server, { path })` | The realtime socket, on `server`, answering upgrades on `path` only | there are no live queries |
 | `backend.start()` | The cron scheduler, the job workers, the expired-token and history-retention sweeps, the metrics sampler and the scheduled RLS audit, each where `ownership` gives it to this process. Safe to call twice. | none of them runs, which is what a request-serving process in a [split deployment](/docs/deployment/split-processes/) wants |
@@ -216,9 +228,8 @@ of the `mount()` layout, so only `mount()` serves them.
 <span class="since-badge" data-since="0.25">Since 0.25</span>
 
 A backend you have built can be used without mounting anything.
-`backend.rebase` is the in-process client, the object `rebase` from
-`@rebasepro/server` becomes, and `backend.fetch(request)` answers a `Request`
-as `mount()` would at `/api`:
+`backend.rebase` is its in-process client, and `backend.fetch(request)`
+answers a `Request` as `mount()` would at `/api`:
 
 ```typescript
 const backend = await createRebaseBackend({ database: adapter, collections, provision: false });
@@ -236,6 +247,72 @@ middleware you added to your own app does not run on them.
 
 For a script that only needs the data, [`openRebase`](/docs/backend/scripts/)
 opens the database without building a backend at all.
+
+## Several backends in one process
+
+<span class="since-badge" data-since="0.25">Since 0.25</span> On 0.24 the JWT
+configuration, the access model, the API-key store, the rate-limit store and
+`rebase` are process globals, and the last backend built wins all of them.
+
+`createRebaseBackend` writes no process global. Each backend holds its own
+state in `backend.services`, so two of them in one process stay two: each
+signs and verifies sessions with its own keys, judges scopes by its own roles,
+checks API keys in its own store and counts rate limits in its own store.
+
+```typescript
+const a = await createRebaseBackend({ database: adapterA, auth: { jwtSecret: SECRET_A }, collections, provision: true });
+const b = await createRebaseBackend({ database: adapterB, auth: { jwtSecret: SECRET_B }, collections, provision: true });
+
+app.route("/a/data", a.routes.data());
+app.route("/b/data", b.routes.data());   // a session from `a` is a 401 here
+```
+
+| `backend.services` | What it is |
+|---|---|
+| `jwt` | The backend's JWT service: signs and verifies sessions, download links and its other tokens, and serves its JWKS |
+| `access` | Its access model (roles to scopes) and the resolver for a personal key's owner |
+| `apiKeyStore` | Where its API keys are checked |
+| `rateLimitStore`, `authLimiters` | Its rate-limit counters, and the limiters on its auth routes |
+| `collections()` | The collections it serves |
+| `topics`, `queues` | Its topic and queue runtimes |
+
+A backend given no `auth.jwtSecret`, such as one whose `auth` is an adapter,
+signs nothing of its own, so its `services.jwt` follows the process default.
+
+**Where `rebase` goes.** Inside a request, a cron run or a job that a backend
+serves, `rebase`, whether imported from `@rebasepro/server` or received as
+`ctx.rebase`, is that backend, and so are topic `publish` and queue `enqueue`.
+Anywhere else (module scope, a script, a test) they answer for the **process
+default**, which `setDefaultBackend(backend)` sets, and which
+`initializeRebaseBackend` sets to its own backend. So does the rest of the
+module-level API: `verifyAccessToken` and the other JWT helpers,
+`getAccessModel`, `verifyCredential` and `extractUserFromToken`.
+
+Three pieces work on one backend directly, and one on no backend at all:
+
+```typescript
+import { createJwtService, requireScope } from "@rebasepro/server";
+
+// Mint a session for this backend, in a test or a login of your own.
+const token = await backend.services.jwt.generateAccessToken("u1", ["editor"]);
+
+// Check a session token or an rk_ API key against this backend, for a socket
+// or a tunnel of your own: its uid, roles, scopes and kind, or null.
+const caller = await backend.verifyCredential(token);
+
+// A route of your own, outside the groups, judged by this backend.
+app.post("/deploy", (c, next) => { c.set("services", backend.services); return next(); },
+    requireScope("project:deploy"), (c) => c.json({ ok: true }));
+
+// A JWT service on its own.
+const jwt = createJwtService({ secret: process.env.JWT_SECRET!, accessExpiresIn: "15m" });
+const payload = await jwt.verifyAccessToken(token);
+```
+
+Every route group sets `c.var.services` itself. A route outside the groups
+that uses `requireAuth`, `requireScope` or another guard from
+`@rebasepro/server` reads it there, and falls back to the process default when
+it is unset.
 
 ## Shutting down
 
