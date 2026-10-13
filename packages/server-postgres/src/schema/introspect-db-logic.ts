@@ -1098,10 +1098,15 @@ export function generateCollectionFile(
                 const fallback = literalDefaultOf(col, finalPropType);
                 if (fallback && "source" in fallback) extra += `\n            defaultValue: ${fallback.source},`;
                 else if (fallback) {
-                    fileNotes.push(fallback.note);
                     // An expression only the database evaluates: on a NOT NULL
-                    // column, a required value a create may leave to it.
-                    if (col.is_nullable === "NO") extra += "\n            databaseDefault: true,";
+                    // column, a required value a create may leave to it. The
+                    // expression is carried, so the planner writes it back.
+                    const expression = col.column_default?.trim();
+                    if (col.is_nullable === "NO" && expression) {
+                        extra += `\n            databaseDefault: ${JSON.stringify(`sql\`${expression}\``)},`;
+                    } else {
+                        fileNotes.push(fallback.note);
+                    }
                 }
             }
         }

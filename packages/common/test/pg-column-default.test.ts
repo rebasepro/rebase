@@ -107,7 +107,8 @@ describe("importing a column default", () => {
  */
 describe("importing an expression default", () => {
     it("marks a NOT NULL column with an expression default databaseDefault, and keeps it required", () => {
-        expect((props.slug as StringProperty).databaseDefault).toBe(true);
+        // The expression itself, so the planner writes the same DEFAULT back.
+        expect((props.slug as StringProperty).databaseDefault).toBe("sql`lower(md5((random())::text))`");
         expect((props.slug as StringProperty).validation?.required).toBe(true);
     });
 

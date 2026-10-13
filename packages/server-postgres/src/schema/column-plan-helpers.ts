@@ -246,8 +246,14 @@ export const idColumnDefault = (propName: string, prop: Property, collection: Co
     // Any other string is a raw SQL default. Written either bare
     // (`gen_random_uuid()::text`) or in the documented template form
     // (``sql`gen_random_uuid()::text` ``); the wrapper is markup, not SQL.
-    const expression = isId.startsWith("sql`") && isId.endsWith("`")
-        ? isId.substring(4, isId.length - 1)
-        : isId;
-    return { kind: "sql", expression };
+    return { kind: "sql", expression: sqlExpressionText(isId) };
 };
+
+/**
+ * The SQL inside a template-form expression (``sql`now()` `` → `now()`); a
+ * bare expression is returned as it is.
+ */
+export const sqlExpressionText = (value: string): string =>
+    value.startsWith("sql`") && value.endsWith("`") && value.length >= 5
+        ? value.substring(4, value.length - 1)
+        : value;

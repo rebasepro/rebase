@@ -75,7 +75,8 @@ import {
     idColumnDefault,
     isIdProperty,
     primaryKeyPropertyNames,
-    resolveColumnName
+    resolveColumnName,
+    sqlExpressionText
 } from "../column-plan-helpers";
 import {
     AUTH_USERS_COLUMNS,
@@ -495,7 +496,10 @@ const literalDefault = (prop: Property, type: PgType): ColumnDefault | undefined
     }
 };
 
-/** The DEFAULT a column carries: id strategy, then `autoValue`, then `defaultValue`. */
+/**
+ * The DEFAULT a column carries: id strategy, then `autoValue`, then a
+ * `databaseDefault` given as SQL, then `defaultValue`.
+ */
 const columnDefault = (
     propName: string,
     prop: Property,
@@ -513,6 +517,10 @@ const columnDefault = (
         if (autoValue === "on_create" || autoValue === "on_update") {
             return { kind: "sql", expression: "now()" };
         }
+    }
+    if (typeof prop.databaseDefault === "string") {
+        const expression = sqlExpressionText(prop.databaseDefault).trim();
+        if (expression) return { kind: "sql", expression };
     }
     return literalDefault(prop, type);
 };

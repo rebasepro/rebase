@@ -9,6 +9,13 @@ import type { AfterReadProps, BeforeSaveProps } from "./entity_callbacks";
 import type { User } from "../users";
 
 /**
+ * A SQL expression, written in template form: ``"sql`gen_random_uuid()`"``.
+ * The `sql` and backticks are markup; the text between them is the SQL.
+ * @group Entity properties
+ */
+export type SqlExpression = `sql\`${string}\``;
+
+/**
  * Callbacks/Hooks for individual property fields
  * @group Entity properties
  */
@@ -441,13 +448,14 @@ export interface BaseProperty<CustomProps = unknown> {
      * required when a stored record is edited. The generated SDK's `Insert`
      * type makes the field optional. Defaults to `false`.
      *
-     * A declaration about the database, not an instruction to it: the schema
-     * planner does not write a `DEFAULT` for it (it cannot express the
-     * expression), so `rebase db push` still plans dropping such a default.
-     * "Import from table" and `rebase schema introspect` set it on such
-     * columns.
+     * Give the expression, in the template form `isId` takes
+     * (``databaseDefault: "sql`gen_random_uuid()`"``), and the schema planner
+     * writes it as the column's `DEFAULT`, so `rebase db push` keeps it. `true`
+     * declares a DEFAULT someone else wrote and the planner does not write
+     * one, so a push plans dropping it. "Import from table" and
+     * `rebase schema introspect` set the expression they read.
      */
-    databaseDefault?: boolean;
+    databaseDefault?: boolean | SqlExpression;
 
     // NOTE: `defaultValue` is intentionally NOT on BaseProperty.
     // Each concrete property type (StringProperty, NumberProperty, etc.)

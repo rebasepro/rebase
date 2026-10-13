@@ -24,6 +24,7 @@ import type {
     PropertyConditions,
     PropertyValidationSchema,
     SecurityRule,
+    SqlExpression,
     WhereFilterOp
 } from "@rebasepro/types";
 import type {
@@ -206,7 +207,7 @@ export interface SerializableBaseProperty {
     validation?: PropertyValidationSchema;
     defaultValue?: unknown;
     /** The database fills the column on create; see `BaseProperty.databaseDefault`. */
-    databaseDefault?: boolean;
+    databaseDefault?: boolean | SqlExpression;
     /**
      * JSON Logic conditions — fully serializable by design.
      * These are the declarative alternative to `dynamicProps` functions.

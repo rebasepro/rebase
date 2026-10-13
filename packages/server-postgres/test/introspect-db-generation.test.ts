@@ -341,7 +341,7 @@ column_default: "lower(md5((random())::text))" }),
 column_default: "'user'::text" })
             ]);
             const result = generateCollectionFile("items", meta, [], new Set(), new Map([["items", meta]]), new Map());
-            expect(propertyBlock(result, "code")).toContain("databaseDefault: true");
+            expect(propertyBlock(result, "code")).toContain('databaseDefault: "sql`lower(md5((random())::text))`"');
             expect(propertyBlock(result, "code")).toContain("required: true");
             expect(propertyBlock(result, "hint")).not.toContain("databaseDefault");
             expect(propertyBlock(result, "role")).not.toContain("databaseDefault");
