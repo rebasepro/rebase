@@ -175,15 +175,36 @@ test("a user only sees their own posts", async () => {
 
 O mesmo funciona com Vitest ou Jest.
 
+### Coleções com histórico
+
+<span class="since-badge" data-since="0.25">Desde 0.25</span>
+
+Uma escrita em uma coleção com [`history: true`](/docs/backend/history/) registra
+a sua entrada da mesma forma que uma escrita do servidor. A entrada é escrita na
+transação da própria linha, então uma escrita que sofre rollback não deixa
+entrada alguma. Ela é registrada com a identidade com que a escrita rodou:
+`service` para o `dataAsAdmin`, o `uid` do usuário sob o `withAuth`. As escritas
+feitas pelo `rebase console` são registradas da mesma forma.
+
+O `openRebase` não cria nada onde registrar. Se nenhum backend com histórico foi
+iniciado no banco de dados, falta a tabela `rebase.entity_history`. Uma escrita em
+uma coleção com histórico é então recusada com
+[`HISTORY_UNAVAILABLE`](/docs/backend/errors/#data-queries-and-writes) antes de
+qualquer um dos seus callbacks rodar, e a mensagem diz o que está faltando. As
+leituras funcionam normalmente. Inicie o backend uma vez com o histórico ativado
+(o `rebase dev` faz isso), e as escritas passam.
+
+As entradas são registradas, nunca podadas. A retenção é uma configuração do
+servidor que um script não enxerga, então o servidor as poda como de costume:
+quando ele escreve a entidade em seguida, e na sua varredura de hora em hora.
+
 ### O que ele deixa de fora
 
 <span class="since-badge" data-since="0.25">Desde 0.25</span>
 
 O `openRebase` abre a camada de dados e nada mais. Ele não inicia o tempo real,
-então suas escritas não são anunciadas às consultas ao vivo. Ele não anexa nenhum
-serviço de histórico, então uma escrita em uma coleção com `history: true` não
-registra nenhuma entrada de histórico. Storage, e-mail, administração de
-autenticação e as suas funções não estão nele.
+então suas escritas não são anunciadas às consultas ao vivo. Storage, e-mail,
+administração de autenticação e as suas funções não estão nele.
 
 Quando um script precisa dessas coisas também, construa o backend sem servi-lo:
 `createRebaseBackend({ …, provision: false })` entrega a você o `backend.rebase`,

@@ -54,6 +54,15 @@ const instance = await initializeRebaseBackend({
 });
 ```
 
+<span class="since-badge" data-since="0.25">Desde 0.25</span> Essa única chamada é
+um atalho sobre passos públicos: o `installUnhandledRejectionHandler` impede que uma
+rejeição perdida encerre o processo, o `createRebaseBackend` constrói o backend,
+o `setDefaultBackend` o torna aquele a que a API em nível de módulo responde, e
+`mount`, `attachRealtime` e `start` o servem. Para montar apenas alguns grupos de
+rotas, colocá-los em outros caminhos, deixar os timers para outro processo ou rodar
+dois backends em um mesmo processo, chame você mesmo os passos. Veja
+[Integração com Servidor Customizado](/docs/backend/custom-server/).
+
 ## Onde fica cada opção
 
 Essa chamada é a forma **ejetada** — aquela que você mesmo escreve após `rebase
@@ -68,8 +77,8 @@ Ambos os caminhos chegam à mesma `RebaseBackendConfig`. Este é o mapa completo
 |---|---|
 | `basePath` | `REBASE_BASE_PATH` (padrão `/api`) |
 | `collections`, `collectionsDir` | o diretório `config/collections/`, declarado pelo `rebase.json` |
-| `functionsDir` | `backend/functions/` |
-| `cronsDir` | `backend/crons/` |
+| `functions`, `functionsDir` | `backend/functions/` |
+| `crons`, `cronsDir` | `backend/crons/` |
 | `bootstrappers`, `database` | `DATABASE_URL`, além de uma declaração `database("<key>")` em `config/resources.ts` para cada banco de dados além do padrão |
 | `auth` | `JWT_SECRET`, as variáveis `OAUTH_*` e `config/collections/users` |
 | `storage` | as variáveis `STORAGE_*`, além de uma declaração `bucket("<key>")` em `config/resources.ts` para cada bucket além do padrão |
@@ -116,9 +125,9 @@ Após a inicialização, estas rotas são montadas:
 | `/api/swagger` | Swagger UI (modo dev, quando `enableSwagger: true`) |
 | `/api/meta/contract` | O esquema de coleções do projeto (requer `schema:read`) |
 | `/api/meta/schema-version` | Uma string de versão para esse esquema (não autenticado) |
-| `/api/functions/*` | Rotas de funções personalizadas (quando `functionsDir` está definido) |
-| `/api/admin/cron/*` | Gerenciamento de tarefas cron (`cron:read` / `cron:write`, quando `cronsDir` está definido) |
-| WebSocket no upgrade | Inscrições em tempo real |
+| `/api/functions/*` | Rotas de funções personalizadas (quando `functions` ou `functionsDir` está definido) |
+| `/api/admin/cron/*` | Gerenciamento de tarefas cron (`cron:read` / `cron:write`, quando `crons` ou `cronsDir` está definido) |
+| WebSocket no upgrade | Inscrições em tempo real, em `/` para uma API em `/api` |
 
 ---
 
@@ -215,10 +224,12 @@ interface RebaseBackendConfig {
     // OpenAPI/Swagger
     enableSwagger?: boolean;
 
-    // Custom API endpoints
+    // Custom API endpoints: values, or a directory of files (not both)
+    functions?: Record<string, FunctionApp>;  // { "send-invoice": app } → /api/functions/send-invoice
     functionsDir?: string;    // Auto-load Hono routes from a directory
 
-    // Scheduled tasks
+    // Scheduled tasks: values, or a directory of files (not both)
+    crons?: Record<string, CronJobDefinition>; // { "nightly-report": defineCron(…) }
     cronsDir?: string;         // Auto-load cron jobs from a directory
     cronPersistence?: boolean; // Write run logs to rebase.cron_logs (default: true)
 
@@ -255,7 +266,9 @@ divergir do runtime sobre a natureza deste processo.
 
 ## A Instância do Backend
 
-`initializeRebaseBackend` retorna uma `RebaseBackendInstance` com acesso a serviços internos:
+`initializeRebaseBackend` retorna o backend que construiu, já montado e iniciado.
+Seu tipo é `RebaseBackendInstance`, que é o `RebaseBackend`, o tipo que o
+`createRebaseBackend` retorna:
 
 ```typescript
 const instance = await initializeRebaseBackend(config);
@@ -269,10 +282,20 @@ instance.storageController   // Default storage
 instance.storageRegistry     // All storage backends
 instance.collectionRegistry  // Collection metadata
 instance.history?.historyService // Entity history
-instance.cronScheduler       // Cron job scheduler (when cronsDir is set)
+instance.cronScheduler       // Cron job scheduler (when crons or cronsDir is set)
+instance.jobQueue            // Durable job queue (when jobs are enabled)
+instance.setCollectionCallbacks(slug, callbacks) // Replace a collection's callbacks
+instance.shutdown()          // Drain and stop; also closes the server it was given
 ```
 
-> **Nota:** Embora a `instance` exponha esses serviços internos, o código da aplicação (como funções personalizadas e tarefas cron) deve usar o singleton global `rebase` de `@rebasepro/server` para interagir com a API do backend.
+<span class="since-badge" data-since="0.25">Desde 0.25</span> Ele também carrega
+o `rebase`, o cliente em processo, o `fetch(request)`, as `routes`, os grupos de
+rotas como sub-apps Hono, os `services`, suas próprias chaves JWT, modelo de
+acesso, armazenamento de chaves de API e limitadores de taxa, e o
+`verifyCredential(token)`; veja
+[Integração com Servidor Customizado](/docs/backend/custom-server/).
+
+> **Nota:** Embora a `instance` exponha esses serviços internos, o código da aplicação (como funções personalizadas e tarefas cron) deve usar o singleton `rebase` de `@rebasepro/server` para interagir com a API do backend. <span class="since-badge" data-since="0.25">Desde 0.25</span> Dentro de uma requisição, de uma execução de cron ou de um job, o `rebase` é o backend que a atende; fora disso, é o padrão do processo, que o `initializeRebaseBackend` define como o seu backend.
 
 ## API REST
 
@@ -306,7 +329,7 @@ não corresponderá a nada de forma silenciosa.
 
 ## WebSocket
 
-O servidor WebSocket é acoplado ao mesmo servidor HTTP e fornece inscrições em tempo real:
+O servidor WebSocket é acoplado ao mesmo servidor HTTP e fornece inscrições em tempo real. <span class="since-badge" data-since="0.25">Desde 0.25</span> Ele responde a upgrades em um único caminho, `/` para uma API em `/api`, onde o SDK se conecta, e deixa todos os outros caminhos para os seus próprios listeners de `upgrade`; na 0.24 ele assume todos os upgrades do servidor:
 
 - Inscrever-se em **alterações na coleção** — receba notificações quando qualquer entidade em uma coleção for criada, atualizada ou excluída
 - Inscrever-se em **alterações na entidade** — receba notificações quando uma entidade específica for alterada

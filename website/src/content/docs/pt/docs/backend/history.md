@@ -182,7 +182,12 @@ Cada entidade também mantém no máximo suas **200** entradas mais recentes. Es
 
 ### Mecânica do Ciclo de Vida da Limpeza
 
-Após cada alteração registrada, a entidade alterada é limpa: suas entradas mais antigas que o período de retenção são removidas, e em seguida tudo além das 200 mais recentes. Isso roda de forma assíncrona e não segura a escrita.
+Após cada alteração que o servidor registra, a entidade alterada é limpa: suas entradas mais antigas que o período de retenção são removidas, e em seguida tudo além das 200 mais recentes. Isso roda de forma assíncrona e não segura a escrita.
+
+Uma escrita feita pelo [`openRebase` ou pelo `rebase console`](/docs/backend/scripts/)
+registra a sua entrada de histórico, mas não poda nada, porque um script não pode
+saber a retenção com que o seu servidor está configurado. O servidor poda essa
+entidade na próxima escrita nela, e na varredura de hora em hora abaixo.
 
 <span class="since-badge" data-since="0.25">Desde 0.25</span> Uma vez por hora, o backend também exclui todas as entradas mais antigas que o período de retenção, de todas as entidades. Antes disso, o histórico de uma entidade que nunca mais era escrita — toda entidade excluída — não era limpo de forma alguma. A varredura:
 

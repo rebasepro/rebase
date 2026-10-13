@@ -212,7 +212,7 @@ slot de middleware da rota.
 **Escopo:** o processo.
 
 <span class="since-badge" data-since="0.25">Desde 0.25</span>
-O `initializeRebaseBackend` é um atalho sobre quatro chamadas públicas, e este
+O `initializeRebaseBackend` é um atalho sobre algumas chamadas públicas, e este
 degrau é chamá-las você mesmo. O `createRebaseBackend` constrói o backend e não
 monta, não inicia e não escuta nada. O `backend.routes` guarda cada grupo de
 rotas como um sub-app Hono que você pode montar sozinho, em qualquer caminho.
