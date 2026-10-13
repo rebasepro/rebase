@@ -63,8 +63,8 @@ There are none in code. The server reads your database schema at boot and serves
 the tables it finds, so the API follows your migrations: change the schema, and
 the endpoints change with it.
 
-A table is served once it has an authorization model — row-level security
-enabled, plus at least one policy:
+A table is served once row-level security is enabled on it. With no policy it
+is served and returns no rows, and boot warns about it; a policy opens it:
 
 ```sql
 ALTER TABLE your_table ENABLE ROW LEVEL SECURITY;
@@ -79,8 +79,8 @@ and [rls-check](/docs/rls-check/) for an audit of what your policies actually
 allow.
 
 A table without RLS is **skipped**, deliberately: every authenticated request
-runs as `rebase_user`, so serving a table with no policy would hand every row to
-every signed-in caller. Each skipped table is named at boot along with the SQL
+runs as `rebase_user`, so serving a table that row-level security does not guard
+would hand every row to every signed-in caller. Each skipped table is named at boot along with the SQL
 that would protect it.
 
 :::note
@@ -162,8 +162,9 @@ Three things resolve it, in the order worth checking:
 
 1. **The database has no tables.** Create them — a migration, plain SQL, or a
    collection file plus `rebase db push` — and restart.
-2. **The tables have no RLS policy**, so boot skipped them. The boot log names
-   each one. Add a policy, as above.
+2. **The tables do not have row-level security enabled**, so boot skipped
+   them. The boot log names each one, with the SQL. Enable it and add a policy,
+   as above.
 3. **`DATABASE_URL` points somewhere else** than you think. `rebase status`
    prints the three files that decide what the backend reaches.
 

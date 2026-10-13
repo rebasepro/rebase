@@ -106,6 +106,14 @@ Overrides in `pnpm-workspace.yaml` and `package.json` move too, but a `link:` or
 `--drop-local-overrides` removes it. `--dry-run` writes nothing, `--no-install`
 skips the install, and `--json` prints one document.
 
+<span class="since-badge" data-since="0.25">Since 0.25</span> A project pinned to
+a prerelease, such as a canary, stays on its channel: `rebase upgrade` takes the
+newest `canary`, or `latest` when that is newer. A dist-tag that would move any
+pin to an older release is refused (`downgrade_refused` under `--json`) unless
+you pass `--allow-downgrade`. An exact `--to` version is applied as asked, and
+the summary says when it is a downgrade. On 0.24, `rebase upgrade` takes
+`latest` whatever the project is on.
+
 ### `rebase start`
 
 Run the built bundle the way a deployment runs it:
@@ -533,8 +541,14 @@ See [Agent Skills](/docs/ai/skills) for the full list and where files are writte
 
 ### `rebase telemetry`
 
-Anonymous usage sharing. **`rebase init` asks once per project, and the prompt
-defaults to yes — nothing is sent unless you answer it:**
+Anonymous usage sharing, off until you say yes. An interactive `rebase init`
+asks at the end, and the prompt defaults to no, so nothing is shared unless you
+answer yes. The answer is per machine (`~/.rebase/telemetry.json`): after a yes
+`init` never asks again, and after a no the next `init` asks again. Each
+checkout gets a random project id, kept in its gitignored
+`.rebase/telemetry-project.json`. <span class="since-badge" data-since="0.25">Since 0.25</span>
+On 0.24 the prompt defaults to yes, and the project id changes on every
+`rebase dev` restart.
 
 ```bash
 rebase telemetry status

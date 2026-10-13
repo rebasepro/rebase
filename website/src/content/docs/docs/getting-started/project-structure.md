@@ -30,7 +30,10 @@ my-app/
 ├── .env                    # Generated for you: JWT_SECRET, a database password, a free port
 ├── rebase.json             # Which apps this repository contains, and how each is built
 ├── package.json            # Root workspace config
+├── tsconfig.json           # Typechecks scripts/; each workspace typechecks on its own
 ├── docker-compose.yml      # Self-hosting: Postgres + the published runtime image
+├── scripts/
+│   └── example.ts          # The SDK end to end against the running backend: `pnpm example`
 │
 ├── config/                 # Shared by the backend and the admin panel
 │   ├── index.ts            # Re-exports `collections`; the runtime reads `storageAuthorize` from here
@@ -53,6 +56,11 @@ my-app/
     ├── src/main.tsx
     └── vite.config.ts
 ```
+
+`tsc --noEmit` at the root checks `scripts/`; in `config/`, `backend/` or
+`frontend/` it checks that workspace. <span class="since-badge" data-since="0.25">Since 0.25</span>
+On 0.24 the root has no `tsconfig.json`, and `tsc` there prints its help and
+checks nothing.
 
 :::note[There is no `backend/src/index.ts`]
 And no `Dockerfile`. A scaffolded project declares `runtime: "managed"` in
@@ -146,7 +154,7 @@ your project. What `backend/` holds is the code the runtime picks up:
 |---|---|
 | `backend/functions/` | Custom routes, auto-mounted at `/api/functions/<filename>` |
 | `backend/crons/` | Scheduled jobs, discovered the same way (create it when you want one) |
-| `backend/src/schema.generated.ts` | The Drizzle schema, regenerated from your collections on every `rebase dev` and `rebase build` |
+| `backend/src/schema.generated.ts` | The Drizzle schema of your collections: written by `rebase init`, and regenerated on every `rebase dev` and `rebase build` |
 
 The runtime sets up:
 
