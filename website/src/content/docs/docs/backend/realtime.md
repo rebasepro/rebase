@@ -163,7 +163,7 @@ query run as them:
    also coalesces a burst of writes into one query. It waits for 300 ms without
    a further change, but never more than **1 s** (`REFETCH_MAX_WAIT_MS`) after
    the first one, so a collection written several times a second still sends
-   its subscribers a frame at least once a second.
+   its subscribers a frame at least once a second. <span class="since-badge" data-since="0.25">Since 0.25</span> Set that bound with `REALTIME_REFETCH_MAX_WAIT_MS` (or `realtime.refetchMaxWaitMs`): higher refetches a busy table less often, lower sends fresher frames.
 
    <span class="since-badge" data-since="0.25">Since 0.25</span> A refetch that reads exactly what a subscriber was last sent sends that
    subscriber nothing: a write to row 9,000 of a list showing the first 50 costs
@@ -217,7 +217,7 @@ states of the collection.
 
 When the count itself fails, the frame carries `partial: true` and no `total`;
 that is not a subscription error, and a client should keep the last real total
-rather than substituting the page length.
+rather than substituting the page length. <span class="since-badge" data-since="0.25">Since 0.25</span> On a big table the count is most of what a frame costs. With `REALTIME_RECOUNT_INTERVAL_MS` set, a list whose last total was at least `REALTIME_RECOUNT_MIN_ROWS` (100,000 by default) reuses that total for the interval instead of counting on every write, and such a frame carries `meta.totalAsOf`, when the total was taken. Unset, as by default, every frame counts.
 
 ### What a write costs, and the limits
 

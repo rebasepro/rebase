@@ -308,6 +308,11 @@ type SubscriptionGroup = {
     collectionRequest?: StoredCollectionRequest;
     /** The relations a single-row group's read loads. See {@link Subscription.include}. */
     include?: IncludeSpec;
+    /**
+     * A list group's last total and when it was counted, reused while
+     * {@link RealtimeService.recountIntervalMs} allows. See `collectionMeta`.
+     */
+    lastCount?: { total: number; at: number };
     /** Whether the group's frames carry the row's `ETag`. See {@link Subscription.etag}. */
     etag?: boolean;
     authContext?: SubscriptionAuthContext;
@@ -396,6 +401,30 @@ export function parseMaxSubscriptionsPerSocket(value: unknown, source: string): 
         throw new Error(
             `${source} must be a positive whole number of subscriptions per socket — got ${JSON.stringify(value)}.`
         );
+    }
+    return parsed;
+}
+
+/** See `RealtimeService.REFETCH_MAX_WAIT_MS`; `REALTIME_REFETCH_MAX_WAIT_MS` moves it. */
+const DEFAULT_REFETCH_MAX_WAIT_MS = 1000;
+
+/**
+ * The smallest last total at which a group's count is reused under
+ * `REALTIME_RECOUNT_INTERVAL_MS`, unless `REALTIME_RECOUNT_MIN_ROWS` says
+ * otherwise. Below it a count is cheap, and stays exact.
+ */
+export const DEFAULT_RECOUNT_MIN_ROWS = 100_000;
+
+/**
+ * Read one of the realtime tuning numbers (`REALTIME_REFETCH_MAX_WAIT_MS`,
+ * `REALTIME_RECOUNT_INTERVAL_MS`, `REALTIME_RECOUNT_MIN_ROWS` and their
+ * `realtime.*` options). A value someone set and mistyped stops the boot
+ * rather than quietly becoming the default.
+ */
+export function parseRealtimeTuning(value: unknown, source: string, unit: string): number {
+    const parsed = typeof value === "string" && value.trim() !== "" ? Number(value.trim()) : value;
+    if (typeof parsed !== "number" || !Number.isInteger(parsed) || parsed < 1) {
+        throw new Error(`${source} must be a positive whole number of ${unit} — got ${JSON.stringify(value)}.`);
     }
     return parsed;
 }
@@ -631,6 +660,24 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
      */
     public maxSubscriptionsPerSocket = DEFAULT_MAX_SUBSCRIPTIONS_PER_SOCKET;
 
+    /**
+     * The longest a change waits for its refetch, in ms; set from config at
+     * boot (`REALTIME_REFETCH_MAX_WAIT_MS`). See {@link REFETCH_MAX_WAIT_MS},
+     * the default.
+     */
+    public refetchMaxWaitMs = DEFAULT_REFETCH_MAX_WAIT_MS;
+
+    /**
+     * How long a list's total may be reused before it is counted again, in ms
+     * (`REALTIME_RECOUNT_INTERVAL_MS`). Unset, the default, counts with every
+     * frame. Only for a group whose last total was at least
+     * {@link recountMinRows}: a count is cheap on a small set, and exact there.
+     */
+    public recountIntervalMs: number | undefined = undefined;
+
+    /** See {@link recountIntervalMs} (`REALTIME_RECOUNT_MIN_ROWS`). */
+    public recountMinRows = DEFAULT_RECOUNT_MIN_ROWS;
+
     private driver?: DataDriver;
 
     // ── Cross-instance LISTEN/NOTIFY ──
@@ -659,7 +706,7 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
      * as long as the writes continued. Under a steady stream a group now
      * refetches once per this interval, which is the whole cost.
      */
-    private static readonly REFETCH_MAX_WAIT_MS = 1000;
+    private static readonly REFETCH_MAX_WAIT_MS = DEFAULT_REFETCH_MAX_WAIT_MS;
 
     // ── Database-level Change Data Capture (CDC) ──
     /** Dedicated LISTEN client for DB-level change events (undefined unless CDC is enabled). */
@@ -948,10 +995,10 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
                 : group.lastChangeAt;
             const quietFor = now - lastChangeAt;
             const waitedFor = now - (group.firstPendingAt ?? now);
-            if (quietFor < RealtimeService.REFETCH_DEBOUNCE_MS && waitedFor < RealtimeService.REFETCH_MAX_WAIT_MS) {
+            if (quietFor < RealtimeService.REFETCH_DEBOUNCE_MS && waitedFor < this.refetchMaxWaitMs) {
                 this.armGroupTimer(group, Math.min(
                     RealtimeService.REFETCH_DEBOUNCE_MS - quietFor,
-                    RealtimeService.REFETCH_MAX_WAIT_MS - waitedFor
+                    this.refetchMaxWaitMs - waitedFor
                 ));
                 return;
             }
@@ -1015,7 +1062,7 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
             if (group.type === "collection") {
                 const request = group.collectionRequest ?? {};
                 const toSockets = targets.some((target) => !target.callback);
-                const { rows, meta } = await this.fetchCollectionWithAuth(group.path, request, group.authContext, { meta: toSockets });
+                const { rows, meta } = await this.fetchCollectionWithAuth(group.path, request, group.authContext, { meta: toSockets, group });
                 let frame: { body: string; digest: string } | undefined;
                 for (const target of targets) {
                     if (!target.canDeliver()) continue;
@@ -1942,7 +1989,7 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
         notifyPath: string,
         collectionRequest: StoredCollectionRequest,
         authContext: SubscriptionAuthContext | undefined,
-        options: { meta: boolean }
+        options: { meta: boolean; group?: SubscriptionGroup }
     ): Promise<{ rows: Record<string, unknown>[]; meta?: CollectionUpdateMeta }> {
         if (this.driver) {
             const collection = this.registry.getCollectionByPath(notifyPath);
@@ -2070,7 +2117,7 @@ roles: ["anon"] };
                     // that fails leaves it aborted, and its rows are already read.
                     return {
                         rows,
-                        meta: options.meta ? await this.collectionMeta(txEntityService, notifyPath, collectionRequest, rows) : undefined
+                        meta: options.meta ? await this.collectionMeta(txEntityService, notifyPath, collectionRequest, rows, options.group) : undefined
                     };
                 }, { accessMode: "read only" })
             );
@@ -2104,7 +2151,7 @@ roles: ["anon"] };
             }, collectionRequest.include);
             return {
                 rows,
-                meta: options.meta ? await this.collectionMeta(this.dataService, notifyPath, collectionRequest, rows) : undefined
+                meta: options.meta ? await this.collectionMeta(this.dataService, notifyPath, collectionRequest, rows, options.group) : undefined
             };
         });
     }
@@ -2131,7 +2178,8 @@ roles: ["anon"] };
         service: DataService,
         notifyPath: string,
         collectionRequest: StoredCollectionRequest,
-        rows: Record<string, unknown>[]
+        rows: Record<string, unknown>[],
+        group?: SubscriptionGroup
     ): Promise<CollectionUpdateMeta> {
         const limit = collectionRequest.limit ?? rows.length;
         const offset = collectionRequest.offset ?? 0;
@@ -2140,8 +2188,16 @@ roles: ["anon"] };
             offset === 0 && !collectionRequest.startAfter && !collectionRequest.searchString && !collectionRequest.distinct;
 
         let total: number;
+        // When a big group's total was counted recently enough, it is reused
+        // and the frame says when it was taken (see `recountIntervalMs`).
+        let totalAsOf: string | undefined;
+        const reusable = group?.lastCount;
         if (wholeSet) {
             total = rows.length;
+        } else if (reusable && this.recountIntervalMs !== undefined && reusable.total >= this.recountMinRows
+            && Date.now() - reusable.at < this.recountIntervalMs) {
+            total = reusable.total;
+            totalAsOf = new Date(reusable.at).toISOString();
         } else {
             try {
                 total = await service.count(notifyPath, {
@@ -2158,6 +2214,7 @@ roles: ["anon"] };
                 logger.warn(`[RealtimeService] Could not count '${notifyPath}' for a subscription frame`, { error });
                 return { limit, offset, hasMore: false, partial: true };
             }
+            if (group) group.lastCount = { total, at: Date.now() };
         }
 
         const last = rows[rows.length - 1];
@@ -2168,7 +2225,7 @@ roles: ["anon"] };
             )
             : undefined;
 
-        return { total, limit, offset, hasMore, ...(nextCursor && { nextCursor }) };
+        return { total, limit, offset, hasMore, ...(nextCursor && { nextCursor }), ...(totalAsOf && { totalAsOf }) };
     }
 
     /**

@@ -701,7 +701,7 @@ interface CollectionRegistryInterface { getCollectionByPath, getCollections, get
 interface CollectionSubscriptionConfig { clientId, databaseId, filter, limit, logical, offset, order, orderBy, path, searchExplain, searchString, startAfter }
 interface CollectionTenantConfig { bypassRoles, field, from }
 interface CollectionUpdateMessage { channel, error, meta, payload, pks, requestId, row, rows, subscriptionId, type }
-interface CollectionUpdateMeta { hasMore, limit, nextCursor, offset, partial, total }
+interface CollectionUpdateMeta { hasMore, limit, nextCursor, offset, partial, total, totalAsOf }
 interface ComparePolicyExpression { kind, left, op, right }
 interface ConditionBuilder { buildFilterConditions, buildSearchConditions, combineConditionsWithAnd, combineConditionsWithOr }
 interface ConditionContext { entityId, index, isNew, now, path, previousValues, propertyValue, user, values }
@@ -814,7 +814,7 @@ interface RawPolicyExpression { kind, sql }
 interface RawSQLCheckOnlySecurityRule { access, check, condition, mode, name, operation, operations, ownerField, pgRoles, roles, using, withCheck }
 interface RawSQLSecurityRule { access, check, condition, mode, name, operation, operations, ownerField, pgRoles, roles, using, withCheck }
 interface ReadQuery { fields, filter, limit, logical, offset, orderBy, relatedTo, searchString }
-interface RealtimeChannelsConfig { bus, channels, maxSocketsPerUser, maxSubscriptionsPerSocket }
+interface RealtimeChannelsConfig { bus, channels, maxSocketsPerUser, maxSubscriptionsPerSocket, recountIntervalMs, recountMinRows, refetchMaxWaitMs }
 interface RealtimeListenerHealth { connected, downSince, name }
 interface RealtimeProvider { destroy, health, notifyUpdate, onServerReady, stopListening, subscribeToCollection, subscribeToOne, unsubscribe }
 interface RealtimeSocketOptions { dataRateLimit, heartbeatIntervalMs, identityRecheckIntervalMs, maxPayload, maxSocketsPerUser, resolveApiKey }

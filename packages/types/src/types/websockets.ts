@@ -65,6 +65,13 @@ export interface CollectionUpdateMeta {
     /** The opaque cursor continuing this listing — see `PaginationMeta.nextCursor`. */
     nextCursor?: string;
     /**
+     * When `total` was counted, ISO-8601 — present only when it was not
+     * counted for this frame. A server with `REALTIME_RECOUNT_INTERVAL_MS` set
+     * reuses a big list's total for that long rather than counting it on every
+     * write; `hasMore` is then judged against the reused total.
+     */
+    totalAsOf?: string;
+    /**
      * The count could not be taken, so `total` is missing and `hasMore` is a
      * floor rather than an answer.
      *

@@ -24,7 +24,7 @@ import {
     type RealtimeSocketOptions
 } from "@rebasepro/types";
 import { PostgresBackendDriver } from "./PostgresBackendDriver";
-import { RealtimeService, parseMaxSubscriptionsPerSocket } from "./services/realtimeService";
+import { RealtimeService, parseMaxSubscriptionsPerSocket, parseRealtimeTuning } from "./services/realtimeService";
 import { buildCollectionRegistry } from "./collections/buildRegistry";
 import { DatabasePoolManager } from "./databasePoolManager";
 import { PostgresCollectionRegistry } from "./collections/PostgresCollectionRegistry";
@@ -763,6 +763,18 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
                     pgConfig.realtime.maxSubscriptionsPerSocket, "realtime.maxSubscriptionsPerSocket"
                 );
             }
+            // How long a change may wait for its refetch, and how often a big
+            // list is recounted. Unset, both are what they always were.
+            const tuning = (envName: string, option: number | undefined, optionName: string, unit: string): number | undefined => {
+                const fromEnv = process.env[envName]?.trim();
+                if (fromEnv) return parseRealtimeTuning(fromEnv, envName, unit);
+                return option !== undefined ? parseRealtimeTuning(option, optionName, unit) : undefined;
+            };
+            const refetchMaxWaitMs = tuning("REALTIME_REFETCH_MAX_WAIT_MS", pgConfig.realtime?.refetchMaxWaitMs, "realtime.refetchMaxWaitMs", "milliseconds");
+            if (refetchMaxWaitMs !== undefined) realtimeService.refetchMaxWaitMs = refetchMaxWaitMs;
+            realtimeService.recountIntervalMs = tuning("REALTIME_RECOUNT_INTERVAL_MS", pgConfig.realtime?.recountIntervalMs, "realtime.recountIntervalMs", "milliseconds");
+            const recountMinRows = tuning("REALTIME_RECOUNT_MIN_ROWS", pgConfig.realtime?.recountMinRows, "realtime.recountMinRows", "rows");
+            if (recountMinRows !== undefined) realtimeService.recountMinRows = recountMinRows;
 
             // Initialize read replica connection if configured
             let readDb: import("drizzle-orm/node-postgres").NodePgDatabase<any> | undefined;

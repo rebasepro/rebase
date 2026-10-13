@@ -346,6 +346,26 @@ export interface RealtimeChannelsConfig {
      * over it.
      */
     maxSocketsPerUser?: number;
+    /**
+     * The longest a change waits for the refetch that delivers it, in ms. A
+     * refetch waits for 300 ms without a change, and at most this long under a
+     * steady stream of writes. Defaults to 1000. A positive whole number,
+     * checked at boot. `REALTIME_REFETCH_MAX_WAIT_MS` wins over it.
+     */
+    refetchMaxWaitMs?: number;
+    /**
+     * How long a big list subscription's total may be reused before it is
+     * counted again, in ms. Unset (the default), every frame counts. Frames
+     * that reuse it carry `meta.totalAsOf`. `REALTIME_RECOUNT_INTERVAL_MS`
+     * wins over it.
+     */
+    recountIntervalMs?: number;
+    /**
+     * The smallest last total at which {@link recountIntervalMs} applies;
+     * smaller lists are counted on every frame. Defaults to 100 000.
+     * `REALTIME_RECOUNT_MIN_ROWS` wins over it.
+     */
+    recountMinRows?: number;
 }
 
 /**
