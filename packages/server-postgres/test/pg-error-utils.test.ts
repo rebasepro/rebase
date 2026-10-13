@@ -17,7 +17,11 @@ jest.mock("@rebasepro/server", () => ({
     // The real predicate: what this file pins is that a subscription error is
     // recognised the way the REST handler recognises it.
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    declaredErrorAnswer: require("../../server/src/api/errors").declaredErrorAnswer
+    declaredErrorAnswer: require("../../server/src/api/errors").declaredErrorAnswer,
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    isDatabaseUnreachable: require("../../server/src/api/errors").isDatabaseUnreachable,
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    DATABASE_UNAVAILABLE_MESSAGE: require("../../server/src/api/errors").DATABASE_UNAVAILABLE_MESSAGE
 }));
 
 const mockLogger = logger as unknown as {
@@ -219,6 +223,23 @@ describe("pg-error-utils", () => {
     });
 
     describe("sanitizeErrorForClient", () => {
+        // A subscription whose read met a stopped database says so, as every
+        // HTTP door does — not "Could not load data … Check server logs", and
+        // not the `57P01` a shutdown arrives as.
+        it("says DATABASE_UNAVAILABLE when the database cannot be reached", () => {
+            const refused = Object.assign(new Error("connect ECONNREFUSED 127.0.0.1:5432"), {
+                code: "ECONNREFUSED", syscall: "connect", address: "127.0.0.1", port: 5432
+            });
+            const shutdown = Object.assign(new Error("terminating connection due to administrator command"), { code: "57P01" });
+            for (const cause of [refused, shutdown]) {
+                const wrapped = Object.assign(new Error("Failed query: select 1\nparams: "), { query: "select 1", params: [], cause });
+                expect(sanitizeErrorForClient(wrapped, "clients")).toEqual({
+                    code: "DATABASE_UNAVAILABLE",
+                    message: expect.stringContaining("database could not be reached")
+                });
+            }
+        });
+
         it("sanitizes a Drizzle-wrapped PG error", () => {
             const pgError = Object.assign(new Error("relation \"clients\" does not exist"), {
                 code: "42P01"

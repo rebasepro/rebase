@@ -7,7 +7,7 @@
  * a message that is safe and helpful to show to end-users.
  */
 
-import { declaredErrorAnswer, logger } from "@rebasepro/server";
+import { DATABASE_UNAVAILABLE_MESSAGE, declaredErrorAnswer, isDatabaseUnreachable, logger } from "@rebasepro/server";
 import type { CollectionConfig } from "@rebasepro/types";
 import { fieldKeyForColumn, getTableName } from "@rebasepro/common";
 import { extractCauseMessage } from "./error-cause";
@@ -527,6 +527,14 @@ export function sanitizeErrorForClient(
             logger.warn(`⚠️ ${line}`);
         }
         return { message: clientError.message, ...(clientError.code && { code: clientError.code }) };
+    }
+
+    // ── The database unreachable: the answer every door gives then ──
+    // Ahead of the SQLSTATE arm, because `57P01` is a SQLSTATE that says the
+    // connection is gone rather than that the statement was wrong.
+    if (isDatabaseUnreachable(error)) {
+        logger.warn(`[DB] The database is unreachable; "${context}" could not be read`);
+        return { message: DATABASE_UNAVAILABLE_MESSAGE, code: "DATABASE_UNAVAILABLE" };
     }
 
     // ── Always log the full, unsanitized error server-side ──────────

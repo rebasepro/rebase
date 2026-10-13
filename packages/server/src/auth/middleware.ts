@@ -3,7 +3,7 @@ import { judgeAccessToken, type AccessJudgeRepository } from "./token-revocation
 import { ANONYMOUS_USER_ID, DataDriver, hasAdminRole, isPublicStorageKey } from "@rebasepro/types";
 import { jwtOf, processJwtService, AccessTokenPayload, type DownloadTokenPayload, type JwtService } from "./jwt";
 import type { HonoEnv } from "../api/types";
-import { ApiError, errorHandler } from "../api/errors";
+import { ApiError, errorHandler, isDatabaseUnreachable } from "../api/errors";
 import { scopeDataDriver } from "./rls-scope";
 import { safeCompare } from "./crypto-utils";
 import { isApiKeyToken, validateApiKey } from "./api-keys/api-key-middleware";
@@ -235,17 +235,19 @@ roles: ["admin"] } as AccessTokenPayload);
             } catch (error) {
                 // Fail closed. The token's own claim is exactly what must not be
                 // trusted here, so falling back to it would reinstate the bug
-                // the lookup exists to close.
+                // the lookup exists to close. A database that cannot be reached
+                // is said as that, the answer every other door gives then.
+                if (isDatabaseUnreachable(error)) {
+                    logger.warn("[Auth] Could not resolve roles for an admin-gated request: the database is unreachable", {
+                        uid: payload.uid
+                    });
+                    return refuse(c, ApiError.databaseUnavailable());
+                }
                 logger.warn("[Auth] Could not resolve roles for an admin-gated request", {
                     uid: payload.uid,
                     error
                 });
-                return c.json({
-                    error: {
-                        message: "Could not verify your permissions. Please try again.",
-                        code: "ROLE_LOOKUP_FAILED"
-                    }
-                }, 503);
+                return refuse(c, ApiError.serviceUnavailable("Could not verify your permissions. Please try again.", "ROLE_LOOKUP_FAILED"));
             }
         }
 

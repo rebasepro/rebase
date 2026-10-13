@@ -39,6 +39,10 @@ jest.mock("@rebasepro/server", () => ({
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     ApiError: require("../../server/src/api/errors").ApiError,
     // eslint-disable-next-line @typescript-eslint/no-require-imports
+    isDatabaseUnreachable: require("../../server/src/api/errors").isDatabaseUnreachable,
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    DATABASE_UNAVAILABLE_MESSAGE: require("../../server/src/api/errors").DATABASE_UNAVAILABLE_MESSAGE,
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     resolveConflictTarget: require("../../server/src/api/rest/conflict-target").resolveConflictTarget,
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     assertNestedWriteAllowed: require("../../server/src/api/rest/nested-write-access").assertNestedWriteAllowed,

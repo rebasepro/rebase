@@ -85,7 +85,10 @@ export async function startPgContainer(
     options: { image?: string } = {}
 ): Promise<PgContainer> {
     const image = options.image ?? DEFAULT_PG_IMAGE;
-    const containerName = `rebase-db-e2e-${crypto.randomUUID().slice(0, 8)}`;
+    // `REBASE_E2E_CONTAINER_PREFIX` lets several runs on one machine tell their
+    // containers apart, so one run's cleanup never reaches another's.
+    const prefix = process.env.REBASE_E2E_CONTAINER_PREFIX || "rebase-db-e2e-";
+    const containerName = `${prefix}${crypto.randomUUID().slice(0, 8)}`;
 
     console.log(`[pg-setup] Starting PostgreSQL container: ${containerName}`);
 

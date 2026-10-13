@@ -176,6 +176,143 @@ function poolFailureOf(error: unknown, depth = 0): "DB_POOL_EXHAUSTED" | "DB_CON
 const POOL_RETRY_AFTER_SECONDS = 1;
 
 /**
+ * SQLSTATEs that mean the database dropped or refused the connection, not
+ * that it judged the statement: class 08 (connection exception), and the
+ * three shutdown codes — `57P01` a server shutting down or an administrator
+ * ending the session, `57P02` a crash restart, `57P03` a server still
+ * starting.
+ */
+const UNREACHABLE_SQLSTATES = new Set(["57P01", "57P02", "57P03"]);
+
+/**
+ * What node-postgres says when the socket under a client closed, in the words
+ * it sets no code on.
+ */
+const CONNECTION_LOST_MESSAGES = new Set([
+    "Connection terminated unexpectedly",
+    "Client has encountered a connection error and is not queryable"
+]);
+
+/** The socket failures Node raises when a host cannot be reached or drops the connection. */
+const SOCKET_FAILURE_CODES = new Set([
+    "ECONNREFUSED", "ECONNRESET", "ENOTFOUND", "EAI_AGAIN", "EHOSTUNREACH", "ENETUNREACH", "ETIMEDOUT", "EPIPE"
+]);
+
+/**
+ * A Node socket failure: one of {@link SOCKET_FAILURE_CODES} on an error the
+ * runtime raised for a system call, or the `AggregateError` `net` raises when
+ * every address a host resolved to failed that way.
+ */
+function isSocketFailure(error: object, depth = 0): boolean {
+    const code = Reflect.get(error, "code");
+    if (typeof code === "string" && SOCKET_FAILURE_CODES.has(code) && typeof Reflect.get(error, "syscall") === "string") {
+        return true;
+    }
+    const inner = Reflect.get(error, "errors");
+    return depth < 2 && Array.isArray(inner) && inner.length > 0 &&
+        inner.every(item => typeof item === "object" && item !== null && isSocketFailure(item, depth + 1));
+}
+
+/**
+ * Did the request fail because the database could not be reached at all — not
+ * because it refused the statement, and not because some other service is down?
+ *
+ * Read off the error the database driver raised, wherever it sits in the cause
+ * chain:
+ *
+ * - a SQLSTATE that means the connection was refused or dropped (class `08`,
+ *   `57P01`–`57P03`). The database's own word, so it settles the question
+ *   either way: a SQLSTATE of any other class is the database answering;
+ * - node-postgres's own sentence for a socket that closed under a query;
+ * - a socket failure (`ECONNREFUSED`, `ENOTFOUND`, …), but only where it can
+ *   only be the database's: thrown as it is, which is how node-postgres hands
+ *   back a pool connection it could not open, or as the cause of a failed
+ *   Drizzle query (the wrapper that carries the statement). Under any other
+ *   wrapper it belongs to another client: `fetch failed` is a `fetch()` to
+ *   some other host, and an S3 call that cannot connect carries the AWS SDK's
+ *   `$metadata`. Answering those "the database is unreachable" would send an
+ *   operator to a database that is fine.
+ */
+export function isDatabaseUnreachable(error: unknown): boolean {
+    if (typeof error !== "object" || error === null) return false;
+
+    const reported = databaseReport(error);
+    if (reported !== undefined) return reported;
+
+    const socketFailureOf = (candidate: unknown): boolean =>
+        typeof candidate === "object" && candidate !== null &&
+        isSocketFailure(candidate) && Reflect.get(candidate, "$metadata") === undefined;
+    if (socketFailureOf(error)) return true;
+    return typeof Reflect.get(error, "query") === "string" && socketFailureOf(Reflect.get(error, "cause"));
+}
+
+/**
+ * What the database itself said about the connection, down the cause chain:
+ * `true` for a lost or refused connection, `false` for a SQLSTATE that is the
+ * database answering, `undefined` when nothing on the chain is the database's.
+ */
+function databaseReport(error: object, depth = 0): boolean | undefined {
+    const code = Reflect.get(error, "code");
+    // `EPIPE` has a SQLSTATE's shape, and is a socket's.
+    if (typeof code === "string" && SQLSTATE_RE.test(code) && !SOCKET_FAILURE_CODES.has(code)) {
+        return code.startsWith("08") || UNREACHABLE_SQLSTATES.has(code);
+    }
+    const message = Reflect.get(error, "message");
+    if (typeof message === "string" && CONNECTION_LOST_MESSAGES.has(message)) return true;
+    const cause = Reflect.get(error, "cause");
+    return depth < 8 && typeof cause === "object" && cause !== null ? databaseReport(cause, depth + 1) : undefined;
+}
+
+/**
+ * The operator's half of an unreachable database, in a few words: the socket
+ * failure and the host it names (`ECONNREFUSED at 127.0.0.1:5432`), or what
+ * the database or its client said about the connection.
+ */
+function describeUnreachableDatabase(error: unknown, depth = 0): string {
+    if (typeof error !== "object" || error === null || depth > 8) return "the connection failed";
+    const code = Reflect.get(error, "code");
+    const message = Reflect.get(error, "message");
+    if (typeof code === "string" && SOCKET_FAILURE_CODES.has(code)) {
+        const address = Reflect.get(error, "address");
+        const port = Reflect.get(error, "port");
+        const hostname = Reflect.get(error, "hostname");
+        if (address !== undefined) return `${code} at ${String(address)}${port !== undefined ? `:${String(port)}` : ""}`;
+        if (typeof hostname === "string") return `${code} for ${hostname}`;
+    }
+    if (typeof message === "string" && (CONNECTION_LOST_MESSAGES.has(message) ||
+        (typeof code === "string" && (code.startsWith("08") || UNREACHABLE_SQLSTATES.has(code))))) {
+        return typeof code === "string" ? `${message} (${code})` : message;
+    }
+    const inner = Reflect.get(error, "errors");
+    if (Array.isArray(inner) && inner.length > 0) return describeUnreachableDatabase(inner[0], depth + 1);
+    const cause = Reflect.get(error, "cause");
+    if (typeof cause === "object" && cause !== null) return describeUnreachableDatabase(cause, depth + 1);
+    return typeof code === "string" ? code : "the connection failed";
+}
+
+/** What a caller is told when the database cannot be reached. Retryable, and not about them. */
+export const DATABASE_UNAVAILABLE_MESSAGE =
+    "The database could not be reached, so this request was not served. " +
+    "Retry shortly; if it keeps happening, the server's database is down or unreachable from it.";
+
+/** Seconds a client is asked to wait before retrying a request the database could not be reached for. */
+const DATABASE_RETRY_AFTER_SECONDS = 5;
+
+/** The operator's line for an unreachable database, at most once a minute — see {@link warnPoolFailure}. */
+let lastUnreachableWarningAt = 0;
+
+function warnDatabaseUnreachable(detail: string): void {
+    const now = Date.now();
+    if (now - lastUnreachableWarningAt < POOL_WARNING_INTERVAL_MS) return;
+    lastUnreachableWarningAt = now;
+    logger.error(
+        `❌ The database is unreachable (${detail}), so requests that need it are answered 503 DATABASE_UNAVAILABLE. ` +
+        "Check that it is running and that this server can reach it; requests recover on their own once it is back. " +
+        "Not repeated for a minute."
+    );
+}
+
+/**
  * The operator's line, at most once a minute. A pool that is exhausted is
  * exhausted for every request at once, and a line per request buries the one
  * thing to do about it.
@@ -324,6 +461,18 @@ export class ApiError extends Error {
 
     static serviceUnavailable(message: string, code = "SERVICE_UNAVAILABLE"): ApiError {
         return new ApiError(503, code, message);
+    }
+
+    /**
+     * `503 DATABASE_UNAVAILABLE`: the database could not be reached. What
+     * every door answers then — the data API, sign-in, the admin routes and
+     * the realtime socket — so a client sees one retryable answer, sent with
+     * `Retry-After`, rather than a permission failure or a crash.
+     *
+     * @see isDatabaseUnreachable
+     */
+    static databaseUnavailable(message = DATABASE_UNAVAILABLE_MESSAGE): ApiError {
+        return new ApiError(503, "DATABASE_UNAVAILABLE", message);
     }
 }
 
@@ -500,6 +649,7 @@ export const errorHandler: ErrorHandler<HonoEnv> = (err, c) => {
         // routine outcome (see ApiError.expected), which would otherwise put a
         // warning in the log for every anonymous page view.
         handOffToRequestLog(c, answer.code, answer.message);
+        if (answer.code === "DATABASE_UNAVAILABLE") c.header("Retry-After", String(DATABASE_RETRY_AFTER_SECONDS));
         if (!requestWillBeLogged(c)) {
             const line = `[API] ${c.req.method} ${c.req.path} → ${answer.status} ${answer.code}: ${answer.message}` +
                 (reqId ? ` [${reqId}]` : "");
@@ -561,6 +711,9 @@ export const errorHandler: ErrorHandler<HonoEnv> = (err, c) => {
     // "Failed query: …" 500 that is undiagnosable without direct DB access.
     const dbError = extractDbError(error);
     const poolFailure = dbError ? undefined : poolFailureOf(error);
+    // Ahead of every SQLSTATE arm below: `57P01` is a SQLSTATE too, and it
+    // says the connection is gone, not that the statement was wrong.
+    const unreachable = !poolFailure && isDatabaseUnreachable(error);
 
     if (poolFailure) {
         code = poolFailure;
@@ -570,13 +723,20 @@ export const errorHandler: ErrorHandler<HonoEnv> = (err, c) => {
             : "Timed out opening a database connection (DB_POOL_CONNECT_TIMEOUT).";
         warnPoolFailure(poolFailure);
         c.header("Retry-After", String(POOL_RETRY_AFTER_SECONDS));
+    } else if (unreachable) {
+        code = "DATABASE_UNAVAILABLE";
+        statusCode = 503;
+        const reason = describeUnreachableDatabase(error);
+        logMessage = `The database could not be reached: ${reason}.`;
+        warnDatabaseUnreachable(reason);
+        c.header("Retry-After", String(DATABASE_RETRY_AFTER_SECONDS));
     } else if (resolvedCause && (resolvedCause.code === "ENETUNREACH" || resolvedCause.code === "ECONNREFUSED")) {
+        // Some other service: a database that cannot be reached is the arm
+        // above, so this one does not say "database".
         const cause = resolvedCause;
-        if (cause.code === "ENETUNREACH") {
-            logMessage = `Network unreachable. Cannot connect to database at ${cause.address}:${cause.port}.`;
-        } else {
-            logMessage = `Connection refused to database at ${cause.address}:${cause.port}. Is PostgreSQL running?`;
-        }
+        logMessage = cause.code === "ENETUNREACH"
+            ? `Network unreachable: cannot connect to ${cause.address}:${cause.port}.`
+            : `Connection refused by ${cause.address}:${cause.port}.`;
     } else if ("code" in error && error.code === "ENETUNREACH") {
          const netErr = error as PgLikeError;
          logMessage = `Network unreachable. Cannot connect to service at ${netErr.address}:${netErr.port}.`;
@@ -662,9 +822,9 @@ export const errorHandler: ErrorHandler<HonoEnv> = (err, c) => {
                 ""
             ].join("\n"));
         }
-    } else if (poolFailure) {
-        // Load, said once a minute by `warnPoolFailure`; the request line
-        // carries each occurrence.
+    } else if (poolFailure || unreachable) {
+        // Said once a minute by `warnPoolFailure` / `warnDatabaseUnreachable`;
+        // the request line carries each occurrence.
         if (!requestWillBeLogged(c)) logger.warn(
             `⚠️ [API] ${c.req.method} ${c.req.path} → ${statusCode} ${code}: ${logMessage}` +
             (reqId ? ` [${reqId}]` : "")
@@ -693,7 +853,7 @@ export const errorHandler: ErrorHandler<HonoEnv> = (err, c) => {
     // message and stack it emits, so the fallbacks below (a connection dropped
     // mid-statement carries no SQLSTATE, so `dbError` is null and the stack is
     // logged) are covered too.
-    const suppressStack = isDbSchemaMismatch || dbError !== null || poolFailure !== undefined ||
+    const suppressStack = isDbSchemaMismatch || dbError !== null || poolFailure !== undefined || unreachable ||
         (statusCode < 500 && code === "BAD_REQUEST");
     if (!suppressStack) {
         // The error goes in as a value, not as `String(error.stack)`. A string
@@ -731,6 +891,8 @@ export const errorHandler: ErrorHandler<HonoEnv> = (err, c) => {
         clientMessage = `Schema drift: ${issue} "${identifier}" does not exist. ${schemaDriftRemedy().short}`;
     } else if (poolFailure) {
         clientMessage = "The database is busy: no connection was free in time. Retry shortly.";
+    } else if (unreachable) {
+        clientMessage = DATABASE_UNAVAILABLE_MESSAGE;
     } else if (code === "DB_PERMISSION_DENIED") {
         const ungranted = missingGrant(dbError?.message);
         clientMessage = ungranted

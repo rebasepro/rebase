@@ -18,7 +18,7 @@ import type { Server, IncomingMessage } from "http";
 import type { Duplex } from "stream";
 import { inspect } from "util";
 import { extractUserFromToken, AccessTokenPayload, safeCompare, resolveRequireAuth, assertWriteRequestValid, assertFieldOpsValid, assertNoFieldOpsOnCreate, declaredErrorAnswer, RUNTIME_DEFAULT_MAX_BODY_SIZE, ApiError, resolveConflictTarget, assertNestedWriteAllowed, assertNoUserUpsert, assertUserCreationBodyValid, createUserThroughAuthCollection, type NestedWriteKind } from "@rebasepro/server";
-import { logger, getAccessModel, decideImpersonation, type ImpersonationCredential } from "@rebasepro/server";
+import { logger, getAccessModel, decideImpersonation, isDatabaseUnreachable, DATABASE_UNAVAILABLE_MESSAGE, type ImpersonationCredential } from "@rebasepro/server";
 
 /**
  * What this socket calls on the realtime side, and all of it.
@@ -283,6 +283,25 @@ function jwtExpiryMs(token: string): number | undefined {
     } catch {
         return undefined;
     }
+}
+
+/**
+ * A socket's identity, asked again: still honoured, ended, or not answerable
+ * right now — with the refusal that says why.
+ */
+type IdentityCheck = "live" | "ended" | { unavailable: { code: string; message: string } };
+
+/**
+ * The refusal for an auth store that could not answer, as the HTTP doors give
+ * it: the 503 the store's own error declares (`DATABASE_UNAVAILABLE`,
+ * `ROLE_LOOKUP_FAILED`), else the database unreachable when that is what the
+ * error says, else the lookup failing.
+ */
+function storeUnavailableAnswer(error: unknown): { code: string; message: string } {
+    const declared = declaredErrorAnswer(error);
+    if (declared && declared.status === 503) return { code: declared.code, message: declared.message };
+    if (isDatabaseUnreachable(error)) return { code: "DATABASE_UNAVAILABLE", message: DATABASE_UNAVAILABLE_MESSAGE };
+    return { code: "ROLE_LOOKUP_FAILED", message: "Could not verify your permissions. Please try again." };
 }
 
 /** Everything about an identity that decides what its frames may do. */
@@ -796,21 +815,22 @@ export function createPostgresWebSocket(
      *   and the socket's subscriptions are re-scoped to them.
      * - `"ended"`: refused — revoked, signed out, deleted, expired. The
      *   socket is closed.
-     * - `"unavailable"`: the store could not answer. The frame is refused,
-     *   the session kept, and the next frame or sweep asks again.
+     * - `{ unavailable }`: the store could not answer, and this is the
+     *   refusal that says why. The frame is refused, the session kept, and
+     *   the next frame or sweep asks again.
      */
     async function recheckIdentity(
         clientId: string,
         resolve: (token: string, impersonate?: string) => ReturnType<typeof resolveIdentity> = resolveIdentity
-    ): Promise<"live" | "ended" | "unavailable"> {
+    ): Promise<IdentityCheck> {
         const session = clientSessions.get(clientId);
         const credential = session?.credential;
         if (!session?.user || !credential) return "live";
         let outcome: Awaited<ReturnType<typeof resolveIdentity>>;
         try {
             outcome = await resolve(credential, session.impersonate);
-        } catch {
-            return "unavailable";
+        } catch (error) {
+            return { unavailable: storeUnavailableAnswer(error) };
         }
         // Re-authenticated while this was in flight: that answer is newer.
         if (session.credential !== credential || !session.user) return session.user ? "live" : "ended";
@@ -831,7 +851,7 @@ export function createPostgresWebSocket(
     }
 
     /** The per-frame check in flight on each socket, and what it asks. */
-    const frameChecks = new Map<string, { credential: string; impersonate?: string; outcome: Promise<"live" | "ended" | "unavailable"> }>();
+    const frameChecks = new Map<string, { credential: string; impersonate?: string; outcome: Promise<IdentityCheck> }>();
 
     /**
      * {@link recheckIdentity} for a frame, shared by the frames of one socket
@@ -847,7 +867,7 @@ export function createPostgresWebSocket(
      * is bounded by one lookup: a demotion that lands while the shared lookup
      * runs is seen by the next frame rather than by these.
      */
-    function recheckIdentityForFrame(clientId: string): Promise<"live" | "ended" | "unavailable"> {
+    function recheckIdentityForFrame(clientId: string): Promise<IdentityCheck> {
         const session = clientSessions.get(clientId);
         const credential = session?.credential;
         if (!session || !credential) return recheckIdentity(clientId);
@@ -1101,16 +1121,25 @@ fetchAllowanceAt: Date.now() });
                         return;
                     }
 
-                    // An adapter that throws (its store unreachable) is an
-                    // invalid token here, as it always was: there is no
-                    // session yet to keep. A lookup for an impersonation that
-                    // throws is refused with the answer it carries when it
-                    // has one, and is never authenticated as the caller.
+                    // A lookup for an impersonation that throws is refused
+                    // with the answer it carries when it has one, and is never
+                    // authenticated as the caller. A store that cannot answer
+                    // at all — the database unreachable — is said as that, in
+                    // an `ERROR`: an `AUTH_ERROR` would tell the SDK the token
+                    // is bad and send it to refresh a session that is fine.
+                    // Any other throw is an invalid token, as it always was:
+                    // there is no session yet to keep.
                     let resolved: Awaited<ReturnType<typeof resolveIdentity>>;
                     try {
                         resolved = await resolveIdentity(token, impersonate, impersonate === undefined ? undefined : { door: "socket", clientId });
                     } catch (error) {
-                        const answer = impersonate === undefined ? undefined : declaredErrorAnswer(error);
+                        const declared = declaredErrorAnswer(error);
+                        if ((declared && declared.status === 503) || isDatabaseUnreachable(error)) {
+                            const unavailable = storeUnavailableAnswer(error);
+                            sendError("ERROR", unavailable.code, unavailable.message);
+                            return;
+                        }
+                        const answer = impersonate === undefined ? undefined : declared;
                         if (answer) {
                             sendError("AUTH_ERROR", answer.code, answer.message);
                             return;
@@ -1191,8 +1220,8 @@ roles: verifiedUser.roles }
                         && Date.now() - session.checkedAt >= (CHANNEL_MESSAGE_TYPES.has(type) ? CHANNEL_RECHECK_MIN_MS : 0)) {
                         const outcome = await recheckIdentityForFrame(clientId);
                         if (outcome === "ended") return;
-                        if (outcome === "unavailable") {
-                            sendError("ERROR", "ROLE_LOOKUP_FAILED", "Could not verify your permissions. Please try again.");
+                        if (outcome !== "live") {
+                            sendError("ERROR", outcome.unavailable.code, outcome.unavailable.message);
                             return;
                         }
                     }
@@ -2008,7 +2037,10 @@ code: "BRANCHING_UNSUPPORTED" } }
                 // `RebaseApiError` every collection-callback veto is. Listing
                 // only the first here is how a `beforeDelete` veto reached the
                 // admin panel as "An unexpected error occurred".
-                const answer = declaredErrorAnswer(error);
+                // The database unreachable is said as that, the answer the
+                // HTTP doors give, rather than as a server fault.
+                const answer = declaredErrorAnswer(error)
+                    ?? (isDatabaseUnreachable(error) ? declaredErrorAnswer(ApiError.databaseUnavailable()) : undefined);
                 if (answer) {
                     const line = `[WebSocket Server] Refused: ${answer.code} ${answer.message}`;
                     if (answer.expected) logger.debug(line);

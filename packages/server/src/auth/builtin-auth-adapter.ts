@@ -45,7 +45,7 @@ import type { HonoEnv } from "../api/types";
 import { safeCompare } from "./crypto-utils";
 import { extractBearerToken } from "./bearer-token";
 import { logger } from "../utils/logger";
-import { ApiError, isDataException } from "../api/errors";
+import { ApiError, isDataException, isDatabaseUnreachable } from "../api/errors";
 
 /**
  * Configuration for the built-in Rebase auth adapter.
@@ -167,16 +167,32 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
      * that token exactly the access the lookup exists to take away; during a
      * database blip it scoped a demoted admin with admin RLS. This refuses
      * instead, with the 503 `createRequireAuth` already gives the admin
-     * routes: the adapter middleware answers with it, and the socket treats
-     * a throwing adapter as an invalid token.
+     * routes: the adapter middleware answers with it, and so does the socket.
      */
     async function resolveLiveRoles(uid: string): Promise<string[]> {
         try {
             return await authRepository.getUserRoleIds(uid);
         } catch (error: unknown) {
-            logger.warn("[Auth] Could not resolve roles for a request; refusing it", { uid, error });
-            throw new ApiError(503, "ROLE_LOOKUP_FAILED", "Could not verify your permissions. Please try again.");
+            throw lookupRefusal("[Auth] Could not resolve roles for a request; refusing it", uid, error);
         }
+    }
+
+    /**
+     * The 503 a request is refused with when its account cannot be read.
+     *
+     * A database that cannot be reached at all is said as that —
+     * `DATABASE_UNAVAILABLE`, the answer every other door gives then — and
+     * not as a doubt about the caller's permissions, which nobody was in a
+     * position to have. Anything else the store throws is the lookup failing,
+     * `ROLE_LOOKUP_FAILED`.
+     */
+    function lookupRefusal(line: string, uid: string, error: unknown): ApiError {
+        if (isDatabaseUnreachable(error)) {
+            logger.warn(`${line}: the database is unreachable`, { uid });
+            return ApiError.databaseUnavailable();
+        }
+        logger.warn(line, { uid, error });
+        return new ApiError(503, "ROLE_LOOKUP_FAILED", "Could not verify your permissions. Please try again.");
     }
 
     /**
@@ -190,8 +206,7 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
         try {
             verdict = await judgeAccessToken(authRepository, payload);
         } catch (error: unknown) {
-            logger.warn("[Auth] Could not judge an access token; refusing it", { uid: payload.uid, error });
-            throw new ApiError(503, "ROLE_LOOKUP_FAILED", "Could not verify your permissions. Please try again.");
+            throw lookupRefusal("[Auth] Could not judge an access token; refusing it", payload.uid, error);
         }
         if (!verdict.live) {
             logger.warn("[Security Audit] Refused an access token", {
