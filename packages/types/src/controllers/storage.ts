@@ -81,8 +81,8 @@ export function isPublicStoragePath(path: string | null | undefined): boolean {
  * so the key `default/photo.png` sent as it is names the root `photo.png`:
  * {@link defaultBucketPath} is the spelling that names the key itself.
  *
- * Shared by every storage source that talks to those routes — the SDK's and
- * the admin panel's `useBackendStorageSource` — so they address an object alike.
+ * Shared by every storage source that talks to those routes, so they address
+ * an object alike.
  *
  * @group Models
  */

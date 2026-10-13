@@ -33,7 +33,6 @@ export * from "./useBuildLocalConfigurationPersistence";
 export * from "./useBuildModeController";
 
 export * from "./useRebaseRegistry";
-export * from "./useBackendStorageSource";
 export * from "./usePermissions";
 
 export * from "./ApiConfigContext";

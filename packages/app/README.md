@@ -68,7 +68,7 @@ This package is **framework-agnostic** in the sense that it doesn't depend on an
 | `useDialogsController` | Programmatic dialog management |
 | `useSnackbarController` | Show snackbar notifications |
 | `useModeController` / `useBuildModeController` | Light/dark mode |
-| `useStorageSource` / `useBackendStorageSource` | Storage source from context |
+| `useStorageSource` | Storage source from context |
 | `useRebaseClient` | Access the `RebaseClient` instance |
 | `useLargeLayout` | Responsive layout breakpoint hook |
 | `useClipboard` | Copy-to-clipboard |
