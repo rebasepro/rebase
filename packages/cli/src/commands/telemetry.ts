@@ -134,7 +134,7 @@ function printPayload(): void {
 
 function printHelp(): void {
     console.log(`
-${chalk.bold("rebase telemetry")} — anonymous usage sharing (asked once per project)
+${chalk.bold("rebase telemetry")} — anonymous usage sharing (off until you say yes; ${chalk.cyan("rebase init")} asks)
 
 ${chalk.bold("Commands")}
   ${chalk.blue("status")}     Whether anything is being shared, and why ${chalk.gray("(default)")}

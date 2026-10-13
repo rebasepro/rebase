@@ -119,19 +119,18 @@ describe("promptForConsent", () => {
         expect(telemetry.readConfig().machineId).toBeUndefined();
     });
 
-    it("defaults to yes, so a bare Enter enrols", async () => {
-        // Deliberately opt-OUT at the prompt: the project is self-hosted and
-        // learns nothing otherwise. It is still a question — nothing is sent
-        // to anyone who never reaches it (see the suppression tests below),
-        // and `n` is one keystroke. The pairing that must hold is this default
-        // and the wording: no surface may still call it "off by default".
+    it("defaults to no, so a bare Enter shares nothing", async () => {
+        // Telemetry is off until somebody says yes, and every surface says so —
+        // the help, the README, the skills. A pre-selected yes made Enter, the
+        // commonest answer to any prompt, the consent: interactive `init` sent
+        // `cli.init` the moment it was pressed through.
         const { consent } = await load();
-        const promptSpy = vi.spyOn(inquirer, "prompt").mockResolvedValue({ accepted: true } as never);
+        const promptSpy = vi.spyOn(inquirer, "prompt").mockResolvedValue({ accepted: false } as never);
 
         await consent.promptForConsent();
 
         const questions = promptSpy.mock.calls[0][0] as unknown as Array<{ default: unknown }>;
-        expect(questions[0].default).toBe(true);
+        expect(questions[0].default).toBe(false);
     });
 
     it("does not persist anything when the prompt itself fails", async () => {

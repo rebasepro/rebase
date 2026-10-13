@@ -112,14 +112,12 @@ export async function promptForConsent(options: PromptOptions = {}): Promise<boo
                 type: "confirm",
                 name: "accepted",
                 message: "Share anonymous usage data?",
-                // Defaults to yes: this is the question the project most needs
-                // answered, and a bare Enter is the commonest answer to any
-                // prompt. It is still a question — nothing is sent until it is
-                // answered, `n` is one keystroke, and the decision is
-                // reversible with the command named two lines above. What it
-                // is NOT is "off by default" any more; anything that used to
-                // say so had to change with it.
-                default: true
+                // Defaults to no. Telemetry is off until somebody says yes, and
+                // a bare Enter is the commonest answer to any prompt — so a
+                // pre-selected yes would make pressing through `init` the
+                // consent. `y` is one keystroke, and `rebase telemetry enable`
+                // is the same answer later.
+                default: false
             }
         ] as Parameters<typeof inquirer.prompt>[0]) as { accepted: boolean };
 
