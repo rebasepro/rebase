@@ -195,6 +195,14 @@ Il s'intercale entre le shell et le fichier de projet dans l'ordre de résolutio
 2. `DATABASE_URL` dans l'environnement du shell
 3. **la branche sur laquelle cet espace de travail est basculé**
 4. `DATABASE_URL` dans le fichier `.env` du projet
+5. `--docker`, ou le dernier `rebase dev` lancé avec cette option
+6. la base de données de développement gérée
+
+<span class="since-badge" data-since="0.25">Depuis 0.25</span> Le cinquième rang suit
+le dernier `rebase dev --docker` : une commande de branche lancée après lui n'a donc
+pas besoin de son propre `--docker`, et un `--docker` qu'un rang supérieur écarte ne
+démarre aucun conteneur et signale qu'il a été ignoré. En 0.24, seule l'option
+compte, et une option écartée démarre quand même le conteneur.
 
 Une branche doit avoir la priorité sur `.env`, sinon le basculement n'aurait aucun effet sur un projet qui définit `DATABASE_URL` ; elle ne doit pas avoir la priorité sur les deux éléments supérieurs, car une option sur la ligne de commande est une instruction plus immédiate qu'un basculement effectué hier.
 
@@ -224,7 +232,7 @@ Le branching ne fonctionne **pas** avec la base de données de développement g�
 
 PGlite ne dessert qu'une seule base de données. Exécuter `CREATE DATABASE ... TEMPLATE` dessus écrit une entrée dans le catalogue et ne copie rien, de sorte que la « branche » pointe vers la base de données à partir de laquelle elle a été clonée : les écritures que vous croyez isolées atterrissent dans votre base de données de développement, et il n'existe aucune seconde copie vers laquelle revenir.
 
-Utilisez le branching avec un véritable serveur — votre propre instance PostgreSQL via `DATABASE_URL`, ou `rebase dev --docker`.
+Utilisez le branching avec un véritable serveur — votre propre instance PostgreSQL via `DATABASE_URL`, ou `rebase dev --docker`, que les commandes de branche suivent alors.
 
 ---
 
@@ -254,6 +262,6 @@ Dans la mesure où les branches sont des bases de données PostgreSQL distinctes
 
 ## Ressources associées
 
-- [Commandes CLI](/docs/cli/) — `rebase db branch` et ses options
+- [Commandes de base de données](/docs/cli/database/#rebase-db-branch) — `rebase db branch` et ses options
 - [Génération de schéma](/docs/cli/schema/) — comment est généré le schéma qu'une branche copie
 - [Environnement et configuration](/docs/getting-started/configuration/) — `DATABASE_URL`, et ordre de priorité d'une branche active

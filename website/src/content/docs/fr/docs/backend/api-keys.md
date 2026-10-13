@@ -301,7 +301,7 @@ Chaque clé est vérifiée par rapport à celui qui la crée, de la même maniè
 
 | Refus | Quand |
 |---|---|
-| `400 INVALID_SCOPES` | Une portée est malformée, inconnue, ou porte une cible qu'elle n'accepte pas. `details.validScopes` liste toutes les portées valides |
+| `400 INVALID_SCOPES` | Une portée est malformée, inconnue, ou porte une cible qu'elle n'accepte pas. `details.validScopes` liste les portées qu'une clé peut détenir. <span class="since-badge" data-since="0.25">Depuis 0.25</span> Elle omet `keys:*`, qu'aucune clé ne peut détenir ; en 0.24, elle les liste |
 | `400 UNKNOWN_SCOPE_TARGET` | Une cible nomme une collection, une source de stockage ou une fonction que ce backend ne sert pas |
 | `400 KEY_MANAGEMENT_SCOPE` | `keys:read` ou `keys:write` a été demandée |
 | `403 SCOPE_EXCEEDS_CREATOR` | Une portée que le créateur ne détient pas. Une clé ne détient jamais plus que le compte qui l'a créée |

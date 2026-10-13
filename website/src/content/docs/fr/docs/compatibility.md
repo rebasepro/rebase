@@ -78,7 +78,7 @@ Les trois évaluations signifient :
 | Serveur MCP + compétences agent (agent skills) | Bêta | `@rebasepro/mcp` s'exécute sur stdio : quarante-deux outils, authentification bearer par projet, les outils destructifs refusent les cibles non locales sauf consentement explicite. Depuis la 0.21, le serveur peut également monter un endpoint distant `/mcp` — OAuth 2.1, six outils de données, chaque appel sous le RLS de la personne connectée — désactivé sauf si `REBASE_MCP_ENABLED=true`, et Postgres uniquement |
 | Studio (SQL, schéma, RLS, explorateur d'API) | Bêta | Utilisé quotidiennement sur des projets réels. Le système de branches est présent dans le paquet open-source et délibérément non exposé dans Rebase Cloud, car le basculement d'un déploiement actif sur une branche n'est pas encore pris en charge |
 | CMS + panneau d'administration | Bêta | Complet pour le CRUD, les relations, les champs de stockage et les rôles. **Le tableau de données n'a pas de sémantique de grille** — pas de `role`, pas d'`aria-rowindex`, `tabIndex` supprimé — si bien que les utilisateurs du clavier et des lecteurs d'écran ne peuvent pas utiliser la vue principale. Pas de brouillons, pas de contenu par langue, pas de texte enrichi par blocs |
-| Base de données de dev gérée PGlite | Bêta | `rebase dev` sans configuration et sans Docker. Une seule session à la fois, les requêtes sont donc sérialisées et la concurrence ne peut pas être reproduite dessus ; les commandes basées sur Atlas (`db push`, `generate`, `migrate`) planifient contre un second PGlite jetable, démarré pour la commande ; `db branch` ne fonctionne pas dans cet environnement et le signale |
+| Base de données de dev gérée PGlite | Bêta | `rebase dev` sans configuration et sans Docker. Une seule session à la fois, les requêtes sont donc sérialisées et la concurrence ne peut pas être reproduite dessus ; les commandes basées sur Atlas (`db push`, `generate`, `migrate`) planifient contre un second PGlite jetable, démarré pour la commande (<span class="since-badge" data-since="0.25">Depuis 0.25</span> ; en 0.24, elles refusent la base gérée) ; `db branch` ne fonctionne pas dans cet environnement et le signale |
 | Helm chart | Bêta | Restitue la topologie en processus séparés et est publié sur le registre OCI à chaque version. Le comportement par défaut reste un conteneur unique |
 | `@rebasepro/server-mongo` | **Expérimental** | Un pilote fonctionnel avec temps réel basé sur les flux de modification (change streams) et historique par instantanés. **Pas de sécurité au niveau des lignes (RLS)** — l'ensemble du modèle d'isolation ci-dessus ne s'y applique pas — et pas de relations. Les flux de modification nécessitent un replica set : sur un `mongod` autonome, rien ne les remplace, de sorte qu'un abonnement voit les écritures effectuées via ce processus Rebase et manque toutes les autres. Pas de MFA : l'enrôlement renvoie 501, et les vérifications répondent « aucun facteur », si bien que la connexion n'en demande jamais. L'agrégat d'administration ne peut pas cibler une collection — il lit le nom depuis une étape `$from` que MongoDB ne possède pas — et ne renvoie donc rien |
 | `@rebasepro/firebase` | Expérimental | Exécute le panneau d'administration et le SDK sur Firestore. Pas de RLS, pas de surface SQL ; l'ensemble des fonctionnalités Postgres n'est pas transposé. Le pilote Firestore ignore les groupes de filtres `or(...)`/`and(...)` ; une requête qui en utilise un lit donc toutes les lignes permises par ses filtres simples |
@@ -115,6 +115,19 @@ seconde catégorie ne puisse jamais survenir en silence.
 Rebase Cloud utilise exactement ces contrats et rien d'autre. Tout ce qui ne
 figure pas dans cette liste est un détail d'implémentation dont la plateforme
 ne dépend pas.
+
+### Badges de version et canaries
+
+La documentation est publiée depuis `main` : une page peut donc décrire quelque chose
+qu'aucune version stable ne porte encore. Un badge *Depuis* nomme la première version stable
+qui le porte, et le texte à côté dit ce que fait la version précédente.
+
+Une canary est un build de `main` numéroté d'après la dernière version stable :
+`0.24.1-canary.g<commit>` est `main` à ce commit, quelque temps après la 0.24.0, et
+`rebase upgrade --to canary` installe la plus récente. Elle porte tout ce qui
+avait atteint `main` au moment de son build : sur une canary récente, un badge qui nomme la
+prochaine version mineure (0.25, après la 0.24.0) s'applique donc à vous, et la note sur la version
+précédente (en 0.24) décrit la version stable dont vous venez.
 
 ## Les contrats versionnés
 

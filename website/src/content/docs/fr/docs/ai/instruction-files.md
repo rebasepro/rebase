@@ -33,9 +33,9 @@ Please refer to and follow the instructions defined in [ai-instructions.md](./ai
 The Rebase skills for this assistant live in `.claude/skills/`. If they are not there yet, install them, with the Rebase MCP server: `rebase skills install --agent claude --mcp`.
 ```
 
-pour cette troisième ligne et le `.mcp.json` ci-dessous : sur la 0.23
-la troisième ligne se contente de dire à l'assistant de lancer `rebase skills install --agent claude`,
-et `.mcp.json` démarre le serveur avec `npx -y @rebasepro/mcp` depuis le registre.
+Sur la 0.23, la troisième ligne se contente de dire à l'assistant de lancer
+`rebase skills install --agent claude`, et le `.mcp.json` ci-dessous démarre le
+serveur avec `npx -y @rebasepro/mcp` depuis le registre.
 
 Les autres ne diffèrent que par le répertoire de skills de l'agent et sa valeur
 `--agent` — `--agent cursor`, `--agent windsurf`, `--agent codex`,
@@ -109,9 +109,11 @@ utile de les répéter au début de chaque session :
    est toute l'étape : le démarrage régénère le schéma Drizzle et crée les tables
    et colonnes manquantes. `pnpm db:push` ne sert qu'à ce que le démarrage laisse
    délibérément de côté — une colonne renommée, un type restreint, un champ
-   supprimé — et il exige votre propre
-   PostgreSQL, pas la base de données de développement gérée. En production,
-   c'est `pnpm db:generate` puis `pnpm db:migrate`.
+   supprimé — sur la base de données de développement gérée comme sur votre
+   propre PostgreSQL. En production, c'est `pnpm db:generate` puis
+   `pnpm db:migrate`.
+   <span class="since-badge" data-since="0.25">Depuis 0.25</span> En 0.24,
+   `pnpm db:push` exige votre propre PostgreSQL, et le fichier le dit.
 3. **Utilisez le SDK.** Passez par `rebase.dataAsAdmin.<slug>` pour le travail
    effectué sous l'identité du service, ou par `getDriver(c)` dans une fonction
    lorsque la lecture doit s'exécuter en tant qu'appelant. Le client serveur n'expose pas

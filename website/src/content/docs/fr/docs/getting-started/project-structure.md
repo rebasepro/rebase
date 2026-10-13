@@ -30,7 +30,10 @@ my-app/
 ├── .env                    # Generated for you: JWT_SECRET, a database password, a free port
 ├── rebase.json             # Which apps this repository contains, and how each is built
 ├── package.json            # Root workspace config
+├── tsconfig.json           # Typechecks scripts/; each workspace typechecks on its own
 ├── docker-compose.yml      # Self-hosting: Postgres + the published runtime image
+├── scripts/
+│   └── example.ts          # The SDK end to end against the running backend: `pnpm example`
 │
 ├── config/                 # Shared by the backend and the admin panel
 │   ├── index.ts            # Re-exports `collections`; the runtime reads `storageAuthorize` from here
@@ -54,10 +57,15 @@ my-app/
     └── vite.config.ts
 ```
 
+`tsc --noEmit` à la racine vérifie `scripts/` ; dans `config/`, `backend/` ou
+`frontend/`, il vérifie ce workspace. <span class="since-badge" data-since="0.25">Depuis 0.25</span>
+En 0.24, la racine n'a pas de `tsconfig.json`, et `tsc` y affiche son aide et
+ne vérifie rien.
+
 :::note[Il n'y a pas de `backend/src/index.ts`]
 Ni de `Dockerfile`. Un projet échafaudé déclare `runtime: "managed"` dans
 `rebase.json`, ce qui signifie que **l'image publiée `rebasepro/server` démarre votre
-projet en tant que bundle** — le même变为 artefact, que vous l'auto-hébergiez ou que vous le déployiez
+projet en tant que bundle** — le même artefact, que vous l'auto-hébergiez ou que vous le déployiez
 sur Rebase Cloud. Vous configurez le serveur via `rebase.json`, `config/` et
 des variables d'environnement plutôt qu'en écrivant un point d'entrée.
 
@@ -146,7 +154,7 @@ votre projet. Ce que contient `backend/`, c'est le code pris en compte par le ru
 |---|---|
 | `backend/functions/` | Routes personnalisées, montées automatiquement sur `/api/functions/<filename>` |
 | `backend/crons/` | Tâches planifiées, découvertes de la même manière (à créer selon vos besoins) |
-| `backend/src/schema.generated.ts` | Le schéma Drizzle, régénéré à partir de vos collections à chaque `rebase dev` et `rebase build` |
+| `backend/src/schema.generated.ts` | Le schéma Drizzle de vos collections : écrit par `rebase init`, et régénéré à chaque `rebase dev` et `rebase build` |
 
 Le runtime met en place :
 
@@ -214,8 +222,8 @@ régénère `backend/src/schema.generated.ts` et les types du SDK dans
 colonnes manquantes. En dehors de `rebase dev`, les mêmes étapes s'effectuent via
 `rebase schema generate` et `rebase generate-sdk`.
 
-pour les types du SDK : sur la 0.23, `rebase dev` ne régénère que le schéma, et
-`rebase generate-sdk` est une étape à part.
+Sur la 0.23, `rebase dev` ne régénère que le schéma, et `rebase generate-sdk`
+est une étape à part.
 
 ## Étapes suivantes
 

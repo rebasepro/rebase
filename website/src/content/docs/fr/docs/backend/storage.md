@@ -206,10 +206,10 @@ qu'aucun message ne le signale.
 
 Les miniatures d'images stockées dans le panneau d'administration utilisent ce point de terminaison : un aperçu
 sous forme de tableau ou de carte demande un rendu webp environ deux fois supérieur à sa taille affichée (96–800px)
-plutôt que l'original. `sharp` est une dépendance facultative ; sans elle, la
-transformation répond 500, le panneau vérifie donc une fois par chargement de page, avec une unique
-requête de rendu, et affiche les originaux si le serveur ne peut pas redimensionner. Les fichiers SVG et GIF
-sont toujours affichés tels quels.
+plutôt que l'original. Les fichiers SVG et GIF sont toujours affichés tels quels.
+`sharp` est facultatif : <span class="since-badge" data-since="0.25">Depuis 0.25</span>
+sans lui, une demande de transformation reçoit l'original, et le backend avertit une fois de
+lancer `pnpm add sharp` dans `backend/` (en 0.24, elle répond 500, et le panneau affiche les originaux).
 
 ### Performance et mise en cache LRU
 
@@ -288,8 +288,7 @@ téléversement avec reprise est refusé dès sa création, avant son premier fr
 `OPTIONS /api/storage/tus` l'annonce sous l'en-tête `Tus-Max-Size` — pour la source
 indiquée par `?storageId=`, ou celle par défaut sinon.
 
-pour `STORAGE_MAX_FILE_SIZE` : sur la version 0.23, seul le `maxFileSize` de la source définit
-la limite, et la variable n'est pas lue.
+Sur la version 0.23, seul le `maxFileSize` de la source définit la limite ; `STORAGE_MAX_FILE_SIZE` n'est pas lue.
 
 ```bash
 STORAGE_MAX_FILE_SIZE=209715200          # (default): 200 MB
@@ -345,7 +344,8 @@ topics.
 
 Chaque source est configurée à partir des **mêmes noms de variables portant leur propre
 suffixe**. La source par défaut ne prend aucun suffixe, ainsi un projet à bucket unique continue
-d'utiliser les noms simples ci-dessus sans rien devoir déclarer :
+d'utiliser les noms simples ci-dessus sans rien devoir déclarer, et déclarer des buckets nommés à côté
+ne les change pas (<span class="since-badge" data-since="0.25">Depuis 0.25</span>, [détails](/docs/backend/multiple-sources/#which-bucket-receives-an-unqualified-upload)) :
 
 ```bash
 S3_BUCKET=app-uploads             # (default)

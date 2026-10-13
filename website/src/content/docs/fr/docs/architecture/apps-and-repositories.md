@@ -69,8 +69,9 @@ Les outils qui le connaissent l'utilisent :
 - **`rebase dev`** affiche l'URL du CMS dans sa bannière de démarrage lorsqu'il ne s'agit pas simplement de la page d'accueil du frontend.
 - **`rebase apps list`** l'affiche à côté de l'application qui la sert.
 
-Trois configurations, toutes courantes. pour la troisième : sur la 0.23 le
-`path` d'une application ne peut pas être une URL, si bien que le CMS partage le nom d'hôte du projet.
+Trois configurations, toutes courantes. Sur la 0.23, le `path` d'une application
+ne peut pas être une URL : la troisième n'y est donc pas disponible, et le CMS
+partage le nom d'hôte du projet.
 
 ```jsonc
 // The whole app is the CMS — what `rebase init` scaffolds.
@@ -103,6 +104,15 @@ Un projet existant n'en a pas besoin. La CLI déduit la même structure à parti
 rebase apps list      # what this repository contributes
 rebase apps init      # write an inferred rebase.json
 ```
+
+L'inférence ne peut pas connaître deux choses que le `rebase.json` d'un scaffold
+déclare. Elle nomme l'application statique `web`, là où un scaffold la nomme
+`admin`, et elle ne peut pas connaître la route `cms` de l'application. Le nom ne
+change pas : Rebase Cloud a enregistré `web` pour chaque projet déployé sans
+`rebase.json`. <span class="since-badge" data-since="0.25">Depuis 0.25</span>
+`rebase apps init --force` conserve les noms, le `path` et le `cms` des
+applications que déclare le fichier qu'il remplace, et signale comme retirée une
+application qu'il ne retrouve plus. En 0.24, il écrit la simple inférence par-dessus.
 
 ## Une application sur son propre nom d'hôte
 

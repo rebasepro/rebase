@@ -25,23 +25,35 @@ téléversements séparément, selon son propre calendrier.
 ## Démarrage rapide
 
 ```bash
-# Sauvegarder vers un répertoire local (format personnalisé, compressé)
+# Back up to a local directory (custom format, compressed)
 rebase db backup --out ./backups
 
-# Sauvegarder directement vers un stockage d'objets privé
+# Back up straight to private object storage
 rebase db backup --out s3://my-private-bucket/backups
 
-# Lister ce dont vous disposez
-rebase db backups list --out ./backups
+# List what you have
+rebase db backups list
 
-# Restaurer dans une base de données NEUVE (ne touche pas à celle en production)
+# Restore into a FRESH database (does not touch the live one)
 rebase db restore ./backups/rebase-app-20260714T030000Z.dump \
   --create-db --target-db app_restored
 ```
 
 La chaîne de connexion provient de l'environnement de votre projet, comme pour toute
-autre [commande `rebase db`](/docs/cli/) : `DATABASE_URL`, avec repli sur
+autre [commande `rebase db`](/docs/cli/database/) : `DATABASE_URL`, avec repli sur
 `ADMIN_CONNECTION_STRING`.
+
+<span class="since-badge" data-since="0.25">Depuis 0.25</span> Un `--out` relatif,
+la valeur par défaut `./backups` et un chemin de dump passé à `rebase db restore`
+se résolvent tous par rapport au répertoire depuis lequel vous lancez `rebase`, normalement la racine
+du projet : `rebase db backup` et `rebase db backups list` se retrouvent donc au même endroit. Un
+`BACKUP_DESTINATION` relatif se résout par rapport au répertoire du backend, où le
+serveur le lit aussi. Les trois commandes refusent une option qu'elles n'acceptent pas
+avant de rien exécuter, et nomment celle que vous aviez probablement en tête. Le mot de passe
+va à `pg_dump`, `pg_dumpall` et `pg_restore` dans `PGPASSWORD`, jamais sur leur
+ligne de commande : aucun message d'erreur ni liste de processus ne le montre. En 0.24, la valeur par défaut
+était `backend/backups`, une option mal orthographiée était ignorée, et une restauration en échec
+affichait la chaîne de connexion avec son mot de passe.
 
 ## Ce qu'est une sauvegarde
 
@@ -52,7 +64,7 @@ se basent la rétention et le tri de la liste.
 
 | Option | Description |
 | --- | --- |
-| `--out`, `-o` | Un chemin local, ou une URL `s3://bucket/prefix` / `gs://bucket/prefix`. Par défaut `$BACKUP_DESTINATION`, puis `./backups`. |
+| `--out`, `-o` | Un chemin local, ou une URL `s3://bucket/prefix` / `gs://bucket/prefix`. Par défaut `$BACKUP_DESTINATION`, puis `./backups` dans le répertoire depuis lequel vous lancez `rebase`. |
 | `--exclude-schema <s>` | Exclut un schéma du dump (répétable). N'excluez jamais `rebase` — voir ci-dessous. |
 | `--no-owner` | Omet les commandes de propriété, pour une restauration sous un rôle différent. |
 | `--enable-row-security` | Effectue le dump en tant que sujet administrateur plutôt que d'échouer sur la sécurité au niveau des lignes. **Peut produire un dump partiel** — voir [Sécurité au niveau des lignes](#sécurité-au-niveau-des-lignes-et-le-dump-silencieusement-incomplet). |
@@ -90,6 +102,11 @@ qu'appellent vos politiques RLS et vos déclencheurs de capture de modifications
 dump sans lui ne comporte aucun utilisateur, et ne peut pas du tout être restauré dans
 une base de données vide : les tables qu'il contient ont des politiques qui appellent
 des fonctions qu'il ne contient pas.
+
+<span class="since-badge" data-since="0.25">Depuis 0.25</span> Comme il contient
+chaque mot de passe et chaque hash de clé, un dump local et son `.globals.sql` sont créés
+lisibles par leur seul propriétaire (0600), avant que `pg_dump` n'y écrive ; les fichiers
+locaux d'une sauvegarde planifiée le sont aussi. En 0.24, ils sont en 0644.
 
 ## Sauvegardes planifiées
 
@@ -156,8 +173,7 @@ supprimée. La purge ne touche que les fichiers dont le nom correspond au motif 
 sauvegarde ; tout ce qui partage le bucket ou le préfixe sans y correspondre est
 laissé intact.
 
-La tâche cron exécute `pg_dump` à l'intérieur du processus serveur.
-l'image de runtime
+La tâche cron exécute `pg_dump` à l'intérieur du processus serveur. L'image de runtime
 officielle (`rebasepro/server`, voir [Auto-hébergement](/docs/deployment/self-hosting/))
 embarque les outils client PostgreSQL 18 pour cela ;
 sur la 0.23 et les versions antérieures elle n'en avait aucun, et chaque exécution
@@ -261,13 +277,13 @@ son `.globals.sql`. Téléchargez les deux et conservez-les dans un même réper
 sauvegarde marquée **Pas de fichier de rôles** n'a pas de fichier associé : recréez ses
 rôles à la main avant de la restaurer dans un nouveau Postgres.
 
-au-dessus de la liste,
-le panneau indique la tâche de sauvegarde planifiée et sa dernière exécution. Une
+Au-dessus de la liste, le panneau
+indique la tâche de sauvegarde planifiée et sa dernière exécution. Une
 exécution en échec s'affiche comme une erreur avec son message, de sorte qu'une
 sauvegarde nocturne qui ne peut pas s'exécuter est visible là où les sauvegardes sont
 listées, et pas seulement dans le panneau Tâches Cron.
 
-ce qu'il indique sur la tâche :
+Ce qu'il indique sur la tâche :
 
 - **Dernière sauvegarde planifiée** est la dernière exécution effectuée par la
   planification. Une exécution lancée à la main depuis lors (**Run Now** dans Tâches
@@ -286,7 +302,7 @@ ce qu'il indique sur la tâche :
   panneau l'indique, plutôt que d'affirmer que la sauvegarde ne s'est pas encore
   exécutée.
 
-la liste est lue
+La liste est lue
 par le processus serveur qui répond à `GET /api/admin/backups`, et ce n'est pas
 toujours le processus qui exécute la planification :
 

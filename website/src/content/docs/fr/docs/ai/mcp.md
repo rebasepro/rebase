@@ -324,7 +324,7 @@ to allow destructive tools against remote environments.
 
 **Si aucune chaîne de connexion ne peut être résolue, les outils de base de données soumis au verrou sont refusés.**
 Sans `DATABASE_URL`, la CLI utilise la base de développement gérée, qui est la valeur par défaut d'un
-nouveau projet, et la CLI y refuse elle-même `db push`, `db migrate` et `db branch`. Le refus l'indique
+nouveau projet, et le verrou y refuse ses quatre outils de base de données. Le refus en donne la raison
 et nomme ce qui fonctionne à la place. Il ne suggère pas la désactivation du verrou :
 
 ```text
@@ -334,6 +334,10 @@ most likely do not need this tool: the dev server applies the collections to tha
 database at boot, additively. After changing a collection, restart it with
 rebase_dev_stop and rebase_dev_start. …
 ```
+
+<span class="since-badge" data-since="0.25">Depuis 0.25</span> Depuis un terminal,
+`rebase db push` et `rebase db migrate` s'exécutent bel et bien sur cette base de
+données ; seuls les outils MCP sont refusés. En 0.24, la CLI les y refuse aussi.
 
 Seule l'interface loopback est considérée comme locale : `localhost`, `*.localhost`, `127.0.0.0/8`, `::1`.
 Les plages privées telles que `10.x` et `192.168.x` ne le sont **pas** — celles-ci ont autant de chances

@@ -10,7 +10,7 @@ description: Les changements cassants apportés par la version 0.25 pour une app
 
 Voici les entrées `### Breaking` qu'apporte la version 0.25 pour une application sous 0.24.
 
-Les trois premières découlent des travaux d'optimisation des performances : le commutateur count sur les listes REST, le listing des collections MCP et les traductions de l'interface d'administration. Le reste provient du nettoyage du backlog : des refus plus stricts au démarrage et sur `OPTIONS`, le chemin cron et les lectures hors ligne du SDK, le registre des sources de stockage, les props inutilisées du kit d'interface utilisateur, l'upsert sur la collection des utilisateurs, une lecture spécifiant à la fois `page` et `offset`, ainsi que les noms de stratégie par défaut sur les tables longues. Les trois dernières sont des décisions produit : la durée de session par défaut, la politique de mot de passe sur un mot de passe choisi par un administrateur, et une chaîne vide sur un champ obligatoire. Trois suppressions suivent : deux exports client qui n'étaient que des moteurs internes, un hook admin dont rien n'a besoin, et une option de stockage qui n'atteignait aucun client.
+Les trois premières découlent des travaux d'optimisation des performances : le commutateur count sur les listes REST, le listing des collections MCP et les traductions de l'interface d'administration. Le reste provient du nettoyage du backlog : des refus plus stricts au démarrage et sur `OPTIONS`, le chemin cron et les lectures hors ligne du SDK, le registre des sources de stockage, les props inutilisées du kit d'interface utilisateur, l'upsert sur la collection des utilisateurs, une lecture spécifiant à la fois `page` et `offset`, ainsi que les noms de stratégie par défaut sur les tables longues. Les trois dernières sont des décisions produit : la durée de session par défaut, la politique de mot de passe sur un mot de passe choisi par un administrateur, et une chaîne vide sur un champ obligatoire. Trois suppressions suivent : deux exports client qui n'étaient que des moteurs internes, un hook admin dont rien n'a besoin, et une option de stockage qui n'atteignait aucun client. La dernière est la source de stockage par défaut, que la déclaration d'un bucket nommé ne déplace plus.
 
 :::note[Comportements modifiés et noms obsolètes]
 La version 0.25 modifie également le comportement de quelques appels existants, sans toutefois les casser. Vérifiez ces points si votre application dépend de l'ancien comportement :
@@ -235,3 +235,29 @@ La source du client transmet également `public` et `context` lors des téléver
 ## 85. `signedUrlExpiration` est retiré de la configuration de stockage S3 et GCS
 
 Supprimez la clé de `storage: { type: "s3" | "gcs", … }` ; TypeScript la signale comme une propriété inconnue. Elle n'a jamais défini la durée de vie d'une URL reçue par un navigateur. Pour modifier la durée de validité de l'URL d'un fichier privé, définissez `storageDownloadTokenTtl` (en secondes ; `STORAGE_DOWNLOAD_TOKEN_TTL` lors d'un déploiement en bundle). Le code serveur qui appelle directement `controller.getSignedUrl()` obtient une URL valable une heure.
+
+## 86. Déclarer un bucket nommé ne déplace plus la source de stockage par défaut
+
+Un projet qui ne déclarait que des buckets nommés dans `config/resources.ts`, comme
+`bucket("media", { engine: "s3" })`, voyait le premier promu bucket par défaut :
+les téléversements dont la propriété ne nomme aucun `storageSource` allaient vers lui. Le bucket par défaut
+lit désormais toujours sa propre configuration, quoi qu'il soit déclaré : `STORAGE_TYPE`,
+`STORAGE_PATH` (ou `./uploads`), et les `S3_*` / `GCS_*` sans suffixe.
+
+Si ces téléversements doivent continuer d'aller vers le bucket nommé, dites-le :
+
+```ts
+// config/resources.ts
+export const media = bucket("media", { engine: "s3", default: true });
+```
+
+Sans cette marque, en production, ces téléversements répondent
+`501 STORAGE_NOT_CONFIGURED` tant que le bucket par défaut n'est pas lié (`STORAGE_TYPE=s3` et
+`S3_BUCKET`, ou `STORAGE_TYPE=gcs` et `GCS_BUCKET`), et le démarrage journalise un avertissement
+qui nomme les deux solutions. Les fichiers qu'a écrits le bucket par défaut promu se trouvent dans le bucket nommé ;
+avec la marque, ils sont servis par le bucket par défaut comme avant. En développement, les
+fichiers déjà présents dans `./uploads` sont de nouveau servis.
+
+Le démarrage refuse aussi deux sources qui se résolvent vers un même répertoire (ou l'un dans
+l'autre), ou vers un même bucket sur un même point de terminaison. Donnez à la source nommée un emplacement
+qui lui soit propre (`STORAGE_PATH__MEDIA`, `S3_BUCKET__MEDIA`), ou marquez-la comme bucket par défaut.

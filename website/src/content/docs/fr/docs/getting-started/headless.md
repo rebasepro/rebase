@@ -65,8 +65,9 @@ Il n'y en a aucune dans le code. Le serveur lit le schéma de votre base de donn
 au démarrage et expose les tables qu'il trouve, de sorte que l'API s'adapte à vos
 migrations : modifiez le schéma, et les endpoints changent avec lui.
 
-Une table est exposée dès lors qu'elle dispose d'un modèle d'autorisation — la
-sécurité au niveau des lignes (RLS) activée, plus au moins une politique :
+Une table est exposée dès lors que la sécurité au niveau des lignes (RLS) y est activée.
+Sans politique, elle est exposée et ne renvoie aucune ligne, et le démarrage
+le signale ; une politique l'ouvre :
 
 ```sql
 ALTER TABLE your_table ENABLE ROW LEVEL SECURITY;
@@ -81,7 +82,7 @@ politiques, et [rls-check](/docs/rls-check/) pour auditer ce que vos politiques
 autorisent réellement.
 
 Une table sans RLS est **ignorée**, délibérément : chaque requête authentifiée
-s'exécute en tant que `rebase_user`, de sorte qu'exposer une table sans politique
+s'exécute en tant que `rebase_user`, de sorte qu'exposer une table que la sécurité au niveau des lignes ne protège pas
 donnerait accès à chaque ligne à tous les utilisateurs connectés. Chaque table
 ignorée est mentionnée au démarrage, accompagnée du SQL permettant de la protéger.
 
@@ -170,9 +171,14 @@ Trois points permettent de résoudre cela, dans l'ordre conseillé de vérificat
 1. **La base de données n'a pas de tables.** Créez-les — via une migration, du
    SQL brut, ou un fichier de collection accompagné de `rebase db push` — puis
    redémarrez.
-2. **Les tables n'ont pas de politique RLS**, le démarrage les a donc ignorées.
-   Les logs de démarrage listent chacune d'elles. Ajoutez une politique, comme
-   indiqué ci-dessus.
+2. **Les tables n'ont pas la sécurité au niveau des lignes activée**, le démarrage
+   les a donc ignorées. Les logs de démarrage listent chacune d'elles, avec le SQL.
+   Activez-la et ajoutez une politique, comme indiqué ci-dessus.
+   <span class="since-badge" data-since="0.25">Depuis 0.25</span> La réponse le dit
+   aussi : son message nomme les tables et donne le
+   `ALTER TABLE … ENABLE ROW LEVEL SECURITY` qui leur correspond, et
+   `details.unprotectedTables` les liste. En 0.24, elle dit que la base de données n'a
+   aucune table.
 3. **`DATABASE_URL` pointe ailleurs** que là où vous le pensez. `rebase status`
    affiche les trois fichiers qui déterminent ce que le backend cible.
 

@@ -227,20 +227,34 @@ Le moteur provient de la déclaration, il n'y a donc aucun `STORAGE_TYPE` à dé
 
 #### Quel bucket reçoit un téléversement non qualifié
 
-Une propriété de stockage qui ne spécifie aucun `storageSource` écrit dans le bucket par **défaut**,
-et un projet comportant des buckets nommés doit indiquer de quel bucket il s'agit. Déclarez
-soit le bucket avec la clé par défaut — `export const uploads = bucket();` — soit marquez
-l'un des buckets nommés :
+<span class="since-badge" data-since="0.25">Depuis 0.25</span>
+
+Une propriété de stockage qui ne spécifie aucun `storageSource` écrit dans le bucket par **défaut**.
+Déclarer des buckets nommés ne le déplace jamais. Le bucket par défaut garde sa propre
+configuration, quoi que déclare `config/resources.ts` : `STORAGE_TYPE`,
+`STORAGE_PATH` (`./uploads` s'il n'est pas défini), et les variables `S3_*` / `GCS_*`
+sans suffixe. Ajouter `bucket("media", { engine: "s3" })` à un projet qui a déjà
+des fichiers dans `./uploads` les laisse où ils sont, et toujours servis. `media`
+lit ses propres variables `__MEDIA` et, en développement, se rabat sur son propre
+répertoire, `uploads__media`.
+
+Pour envoyer plutôt les téléversements non qualifiés vers un bucket nommé, marquez-le :
 
 ```ts
 export const media = bucket("media", { engine: "s3", default: true });
 ```
 
-Sans l'un ou l'autre, le démarrage promeut le premier bucket nommé déclaré et émet un avertissement, indiquant
-les deux solutions possibles. Choisissez-en une : une promotion décide de l'emplacement des fichiers d'un utilisateur selon
-l'ordre de déclaration, et elle donne des réponses différentes avant et après un déploiement,
-car le bucket local utilisé en remplacement pendant le développement est supprimé en production,
-alors que la promotion ne l'est pas.
+Le bucket par défaut *est* alors `media`. Les fichiers que contenait l'ancien bucket par défaut
+restent où ils sont et ne sont plus servis par lui ; copiez-les donc d'abord :
+`rebase storage move --from "(default)" --to media`.
+
+Deux sources ne peuvent pas partager un emplacement. Si un bucket nommé se résolvait vers le
+répertoire du bucket par défaut (ou un répertoire qu'il contient), ou vers le même bucket d'un
+magasin d'objets sur le même point de terminaison, le démarrage refuse et nomme la variable à modifier.
+
+En 0.24, un projet qui ne déclare que des buckets nommés voit le premier d'entre eux déclaré
+promu bucket par défaut au démarrage, avec un avertissement : ajouter `bucket("media")`
+déplace donc le bucket par défaut vers `uploads__media`.
 
 ### Plusieurs buckets sur un même compte
 
@@ -387,11 +401,13 @@ Avec `STORAGE_PATH=/storage/uploads`, `bucket("media", { engine: "local" })`
 `/storage`, comme le fait le fichier compose généré par `rebase init`, et non sur
 `STORAGE_PATH` directement. `STORAGE_PATH__MEDIA` définit explicitement le répertoire d'un bucket spécifique. Consultez [Auto-hébergement](/docs/deployment/self-hosting/#file-storage).
 
-Une conséquence bonne à savoir si vous déclarez des buckets explicitement : aucun bucket
-par défaut n'est inventé pour vous. Déclarer uniquement `bucket("media")` signifie qu'il n'y a pas
-de bucket par défaut, et une propriété qui n'en nomme aucun n'a nulle part où aller —
-délibérément, et de manière identique en développement et en production. Ajoutez également `bucket()`
-si vous en voulez un.
+<span class="since-badge" data-since="0.25">Depuis 0.25</span> Déclarer des
+buckets ne change pas le bucket par défaut. Avec seulement `bucket("media")`
+déclaré, le bucket par défaut lit toujours ses propres variables. En développement, c'est
+`./uploads`. En production, sans liaison, il est désactivé comme tout bucket non lié :
+les téléversements qui ne nomment aucun `storageSource` répondent `501 STORAGE_NOT_CONFIGURED`.
+Le démarrage le dit une fois, avec les deux solutions : le lier (`STORAGE_TYPE=s3` et
+`S3_BUCKET`, ou `STORAGE_TYPE=gcs` et `GCS_BUCKET`), ou marquer un bucket nommé `default: true`.
 
 En développement, un bucket déclaré que rien ne lie est un répertoire local —
 `uploads__media` aux côtés de `uploads` par défaut — quel que soit le moteur déclaré, de sorte que

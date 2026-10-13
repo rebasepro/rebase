@@ -71,8 +71,8 @@ Pendant que `rebase dev` tourne, vous n'en avez pas besoin : il régénère les 
 `generated/sdk/` au démarrage et à chaque enregistrement sous `config/collections/`. Lancez
 vous-même la commande en CI, dans un dépôt frontend sans collections
 (`rebase generate-sdk --from link`), ou partout où `rebase dev` ne tourne pas.
-pour la régénération : sur la 0.23, `rebase dev` laisse les types du SDK inchangés, exécutez donc
-la commande après chaque modification de collection.
+Sur la 0.23, `rebase dev` laisse les types du SDK inchangés, exécutez donc la commande
+après chaque modification de collection.
 
 Passez ensuite le paramètre de type `Database` à `createRebaseClient` pour bénéficier d'une autocomplétion complète :
 
