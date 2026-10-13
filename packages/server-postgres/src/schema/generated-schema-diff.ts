@@ -291,15 +291,23 @@ export function describeSchemaDifference(difference: SchemaDifference): string {
  * Per difference rather than one summary block on purpose: these are read out of
  * a log aggregator as often as a terminal, and a single multi-line message
  * cannot be filtered down to the one collection somebody is looking at.
+ *
+ * The fix it names is `rebase db push`. `rebase dev` rewrites
+ * schema.generated.ts from the collections on every change, and boot applies
+ * only additive changes, so what is still different at boot is the database
+ * behind the file: a rename, a dropped column, a narrowed type, a NOT NULL.
+ * `rebase schema generate` rewrites the file and leaves the database as it is,
+ * so it is named only for collections that changed since the file was written.
  */
 export function warnOnGeneratedSchemaDrift(differences: SchemaDifference[]): void {
     if (differences.length === 0) return;
 
     logger.warn(
-        `📄 [schema] schema.generated.ts no longer describes the database (${differences.length} difference` +
-        `${differences.length === 1 ? "" : "s"}). The server serves the database, so nothing here is broken — ` +
-        "but Atlas, `rebase db push`, `rebase eject` and any code importing that file are all reading a stale " +
-        "description. Run `rebase schema generate`."
+        `📄 [schema] schema.generated.ts and the database disagree (${differences.length} difference` +
+        `${differences.length === 1 ? "" : "s"}). Boot applies only additive changes; these are the ones it ` +
+        "left for you. Run `rebase db push` to apply them (it shows the plan and asks before anything " +
+        "destructive), or `rebase db generate` for a migration. If the collections changed since " +
+        "schema.generated.ts was written, run `rebase schema generate` first."
     );
 
     for (const difference of differences) {
@@ -313,7 +321,7 @@ export function warnOnGeneratedSchemaDrift(differences: SchemaDifference[]): voi
                 generated: difference.generated,
                 live: difference.live
             },
-            fix: "rebase schema generate"
+            fix: "rebase db push"
         });
     }
 }

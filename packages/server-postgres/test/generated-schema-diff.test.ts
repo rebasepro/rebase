@@ -11,10 +11,13 @@ import { describe, expect, it } from "@jest/globals";
 import { boolean, integer, numeric, pgTable, text, timestamp, uuid, varchar } from "drizzle-orm/pg-core";
 import type { CollectionConfig } from "@rebasepro/types";
 
+import { jest } from "@jest/globals";
+import { logger } from "@rebasepro/server";
 import {
     diffGeneratedSchemaAgainstCatalogue,
     describeSchemaDifference,
-    typeFamily
+    typeFamily,
+    warnOnGeneratedSchemaDrift
 } from "../src/schema/generated-schema-diff";
 import { buildTablesMap, type TableColumn } from "../src/schema/introspect-db-logic";
 
@@ -274,5 +277,48 @@ describe("typeFamily", () => {
 
     it("passes an enum through by name, so two spellings of one enum match", () => {
         expect(typeFamily("post_status")).toBe("post_status");
+    });
+});
+
+/**
+ * What the warning tells somebody to run.
+ *
+ * It said `rebase schema generate`, which rewrites the file from the
+ * collections and leaves the database as it is. `rebase dev` already rewrites
+ * that file on every change and boot applies only additive changes, so the
+ * drift still there at boot is the database behind the file, and regenerating
+ * changed nothing: the same warning came back on the next boot.
+ */
+describe("warnOnGeneratedSchemaDrift", () => {
+    it("names `rebase db push` as the fix, in the summary and on every difference", () => {
+        const warnings: { message: string; context: unknown }[] = [];
+        const spy = jest.spyOn(logger, "warn").mockImplementation(((message: string, context?: unknown) => {
+            warnings.push({ message, context });
+        }) as never);
+        try {
+            warnOnGeneratedSchemaDrift([
+                { kind: "missing-column", table: "tags", collection: "tags", column: "color", property: "color" }
+            ]);
+        } finally {
+            spy.mockRestore();
+        }
+
+        const [summary, ...details] = warnings;
+        expect(summary.message).toContain("Run `rebase db push` to apply them");
+        expect(summary.message).toContain("`rebase db generate` for a migration");
+        // Regenerating is offered only for collections that changed, and only first.
+        expect(summary.message).toContain("If the collections changed since schema.generated.ts was written, run `rebase schema generate` first.");
+        expect(details).toHaveLength(1);
+        expect(details[0].context).toMatchObject({ fix: "rebase db push" });
+    });
+
+    it("says nothing when there is no difference", () => {
+        const spy = jest.spyOn(logger, "warn").mockImplementation((() => undefined) as never);
+        try {
+            warnOnGeneratedSchemaDrift([]);
+            expect(spy).not.toHaveBeenCalled();
+        } finally {
+            spy.mockRestore();
+        }
     });
 });
