@@ -439,6 +439,17 @@ describe("the ejected payload", () => {
         fs.rmSync(project, { recursive: true, force: true });
     });
 
+    it("is not handed a relative STORAGE_PATH by the project's .env.example", () => {
+        // An ejected server runs in backend/, and reads a relative STORAGE_PATH
+        // from there: the `./uploads` the file suggested was backend/uploads,
+        // beside the <project>/uploads it uses when the variable is unset.
+        const example = fs.readFileSync(path.join(cliRoot, "templates/template/.env.example"), "utf8");
+        const values = [...example.matchAll(/^#?\s*STORAGE_PATH=(\S*)/gm)].map(match => match[1]);
+        expect(values.length).toBeGreaterThan(0);
+        for (const value of values) expect(value).toMatch(/^\//);
+        expect(example).toMatch(/Unset, files land in <project>\/uploads/);
+    });
+
     it("imports only symbols the runtime packages actually export", async () => {
         // Nothing type-checks this template: it carries `{{…}}` markers and
         // resolves `../../config/*` against a project that does not exist here.
