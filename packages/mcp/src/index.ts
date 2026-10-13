@@ -1030,10 +1030,15 @@ export function managedDatabaseRefusal(toolName: string, projectName: string): s
         return head + "Branches do not work there: PGlite serves exactly one database, so a branch " +
             "would be the original. " + realPostgres;
     }
+    // The CLI runs `db push` and `db migrate` on the managed database too (since
+    // 0.25); this gate is the MCP server's own choice not to let an agent run
+    // schema changes there unattended, so it says so rather than claiming the
+    // database cannot take them.
     return head + "You most likely do not need this tool: the dev server applies the collections to " +
         "that database at boot, additively. After changing a collection, restart it with " +
-        "rebase_dev_stop and rebase_dev_start. Migrations, and dropping or renaming columns, need " +
-        "a real Postgres. " + realPostgres;
+        "rebase_dev_stop and rebase_dev_start. For a change boot leaves alone (a renamed or dropped " +
+        "column), ask the user to run `rebase db push` in their terminal, which works on the managed " +
+        "database; this tool does not run it there. " + realPostgres;
 }
 
 /**

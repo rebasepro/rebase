@@ -23,7 +23,8 @@ import {
     explainToolError,
     answerCliFlags,
     lastLines,
-    untrustedEnvelope
+    untrustedEnvelope,
+    managedDatabaseRefusal
 } from "../src/index";
 import type { PackageManager } from "../src/index";
 import { spawn } from "node:child_process";
@@ -2116,5 +2117,20 @@ describe("the envelope is the remote endpoint's", () => {
         ]) {
             expect(withoutId(untrustedEnvelope(source, body))).toBe(withoutId(shared(source, body)));
         }
+    });
+});
+
+describe("managedDatabaseRefusal", () => {
+    it("does not claim the managed database cannot take a migration", () => {
+        // Since 0.25 the CLI runs `db push` / `db migrate` on the managed
+        // database; the refusal is this server's own gate, and must say so.
+        const text = managedDatabaseRefusal("rebase_db_push", "my-app");
+        expect(text).not.toMatch(/need a real Postgres/i);
+        expect(text).toContain("rebase db push");
+        expect(text).toContain("works on the managed database");
+    });
+
+    it("still says branches cannot work on the managed database", () => {
+        expect(managedDatabaseRefusal("rebase_db_branch_create", "my-app")).toMatch(/Branches do not work there/);
     });
 });
