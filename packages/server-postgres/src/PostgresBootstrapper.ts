@@ -21,6 +21,7 @@ import {
     InitializedDriver,
     type DatabaseAdapterInitConfig,
     RealtimeProvider,
+    resourceEnvSuffix,
     type RealtimeChannelsConfig,
     type RealtimeSocketOptions
 } from "@rebasepro/types";
@@ -55,15 +56,24 @@ export interface PostgresDriverConfig {
     connectionString?: string;
     adminConnectionString?: string;
     /**
-     * A read replica's URL: reads are routed there, writes stay on the
-     * primary. At boot, `DATABASE_READ_URL` fills it in when it is not set.
+     * This database's read replica: reads are routed there, writes stay on
+     * the primary. Unset, the boot ({@link postgresDriverConfigFromEnv}) fills
+     * it from `DATABASE_READ_URL` for the default source only; any other
+     * source has none unless its config names one — the managed runtime
+     * resolves `DATABASE_READ_URL__<KEY>` into this for each source.
      */
     readConnectionString?: string;
     /**
-     * A direct (non-pooled) URL for the `LISTEN` connections realtime holds —
-     * a transaction-mode pooler such as PgBouncer does not keep one. Defaults
-     * to `connectionString`. At boot, `DATABASE_DIRECT_URL` fills it in when
-     * it is not set.
+     * A direct (non-pooled) URL to this database, for the connections that
+     * hold a `LISTEN`: change capture, cross-instance realtime, the Postgres
+     * channel bus and `admin.listen`. A transaction-mode pooler such as
+     * PgBouncer does not keep a `LISTEN`, so behind one this has to name the
+     * database itself.
+     *
+     * Unset, the boot fills it from `DATABASE_DIRECT_URL` for the default
+     * source only, and any other source listens on its own
+     * `connectionString` — see {@link resolveSourceUrls}. The managed runtime
+     * resolves `DATABASE_DIRECT_URL__<KEY>` into this for each source.
      */
     directConnectionString?: string;
     connection?: unknown;
@@ -227,6 +237,38 @@ export function describeSchemaDriftCause(
         "  Resolve that reason — the drift is its consequence, not a separate",
         "  problem, and re-running a migration tool will not change it."
     ];
+}
+
+/**
+ * The URLs one source's driver opens besides its pool: the read replica, and
+ * the direct connection its `LISTEN`s are held on.
+ *
+ * The bare `DATABASE_READ_URL` and `DATABASE_DIRECT_URL` belong to the default
+ * source. Both used to be read here for every source, so a second database
+ * (`database("analytics")`) held its change-capture `LISTEN` on the default
+ * database — where none of its notifications are sent, so its realtime feed
+ * was silent — and read through the default's replica. A keyed source gets
+ * the URLs its config names, and otherwise its own connection and no replica.
+ *
+ * The default source still falls back to the environment: an application that
+ * builds this adapter itself passes a `connectionString` and nothing else, and
+ * has always had those two variables honoured.
+ *
+ * Exported for its own test; the caller needs a live database.
+ */
+export function resolveSourceUrls(
+    pgConfig: Pick<PostgresDriverConfig, "connectionString" | "readConnectionString" | "directConnectionString">,
+    sourceKey: string,
+    env: Record<string, string | undefined> = process.env
+): { readUrl?: string; directUrl?: string } {
+    const isDefault = sourceKey === DEFAULT_DATA_SOURCE_KEY;
+    return {
+        readUrl: pgConfig.readConnectionString || (isDefault ? env.DATABASE_READ_URL : undefined) || undefined,
+        directUrl: pgConfig.directConnectionString
+            || (isDefault ? env.DATABASE_DIRECT_URL : undefined)
+            || pgConfig.connectionString
+            || undefined
+    };
 }
 
 /**
@@ -417,8 +459,8 @@ function parseRealtimeCdcMode(value: string, source: string): RealtimeCdcMode {
  *
  * | variable                               | setting                                |
  * |----------------------------------------|----------------------------------------|
- * | `DATABASE_READ_URL`                    | `readConnectionString`, when unset     |
- * | `DATABASE_DIRECT_URL`                  | `directConnectionString`, when unset   |
+ * | `DATABASE_READ_URL`                    | `readConnectionString`, when unset (*) |
+ * | `DATABASE_DIRECT_URL`                  | `directConnectionString`, when unset (*)|
  * | `REALTIME_CDC`                         | `realtime.cdc`                         |
  * | `REALTIME_CHANNEL_BUS`                 | `realtime.bus` (a named transport)     |
  * | `REALTIME_MAX_SUBSCRIPTIONS_PER_SOCKET`| `realtime.maxSubscriptionsPerSocket`   |
@@ -431,13 +473,21 @@ function parseRealtimeCdcMode(value: string, source: string): RealtimeCdcMode {
  * can change it without a rebuild; the URLs fill in only what the config left
  * empty. A mistyped number throws, naming the variable.
  *
+ * (*) For the default source only. The bare URL variables name the default
+ * database; read for a second source (`database("analytics")`), they put its
+ * change-capture `LISTEN` on the default database, where none of its
+ * notifications arrive, and its reads on the default's replica. A keyed
+ * source's URLs come from its own config — the managed runtime passes
+ * `DATABASE_*_URL__<KEY>` there — see {@link resolveSourceUrls}.
+ *
  * `createPostgresAdapter` applies this when the server boots, and
  * {@link openPostgresDriver} does not — a script that opens the driver itself
  * gets exactly the config it passed.
  */
 export function postgresDriverConfigFromEnv(
     config: PostgresDriverConfig,
-    env: NodeJS.ProcessEnv = process.env
+    env: NodeJS.ProcessEnv = process.env,
+    sourceKey: string = DEFAULT_DATA_SOURCE_KEY
 ): PostgresDriverConfig {
     const read = (name: string): string | undefined => env[name]?.trim() || undefined;
     const realtime: RealtimeChannelsConfig = { ...config.realtime };
@@ -458,8 +508,9 @@ export function postgresDriverConfigFromEnv(
     if (cdc) realtime.cdc = parseRealtimeCdcMode(cdc, "REALTIME_CDC");
     realtime.bus = resolveChannelBusSetting(config.realtime?.bus, env);
 
-    const readConnectionString = config.readConnectionString || read("DATABASE_READ_URL");
-    const directConnectionString = config.directConnectionString || read("DATABASE_DIRECT_URL");
+    const isDefaultSource = sourceKey === DEFAULT_DATA_SOURCE_KEY;
+    const readConnectionString = config.readConnectionString || (isDefaultSource ? read("DATABASE_READ_URL") : undefined);
+    const directConnectionString = config.directConnectionString || (isDefaultSource ? read("DATABASE_DIRECT_URL") : undefined);
     return {
         ...config,
         ...(readConnectionString ? { readConnectionString } : {}),
@@ -727,9 +778,13 @@ export async function openPostgresDriver(
     const recountMinRows = tuning(pgConfig.realtime?.recountMinRows, "realtime.recountMinRows", "rows");
     if (recountMinRows !== undefined) realtimeService.recountMinRows = recountMinRows;
 
+    // This source's own replica and direct URL, never the default's. No
+    // environment here: the boot read it into `pgConfig` already, for the
+    // default source only (see postgresDriverConfigFromEnv).
+    const { readUrl, directUrl } = resolveSourceUrls(pgConfig, sourceKey, {});
+
     // Initialize read replica connection if configured
     let readDb: import("drizzle-orm/node-postgres").NodePgDatabase<any> | undefined;
-    const readUrl = pgConfig.readConnectionString;
     if (readUrl && readUrl !== pgConfig.connectionString) {
         try {
             const { createReadReplicaConnection } = await import("./connection");
@@ -744,6 +799,7 @@ export async function openPostgresDriver(
         ? new DatabasePoolManager(pgConfig.adminConnectionString)
         : undefined;
     const driver = new PostgresBackendDriver(schemaAwareDb, realtimeService, registry, undefined, poolManager);
+    driver.listenConnectionString = directUrl;
     realtimeService.setDataDriver(driver);
 
     // ── RLS enforcement (user context) ───────────────────────────────
@@ -902,7 +958,7 @@ export async function openPostgresDriver(
 
     // ── Realtime change source ───────────────────────────────────────
     // A direct URL bypasses PgBouncer, which does not keep a LISTEN.
-    const directUrl = pgConfig.directConnectionString || pgConfig.connectionString;
+    // `directUrl` (resolved above) bypasses PgBouncer for LISTEN/NOTIFY.
 
     // ── Cross-instance channel bus ───────────────────────────────────
     // Entity changes already span instances (CDC / LISTEN below).
@@ -959,7 +1015,8 @@ export async function openPostgresDriver(
     let cdcFunctionCurrent = false;
 
     if (wantsCdc && !directUrl) {
-        const reason = "no direct database connection is available for the realtime LISTEN client (set DATABASE_DIRECT_URL)";
+        const reason = "no direct database connection is available for the realtime LISTEN client " +
+            `(set DATABASE_DIRECT_URL${resourceEnvSuffix(sourceKey)})`;
         if (explicitCdc) logger.warn(`⚠️ [CDC] REALTIME_CDC=${cdcMode} but ${reason} — using app-level realtime.`);
         else logger.info(`ℹ️ [CDC] Using app-level realtime — ${reason}.`);
     } else if (wantsCdc && directUrl) {
@@ -1242,7 +1299,10 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
      * about one is said once.
      */
     let resolvedConfig: PostgresDriverConfig | undefined;
-    const effectiveConfig = (): PostgresDriverConfig => resolvedConfig ??= postgresDriverConfigFromEnv(pgConfig);
+    // A bootstrapper opens one source, so the first caller's key is the
+    // key: the bare URL variables are read for the default source only.
+    const effectiveConfig = (sourceKey?: string): PostgresDriverConfig =>
+        resolvedConfig ??= postgresDriverConfigFromEnv(pgConfig, process.env, sourceKey);
 
     // Applied at construction rather than threaded through every read: the
     // condition builder's static methods are reached from call sites that
@@ -1396,7 +1456,8 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
         type: "postgres",
 
         async initializeDriver(config: unknown): Promise<InitializedDriver> {
-            return openPostgresDriver(effectiveConfig(), config as DatabaseAdapterInitConfig);
+            const init = config as DatabaseAdapterInitConfig;
+            return openPostgresDriver(effectiveConfig(init.dataSourceKey), init);
         },
 
         async initializeAuth(config: unknown, driverResult: InitializedDriver): Promise<BootstrappedAuth | undefined> {

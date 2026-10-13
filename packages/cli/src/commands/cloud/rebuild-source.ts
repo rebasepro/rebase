@@ -31,6 +31,7 @@ import { execFileSync, spawn } from "child_process";
 import dotenv from "dotenv";
 import type { RebaseProjectManifest } from "@rebasepro/types";
 import { cliUserAgent } from "../../utils/version";
+import { withTempArchive } from "../../utils/temp-archive";
 
 /**
  * The control plane's cap on an uploaded source archive.
@@ -539,38 +540,38 @@ export async function prepareRebuildSource(opts: {
 }): Promise<RebuildSource | null> {
     const steps = { ...DEFAULT_STEPS, ...opts.steps };
     const maxBytes = opts.maxBytes ?? MAX_SOURCE_UPLOAD_BYTES;
-    const tarPath = path.join(os.tmpdir(), `rebase-rebuild-src-${process.pid}-${Date.now()}.tar.gz`);
     const cost = "Platform upgrades will not rebuild this project until a later deploy uploads its source.";
 
     try {
-        const listing = steps.list(opts.projectRoot);
-        await steps.pack(listing, tarPath);
-        const size = fs.statSync(tarPath).size;
-        const mb = (bytes: number): string => (bytes / 1024 / 1024).toFixed(1);
-        if (size > maxBytes) {
-            opts.warn(
-                `The project source is ${mb(size)} MB compressed, over the ${Math.round(maxBytes / 1024 / 1024)} MB ` +
-                    `upload limit, so it was not uploaded. ${cost}`,
-                listing.fromGit
-                    ? "Stop tracking large assets and build output in git, or pass --no-source to skip it on purpose."
-                    : "Initialise a git repository with a .gitignore to choose what is source, or pass --no-source."
-            );
-            return null;
-        }
-        opts.progress(`  Uploading source (${listing.files.length} files, ${mb(size)} MB)...`);
-        const sourceId = await steps.upload(opts.url, await opts.token(), opts.projectId, tarPath);
-        return {
-            sourceId,
-            projectPath: listing.projectPath,
-            buildEnv: collectBuildEnv(opts.projectRoot, staticAppRoots(opts.manifest))
-        };
+        // A directory of this run's own: see `withTempArchive`.
+        return await withTempArchive("rebase-rebuild-src", async (tarPath) => {
+            const listing = steps.list(opts.projectRoot);
+            await steps.pack(listing, tarPath);
+            const size = fs.statSync(tarPath).size;
+            const mb = (bytes: number): string => (bytes / 1024 / 1024).toFixed(1);
+            if (size > maxBytes) {
+                opts.warn(
+                    `The project source is ${mb(size)} MB compressed, over the ${Math.round(maxBytes / 1024 / 1024)} MB ` +
+                        `upload limit, so it was not uploaded. ${cost}`,
+                    listing.fromGit
+                        ? "Stop tracking large assets and build output in git, or pass --no-source to skip it on purpose."
+                        : "Initialise a git repository with a .gitignore to choose what is source, or pass --no-source."
+                );
+                return null;
+            }
+            opts.progress(`  Uploading source (${listing.files.length} files, ${mb(size)} MB)...`);
+            const sourceId = await steps.upload(opts.url, await opts.token(), opts.projectId, tarPath);
+            return {
+                sourceId,
+                projectPath: listing.projectPath,
+                buildEnv: collectBuildEnv(opts.projectRoot, staticAppRoots(opts.manifest))
+            };
+        });
     } catch (err) {
         opts.warn(
             `The project source was not uploaded: ${err instanceof Error ? err.message : String(err)}. ${cost}`,
             "The deploy continues with the bundle alone."
         );
         return null;
-    } finally {
-        fs.rmSync(tarPath, { force: true });
     }
 }

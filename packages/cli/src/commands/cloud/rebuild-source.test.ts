@@ -32,6 +32,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+    vi.restoreAllMocks();
     vi.unstubAllGlobals();
     fs.rmSync(scratch, { recursive: true, force: true });
 });
@@ -566,6 +567,40 @@ describe("prepareRebuildSource never fails the deploy", () => {
         const { result, warnings } = run({ list: () => { throw new Error("EACCES"); } });
         expect(await result).toBeNull();
         expect(warnings.join("\n")).toContain("EACCES");
+    });
+
+    // The process id kept two CI jobs apart, not two runs in one process: those
+    // shared `rebase-rebuild-src-<pid>-<ms>.tar.gz` when started in the same
+    // millisecond, and the first to finish removed the other's archive.
+    it("gives two runs started in the same millisecond an archive each", async () => {
+        vi.spyOn(Date, "now").mockReturnValue(Date.now());
+        const packed: string[] = [];
+        const survived: boolean[] = [];
+        let bothPacked!: () => void;
+        const ready = new Promise<void>(resolve => { bothPacked = resolve; });
+        const steps = {
+            list: () => listing,
+            pack: async (l: SourceListing, out: string) => {
+                await writeArchive(10)(l, out);
+                packed.push(out);
+                if (packed.length === 2) bothPacked();
+            },
+            upload: async (_url: string, _token: string, _projectId: string, tarPath: string) => {
+                await ready;
+                survived.push(fs.existsSync(tarPath));
+                return "0123456789abcdef0123456789abcdef";
+            }
+        };
+
+        const runs = [run(steps), run(steps)];
+        for (const { result, warnings } of runs) {
+            expect(await result).not.toBeNull();
+            expect(warnings).toEqual([]);
+        }
+        expect(packed).toHaveLength(2);
+        expect(packed[0]).not.toBe(packed[1]);
+        expect(survived).toEqual([true, true]);
+        for (const out of packed) expect(fs.existsSync(path.dirname(out))).toBe(false);
     });
 
     it("uses the control plane's 100 MB cap by default", () => {

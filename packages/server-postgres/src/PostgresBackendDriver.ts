@@ -420,6 +420,14 @@ export class PostgresBackendDriver implements DataDriver {
     public rlsUserRole?: string;
 
     /**
+     * The direct (non-pooled) URL {@link listen} holds its `LISTEN` on — this
+     * source's, set by the bootstrapper. Never read from `DATABASE_DIRECT_URL`
+     * here: that variable is the default source's, and a second database
+     * listening on it hears none of its own notifications.
+     */
+    public listenConnectionString?: string;
+
+    /**
      * When true, realtime notifications are deferred until after the
      * wrapping transaction commits.  Set by `withAuth` → `withTransaction`.
      */
@@ -516,11 +524,12 @@ export class PostgresBackendDriver implements DataDriver {
      * `SQLAdmin.listen`: a `LISTEN` on a connection of its own, through the
      * listener CDC and the channel bus use, which reconnects and heartbeats.
      *
-     * The connection is found the way the realtime listener finds its own:
-     * `DATABASE_DIRECT_URL` when set — a transaction-mode pooler such as
-     * PgBouncer does not keep a `LISTEN` — else the pool's own URL. The
-     * in-process development database has neither, and is refused, as is a
-     * first connect that fails: the caller polls instead.
+     * The connection is the one the realtime listener uses: this source's
+     * direct URL ({@link listenConnectionString}) when the bootstrapper
+     * resolved one — a transaction-mode pooler such as PgBouncer does not keep
+     * a `LISTEN` — else the pool's own URL. The in-process development
+     * database has neither, and is refused, as is a first connect that fails:
+     * the caller polls instead.
      */
     async listen(
         channel: string,
@@ -528,7 +537,7 @@ export class PostgresBackendDriver implements DataDriver {
         options?: { onReconnect?: () => void }
     ): Promise<() => Promise<void>> {
         const pool = "$client" in this.db ? this.db.$client : undefined;
-        const connectionString = process.env.DATABASE_DIRECT_URL
+        const connectionString = this.listenConnectionString
             || (pool instanceof Pool ? pool.options.connectionString : undefined);
         if (!connectionString) {
             throw new Error("no database URL to hold a LISTEN connection on (set DATABASE_DIRECT_URL)");

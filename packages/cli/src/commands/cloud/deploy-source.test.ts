@@ -42,8 +42,15 @@ vi.mock("../../resources/derive", async (importOriginal) => {
     return { ...actual, deriveResourceGraph: vi.fn(actual.deriveResourceGraph) };
 });
 
+// The real upload unless a test says otherwise, so a test can see which archive it sent.
+vi.mock("./bundle-deploy", async (importOriginal) => {
+    const actual = await importOriginal<typeof import("./bundle-deploy")>();
+    return { ...actual, uploadBundle: vi.fn(actual.uploadBundle) };
+});
+
 import * as context from "./context";
 import { deployCommand } from "./deploy";
+import { uploadBundle } from "./bundle-deploy";
 import { buildBundle } from "../../bundle";
 import { deriveResourceGraph } from "../../resources/derive";
 import { recordEvent } from "../../telemetry";
@@ -249,6 +256,61 @@ describe("a backend bundle deploy", () => {
             { name: "backend", type: "backend" },
             { name: "web", type: "static" }
         ]);
+    });
+});
+
+/**
+ * Two deploys started in the same millisecond — parallel CI jobs, or two vitest
+ * workers — once packed into the same `rebase-bundle-<ms>.tar.gz`, and the
+ * first to finish removed the archive the other was about to stat or send.
+ */
+describe("two bundle deploys started in the same millisecond", () => {
+    it("pack a tarball each, and both survive until they are uploaded", async () => {
+        bundle("backend");
+        controlPlane();
+        vi.spyOn(Date, "now").mockReturnValue(Date.now());
+
+        // Each upload waits for the other, so both runs have packed and neither
+        // has cleaned up when the archives are looked at.
+        const sent: string[] = [];
+        const survived: boolean[] = [];
+        let bothPacked!: () => void;
+        const packed = new Promise<void>(resolve => { bothPacked = resolve; });
+        const upload = vi.mocked(uploadBundle);
+        const realUpload = upload.getMockImplementation();
+        if (!realUpload) throw new Error("uploadBundle is not stood in");
+        upload.mockImplementation(async (url, token, projectId, tarPath) => {
+            sent.push(tarPath);
+            if (sent.length === 2) bothPacked();
+            await packed;
+            survived.push(fs.existsSync(tarPath));
+            return realUpload(url, token, projectId, tarPath);
+        });
+
+        await Promise.all([deploy("--no-source"), deploy("--no-source")]);
+
+        expect(sent).toHaveLength(2);
+        expect(sent[0]).not.toBe(sent[1]);
+        expect(survived).toEqual([true, true]);
+        expect(invoke).toHaveBeenCalledTimes(2);
+        // And each run removed what it made, directory and all.
+        for (const tarPath of sent) expect(fs.existsSync(path.dirname(tarPath))).toBe(false);
+    });
+
+    it("removes its tarball's directory when the upload fails", async () => {
+        bundle("backend");
+        controlPlane();
+        let sent = "";
+        vi.mocked(uploadBundle).mockImplementationOnce(async (_url, _token, _projectId, tarPath) => {
+            sent = tarPath;
+            throw new Error("Bundle upload failed (500): boom");
+        });
+
+        await expect(deploy("--no-source")).rejects.toThrow(Exited);
+
+        expect(said.join("\n")).toContain("Bundle upload failed (500)");
+        expect(sent).not.toBe("");
+        expect(fs.existsSync(path.dirname(sent))).toBe(false);
     });
 });
 

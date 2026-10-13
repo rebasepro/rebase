@@ -135,6 +135,7 @@ const databaseResolver: ResourceResolver = {
     reads: [
         "DATABASE_URL",
         "DATABASE_READ_URL",
+        "DATABASE_DIRECT_URL",
         "ADMIN_CONNECTION_STRING",
         "REBASE_DRIVER",
         "DB_POOL_MAX",

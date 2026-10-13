@@ -67,6 +67,25 @@ describe("postgresDriverConfigFromEnv", () => {
         });
     });
 
+    it("reads the bare URL variables for the default source only", () => {
+        // They name the default database. Filled into a second source's
+        // config, its LISTEN would sit on the default database and hear none
+        // of its own notifications, and its reads would go to the default's
+        // replica.
+        const env = { DATABASE_READ_URL: "postgres://replica/db", DATABASE_DIRECT_URL: "postgres://direct/db" };
+        const keyed = postgresDriverConfigFromEnv({ connectionString: "postgres://analytics/db" }, env, "analytics");
+        expect(keyed.readConnectionString).toBeUndefined();
+        expect(keyed.directConnectionString).toBeUndefined();
+        expect(postgresDriverConfigFromEnv({
+            connectionString: "postgres://analytics/db",
+            directConnectionString: "postgres://analytics-direct/db"
+        }, env, "analytics").directConnectionString).toBe("postgres://analytics-direct/db");
+        expect(postgresDriverConfigFromEnv({}, env, "(default)")).toMatchObject({
+            readConnectionString: "postgres://replica/db",
+            directConnectionString: "postgres://direct/db"
+        });
+    });
+
     it("refuses a mistyped number, naming the variable", () => {
         expect(() => postgresDriverConfigFromEnv({}, { REALTIME_MAX_SUBSCRIPTIONS_PER_SOCKET: "lots" }))
             .toThrow(/REALTIME_MAX_SUBSCRIPTIONS_PER_SOCKET/);

@@ -207,6 +207,8 @@ export interface ResolvedDataSourceConfig {
     connectionString: string;
     adminConnectionString?: string;
     readConnectionString?: string;
+    /** The source's direct (non-pooled) URL, for the connections that hold a `LISTEN`. */
+    directConnectionString?: string;
     isDefault: boolean;
     poolConfig?: Record<string, number>;
 }
@@ -275,6 +277,7 @@ engine: "postgres" }, ...serverSide];
             connectionString,
             adminConnectionString: readVar(env, "ADMIN_CONNECTION_STRING", suffixes),
             readConnectionString: readVar(env, "DATABASE_READ_URL", suffixes),
+            directConnectionString: readVar(env, "DATABASE_DIRECT_URL", suffixes),
             isDefault: definition.key === DEFAULT_DATA_SOURCE_KEY,
             poolConfig
         });

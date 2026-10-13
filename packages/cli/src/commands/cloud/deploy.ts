@@ -14,7 +14,6 @@
 import arg from "arg";
 import chalk from "chalk";
 import fs from "fs";
-import os from "os";
 import path from "path";
 import { durationBucket, recordEvent } from "../../telemetry";
 import {
@@ -53,6 +52,7 @@ import { buildAssetApp } from "../build";
 import { foldFrontendIntoBundle } from "../../fold-static";
 import { loadManifest, findBackendApp, formatAppAddress, resolveBackendPaths, selectDeployApp } from "../../manifest";
 import { findProjectRoot, requireProjectRoot } from "../../utils/project";
+import { withTempArchive } from "../../utils/temp-archive";
 import { deriveOptionsFor, deriveResourceGraph } from "../../resources/derive";
 import type { RebaseAppConfig, RebaseBackendAppConfig, RebaseProjectManifest } from "@rebasepro/types";
 
@@ -89,26 +89,23 @@ function sleep(ms: number): Promise<void> {
 }
 
 /**
- * Package `sourceDir` into a gzipped tarball; returns the temp archive path.
+ * Package `sourceDir` into a gzipped tarball at `tarPath`.
  *
  * What goes in is {@link listContextFiles}: `.gitignore` read the way git reads
  * it, `.rebaseignore` beside it, and never an env file, a database dump or the
  * CLI's local state, whatever either says. The control plane keeps the archive
  * as the project's source, so this is the last point anything can be kept back.
  */
-async function createSourceTarball(sourceDir: string): Promise<string> {
+async function createSourceTarball(sourceDir: string, tarPath: string): Promise<void> {
     const dir = path.resolve(sourceDir);
     if (!fs.existsSync(dir)) fail(`Source directory not found: ${dir}`);
 
-    const tarPath = path.join(os.tmpdir(), `rebase-src-${Date.now()}.tar.gz`);
     try {
         const files = listContextFiles(dir);
         await packSource({ root: fs.realpathSync(dir), files }, tarPath);
     } catch (e) {
-        fs.rmSync(tarPath, { force: true });
         fail(`Failed to package source: ${e instanceof Error ? e.message : String(e)}`);
     }
-    return tarPath;
 }
 
 /**
@@ -453,26 +450,24 @@ async function uploadAndTrigger(opts: {
         );
     }
 
-    // Pack + upload.
-    const tarPath = path.join(os.tmpdir(), `rebase-bundle-${Date.now()}.tar.gz`);
-
+    // Pack + upload, into a directory of this run's own: see `withTempArchive`.
     let bundleId: string;
     try {
-        const packed = await packBundleForUpload(bundleDir, tarPath, manifest);
-        if (packed.modulesLeftOut) {
-            warn(
-                "This bundle's installed dependencies are not uploaded: a managed pod installs them when it starts.",
-                "Build it with `rebase build --no-vendor` to skip installing a tree the upload leaves out."
-            );
-        }
-        const sizeMb = (packed.bytes / 1024 / 1024).toFixed(1);
-        progress(chalk.gray(`  Uploading bundle (${sizeMb} MB)...`));
-        bundleId = await uploadBundle(url, await uploadToken(client, url), projectId, tarPath);
+        bundleId = await withTempArchive("rebase-bundle", async (tarPath) => {
+            const packed = await packBundleForUpload(bundleDir, tarPath, manifest);
+            if (packed.modulesLeftOut) {
+                warn(
+                    "This bundle's installed dependencies are not uploaded: a managed pod installs them when it starts.",
+                    "Build it with `rebase build --no-vendor` to skip installing a tree the upload leaves out."
+                );
+            }
+            const sizeMb = (packed.bytes / 1024 / 1024).toFixed(1);
+            progress(chalk.gray(`  Uploading bundle (${sizeMb} MB)...`));
+            return uploadBundle(url, await uploadToken(client, url), projectId, tarPath);
+        });
     } catch (e) {
         fail(e instanceof Error ? e.message : String(e));
         return;
-    } finally {
-        fs.rmSync(tarPath, { force: true });
     }
 
     // Guarded for the same reason as the source-deploy banner below: the JSON
@@ -1336,12 +1331,11 @@ export async function deployCommand(rawArgs: string[], projectRef: string): Prom
     // Optional fly-style local source upload: `deploy --source .`
     let source: string | undefined;
     if (args["--source"]) {
-        const tarPath = await createSourceTarball(args["--source"]);
-        try {
-            source = await uploadSource(url, await uploadToken(client, url), projectId, tarPath);
-        } finally {
-            fs.rmSync(tarPath, { force: true });
-        }
+        const sourceDir = args["--source"];
+        source = await withTempArchive("rebase-src", async (tarPath) => {
+            await createSourceTarball(sourceDir, tarPath);
+            return uploadSource(url, await uploadToken(client, url), projectId, tarPath);
+        });
     }
 
     // Guarded: this is stdout, and in JSON mode stdout carries the one JSON
