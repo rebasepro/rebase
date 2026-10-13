@@ -114,6 +114,18 @@ Questo è utile quando si adotta Rebase su un database esistente — prima esegu
 
 **Introspezione, poi push, non cambia nulla.** Le proprietà generate dicono esattamente cos'è ogni colonna — `columnType`, `precision`/`scale`, `defaultValue`, `required`, l'`isId` di una chiave (`"increment"` per un'identity intera, `columnType: "serial"` per una serial, `"manual"` per una chiave senza default), l'`onDelete` di una relazione — e il suo `index: false` dove il database non ha alcun indice sulla colonna della chiave, dato che un `belongsTo` è [indicizzato per impostazione predefinita](/docs/backend/indexes#foreign-keys-are-indexed-for-you) (elimina la riga per farne costruire uno) — e il blocco `search` di una collezione letto a ritroso dalla colonna che ha costruito — quindi `rebase db push --dry-run` eseguito subito dopo un'introspezione non pianifica alcuna modifica. Dove nessuna proprietà può rappresentare una colonna — un `timestamp` senza time zone, un `interval`, un `inet`, un tipo enum che non si chiama `<table>_<column>`, un default come `CURRENT_DATE` — l'introspezione lo segnala, colonna per colonna, sul terminale e in testa al file, con ciò che un push le farebbe e, quando esiste, l'istruzione che fa coincidere le due cose (`ALTER TYPE "mood" RENAME TO "customers_current_mood";`). Una tabella con chiave su più di una colonna torna come una chiave composita, con il suo `isId` su ogni colonna della chiave. Viene esclusa, con il relativo motivo, quando una colonna della chiave non può portare `isId` (un timestamp, per esempio) o la chiave esterna di un'altra tabella punta a essa, cosa che una relazione su una sola colonna non può fare; `db push` lascia stare una tabella che non è una collezione. Sulla 0.23 il push eseguito subito dopo un'introspezione può ancora pianificare cambi di tipo, default rimossi e NOT NULL, e una chiave `id` fantasma.
 
+**Come sono fatti i file generati**
+
+L'introspezione scrive le collezioni con `defineCollection`, che mantiene le chiavi delle proprietà *letterali* — così `propertiesOrder`, `listProperties`, `sort` e `display.title` si completano sui nomi delle tue colonne, e una chiave rimasta dopo la ridenominazione di una colonna è un errore di compilazione anziché una riga che silenziosamente non fa nulla. Quale importare dipende da ciò da cui dipende il tuo progetto, ed è deciso a ogni esecuzione:
+
+| Il tuo progetto dichiara | Le collezioni generate usano | Blocco `admin` |
+|------|------|------|
+| `@rebasepro/cms-types` (un progetto con il pannello) | `defineCollection` da `@rebasepro/cms-types` | sì |
+| `@rebasepro/common` (un progetto `--headless`) | `defineCollection` da `@rebasepro/common` | no |
+| nessuno dei due | un'annotazione `PostgresCollectionConfig`, con un avviso | no |
+
+Un progetto headless non ha un pannello di amministrazione, e i tipi core non dichiarano alcun campo `admin`: per questo il blocco lì non viene emesso. È presentazione (`icon`, `propertiesOrder`, `multiline`); nulla nello schema, nell'API o nei tuoi dati ne dipende.
+
 ### `rebase db push`
 
 Applica le modifiche allo schema direttamente al database senza file di migrazione:
@@ -260,6 +272,12 @@ rebase db branch info feature_auth
 rebase db branch delete feature_auth
 ```
 
+`rebase db branch switch` (e `switch --off`) e `rebase db branch prune` sono
+novità. `create`, `list`, `info` e `delete` sono stati rilasciati nella 0.17.
+
+Ogni branch è una copia completa del database creata con `CREATE DATABASE ... TEMPLATE`,
+quindi richiede un vero server PostgreSQL e occupa lo stesso spazio su disco della sua origine.
+
 ### `rebase doctor`
 
 Rileva la deriva a tre vie tra le tue definizioni di collezioni, lo schema Drizzle generato e il database PostgreSQL in esecuzione:
@@ -274,6 +292,8 @@ rebase doctor
 - Collezioni ↔ Database — c'è qualche deriva imprevista?
 
 Esegui `doctor` ogni volta che qualcosa sembra non sincronizzato. Individua esattamente dove si trova la discrepanza.
+
+Il confronto con il database richiede `DATABASE_URL` (o `ADMIN_CONNECTION_STRING`). Senza una delle due, quella fase viene riportata come **saltata** anziché superata, e l'esecuzione non si chiude mai con "All schemas are in sync": un controllo che non è avvenuto non è un certificato di buona salute.
 
 <span class="since-badge" data-since="0.25">Da 0.25</span> Nomina anche ogni collezione priva di un [blocco `search`](/docs/backend/search) la cui tabella contiene più di circa 10.000 righe. Una ricerca lì — la casella di ricerca dell'admin, `.search()`, `?searchString=` — è un `ILIKE '%term%'` sulle colonne di testo, che nessun indice può servire, quindi ognuna legge l'intera tabella, e il suo conteggio la legge di nuovo (circa un terzo di secondo a 100.000 righe, in crescita con la tabella). Il numero di righe è la stima di Postgres stesso, quindi il controllo non scansiona nulla. È un suggerimento: non cambia il codice di uscita, e nulla viene indicizzato per te.
 
@@ -329,7 +349,12 @@ const client = createRebaseClient<Database>({
 const { data } = await client.data.products.find();
 ```
 
-I nomi dei campi nei tipi generati sono quelli che l'API serve, invariati: una colonna `createdAt` è `row.createdAt`. Solo l'*accessor* della collezione diventa un nome di proprietà (`my-notes` → `client.data.myNotes`), ed è questo che `collectionsDictionary` rimappa sullo slug.
+I nomi dei campi nei tipi generati sono quelli che l'API serve. Il nome di un campo sul filo
+è la chiave della sua proprietà, e l'API è camelCase ovunque: l'introspezione genera una
+colonna `created_at` come proprietà `createdAt` con `columnName: "created_at"`, e la serve
+come `row.createdAt`. La colonna in sé non viene toccata. L'*accessor* della collezione
+diventa un nome di proprietà allo stesso modo (`my-notes` → `client.data.myNotes`), ed è
+questo che `collectionsDictionary` rimappa sullo slug.
 
 ## Flusso di Lavoro di Sviluppo
 
