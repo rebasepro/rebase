@@ -903,6 +903,8 @@ export const fr: RebaseTranslations = {
     studio_sql_add_to_favorites: "Ajouter aux favoris",
     studio_sql_save: "Save",
     studio_sql_run: "Run",
+    studio_sql_cancel_run: "Annuler l'exécution",
+    studio_sql_run_cancelled: "Exécution annulée.",
     studio_sql_database: "Database",
     studio_sql_role: "Role",
     studio_sql_admin: "(Admin)",

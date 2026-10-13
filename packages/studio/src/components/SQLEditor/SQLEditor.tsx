@@ -31,6 +31,7 @@ import {
     PlayIcon,
     PlusIcon,
     ResizablePanels,
+    SquareIcon,
     Select,
     SelectItem,
     Tab,
@@ -878,6 +879,20 @@ role: connection.role });
      */
     const tabsRunningRef = useRef(new Set<string>());
 
+    /**
+     * Each tab's run in flight, by tab, for "Cancel run": aborting it rejects
+     * the run at once, and a server that can cancels the statement too.
+     */
+    const runAbortRef = useRef(new Map<string, AbortController>());
+    const [cancellableTabs, setCancellableTabs] = useState<ReadonlySet<string>>(new Set());
+    const setCancellable = (tabId: string, cancellable: boolean) => setCancellableTabs(previous => {
+        const next = new Set(previous);
+        if (cancellable) next.add(tabId);
+        else next.delete(tabId);
+        return next;
+    });
+    const handleCancelRun = () => runAbortRef.current.get(activeTab.id)?.abort();
+
     /** `work` on the active tab, unless that tab is already running something. */
     const runOnce = async (tabId: string, work: () => Promise<void>): Promise<void> => {
         if (tabsRunningRef.current.has(tabId)) return;
@@ -939,6 +954,12 @@ results: null,
 notices: [],
 truncatedFrom: null });
         const start = performance.now();
+        const tabId = activeTab.id;
+        const abort = databaseAdmin?.runSqlScript ? new AbortController() : undefined;
+        if (abort) {
+            runAbortRef.current.set(tabId, abort);
+            setCancellable(tabId, true);
+        }
 
         try {
             if (databaseAdmin?.runSqlScript || databaseAdmin?.executeSql) {
@@ -947,7 +968,7 @@ truncatedFrom: null });
                 // script; nothing in what it returns is said to come from a
                 // table, so no cell of it is edited.
                 const run = databaseAdmin.runSqlScript
-                    ? await databaseAdmin.runSqlScript(sqlToRun, connection)
+                    ? await databaseAdmin.runSqlScript(sqlToRun, { ...connection, signal: abort?.signal })
                     : undefined;
                 const rows: Record<string, unknown>[] = run ? run.rows : await databaseAdmin.executeSql!(sqlToRun, connection);
                 updateActiveTab({
@@ -976,8 +997,12 @@ truncatedFrom: null });
             }
         } catch (e: unknown) {
             const message = e instanceof Error ? e.message : String(e);
-            updateActiveTab({ error: message || t("studio_sql_error_executing") });
+            updateActiveTab({ error: abort?.signal.aborted ? t("studio_sql_run_cancelled") : message || t("studio_sql_error_executing") });
         } finally {
+            if (abort && runAbortRef.current.get(tabId) === abort) {
+                runAbortRef.current.delete(tabId);
+                setCancellable(tabId, false);
+            }
             updateActiveTab({ loading: false });
         }
         // `runOnce` reads only a ref.
@@ -1675,6 +1700,16 @@ isFavorite: !s.isFavorite } : s));
                                     {loading ? <CircularProgress size="smallest" className="mr-2"/> : <PlayIcon size={iconSize.smallest} className="mr-2"/>}
                                     {t("studio_sql_run")}
                                 </Button>
+                                {loading && cancellableTabs.has(activeTab.id) && (
+                                    <Button
+                                        onClick={handleCancelRun}
+                                        size="small"
+                                        variant="text"
+                                    >
+                                        <SquareIcon size={iconSize.smallest} className="mr-2"/>
+                                        {t("studio_sql_cancel_run")}
+                                    </Button>
+                                )}
                             </div>
                         </div>
 

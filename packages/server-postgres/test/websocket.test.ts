@@ -51,7 +51,7 @@ import {
 } from "@rebasepro/types";
 import { logger } from "@rebasepro/server";
 import { resolveRequireAuth } from "../../server/src/auth/require-auth";
-import { createPostgresWebSocket, ADMIN_PLANE_TYPES, PUBLIC_TYPES } from "../src/websocket";
+import { createPostgresWebSocket, ADMIN_PLANE_TYPES, PUBLIC_TYPES, SOCKET_CAPABILITIES } from "../src/websocket";
 import { RealtimeService } from "../src/services/realtimeService";
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
 import { SQL_RESULT_BYTE_BUDGET, SqlResultTooLargeError } from "../src/services/sql-script";
@@ -226,7 +226,7 @@ describe("WebSocket Server authorization", () => {
             expect(lastSent(mockWs)).toEqual({
                 type: "AUTH_SUCCESS",
                 requestId: "auth-editor",
-                payload: { uid: "editor-user", roles: ["editor"] }
+                payload: { uid: "editor-user", roles: ["editor"], capabilities: SOCKET_CAPABILITIES }
             });
             mockWs.send.mockClear();
 
@@ -360,7 +360,7 @@ describe("WebSocket Server authorization", () => {
                 const { mockWs, messageCallback } = connect();
                 await send(messageCallback, { type: "AUTHENTICATE", requestId: "a", payload: { token: "rk_live_x" } });
                 expect(lastSent(mockWs)).toEqual({
-                    type: "AUTH_SUCCESS", requestId: "a", payload: { uid: "api-key:k1", roles: ["service"] }
+                    type: "AUTH_SUCCESS", requestId: "a", payload: { uid: "api-key:k1", roles: ["service"], capabilities: SOCKET_CAPABILITIES }
                 });
                 // Never handed to the JWT verifier.
                 expect(mockExtractUserFromToken).not.toHaveBeenCalled();
@@ -978,7 +978,7 @@ describe("WebSocket Server SQL console scripts", () => {
         const admin = mockDriver.admin as unknown as { executeSql: jest.Mock; runSqlScript: jest.Mock };
         expect(admin.runSqlScript).toHaveBeenCalledWith(
             "SELECT p.id, a.name FROM posts p JOIN authors a ON a.id = p.author_id",
-            { database: "app", role: "reader" }
+            { database: "app", role: "reader", signal: expect.any(AbortSignal) }
         );
         expect(admin.executeSql).not.toHaveBeenCalled();
         const answer = JSON.parse(mockWs.send.mock.calls[mockWs.send.mock.calls.length - 1][0]);
@@ -1086,6 +1086,83 @@ describe("WebSocket Server SQL console scripts", () => {
             expect(answer.requestId).toBe("req-too-large");
             expect(answer.payload.error.code).toBe("RESULT_TOO_LARGE");
             expect(answer.payload.error.message).toMatch(/128 MB.*LIMIT/);
+        });
+    });
+
+    /**
+     * Nothing could stop a console run: the Run button spun until the
+     * statement ended or `statement_timeout` stopped it. `CANCEL_SQL` names a
+     * run of the same socket by its `requestId` and aborts the signal it runs
+     * with. A server says it takes the frame in its sign-in answer
+     * (`capabilities: ["cancel_sql"]`), so a client sends it only to a server
+     * that does; an older client never sends it, and loses nothing.
+     */
+    describe("cancelling a run", () => {
+        const sent = (mockWs: { send: jest.Mock }) =>
+            mockWs.send.mock.calls.map((call) => JSON.parse(call[0] as string));
+
+        /** A runSqlScript that stays in flight until its signal is aborted. */
+        const runUntilAborted = () => {
+            const admin = mockDriver.admin as unknown as { runSqlScript: jest.Mock };
+            admin.runSqlScript.mockImplementationOnce((async (_sql: string, options: { signal?: AbortSignal }) =>
+                new Promise((_resolve, reject) => {
+                    options.signal?.addEventListener("abort", () =>
+                        reject(new Error("canceling statement due to user request")));
+                })) as never);
+            return admin;
+        };
+
+        it("says in the sign-in answer that this server takes CANCEL_SQL", async () => {
+            const { mockWs } = await signedIn();
+            const auth = sent(mockWs).find((frame) => frame.type === "AUTH_SUCCESS");
+            expect(auth.payload.capabilities).toContain("cancel_sql");
+        });
+
+        it("aborts the run it names, and the run answers with the database's error", async () => {
+            const admin = runUntilAborted();
+            const { mockWs, send } = await signedIn();
+
+            const running = send({ type: "EXECUTE_SQL", requestId: "run-1", payload: { sql: "SELECT pg_sleep(30)", mode: "script" } });
+            await new Promise((resolve) => setImmediate(resolve));
+            const signal = (admin.runSqlScript.mock.calls[0][1] as { signal: AbortSignal }).signal;
+            expect(signal.aborted).toBe(false);
+
+            await send({ type: "CANCEL_SQL", requestId: "cancel-1", payload: { requestId: "run-1" } });
+            await running;
+
+            expect(signal.aborted).toBe(true);
+            expect(sent(mockWs)).toContainEqual({ type: "CANCEL_SQL_SUCCESS", requestId: "cancel-1", payload: { cancelled: true } });
+            const runAnswer = sent(mockWs).find((frame) => frame.requestId === "run-1");
+            expect(runAnswer.type).toBe("ERROR");
+            expect(runAnswer.payload.error.message).toMatch(/canceling statement/);
+        });
+
+        it("says it cancelled nothing for a run that is not in flight", async () => {
+            const { mockWs, send } = await signedIn();
+            await send({ type: "EXECUTE_SQL", requestId: "run-done", payload: { sql: "SELECT 1", mode: "script" } });
+            await send({ type: "CANCEL_SQL", requestId: "cancel-late", payload: { requestId: "run-done" } });
+            expect(sent(mockWs)).toContainEqual({ type: "CANCEL_SQL_SUCCESS", requestId: "cancel-late", payload: { cancelled: false } });
+        });
+
+        it("cannot reach another socket's run", async () => {
+            const admin = runUntilAborted();
+            const first = await signedIn();
+            const second = await signedIn();
+
+            const running = first.send({ type: "EXECUTE_SQL", requestId: "theirs", payload: { sql: "SELECT pg_sleep(30)", mode: "script" } });
+            await new Promise((resolve) => setImmediate(resolve));
+            await second.send({ type: "CANCEL_SQL", requestId: "cancel-theirs", payload: { requestId: "theirs" } });
+
+            const signal = (admin.runSqlScript.mock.calls[0][1] as { signal: AbortSignal }).signal;
+            expect(signal.aborted).toBe(false);
+            expect(sent(second.mockWs)).toContainEqual({ type: "CANCEL_SQL_SUCCESS", requestId: "cancel-theirs", payload: { cancelled: false } });
+
+            await first.send({ type: "CANCEL_SQL", requestId: "cancel-mine", payload: { requestId: "theirs" } });
+            await running;
+        });
+
+        it("is an admin-plane verb, held to database:write", () => {
+            expect(ADMIN_PLANE_TYPES.get("CANCEL_SQL")).toBe("database:write");
         });
     });
 });

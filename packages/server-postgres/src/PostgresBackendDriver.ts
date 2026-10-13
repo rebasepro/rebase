@@ -2534,13 +2534,15 @@ export class PostgresBackendDriver implements DataDriver {
      */
     async runSqlScript(sqlText: string, options?: {
         database?: string,
-        role?: string
+        role?: string,
+        signal?: AbortSignal
     }): Promise<SqlScriptResult> {
         const targetDb = await this.getTargetDb(options?.database);
         const pool = "$client" in targetDb ? targetDb.$client : undefined;
         if (!(pool instanceof Pool)) {
             // One session in process: nothing on the wire to read a column's
-            // origin from, so nothing in the result is said to have one.
+            // origin from, so nothing in the result is said to have one. And
+            // no backend of its own to cancel: `signal` is not read.
             return sqlScriptResultFromRows(await this.executeSql(sqlText, {
                 database: options?.database,
                 role: options?.role,
@@ -2549,7 +2551,8 @@ export class PostgresBackendDriver implements DataDriver {
         }
         const role = options?.role;
         return runSqlScriptOnPool(pool, sqlText, {
-            assumeRole: role ? (connection) => this.assumeSessionRole(connection, role) : undefined
+            assumeRole: role ? (connection) => this.assumeSessionRole(connection, role) : undefined,
+            signal: options?.signal
         });
     }
 

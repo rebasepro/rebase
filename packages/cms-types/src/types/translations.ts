@@ -1006,6 +1006,10 @@ export interface RebaseTranslations {
     studio_sql_add_to_favorites?: string;
     studio_sql_save?: string;
     studio_sql_run?: string;
+    /** Stops the SQL console's run in flight. */
+    studio_sql_cancel_run?: string;
+    /** Shown in place of a result when the run was cancelled. */
+    studio_sql_run_cancelled?: string;
     studio_sql_database?: string;
     studio_sql_role?: string;
     studio_sql_admin?: string;

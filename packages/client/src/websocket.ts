@@ -436,6 +436,13 @@ export class RebaseWebSocketClient {
     private backendToEntityKey = new Map<string, string>();
 
 
+    /**
+     * The frames beyond the base protocol that the server this socket signed
+     * in to says it takes (`AUTH_SUCCESS` `capabilities`). Such a frame is sent
+     * only to a server that listed it; an older server lists nothing.
+     */
+    private serverCapabilities: ReadonlySet<string> = new Set();
+
     private pendingRequests = new Map<string, {
         resolve: (p: unknown) => void;
         reject: (p: Error) => void;
@@ -603,9 +610,10 @@ export class RebaseWebSocketClient {
             }, 30000);
 
             this.pendingRequests.set(requestId, {
-                resolve: () => {
+                resolve: (payload) => {
                     clearTimeout(timeout);
                     this.isAuthenticated = true;
+                    this.serverCapabilities = readCapabilities(payload);
                     resolve();
                 },
                 reject: (error) => {
@@ -1635,16 +1643,64 @@ options }
      * table column each result column was read from. See
      * `SQLAdmin.runSqlScript`.
      */
-    async runSqlScript(sql: string, options?: { database?: string, role?: string }): Promise<SqlScriptResult> {
-        const response = await this.sendMessage({
+    async runSqlScript(sql: string, options?: { database?: string, role?: string, signal?: AbortSignal }): Promise<SqlScriptResult> {
+        const signal = options?.signal;
+        if (signal?.aborted) throw abortReason(signal);
+        const requestId = `sql_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+        const message: Record<string, unknown> = {
             type: "EXECUTE_SQL",
+            requestId,
             payload: {
                 sql,
                 options: { database: options?.database, role: options?.role },
                 mode: "script"
             }
+        };
+        const answer = this.sendMessage(message);
+        if (!signal) return readSqlScriptResult(await answer);
+        // Aborting rejects at once, whatever the server can do; a server that
+        // takes `CANCEL_SQL` also stops the statement. The run's own late
+        // answer then settles a promise nobody waits on.
+        return new Promise<SqlScriptResult>((resolve, reject) => {
+            const onAbort = () => {
+                reject(abortReason(signal));
+                this.cancelSqlRun(message, requestId);
+            };
+            signal.addEventListener("abort", onAbort, { once: true });
+            answer.then(
+                (response) => {
+                    signal.removeEventListener("abort", onAbort);
+                    try {
+                        resolve(readSqlScriptResult(response));
+                    } catch (error) {
+                        reject(error);
+                    }
+                },
+                (error: unknown) => {
+                    signal.removeEventListener("abort", onAbort);
+                    reject(error);
+                }
+            );
         });
-        return readSqlScriptResult(response);
+    }
+
+    /**
+     * Stop a console run its caller gave up on: never written if it has not
+     * been yet, and cancelled on a server that takes `CANCEL_SQL`. A server
+     * that does not is left to finish it, bounded by its `statement_timeout`.
+     */
+    private cancelSqlRun(message: Record<string, unknown>, requestId: string): void {
+        const queuedAt = this.messageQueue.indexOf(message);
+        if (queuedAt >= 0) {
+            this.messageQueue.splice(queuedAt, 1);
+            return;
+        }
+        // Still waiting on authentication in `doSendMessage`: it checks this
+        // before writing.
+        this.abandonedFrames.add(message);
+        if (this.isAuthenticated && this.serverCapabilities.has("cancel_sql")) {
+            this.sendMessage({ type: "CANCEL_SQL", payload: { requestId } }).catch(() => undefined);
+        }
     }
 
     async fetchAvailableDatabases(): Promise<string[]> {
@@ -2410,4 +2466,15 @@ onError });
         const include = props.include !== undefined ? `|${JSON.stringify(props.include)}` : "";
         return `${props.path}|${props.id}${include}`;
     }
+}
+
+/** The `capabilities` an `AUTH_SUCCESS` payload lists; none when it lists none. */
+function readCapabilities(payload: unknown): ReadonlySet<string> {
+    const listed = typeof payload === "object" && payload !== null && "capabilities" in payload ? payload.capabilities : undefined;
+    return new Set(Array.isArray(listed) ? listed.filter((item): item is string => typeof item === "string") : []);
+}
+
+/** What an aborted signal rejects with: its reason, or an `AbortError` as `fetch` gives. */
+function abortReason(signal: AbortSignal): unknown {
+    return signal.reason ?? new DOMException("The operation was aborted.", "AbortError");
 }

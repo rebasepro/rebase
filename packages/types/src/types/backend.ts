@@ -656,8 +656,13 @@ export interface SQLAdmin {
      * no other. A script that leaves a transaction open is refused, and the
      * transaction rolled back: nothing outlives the run to be committed or
      * rolled back by a later one.
+     *
+     * Aborting `signal` cancels the run: the statement in progress is stopped
+     * (`pg_cancel_backend` on a Postgres server; the in-process development
+     * database cannot be interrupted, and the run ends on its own), and the
+     * promise rejects.
      */
-    runSqlScript?(sql: string, options?: { database?: string; role?: string }): Promise<SqlScriptResult>;
+    runSqlScript?(sql: string, options?: { database?: string; role?: string; signal?: AbortSignal }): Promise<SqlScriptResult>;
 
     /**
      * Read the whole result of ONE query a person wrote, a batch at a time —

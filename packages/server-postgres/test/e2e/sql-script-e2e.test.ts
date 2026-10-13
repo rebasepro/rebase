@@ -400,3 +400,52 @@ describe("openSqlCursor", () => {
         }
     });
 });
+
+/**
+ * Cancelling a console run. Nothing could stop one: the console's Run button
+ * spun until the statement ended or `statement_timeout` (30 s) stopped it. An
+ * aborted `signal` cancels the statement with `pg_cancel_backend`, from a
+ * connection of its own — never the pool's, whose only connection, at
+ * `REBASE_DB_POOL_MAX=1`, is the busy one — and the connection goes back to
+ * the pool only once the cancel has settled, so it cannot land on the next
+ * request's query.
+ */
+describe("cancelling a run", () => {
+    it("stops the statement, and the pool's connections stay usable", async () => {
+        const controller = new AbortController();
+        const started = Date.now();
+        const run = driver.runSqlScript("SELECT pg_sleep(30)", { signal: controller.signal });
+        setTimeout(() => controller.abort(), 300);
+        await expect(run).rejects.toThrow(/canceling statement due to user request/);
+        expect(Date.now() - started).toBeLessThan(10_000);
+
+        // Every connection the pool holds still answers, and none is in the
+        // session the cancelled run left.
+        const answers = await Promise.all([1, 2, 3].map(() => pool.query("SELECT 1 AS one")));
+        expect(answers.map(answer => answer.rows[0].one)).toEqual([1, 1, 1]);
+        expect((await driver.runSqlScript("SELECT 2 AS two")).rows).toEqual([{ two: "2" }]);
+    });
+
+    it("cancels a run as the role picked, which the owner may signal", async () => {
+        const controller = new AbortController();
+        const run = driver.runSqlScript("SELECT pg_sleep(30)", { role: "console_reader", signal: controller.signal });
+        setTimeout(() => controller.abort(), 300);
+        await expect(run).rejects.toThrow(/canceling statement/);
+    });
+
+    it("does not run a script whose signal was aborted before it started", async () => {
+        const controller = new AbortController();
+        controller.abort();
+        await expect(driver.runSqlScript("UPDATE accounts SET balance = 0 WHERE id = 1", { signal: controller.signal }))
+            .rejects.toThrow(/cancel/i);
+        expect((await pool.query("SELECT balance FROM accounts WHERE id = 1")).rows[0].balance).toBe(100);
+    });
+
+    it("leaves a run that ends before the abort as it was", async () => {
+        const controller = new AbortController();
+        const result = await driver.runSqlScript("SELECT 3 AS three", { signal: controller.signal });
+        controller.abort();
+        expect(result.rows).toEqual([{ three: "3" }]);
+        expect((await pool.query("SELECT 4 AS four")).rows[0].four).toBe(4);
+    });
+});

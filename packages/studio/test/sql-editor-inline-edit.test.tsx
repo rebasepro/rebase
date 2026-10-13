@@ -168,7 +168,8 @@ async function runQuery(query: string): Promise<void> {
 async function selectOrders(): Promise<void> {
     await runQuery(ORDERS);
     const run = [...executeSql.mock.calls, ...runSqlScript.mock.calls].find(([sql]) => sql.startsWith(ORDERS));
-    expect(run?.[1]).toEqual({ database: "app_prod", role: "postgres" });
+    // The connection it ran on; a script run also carries the signal "Cancel run" aborts.
+    expect({ database: run?.[1]?.database, role: run?.[1]?.role }).toEqual({ database: "app_prod", role: "postgres" });
 }
 
 async function editStatus(value: string): Promise<void> {

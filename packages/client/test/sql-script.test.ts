@@ -158,3 +158,78 @@ describe("readSqlScriptResult", () => {
         expect(result.tables).toEqual([{ schema: "public", table: "events", kind: "table", primaryKey: ["id"], hasInheritors: true }]);
     });
 });
+
+/**
+ * Cancelling a console run. A server that takes `CANCEL_SQL` says so when the
+ * socket signs in (`capabilities: ["cancel_sql"]`); only to such a server does
+ * an aborted run send one, naming the run by its `requestId`. Against any
+ * server the run's promise rejects at once with the signal's reason, so the
+ * console is never left waiting on a statement it gave up on.
+ */
+describe("runSqlScript with a signal", () => {
+    async function signedIn(capabilities?: string[]): Promise<MockWebSocket> {
+        const ws = await connected();
+        const auth = client.authenticate("token");
+        const frame = lastFrame(ws);
+        expect(frame.type).toBe("AUTHENTICATE");
+        ws.onmessage!({ data: JSON.stringify({
+            type: "AUTH_SUCCESS",
+            requestId: frame.requestId,
+            payload: { uid: "u1", roles: ["admin"], ...(capabilities ? { capabilities } : {}) }
+        }) });
+        await auth;
+        return ws;
+    }
+
+    const frames = (ws: MockWebSocket) => ws.sentMessages.map((data) => JSON.parse(data) as { type: string; requestId: string; payload: Record<string, unknown> });
+
+    it("sends CANCEL_SQL for the run to a server that takes it, and rejects at once", async () => {
+        const ws = await signedIn(["cancel_sql"]);
+        const controller = new AbortController();
+        const pending = client.runSqlScript("SELECT pg_sleep(30)", { signal: controller.signal });
+        await Promise.resolve();
+        const run = frames(ws).find((frame) => frame.type === "EXECUTE_SQL")!;
+        expect(run.payload).toEqual({ sql: "SELECT pg_sleep(30)", options: {}, mode: "script" });
+
+        controller.abort();
+        await expect(pending).rejects.toMatchObject({ name: "AbortError" });
+        await Promise.resolve();
+        expect(frames(ws)).toContainEqual(expect.objectContaining({ type: "CANCEL_SQL", payload: { requestId: run.requestId } }));
+
+        // The run's own late answer lands on nobody.
+        ws.onmessage!({ data: JSON.stringify({ type: "ERROR", requestId: run.requestId, payload: { error: { message: "canceling statement due to user request", code: "SQL_ERROR" } } }) });
+    });
+
+    it("sends no CANCEL_SQL to a server that did not say it takes one", async () => {
+        const ws = await signedIn();
+        const controller = new AbortController();
+        const pending = client.runSqlScript("SELECT pg_sleep(30)", { signal: controller.signal });
+        await Promise.resolve();
+        controller.abort();
+        await expect(pending).rejects.toMatchObject({ name: "AbortError" });
+        await Promise.resolve();
+        expect(frames(ws).map((frame) => frame.type)).not.toContain("CANCEL_SQL");
+    });
+
+    it("sends nothing for a signal aborted before the run", async () => {
+        const ws = await signedIn(["cancel_sql"]);
+        const controller = new AbortController();
+        controller.abort();
+        await expect(client.runSqlScript("DELETE FROM posts", { signal: controller.signal })).rejects.toMatchObject({ name: "AbortError" });
+        await Promise.resolve();
+        expect(frames(ws).map((frame) => frame.type)).not.toContain("EXECUTE_SQL");
+    });
+
+    it("resolves as before when the run ends first", async () => {
+        const ws = await signedIn(["cancel_sql"]);
+        const controller = new AbortController();
+        const pending = client.runSqlScript("SELECT 1 AS one", { signal: controller.signal });
+        await Promise.resolve();
+        const run = frames(ws).find((frame) => frame.type === "EXECUTE_SQL")!;
+        ws.onmessage!({ data: JSON.stringify({ type: "EXECUTE_SQL_SUCCESS", requestId: run.requestId, payload: { result: [{ one: "1" }], columns: [{ name: "one" }], tables: [] } }) });
+        await expect(pending).resolves.toMatchObject({ rows: [{ one: "1" }] });
+        controller.abort();
+        await Promise.resolve();
+        expect(frames(ws).map((frame) => frame.type)).not.toContain("CANCEL_SQL");
+    });
+});

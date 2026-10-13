@@ -52,6 +52,17 @@ export function isSocketRealtimeService(provider: RealtimeProvider): provider is
     return socketRealtimeMissing(provider).length === 0;
 }
 
+/**
+ * The frames this server takes beyond the protocol every server has spoken,
+ * said in the `AUTH_SUCCESS` answer as `capabilities`. A client sends such a
+ * frame only to a server that lists it, so a newer client keeps working
+ * against an older server; an older client never sends one.
+ *
+ * - `cancel_sql`: `CANCEL_SQL { requestId }` stops a console run
+ *   (`EXECUTE_SQL`, `mode: "script"`) of the same socket.
+ */
+export const SOCKET_CAPABILITIES: readonly string[] = ["cancel_sql"];
+
 /** What a script run says besides its rows, which an `EXECUTE_SQL` answer carries as `result`. */
 function scriptDescription({ rows: _rows, ...description }: SqlScriptResult): Omit<SqlScriptResult, "rows"> {
     return description;
@@ -302,6 +313,8 @@ const CHANNEL_MESSAGE_TYPES = new Set([
  */
 export const ADMIN_PLANE_TYPES: ReadonlyMap<string, AdminScope> = new Map<string, AdminScope>([
     ["EXECUTE_SQL", "database:write"],
+    // Stops a console run of the same socket, which `EXECUTE_SQL` started.
+    ["CANCEL_SQL", "database:write"],
     ["CREATE_BRANCH", "database:write"],
     ["DELETE_BRANCH", "database:write"],
     ["FETCH_DATABASES", "database:read"],
@@ -897,6 +910,11 @@ fetchAllowance: fetchAllowanceCapacity(),
 fetchAllowanceAt: Date.now() });
         realtimeService.addClient(clientId, ws);
 
+        // This socket's console runs in flight, by the `requestId` that
+        // started each: what `CANCEL_SQL` can stop. One socket's map, so a
+        // frame can only ever stop a run its own socket started.
+        const sqlRuns = new Map<string, AbortController>();
+
         ws.on("close", () => {
             wsDebug(`WebSocket client disconnected: ${clientId}`);
             const session = clientSessions.get(clientId);
@@ -1048,7 +1066,8 @@ fetchAllowanceAt: Date.now() });
                             type: "AUTH_SUCCESS",
                             requestId,
                             payload: { uid: verifiedUser.uid,
-roles: verifiedUser.roles }
+roles: verifiedUser.roles,
+capabilities: SOCKET_CAPABILITIES }
                         }));
                         wsDebug(`🔐 [WebSocket Server] Client ${clientId} authenticated as ${verifiedUser.uid}`);
                     } else {
@@ -1508,6 +1527,12 @@ colors: true }));
 
                     case "EXECUTE_SQL": {
                         const { sql, options, mode } = payload;
+                        // A console run can be stopped by `CANCEL_SQL` while
+                        // it is in flight — one with a requestId to name it.
+                        const cancel = mode === "script" && typeof requestId === "string" && !sqlRuns.has(requestId)
+                            ? new AbortController()
+                            : undefined;
+                        if (cancel && requestId) sqlRuns.set(requestId, cancel);
                         try {
                             const delegate = await getScopedDelegate();
                             const admin = delegate.admin;
@@ -1523,7 +1548,8 @@ colors: true }));
                             const script = mode === "script" && typeof admin.runSqlScript === "function"
                                 ? await admin.runSqlScript(String(sql), {
                                     database: typeof options?.database === "string" ? options.database : undefined,
-                                    role: typeof options?.role === "string" ? options.role : undefined
+                                    role: typeof options?.role === "string" ? options.role : undefined,
+                                    ...(cancel ? { signal: cancel.signal } : {})
                                 })
                                 : undefined;
                             // A session of its own, reset before it goes back
@@ -1613,7 +1639,25 @@ colors: true }));
                             // We return it cleanly to the client without logging a server stack trace.
                             const errMsg = extractErrorMessage(sqlError);
                             sendError("ERROR", "SQL_ERROR", errMsg);
+                        } finally {
+                            if (cancel && requestId && sqlRuns.get(requestId) === cancel) sqlRuns.delete(requestId);
                         }
+                    }
+                        break;
+
+                    case "CANCEL_SQL": {
+                        // The run named is this socket's, or nothing: the map
+                        // is per socket. `cancelled` says whether one was
+                        // still in flight; the run itself answers on its own
+                        // requestId, with the database's "canceling statement".
+                        const target = (payload as { requestId?: unknown } | undefined)?.requestId;
+                        const run = typeof target === "string" ? sqlRuns.get(target) : undefined;
+                        run?.abort();
+                        ws.send(JSON.stringify({
+                            type: "CANCEL_SQL_SUCCESS",
+                            requestId,
+                            payload: { cancelled: run !== undefined }
+                        }));
                     }
                         break;
 

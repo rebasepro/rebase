@@ -370,6 +370,43 @@ export interface OwnSessionOptions {
      * it ran as the connection owner.
      */
     assumeRole?: (connection: PoolClient) => Promise<void>;
+    /**
+     * Cancels the run when aborted: the statement in progress is stopped with
+     * `pg_cancel_backend`, and the run fails with the database's "canceling
+     * statement due to user request". A signal already aborted runs nothing.
+     */
+    signal?: AbortSignal;
+}
+
+/** A run whose signal was aborted before it began. */
+export class SqlRunCancelledError extends Error {
+    readonly code = "SQL_RUN_CANCELLED";
+
+    constructor() {
+        super("The run was cancelled before it started: nothing ran.");
+        this.name = "SqlRunCancelledError";
+    }
+}
+
+/**
+ * Ask the database to cancel what backend `pid` is running, from a connection
+ * of its own: never one of the pool's, since at `REBASE_DB_POOL_MAX=1` the
+ * pool's one connection is the busy one. A cancel that cannot be delivered is
+ * dropped — the run then ends on its own, bounded by `statement_timeout`.
+ */
+async function cancelBackend(pool: Pool, pid: number): Promise<void> {
+    const client = new Client(pool.options);
+    // An unreachable server answers through `connect()`; a stray error event
+    // after it must not be thrown out of the process.
+    client.on("error", () => undefined);
+    try {
+        await client.connect();
+        await client.query("SELECT pg_cancel_backend($1)", [pid]);
+    } catch (error: unknown) {
+        logger.warn("[SQL] could not cancel a console run", { pid, error: error instanceof Error ? error.message : String(error) });
+    } finally {
+        await client.end().catch(() => undefined);
+    }
 }
 
 /**
@@ -390,9 +427,27 @@ export async function onOwnSession<T>(
 ): Promise<T> {
     const connection = await pool.connect();
     let reusable = true;
+    // A cancel in flight. The connection goes back to the pool only once it
+    // has settled, so it can land on nothing but this run — at worst on its
+    // reset, which then fails and has the connection destroyed.
+    let cancelling: Promise<void> | undefined;
+    let stopListening = () => {};
     try {
         let outcome: { value: T } | { error: unknown };
         try {
+            const signal = options.signal;
+            if (signal) {
+                if (signal.aborted) throw new SqlRunCancelledError();
+                const pidResult = await connection.query<{ pid: number }>("SELECT pg_backend_pid() AS pid");
+                const pid = pidResult.rows[0].pid;
+                const onAbort = () => {
+                    cancelling ??= cancelBackend(pool, pid);
+                };
+                signal.addEventListener("abort", onAbort, { once: true });
+                stopListening = () => signal.removeEventListener("abort", onAbort);
+                // Aborted while the pid was read: nothing has run yet.
+                if (signal.aborted) throw new SqlRunCancelledError();
+            }
             await options.assumeRole?.(connection);
             outcome = { value: await work(connection) };
         } catch (error: unknown) {
@@ -438,6 +493,13 @@ export async function onOwnSession<T>(
         if (leftOpen) throw new SqlTransactionLeftOpenError();
         return afterReset && reusable ? await afterReset(connection, outcome.value) : outcome.value;
     } finally {
+        stopListening();
+        if (cancelling) {
+            await cancelling;
+            // A cancel delivered as the reset finished may still be on its
+            // way to the backend; the connection is not handed to anyone else.
+            reusable = false;
+        }
         connection.release(reusable ? undefined : true);
     }
 }
