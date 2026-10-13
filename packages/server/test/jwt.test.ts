@@ -493,6 +493,34 @@ accessExpiresIn: "1s" });
                 debug.mockRestore();
             }
         });
+
+        /**
+         * The data rate limiter reads every `?token=` as a download token, on
+         * function routes too. A tenant function taking its own `?token=` paged
+         * "tenant application errors" for five days on requests it answered 200.
+         */
+        it("logs a refused download token below ERROR, whatever the reason", async () => {
+            const { logger } = await import("../src/utils/logger");
+            const error = jest.spyOn(logger, "error").mockImplementation(() => undefined);
+            const debug = jest.spyOn(logger, "debug").mockImplementation(() => undefined);
+            try {
+                const expiring = await generateDownloadToken("default/photos/file.jpg", 1);
+                const forged = jwt.sign({ purpose: "file-read", path: "default/x" }, "not-the-secret-not-the-secret-not-the-secret");
+                expect(await verifyDownloadToken("a-functions-own-token")).toBeNull();
+                expect(await verifyDownloadToken(forged)).toBeNull();
+                jest.useFakeTimers().setSystemTime(Date.now() + 2_000);
+                try {
+                    expect(await verifyDownloadToken(expiring)).toBeNull();
+                } finally {
+                    jest.useRealTimers();
+                }
+                expect(error).not.toHaveBeenCalled();
+                expect(debug).toHaveBeenCalledTimes(3);
+            } finally {
+                error.mockRestore();
+                debug.mockRestore();
+            }
+        });
     });
 
     // ── Access token round-trip with various roles ────────────

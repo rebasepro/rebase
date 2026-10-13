@@ -25,6 +25,8 @@ import { Map as SchemaMap, MAP_DURATION } from "./reel/Map";
 import { Matrix, MATRIX_DURATION } from "./reel/Matrix";
 import { Routes, ROUTES_DURATION } from "./reel/Routes";
 import { Plausible, PLAUSIBLE_DURATION } from "./reel/Plausible";
+import { RebaseLaunch } from "./launch/Launch";
+import { DURATION as LAUNCH_DURATION, FPS as LAUNCH_FPS } from "./launch/score";
 
 loadFonts();
 
@@ -56,6 +58,17 @@ const HEIGHT = 1080;
 
 export const RemotionRoot: React.FC = () => (
     <>
+        {/* THE LAUNCH TEASER — 30 seconds at 60 fps, cut to its own music.
+            Run `pnpm launch:music` once before opening it in the studio. */}
+        <Composition
+            id="RebaseLaunch"
+            component={RebaseLaunch}
+            durationInFrames={LAUNCH_DURATION}
+            fps={LAUNCH_FPS}
+            width={WIDTH}
+            height={HEIGHT}
+        />
+
         {/* THE DESK — one workspace, a camera, no cuts. See src/desk/beats.ts.
             Its length is its narration's: the authored read by default, a
             take's with --props=takes/<id>/props.json (scripts/take.mjs). */}
