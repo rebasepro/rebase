@@ -23,7 +23,7 @@
         "dev": "remotion studio",
         "intro": "remotion render RebaseIntro out/rebase-intro.mp4",
         "launch:music": "node scripts/compose-launch-music.mjs",
-        "launch": "node scripts/compose-launch-music.mjs && remotion render RebaseLaunch out/rebase-launch.mp4",
+        "launch": "node scripts/compose-launch-music.mjs && remotion render RebaseLaunch out/rebase-launch-4k.mp4 --scale=2 && remotion ffmpeg -y -v error -i out/rebase-launch-4k.mp4 -vf scale=1920:1080:flags=lanczos -c:v libx264 -preset slow -crf 14 -pix_fmt yuv420p -c:a copy out/rebase-launch.mp4",
         "intro:poster": "remotion still RebaseIntro out/rebase-intro-poster.png --frame=230",
         "scene": "remotion render",
         "render": "remotion render",

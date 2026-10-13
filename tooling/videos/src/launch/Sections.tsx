@@ -1,7 +1,7 @@
 import React from "react";
 import { AbsoluteFill, OffthreadVideo, Sequence, staticFile, useCurrentFrame, useVideoConfig } from "remotion";
-import { pop, ramp, SPRING } from "../components/motion";
-import { RebaseLogo } from "../components/RebaseLogo";
+import { ramp, SHIFT } from "../components/motion";
+import { Mark } from "../components/Mark";
 import { FONT, RADIUS, SURFACE, TRACKING } from "../theme";
 import { useTone } from "../Plane";
 import { cell, Editor, TIMING } from "./Editor";
@@ -168,57 +168,85 @@ export const Claim: React.FC = () => {
     );
 };
 
-/** The close: the mark and the name on the drop, the line under it, then
- *  the one command that starts a project. Held to the last frame. */
+/**
+ * The close: the mark and the name on the drop, the line under it, then the
+ * one command that starts a project. Held to the last frame.
+ *
+ * The block is centred at every moment, not just when it is complete: the
+ * command row GROWS into the layout on its downbeat, so the lockup and the
+ * line glide up to make room instead of sitting high for two seconds waiting
+ * for a row that is not there yet.
+ */
+const CMD_ROW = 56 + 70 + 20 + 32;
+
 export const EndCard: React.FC = () => {
     const frame = useCurrentFrame();
-    const { fps, durationInFrames } = useVideoConfig();
+    const { durationInFrames } = useVideoConfig();
     const tone = useTone();
-    const mark = pop(frame, fps, -LEAD, SPRING.pop);
     const push = 1 + 0.06 * (frame / durationInFrames);
-    const cmd = ramp(frame, BAR, 20);
+    const grow = ramp(frame, BAR - LEAD, 30, SHIFT);
+    const cmd = ramp(frame, BAR - LEAD, 24);
+    const url = ramp(frame, BAR + BEAT - LEAD, 24);
     return (
         <AbsoluteFill style={{ alignItems: "center", justifyContent: "center", transform: `scale(${push})` }}>
             <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 34 }}>
-                    <div style={{ transform: `scale(${0.6 + 0.4 * mark}) rotate(${(1 - mark) * -18}deg)`, opacity: Math.min(1, mark * 2) }}>
-                        <RebaseLogo size={150} />
-                    </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 40 }}>
+                    {/* The brand's own entrance: the facets assemble in a wave
+                        across the cube (components/Mark.tsx, the long film's). */}
+                    <Mark size={200} delay={-LEAD} spread={30} />
                     <Word at={0} size={SIZE.word} duration={22}>
                         Rebase
                     </Word>
                 </div>
-                <div style={{ marginTop: 34 }}>
+                <div style={{ marginTop: 30 }}>
                     <Word at={BEAT} size={52} color={tone.copy} style={{ letterSpacing: TRACKING.title }}>
                         A backend for your Postgres.
                     </Word>
                 </div>
-                <div
-                    style={{
-                        marginTop: 64,
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 30,
-                        opacity: cmd,
-                        transform: `translateY(${(1 - cmd) * 16}px)`,
-                    }}
-                >
+                <div style={{ height: grow * CMD_ROW, position: "relative", width: "100%" }}>
                     <div
                         style={{
-                            padding: "16px 26px",
-                            borderRadius: RADIUS.lg,
-                            background: SURFACE.well,
-                            border: `1px solid ${SURFACE.hairlineStrong}`,
-                            fontFamily: FONT.mono,
-                            fontSize: 28,
-                            color: "#E7E9EB",
+                            position: "absolute",
+                            top: 56,
+                            left: "50%",
+                            display: "flex",
+                            flexDirection: "column",
+                            alignItems: "center",
+                            transform: "translateX(-50%)",
+                            whiteSpace: "nowrap",
                         }}
                     >
-                        <span style={{ color: tone.muted, marginRight: 16 }}>$</span>
-                        pnpm dlx @rebasepro/cli init
-                    </div>
-                    <div style={{ fontFamily: FONT.mono, fontSize: 28, color: tone.copy, letterSpacing: "0.02em" }}>
-                        rebase.pro
+                        <div
+                            style={{
+                                padding: "16px 28px",
+                                borderRadius: RADIUS.lg,
+                                background: SURFACE.well,
+                                border: `1px solid ${SURFACE.hairlineStrong}`,
+                                fontFamily: FONT.mono,
+                                fontSize: 30,
+                                lineHeight: "36px",
+                                color: "#E7E9EB",
+                                opacity: cmd,
+                                transform: `translateY(${(1 - cmd) * 18}px)`,
+                            }}
+                        >
+                            <span style={{ color: tone.muted, marginRight: 18 }}>$</span>
+                            pnpm dlx @rebasepro/cli init
+                        </div>
+                        <div
+                            style={{
+                                marginTop: 20,
+                                fontFamily: FONT.mono,
+                                fontSize: 26,
+                                lineHeight: "32px",
+                                letterSpacing: "0.04em",
+                                color: tone.copy,
+                                opacity: url,
+                                transform: `translateY(${(1 - url) * 12}px)`,
+                            }}
+                        >
+                            rebase.pro
+                        </div>
                     </div>
                 </div>
             </div>
