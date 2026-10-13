@@ -395,6 +395,8 @@
         "packages/server/src/env.ts",
         "packages/server/src/init.ts",
         "packages/server/src/init/**",
+        "packages/server/src/backend/**",
+        "packages/server/src/api/mount-path.ts",
         "packages/server/src/index.ts",
         "packages/server/src/singleton.ts",
         "packages/server/src/serve-spa.ts",
@@ -410,6 +412,7 @@
         "packages/server-postgres/src/databasePoolManager.ts",
         "packages/server-postgres/src/module-dir.ts",
         "packages/server-postgres/src/index.ts",
+        "packages/server-postgres/src/open-rebase.ts",
         "packages/server-postgres/src/interfaces.ts",
         "packages/server-postgres/src/types.ts",
         "packages/server/src/api/collections_for_test/**"
