@@ -5,7 +5,6 @@ import {
     createBatchLoader,
     createConcurrencyLimit,
     createDownloadUrlCache,
-    uploadResumable,
     type DownloadMetadataBatchEntry,
     type ResolvedDownload,
     type ResumableUploadSend
@@ -198,6 +197,9 @@ export function createStorage(transport: Transport, storageId?: string): Storage
         // memory. Same fields, so the same object, the same checks and the
         // same triggers — only the transport differs.
         if (resumable && file.size > RESUMABLE_UPLOAD_THRESHOLD) {
+            // Fetched here, the first time a file is this large: a client
+            // that never uploads one never downloads the code that does it.
+            const { uploadResumable } = await import("./storage-resumable");
             const outcome = await uploadResumable({ file, metadata: resumableMetadataOf(formData), send: sendResumable });
             if ("stored" in outcome) return outcome.stored;
             resumable = false;
