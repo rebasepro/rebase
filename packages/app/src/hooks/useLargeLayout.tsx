@@ -1,6 +1,4 @@
-import { useEffect, useState } from "react";
-
-type LayoutListener = (isLargeLayout: boolean) => void;
+import { useSyncExternalStore } from "react";
 
 const breakpoints = {
     xs: 0,
@@ -12,54 +10,53 @@ const breakpoints = {
     "3xl": 1920
 }
 
-// Global state and listeners array
-let isLargeLayoutGlobal = checkLargeLayout("lg"); // Default value
-const listeners: LayoutListener[] = [];
+/**
+ * Who is reading the layout, and what it was at the last `resize`.
+ *
+ * One `resize` listener on `window` serves every reader. It is added when the
+ * first reader mounts and removed when the last one unmounts — never by
+ * importing this module, which an app can do without rendering anything.
+ */
+const subscribers = new Set<() => void>();
+let lastKnown: boolean | undefined;
 
-// Utility to notify all listeners
-const notifyListeners = () => {
-    listeners.forEach(listener => listener(isLargeLayoutGlobal));
-};
+function onResize() {
+    const next = checkLargeLayout("lg");
+    if (next === lastKnown) return;
+    lastKnown = next;
+    subscribers.forEach(notify => notify());
+}
 
-// Listen to resize events once, at a global level
-if (typeof window !== "undefined")
-    window.addEventListener("resize", () => {
-        const newIsLargeLayout = checkLargeLayout("lg");
-        if (newIsLargeLayout !== isLargeLayoutGlobal) {
-            isLargeLayoutGlobal = newIsLargeLayout;
-            notifyListeners();
+function subscribe(notify: () => void): () => void {
+    if (subscribers.size === 0 && typeof window !== "undefined") {
+        lastKnown = checkLargeLayout("lg");
+        window.addEventListener("resize", onResize);
+    }
+    subscribers.add(notify);
+    return () => {
+        subscribers.delete(notify);
+        if (subscribers.size === 0 && typeof window !== "undefined") {
+            window.removeEventListener("resize", onResize);
+            lastKnown = undefined;
         }
-    });
+    };
+}
 
-export const useLargeLayout = () => {
-    const [isLargeLayout, setIsLargeLayout] = useState(isLargeLayoutGlobal);
+function getSnapshot(): boolean {
+    // While listened to, the value the listener keeps; before the first
+    // reader subscribes, the layout as it is now.
+    return lastKnown ?? checkLargeLayout("lg");
+}
 
-    useEffect(() => {
-        // Listener function to update component state
-        const listener: LayoutListener = (newIsLargeLayout) => {
-            setIsLargeLayout(newIsLargeLayout);
-        };
+function getServerSnapshot(): boolean {
+    return false;
+}
 
-        // Register listener
-        listeners.push(listener);
-
-        // Initial state
-        setIsLargeLayout(isLargeLayoutGlobal);
-
-        // Clean up by removing the listener
-        return () => {
-            const index = listeners.indexOf(listener);
-            if (index > -1) {
-                listeners.splice(index, 1);
-            }
-        };
-    }, []);
-
-    return isLargeLayout;
-};
+export const useLargeLayout = (): boolean =>
+    useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 
 function checkLargeLayout(breakpoint: "xs" | "sm" | "md" | "lg" | "xl" | "2xl" | "3xl" = "lg"): boolean {
-    if (typeof window === "undefined")
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function")
         return false;
     return window.matchMedia(`(min-width: ${breakpoints[breakpoint] + 1}px)`).matches;
 }

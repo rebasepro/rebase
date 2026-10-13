@@ -21,9 +21,7 @@ import ts from "typescript";
 const SRC = path.resolve(__dirname, "../src");
 
 /** file (relative to src) → why its module-scope effect is safe to drop with it. */
-const ALLOWED: Record<string, string> = {
-    "hooks/useLargeLayout.tsx": "one shared window resize listener feeding the hook in the same module; useless without it"
-};
+const ALLOWED: Record<string, string> = {};
 
 function sources(dir: string): string[] {
     return fs.readdirSync(dir, { withFileTypes: true }).flatMap(entry => {
