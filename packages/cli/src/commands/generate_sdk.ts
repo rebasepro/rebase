@@ -14,7 +14,7 @@ import chalk from "chalk";
 import { CollectionConfig, computeSchemaVersion, deserializeCollections } from "@rebasepro/types";
 import { CodegenError, generateSDK, GeneratedFile, toCollectionAccessor } from "@rebasepro/codegen";
 import { detectPackageManager, getPMCommands } from "../utils/package-manager";
-import { findProjectRoot } from "../utils/project";
+import { findProjectRoot, readEnvFile } from "../utils/project";
 import { findBackendApp, loadManifest, manifestExists, writeManifest } from "../manifest";
 import { readLink } from "./cloud/context";
 import { COLLECTIONS_FLAG_HELP, COLLECTIONS_PATH_RULE } from "../utils/path-flags";
@@ -306,9 +306,51 @@ ${chalk.bold("Examples")}
  * `target()` to decide whether a foreign key is a string or a number, and a
  * missing target silently degrades that to a union rather than failing.
  */
+/** What `--from` sent to the contract endpoint, and which keys it left behind. */
+interface ContractCredential {
+    /** The bearer token sent: `--token`, the shell's key, or none. */
+    sent: "token" | "ambient" | null;
+    /** `REBASE_SERVICE_KEY` is in the shell environment. */
+    shellKey: boolean;
+    /** `REBASE_SERVICE_KEY` is in the project's `.env`. */
+    envFileKey: boolean;
+}
+
+/**
+ * What to say when the contract endpoint refuses, by what was and was not sent.
+ *
+ * "Set REBASE_SERVICE_KEY" is only right when no key exists. The shell's key is
+ * withheld from every host but the linked project, and `.env`'s is never read
+ * here — it is the local backend's key, and the linked project is usually a
+ * deployed one — so telling a reader whose key is in `.env` to set it sends them
+ * to fix something that is not broken.
+ */
+function contractRefusalHint(credential: ContractCredential): string[] {
+    if (credential.sent === "token") {
+        return ["The token passed with --token was refused: pass a service key, or an admin's token."];
+    }
+    if (credential.sent === "ambient") {
+        return ["REBASE_SERVICE_KEY was sent and refused: it is not this project's service key. Pass the right one with --token."];
+    }
+    if (credential.shellKey) {
+        return [
+            "REBASE_SERVICE_KEY is set, but it is only sent to this checkout's linked project, and this host is not it.",
+            "Pass the key with --token to send it here."
+        ];
+    }
+    if (credential.envFileKey) {
+        return [
+            "REBASE_SERVICE_KEY in .env is not sent: --from sends the shell's REBASE_SERVICE_KEY, and only to this checkout's linked project.",
+            "Pass the key with --token."
+        ];
+    }
+    return ["Pass --token <key>, a service key or an admin's token. The shell's REBASE_SERVICE_KEY is sent only to this checkout's linked project."];
+}
+
 async function fetchRemoteCollections(
     baseUrl: string,
-    token: string | undefined
+    token: string | undefined,
+    credential: ContractCredential
 ): Promise<{ collections: CollectionConfig[]; schemaVersion: string }> {
     const url = `${baseUrl.replace(/\/+$/, "")}/api/meta/contract`;
 
@@ -327,7 +369,7 @@ async function fetchRemoteCollections(
     if (response.status === 401 || response.status === 403) {
         console.log(chalk.red(`  ✗ Not authorized to read the project contract (${response.status}).`));
         console.log(chalk.gray("    The contract describes every table and relation, so it is admin-only."));
-        console.log(chalk.gray("    Pass --token, or set REBASE_SERVICE_KEY."));
+        for (const line of contractRefusalHint(credential)) console.log(chalk.gray(`    ${line}`));
         process.exit(1);
     }
 
@@ -488,7 +530,11 @@ export async function generateSdkCommand(args: GenerateSDKArgs): Promise<void> {
             ));
         }
 
-        const remote = await fetchRemoteCollections(baseUrl, args.token || ambient);
+        const remote = await fetchRemoteCollections(baseUrl, args.token || ambient, {
+            sent: args.token ? "token" : ambient ? "ambient" : null,
+            shellKey: Boolean(process.env.REBASE_SERVICE_KEY),
+            envFileKey: Boolean(readEnvFile(findProjectRoot(cwd) ?? cwd).REBASE_SERVICE_KEY)
+        });
         collections = remote.collections;
         remoteSchemaVersion = remote.schemaVersion;
     } else {

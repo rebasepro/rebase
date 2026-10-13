@@ -192,6 +192,67 @@ describe("generate-sdk --from", () => {
             });
         }
 
+        /**
+         * A refusal names its real cause. With the key in `.env`, the tester's
+         * dev server answered 401 and the CLI said "Pass --token, or set
+         * REBASE_SERVICE_KEY" — about a key that was set, and not sent.
+         */
+        describe("the hint on a refusal", () => {
+            const refuse = () => fetchMock.mockResolvedValue({ ok: false, status: 401, json: async () => ({}) } as unknown as Response);
+            const said = () => vi.mocked(console.log).mock.calls.map(call => call.map(String).join(" ")).join("\n");
+
+            it("says REBASE_SERVICE_KEY in .env is not sent, rather than to set it", async () => {
+                project();
+                fs.writeFileSync(path.join(tmpDir, ".env"), "REBASE_SERVICE_KEY=svc-in-dotenv\n");
+                refuse();
+
+                await expect(run("http://localhost:3732")).rejects.toThrow("process.exit(1)");
+
+                expect(said()).toContain("REBASE_SERVICE_KEY in .env is not sent");
+                expect(said()).not.toContain("set REBASE_SERVICE_KEY");
+                expect(said()).not.toContain("svc-in-dotenv");
+            });
+
+            it("says the shell's key is only sent to the linked project", async () => {
+                process.env.REBASE_SERVICE_KEY = "svc-secret";
+                project("https://api.acme.com");
+                refuse();
+
+                await expect(run("https://other.example.com")).rejects.toThrow("process.exit(1)");
+
+                expect(said()).toMatch(/REBASE_SERVICE_KEY is set, but it is only sent to this checkout's linked project/);
+                expect(said()).not.toContain("set REBASE_SERVICE_KEY");
+            });
+
+            it("says the token it sent was refused", async () => {
+                project();
+                refuse();
+
+                await expect(run("https://api.acme.com", { token: "explicit" })).rejects.toThrow("process.exit(1)");
+
+                expect(said()).toContain("The token passed with --token was refused");
+            });
+
+            it("says the linked project refused the key it was sent", async () => {
+                process.env.REBASE_SERVICE_KEY = "svc-secret";
+                project("https://api.acme.com");
+                refuse();
+
+                await expect(run("link")).rejects.toThrow("process.exit(1)");
+
+                expect(said()).toContain("REBASE_SERVICE_KEY was sent and refused");
+            });
+
+            it("asks for --token when there is no key anywhere", async () => {
+                project();
+                refuse();
+
+                await expect(run("https://api.acme.com")).rejects.toThrow("process.exit(1)");
+
+                expect(said()).toContain("Pass --token <key>");
+            });
+        });
+
         it("refuses when the response carries no collections", async () => {
             project();
             fetchMock.mockResolvedValue({
