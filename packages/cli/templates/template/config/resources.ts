@@ -43,12 +43,13 @@ export const main = database();
  * export const files = bucket({ engine: "s3" });
  * export const media = bucket("media", { engine: "s3" });
  *
- * One of them has to be the one an upload reaches when the property names no
- * `storageSource` — the default-keyed `bucket()` above, or a named bucket
- * marked `bucket("media", { engine: "s3", default: true })`. A project of named
- * buckets with no default refuses to boot rather than have one chosen for it:
- * that choice used to be made by declaration order, and it came out differently
- * in development and in production.
+ * An upload whose property names no `storageSource` goes to the default
+ * bucket, which keeps its own variables — `STORAGE_PATH` (else `./uploads`),
+ * `S3_BUCKET` / `GCS_BUCKET` — whatever you declare here, so adding
+ * `bucket("media")` never moves the files already there. To send those
+ * uploads to a named bucket instead, mark it:
+ * `bucket("media", { engine: "s3", default: true })`. Two buckets may not
+ * share a directory or a bucket; boot refuses if they would.
  *
  * Point a property at it by handle — the same name, spelled once:
  *

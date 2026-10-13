@@ -1556,16 +1556,15 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
         /**
          * Whether this run is on the managed database.
          *
-         * `db push` is the remedy for what boot leaves alone, and it cannot run
-         * against the managed one at all — Atlas plans by diffing against a
-         * second, empty database, and PGlite serves exactly one. So every
-         * remedy that names it has to know which database is under this run.
+         * `db push` runs on either one — on the managed database, which serves
+         * exactly one database, it plans against a throwaway in-memory PGlite
+         * instead of a second database beside it — but its children and the
+         * backend still word their remedies for the database under this run.
          */
         const managed = prepared?.database.kind === "managed";
         if (managed) managedConnectionString = prepared?.env.DATABASE_URL ?? null;
-        // …and the backend needs the same answer, for the same reason. Its
-        // schema-drift remedy said `pnpm db:push` whatever database it was
-        // serving, and on the managed one that command is refused. `db`,
+        // …and the backend needs the same answer, for the same reason: its
+        // schema-drift remedy is worded for the database it serves. `db`,
         // `schema` and `doctor` already pass this to their driver children;
         // the backend is the one that had to guess.
         if (prepared) env[DEV_DATABASE_KIND_ENV] = prepared.database.kind;
@@ -1789,16 +1788,10 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
                         console.log([
                             chalk.green("  ✓ Schema and SDK types regenerated. The backend restarts and boot"),
                             chalk.green("    creates what is missing — a new collection, a new property."),
-                            // `db push` is the remedy for what boot leaves alone, and it
-                            // cannot run against the managed database at all: Atlas plans
-                            // by diffing against a second, empty database, and PGlite
-                            // serves exactly one. Naming it there sends the reader to a
-                            // command that answers with a refusal.
-                            ...(managed
-                                ? [chalk.gray("    A renamed column, a narrowed type or a removed field needs your"),
-                                   chalk.gray("    own PostgreSQL: set DATABASE_URL, then rebase db push.")]
-                                : [chalk.gray("    For what boot leaves alone — a renamed column, a narrowed type,"),
-                                   chalk.gray(`    a removed field — run ${chalk.cyan("rebase db push")}.`)]),
+                            // `db push` is the remedy for what boot leaves alone, on the
+                            // managed database as on your own PostgreSQL.
+                            chalk.gray("    For what boot leaves alone — a renamed column, a narrowed type,"),
+                            chalk.gray(`    a removed field — run ${chalk.cyan("rebase db push")}.`),
                             ""
                         ].join("\n"));
                     })();

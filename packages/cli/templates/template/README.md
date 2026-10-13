@@ -53,9 +53,10 @@ built bundle). Pin a port with `rebase dev --port 3001` if you need a stable one
 Uncomment `DATABASE_URL` in `.env` and run `pnpm dev` again. Nothing else
 changes. A `DATABASE_URL` that is already set is never touched.
 
-With your own database you also get the migration commands, which the managed
-one cannot offer — they plan changes with Atlas, which needs a second empty
-database to compare against, and PGlite serves exactly one:
+The migration commands work on either database. They plan changes with Atlas,
+which needs a second empty database to compare against: beside your own
+database Rebase makes one, and on the managed one, which serves exactly one,
+the command starts a throwaway in-memory PGlite:
 
 ```bash
 pnpm run db:push
