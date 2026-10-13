@@ -315,9 +315,12 @@ export interface DatabaseAdapterInitConfig {
      * runtime otherwise refuses to boot without.
      *
      * Absent means both — every caller that predates this field is a
-     * single-process deployment, where both are true.
+     * single-process deployment, where both are true. `false` is a process
+     * that takes no part in realtime at all: nothing installed, nothing
+     * consumed, and its writes not announced to the processes that serve
+     * realtime (a script, a REPL).
      */
-    realtime?: {
+    realtime?: false | {
         /**
          * Consume change events: open the `LISTEN` connection, start CDC or the
          * app-level fallback. False for a process that serves no websockets.

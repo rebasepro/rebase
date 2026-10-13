@@ -218,6 +218,9 @@ export function guardPoolAgainstDirtyRelease(pool: Pool, label: string): void {
  * @param connectionString  Postgres connection URL
  * @param schema            Optional Drizzle schema for the relational API
  * @param poolConfig        Optional pool tuning (merged over defaults)
+ * @param env               Where the pool-size ceiling `REBASE_DB_POOL_MAX`
+ *                          is read from (see {@link poolMaxCeiling}); pass
+ *                          `{}` to read none.
  *
  * @returns `{ db, pool, connectionString }` — the `pool` is exposed so
  *          callers can register shutdown hooks (`pool.end()`) or monitor
@@ -226,7 +229,8 @@ export function guardPoolAgainstDirtyRelease(pool: Pool, label: string): void {
 export function createPostgresDatabaseConnection(
     connectionString: string,
     schema?: Record<string, unknown>,
-    poolConfig?: PostgresPoolConfig
+    poolConfig?: PostgresPoolConfig,
+    env: NodeJS.ProcessEnv = process.env
 ) {
     const opts = { ...DEFAULT_POOL,
 ...poolConfig };
@@ -234,7 +238,7 @@ export function createPostgresDatabaseConnection(
 
     const pgPoolConfig: PoolConfig = {
         connectionString,
-        max: cappedPoolMax(opts.max),
+        max: cappedPoolMax(opts.max, env),
         idleTimeoutMillis: opts.idleTimeoutMillis,
         connectionTimeoutMillis: opts.connectionTimeoutMillis,
         query_timeout: opts.queryTimeout,

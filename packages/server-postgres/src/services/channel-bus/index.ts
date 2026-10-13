@@ -50,8 +50,11 @@ export interface ChannelBusDeps {
  * transports this package knows how to construct, so honouring it there would
  * mean silently discarding the object the application handed us.
  */
-export function resolveChannelBusSetting(configured?: ChannelBusSetting): ChannelBusSetting {
-    const raw = (process.env.REALTIME_CHANNEL_BUS || "").trim().toLowerCase();
+export function resolveChannelBusSetting(
+    configured?: ChannelBusSetting,
+    env: NodeJS.ProcessEnv = process.env
+): ChannelBusSetting {
+    const raw = (env.REALTIME_CHANNEL_BUS || "").trim().toLowerCase();
 
     if (isChannelBusInstance(configured)) {
         if (raw && raw !== configured.kind) {

@@ -367,6 +367,15 @@ export interface RealtimeChannelsConfig {
      */
     recountMinRows?: number;
     /**
+     * How changes are captured for realtime. `auto` (the default) installs
+     * database-level capture where the connection can and falls back to
+     * announcing the API's own writes where it cannot; `trigger` asks for
+     * capture and warns when it is refused; `wal` is `trigger` until WAL
+     * streaming ships; `off` announces the API's own writes only.
+     * `REALTIME_CDC` wins over it.
+     */
+    cdc?: "auto" | "wal" | "trigger" | "off";
+    /**
      * The URL path the realtime socket accepts upgrades on. Defaults to the
      * one the server derives from where it is mounted — `/` for a server at
      * `/api`, which is where the SDK dials. Set it when clients dial elsewhere

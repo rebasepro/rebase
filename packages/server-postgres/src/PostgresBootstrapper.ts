@@ -19,12 +19,13 @@ import {
     isRelationalCollectionConfig,
     type HistoryConfig,
     InitializedDriver,
+    type DatabaseAdapterInitConfig,
     RealtimeProvider,
     type RealtimeChannelsConfig,
     type RealtimeSocketOptions
 } from "@rebasepro/types";
 import { PostgresBackendDriver } from "./PostgresBackendDriver";
-import { RealtimeService, parseMaxSubscriptionsPerSocket, parseRealtimeTuning } from "./services/realtimeService";
+import { RealtimeService, parseMaxSocketsPerUser, parseMaxSubscriptionsPerSocket, parseRealtimeTuning } from "./services/realtimeService";
 import { buildCollectionRegistry } from "./collections/buildRegistry";
 import { DatabasePoolManager } from "./databasePoolManager";
 import { PostgresCollectionRegistry } from "./collections/PostgresCollectionRegistry";
@@ -53,7 +54,18 @@ import { configureUnknownFilterFields, type UnknownFilterFieldsMode } from "./ut
 export interface PostgresDriverConfig {
     connectionString?: string;
     adminConnectionString?: string;
+    /**
+     * A read replica's URL: reads are routed there, writes stay on the
+     * primary. At boot, `DATABASE_READ_URL` fills it in when it is not set.
+     */
     readConnectionString?: string;
+    /**
+     * A direct (non-pooled) URL for the `LISTEN` connections realtime holds —
+     * a transaction-mode pooler such as PgBouncer does not keep one. Defaults
+     * to `connectionString`. At boot, `DATABASE_DIRECT_URL` fills it in when
+     * it is not set.
+     */
+    directConnectionString?: string;
     connection?: unknown;
     /**
      * The project's generated Drizzle module, for **diagnostics only**.
@@ -76,13 +88,17 @@ export interface PostgresDriverConfig {
      */
     introspectionSchema?: string;
     /**
-     * Realtime options, both opt-in:
+     * Realtime options, among them:
      *
      *  - `channels` — retention. Without rules no channel keeps any history and
      *    broadcast stays fire-and-forget. See {@link ChannelRetentionRule}.
      *  - `bus` — the cross-instance transport for channel broadcast and
      *    presence. Defaults to in-process only, which is correct for a single
      *    instance and wrong for two. See {@link ChannelBusConfig}.
+     *  - `cdc` — how changes are captured (`auto` by default).
+     *
+     * At boot each has an environment variable that wins over it — see
+     * {@link postgresDriverConfigFromEnv}.
      */
     realtime?: RealtimeChannelsConfig;
     /**
@@ -369,7 +385,857 @@ function diagnoseConnectFailure(err: unknown, connectionString: string | undefin
     return undefined;
 }
 
+/** The capture modes `realtime.cdc` takes. */
+const REALTIME_CDC_MODES = ["auto", "wal", "trigger", "off"] as const;
+type RealtimeCdcMode = typeof REALTIME_CDC_MODES[number];
+
+function isRealtimeCdcMode(value: string): value is RealtimeCdcMode {
+    return REALTIME_CDC_MODES.some((mode) => mode === value);
+}
+
+/**
+ * Read a capture mode, case and surrounding space aside. An unknown one is
+ * `auto`, said out loud — a typo must not switch capture off.
+ */
+function parseRealtimeCdcMode(value: string, source: string): RealtimeCdcMode {
+    const mode = value.trim().toLowerCase();
+    if (isRealtimeCdcMode(mode)) return mode;
+    logger.warn(`⚠️ [CDC] Unknown ${source} value "${mode}" — expected auto|wal|trigger|off. Defaulting to "auto".`);
+    return "auto";
+}
+
+/**
+ * `config` with the environment read into it, the way the server's boot reads
+ * it. The one place this driver reads environment variables:
+ *
+ * | variable                               | setting                                |
+ * |----------------------------------------|----------------------------------------|
+ * | `DATABASE_READ_URL`                    | `readConnectionString`, when unset     |
+ * | `DATABASE_DIRECT_URL`                  | `directConnectionString`, when unset   |
+ * | `REALTIME_CDC`                         | `realtime.cdc`                         |
+ * | `REALTIME_CHANNEL_BUS`                 | `realtime.bus` (a named transport)     |
+ * | `REALTIME_MAX_SUBSCRIPTIONS_PER_SOCKET`| `realtime.maxSubscriptionsPerSocket`   |
+ * | `REALTIME_MAX_SOCKETS_PER_USER`        | `realtime.maxSocketsPerUser`           |
+ * | `REALTIME_REFETCH_MAX_WAIT_MS`         | `realtime.refetchMaxWaitMs`            |
+ * | `REALTIME_RECOUNT_INTERVAL_MS`         | `realtime.recountIntervalMs`           |
+ * | `REALTIME_RECOUNT_MIN_ROWS`            | `realtime.recountMinRows`              |
+ *
+ * A `REALTIME_*` variable that is set wins over the option, so a deployment
+ * can change it without a rebuild; the URLs fill in only what the config left
+ * empty. A mistyped number throws, naming the variable.
+ *
+ * `createPostgresAdapter` applies this when the server boots, and
+ * {@link openPostgresDriver} does not — a script that opens the driver itself
+ * gets exactly the config it passed.
+ */
+export function postgresDriverConfigFromEnv(
+    config: PostgresDriverConfig,
+    env: NodeJS.ProcessEnv = process.env
+): PostgresDriverConfig {
+    const read = (name: string): string | undefined => env[name]?.trim() || undefined;
+    const realtime: RealtimeChannelsConfig = { ...config.realtime };
+
+    const subscriptions = read("REALTIME_MAX_SUBSCRIPTIONS_PER_SOCKET");
+    if (subscriptions) {
+        realtime.maxSubscriptionsPerSocket = parseMaxSubscriptionsPerSocket(subscriptions, "REALTIME_MAX_SUBSCRIPTIONS_PER_SOCKET");
+    }
+    const sockets = read("REALTIME_MAX_SOCKETS_PER_USER");
+    if (sockets) realtime.maxSocketsPerUser = parseMaxSocketsPerUser(sockets, "REALTIME_MAX_SOCKETS_PER_USER");
+    const refetchMaxWaitMs = read("REALTIME_REFETCH_MAX_WAIT_MS");
+    if (refetchMaxWaitMs) realtime.refetchMaxWaitMs = parseRealtimeTuning(refetchMaxWaitMs, "REALTIME_REFETCH_MAX_WAIT_MS", "milliseconds");
+    const recountIntervalMs = read("REALTIME_RECOUNT_INTERVAL_MS");
+    if (recountIntervalMs) realtime.recountIntervalMs = parseRealtimeTuning(recountIntervalMs, "REALTIME_RECOUNT_INTERVAL_MS", "milliseconds");
+    const recountMinRows = read("REALTIME_RECOUNT_MIN_ROWS");
+    if (recountMinRows) realtime.recountMinRows = parseRealtimeTuning(recountMinRows, "REALTIME_RECOUNT_MIN_ROWS", "rows");
+    const cdc = read("REALTIME_CDC");
+    if (cdc) realtime.cdc = parseRealtimeCdcMode(cdc, "REALTIME_CDC");
+    realtime.bus = resolveChannelBusSetting(config.realtime?.bus, env);
+
+    const readConnectionString = config.readConnectionString || read("DATABASE_READ_URL");
+    const directConnectionString = config.directConnectionString || read("DATABASE_DIRECT_URL");
+    return {
+        ...config,
+        ...(readConnectionString ? { readConnectionString } : {}),
+        ...(directConnectionString ? { directConnectionString } : {}),
+        realtime
+    };
+}
+
+/**
+ * Open the Postgres data driver from explicit settings.
+ *
+ * What `createPostgresAdapter` runs when the server boots, once it has read
+ * the environment into `pgConfig` (see {@link postgresDriverConfigFromEnv});
+ * this function reads no environment variable itself. `config` says what the
+ * caller wants opened: which collections, whether opening may change the
+ * database (`provision`, default true), and what part this process takes in
+ * realtime (`realtime`, or `false` for none at all).
+ *
+ * `openRebase` is this with `provision: false` and `realtime: false`.
+ */
+export async function openPostgresDriver(
+    pgConfig: PostgresDriverConfig,
+    config: DatabaseAdapterInitConfig
+): Promise<InitializedDriver & { internals: PostgresDriverInternals }> {
+    const { collections, introspectCollections, baas, schemaProvisioning, realtime } = config;
+    // `false` keeps every DDL statement out of this open: the restricted
+    // role, the branch table, channel-history tables, capture triggers.
+    const provision = config.provision !== false;
+    // `realtime: false` is a process that takes no part in realtime: nothing
+    // installed, nothing consumed, its writes not announced.
+    const realtimeOff = realtime === false;
+    // Absent means a caller that predates the field, and every one of
+    // those is a single process that both serves websockets and owns the
+    // schema. Defaulting to false here would silently disable realtime
+    // for them — the failure this whole area is prone to.
+    const realtimeSubscribes = realtimeOff ? false : realtime?.subscribe ?? true;
+    const realtimeProvisions = provision && !realtimeOff && (realtime?.provision ?? true);
+    // Secure by default: a table with no RLS is not served.
+    const unprotectedTables = baas?.unprotectedTables ?? "exclude";
+
+    const connection = pgConfig.connection;
+    const rawClient = (connection && typeof connection === "object" && "$client" in connection
+        ? (connection as Record<string, unknown>).$client
+        : connection) as import("pg").Pool;
+
+    // ── No declared collections: derive the schema from the database ──
+    // No collection files and no generated drizzle schema exist, so read
+    // the live database and build both from what is actually there.
+    let introspectedCollections: CollectionConfig[] | undefined;
+    let introspectedTables: Record<string, PgTable> | undefined;
+    let introspectedRelations: Record<string, Relations> | undefined;
+    if (introspectCollections && (!collections || collections.length === 0)) {
+        const pgSchemaName = pgConfig.introspectionSchema ?? "public";
+        const schema = await introspectSchema(rawClient, pgSchemaName);
+
+        // ── Only serve what the database protects ────────────────
+        // Requests run as rebase_user, which is granted DML on the
+        // schema. A table with RLS disabled therefore has no
+        // authorization model at all: serving it hands every row to
+        // every authenticated user. baas never runs `db push`, so
+        // nothing here would have enabled RLS on the user's behalf.
+        const rlsStatus = await readRlsStatus(rawClient, pgSchemaName);
+        const unprotected = [...schema.tablesMap.keys()].filter(
+            (t) => !schema.joinTables.has(t) && !rlsStatus.get(t)?.rlsEnabled
+        );
+        const policyless = [...schema.tablesMap.keys()].filter(
+            (t) => !schema.joinTables.has(t) && rlsStatus.get(t)?.rlsEnabled && rlsStatus.get(t)?.policyCount === 0
+        );
+
+        if (unprotected.length > 0) {
+            if (unprotectedTables === "serve") {
+                logger.warn(
+                    `🔓 [rls] Serving ${unprotected.length} table(s) with row-level security DISABLED: ${unprotected.join(", ")}. ` +
+                    "Every authenticated request can read and write every row of these. " +
+                    "This is baas.unprotectedTables: \"serve\"."
+                );
+            } else {
+                logger.warn(
+                    `🔒 [rls] Not serving ${unprotected.length} table(s) — row-level security is disabled, so they have no ` +
+                    `authorization model: ${unprotected.join(", ")}\n` +
+                    unprotected.map((t) => `      ALTER TABLE "${pgSchemaName}"."${t}" ENABLE ROW LEVEL SECURITY;  -- then add a policy`).join("\n") +
+                    "\n      Set baas.unprotectedTables: \"serve\" to expose them regardless."
+                );
+                for (const t of unprotected) schema.tablesMap.delete(t);
+            }
+        }
+        if (policyless.length > 0) {
+            // Legal, and silently returns nothing — worth saying out loud,
+            // since an empty table reads exactly like one with no rows.
+            logger.warn(
+                `🔒 [rls] ${policyless.length} table(s) have RLS enabled but no policies, so they will return no rows: ${policyless.join(", ")}`
+            );
+        }
+
+        introspectedCollections = buildCollectionsFromSchema(schema, pgSchemaName);
+        // Tables keyed the way the collections above name their fields,
+        // and relations derived from the foreign keys — the only
+        // evidence a database with no config offers. Without the
+        // relations, drizzle's relational path can't resolve the ones
+        // those collections advertise.
+        ({ tables: introspectedTables, relations: introspectedRelations } =
+            buildBaasSchema(schema.tablesMap, pgSchemaName, introspectedCollections));
+        logger.info(
+            `🔍 [PostgresRegistry] BaaS mode: derived ${introspectedCollections.length} collections from schema "${pgSchemaName}" [${introspectedCollections.map(c => c.slug).join(", ")}]`
+        );
+    }
+
+    // ── Declared collections: read the tables back from the database ──
+    //
+    // Every source, the default included. The bundle's generated Drizzle
+    // module used to be authoritative here for the default source, and a
+    // file one commit behind the database changed what the server did:
+    // a renamed foreign-key column 500'd every request in production, a
+    // property boot-ensure had already created answered 400
+    // VALIDATION_UNKNOWN_FIELDS on first save, and relations the module
+    // lacked went silently missing from list reads. Boot-ensure runs
+    // before this, so `information_schema` is the current, complete
+    // description of what is actually there — and it cannot drift from
+    // itself. The module is now read only to tell the developer their
+    // file is stale (`warnOnGeneratedSchemaDrift`, below).
+    //
+    // Restricted to the collections that are this source's, because the
+    // driver is handed every collection the project declares and must
+    // not go looking for the default's tables in the analytics database.
+    // Without that filter the registry held no table for `events`, and
+    // every routed write failed with "table not found" on a database
+    // that had the table.
+    let ownTables: Record<string, PgTable> | undefined;
+    let ownRelations: Record<string, Relations> | undefined;
+    let ownCatalogue: Map<string, TableMeta> | undefined;
+    let ownCollections: CollectionConfig[] = [];
+    const sourceKey = config.dataSourceKey ?? DEFAULT_DATA_SOURCE_KEY;
+    if (!introspectedCollections && collections && collections.length > 0) {
+        ownCollections = collections.filter(c =>
+            c.dataSource === sourceKey || (!c.dataSource && sourceKey === DEFAULT_DATA_SOURCE_KEY)
+        );
+        if (ownCollections.length > 0) {
+            // Reading the catalogue is the first query this driver
+            // issues, so it is the one that meets an unreachable
+            // database — and the diagnosis that names the host, the
+            // port and `docker compose up -d db` lives on the `SELECT
+            // 1` further down, which would never be reached. Asked
+            // here, in the same words, so a stopped database still says
+            // so instead of failing inside the introspector.
+            try {
+                await rawClient.query("SELECT 1");
+            } catch (err) {
+                const fatal = diagnoseConnectFailure(err, pgConfig.connectionString);
+                if (fatal) throw fatal;
+            }
+            const catalogue = await readCatalogueSchema({
+                client: rawClient,
+                collections: ownCollections,
+                defaultSchema: pgConfig.introspectionSchema ?? "public"
+            });
+            ownTables = catalogue.tables;
+            ownRelations = catalogue.relations;
+            ownCatalogue = catalogue.meta;
+            if (catalogue.missing.length > 0) {
+                logger.warn(
+                    `[PostgresRegistry] Data source "${sourceKey}" has no table yet for: ${catalogue.missing.join(", ")}. ` +
+                    "Their collections will answer \"table not found\" until the schema is provisioned."
+                );
+            }
+        }
+    }
+
+    const activeCollections = introspectedCollections ?? collections;
+    const schemaTables = introspectedTables ?? ownTables;
+    const schemaRelations = introspectedRelations ?? ownRelations;
+
+    // The one remaining reader of the generated module: a warning per
+    // difference, and no effect on anything served. Wrapped because a
+    // diagnostic must never be the reason a server does not start.
+    if (ownCatalogue) {
+        try {
+            warnOnGeneratedSchemaDrift(diffGeneratedSchemaAgainstCatalogue({
+                generated: pgConfig.schema?.tables,
+                catalogue: ownCatalogue,
+                collections: ownCollections
+            }));
+        } catch (err) {
+            logger.debug("[schema] Could not compare schema.generated.ts against the database", { error: err });
+        }
+    }
+
+    // Create a fresh registry for this driver. Registration order is
+    // load-bearing, so it lives in one place — see `buildCollectionRegistry`.
+    //
+    // No enums: a catalogue-built enum column is `text`, which is what a
+    // generated `pgEnum` column served anyway (drizzle validates no
+    // labels; Postgres does), and nothing reads the registry's enum map.
+    const registry = buildCollectionRegistry({
+        collections: activeCollections,
+        tables: schemaTables,
+        relations: schemaRelations
+    });
+
+    // Patch Drizzle's PgArray columns to handle NULL values safely.
+    // Drizzle's mapFromDriverValue crashes with "value.map is not a function"
+    // when a native array column (text[], integer[], etc.) contains NULL.
+    if (schemaTables) {
+        patchPgArrayNullSafety(schemaTables as Record<string, unknown>);
+        // A `number` property is a `numeric` column unless it declared
+        // itself integral, and Postgres sends `numeric` as text. Cast it
+        // back here, where every read path goes through.
+        patchPgNumericToNumber(schemaTables as Record<string, unknown>);
+    }
+
+    // Build schema-aware Drizzle connection
+    const mergedSchema: Record<string, unknown> = {
+        ...schemaTables,
+        ...(schemaRelations || {})
+    };
+    const { drizzle: createDrizzle } = await import("drizzle-orm/node-postgres");
+    const schemaAwareDb = createDrizzle(rawClient, { schema: mergedSchema });
+
+    // Verify connection — fail fast if the database is unreachable
+    try {
+        await schemaAwareDb.execute(sql`SELECT 1`);
+    } catch (err: unknown) {
+        const fatal = diagnoseConnectFailure(err, pgConfig.connectionString);
+        if (fatal) throw fatal;
+        logger.warn("⚠️ Continuing without initial database verification. Drizzle/PG will attempt to connect on subsequent queries.");
+    }
+
+    // ── Which collections are THIS database's? ────────────────────────
+    //
+    // The driver is handed every collection the project declares —
+    // relations resolve across sources, and the API routes by slug — but
+    // three passes below speak about this database and only this one:
+    // the change-capture attach, the drift check and the RLS/grants
+    // pass. Reading the registry unfiltered made a second source
+    // (`database("analytics")`) report the default's tables as SCHEMA
+    // DRIFT, try to attach CDC triggers to tables it does not hold, and
+    // validate the default's policies against its own catalogue. Same
+    // rule as the table read-back above.
+    //
+    // In BaaS mode the registry holds what THIS database was introspected
+    // for, so every registered collection is already this source's.
+    const introspectedHere = Boolean(introspectedCollections);
+    const collectionsOnThisSource = (): CollectionConfig[] => {
+        const all = registry.getCollections() as CollectionConfig[];
+        if (introspectedHere) return all;
+        return all.filter(c => c.dataSource === sourceKey || (!c.dataSource && sourceKey === DEFAULT_DATA_SOURCE_KEY));
+    };
+
+    // Create services
+    const realtimeService = new RealtimeService(schemaAwareDb, registry);
+    // The per-socket subscription ceiling. Checked here, before anything
+    // else boots: a ceiling someone set and mistyped must not quietly
+    // become another number.
+    if (pgConfig.realtime?.maxSubscriptionsPerSocket !== undefined) {
+        realtimeService.maxSubscriptionsPerSocket = parseMaxSubscriptionsPerSocket(
+            pgConfig.realtime.maxSubscriptionsPerSocket, "realtime.maxSubscriptionsPerSocket"
+        );
+    }
+    // How long a change may wait for its refetch, and how often a big
+    // list is recounted. Unset, both are what they always were.
+    const tuning = (option: number | undefined, optionName: string, unit: string): number | undefined =>
+        option !== undefined ? parseRealtimeTuning(option, optionName, unit) : undefined;
+    const refetchMaxWaitMs = tuning(pgConfig.realtime?.refetchMaxWaitMs, "realtime.refetchMaxWaitMs", "milliseconds");
+    if (refetchMaxWaitMs !== undefined) realtimeService.refetchMaxWaitMs = refetchMaxWaitMs;
+    realtimeService.recountIntervalMs = tuning(pgConfig.realtime?.recountIntervalMs, "realtime.recountIntervalMs", "milliseconds");
+    const recountMinRows = tuning(pgConfig.realtime?.recountMinRows, "realtime.recountMinRows", "rows");
+    if (recountMinRows !== undefined) realtimeService.recountMinRows = recountMinRows;
+
+    // Initialize read replica connection if configured
+    let readDb: import("drizzle-orm/node-postgres").NodePgDatabase<any> | undefined;
+    const readUrl = pgConfig.readConnectionString;
+    if (readUrl && readUrl !== pgConfig.connectionString) {
+        try {
+            const { createReadReplicaConnection } = await import("./connection");
+            const readResources = createReadReplicaConnection(readUrl, mergedSchema);
+            readDb = readResources.db;
+            logger.info("📖 [PostgresBootstrapper] Read replica connection established");
+        } catch (err) {
+            logger.warn("⚠️ Could not connect to read replica, falling back to primary for all queries", { error: err });
+        }
+    }
+    const poolManager = pgConfig.adminConnectionString
+        ? new DatabasePoolManager(pgConfig.adminConnectionString)
+        : undefined;
+    const driver = new PostgresBackendDriver(schemaAwareDb, realtimeService, registry, undefined, poolManager);
+    realtimeService.setDataDriver(driver);
+
+    // ── RLS enforcement (user context) ───────────────────────────────
+    // Authenticated requests are authorized entirely by RLS policies,
+    // but a privileged connection (superuser / BYPASSRLS / table owner)
+    // bypasses RLS. Detect the posture and, when privileged, provision
+    // the restricted `rebase_user` role and route authenticated
+    // requests (reads AND writes) through it. The server context (base
+    // driver / auth flows / `rebase.sql`) stays on the owner connection
+    // and bypasses; `rebase.dataAsAdmin` does NOT — it is scoped with
+    // `withAuth({ uid: "service", roles: ["admin"] })` at boot, so it
+    // runs as `rebase_user` and its policies are evaluated.
+    // Default-on: a privileged connection that cannot be
+    // isolated fails the boot rather than serving unenforced requests.
+    {
+        const runSql: RawSqlRunner = async (text) => {
+            const res = await schemaAwareDb.execute(sql.raw(text));
+            return (res.rows ?? []) as Record<string, unknown>[];
+        };
+        // Said before anything else touches the schema: if the role and
+        // a schema share a name, unqualified SQL from any tool that does
+        // not pin `search_path` has been landing in the wrong place, and
+        // that is worth knowing before reading the drift report below.
+        await warnOnRoleSchemaCollision(runSql);
+
+        const collectionSchemas = registry.getCollections()
+            .map((c) => (c as { schema?: string }).schema)
+            .filter((s): s is string => typeof s === "string");
+        // `auth` is deliberately absent: the RLS helpers moved into
+        // `rebase`, and granting USAGE on a schema Rebase does not
+        // own would, on a Supabase database, hand the end-user role
+        // access to theirs.
+        const managedSchemas = ["public", "rebase", ...collectionSchemas];
+
+        const posture = await detectConnectionPosture(runSql, managedSchemas);
+        if (posture.privileged) {
+            // Two different failures hide behind one call here, and they
+            // deserve different answers. A connection that bypasses RLS
+            // *right now* and cannot be switched must not serve: that is
+            // the original contract and it stays fatal. A connection that
+            // merely *could become* the owner — it owns nothing yet, but
+            // may create tables in a schema the server provisions — is
+            // constrained by RLS today, so refusing to boot over it would
+            // break deployments that have been correct all along
+            // (Postgres before 15 grants CREATE on public to PUBLIC, so
+            // that describes a great many ordinary app roles).
+            //
+            // For the second case the answer is: try, warn, and ask again
+            // once provisioning has run. See finalizeSecurityPosture.
+            const bypassesNow = posture.superuser || posture.bypassRLS || posture.ownsTables;
+            let switched = true;
+            if (!provision) {
+                // Nothing is created here, so the switch is to a role an
+                // earlier boot made. A connection that bypasses RLS switches
+                // whether or not it exists: a user's request then fails on
+                // the missing role, where not switching would run it with
+                // no policy applied. One that does not bypass yet is filtered
+                // natively and switches only when there is a role to use.
+                const roleExists = (await runSql(`SELECT 1 FROM pg_roles WHERE rolname = '${REBASE_USER_ROLE}'`)).length > 0;
+                switched = roleExists || bypassesNow;
+                if (!roleExists && bypassesNow) {
+                    logger.warn(
+                        `⚠️ RLS enforcement: connection role "${posture.role}" bypasses row-level security and the ` +
+                        `restricted role "${REBASE_USER_ROLE}" does not exist yet — this driver was opened without ` +
+                        "provisioning, so it was not created. Requests made as a user will fail until a server " +
+                        "boot (or `rebase db push`) creates it; requests as the connection itself are unaffected."
+                    );
+                }
+            } else {
+                try {
+                    await ensureAppRole(runSql, managedSchemas);
+                } catch (err) {
+                    if (bypassesNow) throw err;
+                    switched = false;
+                    logger.warn(
+                        `⚠️ RLS enforcement: connection role "${posture.role}" owns no tables yet and is ` +
+                        `subject to RLS, but it may create tables in ${managedSchemas.join(", ")} — and a ` +
+                        "table's owner bypasses every non-FORCE policy on it. The restricted role could not " +
+                        `be provisioned: ${err instanceof Error ? err.message : String(err)}`
+                    );
+                }
+            }
+
+            if (switched) {
+                driver.rlsUserRole = REBASE_USER_ROLE;
+                realtimeService.rlsUserRole = REBASE_USER_ROLE;
+                const why = posture.superuser
+                    ? "superuser"
+                    : posture.bypassRLS
+                        ? "BYPASSRLS"
+                        : posture.ownsTables
+                            ? "table owner"
+                            : "may create (and would then own) tables in the schemas it serves";
+                logger.info(`🔐 RLS enforcement active: authenticated requests run as "${REBASE_USER_ROLE}" (connection "${posture.role}" bypasses RLS: ${why})`);
+            }
+
+            if (posture.superuser || posture.bypassRLS) {
+                const message =
+                    `The database connection runs as ${posture.superuser ? "a superuser" : "a BYPASSRLS role"} ("${posture.role}"). ` +
+                    `User requests are isolated via SET LOCAL ROLE, but connect as a non-superuser ` +
+                    `table-owner role in production so the server/owner context is least-privilege.`;
+                if (isScaffoldedLocalDatabase(pgConfig.connectionString)) {
+                    logger.debug(`🔐 ${message}`);
+                } else {
+                    logger.warn(`⚠️ ${message}`);
+                }
+            }
+        } else {
+            logger.info(`🔐 RLS enforcement: connection role "${posture.role}" is subject to RLS natively; no role switch needed.`);
+        }
+
+        // Independent of posture: a policy targeting a role the request
+        // never runs as filters every row, so the collection reads as
+        // empty rather than erroring. Applies to both branches — the
+        // role that matters is whichever one requests actually use.
+        await validatePolicyPgRoles(
+            runSql,
+            collectionsOnThisSource() as never,
+            driver.rlsUserRole ?? posture.role
+        );
+
+        // The same habit one surface over, and the dangerous direction:
+        // a rule that reads as "signed in only" but is true for every
+        // caller grants the data away rather than hiding it.
+        warnOnAnonymousGrants(collectionsOnThisSource() as never);
+
+        // Raw policy SQL written against the pre-1.0 helper schema. It
+        // is rewritten on compile, so this is the only place the project
+        // is ever told the spelling moved.
+        warnOnLegacyRlsFunctions(collectionsOnThisSource() as never);
+    }
+
+    // Ensure branch metadata table exists when branching is available
+    if (provision && driver.branchService) {
+        try {
+            await driver.branchService.ensureBranchMetadataTable();
+        } catch (err) {
+            logger.warn("⚠️ Could not initialize branch metadata table", { error: err });
+        }
+    }
+
+    // ── Channel history ──────────────────────────────────────────────
+    // Opt-in per channel pattern. With no rules this creates no tables
+    // and leaves broadcast on its original fire-and-forget path, so
+    // presence-only apps pay nothing for it.
+    try {
+        if (!realtimeOff) {
+            await realtimeService.configureChannelHistory(
+                pgConfig.realtime?.channels,
+                { provision: realtimeProvisions }
+            );
+        }
+    } catch (err) {
+        logger.warn("⚠️ Could not initialize channel history tables — retained channels will not replay", { error: err });
+    }
+
+    // ── Realtime change source ───────────────────────────────────────
+    // A direct URL bypasses PgBouncer, which does not keep a LISTEN.
+    const directUrl = pgConfig.directConnectionString || pgConfig.connectionString;
+
+    // ── Cross-instance channel bus ───────────────────────────────────
+    // Entity changes already span instances (CDC / LISTEN below).
+    // Channel broadcast and presence did not — they lived in per-process
+    // maps, so behind two replicas the clients of one were invisible to
+    // the other. Opt-in, and a no-op when left at "memory".
+    try {
+        const busSetting = pgConfig.realtime?.bus ?? { type: "memory" };
+        // A supplied instance is always installed; a named built-in only
+        // when it is not the in-process default, so the common case
+        // touches none of this machinery.
+        const wantsBus = !realtimeOff && (isChannelBusInstance(busSetting) || busSetting.type !== "memory");
+        if (wantsBus) {
+            await realtimeService.configureChannelBus(
+                createChannelBus(busSetting, {
+                    db: schemaAwareDb as NodePgDatabase<Record<string, unknown>>,
+                    directUrl
+                })
+            );
+        }
+    } catch (err) {
+        logger.warn("⚠️ [ChannelBus] Could not configure the channel bus — channel broadcast and presence stay per-instance", { error: err });
+    }
+
+    // Database-level Change Data Capture. When active, realtime events are
+    // emitted for EVERY committed write — including ones that bypass the
+    // Rebase API (psql, another service's cron, raw SQL, the Studio SQL
+    // editor) — matching Supabase Realtime's WAL-tailing model. CDC also
+    // becomes the cross-instance channel, so the legacy per-mutation
+    // LISTEN/NOTIFY is not started alongside it.
+    // `realtime.cdc` (`REALTIME_CDC` at boot):
+    //   auto     → default: enable where the connection supports it;
+    //              silently fall back to app-level otherwise
+    //   trigger  → force trigger-based capture (warns if it can't)
+    //   wal      → prefer WAL logical replication (degrades to trigger)
+    //   off      → app-level realtime only
+    const cdcMode = parseRealtimeCdcMode(pgConfig.realtime?.cdc ?? "auto", "realtime.cdc");
+
+    // `auto` tries CDC but treats "can't" as a normal outcome (info log);
+    // explicit trigger/wal was asked for, so a failure is worth a warning.
+    // A process that consumes nothing needs no capture *started*, and a
+    // process that does not own the schema installs no triggers. They
+    // come apart: the `api` in a split with an external migration Job
+    // subscribes without provisioning, and both answers are correct.
+    const wantsCdc = cdcMode !== "off" && (realtimeSubscribes || realtimeProvisions);
+    const explicitCdc = cdcMode === "trigger" || cdcMode === "wal";
+    let cdcEnabled = false;
+    let provisionCdcForTables: PostgresDriverInternals["provisionCdcForTables"];
+    const cdcRunSql: RawSqlRunner = async (text) => {
+        const res = await schemaAwareDb.execute(sql.raw(text));
+        return (res.rows ?? []) as Record<string, unknown>[];
+    };
+    /** Whether this boot left the trigger function at the current body. */
+    let cdcFunctionCurrent = false;
+
+    if (wantsCdc && !directUrl) {
+        const reason = "no direct database connection is available for the realtime LISTEN client (set DATABASE_DIRECT_URL)";
+        if (explicitCdc) logger.warn(`⚠️ [CDC] REALTIME_CDC=${cdcMode} but ${reason} — using app-level realtime.`);
+        else logger.info(`ℹ️ [CDC] Using app-level realtime — ${reason}.`);
+    } else if (wantsCdc && directUrl) {
+        if (cdcMode === "wal") {
+            // Native WAL logical-replication streaming requires wal_level=logical,
+            // a replication-privileged role and a replication slot, none of which
+            // are bundled with this adapter yet. Degrade to trigger-based capture,
+            // which provides equivalent database-level coverage.
+            logger.warn(
+                "⚠️ [CDC] REALTIME_CDC=wal: native WAL streaming is not bundled in this build; " +
+                "using trigger-based change capture instead (equivalent database-level coverage)."
+            );
+        }
+        try {
+            // Each table is attached with the columns its rows are
+            // addressed by, and the payload carries those and nothing
+            // else — any login can LISTEN. See `buildCdcFunctionSql`.
+            const cdcTables: CdcTableRef[] = collectionsOnThisSource()
+                .map((c) => ({
+                    schema: (c as { schema?: string }).schema ?? "public",
+                    table: getCollectionTableName(c),
+                    identityColumns: collectionKeyColumns(c, registry).map((k) => k.columnName)
+                }))
+                .filter((t) => Boolean(t.table) && registry.hasTableForCollection(t.table));
+            // Junction tables back no collection, so the list above misses
+            // them — and a link or unlink is a write nobody would hear
+            // about. Their rows are the contents of a child list, which is
+            // as much a change as a write to the rows themselves.
+            // Filtered by the parent's source for the same reason as the
+            // list above: `posts_tags` lives in the database `posts`
+            // lives in, and asking a second database to instrument it
+            // produced one "Could not attach change-capture trigger"
+            // warning per junction on every boot.
+            const ownSlugs = new Set(collectionsOnThisSource().map(c => c.slug));
+            for (const link of collectJunctionLinks(registry)) {
+                if (!ownSlugs.has(link.parentCollection.slug)) continue;
+                // A junction row is addressed by the two ids that name
+                // the child list it belongs to, whatever its own key is.
+                cdcTables.push({
+                    schema: link.schema,
+                    table: link.table,
+                    identityColumns: [link.sourceColumn, link.targetColumn]
+                });
+            }
+            // Provisioning throws only when the connection can't create the
+            // trigger function (insufficient privilege); enableCdc throws when
+            // the LISTEN connection can't be established. Either → fall back.
+            if (realtimeProvisions) {
+                await provisionTriggerCdc(cdcRunSql, cdcTables);
+                cdcFunctionCurrent = true;
+            }
+            if (realtimeSubscribes) await realtimeService.enableCdc(directUrl);
+            cdcEnabled = true;
+            // Boot steps that create their own tables (auth) run after
+            // this one and use it to instrument what they just created.
+            // Left undefined where this process installs nothing, so a
+            // later boot step cannot re-enter the DDL path by the side
+            // door — the callers already treat it as optional, because a
+            // driver without CDC never sets it either.
+            if (realtimeProvisions) {
+                provisionCdcForTables = async (tables) => {
+                    await provisionTriggerCdc(cdcRunSql, tables);
+                };
+            }
+            // Say which half ran. "All writes now emit realtime events"
+            // is a claim about the database and stays true for a process
+            // that only installed the triggers; what changes is whether
+            // *this* process is listening, and an operator reading one
+            // pod's log should not have to infer that from its role.
+            logger.info(
+                `📡 [CDC] Realtime source = database-level change capture (mode: ${cdcMode === "wal" ? "wal→trigger" : "trigger"}). ` +
+                `All writes now emit realtime events regardless of origin.` +
+                (realtimeSubscribes ? "" : " This process installs the capture but does not consume it.")
+            );
+        } catch (err) {
+            if (explicitCdc) {
+                logger.warn("⚠️ [CDC] Could not enable database-level change capture — falling back to app-level realtime.", { error: err });
+            } else {
+                logger.info(
+                    "ℹ️ [CDC] Database-level change capture unavailable (likely insufficient privileges to create triggers, " +
+                    "or the LISTEN connection was refused) — using app-level realtime. Set REALTIME_CDC=off to silence this.",
+                    { detail: err instanceof Error ? err.message : String(err) }
+                );
+            }
+        }
+    }
+
+    // Triggers an earlier boot attached keep firing whether or not this
+    // one provisions capture. With capture switched off they are taken
+    // off the tables: each write ran one and announced itself on a
+    // channel nothing listens to. Otherwise (capture wanted, not
+    // installed this boot) a function from a version that sent whole
+    // rows is replaced — any login can LISTEN to what it sends. Nothing
+    // is installed here either way.
+    if (realtimeProvisions && !cdcFunctionCurrent) {
+        const capture = cdcMode === "off" ? "off" : "not-provisioned";
+        try {
+            const settled = await settleInstalledCapture(cdcRunSql, { capture });
+            if ("removed" in settled && settled.removed > 0) {
+                logger.info(
+                    `ℹ️ [CDC] REALTIME_CDC=off: removed the change-capture triggers an earlier boot attached ` +
+                    `(${settled.removed}). Realtime is app-level; unset REALTIME_CDC to capture changes again.`
+                );
+            }
+        } catch (err) {
+            logger.warn(
+                capture === "off"
+                    ? "⚠️ [CDC] REALTIME_CDC=off, but the change-capture triggers an earlier boot attached could not be " +
+                      "removed; they keep firing on every write. Remove them with " +
+                      "`DROP FUNCTION rebase.rebase_cdc_notify() CASCADE; DROP FUNCTION rebase.rebase_cdc_notify_statement() CASCADE`."
+                    : "⚠️ [CDC] A change-capture trigger function from an earlier boot is installed and could not be " +
+                      "brought up to date. Older versions of it send every changed row on a channel any database " +
+                      "login can LISTEN to; if capture is not wanted, set REALTIME_CDC=off, or remove it with " +
+                      "`DROP FUNCTION rebase.rebase_cdc_notify() CASCADE`.",
+                { detail: err instanceof Error ? err.message : String(err) }
+            );
+        }
+    }
+
+    // Legacy cross-instance realtime (app-level). Skipped when CDC is
+    // active because CDC already spans instances.
+    if (!cdcEnabled && directUrl && realtimeSubscribes) {
+        try {
+            await realtimeService.startListening(directUrl);
+        } catch (err) {
+            logger.warn("⚠️ Cross-instance realtime could not be started", { error: err });
+        }
+    } else if (!cdcEnabled && !realtimeSubscribes && !realtimeOff) {
+        // A worker or a functions process, with no capture to publish
+        // its writes for it (REALTIME_CDC=off, or `auto` fell back).
+        // It has nobody to deliver to, but the `api` does: announce
+        // each write the way an `all` process would, minus the
+        // LISTEN. Where the `api` turns out to run capture after all,
+        // nothing listens on this channel and the notification is
+        // dropped by the database.
+        realtimeService.startPublishing();
+    }
+
+    // ── Startup Schema Validation ────────────────────────────────────
+    // One-directional: only checks collections → DB (extra DB tables
+    // that aren't mapped to collections are perfectly fine).
+    try {
+        const registeredCollections = collectionsOnThisSource();
+        if (registeredCollections.length > 0) {
+            // Deliberately unfiltered by schema: a table that is missing
+            // from where the collection says it lives is very often
+            // sitting in another schema entirely (see the misplaced-table
+            // report below), and knowing *which* is the whole answer.
+            const result = await schemaAwareDb.execute(sql.raw(`
+                SELECT table_name, table_schema
+                FROM information_schema.tables
+                WHERE table_schema NOT IN ('pg_catalog', 'information_schema')
+                  AND table_type = 'BASE TABLE'
+            `));
+            const tablesByName = new Map<string, string[]>();
+            for (const row of result.rows as Array<{ table_name: string; table_schema: string }>) {
+                const schemas = tablesByName.get(row.table_name) ?? [];
+                schemas.push(row.table_schema);
+                tablesByName.set(row.table_name, schemas);
+            }
+            const dbTables = new Set(
+                (result.rows as Array<{ table_name: string; table_schema: string }>).map(r =>
+                    r.table_schema === "public" ? r.table_name : `${r.table_schema}.${r.table_name}`
+                )
+            );
+            const missing: Array<{ slug: string; table: string; foundIn: string[] }> = [];
+            for (const col of registeredCollections) {
+                // Auth owns its table and creates it later in this same
+                // boot (initializeAuth → ensureAuthTablesExist), so it is
+                // legitimately absent right now. Reporting it as drift
+                // tells the user to `db:push` a table that is about to
+                // exist — and on an introspected database, one that the
+                // database was never supposed to hold.
+                if ((col as { auth?: { enabled?: boolean } }).auth?.enabled) continue;
+
+                const schemaName = "schema" in col && col.schema ? col.schema : "public";
+                const checkName = resolveDriftCheckName(col, registry.getTableNames());
+                const fullCheckName = schemaName === "public" ? checkName : `${schemaName}.${checkName}`;
+                if (!dbTables.has(fullCheckName)) {
+                    // Report what was actually looked up: an unqualified
+                    // "users" sends people hunting for public.users.
+                    missing.push({ slug: col.slug,
+table: fullCheckName,
+foundIn: (tablesByName.get(checkName) ?? []).filter(s => s !== schemaName) });
+                }
+            }
+            if (missing.length > 0) {
+                const lines = missing.map(
+                    m => `    • collection "${m.slug}" → table "${m.table}"` +
+                        (m.foundIn.length > 0
+                            ? ` — but a table of that name exists in ${m.foundIn.map(s => `"${s}"`).join(", ")}`
+                            : "")
+                );
+                // A table that exists under the same name in another
+                // schema is not ordinary drift: it is almost always this
+                // framework's own `search_path` hazard. Postgres resolves
+                // unqualified SQL through `"$user", public`, and this
+                // project creates a schema named `rebase` while every
+                // template names the database role `rebase` too — so an
+                // unqualified CREATE TABLE (a hand-written migration, the
+                // SQL editor, drizzle-kit) lands in `rebase`, and the
+                // runtime, which now pins `search_path=public`, cannot see
+                // it. Say so, because "missing table" sends people to
+                // re-run a push that will create a *second* copy.
+                const misplaced = missing.filter(m => m.foundIn.length > 0);
+                const misplacedHelp = misplaced.length === 0 ? [] : [
+                    "  Those tables exist — in the wrong schema. Unqualified SQL run by a",
+                    "  role whose name matches a schema (`rebase` is both, by default)",
+                    "  resolves through search_path's \"$user\" and creates there. Move them:",
+                    ...misplaced.map(m =>
+                        `      ALTER TABLE "${m.foundIn[0]}"."${m.table.split(".").pop()}" SET SCHEMA "${m.table.includes(".") ? m.table.split(".")[0] : "public"}";`
+                    ),
+                    "  and qualify the SQL that created them, or pin search_path in DATABASE_URL",
+                    "  (`?options=-c%20search_path%3Dpublic`).",
+                    ""
+                ];
+                // What to tell the operator depends entirely on whether a
+                // create step ran in this process, and the caller is the
+                // only thing that knows. This warning used to assert that
+                // it had ("this runtime applies the collection schema at
+                // boot unless REBASE_MIGRATE_ON_BOOT=none") and send
+                // people to that variable and to driver-version skew. For
+                // an app whose boot path contained no provisioning step,
+                // both were dead ends: nothing read that variable, and the
+                // driver was current. Say which case this is instead of
+                // guessing, and say nothing when the caller is too old to
+                // tell us.
+                const cause = describeSchemaDriftCause(schemaProvisioning);
+                logger.warn([
+                    "",
+                    "⚠️  SCHEMA DRIFT — the database is missing tables this backend serves:",
+                    ...lines,
+                    "",
+                    ...misplacedHelp,
+                    ...cause,
+                    "",
+                    "  To apply this project's schema:",
+                    "    • Managed cloud: the runtime creates tables and RLS at boot. `rebase db",
+                    "      push` cannot reach a tenant's in-cluster database — redeploy instead.",
+                    "    • Self-host: run `rebase db push` (dev) or `rebase db migrate` (prod)",
+                    "      against DATABASE_URL.",
+                    ""
+                ].join("\n"));
+            }
+        }
+    } catch (err) {
+        logger.warn("⚠️ Startup schema validation could not run", {
+            error: err instanceof Error ? err.message : String(err)
+        });
+    }
+
+    const internals: PostgresDriverInternals = {
+        db: schemaAwareDb,
+        readDb,
+        registry,
+        realtimeService,
+        driver,
+        poolManager,
+        provisionCdcForTables
+    };
+
+    return {
+        driver,
+        realtimeProvider: realtimeService,
+        collectionRegistry: registry,
+        // Only set in baas mode — tells the server which collections the
+        // database turned out to have.
+        collections: introspectedCollections,
+        internals
+    };
+}
+
 export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): BackendBootstrapper {
+    /**
+     * `pgConfig` with the environment read into it — this is the boot, and
+     * the boot is where `DATABASE_READ_URL`, `DATABASE_DIRECT_URL` and the
+     * `REALTIME_*` variables are honoured. Read once, when the first hook
+     * that needs it runs, so a mistyped value fails that hook and a warning
+     * about one is said once.
+     */
+    let resolvedConfig: PostgresDriverConfig | undefined;
+    const effectiveConfig = (): PostgresDriverConfig => resolvedConfig ??= postgresDriverConfigFromEnv(pgConfig);
+
     // Applied at construction rather than threaded through every read: the
     // condition builder's static methods are reached from call sites that
     // carry no config. See `UnknownFilterFieldsMode`.
@@ -522,746 +1388,7 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
         type: "postgres",
 
         async initializeDriver(config: unknown): Promise<InitializedDriver> {
-            // config is passed from coordinator, we merge it with our internal pgConfig if needed
-            // Currently config from init.ts is `{ collections, collectionRegistry, mode }`
-            const { collections, collectionRegistry, introspectCollections, baas, schemaProvisioning, realtime } = config as {
-                collections?: CollectionConfig[];
-                collectionRegistry?: unknown;
-                introspectCollections?: boolean;
-                baas?: { unprotectedTables?: "exclude" | "serve" };
-                schemaProvisioning?: { attempted: boolean; reason?: string };
-                realtime?: { subscribe: boolean; provision: boolean };
-            };
-            // Absent means a caller that predates the field, and every one of
-            // those is a single process that both serves websockets and owns the
-            // schema. Defaulting to false here would silently disable realtime
-            // for them — the failure this whole area is prone to.
-            const realtimeSubscribes = realtime?.subscribe ?? true;
-            const realtimeProvisions = realtime?.provision ?? true;
-            // Secure by default: a table with no RLS is not served.
-            const unprotectedTables = baas?.unprotectedTables ?? "exclude";
-
-            const connection = pgConfig.connection;
-            const rawClient = (connection && typeof connection === "object" && "$client" in connection
-                ? (connection as Record<string, unknown>).$client
-                : connection) as import("pg").Pool;
-
-            // ── No declared collections: derive the schema from the database ──
-            // No collection files and no generated drizzle schema exist, so read
-            // the live database and build both from what is actually there.
-            let introspectedCollections: CollectionConfig[] | undefined;
-            let introspectedTables: Record<string, PgTable> | undefined;
-            let introspectedRelations: Record<string, Relations> | undefined;
-            if (introspectCollections && (!collections || collections.length === 0)) {
-                const pgSchemaName = pgConfig.introspectionSchema ?? "public";
-                const schema = await introspectSchema(rawClient, pgSchemaName);
-
-                // ── Only serve what the database protects ────────────────
-                // Requests run as rebase_user, which is granted DML on the
-                // schema. A table with RLS disabled therefore has no
-                // authorization model at all: serving it hands every row to
-                // every authenticated user. baas never runs `db push`, so
-                // nothing here would have enabled RLS on the user's behalf.
-                const rlsStatus = await readRlsStatus(rawClient, pgSchemaName);
-                const unprotected = [...schema.tablesMap.keys()].filter(
-                    (t) => !schema.joinTables.has(t) && !rlsStatus.get(t)?.rlsEnabled
-                );
-                const policyless = [...schema.tablesMap.keys()].filter(
-                    (t) => !schema.joinTables.has(t) && rlsStatus.get(t)?.rlsEnabled && rlsStatus.get(t)?.policyCount === 0
-                );
-
-                if (unprotected.length > 0) {
-                    if (unprotectedTables === "serve") {
-                        logger.warn(
-                            `🔓 [rls] Serving ${unprotected.length} table(s) with row-level security DISABLED: ${unprotected.join(", ")}. ` +
-                            "Every authenticated request can read and write every row of these. " +
-                            "This is baas.unprotectedTables: \"serve\"."
-                        );
-                    } else {
-                        logger.warn(
-                            `🔒 [rls] Not serving ${unprotected.length} table(s) — row-level security is disabled, so they have no ` +
-                            `authorization model: ${unprotected.join(", ")}\n` +
-                            unprotected.map((t) => `      ALTER TABLE "${pgSchemaName}"."${t}" ENABLE ROW LEVEL SECURITY;  -- then add a policy`).join("\n") +
-                            "\n      Set baas.unprotectedTables: \"serve\" to expose them regardless."
-                        );
-                        for (const t of unprotected) schema.tablesMap.delete(t);
-                    }
-                }
-                if (policyless.length > 0) {
-                    // Legal, and silently returns nothing — worth saying out loud,
-                    // since an empty table reads exactly like one with no rows.
-                    logger.warn(
-                        `🔒 [rls] ${policyless.length} table(s) have RLS enabled but no policies, so they will return no rows: ${policyless.join(", ")}`
-                    );
-                }
-
-                introspectedCollections = buildCollectionsFromSchema(schema, pgSchemaName);
-                // Tables keyed the way the collections above name their fields,
-                // and relations derived from the foreign keys — the only
-                // evidence a database with no config offers. Without the
-                // relations, drizzle's relational path can't resolve the ones
-                // those collections advertise.
-                ({ tables: introspectedTables, relations: introspectedRelations } =
-                    buildBaasSchema(schema.tablesMap, pgSchemaName, introspectedCollections));
-                logger.info(
-                    `🔍 [PostgresRegistry] BaaS mode: derived ${introspectedCollections.length} collections from schema "${pgSchemaName}" [${introspectedCollections.map(c => c.slug).join(", ")}]`
-                );
-            }
-
-            // ── Declared collections: read the tables back from the database ──
-            //
-            // Every source, the default included. The bundle's generated Drizzle
-            // module used to be authoritative here for the default source, and a
-            // file one commit behind the database changed what the server did:
-            // a renamed foreign-key column 500'd every request in production, a
-            // property boot-ensure had already created answered 400
-            // VALIDATION_UNKNOWN_FIELDS on first save, and relations the module
-            // lacked went silently missing from list reads. Boot-ensure runs
-            // before this, so `information_schema` is the current, complete
-            // description of what is actually there — and it cannot drift from
-            // itself. The module is now read only to tell the developer their
-            // file is stale (`warnOnGeneratedSchemaDrift`, below).
-            //
-            // Restricted to the collections that are this source's, because the
-            // driver is handed every collection the project declares and must
-            // not go looking for the default's tables in the analytics database.
-            // Without that filter the registry held no table for `events`, and
-            // every routed write failed with "table not found" on a database
-            // that had the table.
-            let ownTables: Record<string, PgTable> | undefined;
-            let ownRelations: Record<string, Relations> | undefined;
-            let ownCatalogue: Map<string, TableMeta> | undefined;
-            let ownCollections: CollectionConfig[] = [];
-            const sourceKey = (config as { dataSourceKey?: string }).dataSourceKey ?? DEFAULT_DATA_SOURCE_KEY;
-            if (!introspectedCollections && collections && collections.length > 0) {
-                ownCollections = collections.filter(c =>
-                    c.dataSource === sourceKey || (!c.dataSource && sourceKey === DEFAULT_DATA_SOURCE_KEY)
-                );
-                if (ownCollections.length > 0) {
-                    // Reading the catalogue is the first query this driver
-                    // issues, so it is the one that meets an unreachable
-                    // database — and the diagnosis that names the host, the
-                    // port and `docker compose up -d db` lives on the `SELECT
-                    // 1` further down, which would never be reached. Asked
-                    // here, in the same words, so a stopped database still says
-                    // so instead of failing inside the introspector.
-                    try {
-                        await rawClient.query("SELECT 1");
-                    } catch (err) {
-                        const fatal = diagnoseConnectFailure(err, pgConfig.connectionString);
-                        if (fatal) throw fatal;
-                    }
-                    const catalogue = await readCatalogueSchema({
-                        client: rawClient,
-                        collections: ownCollections,
-                        defaultSchema: pgConfig.introspectionSchema ?? "public"
-                    });
-                    ownTables = catalogue.tables;
-                    ownRelations = catalogue.relations;
-                    ownCatalogue = catalogue.meta;
-                    if (catalogue.missing.length > 0) {
-                        logger.warn(
-                            `[PostgresRegistry] Data source "${sourceKey}" has no table yet for: ${catalogue.missing.join(", ")}. ` +
-                            "Their collections will answer \"table not found\" until the schema is provisioned."
-                        );
-                    }
-                }
-            }
-
-            const activeCollections = introspectedCollections ?? collections;
-            const schemaTables = introspectedTables ?? ownTables;
-            const schemaRelations = introspectedRelations ?? ownRelations;
-
-            // The one remaining reader of the generated module: a warning per
-            // difference, and no effect on anything served. Wrapped because a
-            // diagnostic must never be the reason a server does not start.
-            if (ownCatalogue) {
-                try {
-                    warnOnGeneratedSchemaDrift(diffGeneratedSchemaAgainstCatalogue({
-                        generated: pgConfig.schema?.tables,
-                        catalogue: ownCatalogue,
-                        collections: ownCollections
-                    }));
-                } catch (err) {
-                    logger.debug("[schema] Could not compare schema.generated.ts against the database", { error: err });
-                }
-            }
-
-            // Create a fresh registry for this driver. Registration order is
-            // load-bearing, so it lives in one place — see `buildCollectionRegistry`.
-            //
-            // No enums: a catalogue-built enum column is `text`, which is what a
-            // generated `pgEnum` column served anyway (drizzle validates no
-            // labels; Postgres does), and nothing reads the registry's enum map.
-            const registry = buildCollectionRegistry({
-                collections: activeCollections,
-                tables: schemaTables,
-                relations: schemaRelations
-            });
-
-            // Patch Drizzle's PgArray columns to handle NULL values safely.
-            // Drizzle's mapFromDriverValue crashes with "value.map is not a function"
-            // when a native array column (text[], integer[], etc.) contains NULL.
-            if (schemaTables) {
-                patchPgArrayNullSafety(schemaTables as Record<string, unknown>);
-                // A `number` property is a `numeric` column unless it declared
-                // itself integral, and Postgres sends `numeric` as text. Cast it
-                // back here, where every read path goes through.
-                patchPgNumericToNumber(schemaTables as Record<string, unknown>);
-            }
-
-            // Build schema-aware Drizzle connection
-            const mergedSchema: Record<string, unknown> = {
-                ...schemaTables,
-                ...(schemaRelations || {})
-            };
-            const { drizzle: createDrizzle } = await import("drizzle-orm/node-postgres");
-            const schemaAwareDb = createDrizzle(rawClient, { schema: mergedSchema });
-
-            // Verify connection — fail fast if the database is unreachable
-            try {
-                await schemaAwareDb.execute(sql`SELECT 1`);
-            } catch (err: unknown) {
-                const fatal = diagnoseConnectFailure(err, pgConfig.connectionString);
-                if (fatal) throw fatal;
-                logger.warn("⚠️ Continuing without initial database verification. Drizzle/PG will attempt to connect on subsequent queries.");
-            }
-
-            // ── Which collections are THIS database's? ────────────────────────
-            //
-            // The driver is handed every collection the project declares —
-            // relations resolve across sources, and the API routes by slug — but
-            // three passes below speak about this database and only this one:
-            // the change-capture attach, the drift check and the RLS/grants
-            // pass. Reading the registry unfiltered made a second source
-            // (`database("analytics")`) report the default's tables as SCHEMA
-            // DRIFT, try to attach CDC triggers to tables it does not hold, and
-            // validate the default's policies against its own catalogue. Same
-            // rule as the table read-back above.
-            //
-            // In BaaS mode the registry holds what THIS database was introspected
-            // for, so every registered collection is already this source's.
-            const introspectedHere = Boolean(introspectedCollections);
-            const collectionsOnThisSource = (): CollectionConfig[] => {
-                const all = registry.getCollections() as CollectionConfig[];
-                if (introspectedHere) return all;
-                return all.filter(c => c.dataSource === sourceKey || (!c.dataSource && sourceKey === DEFAULT_DATA_SOURCE_KEY));
-            };
-
-            // Create services
-            const realtimeService = new RealtimeService(schemaAwareDb, registry);
-            // The per-socket subscription ceiling. Checked here, before anything
-            // else boots: a ceiling someone set and mistyped must not quietly
-            // become another number.
-            const ceilingFromEnv = process.env.REALTIME_MAX_SUBSCRIPTIONS_PER_SOCKET?.trim();
-            if (ceilingFromEnv) {
-                realtimeService.maxSubscriptionsPerSocket = parseMaxSubscriptionsPerSocket(
-                    ceilingFromEnv, "REALTIME_MAX_SUBSCRIPTIONS_PER_SOCKET"
-                );
-            } else if (pgConfig.realtime?.maxSubscriptionsPerSocket !== undefined) {
-                realtimeService.maxSubscriptionsPerSocket = parseMaxSubscriptionsPerSocket(
-                    pgConfig.realtime.maxSubscriptionsPerSocket, "realtime.maxSubscriptionsPerSocket"
-                );
-            }
-            // How long a change may wait for its refetch, and how often a big
-            // list is recounted. Unset, both are what they always were.
-            const tuning = (envName: string, option: number | undefined, optionName: string, unit: string): number | undefined => {
-                const fromEnv = process.env[envName]?.trim();
-                if (fromEnv) return parseRealtimeTuning(fromEnv, envName, unit);
-                return option !== undefined ? parseRealtimeTuning(option, optionName, unit) : undefined;
-            };
-            const refetchMaxWaitMs = tuning("REALTIME_REFETCH_MAX_WAIT_MS", pgConfig.realtime?.refetchMaxWaitMs, "realtime.refetchMaxWaitMs", "milliseconds");
-            if (refetchMaxWaitMs !== undefined) realtimeService.refetchMaxWaitMs = refetchMaxWaitMs;
-            realtimeService.recountIntervalMs = tuning("REALTIME_RECOUNT_INTERVAL_MS", pgConfig.realtime?.recountIntervalMs, "realtime.recountIntervalMs", "milliseconds");
-            const recountMinRows = tuning("REALTIME_RECOUNT_MIN_ROWS", pgConfig.realtime?.recountMinRows, "realtime.recountMinRows", "rows");
-            if (recountMinRows !== undefined) realtimeService.recountMinRows = recountMinRows;
-
-            // Initialize read replica connection if configured
-            let readDb: import("drizzle-orm/node-postgres").NodePgDatabase<any> | undefined;
-            const readUrl = process.env.DATABASE_READ_URL;
-            if (readUrl && readUrl !== pgConfig.connectionString) {
-                try {
-                    const { createReadReplicaConnection } = await import("./connection");
-                    const readResources = createReadReplicaConnection(readUrl, mergedSchema);
-                    readDb = readResources.db;
-                    logger.info("📖 [PostgresBootstrapper] Read replica connection established");
-                } catch (err) {
-                    logger.warn("⚠️ Could not connect to read replica, falling back to primary for all queries", { error: err });
-                }
-            }
-            const poolManager = pgConfig.adminConnectionString
-                ? new DatabasePoolManager(pgConfig.adminConnectionString)
-                : undefined;
-            const driver = new PostgresBackendDriver(schemaAwareDb, realtimeService, registry, undefined, poolManager);
-            realtimeService.setDataDriver(driver);
-
-            // ── RLS enforcement (user context) ───────────────────────────────
-            // Authenticated requests are authorized entirely by RLS policies,
-            // but a privileged connection (superuser / BYPASSRLS / table owner)
-            // bypasses RLS. Detect the posture and, when privileged, provision
-            // the restricted `rebase_user` role and route authenticated
-            // requests (reads AND writes) through it. The server context (base
-            // driver / auth flows / `rebase.sql`) stays on the owner connection
-            // and bypasses; `rebase.dataAsAdmin` does NOT — it is scoped with
-            // `withAuth({ uid: "service", roles: ["admin"] })` at boot, so it
-            // runs as `rebase_user` and its policies are evaluated.
-            // Default-on: a privileged connection that cannot be
-            // isolated fails the boot rather than serving unenforced requests.
-            {
-                const runSql: RawSqlRunner = async (text) => {
-                    const res = await schemaAwareDb.execute(sql.raw(text));
-                    return (res.rows ?? []) as Record<string, unknown>[];
-                };
-                // Said before anything else touches the schema: if the role and
-                // a schema share a name, unqualified SQL from any tool that does
-                // not pin `search_path` has been landing in the wrong place, and
-                // that is worth knowing before reading the drift report below.
-                await warnOnRoleSchemaCollision(runSql);
-
-                const collectionSchemas = registry.getCollections()
-                    .map((c) => (c as { schema?: string }).schema)
-                    .filter((s): s is string => typeof s === "string");
-                // `auth` is deliberately absent: the RLS helpers moved into
-                // `rebase`, and granting USAGE on a schema Rebase does not
-                // own would, on a Supabase database, hand the end-user role
-                // access to theirs.
-                const managedSchemas = ["public", "rebase", ...collectionSchemas];
-
-                const posture = await detectConnectionPosture(runSql, managedSchemas);
-                if (posture.privileged) {
-                    // Two different failures hide behind one call here, and they
-                    // deserve different answers. A connection that bypasses RLS
-                    // *right now* and cannot be switched must not serve: that is
-                    // the original contract and it stays fatal. A connection that
-                    // merely *could become* the owner — it owns nothing yet, but
-                    // may create tables in a schema the server provisions — is
-                    // constrained by RLS today, so refusing to boot over it would
-                    // break deployments that have been correct all along
-                    // (Postgres before 15 grants CREATE on public to PUBLIC, so
-                    // that describes a great many ordinary app roles).
-                    //
-                    // For the second case the answer is: try, warn, and ask again
-                    // once provisioning has run. See finalizeSecurityPosture.
-                    const bypassesNow = posture.superuser || posture.bypassRLS || posture.ownsTables;
-                    let switched = true;
-                    try {
-                        await ensureAppRole(runSql, managedSchemas);
-                    } catch (err) {
-                        if (bypassesNow) throw err;
-                        switched = false;
-                        logger.warn(
-                            `⚠️ RLS enforcement: connection role "${posture.role}" owns no tables yet and is ` +
-                            `subject to RLS, but it may create tables in ${managedSchemas.join(", ")} — and a ` +
-                            "table's owner bypasses every non-FORCE policy on it. The restricted role could not " +
-                            `be provisioned: ${err instanceof Error ? err.message : String(err)}`
-                        );
-                    }
-
-                    if (switched) {
-                        driver.rlsUserRole = REBASE_USER_ROLE;
-                        realtimeService.rlsUserRole = REBASE_USER_ROLE;
-                        const why = posture.superuser
-                            ? "superuser"
-                            : posture.bypassRLS
-                                ? "BYPASSRLS"
-                                : posture.ownsTables
-                                    ? "table owner"
-                                    : "may create (and would then own) tables in the schemas it serves";
-                        logger.info(`🔐 RLS enforcement active: authenticated requests run as "${REBASE_USER_ROLE}" (connection "${posture.role}" bypasses RLS: ${why})`);
-                    }
-
-                    if (posture.superuser || posture.bypassRLS) {
-                        const message =
-                            `The database connection runs as ${posture.superuser ? "a superuser" : "a BYPASSRLS role"} ("${posture.role}"). ` +
-                            `User requests are isolated via SET LOCAL ROLE, but connect as a non-superuser ` +
-                            `table-owner role in production so the server/owner context is least-privilege.`;
-                        if (isScaffoldedLocalDatabase(pgConfig.connectionString)) {
-                            logger.debug(`🔐 ${message}`);
-                        } else {
-                            logger.warn(`⚠️ ${message}`);
-                        }
-                    }
-                } else {
-                    logger.info(`🔐 RLS enforcement: connection role "${posture.role}" is subject to RLS natively; no role switch needed.`);
-                }
-
-                // Independent of posture: a policy targeting a role the request
-                // never runs as filters every row, so the collection reads as
-                // empty rather than erroring. Applies to both branches — the
-                // role that matters is whichever one requests actually use.
-                await validatePolicyPgRoles(
-                    runSql,
-                    collectionsOnThisSource() as never,
-                    driver.rlsUserRole ?? posture.role
-                );
-
-                // The same habit one surface over, and the dangerous direction:
-                // a rule that reads as "signed in only" but is true for every
-                // caller grants the data away rather than hiding it.
-                warnOnAnonymousGrants(collectionsOnThisSource() as never);
-
-                // Raw policy SQL written against the pre-1.0 helper schema. It
-                // is rewritten on compile, so this is the only place the project
-                // is ever told the spelling moved.
-                warnOnLegacyRlsFunctions(collectionsOnThisSource() as never);
-            }
-
-            // Ensure branch metadata table exists when branching is available
-            if (driver.branchService) {
-                try {
-                    await driver.branchService.ensureBranchMetadataTable();
-                } catch (err) {
-                    logger.warn("⚠️ Could not initialize branch metadata table", { error: err });
-                }
-            }
-
-            // ── Channel history ──────────────────────────────────────────────
-            // Opt-in per channel pattern. With no rules this creates no tables
-            // and leaves broadcast on its original fire-and-forget path, so
-            // presence-only apps pay nothing for it.
-            try {
-                await realtimeService.configureChannelHistory(
-                    pgConfig.realtime?.channels,
-                    { provision: realtimeProvisions }
-                );
-            } catch (err) {
-                logger.warn("⚠️ Could not initialize channel history tables — retained channels will not replay", { error: err });
-            }
-
-            // ── Realtime change source ───────────────────────────────────────
-            // Prefer DATABASE_DIRECT_URL to bypass PgBouncer for LISTEN/NOTIFY.
-            const directUrl = process.env.DATABASE_DIRECT_URL || pgConfig.connectionString;
-
-            // ── Cross-instance channel bus ───────────────────────────────────
-            // Entity changes already span instances (CDC / LISTEN below).
-            // Channel broadcast and presence did not — they lived in per-process
-            // maps, so behind two replicas the clients of one were invisible to
-            // the other. Opt-in, and a no-op when left at "memory".
-            try {
-                const busSetting = resolveChannelBusSetting(pgConfig.realtime?.bus);
-                // A supplied instance is always installed; a named built-in only
-                // when it is not the in-process default, so the common case
-                // touches none of this machinery.
-                const wantsBus = isChannelBusInstance(busSetting) || busSetting.type !== "memory";
-                if (wantsBus) {
-                    await realtimeService.configureChannelBus(
-                        createChannelBus(busSetting, {
-                            db: schemaAwareDb as NodePgDatabase<Record<string, unknown>>,
-                            directUrl
-                        })
-                    );
-                }
-            } catch (err) {
-                logger.warn("⚠️ [ChannelBus] Could not configure the channel bus — channel broadcast and presence stay per-instance", { error: err });
-            }
-
-            // Database-level Change Data Capture. When active, realtime events are
-            // emitted for EVERY committed write — including ones that bypass the
-            // Rebase API (psql, another service's cron, raw SQL, the Studio SQL
-            // editor) — matching Supabase Realtime's WAL-tailing model. CDC also
-            // becomes the cross-instance channel, so the legacy per-mutation
-            // LISTEN/NOTIFY is not started alongside it.
-            //   REALTIME_CDC=auto     → default: enable where the connection supports
-            //                           it; silently fall back to app-level otherwise
-            //   REALTIME_CDC=trigger  → force trigger-based capture (warns if it can't)
-            //   REALTIME_CDC=wal      → prefer WAL logical replication (degrades to trigger)
-            //   REALTIME_CDC=off      → app-level realtime only
-            const validModes = new Set(["auto", "wal", "trigger", "off"]);
-            let cdcMode = (process.env.REALTIME_CDC || "auto").trim().toLowerCase();
-            if (!validModes.has(cdcMode)) {
-                logger.warn(`⚠️ [CDC] Unknown REALTIME_CDC value "${cdcMode}" — expected auto|wal|trigger|off. Defaulting to "auto".`);
-                cdcMode = "auto";
-            }
-
-            // `auto` tries CDC but treats "can't" as a normal outcome (info log);
-            // explicit trigger/wal was asked for, so a failure is worth a warning.
-            // A process that consumes nothing needs no capture *started*, and a
-            // process that does not own the schema installs no triggers. They
-            // come apart: the `api` in a split with an external migration Job
-            // subscribes without provisioning, and both answers are correct.
-            const wantsCdc = cdcMode !== "off" && (realtimeSubscribes || realtimeProvisions);
-            const explicitCdc = cdcMode === "trigger" || cdcMode === "wal";
-            let cdcEnabled = false;
-            let provisionCdcForTables: PostgresDriverInternals["provisionCdcForTables"];
-            const cdcRunSql: RawSqlRunner = async (text) => {
-                const res = await schemaAwareDb.execute(sql.raw(text));
-                return (res.rows ?? []) as Record<string, unknown>[];
-            };
-            /** Whether this boot left the trigger function at the current body. */
-            let cdcFunctionCurrent = false;
-
-            if (wantsCdc && !directUrl) {
-                const reason = "no direct database connection is available for the realtime LISTEN client (set DATABASE_DIRECT_URL)";
-                if (explicitCdc) logger.warn(`⚠️ [CDC] REALTIME_CDC=${cdcMode} but ${reason} — using app-level realtime.`);
-                else logger.info(`ℹ️ [CDC] Using app-level realtime — ${reason}.`);
-            } else if (wantsCdc && directUrl) {
-                if (cdcMode === "wal") {
-                    // Native WAL logical-replication streaming requires wal_level=logical,
-                    // a replication-privileged role and a replication slot, none of which
-                    // are bundled with this adapter yet. Degrade to trigger-based capture,
-                    // which provides equivalent database-level coverage.
-                    logger.warn(
-                        "⚠️ [CDC] REALTIME_CDC=wal: native WAL streaming is not bundled in this build; " +
-                        "using trigger-based change capture instead (equivalent database-level coverage)."
-                    );
-                }
-                try {
-                    // Each table is attached with the columns its rows are
-                    // addressed by, and the payload carries those and nothing
-                    // else — any login can LISTEN. See `buildCdcFunctionSql`.
-                    const cdcTables: CdcTableRef[] = collectionsOnThisSource()
-                        .map((c) => ({
-                            schema: (c as { schema?: string }).schema ?? "public",
-                            table: getCollectionTableName(c),
-                            identityColumns: collectionKeyColumns(c, registry).map((k) => k.columnName)
-                        }))
-                        .filter((t) => Boolean(t.table) && registry.hasTableForCollection(t.table));
-                    // Junction tables back no collection, so the list above misses
-                    // them — and a link or unlink is a write nobody would hear
-                    // about. Their rows are the contents of a child list, which is
-                    // as much a change as a write to the rows themselves.
-                    // Filtered by the parent's source for the same reason as the
-                    // list above: `posts_tags` lives in the database `posts`
-                    // lives in, and asking a second database to instrument it
-                    // produced one "Could not attach change-capture trigger"
-                    // warning per junction on every boot.
-                    const ownSlugs = new Set(collectionsOnThisSource().map(c => c.slug));
-                    for (const link of collectJunctionLinks(registry)) {
-                        if (!ownSlugs.has(link.parentCollection.slug)) continue;
-                        // A junction row is addressed by the two ids that name
-                        // the child list it belongs to, whatever its own key is.
-                        cdcTables.push({
-                            schema: link.schema,
-                            table: link.table,
-                            identityColumns: [link.sourceColumn, link.targetColumn]
-                        });
-                    }
-                    // Provisioning throws only when the connection can't create the
-                    // trigger function (insufficient privilege); enableCdc throws when
-                    // the LISTEN connection can't be established. Either → fall back.
-                    if (realtimeProvisions) {
-                        await provisionTriggerCdc(cdcRunSql, cdcTables);
-                        cdcFunctionCurrent = true;
-                    }
-                    if (realtimeSubscribes) await realtimeService.enableCdc(directUrl);
-                    cdcEnabled = true;
-                    // Boot steps that create their own tables (auth) run after
-                    // this one and use it to instrument what they just created.
-                    // Left undefined where this process installs nothing, so a
-                    // later boot step cannot re-enter the DDL path by the side
-                    // door — the callers already treat it as optional, because a
-                    // driver without CDC never sets it either.
-                    if (realtimeProvisions) {
-                        provisionCdcForTables = async (tables) => {
-                            await provisionTriggerCdc(cdcRunSql, tables);
-                        };
-                    }
-                    // Say which half ran. "All writes now emit realtime events"
-                    // is a claim about the database and stays true for a process
-                    // that only installed the triggers; what changes is whether
-                    // *this* process is listening, and an operator reading one
-                    // pod's log should not have to infer that from its role.
-                    logger.info(
-                        `📡 [CDC] Realtime source = database-level change capture (mode: ${cdcMode === "wal" ? "wal→trigger" : "trigger"}). ` +
-                        `All writes now emit realtime events regardless of origin.` +
-                        (realtimeSubscribes ? "" : " This process installs the capture but does not consume it.")
-                    );
-                } catch (err) {
-                    if (explicitCdc) {
-                        logger.warn("⚠️ [CDC] Could not enable database-level change capture — falling back to app-level realtime.", { error: err });
-                    } else {
-                        logger.info(
-                            "ℹ️ [CDC] Database-level change capture unavailable (likely insufficient privileges to create triggers, " +
-                            "or the LISTEN connection was refused) — using app-level realtime. Set REALTIME_CDC=off to silence this.",
-                            { detail: err instanceof Error ? err.message : String(err) }
-                        );
-                    }
-                }
-            }
-
-            // Triggers an earlier boot attached keep firing whether or not this
-            // one provisions capture. With capture switched off they are taken
-            // off the tables: each write ran one and announced itself on a
-            // channel nothing listens to. Otherwise (capture wanted, not
-            // installed this boot) a function from a version that sent whole
-            // rows is replaced — any login can LISTEN to what it sends. Nothing
-            // is installed here either way.
-            if (realtimeProvisions && !cdcFunctionCurrent) {
-                const capture = cdcMode === "off" ? "off" : "not-provisioned";
-                try {
-                    const settled = await settleInstalledCapture(cdcRunSql, { capture });
-                    if ("removed" in settled && settled.removed > 0) {
-                        logger.info(
-                            `ℹ️ [CDC] REALTIME_CDC=off: removed the change-capture triggers an earlier boot attached ` +
-                            `(${settled.removed}). Realtime is app-level; unset REALTIME_CDC to capture changes again.`
-                        );
-                    }
-                } catch (err) {
-                    logger.warn(
-                        capture === "off"
-                            ? "⚠️ [CDC] REALTIME_CDC=off, but the change-capture triggers an earlier boot attached could not be " +
-                              "removed; they keep firing on every write. Remove them with " +
-                              "`DROP FUNCTION rebase.rebase_cdc_notify() CASCADE; DROP FUNCTION rebase.rebase_cdc_notify_statement() CASCADE`."
-                            : "⚠️ [CDC] A change-capture trigger function from an earlier boot is installed and could not be " +
-                              "brought up to date. Older versions of it send every changed row on a channel any database " +
-                              "login can LISTEN to; if capture is not wanted, set REALTIME_CDC=off, or remove it with " +
-                              "`DROP FUNCTION rebase.rebase_cdc_notify() CASCADE`.",
-                        { detail: err instanceof Error ? err.message : String(err) }
-                    );
-                }
-            }
-
-            // Legacy cross-instance realtime (app-level). Skipped when CDC is
-            // active because CDC already spans instances.
-            if (!cdcEnabled && directUrl && realtimeSubscribes) {
-                try {
-                    await realtimeService.startListening(directUrl);
-                } catch (err) {
-                    logger.warn("⚠️ Cross-instance realtime could not be started", { error: err });
-                }
-            } else if (!cdcEnabled && !realtimeSubscribes) {
-                // A worker or a functions process, with no capture to publish
-                // its writes for it (REALTIME_CDC=off, or `auto` fell back).
-                // It has nobody to deliver to, but the `api` does: announce
-                // each write the way an `all` process would, minus the
-                // LISTEN. Where the `api` turns out to run capture after all,
-                // nothing listens on this channel and the notification is
-                // dropped by the database.
-                realtimeService.startPublishing();
-            }
-
-            // ── Startup Schema Validation ────────────────────────────────────
-            // One-directional: only checks collections → DB (extra DB tables
-            // that aren't mapped to collections are perfectly fine).
-            try {
-                const registeredCollections = collectionsOnThisSource();
-                if (registeredCollections.length > 0) {
-                    // Deliberately unfiltered by schema: a table that is missing
-                    // from where the collection says it lives is very often
-                    // sitting in another schema entirely (see the misplaced-table
-                    // report below), and knowing *which* is the whole answer.
-                    const result = await schemaAwareDb.execute(sql.raw(`
-                        SELECT table_name, table_schema
-                        FROM information_schema.tables
-                        WHERE table_schema NOT IN ('pg_catalog', 'information_schema')
-                          AND table_type = 'BASE TABLE'
-                    `));
-                    const tablesByName = new Map<string, string[]>();
-                    for (const row of result.rows as Array<{ table_name: string; table_schema: string }>) {
-                        const schemas = tablesByName.get(row.table_name) ?? [];
-                        schemas.push(row.table_schema);
-                        tablesByName.set(row.table_name, schemas);
-                    }
-                    const dbTables = new Set(
-                        (result.rows as Array<{ table_name: string; table_schema: string }>).map(r =>
-                            r.table_schema === "public" ? r.table_name : `${r.table_schema}.${r.table_name}`
-                        )
-                    );
-                    const missing: Array<{ slug: string; table: string; foundIn: string[] }> = [];
-                    for (const col of registeredCollections) {
-                        // Auth owns its table and creates it later in this same
-                        // boot (initializeAuth → ensureAuthTablesExist), so it is
-                        // legitimately absent right now. Reporting it as drift
-                        // tells the user to `db:push` a table that is about to
-                        // exist — and on an introspected database, one that the
-                        // database was never supposed to hold.
-                        if ((col as { auth?: { enabled?: boolean } }).auth?.enabled) continue;
-
-                        const schemaName = "schema" in col && col.schema ? col.schema : "public";
-                        const checkName = resolveDriftCheckName(col, registry.getTableNames());
-                        const fullCheckName = schemaName === "public" ? checkName : `${schemaName}.${checkName}`;
-                        if (!dbTables.has(fullCheckName)) {
-                            // Report what was actually looked up: an unqualified
-                            // "users" sends people hunting for public.users.
-                            missing.push({ slug: col.slug,
-table: fullCheckName,
-foundIn: (tablesByName.get(checkName) ?? []).filter(s => s !== schemaName) });
-                        }
-                    }
-                    if (missing.length > 0) {
-                        const lines = missing.map(
-                            m => `    • collection "${m.slug}" → table "${m.table}"` +
-                                (m.foundIn.length > 0
-                                    ? ` — but a table of that name exists in ${m.foundIn.map(s => `"${s}"`).join(", ")}`
-                                    : "")
-                        );
-                        // A table that exists under the same name in another
-                        // schema is not ordinary drift: it is almost always this
-                        // framework's own `search_path` hazard. Postgres resolves
-                        // unqualified SQL through `"$user", public`, and this
-                        // project creates a schema named `rebase` while every
-                        // template names the database role `rebase` too — so an
-                        // unqualified CREATE TABLE (a hand-written migration, the
-                        // SQL editor, drizzle-kit) lands in `rebase`, and the
-                        // runtime, which now pins `search_path=public`, cannot see
-                        // it. Say so, because "missing table" sends people to
-                        // re-run a push that will create a *second* copy.
-                        const misplaced = missing.filter(m => m.foundIn.length > 0);
-                        const misplacedHelp = misplaced.length === 0 ? [] : [
-                            "  Those tables exist — in the wrong schema. Unqualified SQL run by a",
-                            "  role whose name matches a schema (`rebase` is both, by default)",
-                            "  resolves through search_path's \"$user\" and creates there. Move them:",
-                            ...misplaced.map(m =>
-                                `      ALTER TABLE "${m.foundIn[0]}"."${m.table.split(".").pop()}" SET SCHEMA "${m.table.includes(".") ? m.table.split(".")[0] : "public"}";`
-                            ),
-                            "  and qualify the SQL that created them, or pin search_path in DATABASE_URL",
-                            "  (`?options=-c%20search_path%3Dpublic`).",
-                            ""
-                        ];
-                        // What to tell the operator depends entirely on whether a
-                        // create step ran in this process, and the caller is the
-                        // only thing that knows. This warning used to assert that
-                        // it had ("this runtime applies the collection schema at
-                        // boot unless REBASE_MIGRATE_ON_BOOT=none") and send
-                        // people to that variable and to driver-version skew. For
-                        // an app whose boot path contained no provisioning step,
-                        // both were dead ends: nothing read that variable, and the
-                        // driver was current. Say which case this is instead of
-                        // guessing, and say nothing when the caller is too old to
-                        // tell us.
-                        const cause = describeSchemaDriftCause(schemaProvisioning);
-                        logger.warn([
-                            "",
-                            "⚠️  SCHEMA DRIFT — the database is missing tables this backend serves:",
-                            ...lines,
-                            "",
-                            ...misplacedHelp,
-                            ...cause,
-                            "",
-                            "  To apply this project's schema:",
-                            "    • Managed cloud: the runtime creates tables and RLS at boot. `rebase db",
-                            "      push` cannot reach a tenant's in-cluster database — redeploy instead.",
-                            "    • Self-host: run `rebase db push` (dev) or `rebase db migrate` (prod)",
-                            "      against DATABASE_URL.",
-                            ""
-                        ].join("\n"));
-                    }
-                }
-            } catch (err) {
-                logger.warn("⚠️ Startup schema validation could not run", {
-                    error: err instanceof Error ? err.message : String(err)
-                });
-            }
-
-            const internals: PostgresDriverInternals = {
-                db: schemaAwareDb,
-                readDb,
-                registry,
-                realtimeService,
-                driver,
-                poolManager,
-                provisionCdcForTables
-            };
-
-            return {
-                driver,
-                realtimeProvider: realtimeService,
-                collectionRegistry: registry,
-                // Only set in baas mode — tells the server which collections the
-                // database turned out to have.
-                collections: introspectedCollections,
-                internals
-            };
+            return openPostgresDriver(effectiveConfig(), config as DatabaseAdapterInitConfig);
         },
 
         async initializeAuth(config: unknown, driverResult: InitializedDriver): Promise<BootstrappedAuth | undefined> {
@@ -1780,16 +1907,13 @@ schemaHealthCheck: () => probeAuthSchema(db, resolveAuthSchema(authCollection)) 
             }
             // The per-identity socket ceiling, opt-in. Read here, at boot, and
             // refused if mistyped rather than quietly becoming no ceiling.
-            const { parseMaxSocketsPerUser } = await import("./services/realtimeService");
-            const socketsFromEnv = process.env.REALTIME_MAX_SOCKETS_PER_USER?.trim();
-            const maxSocketsPerUser = socketsFromEnv
-                ? parseMaxSocketsPerUser(socketsFromEnv, "REALTIME_MAX_SOCKETS_PER_USER")
-                : pgConfig.realtime?.maxSocketsPerUser !== undefined
-                    ? parseMaxSocketsPerUser(pgConfig.realtime.maxSocketsPerUser, "realtime.maxSocketsPerUser")
-                    : undefined;
+            const realtimeConfig = effectiveConfig().realtime;
+            const maxSocketsPerUser = realtimeConfig?.maxSocketsPerUser !== undefined
+                ? parseMaxSocketsPerUser(realtimeConfig.maxSocketsPerUser, "realtime.maxSocketsPerUser")
+                : undefined;
             // The path this adapter was told to answer on wins over the one
             // the server derived from its mount point.
-            const path = pgConfig.realtime?.path ?? limits?.path;
+            const path = realtimeConfig?.path ?? limits?.path;
             createPostgresWebSocket(
                 server as import("http").Server,
                 realtimeService,
