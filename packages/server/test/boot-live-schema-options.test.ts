@@ -20,7 +20,9 @@ function env(overrides: Record<string, string | undefined>): RebaseBootEnv {
     return { NODE_ENV: "production", ...parsed } as unknown as RebaseBootEnv;
 }
 
-afterEach(() => jest.restoreAllMocks());
+afterEach(() => {
+    jest.restoreAllMocks();
+});
 
 describe("resolveLiveSchemaOptions", () => {
     it("is off when nothing is set — a bundle that does not opt in changes nothing", () => {

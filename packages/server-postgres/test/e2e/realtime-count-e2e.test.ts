@@ -112,7 +112,7 @@ describe("count subscriptions (E2E)", () => {
         await waitFor(() => framesFor("count-on").length === 2, "the count after an insert");
         expect(framesFor("count-on")[1].meta?.total).toBe(6);
 
-        await driver.delete({ path: "items", row: { id: "i-2", path: "items" } });
+        await driver.delete({ row: { id: "i-2", path: "items" } });
         await waitFor(() => framesFor("count-on").length === 3, "the count after a delete");
         expect(framesFor("count-on")[2].meta?.total).toBe(5);
 

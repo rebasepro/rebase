@@ -32,6 +32,7 @@ function transportCounting(total: number): { transport: Transport; counted: jest
         fetchFn: globalThis.fetch,
         setToken: () => undefined,
         setAuthTokenGetter: () => undefined,
+        setOnUnauthorized: () => undefined,
         getHeaders: () => ({}),
         resolveToken: async () => null
     };
@@ -79,7 +80,7 @@ describe("listenCount", () => {
         let total = 5;
         const { server, posts } = setup(countingServer(() => total));
         const totals: number[] = [];
-        posts.listenCount({ where: { status: ["==", "active"] }, searchString: "x", limit: 20, orderBy: "title" }, (n) => totals.push(n));
+        posts.listenCount({ where: { status: ["==", "active"] }, searchString: "x", limit: 20, orderBy: ["title", "asc"] }, (n) => totals.push(n));
         await jest.advanceTimersByTimeAsync(50);
 
         expect(subscribeFrames(server)[0].payload).toMatchObject({

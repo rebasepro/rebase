@@ -26,7 +26,7 @@ function createMockTransport(): { transport: Transport; mockRequest: jest.Mock<T
         setAuthTokenGetter: jest.fn(),
         setOnUnauthorized: jest.fn(),
         getHeaders: jest.fn().mockReturnValue({}),
-        resolveToken: jest.fn().mockResolvedValue(null)
+        resolveToken: jest.fn<() => Promise<string | null>>().mockResolvedValue(null)
     } as unknown as Transport;
     return { transport, mockRequest };
 }

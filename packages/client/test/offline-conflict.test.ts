@@ -163,7 +163,7 @@ describe("offline.onConflict", () => {
 
     it("\"discard\" drops the edit, unreported, and shows the row as the server has it", async () => {
         const onSyncError = jest.fn();
-        const { server, offline, posts } = setup({ onConflict: async () => "discard", onSyncError });
+        const { server, offline, posts } = setup({ onConflict: async () => "discard" as const, onSyncError });
         server.put({ id: "p1", title: "first" });
         await posts.findById("p1");
         goOffline(server);

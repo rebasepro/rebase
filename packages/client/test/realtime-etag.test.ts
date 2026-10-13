@@ -125,6 +125,7 @@ describe("update() hands back the version it wrote", () => {
             fetchFn: globalThis.fetch,
             setToken: () => undefined,
             setAuthTokenGetter: () => undefined,
+            setOnUnauthorized: () => undefined,
             getHeaders: () => ({}),
             resolveToken: async () => null
         };
