@@ -514,6 +514,7 @@ ${chalk.green.bold("AI Agent Skills")}
 
 ${chalk.green.bold("API Keys")}
   ${chalk.blue.bold("api-keys list")}           List the service API keys: kind, scopes, roles
+  ${chalk.blue.bold("api-keys get")} ${chalk.gray("<id>")}       Show one key
   ${chalk.blue.bold("api-keys create")}         Create a service key holding the scopes you name
   ${chalk.blue.bold("api-keys revoke")}         Revoke an API key
   ${chalk.blue.bold("api-keys scopes")}         List the scopes a key can hold

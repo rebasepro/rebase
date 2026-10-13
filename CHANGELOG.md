@@ -1933,6 +1933,12 @@
 - **`rebase dev` says when it regenerated an out-of-date
   `backend/src/schema.generated.ts`.**
 
+- **The top-level help lists the api-keys get command, and the help pages of
+  db push, generate and migrate name the database flags they take.**
+  `rebase --help` left out `api-keys get`, which `rebase api-keys --help`
+  lists, and `rebase db push --help` never said it takes `--database-url` and
+  `--docker`.
+
 #### Admin (CMS & app)
 
 - **The markdown editor's link box takes a link, and pressing Enter in it no longer

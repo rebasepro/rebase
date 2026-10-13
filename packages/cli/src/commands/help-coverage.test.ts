@@ -154,6 +154,36 @@ describe("every command the dispatch answers appears in a help page", () => {
         }
     });
 
+    /**
+     * `rebase --help` lists the api-keys family line by line, so a subcommand
+     * the family answers can be missing from the index while its own page has
+     * it: `api-keys get` was, and only `rebase api-keys --help` said it existed.
+     */
+    it("rebase --help lists every api-keys subcommand", async () => {
+        const names = dispatchedNames("api-keys.ts", "apiKeysCommand");
+        expect(names).toContain("get");
+
+        await entry(["node", "rebase", "--help"]);
+        const help = helpText();
+
+        for (const name of names) {
+            expect(help, `rebase --help does not mention "api-keys ${name}"`).toContain(`api-keys ${name}`);
+        }
+    });
+
+    /**
+     * The CLI resolves `--database-url` and `--docker` for every driver command
+     * and relays them (`RELAYED_FLAGS` in the driver), so they work on
+     * `db push` — and `db push --help` never said so.
+     */
+    it.each(["push", "generate", "migrate"])("rebase db %s --help names --database-url and --docker", async (action) => {
+        await dbCommand(action, ["node", "rebase", "db", action, "--help"]);
+        const help = helpText();
+
+        expect(help).toContain("--database-url");
+        expect(help).toContain("--docker");
+    });
+
     it("rebase telemetry --help lists every subcommand", async () => {
         // Its dispatcher takes only `rawArgs`, so it does not fit the table.
         const names = dispatchedNames("telemetry.ts", "telemetryCommand");

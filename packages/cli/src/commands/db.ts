@@ -1396,6 +1396,10 @@ async function switchBranch(projectRoot: string, rawArgs: readonly string[]): Pr
  * markdown to it. What a reader needs from here is which subcommands exist and
  * what the destructive ones want before they will run.
  */
+/** The database flags every driver command takes; `db url --help` has its own wording. */
+const DATABASE_FLAGS_HELP =
+    "--database-url <url> names the database; --docker uses the compose one, starting it if needed.";
+
 const DB_ACTION_HELP: Record<string, { usage: string; summary: string; notes?: string[] }> = {
     push: {
         usage: "rebase db push [--collections <dir>] [--dry-run] [--allow-destructive] [--yes]",
@@ -1403,7 +1407,8 @@ const DB_ACTION_HELP: Record<string, { usage: string; summary: string; notes?: s
         notes: [
             "--dry-run prints the SQL and applies nothing. Read it before you approve it.",
             "A change that drops data, or re-keys a table (every row gets a new id), needs --allow-destructive.",
-            `--collections <dir>: ${COLLECTIONS_FLAG_HELP}.`
+            `--collections <dir>: ${COLLECTIONS_FLAG_HELP}.`,
+            DATABASE_FLAGS_HELP
         ]
     },
     generate: {
@@ -1411,7 +1416,8 @@ const DB_ACTION_HELP: Record<string, { usage: string; summary: string; notes?: s
         summary: "Generate the Drizzle schema, the Postgres DDL and a SQL migration file from the collections.",
         notes: [
             "A migration that drops or narrows data is named when it is written. It is still written.",
-            `--collections <dir>: ${COLLECTIONS_FLAG_HELP}.`
+            `--collections <dir>: ${COLLECTIONS_FLAG_HELP}.`,
+            DATABASE_FLAGS_HELP
         ]
     },
     migrate: {
@@ -1421,7 +1427,8 @@ const DB_ACTION_HELP: Record<string, { usage: string; summary: string; notes?: s
             "--refuse-destructive dry-runs the pending files and applies nothing when one drops or narrows data.",
             "--baseline <version> records that version as already applied and starts from the next one.",
             "It is what a database Rebase has already booted against needs: boot ensures the schema, so the first migration would try to create tables that are already there.",
-            "The version is the numeric prefix of a file in drizzle/migrations."
+            "The version is the numeric prefix of a file in drizzle/migrations.",
+            DATABASE_FLAGS_HELP
         ]
     },
     branch: {
