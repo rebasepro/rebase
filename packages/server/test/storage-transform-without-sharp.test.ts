@@ -35,7 +35,7 @@ const PNG = Buffer.from(
 
 /** An object store held in memory, with the streamed reads S3 and GCS have. */
 class MemoryStorageController implements StorageController {
-    private readonly objects = new Map<string, { bytes: Uint8Array; contentType: string; lastModified: number }>();
+    private readonly objects = new Map<string, { bytes: Uint8Array<ArrayBuffer>; contentType: string; lastModified: number }>();
 
     async putObject(props: UploadFileProps): Promise<UploadFileResult> {
         const bytes = new Uint8Array(await props.file.arrayBuffer());

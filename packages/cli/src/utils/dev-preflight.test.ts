@@ -481,7 +481,9 @@ describe("ensureDevDatabase", () => {
         // The counter-check: the guard must not stop the case it was written
         // around, which is a `.env` that matches the compose file.
         const port = await freePort();
-        let db: Awaited<ReturnType<typeof fakePostgres>> | null = null;
+        // A holder, not a `let`: assigned inside callbacks, a `let` reads as
+        // never-assigned to the control-flow analysis at the `finally`.
+        const pg: { db?: Awaited<ReturnType<typeof fakePostgres>> } = {};
         fs.writeFileSync(
             path.join(projectRoot, "docker-compose.yml"),
             ["services:", "  db:", "    image: postgres:18-alpine", "    ports:", `      - "${port}:5432"`].join("\n")
@@ -494,14 +496,14 @@ describe("ensureDevDatabase", () => {
                 projectRoot,
                 databaseUrl: `postgres://u@127.0.0.1:${port}/db`,
                 startDatabase: async () => {
-                    db = await fakePostgres({ resets: 0, port });
+                    pg.db = await fakePostgres({ resets: 0, port });
                 },
                 pushSchema: vi.fn()
             });
 
             expect(outcome).toEqual({ action: "started", port, pushed: false });
         } finally {
-            await db?.close();
+            await pg.db?.close();
         }
     });
 
@@ -525,10 +527,12 @@ describe("ensureDevDatabase", () => {
         // A port that is closed when the preflight probes it and open by the
         // time it waits for it — which is what starting a container looks like.
         const port = await freePort();
-        let db: Awaited<ReturnType<typeof fakePostgres>> | null = null;
+        // A holder, not a `let`: assigned inside callbacks, a `let` reads as
+        // never-assigned to the control-flow analysis at the `finally`.
+        const pg: { db?: Awaited<ReturnType<typeof fakePostgres>> } = {};
 
         const started = vi.fn(async () => {
-            db = await fakePostgres({ resets: 0, port });
+            pg.db = await fakePostgres({ resets: 0, port });
         });
 
         fs.writeFileSync(
@@ -552,7 +556,7 @@ describe("ensureDevDatabase", () => {
             expect(exit).not.toHaveBeenCalled();
         } finally {
             exit.mockRestore();
-            await db?.close();
+            await pg.db?.close();
         }
     });
 
@@ -574,7 +578,9 @@ describe("ensureDevDatabase", () => {
          */
         const port = await freePort();
         composeOn(port);
-        let db: Awaited<ReturnType<typeof fakePostgres>> | null = null;
+        // A holder, not a `let`: assigned inside callbacks, a `let` reads as
+        // never-assigned to the control-flow analysis at the `finally`.
+        const pg: { db?: Awaited<ReturnType<typeof fakePostgres>> } = {};
         const pushSchema = vi.fn();
         const logged: string[] = [];
 
@@ -583,7 +589,7 @@ describe("ensureDevDatabase", () => {
                 ...base,
                 projectRoot,
                 databaseUrl: `postgres://u@127.0.0.1:${port}/db`,
-                startDatabase: async () => { db = await fakePostgres({ resets: Infinity, port }); },
+                startDatabase: async () => { pg.db = await fakePostgres({ resets: Infinity, port }); },
                 readyTimeoutMs: 1_000,
                 pushSchema,
                 log: line => logged.push(line)
@@ -596,14 +602,16 @@ describe("ensureDevDatabase", () => {
             expect(outcome.hint).toContain("docker compose logs db");
             expect(logged.join("\n")).not.toContain("Database ready");
         } finally {
-            await db?.close();
+            await pg.db?.close();
         }
     });
 
     it("pushes once the database answers a query, not when its port first opens", async () => {
         const port = await freePort();
         composeOn(port);
-        let db: Awaited<ReturnType<typeof fakePostgres>> | null = null;
+        // A holder, not a `let`: assigned inside callbacks, a `let` reads as
+        // never-assigned to the control-flow analysis at the `finally`.
+        const pg: { db?: Awaited<ReturnType<typeof fakePostgres>> } = {};
         let connectionsAtPush = 0;
 
         try {
@@ -611,15 +619,15 @@ describe("ensureDevDatabase", () => {
                 ...base,
                 projectRoot,
                 databaseUrl: `postgres://u@127.0.0.1:${port}/db`,
-                startDatabase: async () => { db = await fakePostgres({ resets: 3, port }); },
-                pushSchema: async () => { connectionsAtPush = db?.connections() ?? 0; }
+                startDatabase: async () => { pg.db = await fakePostgres({ resets: 3, port }); },
+                pushSchema: async () => { connectionsAtPush = pg.db?.connections() ?? 0; }
             });
 
             expect(outcome).toEqual({ action: "started", port, pushed: true });
             // Past the three resets, to the query that succeeded, before the push.
             expect(connectionsAtPush).toBeGreaterThan(3);
         } finally {
-            await db?.close();
+            await pg.db?.close();
         }
     });
 
@@ -631,7 +639,9 @@ describe("ensureDevDatabase", () => {
          */
         const port = await freePort();
         composeOn(port);
-        let db: Awaited<ReturnType<typeof fakePostgres>> | null = null;
+        // A holder, not a `let`: assigned inside callbacks, a `let` reads as
+        // never-assigned to the control-flow analysis at the `finally`.
+        const pg: { db?: Awaited<ReturnType<typeof fakePostgres>> } = {};
         const logged: string[] = [];
 
         try {
@@ -639,7 +649,7 @@ describe("ensureDevDatabase", () => {
                 ...base,
                 projectRoot,
                 databaseUrl: `postgres://u@127.0.0.1:${port}/db`,
-                startDatabase: async () => { db = await fakePostgres({ resets: 0, port }); },
+                startDatabase: async () => { pg.db = await fakePostgres({ resets: 0, port }); },
                 pushSchema: async () => {
                     // A real child failing the way the driver's push does, so the
                     // error is execa's own and not a stand-in for it.
@@ -661,7 +671,7 @@ describe("ensureDevDatabase", () => {
             // The command line, which carries the database password, is not repeated.
             expect(output).not.toContain(process.execPath);
         } finally {
-            await db?.close();
+            await pg.db?.close();
         }
     });
 });

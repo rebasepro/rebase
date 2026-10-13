@@ -10,7 +10,7 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 import { execFileSync } from "child_process";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from "vitest";
 import { npmFailure, upgradeCommand, type UpgradeIo } from "./upgrade";
 
 class Exited extends Error {
@@ -320,8 +320,8 @@ function canaryProject(version = "0.24.1-canary.gcb918fc"): void {
 }
 
 /** A registry whose dist-tags are `tags`; any other tag is a 404. */
-function registry(tags: Record<string, string>): ReturnType<typeof vi.fn> {
-    return vi.fn(async (spec: string) => {
+function registry(tags: Record<string, string>): Mock<UpgradeIo["npmView"]> {
+    return vi.fn<UpgradeIo["npmView"]>(async (spec: string) => {
         const tag = spec.slice(spec.lastIndexOf("@") + 1);
         if (!(tag in tags)) throw new Error(`npm error 404 No match found for version ${tag}`);
         return `${tags[tag]}\n`;
