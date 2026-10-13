@@ -197,6 +197,7 @@ udt_name: "int4",
 is_nullable: "NO" }),
                 mkCol("company_translation", "locale", { data_type: "character varying",
 udt_name: "varchar",
+character_maximum_length: 10,
 is_nullable: "NO" }),
                 mkCol("company_translation", "name", { data_type: "text",
 udt_name: "text" })

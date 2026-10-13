@@ -98,3 +98,36 @@ describe("importing a column default", () => {
         expect((odd.stage as StringProperty).defaultValue).toBeUndefined();
     });
 });
+
+/**
+ * Two columns whose import changed them on the first push.
+ */
+describe("importing column shapes the planner must reproduce", () => {
+    const shapes = buildCollectionFromTableMetadata("items", {
+        columns: [
+            column("note", "character varying", "varchar", null, "YES"),
+            column("code", "character varying", "varchar", null, "YES", { character_maximum_length: 40 }),
+            column("settings", "jsonb", "jsonb", null, "NO"),
+            column("extra", "jsonb", "jsonb", null, "YES"),
+            column("tags", "ARRAY", "_text", null, "NO")
+        ]
+    } as TableMetadata).properties;
+
+    it("imports an unbounded varchar as unbounded, never VARCHAR(255)", () => {
+        // `columnType: "varchar"` with no `max` plans VARCHAR(255): a narrowing
+        // of a column that may already hold longer values. TEXT is the
+        // unbounded string column the planner writes.
+        expect((shapes.note as StringProperty).columnType).toBe("text");
+        expect((shapes.note as StringProperty).validation?.max).toBeUndefined();
+        // A declared width is still a varchar of that width.
+        expect((shapes.code as StringProperty).columnType).toBe("varchar");
+        expect((shapes.code as StringProperty).validation?.max).toBe(40);
+    });
+
+    it("keeps NOT NULL on a jsonb or array column", () => {
+        expect((shapes.settings as MapProperty).validation?.required).toBe(true);
+        expect((shapes.extra as MapProperty).validation).toBeUndefined();
+        expect((shapes.tags as { validation?: { required?: boolean } }).validation?.required).toBe(true);
+    });
+});
+

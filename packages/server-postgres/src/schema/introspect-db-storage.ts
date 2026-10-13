@@ -132,10 +132,14 @@ function stringStorage(col: TableColumn): ColumnStorage {
             if (typeof col.character_maximum_length === "number" && col.character_maximum_length > 0) {
                 return { keys: [`columnType: ${literal("varchar")}`] };
             }
+            // Unbounded: declared as TEXT, the unbounded string column the
+            // planner writes. `columnType: "varchar"` with no `max` is
+            // VARCHAR(255), which would narrow a column that may already hold
+            // longer values.
             return {
-                keys: [`columnType: ${literal("varchar")}`],
-                note: `"${col.column_name}" is a varchar with no length; the planner always writes one ` +
-                    "(255 unless `validation.max` says otherwise), so a push would plan a narrowing type change."
+                keys: [],
+                note: `"${col.column_name}" is a varchar with no length, declared as text: a push would plan ` +
+                    "converting it to text, which keeps every value."
             };
         case "character":
             return { keys: [`columnType: ${literal("char")}`] };

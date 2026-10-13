@@ -66,6 +66,12 @@ describe("a column's storage keys", () => {
         expect(columnStorage(column, propType, plain).note).toMatch(note);
     });
 
+    it("declares an unbounded varchar as text, never a VARCHAR(255) that narrows it", () => {
+        const stored = columnStorage(col("s", "character varying"), "string", plain);
+        expect(stored.keys).toEqual([]);
+        expect(stored.note).toMatch(/text.*keeps every value/);
+    });
+
     it("declares a smallint as integer, and says the push widens it", () => {
         const stored = columnStorage(col("n", "smallint"), "number", plain);
         expect(stored.keys).toEqual(['columnType: "integer"']);

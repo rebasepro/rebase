@@ -102,6 +102,12 @@ label: prettifyIdentifier(v) })),
             let colType: "varchar" | "text" | "char" = "varchar";
             if (dt === "text" || dt === "citext") colType = "text";
             if (dt === "char" || dt === "character") colType = "char";
+            // A varchar with no length is unbounded, and TEXT is the unbounded
+            // string column the planner writes: `columnType: "varchar"` with no
+            // `max` plans VARCHAR(255), a narrowing of a column that may already
+            // hold longer values. TEXT stores the same strings, and the change
+            // a push plans (varchar → text) keeps every value.
+            if (colType === "varchar" && !character_maximum_length) colType = "text";
             // Carry the declared width across. Dropping it made introspection
             // lossy in the one direction that costs data: a `character
             // varying(500)` column read back as a bare `varchar` regenerates as
@@ -216,12 +222,15 @@ label: prettifyIdentifier(v) })),
 
         case "jsonb":
         case "json":
+            // `required` for NOT NULL, as on every other type: left off, the
+            // first push planned `DROP NOT NULL`.
             return {
                 type: "map",
                 name: prettifiedName,
                 columnType: dt === "jsonb" ? "jsonb" : "json",
                 keyValue: true,
-                properties: {}
+                properties: {},
+                validation: required ? { required: true } : undefined
             };
 
         case "array":
@@ -245,7 +254,8 @@ label: prettifyIdentifier(v) })),
                 type: "array",
                 name: prettifiedName,
                 columnType: colType,
-                of: { type: innerType }
+                of: { type: innerType },
+                validation: required ? { required: true } : undefined
             } as ArrayProperty;
         }
 
