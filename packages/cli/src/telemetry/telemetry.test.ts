@@ -351,15 +351,18 @@ apps: {} };
 describe("ensureProjectId", () => {
 
     /** A real project root: what makes it one is the manifest, not `.rebase/`. */
-    function projectDir(state?: string): string {
+    function projectDir(files: Record<string, string> = {}): string {
         const dir = fs.mkdtempSync(path.join(os.tmpdir(), "rebase-pid-"));
         fs.writeFileSync(path.join(dir, "rebase.json"), '{"rebase":"^1","apps":{}}', "utf-8");
-        if (state !== undefined) {
-            fs.mkdirSync(path.join(dir, ".rebase"));
-            fs.writeFileSync(path.join(dir, ".rebase", "state.json"), state, "utf-8");
+        for (const [name, content] of Object.entries(files)) {
+            fs.mkdirSync(path.join(dir, ".rebase"), { recursive: true });
+            fs.writeFileSync(path.join(dir, ".rebase", name), content, "utf-8");
         }
         return dir;
     }
+
+    const sentProjectId = (fetchMock: ReturnType<typeof vi.fn>, call = 0): unknown =>
+        JSON.parse(fetchMock.mock.calls[call][1].body).projectId;
 
     it("creates .rebase/ in a project that has none yet", async () => {
         // `rebase init` does not create it — that only happens when a scaffold
@@ -374,51 +377,67 @@ describe("ensureProjectId", () => {
 
         await telemetry.recordEvent("cli.init", {}, { projectRoot: dir });
 
-        expect(fs.existsSync(path.join(dir, ".rebase", "state.json"))).toBe(true);
-        expect(JSON.parse(fetchMock.mock.calls[0][1].body).projectId).toMatch(/^[0-9a-f-]{36}$/);
+        expect(fs.existsSync(path.join(dir, ".rebase", "telemetry-project.json"))).toBe(true);
+        expect(sentProjectId(fetchMock)).toMatch(/^[0-9a-f-]{36}$/);
     });
 
-    it("preserves the other commands' keys when it adds its own", async () => {
-        // `state.json` is shared — `generate_sdk`, `apps` and `auth` all read it.
-        // Clobbering their keys to store a telemetry id would break the project.
+    it("keeps one id across dev-server restarts", async () => {
+        // The id lived in `.rebase/state.json`, which is the dev server's
+        // runtime file: it is rewritten on every start and deleted on every
+        // shutdown. So each restart minted a new id, and one checkout read as
+        // a new project every time `rebase dev` came back up.
+        const telemetry = await load();
+        const { cleanupDevPortFile } = await import("@rebasepro/server");
+        telemetry.setConsent(true);
+        const dir = projectDir();
+        const fetchMock = vi.fn().mockResolvedValue({ ok: true });
+        (global as any).fetch = fetchMock;
+
+        await telemetry.recordEvent("cli.dev", {}, { projectRoot: dir });
+        // What a stop and a start do to the dev server's own state.
+        cleanupDevPortFile(dir);
+        fs.writeFileSync(path.join(dir, ".rebase", "state.json"), '{"port":3101}', "utf-8");
+        await telemetry.recordEvent("cli.dev", {}, { projectRoot: dir });
+
+        expect(sentProjectId(fetchMock, 1)).toBe(sentProjectId(fetchMock, 0));
+    });
+
+    it("never writes the dev server's state.json", async () => {
         const telemetry = await load();
         telemetry.setConsent(true);
-        const dir = projectDir('{"lastSdkOutput":"./src/sdk","apiUrl":"http://localhost:3001"}');
+        const state = '{"port":3101,"baseUrl":"http://localhost:3101"}';
+        const dir = projectDir({ "state.json": state });
         (global as any).fetch = vi.fn().mockResolvedValue({ ok: true });
 
         await telemetry.recordEvent("cli.dev", {}, { projectRoot: dir });
 
-        const state = JSON.parse(fs.readFileSync(path.join(dir, ".rebase", "state.json"), "utf-8"));
-        expect(state.lastSdkOutput).toBe("./src/sdk");
-        expect(state.apiUrl).toBe("http://localhost:3001");
-        expect(state.telemetryProjectId).toMatch(/^[0-9a-f-]{36}$/);
+        expect(fs.readFileSync(path.join(dir, ".rebase", "state.json"), "utf-8")).toBe(state);
     });
 
     it("reuses the id it already stored", async () => {
         const telemetry = await load();
         telemetry.setConsent(true);
-        const dir = projectDir('{"telemetryProjectId":"11111111-2222-3333-4444-555555555555"}');
+        const dir = projectDir({ "telemetry-project.json": '{"projectId":"11111111-2222-3333-4444-555555555555"}' });
         const fetchMock = vi.fn().mockResolvedValue({ ok: true });
         (global as any).fetch = fetchMock;
 
         await telemetry.recordEvent("cli.dev", {}, { projectRoot: dir });
 
-        expect(JSON.parse(fetchMock.mock.calls[0][1].body).projectId)
-            .toBe("11111111-2222-3333-4444-555555555555");
+        expect(sentProjectId(fetchMock)).toBe("11111111-2222-3333-4444-555555555555");
     });
 
-    it("does not overwrite a state.json it cannot parse", async () => {
-        // Better to report no project than to destroy another command's state.
+    it("does not overwrite an id file it cannot parse", async () => {
+        // Better to report no project than to silently start a second id.
         const telemetry = await load();
         telemetry.setConsent(true);
-        const dir = projectDir("{ this is not json");
+        const dir = projectDir({ "telemetry-project.json": "{ this is not json" });
         const fetchMock = vi.fn().mockResolvedValue({ ok: true });
         (global as any).fetch = fetchMock;
 
         await telemetry.recordEvent("cli.dev", {}, { projectRoot: dir });
 
-        expect(fs.readFileSync(path.join(dir, ".rebase", "state.json"), "utf-8")).toBe("{ this is not json");
-        expect(JSON.parse(fetchMock.mock.calls[0][1].body).projectId).toBeUndefined();
+        expect(fs.readFileSync(path.join(dir, ".rebase", "telemetry-project.json"), "utf-8")).toBe("{ this is not json");
+        expect(sentProjectId(fetchMock)).toBeUndefined();
     });
 
     it("reports no project, and creates nothing, outside a project", async () => {

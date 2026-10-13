@@ -12,7 +12,8 @@ import crypto from "crypto";
  *  - `machineId` — one developer's machine. Lives beside the cloud credentials
  *    in `~/.rebase/`, so it survives across every project they scaffold.
  *  - `projectId` — one *checkout*. Lives in the project's gitignored
- *    `.rebase/`, next to `cloud.json` and `state.json`.
+ *    `.rebase/`, in a file of its own, `telemetry-project.json`, so it lasts
+ *    as long as the checkout does.
  *
  * Without the split, a developer trying five templates in an afternoon reads as
  * five installations. With it, that is one machine and five projects, which is
@@ -98,6 +99,9 @@ machineId });
     return machineId;
 }
 
+/** Where a checkout keeps its id, under the project's gitignored `.rebase/`. */
+export const PROJECT_ID_FILE = "telemetry-project.json";
+
 /**
  * The checkout's id, generating one if this project has none.
  *
@@ -112,6 +116,12 @@ machineId });
  * The `rebase.json` check is what keeps the fix from being "scatter `.rebase/`
  * wherever a command happens to run": no manifest, no project, no directory,
  * and the event simply reports no project.
+ *
+ * A file of its own, written by nothing else. The id used to be a key in
+ * `.rebase/state.json`, which is the dev server's runtime file: rewritten
+ * from scratch on every start and deleted on every shutdown. So every
+ * restart of `rebase dev` minted a new id, and one checkout read as a new
+ * project each time — the error this split exists to prevent, by another way.
  */
 export function ensureProjectId(projectRoot: string): string | undefined {
     if (!fs.existsSync(path.join(projectRoot, "rebase.json"))) return undefined;
@@ -123,27 +133,31 @@ export function ensureProjectId(projectRoot: string): string | undefined {
         return undefined;
     }
 
-    const file = path.join(dir, "state.json");
-    let state: Record<string, unknown> = {};
-    if (fs.existsSync(file)) {
-        try {
-            const raw = JSON.parse(fs.readFileSync(file, "utf-8"));
-            if (raw && typeof raw === "object") state = raw;
-        } catch {
-            // `state.json` is shared with other commands. A parse failure here
-            // must not destroy their keys, so we do not write in that case.
-            return undefined;
-        }
-    }
-
-    if (typeof state.telemetryProjectId === "string") return state.telemetryProjectId;
+    const file = path.join(dir, PROJECT_ID_FILE);
+    if (fs.existsSync(file)) return readProjectId(file);
 
     const projectId = crypto.randomUUID();
     try {
-        fs.writeFileSync(file, JSON.stringify({ ...state,
-telemetryProjectId: projectId }, null, 2), "utf-8");
+        // `wx`: of two commands minting the first id at once, one writes and
+        // the other reads what it wrote.
+        fs.writeFileSync(file, `${JSON.stringify({ projectId }, null, 2)}\n`, { encoding: "utf-8", flag: "wx", mode: 0o600 });
     } catch {
-        return undefined;
+        return fs.existsSync(file) ? readProjectId(file) : undefined;
     }
     return projectId;
+}
+
+/**
+ * The id a checkout's file holds. A file that does not parse is not ours to
+ * repair — overwriting it would quietly start a second id for the same
+ * checkout — so the event reports no project instead.
+ */
+function readProjectId(file: string): string | undefined {
+    try {
+        const raw = JSON.parse(fs.readFileSync(file, "utf-8"));
+        if (raw && typeof raw === "object" && typeof raw.projectId === "string") return raw.projectId;
+    } catch {
+        // Unreadable or corrupt: see above.
+    }
+    return undefined;
 }
