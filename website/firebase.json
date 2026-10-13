@@ -125,6 +125,16 @@
         "type": 301
       },
       {
+        "source": "/docs/upgrading/0-24-to-next",
+        "destination": "/docs/upgrading/0-24-to-0-25/",
+        "type": 301
+      },
+      {
+        "source": "/docs/upgrading/0-24-to-next/",
+        "destination": "/docs/upgrading/0-24-to-0-25/",
+        "type": 301
+      },
+      {
         "source": "/docs/upgrading/0-18-to-next",
         "destination": "/docs/upgrading/0-18-to-0-21/",
         "type": 301
