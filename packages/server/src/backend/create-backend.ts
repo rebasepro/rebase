@@ -961,9 +961,6 @@ export async function createRebaseBackend(options: RebaseBackendOptions): Promis
             // purpose — say so when the collection expects otherwise.
             warnOnAuthCollectionDataCallbacks(safeAuthConfig.collection as never);
 
-            // Extract the collection-level auth config (if `auth` is an object, not just `true`)
-            const collectionAuth = safeAuthConfig.collection ? safeAuthConfig.collection.auth : undefined;
-            const collectionAuthConfig = (typeof collectionAuth === "object" && collectionAuth !== null) ? collectionAuth : undefined;
             if (safeAuthConfig.jwtSecret) {
                 jwt = createJwtService({
                     secret: safeAuthConfig.jwtSecret,
@@ -1294,18 +1291,20 @@ export async function createRebaseBackend(options: RebaseBackendOptions): Promis
         apiKeyStore,
         collections: () => collectionRegistry.getRawCollections()
     };
-    // The client code this backend runs sees as `rebase`, set once the
-    // in-process client exists further down.
-    let scope: BackendScope | undefined;
     /**
      * Every route group's first middleware: this backend's services on the
      * request, and the rest of the request run in its scope — so a function,
      * a hook or a callback it reaches sees this backend as `rebase`, however
      * many backends the process holds.
+     *
+     * `ownScope` is declared further down, once the in-process client exists.
+     * No request reaches a group before then: an application mounts the groups
+     * through the backend this function returns, and the in-process app the
+     * client dispatches into is declared further down still.
      */
     const provideServices: MiddlewareHandler<HonoEnv> = async (c, next) => {
         c.set("services", services);
-        return scope ? runInBackendScope(scope, next) : next();
+        return runInBackendScope(ownScope, next);
     };
 
     // 3. Initialize Storage
@@ -2668,7 +2667,6 @@ export async function createRebaseBackend(options: RebaseBackendOptions): Promis
     // answer, every cron run and job it executes. Not the process's — that is
     // whichever backend `setDefaultBackend` installed.
     const ownScope: BackendScope = { rebase: serverSingleton };
-    scope = ownScope;
 
     // Retroactively inject the server client into every source's driver so that
     // entity callbacks receive `context.client` at runtime — see
