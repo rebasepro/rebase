@@ -43,7 +43,7 @@ propósito: un pooler de conexiones y ejecutar las funciones y el worker de
 trabajos como procesos propios.
 
 ```bash
-rebase build          # produce ./dist-bundle
+rebase build          # produces ./dist-bundle
 docker compose up -d
 ```
 

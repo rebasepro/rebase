@@ -28,13 +28,13 @@ function App() {
         <Rebase
             client={rebaseClient}
             components={{
-                // Modo Eject: Reemplaza por completo el AppBar predeterminado
+                // Eject Mode: Replace the default AppBar entirely
                 "Shell.AppBar": { Component: MyAppBar },
 
-                // Modo Wrap: Envuelve la vista de inicio de sesión para insertar branding
+                // Wrap Mode: Wrap the login view to insert branding
                 "Auth.LoginView": {
-                    // `OriginalComponent` se inyecta en tiempo de ejecución cuando `wrap: true`; el tipo
-                    // del slot de sobrescritura no lo modela, de ahí la anotación.
+                    // `OriginalComponent` is injected at runtime when `wrap: true`; the override
+                    // slot's type does not model it, hence the annotation.
                     Component: (({ OriginalComponent, ...props }: {
                         OriginalComponent: React.ComponentType<Record<string, unknown>>
                     }) => (
@@ -73,10 +73,10 @@ export const productsCollection = defineCollection({
     properties: { /* ... */ },
     admin: {
         components: {
-            // Modo Eject: Reemplaza la vista de formulario de entidad predeterminada
+            // Eject Mode: Replace the default entity form view
             "Entity.Form": { Component: "../../frontend/src/ProductCustomForm" },
 
-            // Modo Wrap: Envuelve el estado vacío para añadir enlaces rápidos
+            // Wrap Mode: Wrap the empty state to add quick links
             "Collection.EmptyState": {
                 Component: "../../frontend/src/ProductsEmptyState",
                 wrap: true
