@@ -138,6 +138,38 @@ describe("LoginView Component", () => {
         expect(mockAuthController.register).toHaveBeenCalledWith("new@rebase.pro", "password123", "New User");
     });
 
+    describe("every field is named by its visible label", () => {
+        // A field with no associated label is named after its placeholder:
+        // "you@example.com", and the password field "••••••••".
+
+        it("names the sign-in fields Email and Password", async () => {
+            render(<LoginView authController={mockAuthController} />);
+            fireEvent.click(screen.getByRole("button", { name: /Sign in with email/i }));
+
+            expect(await screen.findByLabelText("Email")).toHaveAttribute("type", "email");
+            expect(screen.getByLabelText("Password")).toHaveAttribute("type", "password");
+            expect(screen.getByRole("textbox", { name: "Email" })).toBeInTheDocument();
+        });
+
+        it("names the sign-up fields, the display name included", async () => {
+            render(<LoginView authController={mockAuthController} />);
+            fireEvent.click(screen.getByRole("button", { name: /Create one/i }));
+
+            expect(await screen.findByLabelText("Display Name")).toHaveAttribute("type", "text");
+            expect(screen.getByLabelText("Email")).toHaveAttribute("type", "email");
+            expect(screen.getByLabelText("Password")).toHaveAttribute("type", "password");
+        });
+
+        it("names the forgot-password email field", async () => {
+            render(<LoginView authController={mockAuthController} />);
+            fireEvent.click(screen.getByRole("button", { name: /Sign in with email/i }));
+            fireEvent.click(await screen.findByRole("button", { name: /Forgot/i }));
+
+            expect(await screen.findByText("Reset password")).toBeInTheDocument();
+            expect(screen.getByLabelText("Email")).toHaveAttribute("type", "email");
+        });
+    });
+
     describe("OAuth buttons need both halves configured", () => {
         const GOOGLE_ID = "test-client-id.apps.googleusercontent.com";
 
