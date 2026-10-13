@@ -362,9 +362,10 @@ import {
     openRebase,
     postgresDriverConfigFromEnv
 } from "@rebasepro/server-postgres";
-import collections from "../../config/collections";
+import { collections } from "../../config/collections";
 
 // The shortcut: dataAsAdmin, sql, withAuth(user), close(). No DDL, no env reads.
+// Typed by the Database `rebase generate-sdk --register` registers, or openRebase<Database>(…).
 const rebase = await openRebase({ databaseUrl: process.env.DATABASE_URL!, collections });
 await rebase.close();
 

@@ -58,6 +58,12 @@ development database gets it started first. The history of what you typed is
 kept in `.rebase/console_history`, which the scaffold's `.gitignore` already
 leaves out.
 
+Input piped in runs one line at a time, each after the previous line's `await`
+has settled, so the transcript above works as
+`printf '…\n…\n' | rebase console`. Anything after `.exit` is ignored, and
+values are coloured only on a terminal. Everything the console logs goes to
+stderr.
+
 ### One snippet: `--eval`
 
 <span class="since-badge" data-since="0.25">Since 0.25</span>
@@ -72,9 +78,9 @@ rebase console -e "rebase.sql('select count(*) from posts')" | jq .
 rebase console -e "const u = await rebase.withAuth({ uid: 'u1', roles: ['user'] }); return (await u.data.posts.find()).data"
 ```
 
-What the database resolution has to say goes to stderr, so stdout holds the
-result and nothing else. A snippet that throws prints the error on stderr and
-exits `1`.
+Everything the console logs, whatever `LOG_LEVEL` says, goes to stderr, so
+stdout holds the result and nothing else. A snippet that throws prints the error
+on stderr and exits `1`.
 
 ### Options
 
@@ -139,6 +145,13 @@ Its options:
 `openRebase` reads no environment variable. The `DATABASE_URL` above is read by
 your script, and settings such as `REBASE_DB_POOL_MAX` or `REALTIME_CDC` change
 nothing here.
+
+Its accessors are typed by the `Database` that `rebase generate-sdk --register`
+registers, as a function's `rebase` is, so a misspelled collection, field or
+enum value in a script is a type error. Without a registration, name it per call
+with `openRebase<Database>({ … })`; `OpenedRebase<Database>` is the type to give
+a helper that takes one. With neither, rows are untyped, which is why the first
+example converts `draft.id` with `String()`.
 
 ### Checking what a user can see
 

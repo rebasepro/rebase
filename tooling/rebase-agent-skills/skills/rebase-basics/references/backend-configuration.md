@@ -190,10 +190,11 @@ import { createServer } from "http";
 import { initializeRebaseBackend, loadEnv } from "@rebasepro/server";
 import { createPostgresAdapter, createPostgresDatabaseConnection } from "@rebasepro/server-postgres";
 import { defaultUsersCollection } from "@rebasepro/common";
-import collections from "../config/collections";
+import { collections } from "../../config/collections";
 import dotenv from "dotenv";
 
-dotenv.config({ path: "../../.env" });
+// `rebase dev` and `rebase start` name the project's .env in DOTENV_CONFIG_PATH.
+dotenv.config({ path: process.env.DOTENV_CONFIG_PATH, quiet: true });
 const env = loadEnv();
 
 // The adapter queries through `connection`; a `connectionString` alone opens no pool.
@@ -255,16 +256,21 @@ import {
     createRebaseBackend,
     installShutdownHandlers,
     installUnhandledRejectionHandler,
+    loadEnv,
     loadFunctions,
+    logger,
     setDefaultBackend,
     type HonoEnv
 } from "@rebasepro/server";
 import { createPostgresAdapter, createPostgresDatabaseConnection } from "@rebasepro/server-postgres";
-import collections from "../config/collections";
+import dotenv from "dotenv";
+import { collections } from "../../config/collections";
 
+dotenv.config({ path: process.env.DOTENV_CONFIG_PATH, quiet: true });
+const env = loadEnv();                       // validates, and generates JWT_SECRET in development
 installUnhandledRejectionHandler();          // log a stray rejection instead of exiting (process-wide)
 
-const { db, pool, connectionString } = createPostgresDatabaseConnection(process.env.DATABASE_URL!);
+const { db, pool, connectionString } = createPostgresDatabaseConnection(env.DATABASE_URL);
 const app = new Hono<HonoEnv>();
 const server = createServer(getRequestListener(app.fetch));
 
@@ -272,7 +278,7 @@ const server = createServer(getRequestListener(app.fetch));
 const backend = await createRebaseBackend({
     database: createPostgresAdapter({ connection: db, connectionString }),
     collections,
-    auth: { jwtSecret: process.env.JWT_SECRET! },
+    auth: { jwtSecret: env.JWT_SECRET },
     functions: await loadFunctions("./src/functions"),   // { name: app }
     provision: true                                     // required: may it run DDL?
 });
@@ -286,8 +292,14 @@ installShutdownHandlers(
     { shutdown: (timeoutMs) => backend.shutdown(timeoutMs, { server }) },
     { onCleanup: () => pool.end() }
 );
-server.listen(3001);
+// PORT is the one `rebase dev` picked, and it waits for this line.
+server.listen(env.PORT, () => logger.info(`Server running at http://localhost:${env.PORT}`));
 ```
+
+This is the shape, not a whole scaffold server: the file that serves exactly
+what the runtime serves under `rebase dev` (users collection, functions, crons,
+buckets, CORS for the admin panel, health routes) is in the docs, at
+https://rebase.pro/docs/backend/custom-server/.
 
 A group mounted on its own (`app.route(path, backend.routes.functions())`)
 carries its own auth context, rate limits and admin gate, so `getUser(c)` and

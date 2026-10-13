@@ -244,8 +244,9 @@ open the project from code (new in 0.25) instead of booting a server or reaching
 for `psql`:
 
 ```typescript
+// backend/scripts/x.ts: the backend workspace is the one that can import the driver.
 import { openRebase } from "@rebasepro/server-postgres";
-import collections from "../config/collections";
+import { collections } from "../../config/collections";
 
 const rebase = await openRebase({ databaseUrl: process.env.DATABASE_URL!, collections });
 const { data: posts } = await rebase.dataAsAdmin.posts.find({ limit: 10 });
@@ -259,7 +260,11 @@ await rebase.close();
 ```
 
 - `dataAsAdmin` and `sql` are the accessors a function's `rebase` has, so a
-  snippet moves between a function and a script unchanged.
+  snippet moves between a function and a script unchanged. They are typed by the
+  `Database` that `rebase generate-sdk --register` registers, or per call with
+  `openRebase<Database>({ … })`.
+- Run it from `backend/` with the URL the project uses:
+  `DATABASE_URL="$(pnpm exec rebase db url)" pnpm exec tsx scripts/x.ts`.
 - Opening changes nothing in the database and reads no environment variable.
   `withAuth` against a database no server has booted on fails rather than run
   unfiltered.
@@ -271,12 +276,16 @@ await rebase.close();
 `rebase console` opens the same object in a Node REPL, with `rebase` and the
 project's `collections` in scope and top-level await. It finds the database the
 way `rebase db push` does, the managed one included. `rebase console -e "<code>"`
-runs one snippet and prints its result as JSON on stdout:
+runs one snippet and prints its result as JSON on stdout; every log line goes to
+stderr, so stdout pipes:
 
 ```bash
 rebase console -e "rebase.dataAsAdmin.posts.find({ limit: 5 })"
 rebase console -e "rebase.sql('select count(*) from posts')" | jq .
 ```
+
+Input piped into the REPL runs one line at a time, each after the previous
+line's `await` has settled.
 
 # Reference files
 
