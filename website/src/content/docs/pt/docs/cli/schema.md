@@ -116,6 +116,18 @@ Isso é útil ao adotar a Rebase em um banco de dados existente — faça a intr
 
 **Introspectar e depois fazer push não muda nada.** As propriedades geradas dizem exatamente o que cada coluna é — `columnType`, `precision`/`scale`, `defaultValue`, `required`, o `isId` de uma chave (`"increment"` para uma identity inteira, `columnType: "serial"` para uma serial, `"manual"` para uma chave sem default), o `onDelete` de uma relação — e o seu `index: false` onde o banco de dados não tem índice na coluna da chave, já que um `belongsTo` é [indexado por padrão](/docs/backend/indexes#foreign-keys-are-indexed-for-you) (apague a linha para que um seja construído) — e o bloco `search` de uma coleção lido de volta a partir da coluna que ele construiu — então `rebase db push --dry-run` logo depois de uma introspecção não planeja nenhuma mudança. Onde nenhuma propriedade consegue descrever uma coluna — um `timestamp` sem fuso horário, um `interval`, um `inet`, um tipo enum que não se chama `<table>_<column>`, um default como `CURRENT_DATE` — a introspecção avisa, por coluna, no terminal e no topo do arquivo, com o que um push faria com ela e, quando existir, a instrução que faz as duas coisas coincidirem (`ALTER TYPE "mood" RENAME TO "customers_current_mood";`). Uma tabela com chave composta por mais de uma coluna volta como uma chave composta, com o seu `isId` em cada coluna da chave. Ela é deixada de fora, com o motivo, quando uma coluna da chave não pode levar `isId` (um timestamp, por exemplo) ou a chave estrangeira de outra tabela aponta para ela, o que uma relação de uma só coluna não consegue fazer; o `db push` deixa em paz uma tabela que não é uma coleção. Na 0.23 o push logo depois de uma introspecção ainda pode planejar mudanças de tipo, defaults removidos e NOT NULLs, e uma chave `id` fantasma.
 
+**Como são os arquivos gerados**
+
+A introspecção escreve as coleções com `defineCollection`, que mantém as chaves das propriedades *literais* — de modo que `propertiesOrder`, `listProperties`, `sort` e `display.title` completam com os nomes das suas próprias colunas, e uma chave deixada para trás por uma coluna renomeada é um erro de compilação em vez de uma linha que silenciosamente não faz nada. Qual delas é importada depende do que o seu projeto declara como dependência, e é decidido a cada execução:
+
+| Seu projeto declara | As coleções geradas usam | Bloco `admin` |
+|------|------|------|
+| `@rebasepro/cms-types` (um projeto com o painel) | `defineCollection` de `@rebasepro/cms-types` | sim |
+| `@rebasepro/common` (um projeto `--headless`) | `defineCollection` de `@rebasepro/common` | não |
+| nenhum dos dois | uma anotação `PostgresCollectionConfig`, com um aviso | não |
+
+Um projeto headless não tem painel de administração, e os tipos do core não declaram nenhum campo `admin` — então o bloco não é emitido ali. Ele é apresentação (`icon`, `propertiesOrder`, `multiline`); nada no schema, na API ou nos seus dados depende dele.
+
 ### `rebase db push`
 
 Envie as mudanças de esquema diretamente para o banco de dados sem arquivos de migração:
@@ -278,6 +290,8 @@ rebase doctor
 
 Execute `doctor` sempre que algo parecer fora de sincronia. Ele aponta exatamente onde está a incompatibilidade.
 
+A comparação com o banco de dados precisa de `DATABASE_URL` (ou `ADMIN_CONNECTION_STRING`). Sem uma delas, essa fase é reportada como **ignorada** (skipped) em vez de aprovada, e a execução nunca termina com "All schemas are in sync" — uma verificação que não aconteceu não é um atestado de saúde.
+
 <span class="since-badge" data-since="0.25">Desde 0.25</span> Ele também nomeia toda coleção sem [bloco `search`](/docs/backend/search) cuja tabela tenha mais de cerca de 10.000 linhas. Uma busca ali — a caixa de busca do admin, `.search()`, `?searchString=` — é `ILIKE '%term%'` sobre as colunas de texto, que nenhum índice consegue atender, então cada uma lê a tabela inteira, e a sua contagem a lê de novo (cerca de um terço de segundo com 100.000 linhas, crescendo com a tabela). A contagem de linhas é a estimativa do próprio Postgres, então a verificação não varre nada. É uma dica: ela não muda o código de saída, e nada é indexado para você.
 
 <span class="since-badge" data-since="0.25">Desde 0.25</span> Ele nomeia uma **junção órfã**: uma tabela `public` com a forma de uma junção many-to-many que nenhuma coleção declara. A forma são duas colunas que juntas formam a chave primária, cada uma uma chave estrangeira para a tabela de uma coleção. Renomear ou remover uma `manyToMany` deixa a junção antiga para trás, porque push e boot apenas criam tabelas, e todas as linhas de vínculo continuam nela. A nota é apenas informativa, então não altera o código de saída. A correção é a instrução `DROP TABLE`, que o `doctor` mostra e nunca executa.
@@ -334,7 +348,7 @@ const client = createRebaseClient<Database>({
 const { data } = await client.data.products.find();
 ```
 
-Os nomes dos campos nos tipos gerados são os que a API serve, inalterados: uma coluna `createdAt` é `row.createdAt`. Apenas o *accessor* da coleção é convertido num nome de propriedade (`my-notes` → `client.data.myNotes`), que é o que `collectionsDictionary` mapeia de volta para o slug.
+Os nomes dos campos nos tipos gerados são os que a API serve. O nome de um campo na rede é a chave da sua propriedade, e a API é camelCase por inteiro: a introspecção gera uma coluna `created_at` como uma propriedade `createdAt` que carrega `columnName: "created_at"`, e a serve como `row.createdAt`. A coluna em si não é alterada. O *accessor* da coleção é convertido num nome de propriedade da mesma forma (`my-notes` → `client.data.myNotes`), que é o que `collectionsDictionary` mapeia de volta para o slug.
 
 ## Fluxo de Trabalho de Desenvolvimento
 

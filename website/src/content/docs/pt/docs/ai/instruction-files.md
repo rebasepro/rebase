@@ -48,7 +48,7 @@ Isso acontece em todo `rebase init`, para todos os presets, incluindo `--headles
 Não há nenhuma flag nem prompt.
 
 O `rebase init` também escreve `.mcp.json`, que aponta o Claude Code, o Cursor
-e qualquer outro cliente MCP para o [servidor MCP do Rebase](/pt/docs/ai/mcp) —
+e qualquer outro cliente MCP para o [servidor MCP do Rebase](/docs/ai/mcp) —
 a própria cópia do projeto, uma devDependency fixada junto com a CLI
 (`npx --no rebase-mcp` em um projeto npm):
 
@@ -71,7 +71,7 @@ servidor na raiz do projeto, e um caminho absoluto é a única linha desse arqui
 que não pode ser commitada. Ele está ali porque `~/.rebase/projects.json` vale
 para a máquina inteira — um projeto que não nomeia um diretório próprio acaba
 usando o que o último projeto daquela máquina gravou. Veja
-[a precedência](/pt/docs/ai/mcp#em-qual-diretório-ele-atua).
+[a precedência](/docs/ai/mcp#which-directory-it-acts-on).
 
 ## Por que um ponteiro em vez de uma cópia
 

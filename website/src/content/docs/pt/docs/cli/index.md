@@ -366,7 +366,6 @@ rebase api-keys revoke abc123-def456
 dá a ela todos os escopos que a chave de serviço tem, exceto `keys:*`. `--roles` adiciona roles de RLS além de
 `service`, `--expires-in` aceita dias e `--expires-at` uma data ISO.
 `rebase api-keys scopes` lista todos os escopos que o backend conhece. A chave é exibida apenas uma vez.
-
 As chaves possuem dupla validação de acesso: tanto os escopos da chave quanto o row-level security da identidade
 que ela assume são aplicados. Consulte [Chaves de API](/docs/backend/api-keys/).
 
