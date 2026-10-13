@@ -24,14 +24,20 @@ jest.mock("../api/openapi-generator", () => {
     };
 });
 
-import { mountOpenApiDocs } from "./docs";
+import { loadOpenApiGenerator, mountOpenApiDocs } from "./docs";
 
 const posts = [{ name: "posts", slug: "posts", properties: { title: { type: "string" } } } as unknown as CollectionConfig];
 const tags = [{ name: "tags", slug: "tags", properties: { label: { type: "string" } } } as unknown as CollectionConfig];
 
 async function mounted(collections: CollectionConfig[]): Promise<Hono<HonoEnv>> {
     const app = new Hono<HonoEnv>();
-    await mountOpenApiDocs(app, "/api", true, collections, false, [createRequireAuth({}), requireAdmin]);
+    mountOpenApiDocs(app, "/api", {
+        enableSwagger: true,
+        serverCollections: collections,
+        requireAuth: false,
+        adminGate: [createRequireAuth({}), requireAdmin],
+        generate: await loadOpenApiGenerator()
+    });
     return app;
 }
 

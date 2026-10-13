@@ -3,29 +3,43 @@ import { CollectionConfig } from "@rebasepro/types";
 import { HonoEnv } from "../api/types";
 import { logger } from "../utils/logger";
 
-/** Bound once the generator is imported; the route closes over it. */
-let generateOpenApiSpecFn: typeof import("../api/openapi-generator").generateOpenApiSpec | null = null;
+/** The OpenAPI document builder, loaded on demand — see {@link loadOpenApiGenerator}. */
+export type OpenApiGenerator = typeof import("../api/openapi-generator").generateOpenApiSpec;
+
+/**
+ * Load the document builder. Separate from mounting so the mount is
+ * synchronous: a backend loads it once while it is built, and mounts the
+ * routes wherever and as often as the application asks.
+ */
+export async function loadOpenApiGenerator(): Promise<OpenApiGenerator> {
+    const { generateOpenApiSpec } = await import("../api/openapi-generator");
+    return generateOpenApiSpec;
+}
+
+export interface OpenApiDocsOptions {
+    enableSwagger: boolean | undefined;
+    /**
+     * The collections the REST routes were generated from — the ones whose
+     * data source has a `"server"` transport — not every active collection. A
+     * direct-transport collection is served by the client against its own
+     * backend; documenting it here publishes a full set of CRUD paths that
+     * 404, with a Try-It button next to each.
+     */
+    serverCollections: CollectionConfig[];
+    requireAuth: boolean;
+    /** The runtime's admin gate — the middlewares every admin surface sits behind — for the spec when it is not public. */
+    adminGate: MiddlewareHandler<HonoEnv>[];
+    /** The document builder. Only read when there are collections to document. */
+    generate: OpenApiGenerator | undefined;
+    /** Whether to log where Swagger UI is. Default `true`. */
+    announce?: boolean;
+}
 
 /**
  * Serve the OpenAPI document, and Swagger UI outside production.
- *
- * `serverCollections` must be the collections the REST routes were generated
- * from — the ones whose data source has a `"server"` transport — not every
- * active collection. A direct-transport collection is served by the client
- * against its own backend; documenting it here publishes a full set of CRUD
- * paths that 404, with a Try-It button next to each.
- *
- * `adminGate` is the runtime's admin gate — the middlewares every admin surface
- * sits behind — for the spec when it is not public.
  */
-export async function mountOpenApiDocs(
-    app: Hono<HonoEnv>,
-    basePath: string,
-    enableSwagger: boolean | undefined,
-    serverCollections: CollectionConfig[],
-    requireAuth: boolean,
-    adminGate: MiddlewareHandler<HonoEnv>[]
-): Promise<void> {
+export function mountOpenApiDocs(app: Hono<HonoEnv>, basePath: string, options: OpenApiDocsOptions): void {
+    const { enableSwagger, serverCollections, requireAuth, adminGate, generate } = options;
     if (serverCollections.length === 0) {
         // Still routed, and still a 404 — but one that says which 404 it is.
         //
@@ -67,6 +81,11 @@ export async function mountOpenApiDocs(
     // console is asking on behalf of.
     const isPublic = enableSwagger !== false;
 
+    if (!generate) {
+        throw new Error("mountOpenApiDocs: collections to document, and no document builder — pass `generate` (`await loadOpenApiGenerator()`).");
+    }
+    const generateSpec = generate;
+
     /**
      * The document, generated and encoded on the first request and served
      * as those bytes after: generating it took 39 ms of CPU and a 10.8 MB
@@ -84,12 +103,10 @@ export async function mountOpenApiDocs(
      */
     let serialized: Uint8Array<ArrayBuffer> | undefined;
     const spec = (c: { body: (data: Uint8Array<ArrayBuffer>, status: 200, headers: Record<string, string>) => Response }) => {
-        serialized ??= new TextEncoder().encode(JSON.stringify(generateOpenApiSpecFn!(serverCollections, { basePath, requireAuth })));
+        serialized ??= new TextEncoder().encode(JSON.stringify(generateSpec(serverCollections, { basePath, requireAuth })));
         return c.body(serialized, 200, { "Content-Type": "application/json" });
     };
 
-    const { generateOpenApiSpec } = await import("../api/openapi-generator");
-    generateOpenApiSpecFn = generateOpenApiSpec;
 
     if (isPublic) {
         app.get(`${basePath}/docs`, (c) => spec(c));
@@ -120,6 +137,6 @@ export async function mountOpenApiDocs(
 </body>
 </html>`);
         });
-        logger.info("Swagger UI available", { path: `${basePath}/swagger` });
+        if (options.announce !== false) logger.info("Swagger UI available", { path: `${basePath}/swagger` });
     }
 }

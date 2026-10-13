@@ -155,8 +155,8 @@ describe("SMTPEmailService connections", () => {
         expect(smtp.open()).toBe(0);
     });
 
-    it("is handed to the shutdown by initializeRebaseBackend", () => {
-        const init = readFileSync(path.join(__dirname, "../src/init.ts"), "utf8");
+    it("is handed to the shutdown by the backend", () => {
+        const init = readFileSync(path.join(__dirname, "../src/backend/create-backend.ts"), "utf8");
         expect(init).toMatch(/createShutdown\(\{[\s\S]*?emailService[\s\S]*?\}\)/);
     });
 });

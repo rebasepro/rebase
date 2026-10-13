@@ -56,8 +56,12 @@ const RESPONSE_ONLY_DROP = new Set(["content-encoding", "content-length"]);
 export interface FunctionsProxyOptions {
     /** Base URL of the process serving the functions, e.g. `http://functions:8080`. */
     upstream: string;
-    /** The mount path being forwarded, e.g. `/api/functions`. */
-    basePath: string;
+    /**
+     * The mount path being forwarded, e.g. `/api/functions`. Omitted, it is the
+     * `mountPath` the functions group recorded for the request — the path the
+     * application mounted it at — so the upstream is asked for the same path.
+     */
+    basePath?: string;
 }
 
 /**
@@ -86,14 +90,15 @@ export function createFunctionsProxy(options: FunctionsProxyOptions): Hono<HonoE
 
     router.all("/*", async (c) => {
         const incoming = new URL(c.req.url);
+        const basePath = options.basePath ?? c.get("mountPath") ?? "";
         // The path *below* the mount point. Hono gives the full request path, so
         // taking the suffix is what keeps the upstream's own mount identical:
         // `/api/functions/send-invoice` here becomes `/api/functions/send-invoice`
         // there, not `/api/functions/api/functions/send-invoice`.
-        const suffix = incoming.pathname.startsWith(options.basePath)
-            ? incoming.pathname.slice(options.basePath.length)
+        const suffix = incoming.pathname.startsWith(basePath)
+            ? incoming.pathname.slice(basePath.length)
             : incoming.pathname;
-        const target = `${upstream}${options.basePath}${suffix}${incoming.search}`;
+        const target = `${upstream}${basePath}${suffix}${incoming.search}`;
 
         const headers = new Headers();
         for (const [name, value] of c.req.raw.headers) {

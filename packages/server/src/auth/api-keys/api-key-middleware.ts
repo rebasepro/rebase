@@ -203,16 +203,19 @@ export function createTusScopeGuard(): MiddlewareHandler<HonoEnv> {
  *
  * @param mountPrefix - The path the functions router is mounted at
  *                      (e.g. `/api/functions`), used to extract the function
- *                      name from the request path.
+ *                      name from the request path. Omitted, it is the
+ *                      `mountPath` the functions group recorded for this
+ *                      request — wherever the application mounted it.
  */
-export function createFunctionScopeGuard(mountPrefix: string): MiddlewareHandler<HonoEnv> {
+export function createFunctionScopeGuard(mountPrefix?: string): MiddlewareHandler<HonoEnv> {
     return async (c, next) => {
         const narrowed = c.get("scopes");
         if (!narrowed) return next();
 
         const path = c.req.path;
-        const idx = path.indexOf(mountPrefix);
-        const rest = idx < 0 ? "" : path.slice(idx + mountPrefix.length);
+        const prefix = mountPrefix ?? c.get("mountPath") ?? "";
+        const idx = path.indexOf(prefix);
+        const rest = idx < 0 ? "" : path.slice(idx + prefix.length);
         const rawName = rest.split("/").filter(Boolean)[0] ?? "";
         let functionName: string;
         try {

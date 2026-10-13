@@ -125,8 +125,8 @@ describe("where the boot starts it", () => {
         expect(startExpiredTokenSweep({ authRepo: {}, driver, ownsTimers: true })).toBeUndefined();
     });
 
-    it("is started by initializeRebaseBackend and stopped by its shutdown", () => {
-        const init = readFileSync(path.join(__dirname, "../src/init.ts"), "utf8");
+    it("is started by the backend's start() and stopped by its shutdown", () => {
+        const init = readFileSync(path.join(__dirname, "../src/backend/create-backend.ts"), "utf8");
         expect(init).toMatch(/startExpiredTokenSweep\(\{[\s\S]*?ownsTimers: ownership\.cronScheduler/);
         expect(init).toMatch(/createShutdown\(\{[\s\S]*?authTokenSweep[\s\S]*?\}\)/);
     });

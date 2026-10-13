@@ -7,7 +7,7 @@
  * regression of the `[key: string]: unknown` catch-all that used to make
  * every key (including typos) compile silently.
  */
-import type { RebaseAuthConfig } from "../src/init";
+import type { RebaseAuthConfig } from "../src/backend/options";
 
 describe("RebaseAuthConfig", () => {
 

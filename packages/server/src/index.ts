@@ -10,11 +10,22 @@
 // =============================================================================
 // Core Initialization
 // =============================================================================
+// The one-call boot, and the public steps it is made of: `createRebaseBackend`
+// builds a backend that has mounted and started nothing; its `routes`, `mount`,
+// `attachRealtime`, `start` and `shutdown` are the rest.
+export { initializeRebaseBackend } from "./init";
 export {
-    initializeRebaseBackend,
-    isAuthAdapter,
-    isDatabaseAdapter
-} from "./init";
+    createRebaseBackend,
+    isDatabaseAdapter,
+    realtimeSocketPath
+} from "./backend/create-backend";
+export type {
+    AttachRealtimeOptions,
+    BackendMountOptions,
+    RebaseBackend,
+    RebaseRoutes
+} from "./backend/create-backend";
+export { isAuthAdapter } from "./auth/require-auth";
 // The single answer to "does this server require an authenticated caller?".
 // Exported because the drivers' realtime sockets are the other enforcement
 // point, and while they computed it themselves they computed it differently —
@@ -22,12 +33,17 @@ export {
 export { resolveRequireAuth } from "./auth/require-auth";
 export type {
     RebaseBackendConfig,
-    RebaseBackendInstance,
+    RebaseBackendInstance
+} from "./init";
+export type {
+    RebaseBackendOptions,
+    ProvisionOptions,
     RebaseAuthConfig,
+    LiveSchemaConfig,
     // The type of the `baas` option, exported for the same reason
     // RebaseAuthConfig is: a backend author cannot name the shape otherwise.
     BaasOptions
-} from "./init";
+} from "./backend/options";
 
 // =============================================================================
 // Server-side singleton (import { rebase } from "@rebasepro/server")

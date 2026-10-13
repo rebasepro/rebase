@@ -1,5 +1,5 @@
 import type { CollectionConfig } from "@rebasepro/types";
-import type { LiveSchemaConfig, RebaseAuthConfig } from "../init";
+import type { LiveSchemaConfig, RebaseAuthConfig } from "../backend/options";
 import type { EmailConfig } from "../email";
 import { createDevEmailSink, registerDevEmailSink } from "../email/dev-sink";
 import type { CaptchaConfig, CaptchaRoute } from "../auth/captcha";

@@ -99,6 +99,16 @@ export type HonoEnv = {
          * older schema is usually still compatible.
          */
         schemaDrift?: { client: string; server: string };
+        /**
+         * Where the route group answering this request is mounted, e.g.
+         * `/api/data` or `/api/functions` — wherever the application put it.
+         *
+         * Set by the group's first middleware from the request itself, so a
+         * group mounted at a path of the caller's choosing still knows which
+         * collection a path names and which URL a function answers at. See
+         * `api/mount-path.ts`.
+         */
+        mountPath?: string;
     }
 };
 

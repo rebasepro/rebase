@@ -348,8 +348,7 @@ export function adapterToBootstrapper(
         stampCollectionsSchemaVersion: adapter.stampCollectionsSchemaVersion
             ? (version, driverResult) => adapter.stampCollectionsSchemaVersion!(version, driverResult)
             : undefined,
-        getAdmin: adapter.getAdmin,
-        mountRoutes: adapter.mountRoutes
+        getAdmin: adapter.getAdmin
     };
 }
 

@@ -31,7 +31,8 @@ export function createFunctionRoutes(
     /**
      * Where this router is mounted, so the listing can report a path a caller
      * can actually request. It used to hardcode `/functions/<name>`, which is
-     * wrong under every `basePath` including the default `/api`.
+     * wrong under every `basePath` including the default `/api`. The
+     * `mountPath` a functions group records for the request wins over it.
      */
     mountPath = "/functions"
 ): Hono<HonoEnv> {
@@ -47,10 +48,11 @@ export function createFunctionRoutes(
     // `rebase doctor` and `rebase cloud debug` keep their answer; the latter
     // already reads a 401 here as "mounted".
     router.get("/", requireAuth, (c) => {
+        const at = c.get("mountPath") ?? mountPath;
         return c.json({
             functions: functions.map((fn) => ({
                 name: fn.name,
-                endpoint: `${mountPath}/${fn.name}`
+                endpoint: `${at}/${fn.name}`
             })),
             ...(skipped > 0 && {
                 skipped,
@@ -90,7 +92,7 @@ export function createFunctionRoutes(
         };
 
         if (!name) {
-            refuse(`No function in the request path. Expected ${mountPath}/<function>.`);
+            refuse(`No function in the request path. Expected ${c.get("mountPath") ?? mountPath}/<function>.`);
         }
         if (mounted.has(name)) {
             refuse(

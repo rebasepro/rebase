@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import type { DatabaseAdapter } from "@rebasepro/types";
 import { adapterToBootstrapper } from "../src/boot/driver";
-import { wrapDatabaseAdapter } from "../src/init";
+import { wrapDatabaseAdapter } from "../src/backend/create-backend";
 
 /**
  * Neither wrapper may drop a capability the adapter implements.
@@ -42,8 +42,7 @@ const CAPABILITIES = [
     "finalizeSecurityPosture",
     "readCollectionsSchemaVersion",
     "stampCollectionsSchemaVersion",
-    "getAdmin",
-    "mountRoutes"
+    "getAdmin"
 ] as const;
 
 /** An adapter that implements everything, so any omission shows up as a gap. */
@@ -67,7 +66,7 @@ function minimalAdapter(): DatabaseAdapter {
 }
 
 const WRAPPERS: Array<[string, (adapter: DatabaseAdapter) => Record<string, unknown>]> = [
-    ["wrapDatabaseAdapter (init.ts, config.database path)",
+    ["wrapDatabaseAdapter (backend/create-backend.ts, config.database path)",
         adapter => wrapDatabaseAdapter(adapter) as unknown as Record<string, unknown>],
     ["adapterToBootstrapper (boot/driver.ts, multi-source path)",
         adapter => adapterToBootstrapper(adapter, "(default)", true) as unknown as Record<string, unknown>]
@@ -91,8 +90,13 @@ const WRAPPERS: Array<[string, (adapter: DatabaseAdapter) => Record<string, unkn
  * assign it to — and nothing in the runtime calls it on an adapter either. It is
  * a declared-but-unwired hook rather than a dropped one; listing it here is what
  * keeps that distinction explicit instead of leaving the gate to be loosened.
+ *
+ * `mountRoutes` was forwarded by both wrappers and called by nothing: the boot
+ * never invoked it, so an adapter implementing it mounted no routes. It is not
+ * forwarded any more. An adapter with HTTP routes of its own exports them, and
+ * the application mounts them beside the backend's groups.
  */
-const NOT_FORWARDABLE = new Set(["destroy"]);
+const NOT_FORWARDABLE = new Set(["destroy", "mountRoutes"]);
 
 describe("CAPABILITIES covers the adapter protocol", () => {
     it("names every optional method on DatabaseAdapter", () => {

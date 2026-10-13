@@ -1,7 +1,7 @@
 import type { AuthAdapter } from "@rebasepro/types";
 // Type-only, so it is erased at compile time and creates no runtime cycle with
 // `init.ts` — which imports the two functions below.
-import type { RebaseAuthConfig } from "../init";
+import type { RebaseAuthConfig } from "../backend/options";
 
 /**
  * Whether the `auth` config is an `AuthAdapter` (it can verify a request) or a

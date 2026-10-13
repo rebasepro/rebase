@@ -4,7 +4,7 @@ import path from "node:path";
 
 import { resolveAuthOptions } from "../src/boot/options";
 import type { RebaseBootEnv } from "../src/boot/env";
-import type { RebaseAuthConfig } from "../src/init";
+import type { RebaseAuthConfig } from "../src/backend/options";
 import * as authModule from "../src/auth";
 
 /**
@@ -27,12 +27,12 @@ import * as authModule from "../src/auth";
  *
  *   1. the file exists and exports its factory;
  *   2. `resolveAuthOptions` turns the env pair into a config field;
- *   3. `init.ts`'s provider table knows that field, so the config field becomes
+ *   3. `backend/create-backend.ts`'s provider table knows that field, so the config field becomes
  *      a provider — which is what `enabledProviders` is a map of.
  */
 
 const AUTH_DIR = path.join(__dirname, "../src/auth");
-const INIT = path.join(__dirname, "../src/init.ts");
+const INIT = path.join(__dirname, "../src/backend/create-backend.ts");
 
 /** `discord-oauth.ts` → `discord`. The directory is the source of truth. */
 function shippedProviders(): string[] {
@@ -92,7 +92,7 @@ describe("every shipped OAuth provider has an environment route", () => {
         const init = readFileSync(INIT, "utf8");
         const row = new RegExp(`\\{\\s*key:\\s*"${provider}",\\s*factory:\\s*"(\\w+)"`).exec(init);
 
-        expect(row).not.toBeNull();  // no OAUTH_PROVIDERS row for this provider in init.ts
+        expect(row).not.toBeNull();  // no OAUTH_PROVIDERS row for this provider in backend/create-backend.ts
 
         const factory = (authModule as unknown as Record<string, (cfg: unknown) => { id: string }>)[row![1]];
         expect(typeof factory).toBe("function");

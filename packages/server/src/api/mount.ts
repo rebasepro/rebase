@@ -23,36 +23,16 @@
  */
 import { Hono } from "hono";
 import type { HonoEnv } from "./types";
-import { logger } from "../utils/logger";
-
-export interface MountOptions {
-    /** Where the surface lives now. */
-    canonical: string;
-    /** Where it used to live, when it has moved. */
-    legacy?: string;
-    /** For the boot log — "Cron", "Logs". */
-    surface: string;
-}
 
 /**
- * Mount `router` at its canonical path, and at its legacy path when it has one.
+ * `router`, served again at a path it has moved from.
  *
- * The same router instance serves both, so the two paths cannot drift: there is
- * one set of handlers and one gate, and an alias that forgot to apply the admin
- * gate is not a state this can reach.
+ * Mount the result at the old path, beside `router` at its canonical one. The
+ * same router instance serves both, so the two paths cannot drift: there is one
+ * set of handlers and one gate, and an alias that forgot to apply the admin gate
+ * is not a state this can reach.
  */
-export function mountWithLegacyAlias(
-    app: Hono<HonoEnv>,
-    router: Hono<HonoEnv>,
-    options: MountOptions
-): void {
-    app.route(options.canonical, router);
-
-    if (!options.legacy) {
-        logger.debug(`${options.surface} routes mounted`, { path: options.canonical });
-        return;
-    }
-
+export function deprecatedAlias(router: Hono<HonoEnv>, canonical: string): Hono<HonoEnv> {
     const alias = new Hono<HonoEnv>();
     // Before `route`, not after. Hono collects matching handlers in
     // registration order, so a `use("/*")` appended to an already-populated
@@ -61,13 +41,8 @@ export function mountWithLegacyAlias(
     alias.use("/*", async (c, next) => {
         await next();
         c.header("Deprecation", "true");
-        c.header("Link", `<${options.canonical}>; rel="successor-version"`);
+        c.header("Link", `<${canonical}>; rel="successor-version"`);
     });
     alias.route("/", router);
-    app.route(options.legacy, alias);
-
-    logger.debug(`${options.surface} routes mounted`, {
-        path: options.canonical,
-        deprecatedAlias: options.legacy
-    });
+    return alias;
 }

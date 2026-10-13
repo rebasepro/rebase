@@ -12,7 +12,17 @@
 import { describe, expect, it } from "@jest/globals";
 import { Hono } from "hono";
 import type { HonoEnv } from "../src/api/types";
-import { mountWithLegacyAlias } from "../src/api/mount";
+import { deprecatedAlias } from "../src/api/mount";
+
+/** What `backend.mount()` does for a moved surface: the canonical path, and the alias beside it. */
+function mountWithLegacyAlias(
+    app: Hono<HonoEnv>,
+    router: Hono<HonoEnv>,
+    options: { canonical: string; legacy?: string; surface: string }
+): void {
+    app.route(options.canonical, router);
+    if (options.legacy) app.route(options.legacy, deprecatedAlias(router, options.canonical));
+}
 
 const surface = (): Hono<HonoEnv> => {
     const router = new Hono<HonoEnv>();

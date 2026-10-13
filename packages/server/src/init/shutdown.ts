@@ -4,7 +4,12 @@ import { logger } from "../utils/logger";
 import { drainBackgroundWork } from "../functions/wait-until";
 
 interface ShutdownConfig {
-    server: Server;
+    /**
+     * The HTTP server to drain and close, when the backend was handed one.
+     * Absent, the shutdown stops the backend's own work and leaves the server
+     * to whoever created it.
+     */
+    server?: Server;
     /** Structural, for the same no-circular-imports reason as the backend below. */
     cronScheduler?: { stop(timeoutMs?: number): Promise<void> | void };
     /** Structural, for the same no-circular-imports reason as the backend below. */
@@ -192,7 +197,7 @@ export function createShutdown(config: ShutdownConfig): (timeoutMs?: number) => 
                     );
                     // So the process can actually end: an open socket holds the
                     // event loop, and the cleanup after this closes the pool.
-                    config.server.closeAllConnections?.();
+                    config.server?.closeAllConnections?.();
                     closeEmail();
                     resolve();
                 }, timeoutMs)
@@ -309,9 +314,17 @@ export function createShutdown(config: ShutdownConfig): (timeoutMs?: number) => 
                 // that was in flight — then holds the server open for the whole
                 // keep-alive timeout. Sweep the idle ones until it has closed;
                 // a connection still serving a request is never touched.
-                const sweepIdle = setInterval(() => config.server.closeIdleConnections?.(), 100);
+                const server = config.server;
+                if (!server) {
+                    clearTimeout(forceTimer);
+                    // 4. The email transport, once nothing in this backend can send.
+                    closeEmail();
+                    resolve();
+                    return;
+                }
+                const sweepIdle = setInterval(() => server.closeIdleConnections?.(), 100);
                 sweepIdle.unref();
-                config.server.close(() => {
+                server.close(() => {
                     clearInterval(sweepIdle);
                     logger.info("HTTP server closed");
                     clearTimeout(forceTimer);
