@@ -23,7 +23,7 @@ export const TEST_ENV = { REBASE_TELEMETRY_DISABLED: "1" };
 
 /**
  * `@rebasepro/<name>` → `packages/<name>/src/index.ts`, for every workspace
- * package this one depends on that has one — read from `package.json`, not
+ * package this one depends on, directly or through another, that has one — read from `package.json`, not
  * listed here, which is how `server-postgres/vitest.e2e.config.ts` does it and
  * why its list stopped drifting.
  *
@@ -42,14 +42,32 @@ export const TEST_ENV = { REBASE_TELEMETRY_DISABLED: "1" };
  * spawns `bin/rebase.js` runs the built CLI, which is what the e2e is for.
  */
 export function workspaceSourceAliases(): { find: RegExp; replacement: string }[] {
-    const manifest = JSON.parse(readFileSync(new URL("./package.json", import.meta.url), "utf8")) as {
-        dependencies?: Record<string, string>;
-        devDependencies?: Record<string, string>;
-    };
-    return [manifest.dependencies, manifest.devDependencies]
-        .flatMap((declared) => Object.entries(declared ?? {}))
-        .filter(([name, range]) => name.startsWith("@rebasepro/") && range.startsWith("workspace:"))
-        .map(([name]) => ({
+    // Transitively: `@rebasepro/codegen`'s source imports `@rebasepro/common`,
+    // and left to normal resolution that import reached common's `dist` —
+    // so a codegen change that moved a helper into common ran the CLI suite
+    // against the last build of common, which did not have it.
+    const seen = new Set<string>();
+    const pending = ["cli"];
+    while (pending.length > 0) {
+        const dir = pending.pop()!;
+        const manifestUrl = new URL(`../${dir}/package.json`, import.meta.url);
+        if (!existsSync(manifestUrl)) continue;
+        const manifest = JSON.parse(readFileSync(manifestUrl, "utf8")) as {
+            dependencies?: Record<string, string>;
+            devDependencies?: Record<string, string>;
+            peerDependencies?: Record<string, string>;
+        };
+        const declared = dir === "cli"
+            ? [manifest.dependencies, manifest.devDependencies]
+            : [manifest.dependencies, manifest.peerDependencies];
+        for (const [name, range] of declared.flatMap((deps) => Object.entries(deps ?? {}))) {
+            if (!name.startsWith("@rebasepro/") || !range.startsWith("workspace:") || seen.has(name)) continue;
+            seen.add(name);
+            pending.push(name.slice("@rebasepro/".length));
+        }
+    }
+    return [...seen]
+        .map((name) => ({
             name,
             source: fileURLToPath(new URL(`../${name.slice("@rebasepro/".length)}/src/index.ts`, import.meta.url))
         }))

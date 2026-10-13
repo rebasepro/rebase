@@ -304,6 +304,7 @@ async function dispatch(
                     "--out": "--output",
                     "--from": String,
                     "--token": String,
+                    "--register": Boolean,
                     "-c": "--collections",
                     "-o": "--output"
                 },
@@ -327,6 +328,7 @@ async function dispatch(
                 output: sdkArgs["--output"] || path.join(sdkRoot, "generated/sdk"),
                 from: sdkArgs["--from"],
                 token: sdkArgs["--token"],
+                register: sdkArgs["--register"],
                 help: sdkHelp,
                 cwd: process.cwd()
             });

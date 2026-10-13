@@ -377,6 +377,10 @@ rebase generate-sdk
 
 Creates TypeScript types and a type-safe client for all your collections.
 
+`--register` also types server-side data: it writes the types and the
+`Register` declaration to `config/generated/`, and later runs keep them current.
+See [Typed server-side data](/docs/backend/typed-server-data).
+
 ### `rebase doctor`
 
 ```bash

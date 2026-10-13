@@ -19,12 +19,16 @@ Until you do, they stay untyped: any collection by any name, rows as
 
 ## Register the `Database`
 
-Generate the types (`rebase dev` does it for you on every collection change, or
-run `rebase generate-sdk`), then add one file to the backend:
+```bash
+rebase generate-sdk --register
+```
+
+Besides the SDK in `generated/sdk/`, this writes two files to
+`config/generated/`: a copy of `database.types.ts`, and a `register.ts` that
+declares the registration:
 
 ```ts
-// backend/src/rebase-env.d.ts
-import type { Database } from "../../generated/sdk/database.types";
+import type { Database } from "./database.types";
 
 declare module "@rebasepro/types" {
     interface Register {
@@ -33,18 +37,26 @@ declare module "@rebasepro/types" {
 }
 ```
 
-The file only has to be in the TypeScript program; nothing imports it. The
-backend's `tsconfig.json` includes `src/`, `functions/`, `crons/` and
-`../config/`, so one registration types your functions, your cron jobs and the
-callbacks in your collection files. It is a declaration only: the runtime does
+They live in `config/` because your collection files are compiled twice, by the
+backend (whose `tsconfig.json` includes `../config/`) and by the `config`
+package's own `tsc`, and `config/` is the one directory both read. A
+registration there that imported `../generated/sdk/` would pull a file from
+outside `config/` into that package's compile, which TypeScript refuses. So one
+registration types your functions, your cron jobs and the callbacks in your
+collection files, in both compiles. It is a declaration only: the runtime does
 exactly what it did before.
 
-A registration reaches the TypeScript program it is in, and no other. Your
-collection files are also compiled by the `config` package's own `tsc`, which
-does not read `backend/src/`, so in that compile `context.data` is still the
-untyped object. Write callbacks that compile both ways: the backend's compile is
-the one that catches a misspelt collection or column, and a value you need as a
-specific type you check where you use it, as you would without types.
+Once `config/generated/register.ts` exists, every later `rebase generate-sdk`,
+and `rebase dev` on each collection change, keeps both files current. The
+scaffold's `.gitignore` ignores `generated/` directories, so after a fresh
+clone (and in CI) run `rebase generate-sdk --register` again, or put the flag in
+the `generate:sdk` script. Delete `config/generated/` to go back to untyped
+server-side data.
+
+You can also write the registration yourself, in any file the backend compiles
+(`backend/src/rebase-env.d.ts`, importing `../../generated/sdk/database.types`).
+It then reaches the backend's compile only: in the `config` package's own `tsc`,
+`context.data` stays the untyped object, so callbacks have to compile both ways.
 
 ## What it types
 
