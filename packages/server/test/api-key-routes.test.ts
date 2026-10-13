@@ -260,6 +260,15 @@ describe("what a service key may hold", () => {
         expect(body.error?.code).toBe(code);
     });
 
+    it("offers no key-management scope among the valid ones, since none may go on a key", async () => {
+        const { res, body } = await mint({ name: "k", scopes: ["nothing:here"] }, ["admin"]);
+        expect(res.status).toBe(400);
+        expect(body.error?.code).toBe("INVALID_SCOPES");
+        expect(body.error?.details?.validScopes).toContain("data:read");
+        // Neither in the message nor in `details.validScopes`.
+        expect(JSON.stringify(body)).not.toMatch(/keys:(read|write)/);
+    });
+
     it("refuses an empty scope list", async () => {
         const { res } = await mint({ name: "k", scopes: [] }, ["admin"]);
         expect(res.status).toBe(400);

@@ -70,17 +70,21 @@ export function assertScopesGrantable(
     model: AccessModel,
     targets?: KeyTargets
 ): void {
+    // `keys:*` are scopes, and no key may hold one, so the list a refusal
+    // offers leaves them out: offering them sent the next attempt to
+    // KEY_MANAGEMENT_SCOPE.
+    const keyManagement: ReadonlySet<string> = new Set(KEY_MANAGEMENT_SCOPES);
     const problems = validateScopes(requested, model);
     if (problems.length > 0) {
+        const grantable = knownScopes(model).filter(scope => !keyManagement.has(scope));
         throw new ApiError(400, "INVALID_SCOPES",
             `Not valid scopes: ${problems.map(p => `"${p.scope}" (${p.reason})`).join(", ")}. ` +
-            `Valid scopes are ${knownScopes(model).join(", ")}; data, storage and function scopes take a ` +
+            `Valid scopes are ${grantable.join(", ")}; data, storage and function scopes take a ` +
             "target after a second colon, e.g. \"data:read:posts\".",
-            { problems, validScopes: knownScopes(model) });
+            { problems, validScopes: grantable });
     }
 
-    const management = requested.filter(entry =>
-        (KEY_MANAGEMENT_SCOPES as readonly string[]).includes(parseScope(entry)?.scope ?? ""));
+    const management = requested.filter(entry => keyManagement.has(parseScope(entry)?.scope ?? ""));
     if (management.length > 0) {
         throw new ApiError(400, "KEY_MANAGEMENT_SCOPE",
             `${management.join(", ")} cannot go on a key: a key that manages keys could mint its own successor. ` +
