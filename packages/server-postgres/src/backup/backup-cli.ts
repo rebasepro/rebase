@@ -86,6 +86,63 @@ export async function resolveStorageForDestination(
     }
 }
 
+/**
+ * The directory `rebase` was run from, which `rebase` puts here for the driver.
+ *
+ * The driver runs in the project's `backend/`, so a relative path resolved
+ * against its own working directory named a different place from the one the
+ * user typed it in: `rebase db backup --out ./backups` wrote to `<root>/backups`
+ * (the CLI resolves explicit paths itself) while `rebase db backups list`
+ * looked in `<root>/backend/backups`. Spelled the same in
+ * `packages/cli/src/commands/db.ts`.
+ */
+export const INVOCATION_CWD_ENV = "REBASE_INVOCATION_CWD";
+
+/** Where a relative path the user typed is relative to: where they ran `rebase`. */
+export function invocationDir(env: Readonly<Record<string, string | undefined>> = process.env): string {
+    const dir = env[INVOCATION_CWD_ENV]?.trim();
+    return dir && path.isAbsolute(dir) ? dir : process.cwd();
+}
+
+/**
+ * Where `db backup` writes and `db backups list` reads, by one rule.
+ *
+ * - `--out` is relative to where `rebase` was run, like any path typed on a
+ *   command line.
+ * - `BACKUP_DESTINATION` is relative to the backend directory, because the
+ *   server reads the same variable there: the Backups panel and the scheduled
+ *   backup have to find what the CLI wrote.
+ * - With neither, `./backups` where `rebase` was run, as the help says.
+ *
+ * An `s3://` or `gs://` destination is returned as given.
+ */
+export function resolveBackupLocation(opts: {
+    flag?: string;
+    configured?: string;
+    invocationDir: string;
+    backendDir: string;
+}): string {
+    const flag = opts.flag?.trim();
+    if (flag) return isRemoteDestination(flag) ? flag : path.resolve(opts.invocationDir, flag);
+    const configured = opts.configured?.trim();
+    if (configured) return isRemoteDestination(configured) ? configured : path.resolve(opts.backendDir, configured);
+    return path.join(opts.invocationDir, "backups");
+}
+
+function isRemoteDestination(value: string): boolean {
+    return parseBackupDestination(value).kind !== "local";
+}
+
+/** {@link resolveBackupLocation} for this process. */
+function backupLocation(flag: string | undefined): string {
+    return resolveBackupLocation({
+        flag,
+        configured: process.env.BACKUP_DESTINATION,
+        invocationDir: invocationDir(),
+        backendDir: process.cwd()
+    });
+}
+
 function requireConnection(): string {
     const conn = resolveConnectionString(process.env);
     if (!conn) {
@@ -138,7 +195,7 @@ export async function backupCommand(rawArgs: string[]): Promise<void> {
 
     const connectionString = requireConnection();
     const dbName = parseDbNameFromUrl(connectionString) ?? "database";
-    const out = args["--out"] || process.env.BACKUP_DESTINATION || path.join(process.cwd(), "backups");
+    const out = backupLocation(args["--out"]);
     const dest = parseBackupDestination(out);
 
     print("");
@@ -316,7 +373,7 @@ export async function restoreCommand(rawArgs: string[]): Promise<void> {
             const globalsObj = await storage.getObject(globalsFileForDump(key), bucket);
             if (globalsObj) globalsSql = Buffer.from(await globalsObj.arrayBuffer()).toString("utf-8");
         } else {
-            localFile = path.resolve(backupArg);
+            localFile = path.resolve(invocationDir(), backupArg);
             if (!fs.existsSync(localFile)) {
                 outError(chalk.red(`  ✗ Backup file not found: ${localFile}`));
                 process.exit(1);
@@ -427,7 +484,7 @@ export async function backupsCommand(rawArgs: string[]): Promise<void> {
         rawArgs.slice(3),
         "db backups list"
     );
-    const out = args["--out"] || process.env.BACKUP_DESTINATION || path.join(process.cwd(), "backups");
+    const out = backupLocation(args["--out"]);
     const dest = parseBackupDestination(out);
 
     try {
@@ -436,6 +493,7 @@ export async function backupsCommand(rawArgs: string[]): Promise<void> {
         print("");
         if (backups.length === 0) {
             print(chalk.gray(`  No backups found at ${out}.`));
+            await mentionBackendBackups(out, args["--out"]);
         } else {
             print(chalk.bold(`  💾 ${backups.length} backup(s) at ${out}:`));
             print("");
@@ -466,6 +524,24 @@ export async function backupsCommand(rawArgs: string[]): Promise<void> {
         reportError(err);
         process.exit(1);
     }
+}
+
+/**
+ * Point at `<backend>/backups` when the default listing is empty and that
+ * directory holds dumps.
+ *
+ * Earlier releases resolved the default there, so after an upgrade the
+ * backups a project already has are one directory away from the listing.
+ */
+async function mentionBackendBackups(listed: string, flag: string | undefined): Promise<void> {
+    if (flag || process.env.BACKUP_DESTINATION?.trim()) return;
+    const backendBackups = path.join(process.cwd(), "backups");
+    if (path.resolve(listed) === backendBackups) return;
+    const found = await listBackups({ kind: "local", path: backendBackups }).catch(() => []);
+    if (found.length === 0) return;
+    print(chalk.gray(`  ${found.length} backup(s) are in ${backendBackups}, where earlier releases of`));
+    print(chalk.gray(`  \`rebase db backup\` wrote by default. List them with:`));
+    print(chalk.gray(`    rebase db backups list --out ${path.relative(invocationDir(), backendBackups) || "."}`));
 }
 
 /**

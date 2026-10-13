@@ -241,6 +241,14 @@ export function printManagedDatabaseRefusal(refusal: ManagedDatabaseRefusal): vo
  */
 export const ATLAS_DEV_URL_ENV = "REBASE_ATLAS_DEV_URL";
 
+/**
+ * The variable that tells the driver where `rebase` was run
+ * (`INVOCATION_CWD_ENV` in `@rebasepro/server-postgres`). The driver runs in
+ * `backend/`, so a path it resolves itself, such as `db backup`'s default
+ * `./backups`, needs to know the directory the developer meant.
+ */
+const INVOCATION_CWD_ENV = "REBASE_INVOCATION_CWD";
+
 /** Loaded only when a command needs one: PGlite is 25 MB of WASM. */
 const startAtlasDevDatabase = async (): Promise<AtlasDevDatabase> =>
     (await import("../dev-db/atlas-dev-database")).startAtlasDevDatabase();
@@ -523,6 +531,7 @@ export async function runDriverDbCommand(
     // whatever it exits with.
     const atlasDev = await atlasDevDatabaseFor(rawArgs, prepared.database.kind, env);
     if (atlasDev) env[ATLAS_DEV_URL_ENV] = atlasDev.url;
+    env[INVOCATION_CWD_ENV] = process.cwd();
 
     // Resolved against the directory the developer is standing in, before the
     // child is handed a different one. See absolutizeLocalPathArgs.
