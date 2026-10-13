@@ -715,7 +715,12 @@ export async function verifyDownloadToken(token: string): Promise<DownloadTokenP
         }
         return null;
     } catch (error) {
-        logger.error("[JWT] Download token verification failed", { error: error });
+        // Below ERROR, every reason alike. The data rate limiter verifies any
+        // `?token=` it sees, on every route it guards — so this is also handed a
+        // function's own query parameter, which was never a download token, and
+        // a five-minute token still sitting in an open tab's `<img src>`. A
+        // refused token is answered with a 401; nothing here is a server fault.
+        logger.debug("[JWT] Download token verification failed", { error: error });
         return null;
     }
 }
