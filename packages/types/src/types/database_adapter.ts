@@ -214,9 +214,11 @@ export interface DatabaseAdapter {
     getAdmin?(driverResult: InitializedDriver): DatabaseAdmin | undefined;
 
     /**
-     * Mount any database-specific HTTP routes (e.g., custom admin endpoints).
+     * Never called: the server mounts no route on an adapter's behalf. A
+     * driver that needs HTTP routes exports a route factory, and the app
+     * mounts it where it chooses.
      *
-     * Called after all adapters are initialized.
+     * @deprecated Never called. Will be removed in a future release.
      */
     mountRoutes?(app: unknown, basePath: string, driverResult: InitializedDriver): void;
 

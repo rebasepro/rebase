@@ -99,12 +99,6 @@ export function createPostgresAdapter(pgConfig: PostgresDriverConfig): DatabaseA
                 return bootstrapper.getAdmin(driverResult);
             }
             return undefined;
-        },
-
-        mountRoutes(app, basePath, driverResult) {
-            if (bootstrapper.mountRoutes) {
-                bootstrapper.mountRoutes(app, basePath, driverResult);
-            }
         }
     };
 }

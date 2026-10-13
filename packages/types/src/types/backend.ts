@@ -1201,8 +1201,11 @@ export interface BackendBootstrapper {
     initializeRealtime?(config: unknown, driverResult: InitializedDriver): Promise<RealtimeProvider | undefined>;
 
     /**
-     * Mount any driver-specific HTTP routes (e.g., custom admin endpoints).
-     * Called after all drivers are initialized.
+     * Never called: the server mounts no route on a bootstrapper's behalf. A
+     * driver that needs HTTP routes exports a route factory, and the app
+     * mounts it where it chooses.
+     *
+     * @deprecated Never called. Will be removed in a future release.
      */
     mountRoutes?(app: unknown, basePath: string, driverResult: InitializedDriver): void;
 
@@ -1378,7 +1381,7 @@ export interface InitializedDriver {
 
     /**
      * Opaque handle that the bootstrapper can use in subsequent hooks
-     * (e.g., `initializeAuth`, `mountRoutes`) to access driver internals.
+     * (e.g., `initializeAuth`, `getAdmin`) to access driver internals.
      * Not used by the coordinator.
      */
     internals?: unknown;

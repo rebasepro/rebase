@@ -164,6 +164,21 @@ export async function ensureHistoryTableExists(db: NodePgDatabase, options: Boot
     }
 }
 
+/**
+ * What an earlier boot left in place, read without changing anything — for a
+ * driver opened without provisioning. Entries go on the write's transaction
+ * when the function for the table's entry format is there, and the format is
+ * `2` when the table has its `format` column.
+ */
+export async function readHistoryTableState(db: NodePgDatabase): Promise<HistoryTableState> {
+    const entryFormat: 1 | 2 = await formatColumnExists(db) ? 2 : 1;
+    const signature = entryFormat === 2 ? RECORD_HISTORY_SIGNATURE : LEGACY_RECORD_HISTORY_SIGNATURE;
+    const rows = sqlRows<{ present: boolean }>(await db.execute(sql`
+        SELECT to_regprocedure(${signature}) IS NOT NULL AS present
+    `));
+    return { inTransaction: rows[0]?.present === true, entryFormat };
+}
+
 const ADD_FORMAT_COLUMN = "ALTER TABLE rebase.entity_history ADD COLUMN IF NOT EXISTS format SMALLINT NOT NULL DEFAULT 1";
 
 /** Whether `rebase.entity_history` has its `format` column — a catalogue read, no lock. */

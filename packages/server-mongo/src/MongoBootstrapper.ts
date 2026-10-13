@@ -186,8 +186,6 @@ policies: [] };
             return admin;
         },
 
-        mountRoutes() {},
-
         // Five parameters, not four. `BackendBootstrapper` declares an
         // `authAdapter` here and `init.ts` passes one; dropping it left the
         // socket with only its built-in JWT verifier, so on a backend using an

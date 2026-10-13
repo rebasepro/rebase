@@ -149,6 +149,28 @@ describe("openRebase (E2E)", () => {
             }
         });
 
+        it("the hooks a boot runs after opening honour provision: false too — auth, history, the final posture", async () => {
+            const before = await catalogue(client);
+            const url = urlFor(container, "untouched");
+            const conn = createPostgresDatabaseConnection(url);
+            try {
+                const bootstrapper = createPostgresBootstrapper({ connectionString: url, connection: conn.db });
+                const driverResult = await bootstrapper.initializeDriver({
+                    collections: [notesCollection],
+                    provision: false,
+                    realtime: false
+                });
+                const auth = await bootstrapper.initializeAuth!({}, driverResult);
+                expect(auth?.userService).toBeDefined();
+                const history = await bootstrapper.initializeHistory!(true, driverResult);
+                expect(history?.historyService).toBeDefined();
+                await bootstrapper.finalizeSecurityPosture!(driverResult);
+            } finally {
+                await conn.pool.end();
+            }
+            expect(await catalogue(client)).toEqual(before);
+        });
+
         it("refuses a user's request rather than run it with no policy applied", async () => {
             // The connection is a superuser, which bypasses row-level security,
             // and the restricted role it would switch to was never created.
@@ -217,6 +239,29 @@ describe("openRebase (E2E)", () => {
             await expect(ada.data.notes.create({ ownerId: "bob", title: "forged" })).rejects.toThrow();
             expect(await rebase.sql("SELECT count(*)::int AS n FROM public.notes WHERE title = 'forged'"))
                 .toEqual([{ n: 0 }]);
+        });
+
+        it("finalizeSecurityPosture grants nothing after a provision: false open", async () => {
+            // A privilege a provisioning boot would hand back, taken away.
+            await observer.query("REVOKE SELECT ON public.notes FROM rebase_user");
+            const url = urlFor(container, "app");
+            const conn = createPostgresDatabaseConnection(url);
+            try {
+                const bootstrapper = createPostgresBootstrapper({ connectionString: url, connection: conn.db });
+                const driverResult = await bootstrapper.initializeDriver({
+                    collections: [notesCollection],
+                    provision: false,
+                    realtime: false
+                });
+                await bootstrapper.finalizeSecurityPosture!(driverResult);
+                const { rows } = await observer.query<{ granted: boolean }>(
+                    "SELECT has_table_privilege('rebase_user', 'public.notes', 'SELECT') AS granted"
+                );
+                expect(rows[0].granted).toBe(false);
+            } finally {
+                await conn.pool.end();
+                await observer.query("GRANT SELECT ON public.notes TO rebase_user");
+            }
         });
 
         it("has created nothing in the database by opening it", async () => {

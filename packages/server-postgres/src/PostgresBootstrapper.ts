@@ -32,11 +32,11 @@ import { PostgresCollectionRegistry } from "./collections/PostgresCollectionRegi
 import { createEmailService, type EmailConfig, type EmailService, logger } from "@rebasepro/server";
 import { getTableName as getCollectionTableName, sqlRows } from "@rebasepro/common";
 import { ensureAuthTablesExist } from "./auth/ensure-tables";
-import { probeAuthSchema, resolveAuthSchema } from "./auth/schema-version";
+import { assertAuthSchemaCompatible, probeAuthSchema, resolveAuthSchema } from "./auth/schema-version";
 import { AuthSchemaTables, PostgresAuthRepository, UserService } from "./auth/services";
 import { createAuthSchema } from "./schema/auth-schema";
 import { HistoryService } from "./history/HistoryService";
-import { ensureHistoryIndexes, ensureHistoryTableExists } from "./history/ensure-history-table";
+import { ensureHistoryIndexes, ensureHistoryTableExists, readHistoryTableState } from "./history/ensure-history-table";
 import { patchPgArrayNullSafety } from "./utils/pg-array-null-patch";
 import { patchPgNumericToNumber } from "./utils/pg-numeric-number-patch";
 import { buildCollectionsFromSchema, introspectSchema, readRlsStatus } from "./schema/introspect-runtime";
@@ -121,6 +121,13 @@ export interface PostgresDriverInternals {
     realtimeService: RealtimeService;
     driver: PostgresBackendDriver;
     poolManager?: DatabasePoolManager;
+    /**
+     * Whether the driver was opened with provisioning (`provision`, default
+     * true). The hooks that run after it — auth, history, the final security
+     * posture — read it, so `provision: false` means no DDL anywhere on the
+     * driver's path, not only while it opens.
+     */
+    provisioned: boolean;
     /**
      * Attach CDC triggers to tables that did not exist when the driver
      * bootstrapped. Only set when database-level capture is actually active.
@@ -1211,6 +1218,7 @@ foundIn: (tablesByName.get(checkName) ?? []).filter(s => s !== schemaName) });
         realtimeService,
         driver,
         poolManager,
+        provisioned: provision,
         provisionCdcForTables
     };
 
@@ -1404,7 +1412,15 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
             const authCollection = authConfig.collection as CollectionConfig | undefined;
 
             // ensureAuthTablesExist works with the collection abstraction — no Drizzle leakage.
-            await ensureAuthTablesExist(db, authCollection);
+            // A driver opened without provisioning creates and migrates nothing:
+            // the tables are another process's to make. The one read that
+            // guards every login still runs — a database a newer runtime has
+            // migrated is refused here, not at the first sign-in.
+            if (internals.provisioned !== false) {
+                await ensureAuthTablesExist(db, authCollection);
+            } else {
+                await assertAuthSchemaCompatible(db, resolveAuthSchema(authCollection));
+            }
 
             // The driver bootstrapped before these tables existed, so CDC skipped
             // them. Instrument them now, or writes to the user table emit no
@@ -1491,6 +1507,13 @@ schemaHealthCheck: () => probeAuthSchema(db, resolveAuthSchema(authCollection)) 
 
             const internals = driverResult.internals as PostgresDriverInternals;
             const db = internals.db;
+
+            // Without provisioning, history uses what an earlier boot left —
+            // read, not made — and builds no index.
+            if (internals.provisioned === false) {
+                const retention = typeof config === "object" ? config.retention : undefined;
+                return { historyService: new HistoryService(db, retention ? { ttlDays: retention } : undefined, await readHistoryTableState(db)) };
+            }
 
             const { BOOT_LOCK_TIMEOUT_MS } = await import("./schema/boot-ddl");
             const historyTable = await ensureHistoryTableExists(db, { lockTimeoutMs: BOOT_LOCK_TIMEOUT_MS });
@@ -1815,6 +1838,10 @@ schemaHealthCheck: () => probeAuthSchema(db, resolveAuthSchema(authCollection)) 
             const internals = driverResult.internals as PostgresDriverInternals;
             const { driver, realtimeService, registry, db } = internals;
             if (!db) return;
+            // Opened without provisioning: nothing has been created since the
+            // posture was read at open, so there is nothing new to grant on,
+            // and granting is DDL this process was told not to run.
+            if (internals.provisioned === false) return;
 
             const runSql: RawSqlRunner = async (text) => {
                 const res = await db.execute(sql.raw(text));
@@ -1886,12 +1913,6 @@ schemaHealthCheck: () => probeAuthSchema(db, resolveAuthSchema(authCollection)) 
         getAdmin(driverResult: InitializedDriver): DatabaseAdmin | undefined {
             const internals = driverResult.internals as PostgresDriverInternals;
             return internals.driver.admin;
-        },
-
-        mountRoutes(app: unknown, basePath: string, driverResult: InitializedDriver): void {
-            // The coordinator handles auth/storage/data routes.
-            // This hook is for driver-specific extensions only.
-            // Currently Postgres doesn't need additional routes beyond what the coordinator mounts.
         },
 
         async initializeWebsockets(server: unknown, realtimeService: RealtimeProvider, driver: DataDriver, config?: unknown, adapter?: unknown, limits?: RealtimeSocketOptions): Promise<void> {
