@@ -134,6 +134,10 @@ could only show the marker itself until the queue drained.
 await client.data.products.delete(42);
 ```
 
+On a collection with [soft delete](/docs/collections/soft-delete) this stamps the
+row instead of removing it. `client.data.products.trash` lists, counts, restores
+and purges the stamped rows.
+
 ### Conditional writes
 
 `update` and `delete` take an `ifMatch`, so a write is refused when the row has

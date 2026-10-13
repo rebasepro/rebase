@@ -52,7 +52,7 @@ export type { RebaseErrorCode } from "@rebasepro/types";
 
 // Query + collection types (annotate SDK results; construct via the fluent API).
 export type { RebaseClientConfig, FindParams, FindResponse } from "./transport";
-export type { CollectionClient } from "./collection";
+export type { CollectionClient, RestoreOptions, TrashClient } from "./collection";
 export type { FindResult, SDKCollectionClient, SDKQueryBuilderInterface, PaginationMeta } from "@rebasepro/types";
 
 // Pagination: `iterate()` / `findAll()` parameter types and the error a walk

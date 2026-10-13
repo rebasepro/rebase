@@ -6,7 +6,8 @@ import {
     FindParams,
     RebaseApiError,
     Transport,
-    type ResponseMeta
+    type ResponseMeta,
+    type SoftDeletedRows
 } from "./transport";
 import { RebaseWebSocketClient } from "./websocket";
 import {
@@ -206,15 +207,16 @@ async function readWithParams<T>(
     path: string,
     postPath: string,
     params: FindParams | undefined,
-    serversWithoutRoute: WeakSet<Transport>
+    serversWithoutRoute: WeakSet<Transport>,
+    deleted?: SoftDeletedRows
 ): Promise<T> {
-    const queryString = buildQueryString(params);
+    const queryString = buildQueryString(params, deleted);
     const get = () => transport.request<T>(path + queryString, { method: "GET" });
     if (!sendsQueryBody(transport, path, queryString, params, serversWithoutRoute)) return get();
     try {
         return await transport.request<T>(postPath, {
             method: "POST",
-            body: JSON.stringify(buildQueryBody(params))
+            body: JSON.stringify(buildQueryBody(params, deleted))
         });
     } catch (error) {
         if (!(error instanceof RebaseApiError) || (error.status !== 404 && error.status !== 405)) throw error;
@@ -356,6 +358,63 @@ export interface ObserveOptions {
 export interface ObserveByIdOptions<Inc = IncludeSpec> extends ObserveOptions, ByIdReadOptions<Inc> {}
 
 /**
+ * Options for {@link TrashClient.restore} and {@link TrashClient.restoreMany}.
+ */
+export interface RestoreOptions<M extends Record<string, unknown> = Record<string, unknown>> extends WriteOptions {
+    /**
+     * The collection's soft-delete field, as declared in `softDelete`.
+     * Defaults to `deletedAt`, the field `softDelete: true` uses; pass the
+     * name a `softDelete: { field: "archivedAt" }` collection declares.
+     *
+     * The client cannot discover it: a restore is an ordinary update setting
+     * this field to `null`, which is the one update the server lets reach a
+     * trashed row.
+     */
+    field?: keyof M & string;
+}
+
+/**
+ * The trash of a collection that declares `softDelete`: the rows a delete
+ * stamped rather than removed. `client.data.<slug>.trash`.
+ *
+ * Every call goes to the server. On a client with `offline` enabled the trash
+ * is not cached and nothing here is queued: the local database never holds a
+ * trashed row, so it cannot answer for one, and a restore or a purge made
+ * offline would act on a row this device cannot see. They reject with
+ * `OFFLINE` instead (see `isOfflineError`). A restored row joins the local
+ * database; a purged one leaves it.
+ *
+ * For a collection that declares `softDelete`. The server ignores
+ * `?deleted=` on one that does not, so there `find` and `count` answer for the
+ * live rows, `restore` is refused for a field the collection does not have,
+ * and `purge` is an ordinary delete.
+ */
+export interface TrashClient<M extends Record<string, unknown> = Record<string, unknown>, Inc = IncludeSpec> {
+    /** The trashed rows matching `params` — `GET /data/<slug>?deleted=only`. */
+    find(params?: FindParams<M, Inc>): Promise<FindResult<M>>;
+    /** How many trashed rows match `params` — `GET /data/<slug>/count?deleted=only`. */
+    count(params?: FindParams<M, Inc>): Promise<number>;
+    /**
+     * Bring a trashed row back: `PATCH /data/<slug>/<id>` setting the
+     * soft-delete field to `null`. Resolves with the restored row.
+     */
+    restore(id: string | number, options?: RestoreOptions<M>): Promise<M>;
+    /** {@link TrashClient.restore} for several rows, as one transaction (`PATCH /data/<slug>/bulk`). */
+    restoreMany(ids: (string | number)[], options?: RestoreOptions<M>): Promise<M[]>;
+    /**
+     * Delete a row for good — `DELETE /data/<slug>/<id>?hard=true`. It cannot
+     * be restored afterwards. Needs the same permission an ordinary delete
+     * does, and works on a live row as well as a trashed one.
+     */
+    purge(id: string | number, options?: WriteOptions): Promise<void>;
+    /** {@link TrashClient.purge} for several rows, as one transaction (`POST /data/<slug>/bulk/delete?hard=true`). */
+    purgeMany(ids: (string | number)[], options?: WriteOptions): Promise<void>;
+}
+
+/** What `softDelete: true` names the field a delete stamps. */
+const DEFAULT_SOFT_DELETE_FIELD = "deletedAt";
+
+/**
  * The concrete, HTTP-backed implementation of the public
  * {@link SDKCollectionClient} contract — flat rows (no Entity wrapper), plus
  * fluent query-builder methods (`.where()`, `.orderBy()`, …).
@@ -372,6 +431,12 @@ export interface CollectionClient<
     Inc = IncludeSpec
 > extends SDKCollectionClient<M, I, U, Inc> {
     count(params?: FindParams<M, Inc>): Promise<number>;
+
+    /**
+     * The collection's trash: list, count, restore and purge the rows a soft
+     * delete stamped. See {@link TrashClient}.
+     */
+    trash: TrashClient<M, Inc>;
 
     /**
      * Subscribe to a query's results.
@@ -431,37 +496,135 @@ function withoutBulkRowPrefix(error: unknown): unknown {
 export function createCollectionClient<M extends Record<string, unknown> = Record<string, unknown>>(transport: Transport, slug: string, ws?: RebaseWebSocketClient): CollectionClient<M> {
     const basePath = `/data/${slug}`;
 
-    const client: CollectionClient<M> = {
-        async find(params?: FindParams<M>): Promise<FindResult<M>> {
-            type Page = { data: Record<string, unknown>[]; meta: FindResult<M>["meta"] };
-            const read = async (p: FindParams<M> | undefined): Promise<Page> => {
-                const page = await readWithParams<Page | undefined>(transport, basePath, `${basePath}/query`, p, serversWithoutQueryRoute);
-                // The transport answers `undefined` for a 204 and nothing
-                // else, and a read route answers every other success with 200.
-                if (!page || !Array.isArray(page.data)) {
-                    throw unexpectedResponse(slug, "find()", page ? 200 : 204, "a page with a `data` list");
-                }
-                return page;
-            };
-            const counted = { ...params, count: undefined };
-            let raw: Awaited<ReturnType<typeof read>>;
-            if (params?.count !== "none") {
-                raw = await read(params);
-            } else if (serversWithoutCountParam.has(transport)) {
-                raw = await read(counted);
-            } else {
-                try {
-                    raw = await read(params);
-                } catch (error) {
-                    if (!isCountReadAsFilter(error)) throw error;
-                    serversWithoutCountParam.add(transport);
-                    raw = await read(counted);
-                }
+    /**
+     * A listing — the live rows, or with `deleted` the trash's. One reader for
+     * both, so the trash takes every parameter, and every fallback for an
+     * older server, that `find()` does.
+     */
+    async function findRows(params: FindParams<M> | undefined, deleted?: SoftDeletedRows): Promise<FindResult<M>> {
+        type Page = { data: Record<string, unknown>[]; meta: FindResult<M>["meta"] };
+        const method = deleted ? "trash.find()" : "find()";
+        const read = async (p: FindParams<M> | undefined): Promise<Page> => {
+            const page = await readWithParams<Page | undefined>(transport, basePath, `${basePath}/query`, p, serversWithoutQueryRoute, deleted);
+            // The transport answers `undefined` for a 204 and nothing
+            // else, and a read route answers every other success with 200.
+            if (!page || !Array.isArray(page.data)) {
+                throw unexpectedResponse(slug, method, page ? 200 : 204, "a page with a `data` list");
             }
-            return {
-                data: raw.data as M[],
-                meta: raw.meta
-            };
+            return page;
+        };
+        const counted = { ...params, count: undefined };
+        let raw: Awaited<ReturnType<typeof read>>;
+        if (params?.count !== "none") {
+            raw = await read(params);
+        } else if (serversWithoutCountParam.has(transport)) {
+            raw = await read(counted);
+        } else {
+            try {
+                raw = await read(params);
+            } catch (error) {
+                if (!isCountReadAsFilter(error)) throw error;
+                serversWithoutCountParam.add(transport);
+                raw = await read(counted);
+            }
+        }
+        return {
+            data: raw.data as M[],
+            meta: raw.meta
+        };
+    }
+
+    /** A count — of the live rows, or with `deleted` of the trash's. */
+    async function countRows(params: FindParams<M> | undefined, deleted?: SoftDeletedRows): Promise<number> {
+        const countParams: FindParams<M> = {
+            ...params,
+            limit: undefined,
+            offset: undefined,
+            // A count reads no relation data, so `include` can only add
+            // joins — and a join that does not match drops rows, which
+            // would make the total disagree with the `find()` it describes.
+            // Same reasoning as limit/offset: parameters that cannot affect
+            // the answer are not forwarded.
+            include: undefined,
+            // Whether a *page* is counted beside it; this is the count.
+            count: undefined
+        };
+        const qs = buildQueryString(countParams, deleted);
+
+        // One count per query in flight, not one per caller.
+        //
+        // A count is a property of the query, and every concurrent caller
+        // asking the same question wants the same answer — so they can
+        // share the one request. This is not a micro-optimisation: a live
+        // subscription re-counts on every push (see `listen` below), and
+        // `listenCollection` deliberately collapses identical queries onto
+        // a single socket subscription while keeping one callback per
+        // subscriber. Each push therefore woke N subscribers, and each of
+        // them issued its own identical count. A table showing one relation
+        // column fired one count per visible cell, on every update.
+        //
+        // The entry is dropped as soon as it settles, so this merges
+        // concurrent calls only and never serves a cached total. The key
+        // carries `?deleted=`, so a trash count never answers a live one.
+        const key = basePath + "/count" + qs;
+        const inflight = inflightCountsFor(transport);
+        const existing = inflight.get(key);
+        if (existing) return existing;
+
+        // The verb `find()` would use for the same filters: a vector
+        // search or a URL too long for a proxy goes as `POST …/count`, so
+        // a count beside a `find()` that worked is not the request a
+        // 431/414 refuses.
+        const request = readWithParams<{ count: number }>(
+            transport, `${basePath}/count`, `${basePath}/count`, countParams, serversWithoutCountRoute, deleted
+        ).then((raw) => raw.count ?? 0);
+        inflight.set(key, request);
+        try {
+            return await request;
+        } finally {
+            inflight.delete(key);
+        }
+    }
+
+    const restoreField = (options?: RestoreOptions<M>): string => options?.field ?? DEFAULT_SOFT_DELETE_FIELD;
+
+    const client: CollectionClient<M> = {
+        find(params?: FindParams<M>): Promise<FindResult<M>> {
+            return findRows(params);
+        },
+
+        trash: {
+            find: (params?: FindParams<M>) => findRows(params, "only"),
+            count: (params?: FindParams<M>) => countRows(params, "only"),
+            // A restore is the update the soft-delete docs describe — the
+            // field back to `null` — so it goes through `update()` and keeps
+            // its headers, its verb and its answer.
+            restore: (id: string | number, options?: RestoreOptions<M>) =>
+                client.update(id, { [restoreField(options)]: null } as Partial<M>, options),
+            restoreMany: (ids: (string | number)[], options?: RestoreOptions<M>) => {
+                if (!Array.isArray(ids)) {
+                    return Promise.reject(invalidBulkBody("trash.restoreMany expects an array of ids."));
+                }
+                const data = { [restoreField(options)]: null } as Partial<M>;
+                return client.updateMany(ids.map((id) => ({ id, data })), options);
+            },
+            async purge(id: string | number, options?: WriteOptions) {
+                await transport.request<void>(`${basePath}/${encodeURIComponent(String(id))}?hard=true`, {
+                    method: "DELETE",
+                    ...writeHeaders(options)
+                });
+            },
+            async purgeMany(ids: (string | number)[], options?: WriteOptions) {
+                if (!Array.isArray(ids)) {
+                    throw invalidBulkBody("trash.purgeMany expects an array of ids.");
+                }
+                if (ids.length === 0) return;
+                await transport.request<void>(`${basePath}/bulk/delete?hard=true`, {
+                    method: "POST",
+                    body: JSON.stringify({ ids }),
+                    ...writeHeaders(options)
+                });
+            }
         },
 
         // The pagination engine lives in `@rebasepro/common`, shared with the
@@ -655,54 +818,8 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
             });
         },
 
-        async count(params?: FindParams<M>): Promise<number> {
-            const countParams: FindParams<M> = {
-                ...params,
-                limit: undefined,
-                offset: undefined,
-                // A count reads no relation data, so `include` can only add
-                // joins — and a join that does not match drops rows, which
-                // would make the total disagree with the `find()` it describes.
-                // Same reasoning as limit/offset: parameters that cannot affect
-                // the answer are not forwarded.
-                include: undefined,
-                // Whether a *page* is counted beside it; this is the count.
-                count: undefined
-            };
-            const qs = buildQueryString(countParams);
-
-            // One count per query in flight, not one per caller.
-            //
-            // A count is a property of the query, and every concurrent caller
-            // asking the same question wants the same answer — so they can
-            // share the one request. This is not a micro-optimisation: a live
-            // subscription re-counts on every push (see `listen` below), and
-            // `listenCollection` deliberately collapses identical queries onto
-            // a single socket subscription while keeping one callback per
-            // subscriber. Each push therefore woke N subscribers, and each of
-            // them issued its own identical count. A table showing one relation
-            // column fired one count per visible cell, on every update.
-            //
-            // The entry is dropped as soon as it settles, so this merges
-            // concurrent calls only and never serves a cached total.
-            const key = basePath + "/count" + qs;
-            const inflight = inflightCountsFor(transport);
-            const existing = inflight.get(key);
-            if (existing) return existing;
-
-            // The verb `find()` would use for the same filters: a vector
-            // search or a URL too long for a proxy goes as `POST …/count`, so
-            // a count beside a `find()` that worked is not the request a
-            // 431/414 refuses.
-            const request = readWithParams<{ count: number }>(
-                transport, `${basePath}/count`, `${basePath}/count`, countParams, serversWithoutCountRoute
-            ).then((raw) => raw.count ?? 0);
-            inflight.set(key, request);
-            try {
-                return await request;
-            } finally {
-                inflight.delete(key);
-            }
+        count(params?: FindParams<M>): Promise<number> {
+            return countRows(params);
         },
 
         // Reactive reads. Without the offline layer there is no local database

@@ -1,7 +1,7 @@
 import { buildQueryString, FindParams, RebaseApiError } from "./transport";
 import { FindAllParams, FindResult, IterateParams, LogicalCondition, SDKCollectionClient, WhereFilterOp, WhereValueFor, WriteOptions, hasFieldOperation, isUnsupported, type ByIdReadOptions, type UpdateValues, type UpsertOptions } from "@rebasepro/types";
 import { collectAllPages, normalizeOrderBy, paginateFind } from "@rebasepro/common";
-import { CollectionClient, LiveResult, ObserveOptions, RowSnapshotMeta, byIdRead, invalidBulkBody, type ObserveByIdOptions } from "./collection";
+import { CollectionClient, LiveResult, ObserveOptions, RowSnapshotMeta, byIdRead, invalidBulkBody, type ObserveByIdOptions, type RestoreOptions, type TrashClient } from "./collection";
 import { SDKQueryBuilder } from "./sdk_query_builder";
 import { dehydrateMutation, dehydrateRow, hydrateMutation, hydrateRow, setOwn } from "./offline-codec";
 import { RebaseClientError } from "./errors";
@@ -1325,6 +1325,8 @@ data: u.data as AnyRow })),
             distinct: (enabled) => new SDKQueryBuilder<M>(wrapped).distinct(enabled),
             after: (cursor) => new SDKQueryBuilder<M>(wrapped).after(cursor),
 
+            trash: this.wrapTrash<M>(slug, inner),
+
             // Straight through to the server. An aggregate is a reduction over
             // rows the cache does not necessarily hold, and answering one from
             // a subset is a number that looks exactly like the right number —
@@ -1399,6 +1401,94 @@ data: u.data as AnyRow })),
         }
 
         return wrapped;
+    }
+
+    /**
+     * `client.data.<slug>.trash` on an offline client: every call goes to the
+     * server, and none is cached or queued.
+     *
+     * The local database holds live rows only — a trashed row read into it
+     * would show up in every live query that matches it — so it cannot answer
+     * a trash read, and a restore or a purge queued offline would act on a row
+     * this device has never seen. Each of them rejects with `OFFLINE` instead.
+     *
+     * What the server answers does reach the local database: a restored row
+     * is live again and joins it, and a purged row leaves it. A row with a
+     * write still queued is synced first, so a purge never overtakes the
+     * queued delete it follows; if the queue cannot drain, the call is refused.
+     */
+    private wrapTrash<M extends AnyRow>(slug: string, inner: CollectionClient<M>): TrashClient<M> {
+        const online = async <T>(what: string, call: () => Promise<T>): Promise<T> => {
+            const message = `Offline: ${what} on the trash of "${slug}" needs the server; the trash is never cached on this device.`;
+            if (!this.connectivity.shouldAttempt()) throw offlineError(message);
+            try {
+                const result = await call();
+                this.connectivity.markSuccess();
+                return result;
+            } catch (error) {
+                if (!isNetworkError(error)) throw error;
+                this.connectivity.markFailure();
+                throw new RebaseApiError(message, { status: 0, code: "OFFLINE", cause: error });
+            }
+        };
+        const settleQueued = async (what: string, ids: readonly (string | number)[]): Promise<void> => {
+            if (!ids.some((id) => this.hasPending(slug, id))) return;
+            await this.sync().catch(() => undefined);
+            const stuck = ids.find((id) => this.hasPending(slug, id));
+            if (stuck === undefined) return;
+            throw new RebaseClientError(
+                `Cannot ${what} "${slug}" row ${String(stuck)} yet: a write to it is still queued, and the ` +
+                "trash acts on the server's copy. Retry once `client.offline.sync()` has sent it.",
+                { code: "TRASH_PENDING_WRITE", details: { id: stuck } }
+            );
+        };
+        const restored = async (rows: M[], ticket: ScopeTicket): Promise<void> => {
+            await this.ingest(slug, rows.filter((row) => row && typeof row === "object"), ticket);
+            this.notifyCollection(slug);
+            this.scheduleRefresh(slug);
+        };
+        const purged = (ids: readonly (string | number)[], ticket: ScopeTicket): void => {
+            for (const id of ids) this.removeLocalRow(slug, id, ticket, true);
+            this.notifyCollection(slug);
+            this.scheduleRefresh(slug);
+        };
+        return {
+            find: (params?: FindParams<M>) => online("find()", () => inner.trash.find(params)),
+            count: (params?: FindParams<M>) => online("count()", () => inner.trash.count(params)),
+            restore: async (id: string | number, options?: RestoreOptions<M>) => {
+                const ticket = this.ticket() ?? await this.nextTicket();
+                await this.ensureCollection(slug);
+                await settleQueued("restore", [id]);
+                const row = await online("restore()", () => inner.trash.restore(id, options));
+                await restored(row ? [row] : [], ticket);
+                return row;
+            },
+            restoreMany: async (ids: (string | number)[], options?: RestoreOptions<M>) => {
+                const ticket = this.ticket() ?? await this.nextTicket();
+                await this.ensureCollection(slug);
+                if (!Array.isArray(ids)) throw invalidBulkBody("trash.restoreMany expects an array of ids.");
+                await settleQueued("restore", ids);
+                const rows = await online("restoreMany()", () => inner.trash.restoreMany(ids, options));
+                await restored(rows, ticket);
+                return rows;
+            },
+            purge: async (id: string | number, options?: WriteOptions) => {
+                const ticket = this.ticket() ?? await this.nextTicket();
+                await this.ensureCollection(slug);
+                await settleQueued("purge", [id]);
+                await online("purge()", () => inner.trash.purge(id, options));
+                purged([id], ticket);
+            },
+            purgeMany: async (ids: (string | number)[], options?: WriteOptions) => {
+                const ticket = this.ticket() ?? await this.nextTicket();
+                await this.ensureCollection(slug);
+                if (!Array.isArray(ids)) throw invalidBulkBody("trash.purgeMany expects an array of ids.");
+                if (ids.length === 0) return;
+                await settleQueued("purge", ids);
+                await online("purgeMany()", () => inner.trash.purgeMany(ids, options));
+                purged(ids, ticket);
+            }
+        };
     }
 
     // ─── Live queries ────────────────────────────────────────────────────────

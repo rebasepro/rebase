@@ -224,12 +224,14 @@ export function assertNoUndefinedFilterValues(where: Record<string, unknown>): v
  * Two serializers would be two chances to send a query one way and not the
  * other.
  */
-function findParamPairs(params?: FindParams): [string, string][] {
-    if (!params) return [];
+function findParamPairs(params?: FindParams, deleted?: SoftDeletedRows): [string, string][] {
+    const pairs: [string, string][] = [];
+    // First, so a trash read is recognisable at a glance in a log line.
+    if (deleted) pairs.push(["deleted", deleted]);
+    if (!params) return pairs;
     // Refuses `page` with `offset` (`PAGE_WITH_OFFSET`) before any request,
     // with the code the server would answer.
     resolveFindWindow(params);
-    const pairs: [string, string][] = [];
 
     if (params.limit != null) pairs.push(["limit", String(params.limit)]);
     if (params.offset != null) pairs.push(["offset", String(params.offset)]);
@@ -295,8 +297,19 @@ const encodePairs = (pairs: [string, string][]): string =>
         ? "?" + pairs.map(([name, value]) => `${encodeURIComponent(name)}=${encodeURIComponent(value)}`).join("&")
         : "";
 
-export function buildQueryString(params?: FindParams): string {
-    return encodePairs(findParamPairs(params));
+/**
+ * `?deleted=` — which soft-deleted rows a read covers: `"only"` the trashed
+ * ones, `"include"` live and trashed together. Absent, the server hides them.
+ *
+ * Not a {@link FindParams} field: `FindParams` is also what `listen()` and the
+ * offline cache take, and neither can answer for a trashed row — a
+ * subscription has no `withDeleted`, and the local database never holds one.
+ * Only the trash accessor (`client.data.<slug>.trash`) passes it.
+ */
+export type SoftDeletedRows = "include" | "only";
+
+export function buildQueryString(params?: FindParams, deleted?: SoftDeletedRows): string {
+    return encodePairs(findParamPairs(params, deleted));
 }
 
 /**
@@ -306,9 +319,9 @@ export function buildQueryString(params?: FindParams): string {
  * conditions on one field) a list of them. The server reads it back into the
  * same parameters and runs the same listing.
  */
-export function buildQueryBody(params?: FindParams): Record<string, string | string[]> {
+export function buildQueryBody(params?: FindParams, deleted?: SoftDeletedRows): Record<string, string | string[]> {
     const body: Record<string, string | string[]> = {};
-    for (const [name, value] of findParamPairs(params)) {
+    for (const [name, value] of findParamPairs(params, deleted)) {
         const held = body[name];
         body[name] = held === undefined ? value : [...(Array.isArray(held) ? held : [held]), value];
     }

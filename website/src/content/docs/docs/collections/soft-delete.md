@@ -93,6 +93,37 @@ changes is whether the row can come back. Only the literal `true` or `1` means
 yes; a typo is a 400, because a caller who asked to purge and got a soft delete
 believes the data is gone.
 
+## From the SDK
+
+The typed client reaches the trash through `trash` on each collection. It sends
+the requests above: `?deleted=only` on the reads, the update to `null` for a
+restore, and `?hard=true` for a purge.
+
+```typescript
+const trashed = await client.data.invoices.trash.find({ limit: 20 });
+const howMany = await client.data.invoices.trash.count();
+
+await client.data.invoices.trash.restore(7);       // PATCH { deletedAt: null }
+await client.data.invoices.trash.restoreMany([8, 9]);
+
+await client.data.invoices.trash.purge(7);         // DELETE ?hard=true
+await client.data.invoices.trash.purgeMany([8, 9]);
+```
+
+`trash.find` and `trash.count` take the same parameters as `find` and `count`.
+A restore sets `deletedAt` unless you name the field: a collection declared
+with `softDelete: { field: "archivedAt" }` restores with
+`trash.restore(7, { field: "archivedAt" })`. The client cannot read the field
+name from the server.
+
+Use `trash` on a collection that declares `softDelete`. On one that does not,
+the server ignores `?deleted=`, so `trash.find` returns the live rows and
+`trash.purge` is an ordinary delete.
+
+With [offline](/docs/sdk/offline) enabled, the trash is never cached and nothing
+in it is queued. Each call needs the server, and fails with the `OFFLINE` error
+without it. A restored row joins the local database, and a purged one leaves it.
+
 ## Next Steps
 
 - **[Defining Collections](/docs/collections)** — where `softDelete` is declared

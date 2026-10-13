@@ -25,8 +25,10 @@ import type {
     LogicalConditionFor,
     OrderBySpec,
     QueryComputedFields,
+    RestoreOptions,
     RowOf,
     StorageSource,
+    TrashClient,
     UpdateOf,
     WhereConditionFor,
     WhereFilterOp,
@@ -42,5 +44,6 @@ export type ConsumerCanName = [
     FilterConditionFor<Record<string, unknown>>, LogicalConditionFor<Record<string, unknown>>, QueryComputedFields,
     RowOf<Record<string, unknown>>, StorageSource, UpdateOf<Record<string, unknown>>,
     WhereConditionFor<string>, WhereFilterOp, WhereFor<Record<string, unknown>>,
-    WhereValueFor<"==", string>, WriteOptions
+    WhereValueFor<"==", string>, WriteOptions,
+    RestoreOptions, TrashClient
 ];
