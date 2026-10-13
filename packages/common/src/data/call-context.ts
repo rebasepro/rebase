@@ -4,6 +4,7 @@ import type {
     RebaseCallbackClient,
     RebaseCallContext,
     RebaseSdkData,
+    RegisteredDatabase,
     StorageSource,
     User
 } from "@rebasepro/types";
@@ -32,6 +33,11 @@ import { buildSdkData } from "./buildRebaseData";
  * from `@rebasepro/common` builds the same flat accessor the server hands a
  * callback.
  *
+ * `DB` is the `Database` the context is typed from: the one the project
+ * registered on `Register`, as for the context the server builds, unless
+ * `provided.data` says otherwise. In such a project, build that plane as
+ * `buildSdkData<Database>(driver)` so it is typed the same way.
+ *
  * @example
  * ```ts
  * import { createCallContext } from "@rebasepro/server";
@@ -50,12 +56,12 @@ import { buildSdkData } from "./buildRebaseData";
  *
  * @group Hooks and utilities
  */
-export function createCallContext<USER extends User = User>(
-    provided: Partial<RebaseCallContext<USER>> = {}
-): RebaseCallContext<USER> {
+export function createCallContext<USER extends User = User, DB = RegisteredDatabase>(
+    provided: Partial<RebaseCallContext<USER, DB>> = {}
+): RebaseCallContext<USER, DB> {
     return {
-        client: provided.client ?? missingClient(),
-        data: provided.data ?? missingData(),
+        client: provided.client ?? missingClient<DB>(),
+        data: provided.data ?? missingData<DB>(),
         storageSource: provided.storageSource ?? missingStorageSource("storageSource"),
         ...(provided.user !== undefined ? { user: provided.user } : {}),
         ...(provided.driver !== undefined ? { driver: provided.driver } : {})
@@ -112,8 +118,8 @@ function refusingDriver(field: ContextField): DataDriver {
     };
 }
 
-function missingData(): RebaseSdkData {
-    return buildSdkData(refusingDriver("data"));
+function missingData<DB>(): RebaseSdkData<DB> {
+    return buildSdkData<DB>(refusingDriver("data"));
 }
 
 function missingStorageSource(field: ContextField): StorageSource {
@@ -145,11 +151,11 @@ function missingAuth(): AuthClient {
  * `context.client.email.send(…)` in a hook under test throws this refusal
  * rather than "cannot read properties of undefined".
  */
-function missingClient(): RebaseCallbackClient {
+function missingClient<DB>(): RebaseCallbackClient<DB> {
     const fail = (member: string) => refuse("client", `context.client.${member}`);
     return {
         auth: missingAuth(),
-        dataAsAdmin: buildSdkData(refusingDriver("client")),
+        dataAsAdmin: buildSdkData<DB>(refusingDriver("client")),
         storage: missingStorageSource("client"),
         storageRegistry: {
             get: fail("storageRegistry.get"),

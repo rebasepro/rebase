@@ -1469,11 +1469,18 @@ export function wrapAsEntityData(sdkData: Pick<RebaseSdkData, "collection">, opt
  * the flat SDK data layer (`context.data`) from an existing Entity data layer
  * — e.g. the admin routes its Entity data via `useData()` and exposes the
  * same routing as flat `context.data` for callbacks by wrapping it here.
+ *
+ * `DB` is the generated `Database` the result is typed from. One object serves
+ * every `Database` — each accessor is resolved by name when it is read — so it
+ * describes the result and changes nothing it does. Only an explicit type
+ * argument sets it (`NoInfer`): inferred from where the result is assigned, it
+ * would be whatever that place declares — an untyped `Promise<RebaseSdkData>`
+ * made it `RebaseSdkData | PromiseLike<RebaseSdkData>`. Untyped by default.
  */
-export function wrapAsSdkData(
+export function wrapAsSdkData<DB = unknown>(
     entityData: RebaseData,
     options?: Pick<EntityDataOptions, "resolveAccessor">
-): RebaseSdkData {
+): RebaseSdkData<NoInfer<DB>> {
     const cache = new Map<string, SDKCollectionClient>();
 
     function getAccessor(slug: string): SDKCollectionClient {
@@ -1485,7 +1492,7 @@ export function wrapAsSdkData(
         return accessor;
     }
 
-    const target = { collection: getAccessor } as RebaseSdkData;
+    const target = { collection: getAccessor } as RebaseSdkData<DB>;
 
     return new Proxy(target, {
         get(_target, prop: string | symbol) {
@@ -1511,10 +1518,15 @@ export function wrapAsSdkData(
  *
  * `options.resolveAccessor` names the slug a property is (see
  * `createAccessorSlugResolver`); absent, `data.myNotes` is `my_notes`.
+ *
+ * `DB` types the result from a generated `Database` — `buildSdkData<Database>(driver)`
+ * is the plane `context.data` is in a project that registered it. It describes
+ * the object and changes nothing it does, and only an explicit type argument
+ * sets it (see {@link wrapAsSdkData}); untyped by default.
  */
-export function buildSdkData(
+export function buildSdkData<DB = unknown>(
     driver: DataDriver,
     options?: Pick<EntityDataOptions, "resolveAccessor">
-): RebaseSdkData {
-    return wrapAsSdkData(buildRebaseData(driver), options);
+): RebaseSdkData<NoInfer<DB>> {
+    return wrapAsSdkData<DB>(buildRebaseData(driver), options);
 }

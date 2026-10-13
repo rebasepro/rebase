@@ -8,8 +8,9 @@
  * reporting one as unused means the surface went back to untyped. The
  * unmarked lines are what must keep compiling.
  */
-import { defineCron, defineFunction, rebase } from "@rebasepro/server";
-import type { CollectionCallbacks, RebaseSdkData, RegisteredDatabase } from "@rebasepro/types";
+import { buildSdkData } from "@rebasepro/common";
+import { createCallContext, defineCron, defineFunction, rebase } from "@rebasepro/server";
+import type { CollectionCallbacks, DataDriver, RebaseSdkData, RegisteredDatabase } from "@rebasepro/types";
 
 import type { Database } from "../src/typed-sdk/database.types";
 
@@ -110,3 +111,28 @@ export const helperProbes: CollectionCallbacks = {
         await publishedCount(rebase.dataAsAdmin);
     }
 };
+
+/**
+ * A context built to call a callback directly, in a test or a script: typed
+ * from the registration like the one the server hands it, so it can be passed
+ * to a callback that names the registered `context.data`.
+ */
+export async function callContextProbes(driver: DataDriver): Promise<void> {
+    const context = createCallContext();
+    const author = await context.data.authors.findById(1);
+    const name: string | undefined = author?.name;
+    void name;
+    // @ts-expect-error — no collection is called `autors`
+    await context.data.autors.find();
+    await context.client.dataAsAdmin?.posts.find({ include: ["author"] });
+
+    // Over a driver, as the refusal message tells a test to build it.
+    const overDriver = createCallContext({ data: buildSdkData<Database>(driver) });
+    await callbacks.beforeSave?.({
+        collection: { slug: "authors", name: "Authors", properties: {} },
+        path: "authors",
+        status: "new",
+        values: {},
+        context: overDriver
+    });
+}
