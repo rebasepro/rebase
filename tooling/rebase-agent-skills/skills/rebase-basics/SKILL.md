@@ -52,14 +52,14 @@ Please adhere to these principles when working with Rebase, as they ensure relia
    - `rebase schema generate` — converts collection definitions to Drizzle ORM schema.
    - **On the managed database (the default), boot applies it.** `rebase dev`
      generates the schema and creates the missing tables additively at every
-     start; there is no push step, and `rebase db push` refuses — it plans with
-     Atlas, which needs a second empty database to compare against.
+     start, so an added collection or field needs no push step.
    - **With your own `DATABASE_URL`:** `rebase db push` (development) or
      `rebase db generate && rebase db migrate` (production).
    - What boot's additive apply deliberately leaves alone, on either database:
      any change that is not purely additive — a renamed column, a narrowed
-     type, a removed field. Those
-     need `db push` or a migration, which means they need a `DATABASE_URL`.
+     type, a removed field. Those need `rebase db push` or a migration. Since
+     0.25 both run on the managed database too (Atlas plans against a throwaway
+     in-memory PGlite); on 0.24 and earlier they need a `DATABASE_URL`.
 
 5. **Use Rebase MCP Server tools when available:** For data operations, user management, and collection browsing, prefer the MCP tools (`list_documents`, `get_document`, `create_document`, etc.) over writing manual API calls.
 

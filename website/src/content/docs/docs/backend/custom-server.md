@@ -60,10 +60,10 @@ the shapes are identical — and then `.parse()` rejects every field carrying a
 up, reported success, and ran none of its crons; nothing in the failure
 mentioned zod.
 
-Don't declare `zod` in your project's dependencies — the runtime provides it. If
-you must, match its major and let your bundler dedupe. `loadEnv` now refuses a
-foreign schema at boot with a message naming the fix, rather than accepting it
-and validating half of it.
+The runtime provides `zod`. The scaffold's `backend/package.json` lists it at
+the range `@rebasepro/server` uses, so one copy is installed: keep the two equal.
+`loadEnv` now refuses a foreign schema at boot with a message naming the fix,
+rather than accepting it and validating half of it.
 :::
 
 **Key behaviors:**

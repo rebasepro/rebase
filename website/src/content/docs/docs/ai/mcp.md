@@ -325,9 +325,9 @@ to allow destructive tools against remote environments.
 
 **If no connection string can be resolved at all, the gated DB tools are refused.**
 With no `DATABASE_URL`, the CLI uses the managed development database, which is
-the default for a new project, and the CLI refuses `db push`, `db migrate` and
-`db branch` there itself. The refusal says so and names what works instead. It
-does not suggest the opt-out:
+the default for a new project, and the gate refuses its four database tools
+there. The refusal says why and names what works instead. It does not suggest
+the opt-out:
 
 ```text
 Error: Refusing to run "rebase_db_push": project "default" sets no DATABASE_URL, so the
@@ -336,6 +336,10 @@ most likely do not need this tool: the dev server applies the collections to tha
 database at boot, additively. After changing a collection, restart it with
 rebase_dev_stop and rebase_dev_start. …
 ```
+
+<span class="since-badge" data-since="0.25">Since 0.25</span> From a terminal,
+`rebase db push` and `rebase db migrate` do run on that database; only the MCP
+tools are refused. On 0.24 the CLI refuses them there too.
 
 Only loopback counts as local: `localhost`, `*.localhost`, `127.0.0.0/8`, `::1`.
 Private ranges like `10.x` and `192.168.x` do **not** — those are as likely to be

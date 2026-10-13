@@ -187,6 +187,9 @@ Push schema changes directly to the database (development only):
 rebase db push
 ```
 
+`--database-url <url>` names the database, and `--docker` the compose one, started
+if needed. `generate`, `migrate`, `branch`, `backup` and `restore` take both too.
+
 :::caution
 `db push` modifies the database directly without migration files. Use `db generate` + `db migrate` for production.
 :::
@@ -320,10 +323,11 @@ PostgreSQL will not copy or drop a database anything else is connected to, and
 the usual "anything else" is your own `rebase dev`. `create` and `delete` name
 what is holding the database open; `--force` disconnects those sessions first.
 
- Every branch is a full copy on disk, so they need clearing out. `prune` removes
+Every branch is a full copy on disk, so they need clearing out. `prune` removes
 three things: an entry whose database was dropped outside Rebase, a branch
 database whose entry was never written, and — only with `--older-than` — branches
-past an age you name. It asks before removing anything unless you pass `--yes`.
+past an age you name. It asks before removing anything unless you pass `--yes`;
+with no terminal to ask on, such as in CI, it removes nothing and exits 0.
 
  `switch` records the branch in `.rebase/branch.json` and never edits `.env`. It
 takes precedence over `DATABASE_URL` in `.env` and loses to `--database-url` or a
@@ -511,6 +515,7 @@ another service uses, as opposed to an end user's session:
 
 ```bash
 rebase api-keys list
+rebase api-keys get abc123-def456
 rebase api-keys create --name "Blog CI" --scopes data:read:posts,data:write:posts --expires-in 90
 rebase api-keys create --name "Ops" --full-access --roles admin --expires-at 2027-01-31
 rebase api-keys revoke abc123-def456

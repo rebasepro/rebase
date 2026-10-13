@@ -101,6 +101,19 @@ second category cannot happen quietly.
 Rebase Cloud consumes exactly these contracts and nothing else. Anything not
 listed here is an implementation detail the platform does not depend on.
 
+### Version badges and canaries
+
+The docs are published from `main`, so a page can describe something no stable
+release has yet. A *Since* badge names the first stable release that carries it,
+and the text beside it says what the release before does.
+
+A canary is a build of `main` numbered after the last stable release:
+`0.24.1-canary.g<commit>` is `main` at that commit, some time after 0.24.0, and
+`rebase upgrade --to canary` installs the newest one. It carries everything that
+had reached `main` when it was built, so on a recent canary a badge naming the
+next minor (0.25, after 0.24.0) applies to you, and the note about the release
+before (on 0.24) describes the stable release you came from.
+
 ## The versioned contracts
 
 The values below are read from source; treat the file references as the truth
