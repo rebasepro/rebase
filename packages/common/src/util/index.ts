@@ -14,6 +14,7 @@ export * from "./download-url-cache";
 export * from "./resumable-upload";
 export * from "./resumable-upload-threshold";
 export * from "./callbacks";
+export * from "./compose-callbacks";
 export * from "./callback-errors";
 export * from "./relations";
 export * from "./resolve-relation";
