@@ -4,7 +4,6 @@ import path from "path";
 import pg from "pg";
 import arg from "arg";
 import * as dotenv from "dotenv";
-import readline from "readline";
 
 import {
     buildTablesMap,
@@ -20,6 +19,7 @@ import { countRowsUpTo, isUsableFileName, quoteRelation, readSchemaMetadata } fr
 import { classifyTables, lookupCandidates, LOOKUP_MAX_ROWS } from "./introspect-db-structure";
 import { parseCheckConstraints } from "./introspect-db-constraints";
 import { out, outWarn, outError } from "../cli-output";
+import { promptConfirm } from "../cli-prompt";
 
 async function main() {
     const args = arg(
@@ -150,13 +150,7 @@ async function main() {
             // `rebase init --introspect`) — asking would hang forever.
             out(chalk.gray("Skipping data inference (non-interactive run; pass --data-inference to enable)."));
         } else {
-            const rl = readline.createInterface({
-                input: process.stdin,
-                output: process.stdout
-            });
-            const answer = await new Promise<string>((resolve) => rl.question(chalk.yellow("? Do you want to run comprehensive data inference on sampled rows to auto-detect types, formats, constraints, and UI configurations? (y/N) "), resolve));
-            runDataInference = answer.trim().toLowerCase() === "y";
-            rl.close();
+            runDataInference = await promptConfirm(chalk.yellow("? Do you want to run comprehensive data inference on sampled rows to auto-detect types, formats, constraints, and UI configurations? (y/N) "));
         }
 
         if (runDataInference) {

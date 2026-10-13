@@ -30,7 +30,6 @@ import {
     getTableExcludes,
     getForeignIndexExcludes,
     ExcludeIntrospectionError,
-    promptConfirm,
     queryGeneratedColumnDependencies,
     queryColumnTypes,
     dropGeneratedColumns,
@@ -60,7 +59,8 @@ import {
 import { stripCarvedOutStatements } from "./schema/carved-out-migration";
 import { finishNewMigration } from "./schema/migration-post-process";
 import { acceptsExcludeFlag, buildAtlasArgs, migrateApplyArgs, takesDevUrl } from "./schema/atlas-argv";
-import { ScratchDatabase } from "./cli-scratch-database";
+import { CommandStopped, ScratchDatabase } from "./cli-scratch-database";
+import { promptConfirm } from "./cli-prompt";
 import { applyPoliciesFile, applyPushPlan, stampableTables, type PolicyStamping } from "./cli-push";
 import { unexpectedBranchArgs } from "./branch-argv";
 import { assertKnownFlags, collectionsPathIn, parseDriverLine } from "./cli-flags";
@@ -793,7 +793,7 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
             // copy of the expression, so there is nothing to put back.
             if (unowned.length > 0) {
                 outError(formatForeignGeneratedColumnBanner(unowned));
-                process.exit(1);
+                throw new CommandStopped("A generated column Rebase does not own blocks the push.");
             }
 
             const allowDestructive = argsList["--allow-destructive"] === true || argsList["--yes"] === true;
@@ -815,7 +815,7 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
                 if (decision === "refuse") {
                     outError(chalk.red("  ✗ Aborting: destructive changes require confirmation."));
                     outError(chalk.gray("    Re-run interactively, or pass --allow-destructive to proceed. Back up first: rebase db backup"));
-                    process.exit(1);
+                    throw new CommandStopped("Destructive changes need confirmation.");
                 }
                 if (decision === "confirm") {
                     const confirmed = await promptConfirm(
@@ -823,7 +823,7 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
                     );
                     if (!confirmed) {
                         out(chalk.gray("  Aborted. No changes were made."));
-                        process.exit(1);
+                        throw new CommandStopped("The destructive push was declined.");
                     }
                 } else {
                     // decision === "apply" via --allow-destructive
@@ -1817,7 +1817,7 @@ async function runAtlas(
                 outError(chalk.gray("  Refusing to apply — a partial exclude list could drop tables Rebase does not manage."));
                 const hint = diagnoseDbError(err.cause ?? err, databaseUrl);
                 if (hint) outError(hint);
-                process.exit(1);
+                throw new CommandStopped("Could not determine which tables to protect.");
             }
             throw err;
         }
@@ -1834,7 +1834,7 @@ async function runAtlas(
                 outError(chalk.gray("  Refusing to apply — a partial exclude list could drop an index Rebase does not manage."));
                 const hint = diagnoseDbError(err.cause ?? err, databaseUrl);
                 if (hint) outError(hint);
-                process.exit(1);
+                throw new CommandStopped("Could not determine which indexes to protect.");
             }
             throw err;
         }
@@ -1867,6 +1867,9 @@ async function runAtlas(
     try {
         await subprocess;
     } catch {
+        // What Atlas was planning against is the one thing worth reading after
+        // its own failure, so the scratch database outlives this command.
+        scratchDatabase.keepAsEvidence();
         outError(chalk.red(`\n✗ atlas ${domain} ${args.join(" ")} failed.\n`));
         // Surface actionable recovery guidance for recognized failures. The
         // Atlas-shaped ones first: they read the invocation as well as the

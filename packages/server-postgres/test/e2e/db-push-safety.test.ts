@@ -145,6 +145,12 @@ describe("db push destructive-change gate E2E", () => {
         );
     }
 
+    /** Atlas scratch databases (`<db>_dev_diff`) left on the server. */
+    async function scratchDatabases(): Promise<string[]> {
+        const res = await dbClient.query(`SELECT datname FROM pg_database WHERE datname LIKE '%\\_dev\\_diff' ORDER BY datname`);
+        return res.rows.map((row: { datname: string }) => row.datname);
+    }
+
     async function noteColumnExists(): Promise<boolean> {
         const res = await dbClient.query(
             `SELECT 1 FROM information_schema.columns
@@ -168,6 +174,10 @@ describe("db push destructive-change gate E2E", () => {
         expect(refused.all ?? "").toMatch(/destructive/i);
         // The safety net's whole point: the column and its data survive.
         expect(await noteColumnExists()).toBe(true);
+        // And the refusal cleans up after itself. It exited from inside the
+        // command, past the drop, and a scratch database left once is never
+        // dropped again: the next push takes it for one made by hand.
+        expect(await scratchDatabases()).toEqual([]);
 
         // ── 3. Opt in explicitly → the drop is applied ───────────────────
         const allowed = await runPush(["--allow-destructive"]);

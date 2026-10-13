@@ -7,11 +7,14 @@
  * `db push --dry-run` — described as "nothing was applied" — returned before
  * that line, `db generate` never reached one, and `db migrate` created it for
  * an Atlas call that never uses it. Each left a database on the server, which
- * on a provider that bills per database is a silent cost. A failed command
- * still keeps it: there it holds the state Atlas was planning against.
+ * on a provider that bills per database is a silent cost. Only an Atlas run
+ * that failed against it keeps it: there it holds the state Atlas was planning
+ * against. Every other way out drops it, including a crash and a destructive
+ * push the user declined, because a scratch database left once is never
+ * dropped again: the next push finds it there and takes it for one made by hand.
  */
 import { buildAtlasArgs, takesDevUrl } from "../src/schema/atlas-argv";
-import { ScratchDatabase } from "../src/cli-scratch-database";
+import { CommandStopped, ScratchDatabase } from "../src/cli-scratch-database";
 
 const URL = "postgres://u:p@localhost:5432/app";
 const DEV_URL = "postgres://u:p@localhost:5432/app_dev_diff";
@@ -45,15 +48,52 @@ describe("the scratch database around a db command", () => {
         expect(drop).toHaveBeenCalledTimes(1);
     });
 
-    it("is kept after a command that fails, as the evidence", async () => {
+    it("is kept after an Atlas run against it fails, as the evidence", async () => {
         const { database, drop } = scratch(true);
 
         await expect(database.around(async () => {
             await database.ensure(URL, DEV_URL);
+            database.keepAsEvidence();
             throw new Error("atlas exited 1");
         })).rejects.toThrow("atlas exited 1");
 
         expect(drop).not.toHaveBeenCalled();
+    });
+
+    // The confirmation prompt crashed in the published driver, and the throw
+    // skipped the drop: `rebase_dev_diff` stayed on the server for good.
+    it("is dropped after a command that crashes, and the error still reaches the caller", async () => {
+        const { database, drop } = scratch(true);
+
+        await expect(database.around(async () => {
+            await database.ensure(URL, DEV_URL);
+            throw new TypeError("import___vite_browser_external.default.createInterface is not a function");
+        })).rejects.toThrow(TypeError);
+
+        expect(drop).toHaveBeenCalledWith(URL, DEV_URL);
+    });
+
+    it("is dropped when a destructive push is declined or cannot be confirmed", async () => {
+        const { database, drop } = scratch(true);
+
+        const stopped = database.around(async () => {
+            await database.ensure(URL, DEV_URL);
+            throw new CommandStopped("The destructive push was declined.");
+        });
+
+        await expect(stopped).rejects.toBeInstanceOf(CommandStopped);
+        expect(drop).toHaveBeenCalledTimes(1);
+    });
+
+    it("is dropped once, however many times it is released", async () => {
+        const { database, drop } = scratch(true);
+
+        await database.around(async () => {
+            await database.ensure(URL, DEV_URL);
+            await database.release();
+        });
+
+        expect(drop).toHaveBeenCalledTimes(1);
     });
 
     it("is left alone when it was already there — somebody made it by hand", async () => {

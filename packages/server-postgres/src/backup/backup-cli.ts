@@ -7,7 +7,6 @@ import arg from "arg";
 import path from "path";
 import fs from "fs";
 import os from "os";
-import readline from "readline";
 import { Readable } from "stream";
 import { pipeline } from "stream/promises";
 import chalk from "chalk";
@@ -15,6 +14,7 @@ import chalk from "chalk";
 // backup destination).
 import { out as print, outWarn, outError } from "../cli-output";
 import { parseDriverLine } from "../cli-flags";
+import { promptConfirm } from "../cli-prompt";
 import type { StorageController } from "@rebasepro/server";
 import {
     BackupDestination,
@@ -92,18 +92,6 @@ function requireConnection(): string {
         process.exit(1);
     }
     return conn;
-}
-
-async function promptConfirm(question: string): Promise<boolean> {
-    // Non-interactive shells (CI, pipes) can't answer — treat as "no".
-    if (!process.stdin.isTTY) return false;
-    const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-    try {
-        const answer: string = await new Promise((resolve) => rl.question(question, resolve));
-        return /^y(es)?$/i.test(answer.trim());
-    } finally {
-        rl.close();
-    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────
