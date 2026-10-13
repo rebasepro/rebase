@@ -116,6 +116,13 @@ function materialize(flavour: "cms" | "baas", into: string): void {
         // and its `index.ts` files import siblings that only exist once a preset
         // has been copied up. The default preset is blog, already in place.
         fs.rmSync(path.join(into, "config/collections/presets"), { recursive: true, force: true });
+        // `writeShippedSchema`: init writes the preset's generated schema, which
+        // lives beside the template rather than in it. The entrypoint imports it.
+        fs.mkdirSync(path.join(into, "backend/src"), { recursive: true });
+        fs.copyFileSync(
+            path.join(repoRoot, "packages/cli/templates/generated-schemas/blog.ts"),
+            path.join(into, "backend/src/schema.generated.ts")
+        );
     }
 
     for (const [from, to] of [["gitignore", ".gitignore"], ["npmrc", ".npmrc"]] as const) {
