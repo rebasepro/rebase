@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import type { RebaseServerClient } from "@rebasepro/types";
+import type { RebaseServerClient, RegisteredDatabase } from "@rebasepro/types";
 import type { HonoEnv } from "../api/types";
 import { rebase } from "../singleton";
 
@@ -12,7 +12,7 @@ import { rebase } from "../singleton";
  * on the Hono context via {@link HonoEnv} — read them with `c.get("user")`
  * / `c.var.driver` inside a handler.
  */
-export interface RebaseFunctionContext {
+export interface RebaseFunctionContext<DB = RegisteredDatabase> {
     /**
      * The server-side Rebase singleton (`dataAsAdmin`, `auth`, `storage`,
      * `email`, `sql`).
@@ -38,8 +38,24 @@ export interface RebaseFunctionContext {
      * (`c.var.driver`), which carries the caller's identity. (`rebase.data` no
      * longer exists on this type — `dataAsAdmin` is the only name for the
      * admin-scoped accessor.)
+     *
+     * Typed from the `Database` the project registered on `Register`, or from
+     * the type argument of `defineFunction<Database>(…)`; untyped otherwise.
      */
-    rebase: RebaseServerClient;
+    rebase: RebaseServerClient<DB>;
+}
+
+/**
+ * The `rebase` singleton, seen through the `Database` a function names.
+ *
+ * One object serves every function; `DB` only describes it. Each collection
+ * accessor on `dataAsAdmin` is resolved by name at call time, so a generated
+ * `Database` adds compile-time checks and changes nothing the object does —
+ * the same reason the browser client's `createRebaseClient<Database>()` is one
+ * implementation for every `Database`.
+ */
+function typedSingleton<DB>(): RebaseServerClient<DB> {
+    return rebase as RebaseServerClient<unknown> as RebaseServerClient<DB>;
 }
 
 /**
@@ -77,10 +93,10 @@ export interface RebaseFunctionContext {
  *   own `Hono<HonoEnv>` app to use instead.
  * @returns The Hono app to default-export from the function file.
  */
-export function defineFunction(
-    definition: (app: Hono<HonoEnv>, ctx: RebaseFunctionContext) => void | Hono<HonoEnv>
+export function defineFunction<DB = RegisteredDatabase>(
+    definition: (app: Hono<HonoEnv>, ctx: RebaseFunctionContext<DB>) => void | Hono<HonoEnv>
 ): Hono<HonoEnv> {
     const app = new Hono<HonoEnv>();
-    const returned = definition(app, { rebase });
+    const returned = definition(app, { rebase: typedSingleton<DB>() });
     return returned instanceof Hono ? returned : app;
 }

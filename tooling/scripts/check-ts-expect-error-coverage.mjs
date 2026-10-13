@@ -42,7 +42,8 @@ const ROOT = path.resolve(import.meta.dirname, "..", "..");
 const PROGRAMS = [
     { config: "tsconfig.typecheck.json", gate: "pnpm typecheck" },
     { config: "tsconfig.tests.json", gate: "pnpm typecheck" },
-    { config: "tests/e2e/baas-typecheck/tsconfig.json", gate: "pnpm check:baas-types" }
+    { config: "tests/e2e/baas-typecheck/tsconfig.json", gate: "pnpm check:baas-types" },
+    { config: "tests/e2e/baas-typecheck/registered/tsconfig.json", gate: "pnpm check:baas-types" }
 ];
 
 const SOURCE_EXTENSIONS = /\.(?:ts|tsx|mts|cts)$/;

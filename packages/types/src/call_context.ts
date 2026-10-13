@@ -3,6 +3,7 @@ import type { StorageSource } from "./controllers/storage";
 import type { RebaseClient } from "./controllers/client";
 import type { RebaseSdkData } from "./controllers/data";
 import type { User } from "./users";
+import type { Register, RegisteredDatabase } from "./types/register";
 
 /**
  * The client a collection callback is handed as `context.client`: the Rebase
@@ -22,7 +23,7 @@ import type { User } from "./users";
  *
  * @group Hooks and utilities
  */
-export type RebaseCallbackClient<DB = unknown> = Omit<RebaseClient<DB>, "data">;
+export type RebaseCallbackClient<DB = RegisteredDatabase> = Omit<RebaseClient<DB>, "data">;
 
 /**
  * Context that is provided to entity callbacks (hooks).
@@ -56,7 +57,7 @@ export type RebaseCallbackClient<DB = unknown> = Omit<RebaseClient<DB>, "data">;
  *
  * @group Hooks and utilities
  */
-export type RebaseCallContext<USER extends User = User> = {
+export type RebaseCallContext<USER extends User = User, DB = RegisteredDatabase> = {
 
     /**
      * The Rebase client instance.
@@ -84,7 +85,7 @@ export type RebaseCallContext<USER extends User = User> = {
      * const { client } = props.context;
      * const result = await client.functions.invoke('extract-job', { url });
      */
-    client: RebaseCallbackClient;
+    client: RebaseCallbackClient<DB>;
 
     /**
      * Unified data access — `context.data.products.create(...)`.
@@ -123,8 +124,11 @@ export type RebaseCallContext<USER extends User = User> = {
      * frontend SDK client — so `context.data` in a backend callback and
      * `client.data` in the frontend are accessed the same way (`row.title`,
      * never `row.values.title`). Shape only: privilege differs as above.
+     *
+     * Untyped until the project registers its generated `Database` on
+     * {@link Register}; typed from it from then on.
      */
-    data: RebaseSdkData;
+    data: RebaseSdkData<DB>;
 
     /**
      * The driver executing the operation this callback is attached to.

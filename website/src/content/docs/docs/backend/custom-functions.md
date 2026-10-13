@@ -323,6 +323,8 @@ export default defineFunction((app, { rebase }) => {
 });
 ```
 
+`rebase.dataAsAdmin` is untyped until you [register your generated `Database`](/docs/backend/typed-server-data).
+
 ### RLS-Scoped Driver vs. Rebase Singleton
 
 |                     | `getDriver(c)` (request-scoped)                | `rebase.dataAsAdmin` (service identity)                          |

@@ -1969,9 +1969,12 @@ export type RebaseSdkData<DB = unknown> = {
      */
     collection<M extends Record<string, unknown> = Record<string, unknown>>(slug: string): SDKCollectionClient<M>;
 } & (
-    DB extends Record<string, unknown>
-        ? { [K in keyof DB]: SDKCollectionClient<RowOf<DB[K]>, InsertOf<DB[K]>, UpdateOf<DB[K]>, IncludeOf<DB[K], DB>> }
-        : {
+    // `unknown extends DB` rather than `DB extends Record<string, unknown>`:
+    // the generated `Database` is an `interface`, and an interface has no
+    // implicit index signature, so it never satisfied `Record<string,
+    // unknown>` and a registered `Database` silently fell to the untyped arm.
+    unknown extends DB
+        ? {
             /**
              * Dynamic flat collection accessor.
              * Access any collection by its slug as a property.
@@ -1981,4 +1984,5 @@ export type RebaseSdkData<DB = unknown> = {
              */
             [collectionSlug: string]: SDKCollectionClient;
         }
+        : { [K in keyof DB]: SDKCollectionClient<RowOf<DB[K]>, InsertOf<DB[K]>, UpdateOf<DB[K]>, IncludeOf<DB[K], DB>> }
 );

@@ -1,4 +1,4 @@
-import type { CronJobDefinition } from "@rebasepro/types";
+import type { CronJobDefinition, RegisteredDatabase } from "@rebasepro/types";
 
 /**
  * Typed authoring helper for a cron job file. Identity at runtime —
@@ -39,7 +39,11 @@ import type { CronJobDefinition } from "@rebasepro/types";
  *     },
  * });
  * ```
+ *
+ * `ctx.rebase` is typed from the `Database` the project registered on
+ * `Register` (see the typed server data guide), and untyped when it registered
+ * none. `defineCron<Database>({…})` types one job without the registration.
  */
-export function defineCron(definition: CronJobDefinition): CronJobDefinition {
+export function defineCron<DB = RegisteredDatabase>(definition: CronJobDefinition<DB>): CronJobDefinition<DB> {
     return definition;
 }

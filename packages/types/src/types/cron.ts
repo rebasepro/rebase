@@ -1,4 +1,5 @@
 import type { RebaseServerClient } from "../controllers/client";
+import type { RegisteredDatabase } from "./register";
 
 /**
  * Cron Job type definitions for Rebase.
@@ -16,7 +17,7 @@ import type { RebaseServerClient } from "../controllers/client";
  * A cron job definition file exports this shape as its default export.
  * See the example cron files in `app/backend/crons/` for usage.
  */
-export interface CronJobDefinition {
+export interface CronJobDefinition<DB = RegisteredDatabase> {
     // Cron schedule expression, e.g. "0 3 * * *" for daily at 3 AM.
     schedule: string;
 
@@ -98,14 +99,14 @@ export interface CronJobDefinition {
      * Receives a context object with the data driver and logger.
      * May return arbitrary JSON-serialisable data stored in the log.
      */
-    handler: (ctx: CronJobContext) => Promise<unknown> | unknown;
+    handler: (ctx: CronJobContext<DB>) => Promise<unknown> | unknown;
 }
 
 
 /**
  * Context passed to each cron handler invocation.
  */
-export interface CronJobContext {
+export interface CronJobContext<DB = RegisteredDatabase> {
     /** The job's unique ID (derived from filename). */
     jobId: string;
 
@@ -177,7 +178,7 @@ export interface CronJobContext {
      *     }
      * });
      */
-    rebase: RebaseServerClient;
+    rebase: RebaseServerClient<DB>;
 
 }
 

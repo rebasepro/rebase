@@ -196,6 +196,7 @@ export default defineConfig({
                         { label: "Cron across instances", slug: "docs/backend/cron-across-instances" },
                         { label: "Background Jobs", slug: "docs/backend/jobs" },
                         { label: "Custom Functions", slug: "docs/backend/custom-functions" },
+                        { label: "Typed server-side data", slug: "docs/backend/typed-server-data" },
                         { label: "Global Hooks", slug: "docs/backend/hooks" },
                         { label: "Entity History", slug: "docs/backend/history" },
                         { label: "Database Branching", slug: "docs/backend/branching" },

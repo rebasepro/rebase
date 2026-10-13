@@ -31,7 +31,7 @@
     "check:types-headless:dts": "node tooling/scripts/headless-guard/check-types.mjs --dts",
     "check:browser-deps": "node tooling/scripts/headless-guard/check-browser-deps.mjs",
     "check:core-types": "tsc --noEmit -p tsconfig.core.json",
-    "check:baas-types": "tsc -p tests/e2e/baas-typecheck/tsconfig.json",
+    "check:baas-types": "tsc -p tests/e2e/baas-typecheck/tsconfig.json && tsc -p tests/e2e/baas-typecheck/registered/tsconfig.json",
     "check:templates": "node tooling/scripts/check-templates.mjs",
     "check:template-pins": "node tooling/scripts/check-template-pins.mjs",
     "check:contributor-setup": "node tooling/scripts/check-contributor-setup.mjs",

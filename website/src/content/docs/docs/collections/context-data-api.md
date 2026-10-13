@@ -22,6 +22,10 @@ afterSave: async ({ values, id, context }) => {
 }
 ```
 
+Rows are untyped (`Record<string, unknown>`) until the project registers its
+generated `Database`; then every accessor is typed from it. See
+[Typed server-side data](/docs/backend/typed-server-data).
+
 ## Available Methods
 
 Each collection accessor (`context.data.<slug>`) provides these methods:

@@ -1,0 +1,8 @@
+{
+    "//": "The registered half of the typed-server-data proof: a project that registers its generated `Database` on `Register`. A program of its own because a module augmentation reaches the whole program — inside ../tsconfig.json it would type the untyped probes too. Run via `pnpm check:baas-types`.",
+    "extends": "../tsconfig.json",
+    "include": [
+        "*.ts",
+        "../stubs"
+    ]
+}

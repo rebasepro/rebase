@@ -8,6 +8,7 @@ import type { BackupDownloadLink, BackupListing } from "../types/backup";
 import type { ApiKeysAPI, PersonalKeysAPI } from "../types/api_keys";
 import type { RoleSummary } from "../types/scopes";
 import type { StorageSourceDefinition } from "../types/storage_source";
+import type { RegisteredDatabase } from "../types/register";
 
 
 /**
@@ -540,7 +541,7 @@ export interface RebaseClient<DB = unknown> {
  * connection, no policies. For user-scoped queries inside a request handler use
  * the request-scoped driver (`c.var.driver`) instead — never `dataAsAdmin`.
  */
-export interface RebaseServerClient<DB = unknown> extends Omit<RebaseClient<DB>, "data"> {
+export interface RebaseServerClient<DB = RegisteredDatabase> extends Omit<RebaseClient<DB>, "data"> {
     /**
      * Admin-scoped data accessor (RLS is evaluated as the service identity, not
      * skipped). Always present server-side. See {@link RebaseClient.dataAsAdmin}
