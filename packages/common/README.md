@@ -35,6 +35,19 @@ This package has no React dependency — it's pure TypeScript and can be used in
 | `and(...conditions)` | Create an AND logical condition |
 | `cond(column, op, value)` | Create a single filter condition |
 
+### Callbacks
+
+| Export | Description |
+|---|---|
+| `composeCallbacks(...sets)` | Combines several sets of collection callbacks into one, run in order, the way the backend combines its global, collection and property tiers. Also exported from `@rebasepro/cms-types` and `@rebasepro/server`. New in 0.25. |
+| `createCallContext(partial)` | Builds the `context` a collection callback receives, so a test can call a hook directly; a missing `client`, `data` or `storageSource` throws on first use, naming itself. New in 0.25. |
+
+### Deprecation
+
+| Export | Description |
+|---|---|
+| `warnDeprecated(key, message)` | Prints `[Rebase] Deprecated: <message>` once per process per key. What Rebase's own deprecated aliases call, and usable by a plugin or library for its own. New in 0.25. |
+
 ### Collections
 
 | Export | Description |

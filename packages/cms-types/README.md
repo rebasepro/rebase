@@ -7,8 +7,10 @@ This package is **mostly types** — the vocabulary that the runtime, the genera
 SDK and the admin panel all agree on, kept in one package so a change to a
 collection's shape cannot mean one thing to the server and another to the panel.
 The little that executes is there for the same reason: `defineCollection`, which
-type-checks a collection's `admin` block, and the key lists (`ADMIN_PROPERTY_KEYS`,
-`ADMIN_COLLECTION_KEYS`) that tell an `admin` key from a core one.
+type-checks a collection's `admin` block, the key lists (`ADMIN_PROPERTY_KEYS`,
+`ADMIN_COLLECTION_KEYS`) that tell an `admin` key from a core one, and
+`composeCallbacks` (0.25+), re-exported from `@rebasepro/common`, which combines
+several sets of collection callbacks into one.
 
 The runtime that consumes these types is
 [`@rebasepro/cms`](https://www.npmjs.com/package/@rebasepro/cms). A project that
