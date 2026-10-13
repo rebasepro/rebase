@@ -852,6 +852,9 @@ importers:
 
   packages/cms-types:
     dependencies:
+      '@rebasepro/common':
+        specifier: workspace:*
+        version: link:../common
       '@rebasepro/types':
         specifier: workspace:*
         version: link:../types

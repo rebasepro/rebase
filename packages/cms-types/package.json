@@ -41,6 +41,7 @@
     "clean": "rm -rf dist && find ./src -name '*.js' -type f | xargs rm -f"
   },
   "dependencies": {
+    "@rebasepro/common": "workspace:*",
     "@rebasepro/types": "workspace:*"
   },
   "devDependencies": {
@@ -95,6 +96,7 @@
     ],
     "moduleNameMapper": {
       "\\\\.(css|less)$": "<rootDir>/test/__mocks__/styleMock.js",
+      "^@rebasepro/common$": "<rootDir>/../common/src/index.ts",
       "^@rebasepro/types$": "<rootDir>/../types/src/index.ts",
       "^@rebasepro/utils$": "<rootDir>/../utils/src/index.ts"
     }

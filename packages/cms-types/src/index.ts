@@ -18,6 +18,9 @@ export * from "./react_component_ref";
 // as well as by the panel. `./collections` holds the panel's view models and
 // imports React as a value; nothing in the builder's graph may reach it.
 export * from "./define_collection";
+// Beside the builder, for the same reason: a collection file combines its
+// callback sets with it, and it is the panel-free `@rebasepro/common` one.
+export { composeCallbacks } from "@rebasepro/common";
 export * from "./collections";
 export * from "./admin_collection";
 export * from "./rebase_context";

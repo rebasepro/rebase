@@ -34,6 +34,11 @@ export type {
 // =============================================================================
 export { rebase, _setRebaseMock, _resetRebaseMock } from "./singleton";
 
+// Collection callbacks are plain functions: one combines sets of them, the
+// other builds the `context` one is called with, so a hook can be run from a
+// test or a script without booting a driver.
+export { composeCallbacks, createCallContext } from "@rebasepro/common";
+
 // The single definition of "the collections" — the runtime, the schema and
 // policy generators, and the doctor all load them through this, so what gets
 // served and what gets pushed can never drift apart.
