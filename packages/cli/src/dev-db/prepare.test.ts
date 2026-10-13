@@ -17,7 +17,8 @@ import path from "path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { MANAGED_POOL_MAX } from "./constraints";
-import { managedNotices, prepareDatabaseEnv } from "./prepare";
+import { recordLastDevDatabase } from "./last-dev-database";
+import { devDatabaseKind, managedNotices, prepareDatabaseEnv, resolveProjectDatabase } from "./prepare";
 
 let root: string;
 const originalEnv = { ...process.env };
@@ -147,6 +148,45 @@ describe("an explicit database", () => {
         const prepared = await prepareDatabaseEnv(root, { flagDocker: true });
 
         expect(prepared.database.kind).toBe("docker");
+    });
+});
+
+describe("after `rebase dev --docker`", () => {
+    /**
+     * The failure this pins: while `rebase dev --docker` served the project,
+     * `rebase db url` printed a PGlite URL and started that daemon, and every
+     * other command would have used the empty PGlite too — nothing remembered
+     * which database `dev` was on.
+     */
+    beforeEach(() => {
+        writeComposeFile();
+        writeEnvFile("DATABASE_PASSWORD=s3cret\n");
+        recordLastDevDatabase(root, "docker");
+    });
+
+    it("every command resolves the Docker database, without being told again", () => {
+        expect(devDatabaseKind(root)).toBe("docker");
+        expect(resolveProjectDatabase(root)).toMatchObject({ kind: "docker", source: "last-dev" });
+    });
+
+    it("hands the child the compose URL, starts no managed database, and says why", async () => {
+        const progress: string[] = [];
+
+        const prepared = await prepareDatabaseEnv(root, { onProgress: line => progress.push(line) });
+
+        expect(prepared.database).toMatchObject({ kind: "docker", source: "last-dev" });
+        expect(prepared.env.DATABASE_URL).toContain("@127.0.0.1:5435/rebase");
+        expect(fs.existsSync(path.join(root, ".rebase", "pgdata"))).toBe(false);
+        expect(progress.join("\n")).toContain("rebase dev --docker");
+    });
+
+    it("is not followed by `rebase dev` itself, whose own flags decide", () => {
+        expect(resolveProjectDatabase(root, { followLastDev: false })).toEqual({ kind: "managed", source: "managed" });
+    });
+
+    it("still loses to DATABASE_URL in .env", () => {
+        writeEnvFile("DATABASE_URL=postgresql://u:pw@localhost:5432/mine\n");
+        expect(devDatabaseKind(root)).toBe("external");
     });
 });
 

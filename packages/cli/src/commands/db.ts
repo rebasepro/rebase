@@ -504,13 +504,10 @@ export async function runDriverDbCommand(
     // is a pure function and settles it. It also keeps the refusal working when
     // the managed database would have failed to start, where the developer
     // would otherwise be told about a daemon rather than about branching.
-    const { resolveDevDatabase } = await import("../dev-db/resolve");
-    const { readEnvFile } = await import("../utils/project");
-    refuseBranchOnManagedDatabase(rawArgs, resolveDevDatabase({
+    const { resolveProjectDatabase } = await import("../dev-db/prepare");
+    refuseBranchOnManagedDatabase(rawArgs, resolveProjectDatabase(projectRoot, {
         flagUrl: readFlagValue(rawArgs, "--database-url"),
-        flagDocker: rawArgs.includes("--docker"),
-        env: process.env,
-        envFile: readEnvFile(projectRoot)
+        flagDocker: rawArgs.includes("--docker")
     }).kind);
 
     const { prepareDatabaseEnv, managedNotices } = await import("../dev-db/prepare");
@@ -1102,11 +1099,18 @@ async function anonymizeTarget(
  * own connection error follows, which is the same contract `dev` keeps.
  */
 export async function ensureDockerDatabase(projectRoot: string, rawArgs: readonly string[]): Promise<void> {
-    if (!rawArgs.includes("--docker")) return;
-
     const { ensureDevDatabase } = await import("../utils/dev-preflight");
     const { readEnvFile } = await import("../utils/project");
-    const { resolveComposeUrl } = await import("../dev-db/prepare");
+    const { resolveComposeUrl, resolveProjectDatabase } = await import("../dev-db/prepare");
+
+    // `--docker` on this command line, or on the last `rebase dev`: a command
+    // that follows the remembered choice reaches the same container, so it has
+    // to be up for the same reason. Only when that choice is the one that wins —
+    // a DATABASE_URL anywhere outranks it, and then there is nothing to start.
+    if (!rawArgs.includes("--docker")) {
+        const resolved = resolveProjectDatabase(projectRoot, { flagUrl: readFlagValue(rawArgs, "--database-url") });
+        if (resolved.kind !== "docker") return;
+    }
 
     const composeUrl = resolveComposeUrl(projectRoot, readEnvFile(projectRoot));
     if (!composeUrl) {
@@ -1206,9 +1210,12 @@ async function onParentDatabase(projectRoot: string, rawArgs: string[], action: 
     const { resolveDevDatabase } = await import("../dev-db/resolve");
     const { resolveComposeUrl } = await import("../dev-db/prepare");
 
+    const { readLastDevDocker } = await import("../dev-db/last-dev-database");
+
     const envFile = readEnvFile(projectRoot);
     const parent = resolveDevDatabase({
         flagDocker: rawArgs.includes("--docker"),
+        lastDevDocker: readLastDevDocker(projectRoot),
         env: process.env,
         envFile,
         branch: null,
@@ -1256,6 +1263,7 @@ async function switchBranch(projectRoot: string, rawArgs: readonly string[]): Pr
     const { readEnvFile } = await import("../utils/project");
     const { resolveDevDatabase } = await import("../dev-db/resolve");
     const { resolveComposeUrl } = await import("../dev-db/prepare");
+    const { readLastDevDocker } = await import("../dev-db/last-dev-database");
 
     // Read as a flag rather than as the name in the third position, so
     // `switch --off` and `switch feature --off` mean the same thing. The doc
@@ -1283,6 +1291,7 @@ async function switchBranch(projectRoot: string, rawArgs: readonly string[]): Pr
     const resolved = resolveDevDatabase({
         flagUrl: readFlagValue(rawArgs, "--database-url"),
         flagDocker: rawArgs.includes("--docker"),
+        lastDevDocker: readLastDevDocker(projectRoot),
         env: process.env,
         envFile,
         branch: null,
@@ -1450,7 +1459,8 @@ const DB_ACTION_HELP: Record<string, { usage: string; summary: string; notes?: s
         notes: [
             "psql \"$(rebase db url)\"",
             "Starts the managed database if it is not already running.",
-            "--database-url and --docker answer for the database `rebase dev` would pick with the same flag."
+            "--database-url and --docker answer for the database `rebase dev` would pick with the same flag.",
+            "After `rebase dev --docker` it prints the Docker database without the flag, as every db command does."
         ]
     },
     restore: {

@@ -32,6 +32,7 @@ import {
     type PreparedDatabase
 } from "../dev-db/prepare";
 import { resolveCliEntry, resolveSpawn } from "../dev-db/daemon";
+import { lastDevDatabaseNotice, recordLastDevDatabase } from "../dev-db/last-dev-database";
 import path from "path";
 import fs from "fs";
 import os from "os";
@@ -1269,11 +1270,23 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
                 ? async () => prepareDatabaseEnv(projectRoot, {
                     flagUrl: typeof args["--database-url"] === "string" ? args["--database-url"] : null,
                     flagDocker: Boolean(args["--docker"]),
+                    // This run's flags are the choice; the record below is
+                    // what the other commands follow.
+                    followLastDev: false,
                     onProgress: (message) => console.log(chalk.gray(`  ${message}`)),
                     additionalKeys: await declaredAdditionalDatabases(projectRoot)
                 })
                 : null
         }));
+    }
+
+    // What the other commands follow — `rebase db url`, `db push`, `console` —
+    // so they reach the database this server is on rather than resolve their
+    // own. See `last-dev-database.ts`.
+    if (prepared) {
+        const { previous } = recordLastDevDatabase(projectRoot, prepared.database.kind);
+        const notice = lastDevDatabaseNotice(previous, prepared.database.kind);
+        if (notice) console.log(`  ${chalk.yellow("⚠")} ${chalk.gray(notice)}`);
     }
 
     const children: ResultPromise[] = [];
@@ -2116,6 +2129,10 @@ ${chalk.green.bold("Which database")}
   the schema when this command is what started it. Its connection string
   is derived from the compose file and ${chalk.gray("DATABASE_PASSWORD")} in .env — the same
   string .env carries, commented out, as ${chalk.gray("DATABASE_URL")}.
+
+  The choice is remembered: after ${chalk.blue("rebase dev --docker")}, ${chalk.cyan("rebase db url")}, ${chalk.cyan("db push")},
+  ${chalk.cyan("console")} and the rest use the Docker database too, at rule 5. The next
+  ${chalk.cyan("rebase dev")} without ${chalk.blue("--docker")} goes back to the managed database, and so do they.
 
   A database that is already running is never touched: no schema push,
   no connection. A DATABASE_URL pointing anywhere other than this machine

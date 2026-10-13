@@ -63,6 +63,7 @@ vi.mock("../dev-db/prepare", () => ({
     managedNotices: () => [],
     DEV_DATABASE_KIND_ENV: "REBASE_DEV_DATABASE_KIND",
     devDatabaseKind: () => "external" as const,
+    resolveProjectDatabase: () => ({ kind: "external" as const, url: "postgres://u:p@127.0.0.1:5432/shop", source: "env-file" as const }),
     resolveActiveBranch: () => null,
     resolveComposeUrl: () => null
 }));

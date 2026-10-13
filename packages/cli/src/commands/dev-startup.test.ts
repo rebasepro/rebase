@@ -36,7 +36,8 @@ let frontendDir: string | null = null;
 /** Ports the loopback probe finds something listening on. */
 const busyPorts = new Set<number>();
 let generation = deferred<void>();
-const prepareDatabaseEnv = vi.fn<(root: string, options: { additionalKeys?: readonly string[] }) => Promise<PreparedDatabase>>();
+type PrepareCall = { additionalKeys?: readonly string[]; followLastDev?: boolean };
+const prepareDatabaseEnv = vi.fn<(root: string, options: PrepareCall) => Promise<PreparedDatabase>>();
 const runDriverSchemaCommand = vi.fn<(argv: string[], options?: { quiet?: boolean }) => Promise<void>>();
 
 vi.mock("../utils/project", async importOriginal => {
@@ -62,7 +63,7 @@ vi.mock("../dev-db/prepare", async importOriginal => {
     const actual = await importOriginal<typeof import("../dev-db/prepare")>();
     return {
         ...actual,
-        prepareDatabaseEnv: (root: string, options: { additionalKeys?: readonly string[] }) => prepareDatabaseEnv(root, options)
+        prepareDatabaseEnv: (root: string, options: PrepareCall) => prepareDatabaseEnv(root, options)
     };
 });
 
@@ -246,6 +247,43 @@ describe("rebase dev's start-up", () => {
 
         for (const child of spawned) child.end();
         await run;
+    });
+
+    it("records the database it runs on, for the other commands to follow", async () => {
+        // `rebase dev --docker` was not remembered, so `rebase db url` beside it
+        // started and printed a managed PGlite instead of the container.
+        const record = path.join(scratch, ".rebase", "dev-database.json");
+        const startOn = async (database: PreparedDatabase, port: string): Promise<void> => {
+            prepareDatabaseEnv.mockResolvedValueOnce(database);
+            generation = deferred<void>();
+            runDriverSchemaCommand.mockImplementation(() => generation.promise);
+            spawned.length = 0;
+            const run = devCommand(["node", "rebase", "dev", "--backend-only", "--port", port]);
+            generation.resolve();
+            await vi.waitFor(() => expect(spawned.some(s => s.file === "/bin/true")).toBe(true));
+            for (const child of spawned) child.end();
+            await run;
+        };
+        const logged = vi.mocked(console.log);
+
+        await startOn({
+            database: { kind: "docker", source: "docker", url: "postgresql://u:p@127.0.0.1:5435/rebase" },
+            env: { DATABASE_URL: "postgresql://u:p@127.0.0.1:5435/rebase" },
+            description: "Postgres in Docker"
+        }, "45125");
+        expect(JSON.parse(fs.readFileSync(record, "utf8"))).toMatchObject({ kind: "docker" });
+        // Its own flags decide; it does not follow the record it writes.
+        expect(prepareDatabaseEnv.mock.calls[0][1]).toMatchObject({ followLastDev: false });
+
+        logged.mockClear();
+        await startOn({
+            database: { kind: "managed", source: "managed" },
+            env: { DATABASE_URL: "postgresql://postgres@127.0.0.1:5999/postgres" },
+            description: "the managed development database (PGlite)"
+        }, "45126");
+        expect(fs.existsSync(record)).toBe(false);
+        expect(logged.mock.calls.map(call => call.map(String).join(" ")).join("\n"))
+            .toContain("The last `rebase dev` ran on Postgres in Docker");
     });
 
     it("starts no database under --no-db, and still generates", async () => {

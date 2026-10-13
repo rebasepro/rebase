@@ -26,6 +26,7 @@ import { composeDatabaseUrl } from "../utils/dev-preflight";
 import { findProjectRoot, readEnvFile } from "../utils/project";
 import { resourceEnvSuffix } from "@rebasepro/types";
 import { branchUrl, databaseNameOf, readActiveBranch } from "./branch-pointer";
+import { readLastDevDocker } from "./last-dev-database";
 import { MANAGED_LIMITATIONS, MANAGED_POOL_MAX } from "./constraints";
 import { ensureManagedDatabase } from "./daemon";
 import { type DevDatabase, describeDevDatabase, resolveDevDatabase } from "./resolve";
@@ -35,6 +36,12 @@ export interface PrepareOptions {
     flagUrl?: string | null;
     /** `--docker`. */
     flagDocker?: boolean;
+    /**
+     * Follow the database the last `rebase dev` ran on (`last-dev-database.ts`).
+     * On by default; `rebase dev` itself turns it off, because its own flags are
+     * the choice being recorded.
+     */
+    followLastDev?: boolean;
     /** Suppress the "starting…" progress line. */
     quiet?: boolean;
     /** Where human-facing lines go. Defaults to stdout via the caller. */
@@ -137,17 +144,36 @@ export function devDatabaseKind(projectRoot?: string | null): DevDatabase["kind"
     try {
         const root = projectRoot ?? findProjectRoot();
         if (!root) return null;
-        const envFile = readEnvFile(root);
 
-        return resolveDevDatabase({
-            env: process.env,
-            envFile,
-            branch: resolveActiveBranch(root, envFile),
-            composeUrl: resolveComposeUrl(root, envFile)
-        }).kind;
+        return resolveProjectDatabase(root).kind;
     } catch {
         return null;
     }
+}
+
+/**
+ * The database this command resolves to in this project, decided without
+ * starting anything: the ordering in `resolve.ts`, fed from the project's
+ * `.env`, its branch pointer, its compose file and the last `rebase dev`.
+ *
+ * The one place those four are read for a resolution, so a command that asks
+ * "which database" and a command that then connects to it cannot disagree.
+ */
+export function resolveProjectDatabase(
+    projectRoot: string,
+    options: Pick<PrepareOptions, "flagUrl" | "flagDocker" | "followLastDev"> = {}
+): DevDatabase {
+    const envFile = readEnvFile(projectRoot);
+
+    return resolveDevDatabase({
+        flagUrl: options.flagUrl,
+        flagDocker: options.flagDocker,
+        lastDevDocker: options.followLastDev !== false && readLastDevDocker(projectRoot),
+        env: process.env,
+        envFile,
+        branch: resolveActiveBranch(projectRoot, envFile),
+        composeUrl: resolveComposeUrl(projectRoot, envFile)
+    });
 }
 
 /**
@@ -180,14 +206,7 @@ export async function prepareDatabaseEnv(
     options: PrepareOptions = {}
 ): Promise<PreparedDatabase> {
     const envFile = readEnvFile(projectRoot);
-    const database = resolveDevDatabase({
-        flagUrl: options.flagUrl,
-        flagDocker: options.flagDocker,
-        env: process.env,
-        envFile,
-        branch: resolveActiveBranch(projectRoot, envFile),
-        composeUrl: resolveComposeUrl(projectRoot, envFile)
-    });
+    const database = resolveProjectDatabase(projectRoot, options);
 
     const description = describeDevDatabase(database);
 
@@ -224,6 +243,15 @@ export async function prepareDatabaseEnv(
                 "--docker needs a docker-compose.yml with a db service in this project, " +
                 "and this one has none that names POSTGRES_USER, POSTGRES_DB and a published port. " +
                 "Set DATABASE_URL in .env to point at the database you mean instead."
+            );
+        }
+        // Said every time it decides, because nothing on this command line
+        // asked for Docker: the reader should not have to remember that an
+        // earlier `rebase dev` did.
+        if (database.source === "last-dev") {
+            options.onProgress?.(
+                "Using Postgres in Docker, as the last `rebase dev --docker` did. "
+                + "`rebase dev` without --docker goes back to the managed database."
             );
         }
         return { database, env: { DATABASE_URL: database.url }, description };

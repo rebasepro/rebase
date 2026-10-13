@@ -13,7 +13,7 @@
  *   2. `DATABASE_URL` in the shell environment
  *   3. the database branch this checkout is switched to
  *   4. `DATABASE_URL` in the project's `.env`
- *   5. `--docker`
+ *   5. `--docker`, or the last `rebase dev` having run with it
  *   6. the managed PGlite database
  *
  * An explicit connection string always wins. That is the whole point of the
@@ -21,6 +21,11 @@
  * staging box, a Neon branch, a container they manage — must get exactly that,
  * with no cleverness in between. The managed database is what fills the vacuum
  * when nobody has said anything, and it is the only case where the CLI picks.
+ *
+ * The second half of (5) is `rebase dev --docker` remembered, so that `rebase
+ * db url`, `db push` and the rest reach the database a dev server is on rather
+ * than start an empty PGlite beside it (`last-dev-database.ts`). It is exactly
+ * as strong as the flag it stands in for, and no stronger.
  *
  * The branch at (3) is the one addition that is not an explicit connection
  * string, and it sits where it does deliberately. It has to outrank `.env` or
@@ -47,6 +52,8 @@ export type DevDatabaseSource =
     | "branch"
     /** `--docker`. */
     | "docker"
+    /** `--docker`, on the last `rebase dev` rather than this command line. */
+    | "last-dev"
     /** Nobody said anything, so the managed database fills in. */
     | "managed";
 
@@ -61,7 +68,7 @@ export type DevDatabase =
     }
     | {
         kind: "docker";
-        source: "docker";
+        source: Extract<DevDatabaseSource, "docker" | "last-dev">;
         /**
          * The compose `db` service's connection string, derived by the caller.
          *
@@ -81,6 +88,12 @@ export interface ResolveDevDatabaseInput {
     flagUrl?: string | null;
     /** `--docker`, if given. */
     flagDocker?: boolean;
+    /**
+     * Whether the last `rebase dev` ran with `--docker`. Followed only while
+     * the compose file still names a database, since there is none to go back
+     * to otherwise.
+     */
+    lastDevDocker?: boolean;
     /** The shell environment. Only `DATABASE_URL` is read. */
     env?: Record<string, string | undefined>;
     /** Parsed `.env` from the project root. Only `DATABASE_URL` is read. */
@@ -139,6 +152,10 @@ export function resolveDevDatabase(input: ResolveDevDatabaseInput = {}): DevData
     if (input.flagDocker) {
         return { kind: "docker", source: "docker", url: present(input.composeUrl) };
     }
+    const composeUrl = present(input.composeUrl);
+    if (input.lastDevDocker && composeUrl) {
+        return { kind: "docker", source: "last-dev", url: composeUrl };
+    }
 
     return { kind: "managed", source: "managed" };
 }
@@ -159,7 +176,9 @@ export function describeDevDatabase(database: DevDatabase): string {
             }
             break;
         case "docker":
-            return "Postgres in Docker";
+            return database.source === "last-dev"
+                ? "Postgres in Docker (as the last `rebase dev --docker`)"
+                : "Postgres in Docker";
         case "managed":
             return "the managed development database (PGlite)";
     }

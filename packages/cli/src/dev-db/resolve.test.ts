@@ -117,6 +117,50 @@ describe("resolveDevDatabase", () => {
     });
 });
 
+describe("the database the last `rebase dev` ran on", () => {
+    /**
+     * `rebase dev --docker` was not remembered, so while it ran `rebase db url`
+     * printed — and started — a managed PGlite, and `db push` and `console`
+     * would have used that empty database too.
+     */
+    const COMPOSE_URL = "postgresql://rebase_app:pw@127.0.0.1:5435/rebase?sslmode=disable";
+
+    it("is followed when nothing on this command line or in .env names a database", () => {
+        expect(resolveDevDatabase({ lastDevDocker: true, composeUrl: COMPOSE_URL })).toEqual({
+            kind: "docker",
+            source: "last-dev",
+            url: COMPOSE_URL
+        });
+    });
+
+    it("is still `--docker` when the flag is given as well", () => {
+        expect(resolveDevDatabase({ flagDocker: true, lastDevDocker: true, composeUrl: COMPOSE_URL }))
+            .toMatchObject({ kind: "docker", source: "docker" });
+    });
+
+    it("loses to every connection string, as --docker does", () => {
+        for (const input of [
+            { flagUrl: URL_A },
+            { env: { DATABASE_URL: URL_A } },
+            { envFile: { DATABASE_URL: URL_A } },
+            { branch: { name: "x", url: URL_A } }
+        ]) {
+            expect(resolveDevDatabase({ ...input, lastDevDocker: true, composeUrl: COMPOSE_URL }).kind).toBe("external");
+        }
+    });
+
+    it("is ignored when the compose file no longer names a database", () => {
+        // There is no Docker database to go back to, and an error about a
+        // --docker nobody typed would explain nothing.
+        expect(resolveDevDatabase({ lastDevDocker: true, composeUrl: null })).toEqual({ kind: "managed", source: "managed" });
+    });
+
+    it("says where the choice came from", () => {
+        expect(describeDevDatabase({ kind: "docker", source: "last-dev", url: COMPOSE_URL }))
+            .toContain("rebase dev --docker");
+    });
+});
+
 describe("describeDevDatabase", () => {
     it("names both the database and where the choice came from", () => {
         expect(describeDevDatabase({ kind: "external", url: URL_A, source: "flag" })).toContain("--database-url");
