@@ -28,3 +28,4 @@ export * from "./sql-rows";
 export * from "./sql-redaction";
 export * from "./copy";
 export * from "./untrusted-envelope";
+export * from "./deprecation";
