@@ -49,6 +49,7 @@ type DeepPartial<T> = T extends object
  */
 export type { EffectiveRoleController } from "@rebasepro/types";
 import type { EffectiveRoleController } from "@rebasepro/types";
+import type { ModeController } from "../hooks/useModeController";
 
 
 /**
@@ -290,6 +291,27 @@ export type RebaseProps<USER extends User, DB = unknown> = {
      * Controller to simulate different roles when dev mode is active.
      */
     effectiveRoleController?: EffectiveRoleController;
+
+    /**
+     * The light/dark mode, owned by the host app.
+     *
+     * Without it, `<Rebase>` owns the page's theme: it puts the `dark` class on
+     * `<html>`, follows `prefers-color-scheme`, remembers the user's pick in
+     * localStorage, and takes its class away when it unmounts. Pass one when
+     * your app already has a theme — Rebase then reads `mode` from it, calls
+     * its `setMode` from its own theme toggle, and touches none of the above.
+     *
+     * @example
+     * ```tsx
+     * const [mode, setMode] = useState<"light" | "dark">("light");
+     * const modeController = useMemo(() => ({
+     *     mode,
+     *     setMode: (next: "light" | "dark" | "system") => setMode(next === "dark" ? "dark" : "light")
+     * }), [mode]);
+     * <Rebase client={client} modeController={modeController}>…</Rebase>
+     * ```
+     */
+    modeController?: ModeController;
 
     /**
      * Override or extend any Rebase UI string, keyed by locale.

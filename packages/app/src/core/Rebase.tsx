@@ -95,6 +95,7 @@ export function Rebase<USER extends User, DB = unknown>(props: RebaseProps<USER,
         entityActions,
 
         effectiveRoleController,
+        modeController: modeControllerProp,
         apiUrl,
         translations,
         components: componentsProp
@@ -434,7 +435,10 @@ export function Rebase<USER extends User, DB = unknown>(props: RebaseProps<USER,
     const fallbackEffectiveRoleController = useBuildEffectiveRoleController();
     const activeEffectiveRoleController = effectiveRoleController ?? fallbackEffectiveRoleController;
 
-    const modeController = useBuildModeController();
+    // Built either way (a hook cannot be skipped), but switched off — no class
+    // on <html>, no media query, no storage — when the host owns the theme.
+    const ownModeController = useBuildModeController({ enabled: !modeControllerProp });
+    const modeController = modeControllerProp ?? ownModeController;
     const adminModeController = useBuildAdminModeController();
 
     if (authController.authError) {
