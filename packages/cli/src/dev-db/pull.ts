@@ -28,9 +28,31 @@
  * {@link ANONYMIZE_PATTERNS} says exactly which. It cannot find personal data in
  * a column called `notes`, and this file says so rather than implying a
  * guarantee it cannot keep.
+ *
+ * What it does guarantee is that it never half-happens: {@link anonymizeCopy}
+ * runs the pass in one transaction, and when the pass fails it empties the
+ * tables it would have rewritten rather than leave their real values behind.
  */
 
 import { execa } from "execa";
+import type { Client } from "pg";
+
+/**
+ * How one kind of personal-looking column is overwritten.
+ *
+ * Two forms, because a constant is the most readable replacement and is wrong
+ * for exactly one kind of column: a unique one. Every `token_hash` becoming
+ * `'REDACTED'` is what `UNIQUE(token_hash)` refused on the second row of
+ * `rebase.refresh_tokens` — so on any project where someone had signed in twice.
+ */
+export interface AnonymizeRule {
+    pattern: RegExp;
+    /** The value for a column no unique index covers, or null to always use the unique form. */
+    value: string | null;
+    /** The unique form is `prefix` + random hex + `suffix`, cut to fit the column. */
+    prefix: string;
+    suffix: string;
+}
 
 /**
  * Column-name patterns the anonymizer overwrites.
@@ -39,22 +61,20 @@ import { execa } from "execa";
  * the same things. This is a reasonable-effort measure for making a local copy
  * less dangerous, and it is not a compliance control.
  */
-export const ANONYMIZE_PATTERNS: readonly { pattern: RegExp; replacement: string }[] = [
-    { pattern: /^(.*_)?e?mail(_.*)?$/i, replacement: "concat('user', id::text, '@example.invalid')" },
-    { pattern: /^(.*_)?(phone|mobile|tel|telephone)(_.*)?$/i, replacement: "'+10000000000'" },
-    { pattern: /^(.*_)?(first_name|last_name|full_name|surname|given_name)(_.*)?$/i, replacement: "'Redacted'" },
-    { pattern: /^(.*_)?(address|street|postcode|zip|zipcode)(_.*)?$/i, replacement: "'Redacted'" },
-    { pattern: /^(.*_)?(ssn|tax_id|national_id|passport)(_.*)?$/i, replacement: "'REDACTED'" },
-    { pattern: /^(.*_)?(password|password_hash|secret|token|api_key|access_token|refresh_token)(_.*)?$/i, replacement: "'REDACTED'" },
-    { pattern: /^(.*_)?(ip|ip_address|user_agent)(_.*)?$/i, replacement: "'REDACTED'" }
+export const ANONYMIZE_PATTERNS: readonly AnonymizeRule[] = [
+    // Emails are unique in practice even where nothing enforces it, so they
+    // always get a value of their own.
+    { pattern: /^(.*_)?e?mail(_.*)?$/i, value: null, prefix: "user-", suffix: "@example.invalid" },
+    { pattern: /^(.*_)?(phone|mobile|tel|telephone)(_.*)?$/i, value: "+10000000000", prefix: "+1-", suffix: "" },
+    { pattern: /^(.*_)?(first_name|last_name|full_name|surname|given_name)(_.*)?$/i, value: "Redacted", prefix: "Redacted-", suffix: "" },
+    { pattern: /^(.*_)?(address|street|postcode|zip|zipcode)(_.*)?$/i, value: "Redacted", prefix: "Redacted-", suffix: "" },
+    { pattern: /^(.*_)?(ssn|tax_id|national_id|passport)(_.*)?$/i, value: "REDACTED", prefix: "REDACTED-", suffix: "" },
+    { pattern: /^(.*_)?(password|password_hash|secret|token|api_key|access_token|refresh_token)(_.*)?$/i, value: "REDACTED", prefix: "REDACTED-", suffix: "" },
+    { pattern: /^(.*_)?(ip|ip_address|user_agent)(_.*)?$/i, value: "REDACTED", prefix: "REDACTED-", suffix: "" }
 ];
 
 export function shouldAnonymize(columnName: string): boolean {
     return ANONYMIZE_PATTERNS.some((rule) => rule.pattern.test(columnName));
-}
-
-export function replacementFor(columnName: string): string | null {
-    return ANONYMIZE_PATTERNS.find((rule) => rule.pattern.test(columnName))?.replacement ?? null;
 }
 
 /** A text-ish column the anonymizer can overwrite without a type error. */
@@ -63,6 +83,61 @@ export interface ColumnRef {
     table: string;
     column: string;
     dataType: string;
+    /** `character_maximum_length`: null or absent for an unbounded type. */
+    maxLength?: number | null;
+    /** Covered by a unique index — a primary key, a UNIQUE constraint, or a unique expression index. */
+    unique?: boolean;
+}
+
+/** Random hex of this length, per row. `gen_random_uuid()` is core since PostgreSQL 13. */
+function randomHex(length: number): string {
+    return `left(replace(gen_random_uuid()::text, '-', ''), ${length})`;
+}
+
+function sqlLiteral(value: string): string {
+    return `'${value.replace(/'/g, "''")}'`;
+}
+
+/**
+ * Fewest random hex digits a unique replacement keeps. Twelve is 16^12 values:
+ * a collision needs millions of rows, where eight would need tens of thousands.
+ */
+const MIN_UNIQUE_HEX = 12;
+
+/**
+ * The SQL expression that overwrites one column, or null when no rule names it.
+ *
+ * Unique per row when an index makes the column unique, and always cut to the
+ * column's declared length — `zip char(5)` refused `'Redacted'` outright, and a
+ * failed statement now empties the tables rather than skip one. To fit a short
+ * unique column the prefix goes first, then the suffix, and the random part is
+ * kept to at least {@link MIN_UNIQUE_HEX} digits while there is room for them.
+ * A NULL stays NULL: an empty optional field is not personal data.
+ */
+export function replacementFor(column: ColumnRef): string | null {
+    const rule = ANONYMIZE_PATTERNS.find((candidate) => candidate.pattern.test(column.column));
+    if (!rule) return null;
+    const limit = typeof column.maxLength === "number" && column.maxLength > 0 ? column.maxLength : null;
+
+    let value: string;
+    if (rule.value !== null && !column.unique) {
+        value = sqlLiteral(limit === null ? rule.value : rule.value.slice(0, limit));
+    } else {
+        const shapes = [[rule.prefix, rule.suffix], ["", rule.suffix], ["", ""]];
+        const fitting = shapes.find(([prefix, suffix]) =>
+            limit === null || limit - prefix.length - suffix.length >= MIN_UNIQUE_HEX);
+        const [prefix, suffix] = fitting ?? ["", ""];
+        const hex = Math.min(32, limit === null ? 32 : limit - prefix.length - suffix.length);
+        value = `concat(${sqlLiteral(prefix)}, ${randomHex(Math.max(1, hex))}, ${sqlLiteral(suffix)})`;
+    }
+
+    const name = quoteIdentifier(column.column);
+    return `CASE WHEN ${name} IS NULL THEN NULL ELSE ${value} END`;
+}
+
+/** A double-quoted identifier, with any `"` in it doubled — a table called `order` or `a"b` still works. */
+export function quoteIdentifier(name: string): string {
+    return `"${name.replace(/"/g, '""')}"`;
 }
 
 /**
@@ -79,11 +154,17 @@ export function anonymizableColumns(columns: readonly ColumnRef[]): ColumnRef[] 
     return columns.filter((column) => shouldAnonymize(column.column) && textual.has(column.dataType.toLowerCase()));
 }
 
+/** `"schema"."table"` for each table the pass rewrites, sorted. */
+export function anonymizedTables(columns: readonly ColumnRef[]): string[] {
+    return [...new Set(anonymizableColumns(columns).map((column) =>
+        `${quoteIdentifier(column.schema)}.${quoteIdentifier(column.table)}`))].sort();
+}
+
 /** `UPDATE` statements for one anonymization pass, in a stable order. */
 export function anonymizeStatements(columns: readonly ColumnRef[]): string[] {
     const byTable = new Map<string, ColumnRef[]>();
     for (const column of anonymizableColumns(columns)) {
-        const key = `${column.schema}.${column.table}`;
+        const key = `${quoteIdentifier(column.schema)}.${quoteIdentifier(column.table)}`;
         byTable.set(key, [...(byTable.get(key) ?? []), column]);
     }
 
@@ -92,11 +173,114 @@ export function anonymizeStatements(columns: readonly ColumnRef[]): string[] {
         .map(([table, cols]) => {
             const assignments = [...cols]
                 .sort((a, b) => a.column.localeCompare(b.column))
-                .map((column) => `"${column.column}" = ${replacementFor(column.column)}`)
+                .map((column) => `${quoteIdentifier(column.column)} = ${replacementFor(column)}`)
                 .join(", ");
 
-            return `UPDATE ${table.split(".").map((part) => `"${part}"`).join(".")} SET ${assignments};`;
+            return `UPDATE ${table} SET ${assignments};`;
         });
+}
+
+/**
+ * Every column the pass could overwrite, with what decides how.
+ *
+ * Base tables only — a view has an `email` column too, and is not something to
+ * UPDATE. Generated columns are skipped for the same reason: `email_domain
+ * GENERATED ALWAYS AS (…)` matches by name and refuses any value but DEFAULT,
+ * and it follows the column it is generated from anyway. An extension type such
+ * as `citext` reports `USER-DEFINED`, so its own name is what is compared.
+ *
+ * `unique` comes from the indexes, through `pg_depend` as well as `indkey`: a
+ * unique index on `lower(email)` names no column in `indkey`, and is exactly
+ * what a constant replacement would violate.
+ */
+export const ANONYMIZE_COLUMNS_SQL = `
+WITH unique_columns AS (
+    SELECT DISTINCT i.indrelid AS relid, a.attname AS column_name
+      FROM pg_index i
+      JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum > 0 AND NOT a.attisdropped
+     WHERE i.indisunique
+       AND (a.attnum = ANY (i.indkey)
+            OR EXISTS (SELECT 1 FROM pg_depend d
+                        WHERE d.classid = 'pg_class'::regclass AND d.objid = i.indexrelid
+                          AND d.refclassid = 'pg_class'::regclass AND d.refobjid = i.indrelid
+                          AND d.refobjsubid = a.attnum))
+)
+SELECT c.table_schema AS "schema",
+       c.table_name AS "table",
+       c.column_name AS "column",
+       CASE WHEN c.data_type = 'USER-DEFINED' THEN c.udt_name ELSE c.data_type END AS "dataType",
+       c.character_maximum_length AS "maxLength",
+       (u.column_name IS NOT NULL) AS "unique"
+  FROM information_schema.columns c
+  JOIN information_schema.tables t ON t.table_schema = c.table_schema AND t.table_name = c.table_name
+  LEFT JOIN unique_columns u
+         ON u.relid = format('%I.%I', c.table_schema, c.table_name)::regclass AND u.column_name = c.column_name
+ WHERE t.table_type = 'BASE TABLE'
+   AND c.is_generated = 'NEVER'
+   AND c.table_schema NOT IN ('pg_catalog', 'information_schema')`;
+
+/** How {@link anonymizeCopy} ended. */
+export type AnonymizeOutcome =
+    | { ok: true; tables: string[] }
+    | {
+        ok: false;
+        /** Why the pass failed. Nothing it wrote was kept. */
+        error: string;
+        /** The tables emptied instead, so none of their real values are left. */
+        emptied: string[];
+        /** Why they could not be emptied, when they could not: the copy then holds real data. */
+        emptyError: string | null;
+    };
+
+function errorText(error: unknown): string {
+    return error instanceof Error && error.message ? error.message : String(error);
+}
+
+/**
+ * Overwrite the personal-looking columns of a restored copy, all or nothing.
+ *
+ * One transaction, so a failure part-way leaves no table half done — the old
+ * pass ran its UPDATEs one by one, so a failure on `rebase.refresh_tokens` left
+ * `public.authors` anonymized and `rebase.users` holding every real email.
+ *
+ * A rollback alone would be worse than that, though: it puts back the real
+ * value of every column, in a copy the developer asked to be anonymized. So on
+ * failure the tables the pass would have rewritten are emptied (`TRUNCATE …
+ * CASCADE`, which takes the rows that reference them too), and the outcome
+ * says which — or, if even that failed, says the copy holds real data, so the
+ * caller can say it louder.
+ *
+ * `row_security = off` makes a role that RLS would filter fail the pass instead
+ * of rewriting only the rows its policies show it, which looked like success.
+ */
+export async function anonymizeCopy(client: Client): Promise<AnonymizeOutcome> {
+    let listed = false;
+    let tables: string[] = [];
+    try {
+        const { rows } = await client.query<ColumnRef>(ANONYMIZE_COLUMNS_SQL);
+        tables = anonymizedTables(rows);
+        listed = true;
+        await client.query("BEGIN");
+        await client.query("SET LOCAL row_security = off");
+        for (const statement of anonymizeStatements(rows)) await client.query(statement);
+        await client.query("COMMIT");
+
+        return { ok: true, tables };
+    } catch (error) {
+        const reason = errorText(error);
+        await client.query("ROLLBACK").catch(() => undefined);
+        if (!listed) {
+            return { ok: false, error: reason, emptied: [], emptyError: "the tables to empty could not be listed" };
+        }
+        if (tables.length === 0) return { ok: false, error: reason, emptied: [], emptyError: null };
+        try {
+            await client.query(`TRUNCATE TABLE ${tables.join(", ")} CASCADE`);
+
+            return { ok: false, error: reason, emptied: tables, emptyError: null };
+        } catch (emptyError) {
+            return { ok: false, error: reason, emptied: [], emptyError: errorText(emptyError) };
+        }
+    }
 }
 
 /**

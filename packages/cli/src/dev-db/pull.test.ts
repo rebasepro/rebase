@@ -87,8 +87,10 @@ describe("anonymizeStatements", () => {
         ]);
 
         expect(statements).toEqual([
-            'UPDATE "public"."orders" SET "phone" = \'+10000000000\';',
-            'UPDATE "public"."users" SET "email" = concat(\'user\', id::text, \'@example.invalid\'), "last_name" = \'Redacted\';'
+            'UPDATE "public"."orders" SET "phone" = CASE WHEN "phone" IS NULL THEN NULL ELSE \'+10000000000\' END;',
+            'UPDATE "public"."users" SET "email" = CASE WHEN "email" IS NULL THEN NULL ELSE '
+                + 'concat(\'user-\', left(replace(gen_random_uuid()::text, \'-\', \'\'), 32), \'@example.invalid\') END, '
+                + '"last_name" = CASE WHEN "last_name" IS NULL THEN NULL ELSE \'Redacted\' END;'
         ]);
     });
 
@@ -116,8 +118,39 @@ describe("anonymizeStatements", () => {
     it("keeps emails unique, because a UNIQUE index would otherwise reject the pass", () => {
         // Every row getting the same address is the obvious implementation and
         // it fails on the first table with a unique email constraint — which is
-        // most of them.
-        expect(replacementFor("email")).toContain("id::text");
+        // most of them. Not from `id` either: a table without one failed outright.
+        expect(replacementFor(column({ column: "email" }))).toContain("gen_random_uuid()");
+        expect(replacementFor(column({ column: "email" }))).not.toContain("id::text");
+    });
+
+    it("gives a unique column a value per row, whatever the pattern", () => {
+        // The reported failure: every `token_hash` became `'REDACTED'`, and
+        // `UNIQUE(token_hash)` refused the second refresh token.
+        expect(replacementFor(column({ column: "token_hash", unique: false }))).toContain("'REDACTED'");
+        expect(replacementFor(column({ column: "token_hash", unique: true }))).toContain("gen_random_uuid()");
+        expect(replacementFor(column({ column: "phone", unique: true }))).toContain("gen_random_uuid()");
+    });
+
+    it("fits the replacement to the column's length", () => {
+        // `zip char(5)` refused `'Redacted'`, and a refused statement fails the pass.
+        expect(replacementFor(column({ column: "zip", maxLength: 5 }))).toContain("'Redac'");
+        // Short and unique: the prefix goes first, the address shape stays.
+        const tight = replacementFor(column({ column: "billing_email", maxLength: 30, unique: true }));
+        expect(tight).toContain("left(replace(gen_random_uuid()::text, '-', ''), 14)");
+        expect(tight).toContain("'@example.invalid'");
+        expect(tight).not.toContain("'user-'");
+        // Too short for any shape: random hex, cut to the column.
+        expect(replacementFor(column({ column: "token", maxLength: 8, unique: true })))
+            .toContain("concat('', left(replace(gen_random_uuid()::text, '-', ''), 8), '')");
+    });
+
+    it("keeps a NULL a NULL", () => {
+        expect(replacementFor(column({ column: "phone" }))).toMatch(/^CASE WHEN "phone" IS NULL THEN NULL ELSE /);
+    });
+
+    it("quotes an identifier that has a double quote in it", () => {
+        const [statement] = anonymizeStatements([column({ schema: "s", table: 'we"ird', column: "email" })]);
+        expect(statement).toContain('UPDATE "s"."we""ird" SET');
     });
 });
 

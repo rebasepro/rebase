@@ -807,7 +807,7 @@ async function manageLocalDatabase(
  * and the wrong one here means overwriting production with a laptop.
  */
 async function pullIntoLocal(projectRoot: string, rawArgs: readonly string[]): Promise<void> {
-    const { anonymizeStatements, describeTarget, dumpArgs, findPgTool, restoreArgs, restoreOutcome } =
+    const { describeTarget, dumpArgs, findPgTool, restoreArgs, restoreOutcome } =
         await import("../dev-db/pull");
     const { prepareDatabaseEnv } = await import("../dev-db/prepare");
     const { readEnvFile } = await import("../utils/project");
@@ -910,6 +910,7 @@ async function pullIntoLocal(projectRoot: string, rawArgs: readonly string[]): P
 
     const dumpFile = path.join(os.tmpdir(), `rebase-pull-${process.pid}.dump`);
     let failure: string | null = null;
+    let anonymizeFailure: string[] | null = null;
     try {
         console.log(chalk.gray("  Dumping…"));
         await execa("pg_dump", [...dumpArgs(plan), "--file", dumpFile], { stdio: ["ignore", "inherit", "inherit"] });
@@ -930,28 +931,21 @@ async function pullIntoLocal(projectRoot: string, rawArgs: readonly string[]): P
         // Before the verdict: a partial copy of personal data on a laptop is
         // still personal data on a laptop.
         if (anonymize && restored.started) {
-            const { Client } = await import("pg");
-            const client = new Client({ connectionString: target });
-            await client.connect();
-            try {
-                const { rows } = await client.query<{ schema: string; table: string; column: string; dataType: string }>(
-                    `SELECT table_schema AS "schema", table_name AS "table",
-                            column_name AS "column", data_type AS "dataType"
-                       FROM information_schema.columns
-                      WHERE table_schema NOT IN ('pg_catalog','information_schema')`
-                );
-                const statements = anonymizeStatements(rows);
-                for (const statement of statements) await client.query(statement);
-                console.log(chalk.green(`  ✓ Anonymized ${statements.length} table(s).`));
-                console.log(chalk.gray("    Name-based and best-effort: a free-text column may still hold personal data."));
-            } finally {
-                await client.end();
-            }
+            anonymizeFailure = await anonymizeTarget(target, describeTarget(source), prepared.database.kind);
         }
 
-        if (!failure) await restoreAppRole(target);
+        // Whatever arrived, whole or partial, anonymized or emptied: pg_dump
+        // stripped its grants either way, and a pull that failed is pulled
+        // again into a database that should still be readable meanwhile.
+        if (restored.started) await restoreAppRole(target);
     } finally {
         fs.rmSync(dumpFile, { force: true });
+    }
+
+    if (anonymizeFailure) {
+        for (const line of anonymizeFailure) console.error(line);
+        if (failure) console.error(chalk.red(`✗ ${failure}`));
+        process.exit(1);
     }
 
     if (failure) {
@@ -990,8 +984,11 @@ async function restoreAppRole(target: string): Promise<void> {
     const { provisionableSchemas } = await import("../dev-db/pull");
 
     const client = new Client({ connectionString: target });
-    await client.connect();
+    client.on("error", () => undefined);
     try {
+        // Inside the `try`: a refused connection is the same warning as a
+        // refused grant, not an exception past the pull's own verdict.
+        await client.connect();
         const runSql = async (text: string) => (await client.query(text)).rows as Record<string, unknown>[];
         const posture = await detectConnectionPosture(runSql);
         if (!posture.privileged) {
@@ -1018,7 +1015,67 @@ async function restoreAppRole(target: string): Promise<void> {
         ));
         console.log(chalk.gray("    Run `rebase db push` (or start `rebase dev`) to provision it."));
     } finally {
-        await client.end();
+        await client.end().catch(() => undefined);
+    }
+}
+
+/**
+ * Anonymize the restored copy, and say what happened if that did not work.
+ *
+ * Returns null when the copy is anonymized, and otherwise the lines that say —
+ * in red, because `--anonymize` was the developer saying this data must not
+ * arrive as it is — what state the local database is in now: emptied of what
+ * could not be anonymized, or, when even that failed, holding real data that
+ * has to be deleted before anything else.
+ */
+async function anonymizeTarget(
+    target: string,
+    source: string,
+    kind: DevDatabase["kind"]
+): Promise<string[] | null> {
+    const { Client } = await import("pg");
+    const { anonymizeCopy } = await import("../dev-db/pull");
+
+    const deleteIt = kind === "managed"
+        ? `Delete it now: ${chalk.cyan("rebase db reset --yes")}`
+        : kind === "docker"
+            ? `Delete it now: ${chalk.cyan("docker compose down -v")}`
+            : "Delete it now: drop the restored tables, or the database, before anything else reads it.";
+    const holdsRealData = (reason: string): string[] => [
+        chalk.red(`✗ The copy could not be anonymized: ${reason}`),
+        chalk.red.bold(`  The local database holds an UN-ANONYMIZED copy of ${source}, personal data included.`),
+        chalk.yellow(`  ${deleteIt}`)
+    ];
+
+    const client = new Client({ connectionString: target });
+    client.on("error", () => undefined);
+    try {
+        await client.connect();
+    } catch (error) {
+        return holdsRealData(error instanceof Error ? error.message : String(error));
+    }
+
+    try {
+        const outcome = await anonymizeCopy(client);
+        if (outcome.ok) {
+            console.log(chalk.green(`  ✓ Anonymized ${outcome.tables.length} table(s).`));
+            console.log(chalk.gray("    Name-based and best-effort: a free-text column may still hold personal data."));
+
+            return null;
+        }
+        if (outcome.emptyError !== null) {
+            return [...holdsRealData(outcome.error), chalk.red(`  Emptying the affected tables failed too: ${outcome.emptyError}`)];
+        }
+
+        return [
+            chalk.red(`✗ The copy could not be anonymized: ${outcome.error}`),
+            chalk.yellow("  Nothing was anonymized — the pass is one transaction — so the tables it would have"),
+            chalk.yellow("  rewritten were emptied instead, with every row that references them:"),
+            ...(outcome.emptied.length > 0 ? [chalk.gray(`    ${outcome.emptied.join(", ")}`)] : []),
+            chalk.gray(`  The rest of the copy of ${source} is in place. Fix that error and pull again.`)
+        ];
+    } finally {
+        await client.end().catch(() => undefined);
     }
 }
 

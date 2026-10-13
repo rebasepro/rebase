@@ -92,6 +92,19 @@ describe("rebase db pull, when the restore fails", () => {
         expect(output).toContain("12 object(s)");
     });
 
+    it("re-grants the app role on what did arrive, and still reaches its verdict", async () => {
+        // The re-grant was skipped on any restore error, and its connection was
+        // opened outside its own `try` — so a refused connection threw past the
+        // "incomplete copy" verdict instead of being the warning it is.
+        state.restore = { exitCode: 1, stderr: "pg_restore: warning: errors ignored on restore: 3\n" };
+
+        await expect(pull()).rejects.toEqual(new Exit(1));
+
+        const output = printed.join("\n");
+        expect(output).toContain("could not re-grant");
+        expect(output).toContain("incomplete copy");
+    });
+
     it("refuses before dumping anything when pg_restore is not installed", async () => {
         state.installed.delete("pg_restore");
 
