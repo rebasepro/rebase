@@ -1,5 +1,5 @@
 ---
-sourceHash: a85dec5a1dd5e6ed
+sourceHash: 85e444fd4d0f85a8
 title: O Rebase não faz X
 sidebar_label: Estendendo o servidor
 description: A escada de extensão do lado do servidor — declaração, callback de coleção, função customizada, suas próprias rotas, seu próprio servidor, eject — com o que cada um pode e não pode alcançar.

@@ -1,5 +1,5 @@
 ---
-sourceHash: 5bbd926d0fcd04aa
+sourceHash: c770e1b2f77d1d8d
 title: Sistema de Plugins
 sidebar_label: Plugins
 description: Estenda o Rebase com plugins — injete componentes de UI, modifique coleções, adicione ações na barra de ferramentas e crie construtores de campos personalizados.

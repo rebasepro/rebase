@@ -1,5 +1,5 @@
 ---
-sourceHash: 59bdc8b898c974d7
+sourceHash: 7452474353756b93
 title: Autenticação e Login
 sidebar_label: Autenticação e Login
 description: Configure o controlador de autenticação, a tela de login e a simulação de papéis no seu frontend React do Rebase.

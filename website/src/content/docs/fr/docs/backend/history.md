@@ -1,5 +1,5 @@
 ---
-sourceHash: 4952ad745ea2bab4
+sourceHash: f0cc4de3a8c82b82
 title: Historique des entités
 sidebar_label: Historique des entités
 description: Suivez chaque modification apportée à vos entités avec une piste d'audit complète — qui a modifié quoi, quand, et l'entité complète avant/après.

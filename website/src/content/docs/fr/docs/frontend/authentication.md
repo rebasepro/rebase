@@ -1,5 +1,5 @@
 ---
-sourceHash: 59bdc8b898c974d7
+sourceHash: 7452474353756b93
 title: Authentification et connexion
 sidebar_label: Authentification et connexion
 description: Configurez le contrôleur d'authentification, la vue de connexion et la simulation de rôles dans votre frontend React Rebase.

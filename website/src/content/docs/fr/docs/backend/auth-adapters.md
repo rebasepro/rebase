@@ -1,5 +1,5 @@
 ---
-sourceHash: 2e616bc4a3ea133c
+sourceHash: d619bee6f134bd5e
 title: Adaptateurs d'authentification personnalisés
 sidebar_label: Adaptateurs d'authentification personnalisés
 description: Remplacez l'authentification intégrée de Rebase par Clerk, Firebase Auth ou votre propre fournisseur d'identité en implémentant le contrat AuthAdapter.

@@ -1,5 +1,5 @@
 ---
-sourceHash: 6c59cbcf5c1ee91f
+sourceHash: 62bb342dd6196f27
 title: Vue d'ensemble du Frontend
 sidebar_label: Frontend
 description: "Créez et personnalisez le panneau d'administration — Rebase CMS et Rebase Studio — avec React : contrôleurs, structure (scaffold), routage et vues."

@@ -1,5 +1,5 @@
 ---
-sourceHash: a85dec5a1dd5e6ed
+sourceHash: 85e444fd4d0f85a8
 title: Rebase unterstützt X nicht
 sidebar_label: Server erweitern
 description: Die serverseitige Erweiterungsleiter – Deklaration, Collection-Callback, benutzerdefinierte Funktion, eigene Routen, eigener Server, Eject – und was die einzelnen Stufen erreichen können und was nicht.

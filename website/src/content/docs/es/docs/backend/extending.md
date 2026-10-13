@@ -1,5 +1,5 @@
 ---
-sourceHash: a85dec5a1dd5e6ed
+sourceHash: 85e444fd4d0f85a8
 title: Rebase no hace X
 sidebar_label: Extender el servidor
 description: La escalera de extensiones del lado del servidor — declaración, callback de colección, función personalizada, tus propias rutas, tu propio servidor, eject — con lo que cada uno puede y no puede alcanzar.

@@ -1,4 +1,5 @@
 ---
+sourceHash: 668fde6c17984b6c
 title: Scripts et console
 sidebar_label: Scripts et console
 description: Ouvrez les données d'un projet depuis un script, un test ou un REPL avec openRebase, ou depuis le terminal avec rebase console. Pas de serveur, pas de modification du schéma.

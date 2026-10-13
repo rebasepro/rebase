@@ -1,5 +1,5 @@
 ---
-sourceHash: 97ec2f8d66caedf1
+sourceHash: 75953facb59d9645
 title: "Rezept: Webhook-Integration"
 sidebar_label: Webhooks
 description: Verwenden Sie Entity-Callbacks, um Webhooks an externe Dienste zu senden, wenn sich Daten ändern, ohne die Transaktion des Schreibvorgangs offen zu halten.

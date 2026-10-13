@@ -1,5 +1,5 @@
 ---
-sourceHash: b807a42cae57ce6e
+sourceHash: 83567bb2e0729c08
 title: Integração com Servidor Customizado
 sidebar_label: Servidor Customizado
 description: Construa o backend do Rebase a partir de peças públicas no seu próprio servidor — createRebaseBackend, seus grupos de rotas, mount, attachRealtime e start — ou incorpore o driver do Postgres no Express.

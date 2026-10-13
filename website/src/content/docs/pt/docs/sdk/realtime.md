@@ -1,5 +1,5 @@
 ---
-sourceHash: 07c1391c48e88901
+sourceHash: 479be58faac5dc73
 title: Subscrições em Tempo Real
 sidebar_label: Realtime
 description: Inscreva-se em alterações de dados em tempo real com o SDK tipado do Rebase usando listeners em tempo real baseados em WebSocket.

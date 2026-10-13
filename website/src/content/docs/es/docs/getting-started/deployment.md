@@ -1,5 +1,5 @@
 ---
-sourceHash: e94961f22c3fa77e
+sourceHash: 72190d7e15d46c15
 title: Despliegue
 sidebar_label: Despliegue
 description: Despliega tu proyecto Rebase a producción usando Docker, plataformas en la nube o configuraciones manuales.

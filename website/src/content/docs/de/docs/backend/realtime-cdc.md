@@ -1,5 +1,5 @@
 ---
-sourceHash: a05da9682df4f23a
+sourceHash: f9db2c304fc55386
 title: "Change Capture auf Datenbankebene (CDC)"
 sidebar_label: "Change Capture auf Datenbankebene (CDC)"
 description: "Realtime-Events für jeden bestätigten Schreibvorgang, gleich wie er getätigt wurde: die Capture-Trigger, die Einstellung REALTIME_CDC und was sie brauchen."

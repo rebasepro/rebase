@@ -1,5 +1,5 @@
 ---
-sourceHash: 4952ad745ea2bab4
+sourceHash: f0cc4de3a8c82b82
 title: Historial de entidades
 sidebar_label: Historial de entidades
 description: Realiza un seguimiento de cada cambio en tus entidades con un registro de auditoría completo — quién cambió qué, cuándo y la entidad completa antes y después.

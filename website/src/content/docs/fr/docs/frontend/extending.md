@@ -1,5 +1,5 @@
 ---
-sourceHash: 917e92f2baabde99
+sourceHash: 2bd46c60d468fb45
 title: Étendre Rebase
 sidebar_label: Étendre Rebase
 description: Un guide de décision pour choisir le bon mécanisme d'extension — plugins, slots, surcharges de composants, vues d'entités, actions, et plus encore.

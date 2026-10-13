@@ -1,5 +1,5 @@
 ---
-sourceHash: a85dec5a1dd5e6ed
+sourceHash: 85e444fd4d0f85a8
 title: Rebase non fa X
 sidebar_label: Estendere il server
 description: La scala di estensione lato server — dichiarazione, callback di collezione, funzione personalizzata, rotte personalizzate, server personalizzato, eject — con ciò che ciascuno può e non può raggiungere.

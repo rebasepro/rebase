@@ -1,5 +1,5 @@
 ---
-sourceHash: 52f080ffe0793036
+sourceHash: e806583db3fff138
 title: Entitäts-Callbacks
 sidebar_label: Callbacks
 description: Nutzen Sie Lifecycle-Callbacks, um benutzerdefinierte Logik auszuführen, wenn Entitäten erstellt, aktualisiert, gelesen oder gelöscht werden. Beinhaltet die context.data-API für kollektionsübergreifende Operationen.

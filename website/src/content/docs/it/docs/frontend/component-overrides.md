@@ -1,5 +1,5 @@
 ---
-sourceHash: 78c7b0d8c3e6c984
+sourceHash: 1d7b256891673c72
 title: Override dei componenti (Swizzling)
 sidebar_label: Override dei componenti
 description: Esegui l'override dei componenti UI predefiniti con implementazioni personalizzate a livello di applicazione o di collection.

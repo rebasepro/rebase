@@ -1,5 +1,5 @@
 ---
-sourceHash: a85dec5a1dd5e6ed
+sourceHash: 85e444fd4d0f85a8
 title: Rebase ne fait pas X
 sidebar_label: Étendre le serveur
 description: L'échelle d'extension côté serveur — déclaration, callback de collection, fonction personnalisée, vos propres routes, votre propre serveur, eject — avec ce que chacun peut et ne peut pas atteindre.

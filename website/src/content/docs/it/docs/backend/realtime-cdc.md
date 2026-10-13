@@ -1,5 +1,5 @@
 ---
-sourceHash: a05da9682df4f23a
+sourceHash: f9db2c304fc55386
 title: "Acquisizione delle modifiche a livello di database (CDC)"
 sidebar_label: "Acquisizione delle modifiche a livello di database (CDC)"
 description: "Eventi realtime per ogni scrittura sottoposta a commit, comunque sia stata eseguita: i trigger di acquisizione, l'impostazione REALTIME_CDC e ciò di cui hanno bisogno."

@@ -1,5 +1,5 @@
 ---
-sourceHash: a05da9682df4f23a
+sourceHash: f9db2c304fc55386
 title: "Capture des modifications de la base de données"
 sidebar_label: "Capture des modifications de la base de données"
 description: "Des événements en temps réel pour chaque écriture validée, quelle que soit sa provenance : les déclencheurs de capture, le paramètre REALTIME_CDC et ce qu'ils exigent."

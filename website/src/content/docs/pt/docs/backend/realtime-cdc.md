@@ -1,5 +1,5 @@
 ---
-sourceHash: a05da9682df4f23a
+sourceHash: f9db2c304fc55386
 title: "Captura de alterações do banco de dados"
 sidebar_label: "Captura de alterações do banco de dados"
 description: "Eventos em tempo real para toda gravação confirmada, independentemente de como foi feita: os triggers de captura, a configuração REALTIME_CDC e o que eles exigem."

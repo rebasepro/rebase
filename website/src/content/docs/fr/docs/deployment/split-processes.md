@@ -1,5 +1,5 @@
 ---
-sourceHash: e616e5caaa9bd29f
+sourceHash: e20c62e3ffffe67b
 title: Séparation en plusieurs processus
 sidebar_label: Processus séparés
 description: Exécutez un seul bundle sous forme de plusieurs processus coopérants — une API, un niveau de fonctions, un worker — à partir de la même image d'exécution publiée, afin qu'une fonction personnalisée lourde ne vienne plus concurrencer l'API de données.

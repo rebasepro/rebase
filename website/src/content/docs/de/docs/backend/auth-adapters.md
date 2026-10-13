@@ -1,5 +1,5 @@
 ---
-sourceHash: 2e616bc4a3ea133c
+sourceHash: d619bee6f134bd5e
 title: Benutzerdefinierte Auth-Adapter
 sidebar_label: Benutzerdefinierte Auth-Adapter
 description: Ersetzen Sie die integrierte Authentifizierung von Rebase durch Clerk, Firebase Auth oder Ihren eigenen Identity-Provider, indem Sie den AuthAdapter-Vertrag implementieren.

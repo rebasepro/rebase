@@ -1,5 +1,5 @@
 ---
-sourceHash: 8f6ca9ef6468a144
+sourceHash: f92df350bca97cf1
 title: Benutzerdefinierte Funktionen
 sidebar_label: Benutzerdefinierte Funktionen
 description: Fügen Sie benutzerdefinierte Hono-API-Endpunkte neben Ihren Rebase-CRUD-Routen hinzu. Automatische Erkennung aus einem Verzeichnis, mit vollem Zugriff auf die Backend-Instanz.

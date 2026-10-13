@@ -1,5 +1,5 @@
 ---
-sourceHash: 97ec2f8d66caedf1
+sourceHash: 75953facb59d9645
 title: "Receta: Integración de Webhooks"
 sidebar_label: Webhooks
 description: Utiliza las devoluciones de llamada de la entidad para enviar webhooks a servicios externos cuando los datos cambien, sin mantener abierta la transacción de la escritura.

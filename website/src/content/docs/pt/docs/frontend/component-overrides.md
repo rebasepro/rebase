@@ -1,5 +1,5 @@
 ---
-sourceHash: 78c7b0d8c3e6c984
+sourceHash: 1d7b256891673c72
 title: Substituições de Componentes (Swizzling)
 sidebar_label: Substituições de Componentes
 description: Substitua componentes de interface padrão por implementações personalizadas no nível da aplicação ou da coleção.

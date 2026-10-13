@@ -1,5 +1,5 @@
 ---
-sourceHash: 78c7b0d8c3e6c984
+sourceHash: 1d7b256891673c72
 title: Sobrescritura de componentes (Swizzling)
 sidebar_label: Sobrescritura de componentes
 description: Sobrescribe componentes de interfaz de usuario predeterminados con implementaciones personalizadas a nivel de aplicación o colección.

@@ -1,5 +1,5 @@
 ---
-sourceHash: a05da9682df4f23a
+sourceHash: f9db2c304fc55386
 title: "Captura de cambios a nivel de base de datos (CDC)"
 sidebar_label: "Captura de cambios a nivel de base de datos (CDC)"
 description: "Eventos en tiempo real para cada escritura confirmada, sea cual sea su origen: los triggers de captura, el ajuste REALTIME_CDC y lo que necesitan."

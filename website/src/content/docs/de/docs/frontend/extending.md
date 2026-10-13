@@ -1,5 +1,5 @@
 ---
-sourceHash: 917e92f2baabde99
+sourceHash: 2bd46c60d468fb45
 title: Rebase erweitern
 sidebar_label: Rebase erweitern
 description: Ein Entscheidungsleitfaden zur Auswahl des richtigen Erweiterungsmechanismus – Plugins, Slots, Komponenten-Overrides, Entity-Views, Aktionen und mehr.

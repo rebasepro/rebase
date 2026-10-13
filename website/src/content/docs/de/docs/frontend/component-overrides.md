@@ -1,5 +1,5 @@
 ---
-sourceHash: 78c7b0d8c3e6c984
+sourceHash: 1d7b256891673c72
 title: Komponenten-Overrides (Swizzling)
 sidebar_label: Komponenten-Overrides
 description: Überschreiben Sie Standard-UI-Komponenten mit benutzerdefinierten Implementierungen auf Anwendungs- oder Collection-Ebene.

@@ -1,5 +1,5 @@
 ---
-sourceHash: 917e92f2baabde99
+sourceHash: 2bd46c60d468fb45
 title: Estendendo o Rebase
 sidebar_label: Estendendo o Rebase
 description: Um guia de decisão para escolher o mecanismo de extensão correto — plugins, slots, substituições de componentes, visualizações de entidade, ações e muito mais.
