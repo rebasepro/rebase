@@ -42,6 +42,8 @@ export default defineConfig({
         // successful JS transform, so the build fails at the very end.
         target: "es2022",
         sourcemap: true,
+        // The admin's own chunks are already code-split and the warning names only them, never this project's code.
+        chunkSizeWarningLimit: Infinity,
         rollupOptions: {
             output: {
                 // These rules are copied in rather than taken from

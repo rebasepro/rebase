@@ -1276,6 +1276,13 @@ A tradução está pendente. O conteúdo abaixo está em inglês.
 
 #### CLI
 
+- **`pnpm run build` in a new project no longer warns that "Some chunks are
+  larger than 500 kB".** The chunks it named were the admin's, already
+  code-split, which the project's author did not write and cannot split. The
+  template's `vite.config.ts` sets `chunkSizeWarningLimit: Infinity`, as the
+  repository's example app does. An existing project can add the same line
+  under `build`.
+
 - **`rebase doctor` and `rebase db push` no longer report every
   `policy.authenticated()` and `policy.registered()` policy as the insecure
   `uid() IS NOT NULL` tautology.** The drift check accepted only
