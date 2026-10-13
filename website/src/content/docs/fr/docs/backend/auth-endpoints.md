@@ -1,5 +1,5 @@
 ---
-sourceHash: 5e6e22317b5f9d21
+sourceHash: b2f805e5fb18de22
 title: Endpoints d'authentification et jetons
 sidebar_label: Endpoints d'authentification
 description: Les routes d'authentification montées par le backend Rebase, le format de leurs réponses, l'authentification multifacteur, le contexte de base de données vu par une politique, JWKS et clés de service.
@@ -36,7 +36,7 @@ Tous les endpoints d'authentification sont montés sur `/api/auth/` :
 | `POST` | `/api/auth/otp` | Envoyer par e-mail un code de connexion à six chiffres. Répond de la même manière que l'adresse possède un compte ou non |
 | `POST` | `/api/auth/otp/verify` | Échanger `{ email, code }` contre une session |
 | `POST` | `/api/auth/anonymous` | Créer une session anonyme (activation facultative — `ALLOW_ANONYMOUS`) |
-| `POST` | `/api/auth/anonymous/link` | Associer des identifiants réels au compte anonyme déjà connecté |
+| `POST` | `/api/auth/anonymous/link` | Associer des identifiants réels au compte anonyme déjà connecté. Nécessite à la fois `allowAnonymous` et l'inscription ouverte : `403 ANONYMOUS_AUTH_DISABLED` dès que la connexion anonyme est désactivée, invités déjà connectés compris, et `403 REGISTRATION_DISABLED` tant que l'inscription est fermée |
 | `GET` | `/api/auth/sessions` | Lister les sessions actives de l'appelant, une par connexion. La propre session de l'appelant est marquée `isCurrentSession` |
 | `DELETE` | `/api/auth/sessions` | Révoquer toutes les sessions, y compris celle-ci — déconnexion à distance sur chaque appareil |
 | `DELETE` | `/api/auth/sessions/:id` | Révoquer une session : son jeton de rafraîchissement, et le jeton d'accès que détient cet appareil |

@@ -1,5 +1,5 @@
 ---
-sourceHash: 488d01a16707cd87
+sourceHash: 0b96e438f37a5cac
 title: Importazione ed esportazione dati
 sidebar_label: Importazione ed esportazione dati
 description: Importa dati da file CSV, JSON ed Excel nelle tue collezioni ed esporta i dati delle collezioni in CSV o JSON con campi calcolati opzionali.
@@ -71,7 +71,7 @@ Una nuova riga nella collezione degli utenti è la creazione di un utente: una c
 
 ### Creare una collezione da un file
 
-Quando crei una collezione da un file, il tipo di ogni colonna viene inferito dai suoi valori. Una colonna è un numero solo se ogni valore al suo interno è un numero o un testo che si converte esattamente in uno, quindi una colonna di codici postali, codici prodotto con zeri iniziali, SKU lunghi o numeri di telefono resta testo. Una colonna che mescola tipi (numeri e parole, booleani e numeri) è testo. Le celle vuote non contano, quindi una colonna per lo più vuota non viene contrassegnata come obbligatoria.
+Quando crei una collezione da un file, il tipo di ogni colonna viene inferito dai suoi valori. Una colonna è un numero solo se ogni valore al suo interno è un numero o un testo che si converte esattamente in uno, quindi una colonna di codici postali, codici prodotto con zeri iniziali, SKU lunghi o numeri di telefono resta testo. Una colonna che mescola tipi (numeri e parole, booleani e numeri) è testo. Le celle vuote non contano, quindi una colonna per lo più vuota non viene contrassegnata come obbligatoria. Una colonna di numeri interi il cui nome termina con una parola che dice che contiene un momento (`created_at`, `updatedAt`, `signup_date`, `timestamp`) è una data quando ogni valore è un timestamp epoch tra il 2001 e il 2103, in secondi o millisecondi; con qualsiasi altro nome, o con qualsiasi altro valore, resta un numero.
 
 ### Configurazione dell'importazione
 

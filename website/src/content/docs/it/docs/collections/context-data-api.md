@@ -1,5 +1,5 @@
 ---
-sourceHash: f5cc00d6f5f3e4c3
+sourceHash: 00c369539f8269ad
 title: L'API context.data
 sidebar_label: API context.data
 description: Leggi e scrivi altre collection dall'interno di un callback con context.data — i suoi metodi, i privilegi con cui viene eseguito, la semantica transazionale e la connessione che un callback occupa.
@@ -23,6 +23,15 @@ afterSave: async ({ values, id, context }) => {
 }
 ```
 
+Una proprietà è l'accessor della collection, il nome che l'SDK generato le dà:
+`context.data.myNotes` è la collection `my-notes`, qualunque sia la tabella in cui è
+archiviata. Un nome che non è l'accessor di nessuna collection viene letto come il suo snake_case,
+quindi `context.data.auditLog` è `audit_log`.
+
+Le righe non sono tipizzate (`Record<string, unknown>`) finché il progetto non registra il suo
+`Database` generato; da quel momento ogni accessor è tipizzato a partire da esso. Vedi
+[Dati lato server tipizzati](/docs/backend/typed-server-data).
+
 ## Metodi Disponibili
 
 Ogni funzione di accesso alla collezione (`context.data.<slug>`) fornisce questi metodi:
@@ -37,6 +46,7 @@ Ogni funzione di accesso alla collezione (`context.data.<slug>`) fornisce questi
 | `.count()` | `count(params?: FindParams) → number` | Conta le entità corrispondenti |
 | `.listen()` | `listen(params, onUpdate, onError?) → unsubscribe` | Sottoscrizione in tempo reale (dove supportato) |
 | `.listenById()` | `listenById(id, onUpdate, onError?) → unsubscribe` | Ascolta una singola entità |
+| `.trash` | `trash.find()`, `.count()`, `.restore(id)`, `.restoreMany(ids)`, `.purge(id)`, `.purgeMany(ids)` | Le righe che un [soft delete](/docs/collections/soft-delete#from-the-sdk) ha contrassegnato |
 
 ## Interrogare con `.find()`
 

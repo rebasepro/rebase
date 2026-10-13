@@ -1,5 +1,5 @@
 ---
-sourceHash: 64977a5e5f9b13d2
+sourceHash: b9b698ec32e400fc
 title: Escrita via REST
 sidebar_label: Escrita via REST
 description: Chaves de idempotência, escritas condicionais com ETag e If-Match, operações de campo, upserts em chave natural, return=minimal e lotes entre coleções.
@@ -73,6 +73,12 @@ foi bem-sucedida. Com uma chave, a resposta `204` é reproduzida.
 única linha. Envie-a de volta como `If-Match` em um `PATCH` ou `DELETE` posterior e
 a escrita será recusada com `412` se a linha tiver sido alterada nesse intervalo.
 
+<span class="since-badge" data-since="0.25">Desde 0.25</span> Um `PATCH` bem-sucedido responde com a `ETag` da versão que escreveu,
+de modo que a próxima escrita condicional não precisa de uma leitura antes. A tag
+viaja também em um `204` respondido para `Prefer: return=minimal`, e uma resposta
+reproduzida para uma `Idempotency-Key` carrega a mesma tag da primeira. Uma
+subscrição ativa de linha carrega a mesma tag em cada frame (veja [Tempo real](/docs/backend/realtime/)).
+
 ```bash
 # read
 curl -i /api/data/docs/d1
@@ -93,6 +99,10 @@ A tag é derivada de uma propriedade `date` com `autoValue: "on_update"` quando 
 declara uma — essa coluna já *é* uma versão — e a partir de um hash estável da linha caso
 contrário. `If-Match: *` afirma apenas que a linha existe. Nada é escrito quando a pré-condição
 falha.
+
+<span class="since-badge" data-since="0.25">Desde 0.25</span> O formulário de registro do admin salva com `If-Match`: um salvamento feito contra uma versão
+que alguém já substituiu é recusado, o formulário informa isso, e a edição permanece
+no formulário, reaplicada sobre a nova versão com os campos em conflito marcados.
 
 A tag é comparada dentro da própria transação da escrita, depois que a linha é bloqueada.
 Duas escritas com a mesma tag não podem passar ambas: a segunda espera a primeira

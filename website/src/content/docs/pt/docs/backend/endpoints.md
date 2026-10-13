@@ -1,5 +1,5 @@
 ---
-sourceHash: 330defe6fc90f0fa
+sourceHash: a6a820da39681f4a
 title: Índice de endpoints
 sidebar_label: Índice de endpoints
 description: Cada rota HTTP montada por um backend Rebase — dados, autenticação, armazenamento, administração, meta — com a restrição de acesso (gate) de cada uma e a página que a explica.
@@ -135,7 +135,10 @@ uma coleção não acessa nada disso. Consulte [Papéis e escopos](/docs/backend
 | `GET` | `/api/admin/cron/:id` | `cron:read` | [Cron Jobs](/docs/backend/cron-jobs/) |
 | `PUT` | `/api/admin/cron/:id` | `cron:write` | Habilita ou desabilita um job |
 | `GET` | `/api/admin/cron/:id/logs` | `cron:read` | [Cron Jobs](/docs/backend/cron-jobs/) |
-| `POST` | `/api/admin/cron/:id/trigger` | `cron:write` | Executa um job agora |
+| `POST` | `/api/admin/cron/:id/trigger` | `cron:write` | Executa um job agora. <span class="since-badge" data-since="0.25">Desde 0.25</span> `?async=1` responde `202` assim que ele começa — [Cron Jobs API](/docs/backend/cron-jobs-api/#example-trigger-a-job-manually) |
+| `GET` | `/api/admin/storage/orphans` | `database:read` | <span class="since-badge" data-since="0.25">Desde 0.25</span> Arquivos armazenados que nenhuma linha nomeia, `?storageId=&olderThanHours=` — o que `rebase storage orphans` imprime |
+| `DELETE` | `/api/admin/storage/orphans` | `database:write` | <span class="since-badge" data-since="0.25">Desde 0.25</span> Encontra-os de novo e os exclui; `409 STORAGE_SCAN_INCOMPLETE` quando uma collection não pôde ser lida |
+| `POST` | `/api/admin/storage/move` | `database:write` | <span class="since-badge" data-since="0.25">Desde 0.25</span> Copia uma pasta para outra fonte sob as mesmas chaves, uma página por chamada — o que `rebase storage move` envia |
 | `GET` | `/api/admin/backups` | `backups:read` | Inventário de backups |
 | `GET` | `/api/admin/backups/download` | `backups:read` | Transmite um backup via stream. Com `?token=` de um link de download, nenhum cabeçalho é necessário, apenas para esse backup |
 | `POST` | `/api/admin/backups/download-url` | `backups:read` | <span class="since-badge" data-since="0.25">Desde 0.25</span> Um link para um backup, `{ key }` → `{ url, token, expiresIn }`, válido por 60 segundos — [Backups](/docs/deployment/backups/#download-a-backup) |

@@ -1,5 +1,5 @@
 ---
-sourceHash: 5e6e22317b5f9d21
+sourceHash: b2f805e5fb18de22
 title: Endpoints de autenticação e tokens
 sidebar_label: Endpoints de autenticação
 description: As rotas de autenticação que o backend do Rebase disponibiliza, seus formatos de resposta, autenticação multifator, o contexto de banco de dados que uma política visualiza, JWKS e chaves de serviço.
@@ -36,7 +36,7 @@ Todos os endpoints de autenticação são montados em `/api/auth/`:
 | `POST` | `/api/auth/otp` | Enviar por e-mail um código de seis dígitos para login. Responde da mesma forma quer o endereço possua uma conta ou não |
 | `POST` | `/api/auth/otp/verify` | Trocar `{ email, code }` por uma sessão |
 | `POST` | `/api/auth/anonymous` | Criar uma sessão anônima (opcional — `ALLOW_ANONYMOUS`) |
-| `POST` | `/api/auth/anonymous/link` | Vincular credenciais reais à conta anônima que já está conectada |
+| `POST` | `/api/auth/anonymous/link` | Vincular credenciais reais à conta anônima que já está conectada. Exige `allowAnonymous` e o registro aberto ao mesmo tempo: `403 ANONYMOUS_AUTH_DISABLED` quando o login anônimo está desligado, inclusive para convidados que entraram antes, e `403 REGISTRATION_DISABLED` enquanto o registro está fechado |
 | `GET` | `/api/auth/sessions` | Listar as sessões ativas do chamador, uma por login. A do próprio chamador é marcada como `isCurrentSession` |
 | `DELETE` | `/api/auth/sessions` | Revogar todas as sessões, incluindo esta — logout remoto em todos os dispositivos |
 | `DELETE` | `/api/auth/sessions/:id` | Revogar uma sessão: seu refresh token, e o access token que aquele dispositivo possui |

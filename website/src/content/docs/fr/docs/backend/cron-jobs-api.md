@@ -1,7 +1,8 @@
 ---
-sourceHash: 9057ef27ebe60995
+sourceHash: 3e450f0960514c50
 title: "API des tâches cron"
 sidebar_label: "API des tâches cron"
+description: "Lister, déclencher, suspendre et reprendre les tâches cron via l'API REST, ou avec client.cron du SDK typé."
 ---
 
 ## API REST
@@ -20,7 +21,7 @@ Voir [Rôles et portées](/docs/backend/roles-and-scopes/).
 |---------|--------|-------------|
 | `GET` | `/api/admin/cron` | Lister toutes les tâches cron enregistrées |
 | `GET` | `/api/admin/cron/:id` | Obtenir le statut d'une tâche individuelle |
-| `POST` | `/api/admin/cron/:id/trigger` | Déclencher manuellement une tâche — `409` tant qu'elle est déjà en cours |
+| `POST` | `/api/admin/cron/:id/trigger` | Déclencher manuellement une tâche — `409` tant qu'elle est déjà en cours. `?async=1` répond `202` dès que l'exécution a démarré |
 | `GET` | `/api/admin/cron/:id/logs` | Obtenir l'historique d'exécution (`?limit=N`), sur les 30 derniers jours. `503` lorsque `rebase.cron_logs` ne peut pas être lu, plutôt qu'un historique vide |
 | `PUT` | `/api/admin/cron/:id` | Mettre en pause ou reprendre une tâche partout (`{ "enabled": false }`) ; `null` suit de nouveau le code |
 
@@ -95,6 +96,27 @@ Tant que la tâche s'exécute — ici ou dans n'importe quel autre processus —
 réponse est `409` avec le code `CRON_JOB_ALREADY_EXECUTING` ; voir
 [Gestion de la concurrence](/docs/backend/cron-across-instances/#concurrency-guarding).
 
+L'appel attend la fin de l'exécution et répond `200` avec son journal. Pour une tâche qui dure
+plus longtemps qu'un proxy placé devant le serveur ne garde une requête (beaucoup s'arrêtent à
+60 secondes), ajoutez `?async=1`. La réponse est alors `202` dès que l'exécution a démarré :
+
+```bash
+curl -X POST -H "Authorization: Bearer $TOKEN" \
+    "$API_URL/api/admin/cron/nightly-report/trigger?async=1"
+```
+
+```json
+{
+    "accepted": true,
+    "startedAt": "2026-04-24T08:21:04.512Z",
+    "job": { "id": "nightly-report", "state": "running" }
+}
+```
+
+L'exécution se poursuit après la réponse. Son résultat figure dans `GET /api/admin/cron/:id/logs`,
+sous l'entrée portant `"manual": true` et le même `startedAt`. Une exécution qui ne peut pas démarrer
+répond toujours `409`. `?async` accepte `1`, `true`, `0` ou `false` ; toute autre valeur donne un `400`.
+
 ### Mettre une tâche en pause
 
 Une pause depuis Studio ou via
@@ -119,8 +141,11 @@ const { jobs, rejected } = await client.cron.listJobs();
 // Get a single job
 const { job } = await client.cron.getJob("health-check");
 
-// Trigger manually
+// Trigger manually, and wait for the run
 const { log, job: updated } = await client.cron.triggerJob("health-check");
+
+// Trigger manually, and answer once the run has started
+const { startedAt } = await client.cron.triggerJob("nightly-report", { async: true });
 
 // View execution history
 const { logs } = await client.cron.getJobLogs("health-check", { limit: 10 });
@@ -132,7 +157,8 @@ await client.cron.toggleJob("health-check", true);  // resume
 
 `triggerJob()` attend la fin de l'exécution et répond avec son journal. Un proxy placé devant le
 serveur peut couper la réponse d'une tâche longue (beaucoup s'arrêtent à 60 secondes) alors que
-l'exécution se poursuit. Lisez alors son résultat via `getJobLogs()`.
+l'exécution se poursuit. Pour une telle tâche, passez `{ async: true }` : l'appel répond dès que l'exécution a démarré,
+et `getJobLogs()` donne le résultat, sous l'entrée portant `manual: true` et le `startedAt` renvoyé.
 
 `listJobs()` est typé `CronJobListing` : `jobs`, plus les champs `skipped`,
 `rejected` et `note` décrits sous [Les tâches introuvables](#les-tâches-introuvables).

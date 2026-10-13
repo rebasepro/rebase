@@ -1,5 +1,5 @@
 ---
-sourceHash: 94b81d143b186ece
+sourceHash: dc27c5a35221e71c
 title: Soft Delete
 sidebar_label: Soft Delete
 description: Verwandeln Sie Löschvorgänge in einen Zeitstempel, blenden Sie mit Zeitstempel versehene Zeilen bei jedem Lesezugriff aus und stellen Sie sie mit einer normalen Aktualisierung wieder her.
@@ -102,6 +102,42 @@ dieselbe Operation. Was sich ändert, ist, ob die Zeile wiederhergestellt werden
 kann. Nur das Literal `true` oder `1` bedeutet Ja; ein Tippfehler führt zu einem
 400-Fehler, denn ein Aufrufer, der ein vollständiges Löschen angefordert hat und
 stattdessen ein Soft Delete erhält, geht davon aus, dass die Daten endgültig gelöscht sind.
+
+## Aus dem SDK
+
+Der typisierte Client erreicht den Papierkorb über `trash` an jeder Collection. Er sendet
+die oben beschriebenen Anfragen: `?deleted=only` bei den Lesezugriffen, das Update auf `null` für
+eine Wiederherstellung und `?hard=true` für ein endgültiges Löschen.
+
+```typescript
+const trashed = await client.data.invoices.trash.find({ limit: 20 });
+const howMany = await client.data.invoices.trash.count();
+
+await client.data.invoices.trash.restore(7);       // PATCH { deletedAt: null }
+await client.data.invoices.trash.restoreMany([8, 9]);
+
+await client.data.invoices.trash.purge(7);         // DELETE ?hard=true
+await client.data.invoices.trash.purgeMany([8, 9]);
+```
+
+`trash.find` und `trash.count` nehmen dieselben Parameter wie `find` und `count`.
+Eine Wiederherstellung setzt `deletedAt`, sofern Sie das Feld nicht nennen: Eine Collection, die mit
+`softDelete: { field: "archivedAt" }` deklariert ist, stellt mit
+`trash.restore(7, { field: "archivedAt" })` wieder her. Der Client kann den Feldnamen
+nicht vom Server lesen.
+
+Verwenden Sie `trash` an einer Collection, die `softDelete` deklariert. An einer, die es nicht tut,
+ignoriert der Server `?deleted=`, sodass `trash.find` die aktiven Zeilen zurückgibt und
+`trash.purge` ein gewöhnliches Löschen ist.
+
+Servercode hat denselben `trash`: `context.data.invoices.trash` in einem Callback
+und `rebase.data.invoices.trash` in einer Funktion oder einem Cron. Er liest und löscht endgültig
+über den Driver, mit den Berechtigungen des Aufrufers, wie der Rest von
+[`context.data`](/docs/collections/context-data-api).
+
+Ist [Offline](/docs/sdk/offline) aktiviert, wird der Papierkorb nie zwischengespeichert, und nichts
+darin wird in die Warteschlange gestellt. Jeder Aufruf braucht den Server und schlägt ohne ihn mit dem
+Fehler `OFFLINE` fehl. Eine wiederhergestellte Zeile kommt in die lokale Datenbank, eine endgültig gelöschte verlässt sie.
 
 ## Nächste Schritte
 

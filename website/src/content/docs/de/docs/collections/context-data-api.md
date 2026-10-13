@@ -1,5 +1,5 @@
 ---
-sourceHash: f5cc00d6f5f3e4c3
+sourceHash: 00c369539f8269ad
 title: Die context.data-API
 sidebar_label: context.data-API
 description: Andere Collections aus einem Callback heraus mit context.data lesen und schreiben – Methoden, die Rechte, mit denen es läuft, Transaktionssemantik und die Verbindung, die ein Callback belegt.
@@ -23,6 +23,15 @@ afterSave: async ({ values, id, context }) => {
 }
 ```
 
+Eine Eigenschaft ist der Accessor der Collection, der Name, den das generierte SDK ihr gibt:
+`context.data.myNotes` ist die Collection `my-notes`, in welcher Tabelle sie auch gespeichert ist.
+Ein Name, der kein Accessor einer Collection ist, wird als sein snake_case gelesen, sodass
+`context.data.auditLog` die Collection `audit_log` ist.
+
+Zeilen sind untypisiert (`Record<string, unknown>`), bis das Projekt seine generierte `Database`
+registriert; dann ist jeder Accessor daraus typisiert. Siehe
+[Typisierte serverseitige Daten](/docs/backend/typed-server-data).
+
 ## Verfügbare Methoden
 
 Jeder Kollektions-Accessor (`context.data.<slug>`) stellt die folgenden Methoden bereit:
@@ -37,6 +46,7 @@ Jeder Kollektions-Accessor (`context.data.<slug>`) stellt die folgenden Methoden
 | `.count()` | `count(params?: FindParams) → number` | Übereinstimmende Entitäten zählen |
 | `.listen()` | `listen(params, onUpdate, onError?) → unsubscribe` | Echtzeit-Abonnement (sofern unterstützt) |
 | `.listenById()` | `listenById(id, onUpdate, onError?) → unsubscribe` | Eine einzelne Entität überwachen |
+| `.trash` | `trash.find()`, `.count()`, `.restore(id)`, `.restoreMany(ids)`, `.purge(id)`, `.purgeMany(ids)` | Die Zeilen, die ein [Soft Delete](/docs/collections/soft-delete#from-the-sdk) markiert hat |
 
 ## Abfragen mit `.find()`
 

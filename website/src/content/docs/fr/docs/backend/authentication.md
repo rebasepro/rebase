@@ -1,5 +1,5 @@
 ---
-sourceHash: 53f453267ae3e21c
+sourceHash: d9b66c9d404a5085
 title: Authentification
 sidebar_label: Authentification
 description: Configurez l'authentification JWT, les fournisseurs OAuth, les e-mails SMTP, la protection contre les bots et la collection d'utilisateurs sur le backend Rebase.
@@ -93,7 +93,7 @@ const backend = await initializeRebaseBackend({
 | `requireAuth` | `boolean` | `true` | Exiger une session pour l'API de données |
 | `allowRegistration` | `boolean` | `false` | Ouvrir `POST /api/auth/register`. Hors production, le premier utilisateur sur une table vide est admis dans les deux cas ; en production, l'administrateur est défini avec `REBASE_ADMIN_EMAIL` |
 | `disableSelfRegistration` | `boolean` | `false` | Coupe-circuit : ferme également la fenêtre de bootstrap du premier utilisateur laissée ouverte par `allowRegistration: false` |
-| `allowAnonymous` | `boolean` | `false` | Activer `POST /api/auth/anonymous`. Délibérément non conditionné par `allowRegistration` — une application publique principalement en lecture peut nécessiter des sessions sans comptes. Transformer un invité en compte (`POST /api/auth/anonymous/link`) est une inscription, et nécessite aussi `allowRegistration` |
+| `allowAnonymous` | `boolean` | `false` | Activer `POST /api/auth/anonymous`. Délibérément non conditionné par `allowRegistration` — une application publique principalement en lecture peut nécessiter des sessions sans comptes. Transformer un invité en compte (`POST /api/auth/anonymous/link`) est une inscription, et nécessite aussi `allowRegistration` — et `allowAnonymous` toujours activé : désactivé, il refuse aussi les invités déjà connectés, si bien qu'aucun ne peut devenir un compte (`403 ANONYMOUS_AUTH_DISABLED`) |
 | `allowUserLookup` | `boolean` | `false` | Monter `POST /api/auth/find-user` pour les flux d'invitation par e-mail |
 | `defaultRole` | `string` | — | Rôle attribué à un utilisateur nouvellement inscrit lorsqu'aucun n'est spécifié. Il ne peut pas être `admin`, ni un rôle déclaré qui détient une portée du plan d'administration : le démarrage refuse les deux |
 | `serviceKey` | `string` | — | Clé statique pour les appels de serveur à serveur — voir [Authentification par clé de service](/docs/backend/auth-endpoints/#service-key-authentication) |

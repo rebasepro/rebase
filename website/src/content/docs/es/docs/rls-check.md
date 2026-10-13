@@ -1,5 +1,5 @@
 ---
-sourceHash: 275426a0cc4a1023
+sourceHash: 5a4b74223c30f992
 slug: es/docs/rls-check
 title: rls-check
 description: Audita la seguridad a nivel de fila (RLS) en cualquier base de datos PostgreSQL — Supabase, Neon, RDS o tu propio servidor. De solo lectura, sin registro y sin requerir Rebase.
@@ -402,6 +402,13 @@ En PostgreSQL inferior a la versión 15 esta opción no existe, por lo que cualq
 este modo. En esos casos, el hallazgo se reporta como heurístico y la solución consiste en trasladar la lógica a una
 función o actualizar la versión de PostgreSQL.
 
+El propietario normalmente está exento de las políticas de la tabla base, pero no siempre. Cuando el
+propietario de la vista no es superusuario, no tiene `BYPASSRLS` y no es propietario de la tabla base (o lo es
+con `FORCE ROW LEVEL SECURITY`), las políticas se aplican al propietario. La vista devuelve entonces las
+filas que esas políticas dan al propietario, a todos los llamantes por igual. Pueden ser menos filas de las que
+un llamante debería ver, o más. El hallazgo se sigue reportando, porque las filas no dependen de
+quién pregunte, pero como heurístico y no como seguro. La solución es la misma.
+
 ### matview-bypasses-rls
 
 **La vista materializada expone datos protegidos por RLS.** Alta.
@@ -428,6 +435,17 @@ La condición de "aceptar cualquier fila" es esencial y deliberadamente estricta
 y `authenticated` permisos DML completos de forma predeterminada, por lo que una política dirigida a esos roles no es en sí
 misma un problema; un caso típico como `FOR INSERT TO public WITH CHECK (user_id = auth.uid())` es correcto
 y no se reporta.
+
+Una política llega a un llamante no autenticado mediante `TO public`, mediante un rol llamado
+`anon` o `web_anon`, o mediante un rol del que uno de esos es miembro: `TO app_writer`
+cuenta cuando `anon` hereda `app_writer`.
+
+En Rebase no existe el rol `anon`. Cada petición se ejecuta como `rebase_user`, incluida una
+sin sesión iniciada cuando la API lo admite (`AUTH_REQUIRE=false`, o `auth.requireAuth: false`)
+y cada cuenta de invitado del inicio de sesión anónimo. La base de datos no puede ver esa configuración, así que en
+Rebase una escritura que solo alcanza `rebase_user` se reporta como heurística. Con la puerta de la API activada
+y el inicio de sesión de invitados desactivado, solo llegan a la política los usuarios con sesión iniciada, y aun así pueden escribir cualquier
+fila. Limita la regla de escritura de la colección al llamante (un `ownerField`) o a `roles`.
 
 ### unqualified-column-in-subquery
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: 488d01a16707cd87
+sourceHash: 0b96e438f37a5cac
 title: Import et export de données
 sidebar_label: Import et export de données
 description: Importez des données depuis des fichiers CSV, JSON et Excel dans vos collections, et exportez les données de vos collections au format CSV ou JSON avec des champs calculés optionnels.
@@ -71,7 +71,7 @@ Une nouvelle ligne dans la collection des utilisateurs est une création d'utili
 
 ### Créer une collection à partir d'un fichier
 
-Lorsque vous créez une collection à partir d'un fichier, le type de chaque colonne est déduit de ses valeurs. Une colonne n'est un nombre que si chacune de ses valeurs est un nombre, ou un texte qui se convertit en un nombre exactement, si bien qu'une colonne de codes postaux, de codes produits à zéros initiaux, de longs SKU ou de numéros de téléphone reste du texte. Une colonne qui mélange les types (nombres et mots, booléens et nombres) est du texte. Les cellules vides ne comptent pas, si bien qu'une colonne majoritairement vide n'est pas marquée comme obligatoire.
+Lorsque vous créez une collection à partir d'un fichier, le type de chaque colonne est déduit de ses valeurs. Une colonne n'est un nombre que si chacune de ses valeurs est un nombre, ou un texte qui se convertit en un nombre exactement, si bien qu'une colonne de codes postaux, de codes produits à zéros initiaux, de longs SKU ou de numéros de téléphone reste du texte. Une colonne qui mélange les types (nombres et mots, booléens et nombres) est du texte. Les cellules vides ne comptent pas, si bien qu'une colonne majoritairement vide n'est pas marquée comme obligatoire. Une colonne de nombres entiers dont le nom se termine par un mot indiquant qu'elle contient un instant (`created_at`, `updatedAt`, `signup_date`, `timestamp`) est une date lorsque chaque valeur est un horodatage epoch entre 2001 et 2103, en secondes ou en millisecondes ; sous tout autre nom, ou avec toute autre valeur, elle reste un nombre.
 
 ### Configuration de l'importation
 

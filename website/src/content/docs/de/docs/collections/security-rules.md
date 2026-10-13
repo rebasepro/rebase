@@ -1,5 +1,5 @@
 ---
-sourceHash: 9531407dffbf3092
+sourceHash: abd2a2de4a0ff4be
 title: Sicherheitsregeln (RLS)
 sidebar_label: Sicherheitsregeln
 description: Definieren Sie Row-Level-Security-Richtlinien für Ihre Collections mithilfe praktischer Shortcuts oder reiner SQL-Ausdrücke.
@@ -39,6 +39,30 @@ Die Identität des authentifizierten Benutzers ist in SQL über Folgendes verfü
 | `rebase.jwt()` | Vollständige JWT-Claims als JSONB |
 
 Diese werden vom Rebase-Backend automatisch pro Transaktion gesetzt.
+
+### Policies, die eine Collection erhält, ohne sie zu schreiben
+
+Die Policies einer Tabelle sind mehr als die `securityRules` der Collection selbst:
+
+- **`defaultSecurityRules`**, exportiert aus `config/collections/index.ts`. Eine Collection,
+  deren `securityRules` fehlt oder leer ist, übernimmt sie alle an deren Stelle, als hätte sie
+  sie selbst geschrieben. Eine Collection, die auch nur eine eigene Regel deklariert, übernimmt
+  keine: Die beiden Listen werden nie zusammengeführt.
+- **Die Admin-Basis.** Jede Collection erhält außerdem
+  `<table>_default_admin_read` und `<table>_default_admin_write_insert`,
+  `_update` und `_delete`: permissive Policies, die den Server-Kontext und
+  die Rolle `admin` jede Zeile lesen und schreiben lassen. Sie stehen neben den Regeln, die die
+  Collection am Ende hat, ihren eigenen oder den geerbten Defaults, und permissive
+  Policies werden per OR verknüpft, sodass sie beide erweitern. Die Users-Collection erhält zudem
+  ein Self-Read und ein restriktives Schreib-Gate, das `roles` Admins vorbehält.
+- **Mandantenfähigkeit.** Eine mandantengebundene Collection erhält eine restriktive Regel, die
+  jede Operation auf den Mandanten des Aufrufers beschränkt; der Server-Kontext besteht sie.
+
+`disableDefaultPolicies: true` an einer Collection entfernt die permissive Basis
+und behält die restriktiven Gates. Es gilt pro Collection: `defaultSecurityRules`
+trägt kein solches Flag, sodass eine Collection, die die Defaults erbt, die
+Basis behält, sofern sie das Flag nicht selbst setzt. Das generierte DDL markiert jede injizierte
+Policy, und `rebase db push` stellt eine von Hand gelöschte wieder her.
 
 ## Praktische Shortcuts
 

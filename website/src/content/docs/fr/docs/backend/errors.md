@@ -1,5 +1,5 @@
 ---
-sourceHash: 242a8a8a99d7ef2d
+sourceHash: d6ea7b12fc13a297
 title: Codes d'erreur
 sidebar_label: Codes d'erreur
 description: Tous les codes d'erreur qu'un backend Rebase peut renvoyer, avec leur statut HTTP, leur signification et la marche à suivre — ainsi que l'enveloppe de réponse, X-Request-ID et les règles applicables aux détails.
@@ -251,6 +251,7 @@ Tout le reste — coupure de connexion, colonne manquante, problème de droits �
 | `STORAGE_FILE_TYPE_REFUSED` | 400 | Le type du fichier téléversé ne figure pas dans la liste `acceptedFiles` de la propriété, ni dans les `allowedMimeTypes` propres à la source de stockage. `details` précise la propriété (ou la liste de la source), la liste acceptée et le Content-Type envoyé. | Téléversez un type accepté ou élargissez `acceptedFiles` / `allowedMimeTypes`. |
 | `STORAGE_MISCONFIGURED` | 502 | Le bucket S3 ou GCS avec lequel cette source est configurée n'existe pas, ou le fournisseur a refusé les identifiants de ce déploiement pour celui-ci. Le message nomme le bucket ; `details.reason` vaut `NoSuchBucket` ou le refus du fournisseur. Un bucket manquant se lisait auparavant comme « fichier introuvable » sur chaque fichier. | Corrigez le nom du bucket (`S3_BUCKET` / `GCS_BUCKET`, `__<KEY>` pour une source nommée) ou les permissions des identifiants. |
 | `STORAGE_NOT_CONFIGURED` | 501 / 503 | Aucun service de stockage n'est configuré sur ce serveur, ou aucun n'est celui par défaut et la requête ne nomme aucune source ; le message nomme les sources servies (501). Un téléversement reprenable dont la source a disparu avant la fin donne un 503. | Configurez S3, GCS ou le stockage local, ou nommez une source avec `?storageId=`. |
+| `STORAGE_SCAN_INCOMPLETE` | 409 | <span class="since-badge" data-since="0.25">Depuis 0.25</span> `DELETE /api/admin/storage/orphans` (`rebase storage orphans --delete`) n'a pas pu lire toutes les collections : un fichier que l'une d'elles nomme aurait semblé inutilisé. Rien n'a été supprimé ; `details.unscanned` nomme chaque collection et la raison pour laquelle elle n'a pas pu être lue. | Corrigez ce qui empêche la lecture de ces collections, puis relancez la commande. |
 | `STORAGE_SOURCE_NOT_CONFIGURED` | 501 | La source de stockage est déclarée mais ne dispose d'aucun identifiant configuré ici. | Définissez les variables d'environnement de cette source. |
 | `STORAGE_WRITE_FAILED` | 502 | Le service de stockage a refusé ou interrompu l'écriture. | Vérifiez ses propres logs et identifiants. |
 | `TRANSFORM_OVERLOADED` | 503 | Trop de transformations d'images sont en cours d'exécution. | Réessayez ; envisagez la mise en place d'un CDN en amont. |
@@ -290,10 +291,10 @@ Ces codes indiquent qu'une fonctionnalité est désactivée ou non configurée, 
 | `SCHEMA_EDITING_NO_REPOSITORY` | 503 | La planification fonctionne, mais aucun dépôt n'est configuré pour commiter le changement. | Configurez `liveSchema.repository`. |
 | `SCHEMA_EDITING_UNSUPPORTED` | 503 | Ce pilote ne sait pas planifier les modifications de schéma. | L'édition en direct est disponible sur Postgres. |
 | `SCHEMA_EDITOR_BAAS_MODE` | 501 | Les collections sont ici introspectées directement depuis la base de données ; aucun fichier source n'est donc modifiable. | Modifiez le schéma via une migration. |
-| `SCHEMA_EDITOR_DISABLED` | 501 | L'éditeur de schéma est désactivé sur ce serveur. | Activez-le avec `schemaEditor`. |
+| `SCHEMA_EDITOR_DISABLED` | 501 | L'éditeur de schéma est désactivé sur ce serveur. Un bundle compilé répond toujours ceci. | Activez-le avec `schemaEditor`. Sur un bundle, définissez `REBASE_LIVE_SCHEMA_REPOSITORY` pour modifier les collections via un dépôt — voir [Modification du schéma en direct](/docs/backend/live-schema-editing#from-a-built-bundle). |
 | `SCHEMA_EDITOR_MISSING_DEPENDENCY` | 501 | L'éditeur de schéma requiert `ts-morph`, qui n'est pas installé. | Exécutez `pnpm add -D ts-morph@28.0.0`. |
 | `SCHEMA_EDITOR_NO_COLLECTIONS_DIR` | 501 | Le serveur n'a pas de `collectionsDir` ; l'éditeur n'a donc aucun emplacement où écrire. | Définissez `collectionsDir`. |
-| `SCHEMA_EDITOR_PRODUCTION` | 501 | L'éditeur est désactivé avec `NODE_ENV=production` : les fichiers d'un serveur déployé étant reconstruits depuis votre dépôt à chaque déploiement, toute modification locale ici serait écrasée. | Modifiez les collections en développement puis déployez. |
+| `SCHEMA_EDITOR_PRODUCTION` | 501 | L'éditeur est désactivé avec `NODE_ENV=production` : les fichiers d'un serveur déployé étant reconstruits depuis votre dépôt à chaque déploiement, toute modification locale ici serait écrasée. | Modifiez les collections en développement puis déployez, ou configurez `liveSchema.repository` pour les y valider. |
 | `SQL_EXPORT_UNSUPPORTED` | 501 | <span class="since-badge" data-since="0.25">Depuis 0.25</span> `POST /api/admin/sql/csv` ne peut pas diffuser de résultat ici : la base de développement en processus (PGlite) n'a qu'une connexion, et un curseur conservé pendant un téléchargement retiendrait derrière lui toutes les autres requêtes ; ou la source de données n'a pas de curseur SQL. | Faites pointer `DATABASE_URL` vers un Postgres de votre choix (`rebase dev --docker` en démarre un), ou ajoutez un `LIMIT` et exportez les lignes affichées à l'écran. |
 
 ## Codes génériques

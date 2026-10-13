@@ -1,5 +1,5 @@
 ---
-sourceHash: d5f6bfc83168dcfd
+sourceHash: 5fa5e7d348432b22
 title: Eseguire più di un'istanza
 sidebar_label: Più di un'istanza
 description: Ogni elemento di stato che un processo Rebase conserva solo per sé, e l'impostazione che lo condivide — cosa impostare prima che una seconda replica, un rolling deploy o un deployment suddiviso ricevano traffico.

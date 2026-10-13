@@ -1,5 +1,5 @@
 ---
-sourceHash: 330defe6fc90f0fa
+sourceHash: a6a820da39681f4a
 title: Index des points de terminaison
 sidebar_label: Index des points de terminaison
 description: Chaque route HTTP montée par un backend Rebase — données, auth, stockage, admin, méta — avec son contrôle d'accès et la page qui l'explique.
@@ -135,10 +135,13 @@ une collection ne peut accéder à rien de tout cela. Voir [Rôles et portées](
 | `GET` | `/api/admin/cron/:id` | `cron:read` | [Tâches Cron](/docs/backend/cron-jobs/) |
 | `PUT` | `/api/admin/cron/:id` | `cron:write` | Activer ou désactiver une tâche |
 | `GET` | `/api/admin/cron/:id/logs` | `cron:read` | [Tâches Cron](/docs/backend/cron-jobs/) |
-| `POST` | `/api/admin/cron/:id/trigger` | `cron:write` | Exécuter une tâche maintenant |
+| `POST` | `/api/admin/cron/:id/trigger` | `cron:write` | Exécuter une tâche maintenant. <span class="since-badge" data-since="0.25">Depuis 0.25</span> `?async=1` répond `202` dès qu'elle a démarré — [API des tâches Cron](/docs/backend/cron-jobs-api/#example-trigger-a-job-manually) |
 | `GET` | `/api/admin/backups` | `backups:read` | Inventaire des sauvegardes |
 | `GET` | `/api/admin/backups/download` | `backups:read` | Télécharge une sauvegarde en streaming. Avec `?token=` issu d'un lien de téléchargement, aucun en-tête n'est nécessaire, pour cette sauvegarde uniquement |
 | `POST` | `/api/admin/backups/download-url` | `backups:read` | <span class="since-badge" data-since="0.25">Depuis 0.25</span> Un lien vers une sauvegarde, `{ key }` → `{ url, token, expiresIn }`, valable 60 secondes — [Sauvegardes](/docs/deployment/backups/#download-a-backup) |
+| `GET` | `/api/admin/storage/orphans` | `database:read` | <span class="since-badge" data-since="0.25">Depuis 0.25</span> Fichiers stockés qu'aucune ligne ne nomme, `?storageId=&olderThanHours=` — ce qu'affiche `rebase storage orphans` |
+| `DELETE` | `/api/admin/storage/orphans` | `database:write` | <span class="since-badge" data-since="0.25">Depuis 0.25</span> Les retrouve et les supprime ; `409 STORAGE_SCAN_INCOMPLETE` lorsqu'une collection n'a pas pu être lue |
+| `POST` | `/api/admin/storage/move` | `database:write` | <span class="since-badge" data-since="0.25">Depuis 0.25</span> Copie un dossier vers une autre source sous les mêmes clés, une page par appel — ce qu'envoie `rebase storage move` |
 | `GET` | `/api/admin/logs` | `logs:read` | Le tampon des logs récents |
 | `GET` | `/api/admin/logs/latest` | `logs:read` | Les entrées les plus récentes |
 | `GET` | `/api/admin/logs/stream` | `logs:read` | Événements envoyés par le serveur (SSE) |

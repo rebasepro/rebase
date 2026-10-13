@@ -1,5 +1,5 @@
 ---
-sourceHash: dfd4540bb2b45491
+sourceHash: a255412fa1737b59
 title: Referencia de la CLI
 sidebar_label: CLI
 description: Comandos de Rebase CLI para inicialización de proyectos, generación de esquemas, migraciones de bases de datos y generación de SDK.
@@ -230,10 +230,10 @@ Cada rama es una copia completa en disco, por lo que es necesario limpiarlas. `p
 
 `switch` registra la rama en `.rebase/branch.json` y nunca edita `.env`. Tiene prioridad sobre `DATABASE_URL` en `.env` y cede ante `--database-url` o un `DATABASE_URL` en el shell, por lo que un flag en la línea de comandos siempre prevalece sobre un cambio realizado anteriormente. Al eliminar la rama en la que te encuentras, vuelves a la base de datos principal en lugar de dejar el entorno apuntando a una base de datos que ya no existe.
 
-:::note[No disponible en la base de datos de desarrollo gestionada]
-`push`, `generate` y `migrate` planifican su trabajo con Atlas, que necesita una segunda base de datos vacía con la que comparar — y el PGlite gestionado sirve exactamente una. Al ejecutarlos allí, se detendrán con un mensaje indicándolo. Apunta `DATABASE_URL` a un PostgreSQL real para el flujo de trabajo de migraciones; `rebase dev` ya crea las tablas que faltan de forma acumulativa en la base de datos gestionada.
+:::note[En la base de datos de desarrollo gestionada]
+<span class="since-badge" data-since="0.25">Desde 0.25</span> `push`, `generate` y `migrate` planifican su trabajo con Atlas, que necesita una segunda base de datos vacía con la que comparar — y el PGlite gestionado sirve exactamente una. Por eso, en la base de datos gestionada cada uno de ellos inicia un segundo PGlite desechable en memoria para Atlas, y lo detiene cuando termina el comando. Así es como allí se elimina, renombra o estrecha una columna: `rebase dev` solo añade. La puerta destructiva es la misma que en cualquier otro sitio. Para que Atlas planifique contra una base de datos vacía propia, define `REBASE_ATLAS_DEV_URL` con ella; Rebase no crea ni elimina una base de datos nombrada de esa manera.
 
-`branch` se rechaza allí por una razón relacionada. `CREATE DATABASE ... TEMPLATE` contra PGlite escribe una entrada en el catálogo y no copia nada, por lo que la rama resolvería a la base de datos de la que fue clonada — cada escritura que querías aislar terminaría en tu base de datos de desarrollo. `rebase dev --docker` te proporciona un servidor real con el que las ramas pueden funcionar.
+`branch` se rechaza allí. `CREATE DATABASE ... TEMPLATE` contra PGlite escribe una entrada en el catálogo y no copia nada, por lo que la rama resolvería a la base de datos de la que fue clonada — cada escritura que querías aislar terminaría en tu base de datos de desarrollo. `rebase dev --docker` te proporciona un servidor real con el que las ramas pueden funcionar.
 :::
 
 ### `rebase apps init` / `rebase apps config`
@@ -302,6 +302,12 @@ rebase generate-sdk
 
 Crea tipos de TypeScript y un cliente con tipado seguro para todas tus colecciones.
 
+`--register` también tipa los datos del lado del servidor: escribe los tipos y la
+declaración `Register` en `config/generated/`, y recuerda la elección en
+`rebase.json` (`registerDatabase`), de modo que las siguientes ejecuciones, `rebase dev`
+y los clones nuevos los mantienen al día.
+Consulta [Datos tipados en el servidor](/docs/backend/typed-server-data).
+
 ### `rebase doctor`
 
 ```bash
@@ -361,6 +367,35 @@ rebase api-keys revoke abc123-def456
 `--scopes` nombra lo que la clave puede hacer, separado por comas o repetido; `--full-access` le da todos los alcances que tiene la clave de servicio excepto `keys:*`. `--roles` añade roles de RLS además de `service`, `--expires-in` recibe días y `--expires-at` una fecha ISO. `rebase api-keys scopes` lista todos los alcances que conoce el backend. Una clave solo se muestra una vez.
 
 Las claves cuentan con doble validación: se aplican tanto los alcances de la clave como la seguridad a nivel de fila (RLS) de la identidad bajo la que actúa. Consulta [Claves de API](/docs/backend/api-keys/).
+
+### `rebase storage`
+
+<span class="since-badge" data-since="0.25">Desde 0.25</span> Mantenimiento de todo el almacén
+de archivos guardados, a través del backend en ejecución con
+`REBASE_SERVICE_KEY` de `.env`:
+
+```bash
+rebase storage orphans                         # files no row names
+rebase storage orphans --source media --delete # and delete them, after asking
+rebase storage move --from "(default)" --to media --prefix avatars
+rebase storage move --from "(default)" --to media --prefix avatars --delete-source
+```
+
+`orphans` lee cada fila de cada colección, incluidas las eliminadas lógicamente, y
+lista los archivos de un origen (`--source`, el origen por defecto si se omite)
+que ninguna cadena de ninguna fila nombra: una clave, una URL, una referencia
+`rebase-storage:` en un texto. Los archivos más recientes que `--older-than` horas (24 por defecto) se
+dejan fuera, porque el panel de administración sube un archivo antes de que se guarde la fila que lo nombra.
+`--delete` pregunta antes de eliminar (`--yes` omite la pregunta, y es obligatorio
+sin terminal), el servidor vuelve a buscar primero los archivos, y no se
+elimina nada mientras una colección no se pueda leer. Los archivos que solo nombran tus propias tablas
+fuera de las colecciones parecen sin uso: comprueba antes de eliminar.
+
+`move` copia los archivos bajo `--prefix` a otro origen con las mismas claves,
+una página cada vez. Un archivo que el destino ya tiene con el mismo tamaño se omite,
+así que un traslado interrumpido se reanuda ejecutándolo de nuevo; `--delete-source` elimina cada
+archivo del origen una vez que el destino lo tiene. Ambos necesitan `database:read`, y
+eliminar o trasladar `database:write`, que la clave de servicio tiene.
 
 ### `rebase skills install`
 

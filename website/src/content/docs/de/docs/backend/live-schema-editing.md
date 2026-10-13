@@ -1,5 +1,5 @@
 ---
-sourceHash: 1437a2b48ddb6d7b
+sourceHash: 93dc2717d7cba3ac
 title: Live-Schema-Bearbeitung
 description: Erstellen und Ändern von Collections auf einem laufenden Backend – zuerst in Ihr Repository committet, dann angewendet.
 ---
@@ -295,10 +295,16 @@ Ein fehlgeschlagenes Apply ist also **kein Fehler**. Die Antwort besagt:
 ## Wo dies funktioniert
 
 Live Schema Editing schreibt Ihren Collection-Quellcode mit demselben Editor neu, den auch
-die reinen Quellcode-Speichervorgänge des Panels verwenden, und läuft daher dort, wo dieser Editor läuft: auf einem Server mit
-Ihrem **Collection-Quellcode auf der Festplatte** (`collectionsDir`) und eingeschaltetem Schema-Editor.
-Der Schema-Editor ist unter `NODE_ENV=production` ausgeschaltet, sofern der Server nicht
-`schemaEditor: true` setzt, und er benötigt eine installierte `ts-morph`.
+die reinen Quellcode-Speichervorgänge des Panels verwenden (er benötigt eine installierte `ts-morph`).
+Woher dieser Quellcode kommt, entscheidet, wo es läuft:
+
+- **Auf der Festplatte** (`collectionsDir`, der Standard): Es läuft dort, wo der Editor für
+  reine Quellcode-Änderungen läuft. Dieser Editor ist unter `NODE_ENV=production` ausgeschaltet, sofern der Server
+  nicht `schemaEditor: true` setzt.
+- **In einem Repository, das Sie benennen** (`liveSchema.repository`, oder
+  `REBASE_LIVE_SCHEMA_REPOSITORY` für ein Bundle): Der Quellcode wird von
+  GitHub gelesen und die Änderung dorthin zurückgecommittet, sodass es überall läuft,
+  Produktion eingeschlossen. Das ist das Opt-in für ein gebautes Bundle.
 
 ### MongoDB
 
@@ -319,19 +325,58 @@ dies explizit, anstatt Sie die relationale Antwort vermuten zu lassen.
 |---|---|
 | `rebase dev` auf Ihrem Rechner | ja |
 | Self-Hosting mit gemountetem Projekt und seinem Git-Arbeitsverzeichnis | ja, wenn `NODE_ENV` nicht `production` ist, oder mit `schemaEditor: true` |
-| Ein gebautes Bundle: ein Self-Hosting, das einen Build ausliefert, oder Rebase Cloud | nein |
+| Ein gebautes Bundle: ein Self-Hosting, das einen Build ausliefert, oder das veröffentlichte Image | nur wenn es sich mit `REBASE_LIVE_SCHEMA_REPOSITORY` dafür entscheidet — siehe [Aus einem gebauten Bundle](#aus-einem-gebauten-bundle) |
+| Jeder Server mit konfiguriertem `liveSchema.repository` | ja, `NODE_ENV=production` eingeschlossen |
 
 Ein Bundle ist kompilierte Ausgabe, daher befindet sich darin kein Collection-Quellcode, und die
-Runtime, die es ausliefert, schaltet den Schema-Editor aus. `/api/admin/schema/status`
-antwortet mit `enabled: false` und dem Code `SCHEMA_EDITOR_DISABLED`. Bearbeiten Sie
-Collections in der Entwicklung, committen Sie und deployen Sie.
+Runtime, die es ausliefert, schaltet den Editor für reine Quellcode-Änderungen aus. Sofern es kein Repository
+benennt, antwortet `/api/admin/schema/status` mit `enabled: false` und dem Code
+`SCHEMA_EDITOR_DISABLED`: Bearbeiten Sie Collections in der Entwicklung, committen Sie und deployen Sie.
+
+### Aus einem gebauten Bundle
+
+Ein Bundle hat keinen eigenen Code zum Konfigurieren, daher entscheidet es sich per Umgebungsvariablen
+dafür. Für ein Bundle, das sie nicht setzt, ändert sich nichts.
+
+```bash
+REBASE_LIVE_SCHEMA_REPOSITORY=acme/storefront     # turns it on
+REBASE_LIVE_SCHEMA_GITHUB_TOKEN=github_pat_…       # or the three _GITHUB_APP_* variables
+# REBASE_LIVE_SCHEMA_BRANCH=main                   # default
+# REBASE_LIVE_SCHEMA_COLLECTIONS_PATH=config/collections   # default
+```
+
+Die vollständige Liste steht unter [Konfiguration](/docs/getting-started/configuration#live-schema-editing-from-a-bundle).
+Ein Repository, das ohne verwendbare Zugangsdaten benannt wird (keine, beide Arten, eine halbe GitHub-App),
+oder ein Wert, der nicht `owner/name` ist, verweigert den Start, statt einen Editor auszuliefern,
+der fehlschlägt, wenn jemand auf Apply drückt.
+
+Was gleich bleibt, wenn es eingeschaltet ist:
+
+- Es ist eine `/api/admin`-Oberfläche: überhaupt keine Antwort ohne `schema:read`, und
+  `/apply` braucht `schema:write` und eine Person (siehe [Wer Änderungen anwenden darf](#wer-änderungen-anwenden-darf)).
+- Das Schreibziel ist nur das Repository, das Sie benannt haben. Der Editor für reine Quellcode-Änderungen,
+  der Dateien neben dem Prozess schreibt, bleibt ausgeschaltet.
+- Jede Änderung wird geplant, angezeigt, committet und dann angewendet, genau wie auf Ihrem
+  Rechner.
+
+Eine Sache ist anders. Das laufende Deployment liefert weiterhin die Collections aus, mit denen es gebaut
+wurde, bis Ihre Pipeline den Commit baut und deployt. Die Datenbank
+hat die Änderung sofort; das Admin-Panel und die API sehen die neue Collection-Definition
+erst nach diesem Deploy.
+
+Ein Deployment macht also **eine Änderung pro Deploy**. Nachdem ein Commit gelandet ist, wird die nächste
+Anwendung mit `SCHEMA_CHANGE_FAILED` abgelehnt, unter Nennung des Commits, bis ein Prozess, der
+diesen Commit ausführt, diesen hier ersetzt. Eine zweite Änderung, die gegen die
+Collections geplant wird, die dieses Deployment noch ausführt, würde generierte Schema-Dateien committen,
+die die erste Änderung auslassen. Das Planen bleibt in der Zwischenzeit verfügbar.
 
 ### In ein Remote-Repository committen
 
 `liveSchema.repository` lässt den Server jede Änderung über die Git Data API in ein GitHub-Repository
-committen, statt `git commit` in einem Arbeitsverzeichnis auszuführen. Es greift nur auf einem Server, dessen
-Schema-Editor eingeschaltet ist, also einem Server mit `collectionsDir` auf der Festplatte (siehe die Tabelle oben). Ein
-gebautes Bundle liest es nicht.
+committen, statt `git commit` in einem Arbeitsverzeichnis auszuführen. Es hängt nicht davon ab, dass der Editor für
+reine Quellcode-Änderungen eingeschaltet ist: Mit konfiguriertem Repository funktioniert Live-Bearbeitung unter
+`NODE_ENV=production` und mit `schemaEditor: false`, weil nichts auf diesem Rechner geschrieben wird. Ein Bundle
+setzt es über die obigen Variablen.
 
 ```typescript no-verify
 initializeRebaseBackend({
@@ -351,11 +396,12 @@ initializeRebaseBackend({
 })
 ```
 
-Die geänderte Collection-Datei wird dann aus dem Repository gelesen, mit demselben Editor neu geschrieben, der
-auch lokal ausgeführt wird, und über die Git Data API zurückgecommittet: ein Blob, ein Tree, ein
-Commit und ein Ref-Update. Nichts wird geklont und nichts verbleibt auf der Festplatte. Es wird nur diese eine Datei
-abgerufen, daher sind in diesem Modus zwei Änderungen nicht möglich: das Hinzufügen einer Relation, die auf eine andere
-Collection zielt, und das Löschen einer Collection.
+Das Collections-Verzeichnis wird dann aus dem Repository gelesen, mit demselben Editor neu geschrieben, der
+auch lokal ausgeführt wird, und was sich geändert hat, wird über die Git Data API zurückgecommittet: ein Blob pro Datei,
+ein Tree, ein Commit und ein Ref-Update. Nichts wird geklont und nichts verbleibt auf der Festplatte. Das ganze Verzeichnis
+wird gelesen, nicht nur die bearbeitete Datei, sodass eine Relation auf eine andere Collection zielen kann (ihre Datei wird
+importiert) und das Löschen einer Collection funktioniert wie lokal: abgelehnt, solange
+eine andere Collection sie importiert, und im selben Commit aus `index.ts` entfernt.
 
 `auth` akzeptiert ein Token oder eine GitHub-App-Installation:
 

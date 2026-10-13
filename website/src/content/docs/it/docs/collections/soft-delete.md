@@ -1,5 +1,5 @@
 ---
-sourceHash: 94b81d143b186ece
+sourceHash: dc27c5a35221e71c
 title: Soft delete
 sidebar_label: Soft delete
 description: Trasforma l'eliminazione in un timestamp, nascondi le righe contrassegnate da ogni lettura e ripristinale con un normale aggiornamento.
@@ -94,6 +94,42 @@ separatamente creerebbe una seconda superficie di controllo accessi per la medes
 cambia è la possibilità che la riga venga recuperata. Solo il valore letterale `true` o `1`
 significa sì; un errore di digitazione produce un 400, poiché un chiamante che ha richiesto di eliminare
 definitivamente e ha ottenuto un soft delete crederebbe erroneamente che i dati siano spariti.
+
+## Dall'SDK
+
+Il client tipizzato raggiunge il cestino tramite `trash` su ogni collection. Invia
+le richieste sopra descritte: `?deleted=only` sulle letture, l'aggiornamento a `null` per un
+ripristino, e `?hard=true` per un'eliminazione definitiva.
+
+```typescript
+const trashed = await client.data.invoices.trash.find({ limit: 20 });
+const howMany = await client.data.invoices.trash.count();
+
+await client.data.invoices.trash.restore(7);       // PATCH { deletedAt: null }
+await client.data.invoices.trash.restoreMany([8, 9]);
+
+await client.data.invoices.trash.purge(7);         // DELETE ?hard=true
+await client.data.invoices.trash.purgeMany([8, 9]);
+```
+
+`trash.find` e `trash.count` accettano gli stessi parametri di `find` e `count`.
+Un ripristino imposta `deletedAt` a meno che tu non nomini il campo: una collection dichiarata
+con `softDelete: { field: "archivedAt" }` si ripristina con
+`trash.restore(7, { field: "archivedAt" })`. Il client non può leggere il nome del
+campo dal server.
+
+Usa `trash` su una collection che dichiara `softDelete`. Su una che non lo fa,
+il server ignora `?deleted=`, quindi `trash.find` restituisce le righe attive e
+`trash.purge` è un'eliminazione ordinaria.
+
+Il codice server ha lo stesso `trash`: `context.data.invoices.trash` in una callback,
+e `rebase.data.invoices.trash` in una function o in un cron. Legge ed elimina
+definitivamente tramite il driver, con i privilegi del chiamante, come fa il resto di
+[`context.data`](/docs/collections/context-data-api).
+
+Con [offline](/docs/sdk/offline) abilitato, il cestino non viene mai messo in cache e nulla
+al suo interno viene accodato. Ogni chiamata richiede il server, e fallisce con l'errore `OFFLINE`
+senza di esso. Una riga ripristinata entra nel database locale, e una eliminata definitivamente ne esce.
 
 ## Passaggi successivi
 

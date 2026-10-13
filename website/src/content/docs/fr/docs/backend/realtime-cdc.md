@@ -1,7 +1,8 @@
 ---
-sourceHash: c3a5adad80c0b11b
-title: "Capture des modifications au niveau de la base de données (CDC)"
-sidebar_label: "Capture des modifications au niveau de la base de données (CDC)"
+sourceHash: a05da9682df4f23a
+title: "Capture des modifications de la base de données"
+sidebar_label: "Capture des modifications de la base de données"
+description: "Des événements en temps réel pour chaque écriture validée, quelle que soit sa provenance : les déclencheurs de capture, le paramètre REALTIME_CDC et ce qu'ils exigent."
 ---
 
 **Le Change Data Capture (CDC) est activé par défaut.** Rebase capture les modifications au niveau de la base de données et émet des événements en temps réel pour **chaque écriture validée (commit), quelle que soit sa provenance** — REST, SDK, Studio, `psql`, une tâche cron dans un autre service, Drizzle/SQL brut, ou l'**éditeur SQL** de Studio. Il s'agit du même modèle que Supabase Realtime suivant le journal de réécriture (WAL).
@@ -49,3 +50,8 @@ Si la connexion ne le prend pas en charge, `auto` consigne une ligne d'informati
 - Les déclencheurs ne sont installés que sur les tables adossées à une collection enregistrée. Les écritures sur des tables non associées sont ignorées.
 - Une collection dont la table n'a pas encore fait l'objet d'une migration est ignorée avec un avertissement au lieu de bloquer le CDC pour le reste.
 - Le streaming natif par réplication logique WAL (`wal2json`/`pgoutput`) est prévu ; aujourd'hui, `REALTIME_CDC=wal` se rabat sur la méthode basée sur les déclencheurs, qui fournit une couverture équivalente au niveau de la base de données.
+
+## Prochaines étapes
+
+- [Temps réel & WebSocket](/docs/backend/realtime) — abonnements, canaux et présence, que ces événements alimentent.
+- [Temps réel entre instances](/docs/backend/realtime-transports) — le bus qui transporte les modifications entre les processus serveur.

@@ -1,5 +1,5 @@
 ---
-sourceHash: 330defe6fc90f0fa
+sourceHash: a6a820da39681f4a
 title: Endpunkt-Index
 sidebar_label: Endpunkt-Index
 description: Jede HTTP-Route, die ein Rebase-Backend mountet – Daten, Authentifizierung, Speicher, Admin, Meta – mit dem jeweiligen Gate und der Seite, die sie erklärt.
@@ -135,10 +135,13 @@ der auf eine Collection beschränkt ist, erreicht nichts davon. Siehe [Rollen un
 | `GET` | `/api/admin/cron/:id` | `cron:read` | [Cron Jobs](/docs/backend/cron-jobs/) |
 | `PUT` | `/api/admin/cron/:id` | `cron:write` | Einen Job aktivieren oder deaktivieren |
 | `GET` | `/api/admin/cron/:id/logs` | `cron:read` | [Cron Jobs](/docs/backend/cron-jobs/) |
-| `POST` | `/api/admin/cron/:id/trigger` | `cron:write` | Einen Job jetzt ausführen |
+| `POST` | `/api/admin/cron/:id/trigger` | `cron:write` | Einen Job jetzt ausführen. <span class="since-badge" data-since="0.25">Seit 0.25</span> `?async=1` antwortet mit `202`, sobald er gestartet ist — [Cron-Jobs-API](/docs/backend/cron-jobs-api/#example-trigger-a-job-manually) |
 | `GET` | `/api/admin/backups` | `backups:read` | Backup-Inventar |
 | `GET` | `/api/admin/backups/download` | `backups:read` | Streamt ein Backup. Mit `?token=` aus einem Download-Link ist kein Header nötig, nur für dieses Backup |
 | `POST` | `/api/admin/backups/download-url` | `backups:read` | <span class="since-badge" data-since="0.25">Seit 0.25</span> Ein Link zu einem Backup, `{ key }` → `{ url, token, expiresIn }`, 60 Sekunden gültig — [Backups](/docs/deployment/backups/#download-a-backup) |
+| `GET` | `/api/admin/storage/orphans` | `database:read` | <span class="since-badge" data-since="0.25">Seit 0.25</span> Gespeicherte Dateien, die keine Zeile nennt, `?storageId=&olderThanHours=` — was `rebase storage orphans` ausgibt |
+| `DELETE` | `/api/admin/storage/orphans` | `database:write` | <span class="since-badge" data-since="0.25">Seit 0.25</span> Findet sie erneut und löscht sie; `409 STORAGE_SCAN_INCOMPLETE`, wenn eine Collection nicht gelesen werden konnte |
+| `POST` | `/api/admin/storage/move` | `database:write` | <span class="since-badge" data-since="0.25">Seit 0.25</span> Kopiert einen Ordner unter denselben Schlüsseln in eine andere Quelle, eine Seite pro Aufruf — was `rebase storage move` sendet |
 | `GET` | `/api/admin/logs` | `logs:read` | Der Puffer der letzten Protokolle |
 | `GET` | `/api/admin/logs/latest` | `logs:read` | Die neuesten Einträge |
 | `GET` | `/api/admin/logs/stream` | `logs:read` | Server-Sent Events |

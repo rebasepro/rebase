@@ -1,5 +1,5 @@
 ---
-sourceHash: 94b81d143b186ece
+sourceHash: dc27c5a35221e71c
 title: Soft delete
 sidebar_label: Soft delete
 description: Transforme a exclusão em um timestamp, oculte linhas marcadas de todas as leituras e restaure-as com uma atualização comum.
@@ -93,6 +93,42 @@ separadamente criaria uma segunda superfície de controle de acesso para uma ún
 muda é se a linha pode retornar ou não. Apenas o valor literal `true` ou `1` significa
 sim; um erro de digitação resulta em um 400, porque quem fez a chamada pediu para expurgar e
 recebeu um soft delete acredita que os dados foram apagados.
+
+## Pelo SDK
+
+O cliente tipado alcança a lixeira por meio de `trash` em cada collection. Ele envia
+as requisições acima: `?deleted=only` nas leituras, a atualização para `null` em uma
+restauração e `?hard=true` em uma exclusão definitiva.
+
+```typescript
+const trashed = await client.data.invoices.trash.find({ limit: 20 });
+const howMany = await client.data.invoices.trash.count();
+
+await client.data.invoices.trash.restore(7);       // PATCH { deletedAt: null }
+await client.data.invoices.trash.restoreMany([8, 9]);
+
+await client.data.invoices.trash.purge(7);         // DELETE ?hard=true
+await client.data.invoices.trash.purgeMany([8, 9]);
+```
+
+`trash.find` e `trash.count` aceitam os mesmos parâmetros que `find` e `count`.
+Uma restauração define `deletedAt` a menos que você nomeie o campo: uma collection declarada
+com `softDelete: { field: "archivedAt" }` restaura com
+`trash.restore(7, { field: "archivedAt" })`. O cliente não consegue ler o nome do
+campo a partir do servidor.
+
+Use `trash` em uma collection que declara `softDelete`. Em uma que não declara,
+o servidor ignora `?deleted=`, então `trash.find` retorna as linhas ativas e
+`trash.purge` é uma exclusão comum.
+
+O código do servidor tem o mesmo `trash`: `context.data.invoices.trash` em um callback,
+e `rebase.data.invoices.trash` em uma função ou em um cron. Ele lê e exclui
+definitivamente por meio do driver, com os privilégios do chamador, como o restante de
+[`context.data`](/docs/collections/context-data-api) faz.
+
+Com o [offline](/docs/sdk/offline) habilitado, a lixeira nunca é armazenada em cache e nada
+nela entra na fila. Cada chamada precisa do servidor e falha com o erro `OFFLINE`
+sem ele. Uma linha restaurada entra no banco de dados local, e uma excluída definitivamente sai dele.
 
 ## Próximos Passos
 

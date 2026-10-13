@@ -1,5 +1,5 @@
 ---
-sourceHash: dfd4540bb2b45491
+sourceHash: a255412fa1737b59
 title: CLI-Referenz
 sidebar_label: CLI
 description: Rebase-CLI-Befehle für Projektinitialisierung, Schemagenerierung, Datenbankmigrationen und SDK-Generierung.
@@ -276,14 +276,16 @@ hat Vorrang vor `DATABASE_URL` in `.env` und unterliegt `--database-url` oder ei
 zuvor durchgeführten Wechsel hat. Das Löschen des Branches, auf dem Sie sich befinden, bringt
 Sie zur Hauptdatenbank zurück, anstatt den Checkout auf eine nicht mehr existierende Datenbank verweisen zu lassen.
 
-:::note[Nicht auf der verwalteten Entwicklungsdatenbank]
-`push`, `generate` und `migrate` planen ihre Arbeit mit Atlas, welches eine zweite
-leere Datenbank zum Vergleichen benötigt — und das verwaltete PGlite stellt genau eine bereit.
-Das Ausführen dort bricht mit einer entsprechenden Meldung ab. Verweisen Sie `DATABASE_URL`
-auf ein echtes PostgreSQL für den Migrations-Workflow; `rebase dev` erstellt fehlende Tabellen
-auf der verwalteten Datenbank ohnehin bereits additiv.
+:::note[Auf der verwalteten Entwicklungsdatenbank]
+<span class="since-badge" data-since="0.25">Seit 0.25</span> `push`, `generate` und `migrate` planen ihre Arbeit mit Atlas, welches eine zweite
+leere Datenbank zum Vergleichen benötigt — und das verwaltete PGlite stellt genau eine bereit. Auf
+der verwalteten Datenbank startet daher jeder dieser Befehle ein zweites, wegwerfbares PGlite im Speicher
+für Atlas und stoppt es, wenn der Befehl endet. So wird dort eine Spalte gelöscht,
+umbenannt oder verengt: `rebase dev` fügt immer nur hinzu. Das Destructive-Gate ist
+dasselbe wie überall. Damit Atlas stattdessen gegen eine leere Datenbank von Ihnen plant,
+setzen Sie `REBASE_ATLAS_DEV_URL` darauf; Rebase legt eine so benannte Datenbank weder an noch löscht es sie.
 
-`branch` wird dort aus einem ähnlichen Grund verweigert. `CREATE DATABASE ... TEMPLATE`
+`branch` wird dort verweigert. `CREATE DATABASE ... TEMPLATE`
 auf PGlite schreibt einen Katalogeintrag und kopiert nichts, sodass der Branch auf die Datenbank
 verweisen würde, von der er geklont wurde — jeder Schreibvorgang, den Sie isolieren wollten,
 würde in Ihrer Entwicklungsdatenbank landen. `rebase dev --docker` liefert Ihnen einen echten
@@ -374,6 +376,12 @@ rebase generate-sdk
 
 Erstellt TypeScript-Typen und einen typsicheren Client für alle Ihre Collections.
 
+`--register` typisiert auch serverseitige Daten: Es schreibt die Typen und die
+`Register`-Deklaration nach `config/generated/` und merkt sich die Wahl in
+`rebase.json` (`registerDatabase`), sodass spätere Läufe, `rebase dev` und frische Klone
+sie aktuell halten.
+Siehe [Typisierte serverseitige Daten](/docs/backend/typed-server-data).
+
 ### `rebase doctor`
 
 ```bash
@@ -446,6 +454,35 @@ gibt ihm jeden Scope, den der Service-Key hält, außer `keys:*`. `--roles` füg
 
 Schlüssel sind doppelt abgesichert: Sowohl die Scopes des Schlüssels als auch die Row-Level Security
 der Identität, als die er agiert, greifen. Siehe [API-Schlüssel](/docs/backend/api-keys/).
+
+### `rebase storage`
+
+<span class="since-badge" data-since="0.25">Seit 0.25</span> Wartung des gesamten Speichers
+gespeicherter Dateien, über das laufende Backend mit
+`REBASE_SERVICE_KEY` aus `.env`:
+
+```bash
+rebase storage orphans                         # files no row names
+rebase storage orphans --source media --delete # and delete them, after asking
+rebase storage move --from "(default)" --to media --prefix avatars
+rebase storage move --from "(default)" --to media --prefix avatars --delete-source
+```
+
+`orphans` liest jede Zeile jeder Collection, soft-gelöschte Zeilen eingeschlossen, und
+listet die Dateien einer Quelle (`--source`, bei Weglassen die Standardquelle) auf,
+die kein String in irgendeiner Zeile nennt: ein Schlüssel, eine URL, eine `rebase-storage:`-Referenz in
+einem Text. Dateien, die neuer sind als `--older-than` Stunden (standardmäßig 24), bleiben außen vor,
+weil das Admin-Panel eine Datei hochlädt, bevor die Zeile gespeichert wird, die sie nennt.
+`--delete` fragt vor dem Löschen nach (`--yes` überspringt die Frage und ist ohne Terminal
+erforderlich), der Server findet die Dateien zuvor erneut, und nichts wird
+gelöscht, solange eine Collection nicht gelesen werden kann. Dateien, die nur Ihre eigenen Tabellen
+außerhalb von Collections nennen, wirken ungenutzt: Prüfen Sie vor dem Löschen.
+
+`move` kopiert die Dateien unter `--prefix` seitenweise unter denselben Schlüsseln in eine andere Quelle.
+Eine Datei, die das Ziel bereits mit derselben Größe hält, wird übersprungen,
+sodass ein abgebrochenes Verschieben durch erneutes Ausführen fortgesetzt wird; `--delete-source` löscht jede
+Datei aus der Quelle, sobald das Ziel sie hält. Beide brauchen `database:read`, und
+Löschen oder Verschieben `database:write`, was der Service-Key hält.
 
 ### `rebase skills install`
 

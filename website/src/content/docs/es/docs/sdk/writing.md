@@ -1,5 +1,5 @@
 ---
-sourceHash: c30985ad74db5bdc
+sourceHash: dcdd32536d7ea87a
 title: Escritura de datos
 sidebar_label: Escritura de datos
 description: create, upsert, update y delete con el SDK — operaciones de campo, escrituras condicionales, claves de idempotencia, escrituras por lotes y escritura entre colecciones en una sola transacción.
@@ -124,6 +124,10 @@ optimista solo podría mostrar el marcador en sí hasta que la cola se vaciase.
 await client.data.products.delete(42);
 ```
 
+En una colección con [borrado lógico](/docs/collections/soft-delete) esto marca la
+fila en lugar de eliminarla. `client.data.products.trash` lista, cuenta, restaura
+y purga las filas marcadas.
+
 ### Escrituras condicionales
 
 `update` y `delete` aceptan un `ifMatch`, de modo que la escritura se rechaza si la fila ha
@@ -147,6 +151,22 @@ Reside en una clave no enumerable, por lo que nunca entra en el tipo `Row` gener
 una fila proveniente de `find()`, de la caché offline o de un servidor que no envíe ningún
 `ETag`; y pasar `undefined` no envía ninguna precondición, por lo que la llamada anterior
 se degrada a una actualización ordinaria en lugar de lanzar un error.
+
+<span class="since-badge" data-since="0.25">Desde 0.25</span> Una fila devuelta por `update()` lleva la versión que produjo esa escritura, de modo que
+las ediciones condicionales se encadenan sin una lectura intermedia. Una fila que recibe un callback de `listenById()`
+lleva la versión que muestra ese frame:
+
+```typescript
+import { etagOf } from "@rebasepro/client";
+
+let shown: Record<string, unknown> | undefined;
+client.data.posts.listenById(1, (post) => {
+    shown = post; // etagOf(shown) is the version this frame shows
+});
+
+// On save: refused with 412 if the row has moved on since that frame
+await client.data.posts.update(1, { title: "New" }, { ifMatch: etagOf(shown) });
+```
 
 Desde un navegador en otro origen — un frontend de Vite en su propio puerto,
 un host `app.` que llama a un host `api.` — el `ETag` solo es legible porque

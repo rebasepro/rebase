@@ -1,5 +1,5 @@
 ---
-sourceHash: 1437a2b48ddb6d7b
+sourceHash: 93dc2717d7cba3ac
 title: Edição de schema ao vivo
 description: Crie e altere coleções em um backend em execução — comitadas primeiro no seu repositório, depois aplicadas.
 ---
@@ -298,10 +298,16 @@ Portanto, uma aplicação que falha **não é um erro**. A resposta diz isso:
 ## Onde isso funciona
 
 A edição ao vivo do schema reescreve o código-fonte das suas coleções com o mesmo editor
-que os salvamentos somente de código-fonte do painel usam, portanto ela roda onde esse
-editor roda: um servidor com o **código-fonte das coleções em disco** (`collectionsDir`) e
-o editor de schema ligado. O editor de schema fica desligado sob `NODE_ENV=production`, a
-menos que o servidor defina `schemaEditor: true`, e precisa do `ts-morph` instalado.
+que os salvamentos somente de código-fonte do painel usam (ele precisa do `ts-morph`
+instalado). De onde vem esse código-fonte decide onde ela roda:
+
+- **Em disco** (`collectionsDir`, o padrão): roda onde o editor somente de
+  código-fonte roda. Esse editor fica desligado sob `NODE_ENV=production`, a menos que o servidor
+  defina `schemaEditor: true`.
+- **Em um repositório que você nomeia** (`liveSchema.repository`, ou
+  `REBASE_LIVE_SCHEMA_REPOSITORY` para um bundle): o código-fonte é lido do
+  GitHub e a alteração é comitada de volta lá, então roda em qualquer lugar,
+  produção inclusive. Esta é a adesão para um bundle compilado.
 
 ### MongoDB
 
@@ -324,20 +330,59 @@ relacional.
 |---|---|
 | `rebase dev` na sua máquina | sim |
 | Self-host com o projeto e sua árvore de trabalho do git montados | sim, quando `NODE_ENV` não é `production`, ou com `schemaEditor: true` |
-| Um bundle compilado: um self-host servindo uma build, ou o Rebase Cloud | não |
+| Um bundle compilado: um self-host servindo uma build, ou a imagem publicada | somente quando adere com `REBASE_LIVE_SCHEMA_REPOSITORY` — veja [A partir de um bundle compilado](#a-partir-de-um-bundle-compilado) |
+| Qualquer servidor com `liveSchema.repository` configurado | sim, `NODE_ENV=production` inclusive |
 
 Um bundle é uma saída compilada, portanto não há código-fonte de coleções nele, e o
-runtime que o serve desliga o editor de schema. `/api/admin/schema/status`
-responde `enabled: false` com o código `SCHEMA_EDITOR_DISABLED`. Edite as
-coleções em desenvolvimento, faça o commit e o deploy.
+runtime que o serve desliga o editor somente de código-fonte. A menos que nomeie um
+repositório, `/api/admin/schema/status` responde `enabled: false` com o código
+`SCHEMA_EDITOR_DISABLED`: edite as coleções em desenvolvimento, faça o commit e o deploy.
+
+### A partir de um bundle compilado
+
+Um bundle não tem código próprio para configurar, então adere por meio de variáveis
+de ambiente. Nada muda para um bundle que não as define.
+
+```bash
+REBASE_LIVE_SCHEMA_REPOSITORY=acme/storefront     # turns it on
+REBASE_LIVE_SCHEMA_GITHUB_TOKEN=github_pat_…       # or the three _GITHUB_APP_* variables
+# REBASE_LIVE_SCHEMA_BRANCH=main                   # default
+# REBASE_LIVE_SCHEMA_COLLECTIONS_PATH=config/collections   # default
+```
+
+A lista completa está em [Configuração](/docs/getting-started/configuration#live-schema-editing-from-a-bundle).
+Um repositório nomeado sem uma credencial utilizável (nenhuma, os dois tipos, metade de um GitHub
+App), ou um valor que não seja `owner/name`, se recusa a iniciar, em vez de servir
+um editor que falha quando alguém pressiona Apply.
+
+O que permanece igual quando está ligado:
+
+- É uma superfície de `/api/admin`: nenhuma resposta sem `schema:read`, e
+  `/apply` exige `schema:write` e uma pessoa (veja [Quem pode aplicar](#quem-pode-aplicar)).
+- O alvo da escrita é apenas o repositório que você nomeou. O editor somente de código-fonte,
+  que grava arquivos ao lado do processo, permanece desligado.
+- Cada alteração é planejada, mostrada, comitada e então aplicada, exatamente como na
+  sua máquina.
+
+Uma coisa é diferente. A implantação em execução continua servindo as coleções com as quais
+foi construída até que o seu pipeline construa e faça o deploy do commit. O banco de dados
+recebe a alteração de imediato; o painel de administração e a API veem a nova definição da coleção
+depois desse deploy.
+
+Por isso uma implantação faz **uma alteração por deploy**. Depois que um commit entra, o próximo
+apply é recusado com `SCHEMA_CHANGE_FAILED`, citando o commit, até que um processo
+executando esse commit substitua este. Uma segunda alteração planejada contra as
+coleções que esta implantação ainda executa comitaria arquivos de schema gerados
+que deixam a primeira alteração de fora. O planejamento continua disponível nesse meio tempo.
 
 ### Fazendo commit em um repositório remoto
 
 `liveSchema.repository` faz o servidor comitar cada alteração em um repositório do
 GitHub através da Git Data API, em vez de executar `git commit` em uma árvore de
-trabalho. Ele só tem efeito em um servidor com o editor de schema ligado,
-ou seja, um servidor com `collectionsDir` em disco (veja a tabela acima). Um
-bundle compilado não o lê.
+trabalho. Ele não depende de o editor somente de código-fonte estar ligado: com
+um repositório configurado, a edição ao vivo funciona sob `NODE_ENV=production` e com
+`schemaEditor: false`, porque nada nesta máquina é gravado. Um bundle
+o define pelas variáveis acima.
 
 ```typescript no-verify
 initializeRebaseBackend({
@@ -357,12 +402,13 @@ initializeRebaseBackend({
 })
 ```
 
-O arquivo da coleção alterada é então lido do repositório, reescrito com
-o mesmo editor executado localmente e comitado de volta através da Git Data API:
-um blob, uma tree, um commit e uma atualização de ref. Nada é clonado e nada é
-deixado em disco. Apenas esse arquivo é buscado, portanto duas alterações não podem ser
-feitas neste modo: adicionar uma relação que aponta para outra coleção e excluir uma
-coleção.
+O diretório de coleções é então lido do repositório, reescrito com o
+mesmo editor executado localmente, e o que mudou é comitado de volta através da
+Git Data API: um blob por arquivo, uma tree, um commit e uma atualização de ref. Nada é
+clonado e nada é deixado em disco. O diretório inteiro é lido, não apenas o
+arquivo editado, então uma relação pode apontar para outra coleção (o arquivo dela é
+importado) e excluir uma coleção funciona como localmente: recusado enquanto
+outra coleção a importa, e removida de `index.ts` no mesmo commit.
 
 `auth` aceita um token ou uma instalação de GitHub App:
 

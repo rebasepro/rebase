@@ -1,5 +1,5 @@
 ---
-sourceHash: 53f453267ae3e21c
+sourceHash: d9b66c9d404a5085
 title: Authentifizierung
 sidebar_label: Authentifizierung
 description: Konfigurieren Sie JWT-Authentifizierung, OAuth-Provider, SMTP-E-Mail, Bot-Schutz und die Users-Collection im Rebase-Backend.
@@ -93,7 +93,7 @@ const backend = await initializeRebaseBackend({
 | `requireAuth` | `boolean` | `true` | Erfordert eine Sitzung für die Daten-API |
 | `allowRegistration` | `boolean` | `false` | Gibt `POST /api/auth/register` frei. Außerhalb der Produktion wird der erste Benutzer bei einer leeren Tabelle in jedem Fall zugelassen; in der Produktion wird der Admin über `REBASE_ADMIN_EMAIL` festgelegt |
 | `disableSelfRegistration` | `boolean` | `false` | Kill-Switch: Schließt auch das Bootstrap-Fenster für den ersten Benutzer, das `allowRegistration: false` offen lässt |
-| `allowAnonymous` | `boolean` | `false` | Aktiviert `POST /api/auth/anonymous`. Bewusst nicht an `allowRegistration` gekoppelt — eine öffentlich lesbare App benötigt möglicherweise Sitzungen ohne Benutzerkonten. Einen Gast in ein Konto zu verwandeln (`POST /api/auth/anonymous/link`) ist eine Registrierung und braucht ebenfalls `allowRegistration` |
+| `allowAnonymous` | `boolean` | `false` | Aktiviert `POST /api/auth/anonymous`. Bewusst nicht an `allowRegistration` gekoppelt — eine öffentlich lesbare App benötigt möglicherweise Sitzungen ohne Benutzerkonten. Einen Gast in ein Konto zu verwandeln (`POST /api/auth/anonymous/link`) ist eine Registrierung und braucht ebenfalls `allowRegistration` — und `allowAnonymous` muss weiterhin aktiv sein: Ist es abgeschaltet, weist es auch die bereits angemeldeten Gäste ab, sodass keiner zu einem Konto werden kann (`403 ANONYMOUS_AUTH_DISABLED`) |
 | `allowUserLookup` | `boolean` | `false` | Stellt `POST /api/auth/find-user` für Einladungs-Flows per E-Mail bereit |
 | `defaultRole` | `string` | — | Rolle, die einem neu registrierten Benutzer zugewiesen wird, wenn keine angegeben ist. Sie darf weder `admin` noch eine deklarierte Rolle sein, die einen Scope der Admin-Ebene hält: Der Boot lehnt beides ab |
 | `serviceKey` | `string` | — | Statischer Schlüssel für Server-zu-Server-Aufrufe — siehe [Service-Key-Authentifizierung](/docs/backend/auth-endpoints/#service-key-authentication) |

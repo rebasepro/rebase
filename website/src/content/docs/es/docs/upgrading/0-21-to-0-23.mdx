@@ -1,0 +1,167 @@
+---
+sourceHash: c6b95df3140b1b02
+slug: es/docs/upgrading/0-21-to-0-23
+title: Actualización de 0.21 a 0.23
+sidebar_label: 0.21 → 0.23
+description: Los cambios incompatibles de 0.23 para una aplicación en 0.21 o 0.22: claves de API en rutas anidadas, rechazos al arrancar, repositorios de autenticación personalizados, conversión de invitados y almacenes de trabajos personalizados.
+---
+
+# Actualización de 0.21 → 0.23
+
+Estas son las entradas `### Breaking` que incluye 0.23. La 0.22 no declara ningún
+cambio incompatible, por lo que una aplicación en 0.21 o 0.22 solo necesita leer
+esta página para llegar a 0.23.
+
+Tres de ellos se rechazan al arrancar, indicando el ajuste afectado, en lugar de
+cambiar el comportamiento en silencio. Cuatro cambian quién puede iniciar sesión o
+a qué puede acceder una clave: léalos primero si su aplicación tiene claves de API
+en rutas anidadas, un repositorio de autenticación personalizado o invitados que se
+convierten en cuentas. El último cambia el contrato de un almacén de trabajos
+personalizado.
+
+---
+
+## 33. Una clave de API en una ruta anidada necesita `read` en cada colección padre
+
+Una clave se comprobaba contra el último segmento de una URL anidada, que nombra
+una relación y no una colección, y la colección padre nunca se comprobaba. Ahora la
+operación de la ruta se comprueba contra la colección a la que llega la ruta, y
+cada colección por la que pasa la ruta necesita `read`. Una clave limitada solo a
+`posts` que llame a `/api/data/authors/1/posts` recibe
+`403 API_KEY_FORBIDDEN` nombrando `authors` hasta que también pueda leer `authors`.
+
+**Qué cambiar:** otorgue a cada clave que use rutas anidadas `read` sobre los padres
+(`PUT /api/admin/api-keys/:id`), o haga que llame a la ruta propia de la colección
+hija con un filtro.
+
+```json
+[
+    { "collection": "posts", "operations": ["read", "write"] },
+    { "collection": "authors", "operations": ["read"] }
+]
+```
+
+Consulte [Claves de API](/docs/backend/api-keys/#data). Desde 0.24 la misma regla se escribe en scopes: cada padre necesita `data:read`.
+
+## 34. Una variable de entorno numérica que no es un número hace fallar el arranque
+
+`PORT`, `SMTP_PORT`, `REBASE_MAX_BODY_SIZE` y las variables `DB_POOL_*` solían
+pasar `NaN` o leer un valor en blanco como `0`. Un `REBASE_MAX_BODY_SIZE` en blanco
+eliminaba el límite de cuerpo de todas las rutas, y un `PORT` en blanco hacía que un
+servidor de producción escuchara en un puerto aleatorio. Ahora un valor en blanco
+significa sin definir y toma el valor por defecto, un `0` explícito sigue contando, y
+cualquier cosa que no sea un número detiene el arranque, nombrando la variable.
+
+**Qué cambiar:** nada, a menos que el arranque nombre ahora una variable. En ese
+caso, corrija su valor o elimínela.
+
+```bash
+grep -nE "^(PORT|SMTP_PORT|REBASE_MAX_BODY_SIZE|DB_POOL_[A-Z_]+)=" .env*
+```
+
+## 35. Una duración de sesión que el firmador de tokens no puede leer se niega a arrancar
+
+`auth.accessExpiresIn` y `auth.refreshExpiresIn` (`JWT_ACCESS_EXPIRES_IN`,
+`JWT_REFRESH_EXPIRES_IN`) se validaban contra `^\d+[dhms]$` mientras el firmador de
+tokens los leía de otra manera, y todo lo intermedio recurría silenciosamente a un
+valor por defecto: `1w`, `2 weeks` o `30 days` se convertían en un token de
+actualización de 400 días. Ahora ambos aceptan un número positivo y una unidad, como
+`15m`, `1h`, `30d` o `2 weeks`. Un número sin unidad, cero, un valor negativo o un
+valor que el firmador no pueda leer detiene el arranque y nombra el ajuste.
+
+**Qué cambiar:** dé una unidad a cada duración. `3600` no es una hora —el firmador
+lee un número sin unidad como milisegundos—, así que escriba `1h`.
+
+```bash
+grep -rnE "(EXPIRES_IN|ExpiresIn)" .env* config
+```
+
+## 36. Un repositorio de autenticación personalizado necesita `unlinkUserIdentity`, o se rechazan algunos inicios de sesión
+
+La primera vez que alguien demuestra la dirección de una cuenta no verificada, por
+enlace mágico, código por correo o restablecimiento de contraseña, Rebase elimina
+todas las identidades de inicio de sesión vinculadas cuyo proveedor no verificó esa
+dirección ([37](#37-una-cuenta-no-verificada-pierde-lo-que-nadie-probó-la-primera-vez-que-se-prueba-su-dirección)).
+Lo hace mediante el nuevo `unlinkUserIdentity` opcional del repositorio. Un
+repositorio que no lo tenga responde a ese inicio de sesión con
+`409 UNVERIFIED_IDENTITIES` en lugar de dejar la identidad en su sitio.
+`updatePassword` también debe aceptar `null`, que elimina la contraseña.
+
+**Qué cambiar:** en un `AuthRepository` personalizado, implemente
+`unlinkUserIdentity(uid, provider, providerId)` y haga que `updatePassword` acepte
+`null`. El almacén de Postgres implementa ambos. El almacén de MongoDB aún no tiene
+`unlinkUserIdentity`, así que en MongoDB ese inicio de sesión se rechaza.
+
+## 37. Una cuenta no verificada pierde lo que nadie probó la primera vez que se prueba su dirección
+
+Nada verifica la dirección con la que se registra una cuenta, así que cualquiera
+podía registrar la dirección de otra persona con una contraseña, o iniciar sesión
+con ella a través de un proveedor que no la avala, y esperar al propietario. El
+primer enlace mágico, código por correo o restablecimiento de contraseña sobre una
+cuenta no verificada ahora elimina su contraseña (un restablecimiento establece la
+nueva) y todas las identidades vinculadas cuyo proveedor no verificó esa dirección,
+y cierra todas sus sesiones, antes de marcarla como verificada. El inicio de sesión
+con OAuth ya no se vincula en absoluto a una cuenta no verificada: responde
+`403 EMAIL_NOT_VERIFIED`, con `details.reason` indicando qué lado no estaba
+verificado.
+
+**Qué cambiar:** nada en el código. Tenga en cuenta que quien se registró con una
+contraseña, nunca verificó y luego inicia sesión con un enlace mágico o un código
+tendrá que establecer una contraseña de nuevo, y se cerrará su sesión en sus demás
+dispositivos. Las cuentas creadas con `POST /api/admin/users` se almacenan como
+verificadas, así que los invitados pueden seguir usando «Iniciar sesión con Google».
+Consulte
+[Vinculación de cuentas](/docs/backend/authentication/#account-linking-across-sign-in-methods).
+
+## 38. Con captcha protegiendo `register`, convertir a un invitado exige un desafío resuelto
+
+`POST /auth/anonymous/link` convierte a un invitado en una cuenta con correo y
+contraseña, lo cual es un registro, y omitía tanto el captcha de `register` como
+`beforeUserCreate`. Ahora toma el desafío de `register` y ejecuta el hook, igual que
+`/auth/register`. `register` es una de las rutas de captcha por defecto. El inicio de
+sesión de invitado en sí (`POST /auth/anonymous`) sigue sin exigir desafío.
+
+**Qué cambiar:** una aplicación que convierte invitados en cuentas envía también el
+token del widget en `/auth/anonymous/link` —como `captchaToken` en el cuerpo, o en la
+cabecera `cf-turnstile-response` / `h-captcha-response`—, igual que lo hace para
+`/auth/register`. Consulte [Protección contra bots](/docs/backend/authentication/#bot-protection).
+
+## 39. El correo se niega a arrancar sin una URL base absoluta de restablecimiento de contraseña
+
+Los enlaces de verificación y los enlaces mágicos recurren a
+`auth.email.resetPasswordUrl`, y nada recurre a `verifyEmailUrl` ni a
+`magicLinkUrl`. Una configuración que solo definía esas dos arrancaba y enviaba un
+enlace relativo muerto en cada correo de restablecimiento de contraseña. Ahora el
+correo se niega a iniciar a menos que cada tipo de enlace enviado se resuelva a una
+base `http(s)` absoluta, e indica cuál no lo hace.
+
+**Qué cambiar:** defina `FRONTEND_URL`, o `auth.email.resetPasswordUrl`, con una URL
+absoluta como `https://app.example.com`.
+
+```bash
+grep -rnE "(FRONTEND_URL|resetPasswordUrl|verifyEmailUrl|magicLinkUrl)" .env* config
+```
+
+## 40. Un almacén de trabajos personalizado recibe un claim al completar o fallar un trabajo
+
+Un manejador de cola que superaba el tiempo de visibilidad era reclamado de nuevo
+mientras seguía ejecutándose y se iniciaba una segunda vez junto a sí mismo.
+`complete` y `fail` encontraban el trabajo solo por su id, de modo que el éxito del
+primer intento marcaba el trabajo como terminado mientras el segundo se ejecutaba, y
+el fallo del segundo devolvía el trabajo terminado para una tercera ejecución. Ahora
+el worker renueva su claim mientras se ejecuta un manejador, y solo el intento que
+aún conserva un trabajo puede registrar su resultado.
+
+`JobStore.complete(id, claim)` y `fail(id, error, retryAt, claim)` reciben un
+`JobClaim`, `{ workerId, attempt }`. El nuevo `heartbeat(id, claim)` opcional renueva
+el claim de un trabajo en ejecución y se resuelve indicando si aún lo conservaba. El
+almacén incorporado implementa los tres, así que una aplicación que lo use no tiene
+nada que hacer.
+
+**Qué cambiar:** en un `JobStore` personalizado, haga que `complete` y `fail`
+modifiquen la fila solo mientras el claim siga reteniéndola —en ejecución, bloqueada
+por `claim.workerId`, en el intento `claim.attempt`— y que no hagan nada en caso
+contrario. Añada `heartbeat`, renovando la hora de bloqueo bajo la misma condición.
+Un almacén sin él sigue funcionando, pero un manejador que supere el tiempo de
+visibilidad se ejecuta dos veces. Consulte
+[Trabajos en segundo plano](/docs/backend/jobs/#what-happens-when-a-worker-dies).

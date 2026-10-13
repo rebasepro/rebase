@@ -1,5 +1,5 @@
 ---
-sourceHash: 9057ef27ebe60995
+sourceHash: 3e450f0960514c50
 title: "API de Cron Jobs"
 sidebar_label: "API de Cron Jobs"
 ---
@@ -21,7 +21,7 @@ Consulta [Roles y alcances](/docs/backend/roles-and-scopes/).
 |--------|------|-------------|
 | `GET` | `/api/admin/cron` | Listar todos los cron jobs registrados |
 | `GET` | `/api/admin/cron/:id` | Obtener el estado de una tarea individual |
-| `POST` | `/api/admin/cron/:id/trigger` | Activar manualmente una tarea — `409` mientras ya se está ejecutando |
+| `POST` | `/api/admin/cron/:id/trigger` | Activar manualmente una tarea — `409` mientras ya se está ejecutando. `?async=1` responde `202` en cuanto la ejecución ha empezado |
 | `GET` | `/api/admin/cron/:id/logs` | Obtener el historial de ejecución (`?limit=N`), de los últimos 30 días. `503` cuando no se puede leer `rebase.cron_logs`, en lugar de un historial vacío |
 | `PUT` | `/api/admin/cron/:id` | Pausar o reanudar una tarea en todos los procesos (`{ "enabled": false }`); `null` vuelve a seguir el código |
 
@@ -87,6 +87,27 @@ Mientras la tarea se está ejecutando — aquí o en cualquier otro proceso —,
 respuesta es `409` con el código `CRON_JOB_ALREADY_EXECUTING`; consulta
 [Protección de concurrencia](/docs/backend/cron-across-instances/#concurrency-guarding).
 
+La llamada espera a que termine la ejecución y responde `200` con su log. Para una tarea que se ejecuta
+más tiempo del que un proxy delante del servidor mantiene una petición (muchos lo hacen a los 60 segundos), añade
+`?async=1`. La respuesta es entonces `202` en cuanto la ejecución ha empezado:
+
+```bash
+curl -X POST -H "Authorization: Bearer $TOKEN" \
+    "$API_URL/api/admin/cron/nightly-report/trigger?async=1"
+```
+
+```json
+{
+    "accepted": true,
+    "startedAt": "2026-04-24T08:21:04.512Z",
+    "job": { "id": "nightly-report", "state": "running" }
+}
+```
+
+La ejecución continúa tras la respuesta. Su resultado está en `GET /api/admin/cron/:id/logs`, como la
+entrada con `"manual": true` y el mismo `startedAt`. Una ejecución que no puede empezar sigue respondiendo
+`409`. `?async` acepta `1`, `true`, `0` o `false`; cualquier otro valor es un `400`.
+
 ### Pausar una tarea
 
 Una pausa desde Studio o con
@@ -110,8 +131,11 @@ const { jobs, rejected } = await client.cron.listJobs();
 // Get a single job
 const { job } = await client.cron.getJob("health-check");
 
-// Trigger manually
+// Trigger manually, and wait for the run
 const { log, job: updated } = await client.cron.triggerJob("health-check");
+
+// Trigger manually, and answer once the run has started
+const { startedAt } = await client.cron.triggerJob("nightly-report", { async: true });
 
 // View execution history
 const { logs } = await client.cron.getJobLogs("health-check", { limit: 10 });
@@ -123,7 +147,8 @@ await client.cron.toggleJob("health-check", true);  // resume
 
 `triggerJob()` espera a que termine la ejecución y responde con su log. Un proxy delante del
 servidor puede cortar la respuesta de un trabajo largo (muchos lo hacen a los 60 segundos) mientras la
-ejecución sigue su curso. En ese caso, lee su resultado desde `getJobLogs()`.
+ejecución sigue su curso. Para un trabajo así pasa `{ async: true }`: la llamada responde en cuanto la ejecución ha empezado,
+y `getJobLogs()` tiene el resultado, como la entrada con `manual: true` y el `startedAt` devuelto.
 
 `listJobs()` tiene el tipo `CronJobListing`: `jobs`, más los campos `skipped`,
 `rejected` y `note` descritos en [Tareas que no están ahí](#tareas-que-no-están-ahí).

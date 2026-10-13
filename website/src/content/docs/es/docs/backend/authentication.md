@@ -1,5 +1,5 @@
 ---
-sourceHash: 53f453267ae3e21c
+sourceHash: d9b66c9d404a5085
 title: Autenticación
 sidebar_label: Autenticación
 description: Configura la autenticación JWT, proveedores OAuth, correo SMTP, protección contra bots y la colección de usuarios en el backend de Rebase.
@@ -93,7 +93,7 @@ const backend = await initializeRebaseBackend({
 | `requireAuth` | `boolean` | `true` | Requiere una sesión para la API de datos |
 | `allowRegistration` | `boolean` | `false` | Habilita `POST /api/auth/register`. Fuera de producción, el primer usuario en una tabla vacía se admite de cualquier manera; en producción, el administrador se define con `REBASE_ADMIN_EMAIL` |
 | `disableSelfRegistration` | `boolean` | `false` | Mecanismo de corte: también cierra la ventana de inicialización del primer usuario que `allowRegistration: false` deja abierta |
-| `allowAnonymous` | `boolean` | `false` | Habilita `POST /api/auth/anonymous`. Deliberadamente no condicionado por `allowRegistration` — una aplicación pública principalmente de lectura puede requerir sesiones sin cuentas. Convertir a un invitado en una cuenta (`POST /api/auth/anonymous/link`) es un registro, y también necesita `allowRegistration` |
+| `allowAnonymous` | `boolean` | `false` | Habilita `POST /api/auth/anonymous`. Deliberadamente no condicionado por `allowRegistration` — una aplicación pública principalmente de lectura puede requerir sesiones sin cuentas. Convertir a un invitado en una cuenta (`POST /api/auth/anonymous/link`) es un registro, y también necesita `allowRegistration` — y que `allowAnonymous` siga activado: si se desactiva, también rechaza a los invitados que ya habían iniciado sesión, de modo que ninguno puede convertirse en cuenta (`403 ANONYMOUS_AUTH_DISABLED`) |
 | `allowUserLookup` | `boolean` | `false` | Monta `POST /api/auth/find-user` para flujos de invitación por correo electrónico |
 | `defaultRole` | `string` | — | Rol asignado a un usuario recién registrado cuando no se especifica ninguno. No puede ser `admin` ni un rol declarado que tenga un alcance del plano de administración: el arranque rechaza ambos |
 | `serviceKey` | `string` | — | Clave estática para llamadas servidor a servidor — consulte [Autenticación mediante clave de servicio](/docs/backend/auth-endpoints/#service-key-authentication) |

@@ -1,5 +1,5 @@
 ---
-sourceHash: 488d01a16707cd87
+sourceHash: 0b96e438f37a5cac
 title: Datenimport & -export
 sidebar_label: Datenimport & -export
 description: Importieren Sie Daten aus CSV-, JSON- und Excel-Dateien in Ihre Collections und exportieren Sie Collection-Daten nach CSV oder JSON mit optionalen berechneten Feldern.
@@ -94,7 +94,7 @@ abgeleitet. Eine Spalte ist nur dann eine Zahl, wenn jeder Wert darin eine Zahl 
 sich exakt in eine umwandeln lässt; eine Spalte mit Postleitzahlen, Produktcodes mit führenden
 Nullen, langen SKUs oder Telefonnummern bleibt daher Text. Eine Spalte, die Typen mischt (Zahlen
 und Wörter, Booleans und Zahlen), ist Text. Leere Zellen zählen nicht, sodass eine größtenteils
-leere Spalte nicht als erforderlich markiert wird.
+leere Spalte nicht als erforderlich markiert wird. Eine Spalte ganzer Zahlen, deren Name auf ein Wort endet, das einen Zeitpunkt anzeigt (`created_at`, `updatedAt`, `signup_date`, `timestamp`), ist ein Datum, wenn jeder Wert ein Epoch-Zeitstempel zwischen 2001 und 2103 ist, in Sekunden oder Millisekunden; unter jedem anderen Namen oder mit einem anderen Wert bleibt sie eine Zahl.
 
 ### Import-Konfiguration
 

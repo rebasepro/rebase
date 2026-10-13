@@ -1,5 +1,5 @@
 ---
-sourceHash: 536427d653beb637
+sourceHash: 01546a922a601fac
 title: Démarrage rapide
 sidebar_label: Démarrage rapide
 description: Créez un nouveau projet Rebase et lancez-le localement en moins de 2 minutes.
@@ -86,10 +86,10 @@ Démarrez ensuite les serveurs de développement comme ci-dessus. Une variable `
 modifiée, et si elle pointe ailleurs que sur cette machine, elle est totalement
 laissée intacte.
 
-Avec votre propre base de données, vous bénéficiez également des commandes de migration, ce que la base gérée
-ne peut pas proposer — elles planifient les modifications avec [Atlas](https://atlasgo.io/), le moteur de migration de schéma
-avec lequel Rebase fonctionne, qui nécessite une seconde base de données vide
-pour comparaison, alors que PGlite n'en dessert qu'une seule :
+Les commandes de migration planifient les modifications avec [Atlas](https://atlasgo.io/), le moteur de migration de schéma
+avec lequel Rebase fonctionne, qui nécessite une seconde base de données vide pour comparaison. Sur votre propre base de données,
+Rebase en crée une à côté ; sur la base gérée, qui n'en dessert qu'une seule, il démarre un PGlite jetable pendant la durée de la
+commande. Dans les deux cas :
 
 ```bash
 pnpm run db:push

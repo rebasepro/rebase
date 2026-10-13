@@ -1,5 +1,5 @@
 ---
-sourceHash: 488d01a16707cd87
+sourceHash: 0b96e438f37a5cac
 title: Importação e Exportação de Dados
 sidebar_label: Importação e Exportação de Dados
 description: Importe dados de arquivos CSV, JSON e Excel para suas coleções e exporte dados de coleções para CSV ou JSON com campos computados opcionais.
@@ -71,7 +71,7 @@ Uma linha nova na coleção de usuários é a criação de um usuário: uma colu
 
 ### Criando uma coleção a partir de um arquivo
 
-Ao criar uma coleção a partir de um arquivo, o tipo de cada coluna é inferido a partir de seus valores. Uma coluna só é numérica se todo valor nela for um número ou texto que se converte exatamente em um, então uma coluna de CEPs, códigos de produto com zeros à esquerda, SKUs longos ou números de telefone permanece texto. Uma coluna que mistura tipos (números e palavras, booleanos e números) é texto. Células em branco não contam, então uma coluna majoritariamente vazia não é marcada como obrigatória.
+Ao criar uma coleção a partir de um arquivo, o tipo de cada coluna é inferido a partir de seus valores. Uma coluna só é numérica se todo valor nela for um número ou texto que se converte exatamente em um, então uma coluna de CEPs, códigos de produto com zeros à esquerda, SKUs longos ou números de telefone permanece texto. Uma coluna que mistura tipos (números e palavras, booleanos e números) é texto. Células em branco não contam, então uma coluna majoritariamente vazia não é marcada como obrigatória. Uma coluna de números inteiros cujo nome termina numa palavra que indica um momento (`created_at`, `updatedAt`, `signup_date`, `timestamp`) é uma data quando todo valor é um timestamp de época entre 2001 e 2103, em segundos ou milissegundos; com qualquer outro nome, ou com qualquer outro valor, continua sendo um número.
 
 ### Configuração de Importação
 

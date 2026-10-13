@@ -1,5 +1,5 @@
 ---
-sourceHash: 7d1fe8f3e85d948e
+sourceHash: 07c1391c48e88901
 title: Sottoscrizioni Realtime
 sidebar_label: Realtime
 description: Sottoscrivi le modifiche ai dati in tempo reale con l'SDK tipizzato di Rebase utilizzando listener realtime basati su WebSocket.
@@ -144,6 +144,27 @@ client.data.posts.listenById(1, (post) => {
 incluse. La modifica di una sola riga correlata non invia alcun frame: modificare il nome di un tag non
 aggiorna un post ascoltato con `include: ["tags"]` finché non cambia anche il post. Per seguire
 le righe correlate, ascolta anche la loro collection.
+
+## Osservare un conteggio
+
+<span class="since-badge" data-since="0.25">Da 0.25</span> `listenCount()` mantiene aggiornato un conteggio: il totale di ciò che il filtro di un elenco seleziona, per una
+toolbar o un'offerta «seleziona tutti gli N» che non deve diventare obsoleta mentre altre persone aggiungono e rimuovono righe.
+La callback viene eseguita con il totale non appena è noto, e di nuovo ogni volta che una scrittura lo cambia.
+
+```typescript
+const stop = client.data.orders.listenCount(
+    { where: { status: ["==", "open"] } },
+    (total) => console.log(`${total} open orders`),
+    (error) => console.error(error)
+);
+```
+
+Conta solo il filtro — `where`, `logical` e `searchString`; un `limit`, un `offset` o un ordinamento viene
+ignorato. Il server non legge alcuna riga per questo, solo il conteggio, con l'identità del sottoscrittore come per ogni
+altro frame. Un server precedente alla 0.25 non conosce la richiesta; risponde con una riga e lo
+stesso totale, e l'SDK legge il totale da quella. Su un client senza socket, `listenCount()` è uno
+stub che lancia un'eccezione, come `listen()`. Con il [supporto offline](/docs/sdk/offline/) attivo, il conteggio è
+quello del server: le scritture in coda non ne fanno parte finché non vengono ritrasmesse.
 
 ## Query builder fluent
 

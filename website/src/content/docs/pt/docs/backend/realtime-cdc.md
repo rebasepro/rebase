@@ -1,7 +1,8 @@
 ---
-sourceHash: c3a5adad80c0b11b
-title: "Captura de Alterações a Nível de Banco de Dados (CDC)"
-sidebar_label: "Captura de Alterações a Nível de Banco de Dados (CDC)"
+sourceHash: a05da9682df4f23a
+title: "Captura de alterações do banco de dados"
+sidebar_label: "Captura de alterações do banco de dados"
+description: "Eventos em tempo real para toda gravação confirmada, independentemente de como foi feita: os triggers de captura, a configuração REALTIME_CDC e o que eles exigem."
 ---
 
 **O Change Data Capture vem ativado por padrão.** O Rebase captura alterações no banco de dados e emite eventos em tempo real para **toda gravação confirmada (committed), independentemente de como ela foi feita** — REST, SDK, Studio, `psql`, um cron job em outro serviço, Drizzle/SQL puro ou pelo **editor SQL** do Studio. Este é o mesmo modelo do Supabase Realtime monitorando o write-ahead log.
@@ -49,3 +50,8 @@ Se a conexão não puder dar suporte, `auto` registra uma linha informativa em v
 - Os triggers são instalados apenas em tabelas associadas a uma coleção registrada. Gravações em tabelas não mapeadas são ignoradas.
 - Uma coleção cuja tabela ainda não foi migrada é ignorada com um aviso, em vez de bloquear o CDC para as demais.
 - O streaming de replicação lógica nativa do WAL (`wal2json`/`pgoutput`) está planejado; atualmente `REALTIME_CDC=wal` degrada para o caminho baseado em triggers, que oferece cobertura equivalente a nível de banco de dados.
+
+## Próximos Passos
+
+- [Tempo Real & WebSocket](/docs/backend/realtime) — assinaturas, canais e presença, que esses eventos alimentam.
+- [Tempo real entre instâncias](/docs/backend/realtime-transports) — o barramento que leva as alterações entre processos do servidor.

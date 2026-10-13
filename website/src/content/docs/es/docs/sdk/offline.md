@@ -1,5 +1,5 @@
 ---
-sourceHash: 8deb74573f8209f1
+sourceHash: dc394aa7ff8f8f55
 title: Sincronización Offline y Local-First
 sidebar_label: Offline
 description: Active el motor de sincronización local-first del SDK tipado de Rebase — una base de datos local de filas, escrituras offline instantáneas con reversión y consultas en vivo reactivas.
@@ -74,6 +74,8 @@ Si el servidor asigna el suyo al reproducirlas, la fila local y cualquier escrit
 
 Las escrituras se reproducen en el orden en que las hizo, entre colecciones — así que una creación en una colección sigue llegando antes que la fila de otra que la referencia.
 
+Cada escritura en cola es una petición por defecto, así que 500 filas escritas sin conexión tardan 500 viajes de ida y vuelta en vaciarse. Con `replayBatchSize` definido (hasta 1 000), una serie de creaciones offline consecutivas en una colección se reproduce como un solo `createMany`. Solo se agrupan las creaciones con un id que el SDK generó como cadena, y nunca una que haga referencia a otra fila de la misma serie. Si el servidor rechaza o aplaza la serie por cualquier motivo que no sea una conexión perdida, no se escribe nada (una escritura masiva es una transacción), y la serie se reproduce escritura a escritura, como lo haría por defecto.
+
 ## Consultas en vivo
 
 `observe()` es la lectura reactiva, y la que conviene usar en una UI:
@@ -129,7 +131,7 @@ const { online, pending, syncing, lastSyncedAt, lastError } = client.offline!.st
 
 | Método | Propósito |
 |--------|-----------|
-| `status()` | Conectividad actual, profundidad de la cola, actividad de sincronización, último error, y `persisted`: si el navegador aceptó conservar la base de datos offline (se pregunta cuando se pone en cola la primera escritura; `false` significa que puede ser desalojada bajo presión de almacenamiento, incluidas las escrituras sin enviar) |
+| `status()` | Conectividad actual, profundidad de la cola, actividad de sincronización, último error, y `persisted`: si el navegador aceptó conservar la base de datos offline (se pregunta cuando se pone en cola la primera escritura; `false` significa que puede ser desalojada bajo presión de almacenamiento, incluidas las escrituras sin enviar). `unverifiedUser` es `true` mientras una recarga sin conexión muestra los datos del último usuario sin una sesión confirmada (consulta [`keepLastUser`](#recargas-sin-conexión-en-modo-cookie)) |
 | `onStatusChange(fn)` | Suscribirse a lo anterior |
 | `onQueueChange(fn)` | Solo el número de escrituras sin enviar, para un indicador |
 | `pending()` | Las mutaciones en cola en sí, de la más antigua a la más reciente. `pending({ orphaned: true })`: las que se pusieron en cola sin sesión iniciada — véase [Usuarios](#usuarios) |
@@ -158,6 +160,29 @@ Una fila que otra persona eliminó es el único caso que no se revierte. Un `del
 La cascada es estrecha: un `update` se descarta junto con la escritura que editaba, porque solo puede fallar de la misma manera. Un `create` o `delete` posterior sobre la misma fila se sostiene por sí mismo y se conserva. Un `create` rechazado de una fila creada offline arrastra además consigo toda escritura en cola, en cualquier colección, cuyos valores referencien el id temporal de la fila. Una escritura descartada nunca se envió. Se informa con un `RebaseApiError` cuyo `code` es `DEPENDENCY_REJECTED` y cuyo `cause` es el rechazo que la condenó, para que puedas distinguirla de la escritura que el servidor realmente rechazó. En 0.23 lleva en cambio el propio error de la escritura rechazada.
 
 Las ediciones consecutivas sobre una misma fila mientras está sin conexión se fusionan en una única escritura en cola, de modo que un formulario en el que se está escribiendo no hace crecer la cola. Si el servidor rechaza la escritura fusionada por su contenido (un 400, 403 o 422 — por ejemplo, un campo eliminado por un cambio de esquema mientras el usuario estaba sin conexión), el motor la divide de nuevo en las ediciones separadas y reproduce cada una. Solo se revierte y se informa la edición que el servidor rechaza; las demás se conservan.
+
+### Conflictos
+
+Por defecto, una edición puesta en cola sin conexión sobrescribe lo que tenga el servidor en los campos que cambia, aunque otra persona los haya cambiado entretanto. Para enterarte en su lugar, pasa `onConflict`. Un `update` en cola se reproduce entonces con `If-Match`, la versión de la fila contra la que se hizo, y cuando la fila ha cambiado desde entonces, el servidor la rechaza con un 412 y `onConflict` decide:
+
+```typescript
+const client = createRebaseClient({
+    baseUrl: API_URL,
+    offline: {
+        onConflict: async (error, mutation) =>
+            (await askUser(`${mutation.collection} changed while you were offline. Keep your edit?`))
+                ? "overwrite"
+                : "discard"
+    }
+});
+```
+
+- `"overwrite"` envía la edición de nuevo sin la precondición: gana el último escritor, como sin `onConflict`.
+- `"discard"` descarta la edición. La fila vuelve a ser lo que era antes de ella, como en un rechazo, y se lee de nuevo del servidor. No se notifica a `onSyncError`; las escrituras puestas en cola encima de ella sí, como `DEPENDENCY_REJECTED`.
+
+La cola espera mientras se ejecuta `onConflict`, así que puede preguntar al usuario. Si lanza un error, la edición se sobrescribe.
+
+La versión contra la que se hace una edición es la que informó la última lectura de la fila: `findById()`, una trama de `listenById()`, o la respuesta de un `update()` anterior. Una fila leída por última vez en una lista de `find()` o `listen()` no tiene versión, ni tampoco una edición hecha encima de otra escritura en cola sobre la misma fila. Esas se reproducen sin precondición. Un `ifMatch` que pases tú mismo a `update()` se conserva cuando la edición se pone en cola.
 
 Un fallo que es meramente temporal — un 429, un 503, una conexión caída — no es un rechazo. Esos permanecen en cola y se reintentan; solo después de `maxRetries` aplazamientos se revierte una escritura.
 
@@ -196,6 +221,36 @@ client.auth.onAuthStateChange(async (event) => {
 
 `clear({ orphaned: true })` las descarta, junto con las filas locales a las que se aplicaron; la cola de salida propia del usuario con sesión iniciada no se toca. Si nadie las toca, se reproducen la próxima vez que nadie haya iniciado sesión. Mientras nadie ha iniciado sesión son simplemente la cola de salida actual, y `pending({ orphaned: true })` no lista nada.
 
+### Recargas sin conexión en modo cookie
+
+En modo cookie no se almacena nada de la sesión en el dispositivo, así que una recarga
+que no puede alcanzar el servidor no tiene usuario. Por defecto se trata como sin
+sesión iniciada: las filas locales del usuario se ocultan, y las escrituras hechas entonces se ponen en cola
+como las del usuario sin sesión.
+
+`keepLastUser: true` lo cambia. El cliente recuerda al último usuario que
+inició sesión en el dispositivo (solo su id), y una recarga sin conexión abre en su lugar la
+base de datos local de ese usuario. Las escrituras hechas entonces se ponen en cola como suyas, pero ninguna
+se reproduce hasta que se confirma la sesión: cuando vuelve la conexión, el
+cliente renueva la sesión, y un inicio de sesión también la confirma. Si el servidor
+rechaza la sesión, o inicia sesión otra persona, el dispositivo cambia de usuario, y
+las escrituras en cola se quedan con su autor hasta que vuelva a iniciar sesión. Mientras tanto
+`status().unverifiedUser` es `true`.
+
+```typescript
+createRebaseClient({
+    baseUrl: API_URL,
+    auth: { authFlowMode: "cookie" },
+    offline: { keepLastUser: true }
+});
+```
+
+Está desactivado por defecto porque en un dispositivo compartido permite leer sin conexión y sin sesión las filas
+en caché del usuario anterior. Actívalo en instalaciones que
+pertenezcan a una sola persona. El id se olvida al cerrar sesión y cuando el servidor
+rechaza la sesión. Nunca se usa cuando el servidor responde que no hay
+sesión.
+
 ## Configuración
 
 ```typescript
@@ -208,6 +263,9 @@ createRebaseClient({
         syncIntervalMs: 60_000,               // ceiling for the retry backoff; 0 disables auto-retry
         maxRetries: 5,                        // deferrals before a write is given up on
         crossTab: true,                       // default: on for IndexedDB, off for memory
+        keepLastUser: false,                  // open the last user's data on an offline reload (cookie mode)
+        replayBatchSize: 1,                   // queued creates sent per request on replay (max 1000)
+        onConflict: (error, mutation) => "overwrite", // or "discard"; default: no conflict check
         onSyncError: (error, mutation) => {}
     }
 });
@@ -239,8 +297,9 @@ El cliente no es una réplica de su base de datos, y no pretende serlo:
 - **`count()` sin conexión necesita un conteo que el servidor dio a este dispositivo para la misma consulta.** Las escrituras en cola desde entonces lo mueven: creates, ediciones que llevan una fila dentro o fuera del filtro, y deletes. Sin uno, falla con el error `OFFLINE` en lugar de contar las filas que este dispositivo casualmente tiene. En 0.24 devolvía ese número.
 - **`searchString` se aproxima** como un escaneo de subcadena sin distinción de mayúsculas sobre los campos de texto en caché. El servidor ejecuta una búsqueda de texto completo real sobre las columnas configuradas de la colección.
 - **Las relaciones incluidas con `include` no se pueden evaluar localmente** — las filas relacionadas viven en colecciones que la consulta nunca cargó. Una consulta así siempre se marca como `partial` cuando se responde desde la caché.
-- **Los conflictos son de último escritor gana, por campo, sin detección.** Un `update` reproducido envía los campos que el usuario cambió y nada más, así que los campos que no tocó conservan lo que tenga el servidor. Para un campo que *sí* cambió, un cambio que otra persona hizo en el servidor mientras estaba sin conexión se sobrescribe cuando se reproduce la cola, y ninguno de los dos usuarios es avisado. Nada compara versiones al reproducir.
+- **Los conflictos son de último escritor gana, por campo, salvo que pases `onConflict`.** Un `update` reproducido envía los campos que el usuario cambió y nada más, así que los campos que no tocó conservan lo que tenga el servidor. Para un campo que *sí* cambió, un cambio que otra persona hizo en el servidor mientras estaba sin conexión se sobrescribe cuando se reproduce la cola, y ninguno de los dos usuarios es avisado. Con [`onConflict`](#conflictos), una edición cuya versión de fila se conoce se compara con la del servidor, y la aplicación decide. Las creaciones, los borrados y las escrituras masivas nunca se comprueban.
 - **La reproducción es al menos una vez.** Una escritura que llega al servidor pero cuya respuesta se pierde puede enviarse de nuevo. Prefiera escrituras idempotentes (`createMany` con `upsert`) allí donde los duplicados importen.
+- **La papelera necesita el servidor.** La base de datos local contiene solo filas vivas, así que `trash.find()`, `trash.count()`, `trash.restore()` y `trash.purge()` (consulta [borrado lógico](/docs/collections/soft-delete#from-the-sdk)) nunca se responden localmente ni se ponen en cola: sin conexión fallan con el error `OFFLINE`. Una restauración o purga de una fila con una escritura aún en cola sincroniza primero la cola, y se rechaza con `TRASH_PENDING_WRITE` si la escritura aún no se puede enviar.
 - **Un upsert sobre una clave natural necesita el servidor.** Qué fila nombra un destino `onConflict` solo lo puede averiguar el servidor, así que `upsert()` sobre una clave natural (o sin el id de la fila), y un `createMany()` con `onConflict` que nunca se envió, se rechazan sin conexión con `OFFLINE_UPSERT_UNSUPPORTED`. Un upsert sobre la clave primaria, con la clave en cada fila, se pone en cola.
 - **Las lecturas locales aplican la semántica de Postgres, no los datos de la base de datos.** Los filtros se evalúan como lo haría SQL — las comparaciones contra `NULL` son desconocidas, `ORDER BY` coloca los nulos al final en orden ascendente — pero contra la copia de las filas que tiene el cliente, que puede estar desactualizada.
 

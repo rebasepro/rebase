@@ -1,5 +1,5 @@
 ---
-sourceHash: 64977a5e5f9b13d2
+sourceHash: b9b698ec32e400fc
 title: Écriture via REST
 sidebar_label: Écriture via REST
 description: Clés d'idempotence, écritures conditionnelles avec ETag et If-Match, opérations sur les champs, upserts sur clé naturelle, return=minimal et lots multi-collections.
@@ -44,6 +44,8 @@ Le cas de `DELETE` mérite une attention particulière. Rejouée sans clé, la s
 
 `GET /api/data/:slug/:id` renvoie un `ETag`, tout comme le `GET` imbriqué d'une seule ligne. Renvoyez-le dans l'en-tête `If-Match` lors d'un `PATCH` ou d'un `DELETE` ultérieur et l'écriture sera refusée avec un code `412` si la ligne a été modifiée entre-temps.
 
+<span class="since-badge" data-since="0.25">Depuis 0.25</span> Un `PATCH` réussi répond avec l'`ETag` de la version qu'il a écrite, de sorte que l'écriture conditionnelle suivante n'a pas besoin de lecture préalable. Le jeton accompagne aussi un `204` répondu pour `Prefer: return=minimal`, et une réponse rejouée pour une `Idempotency-Key` porte le même jeton que la première. Un abonnement en direct à une ligne porte le même jeton sur chaque trame (voir [Temps réel](/docs/backend/realtime/)).
+
 ```bash
 # read
 curl -i /api/data/docs/d1
@@ -59,6 +61,8 @@ curl -X PATCH /api/data/docs/d1 \
 Sans cela, le mécanisme de lecture-modification-écriture applique la règle du « dernier arrivant gagne » sur tout ce que la seconde écriture n'a pas envoyé : deux modifications à une seconde d'intervalle réussissent toutes les deux, et le changement apporté par la première disparaît sans la moindre erreur.
 
 Le jeton provient d'une propriété `date` avec `autoValue: "on_update"` lorsque la collection en déclare une — cette colonne constitue déjà une version — et d'un hachage stable de la ligne dans le cas contraire. `If-Match: *` affirme uniquement que la ligne existe. Rien n'est écrit lorsque la précondition échoue.
+
+<span class="since-badge" data-since="0.25">Depuis 0.25</span> Le formulaire d'enregistrement de l'admin enregistre avec `If-Match` : un enregistrement fait sur une version que quelqu'un a remplacée depuis est refusé, le formulaire le signale, et la modification reste dans le formulaire, rebasée sur la nouvelle version avec les champs en conflit marqués.
 
 Le jeton est comparé au sein de la propre transaction de l'écriture, une fois la ligne verrouillée. Deux écritures portant le même jeton ne peuvent pas passer toutes les deux : la seconde attend le commit de la première, lit ce qu'elle a écrit et est refusée avec un code `412`.
 

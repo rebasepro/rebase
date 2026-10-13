@@ -1,5 +1,5 @@
 ---
-sourceHash: 53f453267ae3e21c
+sourceHash: d9b66c9d404a5085
 title: Autenticação
 sidebar_label: Autenticação
 description: Configure a autenticação JWT, provedores OAuth, e-mail SMTP, proteção contra bots e a coleção de usuários no backend do Rebase.
@@ -93,7 +93,7 @@ const backend = await initializeRebaseBackend({
 | `requireAuth` | `boolean` | `true` | Exigir uma sessão para a API de dados |
 | `allowRegistration` | `boolean` | `false` | Libera `POST /api/auth/register`. Fora de produção, o primeiro usuário em uma tabela vazia é admitido de qualquer forma; em produção, o admin é definido com `REBASE_ADMIN_EMAIL` |
 | `disableSelfRegistration` | `boolean` | `false` | Kill switch: também fecha a janela de bootstrap do primeiro usuário que `allowRegistration: false` deixa aberta |
-| `allowAnonymous` | `boolean` | `false` | Habilita `POST /api/auth/anonymous`. Deliberadamente não restrito por `allowRegistration` — um aplicativo público predominantemente de leitura pode querer sessões sem contas. Transformar um convidado em uma conta (`POST /api/auth/anonymous/link`) é um registro, e também requer `allowRegistration` |
+| `allowAnonymous` | `boolean` | `false` | Habilita `POST /api/auth/anonymous`. Deliberadamente não restrito por `allowRegistration` — um aplicativo público predominantemente de leitura pode querer sessões sem contas. Transformar um convidado em uma conta (`POST /api/auth/anonymous/link`) é um registro, e também requer `allowRegistration` — e `allowAnonymous` ainda ligado: se for desligado, ele também recusa os convidados que já entraram, de modo que nenhum pode virar uma conta (`403 ANONYMOUS_AUTH_DISABLED`) |
 | `allowUserLookup` | `boolean` | `false` | Disponibiliza `POST /api/auth/find-user` para fluxos de convite por e-mail |
 | `defaultRole` | `string` | — | Role atribuída a um usuário recém-registrado quando nenhuma for especificada. Não pode ser `admin`, nem uma role declarada que tenha um escopo do plano administrativo: a inicialização recusa as duas |
 | `serviceKey` | `string` | — | Chave estática para chamadas servidor para servidor — consulte [Autenticação por Chave de Serviço](/docs/backend/auth-endpoints/#service-key-authentication) |

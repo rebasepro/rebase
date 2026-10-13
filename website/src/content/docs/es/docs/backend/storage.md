@@ -1,5 +1,5 @@
 ---
-sourceHash: 0b9f331306c3360e
+sourceHash: 9f860853c1427015
 title: Configuración de almacenamiento
 sidebar_label: Configuración de almacenamiento
 description: Configure backends de sistema de archivos local, compatibles con S3 o GCS/Firebase Storage para la subida de archivos, imágenes y contenido multimedia.
@@ -37,7 +37,7 @@ const backend = await initializeRebaseBackend({
 });
 ```
 
-El almacenamiento local guarda los metadatos de cada objeto a su lado, como `<key>.metadata.json`, así que una clave cuyo último segmento termina en `.metadata.json` se rechaza con `400 INVALID_STORAGE_KEY` en todas las rutas. S3 y GCS guardan los metadatos en el objeto y almacenan cualquier clave.
+El almacenamiento local guarda los metadatos de cada objeto a su lado, como `<key>.metadata.json`, así que una clave cuyo último segmento termina en `.metadata.json` se rechaza con `400 INVALID_STORAGE_KEY` en todas las rutas. S3 y GCS guardan los metadatos en el objeto y almacenan cualquier clave. En un sistema de archivos que no distingue mayúsculas de minúsculas (macOS y Windows por defecto) `Avatar.png` y `avatar.png` son un solo archivo local pero dos objetos en S3, GCS o un disco Linux, por lo que el servidor avisa al arrancar cuando la carpeta de almacenamiento está en uno.
 
 ### Almacenamiento S3
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: f5cc00d6f5f3e4c3
+sourceHash: 00c369539f8269ad
 title: A API context.data
 sidebar_label: API context.data
 description: Leia e grave outras coleções de dentro de um callback com context.data — seus métodos, os privilégios com que é executado, a semântica transacional e a conexão que um callback ocupa.
@@ -23,6 +23,15 @@ afterSave: async ({ values, id, context }) => {
 }
 ```
 
+Uma propriedade é o acessador da coleção, o nome que o SDK gerado lhe dá:
+`context.data.myNotes` é a coleção `my-notes`, seja qual for a tabela em que
+ela está armazenada. Um nome que não é o acessador de nenhuma coleção é lido
+como o seu snake_case, então `context.data.auditLog` é `audit_log`.
+
+As linhas não têm tipos (`Record<string, unknown>`) até o projeto registrar o seu
+`Database` gerado; então cada acessador recebe tipos a partir dele. Veja
+[Dados tipados no servidor](/docs/backend/typed-server-data).
+
 ## Métodos Disponíveis
 
 Cada acessor de coleção (`context.data.<slug>`) fornece estes métodos:
@@ -37,6 +46,7 @@ Cada acessor de coleção (`context.data.<slug>`) fornece estes métodos:
 | `.count()` | `count(params?: FindParams) → number` | Contar entidades correspondentes |
 | `.listen()` | `listen(params, onUpdate, onError?) → unsubscribe` | Inscrição em tempo real (onde suportado) |
 | `.listenById()` | `listenById(id, onUpdate, onError?) → unsubscribe` | Escutar uma única entidade |
+| `.trash` | `trash.find()`, `.count()`, `.restore(id)`, `.restoreMany(ids)`, `.purge(id)`, `.purgeMany(ids)` | As linhas marcadas por uma [exclusão lógica](/docs/collections/soft-delete#from-the-sdk) |
 
 ## Consultando com `.find()`
 

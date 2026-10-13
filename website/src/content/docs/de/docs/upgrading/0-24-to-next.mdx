@@ -1,0 +1,341 @@
+---
+sourceHash: 1766aaeb8903ec34
+slug: de/docs/upgrading/0-24-to-next
+title: Upgrade von 0.24 auf das nächste Release
+sidebar_label: 0.24 → nächstes
+description: Die Breaking Changes, die bereits auf main gemergt sind und in dieser Dokumentation stehen, bevor das Release existiert, das sie mitbringt — die REST-Count-Umschaltung, die MCP-Collection-Auflistung und die Übersetzungen des Admin-Bereichs.
+---
+
+# Upgrade von 0.24 → nächstes
+
+**Nichts davon ist bereits veröffentlicht.** Dies sind die `### Breaking`-Einträge im
+[`[Unreleased]`](/docs/changelog/)-Abschnitt des Changelogs: Sie liegen auf `main`, und
+diese Dokumentationsseite wird aus `main` veröffentlicht, daher sind sie hier beschrieben, bevor
+die Version, die sie mitbringt, auf npm existiert. Wenn Sie von npm installiert haben, sind Sie
+auf 0.24, und nichts davon hat Sie erreicht — lesen Sie es, um zu wissen, was kommt, und
+kehren Sie zurück, wenn Sie umsteigen.
+
+Die ersten drei gehören zur Performance-Arbeit: die Count-Umschaltung bei REST-Listen,
+die MCP-Collection-Auflistung und die Übersetzungen des Admin-Bereichs. Der Rest stammt aus dem
+Backlog-Sweep: strengere Ablehnungen beim Start und bei `OPTIONS`, der Cron-Pfad des SDK
+und Offline-Lesezugriffe, das Register der Storage-Quellen, ungenutzte UI-Kit-Props, der
+Upsert der Users-Collection, ein Lesezugriff, der `page` und `offset` nennt, und die Standard-
+Policy-Namen bei langen Tabellen. Die letzten drei sind Produktentscheidungen: die Standard-
+Sitzungsdauer, die Passwort-Policy für das von einem Administrator gewählte Passwort und
+ein leerer String in einem Pflichtfeld. Es folgen drei Entfernungen: zwei Client-Exporte,
+die nur Engines waren, ein Admin-Hook, den niemand braucht, und eine Storage-Option, die
+keinen Client erreichte.
+
+---
+
+## 68. Ein Filter auf eine Spalte namens `count` gehört in `?where=`
+
+`?count=` an einer REST-Liste ist nun der Schalter für die Zählung hinter `meta.total`:
+`?count=none` überspringt sie und `?count=exact` ist der Standard. Jeder andere Wert wird
+mit `400 INVALID_COUNT` abgelehnt. Zuvor filterte `?count=5` die Zeilen, deren
+Spalte `count` 5 war.
+
+**Was zu ändern ist:** nichts mit dem SDK, das einen Filter auf eine
+Spalte namens `count` bereits in `?where=` sendet. Ein von Hand geschriebener REST-Aufruf, der auf
+eine solche Spalte filtert, verschiebt den Filter dorthin:
+
+```diff lang="http"
+- GET /api/data/products?count=5
++ GET /api/data/products?where={"count":["==",5]}
+```
+
+**Ein neues SDK gegen einen alten Server:** `iterate()` und `findAll()` senden
+`?count=none` bei jeder Seite, ebenso `find({ count: "none" })`. Ein 0.24-
+Server liest es als Filter auf eine Spalte namens `count`. Hat die Collection
+keine solche Spalte, antwortet er `400 UNKNOWN_FILTER_FIELD`, und das SDK sendet den Lesezugriff
+erneut ohne es. Hat die Collection eine **Text**-Spalte namens `count`, filtert der
+alte Server stattdessen auf die Zeilen, deren `count` `'none'` ist, ohne Fehler:
+Die Seite kommt zu kurz oder leer zurück, und ein Durchlauf endet früh. Aktualisieren Sie den Server
+vor dem SDK, wenn eine Collection eine solche Spalte hat.
+
+Siehe [Die Zählung überspringen](/docs/backend/api/#skipping-the-count).
+
+## 69. `list_collections` des Remote-MCP hat kein `structuredContent`
+
+`list_collections` sendete seine Auflistung doppelt: formatiert im Textblock und
+erneut als `structuredContent`. Bei einem großen Projekt waren beide zusammen mehr als
+der Kontext eines Modells. Es sendet die Auflistung nun einmal, im Textblock, als kompaktes
+JSON. Die anderen Tools behalten ihr `structuredContent`.
+
+**Was zu ändern ist:** nichts für einen Assistenten, der den Text liest. Ein Programm,
+das die Auflistung aus `structuredContent` las, parst stattdessen den Textblock;
+sein Inhalt ist derselbe. Siehe [Der Remote-Endpunkt](/docs/ai/mcp/#the-remote-endpoint).
+
+## 70. `@rebasepro/app` exportiert `es` nicht mehr
+
+Der Einstiegspunkt des Pakets re-exportierte die spanische Übersetzungstabelle `es`, was
+die spanischen Strings in jedes daraus gebaute Bundle brachte. Andere Übersetzungen als
+Englisch werden nun geladen, wenn ein Benutzer seine Sprache wählt, und `es` wird nicht mehr
+exportiert. `en` weiterhin.
+
+**Was zu ändern ist:** nichts, es sei denn, Sie haben `es` importiert. Um die Strings des Admin-Bereichs zu ändern,
+übergeben Sie Overrides an `<Rebase translations={…}>`; um die Sprache festzulegen,
+übergeben Sie `locale`.
+
+```bash
+grep -rnE "import \{[^}]*\bes\b[^}]*\} from \"@rebasepro/app\"" --exclude-dir=node_modules .
+```
+
+## 71. Ein einfaches `OPTIONS` an eine Route ohne Handler ergibt 404
+
+Die CORS-Middleware beantwortete früher jede `OPTIONS`-Anfrage selbst, mit einem leeren
+`204`. Sie beantwortet nun nur noch CORS-Preflights (ein `OPTIONS` mit
+`Access-Control-Request-Method`); jedes andere `OPTIONS` erreicht seine Route. Eine Route
+ohne `OPTIONS`-Handler antwortet `404`. `OPTIONS /api/storage/tus` gibt nun
+die TUS-Fähigkeiten zurück (`Tus-Version`, `Tus-Extension`, `Tus-Max-Size`), wie die
+Dokumentation es immer sagte.
+
+**Wer betroffen ist:** ein Client, Proxy oder Health-Check, der eine Route mit
+`OPTIONS` abfragte und das `204` als „sie existiert“ las. Die Preflights von Browsern sind
+unverändert.
+
+**Was zu ändern ist:** Fragen Sie mit der echten Methode der Route ab (`HEAD` oder `GET`).
+
+## 72. Kollidierende Namen werden beim Start abgelehnt, mit Begründung
+
+Eine Tabelle, Junction-Tabelle oder ein Enum-Typ, deren Namen nach der 63-Byte-Kürzung von Postgres
+gleich sind, schlug früher bei `db push` mit „already exists“ fehl. Zwei
+Properties, die zur selben Spalte aufgelöst werden (`myTitle` und `my_title`), und ein
+Relation-`target`, das als String geschrieben ist (`target: "authors"`), scheiterten später oder
+verwirrend. Jedes wird nun beim Laden der Konfiguration abgelehnt, und die Meldung
+sagt, was umzubenennen oder zu schreiben ist.
+
+**Wer betroffen ist:** ein Projekt, das ein solches Paar deklariert. Es konnte auch zuvor
+`db push` nicht abschließen, sodass der Fehler nun früher auftritt.
+
+**Was zu ändern ist:** Benennen Sie einen der kollidierenden Namen um und schreiben Sie das Relation-
+Target als Collection, nicht als deren Slug:
+
+```diff
+- relation: { kind: "belongsTo", target: "authors" },
++ relation: { kind: "belongsTo", target: () => authors },
+```
+
+## 73. `client.cron` ruft `/api/admin/cron` auf
+
+Der Cron-Client des SDK verwendete standardmäßig `/api/cron`, den veralteten Alias. Er
+ruft nun `/api/admin/cron` auf, wo jede Admin-Oberfläche liegt.
+
+**Wer betroffen ist:** ein Server (oder eine Proxy-Regel), der nur den alten Pfad bedient.
+Die Cron-Aufrufe des SDK antworten dagegen mit `404`.
+
+**Was zu ändern ist:** Aktualisieren Sie den Server zusammen mit dem SDK, oder behalten Sie den alten Pfad
+ausdrücklich bei:
+
+```ts
+const client = createRebaseClient({ baseUrl, cron: { cronPath: "/api/cron" } });
+```
+
+## 74. Offline-Lesezugriffe, die nicht vollständig beantwortet werden können, schlagen mit `OFFLINE` fehl
+
+Offline gaben `findAll()` und `iterate()` den Teil der Collection zurück, den dieses Gerät
+zwischengespeichert hatte, als wäre es alles, und `count()` zählte die zwischengespeicherten
+Zeilen. Eine Seite, die dieses Gerät nie abgerufen hat, schlägt nun mit `OFFLINE` fehl, ebenso ein
+`count()` ohne vom Server zwischengespeicherte Zählung.
+
+**Wer betroffen ist:** eine App, die diese Lesezugriffe offline anzeigt.
+
+**Was zu ändern ist:** Fangen Sie den Fehler dort ab, wo die App Teilergebnisse zeichnete, und
+zeigen Sie, was sie hat, mit einem Hinweis, oder fragen Sie eine Seite an, die das Gerät bereits hält.
+
+```ts
+let rows;
+try {
+  rows = await client.data.posts.findAll();
+} catch (e) {
+  if (e instanceof RebaseApiError && e.code === "OFFLINE") rows = cached;
+  else throw e;
+}
+```
+
+## 75. `getOrDefault(key)` wirft bei einer nicht registrierten Storage-Quelle
+
+`ClientStorageSourceRegistry.getOrDefault(key)` gab für einen unbekannten Schlüssel die Standardquelle
+zurück, sodass eine Property, die eine vom Panel noch nicht geladene Quelle nannte, in den Standard-Bucket
+hochlud. Es wirft nun.
+
+**Wer betroffen ist:** Code, der `getOrDefault` mit einem Schlüssel aufruft, den er nicht
+registriert hat. Der Admin-Bereich selbst tut das nicht mehr.
+
+**Was zu ändern ist:** Registrieren Sie die Quelle zuerst oder verwenden Sie `get(key)`, das
+für einen unbekannten Schlüssel `undefined` zurückgibt, wo eine fehlende Quelle erwartet wird.
+
+## 76. `TextField.maxRows` und sechs `MultiSelect`-Props sind weg
+
+`TextField` deklarierte `maxRows`, und `MultiSelect` deklarierte `onChange`, `name`,
+`position`, `endAdornment`, `multiple` und `padding`. Keine wurde je gelesen, sodass
+die Übergabe einer nichts bewirkte. Sie sind aus den Typen entfernt, und die Übergabe einer ist nun
+ein Typfehler.
+
+**Wer betroffen ist:** Code, der eine davon übergab. Zur Laufzeit ändert sich nichts.
+
+**Was zu ändern ist:** Löschen Sie die Prop. Für die Änderungen eines Multi-Selects verwenden Sie
+`onValueChange`.
+
+## 77. Ein Upsert auf die Users-Collection wird abgelehnt
+
+Die Users-Collection (die mit aktiviertem `auth`) antwortet auf einen Upsert nun mit 400
+`INVALID_CONFLICT_TARGET`, an jeder Tür: `?on_conflict=`, `/bulk`
+mit `upsert: true`, eine `_batch`-Operation `upsert`, `upsert()` und
+`createMany(…, { upsert: true })` des SDK und der Realtime-Socket. Ein Upsert
+erfährt erst innerhalb des Schreibvorgangs, ob er anlegt oder aktualisiert, sodass er keinen der beiden
+Regelsätze anwendete: kein Passwort-Hashing, keine E-Mail-Normalisierung, kein `onCreateUser` und keine
+Einladung beim Anlegen und keine Prüfung auf den letzten Administrator beim Aktualisieren.
+
+**Wer betroffen ist:** Code, der Benutzer per Upsert schreibt, zum Beispiel ein Sync, der
+`client.data.users.upsert(user, { onConflict: ["email"] })` ausführte.
+
+**Was zu ändern ist:** Schlagen Sie den Benutzer nach, legen Sie ihn dann an oder aktualisieren Sie ihn.
+
+```ts
+const user = { email: "ada@example.com", displayName: "Ada" };
+const { data: [found] } = await client.data.users.find({ where: { email: ["==", user.email] }, limit: 1 });
+if (!found) await client.data.users.create(user);
+else await client.data.users.update(String(found.id), user);
+```
+
+## 78. `page` mit `offset` wird mit `PAGE_WITH_OFFSET` abgelehnt
+
+Ein Lesezugriff, der `page` und `offset` nennt, wird nun abgelehnt. Der Server antwortet
+`400 PAGE_WITH_OFFSET`, und das SDK lehnt das Paar vor jeder Anfrage ab, mit einem
+`RebaseClientError` mit demselben Code: über HTTP, In-Process
+(`rebase.data`) und offline. Zuvor gewann `page`, und das `offset` wurde
+kommentarlos verworfen.
+
+**Wer betroffen ist:** Code, der beides sendet, zum Beispiel ein `find({ page, offset })`
+oder ein REST-Aufruf mit `?page=3&offset=40`. Ein solcher Lesezugriff las bereits nur
+`page`.
+
+**Was zu ändern ist:** Senden Sie eines von beiden. Um das zu behalten, was der Lesezugriff zuvor zurückgab,
+lassen Sie `offset` weg.
+
+```diff lang="ts"
+- await client.data.products.find({ page: 3, offset: 40, limit: 20 });
++ await client.data.products.find({ page: 3, limit: 20 });
+```
+
+## 79. Lange Tabellen erhalten neue Namen für die Standard-Admin-Write-Policies
+
+Bei einer Tabelle, deren Name 42 Byte oder mehr hat, heißen die drei Standard-Admin-Write-
+Policies (`…_default_admin_write_insert`, `_update` und `_delete`) nun
+`<head>_<hash8>_<op>`, höchstens 63 Byte. Postgres behält 63 Byte eines Namens, sodass
+die drei alten Namen auf denselben Namen gekürzt wurden und nur eine Policy, die
+DELETE-Policy, existierte: Admins konnten nicht einfügen oder aktualisieren.
+
+**Wer betroffen ist:** ein Projekt mit einem Tabellennamen von 42 Byte oder mehr und
+alles, was diese Policies beim Namen nennt, etwa eine Migration oder ein Skript,
+das sie löscht. Die alten Namen existierten nie in der Datenbank.
+
+**Was zu ändern ist:** nichts für die Datenbank. Der nächste Start oder `rebase db push`
+löscht die gekürzte Policy und legt eine Policy pro Operation an. Aktualisieren Sie jedes
+Skript, das die alten Policies nennt.
+
+## 80. Sitzungen halten standardmäßig 30 Tage Inaktivität
+
+Die Standardlebensdauer des Refresh-Tokens beträgt nun an jedem Einstiegspunkt 30 Tage. Ein
+Server, der mit der `rebase-server`-Runtime (oder `rebase start`) gestartet wurde, verwendete 400
+Tage, wenn `JWT_REFRESH_EXPIRES_IN` nicht gesetzt war; ein von Hand geschriebenes
+`initializeRebaseBackend` verwendete bereits 30.
+
+Die Lebensdauer ist gleitend: Jede Erneuerung stellt ein Token für weitere 30
+Tage aus, sodass ein Benutzer, der die App mindestens einmal im Monat öffnet, angemeldet bleibt. Ein
+länger inaktiver Benutzer meldet sich erneut an. Vor dem Upgrade ausgestellte Tokens behalten das
+Ablaufdatum, mit dem sie ausgestellt wurden, bis zu ihrer nächsten Erneuerung.
+
+**Wer betroffen ist:** ein Deployment auf der Runtime, das `JWT_REFRESH_EXPIRES_IN` nie gesetzt hat und dessen Benutzer seltener als einmal im Monat zurückkehren.
+
+**Was zu ändern ist:** nichts, um den neuen Standard zu übernehmen. Um das bisherige
+Verhalten zu behalten, setzen Sie es ausdrücklich:
+
+```bash
+JWT_REFRESH_EXPIRES_IN=400d
+```
+
+oder `auth: { refreshExpiresIn: "400d" }` in einem ejecteten Backend. Browser begrenzen
+das Refresh-Cookie auf 400 Tage, sodass ein längerer Wert im Cookie-Modus nichts bringt.
+
+## 81. Das von einem Administrator gewählte Passwort muss die Passwort-Policy erfüllen
+
+`POST /api/admin/users` und ein Create an der Users-Collection über die Daten-
+API (`POST /api/data/users`, `/bulk`, ein Batch, MCP `create_document`, ein Socket-
+Speichern) lehnen ein `password`, das die Policy nicht erfüllt, nun mit `400 WEAK_PASSWORD` ab,
+wie es Registrierung, Resets und `PUT /api/admin/users/:uid` bereits taten. Nichts wird
+geschrieben und kein Create-Hook läuft. Bei einem `/bulk` beginnt die Meldung
+mit `Row <n>: `, wie die anderen Zeilenfehler des Bulks. Ein Create ohne Passwort ist
+unverändert: Ein Passwort wird generiert oder eine Einladung gesendet.
+
+**Wer betroffen ist:** Code, der Benutzer mit einem anderswo gewählten Passwort anlegt,
+etwa ein Import oder ein Sync aus einem anderen System.
+
+**Was zu ändern ist:** Um Konten zu importieren, deren Passwörter anderswo gesetzt wurden, senden Sie
+`skipPasswordPolicy: true` in jedem Create-Body (an jeder Zeile eines `/bulk`), als
+Administrator oder mit dem Service-Key:
+
+```ts
+await client.admin.createUser({ email, password: legacyPassword, skipPasswordPolicy: true });
+```
+
+Von jedem anderen Aufrufer verzichtet das Flag auf nichts. Es wird nie gespeichert und erreicht nie
+`onCreateUser` oder `onAdminCreateUser`. Der Import des Admin-Panels sendet es
+für Zeilen mit einem `password` selbst. Ein eigener `AuthAdapter` erhält
+die Entscheidung als neues drittes Argument von `prepareUserCreation`
+(`{ mayWaivePasswordPolicy }`); ein Adapter, der es ignoriert, behält sein aktuelles
+Verhalten. Um die Policy selbst zu ändern, übergeben Sie `auth.hooks.validatePasswordStrength`.
+
+## 82. Ein leerer String in einem Pflicht-String-Feld wird abgelehnt
+
+Ein Schreibvorgang, der `""` für eine `string`-Property mit `validation.required` sendet,
+antwortet nun `400 VALIDATION_CONSTRAINT`, mit einem Eintrag in `details.violations`
+`{ field, code: "required" }`: dieselbe Antwort wie bei einem fehlenden Wert. Das gilt
+für Creates und Updates an jeder Tür (REST, Bulk, Batch, Upsert, der Realtime-
+Socket, MCP) und auch, wenn die Property einen `defaultValue` hat, da ein Default
+einen fehlenden Schlüssel füllt, nicht einen leeren. Das Admin-Panel schreibt bereits `null`
+für ein geleertes Feld, ist also nicht betroffen.
+
+**Wer betroffen ist:** Code, der `""` in ein Pflicht-String-Feld schreibt, zum
+Beispiel ein Formular oder ein Import, der jede Spalte sendet, ob gefüllt oder nicht.
+
+**Was zu ändern ist:** Senden Sie einen Wert, lassen Sie den Schlüssel beim Create weg, wenn ein `defaultValue`
+greifen soll, oder entfernen Sie `required` von Feldern, die legitim leer sein dürfen.
+Collections, die ein `beforeSave` deklarieren, werden an der Grenze nicht geprüft (der Hook
+darf den Wert füllen), wie zuvor. Servercode, der In-Process schreibt
+(`rebase.data`), ist nicht betroffen.
+
+## 83. `QueryBuilder` und `createBackups` werden nicht mehr aus `@rebasepro/client` exportiert
+
+Beide waren die Engines hinter Client-Aufrufen.
+
+- `new QueryBuilder(collection).where(…)` → `client.data.<collection>.where(…)`;
+  die Helfer `or`, `and`, `not` und `cond` werden weiterhin exportiert.
+- `createBackups(transport)` → `client.backups` (dieselben `list`, `download`,
+  `downloadUrl`, `stream`). `CreateBackupsOptions` ist damit weg;
+  `BackupStream` wird weiterhin exportiert.
+
+`client.ws` ist unverändert.
+
+## 84. `useBackendStorageSource` wurde aus `@rebasepro/app` entfernt
+
+```ts
+// before
+const storageSource = useBackendStorageSource({ apiUrl, getAuthToken });
+// after — the client you already pass to the admin
+const storageSource = client.storage;                     // default source
+const media = client.createStorageSource("media");        // a named source
+```
+
+Die Quelle des Clients sendet bei Uploads auch `public` und `context` (serverseitig geprüfte Property-
+Limits) und `storageId` für benannte Quellen, was der Hook
+nicht tat.
+
+## 85. `signedUrlExpiration` wurde aus der S3- und GCS-Storage-Konfiguration entfernt
+
+Löschen Sie den Schlüssel aus `storage: { type: "s3" | "gcs", … }`; TypeScript meldet ihn
+als unbekannte Property. Er setzte nie die Lebensdauer einer URL, die ein Browser erhielt.
+Um zu ändern, wie lange die URL einer privaten Datei funktioniert, setzen Sie `storageDownloadTokenTtl`
+(Sekunden; `STORAGE_DOWNLOAD_TOKEN_TTL` bei einem Bundle-Deployment). Servercode,
+der `controller.getSignedUrl()` direkt aufruft, erhält eine URL, die eine Stunde gültig ist.

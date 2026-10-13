@@ -1,5 +1,5 @@
 ---
-sourceHash: 8deb74573f8209f1
+sourceHash: dc394aa7ff8f8f55
 title: Hors ligne et synchronisation local-first
 sidebar_label: Hors ligne
 description: Activez le moteur de synchronisation local-first du SDK typé de Rebase — une base de données locale de lignes, des écritures hors ligne instantanées avec annulation, et des requêtes en direct réactives.
@@ -74,6 +74,8 @@ Si le serveur attribue le sien au moment du rejeu, la ligne locale et toutes les
 
 Les écritures sont rejouées dans l'ordre où vous les avez faites, toutes collections confondues — ainsi une création dans une collection arrive toujours avant la ligne d'une autre collection qui la référence.
 
+Chaque écriture en file d'attente est une requête par défaut : 500 lignes saisies hors ligne demandent donc 500 allers-retours pour se vider. Avec `replayBatchSize` défini (jusqu'à 1 000), une suite de créations consécutives hors ligne dans une même collection est rejouée en un seul `createMany`. Seules les créations dont l'id est une chaîne générée par le SDK sont regroupées, et jamais une qui référence une autre ligne du même lot. Si le serveur refuse ou reporte le lot pour une raison autre qu'une connexion perdue, rien n'est écrit (une écriture groupée est une seule transaction), et le lot est rejoué écriture par écriture, comme par défaut.
+
 ## Requêtes en direct
 
 `observe()` est la lecture réactive, et celle vers laquelle se tourner dans une interface :
@@ -129,7 +131,7 @@ const { online, pending, syncing, lastSyncedAt, lastError } = client.offline!.st
 
 | Méthode | Rôle |
 |--------|---------|
-| `status()` | Connectivité actuelle, profondeur de la file d'attente, activité de synchronisation, dernière erreur, et `persisted` : indique si le navigateur a accepté de conserver la base hors ligne (demandé lorsque la première écriture est mise en file ; `false` signifie qu'elle peut être évincée en cas de pression sur le stockage, écritures non envoyées comprises) |
+| `status()` | Connectivité actuelle, profondeur de la file d'attente, activité de synchronisation, dernière erreur, et `persisted` : indique si le navigateur a accepté de conserver la base hors ligne (demandé lorsque la première écriture est mise en file ; `false` signifie qu'elle peut être évincée en cas de pression sur le stockage, écritures non envoyées comprises). `unverifiedUser` vaut `true` tant qu'un rechargement hors ligne montre les données du dernier utilisateur sans session confirmée (voir [`keepLastUser`](#rechargements-hors-ligne-en-mode-cookie)) |
 | `onStatusChange(fn)` | S'abonner à ce qui précède |
 | `onQueueChange(fn)` | Uniquement le nombre d'écritures non envoyées, pour un badge |
 | `pending()` | Les mutations en file d'attente elles-mêmes, les plus anciennes d'abord. `pending({ orphaned: true })` : celles mises en file d'attente sans session ouverte — voir [Utilisateurs](#utilisateurs) |
@@ -160,6 +162,29 @@ La cascade est étroite : un `update` est écarté en même temps que l'écritur
 Des modifications consécutives sur une même ligne pendant la déconnexion sont fusionnées en une seule écriture mise en file d'attente, de sorte qu'un formulaire en cours de saisie ne fait pas grossir la file. Si le serveur refuse l'écriture fusionnée en raison de son contenu (un 400, 403 ou 422 — par exemple un champ supprimé par un changement de schéma pendant que l'utilisateur était hors ligne), le moteur la scinde à nouveau en modifications séparées et rejoue chacune d'elles. Seule la modification que le serveur refuse est annulée et signalée ; les autres sont conservées.
 
 Un échec simplement temporaire — un 429, un 503, une connexion coupée — n'est pas un rejet. Ces écritures restent en file d'attente et sont réessayées ; ce n'est qu'après `maxRetries` reports qu'une écriture est annulée.
+
+### Conflits
+
+Par défaut, une modification mise en file d'attente hors ligne écrase ce que le serveur possède pour les champs qu'elle change, même si quelqu'un d'autre les a modifiés entre-temps. Pour le savoir plutôt, passez `onConflict`. Un `update` en file d'attente est alors rejoué avec `If-Match`, la version de la ligne sur laquelle il a été fait, et lorsque la ligne a changé depuis, le serveur le refuse avec un 412 et `onConflict` tranche :
+
+```typescript
+const client = createRebaseClient({
+    baseUrl: API_URL,
+    offline: {
+        onConflict: async (error, mutation) =>
+            (await askUser(`${mutation.collection} changed while you were offline. Keep your edit?`))
+                ? "overwrite"
+                : "discard"
+    }
+});
+```
+
+- `"overwrite"` renvoie la modification sans la précondition : le dernier écrivain gagne, comme sans `onConflict`.
+- `"discard"` abandonne la modification. La ligne revient à ce qu'elle était avant elle, comme pour un rejet, et est relue depuis le serveur. Elle n'est pas signalée à `onSyncError` ; les écritures mises en file par-dessus le sont, sous la forme `DEPENDENCY_REJECTED`.
+
+La file attend pendant que `onConflict` s'exécute, il peut donc interroger l'utilisateur. S'il lève une exception, la modification est écrasée.
+
+La version sur laquelle une modification est faite est celle qu'a rapportée la dernière lecture de la ligne : `findById()`, une trame `listenById()`, ou la réponse d'un `update()` antérieur. Une ligne lue en dernier dans une liste `find()` ou `listen()` n'a pas de version, pas plus qu'une modification faite par-dessus une autre écriture en file sur la même ligne. Celles-ci sont rejouées sans précondition. Un `ifMatch` que vous passez vous-même à `update()` est conservé lorsque la modification est mise en file.
 
 ## Onglets multiples
 
@@ -196,6 +221,22 @@ client.auth.onAuthStateChange(async (event) => {
 
 `clear({ orphaned: true })` les écarte, avec les lignes locales auxquelles elles ont été appliquées ; la propre file d'attente d'envoi de l'utilisateur connecté n'est pas touchée. Si on les laisse, elles sont rejouées la prochaine fois que personne n'est connecté. Tant que personne n'est connecté, elles sont simplement la file d'attente d'envoi courante, et `pending({ orphaned: true })` ne liste rien.
 
+### Rechargements hors ligne en mode cookie
+
+En mode cookie, rien sur la session n'est stocké sur l'appareil : un rechargement qui ne peut pas joindre le serveur n'a donc pas d'utilisateur. Par défaut, il est traité comme déconnecté : les lignes locales de l'utilisateur sont masquées, et les écritures faites alors sont mises en file comme celles de l'utilisateur déconnecté.
+
+`keepLastUser: true` change cela. Le client mémorise le dernier utilisateur connecté sur l'appareil (son id seulement), et un rechargement hors ligne ouvre à la place la base locale de cet utilisateur. Les écritures faites alors sont mises en file comme les siennes, mais aucune n'est rejouée tant que la session n'est pas confirmée : lorsque la connexion revient, le client rafraîchit la session, et une connexion la confirme aussi. Si le serveur refuse la session, ou si quelqu'un d'autre se connecte, l'appareil change d'utilisateur, et les écritures en file restent à leur auteur jusqu'à ce qu'il se reconnecte. Pendant ce temps, `status().unverifiedUser` vaut `true`.
+
+```typescript
+createRebaseClient({
+    baseUrl: API_URL,
+    auth: { authFlowMode: "cookie" },
+    offline: { keepLastUser: true }
+});
+```
+
+Il est désactivé par défaut car, sur un appareil partagé, il permet de lire hors ligne, sans session, les lignes en cache de l'utilisateur précédent. Activez-le pour les installations qui appartiennent à une seule personne. L'id est oublié à la déconnexion et lorsque le serveur refuse la session. Il n'est jamais utilisé lorsque le serveur répond qu'il n'y a pas de session.
+
 ## Configuration
 
 ```typescript
@@ -208,6 +249,9 @@ createRebaseClient({
         syncIntervalMs: 60_000,               // ceiling for the retry backoff; 0 disables auto-retry
         maxRetries: 5,                        // deferrals before a write is given up on
         crossTab: true,                       // default: on for IndexedDB, off for memory
+        keepLastUser: false,                  // open the last user's data on an offline reload (cookie mode)
+        replayBatchSize: 1,                   // queued creates sent per request on replay (max 1000)
+        onConflict: (error, mutation) => "overwrite", // or "discard"; default: no conflict check
         onSyncError: (error, mutation) => {}
     }
 });
@@ -239,7 +283,8 @@ Le client n'est pas une réplique de votre base de données, et il ne prétend p
 - **`count()` hors ligne a besoin d'un décompte que le serveur a donné à cet appareil pour la même requête.** Les écritures mises en file depuis le déplacent : créations, modifications qui font entrer ou sortir une ligne du filtre, et suppressions. Sans décompte, il échoue avec l'erreur `OFFLINE` plutôt que de compter les lignes que cet appareil détient par hasard. Sur la 0.24, il renvoyait ce nombre.
 - **`searchString` est approximé** par un balayage de sous-chaîne insensible à la casse sur les champs texte en cache. Le serveur, lui, exécute une vraie recherche plein texte sur les colonnes configurées de la collection.
 - **Les relations passées à `include` ne peuvent pas être évaluées localement** — les lignes liées vivent dans des collections que la requête n'a jamais chargées. Une telle requête est toujours marquée `partial` lorsqu'elle est servie depuis le cache.
-- **Les conflits sont résolus par le dernier écrivain gagnant, champ par champ, sans détection.** Un `update` rejoué envoie les champs que l'utilisateur a modifiés et rien d'autre : les champs qu'il n'a pas touchés gardent ce que possède le serveur. Pour un champ qu'il a *bien* modifié, un changement fait par quelqu'un d'autre sur le serveur pendant qu'il était hors ligne est écrasé au rejeu de la file, et aucun des deux utilisateurs n'en est informé. Rien ne compare les versions au rejeu.
+- **Les conflits sont résolus par le dernier écrivain gagnant, champ par champ, sauf si vous passez `onConflict`.** Un `update` rejoué envoie les champs que l'utilisateur a modifiés et rien d'autre : les champs qu'il n'a pas touchés gardent ce que possède le serveur. Pour un champ qu'il a *bien* modifié, un changement fait par quelqu'un d'autre sur le serveur pendant qu'il était hors ligne est écrasé au rejeu de la file, et aucun des deux utilisateurs n'en est informé. Avec [`onConflict`](#conflits), une modification dont la version de ligne est connue est comparée à celle du serveur, et l'application tranche. Les créations, suppressions et écritures groupées ne sont jamais vérifiées.
+- **La corbeille a besoin du serveur.** La base locale ne contient que des lignes actives : `trash.find()`, `trash.count()`, `trash.restore()` et `trash.purge()` (voir [suppression logique](/docs/collections/soft-delete#from-the-sdk)) ne sont donc jamais traités localement ni mis en file ; hors ligne, ils échouent avec l'erreur `OFFLINE`. La restauration ou la purge d'une ligne dont une écriture est encore en file synchronise d'abord la file, et est refusée avec `TRASH_PENDING_WRITE` si l'écriture ne peut pas encore être envoyée.
 - **Le rejeu est « au moins une fois ».** Une écriture qui atteint le serveur mais dont la réponse se perd peut être renvoyée. Préférez des écritures idempotentes (`createMany` avec `upsert`) là où des doublons poseraient problème.
 - **Un upsert sur une clé naturelle a besoin du serveur.** Seul le serveur peut trouver la ligne que désigne une cible `onConflict`, donc `upsert()` sur une clé naturelle (ou sans l'identifiant de la ligne), et un `createMany()` avec `onConflict` jamais envoyé, sont refusés hors ligne avec `OFFLINE_UPSERT_UNSUPPORTED`. Un upsert sur la clé primaire, avec la clé dans chaque ligne, est mis en file d'attente.
 - **Les lectures locales appliquent la sémantique de Postgres, pas les données de la base.** Les filtres sont évalués comme SQL le ferait — les comparaisons avec `NULL` sont inconnues, `ORDER BY` place les valeurs nulles en dernier en ordre croissant — mais sur la copie des lignes détenue par le client, qui peut être obsolète.

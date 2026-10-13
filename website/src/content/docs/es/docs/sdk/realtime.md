@@ -1,5 +1,5 @@
 ---
-sourceHash: 7d1fe8f3e85d948e
+sourceHash: 07c1391c48e88901
 title: Suscripciones en tiempo real
 sidebar_label: Tiempo real
 description: Suscríbete a cambios de datos en vivo con el SDK tipado de Rebase utilizando listeners en tiempo real basados en WebSocket.
@@ -144,6 +144,27 @@ client.data.posts.listenById(1, (post) => {
 incluidas. Un cambio solo en una fila relacionada no envía ninguna trama: editar el nombre de una etiqueta no
 refresca un post escuchado con `include: ["tags"]` hasta que el post también cambie. Para seguir
 las filas relacionadas, escucha también su colección.
+
+## Observar un recuento
+
+<span class="since-badge" data-since="0.25">Desde 0.25</span> `listenCount()` mantiene un recuento al día: el total de lo que coincide con el filtro de una lista, para una
+barra de herramientas o una oferta de «seleccionar los N» que no debe quedarse obsoleta mientras otras personas añaden y eliminan filas.
+El callback se ejecuta con el total en cuanto se conoce, y de nuevo cada vez que una escritura lo cambia.
+
+```typescript
+const stop = client.data.orders.listenCount(
+    { where: { status: ["==", "open"] } },
+    (total) => console.log(`${total} open orders`),
+    (error) => console.error(error)
+);
+```
+
+Solo cuenta el filtro — `where`, `logical` y `searchString`; un `limit`, un `offset` o una ordenación se
+ignoran. El servidor no lee ninguna fila para ello, solo el recuento, con la identidad del suscriptor como en cualquier
+otro frame. Un servidor anterior a 0.25 no conoce la petición; la responde con una fila y el
+mismo total, y el SDK lee el total de ahí. En un cliente sin socket, `listenCount()` es un
+stub que lanza un error, como `listen()`. Con el [soporte offline](/docs/sdk/offline/) activado, el recuento es el
+del servidor: las escrituras en cola no figuran en él hasta que se reproducen.
 
 ## Fluent Query Builder
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: 64977a5e5f9b13d2
+sourceHash: b9b698ec32e400fc
 title: Schreiben über REST
 sidebar_label: Schreiben über REST
 description: Idempotenz-Schlüssel, bedingte Schreibvorgänge mit ETag und If-Match, Feldoperationen, Upserts über natürliche Schlüssel, return=minimal und sammlungsübergreifende Batches.
@@ -37,6 +37,8 @@ Wird bei `POST`, `PATCH`, `DELETE`, allen drei `/bulk`-Routen sowie `/_batch` un
 
 `GET /api/data/:slug/:id` gibt ein `ETag` zurück, ebenso das verschachtelte `GET` einer einzelnen Zeile. Wird dieses bei einem späteren `PATCH` oder `DELETE` als `If-Match` zurückgesendet, wird der Schreibvorgang mit `412` abgelehnt, falls sich die Zeile in der Zwischenzeit geändert hat.
 
+<span class="since-badge" data-since="0.25">Seit 0.25</span> Ein erfolgreiches `PATCH` antwortet mit dem `ETag` der Version, die es geschrieben hat, sodass der nächste bedingte Schreibvorgang kein vorheriges Lesen braucht. Das Tag steht auch bei einem `204`, das für `Prefer: return=minimal` zurückgegeben wird, und eine für einen `Idempotency-Key` wiedergegebene Antwort trägt dasselbe Tag wie die erste. Ein Live-Abonnement einer Zeile trägt dasselbe Tag in jedem Frame (siehe [Realtime](/docs/backend/realtime/)).
+
 ```bash
 # read
 curl -i /api/data/docs/d1
@@ -52,6 +54,8 @@ curl -X PATCH /api/data/docs/d1 \
 Ohne dies gilt bei Read-Modify-Write das Prinzip „Last-Writer-Wins“ für alles, was der zweite Schreibvorgang nicht übermittelt hat: Zwei Bearbeiter, die im Abstand von einer Sekunde speichern, sind beide erfolgreich, und die Änderung des ersten geht ohne jegliche Fehlermeldung verloren.
 
 Das Tag wird aus einer `date`-Eigenschaft mit `autoValue: "on_update"` abgeleitet, sofern die Collection eine solche deklariert – diese Spalte *ist* bereits eine Version – andernfalls aus einem stabilen Hash der Zeile. `If-Match: *` stellt lediglich sicher, dass die Zeile existiert. Es wird nichts geschrieben, wenn die Vorbedingung fehlschlägt.
+
+<span class="since-badge" data-since="0.25">Seit 0.25</span> Das Formular des Admin-Bereichs speichert mit `If-Match`: Ein Speichern gegen eine Version, die inzwischen jemand ersetzt hat, wird abgelehnt, das Formular sagt es, und die Bearbeitung bleibt im Formular, auf die neue Version aufgesetzt, mit markierten konfliktierenden Feldern.
 
 Das Tag wird innerhalb der eigenen Transaktion des Schreibvorgangs verglichen, nachdem die Zeile gesperrt wurde. Zwei Schreibvorgänge mit demselben Tag können nicht beide durchkommen: Der zweite wartet, bis der erste committet hat, liest, was dieser geschrieben hat, und wird mit `412` abgelehnt.
 

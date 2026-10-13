@@ -1,0 +1,156 @@
+---
+sourceHash: c6b95df3140b1b02
+slug: pt/docs/upgrading/0-21-to-0-23
+title: Atualizando da versão 0.21 para a 0.23
+sidebar_label: 0.21 → 0.23
+description: As mudanças com quebra de compatibilidade que a 0.23 traz para um app na 0.21 ou 0.22 — chaves de API em caminhos aninhados, recusas na inicialização, repositórios de autenticação customizados, promoção de convidados e job stores customizados.
+---
+
+# Atualizando de 0.21 → 0.23
+
+Estas são as entradas `### Breaking` que a 0.23 traz. A 0.22 não declara nenhuma quebra
+de compatibilidade, portanto um app na 0.21 ou na 0.22 lê esta única página para chegar à 0.23.
+
+Três delas recusam a inicialização, nomeando a configuração, em vez de mudar o comportamento
+silenciosamente. Quatro mudam quem pode entrar ou o que uma chave pode alcançar: leia essas primeiro
+se o seu app tem chaves de API em caminhos aninhados, um repositório de autenticação customizado ou convidados
+que viram contas. A última muda o contrato de um job store customizado.
+
+---
+
+## 33. Uma chave de API em um caminho aninhado precisa de `read` em toda coleção pai
+
+Uma chave era verificada contra o último segmento de uma URL aninhada, que nomeia uma
+relação e não uma coleção, e a coleção pai nunca era verificada
+de forma alguma. Agora a operação da rota é verificada contra a coleção que o caminho
+alcança, e toda coleção pela qual o caminho passa precisa de `read`. Uma chave com escopo
+apenas para `posts` que chama `/api/data/authors/1/posts` recebe
+`403 API_KEY_FORBIDDEN` nomeando `authors` até poder ler `authors` também.
+
+**O que alterar:** dê a cada chave que usa caminhos aninhados `read` nos pais
+(`PUT /api/admin/api-keys/:id`), ou faça-a chamar a rota própria da coleção filha com um filtro.
+
+```json
+[
+    { "collection": "posts", "operations": ["read", "write"] },
+    { "collection": "authors", "operations": ["read"] }
+]
+```
+
+Veja [Chaves de API](/docs/backend/api-keys/#data). Desde a 0.24, a mesma regra é escrita em escopos: cada pai precisa de `data:read`.
+
+## 34. Uma variável de ambiente numérica que não é um número faz a inicialização falhar
+
+`PORT`, `SMTP_PORT`, `REBASE_MAX_BODY_SIZE` e as variáveis `DB_POOL_*` costumavam
+repassar `NaN` ou ler um valor em branco como `0`. Um `REBASE_MAX_BODY_SIZE` em branco
+removia o limite de corpo de todas as rotas, e um `PORT` em branco fazia um servidor de produção
+escutar em uma porta aleatória. Agora um valor em branco significa não definido e usa o
+padrão, um `0` explícito ainda conta, e qualquer coisa que não seja um número interrompe
+a inicialização, nomeando a variável.
+
+**O que alterar:** nada, a menos que a inicialização agora nomeie uma variável. Então corrija o seu
+valor ou remova a definição.
+
+```bash
+grep -nE "^(PORT|SMTP_PORT|REBASE_MAX_BODY_SIZE|DB_POOL_[A-Z_]+)=" .env*
+```
+
+## 35. Uma duração de sessão que o assinador de tokens não consegue ler se recusa a iniciar
+
+`auth.accessExpiresIn` e `auth.refreshExpiresIn` (`JWT_ACCESS_EXPIRES_IN`,
+`JWT_REFRESH_EXPIRES_IN`) eram verificadas contra `^\d+[dhms]$` enquanto o assinador
+de tokens as lia de outra maneira, e qualquer coisa no meio caía em um padrão silencioso:
+`1w`, `2 weeks` ou `30 days` virava um token de renovação de 400 dias. Ambas agora aceitam um
+número positivo e uma unidade, como `15m`, `1h`, `30d` ou `2 weeks`. Um número
+solto, zero, um valor negativo, ou um valor que o assinador não consegue ler interrompe a inicialização
+e nomeia a configuração.
+
+**O que alterar:** dê uma unidade a toda duração. `3600` não é uma hora — o
+assinador lê um número solto como milissegundos —, então escreva `1h`.
+
+```bash
+grep -rnE "(EXPIRES_IN|ExpiresIn)" .env* config
+```
+
+## 36. Um repositório de autenticação customizado precisa de `unlinkUserIdentity`, ou alguns logins são recusados
+
+Na primeira vez que alguém comprova o endereço de uma conta não verificada, por magic link,
+código por e-mail ou redefinição de senha, o Rebase remove toda identidade de login vinculada cujo
+provedor não verificou esse endereço ([37](#37-uma-conta-não-verificada-perde-o-que-ninguém-comprovou-na-primeira-vez-que-o-endereço-é-comprovado)).
+Ele faz isso por meio do novo `unlinkUserIdentity` opcional do repositório. Um
+repositório sem ele responde a esse login com `409 UNVERIFIED_IDENTITIES`
+em vez de deixar a identidade no lugar. `updatePassword` também precisa aceitar
+`null`, que remove a senha.
+
+**O que alterar:** em um `AuthRepository` customizado, implemente
+`unlinkUserIdentity(uid, provider, providerId)` e faça `updatePassword` aceitar
+`null`. O store do Postgres implementa ambos. O store do MongoDB ainda não tem
+`unlinkUserIdentity`, então no MongoDB esse login é recusado.
+
+## 37. Uma conta não verificada perde o que ninguém comprovou na primeira vez que o endereço é comprovado
+
+Nada verifica o endereço com que uma conta é registrada, então qualquer pessoa poderia
+registrar o endereço de outra com uma senha, ou entrar como ele por um
+provedor que não o atesta, e esperar pelo dono. O primeiro magic
+link, código por e-mail ou redefinição de senha em uma conta não verificada agora remove a sua
+senha (uma redefinição define a nova) e toda identidade vinculada cujo provedor
+não verificou esse endereço, e encerra todas as suas sessões, antes de marcá-la como verificada.
+O login por OAuth já não vincula a uma conta não verificada: ele responde
+`403 EMAIL_NOT_VERIFIED`, com `details.reason` nomeando qual lado não estava
+verificado.
+
+**O que alterar:** nada no código. Espere que quem se registrou com uma
+senha, nunca verificou e depois entra por magic link ou código precise definir uma
+senha de novo, e seja desconectado dos seus outros dispositivos. Contas criadas com
+`POST /api/admin/users` são armazenadas como verificadas, então os convidados ainda podem usar "Entrar
+com o Google". Veja
+[Vinculação de contas](/docs/backend/authentication/#account-linking-across-sign-in-methods).
+
+## 38. Com captcha protegendo `register`, promover um convidado exige um desafio resolvido
+
+`POST /auth/anonymous/link` transforma um convidado em uma conta com e-mail e
+senha, o que é um registro, e ele ignorava tanto o captcha de `register` quanto
+`beforeUserCreate`. Agora ele recebe o desafio de `register` e executa o hook, como
+`/auth/register` faz. `register` é uma das rotas padrão do captcha. O próprio login
+de convidado (`POST /auth/anonymous`) continua sem receber desafio.
+
+**O que alterar:** um app que transforma convidados em contas envia também o token do widget
+em `/auth/anonymous/link` — como `captchaToken` no corpo, ou no cabeçalho
+`cf-turnstile-response` / `h-captcha-response` — da mesma forma que faz para
+`/auth/register`. Veja [Proteção contra bots](/docs/backend/authentication/#bot-protection).
+
+## 39. O e-mail se recusa a iniciar sem uma URL base absoluta de redefinição de senha
+
+Os links de verificação e os magic links recorrem a `auth.email.resetPasswordUrl`, e
+nada recorre a `verifyEmailUrl` ou `magicLinkUrl`. Uma configuração que definia apenas
+essas iniciava e enviava um link relativo morto em todo e-mail de redefinição de senha. Agora
+o e-mail se recusa a iniciar a menos que todo tipo de link enviado resolva para uma base
+`http(s)` absoluta, e diz qual não resolve.
+
+**O que alterar:** defina `FRONTEND_URL`, ou `auth.email.resetPasswordUrl`, como uma
+URL absoluta como `https://app.example.com`.
+
+```bash
+grep -rnE "(FRONTEND_URL|resetPasswordUrl|verifyEmailUrl|magicLinkUrl)" .env* config
+```
+
+## 40. Um job store customizado recebe uma claim ao concluir ou falhar um job
+
+Um handler de fila que durou mais que o timeout de visibilidade era retomado enquanto ainda
+estava em execução e começava uma segunda vez ao lado de si mesmo. `complete` e `fail`
+encontravam o job apenas pelo id, então o sucesso da primeira tentativa marcava o job
+como concluído enquanto a segunda rodava, e a falha da segunda mandava o job concluído
+de volta para uma terceira execução. O worker agora renova a sua claim enquanto um handler roda, e somente
+a tentativa que ainda detém um job pode registrar o seu resultado.
+
+`JobStore.complete(id, claim)` e `fail(id, error, retryAt, claim)` recebem um
+`JobClaim`, `{ workerId, attempt }`. O novo `heartbeat(id, claim)` opcional
+renova a claim de um job em execução e resolve com o valor indicando se ela ainda era válida.
+O store embutido implementa os três, então um app que o usa não tem nada a fazer.
+
+**O que alterar:** em um `JobStore` customizado, faça `complete` e `fail` alterarem a
+linha somente enquanto a claim ainda a detém — em execução, travada por `claim.workerId`,
+na tentativa `claim.attempt` — e não fazerem nada caso contrário. Adicione `heartbeat`, renovando
+o horário da trava sob a mesma condição. Um store sem ele ainda funciona, mas um
+handler que dura mais que o timeout de visibilidade é executado duas vezes. Veja
+[Jobs em segundo plano](/docs/backend/jobs/#what-happens-when-a-worker-dies).

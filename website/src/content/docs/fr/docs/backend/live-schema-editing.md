@@ -1,5 +1,5 @@
 ---
-sourceHash: 1437a2b48ddb6d7b
+sourceHash: 93dc2717d7cba3ac
 title: Édition de schéma en direct
 description: Créez et modifiez des collections sur un backend en cours d'exécution — d'abord validé dans votre dépôt, puis appliqué.
 ---
@@ -231,7 +231,10 @@ Un échec de l'application n'est donc **pas une erreur**. La réponse le précis
 
 ## Où cela fonctionne
 
-L'édition de schéma en direct réécrit le code source de vos collections avec le même éditeur que celui des enregistrements du panneau qui ne touchent que la source ; elle fonctionne donc là où cet éditeur fonctionne : un serveur qui dispose du **code source de vos collections sur le disque** (`collectionsDir`) et dont l'éditeur de schéma est activé. L'éditeur de schéma est désactivé avec `NODE_ENV=production`, sauf si le serveur définit `schemaEditor: true`, et il nécessite que `ts-morph` soit installé.
+L'édition de schéma en direct réécrit le code source de vos collections avec le même éditeur que celui des enregistrements du panneau qui ne touchent que la source (il nécessite que `ts-morph` soit installé). D'où vient ce code source détermine où elle fonctionne :
+
+- **Sur le disque** (`collectionsDir`, le défaut) : elle fonctionne là où fonctionne l'éditeur source seule. Cet éditeur est désactivé avec `NODE_ENV=production`, sauf si le serveur définit `schemaEditor: true`.
+- **Dans un dépôt que vous nommez** (`liveSchema.repository`, ou `REBASE_LIVE_SCHEMA_REPOSITORY` pour un bundle) : le code source est lu depuis GitHub et la modification y est validée en retour ; elle fonctionne donc partout, production comprise. C'est l'option à activer pour un bundle compilé.
 
 ### MongoDB
 
@@ -245,13 +248,37 @@ La seule chose qui mérite une lecture attentive est une suppression. Sur Postgr
 |---|---|
 | `rebase dev` sur votre machine | oui |
 | Auto-hébergement avec le projet et son arbre de travail git montés | oui, lorsque `NODE_ENV` n'est pas `production`, ou avec `schemaEditor: true` |
-| Un bundle compilé : un auto-hébergement servant un build, ou Rebase Cloud | non |
+| Un bundle compilé : un auto-hébergement servant un build, ou l'image publiée | uniquement s'il y souscrit avec `REBASE_LIVE_SCHEMA_REPOSITORY` — voir [Depuis un bundle compilé](#depuis-un-bundle-compilé) |
+| Tout serveur avec `liveSchema.repository` configuré | oui, `NODE_ENV=production` compris |
 
-Un bundle étant un résultat compilé, il ne contient pas le code source des collections, et le runtime qui le sert désactive l'éditeur de schéma. `/api/admin/schema/status` répond `enabled: false` avec le code `SCHEMA_EDITOR_DISABLED`. Modifiez les collections en développement, validez (commit) et déployez.
+Un bundle étant un résultat compilé, il ne contient pas le code source des collections, et le runtime qui le sert désactive l'éditeur source seule. À moins qu'il ne nomme un dépôt, `/api/admin/schema/status` répond `enabled: false` avec le code `SCHEMA_EDITOR_DISABLED` : modifiez les collections en développement, validez (commit) et déployez.
+
+### Depuis un bundle compilé
+
+Un bundle n'a pas de code à configurer : il y souscrit par des variables d'environnement. Rien ne change pour un bundle qui ne les définit pas.
+
+```bash
+REBASE_LIVE_SCHEMA_REPOSITORY=acme/storefront     # turns it on
+REBASE_LIVE_SCHEMA_GITHUB_TOKEN=github_pat_…       # or the three _GITHUB_APP_* variables
+# REBASE_LIVE_SCHEMA_BRANCH=main                   # default
+# REBASE_LIVE_SCHEMA_COLLECTIONS_PATH=config/collections   # default
+```
+
+La liste complète figure dans [Configuration](/docs/getting-started/configuration#live-schema-editing-from-a-bundle). Un dépôt nommé sans identifiant utilisable (aucun, les deux types, la moitié d'une GitHub App), ou une valeur qui n'est pas de la forme `owner/name`, refuse de démarrer, plutôt que de servir un éditeur qui échoue quand quelqu'un appuie sur Appliquer.
+
+Ce qui reste identique lorsqu'il est activé :
+
+- C'est une interface `/api/admin` : aucune réponse du tout sans `schema:read`, et `/apply` exige `schema:write` et une personne (voir [Qui peut appliquer](#qui-peut-appliquer)).
+- La seule cible d'écriture est le dépôt que vous avez nommé. L'éditeur source seule, qui écrit des fichiers à côté du processus, reste désactivé.
+- Chaque modification est planifiée, présentée, validée (commit), puis appliquée, exactement comme sur votre machine.
+
+Une chose diffère. Le déploiement en cours continue de servir les collections avec lesquelles il a été construit, jusqu'à ce que votre pipeline construise et déploie le commit. La base de données a la modification tout de suite ; le panneau d'administration et l'API voient la nouvelle définition de collection après ce déploiement.
+
+Un déploiement ne fait donc **qu'une modification par déploiement**. Une fois un commit arrivé, l'application suivante est refusée avec `SCHEMA_CHANGE_FAILED`, qui nomme le commit, jusqu'à ce qu'un processus exécutant ce commit remplace celui-ci. Une seconde modification planifiée contre les collections que ce déploiement exécute encore validerait des fichiers de schéma générés qui omettent la première. La planification reste disponible entre-temps.
 
 ### Valider dans un dépôt distant
 
-`liveSchema.repository` fait valider chaque modification par le serveur dans un dépôt GitHub via l'API Git Data, au lieu d'exécuter `git commit` dans un arbre de travail. Il ne prend effet que sur un serveur dont l'éditeur de schéma est activé, c'est-à-dire un serveur dont `collectionsDir` est sur le disque (voir le tableau ci-dessus). Un bundle compilé ne le lit pas.
+`liveSchema.repository` fait valider chaque modification par le serveur dans un dépôt GitHub via l'API Git Data, au lieu d'exécuter `git commit` dans un arbre de travail. Il ne dépend pas de l'activation de l'éditeur source seule : avec un dépôt configuré, l'édition en direct fonctionne avec `NODE_ENV=production` et avec `schemaEditor: false`, car rien n'est écrit sur cette machine. Un bundle le définit par les variables ci-dessus.
 
 ```typescript no-verify
 initializeRebaseBackend({
@@ -271,7 +298,7 @@ initializeRebaseBackend({
 })
 ```
 
-Le fichier de collection modifié est alors lu depuis le dépôt, réécrit avec le même éditeur que celui qui s'exécute localement, et validé via l'API Git Data : un blob, une arborescence (tree), un commit et une mise à jour de référence. Rien n'est cloné et rien n'est laissé sur le disque. Seul ce fichier est récupéré, deux modifications sont donc impossibles dans ce mode : ajouter une relation qui cible une autre collection, et supprimer une collection.
+Le répertoire des collections est alors lu depuis le dépôt, réécrit avec le même éditeur que celui qui s'exécute localement, et ce qui a changé est validé via l'API Git Data : un blob par fichier, une arborescence (tree), un commit et une mise à jour de référence. Rien n'est cloné et rien n'est laissé sur le disque. Tout le répertoire est lu, pas seulement le fichier modifié : une relation peut donc cibler une autre collection (son fichier est importé), et supprimer une collection fonctionne comme en local : refusé tant qu'une autre collection l'importe, et retirée de `index.ts` dans le même commit.
 
 `auth` prend un jeton ou une installation de GitHub App :
 

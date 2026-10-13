@@ -1,5 +1,5 @@
 ---
-sourceHash: 275426a0cc4a1023
+sourceHash: 5a4b74223c30f992
 slug: pt/docs/rls-check
 title: rls-check
 description: Audite a segurança em nível de linha (RLS) em qualquer banco de dados PostgreSQL — Supabase, Neon, RDS ou seu próprio servidor. Somente leitura, sem cadastro, sem necessidade de Rebase.
@@ -404,6 +404,13 @@ No PostgreSQL anterior à versão 15, essa opção nem sequer existe, logo todas
 dessa forma. Nesses casos, o achado é relatado como heurístico, e a solução é mover a lógica para uma
 função ou atualizar o PostgreSQL.
 
+O dono normalmente está isento das policies da tabela base, mas nem sempre. Quando o dono
+da view não é superusuário, não tem `BYPASSRLS` e não é dono da tabela base (ou é dono dela
+com `FORCE ROW LEVEL SECURITY`), as policies se aplicam ao dono. A view então retorna as
+linhas que essas policies dão ao dono, a todo chamador igualmente. Isso pode ser menos linhas do que
+um chamador deveria ver, ou mais. O achado ainda é relatado, porque as linhas não dependem de
+quem pergunta, mas como heurístico em vez de certo. A solução é a mesma.
+
 ### matview-bypasses-rls
 
 **Materialized view expõe dados protegidos por RLS.** Alta.
@@ -430,6 +437,17 @@ A condição "aceita qualquer linha" é essencial e deliberadamente restrita. O 
 para `anon` e `authenticated` por padrão, portanto uma policy direcionada a essas roles não é, por si só,
 um problema — um clássico `FOR INSERT TO public WITH CHECK (user_id = auth.uid())` está correto
 e não é relatado.
+
+Uma policy alcança um chamador não autenticado por `TO public`, por uma role chamada
+`anon` ou `web_anon`, ou por uma role da qual uma dessas é membro: `TO app_writer`
+conta quando `anon` herda `app_writer`.
+
+No Rebase não existe role `anon`. Toda requisição roda como `rebase_user`, inclusive uma
+sem login quando a API a admite (`AUTH_REQUIRE=false`, ou `auth.requireAuth: false`)
+e toda conta de convidado do login anônimo. O banco de dados não enxerga essa configuração, então no
+Rebase uma escrita que só `rebase_user` alcança é relatada como heurística. Com o portão da API ligado
+e o login de convidado desligado, apenas usuários autenticados alcançam a policy, e eles ainda podem escrever em qualquer
+linha. Restrinja a regra de escrita da coleção ao chamador (um `ownerField`) ou a `roles`.
 
 ### unqualified-column-in-subquery
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: 0fc23adc81af9f41
+sourceHash: 8f6ca9ef6468a144
 title: Funções Personalizadas
 sidebar_label: Funções Personalizadas
 description: Adicione endpoints de API Hono personalizados junto com suas rotas CRUD do Rebase. Descoberta automática a partir de um diretório, com acesso total à instância do backend.
@@ -323,6 +323,8 @@ export default defineFunction((app, { rebase }) => {
     });
 });
 ```
+
+`rebase.dataAsAdmin` não tem tipos até você [registrar o seu `Database` gerado](/docs/backend/typed-server-data).
 
 ### Driver com Escopo RLS vs. Singleton Rebase
 

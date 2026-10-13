@@ -1,5 +1,5 @@
 ---
-sourceHash: 275426a0cc4a1023
+sourceHash: 5a4b74223c30f992
 slug: it/docs/rls-check
 title: rls-check
 description: Esegui l'audit della row-level security su qualsiasi database PostgreSQL — Supabase, Neon, RDS o il tuo server. Di sola lettura, nessuna registrazione, nessun Rebase richiesto.
@@ -406,6 +406,13 @@ Nelle versioni di PostgreSQL precedenti alla 15 l'opzione non esiste affatto, qu
 in questo modo. In quel caso la segnalazione viene indicata come euristica, e la correzione consiste nello spostare la logica all'interno di una
 funzione o nell'aggiornare il database.
 
+Il proprietario è normalmente esente dalle policy della tabella di base, ma non sempre. Quando il
+proprietario della vista non è un superuser, non ha `BYPASSRLS` e non possiede la tabella di base (oppure la possiede
+con `FORCE ROW LEVEL SECURITY`), le policy si applicano al proprietario. La vista restituisce allora le
+righe che quelle policy concedono al proprietario, a ogni chiamante allo stesso modo. Possono essere meno righe di quante
+un chiamante dovrebbe vederne, o di più. La segnalazione viene comunque riportata, perché le righe non dipendono da
+chi chiede, ma come euristica anziché certa. La correzione è la stessa.
+
 ### matview-bypasses-rls
 
 **La vista materializzata espone dati protetti da RLS.** Alta.
@@ -432,6 +439,17 @@ La condizione "accetta qualsiasi riga" è fondamentale e volutamente circoscritt
 e `authenticated` pieni privilegi DML per impostazione predefinita, quindi una policy destinata a tali ruoli non rappresenta di per sé
 un problema — una classica clausola `FOR INSERT TO public WITH CHECK (user_id = auth.uid())` è corretta
 e non viene segnalata.
+
+Una policy raggiunge un chiamante non autenticato tramite `TO public`, tramite un ruolo chiamato
+`anon` o `web_anon`, o tramite un ruolo di cui uno di questi è membro: `TO app_writer`
+conta quando `anon` eredita `app_writer`.
+
+Su Rebase non esiste un ruolo `anon`. Ogni richiesta viene eseguita come `rebase_user`, comprese quelle di un utente
+non autenticato quando l'API lo ammette (`AUTH_REQUIRE=false`, oppure `auth.requireAuth: false`)
+e ogni account guest dell'accesso anonimo. Il database non può vedere questa impostazione, quindi su
+Rebase una scrittura che solo `rebase_user` raggiunge viene segnalata come euristica. Con il gate dell'API attivo
+e l'accesso guest disattivato, solo gli utenti autenticati raggiungono la policy, e possono comunque scrivere qualsiasi
+riga. Limita la regola di scrittura della collection al chiamante (un `ownerField`) o a `roles`.
 
 ### unqualified-column-in-subquery
 

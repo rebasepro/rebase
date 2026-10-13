@@ -1,5 +1,5 @@
 ---
-sourceHash: e18fe07b6281381b
+sourceHash: 3702fa186011ca6b
 title: Campos de upload de arquivos
 sidebar_label: Uploads de arquivos
 description:"\"Declarando um campo de arquivo ou imagem em uma coleção: o bloco de storage, uploads de arquivo único e múltiplos arquivos, e quais de suas opções o painel resolve em vez do servidor.\""
@@ -127,8 +127,11 @@ site que renderiza o campo faz o mesmo com
 `resolveStorageReferences(text, client)` — consulte
 [Arquivos dentro de texto](/docs/sdk/storage#files-inside-text).
 
-Textos salvos antes dessa mudança armazenam as próprias URLs, e os tokens delas
-já expiraram; reinsira essas imagens para armazenar referências em vez disso.
+Textos salvos antes das referências armazenam as próprias URLs de download, com tokens
+expirados. O editor, as pré-visualizações e `resolveStorageReferences` os renovam quando
+exibem o texto, porque um token ainda nomeia o seu objeto; reinserir a imagem
+ou reescrever o texto com `storageReferencesForDownloadUrls(text)` armazena uma
+referência.
 
 ### Para onde o arquivo pode ir
 
@@ -146,7 +149,8 @@ mesma chave, então o painel não tem como saber que um arquivo está sem uso.
 Objetos aos quais nenhuma linha aponta permanecem no bucket, e são cobrados,
 até que você os exclua — pelo navegador de storage do Studio, com
 `client.storage.deleteObject(key)`, ou com uma regra de ciclo de vida no
-bucket.
+bucket. <span class="since-badge" data-since="0.25">Desde 0.25</span> `rebase storage orphans` lista os arquivos que nenhuma linha nomeia e os exclui
+com `--delete` — veja [a CLI](/docs/cli/#rebase-storage).
 
 ### Movendo uma propriedade para outra fonte de storage
 
@@ -154,9 +158,9 @@ Um campo de arquivo armazena a chave do objeto, não sua fonte. Alterar o
 `storageSource` de uma propriedade faz todo valor existente apontar para a
 nova fonte, onde essas chaves não existem, então pré-visualizações de arquivos
 enviados antes da mudança respondem "não encontrado". Copie os objetos para a
-nova fonte sob as mesmas chaves antes de alterar a propriedade — com as
-próprias ferramentas do provedor, como `aws s3 sync` ou `gcloud storage cp` —
-ou mantenha a fonte antiga para os arquivos existentes.
+nova fonte sob as mesmas chaves antes de alterar a propriedade — `rebase storage move --from <old> --to <new> --prefix
+<storagePath>`, ou com as próprias ferramentas do provedor, como `aws s3 sync` ou
+`gcloud storage cp` — ou mantenha a fonte antiga para os arquivos existentes.
 
 ## Próximos passos
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: 9531407dffbf3092
+sourceHash: abd2a2de4a0ff4be
 title: Règles de sécurité (RLS)
 sidebar_label: Règles de sécurité
 description: Définissez des stratégies de sécurité au niveau des lignes (RLS) pour vos collections à l'aide de raccourcis pratiques ou d'expressions SQL brutes.
@@ -39,6 +39,16 @@ L'identité de l'utilisateur authentifié est accessible en SQL via :
 | `rebase.jwt()` | L'ensemble des revendications (claims) JWT sous forme de JSONB |
 
 Ces valeurs sont définies automatiquement par transaction par le backend Rebase.
+
+### Les politiques qu'une collection reçoit sans les écrire
+
+Les politiques d'une table sont plus que les `securityRules` propres à la collection :
+
+- **`defaultSecurityRules`**, exporté depuis `config/collections/index.ts`. Une collection dont `securityRules` est absent ou vide les reçoit toutes à sa place, comme si elle les avait écrites. Une collection qui déclare ne serait-ce qu'une règle à elle n'en reçoit aucune : les deux listes ne sont jamais fusionnées.
+- **La base administrateur.** Chaque collection reçoit aussi `<table>_default_admin_read` et `<table>_default_admin_write_insert`, `_update` et `_delete` : des politiques permissives qui laissent le contexte serveur et le rôle `admin` lire et écrire chaque ligne. Elles s'ajoutent aux règles que la collection finit par avoir, les siennes ou les valeurs par défaut héritées, et les politiques permissives sont combinées par OR : elles élargissent donc les deux. La collection des utilisateurs reçoit aussi une lecture de soi-même et un verrou d'écriture restrictif qui réserve `roles` aux administrateurs.
+- **Multi-tenance.** Une collection limitée à un tenant reçoit une règle restrictive qui confine chaque opération au tenant de l'appelant ; le contexte serveur la franchit.
+
+`disableDefaultPolicies: true` sur une collection retire la base permissive, et conserve les verrous restrictifs. C'est par collection : `defaultSecurityRules` ne porte aucun indicateur de ce genre, si bien qu'une collection qui hérite des valeurs par défaut conserve la base à moins de définir elle-même l'indicateur. Le DDL généré marque chaque politique injectée, et `rebase db push` remet celle qu'on a supprimée à la main.
 
 ## Raccourcis pratiques
 

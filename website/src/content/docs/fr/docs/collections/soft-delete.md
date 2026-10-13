@@ -1,5 +1,5 @@
 ---
-sourceHash: 94b81d143b186ece
+sourceHash: dc27c5a35221e71c
 title: Soft delete
 sidebar_label: Soft delete
 description: Transformez la suppression en horodatage, masquez les lignes marquées de chaque lecture et restaurez-les avec une simple mise à jour.
@@ -62,6 +62,29 @@ Un upsert n'écrit pas non plus dans une ligne de la corbeille : lorsque sa clé
 Une suppression via un chemin plusieurs-à-plusieurs, comme `DELETE /api/data/posts/1/tags/5`, retire le lien entre le post 1 et le tag. Elle ne supprime pas logiquement le tag, que d'autres posts utilisent encore.
 
 Un **vrai** `DELETE` s'effectue avec `?hard=true` lors de l'appel de suppression. Il nécessite exactement la même permission qu'une suppression classique : il s'agit du même verbe, et restreindre son accès séparément créerait une seconde surface de contrôle d'accès pour une seule opération. Ce qui change, c'est la possibilité pour la ligne d'être restaurée ou non. Seuls les littéraux `true` ou `1` signifient « oui » ; une faute de frappe renvoie une 400, car un appelant ayant demandé une purge définitive et obtenant une suppression réversible croirait à tort que les données ont disparu.
+
+## Depuis le SDK
+
+Le client typé accède à la corbeille par `trash` sur chaque collection. Il envoie les requêtes ci-dessus : `?deleted=only` sur les lectures, la mise à jour à `null` pour une restauration, et `?hard=true` pour une purge.
+
+```typescript
+const trashed = await client.data.invoices.trash.find({ limit: 20 });
+const howMany = await client.data.invoices.trash.count();
+
+await client.data.invoices.trash.restore(7);       // PATCH { deletedAt: null }
+await client.data.invoices.trash.restoreMany([8, 9]);
+
+await client.data.invoices.trash.purge(7);         // DELETE ?hard=true
+await client.data.invoices.trash.purgeMany([8, 9]);
+```
+
+`trash.find` et `trash.count` prennent les mêmes paramètres que `find` et `count`. Une restauration définit `deletedAt` sauf si vous nommez le champ : une collection déclarée avec `softDelete: { field: "archivedAt" }` se restaure avec `trash.restore(7, { field: "archivedAt" })`. Le client ne peut pas lire le nom du champ depuis le serveur.
+
+Utilisez `trash` sur une collection qui déclare `softDelete`. Sur une collection qui ne le fait pas, le serveur ignore `?deleted=`, si bien que `trash.find` renvoie les lignes actives et que `trash.purge` est une suppression ordinaire.
+
+Le code serveur a le même `trash` : `context.data.invoices.trash` dans un callback, et `rebase.data.invoices.trash` dans une fonction ou un cron. Il lit et purge via le driver, avec les privilèges de l'appelant, comme le reste de [`context.data`](/docs/collections/context-data-api).
+
+Avec [offline](/docs/sdk/offline) activé, la corbeille n'est jamais mise en cache et rien n'y est mis en file d'attente. Chaque appel a besoin du serveur, et échoue avec l'erreur `OFFLINE` sans lui. Une ligne restaurée rejoint la base locale, et une ligne purgée la quitte.
 
 ## Prochaines étapes
 

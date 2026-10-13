@@ -1,5 +1,5 @@
 ---
-sourceHash: 8deb74573f8209f1
+sourceHash: dc394aa7ff8f8f55
 title: Offline e Sincronização Local-First
 sidebar_label: Offline
 description: Ative o motor de sincronização local-first do SDK tipado do Rebase — um banco de dados local de linhas, escritas offline instantâneas com reversão e consultas ao vivo reativas.
@@ -74,6 +74,8 @@ Se o servidor atribuir o seu próprio na reexecução, a linha local e quaisquer
 
 As escritas são reexecutadas na ordem em que você as fez, entre coleções — de modo que um create em uma coleção ainda chega antes da linha de outra que o referencia.
 
+Cada escrita enfileirada é, por padrão, uma requisição, então 500 linhas digitadas offline levam 500 idas e voltas para escoar. Com `replayBatchSize` definido (até 1 000), uma sequência de creates offline consecutivos em uma coleção é reexecutada como um único `createMany`. Só são agrupados creates com um id que o SDK gerou como string, e nunca um que referencie outra linha da mesma sequência. Se o servidor recusar ou adiar a sequência por qualquer motivo que não seja uma conexão perdida, nada é escrito (uma escrita em massa é uma transação), e a sequência é reexecutada uma escrita de cada vez, como seria por padrão.
+
 ## Consultas ao Vivo
 
 `observe()` é a leitura reativa, e a que você deve usar em uma interface:
@@ -129,7 +131,7 @@ const { online, pending, syncing, lastSyncedAt, lastError } = client.offline!.st
 
 | Método | Finalidade |
 |--------|---------|
-| `status()` | Conectividade atual, tamanho da fila, atividade de sincronização, último erro e `persisted`: se o navegador concordou em manter a base de dados offline (perguntado quando a primeira escrita é enfileirada; `false` significa que ela pode ser removida sob pressão de armazenamento, escritas não enviadas inclusive) |
+| `status()` | Conectividade atual, tamanho da fila, atividade de sincronização, último erro e `persisted`: se o navegador concordou em manter a base de dados offline (perguntado quando a primeira escrita é enfileirada; `false` significa que ela pode ser removida sob pressão de armazenamento, escritas não enviadas inclusive). `unverifiedUser` é `true` enquanto um recarregamento offline mostra os dados do último usuário sem uma sessão confirmada (veja [`keepLastUser`](#recarregamentos-offline-no-modo-cookie)) |
 | `onStatusChange(fn)` | Assinar o item acima |
 | `onQueueChange(fn)` | Apenas o número de escritas não enviadas, para um badge |
 | `pending()` | As próprias mutações enfileiradas, da mais antiga para a mais recente. `pending({ orphaned: true })`: as que foram enfileiradas sem sessão iniciada — veja [Usuários](#usuários) |
@@ -158,6 +160,29 @@ Uma linha que outra pessoa excluiu é o único caso que não é revertido. Um `d
 A cascata é estreita: um `update` é descartado junto com a escrita que ele editava, porque só pode falhar da mesma maneira. Um `create` ou `delete` posterior para a mesma linha se sustenta por conta própria e é mantido. Um `create` recusado de uma linha criada offline também leva consigo toda escrita enfileirada, em qualquer coleção, cujos valores referenciem o id temporário da linha. Uma escrita descartada nunca foi enviada. Ela é reportada com um `RebaseApiError` cujo `code` é `DEPENDENCY_REJECTED` e cujo `cause` é a recusa que a condenou, para que você possa distingui-la da escrita que o servidor de fato recusou. Na 0.23 ela carrega em vez disso o próprio erro da escrita recusada.
 
 Edições consecutivas em uma mesma linha enquanto offline são mescladas em uma única escrita na fila, para que um formulário sendo digitado não faça a fila crescer. Se o servidor recusar a escrita mesclada por causa do seu conteúdo (um 400, 403 ou 422 — por exemplo, um campo removido por uma alteração de esquema enquanto o usuário estava offline), o motor a divide novamente nas edições separadas e reproduz cada uma. Apenas a edição que o servidor recusa é revertida e reportada; as demais são mantidas.
+
+### Conflitos
+
+Por padrão, uma edição enfileirada offline sobrescreve o que o servidor tem para os campos que ela alterou, mesmo que outra pessoa os tenha alterado nesse meio tempo. Para ser avisado, passe `onConflict`. Um `update` enfileirado é então reexecutado com `If-Match`, a versão da linha contra a qual foi feito, e quando a linha mudou desde então, o servidor o recusa com um 412 e `onConflict` decide:
+
+```typescript
+const client = createRebaseClient({
+    baseUrl: API_URL,
+    offline: {
+        onConflict: async (error, mutation) =>
+            (await askUser(`${mutation.collection} changed while you were offline. Keep your edit?`))
+                ? "overwrite"
+                : "discard"
+    }
+});
+```
+
+- `"overwrite"` envia a edição de novo sem a pré-condição: vale a última escrita, como sem `onConflict`.
+- `"discard"` descarta a edição. A linha volta ao que era antes dela, como numa rejeição, e é lida de novo do servidor. Não é reportada a `onSyncError`; as escritas enfileiradas sobre ela são, como `DEPENDENCY_REJECTED`.
+
+A fila espera enquanto `onConflict` é executado, então ele pode perguntar ao usuário. Se lançar um erro, a edição é sobrescrita.
+
+A versão contra a qual uma edição é feita é a que a última leitura da linha informou: `findById()`, um frame de `listenById()` ou a resposta de um `update()` anterior. Uma linha lida pela última vez numa lista de `find()` ou `listen()` não tem versão, nem uma edição feita sobre outra escrita enfileirada para a mesma linha. Essas são reexecutadas sem pré-condição. Um `ifMatch` que você mesmo passa a `update()` é mantido quando a edição entra na fila.
 
 Uma falha que é meramente temporária — um 429, um 503, uma conexão interrompida — não é uma rejeição. Essas permanecem na fila e são repetidas; somente após `maxRetries` adiamentos uma escrita é revertida.
 
@@ -196,6 +221,36 @@ client.auth.onAuthStateChange(async (event) => {
 
 `clear({ orphaned: true })` as descarta, junto com as linhas locais às quais foram aplicadas; a fila de saída do próprio usuário com sessão iniciada não é tocada. Se ninguém mexer nelas, são reexecutadas na próxima vez que ninguém estiver com a sessão iniciada. Enquanto ninguém está com a sessão iniciada, elas são simplesmente a fila de saída atual, e `pending({ orphaned: true })` não lista nada.
 
+### Recarregamentos offline no modo cookie
+
+No modo cookie, nada sobre a sessão é guardado no dispositivo, então um recarregamento
+que não consegue alcançar o servidor não tem usuário. Por padrão ele é tratado como
+sem sessão: as linhas locais do usuário ficam ocultas, e as escritas feitas então entram na fila
+como do usuário sem sessão.
+
+`keepLastUser: true` muda isso. O cliente lembra do último usuário que
+entrou no dispositivo (apenas o id), e um recarregamento offline abre a base de dados
+local desse usuário. As escritas feitas então entram na fila como dele, mas nenhuma
+é reexecutada até que a sessão seja confirmada: quando a conexão volta, o
+cliente renova a sessão, e um login também a confirma. Se o servidor
+recusar a sessão, ou outra pessoa entrar, o dispositivo troca de usuário, e as
+escritas enfileiradas ficam com o seu autor até que ele entre de novo. Enquanto isso,
+`status().unverifiedUser` é `true`.
+
+```typescript
+createRebaseClient({
+    baseUrl: API_URL,
+    auth: { authFlowMode: "cookie" },
+    offline: { keepLastUser: true }
+});
+```
+
+Vem desligado por padrão porque, num dispositivo compartilhado, permite que as linhas em cache do usuário anterior
+sejam lidas offline sem uma sessão. Ligue-o para instalações que
+pertencem a uma só pessoa. O id é esquecido no logout e quando o servidor
+recusa a sessão. Nunca é usado quando o servidor responde que não há
+sessão.
+
 ## Configuração
 
 ```typescript
@@ -208,6 +263,9 @@ createRebaseClient({
         syncIntervalMs: 60_000,               // ceiling for the retry backoff; 0 disables auto-retry
         maxRetries: 5,                        // deferrals before a write is given up on
         crossTab: true,                       // default: on for IndexedDB, off for memory
+        keepLastUser: false,                  // open the last user's data on an offline reload (cookie mode)
+        replayBatchSize: 1,                   // queued creates sent per request on replay (max 1000)
+        onConflict: (error, mutation) => "overwrite", // or "discard"; default: no conflict check
         onSyncError: (error, mutation) => {}
     }
 });
@@ -239,8 +297,9 @@ O cliente não é uma réplica do seu banco de dados, e não finge ser:
 - **`count()` offline precisa de uma contagem que o servidor deu a este dispositivo para a mesma consulta.** As escritas enfileiradas desde então a movem: creates, edições que levam uma linha para dentro ou para fora do filtro, e deletes. Sem uma, ele falha com o erro `OFFLINE` em vez de contar as linhas que este dispositivo por acaso possui. Na 0.24 ele retornava esse número.
 - **`searchString` é aproximado** como uma varredura de substring que não diferencia maiúsculas de minúsculas sobre os campos de texto em cache. O servidor executa uma busca de texto completo real sobre as colunas configuradas da coleção.
 - **As relações trazidas por `include` não podem ser avaliadas localmente** — as linhas relacionadas vivem em coleções que a consulta nunca carregou. Uma consulta assim é sempre marcada como `partial` quando respondida a partir do cache.
-- **Os conflitos são last-writer-wins, por campo, sem detecção.** Um `update` reexecutado envia os campos que o usuário alterou e nada mais, então os campos que ele não tocou mantêm o que o servidor tem. Para um campo que ele *alterou*, uma mudança que outra pessoa fez no servidor enquanto ele estava offline é sobrescrita quando a fila é reexecutada, e nenhum dos usuários é avisado. Nada compara versões na reexecução.
+- **Os conflitos são last-writer-wins, por campo, a menos que você passe `onConflict`.** Um `update` reexecutado envia os campos que o usuário alterou e nada mais, então os campos que ele não tocou mantêm o que o servidor tem. Para um campo que ele *alterou*, uma mudança que outra pessoa fez no servidor enquanto ele estava offline é sobrescrita quando a fila é reexecutada, e nenhum dos usuários é avisado. Com [`onConflict`](#conflitos), uma edição cuja versão da linha é conhecida é comparada com a do servidor, e o app decide. Creates, deletes e escritas em massa nunca são verificados.
 - **A reexecução é pelo menos uma vez.** Uma escrita que chega ao servidor mas cuja resposta se perde pode ser enviada de novo. Prefira escritas idempotentes (`createMany` com `upsert`) onde duplicatas fizerem diferença.
+- **A lixeira precisa do servidor.** A base de dados local guarda apenas linhas ativas, então `trash.find()`, `trash.count()`, `trash.restore()` e `trash.purge()` (veja [soft delete](/docs/collections/soft-delete#from-the-sdk)) nunca são respondidos localmente nem enfileirados: offline falham com o erro `OFFLINE`. Restaurar ou excluir definitivamente uma linha com uma escrita ainda na fila sincroniza a fila primeiro, e é recusado com `TRASH_PENDING_WRITE` se a escrita ainda não puder ser enviada.
 - **Um upsert em uma chave natural precisa do servidor.** Qual linha um destino `onConflict` indica só o servidor consegue descobrir, então `upsert()` em uma chave natural (ou sem o id da linha), e um `createMany()` com `onConflict` que nunca foi enviado, são recusados offline com `OFFLINE_UPSERT_UNSUPPORTED`. Um upsert na chave primária, com a chave em cada linha, é colocado na fila.
 - **As leituras locais aplicam a semântica do Postgres, não os dados do banco de dados.** Os filtros são avaliados como o SQL faria — comparações com `NULL` são desconhecidas, `ORDER BY` coloca os nulos por último em ordem crescente —, mas sobre a cópia das linhas que o cliente tem, que pode estar desatualizada.
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: 0e00ae18684830bb
+sourceHash: 1bf5f81fc739ecfd
 title: Autenticación
 sidebar_label: Autenticación
 description: Autenticación del lado del cliente con el SDK de Rebase — inicio de sesión con correo electrónico/contraseña, proveedores OAuth, gestión de sesiones y escuchadores de estado de autenticación.
@@ -166,7 +166,8 @@ await client.auth.linkAnonymous("user@example.com", "correct-horse-battery");
 
 | Fallo | Significado |
 |-------|-------------|
-| `ANONYMOUS_AUTH_DISABLED` (403) | El backend no ha habilitado la autenticación anónima |
+| `ANONYMOUS_AUTH_DISABLED` (403) | El backend no ha habilitado la autenticación anónima, o la desactivó después de que este invitado iniciara sesión: un invitado se convierte en cuenta solo mientras `allowAnonymous` está activado |
+| `REGISTRATION_DISABLED` (403) | El registro está cerrado en el backend, y convertirse en cuenta es registrarse |
 | `NOT_ANONYMOUS` (400) | La sesión actual pertenece a una cuenta ordinaria |
 | `EMAIL_EXISTS` (409) | La dirección ya tiene una cuenta — inicia sesión en esa en su lugar |
 
@@ -307,6 +308,19 @@ Una restauración que actualiza (un token almacenado caducado, o el modo cookie)
 silenciosamente. Así que un escuchador no puede indicarte que la restauración ha finalizado: un arranque que no emite
 nada es indistinguible de uno que aún está en curso. Espera con `await isInitialized()`
 para esa comprobación y utiliza el escuchador para los cambios posteriores.
+
+`restoreOutcome()` indica cómo terminó la restauración, una vez que `isInitialized()` se
+ha resuelto: `"restored"`, `"none"` (nada que restaurar), `"refused"` (el servidor
+rechazó la sesión) o `"unreachable"` (no se pudo contactar con el servidor, así que
+la sesión no se confirmó ni se rechazó). En modo cookie, `"unreachable"`
+sin sesión es el único caso en que no se sabe que «sin sesión iniciada» sea cierto:
+
+```typescript
+await client.auth.isInitialized();
+if (!client.auth.getSession() && client.auth.restoreOutcome() === "unreachable") {
+    console.log("Offline: could not check the session.");
+}
+```
 
 ## Escuchador del estado de autenticación
 

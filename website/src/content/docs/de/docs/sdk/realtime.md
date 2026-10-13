@@ -1,5 +1,5 @@
 ---
-sourceHash: 7d1fe8f3e85d948e
+sourceHash: 07c1391c48e88901
 title: Realtime-Abonnements
 sidebar_label: Realtime
 description: Abonnieren Sie Live-Datenänderungen mit dem typisierten SDK von Rebase über WebSocket-basierte Realtime-Listener.
@@ -144,6 +144,27 @@ client.data.posts.listenById(1, (post) => {
 Relationen neu. Eine Änderung nur an einer verknüpften Zeile sendet keinen Frame: Das Bearbeiten des Namens eines Tags
 aktualisiert einen mit `include: ["tags"]` beobachteten Post erst, wenn sich auch der Post ändert. Um
 den verknüpften Zeilen zu folgen, beobachten Sie zusätzlich deren Collection.
+
+## Eine Anzahl beobachten
+
+<span class="since-badge" data-since="0.25">Seit 0.25</span> `listenCount()` hält eine Anzahl aktuell: die Gesamtzahl dessen, was der Filter einer Liste trifft, für
+eine Toolbar oder ein „Alle N auswählen“-Angebot, das nicht veralten soll, während andere Zeilen hinzufügen und entfernen.
+Der Callback läuft mit der Gesamtzahl, sobald sie bekannt ist, und erneut, wann immer ein Schreibvorgang sie ändert.
+
+```typescript
+const stop = client.data.orders.listenCount(
+    { where: { status: ["==", "open"] } },
+    (total) => console.log(`${total} open orders`),
+    (error) => console.error(error)
+);
+```
+
+Nur der Filter zählt — `where`, `logical` und `searchString`; ein `limit`, ein `offset` oder eine Sortierung wird
+ignoriert. Der Server liest dafür keine Zeilen, nur die Anzahl, unter der Identität des Abonnenten wie bei jedem
+anderen Frame. Ein Server älter als 0.25 kennt die Anfrage nicht; er beantwortet sie mit einer Zeile und derselben
+Gesamtzahl, und das SDK liest die Gesamtzahl daraus. Bei einem Client ohne Socket ist `listenCount()` ein
+Stub, der einen Fehler wirft, wie `listen()`. Ist [Offline-Unterstützung](/docs/sdk/offline/) aktiv, ist die Anzahl die
+des Servers: Warteschlangen-Schreibvorgänge sind darin erst enthalten, wenn sie wiedergegeben werden.
 
 ## Fluent Query Builder
 

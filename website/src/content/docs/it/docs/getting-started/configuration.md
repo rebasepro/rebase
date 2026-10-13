@@ -1,5 +1,5 @@
 ---
-sourceHash: 36738ccb08826775
+sourceHash: 6abd69bb5f29dabc
 title: Ambiente e configurazione
 sidebar_label: Configurazione
 description: Tutte le variabili d'ambiente e le opzioni di configurazione per i progetti Rebase.
@@ -231,6 +231,10 @@ direttamente nel proprio codice.
 | `REALTIME_CDC` | Acquisizione dei dati di modifica (CDC) a livello di database: `auto` (abilita se la connessione lo supporta, fallback trasparente altrimenti), `trigger` (forza l'abilitazione, avvisa se impossibile), `wal` (attualmente degrada a `trigger`), `off`. Vedere [Realtime](/docs/backend/realtime-cdc/). | `auto` |
 | `REALTIME_CHANNEL_BUS` | Trasporto tra istanze per canali di broadcast e presence: `memory` o `postgres`. Ignorato se a `realtime.bus` è stato assegnato un trasporto già istanziato. | `memory` |
 | `REALTIME_MAX_SUBSCRIPTIONS_PER_SOCKET` | Quante sottoscrizioni può mantenere un socket realtime; la successiva viene rifiutata con `TOO_MANY_SUBSCRIPTIONS`. Un numero intero positivo — qualsiasi altro valore blocca l'avvio del server. Prevale su `realtime.maxSubscriptionsPerSocket`. Vedi [Realtime](/docs/backend/realtime#what-a-write-costs-and-the-limits). | `1000` |
+| `REALTIME_MAX_SOCKETS_PER_USER` | <span class="since-badge" data-since="0.25">Da 0.25</span> Quanti socket realtime un utente può tenere aperti su una singola istanza del server. L'accesso del successivo viene rifiutato con `TOO_MANY_SOCKETS` e il socket chiuso (4002); l'SDK continua a riprovare, quindi entra quando un altro si chiude. Un numero intero positivo — qualsiasi altro valore blocca l'avvio del server. Prevale su `realtime.maxSocketsPerUser`. | Nessun tetto |
+| `REALTIME_REFETCH_MAX_WAIT_MS` | <span class="since-badge" data-since="0.25">Da 0.25</span> Il tempo massimo che una modifica attende il refetch che la consegna ai sottoscrittori live, in ms. Un refetch attende 300 ms senza modifiche, e al massimo questo tempo sotto un flusso costante di scritture. Un numero intero positivo — qualsiasi altro valore blocca l'avvio del server. Prevale su `realtime.refetchMaxWaitMs`. | `1000` |
+| `REALTIME_RECOUNT_INTERVAL_MS` | <span class="since-badge" data-since="0.25">Da 0.25</span> Per quanto tempo il totale di una grande sottoscrizione a elenco può essere riutilizzato prima di essere contato di nuovo, in ms; i frame che lo riutilizzano portano `meta.totalAsOf`. Se non impostato, ogni frame conta. Prevale su `realtime.recountIntervalMs`. | Non impostato |
+| `REALTIME_RECOUNT_MIN_ROWS` | <span class="since-badge" data-since="0.25">Da 0.25</span> Il più piccolo ultimo totale a cui si applica `REALTIME_RECOUNT_INTERVAL_MS`; gli elenchi più piccoli vengono contati a ogni frame. Prevale su `realtime.recountMinRows`. | `100000` |
 | `ALLOW_LOCALHOST_IN_PRODUCTION` | Consente valori `localhost`/loopback con `NODE_ENV=production`. Disattivato per impostazione predefinita, in modo che un avvio in produzione fallisca vistosamente anziché connettersi a un database inesistente. | `false` |
 | `REBASE_STRICT_COLLECTION_CONFIG` | Comportamento all'avvio in presenza di una chiave nelle collection non letta da questa versione: `warn`, `error` (rifiuta l'avvio — consigliato da attivare in CI), o `off`. Regola solo le chiavi non *riconosciute*, che di solito sono un refuso e occasionalmente metadati intenzionali; una chiave che il sistema sa essere stata spostata è sempre fatale, poiché la funzionalità configurata risulterebbe altrimenti assente in modo silente. | `warn` |
 | `REBASE_PROVISION_ONLY` | `1`/`true` esegue il passaggio dello schema ed esce senza aprire un socket — il formato desiderato per un Job di migrazione, a partire dalla stessa immagine e dallo stesso bundle del server che lo segue. Un valore vuoto equivale a *non impostato*, pertanto una variabile `${SOMETHING}` non sostituita in un file compose non può trasformare un deployment ordinario in uno che esegue le migrazioni rifiutandosi di servire richieste. | — |
@@ -285,6 +289,26 @@ e dovrebbe essere presa da una persona anziché ereditata dalla mansione di un c
 | `REBASE_MCP_ENABLED` | Monta la superficie MCP. Richiede `REBASE_PUBLIC_URL`; in sua assenza la superficie non viene montata e lo segnala nel log di avvio. | `false` |
 | `REBASE_PUBLIC_URL` | L'origin raggiungibile esternamente di questo deployment, ad es. `https://app.example.com`. La superficie MCP non è in grado di dedurla — ricavare l'origin dall'header `Host` renderebbe l'identità dell'emittente, e l'audience rispetto a cui vengono verificati i propri token, un valore fornito dal chiamante. | — |
 | `REBASE_MCP_OPEN_REGISTRATION` | Consente la registrazione dinamica dei client OAuth (RFC 7591), consentendo a un client di registrarsi autonomamente. Impostare su `false` per richiedere che i client siano preregistrati. | `true` |
+
+### Modifica live dello schema da un bundle
+
+Disattivata a meno che `REBASE_LIVE_SCHEMA_REPOSITORY` non sia impostata. Un bundle compilato non ha
+sorgente delle collection da modificare, quindi con queste impostate l'editor di collection dell'admin legge
+il sorgente dal repository, committa ogni modifica e ne esegue il DDL su
+questo database. Solo per admin, e applicata da una persona a meno che
+`REBASE_LIVE_SCHEMA_ALLOW_MACHINE_APPLY` non dica altrimenti. Un repository indicato
+senza credenziali utilizzabili si rifiuta di avviarsi. Vedi
+[Live schema editing](/docs/backend/live-schema-editing#from-a-built-bundle).
+
+| Variabile | Descrizione | Predefinito |
+|-----------|-------------|-------------|
+| `REBASE_LIVE_SCHEMA_REPOSITORY` | Il repository GitHub su cui committare le modifiche di schema, come `owner/name`. Impostarla è ciò che attiva la funzionalità. | — |
+| `REBASE_LIVE_SCHEMA_BRANCH` | Il branch su cui arriva il commit. | `main` |
+| `REBASE_LIVE_SCHEMA_COLLECTIONS_PATH` | Dove vive il sorgente delle collection in quel repository, relativo alla radice del repository. | `config/collections` |
+| `REBASE_LIVE_SCHEMA_GITHUB_TOKEN` | Un token fine-grained con accesso in lettura e scrittura ai contenuti del repository. Imposta questa oppure le tre variabili `_GITHUB_APP_*`, non entrambe. | — |
+| `REBASE_LIVE_SCHEMA_GITHUB_APP_ID` | L'id di una GitHub App, per committare come app invece che con un token. | — |
+| `REBASE_LIVE_SCHEMA_GITHUB_APP_INSTALLATION_ID` | L'installazione dell'app sul repository. | — |
+| `REBASE_LIVE_SCHEMA_GITHUB_APP_PRIVATE_KEY` | La chiave privata dell'app: PEM, PEM con a capo con escape, oppure base64. | — |
 
 ### Backup
 
@@ -348,6 +372,7 @@ Letto da `rebase`, non dal server. Nessun parametro qui presente influisce su un
 | `REBASE_CLOUD_PASSWORD` | La relativa password, in modo che un secret store possa fornirla senza che finisca nella cronologia della shell. | — |
 | `REBASE_TOKEN` | Un token creato con `rebase cloud tokens create`. Se impostata, ogni comando `rebase cloud` si autentica con il token invece che con la sessione di `rebase cloud login`, e non legge né scrive mai la sessione salvata. È il modo di eseguire `rebase cloud` in CI — vedi [CI e agent](/docs/deployment/cloud/#ci-and-agents). Il [server MCP](/docs/ai/mcp/) legge lo stesso nome come alias di `REBASE_API_TOKEN`. | — |
 | `REBASE_DEBUG` | `1` stampa l'errore sottostante e il dettaglio della richiesta invece del messaggio sintetico. La prima opzione da impostare quando un comando `rebase cloud` fallisce senza fornire informazioni utili. | — |
+| `REBASE_ATLAS_DEV_URL` | <span class="since-badge" data-since="0.25">Da 0.25</span> Il database vuoto su cui `rebase db push`, `db generate` e `db migrate` pianificano, invece del `<db>_dev_diff` che creano accanto a `DATABASE_URL`. Rebase non crea né elimina un database indicato qui, e rifiuta uno uguale a `DATABASE_URL`. Sul database di sviluppo gestito la CLI lo imposta su un PGlite in memoria temporaneo tutto suo. Impostala dove `CREATE DATABASE` non è concesso. | `<db>_dev_diff` |
 | `REBASE_DEV_NO_DB` | `rebase dev` non avvia alcun database e non esegue il provisioning — è necessario fornirne uno proprio. Equivale a `--no-db`. | — |
 | `REBASE_FRONTEND_PORT` | Fissa la porta del dev server frontend, che `rebase dev` altrimenti ricaverebbe dal percorso del progetto. | — |
 | `REBASE_DEV_READY_TIMEOUT_MS` | Tempo di attesa in millisecondi che `rebase dev` concede al backend per annunciarsi prima di segnalare che non è stato avviato. `0` disabilita la segnalazione. | `30000` |

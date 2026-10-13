@@ -1,5 +1,5 @@
 ---
-sourceHash: 536427d653beb637
+sourceHash: 01546a922a601fac
 title: Inicio rápido
 sidebar_label: Inicio rápido
 description: Crea un nuevo proyecto de Rebase y ponlo en marcha localmente en menos de 2 minutos.
@@ -74,7 +74,7 @@ DATABASE_URL=postgresql://username:password@localhost:5432/your_database
 
 Luego, inicia los servidores de desarrollo como se indicó anteriormente. Si se define una variable `DATABASE_URL`, esta nunca se modifica, y si apunta a cualquier lugar fuera de esta máquina, se deja completamente intacta.
 
-Con tu propia base de datos también obtienes los comandos de migración, que la administrada no puede ofrecer; estos planifican los cambios con [Atlas](https://atlasgo.io/), el motor de migración de esquemas con el que Rebase planifica, el cual necesita una segunda base de datos vacía con la cual comparar, y PGlite solo proporciona una:
+Los comandos de migración planifican los cambios con [Atlas](https://atlasgo.io/), el motor de migración de esquemas con el que Rebase planifica, el cual necesita una segunda base de datos vacía con la cual comparar. Con tu propia base de datos, Rebase crea una a su lado; en la administrada, que sirve exactamente una base de datos, inicia un PGlite desechable mientras dura el comando. En ambos casos:
 
 ```bash
 pnpm run db:push

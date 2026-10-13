@@ -1,5 +1,5 @@
 ---
-sourceHash: 0e00ae18684830bb
+sourceHash: 1bf5f81fc739ecfd
 title: Authentifizierung
 sidebar_label: Authentifizierung
 description: Clientseitige Authentifizierung mit dem Rebase SDK — E-Mail/Passwort-Anmeldung, OAuth-Anbieter, Sitzungsverwaltung und Auth-Status-Listener.
@@ -164,7 +164,8 @@ await client.auth.linkAnonymous("user@example.com", "correct-horse-battery");
 
 | Fehler | Bedeutung |
 |---------|-------|
-| `ANONYMOUS_AUTH_DISABLED` (403) | Das Backend hat die anonyme Authentifizierung nicht aktiviert |
+| `ANONYMOUS_AUTH_DISABLED` (403) | Das Backend hat die anonyme Authentifizierung nicht aktiviert, oder sie ausgeschaltet, seit sich dieser Gast angemeldet hat: Ein Gast wird nur zu einem Konto, solange `allowAnonymous` an ist |
+| `REGISTRATION_DISABLED` (403) | Die Registrierung ist im Backend geschlossen, und ein Konto zu werden ist eine Registrierung |
 | `NOT_ANONYMOUS` (400) | Die aktuelle Sitzung gehört zu einem regulären Konto |
 | `EMAIL_EXISTS` (409) | Für die Adresse existiert bereits ein Konto — melden Sie sich stattdessen bei diesem an |
 
@@ -300,6 +301,19 @@ function useCurrentUser() {
 `useRebaseAuthController` in `@rebasepro/app` erledigt dies bereits, sodass eine auf der generierten Vorlage aufbauende App dies automatisch mitbringt. Datenanfragen müssen nicht warten: Eine mitten in der Wiederherstellung gestellte wird gesendet, sobald diese abgeschlossen ist — als der wiederhergestellte Benutzer oder anonym —, sodass ein erstes Rendern nie eine öffentliche Auflistung anstelle der eigenen des Benutzers liest.
 
 Eine Wiederherstellung, die aktualisiert (ein abgelaufenes gespeichertes Token oder der Cookie-Modus), erreicht `onAuthStateChange` als `TOKEN_REFRESHED`; ein noch gültiges gespeichertes Token wird still übernommen. Ein Listener kann Ihnen also nicht sagen, ob die Wiederherstellung abgeschlossen ist: Ein Start, der nichts auslöst, ist von einem noch laufenden Vorgang nicht zu unterscheiden. Warten Sie für diese Prüfung `isInitialized()` ab und nutzen Sie den Listener für spätere Änderungen.
+
+`restoreOutcome()` sagt, wie die Wiederherstellung endete, sobald `isInitialized()`
+aufgelöst hat: `"restored"`, `"none"` (nichts wiederherzustellen), `"refused"` (der Server
+hat die Sitzung abgelehnt) oder `"unreachable"` (der Server war nicht erreichbar, sodass
+die Sitzung weder bestätigt noch abgelehnt wurde). Im Cookie-Modus ist `"unreachable"`
+ohne Sitzung der eine Fall, in dem „abgemeldet“ nicht als wahr bekannt ist:
+
+```typescript
+await client.auth.isInitialized();
+if (!client.auth.getSession() && client.auth.restoreOutcome() === "unreachable") {
+    console.log("Offline: could not check the session.");
+}
+```
 
 ## Auth-Status-Listener
 

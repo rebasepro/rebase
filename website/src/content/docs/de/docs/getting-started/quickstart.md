@@ -1,5 +1,5 @@
 ---
-sourceHash: 536427d653beb637
+sourceHash: 01546a922a601fac
 title: Schnellstart
 sidebar_label: Schnellstart
 description: Erstellen Sie ein neues Rebase-Projekt und führen Sie es in weniger als 2 Minuten lokal aus.
@@ -85,10 +85,10 @@ DATABASE_URL=postgresql://username:password@localhost:5432/your_database
 Starten Sie dann die Dev-Server wie oben beschrieben. Eine gesetzte `DATABASE_URL` wird niemals
 angetastet, und eine URL, die auf einen anderen Rechner verweist, bleibt völlig unberührt.
 
-Mit einer eigenen Datenbank stehen Ihnen auch die Migrationsbefehle zur Verfügung, die die verwaltete Datenbank
-nicht bieten kann — diese planen Änderungen mit [Atlas](https://atlasgo.io/), der Schema-Migrationsengine,
-die Rebase zur Planung nutzt. Atlas benötigt eine zweite leere Datenbank
-für den Vergleich, und PGlite stellt exakt eine bereit:
+Die Migrationsbefehle planen Änderungen mit [Atlas](https://atlasgo.io/), der Schema-Migrationsengine,
+die Rebase zur Planung nutzt. Atlas benötigt eine zweite leere Datenbank für den Vergleich. Bei einer
+eigenen Datenbank legt Rebase eine daneben an; bei der verwalteten, die exakt eine Datenbank bereitstellt,
+startet es für die Dauer des Befehls eine wegwerfbare PGlite-Instanz. In beiden Fällen:
 
 ```bash
 pnpm run db:push

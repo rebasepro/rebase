@@ -1,5 +1,5 @@
 ---
-sourceHash: 4b29623fe71430bc
+sourceHash: f26c07b9fa5cc279
 title: Eigenschaften
 sidebar_label: Eigenschaften
 description: Eigenschaftstypen definieren den Datentyp, die Validierung und das UI-Rendering für jedes Feld in einer Collection. Rebase unterstützt die Typen String, Number, Boolean, Date, Array, Map, Reference, Relation und Geopoint.
@@ -42,6 +42,7 @@ Alle Eigenschaftstypen teilen diese Optionen:
 | `name` | `string` | Anzeigebezeichnung. Standardmäßig der Eigenschaftsschlüssel, formatiert – `publishDate` → "Publish Date". Setzen Sie ihn, wenn diese Ableitung nicht passt: `"URL"` statt "Url". |
 | `description` | `string` | Hilfetext, der unter dem Feld angezeigt wird |
 | `defaultValue` | `any` | Standardwert für neue Entitäten. Ein Literal – ein String, eine Zahl, ein Boolean, ein Datum, eine Enum-ID oder ein `map`/`array`-Dokument – wird auch zum `DEFAULT` der Spalte, sodass auch eine Zeile, die nicht über das Admin-Panel eingefügt wird (die REST-API, ein Seed, `psql`), diesen Wert erhält |
+| `databaseDefault` | `boolean \| SqlExpression` | <span class="since-badge" data-since="0.25">Seit 0.25</span> Die Datenbank füllt die Spalte, wenn ein Create sie leer lässt: eine Spalte `NOT NULL DEFAULT <expression>` wie `gen_random_uuid()` oder `nextval(…)`. Ein `required`-Feld mit dieser Option darf bei einem Create weggelassen werden, vom Admin-Formular wie von der API, und ein beim Create gesendetes `null` bleibt der Datenbank überlassen; beim Bearbeiten bleibt es erforderlich, und der generierte `Insert`-Typ macht es optional. Geben Sie den Ausdruck in der Template-Form an, die `isId` annimmt, ``databaseDefault: "sql`gen_random_uuid()`"``, und der Schema-Planer schreibt ihn als `DEFAULT` der Spalte, sodass `rebase db push` ihn beibehält. `true` deklariert einen anderswo geschriebenen `DEFAULT` und schreibt keinen, sodass ein Push plant, ihn zu entfernen. „Import from table“ und `rebase schema introspect` setzen den Ausdruck, den sie lesen |
 | `validation` | `object` | Validierungsregeln |
 | `propertyConfig` | `string` | Registrierter Eigenschafts-Konfigurationsschlüssel |
 | `columnName` | `string` | Expliziter Datenbankspaltenname (umgeht die snake_case-Konvertierung) |
@@ -449,7 +450,7 @@ aus dem es die Volltextsuch-Helfer nicht verwalten kann.
 |----------|------|-------------|
 | `mode` | `"date" \| "date_time"` | Nur Datum oder Datum + Uhrzeit (Standard: `"date_time"`). Bestimmt das Widget; die Spalte ist in beiden Fällen dieselbe. **Nur Admin-Formular – wird von der API oder der Datenbank nicht erzwungen.** |
 | `autoValue` | `"on_create" \| "on_update"` | Zeitstempel automatisch setzen. `on_create` ist ein `DEFAULT now()`; `on_update` ist ein `BEFORE UPDATE`-Trigger **sowie** ein Stempel auf Anwendungsebene, sodass ein direktes `UPDATE` aus einem Seed oder einer Migration die Spalte ebenfalls aktualisiert |
-| `columnType` | `"timestamp" \| "date" \| "time"` | Die Datenbankspalte. Standardmäßig `timestamp` **mit Zeitzone** |
+| `columnType` | `"timestamp" \| "date" \| "time"` | Die Datenbankspalte. Standardmäßig `timestamp` **mit Zeitzone**. Eine `date`-Spalte wird als Tag ausgewählt und angezeigt, was auch immer `mode` sagt; eine `time`-Spalte als reine Tageszeit in UTC ohne Tag (sie wird als diese Uhrzeit am 1970-01-01 übertragen) |
 | `timezone` | `string` | In welcher Zeitzone die Auswahl den Wert liest und schreibt. **Nur Admin-Formular – wird von der API oder der Datenbank nicht erzwungen.** |
 | `admin.clearable` | `boolean` | Symbol zum Leeren des Werts hinzufügen (auf null setzen) |
 

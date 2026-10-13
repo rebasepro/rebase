@@ -1,5 +1,5 @@
 ---
-sourceHash: 0fc23adc81af9f41
+sourceHash: 8f6ca9ef6468a144
 title: Fonctions personnalisées
 sidebar_label: Fonctions personnalisées
 description: Ajoutez des points de terminaison d'API Hono personnalisés aux côtés de vos routes CRUD Rebase. Découverte automatique à partir d'un répertoire, avec un accès complet à l'instance backend.
@@ -323,6 +323,8 @@ export default defineFunction((app, { rebase }) => {
     });
 });
 ```
+
+`rebase.dataAsAdmin` n'est pas typé tant que vous n'[enregistrez pas votre `Database` générée](/docs/backend/typed-server-data).
 
 ### Driver restreint par RLS vs Singleton Rebase
 

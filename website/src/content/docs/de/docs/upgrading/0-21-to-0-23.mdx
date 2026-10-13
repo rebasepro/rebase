@@ -1,0 +1,154 @@
+---
+sourceHash: c6b95df3140b1b02
+slug: de/docs/upgrading/0-21-to-0-23
+title: Upgrade von 0.21 auf 0.23
+sidebar_label: 0.21 → 0.23
+description: Die Breaking Changes, die 0.23 für eine App auf 0.21 oder 0.22 mitbringt — API-Schlüssel auf verschachtelten Pfaden, Boot-Verweigerungen, eigene Auth-Repositories, Gast-Upgrades und eigene Job-Stores.
+---
+
+# Upgrade von 0.21 → 0.23
+
+Dies sind die `### Breaking`-Einträge, die 0.23 mitbringt. 0.22 deklariert keine Breaking
+Changes, daher liest eine App auf 0.21 oder 0.22 diese eine Seite, um 0.23 zu erreichen.
+
+Drei davon verweigern den Start und nennen die Einstellung, statt das Verhalten
+stillschweigend zu ändern. Vier ändern, wer sich anmelden kann oder was ein Schlüssel erreichen darf: Lesen Sie diese zuerst,
+wenn Ihre App API-Schlüssel auf verschachtelten Pfaden, ein eigenes Auth-Repository oder Gäste hat,
+die zu Konten werden. Der letzte ändert den Vertrag eines eigenen Job-Stores.
+
+---
+
+## 33. Ein API-Schlüssel auf einem verschachtelten Pfad braucht `read` auf jeder übergeordneten Collection
+
+Ein Schlüssel wurde gegen das letzte Segment einer verschachtelten URL geprüft, das eine Relation
+und keine Collection benennt, und die übergeordnete Collection wurde gar nicht geprüft.
+Jetzt wird die Operation der Route gegen die Collection geprüft, die der Pfad erreicht, und jede Collection, durch die der Pfad führt, braucht
+`read`. Ein Schlüssel, der nur auf `posts` beschränkt ist und `/api/data/authors/1/posts` aufruft, erhält
+`403 API_KEY_FORBIDDEN` mit Nennung von `authors`, bis er auch `authors` lesen kann.
+
+**Was zu ändern ist:** Geben Sie jedem Schlüssel, der verschachtelte Pfade nutzt, `read` auf den übergeordneten Collections
+(`PUT /api/admin/api-keys/:id`), oder lassen Sie ihn stattdessen die eigene Route der untergeordneten Collection
+mit einem Filter aufrufen.
+
+```json
+[
+    { "collection": "posts", "operations": ["read", "write"] },
+    { "collection": "authors", "operations": ["read"] }
+]
+```
+
+Siehe [API-Schlüssel](/docs/backend/api-keys/#data). Seit 0.24 wird dieselbe Regel in Scopes geschrieben: Jede übergeordnete Collection braucht `data:read`.
+
+## 34. Eine numerische Umgebungsvariable, die keine Zahl ist, lässt den Start fehlschlagen
+
+`PORT`, `SMTP_PORT`, `REBASE_MAX_BODY_SIZE` und die `DB_POOL_*`-Variablen reichten früher
+`NaN` weiter oder lasen einen leeren Wert als `0`. Ein leeres `REBASE_MAX_BODY_SIZE`
+entfernte das Body-Limit von jeder Route, und ein leeres `PORT` ließ einen Produktionsserver
+auf einem zufälligen Port lauschen. Ein leerer Wert bedeutet nun „nicht gesetzt“ und nimmt den
+Standard, ein ausdrückliches `0` zählt weiterhin, und alles, was keine Zahl ist, stoppt
+den Start unter Nennung der Variable.
+
+**Was zu ändern ist:** nichts, es sei denn, der Start nennt nun eine Variable. Dann korrigieren Sie deren
+Wert oder entfernen Sie sie.
+
+```bash
+grep -nE "^(PORT|SMTP_PORT|REBASE_MAX_BODY_SIZE|DB_POOL_[A-Z_]+)=" .env*
+```
+
+## 35. Eine Sitzungsdauer, die der Token-Signierer nicht lesen kann, verweigert den Start
+
+`auth.accessExpiresIn` und `auth.refreshExpiresIn` (`JWT_ACCESS_EXPIRES_IN`,
+`JWT_REFRESH_EXPIRES_IN`) wurden gegen `^\d+[dhms]$` geprüft, während der Token-
+Signierer sie anders las, und alles dazwischen fiel stillschweigend zurück:
+`1w`, `2 weeks` oder `30 days` wurde zu einem 400-Tage-Refresh-Token. Beide nehmen nun
+eine positive Zahl und eine Einheit, etwa `15m`, `1h`, `30d` oder `2 weeks`. Eine bloße
+Zahl, null, ein negativer Wert oder ein Wert, den der Signierer nicht lesen kann, stoppt den Start
+und nennt die Einstellung.
+
+**Was zu ändern ist:** Geben Sie jeder Dauer eine Einheit. `3600` ist keine Stunde — der
+Signierer liest eine bloße Zahl als Millisekunden —, schreiben Sie also `1h`.
+
+```bash
+grep -rnE "(EXPIRES_IN|ExpiresIn)" .env* config
+```
+
+## 36. Ein eigenes Auth-Repository braucht `unlinkUserIdentity`, sonst werden manche Anmeldungen abgelehnt
+
+Beim ersten Mal, dass jemand die Adresse eines nicht verifizierten Kontos nachweist, per Magic Link,
+E-Mail-Code oder Passwort-Reset, entfernt Rebase jede verknüpfte Anmelde-Identität, deren
+Anbieter diese Adresse nicht verifiziert hat ([37](#37-ein-nicht-verifiziertes-konto-verliert-beim-ersten-verifizieren-seiner-adresse-alles-was-niemand-bewiesen-hat)).
+Es tut dies über das neue optionale `unlinkUserIdentity` des Repositorys. Ein
+Repository ohne dieses beantwortet eine solche Anmeldung mit `409 UNVERIFIED_IDENTITIES`,
+statt die Identität bestehen zu lassen. `updatePassword` muss außerdem
+`null` akzeptieren, was das Passwort entfernt.
+
+**Was zu ändern ist:** Implementieren Sie in einem eigenen `AuthRepository`
+`unlinkUserIdentity(uid, provider, providerId)` und lassen Sie `updatePassword` `null` annehmen.
+Der Postgres-Store implementiert beides. Der MongoDB-Store hat noch kein
+`unlinkUserIdentity`, sodass eine solche Anmeldung auf MongoDB abgelehnt wird.
+
+## 37. Ein nicht verifiziertes Konto verliert beim ersten Verifizieren seiner Adresse alles, was niemand bewiesen hat
+
+Nichts verifiziert die Adresse, mit der ein Konto registriert wird, sodass jeder die Adresse eines anderen
+mit einem Passwort registrieren oder sich über einen Anbieter, der nicht dafür bürgt, als diese anmelden
+und auf den Eigentümer warten konnte. Der erste Magic Link, E-Mail-Code oder Passwort-Reset an einem nicht verifizierten Konto
+entfernt nun dessen Passwort (ein Reset setzt das neue) und jede verknüpfte Identität, deren Anbieter
+diese Adresse nicht verifiziert hat, und beendet alle seine Sitzungen, bevor es als verifiziert markiert wird.
+Die OAuth-Anmeldung verknüpft sich gar nicht mehr mit einem nicht verifizierten Konto: Sie antwortet
+`403 EMAIL_NOT_VERIFIED`, wobei `details.reason` nennt, welche Seite nicht verifiziert war.
+
+**Was zu ändern ist:** nichts im Code. Rechnen Sie damit, dass jemand, der sich mit einem
+Passwort registriert, nie verifiziert hat und sich dann per Magic Link oder Code anmeldet, erneut ein
+Passwort setzen muss und auf seinen anderen Geräten abgemeldet wird. Mit
+`POST /api/admin/users` angelegte Konten werden verifiziert gespeichert, sodass Eingeladene weiterhin „Mit Google
+anmelden“ nutzen können. Siehe
+[Kontoverknüpfung](/docs/backend/authentication/#account-linking-across-sign-in-methods).
+
+## 38. Wenn Captcha `register` schützt, braucht das Upgrade eines Gastes eine gelöste Challenge
+
+`POST /auth/anonymous/link` macht aus einem Gast ein Konto mit E-Mail und
+Passwort, was eine Registrierung ist, und übersprang sowohl das `register`-Captcha als auch
+`beforeUserCreate`. Es nimmt nun die `register`-Challenge und führt den Hook aus, wie
+`/auth/register` es tut. `register` ist eine der Standard-Captcha-Routen. Die
+Gast-Anmeldung selbst (`POST /auth/anonymous`) nimmt weiterhin keine Challenge.
+
+**Was zu ändern ist:** Eine App, die Gäste zu Konten macht, sendet das Token des Widgets auch an `/auth/anonymous/link` —
+als `captchaToken` im Body oder im Header
+`cf-turnstile-response` / `h-captcha-response` —, so wie sie es für
+`/auth/register` tut. Siehe [Bot-Schutz](/docs/backend/authentication/#bot-protection).
+
+## 39. E-Mail verweigert den Start ohne absolute Basis-URL für das Zurücksetzen von Passwörtern
+
+Verifizierungs- und Magic Links fallen auf `auth.email.resetPasswordUrl` zurück, und
+nichts fällt auf `verifyEmailUrl` oder `magicLinkUrl` zurück. Eine Konfiguration, die nur
+diese setzte, startete und sendete in jeder Passwort-Reset-E-Mail einen toten relativen Link. Jetzt
+verweigert E-Mail den Start, sofern nicht jede per E-Mail versendete Link-Art zu einer absoluten
+`http(s)`-Basis aufgelöst wird, und sagt, welche es nicht tut.
+
+**Was zu ändern ist:** Setzen Sie `FRONTEND_URL` oder `auth.email.resetPasswordUrl` auf eine
+absolute URL wie `https://app.example.com`.
+
+```bash
+grep -rnE "(FRONTEND_URL|resetPasswordUrl|verifyEmailUrl|magicLinkUrl)" .env* config
+```
+
+## 40. Ein eigener Job-Store nimmt einen Claim, wenn er einen Job abschließt oder fehlschlagen lässt
+
+Ein Queue-Handler, der das Visibility-Timeout überschritt, wurde zurückgefordert, während er
+noch lief, und neben sich ein zweites Mal gestartet. `complete` und `fail`
+fanden den Job allein über seine ID, sodass der Erfolg des ersten Versuchs den Job als
+erledigt markierte, während der zweite lief, und das Scheitern des zweiten den fertigen Job
+für einen dritten Lauf zurückschickte. Der Worker erneuert nun seinen Claim, solange ein Handler läuft, und nur
+der Versuch, der einen Job noch hält, darf sein Ergebnis festhalten.
+
+`JobStore.complete(id, claim)` und `fail(id, error, retryAt, claim)` erhalten einen
+`JobClaim`, `{ workerId, attempt }`. Das neue optionale `heartbeat(id, claim)`
+erneuert den Claim eines laufenden Jobs und löst mit der Angabe auf, ob er ihn noch hielt.
+Der eingebaute Store implementiert alle drei, sodass eine App, die ihn nutzt, nichts zu tun hat.
+
+**Was zu ändern ist:** Lassen Sie in einem eigenen `JobStore` `complete` und `fail` die Zeile nur ändern, solange der Claim sie
+noch hält — laufend, gesperrt von `claim.workerId`,
+im Versuch `claim.attempt` — und sonst nichts tun. Fügen Sie `heartbeat` hinzu, das die
+Sperrzeit unter derselben Bedingung erneuert. Ein Store ohne dieses funktioniert weiterhin, aber ein
+Handler, der das Visibility-Timeout überschreitet, wird zweimal ausgeführt. Siehe
+[Hintergrund-Jobs](/docs/backend/jobs/#what-happens-when-a-worker-dies).

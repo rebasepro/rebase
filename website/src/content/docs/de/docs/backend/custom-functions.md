@@ -1,5 +1,5 @@
 ---
-sourceHash: 0fc23adc81af9f41
+sourceHash: 8f6ca9ef6468a144
 title: Benutzerdefinierte Funktionen
 sidebar_label: Benutzerdefinierte Funktionen
 description: Fügen Sie benutzerdefinierte Hono-API-Endpunkte neben Ihren Rebase-CRUD-Routen hinzu. Automatische Erkennung aus einem Verzeichnis, mit vollem Zugriff auf die Backend-Instanz.
@@ -311,6 +311,8 @@ export default defineFunction((app, { rebase }) => {
     });
 });
 ```
+
+`rebase.dataAsAdmin` ist untypisiert, bis Sie [Ihre generierte `Database` registrieren](/docs/backend/typed-server-data).
 
 ### RLS-bezogener Driver vs. Rebase-Singleton
 

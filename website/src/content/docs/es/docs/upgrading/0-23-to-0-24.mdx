@@ -1,0 +1,612 @@
+---
+sourceHash: acd1967fc17b4924
+slug: es/docs/upgrading/0-23-to-0-24
+title: Actualización de 0.23 a 0.24
+sidebar_label: 0.23 → 0.24
+description: Los cambios incompatibles que 0.24 trae para una aplicación en 0.23: SQL y tipos del SDK generados, rutas de la CLI, scopes, upserts y claves, el endpoint MCP remoto, sesiones y cuentas, las rutas de copias de seguridad, el plugin de insights y las imágenes en campos markdown.
+---
+
+# Actualización de 0.23 → 0.24
+
+Estas son las entradas `### Breaking` que 0.24 trae para una aplicación en 0.23.
+
+Las secciones 41 a 46 tratan de la CLI: el SQL generado sale del repositorio,
+`rebase dev` regenera los tipos del SDK sin que se lo pida, y las rutas, los
+fallos y la configuración de agentes se vuelven coherentes. Las secciones 47 a 50
+cambian lo que responde el servidor, y de la 51 a la 55 tratan del acceso. Los permisos
+ahora son [scopes](/docs/backend/roles-and-scopes/), un único vocabulario para
+sesiones, claves de API, roles y tokens MCP; si todas las personas que usan sus
+superficies de administración tienen el rol `admin`, la mayoría no le piden nada.
+Las secciones 56 a 58 cubren el endpoint MCP remoto, las escrituras en proceso y
+el kit de UI, de la 59 a la 64 los cambios de sesión y de cuenta, la 65 las rutas de
+copias de seguridad, la 66 el plugin de insights y la 67 las imágenes en campos
+markdown.
+
+---
+
+## 41. `db push` y `db generate` escriben su SQL en `.rebase/sql/`
+
+`rebase db push` y `rebase db generate` convierten sus colecciones en cinco
+archivos SQL: `schema.sql`, `policies.sql`, `search.sql`, `vector.sql` y
+`triggers.sql`. Se escribían en `drizzle/`, junto a las migraciones, y se
+confirmaban en el repositorio. Ambos comandos regeneran los cinco antes de leer
+ninguno, por lo que la copia confirmada nunca se leía, y aparecía en el diff de
+cada cambio de colección. Ahora se escriben en `.rebase/sql/`, relativo al
+directorio donde se ejecuta el comando (`backend/.rebase/sql/` en un proyecto
+generado con la plantilla). El directorio escribe su propio `.gitignore`, de modo
+que nunca se confirma.
+
+La primera ejecución tras actualizar elimina las copias antiguas de `drizzle/` y
+nombra cada una. Solo elimina los archivos que empiezan con la cabecera del
+generador, así que un archivo que usted haya escrito allí se conserva, igual que
+las migraciones de `drizzle/migrations/`.
+
+**Qué cambiar:** confirme la eliminación que informa la primera ejecución. Si un
+script o un paso de CI lee alguno de estos archivos, apúntelo a `.rebase/sql/` y
+ejecute `rebase db push` o `rebase db generate` antes: una copia limpia del
+repositorio ya no tiene el archivo.
+
+```bash
+grep -rnE "drizzle/(schema|policies|search|vector|triggers)\.sql" --exclude-dir=node_modules .
+```
+
+## 42. `rebase dev` ya no acepta `--generate`
+
+Lo que activaba la opción es lo que `rebase dev` hace siempre ahora. Al arrancar y
+en cada guardado bajo `config/collections/`, regenera los tipos del SDK en
+`generated/sdk/`, como ya hacía con el esquema de Drizzle. Antes, el SDK solo se
+regeneraba con la opción, por lo que una copia nueva del repositorio no tenía
+tipos del SDK hasta que alguien ejecutaba `rebase generate-sdk`. Pasar
+`--generate` o `-g` se detiene con un mensaje que indica que la quite, y
+`REBASE_AUTO_GENERATE` y `REBASE_GENERATE` ya no se leen.
+
+**Qué cambiar:** elimine `--generate` y `-g` de todo script que inicie
+`rebase dev`, y borre `REBASE_AUTO_GENERATE` y `REBASE_GENERATE` de sus archivos
+`.env`. `rebase generate-sdk` no cambia: manténgalo en CI, en un repositorio de
+frontend sin colecciones (`--from link`) y en cualquier lugar donde `rebase dev`
+no se esté ejecutando.
+
+```bash
+grep -rnE "rebase dev.*(--generate|-g)|REBASE_(AUTO_)?GENERATE" --exclude-dir=node_modules .
+```
+
+## 43. Una ruta relativa de `--collections` se lee desde donde ejecuta el comando
+
+`schema generate`, `db push`, `db generate` y `doctor` resolvían un
+`--collections` relativo desde `backend/`, mientras que `generate-sdk` y
+`db backup --out` resolvían el suyo desde el directorio en el que escribió el
+comando. Ahora todos los comandos usan la segunda regla, y también `schema
+--output` y `doctor --schema`/`--sdk`. Un script escrito para la regla anterior,
+`--collections ../config/collections` ejecutado desde la raíz del proyecto, ahora
+nombra un directorio que no existe. La CLI lo rechaza antes de ejecutar nada,
+porque un esquema generado a partir de cero colecciones está vacío y aplicarlo
+eliminaría todas las tablas, y el mensaje indica qué escribir en su lugar.
+
+**Qué cambiar:** quite la opción donde nombre `config/collections`, que es el
+valor por defecto, o escriba la ruta desde donde se ejecuta el comando.
+`generate-sdk` ahora también acepta `--collections`; `--collections-dir` sigue
+funcionando.
+
+```diff lang="json"
+- "db:push": "rebase db push --collections ../config/collections"
++ "db:push": "rebase db push"
+```
+
+```bash
+grep -rnE -- "(--collections|-c) \.\./" --exclude-dir=node_modules .
+```
+
+## 44. `rebase generate-sdk` se detiene ante un archivo de colección que no carga
+
+`generate-sdk` leía el barrel `index.ts` de `config/collections/` y omitía, con una
+advertencia, un archivo que fallaba al cargar. Ahora carga todos los archivos de
+colección de primer nivel del directorio, los mismos que sirve el backend y que
+lista el panel de administración, los nombre o no el barrel. Un archivo que no
+carga hace fallar el comando, igual que ya hacía fallar el arranque. El barrel
+ordena la navegación y contiene `defaultSecurityRules`; no es un registro.
+
+**Qué cambiar:** nada, si su backend arranca. Si `generate-sdk` (o `rebase dev`,
+que lo ejecuta) ahora se detiene, corrija el archivo que nombra: es uno que el
+backend también rechazaría. Una colección omitida del barrel ahora aparece en el
+tipo `Database` generado, por lo que un cliente tipado gana su descriptor de
+acceso.
+
+## 45. Los agentes inician el `@rebasepro/mcp` del propio proyecto
+
+El `.mcp.json` que generaba `rebase init` ejecutaba `npx -y @rebasepro/mcp`: la
+versión más reciente del registro, fuera cual fuera la versión de la CLI del
+proyecto. `rebase init`, y el nuevo `rebase skills install --mcp`, ahora añaden
+`@rebasepro/mcp` como devDependency fijada junto con la CLI e inician esa copia:
+`pnpm exec rebase-mcp`, o `npx --no rebase-mcp` en un proyecto con npm. Un
+proyecto creado antes recibe la devDependency, con un mensaje para instalarla, la
+próxima vez que se ejecute `skills install --mcp`.
+
+**Qué cambiar:** añada la devDependency, con `rebase skills install --mcp` o
+`pnpm add -D @rebasepro/mcp`, y apunte el servidor `rebase` de `.mcp.json` (y
+cualquier otra configuración de agente que haya escrito a mano) al binario local:
+
+```diff lang="json"
+- "command": "npx", "args": ["-y", "@rebasepro/mcp"]
++ "command": "pnpm", "args": ["exec", "rebase-mcp"]
+```
+
+A partir de ahora, actualice `@rebasepro/mcp` junto con la CLI, ya que ambos van
+fijados juntos. Consulte [Conectar un cliente](/docs/ai/mcp/#connecting-a-client).
+
+## 46. `rebase api-keys create` acepta scopes
+
+`--scopes` nombra lo que la clave puede hacer, separado por comas o repetido:
+`--scopes data:read:posts,logs:read`. `--roles` indica los roles RLS con los que
+se ejecuta, además de `service`, y `--expires-in <días>` o `--expires-at <fecha>`
+indica cuándo deja de valer. `--full-access` son todos los scopes que tiene la
+clave de servicio, excepto `keys:read` y `keys:write`, que ninguna clave puede
+tener. `rebase api-keys scopes` lista todos los scopes que conoce el backend.
+
+`--permissions`, `--admin` y `--expires` se eliminan. Cada uno detiene el comando
+con un mensaje que nombra su reemplazo, de modo que un script que lleve alguno
+falla en lugar de crear una clave distinta de la que pretendía.
+
+**Qué cambiar:** en todo script que cree claves, reemplace `--permissions` por
+`--scopes`, `--admin` por `--roles admin` más los scopes del plano de
+administración que necesite la clave, y `--expires 90d` por `--expires-in 90`.
+
+| Antes | Después |
+|---|---|
+| `--permissions '[{"collection":"orders","operations":["read","write"]}]'` | `--scopes data:read:orders,data:write:orders` |
+| `--full-access` | `--full-access` (ahora también incluye los scopes del plano de administración que tiene la clave de servicio) |
+| `--admin --full-access` | `--full-access --roles admin` |
+| `--expires 30d` | `--expires-in 30` |
+
+```bash
+grep -rnE "api-keys create.*(--permissions|--admin|--expires )" --exclude-dir=node_modules .
+```
+
+## 47. Una edición de esquema en vivo no confirma SQL
+
+Un cambio aplicado desde el
+[editor de esquema en vivo](/docs/backend/live-schema-editing/) del panel de
+administración confirma la colección y `backend/src/schema.generated.ts`, y nada
+más. Antes también confirmaba los cinco archivos SQL, pero los escribía en la raíz
+del proyecto mientras que la CLI los escribe junto al backend, así que un proyecto
+podía tener dos copias que no coincidían. `SchemaCommitPaths` y
+`DEFAULT_COMMIT_PATHS` ahora solo contienen `schemaFile`.
+
+**Qué cambiar:** nada, a menos que su código lea `DEFAULT_COMMIT_PATHS` o
+construya un `SchemaCommitPaths`: entonces elimine `ddlFile`, `policiesFile`,
+`searchFile`, `vectorFile` y `triggersFile`, que TypeScript ahora señala. Si una
+edición en vivo confirmó esos archivos en un directorio `drizzle/` en la raíz de
+su proyecto, nada los lee: bórrelos. Un proyecto que mantiene migraciones
+versionadas sigue ejecutando `rebase db generate` tras una edición en vivo, y esa
+escribe la migración a partir de la colección confirmada.
+
+## 48. Un upsert sobre una fila en la papelera se rechaza con `409 ROW_IN_TRASH`
+
+En una colección con [borrado lógico](/docs/collections/soft-delete/), una fila
+eliminada conserva su clave. Un upsert cuya clave pertenecía a una fila así
+escribía sus valores en la fila oculta y respondía `201 Created`, por lo que la
+fila seguía eliminada y quien llamaba veía un éxito. Ahora se rechaza con
+`409 ROW_IN_TRASH` y no se escribe nada, en todas las vías de upsert:
+`?on_conflict=`, `/bulk`, `/_batch`, el SDK, el socket, y `rebase.data` o
+`context.data` en el servidor.
+
+**Qué cambiar:** nada, a menos que algo haga upsert en una colección con borrado
+lógico y espere recuperar una fila. Restaure primero la fila, con una
+actualización que ponga su campo de borrado lógico en `null`, y luego haga el
+upsert. O elimínela definitivamente con `?hard=true` y haga upsert de una nueva.
+
+```diff lang="ts"
+- await client.data.invoices.upsert({ id, ...values });
++ await client.data.invoices.update(id, { deletedAt: null });
++ await client.data.invoices.upsert({ id, ...values });
+```
+
+## 49. Una actualización que cambia la clave de una fila se rechaza con `400 KEY_IMMUTABLE`
+
+Una actualización cuyo cuerpo nombraba la clave de la fila con otro valor, o un
+`beforeSave` que la cambiaba, respondía `500`. En proceso, a través de
+`rebase.data`, la fila ya se había movido a la nueva clave cuando la escritura
+lanzaba el error. Ahora todas las vías la rechazan con `400 KEY_IMMUTABLE` antes
+de que se ejecute ningún hook, nombrando el campo, y no se escribe nada. Enviar la
+clave que la fila ya tiene se sigue aceptando.
+
+**Qué cambiar:** donde el código movía una fila actualizando su clave, cree la
+fila con la nueva clave y elimine la antigua. Un `beforeSave` que reescribía la
+clave en una actualización tiene que dejar de hacerlo. Consulte
+[Escritura](/docs/backend/writes/).
+
+## 50. `Strict-Transport-Security` ya no envía `includeSubDomains`
+
+La cabecera le decía a los navegadores que rechazaran HTTP plano en todos los
+subdominios del dominio del servidor, incluidos aquellos con los que el servidor
+no tiene nada que ver, durante todo el tiempo que indicara la cabecera. Ahora
+cubre únicamente el host propio del servidor.
+
+**Qué cambiar:** nada, a menos que su dominio padre dependa de la cabecera de este
+servidor para forzar HTTPS en sus subdominios. En ese caso, defina la variable
+para conservar la cabecera anterior:
+
+```bash
+REBASE_HSTS_INCLUDE_SUBDOMAINS=true
+```
+
+Consulte [Cabeceras de seguridad](/docs/deployment/self-hosting/#security-headers).
+
+## 51. Los permisos son scopes
+
+Toda pregunta del tipo "¿puede quien llama hacer esto?" ahora pide un scope, con
+nombre `recurso:acción`: `data:read`, `users:write`, `cron:write`. Un scope puede
+nombrar un único destino: `data:read:posts` es `data:read` solo sobre `posts`. La
+sesión de una persona, una clave de API, un rol y un token MCP tienen scopes, y
+todos usan las mismas cadenas.
+
+Toda persona con sesión iniciada tiene el plano de datos: `data:*`, `storage:*` y
+`functions:invoke`. Sus filas siguen decidiéndose por las `securityRules` de la
+colección, así que ahí no cambia nada. El plano de administración son usuarios,
+esquema, base de datos, copias de seguridad, cron, registros y claves. El rol
+`admin` tiene todo eso, y cualquier rol que usted declare bajo `auth.roles` en la
+colección de usuarios tiene lo que usted indique. Ahora cada superficie de
+administración pide su propio scope en lugar de "¿es administrador?": las rutas
+de usuarios necesitan `users:read` o `users:write`, cron necesita `cron:read` o
+`cron:write`, y así sucesivamente. El
+[índice de endpoints](/docs/backend/endpoints/#admin) nombra el scope de cada
+ruta. Un rechazo es `403 SCOPE_MISSING`, con el scope en `details.requiredScope`.
+
+**Qué cambiar:** nada, si todas las personas que usan las superficies de
+administración tienen el rol `admin`, porque un administrador tiene todos los
+scopes. Si un rol más acotado debe acceder a una (un equipo de soporte que
+gestiona cuentas, un desarrollador que lee registros), declárelo con los scopes
+que necesita. Consulte
+[Roles y scopes](/docs/backend/roles-and-scopes/#declaring-roles). Un cliente que
+se ramificaba por `API_KEY_FORBIDDEN`, o por `FORBIDDEN` desde una ruta de
+administración, se ramifica por `SCOPE_MISSING`.
+
+```bash
+grep -rnE "API_KEY_FORBIDDEN|Admin privileges required" --exclude-dir=node_modules .
+```
+
+## 52. Las claves de API tienen scopes, no una lista de permisos y un indicador `admin`
+
+Una clave ahora tiene `scopes` y, si es una clave de servicio, `roles`: los roles
+RLS con los que se ejecuta, además de `service`. `permissions: [{ collection,
+operations }]` y `admin: true` desaparecen de `CreateApiKeyRequest`,
+`UpdateApiKeyRequest` y `ApiKeyMasked`, y también `ApiKeyPermission`,
+`ApiKeyOperation` e `isOperationAllowed`. Una petición que envíe `permissions` o
+`admin` en lugar de `scopes` se rechaza con `400 INVALID_INPUT`.
+
+Las claves ya almacenadas se convierten al arrancar en los scopes que tenían, y
+nunca más: `{ collection: "posts", operations: ["read"] }` pasa a ser
+`data:read:posts`, y `admin: true` pasa a ser el rol `admin` más los scopes de
+usuarios, esquema, copias de seguridad, cron y registros. El secreto no cambia. La
+tabla completa está en
+[Claves de API](/docs/backend/api-keys/#keys-made-before-scopes).
+
+Un permiso se estrecha. Un permiso de función sin `write` queda en nada, porque
+llamar a una función no es una lectura. Una clave que llamaba a una función `GET`
+solo con `read` se rechaza tras la actualización.
+
+**Qué cambiar:**
+
+- Dé a toda clave que llame a una función personalizada `functions:invoke`, o
+  `functions:invoke:<name>`, con `PUT /api/admin/api-keys/:id` o
+  `client.apiKeys.updateKey`.
+- El código que crea claves envía `scopes`, y `roles: ["admin"]` donde enviaba
+  `admin: true`.
+
+```bash
+grep -rnE "ApiKeyPermission|ApiKeyOperation|isOperationAllowed|api-keys create" --exclude-dir=node_modules .
+```
+
+## 53. `schema-admin` deja de ser administrador, y los roles se declaran
+
+`admin` es el único rol integrado. Un rol llamado `schema-admin` solía contar como
+un segundo administrador; ahora no significa nada por sí mismo. Los roles ya no son
+objetos almacenados: `createRole`, `updateRole`, `deleteRole`, `getRoleById`,
+`getUserRoles`, `RoleRepository`, `RoleData` y `CreateRoleData` se eliminan, y
+también `BootstrappedAuth.roleService`. `getUserWithRoles` devuelve ids de rol.
+`GET /api/admin/roles` lista `admin` y los roles que usted declare, con sus
+scopes. El driver de MongoDB ya no siembra una colección `rebase_roles`.
+
+**Qué cambiar:** si alguna cuenta tiene `schema-admin`, declare el rol con los
+scopes que debería tener:
+
+```typescript
+import { defineCollection } from "@rebasepro/cms-types";
+
+export const usersCollection = defineCollection({
+    slug: "users",
+    name: "Users",
+    table: "users",
+    auth: {
+        enabled: true,
+        roles: {
+            "schema-admin": {
+                name: "Schema admin",
+                scopes: ["schema:read", "schema:write", "database:read", "database:write"]
+            }
+        }
+    },
+    properties: {
+        email: { name: "Email", type: "string" }
+    }
+});
+```
+
+El código que llamaba a las funciones de roles lee en su lugar los roles
+declarados, con `client.admin.listRoles()`. Un `defaultRole` que tenga cualquier
+scope del plano de administración ahora hace fallar el arranque.
+
+```bash
+grep -rnE "schema-admin|roleService|RoleData|createRole|getUserRoles|collectionPermissions" --exclude-dir=node_modules .
+```
+
+## 54. Los scopes del servidor MCP alojado son `data:read`, `data:write` y `data:delete`
+
+El [endpoint MCP remoto](/docs/ai/mcp/#the-remote-endpoint) usaba `mcp:read` y
+`mcp:write`. Ahora usa los scopes de datos que usa cualquier otra credencial, y
+cada uno puede acotarse a una colección: `data:read:posts`. `delete_document`
+necesita `data:delete`, que `data:write` ya no cubre.
+
+**Qué cambiar:** nada para los clientes ya conectados. Un permiso almacenado de
+`mcp:read` se lee como `data:read`, y `mcp:write` como `data:write data:delete`,
+de modo que conservan su alcance, y un cliente que aún pida los nombres antiguos
+recibe lo mismo. El código que compara una cadena de scope concedido con
+`mcp:read` o `mcp:write` la compara con los nombres nuevos.
+
+## 55. `RealtimeSocketLimits` ahora es `RealtimeSocketOptions`
+
+Lleva el resolutor de claves de API junto con los límites, como sexto argumento de
+`initializeWebsockets`. Eso es lo que permite que una clave de API autentique el
+socket de tiempo real.
+
+**Qué cambiar:** nada, a menos que llame a `initializeWebsockets` desde su propio
+inicializador. En ese caso, renombre el tipo.
+
+```bash
+grep -rn "RealtimeSocketLimits" --exclude-dir=node_modules .
+```
+
+## 56. El endpoint MCP remoto acepta los argumentos del SDK
+
+Las herramientas de `/mcp` usaban sus propios nombres de argumento. Ahora aceptan
+lo que acepta el SDK: `where` (antes `filter`), `orderBy` como `["field", "desc"]`
+o `"field:desc"` (antes `orderBy` más `order`), y `data` para una escritura (antes
+`values`). `query_collection` responde con la forma de REST, `{ data, meta }`, en
+lugar de `{ rows, count, truncated }`. Un argumento que una herramienta no declara
+se rechaza en lugar de ignorarse, y un `limit` superior a 1000 se rechaza, como en
+REST, en lugar de recortarse a 200.
+
+**Qué cambiar:** nada para un asistente, que lee los esquemas de las herramientas
+cada vez que se conecta. El código o los prompts guardados que llaman a las
+herramientas con argumentos fijos usan los nombres nuevos y leen `data` y
+`meta.total` de una consulta:
+
+```diff lang="json"
+- { "collection": "orders", "filter": { "status": ["==", "paid"] }, "orderBy": "total", "order": "desc" }
++ { "collection": "orders", "where": { "status": ["==", "paid"] }, "orderBy": ["total", "desc"] }
+```
+
+Consulte [El endpoint remoto](/docs/ai/mcp/#the-remote-endpoint).
+
+## 57. Las escrituras en proceso rechazan `ifMatch` e `idempotencyKey`
+
+Una escritura a través de `context.data` en un callback, o de `rebase.data` en una
+función, un trabajo cron o un seed, nunca sale del proceso: no hay `If-Match` que
+comprobar ni almacén de idempotencia. Ambas opciones se ignoraban en silencio, por
+lo que una escritura condicional allí era incondicional. Ahora lanzan
+`UNSUPPORTED_OPTION` antes de escribir nada.
+
+**Qué cambiar:** quite la opción de las escrituras en proceso. Donde la condición
+importe, compruébela en el código que escribe, o haga la escritura a través del
+cliente HTTP, que respeta ambas.
+
+```diff lang="ts"
+- await context.data.orders.update(id, { status: "paid" }, { ifMatch: etag });
++ await context.data.orders.update(id, { status: "paid" });
+```
+
+```bash
+grep -rnE "(context|rebase)\.data\..*(ifMatch|idempotencyKey)" --exclude-dir=node_modules .
+```
+
+## 58. `Button` e `IconButton` se tipan según el elemento que renderizan
+
+Ambos aceptaban cualquier prop, que acababa en el DOM sin hacer nada. Ahora se
+tipan según el elemento que renderizan, un `button` o el `component` que pase, de
+modo que una prop que no tienen es un error de compilación. Eso incluye el `color`
+de `IconButton`, el atributo HTML obsoleto, que nunca coloreó nada, y `endIcon` o
+`loading` en `Button`, que nunca se renderizaron.
+
+**Qué cambiar:** quite cada prop que señale TypeScript. Lo que se renderiza no
+cambia; un icono que debía mostrarse va como hijo.
+
+```diff lang="tsx"
+- <IconButton color="primary" onClick={close}><CloseIcon /></IconButton>
++ <IconButton onClick={close}><CloseIcon /></IconButton>
+```
+
+## 59. Un socket de tiempo real abierto se vuelve a comprobar, y se cierra cuando termina su identidad
+
+Un socket comprobaba su token una sola vez, al autenticarse. Un token que expiraba,
+una sesión que se revocaba o un rol que se retiraba no cambiaba nada hasta que el
+socket se reconectaba. Ahora, antes de cada trama, al menos cada 30 segundos en un
+socket que solo escucha, y en el instante en que expira su token, el servidor
+comprueba si la cuenta sigue existiendo, sigue con la sesión iniciada y sigue
+teniendo sus roles. Una identidad terminada recibe una trama `AUTH_ERROR`
+(`SESSION_ENDED` o `TOKEN_EXPIRED`) y el código de cierre `4001`. Un cambio de rol
+vuelve a acotar las suscripciones del socket desde la siguiente trama.
+
+**Qué cambiar:** nada con el SDK, que se reautentica en cada renovación del token y
+se reconecta tras un `4001`. Un cliente que habla directamente el
+[protocolo del socket](/docs/backend/realtime/#authentication--rls) debe enviar un
+token nuevo en `AUTHENTICATE` antes de que expire el anterior, y tratar el código
+de cierre `4001` como motivo para reconectarse con una sesión nueva.
+
+## 60. Un enlace de verificación de correo prueba la dirección, y nada más
+
+Seguir un enlace de verificación marcaba la dirección como verificada y conservaba
+todo lo demás de la cuenta. Alguien podía registrar la dirección de un desconocido
+con una contraseña propia, y cuando el dueño pulsaba el enlace, esa contraseña se
+convertía en una vía de entrada a una cuenta verificada. Sin una sesión activa de
+la cuenta ni su contraseña, el enlace ahora elimina la contraseña y cualquier
+identidad que nadie haya probado, y cierra todas las sesiones, como ya hacían los
+enlaces mágicos, los códigos por correo y los restablecimientos de contraseña.
+
+`client.auth.verifyEmail(token, options?)` ahora hace POST, envía la sesión cuando
+la hay, y puede lanzar `PROOF_REQUIRED` (`409`): la cuenta tiene una contraseña o
+una identidad que la petición no prueba, y el token no se gasta.
+
+**Qué cambiar:** en una página de verificación personalizada, capture
+`PROOF_REQUIRED` y pida la contraseña, o deje que la persona verifique sin ella.
+Una página que llame a `GET /api/auth/verify-email?token=` sin la sesión de la
+cuenta ahora elimina la contraseña. La propia página del CMS ya la pide.
+
+```diff lang="ts"
+- await client.auth.verifyEmail(token);
++ try {
++     await client.auth.verifyEmail(token);
++ } catch (error) {
++     if (error instanceof RebaseApiError && error.code === "PROOF_REQUIRED") {
++         await client.auth.verifyEmail(token, { password: await askForPassword() });
++     } else throw error;
++ }
+```
+
+Consulte [Verificación de correo electrónico](/docs/backend/email-verification/).
+
+## 61. `client.auth.signUp` resuelve `confirmationRequired`, y `user` puede ser `null`
+
+Con [`requireEmailVerification`](/docs/backend/email-verification/#confirm-first-registration)
+activado, registrarse no inicia sesión a nadie hasta que se confirma la dirección.
+`signUp` ahora resuelve `{ confirmationRequired, user, accessToken, refreshToken }`:
+con `confirmationRequired: true`, los otros tres son `null`. Con la opción
+desactivada, que es el valor por defecto, `confirmationRequired` es `false` y el
+resto es como antes.
+
+**Qué cambiar:** TypeScript ahora señala el código que lee `user` sin comprobarlo.
+Acote por `confirmationRequired`:
+
+```diff lang="ts"
+  const result = await client.auth.signUp(email, password);
+- showWelcome(result.user.uid);
++ if (result.confirmationRequired) showCheckYourInbox();
++ else showWelcome(result.user.uid);
+```
+
+## 62. `mfa.enroll().recoveryCodes` es `null` al añadir un segundo factor
+
+Cada inscripción generaba un juego nuevo de códigos de recuperación y reemplazaba
+el anterior, de modo que añadir un segundo autenticador, o iniciar una inscripción
+y abandonarla, invalidaba en silencio los códigos impresos. Ahora los códigos se
+generan una sola vez, con el primer factor. Inscribir otro devuelve
+`recoveryCodes: null` y conserva los códigos que tiene la cuenta;
+`mfa.regenerateRecoveryCodes()` los reemplaza cuando se pide.
+
+**Qué cambiar:** muestre los códigos solo cuando existan, y ofrezca la
+regeneración donde ofrecía la reinscripción. Consulte
+[Inscribir un factor](/docs/sdk/multi-factor-authentication/#enrolling-a-factor).
+
+```diff lang="ts"
+  const { totp, recoveryCodes } = await client.auth.mfa.enroll({ friendlyName: "Phone" });
+- showRecoveryCodes(recoveryCodes);
++ if (recoveryCodes) showRecoveryCodes(recoveryCodes);
+```
+
+## 63. Convertir a un invitado en una cuenta requiere el registro abierto
+
+`POST /api/auth/anonymous/link`, y vincular un proveedor OAuth a una sesión de
+invitado, convierten a un invitado en una cuenta. Ahora ambos responden a
+`allowRegistration` como cualquier otro registro, y se rechazan con
+`403 REGISTRATION_DISABLED` cuando está desactivado.
+
+**Qué cambiar:** nada, si `allowRegistration` está activado. Si su aplicación
+mantiene el registro cerrado y promociona invitados, tiene que abrirlo, en el
+bloque `auth` de la colección de usuarios. Consulte
+[Sesiones anónimas](/docs/sdk/authentication/#anonymous-sessions).
+
+## 64. El token de una cuenta eliminada responde `401 SESSION_REVOKED`
+
+Un token de acceso cuya cuenta se había eliminado respondía `404` desde `/me`.
+Ahora todas las vías responden `401 SESSION_REVOKED`, como para una sesión que se
+cerró.
+
+**Qué cambiar:** nada con el SDK, que cierra la sesión al recibirlo. Un cliente que
+trataba un `404` desde `/me` como "la cuenta ya no existe" comprueba en su lugar
+`SESSION_REVOKED`. Consulte [Errores](/docs/backend/errors/).
+
+## 65. `createBackupRoutes` acepta `storageFor`, no `storage`
+
+Las rutas de copias de seguridad listaban y descargaban una copia `s3://` o
+`gs://` a través del controlador de almacenamiento de archivos de la propia
+aplicación, que direcciona otro bucket, un directorio local o nada. Ahora
+construyen un controlador para el bucket del destino de la copia a partir de
+`BACKUP_DESTINATION` y las variables `S3_*`, igual que el cron de copias de
+seguridad. La opción `storage` de `createBackupRoutes` desaparece;
+`storageFor(destination)` la reemplaza. `listBackupObjects`, `readBackupBytes` y
+`openBackupStream` lanzan un error para un destino de objetos para el que no
+tienen controlador, donde antes no devolvían nada.
+
+**Qué cambiar:** nada, a menos que monte `createBackupRoutes` usted mismo. En ese
+caso, quite `storage`, o pase `storageFor` cuando el destino necesite un
+controlador distinto del que describe el entorno. Consulte
+[Copias de seguridad](/docs/deployment/backups/).
+
+## 66. El plugin de insights lee fuentes con nombre
+
+Un insight llevaba su propio callback `data()` y un bloque `scorecard`, por lo que
+la misma cifra en la página de inicio y en la tarjeta de una colección se obtenía
+dos veces, y el cambio junto a ella era un delta que el callback tenía que
+calcular. Ahora la configuración declara `sources` (cada una devuelve un registro
+de cifras para el periodo que recibe) y un insight nombra la `source`, el campo
+`value` y el campo que contiene la cifra `previous`. El plugin calcula el cambio
+por sí mismo.
+
+**Qué cambiar:** en la configuración de su `useInsightsPlugin`, mueva cada
+callback `data()` a `sources` bajo un nombre, haga que devuelva un registro en
+lugar de `{ rows }`, y reemplace `scorecard` por `source`, `value` y `comparison`.
+`ScorecardFormat` es `InsightFormat`, sin `showSign`. Quite `description` y
+`dateRange`: la fila sobre las cifras nombra el periodo. Envuelva la configuración
+en `useMemo`, porque un objeto `sources` nuevo inicia una caché nueva.
+
+```typescript
+const insightsPlugin = useInsightsPlugin(useMemo(() => ({
+    period: { days: 30 },
+    sources: {
+        orders: ({ period }) => fetchOrderStats(period.previousFrom, period.from, period.to)
+    },
+    insights: {
+        home: [{
+            id: "revenue",
+            title: "Revenue",
+            source: "orders",
+            value: { field: "revenue", format: { style: "currency", currency: "USD" } },
+            comparison: { previous: "previousRevenue", intent: "increase_is_good" }
+        }]
+    }
+}), []));
+```
+
+La fuente devuelve las cifras de ambas ventanas, aquí `{ revenue, previousRevenue }`.
+Un recuento que varía en unas pocas unidades se lee mejor como diferencia que como
+porcentaje: defina `show: "absolute"` en su `comparison`.
+
+## 67. Un campo markdown almacena una imagen subida como referencia de almacenamiento
+
+El editor markdown escribía en el texto la URL firmada de un archivo privado. Su
+token de descarga caduca, por defecto cinco minutos después de la subida, por lo
+que la imagen se rompía en el panel de administración y en todos los sitios que
+publicaban el texto. Una imagen subida en el editor ahora se almacena como
+`rebase-storage:<key>` (con `?storageId=` para una fuente con nombre), y el panel
+intercambia cada referencia por una URL nueva al renderizar.
+
+**Qué cambiar:** nada en el panel. Un sitio o aplicación que renderice un campo
+markdown por su cuenta resuelve las referencias antes de renderizar, o las
+imágenes apuntarán a URLs `rebase-storage:` que un navegador no puede abrir:
+
+```typescript
+import { resolveStorageReferences } from "@rebasepro/client";
+
+const body = await resolveStorageReferences(String(post.body ?? ""), client);
+```
+
+El texto guardado antes conserva las URLs con las que se guardó. Consulte
+[Archivos dentro del texto](/docs/sdk/storage/#files-inside-text).

@@ -1,5 +1,5 @@
 ---
-sourceHash: 94b81d143b186ece
+sourceHash: dc27c5a35221e71c
 title: Soft delete
 sidebar_label: Soft delete
 description: Convierte el borrado en una marca de tiempo, oculta las filas marcadas de cada lectura y restáuralas con una actualización ordinaria.
@@ -62,6 +62,42 @@ Tampoco escribe un upsert en una fila que está en la papelera: cuando su clave 
 Una eliminación a través de una ruta muchos a muchos, como `DELETE /api/data/posts/1/tags/5`, elimina el vínculo del post 1 con la etiqueta. No hace un soft delete de la etiqueta, que otros posts siguen usando.
 
 Un `DELETE` **real** es `?hard=true` en la llamada de eliminación. Requiere exactamente el mismo permiso que un borrado ordinario: es el mismo verbo, y restringirlo por separado supondría una segunda superficie de control de acceso para una sola operación. Lo que cambia es si la fila puede recuperarse o no. Solo el valor literal `true` o `1` significa que sí; un error tipográfico devuelve un 400, porque quien realiza la llamada solicitó purgar y, si obtuviera un soft delete, creería que los datos han desaparecido.
+
+## Desde el SDK
+
+El cliente tipado llega a la papelera a través de `trash` en cada colección. Envía
+las peticiones anteriores: `?deleted=only` en las lecturas, la actualización a `null` para
+restaurar y `?hard=true` para purgar.
+
+```typescript
+const trashed = await client.data.invoices.trash.find({ limit: 20 });
+const howMany = await client.data.invoices.trash.count();
+
+await client.data.invoices.trash.restore(7);       // PATCH { deletedAt: null }
+await client.data.invoices.trash.restoreMany([8, 9]);
+
+await client.data.invoices.trash.purge(7);         // DELETE ?hard=true
+await client.data.invoices.trash.purgeMany([8, 9]);
+```
+
+`trash.find` y `trash.count` aceptan los mismos parámetros que `find` y `count`.
+Una restauración establece `deletedAt` salvo que nombres el campo: una colección declarada
+con `softDelete: { field: "archivedAt" }` se restaura con
+`trash.restore(7, { field: "archivedAt" })`. El cliente no puede leer el nombre
+del campo del servidor.
+
+Usa `trash` en una colección que declare `softDelete`. En una que no lo haga,
+el servidor ignora `?deleted=`, así que `trash.find` devuelve las filas vivas y
+`trash.purge` es un borrado normal.
+
+El código del servidor tiene el mismo `trash`: `context.data.invoices.trash` en un callback,
+y `rebase.data.invoices.trash` en una función o un cron. Lee y purga
+a través del driver, con los privilegios de quien llama, como el resto de
+[`context.data`](/docs/collections/context-data-api).
+
+Con [offline](/docs/sdk/offline) activado, la papelera nunca se almacena en caché y nada
+de ella se encola. Cada llamada necesita el servidor y falla con el error `OFFLINE`
+sin él. Una fila restaurada se une a la base de datos local, y una purgada la abandona.
 
 ## Siguientes pasos
 

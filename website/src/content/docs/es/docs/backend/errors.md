@@ -1,5 +1,5 @@
 ---
-sourceHash: 242a8a8a99d7ef2d
+sourceHash: d6ea7b12fc13a297
 title: Códigos de error
 sidebar_label: Códigos de error
 description: Todos los códigos de error que un backend de Rebase puede devolver, con su estado HTTP, qué significan y qué hacer al respecto; además del envelope de respuesta, X-Request-ID y las reglas de details.
@@ -291,6 +291,7 @@ mensaje nombra la restricción.
 | `STORAGE_FILE_TYPE_REFUSED` | 400 | El tipo del archivo subido no está en el `acceptedFiles` de la propiedad, ni en el `allowedMimeTypes` propio del origen de almacenamiento. `details` contiene la propiedad (o la lista del origen), la lista aceptada y el tipo de contenido enviado. | Sube un tipo aceptado o amplía `acceptedFiles` / `allowedMimeTypes`. |
 | `STORAGE_MISCONFIGURED` | 502 | El bucket de S3 o GCS con el que está configurado este origen no existe, o el proveedor rechazó las credenciales de este despliegue para él. El mensaje nombra el bucket; `details.reason` es `NoSuchBucket` o el rechazo del proveedor. Un bucket inexistente solía leerse como «archivo no encontrado» en cada archivo. | Corrige el nombre del bucket (`S3_BUCKET` / `GCS_BUCKET`, `__<KEY>` para un origen con nombre) o los permisos de las credenciales. |
 | `STORAGE_NOT_CONFIGURED` | 501 / 503 | No hay backend de almacenamiento configurado en este servidor, o ninguno es el predeterminado y la solicitud no nombra ningún origen; el mensaje nombra los orígenes que se sirven (501). Una subida reanudable cuyo origen desapareció antes de terminar es un 503. | Configura S3, GCS o almacenamiento local, o nombra un origen con `?storageId=`. |
+| `STORAGE_SCAN_INCOMPLETE` | 409 | <span class="since-badge" data-since="0.25">Desde 0.25</span> `DELETE /api/admin/storage/orphans` (`rebase storage orphans --delete`) no pudo leer todas las colecciones, así que un archivo que una de ellas nombra parecería sin uso. No se eliminó nada; `details.unscanned` nombra cada colección y por qué no se pudo leer. | Corrige lo que impide leer esas colecciones y ejecútalo de nuevo. |
 | `STORAGE_SOURCE_NOT_CONFIGURED` | 501 | El origen de almacenamiento está declarado pero no tiene credenciales aquí. | Configura las variables de entorno de ese origen. |
 | `STORAGE_WRITE_FAILED` | 502 | El backend de almacenamiento rechazó o interrumpió la escritura. | Revisa sus propios logs y credenciales. |
 | `TRANSFORM_OVERLOADED` | 503 | Hay demasiadas transformaciones de imagen en curso. | Reintenta; considera colocar una CDN delante. |
@@ -333,10 +334,10 @@ funcionalidad en lugar de mostrar un error.
 | `SCHEMA_EDITING_NO_REPOSITORY` | 503 | La planificación funciona; no hay repositorio en el que hacer commit del cambio. | Configura `liveSchema.repository`. |
 | `SCHEMA_EDITING_UNSUPPORTED` | 503 | Este driver no puede planificar cambios de esquema. | La edición en vivo está disponible en Postgres. |
 | `SCHEMA_EDITOR_BAAS_MODE` | 501 | Aquí las colecciones se introspeccionan desde la base de datos, por lo que no hay archivos fuente para editar. | Modifica el esquema mediante una migración. |
-| `SCHEMA_EDITOR_DISABLED` | 501 | El editor de esquemas está desactivado para este servidor. | Actívalo con `schemaEditor`. |
+| `SCHEMA_EDITOR_DISABLED` | 501 | El editor de esquemas está desactivado para este servidor. Un bundle compilado siempre responde esto. | Actívalo con `schemaEditor`. En un bundle, define `REBASE_LIVE_SCHEMA_REPOSITORY` para editar las colecciones a través de un repositorio — consulta [Edición de esquemas en vivo](/docs/backend/live-schema-editing#from-a-built-bundle). |
 | `SCHEMA_EDITOR_MISSING_DEPENDENCY` | 501 | El editor de esquemas necesita `ts-morph`, que no está instalado. | `pnpm add -D ts-morph@28.0.0`. |
 | `SCHEMA_EDITOR_NO_COLLECTIONS_DIR` | 501 | El servidor no tiene `collectionsDir`, por lo que el editor no tiene dónde escribir. | Configura `collectionsDir`. |
-| `SCHEMA_EDITOR_PRODUCTION` | 501 | El editor está desactivado bajo `NODE_ENV=production`: los archivos de un servidor desplegado se reconstruyen a partir de tu repositorio en cada despliegue, por lo que una edición aquí se descartaría. | Edita las colecciones en desarrollo y despliega. |
+| `SCHEMA_EDITOR_PRODUCTION` | 501 | El editor está desactivado bajo `NODE_ENV=production`: los archivos de un servidor desplegado se reconstruyen a partir de tu repositorio en cada despliegue, por lo que una edición aquí se descartaría. | Edita las colecciones en desarrollo y despliega, o configura `liveSchema.repository` para confirmarlas allí. |
 | `SQL_EXPORT_UNSUPPORTED` | 501 | <span class="since-badge" data-since="0.25">Desde 0.25</span> `POST /api/admin/sql/csv` no puede transmitir un resultado aquí: la base de datos de desarrollo en proceso (PGlite) tiene una sola conexión, y un cursor mantenido durante una descarga retendría detrás de él todas las demás consultas; o el origen de datos no tiene cursor SQL. | Apunta `DATABASE_URL` a un Postgres propio (`rebase dev --docker` inicia uno), o añade un `LIMIT` y exporta las filas en pantalla. |
 
 ## Códigos genéricos

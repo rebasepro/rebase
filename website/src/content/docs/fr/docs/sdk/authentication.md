@@ -1,5 +1,5 @@
 ---
-sourceHash: 0e00ae18684830bb
+sourceHash: 1bf5f81fc739ecfd
 title: Authentification
 sidebar_label: Authentification
 description: Authentification côté client avec le SDK Rebase — connexion par e-mail/mot de passe, fournisseurs OAuth, gestion des sessions et écouteurs d'état d'authentification.
@@ -169,7 +169,8 @@ await client.auth.linkAnonymous("user@example.com", "correct-horse-battery");
 
 | Échec | Signification |
 |-------|---------------|
-| `ANONYMOUS_AUTH_DISABLED` (403) | Le backend n'a pas activé l'authentification anonyme |
+| `ANONYMOUS_AUTH_DISABLED` (403) | Le backend n'a pas activé l'authentification anonyme, ou l'a désactivée depuis la connexion de cet invité : un invité ne devient un compte que tant que `allowAnonymous` est activé |
+| `REGISTRATION_DISABLED` (403) | L'inscription est fermée sur le backend, et devenir un compte est une inscription |
 | `NOT_ANONYMOUS` (400) | La session actuelle appartient à un compte ordinaire |
 | `EMAIL_EXISTS` (409) | L'adresse possède déjà un compte — connectez-vous plutôt à celui-ci |
 
@@ -304,6 +305,15 @@ function useCurrentUser() {
 `useRebaseAuthController` dans `@rebasepro/app` effectue déjà cela, donc une application construite sur le modèle généré en bénéficie automatiquement. Les requêtes de données n'ont pas à attendre : celle émise pendant la restauration part une fois celle-ci terminée — en tant qu'utilisateur restauré, ou anonymement — de sorte qu'un premier rendu ne lit jamais une liste publique à la place de celle de l'utilisateur.
 
 Une restauration qui rafraîchit (un jeton stocké expiré, ou le mode cookie) parvient à `onAuthStateChange` sous forme de `TOKEN_REFRESHED` ; un jeton stocké encore valide est adopté silencieusement. Un écouteur ne peut donc pas vous indiquer que la restauration s'est terminée : un démarrage qui n'émet rien ne se distingue pas d'une restauration encore en cours. Attendez la résolution de `isInitialized()` pour cette vérification et utilisez l'écouteur pour les changements ultérieurs.
+
+`restoreOutcome()` indique comment la restauration s'est terminée, une fois que `isInitialized()` s'est résolue : `"restored"`, `"none"` (rien à restaurer), `"refused"` (le serveur a refusé la session) ou `"unreachable"` (le serveur n'a pas pu être joint : la session n'a donc été ni confirmée ni refusée). En mode cookie, `"unreachable"` sans session est le seul cas où « déconnecté » n'est pas connu pour vrai :
+
+```typescript
+await client.auth.isInitialized();
+if (!client.auth.getSession() && client.auth.restoreOutcome() === "unreachable") {
+    console.log("Offline: could not check the session.");
+}
+```
 
 ## Écouteur d'état d'authentification
 

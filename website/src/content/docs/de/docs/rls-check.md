@@ -1,5 +1,5 @@
 ---
-sourceHash: 275426a0cc4a1023
+sourceHash: 5a4b74223c30f992
 slug: de/docs/rls-check
 title: rls-check
 description: Überprüfen Sie Row-Level Security auf jeder PostgreSQL-Datenbank – Supabase, Neon, RDS oder Ihr eigener Server. Schreibgeschützt, keine Registrierung, kein Rebase erforderlich.
@@ -413,6 +413,13 @@ Unter PostgreSQL vor Version 15 existiert diese Option überhaupt nicht, sodass 
 verhält. Dort wird der Befund als heuristisch gemeldet, und die Lösung besteht darin, die Logik in eine
 Funktion zu verlagern oder ein Upgrade durchzuführen.
 
+Der Eigentümer ist von den Policies der Basistabelle normalerweise ausgenommen, aber nicht immer. Wenn der
+Eigentümer der View kein Superuser ist, kein `BYPASSRLS` hält und die Basistabelle nicht besitzt (oder sie
+mit `FORCE ROW LEVEL SECURITY` besitzt), gelten die Policies für den Eigentümer. Die View liefert dann die
+Zeilen, die diese Policies dem Eigentümer geben, an jeden Aufrufer gleichermaßen. Das können weniger Zeilen
+sein, als ein Aufrufer sehen sollte, oder mehr. Der Befund wird weiterhin gemeldet, weil die Zeilen nicht
+davon abhängen, wer fragt, aber als heuristisch statt als sicher. Die Lösung ist dieselbe.
+
 ### matview-bypasses-rls
 
 **Materialized View exponiert RLS-geschützte Daten.** High.
@@ -441,6 +448,17 @@ Die Bedingung "akzeptiert jede Zeile" ist essenziell und bewusst eng gefasst. Su
 und `authenticated` standardmäßig volle DML-Rechte; eine Policy, die auf diese Rollen abzielt, ist daher
 für sich genommen kein Problem – ein klassisches `FOR INSERT TO public WITH CHECK (user_id = auth.uid())`
 ist korrekt und wird nicht gemeldet.
+
+Eine Policy erreicht einen nicht authentifizierten Aufrufer über `TO public`, über eine Rolle namens
+`anon` oder `web_anon` oder über eine Rolle, deren Mitglied eine dieser ist: `TO app_writer`
+zählt, wenn `anon` von `app_writer` erbt.
+
+Bei Rebase gibt es keine Rolle `anon`. Jede Anfrage läuft als `rebase_user`, auch eine abgemeldete,
+wenn die API sie zulässt (`AUTH_REQUIRE=false` oder `auth.requireAuth: false`),
+und jedes Gastkonto aus der anonymen Anmeldung. Die Datenbank kann diese Einstellung nicht sehen, sodass bei
+Rebase ein Schreibzugriff, den nur `rebase_user` erreicht, als heuristisch gemeldet wird. Bei aktivem API-Gate
+und abgeschalteter Gast-Anmeldung erreichen nur angemeldete Benutzer die Policy, und sie können weiterhin jede
+Zeile schreiben. Beschränken Sie die Schreibregel der Collection auf den Aufrufer (ein `ownerField`) oder auf `roles`.
 
 ### unqualified-column-in-subquery
 

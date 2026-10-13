@@ -1,5 +1,5 @@
 ---
-sourceHash: e18fe07b6281381b
+sourceHash: 3702fa186011ca6b
 title: Campos de subida de archivos
 sidebar_label: Subidas de archivos
 description:"\"Declarar un campo de archivo o imagen en una colección: el bloque storage, subidas de archivos individuales o múltiples, y cuáles de sus opciones son resueltas por el panel en lugar del servidor.\""
@@ -127,9 +127,11 @@ mostrarla; un sitio que renderiza el campo hace lo mismo con
 `resolveStorageReferences(text, client)` — consulta
 [Archivos dentro de texto](/docs/sdk/storage#files-inside-text).
 
-El texto guardado antes de este cambio contiene las propias URL, y sus
-tokens ya han caducado; vuelve a insertar esas imágenes para almacenar
-referencias.
+El texto guardado antes de las referencias contiene las propias URL de descarga, con tokens
+caducados. El editor, las vistas previas y `resolveStorageReferences` las renuevan cuando
+muestran el texto, porque un token sigue nombrando su objeto; volver a insertar la imagen
+o reescribir el texto con `storageReferencesForDownloadUrls(text)` almacena una
+referencia.
 
 ### Adónde se permite que vaya el archivo
 
@@ -147,7 +149,8 @@ contener la misma clave, así que el panel no puede saber si un archivo está
 sin usar. Los objetos a los que ninguna fila apunta permanecen en el bucket,
 y se facturan, hasta que los elimines — desde el explorador de almacenamiento
 de Studio, con `client.storage.deleteObject(key)`, o con una regla de ciclo
-de vida (lifecycle) en el bucket.
+de vida (lifecycle) en el bucket. <span class="since-badge" data-since="0.25">Desde 0.25</span> `rebase storage orphans` lista los archivos que ninguna fila nombra, y los elimina
+con `--delete` — consulta [la CLI](/docs/cli/#rebase-storage).
 
 ### Mover una propiedad a otro origen de almacenamiento
 
@@ -156,7 +159,8 @@ Un campo de archivo almacena la clave del objeto, no su origen. Cambiar el
 origen nuevo, donde esas claves no existen, así que las vistas previas de
 archivos subidos antes del cambio responden «no encontrado». Copia los
 objetos al origen nuevo con las mismas claves antes de cambiar la propiedad
-—con las herramientas propias del proveedor, como `aws s3 sync` o
+—`rebase storage move --from <old> --to <new> --prefix
+<storagePath>`, o las herramientas propias del proveedor, como `aws s3 sync` o
 `gcloud storage cp`— o conserva el origen anterior para los archivos
 existentes.
 

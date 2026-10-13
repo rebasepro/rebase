@@ -1,5 +1,5 @@
 ---
-sourceHash: 7f4db751ce80395f
+sourceHash: 3529ea341017acda
 title: Armazenamento e Arquivos
 sidebar_label: Armazenamento
 description: Envie, baixe, liste e exclua arquivos usando o módulo de armazenamento do SDK tipado do Rebase.
@@ -121,6 +121,14 @@ uma imagem privada continua funcionando por mais tempo que tenha passado desde
 o upload. Uma referência que nomeia um objeto que não existe mais é deixada
 como está. `storageReference(key, storageId?)` constrói uma, para texto que
 você mesmo escreve.
+
+<span class="since-badge" data-since="0.25">Desde 0.25</span> O texto salvo antes de as referências existirem guarda a própria URL de download de um arquivo privado,
+`…/storage/file/posts/cover.png?token=…`, cujo token expirou minutos
+depois de ser escrito. `resolveStorageReferences` renova essas também: o token
+ainda nomeia o objeto, então a URL é substituída por uma nova. Para armazenar
+referências em vez disso, reescreva o texto uma vez com
+`storageReferencesForDownloadUrls(text)`, que deixa todas as outras URLs
+como estão.
 
 ## Baixar um Arquivo
 

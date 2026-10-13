@@ -1,5 +1,5 @@
 ---
-sourceHash: e18fe07b6281381b
+sourceHash: 3702fa186011ca6b
 title: Campi di caricamento file
 sidebar_label: Caricamenti file
 description:"\"Dichiarare un campo file o immagine su una collezione: il blocco storage, i caricamenti di file singoli e multipli e quali delle sue opzioni vengono risolte dal pannello anziché dal server.\""
@@ -128,8 +128,11 @@ lo mostrano; un sito che esegue il rendering del campo fa lo stesso con
 `resolveStorageReferences(text, client)` — vedi
 [File dentro un testo](/docs/sdk/storage#files-inside-text).
 
-Un testo salvato prima di questa modifica contiene gli URL stessi, e i loro
-token sono scaduti; reinserisci quelle immagini per memorizzare i riferimenti.
+Un testo salvato prima dei riferimenti contiene gli URL di download stessi, con
+token scaduti. L'editor, le anteprime e `resolveStorageReferences` li rinnovano quando
+mostrano il testo, perché un token nomina ancora il suo oggetto; reinserire l'immagine
+o riscrivere il testo con `storageReferencesForDownloadUrls(text)` memorizza un
+riferimento.
 
 ### Dove è consentito collocare il file
 
@@ -147,7 +150,8 @@ condividere la stessa chiave, quindi il pannello non può sapere che un file
 non è più usato. Gli oggetti a cui nessuna riga punta restano nel bucket, e
 vengono fatturati, finché non li elimini — dal browser di storage di Studio,
 con `client.storage.deleteObject(key)`, o con una regola di lifecycle sul
-bucket.
+bucket. <span class="since-badge" data-since="0.25">Da 0.25</span> `rebase storage orphans` elenca i file che nessuna riga nomina, e li elimina
+con `--delete` — vedi [la CLI](/docs/cli/#rebase-storage).
 
 ### Spostare una proprietà su un'altra sorgente di storage
 
@@ -156,7 +160,8 @@ lo `storageSource` di una proprietà fa puntare ogni valore esistente alla
 nuova sorgente, dove quelle chiavi non esistono, quindi le anteprime dei file
 caricati prima della modifica rispondono "non trovato". Copia gli oggetti
 sulla nuova sorgente con le stesse chiavi prima di modificare la proprietà —
-con gli strumenti propri del provider, come `aws s3 sync` o
+`rebase storage move --from <old> --to <new> --prefix
+<storagePath>`, o con gli strumenti propri del provider, come `aws s3 sync` o
 `gcloud storage cp` — oppure conserva la vecchia sorgente per i file
 esistenti.
 

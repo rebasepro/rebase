@@ -1,5 +1,5 @@
 ---
-sourceHash: f5cc00d6f5f3e4c3
+sourceHash: 00c369539f8269ad
 title: La API context.data
 sidebar_label: API context.data
 description: Lee y escribe otras colecciones desde un callback con context.data — sus métodos, los privilegios con los que se ejecuta, la semántica transaccional y la conexión que ocupa un callback.
@@ -23,6 +23,15 @@ afterSave: async ({ values, id, context }) => {
 }
 ```
 
+Una propiedad es el accesor de la colección, el nombre que le da el SDK generado:
+`context.data.myNotes` es la colección `my-notes`, sea cual sea la tabla en la que
+se almacene. Un nombre que no es el accesor de ninguna colección se lee como su
+snake_case, así que `context.data.auditLog` es `audit_log`.
+
+Las filas no tienen tipos (`Record<string, unknown>`) hasta que el proyecto registra
+su `Database` generada; entonces cada accesor se tipa a partir de ella. Consulta
+[Datos tipados en el servidor](/docs/backend/typed-server-data).
+
 ## Métodos disponibles
 
 Cada descriptor de acceso a la colección (`context.data.<slug>`) proporciona estos métodos:
@@ -37,6 +46,7 @@ Cada descriptor de acceso a la colección (`context.data.<slug>`) proporciona es
 | `.count()` | `count(params?: FindParams) → number` | Cuenta las entidades que coinciden |
 | `.listen()` | `listen(params, onUpdate, onError?) → unsubscribe` | Suscripción en tiempo real (donde sea compatible) |
 | `.listenById()` | `listenById(id, onUpdate, onError?) → unsubscribe` | Escucha una sola entidad |
+| `.trash` | `trash.find()`, `.count()`, `.restore(id)`, `.restoreMany(ids)`, `.purge(id)`, `.purgeMany(ids)` | Las filas que marcó un [borrado lógico](/docs/collections/soft-delete#from-the-sdk) |
 
 ## Consultar con `.find()`
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: 53f453267ae3e21c
+sourceHash: d9b66c9d404a5085
 title: Autenticazione
 sidebar_label: Autenticazione
 description: Configura l'autenticazione JWT, i provider OAuth, le email SMTP, la protezione dai bot e la collection users sul backend Rebase.
@@ -93,7 +93,7 @@ const backend = await initializeRebaseBackend({
 | `requireAuth` | `boolean` | `true` | Richiede una sessione per le API dei dati |
 | `allowRegistration` | `boolean` | `false` | Abilita `POST /api/auth/register`. Al di fuori della produzione, il primo utente su una tabella vuota viene ammesso in ogni caso; in produzione l'admin viene definito con `REBASE_ADMIN_EMAIL` |
 | `disableSelfRegistration` | `boolean` | `false` | Kill switch: chiude anche la finestra di bootstrap del primo utente lasciata aperta da `allowRegistration: false` |
-| `allowAnonymous` | `boolean` | `false` | Abilita `POST /api/auth/anonymous`. Volutamente non vincolato a `allowRegistration`: un'app pubblica a prevalente lettura potrebbe richiedere sessioni senza account. Trasformare un guest in un account (`POST /api/auth/anonymous/link`) è una registrazione, e richiede anche `allowRegistration` |
+| `allowAnonymous` | `boolean` | `false` | Abilita `POST /api/auth/anonymous`. Volutamente non vincolato a `allowRegistration`: un'app pubblica a prevalente lettura potrebbe richiedere sessioni senza account. Trasformare un guest in un account (`POST /api/auth/anonymous/link`) è una registrazione, e richiede anche `allowRegistration` — e `allowAnonymous` ancora attivo: se è disattivato, rifiuta anche i guest già autenticati, quindi nessuno può diventare un account (`403 ANONYMOUS_AUTH_DISABLED`) |
 | `allowUserLookup` | `boolean` | `false` | Monta `POST /api/auth/find-user` per i flussi di invito via email |
 | `defaultRole` | `string` | — | Ruolo assegnato a un nuovo utente registrato quando non ne viene specificato uno. Non può essere `admin`, né un ruolo dichiarato che possiede uno scope del piano di amministrazione: l'avvio li rifiuta entrambi |
 | `serviceKey` | `string` | — | Chiave statica per chiamate server-to-server — vedi [Autenticazione con Service Key](/docs/backend/auth-endpoints/#service-key-authentication) |

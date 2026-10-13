@@ -1,7 +1,8 @@
 ---
-sourceHash: 0e00ae18684830bb
+sourceHash: a67897c131d33a15
 title: "Authentification multifacteur"
 sidebar_label: "Authentification multifacteur"
+description: "Les facteurs TOTP avec le SDK Rebase : en enrôler un, la seconde étape d'une connexion, les codes de récupération et la suppression d'un facteur."
 ---
 
 Facteurs TOTP — une application d'authentification — ainsi que le challenge qui élève une session de `aal1` à `aal2`.
@@ -77,3 +78,8 @@ await client.auth.mfa.unenroll(factorId);
 ```
 
 Une fois un facteur vérifié, cela nécessite une session `aal2`, afin qu'un jeton `aal1` dérobé ne puisse pas désactiver la MFA ; une première inscription inachevée se supprime depuis n'importe quelle session. La suppression du dernier facteur vérifié élimine également les codes de récupération.
+
+## Prochaines étapes
+
+- **[Authentification](/docs/sdk/authentication/)** — Connexion, sessions et le reste de `client.auth`
+- **[Endpoints d'authentification](/docs/backend/auth-endpoints/#multi-factor-authentication-totp)** — Les routes HTTP derrière l'enrôlement et le challenge

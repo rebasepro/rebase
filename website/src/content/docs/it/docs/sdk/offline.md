@@ -1,5 +1,5 @@
 ---
-sourceHash: 8deb74573f8209f1
+sourceHash: dc394aa7ff8f8f55
 title: Offline e sincronizzazione local-first
 sidebar_label: Offline
 description: Attiva il motore di sincronizzazione local-first dell'SDK tipizzato di Rebase — un database locale di righe, scritture offline istantanee con rollback e query live reattive.
@@ -74,6 +74,8 @@ Se il server ne assegna uno proprio in fase di ritrasmissione, la riga locale e 
 
 Le scritture vengono ritrasmesse nell'ordine in cui le hai eseguite, attraverso le collezioni — così una create in una collezione arriva comunque prima della riga in un'altra che vi fa riferimento.
 
+Per impostazione predefinita ogni scrittura in coda è una richiesta, quindi 500 righe digitate offline richiedono 500 round trip per essere smaltite. Con `replayBatchSize` impostato (fino a 1 000), una serie di create offline consecutive in una collezione viene ritrasmessa invece come un unico `createMany`. Vengono raggruppate solo le create con un id stringa generato dall'SDK, e mai una che fa riferimento a un'altra riga della stessa serie. Se il server rifiuta o rimanda la serie per qualsiasi motivo diverso da una connessione persa, non viene scritto nulla (una scrittura bulk è una transazione), e la serie viene ritrasmessa una scrittura alla volta, come avverrebbe per impostazione predefinita.
+
 ## Query live
 
 `observe()` è la lettura reattiva, quella a cui ricorrere in un'interfaccia:
@@ -129,7 +131,7 @@ const { online, pending, syncing, lastSyncedAt, lastError } = client.offline!.st
 
 | Metodo | Scopo |
 |--------|-------|
-| `status()` | Connettività attuale, profondità della coda, attività di sincronizzazione, ultimo errore, e `persisted`: se il browser ha accettato di conservare il database offline (richiesto quando viene messa in coda la prima scrittura; `false` significa che può essere eliminato in caso di scarsità di spazio, comprese le scritture non inviate) |
+| `status()` | Connettività attuale, profondità della coda, attività di sincronizzazione, ultimo errore, e `persisted`: se il browser ha accettato di conservare il database offline (richiesto quando viene messa in coda la prima scrittura; `false` significa che può essere eliminato in caso di scarsità di spazio, comprese le scritture non inviate). `unverifiedUser` è `true` mentre un ricaricamento offline mostra i dati dell'ultimo utente senza una sessione confermata (vedi [`keepLastUser`](#ricaricamenti-offline-in-modalità-cookie)) |
 | `onStatusChange(fn)` | Sottoscrivi a quanto sopra |
 | `onQueueChange(fn)` | Solo il numero di scritture non inviate, per un badge |
 | `pending()` | Le mutazioni in coda stesse, dalla più vecchia. `pending({ orphaned: true })`: quelle messe in coda senza un accesso — vedi [Utenti](#utenti) |
@@ -158,6 +160,29 @@ Una riga che qualcun altro ha eliminato è l'unico caso che non viene annullato.
 La cascata è ristretta: un `update` viene scartato insieme alla scrittura che modificava, perché può fallire solo allo stesso modo. Un `create` o un `delete` successivo per la stessa riga sta in piedi da solo e viene mantenuto. Un `create` rifiutato di una riga creata offline porta con sé anche ogni scrittura in coda, in qualsiasi collezione, i cui valori referenziano l'id temporaneo della riga. Una scrittura scartata non è mai stata inviata. Viene segnalata con un `RebaseApiError` il cui `code` è `DEPENDENCY_REJECTED` e il cui `cause` è il rifiuto che l'ha condannata, così puoi distinguerla dalla scrittura che il server ha effettivamente rifiutato. Sulla 0.23 porta invece l'errore della scrittura rifiutata stessa.
 
 Modifiche consecutive a una stessa riga mentre si è offline vengono unite in un'unica scrittura in coda, così un form in cui si sta digitando non fa crescere la coda. Se il server rifiuta la scrittura unita per il suo contenuto (un 400, 403 o 422 — ad esempio un campo rimosso da una modifica dello schema mentre l'utente era offline), il motore la scompone di nuovo nelle modifiche separate e le riapplica una per una. Viene annullata e segnalata solo la modifica che il server rifiuta; le altre vengono mantenute.
+
+### Conflitti
+
+Per impostazione predefinita una modifica messa in coda offline sovrascrive ciò che il server ha per i campi che ha cambiato, anche se qualcun altro li ha cambiati nel frattempo. Per scoprirlo, passa `onConflict`. Un `update` in coda viene allora ritrasmesso con `If-Match`, la versione della riga su cui è stato fatto, e quando la riga è cambiata nel frattempo, il server lo rifiuta con un 412 e `onConflict` decide:
+
+```typescript
+const client = createRebaseClient({
+    baseUrl: API_URL,
+    offline: {
+        onConflict: async (error, mutation) =>
+            (await askUser(`${mutation.collection} changed while you were offline. Keep your edit?`))
+                ? "overwrite"
+                : "discard"
+    }
+});
+```
+
+- `"overwrite"` invia di nuovo la modifica senza la precondizione: vince l'ultimo che scrive, come senza `onConflict`.
+- `"discard"` scarta la modifica. La riga torna a ciò che era prima di essa, come per un rifiuto, e viene riletta dal server. Non viene segnalata a `onSyncError`; le scritture messe in coda sopra di essa lo sono, come `DEPENDENCY_REJECTED`.
+
+La coda attende mentre `onConflict` è in esecuzione, quindi può interrogare l'utente. Se lancia un'eccezione, la modifica viene sovrascritta.
+
+La versione su cui viene fatta una modifica è quella riportata dall'ultima lettura della riga: `findById()`, un frame di `listenById()`, o la risposta di un precedente `update()`. Una riga letta per ultima in un elenco di `find()` o `listen()` non ha versione, e nemmeno una modifica fatta sopra un'altra scrittura in coda sulla stessa riga. Queste vengono ritrasmesse senza precondizione. Un `ifMatch` che passi tu stesso a `update()` viene mantenuto quando la modifica viene messa in coda.
 
 Un fallimento che è soltanto temporaneo — un 429, un 503, una connessione caduta — non è un rifiuto. Questi restano in coda e vengono ritentati; solo dopo `maxRetries` rinvii una scrittura viene annullata con un rollback.
 
@@ -196,6 +221,36 @@ client.auth.onAuthStateChange(async (event) => {
 
 `clear({ orphaned: true })` le scarta, insieme alle righe locali a cui erano state applicate; l'outbox dell'utente che ha effettuato l'accesso non viene toccata. Se le si lascia stare, vengono ritrasmesse la prossima volta che nessuno ha effettuato l'accesso. Finché nessuno ha effettuato l'accesso sono semplicemente l'outbox corrente, e `pending({ orphaned: true })` non elenca nulla.
 
+### Ricaricamenti offline in modalità cookie
+
+In modalità cookie nulla della sessione viene memorizzato sul dispositivo, quindi un ricaricamento
+che non può raggiungere il server non ha utente. Per impostazione predefinita viene trattato come
+disconnesso: le righe locali dell'utente sono nascoste, e le scritture fatte in quel momento vengono messe in coda
+come quelle dell'utente disconnesso.
+
+`keepLastUser: true` cambia questo comportamento. Il client ricorda l'ultimo utente che
+ha effettuato l'accesso sul dispositivo (solo il suo id), e un ricaricamento offline apre invece il
+database locale di quell'utente. Le scritture fatte allora vengono messe in coda come sue, ma nessuna
+viene ritrasmessa finché la sessione non è confermata: quando la connessione torna, il
+client aggiorna la sessione, e anche un accesso la conferma. Se il server
+rifiuta la sessione, o qualcun altro accede, il dispositivo cambia utente, e le
+scritture in coda restano al loro autore finché non accede di nuovo. Nel frattempo
+`status().unverifiedUser` è `true`.
+
+```typescript
+createRebaseClient({
+    baseUrl: API_URL,
+    auth: { authFlowMode: "cookie" },
+    offline: { keepLastUser: true }
+});
+```
+
+È disattivato per impostazione predefinita perché su un dispositivo condiviso permette di leggere offline, senza una sessione, le righe
+in cache dell'utente precedente. Attivalo per installazioni che
+appartengono a una sola persona. L'id viene dimenticato alla disconnessione e quando il server
+rifiuta la sessione. Non viene mai usato quando il server risponde che non c'è alcuna
+sessione.
+
 ## Configurazione
 
 ```typescript
@@ -208,6 +263,9 @@ createRebaseClient({
         syncIntervalMs: 60_000,               // ceiling for the retry backoff; 0 disables auto-retry
         maxRetries: 5,                        // deferrals before a write is given up on
         crossTab: true,                       // default: on for IndexedDB, off for memory
+        keepLastUser: false,                  // open the last user's data on an offline reload (cookie mode)
+        replayBatchSize: 1,                   // queued creates sent per request on replay (max 1000)
+        onConflict: (error, mutation) => "overwrite", // or "discard"; default: no conflict check
         onSyncError: (error, mutation) => {}
     }
 });
@@ -239,8 +297,9 @@ Il client non è una replica del tuo database, e non finge di esserlo:
 - **`count()` offline ha bisogno di un conteggio che il server ha dato a questo dispositivo per la stessa query.** Lo spostano le scritture messe in coda da allora: create, modifiche che portano una riga dentro o fuori dal filtro, ed eliminazioni. Senza di esso fallisce con l'errore `OFFLINE` invece di contare le righe che questo dispositivo si trova ad avere. Sulla 0.24 restituiva quel numero.
 - **`searchString` è approssimato** come una scansione di sottostringhe senza distinzione tra maiuscole e minuscole sui campi stringa in cache. Il server esegue una vera ricerca full-text sulle colonne configurate della collezione.
 - **Le relazioni caricate con `include` non possono essere valutate localmente** — le righe correlate vivono in collezioni che la query non ha mai caricato. Una query di questo tipo è sempre contrassegnata come `partial` quando riceve risposta dalla cache.
-- **I conflitti sono last-writer-wins, per campo, senza rilevamento.** Un `update` ritrasmesso invia i campi che l'utente ha modificato e nient'altro, quindi i campi che non ha toccato mantengono ciò che ha il server. Per un campo che *ha* modificato, una modifica fatta da qualcun altro sul server mentre era offline viene sovrascritta quando la coda viene ritrasmessa, e nessuno dei due utenti ne viene informato. Nulla confronta le versioni durante la ritrasmissione.
+- **I conflitti sono last-writer-wins, per campo, a meno che tu non passi `onConflict`.** Un `update` ritrasmesso invia i campi che l'utente ha modificato e nient'altro, quindi i campi che non ha toccato mantengono ciò che ha il server. Per un campo che *ha* modificato, una modifica fatta da qualcun altro sul server mentre era offline viene sovrascritta quando la coda viene ritrasmessa, e nessuno dei due utenti ne viene informato. Con [`onConflict`](#conflitti), una modifica di cui è nota la versione della riga viene confrontata con quella del server, e decide l'app. Create, eliminazioni e scritture bulk non vengono mai controllate.
 - **La ritrasmissione è at-least-once.** Una scrittura che raggiunge il server ma la cui risposta va persa può essere inviata di nuovo. Preferisci scritture idempotenti (`createMany` con `upsert`) dove i duplicati sarebbero un problema.
+- **Il cestino ha bisogno del server.** Il database locale contiene solo righe attive, quindi `trash.find()`, `trash.count()`, `trash.restore()` e `trash.purge()` (vedi [soft delete](/docs/collections/soft-delete#from-the-sdk)) non ricevono mai risposta in locale né vengono messi in coda: offline falliscono con l'errore `OFFLINE`. Un ripristino o un'eliminazione definitiva di una riga con una scrittura ancora in coda sincronizza prima la coda, e viene rifiutato con `TRASH_PENDING_WRITE` se la scrittura non può ancora essere inviata.
 - **Un upsert su una chiave naturale ha bisogno del server.** Quale riga indichi un target `onConflict` può scoprirlo solo il server, quindi `upsert()` su una chiave naturale (o senza l'id della riga), e un `createMany()` con `onConflict` mai inviato, vengono rifiutati offline con `OFFLINE_UPSERT_UNSUPPORTED`. Un upsert sulla chiave primaria, con la chiave in ogni riga, viene messo in coda.
 - **Le letture locali applicano la semantica di Postgres, non i dati del database.** I filtri vengono valutati come farebbe SQL — i confronti con `NULL` sono ignoti, `ORDER BY` mette i null per ultimi in ordine crescente — ma sulla copia delle righe che ha il client, che può essere obsoleta.
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: c30985ad74db5bdc
+sourceHash: dcdd32536d7ea87a
 title: Scrittura dei dati
 sidebar_label: Scrittura dei dati
 description: create, upsert, update e delete con l'SDK — operazioni sui campi, scritture condizionali, chiavi di idempotenza, scritture batch e scrittura tra collezioni in una singola transazione.
@@ -122,6 +122,10 @@ potrebbe mostrare solo il marcatore stesso finché la coda non viene smaltita.
 await client.data.products.delete(42);
 ```
 
+Su una collezione con [soft delete](/docs/collections/soft-delete) questo contrassegna la
+riga invece di rimuoverla. `client.data.products.trash` elenca, conta, ripristina
+ed elimina definitivamente le righe contrassegnate.
+
 ### Scritture condizionali
 
 `update` e `delete` accettano un parametro `ifMatch`, in modo che la scrittura venga rifiutata se la riga è
@@ -145,6 +149,22 @@ risiede su una chiave non enumerabile, quindi non entra mai nel tipo `Row` gener
 riga proveniente da `find()`, dalla cache offline o da un server che non invia alcun
 `ETag` — e passare `undefined` non invia alcuna precondizione, degradando la chiamata precedente
 a un normale update invece di generare un errore.
+
+<span class="since-badge" data-since="0.25">Da 0.25</span> Una riga restituita da `update()` porta la versione che quella scrittura ha prodotto,
+così le modifiche condizionali si concatenano senza una lettura nel mezzo. Una riga che riceve una callback di `listenById()`
+porta la versione che quel frame mostra:
+
+```typescript
+import { etagOf } from "@rebasepro/client";
+
+let shown: Record<string, unknown> | undefined;
+client.data.posts.listenById(1, (post) => {
+    shown = post; // etagOf(shown) is the version this frame shows
+});
+
+// On save: refused with 412 if the row has moved on since that frame
+await client.data.posts.update(1, { title: "New" }, { ifMatch: etagOf(shown) });
+```
 
 Da un browser su un'altra origine — un frontend Vite su una propria porta, un
 host `app.` che chiama un host `api.` — l'`ETag` è leggibile solo perché il

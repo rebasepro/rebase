@@ -1,7 +1,8 @@
 ---
-sourceHash: c3a5adad80c0b11b
+sourceHash: a05da9682df4f23a
 title: "Change Capture auf Datenbankebene (CDC)"
 sidebar_label: "Change Capture auf Datenbankebene (CDC)"
+description: "Realtime-Events für jeden bestätigten Schreibvorgang, gleich wie er getätigt wurde: die Capture-Trigger, die Einstellung REALTIME_CDC und was sie brauchen."
 ---
 
 **Change Data Capture ist standardmäßig aktiviert.** Rebase erfasst Änderungen direkt an der Datenbank und gibt Realtime-Events für **jeden bestätigten (committed) Schreibvorgang aus, unabhängig davon, wie er getätigt wurde** – REST, SDK, Studio, `psql`, ein Cron-Job in einem anderen Dienst, rohes Drizzle/SQL oder der **SQL-Editor** von Studio. Dies entspricht demselben Modell wie bei Supabase Realtime, das das Write-Ahead-Log überwacht.
@@ -49,3 +50,8 @@ Wenn die Verbindung dies nicht unterstützt, gibt `auto` stattdessen eine Inform
 - Trigger werden nur auf Tabellen installiert, die einer registrierten Collection zugeordnet sind. Schreibvorgänge in nicht zugeordnete Tabellen werden ignoriert.
 - Eine Collection, deren Tabelle noch nicht migriert wurde, wird mit einer Warnung übersprungen, anstatt CDC für die übrigen zu blockieren.
 - Natives WAL-Logical-Replication-Streaming (`wal2json`/`pgoutput`) ist geplant; derzeit fällt `REALTIME_CDC=wal` auf den triggerbasierten Pfad zurück, der eine gleichwertige Abdeckung auf Datenbankebene bietet.
+
+## Nächste Schritte
+
+- [Realtime & WebSocket](/docs/backend/realtime) — Abonnements, Kanäle und Presence, die diese Events speisen.
+- [Realtime über Instanzen hinweg](/docs/backend/realtime-transports) — der Bus, der Änderungen zwischen Server-Prozessen trägt.

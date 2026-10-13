@@ -1,7 +1,8 @@
 ---
-sourceHash: c3a5adad80c0b11b
+sourceHash: a05da9682df4f23a
 title: "Captura de cambios a nivel de base de datos (CDC)"
 sidebar_label: "Captura de cambios a nivel de base de datos (CDC)"
+description: "Eventos en tiempo real para cada escritura confirmada, sea cual sea su origen: los triggers de captura, el ajuste REALTIME_CDC y lo que necesitan."
 ---
 
 **La captura de datos modificados (CDC) está activada por defecto.** Rebase captura los cambios en la base de datos y emite eventos en tiempo real para **cada escritura confirmada (committed), sin importar cómo se haya realizado**: REST, SDK, Studio, `psql`, un trabajo cron en otro servicio, Drizzle/SQL directo o el **editor SQL** de Studio. Este es el mismo modelo que utiliza Supabase Realtime al seguir el log de escritura previa (write-ahead log o WAL).
@@ -49,3 +50,8 @@ Si la conexión no lo soporta, `auto` muestra en su lugar una línea informativa
 - Los triggers solo se instalan en tablas respaldadas por una colección registrada. Las escrituras en tablas no asignadas se ignoran.
 - Una colección cuya tabla aún no ha sido migrada se omite con una advertencia en lugar de bloquear CDC para el resto.
 - La transmisión por replicación lógica nativa de WAL (`wal2json`/`pgoutput`) está prevista; hoy en día `REALTIME_CDC=wal` se degrada a la vía basada en triggers, que proporciona una cobertura equivalente a nivel de base de datos.
+
+## Siguientes pasos
+
+- [Realtime y WebSocket](/docs/backend/realtime) — suscripciones, canales y presencia, que estos eventos alimentan.
+- [Realtime entre instancias](/docs/backend/realtime-transports) — el bus que transporta los cambios entre procesos del servidor.

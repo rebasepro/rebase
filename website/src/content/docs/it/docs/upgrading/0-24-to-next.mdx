@@ -1,0 +1,342 @@
+---
+sourceHash: 1766aaeb8903ec34
+slug: it/docs/upgrading/0-24-to-next
+title: Aggiornamento da 0.24 alla prossima release
+sidebar_label: 0.24 → next
+description: Le breaking change già integrate in main e presenti in questa documentazione, prima che esista la release che le porta — l'interruttore di conteggio di REST, l'elenco delle collection MCP e le traduzioni dell'admin.
+---
+
+# Aggiornamento 0.24 → next
+
+**Nulla di quanto segue è ancora stato rilasciato.** Queste sono le voci `### Breaking` della
+sezione [`[Unreleased]`](/docs/changelog/) del changelog: sono su `main`, e
+questo sito di documentazione viene pubblicato da `main`, quindi sono descritte qui prima
+che la versione che le porta esista su npm. Se hai installato da npm sei
+sulla 0.24 e nulla di tutto questo ti ha raggiunto — leggilo per sapere cosa sta arrivando, e
+torna quando ti sposterai.
+
+Le prime tre arrivano con il lavoro sulle prestazioni: l'interruttore di conteggio sugli elenchi REST,
+l'elenco delle collection MCP e le traduzioni dell'admin. Le altre vengono dal
+giro di pulizia dell'arretrato: rifiuti più rigorosi all'avvio e su `OPTIONS`, il percorso cron dell'SDK
+e le letture offline, il registro delle sorgenti di storage, le prop inutilizzate del kit UI, l'upsert
+sulla collection degli utenti, una lettura che nomina sia `page` sia `offset`, e i nomi
+predefiniti delle policy sulle tabelle lunghe. Le ultime tre sono scelte di prodotto: la durata
+predefinita della sessione, la password policy su una password scelta da un amministratore, e
+una stringa vuota su un campo obbligatorio. Seguono tre rimozioni: due export del client che erano
+solo motori, un hook dell'admin di cui nessuno ha bisogno, e un'opzione di storage che
+non raggiungeva alcun client.
+
+---
+
+## 68. Un filtro su una colonna chiamata `count` va dentro `?where=`
+
+`?count=` su un elenco REST è ora l'interruttore per il conteggio dietro `meta.total`:
+`?count=none` lo salta e `?count=exact` è il predefinito. Qualsiasi altro valore viene
+rifiutato con `400 INVALID_COUNT`. Prima, `?count=5` filtrava le righe la cui colonna
+`count` valeva 5.
+
+**Cosa modificare:** nulla con l'SDK, che già invia un filtro su una
+colonna chiamata `count` dentro `?where=`. Una chiamata REST scritta a mano che filtra su
+una tale colonna sposta il filtro lì:
+
+```diff lang="http"
+- GET /api/data/products?count=5
++ GET /api/data/products?where={"count":["==",5]}
+```
+
+**Un nuovo SDK contro un vecchio server:** `iterate()` e `findAll()` inviano
+`?count=none` a ogni pagina, e così `find({ count: "none" })`. Un server 0.24
+lo legge come un filtro su una colonna chiamata `count`. Dove la collection non ha
+una tale colonna risponde `400 UNKNOWN_FILTER_FIELD`, e l'SDK invia di nuovo la lettura
+senza di esso. Dove la collection ha una colonna **di testo** chiamata `count`, il
+vecchio server filtra invece le righe il cui `count` è `'none'`, senza errore:
+la pagina torna corta o vuota e una scansione termina prima. Aggiorna il server
+prima dell'SDK quando una collection ha una tale colonna.
+
+Vedi [Saltare il conteggio](/docs/backend/api/#skipping-the-count).
+
+## 69. `list_collections` dell'MCP remoto non ha `structuredContent`
+
+`list_collections` inviava il suo elenco due volte: formattato nel blocco di testo, e
+di nuovo come `structuredContent`. Su un progetto grande i due insieme superavano
+il contesto di un modello. Ora invia l'elenco una volta, nel blocco di testo, come JSON
+compatto. Gli altri tool mantengono il loro `structuredContent`.
+
+**Cosa modificare:** nulla per un assistente, che legge il testo. Un programma
+che leggeva l'elenco da `structuredContent` analizza invece il blocco di testo;
+il contenuto è lo stesso. Vedi [L'endpoint remoto](/docs/ai/mcp/#the-remote-endpoint).
+
+## 70. `@rebasepro/app` non esporta più `es`
+
+L'entry del pacchetto riesportava la tabella di traduzione spagnola, `es`, che metteva
+le stringhe spagnole in ogni bundle costruito da esso. Le traduzioni diverse
+dall'inglese vengono ora recuperate quando un utente sceglie la sua lingua, e `es` non è più
+esportato. `en` lo è ancora.
+
+**Cosa modificare:** nulla, a meno che tu non importassi `es`. Per cambiare le stringhe
+dell'admin, passa gli override a `<Rebase translations={…}>`; per fissare la lingua,
+passa `locale`.
+
+```bash
+grep -rnE "import \{[^}]*\bes\b[^}]*\} from \"@rebasepro/app\"" --exclude-dir=node_modules .
+```
+
+## 71. Un semplice `OPTIONS` verso una rotta senza handler è un 404
+
+Il middleware CORS rispondeva a ogni richiesta `OPTIONS` da solo, con un `204` vuoto. Ora
+risponde solo ai preflight CORS (un `OPTIONS` che porta
+`Access-Control-Request-Method`); qualsiasi altro `OPTIONS` raggiunge la sua rotta. Una rotta
+senza un handler `OPTIONS` risponde `404`. `OPTIONS /api/storage/tus` ora restituisce
+le capability TUS (`Tus-Version`, `Tus-Extension`, `Tus-Max-Size`), come la
+documentazione ha sempre detto.
+
+**Chi è interessato:** un client, proxy o health check che sondava una rotta con
+`OPTIONS` e leggeva il `204` come «esiste». I preflight dei browser non
+cambiano.
+
+**Cosa modificare:** sonda con il metodo reale della rotta (`HEAD` o `GET`).
+
+## 72. I nomi in collisione vengono rifiutati all'avvio, con il motivo
+
+Una tabella, tabella di giunzione o tipo enum i cui nomi sono uguali dopo il troncamento
+di Postgres a 63 byte falliva a `db push` con «already exists». Due
+proprietà che si risolvono nella stessa colonna (`myTitle` e `my_title`), e un
+`target` di relazione scritto come stringa (`target: "authors"`), fallivano più tardi o in modo
+confuso. Ognuno viene ora rifiutato quando la configurazione si carica, e il messaggio
+dice cosa rinominare o scrivere.
+
+**Chi è interessato:** un progetto che dichiara una tale coppia. Non poteva completare
+`db push` nemmeno prima, quindi questo sposta il fallimento più in anticipo.
+
+**Cosa modificare:** rinomina uno dei nomi in collisione, e scrivi il target di una relazione
+come la collection, non il suo slug:
+
+```diff
+- relation: { kind: "belongsTo", target: "authors" },
++ relation: { kind: "belongsTo", target: () => authors },
+```
+
+## 73. `client.cron` chiama `/api/admin/cron`
+
+Il client cron dell'SDK usava come predefinito `/api/cron`, l'alias deprecato. Ora
+chiama `/api/admin/cron`, dove vive ogni superficie admin.
+
+**Chi è interessato:** un server (o una regola di proxy) che serve solo il vecchio percorso.
+Le chiamate cron dell'SDK rispondono `404` contro di esso.
+
+**Cosa modificare:** aggiorna il server insieme all'SDK, oppure mantieni esplicitamente il vecchio
+percorso:
+
+```ts
+const client = createRebaseClient({ baseUrl, cron: { cronPath: "/api/cron" } });
+```
+
+## 74. Le letture offline a cui non si può rispondere per intero falliscono con `OFFLINE`
+
+Da offline, `findAll()` e `iterate()` restituivano la parte della collection
+che questo dispositivo aveva in cache come se fosse tutta, e `count()` contava le righe
+in cache. Una pagina che questo dispositivo non ha mai recuperato ora fallisce con `OFFLINE`, e così
+un `count()` senza un conteggio dal server in cache.
+
+**Chi è interessato:** un'app che mostra quelle letture offline.
+
+**Cosa modificare:** intercetta l'errore dove l'app disegnava risultati parziali, e
+mostra ciò che ha con una nota, oppure chiedi una pagina che il dispositivo possiede già.
+
+```ts
+let rows;
+try {
+  rows = await client.data.posts.findAll();
+} catch (e) {
+  if (e instanceof RebaseApiError && e.code === "OFFLINE") rows = cached;
+  else throw e;
+}
+```
+
+## 75. `getOrDefault(key)` lancia un errore per una sorgente di storage non registrata
+
+`ClientStorageSourceRegistry.getOrDefault(key)` restituiva la sorgente predefinita per
+una chiave che non conosceva, quindi una proprietà che nominava una sorgente che il pannello non aveva
+ancora caricato caricava nel bucket predefinito. Ora lancia un errore.
+
+**Chi è interessato:** il codice che chiama `getOrDefault` con una chiave che non ha
+registrato. L'admin stesso non lo fa più.
+
+**Cosa modificare:** registra prima la sorgente, oppure usa `get(key)`, che restituisce
+`undefined` per una chiave sconosciuta, dove una sorgente mancante è prevista.
+
+## 76. `TextField.maxRows` e sei prop di `MultiSelect` non ci sono più
+
+`TextField` dichiarava `maxRows`, e `MultiSelect` dichiarava `onChange`, `name`,
+`position`, `endAdornment`, `multiple` e `padding`. Nessuna veniva mai letta, quindi
+passarne una non faceva nulla. Sono rimosse dai tipi, e passarne una è ora
+un errore di tipo.
+
+**Chi è interessato:** il codice che ne passava una. A runtime nulla cambia.
+
+**Cosa modificare:** elimina la prop. Per le modifiche di un multi-select usa
+`onValueChange`.
+
+## 77. Un upsert sulla collection degli utenti viene rifiutato
+
+La collection degli utenti (quella con `auth` abilitato) ora risponde un 400
+`INVALID_CONFLICT_TARGET` a un upsert, su ogni porta: `?on_conflict=`, `/bulk`
+con `upsert: true`, un'operazione `upsert` di `_batch`, `upsert()` e
+`createMany(…, { upsert: true })` dell'SDK, e il socket realtime. Un upsert
+scopre solo durante la scrittura se crea o aggiorna, quindi non applicava nessuno dei due
+insiemi di regole: nessun hashing della password, normalizzazione dell'email, `onCreateUser` o
+invito su una creazione, e nessun controllo dell'ultimo amministratore su un aggiornamento.
+
+**Chi è interessato:** il codice che fa upsert di utenti, per esempio una sincronizzazione che eseguiva
+`client.data.users.upsert(user, { onConflict: ["email"] })`.
+
+**Cosa modificare:** cerca l'utente, poi crealo o aggiornalo.
+
+```ts
+const user = { email: "ada@example.com", displayName: "Ada" };
+const { data: [found] } = await client.data.users.find({ where: { email: ["==", user.email] }, limit: 1 });
+if (!found) await client.data.users.create(user);
+else await client.data.users.update(String(found.id), user);
+```
+
+## 78. `page` con `offset` viene rifiutato con `PAGE_WITH_OFFSET`
+
+Una lettura che nomina sia `page` sia `offset` viene ora rifiutata. Il server risponde
+`400 PAGE_WITH_OFFSET`, e l'SDK rifiuta la coppia prima di qualsiasi richiesta, con un
+`RebaseClientError` che porta lo stesso codice: via HTTP, in-process
+(`rebase.data`) e offline. Prima, `page` vinceva e `offset` veniva scartato
+senza una parola.
+
+**Chi è interessato:** il codice che invia entrambi, per esempio un `find({ page, offset })`
+o una chiamata REST con `?page=3&offset=40`. Una tale lettura leggeva già solo
+`page`.
+
+**Cosa modificare:** invia uno dei due. Per mantenere ciò che la lettura restituiva prima,
+elimina `offset`.
+
+```diff lang="ts"
+- await client.data.products.find({ page: 3, offset: 40, limit: 20 });
++ await client.data.products.find({ page: 3, limit: 20 });
+```
+
+## 79. Le tabelle lunghe ricevono nuovi nomi per le policy di scrittura admin predefinite
+
+Su una tabella il cui nome è di 42 byte o più, le tre policy di scrittura admin predefinite
+(`…_default_admin_write_insert`, `_update` e `_delete`) sono ora chiamate
+`<head>_<hash8>_<op>`, al massimo 63 byte. Postgres conserva 63 byte di un nome, quindi
+i tre vecchi nomi venivano troncati allo stesso nome ed esisteva una sola policy, quella
+DELETE: gli admin non potevano inserire né aggiornare.
+
+**Chi è interessato:** un progetto con un nome di tabella di 42 byte o più, e
+tutto ciò che fa riferimento a quelle policy per nome, come una migrazione o uno script
+che le elimina. I vecchi nomi non sono mai esistiti nel database.
+
+**Cosa modificare:** nulla per il database. Il prossimo avvio o `rebase db push`
+elimina la policy troncata e crea una policy per operazione. Aggiorna qualsiasi
+script che nomina le vecchie policy.
+
+## 80. Le sessioni durano 30 giorni di inattività per impostazione predefinita
+
+La durata predefinita del refresh token è ora di 30 giorni su ogni punto di ingresso. Un
+server avviato con il runtime `rebase-server` (o `rebase start`) usava 400
+giorni ogni volta che `JWT_REFRESH_EXPIRES_IN` non era impostato; un
+`initializeRebaseBackend` scritto a mano ne usava già 30.
+
+La durata è scorrevole: ogni refresh emette un token valido per altri 30
+giorni, quindi un utente che apre l'app almeno una volta al mese resta connesso. Un
+utente inattivo più a lungo deve accedere di nuovo. I token emessi prima dell'aggiornamento mantengono la
+scadenza con cui sono stati emessi fino al loro prossimo refresh.
+
+**Chi è interessato:** un deployment sul runtime che non ha mai impostato
+`JWT_REFRESH_EXPIRES_IN`, i cui utenti tornano meno di una volta al mese.
+
+**Cosa modificare:** nulla, per adottare il nuovo predefinito. Per mantenere il comportamento
+precedente, impostalo esplicitamente:
+
+```bash
+JWT_REFRESH_EXPIRES_IN=400d
+```
+
+oppure `auth: { refreshExpiresIn: "400d" }` in un backend ejected. I browser limitano
+il cookie di refresh a 400 giorni, quindi un valore più lungo non porta nulla in modalità cookie.
+
+## 81. La password scelta da un amministratore deve rispettare la password policy
+
+`POST /api/admin/users` e una creazione sulla collection degli utenti tramite la data
+API (`POST /api/data/users`, `/bulk`, un batch, MCP `create_document`, un salvataggio
+via socket) ora rifiutano una `password` che non rispetta la policy con `400 WEAK_PASSWORD`,
+come già facevano registrazione, reimpostazioni e `PUT /api/admin/users/:uid`. Nulla viene
+scritto e nessun hook di creazione viene eseguito. Su un `/bulk`, il messaggio inizia con
+`Row <n>: `, come gli altri errori di riga del bulk. Una creazione senza password non
+cambia: una password viene generata, o viene inviato un invito.
+
+**Chi è interessato:** il codice che crea utenti con una password scelta altrove,
+come un'importazione o una sincronizzazione da un altro sistema.
+
+**Cosa modificare:** per importare account le cui password sono state impostate altrove, invia
+`skipPasswordPolicy: true` in ogni body di creazione (su ogni riga di un `/bulk`), come
+amministratore o con la service key:
+
+```ts
+await client.admin.createUser({ email, password: legacyPassword, skipPasswordPolicy: true });
+```
+
+Da qualsiasi altro chiamante il flag non esonera da nulla. Non viene mai memorizzato e non
+raggiunge mai `onCreateUser` o `onAdminCreateUser`. L'importazione del pannello di amministrazione
+lo invia per te sulle righe che portano una `password`. Un `AuthAdapter` personalizzato riceve
+la decisione come nuovo terzo argomento di `prepareUserCreation`
+(`{ mayWaivePasswordPolicy }`); un adapter che lo ignora mantiene il comportamento attuale.
+Per cambiare la policy stessa, passa `auth.hooks.validatePasswordStrength`.
+
+## 82. Una stringa vuota su un campo stringa obbligatorio viene rifiutata
+
+Una scrittura che invia `""` per una proprietà `string` con `validation.required` ora
+risponde `400 VALIDATION_CONSTRAINT`, con una voce `details.violations`
+`{ field, code: "required" }`: la stessa risposta di un valore mancante. Questo si applica
+a creazioni e aggiornamenti su ogni porta (REST, bulk, batch, upsert, il socket
+realtime, MCP), e anche quando la proprietà ha un `defaultValue`, poiché un default
+riempie una chiave assente, non una vuota. Il pannello di amministrazione scrive già `null`
+per un campo svuotato, quindi non è interessato.
+
+**Chi è interessato:** il codice che scrive `""` in un campo stringa obbligatorio, per
+esempio un form o un'importazione che invia ogni colonna, piena o no.
+
+**Cosa modificare:** invia un valore, ometti la chiave in creazione quando deve applicarsi un
+`defaultValue`, oppure elimina `required` dai campi che possono legittimamente essere vuoti.
+Le collection che dichiarano un `beforeSave` non vengono controllate al confine (l'hook
+può riempire il valore), come prima. Il codice server che scrive in-process
+(`rebase.data`) non è interessato.
+
+## 83. `QueryBuilder` e `createBackups` non sono più esportati da `@rebasepro/client`
+
+Entrambi erano i motori dietro le chiamate del client.
+
+- `new QueryBuilder(collection).where(…)` → `client.data.<collection>.where(…)`;
+  gli helper `or`, `and`, `not` e `cond` sono ancora esportati.
+- `createBackups(transport)` → `client.backups` (stessi `list`, `download`,
+  `downloadUrl`, `stream`). `CreateBackupsOptions` sparisce con esso;
+  `BackupStream` è ancora esportato.
+
+`client.ws` non cambia.
+
+## 84. `useBackendStorageSource` è rimosso da `@rebasepro/app`
+
+```ts
+// before
+const storageSource = useBackendStorageSource({ apiUrl, getAuthToken });
+// after — the client you already pass to the admin
+const storageSource = client.storage;                     // default source
+const media = client.createStorageSource("media");        // a named source
+```
+
+La sorgente del client invia anche `public` e `context` nei caricamenti (limiti di proprietà
+verificati lato server) e `storageId` per le sorgenti con nome, cosa che l'hook
+non faceva.
+
+## 85. `signedUrlExpiration` è rimosso dalla configurazione di storage S3 e GCS
+
+Elimina la chiave da `storage: { type: "s3" | "gcs", … }`; TypeScript la segnala
+come proprietà sconosciuta. Non ha mai impostato la durata di un URL ricevuto da un browser.
+Per cambiare per quanto tempo funziona l'URL di un file privato, imposta `storageDownloadTokenTtl`
+(secondi; `STORAGE_DOWNLOAD_TOKEN_TTL` su un deployment con bundle). Il codice server che
+chiama direttamente `controller.getSignedUrl()` ottiene un URL valido per un'ora.

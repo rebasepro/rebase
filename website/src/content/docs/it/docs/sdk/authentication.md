@@ -1,5 +1,5 @@
 ---
-sourceHash: 0e00ae18684830bb
+sourceHash: 1bf5f81fc739ecfd
 title: Autenticazione
 sidebar_label: Autenticazione
 description: Autenticazione lato client con l'SDK di Rebase — accesso con email/password, provider OAuth, gestione delle sessioni e listener dello stato di autenticazione.
@@ -167,7 +167,8 @@ await client.auth.linkAnonymous("user@example.com", "correct-horse-battery");
 
 | Errore | Significato |
 |--------|-------------|
-| `ANONYMOUS_AUTH_DISABLED` (403) | Il backend non ha abilitato l'autenticazione anonima |
+| `ANONYMOUS_AUTH_DISABLED` (403) | Il backend non ha abilitato l'autenticazione anonima, oppure l'ha disattivata dopo l'accesso di questo guest: un guest diventa un account solo finché `allowAnonymous` è attivo |
+| `REGISTRATION_DISABLED` (403) | La registrazione è chiusa sul backend, e diventare un account è una registrazione |
 | `NOT_ANONYMOUS` (400) | La sessione corrente appartiene a un account ordinario |
 | `EMAIL_EXISTS` (409) | L'indirizzo ha già un account — accedi invece a quello |
 
@@ -303,6 +304,19 @@ function useCurrentUser() {
 `useRebaseAuthController` in `@rebasepro/app` esegue già questa operazione, quindi un'applicazione creata sul template generato ne dispone automaticamente. Le richieste di dati non devono attendere: una effettuata durante il ripristino viene inviata non appena questo si assesta — come utente ripristinato, oppure in forma anonima — così un primo render non legge mai un elenco pubblico al posto di quello dell'utente.
 
 Un ripristino che esegue un refresh (un token memorizzato scaduto, o la modalità cookie) raggiunge `onAuthStateChange` come `TOKEN_REFRESHED`; un token memorizzato ancora valido viene adottato in silenzio. Quindi un listener non può indicare che il ripristino è terminato: un avvio che non emette nulla è indistinguibile da uno ancora in corso. Attendi `isInitialized()` per verificare questo stato e usa il listener per le modifiche successive.
+
+`restoreOutcome()` dice come si è conclusa la ripresa, una volta che `isInitialized()` si è
+risolta: `"restored"`, `"none"` (nulla da ripristinare), `"refused"` (il server ha
+rifiutato la sessione), oppure `"unreachable"` (il server non era raggiungibile, quindi
+la sessione non è stata né confermata né rifiutata). In modalità cookie, `"unreachable"`
+senza sessione è l'unico caso in cui non si sa con certezza che l'utente sia disconnesso:
+
+```typescript
+await client.auth.isInitialized();
+if (!client.auth.getSession() && client.auth.restoreOutcome() === "unreachable") {
+    console.log("Offline: could not check the session.");
+}
+```
 
 ## Listener dello stato di autenticazione
 

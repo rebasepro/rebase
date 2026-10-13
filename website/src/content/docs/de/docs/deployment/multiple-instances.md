@@ -1,5 +1,5 @@
 ---
-sourceHash: d5f6bfc83168dcfd
+sourceHash: 5fa5e7d348432b22
 title: Mehr als eine Instanz ausführen
 sidebar_label: Mehr als eine Instanz
 description: Jedes Stück Zustand, das ein Rebase-Prozess für sich behält, und die Einstellung, die es teilt — was zu setzen ist, bevor eine zweite Replik, ein Rolling Deployment oder ein aufgeteiltes Deployment Traffic übernimmt.

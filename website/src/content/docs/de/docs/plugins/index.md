@@ -1,5 +1,5 @@
 ---
-sourceHash: 38c32f7e5b1fc7ae
+sourceHash: 5bbd926d0fcd04aa
 title: Plugin-System
 sidebar_label: Plugins
 description: Erweitern Sie Rebase mit Plugins – injizieren Sie UI-Komponenten, modifizieren Sie Collections, fügen Sie Toolbar-Aktionen hinzu und erstellen Sie benutzerdefinierte Field Builder.
@@ -161,6 +161,14 @@ import { useDataEnhancementPlugin } from "@rebasepro/plugin-ai";
 
 const enhancementPlugin = useDataEnhancementPlugin();
 ```
+
+Es fügt jedem Formular eine Autofill-Aktion hinzu und jedem Markdown-Feld einen
+**Autocomplete**-Slash-Befehl, der den Text ab dem Cursor fortsetzt. Beide erscheinen
+nur dort, wo das Plugin aktiviert ist: Der Dienst meldet sich als verfügbar und
+`getConfigForPath` (sofern Sie eines übergeben) erlaubt die Collection. Ein Feld, dessen
+`customProps.editorProps.aiController` einen eigenen Controller nennt, verwendet
+diesen. <span class="since-badge" data-since="0.25">Seit 0.25</span> Ein anderes Plugin kann Markdown-Feldern auf dieselbe Weise einen Controller geben, mit
+`EditorAIControllerProvider` aus `@rebasepro/cms` in einem formularbezogenen Provider.
 
 ![Data enhancement](/img/data_enhancement.png)
 

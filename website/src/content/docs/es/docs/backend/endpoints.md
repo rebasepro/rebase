@@ -1,5 +1,5 @@
 ---
-sourceHash: 330defe6fc90f0fa
+sourceHash: a6a820da39681f4a
 title: Índice de endpoints
 sidebar_label: Índice de endpoints
 description: Cada ruta HTTP que monta un backend de Rebase — datos, autenticación, almacenamiento, administración, meta — con el control de acceso de cada una y la página que la explica.
@@ -138,10 +138,13 @@ puede acceder a nada de esto. Consulte [Roles y alcances](/docs/backend/roles-an
 | `GET` | `/api/admin/cron/:id` | `cron:read` | [Trabajos cron](/docs/backend/cron-jobs/) |
 | `PUT` | `/api/admin/cron/:id` | `cron:write` | Habilita o deshabilita un trabajo |
 | `GET` | `/api/admin/cron/:id/logs` | `cron:read` | [Trabajos cron](/docs/backend/cron-jobs/) |
-| `POST` | `/api/admin/cron/:id/trigger` | `cron:write` | Ejecuta un trabajo ahora |
+| `POST` | `/api/admin/cron/:id/trigger` | `cron:write` | Ejecuta un trabajo ahora. <span class="since-badge" data-since="0.25">Desde 0.25</span> `?async=1` responde `202` en cuanto ha empezado — [API de trabajos cron](/docs/backend/cron-jobs-api/#example-trigger-a-job-manually) |
 | `GET` | `/api/admin/backups` | `backups:read` | Inventario de copias de seguridad |
 | `GET` | `/api/admin/backups/download` | `backups:read` | Transmite en flujo una copia de seguridad. Con `?token=` de un enlace de descarga no hace falta cabecera, solo para esa copia |
 | `POST` | `/api/admin/backups/download-url` | `backups:read` | <span class="since-badge" data-since="0.25">Desde 0.25</span> Un enlace a una copia de seguridad, `{ key }` → `{ url, token, expiresIn }`, válido durante 60 segundos — [Copias de seguridad](/docs/deployment/backups/#download-a-backup) |
+| `GET` | `/api/admin/storage/orphans` | `database:read` | <span class="since-badge" data-since="0.25">Desde 0.25</span> Archivos almacenados que ninguna fila nombra, `?storageId=&olderThanHours=` — lo que imprime `rebase storage orphans` |
+| `DELETE` | `/api/admin/storage/orphans` | `database:write` | <span class="since-badge" data-since="0.25">Desde 0.25</span> Los vuelve a buscar y los elimina; `409 STORAGE_SCAN_INCOMPLETE` cuando no se pudo leer una colección |
+| `POST` | `/api/admin/storage/move` | `database:write` | <span class="since-badge" data-since="0.25">Desde 0.25</span> Copia una carpeta a otro origen con las mismas claves, una página por llamada — lo que envía `rebase storage move` |
 | `GET` | `/api/admin/logs` | `logs:read` | El búfer de registros recientes |
 | `GET` | `/api/admin/logs/latest` | `logs:read` | Las entradas más recientes |
 | `GET` | `/api/admin/logs/stream` | `logs:read` | Server-sent events |

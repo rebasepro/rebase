@@ -1,5 +1,5 @@
 ---
-sourceHash: 9531407dffbf3092
+sourceHash: abd2a2de4a0ff4be
 title: Regole di sicurezza (RLS)
 sidebar_label: Regole di sicurezza
 description: Definisci criteri di Row Level Security per le tue collection utilizzando scorciatoie pratiche o espressioni SQL raw.
@@ -39,6 +39,30 @@ L'identità dell'utente autenticato è disponibile in SQL tramite:
 | `rebase.jwt()` | Claim completi del JWT in formato JSONB |
 
 Questi valori vengono impostati automaticamente per transazione dal backend di Rebase.
+
+### Policy che una collection riceve senza scriverle
+
+Le policy su una tabella sono più dei `securityRules` della collection stessa:
+
+- **`defaultSecurityRules`**, esportato da `config/collections/index.ts`. Una
+  collection i cui `securityRules` sono assenti o vuoti le prende tutte al
+  suo posto, come se le avesse scritte. Una collection che dichiara anche una sola regola
+  propria non ne prende nessuna: le due liste non vengono mai unite.
+- **La baseline admin.** Ogni collection riceve anche
+  `<table>_default_admin_read` e `<table>_default_admin_write_insert`,
+  `_update` e `_delete`: policy permissive che permettono al contesto server e
+  al ruolo `admin` di leggere e scrivere ogni riga. Stanno accanto a qualunque regola
+  la collection finisca per avere, le proprie o i default ereditati, e le policy permissive
+  sono in OR, quindi allargano entrambi. La collection degli utenti riceve anche un
+  self-read e un gate di scrittura restrittivo che mantiene `roles` riservato all'admin.
+- **Tenancy.** Una collection con ambito tenant riceve una regola restrittiva che confina
+  ogni operazione al tenant del chiamante; il contesto server la supera.
+
+`disableDefaultPolicies: true` su una collection rimuove la baseline permissiva,
+e mantiene i gate restrittivi. È per collection: `defaultSecurityRules`
+non porta alcun flag simile, quindi una collection che eredita i default mantiene la
+baseline a meno che non imposti lei stessa il flag. Il DDL generato contrassegna ogni
+policy iniettata, e `rebase db push` rimette quella eliminata a mano.
 
 ## Scorciatoie pratiche
 

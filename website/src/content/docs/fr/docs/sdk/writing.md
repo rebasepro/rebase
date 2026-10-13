@@ -1,5 +1,5 @@
 ---
-sourceHash: c30985ad74db5bdc
+sourceHash: dcdd32536d7ea87a
 title: Écriture de données
 sidebar_label: Écriture de données
 description: create, upsert, update et delete avec le SDK — opérations sur les champs, écritures conditionnelles, clés d'idempotence, écritures par lots et écriture entre collections dans une seule transaction.
@@ -122,6 +122,8 @@ ne pourrait afficher que le marqueur lui-même jusqu'à ce que la file soit trai
 await client.data.products.delete(42);
 ```
 
+Sur une collection avec [suppression logique](/docs/collections/soft-delete), cela marque la ligne au lieu de la retirer. `client.data.products.trash` liste, compte, restaure et purge les lignes marquées.
+
 ### Écritures conditionnelles
 
 `update` et `delete` acceptent un paramètre `ifMatch`, afin qu'une écriture soit refusée lorsque la ligne a
@@ -145,6 +147,20 @@ réside sur une clé non énumérable, de sorte qu'elle n'entre jamais dans le t
 ligne issue de `find()`, du cache hors ligne ou d'un serveur qui n'envoie pas
 d'`ETag` — et passer `undefined` n'envoie aucune précondition, l'appel ci-dessus
 se dégrade donc en une mise à jour ordinaire plutôt que de lever une exception.
+
+<span class="since-badge" data-since="0.25">Depuis 0.25</span> Une ligne issue de `update()` porte la version que cette écriture a produite, de sorte que les modifications conditionnelles s'enchaînent sans lecture intermédiaire. Une ligne que reçoit un callback `listenById()` porte la version que cette trame montre :
+
+```typescript
+import { etagOf } from "@rebasepro/client";
+
+let shown: Record<string, unknown> | undefined;
+client.data.posts.listenById(1, (post) => {
+    shown = post; // etagOf(shown) is the version this frame shows
+});
+
+// On save: refused with 412 if the row has moved on since that frame
+await client.data.posts.update(1, { title: "New" }, { ifMatch: etagOf(shown) });
+```
 
 Depuis un navigateur sur une autre origine — un frontend Vite sur son propre port, un hôte `app.` appelant un hôte `api.` — l'`ETag` n'est lisible que parce que le serveur le nomme dans `Access-Control-Expose-Headers`. Le runtime Rebase le fait, avec `Retry-After`, `X-Request-ID`, les en-têtes `X-RateLimit-*` et `Preference-Applied` ; sur la 0.23 il n'en expose aucun, si bien que `etagOf` y vaut `undefined` en cross-origin. Un backend qui configure son propre `cors()` doit exposer la même liste, sans quoi `etagOf` y vaut toujours `undefined` et chaque écriture conditionnelle part sans condition.
 

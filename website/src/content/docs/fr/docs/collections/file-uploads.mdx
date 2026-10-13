@@ -1,5 +1,5 @@
 ---
-sourceHash: e18fe07b6281381b
+sourceHash: 3702fa186011ca6b
 title: Champs de téléversement de fichiers
 sidebar_label: Téléversements de fichiers
 description:"\"Déclarer un champ de fichier ou d'image sur une collection : le bloc storage, les téléversements uniques et multiples, et quelles options sont résolues par le panneau plutôt que par le serveur.\""
@@ -100,7 +100,7 @@ Les deux sont désormais vérifiés par le serveur par rapport à **l'endroit o�
 
 Une propriété markdown (`admin.markdown: true`) dotée d'un bloc `storage` accepte les téléversements d'images dans son éditeur. Le texte stocke chaque image comme une **référence de stockage** — `![](rebase-storage:posts/abc_cover.png)` — et non comme une URL : l'URL d'un fichier privé porte un token de téléchargement qui expire en quelques minutes, alors que le texte, lui, est enregistré. L'éditeur et les aperçus du panneau d'administration échangent chaque référence contre une URL fraîche au moment de l'affichage ; un site qui restitue le champ fait de même avec `resolveStorageReferences(text, client)` — voir [Fichiers à l'intérieur d'un texte](/docs/sdk/storage#files-inside-text).
 
-Un texte enregistré avant ce changement contient les URL elles-mêmes, et leurs tokens ont expiré ; réinsérez ces images pour stocker des références.
+Un texte enregistré avant les références contient les URL de téléchargement elles-mêmes, avec des tokens expirés. L'éditeur, les aperçus et `resolveStorageReferences` les renouvellent lorsqu'ils affichent le texte, car un token nomme toujours son objet ; réinsérer l'image ou réécrire le texte avec `storageReferencesForDownloadUrls(text)` stocke une référence.
 
 ### Où le fichier est autorisé à aller
 
@@ -110,11 +110,11 @@ règles d'autorisation de stockage — voir [Storage](/docs/backend/storage).
 
 ### Les fichiers ne sont jamais supprimés pour vous
 
-Vider un champ de fichier, remplacer son fichier, ou supprimer la ligne à laquelle il appartient laisse l'objet stocké où il est. Chaque téléversement reçoit sa propre clé, si bien qu'un remplacement écrit un nouvel objet plutôt que d'écraser l'ancien, et rien ne supprime le précédent : deux lignes peuvent partager la même clé, donc le panneau ne peut pas savoir qu'un fichier est inutilisé. Les objets qu'aucune ligne ne référence restent dans le bucket, et sont facturés, jusqu'à ce que vous les supprimiez — depuis le navigateur de stockage de Studio, avec `client.storage.deleteObject(key)`, ou avec une règle de cycle de vie sur le bucket.
+Vider un champ de fichier, remplacer son fichier, ou supprimer la ligne à laquelle il appartient laisse l'objet stocké où il est. Chaque téléversement reçoit sa propre clé, si bien qu'un remplacement écrit un nouvel objet plutôt que d'écraser l'ancien, et rien ne supprime le précédent : deux lignes peuvent partager la même clé, donc le panneau ne peut pas savoir qu'un fichier est inutilisé. Les objets qu'aucune ligne ne référence restent dans le bucket, et sont facturés, jusqu'à ce que vous les supprimiez — depuis le navigateur de stockage de Studio, avec `client.storage.deleteObject(key)`, ou avec une règle de cycle de vie sur le bucket. <span class="since-badge" data-since="0.25">Depuis 0.25</span> `rebase storage orphans` liste les fichiers qu'aucune ligne ne nomme, et les supprime avec `--delete` — voir [la CLI](/docs/cli/#rebase-storage).
 
 ### Déplacer une propriété vers une autre source de stockage
 
-Un champ de fichier stocke la clé de l'objet, pas sa source. Modifier le `storageSource` d'une propriété fait pointer chaque valeur existante vers la nouvelle source, où ces clés n'existent pas, de sorte que les aperçus des fichiers téléversés avant le changement répondent « introuvable ». Copiez les objets vers la nouvelle source sous les mêmes clés avant de modifier la propriété — avec l'outillage propre au fournisseur, comme `aws s3 sync` ou `gcloud storage cp` — ou conservez l'ancienne source pour les fichiers existants.
+Un champ de fichier stocke la clé de l'objet, pas sa source. Modifier le `storageSource` d'une propriété fait pointer chaque valeur existante vers la nouvelle source, où ces clés n'existent pas, de sorte que les aperçus des fichiers téléversés avant le changement répondent « introuvable ». Copiez les objets vers la nouvelle source sous les mêmes clés avant de modifier la propriété — `rebase storage move --from <old> --to <new> --prefix <storagePath>`, ou l'outillage propre au fournisseur, comme `aws s3 sync` ou `gcloud storage cp` — ou conservez l'ancienne source pour les fichiers existants.
 
 ## Prochaines étapes
 

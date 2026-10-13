@@ -1,5 +1,5 @@
 ---
-sourceHash: c30985ad74db5bdc
+sourceHash: dcdd32536d7ea87a
 title: Daten schreiben
 sidebar_label: Daten schreiben
 description: Erstellen, Upserten, Aktualisieren und Löschen mit dem SDK – Feldoperationen, bedingte Schreibvorgänge, Idempotenzschlüssel, Batch-Schreibvorgänge und kollektionsübergreifendes Schreiben in einer einzigen Transaktion.
@@ -123,6 +123,10 @@ selbst anzeigen.
 await client.data.products.delete(42);
 ```
 
+Bei einer Collection mit [Soft Delete](/docs/collections/soft-delete) markiert dies die
+Zeile, statt sie zu entfernen. `client.data.products.trash` listet, zählt, stellt wieder her
+und löscht die markierten Zeilen endgültig.
+
 ### Bedingte Schreibvorgänge
 
 `update` und `delete` akzeptieren ein `ifMatch`, sodass ein Schreibvorgang abgewiesen wird, wenn
@@ -146,6 +150,22 @@ einem nicht-aufzählbaren (non-enumerable) Schlüssel, sodass sie nie in den gen
 Zeile aus `find()`, aus dem Offline-Cache oder von einem Server, der kein `ETag` sendet – und die
 Übergabe von `undefined` sendet keine Vorbedingung, sodass der obige Aufruf zu einem gewöhnlichen
 Update herabgestuft wird, anstatt einen Fehler zu werfen.
+
+<span class="since-badge" data-since="0.25">Seit 0.25</span> Eine Zeile aus `update()` trägt die Version, die dieser Schreibvorgang erzeugt hat, sodass
+bedingte Bearbeitungen ohne dazwischenliegendes Lesen aneinandergereiht werden können. Eine Zeile, die ein `listenById()`-Callback
+erhält, trägt die Version, die dieser Frame zeigt:
+
+```typescript
+import { etagOf } from "@rebasepro/client";
+
+let shown: Record<string, unknown> | undefined;
+client.data.posts.listenById(1, (post) => {
+    shown = post; // etagOf(shown) is the version this frame shows
+});
+
+// On save: refused with 412 if the row has moved on since that frame
+await client.data.posts.update(1, { title: "New" }, { ifMatch: etagOf(shown) });
+```
 
 Von einem Browser auf einem anderen Origin aus — ein Vite-Frontend auf eigenem Port, ein
 `app.`-Host, der einen `api.`-Host aufruft — ist das `ETag` nur lesbar, weil der Server es in

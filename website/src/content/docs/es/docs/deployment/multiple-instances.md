@@ -1,5 +1,5 @@
 ---
-sourceHash: d5f6bfc83168dcfd
+sourceHash: 5fa5e7d348432b22
 title: Ejecutar más de una instancia
 sidebar_label: Más de una instancia
 description: Cada parte del estado que un proceso de Rebase guarda para sí mismo, y el ajuste que lo comparte — qué configurar antes de que una segunda réplica, un despliegue progresivo o un despliegue dividido reciban tráfico.

@@ -1,5 +1,5 @@
 ---
-sourceHash: 330defe6fc90f0fa
+sourceHash: a6a820da39681f4a
 title: Indice degli endpoint
 sidebar_label: Indice degli endpoint
 description: Ogni route HTTP montata da un backend Rebase — data, auth, storage, admin, meta — con il relativo gate e la pagina che la descrive.
@@ -135,10 +135,13 @@ una collection non può accedere a nulla di tutto questo. Vedi [Ruoli e scope](/
 | `GET` | `/api/admin/cron/:id` | `cron:read` | [Cron Job](/docs/backend/cron-jobs/) |
 | `PUT` | `/api/admin/cron/:id` | `cron:write` | Abilita o disabilita un job |
 | `GET` | `/api/admin/cron/:id/logs` | `cron:read` | [Cron Job](/docs/backend/cron-jobs/) |
-| `POST` | `/api/admin/cron/:id/trigger` | `cron:write` | Esegue un job immediatamente |
+| `POST` | `/api/admin/cron/:id/trigger` | `cron:write` | Esegue un job immediatamente. <span class="since-badge" data-since="0.25">Da 0.25</span> `?async=1` risponde `202` appena è partito — [Cron Jobs API](/docs/backend/cron-jobs-api/#example-trigger-a-job-manually) |
 | `GET` | `/api/admin/backups` | `backups:read` | Inventario dei backup |
 | `GET` | `/api/admin/backups/download` | `backups:read` | Trasmette in streaming un backup. Con `?token=` da un link di download non serve alcun header, solo per quel backup |
 | `POST` | `/api/admin/backups/download-url` | `backups:read` | <span class="since-badge" data-since="0.25">Da 0.25</span> Un link a un backup, `{ key }` → `{ url, token, expiresIn }`, valido per 60 secondi — [Backup](/docs/deployment/backups/#download-a-backup) |
+| `GET` | `/api/admin/storage/orphans` | `database:read` | <span class="since-badge" data-since="0.25">Da 0.25</span> File archiviati che nessuna riga nomina, `?storageId=&olderThanHours=` — ciò che stampa `rebase storage orphans` |
+| `DELETE` | `/api/admin/storage/orphans` | `database:write` | <span class="since-badge" data-since="0.25">Da 0.25</span> Li individua di nuovo e li elimina; `409 STORAGE_SCAN_INCOMPLETE` quando una collection non ha potuto essere letta |
+| `POST` | `/api/admin/storage/move` | `database:write` | <span class="since-badge" data-since="0.25">Da 0.25</span> Copia una cartella in un'altra sorgente con le stesse chiavi, una pagina per chiamata — ciò che invia `rebase storage move` |
 | `GET` | `/api/admin/logs` | `logs:read` | Il buffer dei log recenti |
 | `GET` | `/api/admin/logs/latest` | `logs:read` | Le voci più recenti |
 | `GET` | `/api/admin/logs/stream` | `logs:read` | Server-sent events |

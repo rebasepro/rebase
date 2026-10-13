@@ -1,5 +1,5 @@
 ---
-sourceHash: 7d1fe8f3e85d948e
+sourceHash: 07c1391c48e88901
 title: Abonnements en temps réel
 sidebar_label: Temps réel
 description: Abonnez-vous aux modifications de données en direct avec le SDK typé de Rebase à l'aide d'écouteurs en temps réel basés sur WebSocket.
@@ -166,6 +166,20 @@ client.data.posts.listenById(1, (post) => {
 relations incluses. Le changement d'une seule ligne liée n'envoie aucune trame : modifier le nom d'un tag ne
 rafraîchit pas un post écouté avec `include: ["tags"]` tant que le post ne change pas lui aussi. Pour suivre
 les lignes liées, écoutez aussi leur collection.
+
+## Suivre un décompte
+
+<span class="since-badge" data-since="0.25">Depuis 0.25</span> `listenCount()` maintient un décompte à jour : le total de ce que correspond le filtre d'une liste, pour une barre d'outils ou une offre « tout sélectionner (N) » qui ne doit pas se périmer pendant que d'autres ajoutent et retirent des lignes. Le callback s'exécute avec le total dès qu'il est connu, puis chaque fois qu'une écriture le modifie.
+
+```typescript
+const stop = client.data.orders.listenCount(
+    { where: { status: ["==", "open"] } },
+    (total) => console.log(`${total} open orders`),
+    (error) => console.error(error)
+);
+```
+
+Seul le filtre compte — `where`, `logical` et `searchString` ; un `limit`, un `offset` ou un tri est ignoré. Le serveur ne lit aucune ligne pour cela, seulement le décompte, sous l'identité de l'abonné comme pour n'importe quelle autre trame. Un serveur antérieur à la 0.25 ne connaît pas la demande ; il y répond par une ligne et le même total, et le SDK lit le total à partir de là. Sur un client sans socket, `listenCount()` est un stub qui lève une exception, comme `listen()`. Avec la [prise en charge hors ligne](/docs/sdk/offline/) activée, le décompte est celui du serveur : les écritures en file d'attente n'y figurent pas tant qu'elles ne sont pas rejouées.
 
 ## Générateur de requêtes fluide (Fluent Query Builder)
 

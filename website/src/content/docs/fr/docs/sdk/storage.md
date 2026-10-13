@@ -1,5 +1,5 @@
 ---
-sourceHash: 7f4db751ce80395f
+sourceHash: 3529ea341017acda
 title: Stockage et fichiers
 sidebar_label: Stockage
 description: Téléverser, télécharger, lister et supprimer des fichiers à l'aide du module de stockage du SDK typé de Rebase.
@@ -107,6 +107,8 @@ const body = await resolveStorageReferences(String(post?.body ?? ""), client);
 ```
 
 Chaque objet est signé une fois par appel, depuis sa propre source, de sorte qu'une image privée continue de fonctionner quelle que soit l'ancienneté du téléversement. Une référence qui nomme un objet qui n'existe plus est laissée telle quelle. `storageReference(key, storageId?)` en construit une, pour un texte que vous écrivez vous-même.
+
+<span class="since-badge" data-since="0.25">Depuis 0.25</span> Un texte enregistré avant l'existence des références contient lui-même l'URL de téléchargement d'un fichier privé, `…/storage/file/posts/cover.png?token=…`, dont le token a expiré quelques minutes après son écriture. `resolveStorageReferences` renouvelle aussi celles-ci : le token nomme toujours l'objet, l'URL est donc remplacée par une URL fraîche. Pour stocker des références à la place, réécrivez le texte une fois avec `storageReferencesForDownloadUrls(text)`, qui laisse toutes les autres URL telles quelles.
 
 ## Télécharger un fichier
 

@@ -1,0 +1,156 @@
+---
+sourceHash: c6b95df3140b1b02
+slug: fr/docs/upgrading/0-21-to-0-23
+title: Mise à niveau de 0.21 vers 0.23
+sidebar_label: 0.21 → 0.23
+description: Les changements cassants de la 0.23 pour une application en 0.21 ou 0.22 — clés d'API sur chemin imbriqué, refus au démarrage, dépôts d'authentification personnalisés, passage d'invités à des comptes et stores de tâches personnalisés.
+---
+
+# Mise à niveau 0.21 → 0.23
+
+Voici les entrées `### Breaking` que porte la 0.23. La 0.22 ne déclare aucun changement
+cassant : une application en 0.21 ou 0.22 lit donc cette seule page pour atteindre la 0.23.
+
+Trois d'entre elles refusent le démarrage, en nommant le réglage, plutôt que de changer le comportement
+en silence. Quatre changent qui peut se connecter ou ce qu'une clé peut atteindre : lisez-les en premier
+si votre application a des clés d'API sur des chemins imbriqués, un dépôt d'authentification personnalisé, ou des invités
+qui deviennent des comptes. La dernière change le contrat d'un store de tâches personnalisé.
+
+---
+
+## 33. Une clé d'API sur un chemin imbriqué a besoin de `read` sur chaque collection parente
+
+Une clé était vérifiée par rapport au dernier segment d'une URL imbriquée, qui nomme une
+relation et non une collection, et la collection parente n'était jamais vérifiée
+du tout. Désormais, l'opération de la route est vérifiée par rapport à la collection que le chemin
+atteint, et chaque collection que le chemin traverse a besoin de `read`. Une clé limitée
+à `posts` qui appelle `/api/data/authors/1/posts` reçoit
+`403 API_KEY_FORBIDDEN` nommant `authors` tant qu'elle ne peut pas aussi lire `authors`.
+
+**Ce qu'il faut changer :** donnez à chaque clé qui utilise des chemins imbriqués `read` sur les parents
+(`PUT /api/admin/api-keys/:id`), ou faites-lui appeler plutôt la route propre de la collection enfant
+avec un filtre.
+
+```json
+[
+    { "collection": "posts", "operations": ["read", "write"] },
+    { "collection": "authors", "operations": ["read"] }
+]
+```
+
+Voir [Clés d'API](/docs/backend/api-keys/#data). Depuis la 0.24, la même règle s'écrit en portées : chaque parent a besoin de `data:read`.
+
+## 34. Une variable d'environnement numérique qui n'est pas un nombre fait échouer le démarrage
+
+`PORT`, `SMTP_PORT`, `REBASE_MAX_BODY_SIZE` et les variables `DB_POOL_*` laissaient
+passer `NaN`, ou lisaient une valeur vide comme `0`. Un `REBASE_MAX_BODY_SIZE` vide
+supprimait la limite de corps de chaque route, et un `PORT` vide faisait écouter un serveur de production
+sur un port aléatoire. Une valeur vide signifie désormais non définie et prend la
+valeur par défaut, un `0` explicite compte toujours, et tout ce qui n'est pas un nombre arrête
+le démarrage, en nommant la variable.
+
+**Ce qu'il faut changer :** rien, sauf si le démarrage nomme désormais une variable. Corrigez alors sa
+valeur, ou retirez-la.
+
+```bash
+grep -nE "^(PORT|SMTP_PORT|REBASE_MAX_BODY_SIZE|DB_POOL_[A-Z_]+)=" .env*
+```
+
+## 35. Une durée de session que le signeur de jetons ne sait pas lire empêche le démarrage
+
+`auth.accessExpiresIn` et `auth.refreshExpiresIn` (`JWT_ACCESS_EXPIRES_IN`,
+`JWT_REFRESH_EXPIRES_IN`) étaient vérifiés par rapport à `^\d+[dhms]$` alors que le signeur de jetons
+les lisait autrement, et tout ce qui se trouvait entre les deux retombait en silence :
+`1w`, `2 weeks` ou `30 days` devenait un jeton de rafraîchissement de 400 jours. Les deux acceptent désormais
+un nombre positif et une unité, comme `15m`, `1h`, `30d` ou `2 weeks`. Un nombre seul,
+zéro, une valeur négative, ou une valeur que le signeur ne sait pas lire arrête le démarrage
+et nomme le réglage.
+
+**Ce qu'il faut changer :** donnez une unité à chaque durée. `3600` n'est pas une heure — le
+signeur lit un nombre seul comme des millisecondes — écrivez donc `1h`.
+
+```bash
+grep -rnE "(EXPIRES_IN|ExpiresIn)" .env* config
+```
+
+## 36. Un dépôt d'authentification personnalisé a besoin de `unlinkUserIdentity`, sinon certaines connexions sont refusées
+
+La première fois que quelqu'un prouve l'adresse d'un compte non vérifié, par lien magique,
+code envoyé par e-mail ou réinitialisation de mot de passe, Rebase retire toute identité de connexion liée dont le
+fournisseur n'a pas vérifié cette adresse ([37](#37-un-compte-non-vérifié-perd-ce-que-personne-na-prouvé-quand-son-adresse-lest-pour-la-première-fois)).
+Il le fait par le nouveau `unlinkUserIdentity` optionnel du dépôt. Un
+dépôt qui ne l'a pas répond à une telle connexion par `409 UNVERIFIED_IDENTITIES`
+plutôt que de laisser l'identité en place. `updatePassword` doit aussi accepter
+`null`, ce qui supprime le mot de passe.
+
+**Ce qu'il faut changer :** dans un `AuthRepository` personnalisé, implémentez
+`unlinkUserIdentity(uid, provider, providerId)` et laissez `updatePassword` accepter
+`null`. Le store Postgres implémente les deux. Le store MongoDB n'a pas encore
+`unlinkUserIdentity` : sur MongoDB, une telle connexion est donc refusée.
+
+## 37. Un compte non vérifié perd ce que personne n'a prouvé quand son adresse l'est pour la première fois
+
+Rien ne vérifie l'adresse avec laquelle un compte est enregistré : n'importe qui pouvait donc
+enregistrer l'adresse de quelqu'un d'autre avec un mot de passe, ou s'y connecter via un
+fournisseur qui ne s'en porte pas garant, et attendre le propriétaire. Le premier lien magique,
+code par e-mail ou réinitialisation de mot de passe sur un compte non vérifié retire désormais son mot de passe
+(une réinitialisation définit le nouveau) et toute identité liée dont le fournisseur
+n'a pas vérifié cette adresse, et met fin à toutes ses sessions, avant de le marquer comme vérifié.
+La connexion OAuth ne se lie plus du tout à un compte non vérifié : elle répond
+`403 EMAIL_NOT_VERIFIED`, avec `details.reason` qui nomme le côté non vérifié.
+
+**Ce qu'il faut changer :** rien dans le code. Attendez-vous à ce qu'une personne qui s'est inscrite avec un
+mot de passe, ne l'a jamais vérifié, puis se connecte par lien magique ou code doive définir
+à nouveau un mot de passe, et soit déconnectée de ses autres appareils. Les comptes créés avec
+`POST /api/admin/users` sont stockés comme vérifiés : les invités peuvent donc toujours utiliser « Sign in
+with Google ». Voir
+[Liaison de comptes](/docs/backend/authentication/#account-linking-across-sign-in-methods).
+
+## 38. Avec un captcha protégeant `register`, transformer un invité en compte exige un challenge résolu
+
+`POST /auth/anonymous/link` transforme un invité en compte avec un e-mail et un
+mot de passe, ce qui est une inscription, et il contournait à la fois le captcha de `register` et
+`beforeUserCreate`. Il prend désormais le challenge `register` et exécute le hook, comme
+`/auth/register`. `register` fait partie des routes captcha par défaut. La connexion d'invité elle-même
+(`POST /auth/anonymous`) ne prend toujours aucun challenge.
+
+**Ce qu'il faut changer :** une application qui transforme des invités en comptes envoie aussi le jeton du widget sur
+`/auth/anonymous/link` — sous la forme `captchaToken` dans le corps, ou dans l'en-tête
+`cf-turnstile-response` / `h-captcha-response` — comme elle le fait pour
+`/auth/register`. Voir [Protection contre les bots](/docs/backend/authentication/#bot-protection).
+
+## 39. L'e-mail refuse de démarrer sans URL de base absolue de réinitialisation de mot de passe
+
+Les liens de vérification et les liens magiques retombent sur `auth.email.resetPasswordUrl`, et
+rien ne retombe sur `verifyEmailUrl` ou `magicLinkUrl`. Une configuration qui ne définissait que
+ceux-ci démarrait, et envoyait un lien relatif mort dans chaque e-mail de réinitialisation de mot de passe. L'e-mail
+refuse désormais de démarrer tant que chaque type de lien envoyé ne se résout pas en une base `http(s)` absolue, et
+dit lequel ne le fait pas.
+
+**Ce qu'il faut changer :** définissez `FRONTEND_URL`, ou `auth.email.resetPasswordUrl`, sur une
+URL absolue comme `https://app.example.com`.
+
+```bash
+grep -rnE "(FRONTEND_URL|resetPasswordUrl|verifyEmailUrl|magicLinkUrl)" .env* config
+```
+
+## 40. Un store de tâches personnalisé prend une réservation (claim) quand il termine ou fait échouer une tâche
+
+Un gestionnaire de file qui dépassait le délai de visibilité était récupéré alors qu'il
+s'exécutait encore, et démarré une seconde fois à côté de lui-même. `complete` et `fail`
+retrouvaient la tâche par son seul id : le succès de la première tentative marquait donc la tâche
+comme terminée pendant que la seconde s'exécutait, et l'échec de la seconde renvoyait la tâche terminée
+pour une troisième exécution. Le worker renouvelle désormais sa réservation pendant qu'un gestionnaire s'exécute, et seule
+la tentative qui détient encore une tâche peut en enregistrer le résultat.
+
+`JobStore.complete(id, claim)` et `fail(id, error, retryAt, claim)` reçoivent un
+`JobClaim`, `{ workerId, attempt }`. Le nouveau `heartbeat(id, claim)` optionnel
+renouvelle la réservation d'une tâche en cours et se résout avec le fait qu'elle la détenait encore. Le
+store intégré implémente les trois : une application qui l'utilise n'a rien à faire.
+
+**Ce qu'il faut changer :** dans un `JobStore` personnalisé, faites en sorte que `complete` et `fail` ne modifient la
+ligne que tant que la réservation la détient — en cours d'exécution, verrouillée par `claim.workerId`,
+à la tentative `claim.attempt` — et ne fassent rien sinon. Ajoutez `heartbeat`, qui renouvelle
+l'heure de verrouillage sous la même condition. Un store sans lui fonctionne toujours, mais un
+gestionnaire qui dépasse le délai de visibilité est exécuté deux fois. Voir
+[Tâches en arrière-plan](/docs/backend/jobs/#what-happens-when-a-worker-dies).

@@ -1,5 +1,5 @@
 ---
-sourceHash: 0b9f331306c3360e
+sourceHash: 9f860853c1427015
 title: Configuration du stockage
 sidebar_label: Configuration du stockage
 description: Configurez des backends de stockage sur système de fichiers local, compatibles S3 ou GCS/Firebase Storage pour les téléversements de fichiers, les images et les médias.
@@ -37,7 +37,7 @@ const backend = await initializeRebaseBackend({
 });
 ```
 
-Le stockage local conserve les métadonnées de chaque objet à côté de lui, sous la forme `<key>.metadata.json` : une clé dont le dernier segment se termine par `.metadata.json` est donc refusée avec `400 INVALID_STORAGE_KEY` sur toutes les routes. S3 et GCS conservent les métadonnées sur l'objet et stockent n'importe quelle clé.
+Le stockage local conserve les métadonnées de chaque objet à côté de lui, sous la forme `<key>.metadata.json` : une clé dont le dernier segment se termine par `.metadata.json` est donc refusée avec `400 INVALID_STORAGE_KEY` sur toutes les routes. S3 et GCS conservent les métadonnées sur l'objet et stockent n'importe quelle clé. Sur un système de fichiers insensible à la casse (macOS et Windows par défaut), `Avatar.png` et `avatar.png` forment un seul fichier local mais deux objets sur S3, GCS ou un disque Linux ; le serveur émet donc un avertissement au démarrage lorsque le dossier de stockage se trouve sur un tel système.
 
 ### Stockage S3
 
@@ -523,7 +523,7 @@ Renvoyez `false` pour refuser avec un code **403**. Lever une exception refuse �
 
 Bon à savoir :
 
-- **La route de métadonnées est l'endroit où l'accès en lecture est réellement validé.** Elle génère le jeton de téléchargement temporaire restreint au chemin, auquel la route de fichier fait confiance ; le hook effectue donc le filtrage à ce niveau. Les requêtes présentant déjà un tel jeton, ou ciblant un chemin déclaré public, ignorent le hook — le jeton a été délivré sous son contrôle et n'est valide que pour son propre chemin. Seules ces deux lectures l'ignorent : un utilisateur que votre adaptateur d'authentification appelle `public` est interrogé comme n'importe qui d'autre.
+- **La route de métadonnées est l'endroit où l'accès en lecture est réellement validé.** Elle génère le jeton de téléchargement temporaire restreint au chemin, auquel la route de fichier fait confiance ; le hook effectue donc le filtrage à ce niveau. Deux lectures ignorent le hook, par conception. Celle qui présente déjà un tel jeton : le hook l'a approuvée lors de la délivrance du jeton, pour ce chemin et cette source uniquement, de sorte qu'un hook qui refuserait maintenant (une appartenance révoquée depuis) ne l'arrête pas avant l'expiration du jeton — `storageDownloadTokenTtl`, 300 secondes par défaut. Et la lecture d'une clé sous `public/` par un appelant sans identifiant : le préfixe est la déclaration que tout le monde peut la lire, visiteurs anonymes et CDN compris. La lecture d'un appelant connecté reste soumise au hook, celle d'un appelant anonyme non, si bien qu'un hook ne peut pas rendre privée une clé `public/` ; stockez plutôt le fichier en dehors de `public/`. Seules ces deux lectures l'ignorent : un utilisateur que votre adaptateur d'authentification appelle `public` est interrogé comme n'importe qui d'autre.
 - **Un bucket, un nom.** Sur S3 et GCS, le `bucket` du hook vaut toujours `"default"`, y compris lorsqu'une requête nomme le bucket du fournisseur, qui atteint les mêmes objets.
 - **Un chemin est public quand la clé qu'il désigne l'est.** Le préfixe `public/` est testé sur la clé canonique que sert la route — après lecture d'un segment de bucket `default/` initial et repli de `//`, `./` et d'un `/` initial —, jamais sur l'URL telle qu'elle est écrite. `/api/storage/file/notes://public/x.txt` désigne la clé privée `notes:/public/x.txt`, et la clé `default/public/x.txt` (atteinte via `/api/storage/file/default/default/public/x.txt`) se trouve dans un dossier nommé `default` ; aucune des deux n'est publique. Dans un hook, testez la `key` qui vous est transmise avec `isPublicStorageKey` de `@rebasepro/types` — `isPublicStoragePath` lit un chemin ou une URL côté client, et considère ces deux cas comme publics.
 - **`list` est filtré selon le préfixe.** L'opération de listage permet de découvrir des clés dont personne ne vous a communiqué l'existence.

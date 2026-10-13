@@ -1,5 +1,5 @@
 ---
-sourceHash: 0b9f331306c3360e
+sourceHash: 9f860853c1427015
 title: Configurazione dello Storage
 sidebar_label: Configurazione dello Storage
 description: Configura backend di storage su filesystem locale, compatibili con S3 o GCS/Firebase Storage per il caricamento di file, immagini e contenuti multimediali.
@@ -37,7 +37,7 @@ const backend = await initializeRebaseBackend({
 });
 ```
 
-Lo storage locale conserva i metadati di ogni oggetto accanto a esso, come `<key>.metadata.json`, quindi una chiave il cui ultimo segmento termina con `.metadata.json` viene rifiutata con `400 INVALID_STORAGE_KEY` su ogni route. S3 e GCS conservano i metadati sull'oggetto e memorizzano qualsiasi chiave.
+Lo storage locale conserva i metadati di ogni oggetto accanto a esso, come `<key>.metadata.json`, quindi una chiave il cui ultimo segmento termina con `.metadata.json` viene rifiutata con `400 INVALID_STORAGE_KEY` su ogni route. S3 e GCS conservano i metadati sull'oggetto e memorizzano qualsiasi chiave. Su un file system insensibile alle maiuscole (macOS e Windows per impostazione predefinita) `Avatar.png` e `avatar.png` sono un solo file locale ma due oggetti su S3, GCS o un disco Linux, quindi il server emette un avviso all'avvio quando la cartella di storage si trova su uno di essi.
 
 ### Storage S3
 
@@ -539,7 +539,7 @@ Restituisci `false` per negare l'accesso con un **403**. Anche il sollevamento d
 
 Da sapere:
 
-- **La rotta dei metadati è il punto in cui viene realmente decisa l'autorizzazione di lettura.** È qui che viene generato il token di download temporaneo associato al percorso di cui la rotta del file si fida, perciò l'hook ne regola l'accesso in questo punto. Le richieste che dispongono già di tale token o che raggiungono un percorso pubblico dichiarato ignorano l'hook — il token è stato emesso sotto di esso ed è valido esclusivamente per il proprio percorso. Solo queste due letture lo saltano: un utente che il tuo auth adapter chiama `public` viene interrogato come chiunque altro.
+- **La rotta dei metadati è il punto in cui viene realmente decisa l'autorizzazione di lettura.** È qui che viene generato il token di download temporaneo associato al percorso di cui la rotta del file si fida, perciò l'hook ne regola l'accesso in questo punto. Due letture saltano l'hook, per scelta. Una che porta tale token: l'hook l'ha approvata quando il token è stato emesso, solo per quel percorso e quella sorgente, quindi un hook che ora rifiuterebbe (un'appartenenza revocata nel frattempo) non la ferma prima che il token scada — `storageDownloadTokenTtl`, 300 secondi per impostazione predefinita. E una lettura di una chiave sotto `public/` da parte di un chiamante senza credenziali: il prefisso è la dichiarazione che chiunque può leggerla, visitatori anonimi e CDN compresi. La lettura dello stesso file da parte di un chiamante autenticato viene comunque sottoposta all'hook, ma quella anonima no, quindi un hook non può rendere privata una chiave `public/`; archivia invece il file fuori da `public/`. Solo queste due letture lo saltano: un utente che il tuo auth adapter chiama `public` viene interrogato come chiunque altro.
 - **Un bucket, un nome.** Su S3 e GCS il `bucket` dell'hook è sempre `"default"`, anche quando una richiesta nomina il bucket del provider, che raggiunge gli stessi oggetti.
 - **Un percorso è pubblico quando lo è la chiave che indica.** Il prefisso `public/` viene verificato sulla chiave canonica servita dalla rotta — dopo aver letto un eventuale segmento di bucket `default/` iniziale e aver compresso `//`, `./` e una `/` iniziale —, mai sull'URL così come è scritto. `/api/storage/file/notes://public/x.txt` indica la chiave privata `notes:/public/x.txt`, e la chiave `default/public/x.txt` (raggiunta come `/api/storage/file/default/default/public/x.txt`) si trova in una cartella chiamata `default`; nessuna delle due è pubblica. In un hook, verifica la `key` che ricevi con `isPublicStorageKey` di `@rebasepro/types` — `isPublicStoragePath` legge un percorso o un URL lato client, e considera pubblici entrambi i casi.
 - **`list` è regolato in base al prefisso.** L'elenco è il modo in cui si scoprono chiavi di cui nessuno ti ha parlato.

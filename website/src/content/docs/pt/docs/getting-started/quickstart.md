@@ -1,5 +1,5 @@
 ---
-sourceHash: 536427d653beb637
+sourceHash: 01546a922a601fac
 title: Início Rápido
 sidebar_label: Início Rápido
 description: Crie um novo projeto Rebase e coloque-o para rodar localmente em menos de 2 minutos.
@@ -86,10 +86,11 @@ Em seguida, inicie os servidores de desenvolvimento como acima. Uma `DATABASE_UR
 é alterada, e qualquer uma que aponte para outro local que não seja esta máquina não é
 modificada de forma alguma.
 
-Com seu próprio banco de dados, você também obtém os comandos de migração, que o gerenciado
-não pode oferecer — eles planejam alterações com o [Atlas](https://atlasgo.io/), o mecanismo de migração de schema
-utilizado pelo Rebase, que precisa de um segundo banco de dados vazio
-para comparação, e o PGlite atende exatamente a um:
+Os comandos de migração planejam alterações com o [Atlas](https://atlasgo.io/), o mecanismo de migração de schema
+utilizado pelo Rebase, que precisa de um segundo banco de dados vazio para
+comparação. No seu próprio banco de dados, o Rebase cria um ao lado dele; no gerenciado,
+que atende exatamente a um banco de dados, ele inicia um PGlite descartável pela
+duração do comando. Em ambos os casos:
 
 ```bash
 pnpm run db:push

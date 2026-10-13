@@ -1,5 +1,5 @@
 ---
-sourceHash: 4b29623fe71430bc
+sourceHash: f26c07b9fa5cc279
 title: Proprietà
 sidebar_label: Proprietà
 description: I tipi di proprietà definiscono il tipo di dati, la validazione e il rendering dell'interfaccia utente per ogni campo in una collection. Rebase supporta i tipi string, number, boolean, date, array, map, reference, relation e geopoint.
@@ -42,6 +42,7 @@ Tutti i tipi di proprietà condividono le seguenti opzioni:
 | `name` | `string` | Etichetta visualizzata. Di default è la chiave della proprietà, formattata graficamente — `publishDate` → "Publish Date". Impostala quando tale derivazione è errata: `"URL"` anziché "Url". |
 | `description` | `string` | Testo di aiuto mostrato sotto il campo |
 | `defaultValue` | `any` | Valore predefinito per le nuove entità. Un valore letterale — una stringa, un numero, un booleano, una data, un ID di enum o un documento `map`/`array` — diventa anche il `DEFAULT` della colonna, quindi qualsiasi riga inserita da elementi esterni al pannello di amministrazione (l'API REST, un seed, `psql`) lo riceve a sua volta |
+| `databaseDefault` | `boolean \| SqlExpression` | <span class="since-badge" data-since="0.25">Da 0.25</span> Il database riempie la colonna quando una creazione la lascia vuota: una colonna `NOT NULL DEFAULT <expression>` come `gen_random_uuid()` o `nextval(…)`. Un campo `required` che lo ha può essere omesso da una creazione, sia dal form di amministrazione sia dall'API, e un `null` inviato in creazione viene lasciato al database; resta obbligatorio in modifica, e il tipo `Insert` generato lo rende facoltativo. Indica l'espressione nella forma template che accetta `isId`, ``databaseDefault: "sql`gen_random_uuid()`"``, e il planner dello schema la scrive come `DEFAULT` della colonna, così `rebase db push` la mantiene. `true` dichiara un `DEFAULT` scritto altrove e non ne scrive nessuno, quindi un push pianifica di eliminarlo. «Import from table» e `rebase schema introspect` impostano l'espressione che leggono |
 | `validation` | `object` | Regole di validazione |
 | `propertyConfig` | `string` | Chiave di configurazione della proprietà registrata |
 | `columnName` | `string` | Nome esplicito della colonna del database (ignora la conversione in snake_case) |
@@ -443,7 +444,7 @@ dalla sincronizzazione dello schema — Atlas non è in grado di gestirlo, per l
 |----------|------|-------------|
 | `mode` | `"date" \| "date_time"` | Solo data o data + ora (predefinito: `"date_time"`). Determina il widget; la colonna è identica in entrambi i casi. **Solo per il modulo admin — non applicato dall'API o dal database.** |
 | `autoValue` | `"on_create" \| "on_update"` | Timestamp automatici. `on_create` imposta un `DEFAULT now()`; `on_update` crea un trigger `BEFORE UPDATE` **oltre** a impostare il valore a livello di applicazione, in modo che anche un `UPDATE` diretto da un seed o da una migrazione aggiorni la colonna |
-| `columnType` | `"timestamp" \| "date" \| "time"` | La colonna del database. Il valore predefinito è `timestamp` **with time zone** |
+| `columnType` | `"timestamp" \| "date" \| "time"` | La colonna del database. Il valore predefinito è `timestamp` **with time zone**. Una colonna `date` viene scelta e mostrata come giorno, qualunque cosa dica `mode`; una colonna `time` come sola ora del giorno, in UTC, senza giorno (viaggia come quell'ora al 1970-01-01) |
 | `timezone` | `string` | Il fuso orario in cui il selettore legge e scrive il valore. **Solo per il modulo admin — non applicato dall'API o dal database.** |
 | `admin.clearable` | `boolean` | Aggiunge un'icona per cancellare il valore (impostandolo su null) |
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: dfd4540bb2b45491
+sourceHash: a255412fa1737b59
 title: Référence de la CLI
 sidebar_label: CLI
 description: Commandes de la CLI Rebase pour l'initialisation de projet, la génération de schéma, les migrations de base de données et la génération de SDK.
@@ -234,10 +234,10 @@ Chaque branche est une copie complète sur le disque, elles doivent donc être n
 
 `switch` enregistre la branche dans `.rebase/branch.json` et ne modifie jamais `.env`. Elle a la priorité sur `DATABASE_URL` dans `.env` et s'efface devant `--database-url` ou un `DATABASE_URL` dans le shell, de sorte qu'une option sur la ligne de commande prévaut toujours sur un basculement effectué précédemment. La suppression de la branche sur laquelle vous vous trouvez vous ramène à la base de données principale plutôt que de laisser le projet pointé sur une base de données disparue.
 
-:::note[Pas sur la base de données de développement gérée]
-`push`, `generate` et `migrate` planifient leur travail avec Atlas, qui a besoin d'une seconde base de données vide pour effectuer la comparaison — et l'instance PGlite gérée n'en fournit qu'une seule. Les exécuter à cet endroit s'arrête avec un message explicatif. Pointez `DATABASE_URL` vers une véritable instance PostgreSQL pour le flux de travail des migrations ; `rebase dev` crée déjà les tables manquantes de manière incrémentale sur l'instance gérée.
+:::note[Sur la base de données de développement gérée]
+<span class="since-badge" data-since="0.25">Depuis 0.25</span> `push`, `generate` et `migrate` planifient leur travail avec Atlas, qui a besoin d'une seconde base de données vide pour effectuer la comparaison — et l'instance PGlite gérée n'en fournit qu'une seule. Sur la base gérée, chacune d'elles démarre donc, pour Atlas, un second PGlite jetable en mémoire, et l'arrête à la fin de la commande. C'est ainsi qu'une colonne y est supprimée, renommée ou rétrécie : `rebase dev` ne fait qu'ajouter. Le garde-fou destructif est le même qu'ailleurs. Pour qu'Atlas planifie plutôt contre une base vide qui est la vôtre, définissez `REBASE_ATLAS_DEV_URL` sur celle-ci ; Rebase ne crée ni ne supprime une base de données nommée de cette façon.
 
-`branch` y est refusé pour une raison similaire. `CREATE DATABASE ... TEMPLATE` avec PGlite écrit une entrée dans le catalogue et ne copie rien, de sorte que la branche pointerait vers la base de données dont elle a été clonée — chaque écriture que vous souhaitiez isoler atterrirait dans votre base de données de développement. `rebase dev --docker` vous fournit un véritable serveur avec lequel les branches fonctionnent.
+`branch` y est refusé. `CREATE DATABASE ... TEMPLATE` avec PGlite écrit une entrée dans le catalogue et ne copie rien, de sorte que la branche pointerait vers la base de données dont elle a été clonée — chaque écriture que vous souhaitiez isoler atterrirait dans votre base de données de développement. `rebase dev --docker` vous fournit un véritable serveur avec lequel les branches fonctionnent.
 :::
 
 ### `rebase apps init` / `rebase apps config`
@@ -306,6 +306,8 @@ rebase generate-sdk
 
 Crée les types TypeScript et un client sécurisé au niveau des types pour toutes vos collections.
 
+`--register` type aussi les données côté serveur : il écrit les types et la déclaration `Register` dans `config/generated/`, et mémorise ce choix dans `rebase.json` (`registerDatabase`), de sorte que les exécutions suivantes, `rebase dev` et les nouveaux clones les maintiennent à jour. Voir [Données côté serveur typées](/docs/backend/typed-server-data).
+
 ### `rebase doctor`
 
 ```bash
@@ -365,6 +367,21 @@ rebase api-keys revoke abc123-def456
 `--scopes` nomme ce que la clé peut faire, séparé par des virgules ou répété ; `--full-access` lui donne toutes les portées que détient la clé de service sauf `keys:*`. `--roles` ajoute des rôles RLS à côté de `service`, `--expires-in` prend un nombre de jours et `--expires-at` une date ISO. `rebase api-keys scopes` liste toutes les portées que le backend connaît. Une clé n'est affichée qu'une seule fois.
 
 Les clés ont une double barrière de contrôle : les portées de la clé ainsi que la sécurité au niveau des lignes (RLS) de l'identité sous laquelle elle agit s'appliquent toutes deux. Voir [Clés d'API](/docs/backend/api-keys/).
+
+### `rebase storage`
+
+<span class="since-badge" data-since="0.25">Depuis 0.25</span> Maintenance de l'ensemble du stockage des fichiers, via le backend en cours d'exécution avec `REBASE_SERVICE_KEY` tirée de `.env` :
+
+```bash
+rebase storage orphans                         # files no row names
+rebase storage orphans --source media --delete # and delete them, after asking
+rebase storage move --from "(default)" --to media --prefix avatars
+rebase storage move --from "(default)" --to media --prefix avatars --delete-source
+```
+
+`orphans` lit chaque ligne de chaque collection, lignes supprimées logiquement comprises, et liste les fichiers d'une source (`--source`, la source par défaut si omis) qu'aucune chaîne d'aucune ligne ne nomme : une clé, une URL, une référence `rebase-storage:` dans un texte. Les fichiers plus récents que `--older-than` heures (24 par défaut) sont écartés, car le panneau d'administration téléverse un fichier avant d'enregistrer la ligne qui le nomme. `--delete` demande confirmation avant de supprimer (`--yes` passe la question, et est obligatoire sans terminal), le serveur retrouve d'abord les fichiers, et rien n'est supprimé tant qu'une collection ne peut pas être lue. Les fichiers que seules vos propres tables hors collections nomment paraissent inutilisés : vérifiez avant de supprimer.
+
+`move` copie les fichiers placés sous `--prefix` vers une autre source sous les mêmes clés, une page à la fois. Un fichier que la cible détient déjà à la même taille est ignoré, si bien qu'un déplacement interrompu reprend en le relançant ; `--delete-source` supprime chaque fichier de la source dès que la cible le détient. Les deux exigent `database:read`, et la suppression ou le déplacement `database:write`, que détient la clé de service.
 
 ### `rebase skills install`
 

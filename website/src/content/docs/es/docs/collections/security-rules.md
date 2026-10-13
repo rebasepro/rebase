@@ -1,5 +1,5 @@
 ---
-sourceHash: 9531407dffbf3092
+sourceHash: abd2a2de4a0ff4be
 title: Reglas de seguridad (RLS)
 sidebar_label: Reglas de seguridad
 description: Define políticas de seguridad a nivel de fila (RLS) para tus colecciones mediante atajos prácticos o expresiones SQL puras.
@@ -39,6 +39,30 @@ La identidad del usuario autenticado está disponible en SQL a través de:
 | `rebase.jwt()` | Los claims completos del JWT como JSONB |
 
 El backend de Rebase establece estos valores automáticamente por transacción.
+
+### Políticas que una colección recibe sin escribirlas
+
+Las políticas de una tabla son más que las `securityRules` propias de la colección:
+
+- **`defaultSecurityRules`**, exportadas desde `config/collections/index.ts`. Una
+  colección cuyas `securityRules` están ausentes o vacías toma todas ellas en su
+  lugar, como si las hubiera escrito. Una colección que declara aunque sea una regla
+  propia no toma ninguna: las dos listas nunca se fusionan.
+- **La base del administrador.** Cada colección recibe también
+  `<table>_default_admin_read` y `<table>_default_admin_write_insert`,
+  `_update` y `_delete`: políticas permisivas que permiten al contexto del servidor y
+  al rol `admin` leer y escribir cada fila. Se sitúan junto a las reglas con las que
+  acabe la colección, las propias o las predeterminadas heredadas, y las políticas permisivas
+  se combinan con OR, así que ensanchan ambas. La colección de usuarios recibe además una
+  lectura propia y una puerta de escritura restrictiva que mantiene `roles` solo para administradores.
+- **Tenencia (tenancy).** Una colección con alcance de inquilino recibe una regla restrictiva que confina
+  cada operación al inquilino de quien llama; el contexto del servidor la supera.
+
+`disableDefaultPolicies: true` en una colección elimina la base permisiva,
+y mantiene las puertas restrictivas. Es por colección: `defaultSecurityRules`
+no lleva tal indicador, así que una colección que hereda las predeterminadas conserva la
+base salvo que ella misma lo active. El DDL generado marca cada política
+inyectada, y `rebase db push` restaura la que se haya eliminado a mano.
 
 ## Atajos prácticos
 

@@ -1,0 +1,157 @@
+---
+sourceHash: c6b95df3140b1b02
+slug: it/docs/upgrading/0-21-to-0-23
+title: Aggiornamento da 0.21 a 0.23
+sidebar_label: 0.21 → 0.23
+description: Le breaking change che la 0.23 porta a un'app sulla 0.21 o 0.22 — chiavi API su percorsi annidati, rifiuti all'avvio, repository di autenticazione personalizzati, upgrade dei guest e job store personalizzati.
+---
+
+# Aggiornamento 0.21 → 0.23
+
+Queste sono le voci `### Breaking` che la 0.23 porta con sé. La 0.22 non dichiara alcuna
+breaking change, quindi un'app sulla 0.21 o 0.22 legge questa sola pagina per arrivare alla 0.23.
+
+Tre di queste si rifiutano di avviarsi, nominando l'impostazione, anziché cambiare comportamento
+in silenzio. Quattro cambiano chi può accedere o cosa può raggiungere una chiave: leggi prima quelle
+se la tua app ha chiavi API su percorsi annidati, un repository di autenticazione personalizzato, o guest
+che diventano account. L'ultima cambia il contratto di un job store personalizzato.
+
+---
+
+## 33. Una chiave API su un percorso annidato richiede `read` su ogni collection genitore
+
+Una chiave veniva verificata rispetto all'ultimo segmento di un URL annidato, che nomina una
+relazione anziché una collection, e la collection genitore non veniva verificata
+affatto. Ora l'operazione della rotta viene verificata rispetto alla collection a cui il percorso
+arriva, e ogni collection che il percorso attraversa richiede `read`. Una chiave limitata
+solo a `posts` che chiama `/api/data/authors/1/posts` riceve
+`403 API_KEY_FORBIDDEN` che nomina `authors` finché non può leggere anche `authors`.
+
+**Cosa modificare:** concedi a ogni chiave che usa percorsi annidati `read` sui genitori
+(`PUT /api/admin/api-keys/:id`), oppure fai chiamare la rotta propria della collection figlia
+con un filtro.
+
+```json
+[
+    { "collection": "posts", "operations": ["read", "write"] },
+    { "collection": "authors", "operations": ["read"] }
+]
+```
+
+Vedi [Chiavi API](/docs/backend/api-keys/#data). Dalla 0.24 la stessa regola è scritta in scope: ogni genitore richiede `data:read`.
+
+## 34. Una variabile d'ambiente numerica che non è un numero fa fallire l'avvio
+
+`PORT`, `SMTP_PORT`, `REBASE_MAX_BODY_SIZE` e le variabili `DB_POOL_*` passavano
+`NaN`, oppure leggevano un valore vuoto come `0`. Un `REBASE_MAX_BODY_SIZE` vuoto
+rimuoveva il limite del body da ogni rotta, e un `PORT` vuoto faceva sì che un server di produzione
+ascoltasse su una porta casuale. Un valore vuoto ora significa non impostato e prende il
+predefinito, uno `0` esplicito conta ancora, e qualsiasi cosa che non sia un numero ferma
+l'avvio, nominando la variabile.
+
+**Cosa modificare:** nulla, a meno che l'avvio non nomini ora una variabile. In tal caso correggine il
+valore, oppure rimuovila.
+
+```bash
+grep -nE "^(PORT|SMTP_PORT|REBASE_MAX_BODY_SIZE|DB_POOL_[A-Z_]+)=" .env*
+```
+
+## 35. Una durata di sessione che il firmatario dei token non sa leggere si rifiuta di avviarsi
+
+`auth.accessExpiresIn` e `auth.refreshExpiresIn` (`JWT_ACCESS_EXPIRES_IN`,
+`JWT_REFRESH_EXPIRES_IN`) venivano verificati rispetto a `^\d+[dhms]$` mentre il firmatario
+dei token li leggeva in un altro modo, e qualsiasi cosa nel mezzo ripiegava in silenzio:
+`1w`, `2 weeks` o `30 days` diventavano un refresh token di 400 giorni. Entrambi ora accettano un
+numero positivo e un'unità, come `15m`, `1h`, `30d` o `2 weeks`. Un numero senza unità, zero, un valore negativo,
+o un valore che il firmatario non sa leggere ferma l'avvio
+e nomina l'impostazione.
+
+**Cosa modificare:** dai a ogni durata un'unità. `3600` non è un'ora — il
+firmatario legge un numero senza unità come millisecondi — quindi scrivi `1h`.
+
+```bash
+grep -rnE "(EXPIRES_IN|ExpiresIn)" .env* config
+```
+
+## 36. Un repository di autenticazione personalizzato richiede `unlinkUserIdentity`, altrimenti alcuni accessi vengono rifiutati
+
+La prima volta che qualcuno dimostra l'indirizzo di un account non verificato, tramite magic link,
+codice via email o reimpostazione della password, Rebase rimuove ogni identità di accesso collegata il cui
+provider non ha verificato quell'indirizzo ([37](#37-un-account-non-verificato-perde-ciò-che-nessuno-ha-provato-la-prima-volta-che-il-suo-indirizzo-viene-verificato)).
+Lo fa tramite il nuovo `unlinkUserIdentity` facoltativo del repository. Un
+repository che ne è privo risponde a un tale accesso con `409 UNVERIFIED_IDENTITIES`
+anziché lasciare l'identità al suo posto. Anche `updatePassword` deve accettare
+`null`, che rimuove la password.
+
+**Cosa modificare:** in un `AuthRepository` personalizzato, implementa
+`unlinkUserIdentity(uid, provider, providerId)` e fai sì che `updatePassword` accetti
+`null`. Lo store Postgres implementa entrambi. Lo store MongoDB non ha ancora
+`unlinkUserIdentity`, quindi su MongoDB un tale accesso viene rifiutato.
+
+## 37. Un account non verificato perde ciò che nessuno ha provato la prima volta che il suo indirizzo viene verificato
+
+Nulla verifica l'indirizzo con cui un account è registrato, quindi chiunque poteva
+registrare l'indirizzo di qualcun altro con una password, oppure accedere come tale tramite un
+provider che non lo garantisce, e aspettare il proprietario. Il primo magic
+link, codice via email o reimpostazione della password su un account non verificato ora rimuove la sua
+password (una reimpostazione imposta la nuova) e ogni identità collegata il cui provider
+non ha verificato quell'indirizzo, e termina tutte le sue sessioni, prima di contrassegnarlo come verificato.
+L'accesso OAuth non si collega più affatto a un account non verificato: risponde
+`403 EMAIL_NOT_VERIFIED`, con `details.reason` che nomina quale lato non era
+verificato.
+
+**Cosa modificare:** nulla nel codice. Aspettati che chi si è registrato con una
+password, non ha mai verificato, e poi accede tramite magic link o codice debba impostare di nuovo
+una password, e venga disconnesso sugli altri dispositivi. Gli account creati con
+`POST /api/admin/users` sono memorizzati come verificati, quindi gli invitati possono ancora usare «Sign in
+with Google». Vedi
+[Collegamento degli account](/docs/backend/authentication/#account-linking-across-sign-in-methods).
+
+## 38. Con il captcha a protezione di `register`, l'upgrade di un guest richiede una challenge risolta
+
+`POST /auth/anonymous/link` trasforma un guest in un account con un'email e una
+password, che è una registrazione, e saltava sia il captcha di `register` sia
+`beforeUserCreate`. Ora accetta la challenge di `register` ed esegue l'hook, come
+fa `/auth/register`. `register` è una delle rotte captcha predefinite. L'accesso guest
+stesso (`POST /auth/anonymous`) continua a non richiedere alcuna challenge.
+
+**Cosa modificare:** un'app che trasforma i guest in account invia il token del widget anche su `/auth/anonymous/link` —
+come `captchaToken` nel body, oppure nell'header
+`cf-turnstile-response` / `h-captcha-response` — come fa per
+`/auth/register`. Vedi [Protezione dai bot](/docs/backend/authentication/#bot-protection).
+
+## 39. L'email si rifiuta di avviarsi senza un base URL assoluto per la reimpostazione della password
+
+I link di verifica e i magic link ripiegano su `auth.email.resetPasswordUrl`, e
+nulla ripiega su `verifyEmailUrl` o `magicLinkUrl`. Una configurazione che impostava solo
+quelli si avviava, e inviava un link relativo inutilizzabile in ogni email di reimpostazione della password. Ora
+l'email si rifiuta di avviarsi a meno che ogni tipo di link inviato via email non si risolva in un
+base `http(s)` assoluto, e dice quale non lo fa.
+
+**Cosa modificare:** imposta `FRONTEND_URL`, oppure `auth.email.resetPasswordUrl`, a un
+URL assoluto come `https://app.example.com`.
+
+```bash
+grep -rnE "(FRONTEND_URL|resetPasswordUrl|verifyEmailUrl|magicLinkUrl)" .env* config
+```
+
+## 40. Un job store personalizzato riceve un claim quando completa o fa fallire un job
+
+Un handler di coda che superava il visibility timeout veniva reclamato mentre era
+ancora in esecuzione e avviato una seconda volta accanto a sé stesso. `complete` e `fail`
+trovavano il job solo tramite il suo id, quindi il successo del primo tentativo contrassegnava il job come
+completato mentre il secondo era in esecuzione, e il fallimento del secondo rimandava il job finito
+a una terza esecuzione. Il worker ora rinnova il suo claim mentre un handler è in esecuzione, e solo
+il tentativo che detiene ancora un job può registrarne l'esito.
+
+`JobStore.complete(id, claim)` e `fail(id, error, retryAt, claim)` ricevono un
+`JobClaim`, `{ workerId, attempt }`. Il nuovo `heartbeat(id, claim)` facoltativo
+rinnova il claim di un job in esecuzione e si risolve indicando se lo deteneva ancora.
+Lo store integrato implementa tutti e tre, quindi un'app che lo usa non ha nulla da fare.
+
+**Cosa modificare:** in un `JobStore` personalizzato, fai sì che `complete` e `fail` modifichino la
+riga solo finché il claim la detiene — in esecuzione, bloccata da `claim.workerId`,
+al tentativo `claim.attempt` — e non facciano nulla altrimenti. Aggiungi `heartbeat`, rinnovando
+l'orario di blocco con la stessa condizione. Uno store che ne è privo funziona ancora, ma un
+handler che supera il visibility timeout viene eseguito due volte. Vedi
+[Job in background](/docs/backend/jobs/#what-happens-when-a-worker-dies).

@@ -1,5 +1,5 @@
 ---
-sourceHash: 275426a0cc4a1023
+sourceHash: 5a4b74223c30f992
 slug: fr/docs/rls-check
 title: rls-check
 description: Auditez la sécurité au niveau des lignes (RLS) sur n'importe quelle base de données PostgreSQL — Supabase, Neon, RDS ou votre propre serveur. En lecture seule, sans inscription, sans Rebase requis.
@@ -398,6 +398,8 @@ Sur PostgreSQL antérieur à la version 15, cette option n'existe pas du tout, d
 se comporte ainsi. Dans ce cas, le constat est signalé comme heuristique, et la solution consiste à déplacer la
 logique dans une fonction ou à mettre à niveau votre version de PostgreSQL.
 
+Le propriétaire est normalement exempté des politiques de la table de base, mais pas toujours. Lorsque le propriétaire de la vue n'est pas superutilisateur, ne détient pas `BYPASSRLS` et ne possède pas la table de base (ou la possède avec `FORCE ROW LEVEL SECURITY`), les politiques s'appliquent au propriétaire. La vue renvoie alors les lignes que ces politiques accordent au propriétaire, à tous les appelants sans distinction. Cela peut représenter moins de lignes que ce qu'un appelant devrait voir, ou davantage. Le constat est tout de même signalé, car les lignes ne dépendent pas de qui demande, mais comme heuristique plutôt que comme certain. La solution est la même.
+
 ### matview-bypasses-rls
 
 **La vue matérialisée expose des données protégées par RLS.** Élevé.
@@ -425,6 +427,10 @@ La condition « accepte n'importe quelle ligne » est essentielle et délibéré
 défaut à `anon` et `authenticated` tous les droits DML, de sorte qu'une stratégie ciblant ces rôles ne pose pas
 de problème en soi — une stratégie classique `FOR INSERT TO public WITH CHECK (user_id = auth.uid())` est correcte
 et n'est pas signalée.
+
+Une politique atteint un appelant non authentifié par `TO public`, par un rôle nommé `anon` ou `web_anon`, ou par un rôle dont l'un de ceux-ci est membre : `TO app_writer` compte lorsque `anon` hérite de `app_writer`.
+
+Sur Rebase, il n'y a pas de rôle `anon`. Chaque requête s'exécute en tant que `rebase_user`, y compris celle d'un visiteur déconnecté lorsque l'API l'admet (`AUTH_REQUIRE=false`, ou `auth.requireAuth: false`) et celle de chaque compte invité issu de la connexion anonyme. La base de données ne peut pas voir ce réglage : sur Rebase, une écriture que seul `rebase_user` atteint est donc signalée comme heuristique. Avec la barrière de l'API activée et la connexion d'invité désactivée, seuls les utilisateurs connectés atteignent la politique, et ils peuvent tout de même écrire dans n'importe quelle ligne. Limitez la règle d'écriture de la collection à l'appelant (un `ownerField`) ou à des `roles`.
 
 ### unqualified-column-in-subquery
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: 0e00ae18684830bb
+sourceHash: a67897c131d33a15
 title: "Autenticação Multifator"
 sidebar_label: "Autenticação Multifator"
 ---
@@ -83,3 +83,8 @@ Depois que um fator é verificado, isso requer uma sessão `aal2`, para que um t
 `aal1` roubado não possa desativar o MFA; um primeiro cadastro inacabado é removido a
 partir de qualquer sessão. Remover o último fator verificado também
 descarta os códigos de recuperação.
+
+## Próximos Passos
+
+- **[Autenticação](/docs/sdk/authentication/)** — Login, sessões e o restante do `client.auth`
+- **[Endpoints de autenticação](/docs/backend/auth-endpoints/#multi-factor-authentication-totp)** — As rotas HTTP por trás do cadastro e do desafio

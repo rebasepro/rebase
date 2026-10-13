@@ -1,5 +1,5 @@
 ---
-sourceHash: e18fe07b6281381b
+sourceHash: 3702fa186011ca6b
 title: Datei-Upload-Felder
 sidebar_label: Datei-Uploads
 description:"\"Deklarieren eines Datei- oder Bildfelds in einer Collection: der storage-Block, Einzel- und Mehrfach-Datei-Uploads und welche Optionen vom Panel statt vom Server aufgelöst werden.\""
@@ -120,8 +120,10 @@ und die Vorschauen des Admin-Panels tauschen jede Referenz beim Anzeigen gegen e
 aus; eine Website, die das Feld rendert, tut dasselbe mit `resolveStorageReferences(text, client)`
 — siehe [Dateien innerhalb von Text](/docs/sdk/storage#files-inside-text).
 
-Text, der vor dieser Änderung gespeichert wurde, enthält die URLs selbst, und deren Tokens sind
-inzwischen abgelaufen; fügen Sie diese Bilder erneut ein, damit Referenzen gespeichert werden.
+Text, der vor den Referenzen gespeichert wurde, enthält die Download-URLs selbst, mit abgelaufenen
+Tokens. Der Editor, die Vorschauen und `resolveStorageReferences` erneuern sie, wenn sie den Text
+anzeigen, denn ein Token nennt weiterhin sein Objekt; das erneute Einfügen des Bildes oder das
+Umschreiben des Textes mit `storageReferencesForDownloadUrls(text)` speichert eine Referenz.
 
 ### Wohin die Datei gespeichert werden darf
 
@@ -137,7 +139,8 @@ ein neues Objekt schreibt, statt das alte zu überschreiben, und nichts entfernt
 Zeilen können denselben Schlüssel halten, daher kann das Panel nicht wissen, dass eine Datei ungenutzt
 ist. Objekte, auf die keine Zeile mehr verweist, bleiben im Bucket – und werden weiterhin abgerechnet
 –, bis Sie sie löschen: über Studios Storage-Browser, mit `client.storage.deleteObject(key)` oder mit
-einer Lifecycle-Regel auf dem Bucket.
+einer Lifecycle-Regel auf dem Bucket. <span class="since-badge" data-since="0.25">Seit 0.25</span> `rebase storage orphans` listet die Dateien auf, die keine Zeile nennt, und löscht sie
+mit `--delete` — siehe [die CLI](/docs/cli/#rebase-storage).
 
 ### Eine Eigenschaft zu einer anderen Storage-Quelle verschieben
 
@@ -145,7 +148,8 @@ Ein Dateifeld speichert den Schlüssel des Objekts, nicht dessen Quelle. Die `st
 Eigenschaft zu ändern, lässt jeden vorhandenen Wert auf die neue Quelle zeigen, in der diese
 Schlüssel nicht existieren, sodass Vorschauen von Dateien, die vor der Änderung hochgeladen wurden,
 mit „nicht gefunden“ antworten. Kopieren Sie die Objekte unter denselben Schlüsseln in die neue
-Quelle, bevor Sie die Eigenschaft ändern — mit dem eigenen Werkzeug des Anbieters, etwa
+Quelle, bevor Sie die Eigenschaft ändern — mit `rebase storage move --from <old> --to <new>
+--prefix <storagePath>` oder dem eigenen Werkzeug des Anbieters, etwa
 `aws s3 sync` oder `gcloud storage cp` — oder behalten Sie die alte Quelle für die bestehenden
 Dateien.
 

@@ -1,0 +1,580 @@
+---
+sourceHash: acd1967fc17b4924
+slug: de/docs/upgrading/0-23-to-0-24
+title: Upgrade von 0.23 auf 0.24
+sidebar_label: 0.23 → 0.24
+description: Die Breaking Changes, die 0.24 für eine App auf 0.23 mitbringt — generiertes SQL und SDK-Typen, CLI-Pfade, Scopes, Upserts und Schlüssel, der Remote-MCP-Endpunkt, Sitzungen und Konten, die Backup-Routen, das Insights-Plugin und Bilder in Markdown-Feldern.
+---
+
+# Upgrade von 0.23 → 0.24
+
+Dies sind die `### Breaking`-Einträge, die 0.24 für eine App auf 0.23 mitbringt.
+
+Die Abschnitte 41 bis 46 betreffen die CLI: Generiertes SQL verlässt das Repository, `rebase
+dev` generiert die SDK-Typen ungefragt neu, und Pfade, Fehlschläge und
+die Agent-Einrichtung werden vereinheitlicht. Die Abschnitte 47 bis 50 ändern, was der Server
+antwortet, und 51 bis 55 betreffen den Zugriff. Berechtigungen sind nun
+[Scopes](/docs/backend/roles-and-scopes/), ein Vokabular für Sitzungen, API-Schlüssel,
+Rollen und MCP-Tokens; wenn jede Person, die Ihre Admin-Oberflächen nutzt, die Rolle
+`admin` hat, verlangen die meisten davon nichts von Ihnen. Die Abschnitte 56 bis 58 behandeln den Remote-
+MCP-Endpunkt, In-Process-Schreibvorgänge und das UI-Kit, 59 bis 64 die Änderungen an Sitzungen und
+Konten, 65 die Backup-Routen, 66 das Insights-Plugin
+und 67 Bilder in Markdown-Feldern.
+
+---
+
+## 41. `db push` und `db generate` schreiben ihr SQL nach `.rebase/sql/`
+
+`rebase db push` und `rebase db generate` rendern Ihre Collections in fünf SQL-
+Dateien: `schema.sql`, `policies.sql`, `search.sql`, `vector.sql` und
+`triggers.sql`. Sie wurden nach `drizzle/` geschrieben, neben die Migrationen, und
+committet. Beide Befehle generieren alle fünf neu, bevor sie eine davon lesen, sodass die
+committete Kopie nie gelesen wurde und bei jeder Collection-Änderung im Diff auftauchte. Sie werden nun nach `.rebase/sql/` geschrieben, relativ zu dem Verzeichnis, in dem der
+Befehl läuft — `backend/.rebase/sql/` in einem gescaffoldeten Projekt. Das Verzeichnis
+schreibt seine eigene `.gitignore`, sodass es nie committet wird.
+
+Der erste Lauf nach dem Upgrade löscht die alten Kopien in `drizzle/` und nennt
+jede einzelne. Er löscht nur Dateien, die mit dem Header des Generators beginnen, sodass eine Datei,
+die Sie dort geschrieben haben, bleibt, ebenso die Migrationen in `drizzle/migrations/`.
+
+**Was zu ändern ist:** Committen Sie die Löschung, die der erste Lauf meldet. Liest ein Skript oder
+CI-Schritt eine dieser Dateien, verweisen Sie ihn auf `.rebase/sql/` und führen Sie davor
+`rebase db push` oder `rebase db generate` aus: Ein frischer Checkout hat
+die Datei nicht mehr.
+
+```bash
+grep -rnE "drizzle/(schema|policies|search|vector|triggers)\.sql" --exclude-dir=node_modules .
+```
+
+## 42. `rebase dev` nimmt kein `--generate` mehr
+
+Was das Flag einschaltete, tut `rebase dev` jetzt immer. Beim Start und bei
+jedem Speichern unter `config/collections/` generiert es die SDK-Typen in
+`generated/sdk/` neu, wie es das für das Drizzle-Schema schon tat. Zuvor wurde das SDK
+nur mit dem Flag neu generiert, sodass ein frischer Klon keine SDK-Typen hatte, bis jemand
+`rebase generate-sdk` ausführte. Die Übergabe von `--generate` oder `-g` stoppt mit einer Meldung,
+die auffordert, es wegzulassen, und `REBASE_AUTO_GENERATE` und `REBASE_GENERATE` werden
+nicht mehr gelesen.
+
+**Was zu ändern ist:** Entfernen Sie `--generate` und `-g` aus jedem Skript, das
+`rebase dev` startet, und löschen Sie `REBASE_AUTO_GENERATE` und `REBASE_GENERATE` aus Ihren
+`.env`-Dateien. `rebase generate-sdk` ist unverändert: Behalten Sie es in CI, in einem Frontend-
+Repository ohne Collections (`--from link`) und überall, wo `rebase dev` nicht
+läuft.
+
+```bash
+grep -rnE "rebase dev.*(--generate|-g)|REBASE_(AUTO_)?GENERATE" --exclude-dir=node_modules .
+```
+
+## 43. Ein relativer `--collections`-Pfad wird von dort gelesen, wo Sie den Befehl ausführen
+
+`schema generate`, `db push`, `db generate` und `doctor` lösten ein relatives
+`--collections` von `backend/` aus auf, während `generate-sdk` und `db backup --out`
+ihres von dem Verzeichnis aus auflösten, in dem Sie den Befehl eingaben. Jeder Befehl
+nutzt nun die zweite Regel, ebenso `schema --output` und `doctor --schema`/`--sdk`.
+Ein Skript, das für die alte Regel geschrieben wurde, `--collections ../config/collections` aus
+dem Projektstamm ausgeführt, nennt nun ein Verzeichnis, das es nicht gibt. Die CLI lehnt es ab,
+bevor etwas läuft, denn ein aus keinen Collections generiertes Schema ist leer, und
+dessen Push würde jede Tabelle löschen; die Meldung sagt, was stattdessen zu schreiben ist.
+
+**Was zu ändern ist:** Lassen Sie das Flag weg, wo es `config/collections` nennt, was
+der Standard ist, oder schreiben Sie den Pfad von dort, wo der Befehl läuft. `generate-sdk` nimmt nun
+auch `--collections`; `--collections-dir` funktioniert weiterhin.
+
+```diff lang="json"
+- "db:push": "rebase db push --collections ../config/collections"
++ "db:push": "rebase db push"
+```
+
+```bash
+grep -rnE -- "(--collections|-c) \.\./" --exclude-dir=node_modules .
+```
+
+## 44. `rebase generate-sdk` stoppt bei einer Collection-Datei, die nicht lädt
+
+`generate-sdk` las das `index.ts`-Barrel in `config/collections/` und übersprang
+mit einer Warnung eine Datei, die nicht geladen werden konnte. Es lädt nun jede Collection-Datei
+der obersten Ebene im Verzeichnis, dieselben Dateien, die das Backend ausliefert und das
+Admin-Panel auflistet, ob das Barrel sie nennt oder nicht. Eine Datei, die nicht
+lädt, lässt den Befehl fehlschlagen, wie sie schon den Start fehlschlagen ließ. Das Barrel ordnet die Navigation
+und hält `defaultSecurityRules`; es ist kein Register.
+
+**Was zu ändern ist:** nichts, wenn Ihr Backend startet. Stoppt `generate-sdk` (oder
+`rebase dev`, das es ausführt) nun, korrigieren Sie die genannte Datei: Auch das Backend würde sie
+ablehnen. Eine Collection, die im Barrel fehlt, erscheint nun im
+generierten `Database`-Typ, sodass ein typisierter Client ihren Accessor erhält.
+
+## 45. Agents starten das projekteigene `@rebasepro/mcp`
+
+Die `.mcp.json`, die `rebase init` scaffoldete, führte `npx -y @rebasepro/mcp` aus: die
+neueste Version der Registry, gleich welche Version die CLI des Projekts hatte.
+`rebase init` und das neue `rebase skills install --mcp` fügen nun
+`@rebasepro/mcp` als devDependency hinzu, an die CLI gepinnt, und starten diese Kopie:
+`pnpm exec rebase-mcp`, oder `npx --no rebase-mcp` in einem npm-Projekt. Ein davor
+erstelltes Projekt erhält die devDependency, mit einer Meldung zur Installation, beim nächsten
+Lauf von `skills install --mcp`.
+
+**Was zu ändern ist:** Fügen Sie die devDependency hinzu, mit `rebase skills install --mcp` oder
+`pnpm add -D @rebasepro/mcp`, und verweisen Sie den `rebase`-Server in `.mcp.json` (und
+jede andere von Hand geschriebene Agent-Konfiguration) auf die lokale Binärdatei:
+
+```diff lang="json"
+- "command": "npx", "args": ["-y", "@rebasepro/mcp"]
++ "command": "pnpm", "args": ["exec", "rebase-mcp"]
+```
+
+Aktualisieren Sie `@rebasepro/mcp` ab dann zusammen mit der CLI, da beide
+gemeinsam gepinnt sind. Siehe [Einen Client verbinden](/docs/ai/mcp/#connecting-a-client).
+
+## 46. `rebase api-keys create` nimmt Scopes
+
+`--scopes` nennt, was der Schlüssel darf, kommagetrennt oder wiederholt:
+`--scopes data:read:posts,logs:read`. `--roles` gibt die RLS-Rollen an, als die er neben
+`service` läuft, und `--expires-in <days>` oder `--expires-at <date>` sagt, wann
+er endet. `--full-access` ist jeder Scope, den der Service-Key hält, außer
+`keys:read` und `keys:write`, die kein Schlüssel halten darf. `rebase api-keys scopes`
+listet jeden Scope, den das Backend kennt.
+
+`--permissions`, `--admin` und `--expires` wurden entfernt. Jedes stoppt den
+Befehl mit einer Meldung, die seinen Ersatz nennt, sodass ein Skript, das eines enthält, fehlschlägt,
+statt einen anderen Schlüssel zu erzeugen, als gemeint war.
+
+**Was zu ändern ist:** Ersetzen Sie in jedem Skript, das Schlüssel erzeugt, `--permissions`
+durch `--scopes`, `--admin` durch `--roles admin` plus die Admin-Plane-Scopes, die der
+Schlüssel braucht, und `--expires 90d` durch `--expires-in 90`.
+
+| Vorher | Nachher |
+|---|---|
+| `--permissions '[{"collection":"orders","operations":["read","write"]}]'` | `--scopes data:read:orders,data:write:orders` |
+| `--full-access` | `--full-access` (jetzt auch die Admin-Plane-Scopes, die der Service-Key hält) |
+| `--admin --full-access` | `--full-access --roles admin` |
+| `--expires 30d` | `--expires-in 30` |
+
+```bash
+grep -rnE "api-keys create.*(--permissions|--admin|--expires )" --exclude-dir=node_modules .
+```
+
+## 47. Eine Live-Schema-Änderung committet kein SQL
+
+Eine Änderung, die über den [Live-Schema-Editor](/docs/backend/live-schema-editing/) des Admin-Panels angewendet wird, committet die Collection
+und `backend/src/schema.generated.ts` und sonst nichts. Früher committete sie auch
+die fünf SQL-Dateien, schrieb sie aber in den Projektstamm, während die CLI sie
+neben das Backend schreibt, sodass ein Projekt zwei Kopien halten konnte, die voneinander abwichen.
+`SchemaCommitPaths` und `DEFAULT_COMMIT_PATHS` halten nun nur noch `schemaFile`.
+
+**Was zu ändern ist:** nichts, es sei denn, Ihr Code liest `DEFAULT_COMMIT_PATHS` oder
+baut ein `SchemaCommitPaths` — dann entfernen Sie `ddlFile`, `policiesFile`, `searchFile`,
+`vectorFile` und `triggersFile`, was TypeScript nun meldet. Hat eine Live-Änderung
+diese Dateien in ein `drizzle/`-Verzeichnis im Projektstamm committet, liest sie nichts mehr:
+Löschen Sie sie. Ein Projekt, das versionierte Migrationen führt, führt nach einer Live-Änderung weiterhin
+`rebase db generate` aus, und es schreibt die Migration aus der
+committeten Collection.
+
+## 48. Ein Upsert in eine Zeile im Papierkorb wird mit `409 ROW_IN_TRASH` abgelehnt
+
+Bei einer Collection mit [Soft Delete](/docs/collections/soft-delete/) behält eine gelöschte Zeile
+ihren Schlüssel. Ein Upsert, dessen Schlüssel zu einer solchen Zeile gehörte, schrieb seine Werte in
+die verborgene Zeile und antwortete `201 Created`, sodass die Zeile gelöscht blieb und der
+Aufrufer einen Erfolg sah. Er wird nun mit `409 ROW_IN_TRASH` abgelehnt, und nichts wird
+geschrieben, an jeder Upsert-Tür: `?on_conflict=`, `/bulk`, `/_batch`, das SDK, der
+Socket und `rebase.data` oder `context.data` auf dem Server.
+
+**Was zu ändern ist:** nichts, es sei denn, etwas führt einen Upsert in eine Soft-Delete-Collection aus und erwartet, eine Zeile zurückzuholen.
+Stellen Sie die Zeile zuerst wieder her, mit einem Update, das ihr Soft-Delete-Feld auf `null` setzt, und führen Sie dann den Upsert aus. Oder löschen Sie sie mit
+`?hard=true` endgültig und führen Sie einen Upsert für eine neue aus.
+
+```diff lang="ts"
+- await client.data.invoices.upsert({ id, ...values });
++ await client.data.invoices.update(id, { deletedAt: null });
++ await client.data.invoices.upsert({ id, ...values });
+```
+
+## 49. Ein Update, das den Schlüssel einer Zeile ändert, wird mit `400 KEY_IMMUTABLE` abgelehnt
+
+Ein Update, dessen Body den Schlüssel der Zeile mit einem anderen Wert nannte, oder ein `beforeSave`,
+der ihn änderte, antwortete mit `500`. In-Process, über `rebase.data`, war die Zeile
+bereits auf den neuen Schlüssel umgezogen, als der Schreibvorgang warf. Jede Tür lehnt es nun
+mit `400 KEY_IMMUTABLE` ab, bevor ein Hook läuft, unter Nennung des Feldes, und nichts wird
+geschrieben. Das Senden des Schlüssels, den die Zeile bereits hat, wird weiterhin akzeptiert.
+
+**Was zu ändern ist:** Wo Code eine Zeile durch Aktualisieren ihres Schlüssels verschob, legen Sie die Zeile
+unter dem neuen Schlüssel an und löschen die alte. Ein `beforeSave`, der den Schlüssel
+beim Update umschrieb, muss damit aufhören. Siehe [Schreiben](/docs/backend/writes/).
+
+## 50. `Strict-Transport-Security` sendet kein `includeSubDomains` mehr
+
+Der Header wies Browser an, einfaches HTTP auf jeder Subdomain der Domain des
+Servers abzulehnen, auch auf solchen, mit denen der Server nichts zu tun hat, so lange,
+wie der Header es sagte. Er gilt nun nur noch für den Host des Servers selbst.
+
+**Was zu ändern ist:** nichts, es sei denn, Ihre übergeordnete Domain verlässt sich auf den Header dieses Servers, um HTTPS auf ihren Subdomains zu erzwingen.
+Setzen Sie dann die Variable, um den alten Header zu behalten:
+
+```bash
+REBASE_HSTS_INCLUDE_SUBDOMAINS=true
+```
+
+Siehe [Sicherheits-Header](/docs/deployment/self-hosting/#security-headers).
+
+## 51. Berechtigungen sind Scopes
+
+Jede Frage „Darf dieser Aufrufer das?“ verlangt nun einen Scope, benannt als `resource:action`:
+`data:read`, `users:write`, `cron:write`. Ein Scope kann ein Ziel nennen:
+`data:read:posts` ist `data:read` allein auf `posts`. Die Sitzung einer Person, ein API-
+Schlüssel, eine Rolle und ein MCP-Token halten alle Scopes, und alle verwenden dieselben Strings.
+
+Jede angemeldete Person hält die Daten-Plane: `data:*`, `storage:*` und
+`functions:invoke`. Ihre Zeilen werden weiterhin von den `securityRules` der Collection entschieden,
+sodass sich dort nichts ändert. Die Admin-Plane sind Benutzer, Schema,
+Datenbank, Backups, Cron, Logs und Schlüssel. Die Rolle `admin` hält alles davon, und
+jede Rolle, die Sie unter `auth.roles` an der Users-Collection deklarieren, hält, was Sie
+auflisten. Jede Admin-Oberfläche verlangt nun ihren eigenen Scope statt „ist Admin“: Die
+Benutzer-Routen brauchen `users:read` oder `users:write`, Cron braucht `cron:read` oder
+`cron:write` und so weiter. Der [Endpunkt-Index](/docs/backend/endpoints/#admin)
+nennt den Scope an jeder Route. Eine Ablehnung ist `403 SCOPE_MISSING`, mit dem Scope
+in `details.requiredScope`.
+
+**Was zu ändern ist:** nichts, wenn jeder, der die Admin-Oberflächen nutzt, die
+Rolle `admin` hält, denn ein Admin hält jeden Scope. Soll eine engere Rolle
+eine davon erreichen — ein Support-Team, das Konten verwaltet, ein Entwickler, der Logs liest —,
+deklarieren Sie sie mit den Scopes, die sie braucht. Siehe
+[Rollen und Scopes](/docs/backend/roles-and-scopes/#declaring-roles). Ein Client,
+der auf `API_KEY_FORBIDDEN` oder auf `FORBIDDEN` von einer Admin-Route verzweigte,
+verzweigt auf `SCOPE_MISSING`.
+
+```bash
+grep -rnE "API_KEY_FORBIDDEN|Admin privileges required" --exclude-dir=node_modules .
+```
+
+## 52. API-Schlüssel halten Scopes, keine Berechtigungsliste und kein `admin`-Flag
+
+Ein Schlüssel hat nun `scopes` und, für einen Service-Key, `roles`: die RLS-Rollen, als die er
+neben `service` läuft. `permissions: [{ collection, operations }]` und `admin: true`
+sind aus `CreateApiKeyRequest`, `UpdateApiKeyRequest` und `ApiKeyMasked` verschwunden,
+ebenso `ApiKeyPermission`, `ApiKeyOperation` und `isOperationAllowed`. Eine
+Anfrage, die `permissions` oder `admin` statt `scopes` sendet, wird mit
+`400 INVALID_INPUT` abgelehnt.
+
+Bereits gespeicherte Schlüssel werden beim Start in die Scopes umgewandelt, die sie hielten, und nie
+mehr: `{ collection: "posts", operations: ["read"] }` wird zu `data:read:posts`,
+und `admin: true` wird zur Rolle `admin` plus den Scopes für Benutzer, Schema, Backups, Cron
+und Logs. Das Secret ändert sich nicht. Die vollständige Tabelle steht in
+[API-Schlüssel](/docs/backend/api-keys/#keys-made-before-scopes).
+
+Eine Berechtigung wird enger. Eine Funktionsberechtigung ohne `write` wird zu nichts, weil
+der Aufruf einer Funktion kein Lesen ist. Ein Schlüssel, der eine `GET`-Funktion mit
+`read` allein aufrief, wird nach dem Upgrade abgelehnt.
+
+**Was zu ändern ist:**
+
+- Geben Sie jedem Schlüssel, der eine Custom Function aufruft, `functions:invoke` oder
+  `functions:invoke:<name>`, mit `PUT /api/admin/api-keys/:id` oder
+  `client.apiKeys.updateKey`.
+- Code, der Schlüssel anlegt, sendet `scopes` und `roles: ["admin"]`, wo er
+  `admin: true` sendete.
+
+```bash
+grep -rnE "ApiKeyPermission|ApiKeyOperation|isOperationAllowed|api-keys create" --exclude-dir=node_modules .
+```
+
+## 53. `schema-admin` ist kein Administrator mehr, und Rollen werden deklariert
+
+`admin` ist die einzige eingebaute Rolle. Eine Rolle namens `schema-admin` zählte früher als
+zweiter Admin; sie bedeutet jetzt für sich nichts mehr. Rollen sind keine gespeicherten
+Objekte mehr: `createRole`, `updateRole`, `deleteRole`, `getRoleById`,
+`getUserRoles`, `RoleRepository`, `RoleData` und `CreateRoleData` wurden entfernt,
+ebenso `BootstrappedAuth.roleService`. `getUserWithRoles` gibt Rollen-IDs zurück.
+`GET /api/admin/roles` listet `admin` und die von Ihnen deklarierten Rollen mit ihren
+Scopes. Der MongoDB-Driver legt keine Collection `rebase_roles` mehr an.
+
+**Was zu ändern ist:** Hält ein Konto `schema-admin`, deklarieren Sie die Rolle mit
+den Scopes, die sie haben soll:
+
+```typescript
+import { defineCollection } from "@rebasepro/cms-types";
+
+export const usersCollection = defineCollection({
+    slug: "users",
+    name: "Users",
+    table: "users",
+    auth: {
+        enabled: true,
+        roles: {
+            "schema-admin": {
+                name: "Schema admin",
+                scopes: ["schema:read", "schema:write", "database:read", "database:write"]
+            }
+        }
+    },
+    properties: {
+        email: { name: "Email", type: "string" }
+    }
+});
+```
+
+Code, der die Rollenfunktionen aufrief, liest stattdessen die deklarierten Rollen, mit
+`client.admin.listRoles()`. Eine `defaultRole`, die einen Admin-Plane-Scope hält, lässt
+den Start nun fehlschlagen.
+
+```bash
+grep -rnE "schema-admin|roleService|RoleData|createRole|getUserRoles|collectionPermissions" --exclude-dir=node_modules .
+```
+
+## 54. Die Scopes des gehosteten MCP-Servers sind `data:read`, `data:write` und `data:delete`
+
+Der [Remote-MCP-Endpunkt](/docs/ai/mcp/#the-remote-endpoint) verwendete `mcp:read` und
+`mcp:write`. Er verwendet nun die Daten-Scopes, die jede andere Anmeldeinformation nutzt, und jeder
+lässt sich auf eine Collection eingrenzen: `data:read:posts`. `delete_document` braucht
+`data:delete`, was `data:write` nicht mehr abdeckt.
+
+**Was zu ändern ist:** nichts für bereits verbundene Clients. Eine gespeicherte Berechtigung
+`mcp:read` wird als `data:read` gelesen und `mcp:write` als `data:write data:delete`,
+sodass sie ihre Reichweite behalten, und ein Client, der noch die alten Namen anfordert, erhält
+dasselbe. Code, der einen gewährten Scope-String mit `mcp:read` oder
+`mcp:write` vergleicht, vergleicht ihn mit den neuen Namen.
+
+## 55. `RealtimeSocketLimits` heißt jetzt `RealtimeSocketOptions`
+
+Es trägt den API-Schlüssel-Resolver neben den Limits, als sechstes Argument von
+`initializeWebsockets`. Das ermöglicht es einem API-Schlüssel, den Realtime-Socket zu authentifizieren.
+
+**Was zu ändern ist:** nichts, es sei denn, Sie rufen `initializeWebsockets` aus Ihrem eigenen
+Bootstrapper auf. Dann benennen Sie den Typ um.
+
+```bash
+grep -rn "RealtimeSocketLimits" --exclude-dir=node_modules .
+```
+
+## 56. Der Remote-MCP-Endpunkt nimmt die Argumente des SDK
+
+Die Tools auf `/mcp` verwendeten eigene Argumentnamen. Sie nehmen nun, was das SDK
+nimmt: `where` (war `filter`), `orderBy` als `["field", "desc"]` oder
+`"field:desc"` (war `orderBy` plus `order`) und `data` für einen Schreibvorgang (war
+`values`). `query_collection` antwortet in der Form von REST, `{ data, meta }`, statt
+`{ rows, count, truncated }`. Ein Argument, das ein Tool nicht deklariert, wird abgelehnt,
+statt ignoriert zu werden, und ein `limit` über 1000 wird abgelehnt, wie bei REST, statt
+auf 200 begrenzt zu werden.
+
+**Was zu ändern ist:** nichts für einen Assistenten, der die Tool-Schemas bei jeder
+Verbindung liest. Code oder gespeicherte Prompts, die die Tools mit festen
+Argumenten aufrufen, verwenden die neuen Namen und lesen `data` und `meta.total` aus einer Abfrage:
+
+```diff lang="json"
+- { "collection": "orders", "filter": { "status": ["==", "paid"] }, "orderBy": "total", "order": "desc" }
++ { "collection": "orders", "where": { "status": ["==", "paid"] }, "orderBy": ["total", "desc"] }
+```
+
+Siehe [Der Remote-Endpunkt](/docs/ai/mcp/#the-remote-endpoint).
+
+## 57. In-Process-Schreibvorgänge lehnen `ifMatch` und `idempotencyKey` ab
+
+Ein Schreibvorgang über `context.data` in einem Callback oder `rebase.data` in einer Funktion,
+einem Cron-Job oder einem Seed verlässt den Prozess nie: Es gibt kein `If-Match` zu prüfen und
+keinen Idempotenz-Store. Beide Optionen wurden stillschweigend ignoriert, sodass ein bedingter Schreibvorgang
+dort unbedingt war. Sie werfen nun `UNSUPPORTED_OPTION`, bevor etwas geschrieben wird.
+
+**Was zu ändern ist:** Entfernen Sie die Option aus In-Process-Schreibvorgängen. Wo die Bedingung
+zählt, prüfen Sie sie im schreibenden Code, oder schreiben Sie über den HTTP-
+Client, der beides berücksichtigt.
+
+```diff lang="ts"
+- await context.data.orders.update(id, { status: "paid" }, { ifMatch: etag });
++ await context.data.orders.update(id, { status: "paid" });
+```
+
+```bash
+grep -rnE "(context|rebase)\.data\..*(ifMatch|idempotencyKey)" --exclude-dir=node_modules .
+```
+
+## 58. `Button` und `IconButton` sind gegen das Element typisiert, das sie rendern
+
+Beide akzeptierten jede Prop, die im DOM landete und nichts bewirkte. Sie sind nun
+gegen das Element typisiert, das sie rendern, ein `button` oder die `component`, die Sie übergeben,
+sodass eine Prop, die sie nicht haben, ein Kompilierfehler ist. Das umfasst das `color` von `IconButton`,
+das veraltete HTML-Attribut, das nie etwas färbte, und
+`endIcon` oder `loading` an `Button`, die nie gerendert wurden.
+
+**Was zu ändern ist:** Entfernen Sie jede Prop, die TypeScript meldet. Was gerendert wird, ändert sich
+nicht; ein Icon, das angezeigt werden sollte, kommt als Child hinein.
+
+```diff lang="tsx"
+- <IconButton color="primary" onClick={close}><CloseIcon /></IconButton>
++ <IconButton onClick={close}><CloseIcon /></IconButton>
+```
+
+## 59. Ein offener Realtime-Socket wird erneut geprüft und geschlossen, wenn seine Identität endet
+
+Ein Socket prüfte sein Token einmal, bei der Authentifizierung. Ein Token, das ablief, eine
+Sitzung, die widerrufen wurde, oder eine Rolle, die entzogen wurde, änderte nichts, bis der
+Socket sich neu verband. Jetzt fragt der Server vor jedem Frame, mindestens alle 30 Sekunden bei einem
+Socket, der nur lauscht, und im Moment des Token-Ablaufs,
+ob das Konto noch existiert, noch angemeldet ist und seine Rollen noch hält.
+Eine beendete Identität erhält einen `AUTH_ERROR`-Frame (`SESSION_ENDED` oder
+`TOKEN_EXPIRED`) und den Close-Code `4001`. Eine geänderte Rolle ordnet die Abonnements des Sockets
+ab dem nächsten Frame neu zu.
+
+**Was zu ändern ist:** nichts mit dem SDK, das sich bei jeder Token-Erneuerung neu authentifiziert und
+sich nach einem `4001` neu verbindet. Ein Client, der das
+[Socket-Protokoll](/docs/backend/realtime/#authentication--rls) direkt spricht, muss
+ein frisches Token in `AUTHENTICATE` senden, bevor das alte abläuft, und den Close-
+Code `4001` als Grund sehen, sich mit einer neuen Sitzung neu zu verbinden.
+
+## 60. Ein E-Mail-Verifizierungslink beweist die Adresse und sonst nichts
+
+Das Folgen eines Verifizierungslinks markierte die Adresse als verifiziert und behielt alles
+andere am Konto. Jemand konnte die Adresse eines Fremden mit einem eigenen Passwort registrieren,
+und klickte der Eigentümer auf den Link, wurde dieses Passwort zu einem Zugang zu einem verifizierten Konto. Ohne eine
+aktive Sitzung des Kontos oder sein Passwort entfernt der Link nun das Passwort und jede Identität,
+die niemand bewiesen hat, und beendet jede Sitzung, wie es Magic Links, E-Mail-Codes und Passwort-Resets bereits taten.
+
+`client.auth.verifyEmail(token, options?)` sendet nun per POST, schickt die Sitzung mit, wenn
+es eine gibt, und kann `PROOF_REQUIRED` (`409`) werfen: Das Konto hält ein
+Passwort oder eine Identität, die die Anfrage nicht beweist, und das Token ist nicht verbraucht.
+
+**Was zu ändern ist:** Fangen Sie in einer eigenen Verifizierungsseite `PROOF_REQUIRED` ab und
+fragen Sie nach dem Passwort, oder lassen Sie die Person ohne es verifizieren. Eine Seite, die
+`GET /api/auth/verify-email?token=` ohne die Sitzung des Kontos aufruft, entfernt nun
+das Passwort. Die eigene Seite des CMS fragt bereits danach.
+
+```diff lang="ts"
+- await client.auth.verifyEmail(token);
++ try {
++     await client.auth.verifyEmail(token);
++ } catch (error) {
++     if (error instanceof RebaseApiError && error.code === "PROOF_REQUIRED") {
++         await client.auth.verifyEmail(token, { password: await askForPassword() });
++     } else throw error;
++ }
+```
+
+Siehe [E-Mail-Verifizierung](/docs/backend/email-verification/).
+
+## 61. `client.auth.signUp` löst `confirmationRequired` auf, und `user` kann `null` sein
+
+Ist [`requireEmailVerification`](/docs/backend/email-verification/#confirm-first-registration)
+aktiv, meldet die Registrierung niemanden an, bis die Adresse bestätigt ist. `signUp` löst nun
+`{ confirmationRequired, user, accessToken, refreshToken }` auf: Mit
+`confirmationRequired: true` sind die anderen drei `null`. Ist es aus, was der
+Standard ist, ist `confirmationRequired` `false`, und der Rest ist wie zuvor.
+
+**Was zu ändern ist:** TypeScript meldet nun Code, der `user` ohne Prüfung liest.
+Grenzen Sie über `confirmationRequired` ein:
+
+```diff lang="ts"
+  const result = await client.auth.signUp(email, password);
+- showWelcome(result.user.uid);
++ if (result.confirmationRequired) showCheckYourInbox();
++ else showWelcome(result.user.uid);
+```
+
+## 62. `mfa.enroll().recoveryCodes` ist `null`, wenn ein zweiter Faktor hinzugefügt wird
+
+Jede Registrierung erzeugte einen frischen Satz Wiederherstellungscodes und ersetzte den alten, sodass
+das Hinzufügen eines zweiten Authentifikators oder das Beginnen und Abbrechen einer Registrierung
+den Ausdruck stillschweigend ungültig machte. Die Codes werden nun einmal erzeugt, mit dem ersten
+Faktor. Die Registrierung eines weiteren gibt `recoveryCodes: null` zurück und behält die Codes, die das
+Konto hat; `mfa.regenerateRecoveryCodes()` ersetzt sie auf Anfrage.
+
+**Was zu ändern ist:** Zeigen Sie die Codes nur an, wenn sie da sind, und bieten Sie die
+Neugenerierung dort an, wo Sie die erneute Registrierung angeboten haben. Siehe
+[Einen Faktor registrieren](/docs/sdk/multi-factor-authentication/#enrolling-a-factor).
+
+```diff lang="ts"
+  const { totp, recoveryCodes } = await client.auth.mfa.enroll({ friendlyName: "Phone" });
+- showRecoveryCodes(recoveryCodes);
++ if (recoveryCodes) showRecoveryCodes(recoveryCodes);
+```
+
+## 63. Einen Gast zu einem Konto zu machen braucht offene Registrierung
+
+`POST /api/auth/anonymous/link` und das Verknüpfen eines OAuth-Anbieters mit einer Gast-
+Sitzung machen aus einem Gast ein Konto. Beide richten sich nun wie jede andere Anmeldung
+nach `allowRegistration` und lehnen mit `403 REGISTRATION_DISABLED` ab, wenn es
+aus ist.
+
+**Was zu ändern ist:** nichts, wenn `allowRegistration` an ist. Hält Ihre App die
+Registrierung geschlossen und stuft Gäste hoch, muss sie sie öffnen, im `auth`-Block der Users-
+Collection. Siehe
+[Anonyme Sitzungen](/docs/sdk/authentication/#anonymous-sessions).
+
+## 64. Das Token eines gelöschten Kontos antwortet mit `401 SESSION_REVOKED`
+
+Ein Access-Token, dessen Konto gelöscht worden war, antwortete von `/me` mit `404`. Jede
+Tür antwortet nun mit `401 SESSION_REVOKED`, wie bei einer abgemeldeten Sitzung.
+
+**Was zu ändern ist:** nichts mit dem SDK, das sich dabei abmeldet. Ein Client, der
+ein `404` von `/me` als „Konto weg“ behandelte, prüft stattdessen auf `SESSION_REVOKED`.
+Siehe [Fehler](/docs/backend/errors/).
+
+## 65. `createBackupRoutes` nimmt `storageFor`, nicht `storage`
+
+Die Backup-Routen listeten ein `s3://`- oder `gs://`-Backup über den eigenen
+Dateispeicher-Controller der App auf und luden es darüber herunter, der einen anderen Bucket, ein lokales
+Verzeichnis oder nichts adressiert. Sie bauen nun einen Controller für den Bucket des Backup-
+Ziels aus `BACKUP_DESTINATION` und den `S3_*`-Variablen,
+so wie es der Backup-Cron tut. Die Option `storage` von `createBackupRoutes` ist weg;
+`storageFor(destination)` ersetzt sie. `listBackupObjects`, `readBackupBytes`
+und `openBackupStream` werfen für ein Objektziel, für das sie keinen Controller
+haben, wo sie früher nichts zurückgaben.
+
+**Was zu ändern ist:** nichts, es sei denn, Sie binden `createBackupRoutes` selbst ein.
+Dann entfernen Sie `storage` oder übergeben `storageFor`, wenn das Ziel einen anderen Controller
+braucht als den, den die Umgebung beschreibt. Siehe
+[Backups](/docs/deployment/backups/).
+
+## 66. Das Insights-Plugin liest benannte Quellen
+
+Ein Insight trug sein eigenes `data()`-Callback und einen `scorecard`-Block, sodass
+dieselbe Zahl auf der Startseite und auf der Karte einer Collection zweimal abgerufen wurde, und
+die Veränderung daneben war ein Delta, das das Callback berechnen musste. Jetzt deklariert die Config
+`sources` — jede gibt einen Datensatz mit Zahlen für den übergebenen Zeitraum zurück — und ein Insight nennt die `source`, das `value`-Feld und das Feld,
+das die `previous`-Zahl hält. Das Plugin berechnet die Veränderung selbst.
+
+**Was zu ändern ist:** Verschieben Sie in Ihrer `useInsightsPlugin`-Config jedes `data()`-
+Callback unter einem Namen in `sources`, lassen Sie es einen Datensatz statt
+`{ rows }` zurückgeben, und ersetzen Sie `scorecard` durch `source`, `value` und `comparison`.
+`ScorecardFormat` ist `InsightFormat`, ohne `showSign`. Entfernen Sie `description`
+und `dateRange`: Die Zeile über den Zahlen nennt den Zeitraum. Umgeben Sie die Config mit
+`useMemo`, denn ein neues `sources`-Objekt startet einen neuen Cache.
+
+```typescript
+const insightsPlugin = useInsightsPlugin(useMemo(() => ({
+    period: { days: 30 },
+    sources: {
+        orders: ({ period }) => fetchOrderStats(period.previousFrom, period.from, period.to)
+    },
+    insights: {
+        home: [{
+            id: "revenue",
+            title: "Revenue",
+            source: "orders",
+            value: { field: "revenue", format: { style: "currency", currency: "USD" } },
+            comparison: { previous: "previousRevenue", intent: "increase_is_good" }
+        }]
+    }
+}), []));
+```
+
+Die Quelle gibt die Zahlen beider Fenster zurück, hier `{ revenue, previousRevenue }`.
+Eine Anzahl, die sich um wenige ändert, liest sich besser als Differenz denn als Prozentsatz:
+Setzen Sie `show: "absolute"` an ihrem `comparison`.
+
+## 67. Ein Markdown-Feld speichert ein hochgeladenes Bild als Storage-Referenz
+
+Der Markdown-Editor schrieb die signierte URL einer privaten Datei in den Text. Deren Download-
+Token läuft ab, standardmäßig fünf Minuten nach dem Upload, sodass das Bild im
+Admin-Panel und auf jeder Website, die den Text veröffentlichte, brach. Ein im Editor hochgeladenes Bild
+wird nun als `rebase-storage:<key>` gespeichert (mit `?storageId=` für eine
+benannte Quelle), und das Panel tauscht jede Referenz beim Rendern gegen eine frische URL.
+
+**Was zu ändern ist:** nichts im Panel. Eine Website oder App, die ein Markdown-
+Feld selbst rendert, löst die Referenzen vor dem Rendern auf, sonst zeigen die Bilder auf `rebase-storage:`-URLs, die ein Browser nicht öffnen kann:
+
+```typescript
+import { resolveStorageReferences } from "@rebasepro/client";
+
+const body = await resolveStorageReferences(String(post.body ?? ""), client);
+```
+
+Zuvor gespeicherter Text behält die URLs, mit denen er gespeichert wurde. Siehe
+[Dateien innerhalb von Text](/docs/sdk/storage/#files-inside-text).

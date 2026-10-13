@@ -1,7 +1,8 @@
 ---
-sourceHash: 0e00ae18684830bb
+sourceHash: a67897c131d33a15
 title: "Multi-Faktor-Authentifizierung"
 sidebar_label: "Multi-Faktor-Authentifizierung"
+description: "TOTP-Faktoren mit dem Rebase-SDK: einen registrieren, der zweite Schritt einer Anmeldung, Wiederherstellungscodes und das Entfernen eines Faktors."
 ---
 
 TOTP-Faktoren — eine Authentifikator-App — plus die Challenge, die eine Sitzung von `aal1` auf `aal2` hochstuft.
@@ -77,3 +78,8 @@ await client.auth.mfa.unenroll(factorId);
 ```
 
 Sobald ein Faktor verifiziert ist, erfordert dies eine `aal2`-Sitzung, damit ein gestohlenes `aal1`-Token MFA nicht deaktivieren kann; eine unvollendete erste Registrierung wird aus jeder Sitzung entfernt. Durch das Entfernen des letzten verifizierten Faktors werden auch die Wiederherstellungscodes gelöscht.
+
+## Nächste Schritte
+
+- **[Authentifizierung](/docs/sdk/authentication/)** — Anmeldung, Sitzungen und der Rest von `client.auth`
+- **[Auth-Endpunkte](/docs/backend/auth-endpoints/#multi-factor-authentication-totp)** — Die HTTP-Routen hinter Registrierung und Challenge

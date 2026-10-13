@@ -1,5 +1,5 @@
 ---
-sourceHash: 0b9f331306c3360e
+sourceHash: 9f860853c1427015
 title: Storage-Konfiguration
 sidebar_label: Storage-Konfiguration
 description: Konfigurieren Sie lokales Dateisystem, S3-kompatible oder GCS/Firebase Storage-Backends für Datei-Uploads, Bilder und Medien.
@@ -37,7 +37,7 @@ const backend = await initializeRebaseBackend({
 });
 ```
 
-Der lokale Speicher legt die Metadaten jedes Objekts daneben ab, als `<key>.metadata.json`, daher wird ein Schlüssel, dessen letztes Segment auf `.metadata.json` endet, auf jeder Route mit `400 INVALID_STORAGE_KEY` abgelehnt. S3 und GCS halten Metadaten am Objekt und speichern jeden Schlüssel.
+Der lokale Speicher legt die Metadaten jedes Objekts daneben ab, als `<key>.metadata.json`, daher wird ein Schlüssel, dessen letztes Segment auf `.metadata.json` endet, auf jeder Route mit `400 INVALID_STORAGE_KEY` abgelehnt. S3 und GCS halten Metadaten am Objekt und speichern jeden Schlüssel. Auf einem Dateisystem ohne Groß-/Kleinschreibung (unter macOS und Windows standardmäßig) sind `Avatar.png` und `avatar.png` eine lokale Datei, aber zwei Objekte auf S3, GCS oder einem Linux-Datenträger; der Server warnt daher beim Start, wenn der Speicherordner auf einem solchen liegt.
 
 ### S3-Speicher
 
@@ -424,7 +424,7 @@ Geben Sie `false` zurück, um mit einem **403** abzuweisen. Das Werfen einer Exc
 
 Wissenswertes:
 
-- **Die Metadaten-Route entscheidet maßgeblich über den Lesezugriff.** Sie generiert das kurzlebige, pfadgebundene Download-Token, dem die Datei-Route vertraut; daher schützt der Hook den Zugriff bereits hier. Anfragen, die bereits ein solches Token mitführen oder einen deklarierten öffentlichen Pfad aufrufen, überspringen den Hook — das Token wurde unter seiner Kontrolle ausgestellt und ist ausschließlich für den eigenen Pfad gültig. Nur diese beiden Lesezugriffe überspringen ihn: Nach einem Benutzer, den Ihr Auth-Adapter zufällig `public` nennt, wird wie bei jedem anderen gefragt.
+- **Die Metadaten-Route entscheidet maßgeblich über den Lesezugriff.** Sie generiert das kurzlebige, pfadgebundene Download-Token, dem die Datei-Route vertraut; daher schützt der Hook den Zugriff bereits hier. Zwei Lesezugriffe überspringen den Hook, mit Absicht. Einer, der ein solches Token mitführt: Der Hook hat ihn beim Ausstellen des Tokens genehmigt, nur für diesen Pfad und diese Quelle, sodass ein Hook, der nun ablehnen würde (eine inzwischen entzogene Mitgliedschaft), ihn nicht stoppt, bevor das Token abläuft — `storageDownloadTokenTtl`, standardmäßig 300 Sekunden. Und ein Lesezugriff auf einen Schlüssel unter `public/` durch einen Aufrufer ohne Anmeldedaten: Das Präfix ist die Deklaration, dass jeder ihn lesen darf, anonyme Besucher und CDNs eingeschlossen. Der Lesezugriff eines angemeldeten Aufrufers darauf wird weiterhin abgefragt, der eines anonymen aber nicht, sodass ein Hook einen `public/`-Schlüssel nicht privat machen kann; legen Sie die Datei stattdessen außerhalb von `public/` ab. Nur diese beiden Lesezugriffe überspringen ihn: Nach einem Benutzer, den Ihr Auth-Adapter zufällig `public` nennt, wird wie bei jedem anderen gefragt.
 - **Ein Bucket, ein Name.** Auf S3 und GCS ist der `bucket` des Hooks immer `"default"`, auch wenn eine Anfrage den Bucket des Anbieters nennt, der dieselben Objekte erreicht.
 - **Ein Pfad ist öffentlich, wenn der Schlüssel, den er benennt, es ist.** Das Präfix `public/` wird am kanonischen Schlüssel geprüft, den die Route ausliefert — nachdem ein führendes `default/`-Bucket-Segment abgelesen und `//`, `./` sowie ein führendes `/` zusammengefaltet wurden —, niemals an der URL, wie sie geschrieben wurde. `/api/storage/file/notes://public/x.txt` benennt den privaten Schlüssel `notes:/public/x.txt`, und der Schlüssel `default/public/x.txt` (erreichbar als `/api/storage/file/default/default/public/x.txt`) liegt in einem Ordner namens `default`; keiner von beiden ist öffentlich. Prüfen Sie in einem Hook den übergebenen `key` mit `isPublicStorageKey` aus `@rebasepro/types` — `isPublicStoragePath` liest einen clientseitigen Pfad oder eine URL und hält beide für öffentlich.
 - **`list` wird anhand des Präfixes geprüft.** Über das Auflisten lassen sich Schlüssel ermitteln, die einem zuvor nicht bekannt waren.

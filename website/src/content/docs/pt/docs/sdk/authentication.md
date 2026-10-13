@@ -1,5 +1,5 @@
 ---
-sourceHash: 0e00ae18684830bb
+sourceHash: 1bf5f81fc739ecfd
 title: Autenticação
 sidebar_label: Autenticação
 description: Autenticação no lado do cliente com o SDK Rebase — login com e-mail/senha, provedores OAuth, gerenciamento de sessão e listeners de estado de autenticação.
@@ -175,7 +175,8 @@ await client.auth.linkAnonymous("user@example.com", "correct-horse-battery");
 
 | Falha | Significado |
 |---------|-------|
-| `ANONYMOUS_AUTH_DISABLED` (403) | O backend não habilitou a autenticação anônima |
+| `ANONYMOUS_AUTH_DISABLED` (403) | O backend não habilitou a autenticação anônima, ou a desligou depois que este convidado entrou: um convidado só vira conta enquanto `allowAnonymous` está ligado |
+| `REGISTRATION_DISABLED` (403) | O registro está fechado no backend, e virar uma conta é um registro |
 | `NOT_ANONYMOUS` (400) | A sessão atual pertence a uma conta comum |
 | `EMAIL_EXISTS` (409) | O endereço já possui uma conta — faça login nela |
 
@@ -330,6 +331,19 @@ Uma restauração que atualiza (um token armazenado expirado, ou o modo cookie) 
 silenciosamente. Assim, um listener não consegue informar se a restauração terminou: uma inicialização que não emite
 nada é indistinguível de uma ainda em andamento. Aguarde `isInitialized()`
 para essa confirmação e use o listener para alterações posteriores.
+
+`restoreOutcome()` diz como a restauração terminou, depois que `isInitialized()`
+foi resolvido: `"restored"`, `"none"` (nada para restaurar), `"refused"` (o servidor
+recusou a sessão) ou `"unreachable"` (o servidor não pôde ser alcançado, então
+a sessão não foi confirmada nem recusada). No modo cookie, `"unreachable"`
+sem sessão é o único caso em que "desconectado" não é sabidamente verdade:
+
+```typescript
+await client.auth.isInitialized();
+if (!client.auth.getSession() && client.auth.restoreOutcome() === "unreachable") {
+    console.log("Offline: could not check the session.");
+}
+```
 
 ## Listener de Estado de Autenticação
 

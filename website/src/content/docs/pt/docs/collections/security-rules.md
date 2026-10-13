@@ -1,5 +1,5 @@
 ---
-sourceHash: 9531407dffbf3092
+sourceHash: abd2a2de4a0ff4be
 title: Regras de Segurança (RLS)
 sidebar_label: Regras de Segurança
 description: Defina políticas de Row Level Security para suas coleções usando atalhos de conveniência ou expressões SQL puras.
@@ -39,6 +39,31 @@ A identidade do usuário autenticado está disponível no SQL através de:
 | `rebase.jwt()` | Claims completos do JWT como JSONB |
 
 Estes são definidos automaticamente por transação pelo backend do Rebase.
+
+### Policies que uma coleção recebe sem que você as escreva
+
+As policies de uma tabela são mais do que as `securityRules` da própria coleção:
+
+- **`defaultSecurityRules`**, exportado de `config/collections/index.ts`. Uma
+  coleção cujo `securityRules` está ausente ou vazio recebe todas elas no
+  lugar, como se as tivesse escrito. Uma coleção que declara ao menos uma regra
+  própria não recebe nenhuma: as duas listas nunca são mescladas.
+- **A base do admin.** Toda coleção também recebe
+  `<table>_default_admin_read` e `<table>_default_admin_write_insert`,
+  `_update` e `_delete`: policies permissivas que deixam o contexto do servidor e
+  a role `admin` ler e escrever todas as linhas. Elas ficam ao lado das regras
+  que a coleção acabar tendo, as próprias ou as padrões herdadas, e as
+  policies permissivas são combinadas com OR, então ampliam ambas. A coleção de
+  usuários recebe ainda uma leitura do próprio registro e um portão de escrita
+  restritivo que mantém `roles` exclusivo do admin.
+- **Multi-tenancy.** Uma coleção com escopo de tenant recebe uma regra restritiva que confina
+  cada operação ao tenant do chamador; o contexto do servidor passa por ela.
+
+`disableDefaultPolicies: true` em uma coleção remove a base permissiva
+e mantém os portões restritivos. É por coleção: `defaultSecurityRules`
+não carrega esse sinalizador, então uma coleção que herda os padrões mantém a
+base a menos que defina o sinalizador ela mesma. O DDL gerado marca cada
+policy injetada, e `rebase db push` recoloca uma removida à mão.
 
 ## Atalhos de Conveniência
 

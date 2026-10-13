@@ -1,5 +1,5 @@
 ---
-sourceHash: 7f4db751ce80395f
+sourceHash: 3529ea341017acda
 title: Speicher & Dateien
 sidebar_label: Speicher
 description: Dateien mit dem Speichermodul des typisierten SDK von Rebase hochladen, herunterladen, auflisten und löschen.
@@ -116,6 +116,14 @@ Jedes Objekt wird einmal pro Aufruf signiert, aus seiner eigenen Quelle, sodass 
 Bild funktionsfähig bleibt, egal wie lange es schon hochgeladen ist. Eine Referenz, die ein
 nicht mehr existierendes Objekt benennt, bleibt unverändert. `storageReference(key,
 storageId?)` erstellt eine solche Referenz, für Text, den Sie selbst schreiben.
+
+<span class="since-badge" data-since="0.25">Seit 0.25</span> Text, der gespeichert wurde, bevor es Referenzen gab, enthält die Download-URL einer privaten Datei
+selbst, `…/storage/file/posts/cover.png?token=…`, deren Token wenige Minuten
+nach dem Schreiben ablief. `resolveStorageReferences` erneuert auch diese:
+Das Token nennt weiterhin das Objekt, sodass die URL durch eine frische ersetzt wird. Um
+stattdessen Referenzen zu speichern, schreiben Sie den Text einmal mit
+`storageReferencesForDownloadUrls(text)` um, was jede andere URL
+unverändert lässt.
 
 ## Eine Datei herunterladen
 

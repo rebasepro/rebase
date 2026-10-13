@@ -1,5 +1,5 @@
 ---
-sourceHash: 5e6e22317b5f9d21
+sourceHash: b2f805e5fb18de22
 title: Auth-Endpunkte und Tokens
 sidebar_label: Auth-Endpunkte
 description: Die Authentifizierungs-Routen, die das Rebase-Backend bereitstellt, ihre Antwortstrukturen, Multi-Faktor-Authentifizierung, der Datenbankkontext für Richtlinien, JWKS und Service-Schlüssel.
@@ -36,7 +36,7 @@ Alle Auth-Endpunkte sind unter `/api/auth/` eingebunden:
 | `POST` | `/api/auth/otp` | Sechsstelligen Anmeldecode per E-Mail senden. Antwortet unabhängig davon gleich, ob für die Adresse ein Konto existiert |
 | `POST` | `/api/auth/otp/verify` | `{ email, code }` gegen eine Sitzung eintauschen |
 | `POST` | `/api/auth/anonymous` | Anonyme Sitzung erstellen (Opt-in — `ALLOW_ANONYMOUS`) |
-| `POST` | `/api/auth/anonymous/link` | Reale Anmeldedaten mit dem bereits angemeldeten anonymen Konto verknüpfen |
+| `POST` | `/api/auth/anonymous/link` | Reale Anmeldedaten mit dem bereits angemeldeten anonymen Konto verknüpfen. Braucht `allowAnonymous` und offene Registrierung zugleich: `403 ANONYMOUS_AUTH_DISABLED`, sobald die anonyme Anmeldung aus ist (auch für zuvor angemeldete Gäste), und `403 REGISTRATION_DISABLED`, solange die Registrierung geschlossen ist |
 | `GET` | `/api/auth/sessions` | Aktive Sitzungen des Aufrufers auflisten, eine pro Anmeldung. Die eigene Sitzung des Aufrufers ist mit `isCurrentSession` markiert |
 | `DELETE` | `/api/auth/sessions` | Jede Sitzung widerrufen, einschließlich dieser – Remote-Abmeldung auf jedem Gerät |
 | `DELETE` | `/api/auth/sessions/:id` | Eine Sitzung widerrufen: ihr Refresh-Token und das Access-Token, das dieses Gerät hält |

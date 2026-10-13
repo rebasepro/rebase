@@ -1,5 +1,5 @@
 ---
-sourceHash: d5f6bfc83168dcfd
+sourceHash: 5fa5e7d348432b22
 title: Executando mais de uma instância
 sidebar_label: Mais de uma instância
 description: Todo estado que um processo Rebase mantém só para si, e a configuração que o compartilha — o que definir antes de uma segunda réplica, um deploy rolling ou uma implantação dividida receber tráfego.

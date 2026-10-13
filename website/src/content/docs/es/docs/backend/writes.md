@@ -1,5 +1,5 @@
 ---
-sourceHash: 64977a5e5f9b13d2
+sourceHash: b9b698ec32e400fc
 title: Escritura a través de REST
 sidebar_label: Escritura a través de REST
 description: Claves de idempotencia, escrituras condicionales con ETag e If-Match, operaciones de campo, upserts sobre clave natural, return=minimal y lotes entre colecciones.
@@ -44,6 +44,13 @@ Se admite en `POST`, `PATCH`, `DELETE`, las tres rutas `/bulk` y `/_batch`. Las 
 
 `GET /api/data/:slug/:id` devuelve un `ETag`, y también lo hace el `GET` anidado de una sola fila. Envíelo de vuelta como `If-Match` en un `PATCH` o `DELETE` posterior y la escritura se rechazará con `412` si la fila ha cambiado en el ínterin.
 
+<span class="since-badge" data-since="0.25">Desde 0.25</span> Un `PATCH` correcto responde con el `ETag` de la versión que escribió,
+de modo que la siguiente escritura condicional no necesita leer antes. La etiqueta
+viaja también en un `204` respondido por `Prefer: return=minimal`, y una respuesta
+reenviada para una `Idempotency-Key` lleva la misma etiqueta que la primera. Una
+suscripción en vivo a una fila lleva la misma etiqueta en cada fotograma (consulta
+[Tiempo real](/docs/backend/realtime/)).
+
 ```bash
 # read
 curl -i /api/data/docs/d1
@@ -59,6 +66,10 @@ curl -X PATCH /api/data/docs/d1 \
 Sin esto, lectura-modificación-escritura funciona como «gana el último» sobre todo lo que la segunda escritura no haya enviado: dos editores con un segundo de diferencia tienen éxito y el cambio del primero desaparece sin ningún error en ninguna parte.
 
 La etiqueta se deriva de una propiedad `date` con `autoValue: "on_update"` cuando la colección declara una — esa columna ya *es* una versión — y de un hash estable de la fila en caso contrario. `If-Match: *` solo afirma que la fila existe. No se escribe nada si la precondición falla.
+
+<span class="since-badge" data-since="0.25">Desde 0.25</span> El formulario de registro del panel de administración guarda con `If-Match`: un guardado hecho sobre una versión
+que alguien ha reemplazado entretanto se rechaza, el formulario lo indica y la edición se queda
+en el formulario, reajustada sobre la nueva versión con los campos en conflicto marcados.
 
 La etiqueta se compara dentro de la propia transacción de la escritura, una vez bloqueada la fila. Dos escrituras con la misma etiqueta no pueden pasar ambas: la segunda espera a que la primera confirme, lee lo que escribió y se rechaza con `412`.
 

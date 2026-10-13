@@ -1,5 +1,5 @@
 ---
-sourceHash: 7f4db751ce80395f
+sourceHash: 3529ea341017acda
 title: Archiviazione e file
 sidebar_label: Archiviazione
 description: Carica, scarica, elenca ed elimina file usando il modulo di archiviazione dell'SDK tipizzato di Rebase.
@@ -121,6 +121,14 @@ un'immagine privata continua a funzionare indipendentemente da quanto tempo fa
 è stata caricata. Un riferimento che nomina un oggetto che non esiste più viene
 lasciato com'è. `storageReference(key, storageId?)` ne costruisce uno, per un
 testo che scrivi tu stesso.
+
+<span class="since-badge" data-since="0.25">Da 0.25</span> Un testo salvato prima che i riferimenti esistessero contiene l'URL di download
+di un file privato, `…/storage/file/posts/cover.png?token=…`, il cui token è scaduto pochi minuti
+dopo la scrittura. `resolveStorageReferences` rinnova anche questi: il token
+nomina ancora l'oggetto, quindi l'URL viene sostituito da uno nuovo. Per memorizzare
+invece dei riferimenti, riscrivi il testo una volta con
+`storageReferencesForDownloadUrls(text)`, che lascia ogni altro URL
+com'è.
 
 ## Scaricare un file
 
