@@ -80,10 +80,10 @@ The composition question is not academic. Asking "does this still work beside so
 
 ## What we're changing
 
-**The backend becomes public pieces plus a shortcut.** `createRebaseBackend` builds everything and does nothing else: it mounts nothing, starts no timer and touches no process state. Each route group is a self-contained sub-app you can put on any path. Starting background work is a call you make.
+**The backend becomes public pieces plus a shortcut.** `createRebaseBackend` builds everything and does nothing else: it mounts nothing, starts no timer and touches no process state. Each route group is a sub-app that carries its own auth context, rate limits and admin gate, so you can put it on any path. Starting background work is a call you make.
 
 ```ts
-const backend = await createRebaseBackend({ database, auth, collections });
+const backend = await createRebaseBackend({ database, auth, collections, provision: true });
 
 app.route("/api/data", backend.routes.data());   // only the parts you want,
 app.route("/api/auth", backend.routes.auth());   // at the paths you want
@@ -91,7 +91,9 @@ backend.attachRealtime(server);
 backend.start();                                 // crons, job workers, sweeps
 ```
 
-`initializeRebaseBackend` stays, and it becomes a short function that calls exactly those public methods. That is the essay's "one shallow step": when the shortcut stops fitting, you open it, copy it and change one line. The DDL that ran as a side effect becomes your decision. You can ask for it, skip it, or run it from a migration step.
+`initializeRebaseBackend` stays, and it is now five calls to exactly those public methods. That is the essay's "one shallow step": when the shortcut stops fitting, you open it, copy it and change one line.
+
+The DDL that used to run as a side effect is now a required `provision` option. It is an option rather than a later step because the Postgres driver reads your tables while it opens, so they have to exist first. `provision: false` creates nothing, which leaves the schema to your own migration step.
 
 **State moves onto the instance.** Each backend carries its own JWT configuration, access model and stores, so two backends in one process work and tests no longer reset globals. The module-level helpers keep working against the backend `initializeRebaseBackend` installed.
 
@@ -101,13 +103,16 @@ backend.start();                                 // crons, job workers, sweeps
 
 ```ts
 const rebase = await openRebase({ databaseUrl, collections }); // no HTTP, no DDL, no env reads
-await rebase.dataAsAdmin.collection("posts").find();
+await rebase.dataAsAdmin.posts.find({ limit: 10 });
+
+const ada = await rebase.withAuth({ uid: "ada", roles: ["user"] });
+await ada.data.posts.find();                                    // only what Ada's RLS lets her see
 await rebase.close();
 ```
 
-It uses the same vocabulary as the server-side client inside a function, so a snippet moves between a function and a script unchanged. `rebase console` gives you that object in a Node REPL with your project's collections loaded. `rebase console -e "<code>"` runs a one-off script.
+It uses the same vocabulary as the server-side client inside a function, so a snippet moves between a function and a script unchanged. `rebase console` gives you that object in a Node REPL with your project's collections loaded. `rebase console -e "<code>"` runs a one-off script and prints the result as JSON.
 
-**Admin pieces work on their own.** `CollectionPanel` and `EntityForm` take the collection as a value and work inside `<Rebase>` alone, under any router, at any path. Your app can show one table on one page without adopting the whole shell. Your app can also own the theme.
+**Admin pieces work on their own.** `CollectionPanel` now takes the collection as a value, and a new `EntityFormPanel` shows one record's form. Inside `<Rebase>` and a small `CollectionsProvider`, both work under any React Router setup, at any path. Your app can show one table on one page without adopting the whole shell. With `<Rebase modeController>`, your app can also own the theme.
 
 **Callbacks get the two primitives they were missing.**
 
