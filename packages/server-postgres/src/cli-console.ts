@@ -16,6 +16,7 @@ import fs from "fs";
 import path from "path";
 import repl from "node:repl";
 import { inspect } from "node:util";
+import { setLogOutput } from "@rebasepro/server";
 import type { CollectionConfig } from "@rebasepro/types";
 import { RELAYED_FLAGS } from "./cli-flags";
 import { out, outError, describeFailure } from "./cli-output";
@@ -107,7 +108,30 @@ export async function consoleCommand(args: string[], streams: ConsoleStreams = {
     // info-level boot notes are not, unless they asked for them.
     if (process.env.LOG_LEVEL === undefined) process.env.LOG_LEVEL = "warn";
 
-    const collectionsPath = path.resolve(flags["--collections"] || path.join("..", "config", "collections"));
+    // And whatever level they asked for, a log line is never part of the
+    // answer: stdout holds the `--eval` result a pipe reads (`| jq .`) and the
+    // REPL's values. The scaffold's `.env` sets LOG_LEVEL=info, and under
+    // NODE_ENV=production warnings go to stdout too.
+    setLogOutput("stderr");
+    try {
+        return await openAndRun({
+            databaseUrl,
+            collections: flags["--collections"],
+            eval: flags["--eval"],
+            history: flags["--history"]
+        }, streams);
+    } finally {
+        setLogOutput();
+    }
+}
+
+/** Open the project, run `--eval` or the REPL, and close it again. Resolves with the exit code. */
+async function openAndRun(
+    options: { databaseUrl: string; collections?: string; eval?: string; history?: string },
+    streams: ConsoleStreams
+): Promise<number> {
+    const { databaseUrl } = options;
+    const collectionsPath = path.resolve(options.collections || path.join("..", "config", "collections"));
     const { loadCollections } = await import("./schema/doctor");
     const collections = fs.existsSync(collectionsPath) ? await loadCollections(collectionsPath) : [];
 
@@ -119,7 +143,7 @@ export async function consoleCommand(args: string[], streams: ConsoleStreams = {
     });
 
     try {
-        const code = flags["--eval"];
+        const code = options.eval;
         if (code !== undefined) {
             try {
                 const result = await evaluateInConsole(code, { rebase, collections: rebase.collections });
@@ -132,7 +156,7 @@ export async function consoleCommand(args: string[], streams: ConsoleStreams = {
         }
 
         await startRepl({ rebase, collections: rebase.collections }, {
-            history: flags["--history"],
+            history: options.history,
             database: describeDatabase(databaseUrl),
             ...streams
         });

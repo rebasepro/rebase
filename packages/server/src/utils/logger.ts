@@ -84,6 +84,21 @@ export function setLogLevel(level?: LogLevel): void {
     configuredLevel = level;
 }
 
+/** Every line to stderr, when a command's stdout is its result. See {@link setLogOutput}. */
+let everyLineToStderr = false;
+
+/**
+ * Send every log line to stderr — `"stderr"` — or back to the default with
+ * `undefined`, where errors (and in development, warnings) go to stderr and
+ * the rest to stdout.
+ *
+ * For a process whose stdout is its answer: `rebase console --eval` prints a
+ * value for `jq` to read, and a log line on stdout would be part of it.
+ */
+export function setLogOutput(output?: "stderr"): void {
+    everyLineToStderr = output === "stderr";
+}
+
 function getMinLevel(): LogLevel {
     if (configuredLevel) return configuredLevel;
     const env = (hostEnv().LOG_LEVEL || "info").trim().toLowerCase();
@@ -430,7 +445,7 @@ function createLogger(rawDefaultFields: Record<string, unknown> = {}): Logger {
             };
             const line = JSON.stringify(entry);
 
-            if (level === "error") {
+            if (level === "error" || everyLineToStderr) {
                 writeLine("err", line);
             } else {
                 writeLine("out", line);
@@ -444,7 +459,7 @@ function createLogger(rawDefaultFields: Record<string, unknown> = {}): Logger {
             const extra = Object.keys(merged).length > 0 ? ` ${JSON.stringify(merged)}` : "";
             const out = `${prefix} [${level.toUpperCase()}] ${safeMessage}${extra}`;
 
-            if (level === "error") {
+            if (level === "error" || everyLineToStderr) {
                 console.error(out);
             } else if (level === "warn") {
                 console.warn(out);

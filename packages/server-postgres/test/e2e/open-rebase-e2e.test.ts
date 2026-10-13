@@ -19,6 +19,8 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { PassThrough } from "node:stream";
+import { spawn } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import pg from "pg";
 import type { CollectionConfig } from "@rebasepro/types";
 
@@ -470,6 +472,63 @@ describe("openRebase (E2E)", () => {
                 }
                 expect(transcript).toContain("20");
                 expect(transcript).not.toMatch(/Uncaught/);
+            });
+
+            describe("as the CLI runs it: its own process, the project's .env loaded", () => {
+                const packageRoot = path.resolve(fileURLToPath(new URL("../..", import.meta.url)));
+                let projectDir: string;
+
+                beforeAll(() => {
+                    // The scaffold's `.env` sets LOG_LEVEL=info.
+                    projectDir = fs.mkdtempSync(path.join(os.tmpdir(), "rebase-console-cli-"));
+                    fs.writeFileSync(path.join(projectDir, ".env"), "LOG_LEVEL=info\n");
+                });
+
+                afterAll(() => {
+                    fs.rmSync(projectDir, { recursive: true, force: true });
+                });
+
+                /** `rebase console …` through the driver's entry point, from source, in the project directory. */
+                function runConsole(args: string[], options: { env?: Record<string, string>; stdin?: string } = {}): Promise<{ code: number | null; stdout: string; stderr: string }> {
+                    const env: Record<string, string> = {};
+                    for (const [key, value] of Object.entries(process.env)) {
+                        if (value !== undefined && !["LOG_LEVEL", "NODE_ENV", "DATABASE_URL", "VITEST", "VITEST_WORKER_ID"].includes(key)) env[key] = value;
+                    }
+                    Object.assign(env, {
+                        DATABASE_URL: urlFor(container, "app"),
+                        // `@rebasepro/*` from this checkout's source, as the vitest aliases do.
+                        TSX_TSCONFIG_PATH: path.resolve(packageRoot, "../../tsconfig.typecheck.json")
+                    }, options.env);
+                    return new Promise((resolve, reject) => {
+                        const child = spawn(
+                            path.join(packageRoot, "node_modules/.bin/tsx"),
+                            [path.join(packageRoot, "src/cli.ts"), "console", "--collections", collectionsDir, ...args],
+                            { cwd: projectDir, env, stdio: ["pipe", "pipe", "pipe"] }
+                        );
+                        let stdout = "";
+                        let stderr = "";
+                        child.stdout.on("data", (chunk: Buffer) => { stdout += String(chunk); });
+                        child.stderr.on("data", (chunk: Buffer) => { stderr += String(chunk); });
+                        child.on("error", reject);
+                        child.on("close", (code) => resolve({ code, stdout, stderr }));
+                        child.stdin.end(options.stdin ?? "");
+                    });
+                }
+
+                it("--eval prints the result and nothing else on stdout, under LOG_LEVEL=info, and the log goes to stderr", async () => {
+                    const result = await runConsole(["--eval", "rebase.sql('SELECT count(*)::int AS n FROM public.notes')"]);
+                    expect(result.code).toBe(0);
+                    const parsed = JSON.parse(result.stdout) as Array<{ n: number }>;
+                    expect(typeof parsed[0].n).toBe("number");
+                    expect(result.stderr).toMatch(/RLS enforcement active/);
+                }, 60_000);
+
+                it("--eval keeps stdout to the result under NODE_ENV=production too, where every level is a JSON line", async () => {
+                    const result = await runConsole(["--eval", "6 * 7"], { env: { NODE_ENV: "production", LOG_LEVEL: "debug" } });
+                    expect(result.code).toBe(0);
+                    expect(JSON.parse(result.stdout)).toBe(42);
+                    expect(result.stderr).toMatch(/RLS enforcement active/);
+                }, 60_000);
             });
 
             it("exits 1 with the error on stderr, and nothing on stdout, when the code throws", async () => {

@@ -373,7 +373,7 @@ export { authUid, authRoles, authJwt } from "./utils/sql";
 // =============================================================================
 // Logger
 // =============================================================================
-export { logger, rawQueryLoggingEnabled } from "./utils/logger";
+export { logger, rawQueryLoggingEnabled, setLogOutput } from "./utils/logger";
 export type { Logger } from "./utils/logger";
 
 // =============================================================================
