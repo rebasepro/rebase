@@ -59,7 +59,8 @@ describe("realtime socket URL", () => {
         const absolute = createRebaseClient({ baseUrl: "https://app.example.com/backend" });
         absolute.collection("posts").listen!(undefined, () => {});
 
-        expect(opened[0]).toBe("wss://app.example.com/backend");
+        // The address; the query after it names the socket's opt-ins.
+        expect(opened[0].split("?")[0]).toBe("wss://app.example.com/backend");
         expect(opened[0]).toBe(opened[1]);
     });
 
@@ -71,7 +72,7 @@ describe("realtime socket URL", () => {
         const client = createRebaseClient({});
         client.collection("posts").listen!(undefined, () => {});
 
-        expect(opened[0]).toBe("wss://app.example.com");
+        expect(opened[0].split("?")[0]).toBe("wss://app.example.com");
     });
 
     it("says why realtime is unavailable when no URL could be derived", () => {

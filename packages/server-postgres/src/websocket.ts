@@ -9,6 +9,7 @@ import type { CollectionConfig, DataDriver, DeleteProps, FetchCollectionProps, F
 import type { SqlScriptResult } from "@rebasepro/types";
 import { deserializeFilter, redactSqlLiterals, UnknownFilterOperatorError } from "@rebasepro/common";
 import { budgetSendBuffers, reapSilentSockets, terminateIfBacklogged } from "./services/socket-liveness";
+import { DEFAULT_HEARTBEAT_INTERVAL_MS, helloFrame, requestedOptIns, startHeartbeats, type SocketOptIn } from "./socket-opt-ins";
 import { ANONYMOUS_USER_ID, hasAdminRole, isSQLAdmin, isSchemaAdmin, resolveClientListLimit, ListLimitError, scopeGrants, scopesForRoles, type AdminScope } from "@rebasepro/types";
 import type { User } from "@rebasepro/types";
 
@@ -33,6 +34,12 @@ export interface SocketRealtimeService {
     addClient(clientId: string, ws: WebSocket): void;
     rescopeClient(clientId: string, authContext: SubscriptionAuthContext): Promise<void>;
     handleClientMessage(clientId: string, message: WebSocketMessage, authContext?: SubscriptionAuthContext): Promise<void> | void;
+    /**
+     * What the client opted into when it opened the socket (see
+     * `socket-opt-ins.ts`). Optional: a service that sends nothing that
+     * depends on one need not hear about them.
+     */
+    setClientOptIns?(clientId: string, optIns: ReadonlySet<SocketOptIn>): void;
 }
 
 /**
@@ -496,6 +503,10 @@ export function createPostgresWebSocket(
     // leaking across hot reloads or multiple factory calls.
     const clientSessions = new Map<string, ClientSession>();
 
+    /** The sockets that opted into heartbeats — see `socket-opt-ins.ts`. */
+    const heartbeatSockets = new Set<WebSocket>();
+    const heartbeatIntervalMs = options?.heartbeatIntervalMs ?? DEFAULT_HEARTBEAT_INTERVAL_MS;
+
     const isProduction = process.env.NODE_ENV === "production";
     /**
      * Debug tracing for this socket.
@@ -897,6 +908,20 @@ export function createPostgresWebSocket(
         const clientId = `client_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
         const origin = connectionOrigin(request);
         wsDebug(`WebSocket client connected: ${clientId}`);
+
+        // What the client opted into on its URL, answered with a `hello`
+        // before anything else. A client that named nothing — one that
+        // predates the opt-ins — is sent neither the `hello` nor anything it
+        // would have had to ask for.
+        const optIns = requestedOptIns(request?.url);
+        if (optIns) {
+            ws.send(helloFrame(optIns, heartbeatIntervalMs, clientId));
+            realtimeService.setClientOptIns?.(clientId, optIns);
+            if (optIns.has("heartbeat")) {
+                heartbeatSockets.add(ws);
+                ws.once("close", () => heartbeatSockets.delete(ws));
+            }
+        }
 
         // Initialize client session
         clientSessions.set(clientId, { ws,
@@ -1958,4 +1983,10 @@ code: "BRANCHING_UNSUPPORTED" } }
     const stopBudgeting = budgetSendBuffers(wss);
     wss.on("close", stopBudgeting);
     if (typeof server.on === "function") server.on("close", stopBudgeting);
+
+    // The heartbeat a browser needs to notice a half-open socket, for the
+    // sockets that asked for it. One timer for all of them.
+    const stopHeartbeats = startHeartbeats(() => heartbeatSockets, heartbeatIntervalMs);
+    wss.on("close", stopHeartbeats);
+    if (typeof server.on === "function") server.on("close", stopHeartbeats);
 }

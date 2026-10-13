@@ -435,6 +435,8 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
     public readonly supportsChannels = true;
 
     private clients = new Map<string, WebSocket>();
+    /** What each socket opted into when it opened — see `socket-opt-ins.ts`. */
+    private clientOptIns = new Map<string, ReadonlySet<string>>();
 
     // Broadcast channels: channel name → set of client IDs
     private channels = new Map<string, Set<string>>();
@@ -1235,8 +1237,14 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
         await this.handleMessage(clientId, message, authContext);
     }
 
+    /** Record what a socket opted into when it opened. See `socket-opt-ins.ts`. */
+    setClientOptIns(clientId: string, optIns: ReadonlySet<string>): void {
+        this.clientOptIns.set(clientId, optIns);
+    }
+
     async removeClient(clientId: string) {
         this.clients.delete(clientId);
+        this.clientOptIns.delete(clientId);
 
         // Remove all subscriptions and callbacks for this client; a group it
         // was the last member of goes with its pending refetch.
@@ -2852,7 +2860,17 @@ roles: ["anon"] };
         });
 
         for (const memberId of members) {
-            if (memberId === clientId) continue; // Don't echo back to sender
+            if (memberId === clientId) {
+                // Never echoed back to the sender. A sender that watches the
+                // sequence (`channel_seq`) is told the number its message
+                // took instead, so its own message leaves no hole in it: a
+                // retained channel's numbers reach every member, one way or
+                // the other, and a hole is always a message that was missed.
+                if (seq !== undefined && this.clientOptIns.get(memberId)?.has("channel_seq")) {
+                    this.sendRaw(memberId, JSON.stringify({ type: "broadcast_ack", channel, seq }));
+                }
+                continue;
+            }
             this.sendRaw(memberId, message);
         }
     }

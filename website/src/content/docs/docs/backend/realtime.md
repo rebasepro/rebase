@@ -272,6 +272,8 @@ a vanished client is let go of within a minute. Browsers and the SDK answer
 pings on their own; a client that speaks the protocol directly has to answer
 them too, as most WebSocket libraries do.
 
+<span class="since-badge" data-since="0.25">Since 0.25</span> **The browser side.** A browser cannot send a ping or see one, so a half-open socket looks connected to it forever. The SDK opens the socket with `?rebase_caps=heartbeat,channel_seq`; a server that knows them answers with `{"type":"hello","capabilities":[…],"heartbeatMs":30000}` and sends `{"type":"heartbeat"}` every 30 seconds, and the SDK drops the socket and [reconnects](#auto-reconnect) after two missed. A client that names nothing is sent neither, and an older server ignores the parameter, so an SDK talking to one behaves as before.
+
 A socket is also terminated when more than 16&nbsp;MiB of frames sent to it are
 still unread. That is a client that does not read what it is sent, or one so far
 behind that what it would read is stale. And when a server's sockets together
@@ -388,6 +390,7 @@ Pruning happens as messages arrive, throttled per channel so cost tracks elapsed
 - **Ordered.** Sequence numbers are allocated per channel, and delivery order matches sequence order — on one instance, and across instances on the `postgres` bus, where the statement that numbers a message also announces it, so every instance (the sender's included) receives the announcements in sequence order. A bus you supply yourself carries frames in whatever order it delivers them.
 - **Durable before delivered.** A message that cannot be stored is not delivered to anyone, and the sender is told. Delivering it would put it in front of live subscribers while leaving it out of every future replay, and no later message could repair that gap.
 - **At-least-once on catch-up.** A replay range may overlap messages a client already received; the SDK discards ones it has already delivered.
+- <span class="since-badge" data-since="0.25">Since 0.25</span> **No holes.** A retained message reaches every member: the sender, who is never sent its own message, is sent `{"type":"broadcast_ack","channel","seq"}` instead when it opted into `channel_seq`. So a message past `lastSeq + 1` means one was missed, and the SDK holds it back, asks for the history in between, and delivers all of them in order. Against a server without `channel_seq`, a jump is delivered as it arrives.
 
 :::caution[History has the same access model as the channel]
 A client that has joined a channel may replay its retained messages, including those broadcast before it arrived — membership is the only check, and joining is open to any client that can name the channel. Retention is opt-in per channel pattern, so enabling it makes that channel's past readable to any visitor who guesses the name. Retained channels are the case where this becomes durable rather than momentary, so treat a retained channel's contents as public to your users.

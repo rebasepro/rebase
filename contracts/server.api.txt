@@ -684,6 +684,7 @@ interface BootstrappedAuth { authRepository, emailService, schemaHealthCheck, us
 interface BranchAdmin { createBranch, deleteBranch, getBranchInfo, listBranches }
 interface BranchInfo { createdAt, database, name, parentDatabase, sizeBytes }
 interface BrinIndex { on, reason, using, where }
+interface BroadcastAckMessage { channel, error, payload, requestId, row, rows, seq, subscriptionId, type }
 interface BroadcastMessage { channel, error, event, payload, requestId, row, rows, seq, subscriptionId, type }
 interface BtreeIndex { include, on, reason, unique, using, where }
 interface BucketOptions { account, default, engine, label, prefix, publicRead, transport }
@@ -816,7 +817,7 @@ interface ReadQuery { fields, filter, limit, logical, offset, orderBy, relatedTo
 interface RealtimeChannelsConfig { bus, channels, maxSubscriptionsPerSocket }
 interface RealtimeListenerHealth { connected, downSince, name }
 interface RealtimeProvider { destroy, health, notifyUpdate, onServerReady, stopListening, subscribeToCollection, subscribeToOne, unsubscribe }
-interface RealtimeSocketOptions { dataRateLimit, identityRecheckIntervalMs, maxPayload, resolveApiKey }
+interface RealtimeSocketOptions { dataRateLimit, heartbeatIntervalMs, identityRecheckIntervalMs, maxPayload, resolveApiKey }
 interface RebaseBackendAppConfig { config, context, crons, dockerfile, functions, port, runtime, schema, type, usersCollection }
 interface RebaseBundleEntrypoints { collections, config, crons, functions, schema, static, usersCollection }
 interface RebaseBundleFunction { file, name, portable, requires }
@@ -1091,7 +1092,7 @@ class RebaseApiError { code, details, requestId, retryAfterSeconds, status }
 class RebaseClientError { code, details, requestId, retryAfterSeconds, status }
 class RebasePaginationError { code }
 class RebaseRealtimeChannel { broadcast, enableHistory, history, join, leave, name, onBroadcast, onBroadcast, onError, onPresence, sequence, track, untrack }
-class RebaseWebSocketClient { authenticate, checkUniqueField, count, createBranch, delete, deleteBranch, disconnect, ensureConnected, executeSql, fetchApplicationRoles, fetchAvailableDatabases, fetchAvailableRoles, fetchCollection, fetchCurrentDatabase, fetchOne, fetchTableMetadata, fetchUnmappedTables, getAuthToken, hasSocket, listBranches, listenCollection, listenOne, on, onChannelMessage, onConnectionLost, onReconnect, onStateChange, onUnauthorized, reauthenticate, runSqlScript, save, sendMessage, setAuthTokenGetter, state }
+class RebaseWebSocketClient { authenticate, checkUniqueField, count, createBranch, delete, deleteBranch, disconnect, ensureConnected, executeSql, fetchApplicationRoles, fetchAvailableDatabases, fetchAvailableRoles, fetchCollection, fetchCurrentDatabase, fetchOne, fetchTableMetadata, fetchUnmappedTables, getAuthToken, hasServerOptIn, hasSocket, listBranches, listenCollection, listenOne, on, onChannelMessage, onConnectionLost, onReconnect, onStateChange, onUnauthorized, reauthenticate, runSqlScript, save, sendMessage, setAuthTokenGetter, socketClientId, state }
 const STORAGE_REFERENCE_SCHEME
 function and { conditions, type }
 function cond { column, operator, value }
@@ -1124,7 +1125,7 @@ interface BroadcastEvent { event, payload, replayed, seq }
 interface ChannelHistoryEntry { at, event, payload, senderId, seq }
 interface ChannelHistoryResult { latestSeq, messages, retained }
 interface ChannelOptions { history }
-interface ChannelTransport { onChannelMessage, onConnectionLost, onReconnect, sendMessage }
+interface ChannelTransport { hasServerOptIn, onChannelMessage, onConnectionLost, onReconnect, sendMessage, socketClientId }
 interface CollectionClient { after, aggregate, count, create, createMany, delete, deleteMany, distinct, fields, find, findAll, findById, get, include, iterate, limit, listen, listenById, observe, observeById, offset, orderBy, search, update, updateMany, upsert, vectorSearch, where }
 interface CookieStorageOptions { domain, maxAge, path, sameSite, secure }
 interface CreateAdminOptions { adminPath }

@@ -30,6 +30,11 @@ export interface WsRealtimeService extends RealtimeProvider {
      */
     rescopeClient(clientId: string, authContext: unknown): Promise<void>;
     /**
+     * What the client opted into when it opened the socket (`?rebase_caps=`).
+     * Optional: a provider that sends nothing depending on one ignores them.
+     */
+    setClientOptIns?(clientId: string, optIns: ReadonlySet<string>): void;
+    /**
      * Whether this provider actually implements channels, presence and
      * broadcast. Declared by the provider rather than inferred, because the
      * alternative — assuming the default one does — is how these frames came to
@@ -123,6 +128,12 @@ export function createRoutedRealtimeService(opts: RoutedRealtimeOptions): WsReal
     return {
         addClient(clientId, ws) {
             for (const p of all()) p.addClient?.(clientId, ws);
+        },
+
+        // Every source, like the client itself: whichever serves channels
+        // is the one that reads them.
+        setClientOptIns(clientId, optIns) {
+            for (const p of all()) p.setClientOptIns?.(clientId, optIns);
         },
 
         // Every source: each holds its own share of the socket's

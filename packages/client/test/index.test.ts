@@ -392,7 +392,8 @@ photoURL: null }
                     websocketUrl: "wss://custom-ws.example.com"
                 });
                 client.ws!.ensureConnected();
-                expect(urls).toEqual(["wss://custom-ws.example.com"]);
+                // The address; the query after it names the socket's opt-ins.
+                expect(urls.map((url) => url.split("?")[0])).toEqual(["wss://custom-ws.example.com"]);
             });
         });
 
@@ -400,7 +401,7 @@ photoURL: null }
             withCapturedSockets((urls) => {
                 const client = createRebaseClient({ baseUrl: "https://api.example.com" });
                 client.ws!.ensureConnected();
-                expect(urls).toEqual(["wss://api.example.com"]);
+                expect(urls.map((url) => url.split("?")[0])).toEqual(["wss://api.example.com"]);
             });
         });
 

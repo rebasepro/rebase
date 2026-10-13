@@ -19,6 +19,7 @@ import {
 } from "@rebasepro/types";
 import { buildCompositeId, COMPOSITE_ID_SEPARATOR, withETag, type PrimaryKeyInfo } from "@rebasepro/common";
 import { parseRebaseJson } from "./reviver";
+import { unref } from "@rebasepro/utils";
 import { readSqlScriptResult } from "./sql-script";
 import type { SqlScriptResult } from "@rebasepro/types";
 
@@ -128,6 +129,28 @@ const MIN_RECONNECT_DELAY_MS = 250;
  */
 const OUTAGE_REPORT_AFTER_MS = 14_000;
 
+/**
+ * What this client opts into when it opens the socket, named on the URL as
+ * `?rebase_caps=` — the server's `socket-opt-ins.ts` says what each one does.
+ * A server that knows them answers with a `hello` listing the ones it will
+ * honour; an older one ignores the parameter, sends no `hello`, and the
+ * client goes on as it did before there were any.
+ */
+const SOCKET_OPT_IN_PARAM = "rebase_caps";
+const SOCKET_OPT_INS = ["heartbeat", "channel_seq"];
+
+/** Slack on top of two heartbeat intervals before a silent socket is given up on. */
+const HEARTBEAT_GRACE_MS = 5_000;
+
+/**
+ * `url` with the opt-ins named on it. Appended rather than rebuilt through
+ * `URL`, which would rewrite the address the caller gave (a bare origin gains
+ * a `/`).
+ */
+function withOptIns(url: string): string {
+    return `${url}${url.includes("?") ? "&" : "?"}${SOCKET_OPT_IN_PARAM}=${SOCKET_OPT_INS.join(",")}`;
+}
+
 /** A frame waiting in `messageQueue`, carrying the handlers of the promise its caller holds. */
 type QueuedFrame = Record<string, unknown> & {
     _queuedResolve?: (value: unknown) => void;
@@ -203,6 +226,8 @@ function isNotSignedIn(error: unknown): boolean {
  */
 const CHANNEL_FRAME_TYPES = new Set([
     "broadcast",
+    // The number the sender's own retained broadcast took (`channel_seq`).
+    "broadcast_ack",
     "presence_state",
     "presence_diff",
     "channel_history",
@@ -330,6 +355,33 @@ export class RebaseWebSocketClient {
 
     /** So the "no WebSocket in this environment" warning is said once, not per call. */
     private warnedNoWebSocket = false;
+
+    /**
+     * What the server said in its `hello` it does for this socket: empty
+     * until then, after a close, and for a server that sends no `hello`.
+     */
+    private serverOptIns: ReadonlySet<string> = new Set();
+    /** This socket's id on the server, from its `hello` (with `channel_seq`). */
+    private serverClientId: string | undefined;
+    /** When the current socket last delivered anything, heartbeats included. */
+    private lastFrameAt = 0;
+    private livenessTimer: ReturnType<typeof setInterval> | null = null;
+    /** Give up on the current socket as though it had closed. Set per socket. */
+    private dropSocket: (() => void) | null = null;
+
+    /** Whether the server agreed, in its `hello`, to `name` for this socket. */
+    public hasServerOptIn(name: string): boolean {
+        return this.serverOptIns.has(name);
+    }
+
+    /**
+     * This socket's id on the server, as its broadcasts' `senderId` in a
+     * channel's history. Known once a server that numbers retained channels
+     * for it (`channel_seq`) has said hello.
+     */
+    public get socketClientId(): string | undefined {
+        return this.serverClientId;
+    }
 
     /** Subscribe to broadcast/presence frames for one channel. */
     public onChannelMessage(channel: string, handler: (message: ChannelMessage) => void): () => void {
@@ -702,6 +754,8 @@ export class RebaseWebSocketClient {
         // user's rows as already loaded — and, since a loaded registration
         // needs no subscribe, never asks the server at all.
         this.forgetCachedData();
+        this.stopLivenessWatch();
+        this.forgetServerOptIns();
         if (this.ws) {
             this.ws.onclose = null; // Prevent reconnect on explicit disconnect
             this.ws.onerror = null; // Prevent errors on explicit disconnect
@@ -727,7 +781,7 @@ export class RebaseWebSocketClient {
         try {
             // Captured so each handler can tell "my socket" from a later one:
             // a close arriving after a redial must not clear the new socket.
-            const socket = new this.WebSocketConstructor(this.websocketUrl);
+            const socket = new this.WebSocketConstructor(withOptIns(this.websocketUrl));
             this.ws = socket;
 
             this.ws!.onopen = async () => {
@@ -775,6 +829,7 @@ export class RebaseWebSocketClient {
             };
 
             this.ws!.onmessage = (event) => {
+                this.lastFrameAt = Date.now();
                 try {
                     // A reviver parse calls back for every key and value of the
                     // frame; most frames have nothing to revive. Same result.
@@ -785,8 +840,11 @@ export class RebaseWebSocketClient {
                 }
             };
 
-            this.ws!.onclose = () => {
+            const onClosed = () => {
                 console.debug("Disconnected from PostgreSQL backend");
+                // The next socket says hello again; nothing agreed for this one carries over.
+                this.stopLivenessWatch();
+                this.forgetServerOptIns();
                 // Release the dead socket. `ensureConnected` returns early
                 // while `this.ws` is set, so holding a closed one made the
                 // "give up after N attempts" state permanent: nothing could
@@ -821,6 +879,24 @@ export class RebaseWebSocketClient {
                 this.setState(this.outageReported ? "disconnected" : "reconnecting");
                 this.attemptReconnect();
             };
+            this.ws!.onclose = onClosed;
+            // A socket that went half-open never closes: a browser sees no TCP
+            // reset and cannot send a ping. Dropped here instead, when the
+            // heartbeats it asked for stop arriving — handlers first, so its
+            // close (if one ever comes) does not run `onClosed` twice.
+            this.dropSocket = () => {
+                if (this.ws !== socket) return;
+                socket.onclose = null;
+                socket.onmessage = null;
+                socket.onerror = null;
+                socket.onopen = null;
+                try {
+                    socket.close();
+                } catch {
+                    // Already closing.
+                }
+                onClosed();
+            };
 
             this.ws!.onerror = (error) => {
                 console.error("WebSocket error:", error);
@@ -831,6 +907,49 @@ export class RebaseWebSocketClient {
             console.error("Failed to initialize WebSocket:", error);
             this.attemptReconnect();
         }
+    }
+
+    /** Read the server's `hello`: what it agreed to, and start watching for heartbeats. */
+    private receiveHello(message: WebSocketMessage): void {
+        const capabilities = "capabilities" in message && Array.isArray(message.capabilities)
+            ? message.capabilities.filter((name): name is string => typeof name === "string")
+            : [];
+        this.serverOptIns = new Set(capabilities);
+        this.serverClientId = "clientId" in message && typeof message.clientId === "string" ? message.clientId : undefined;
+        const heartbeatMs = "heartbeatMs" in message && typeof message.heartbeatMs === "number" && message.heartbeatMs > 0
+            ? message.heartbeatMs
+            : undefined;
+        if (this.serverOptIns.has("heartbeat") && heartbeatMs !== undefined) this.watchLiveness(heartbeatMs);
+    }
+
+    /**
+     * Redial when two heartbeats in a row have not arrived. Anything the
+     * server sends counts as a beat, so a busy socket is never judged on them.
+     */
+    private watchLiveness(heartbeatMs: number): void {
+        this.stopLivenessWatch();
+        const deadline = 2 * heartbeatMs + Math.min(HEARTBEAT_GRACE_MS, heartbeatMs);
+        this.lastFrameAt = Date.now();
+        this.livenessTimer = setInterval(() => {
+            const silentFor = Date.now() - this.lastFrameAt;
+            if (silentFor <= deadline) return;
+            console.warn(`[Rebase] Realtime: nothing from the server for ${Math.round(silentFor / 1000)} s, two missed heartbeats. Reconnecting.`);
+            this.stopLivenessWatch();
+            this.dropSocket?.();
+        }, Math.max(250, Math.floor(heartbeatMs / 2)));
+        unref(this.livenessTimer);
+    }
+
+    private stopLivenessWatch(): void {
+        if (this.livenessTimer) {
+            clearInterval(this.livenessTimer);
+            this.livenessTimer = null;
+        }
+    }
+
+    private forgetServerOptIns(): void {
+        this.serverOptIns = new Set();
+        this.serverClientId = undefined;
     }
 
     private processMessageQueue(isReconnect: boolean) {
@@ -1099,6 +1218,14 @@ export class RebaseWebSocketClient {
             requestId,
             subscriptionId
         } = message;
+
+        // The socket's own frames. A heartbeat's work is done by arriving
+        // (`lastFrameAt`); a server only sends either to a client that asked.
+        if (type === "hello") {
+            this.receiveHello(message);
+            return;
+        }
+        if (type === "heartbeat") return;
 
         // Handle responses to pending requests
         if (requestId && this.pendingRequests.has(requestId)) {

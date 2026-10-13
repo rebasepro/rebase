@@ -165,6 +165,23 @@ export interface BroadcastMessage extends WebSocketMessage {
 }
 
 /**
+ * Server → client: the sequence number the sender's own broadcast took on a
+ * retained channel, sent to the sender in place of the message itself (which
+ * is never echoed back).
+ *
+ * Sent only to a socket that opted into `channel_seq` when it opened (see the
+ * socket's `hello`). With it, every member of a retained channel hears of
+ * every number, one way or the other, so a client that sees a hole in the
+ * sequence knows it missed a message and can ask for it — which is what the
+ * SDK does.
+ */
+export interface BroadcastAckMessage extends WebSocketMessage {
+    type: "broadcast_ack";
+    channel: string;
+    seq: number;
+}
+
+/**
  * Server → client: the whole roster of a channel.
  *
  * Sent only in answer to a `presence_state` request. Joining does not push one,
@@ -294,6 +311,7 @@ export interface ChannelHistoryMessage extends WebSocketMessage {
  */
 export type ChannelMessage =
     | BroadcastMessage
+    | BroadcastAckMessage
     | PresenceStateMessage
     | PresenceDiffMessage
     | ChannelHistoryMessage

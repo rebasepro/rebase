@@ -135,7 +135,8 @@ describe("RebaseWebSocketClient", () => {
         it("creates a WebSocket connection on init", () => {
             createClient();
             expect(MockWebSocket.instances).toHaveLength(1);
-            expect(getWs().url).toBe("ws://localhost:1234");
+            // The address; the query after it names the socket's opt-ins.
+            expect(getWs().url.split("?")[0]).toBe("ws://localhost:1234");
         });
 
         it("does NOT connect until asked", () => {

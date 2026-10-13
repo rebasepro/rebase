@@ -111,7 +111,22 @@ export interface ChannelTransport {
      * transport need not implement it.
      */
     onConnectionLost?(handler: (error: RebaseApiError) => void): () => void;
+    /**
+     * Whether the server agreed, for the current socket, to `name` (see the
+     * socket's `hello`). A transport without it is one whose server agreed to
+     * nothing.
+     */
+    hasServerOptIn?(name: string): boolean;
+    /** The current socket's id on the server: the `senderId` of what it broadcasts. */
+    readonly socketClientId?: string;
 }
+
+/**
+ * A message held back while a catch-up is in flight — or, `own`, the number
+ * this client's own broadcast took, which moves the watermark and is never
+ * delivered (a sender is not sent its own messages).
+ */
+type HeldBack = BroadcastEvent & { own?: true };
 
 /**
  * Re-send presence comfortably inside the server's 30s expiry.
@@ -164,7 +179,7 @@ export class RebaseRealtimeChannel {
      * messages would be lost for good. Held here and flushed, in order, once
      * the replay lands.
      */
-    private pendingLive: BroadcastEvent[] = [];
+    private pendingLive: HeldBack[] = [];
     private catchUpInFlight = false;
 
     /**
@@ -562,9 +577,25 @@ export class RebaseRealtimeChannel {
                     break;
                 }
                 if (seq <= this.lastSeq) break; // already delivered
+                if (this.fillsGap(event)) break;
                 this.lastSeq = seq;
                 this.positioned = true;
                 this.deliver(event);
+                break;
+            }
+            case "broadcast_ack": {
+                // This client's own message took `seq`. Nothing to deliver —
+                // a sender is never sent its own broadcast — but the number
+                // is accounted for, so it is not mistaken for a missed one.
+                const held: HeldBack = { event: "", payload: undefined, seq: message.seq, own: true };
+                if (this.catchUpInFlight) {
+                    this.pendingLive.push(held);
+                    break;
+                }
+                if (message.seq <= this.lastSeq) break;
+                if (this.fillsGap(held)) break;
+                this.lastSeq = message.seq;
+                this.positioned = true;
                 break;
             }
             case "channel_history": {
@@ -592,9 +623,15 @@ export class RebaseRealtimeChannel {
                 // Server-ordered ascending; the watermark check makes the
                 // overlap with anything already seen a no-op rather than a
                 // double-apply.
+                const ownId = this.watchesForGaps() ? this.transport.socketClientId : undefined;
                 for (const entry of entries) {
                     if (entry.seq <= this.lastSeq) continue;
                     this.lastSeq = entry.seq;
+                    // Sent from this very socket, which is never sent its own
+                    // messages live; a hole filled from history keeps to that.
+                    // (After a reconnect the socket is a new one, and a replay
+                    // delivers the old socket's messages as it always has.)
+                    if (ownId !== undefined && entry.senderId === ownId) continue;
                     this.deliver({
                         event: entry.event,
                         payload: entry.payload,
@@ -658,6 +695,33 @@ export class RebaseRealtimeChannel {
         }
     }
 
+    /**
+     * Whether a jump in the sequence means a missed message: only when the
+     * server numbers this client's own broadcasts for it (`channel_seq`), so
+     * its own messages leave no hole. Against a server that does not, a hole
+     * is as likely to be the client's own message, and the old behaviour —
+     * deliver, advance — stands.
+     */
+    private watchesForGaps(): boolean {
+        return this.transport.hasServerOptIn?.("channel_seq") === true;
+    }
+
+    /**
+     * Hold `event` back and fetch what lies between it and {@link lastSeq},
+     * when it is past a hole. A frame can go missing between instances — a
+     * dropped bus connection, a bus that does not order — and the watermark
+     * would otherwise step over it for good.
+     *
+     * @returns Whether it was held back.
+     */
+    private fillsGap(event: HeldBack): boolean {
+        const seq = event.seq;
+        if (seq === undefined || !this.positioned || seq <= this.lastSeq + 1 || !this.watchesForGaps()) return false;
+        this.pendingLive.push(event);
+        void this.requestHistory();
+        return true;
+    }
+
     /** Tell the app that retention dropped messages it never received. */
     private reportHistoryGap(from: number, to: number): void {
         this.emitError(new RebaseApiError(
@@ -697,6 +761,7 @@ export class RebaseRealtimeChannel {
                 this.lastSeq = seq;
                 this.positioned = true;
             }
+            if (event.own) continue;
             this.deliver(event);
         }
     }

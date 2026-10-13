@@ -1048,6 +1048,11 @@ export interface RealtimeSocketOptions {
      * identity that has since signed out, been revoked, demoted or deleted.
      */
     identityRecheckIntervalMs?: number;
+    /**
+     * How often a socket that asked for heartbeats (`?rebase_caps=heartbeat`)
+     * is sent one, in ms (default 30 000). The SDK redials after two missed.
+     */
+    heartbeatIntervalMs?: number;
 }
 
 /**
