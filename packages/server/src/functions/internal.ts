@@ -16,8 +16,8 @@
  *
  * @module
  */
-export { loadFunctionsFromDirectory, loadFunctionsWithDiagnostics } from "./function-loader";
-export type { LoadedFunction, LoadedFunctions } from "./function-loader";
+export { loadFunctions, loadFunctionsFromDirectory, loadFunctionsWithDiagnostics } from "./function-loader";
+export type { FunctionApp, FunctionsRecord, LoadDirectoryOptions, LoadedFunction, LoadedFunctions } from "./function-loader";
 export { createFunctionRoutes } from "./function-routes";
 export { createFunctionsProxy } from "./proxy";
 export type { FunctionsProxyOptions } from "./proxy";

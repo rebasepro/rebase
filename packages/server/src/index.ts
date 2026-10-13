@@ -276,8 +276,12 @@ export { createHistoryRoutes } from "./history";
 // importing them from here behaves identically to one importing them from the
 // subpath.
 // =============================================================================
-export { loadFunctionsFromDirectory, loadFunctionsWithDiagnostics, createFunctionRoutes } from "./functions/internal";
-export type { LoadedFunction, LoadedFunctions } from "./functions/internal";
+// Functions are values — `{ [name]: app }` — and `loadFunctions` reads a
+// directory into exactly that, so `functions: await loadFunctions(dir)` and
+// `functionsDir: dir` serve the same routes. The two `load…` names before it
+// are deprecated aliases that keep their old array shape.
+export { loadFunctions, loadFunctionsFromDirectory, loadFunctionsWithDiagnostics, createFunctionRoutes } from "./functions/internal";
+export type { FunctionApp, FunctionsRecord, LoadDirectoryOptions, LoadedFunction, LoadedFunctions } from "./functions/internal";
 export { defineFunction } from "./functions";
 export type { RebaseFunctionContext } from "./functions";
 export {
@@ -316,8 +320,12 @@ export { drainBackgroundWork, pendingBackgroundWork } from "./functions/wait-unt
 // =============================================================================
 // Cron Jobs (auto-discovered scheduled tasks)
 // =============================================================================
-export { loadCronJobsFromDirectory, loadCronJobsWithDiagnostics, CronScheduler, validateCronExpression, createCronRoutes, createCronStore, defineCron } from "./cron";
-export type { LoadedCronJob, CronStore, CronJobPersistedState, CronRunLease, CronJobRunSummary, CronLogSweep } from "./cron";
+// Crons are values too — `{ [id]: definition }` — read from a directory by
+// `loadCrons`. Loading declares nothing; `declareCrons` records them in the
+// resource graph where a build step wants that. The two `loadCronJobs…` names
+// are deprecated aliases that keep their old shape and side effect.
+export { loadCrons, declareCrons, loadCronJobsFromDirectory, loadCronJobsWithDiagnostics, CronScheduler, validateCronExpression, createCronRoutes, createCronStore, defineCron } from "./cron";
+export type { CronsRecord, LoadedCronJob, CronStore, CronJobPersistedState, CronRunLease, CronJobRunSummary, CronLogSweep } from "./cron";
 
 // =============================================================================
 // Backups (admin routes + storage-generic helpers)

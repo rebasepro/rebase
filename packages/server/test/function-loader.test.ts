@@ -1,7 +1,7 @@
 import * as path from "path";
 import { Hono } from "hono";
 import type { HonoEnv } from "../src/api/types";
-import { loadFunctionsFromDirectory, loadFunctionsWithDiagnostics } from "../src/functions/function-loader";
+import { functionList, loadFunctions } from "../src/functions/function-loader";
 import { createFunctionRoutes } from "../src/functions/function-routes";
 import { requireImporter } from "./helpers/require-importer";
 
@@ -15,30 +15,31 @@ import { requireImporter } from "./helpers/require-importer";
 describe("Function Loader & Routes", () => {
     const functionsDir = path.resolve(__dirname, "fixtures/functions");
 
-    describe("loadFunctionsFromDirectory", () => {
-        it("should return empty array if directory does not exist", async () => {
-            const result = await loadFunctionsFromDirectory(path.join(functionsDir, "non-existent-folder"), requireImporter);
-            expect(result).toEqual([]);
+    /** The loader's answer, plus every file it reported as skipped. */
+    const load = async (dir: string) => {
+        const problems: string[] = [];
+        const functions = await loadFunctions(dir, { importModule: requireImporter, onSkip: p => problems.push(p) });
+        return { functions, problems };
+    };
+
+    describe("loadFunctions", () => {
+        it("returns an empty record if the directory does not exist", async () => {
+            const result = await loadFunctions(path.join(functionsDir, "non-existent-folder"), { importModule: requireImporter });
+            expect(result).toEqual({});
         });
 
-        it("should load valid apps and factories while ignoring invalid files", async () => {
-            const loaded = await loadFunctionsFromDirectory(functionsDir, requireImporter);
+        it("keys the valid apps and factories by file name, ignoring invalid files", async () => {
+            const loaded = await loadFunctions(functionsDir, { importModule: requireImporter });
 
-            // We expect exactly 2 functions to be loaded: "valid-app" and "valid-factory"
-            expect(loaded).toHaveLength(2);
-
-            const names = loaded.map(f => f.name);
-            expect(names).toContain("valid-app");
-            expect(names).toContain("valid-factory");
+            // Exactly "valid-app" and "valid-factory" load — the record key is
+            // the URL segment each one answers at.
+            expect(Object.keys(loaded).sort()).toEqual(["valid-app", "valid-factory"]);
 
             // Verify they both look like Hono instances
-            const validApp = loaded.find(f => f.name === "valid-app")!;
-            expect(typeof validApp.app.fetch).toBe("function");
-            expect(Array.isArray(validApp.app.routes)).toBe(true);
-
-            const validFactory = loaded.find(f => f.name === "valid-factory")!;
-            expect(typeof validFactory.app.fetch).toBe("function");
-            expect(Array.isArray(validFactory.app.routes)).toBe(true);
+            expect(typeof loaded["valid-app"].fetch).toBe("function");
+            expect(Array.isArray(loaded["valid-app"].routes)).toBe(true);
+            expect(typeof loaded["valid-factory"].fetch).toBe("function");
+            expect(Array.isArray(loaded["valid-factory"].routes)).toBe(true);
         });
     });
 
@@ -54,11 +55,9 @@ describe("Function Loader & Routes", () => {
          */
         it("names ignored subdirectories instead of dropping them", async () => {
             // `test/fixtures` holds only subdirectories (`functions`, `crons`).
-            const { functions, problems } = await loadFunctionsWithDiagnostics(
-                path.resolve(__dirname, "fixtures"), requireImporter
-            );
+            const { functions, problems } = await load(path.resolve(__dirname, "fixtures"));
 
-            expect(functions).toEqual([]);
+            expect(functions).toEqual({});
             expect(problems).toEqual(expect.arrayContaining([
                 expect.stringContaining("functions/ (subdirectory"),
                 expect.stringContaining("crons/ (subdirectory")
@@ -66,7 +65,7 @@ describe("Function Loader & Routes", () => {
         });
 
         it("names files whose extension it cannot import", async () => {
-            const { problems } = await loadFunctionsWithDiagnostics(functionsDir, requireImporter);
+            const { problems } = await load(functionsDir);
 
             expect(problems).toEqual(expect.arrayContaining([
                 expect.stringContaining("needs-transpile.mts (unsupported extension .mts)")
@@ -74,7 +73,7 @@ describe("Function Loader & Routes", () => {
         });
 
         it("still reports the files it tried and could not use", async () => {
-            const { problems } = await loadFunctionsWithDiagnostics(functionsDir, requireImporter);
+            const { problems } = await load(functionsDir);
 
             expect(problems).toEqual(expect.arrayContaining([
                 expect.stringContaining("no-default.js"),
@@ -87,8 +86,8 @@ describe("Function Loader & Routes", () => {
 
     describe("createFunctionRoutes", () => {
         it("should mount and route correctly", async () => {
-            const loaded = await loadFunctionsFromDirectory(functionsDir, requireImporter);
-            const routes = createFunctionRoutes(loaded);
+            const loaded = await loadFunctions(functionsDir, { importModule: requireImporter });
+            const routes = createFunctionRoutes(functionList(loaded));
 
             // 1. Verify GET / lists loaded functions — to a resolved identity.
             // In the server the auth middleware runs ahead of this router and

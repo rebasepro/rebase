@@ -5,12 +5,75 @@ import { Hono } from "hono";
 import { logger } from "../utils/logger.js";
 import { nativeDynamicImport, type ModuleImporter } from "../utils/dynamic-import.js";
 import { describeLoadFailure, SYNTAX_ERROR_ADVICE } from "../utils/load-failure.js";
+import { warnDeprecated } from "@rebasepro/common";
 
+/**
+ * One custom function: a Hono app, served at `<functions mount>/<name>`.
+ *
+ * What `defineFunction(...)` returns, and what a function file default-exports.
+ * Any Hono-compatible app works — the loader checks for `.fetch()` and
+ * `.routes` rather than an `instanceof`, because a project and the server can
+ * hold two copies of hono.
+ */
+export type FunctionApp = Hono<import("hono").Env>;
+
+/**
+ * Functions as values: the URL segment each one answers at, to its app.
+ *
+ * `functions: { "send-invoice": sendInvoice }` serves `sendInvoice` at
+ * `/api/functions/send-invoice` — the same thing a file named
+ * `functions/send-invoice.ts` does. {@link loadFunctions} returns exactly this
+ * shape, so `functions: await loadFunctions(dir)` and `functionsDir: dir` serve
+ * the same routes.
+ */
+export type FunctionsRecord = Record<string, FunctionApp>;
+
+/** How a directory of modules is read. Shared by the function and cron loaders. */
+export interface LoadDirectoryOptions {
+    /**
+     * How a module file is imported. Defaults to the runtime's own `import()`;
+     * a caller with its own loader hooks (tsx, a test runner's sandbox) passes
+     * `url => import(url)` so they apply.
+     */
+    importModule?: ModuleImporter;
+    /**
+     * Called once for every file the loader saw and did **not** load, as
+     * `<file> (<reason>)`. The files are skipped either way — one malformed
+     * file must not take the others with it — and logged; this is how a caller
+     * reports them anywhere else.
+     */
+    onSkip?: (problem: string) => void;
+}
+
+/**
+ * Load the custom functions in a directory, as values.
+ *
+ * Each file default-exports a Hono app — `defineFunction(...)` — or a factory
+ * returning one. The filename without its extension is the record key, which
+ * is the URL segment it is served at: `functions/send-invoice.ts` →
+ * `{ "send-invoice": app }`. Only the top level is read.
+ *
+ * Never throws for a bad file: it is skipped, logged, and passed to
+ * `options.onSkip`.
+ *
+ * @example
+ * ```ts
+ * const functions = await loadFunctions(path.resolve("functions"));
+ * const backend = await createRebaseBackend({ database, functions, provision: true });
+ * ```
+ */
+export async function loadFunctions(directory: string, options: LoadDirectoryOptions = {}): Promise<FunctionsRecord> {
+    const { functions, problems } = await readFunctionsDirectory(directory, options.importModule);
+    if (options.onSkip) for (const problem of problems) options.onSkip(problem);
+    return functions;
+}
+
+/** A loaded function, by name. The shape {@link createFunctionRoutes} mounts. */
 export interface LoadedFunction {
     /** Endpoint name derived from filename (e.g., "send-invoice") */
     name: string;
     /** The Hono sub-app to mount */
-    app: Hono<import("hono").Env>;
+    app: FunctionApp;
 }
 
 /** What a directory of function files produced: what mounted, and what did not. */
@@ -19,11 +82,14 @@ export interface LoadedFunctions {
     functions: LoadedFunction[];
     /**
      * One entry per file the loader saw and did **not** mount, each already
-     * phrased as `<name> (<reason>)`. Returned rather than only logged so the
-     * running server can say what is missing — a boot log line is not reachable
-     * from `GET /api/functions`.
+     * phrased as `<name> (<reason>)`.
      */
     problems: string[];
+}
+
+/** A record of functions as the list {@link createFunctionRoutes} mounts, in record order. */
+export function functionList(functions: FunctionsRecord): LoadedFunction[] {
+    return Object.entries(functions).map(([name, app]) => ({ name, app }));
 }
 
 /**
@@ -37,36 +103,49 @@ export interface LoadedFunctions {
 const UNSUPPORTED_CODE_EXTENSIONS = [".mts", ".cts", ".tsx", ".jsx", ".mjs", ".cjs"];
 
 /**
- * Auto-discover Hono route files from a directory.
- *
- * Each file should default-export a Hono app (or router).
- * The filename (without extension) becomes the mount path:
- *   `functions/send-invoice.ts` → mounted at `/send-invoice`
- *
- * This mirrors how `loadCollectionsFromDirectory` works for collections.
- *
- * Returns only what loaded. Use {@link loadFunctionsWithDiagnostics} when the
- * caller also needs to report what did not.
+ * @deprecated Use `loadFunctions` instead, which returns the functions as a
+ * record keyed by name. Will be removed in a future release.
  */
 export async function loadFunctionsFromDirectory(
     directory: string,
     importModule: ModuleImporter = nativeDynamicImport
 ): Promise<LoadedFunction[]> {
-    return (await loadFunctionsWithDiagnostics(directory, importModule)).functions;
+    warnDeprecated(
+        "server.loadFunctionsFromDirectory",
+        "`loadFunctionsFromDirectory` is deprecated; use `loadFunctions(dir)`, which returns `{ [name]: app }`."
+    );
+    return functionList((await readFunctionsDirectory(directory, importModule)).functions);
 }
 
 /**
- * {@link loadFunctionsFromDirectory}, plus the list of files that were skipped.
- *
- * Never throws: a single malformed function must not crash server boot. The
- * caller decides what to do with `problems` — `init.ts` mounts the router
- * regardless and surfaces the count on the listing endpoint.
+ * @deprecated Use `loadFunctions` instead, with `onSkip` to collect the files
+ * it skipped. Will be removed in a future release.
  */
 export async function loadFunctionsWithDiagnostics(
     directory: string,
     importModule: ModuleImporter = nativeDynamicImport
 ): Promise<LoadedFunctions> {
-    const functions: LoadedFunction[] = [];
+    warnDeprecated(
+        "server.loadFunctionsWithDiagnostics",
+        "`loadFunctionsWithDiagnostics` is deprecated; use `loadFunctions(dir, { onSkip })`, which returns `{ [name]: app }`."
+    );
+    const { functions, problems } = await readFunctionsDirectory(directory, importModule);
+    return { functions: functionList(functions), problems };
+}
+
+/**
+ * Read a directory of function files: what loaded, keyed by name, and one
+ * `<file> (<reason>)` per file that did not.
+ *
+ * Never throws: a single malformed function must not crash server boot. The
+ * backend mounts the router regardless and surfaces the count of skipped files
+ * on the listing endpoint.
+ */
+export async function readFunctionsDirectory(
+    directory: string,
+    importModule: ModuleImporter = nativeDynamicImport
+): Promise<{ functions: FunctionsRecord; problems: string[] }> {
+    const functions: FunctionsRecord = {};
     // Aggregate problem files so a broken function surfaces as one loud
     // summary line, not just a warning buried per-file. We still don't throw:
     // a single malformed function must not crash server boot.
@@ -136,24 +215,23 @@ export async function loadFunctionsWithDiagnostics(
 
                 // Accept a Hono instance — use duck-typing to handle different
                 // Hono versions which may not share the same prototype.
-                if (isHonoLike(exported)) {
+                const app = isHonoLike(exported)
+                    ? exported as Hono
+                    // Also accept a factory function that returns a Hono instance
+                    : typeof exported === "function" ? exported() : undefined;
+                if (isHonoLike(app)) {
                     const name = path.basename(file, path.extname(file));
-                    functions.push({ name,
-app: exported as Hono });
-                    logger.debug(`⚡ Loaded function route: ${name}`);
-                    continue;
-                }
-
-                // Also accept a factory function that returns a Hono instance
-                if (typeof exported === "function") {
-                    const result = exported();
-                    if (isHonoLike(result)) {
-                        const name = path.basename(file, path.extname(file));
-                        functions.push({ name,
-app: result as Hono });
-                        logger.debug(`⚡ Loaded function route: ${name}`);
+                    // `send.ts` and `send.js` side by side name one URL. A
+                    // record holds one app per name, so the second is reported
+                    // rather than silently replacing the first.
+                    if (Object.hasOwn(functions, name)) {
+                        logger.warn(`[functions] ${file}: another file is already served as '${name}'. Skipping.`);
+                        problems.push(`${file} (another file is already served as '${name}')`);
                         continue;
                     }
+                    functions[name] = app as Hono;
+                    logger.debug(`⚡ Loaded function route: ${name}`);
+                    continue;
                 }
 
                 // Provide actionable diagnostics

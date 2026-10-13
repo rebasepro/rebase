@@ -1,7 +1,7 @@
 import { describe, it, expect } from "@jest/globals";
 import * as path from "path";
 import { defineCron } from "./define-cron";
-import { loadCronJobsFromDirectory } from "./cron-loader";
+import { loadCrons } from "./cron-loader";
 import { requireImporter } from "../../test/helpers/require-importer";
 import type { CronJobDefinition } from "@rebasepro/types";
 
@@ -47,7 +47,7 @@ describe("defineCron", () => {
 
 // ─── Integration: loader with defineCron fixture ────────────────────
 
-describe("loadCronJobsFromDirectory (defineCron fixture)", () => {
+describe("loadCrons (defineCron fixture)", () => {
     // Load from a committed fixtures directory (test/fixtures/crons) rather
     // than writing a temp file at runtime. The fixture is a CJS module (a
     // nested package.json pins `"type": "commonjs"` inside server's ESM
@@ -57,14 +57,14 @@ describe("loadCronJobsFromDirectory (defineCron fixture)", () => {
     // empty result.
     const cronsDir = path.resolve(__dirname, "../../test/fixtures/crons");
 
-    it("loads a defineCron-authored file correctly", async () => {
-        const jobs = await loadCronJobsFromDirectory(cronsDir, requireImporter);
+    it("loads a defineCron-authored file as the value it exports, keyed by file name", async () => {
+        const crons = await loadCrons(cronsDir, { importModule: requireImporter });
 
-        expect(jobs).toHaveLength(1);
-        expect(jobs[0].id).toBe("fixture-job");
-        expect(jobs[0].definition.name).toBe("Fixture job");
-        expect(jobs[0].definition.schedule).toBe("*/10 * * * *");
-        expect(jobs[0].definition.description).toBe("Test fixture");
-        expect(typeof jobs[0].definition.handler).toBe("function");
+        expect(Object.keys(crons)).toEqual(["fixture-job"]);
+        const job = crons["fixture-job"];
+        expect(job.name).toBe("Fixture job");
+        expect(job.schedule).toBe("*/10 * * * *");
+        expect(job.description).toBe("Test fixture");
+        expect(typeof job.handler).toBe("function");
     });
 });

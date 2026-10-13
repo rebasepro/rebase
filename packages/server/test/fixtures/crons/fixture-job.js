@@ -1,5 +1,5 @@
 // Committed cron fixture (CJS — see sibling package.json).
-// Loaded by define-cron.test.ts via loadCronJobsFromDirectory. A committed
+// Loaded by define-cron.test.ts via loadCrons. A committed
 // file avoids the mkdtemp→write→native-import→rmSync lifecycle race that made
 // the previous temp-file version flaky under jest's parallel workers.
 module.exports = {

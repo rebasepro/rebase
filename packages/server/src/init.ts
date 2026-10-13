@@ -457,8 +457,30 @@ export interface BaasOptions {
 }
 
 export interface RebaseBackendConfig {
-    /** Invariance again — see the note on `RebaseAuthConfig.collection`. */
+    /**
+     * The collections this backend serves, as values. Wins over
+     * {@link collectionsDir} for what is served.
+     *
+     * Invariance again — see the note on `RebaseAuthConfig.collection`.
+     */
     collections?: AnyCollectionConfig[];
+    /**
+     * The directory holding this project's collection source files.
+     *
+     * Two jobs, and only the first depends on {@link collections}:
+     *
+     * 1. Without `collections`, it is where the served collections are loaded
+     *    from (`loadCollectionsFromDirectory`).
+     * 2. Always, it is the source the schema editor and live schema editing
+     *    rewrite. The editor changes TypeScript files, not the values in this
+     *    process, so it needs to know where they are — collections passed as
+     *    values carry no path back to the file they came from. A backend given
+     *    `collections` and no directory serves them and reports the editor as
+     *    unavailable (`SCHEMA_EDITOR_NO_COLLECTIONS_DIR`), with the reason.
+     *
+     * Passing both is therefore not ambiguous: the values are served, and the
+     * directory is what an edit writes to.
+     */
     collectionsDir?: string;
     server: Server;
     app: Hono<HonoEnv>;
@@ -772,6 +794,25 @@ export interface RebaseBackendConfig {
      * scheduled work to a process whose replica count is a scaling decision.
      */
     ownership?: RuntimeOwnershipOptions;
+    /**
+     * Custom functions, as values: the URL segment each one is served at, to
+     * its Hono app (`defineFunction(...)`).
+     *
+     * ```ts
+     * functions: { "send-invoice": sendInvoice }      // → /api/functions/send-invoice
+     * functions: await loadFunctions("./functions")   // the same as functionsDir
+     * ```
+     *
+     * Give this or {@link functionsDir}, not both: two sources for one set of
+     * URLs has no single answer, so the boot refuses it.
+     */
+    functions?: import("./functions/function-loader").FunctionsRecord;
+    /**
+     * A directory of function files, one per URL segment: `send-invoice.ts` is
+     * served at `/api/functions/send-invoice`. Read with `loadFunctions`, so it
+     * is exactly {@link functions} with the directory's skipped files reported
+     * on `GET /api/functions` as well.
+     */
     functionsDir?: string;
     /**
      * Per-request ceiling for `/api/functions/*`, in milliseconds.
@@ -806,6 +847,22 @@ export interface RebaseBackendConfig {
      * @internal Filled from `REBASE_FUNCTIONS_UPSTREAM` on the `api` role.
      */
     functionsUpstream?: string;
+    /**
+     * Cron jobs, as values: the job id, to its definition (`defineCron(...)`).
+     *
+     * ```ts
+     * crons: { "nightly-report": nightlyReport }
+     * crons: await loadCrons("./crons")   // the same as cronsDir
+     * ```
+     *
+     * Give this or {@link cronsDir}, not both — the boot refuses the pair.
+     */
+    crons?: import("./cron/cron-loader").CronsRecord;
+    /**
+     * A directory of cron files, one job per file, the filename its id. Read
+     * with `loadCrons`, so it is exactly {@link crons} with the directory's
+     * skipped files reported on `GET /api/admin/cron` as well.
+     */
     cronsDir?: string;
     /**
      * Enable/disable database persistence for cron job execution logs.
@@ -1088,6 +1145,29 @@ export function wrapDatabaseAdapter(dbAdapter: DatabaseAdapter): BackendBootstra
     };
 }
 
+/**
+ * Functions and crons each come from values or from a directory, never both.
+ *
+ * Both would be two answers to "what does `/api/functions/send` run", and any
+ * rule picking one — values first, the directory first, a merge — is a rule a
+ * reader has to know to predict the server. Refused at the first line of boot,
+ * naming the pair, before anything is loaded.
+ */
+function assertOneSourceEach(config: Pick<RebaseBackendConfig, "functions" | "functionsDir" | "crons" | "cronsDir">): void {
+    if (config.functions && config.functionsDir) {
+        throw new Error(
+            "Both `functions` and `functionsDir` are set. Pass one: `functions: await loadFunctions(dir)` " +
+            "is the same as `functionsDir: dir`, so keep whichever reads better and drop the other."
+        );
+    }
+    if (config.crons && config.cronsDir) {
+        throw new Error(
+            "Both `crons` and `cronsDir` are set. Pass one: `crons: await loadCrons(dir)` " +
+            "is the same as `cronsDir: dir`, so keep whichever reads better and drop the other."
+        );
+    }
+}
+
 export async function initializeRebaseBackend(config: RebaseBackendConfig): Promise<RebaseBackendInstance> {
     // No try/catch: let init errors propagate to the caller.
     // The app entry point (e.g. startServer()) should catch and process.exit(1).
@@ -1113,6 +1193,8 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
     // answer: the registry is populated by the config module's own
     // declarations, which have already been evaluated by the time a backend is
     // being initialised with them.
+    assertOneSourceEach(config);
+
     const resourceGraph = buildResourceGraph();
     assertEveryKindBindable(resourceGraph);
     const declaredDataSources = graphToDataSources(resourceGraph);
@@ -3280,12 +3362,17 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
     // project's function modules has side effects the author chose (a client
     // constructed at module scope, a connection opened), and a process that will
     // never serve them should not be paying for or triggering any of it.
-    if (config.functionsDir && surfaces.functions) {
-        const { loadFunctionsWithDiagnostics } = await import("./functions/function-loader");
+    if ((config.functionsDir || config.functions) && surfaces.functions) {
+        const { functionList, readFunctionsDirectory } = await import("./functions/function-loader");
         const { createFunctionRoutes } = await import("./functions/function-routes");
         const { createFunctionsRequestTimeout, resolveFunctionsTimeoutMs } = await import("./functions/request-timeout");
 
-        const { functions: allFunctions, problems } = await loadFunctionsWithDiagnostics(config.functionsDir);
+        // Values, or a directory read into exactly those values. Only the
+        // directory can have files that failed to load.
+        const { functions: functionRecord, problems } = config.functions
+            ? { functions: config.functions, problems: [] }
+            : await readFunctionsDirectory(config.functionsDir!);
+        const allFunctions = functionList(functionRecord);
 
         // A subset, when this process was told to serve one. Applied after the
         // load rather than before it so an unknown name can be reported against
@@ -3391,7 +3478,8 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
             });
         } else {
             logger.warn(
-                `Function routes mounted at ${basePath}/functions, but no functions loaded from ${config.functionsDir}. ` +
+                `Function routes mounted at ${basePath}/functions, but no functions loaded from ` +
+                `${config.functionsDir ?? "the `functions` option"}. ` +
                 (problems.length > 0
                     ? `${problems.length} file(s) were skipped — see the messages above.`
                     : "The directory holds no .ts/.js function files.")
@@ -3433,15 +3521,18 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
     // that could never succeed. The argument three paragraphs down — mounted
     // for the directory, not for the jobs in it, because an empty list is the
     // honest answer — just stopped one level too early.
-    if (surfaces.cron || (config.cronsDir && ownership.cronScheduler)) {
-        const { loadCronJobsWithDiagnostics } = await import("./cron/cron-loader");
+    if (surfaces.cron || ((config.cronsDir || config.crons) && ownership.cronScheduler)) {
+        const { cronJobsFrom, readCronsDirectory } = await import("./cron/cron-loader");
         const { CronScheduler } = await import("./cron/cron-scheduler");
         const { createCronRoutes } = await import("./cron/cron-routes");
         const { createCronStore } = await import("./cron/cron-store");
 
-        const { jobs: loadedCronJobs, problems: cronProblems } = config.cronsDir
-            ? await loadCronJobsWithDiagnostics(config.cronsDir)
-            : { jobs: [], problems: [] };
+        const { crons: cronRecord, problems: cronProblems } = config.crons
+            ? { crons: config.crons, problems: [] }
+            : config.cronsDir
+                ? await readCronsDirectory(config.cronsDir)
+                : { crons: {}, problems: [] };
+        const loadedCronJobs = cronJobsFrom(cronRecord);
 
         cronScheduler = new CronScheduler();
 
@@ -3497,7 +3588,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
                 count: loadedCronJobs.length,
                 path: `${basePath}/admin/cron`
             });
-        } else if (config.cronsDir) {
+        } else if (config.cronsDir && !config.crons) {
             logger.warn(
                 `Cron routes mounted at ${basePath}/admin/cron, but no jobs loaded from ${config.cronsDir}. ` +
                 (cronProblems.length > 0

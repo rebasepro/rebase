@@ -5,7 +5,23 @@ import { declareCron, type CronJobDefinition, type CronResourceOptions } from "@
 import { logger } from "../utils/logger.js";
 import { nativeDynamicImport, type ModuleImporter } from "../utils/dynamic-import.js";
 import { describeLoadFailure, SYNTAX_ERROR_ADVICE } from "../utils/load-failure.js";
+import { warnDeprecated } from "@rebasepro/common";
+import type { LoadDirectoryOptions } from "../functions/function-loader.js";
 
+/**
+ * Cron jobs as values: the job id, to its definition.
+ *
+ * `crons: { "nightly-report": nightlyReport }` schedules `nightlyReport` as the
+ * job `nightly-report` — the same thing a file named `crons/nightly-report.ts`
+ * does. {@link loadCrons} returns exactly this shape, so
+ * `crons: await loadCrons(dir)` and `cronsDir: dir` schedule the same jobs.
+ *
+ * A value is what the author wrote — `defineCron({...})` — with no defaults
+ * filled in. The scheduler fills them in when it registers the job.
+ */
+export type CronsRecord = Record<string, CronJobDefinition>;
+
+/** A job as the scheduler registers it: its id, and its definition with defaults filled in. */
 export interface LoadedCronJob {
     /** Job ID derived from filename (e.g. "cleanup-sessions"). */
     id: string;
@@ -21,50 +37,163 @@ export interface LoadedCronJobs {
 }
 
 /**
- * Auto-discover cron job files from a directory.
+ * Load the cron jobs in a directory, as values.
  *
- * Each file should default-export a `CronJobDefinition`.
- * The filename (without extension) becomes the job ID:
- *   `crons/cleanup-sessions.ts` → id = "cleanup-sessions"
+ * Each file default-exports a `CronJobDefinition` — `defineCron({...})`. The
+ * filename without its extension is the record key, which is the job id:
+ * `crons/cleanup-sessions.ts` → `{ "cleanup-sessions": definition }`.
  *
- * Follows the same discovery pattern as `loadFunctionsFromDirectory` — see
- * {@link loadCronJobsWithDiagnostics} for what happens to the files it cannot
- * load.
+ * Loading declares nothing: the definitions come back exactly as written, and
+ * whoever uses them decides what they are for — a backend schedules them, the
+ * build's derive step records them in the resource graph ({@link declareCrons}).
+ *
+ * Never throws for a bad file: it is skipped, logged, and passed to
+ * `options.onSkip`.
+ *
+ * @example
+ * ```ts
+ * const crons = await loadCrons(path.resolve("crons"));
+ * const backend = await createRebaseBackend({ database, crons, provision: true });
+ * ```
+ */
+export async function loadCrons(directory: string, options: LoadDirectoryOptions = {}): Promise<CronsRecord> {
+    const { crons, problems } = await readCronsDirectory(directory, options.importModule);
+    if (options.onSkip) for (const problem of problems) options.onSkip(problem);
+    return crons;
+}
+
+/**
+ * Record each cron in the project's resource graph — what `rebase resources`
+ * lists and a host reads to know a schedule exists, without running it.
+ *
+ * Keyed by the same id the scheduler, the routes and the Studio use, and built
+ * from the definitions as written: a default the scheduler fills in
+ * (`enabled: true`, `timeoutSeconds: 300`) is this process's, not something the
+ * author declared.
+ */
+export function declareCrons(crons: CronsRecord): void {
+    for (const [id, definition] of Object.entries(crons)) {
+        declareCron(id, cronResourceOptions(definition));
+    }
+}
+
+/**
+ * The jobs a scheduler registers, from cron values: the definitions with this
+ * process's defaults filled in.
+ *
+ * Spread first, then normalise. Rebuilding the object field by field dropped
+ * `catchUpWindowSeconds` once — and since this is the path every job takes to
+ * the scheduler, catch-up never ran for any job authored the documented way. A
+ * field added to `CronJobDefinition` tomorrow would be dropped the same way.
+ *
+ * @throws when a value has no `schedule` or no `handler`. A file like that is
+ * skipped by the loader with a reason; a value handed over in code is refused,
+ * because the caller is right there to fix it.
+ */
+export function cronJobsFrom(crons: CronsRecord): LoadedCronJob[] {
+    return Object.entries(crons).map(([id, definition]) => {
+        const def = definition as Partial<CronJobDefinition> | undefined;
+        if (!def || typeof def.schedule !== "string" || typeof def.handler !== "function") {
+            throw new Error(
+                `crons["${id}"] is not a cron job: it needs a \`schedule\` string and a \`handler\` function. ` +
+                "Author it with `defineCron({ schedule, handler })`."
+            );
+        }
+        return {
+            id,
+            definition: {
+                ...def,
+                schedule: def.schedule,
+                name: def.name || id,
+                enabled: def.enabled !== false,
+                // `??`, not `||`: zero and NaN are values the author wrote, and
+                // the scheduler refuses both by name (they end up under
+                // `rejected`). `|| 300` swallowed them, so a job written with
+                // `0` meaning "no limit" ran with five minutes and was listed as
+                // healthy. `Infinity` is "none".
+                timeoutSeconds: def.timeoutSeconds ?? 300,
+                handler: def.handler
+            }
+        };
+    });
+}
+
+/**
+ * @deprecated Use `loadCrons` instead, which returns the jobs as a record keyed
+ * by id. Will be removed in a future release.
  */
 export async function loadCronJobsFromDirectory(
     directory: string,
     importModule: ModuleImporter = nativeDynamicImport
 ): Promise<LoadedCronJob[]> {
-    return (await loadCronJobsWithDiagnostics(directory, importModule)).jobs;
+    warnDeprecated(
+        "server.loadCronJobsFromDirectory",
+        "`loadCronJobsFromDirectory` is deprecated; use `loadCrons(dir)`, which returns `{ [id]: definition }`."
+    );
+    return (await legacyLoad(directory, importModule)).jobs;
 }
 
 /**
- * {@link loadCronJobsFromDirectory}, plus the list of files that were skipped.
- *
- * A job that does not load does not run, and until now the only trace was one
- * `warn` per file in the boot log — next to nothing at 3am when the report that
- * should have been mailed was not. A cron file is written once and then trusted
- * for months, so "it silently never ran" is the failure mode this surface has,
- * and a log line is not a surface.
- *
- * Never throws, for the same reason `loadFunctionsWithDiagnostics` does not: one
- * malformed file must not take the server down, and the other jobs in the
- * directory are still worth scheduling. The difference is that the skips are now
- * counted, summarised in one place, and answered by `GET /api/cron` — so the
- * question "why did nothing run?" has an answer that does not require log
- * access.
+ * @deprecated Use `loadCrons` instead, with `onSkip` to collect the files it
+ * skipped — and `declareCrons` where the jobs belong in the resource graph,
+ * which this used to do as a side effect of loading. Will be removed in a
+ * future release.
  */
 export async function loadCronJobsWithDiagnostics(
     directory: string,
     importModule: ModuleImporter = nativeDynamicImport
 ): Promise<LoadedCronJobs> {
-    const jobs: LoadedCronJob[] = [];
+    warnDeprecated(
+        "server.loadCronJobsWithDiagnostics",
+        "`loadCronJobsWithDiagnostics` is deprecated; use `loadCrons(dir, { onSkip })`, which returns " +
+        "`{ [id]: definition }`, and `declareCrons(crons)` to record them in the resource graph."
+    );
+    return legacyLoad(directory, importModule);
+}
+
+/**
+ * What the deprecated loaders did: load, declare every job in the resource
+ * graph, and hand back normalised jobs. A job the graph refuses is skipped as a
+ * problem, as it was when the declaration ran inside the loader.
+ */
+async function legacyLoad(directory: string, importModule: ModuleImporter): Promise<LoadedCronJobs> {
+    const { crons, problems } = await readCronsDirectory(directory, importModule);
+    const declared: CronsRecord = {};
+    for (const [id, definition] of Object.entries(crons)) {
+        try {
+            declareCron(id, cronResourceOptions(definition));
+            declared[id] = definition;
+        } catch (err) {
+            problems.push(describeLoadFailure(id, err));
+        }
+    }
+    return { jobs: cronJobsFrom(declared), problems };
+}
+
+/**
+ * Read a directory of cron files: the definitions that loaded, keyed by id, and
+ * one `<file> (<reason>)` per file that will NOT be scheduled.
+ *
+ * A job that does not load does not run, and the only trace used to be one
+ * `warn` per file in the boot log — next to nothing at 3am when the report that
+ * should have been mailed was not. So the skips are counted, summarised in one
+ * place, and answered by `GET /api/admin/cron`.
+ *
+ * Never throws, for the same reason the function loader does not: one
+ * malformed file must not take the server down, and the other jobs in the
+ * directory are still worth scheduling.
+ */
+export async function readCronsDirectory(
+    directory: string,
+    importModule: ModuleImporter = nativeDynamicImport
+): Promise<{ crons: CronsRecord; problems: string[] }> {
+    const crons: CronsRecord = {};
     // Aggregated so a broken job surfaces as one loud summary rather than a
     // warning buried per-file among the boot noise.
     const problems: string[] = [];
 
     if (!fs.existsSync(directory)) {
-        return { jobs, problems };
+        return { crons, problems };
     }
 
     const files = fs.readdirSync(directory);
@@ -94,51 +223,15 @@ export async function loadCronJobsWithDiagnostics(
                 }
 
                 const def = exported as Record<string, unknown>;
-                if (typeof def.schedule !== "string" || typeof def.handler !== "function") {
+                if (typeof def.schedule !== "string" || def.schedule.trim() === "" || typeof def.handler !== "function") {
                     problems.push(`${file} (default export has no 'schedule' or no 'handler')`);
                     logger.warn(`[cron] ${file}: default export missing required 'schedule' or 'handler'. Skipping.`);
                     continue;
                 }
 
                 const id = path.basename(file, path.extname(file));
-                // Spread first, then normalise. Rebuilding this object field by
-                // field dropped `catchUpWindowSeconds` — and since this loader
-                // is the only production caller of `registerJobs`, catch-up
-                // never ran for any job authored the documented way: 64 lines
-                // of docblock, a docs section, a unit suite and a Postgres e2e
-                // all describing a feature that was switched off in the one
-                // path that matters. Every existing test built `LoadedCronJob`
-                // literals directly, so none of them went through here.
-                //
-                // The shape is the bug, not the missing line: a field added to
-                // `CronJobDefinition` tomorrow would be dropped the same way.
-                const definition: CronJobDefinition = {
-                    ...(def as Partial<CronJobDefinition>),
-                    schedule: def.schedule as string,
-                    name: (def.name as string) || id,
-                    enabled: def.enabled !== false,
-                    // `??`, not `||`: zero and NaN are values the author
-                    // wrote, and the scheduler refuses both by name (they end
-                    // up under `rejected`). `|| 300` swallowed them, so a job
-                    // written with `0` meaning "no limit" ran with five
-                    // minutes and was listed as healthy. `Infinity` is "none".
-                    timeoutSeconds: (def.timeoutSeconds as number | undefined) ?? 300,
-                    handler: def.handler as CronJobDefinition["handler"]
-                };
-
-                // The declaration, keyed by the same id the scheduler, the
-                // routes and the Studio use — the filename. `defineCron` cannot
-                // do this: it never sees the filename, and `name` is a label.
-                // The derive step runs this same loader, so the graph a host
-                // reads and the schedule this process runs come from one place.
-                // From the raw export, not the normalised definition: the
-                // defaults filled in above (`enabled: true`, `timeoutSeconds:
-                // 300`) are this process's, and a graph that records them for
-                // every cron would say something the author never wrote.
-                declareCron(id, cronResourceOptions(def as unknown as CronJobDefinition));
-
-                jobs.push({ id,
-definition });
+                const definition = exported as CronJobDefinition;
+                crons[id] = definition;
                 logger.info(
                     `⏰ Loaded cron job: ${id} (${definition.schedule}` +
                     `${definition.timezone ? ` ${definition.timezone}` : " in the process's local time"})`
@@ -172,7 +265,7 @@ definition });
         );
     }
 
-    return { jobs, problems };
+    return { crons, problems };
 }
 
 /**

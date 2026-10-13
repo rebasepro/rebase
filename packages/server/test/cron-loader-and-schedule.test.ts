@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "@jest/globals";
 import fs from "fs";
 import os from "os";
 import path from "path";
-import { loadCronJobsFromDirectory, loadCronJobsWithDiagnostics } from "../src/cron/cron-loader";
+import { cronJobsFrom, loadCrons } from "../src/cron/cron-loader";
 import { CronScheduler, parseCronExpression } from "../src/cron/cron-scheduler";
 
 /**
@@ -37,6 +37,14 @@ describe("cron loader", () => {
         if (!found) throw new Error(`no fixture for ${spec}`);
         return { default: found[1] } as never;
     };
+    /** The jobs as the scheduler registers them, as a backend booting `cronsDir` does. */
+    const loadJobs = async () => cronJobsFrom(await loadCrons(dir, { importModule: importer }));
+    /** The loaded jobs, and every file the loader reported as skipped. */
+    const loadWithProblems = async () => {
+        const problems: string[] = [];
+        const jobs = cronJobsFrom(await loadCrons(dir, { importModule: importer, onSkip: p => problems.push(p) }));
+        return { jobs, problems };
+    };
 
     /**
      * `catchUpWindowSeconds` never reached the scheduler.
@@ -55,7 +63,7 @@ describe("cron loader", () => {
             handler: async () => {}
         });
 
-        const jobs = await loadCronJobsFromDirectory(dir, importer);
+        const jobs = await loadJobs();
 
         expect(jobs).toHaveLength(1);
         expect(jobs[0].definition.catchUpWindowSeconds).toBe(3600);
@@ -73,7 +81,7 @@ describe("cron loader", () => {
         // The control: spreading must not stop the loader normalising.
         writeJob("plain.js", { schedule: "* * * * *", handler: async () => {} });
 
-        const jobs = await loadCronJobsFromDirectory(dir, importer);
+        const jobs = await loadJobs();
 
         expect(jobs[0].definition.name).toBe("plain");
         expect(jobs[0].definition.enabled).toBe(true);
@@ -93,12 +101,11 @@ describe("cron loader", () => {
         ["NaN", "nan", Number.NaN],
         ["a negative number", "negative", -5]
     ])("hands a timeoutSeconds of %s to the scheduler, which rejects it", async (_label, id, timeoutSeconds) => {
-        // A file name per case: the loader declares each cron in the process's
-        // resource graph, and one id declared twice differently is refused.
+        // A file name per case, so each rejection names its own id.
         writeJob(`${id}.js`, { schedule: "0 3 * * *", timeoutSeconds, handler: async () => {} });
 
         const scheduler = new CronScheduler();
-        scheduler.registerJobs(await loadCronJobsFromDirectory(dir, importer));
+        scheduler.registerJobs(await loadJobs());
 
         expect(await scheduler.fetchJobs()).toEqual([]);
         expect(scheduler.listRejectedJobs()).toEqual([
@@ -121,7 +128,7 @@ describe("cron loader", () => {
         it("reports one that exports nothing usable", async () => {
             writeJob("broken.js", "not an object");
 
-            const { jobs, problems } = await loadCronJobsWithDiagnostics(dir, importer);
+            const { jobs, problems } = await loadWithProblems();
 
             expect(jobs).toHaveLength(0);
             expect(problems).toEqual(["broken.js (no default export)"]);
@@ -130,7 +137,7 @@ describe("cron loader", () => {
         it("reports one missing `schedule` or `handler`", async () => {
             writeJob("half.js", { schedule: "* * * * *" });
 
-            const { problems } = await loadCronJobsWithDiagnostics(dir, importer);
+            const { problems } = await loadWithProblems();
 
             expect(problems).toEqual(["half.js (default export has no 'schedule' or no 'handler')"]);
         });
@@ -139,7 +146,7 @@ describe("cron loader", () => {
             // The worst case: a syntax error or a bad import inside the file.
             fs.writeFileSync(path.join(dir, "explodes.js"), "// fixture", "utf8");
 
-            const { jobs, problems } = await loadCronJobsWithDiagnostics(dir, importer);
+            const { jobs, problems } = await loadWithProblems();
 
             expect(jobs).toHaveLength(0);
             expect(problems).toHaveLength(1);
@@ -152,7 +159,7 @@ describe("cron loader", () => {
             writeJob("good.js", { schedule: "0 3 * * *", handler: async () => {} });
             writeJob("bad.js", { schedule: "0 3 * * *" });
 
-            const { jobs, problems } = await loadCronJobsWithDiagnostics(dir, importer);
+            const { jobs, problems } = await loadWithProblems();
 
             expect(jobs.map(j => j.id)).toEqual(["good"]);
             expect(problems).toHaveLength(1);
@@ -161,7 +168,7 @@ describe("cron loader", () => {
         it("says nothing when every file loaded", async () => {
             writeJob("fine.js", { schedule: "0 3 * * *", handler: async () => {} });
 
-            const { problems } = await loadCronJobsWithDiagnostics(dir, importer);
+            const { problems } = await loadWithProblems();
 
             expect(problems).toEqual([]);
         });

@@ -2,8 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals
 import fs from "fs";
 import os from "os";
 import path from "path";
-import { loadFunctionsWithDiagnostics } from "../src/functions/function-loader";
-import { loadCronJobsWithDiagnostics } from "../src/cron/cron-loader";
+import { loadFunctions } from "../src/functions/function-loader";
+import { loadCrons } from "../src/cron/cron-loader";
 import { logger } from "../src/utils/logger";
 
 /**
@@ -37,7 +37,8 @@ describe("a function or cron file with a syntax error", () => {
     };
 
     it("is reported by the function loader as a syntax error at its line, with no module-scope advice", async () => {
-        const { problems } = await loadFunctionsWithDiagnostics(dir, importer);
+        const problems: string[] = [];
+        await loadFunctions(dir, { importModule: importer, onSkip: p => problems.push(p) });
 
         expect(problems).toEqual(["broken.js (syntax error at broken.js:1: Unexpected identifier 'is')"]);
         const summary = warned.join("\n");
@@ -46,7 +47,8 @@ describe("a function or cron file with a syntax error", () => {
     });
 
     it("is reported by the cron loader the same way, without the defineCron advice", async () => {
-        const { problems } = await loadCronJobsWithDiagnostics(dir, importer);
+        const problems: string[] = [];
+        await loadCrons(dir, { importModule: importer, onSkip: p => problems.push(p) });
 
         expect(problems).toEqual(["broken.js (syntax error at broken.js:1: Unexpected identifier 'is')"]);
         const summary = warned.join("\n");
