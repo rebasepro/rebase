@@ -19,7 +19,10 @@ Rebase ti dà i dati del progetto come oggetto, in due posti:
 - **`openRebase`**, lo stesso oggetto in uno script o in un test tuo.
 
 Entrambi aprono il database senza modificarlo: non viene creata alcuna tabella, ruolo,
-trigger o funzione, e non resta in esecuzione nulla. L'oggetto ha il vocabolario che una
+trigger o funzione. Il `close()` di uno script termina ciò che `openRebase` ha aperto.
+Sul database di sviluppo gestito, `rebase console` avvia quel database quando non è in
+esecuzione e lo lascia in esecuzione al termine, come fanno i comandi `rebase db`;
+`rebase db stop` lo ferma. L'oggetto ha il vocabolario che una
 [funzione personalizzata](/docs/backend/custom-functions/) riceve dal server,
 `dataAsAdmin` e `sql`, quindi uno snippet passa da una funzione a uno script e alla
 console senza modifiche.
@@ -55,6 +58,11 @@ database e le stesse collection. Se il progetto usa il database di sviluppo gest
 questo viene prima avviato. La cronologia di ciò che hai digitato è conservata in
 `.rebase/console_history`, che il `.gitignore` dello scaffold già esclude.
 
+L'input in pipe viene eseguito una riga alla volta, ciascuna dopo che l'`await` della riga
+precedente si è concluso, quindi la trascrizione qui sopra funziona come
+`printf '…\n…\n' | rebase console`. Tutto ciò che segue `.exit` viene ignorato, e i
+valori sono colorati solo su un terminale. Tutto ciò che la console registra va su stderr.
+
 ### Un solo snippet: `--eval`
 
 <span class="since-badge" data-since="0.25">Da 0.25</span>
@@ -69,9 +77,9 @@ rebase console -e "rebase.sql('select count(*) from posts')" | jq .
 rebase console -e "const u = await rebase.withAuth({ uid: 'u1', roles: ['user'] }); return (await u.data.posts.find()).data"
 ```
 
-Ciò che la risoluzione del database ha da dire va su stderr, così stdout contiene il
-risultato e nient'altro. Uno snippet che lancia un errore stampa l'errore su stderr e
-termina con `1`.
+Tutto ciò che la console registra, qualunque cosa dica `LOG_LEVEL`, va su stderr, così
+stdout contiene il risultato e nient'altro. Uno snippet che lancia un errore stampa
+l'errore su stderr e termina con `1`.
 
 ### Opzioni
 
@@ -87,19 +95,32 @@ termina con `1`.
 <span class="since-badge" data-since="0.25">Da 0.25</span>
 
 `openRebase` da `@rebasepro/server-postgres` è ciò che chiama la console. Usalo in uno
-script, in un seed, in una correzione dei dati o in un test:
+script, in un seed, in una correzione dei dati o in un test. In un progetto generato con lo
+scaffold, metti lo script sotto `backend/`, per esempio `backend/scripts/publish-drafts.ts`:
+il workspace backend è quello che dipende da `@rebasepro/server-postgres`, e uno script
+nella cartella `scripts/` alla radice non può importarlo.
 
 ```typescript
 import { openRebase } from "@rebasepro/server-postgres";
-import { collections } from "../config/collections";
+import { collections } from "../../config/collections";
 
 const rebase = await openRebase({ databaseUrl: process.env.DATABASE_URL!, collections });
 
 const { data: drafts } = await rebase.dataAsAdmin.posts.find({ where: { status: ["==", "draft"] } });
 console.log(`${drafts.length} drafts`);
-await rebase.dataAsAdmin.posts.update("42", { status: "archived" });
+for (const draft of drafts) {
+    await rebase.dataAsAdmin.posts.update(String(draft.id), { status: "published" });
+}
 
 await rebase.close();
+```
+
+Eseguilo da `backend/`. `rebase db url` stampa l'URL del database che usa il progetto,
+compreso quello di sviluppo gestito:
+
+```bash
+cd backend
+DATABASE_URL="$(pnpm exec rebase db url)" pnpm exec tsx scripts/publish-drafts.ts
 ```
 
 | Membro | Cosa fa |
@@ -124,6 +145,13 @@ Le sue opzioni:
 dal tuo script, e impostazioni come `REBASE_DB_POOL_MAX` o `REALTIME_CDC` non cambiano
 nulla in questo caso.
 
+I suoi accessor sono tipizzati dal `Database` che registra `rebase generate-sdk --register`,
+come il `rebase` di una funzione, quindi in uno script una collection, un campo o un valore
+di enum scritto male è un errore di tipo. Senza una registrazione, indicalo a ogni chiamata
+con `openRebase<Database>({ … })`; `OpenedRebase<Database>` è il tipo da dare a un helper
+che ne riceve uno. Con nessuna delle due, le righe non sono tipizzate, ed è per questo che il
+primo esempio converte `draft.id` con `String()`.
+
 ### Verificare cosa può vedere un utente
 
 <span class="since-badge" data-since="0.25">Da 0.25</span>
@@ -132,7 +160,7 @@ nulla in questo caso.
 
 ```typescript
 import { openRebase } from "@rebasepro/server-postgres";
-import { collections } from "../config/collections";
+import { collections } from "../../config/collections";
 
 const rebase = await openRebase({ databaseUrl: process.env.DATABASE_URL!, collections });
 const ada = await rebase.withAuth({ uid: "ada", roles: ["user"] });
@@ -157,7 +185,7 @@ avvia una volta il server.
 import { after, before, test } from "node:test";
 import assert from "node:assert/strict";
 import { openRebase, type OpenedRebase } from "@rebasepro/server-postgres";
-import { collections } from "../config/collections";
+import { collections } from "../../config/collections";
 
 let rebase: OpenedRebase;
 before(async () => {
@@ -170,6 +198,13 @@ test("a user only sees their own posts", async () => {
     const { data } = await ada.data.posts.find();
     assert.ok(data.every(post => post.author_id === "ada"));
 });
+```
+
+Eseguilo da `backend/` con il test runner di Node, puntando `TEST_DATABASE_URL` a un
+database su cui un server Rebase è già partito:
+
+```bash
+TEST_DATABASE_URL="$(pnpm exec rebase db url)" pnpm exec tsx --test scripts/posts.test.ts
 ```
 
 Lo stesso funziona con Vitest o Jest.

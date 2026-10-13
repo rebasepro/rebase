@@ -267,8 +267,8 @@ export const medicalRecordsCollection = defineCollection({
         patient_id: { name: "Patient", type: "string" },
         notes: { name: "Notes", type: "string" }
     },
-    // Rimuove la baseline admin/server iniettata — nulla è leggibile
-    // tranne quanto consentito dalle regole sottostanti.
+    // Remove the injected admin/server baseline — nothing is readable
+    // except what the rules below allow.
     disableDefaultPolicies: true,
     securityRules: [
         { operations: ["select", "update"], ownerField: "patient_id" }
@@ -326,8 +326,8 @@ to allow destructive tools against remote environments.
 
 **Se non è possibile risolvere alcuna stringa di connessione, i tool del DB soggetti a gate vengono rifiutati.**
 Senza `DATABASE_URL`, la CLI usa il database di sviluppo gestito, che è
-l'impostazione predefinita per un nuovo progetto, e la CLI rifiuta lì stessa
-`db push`, `db migrate` e `db branch`. Il rifiuto lo dice e indica cosa funziona
+l'impostazione predefinita per un nuovo progetto, e il gate rifiuta lì i suoi
+quattro tool per il database. Il rifiuto dice perché e indica cosa funziona
 al suo posto. Non suggerisce la via d'uscita:
 
 ```text
@@ -337,6 +337,10 @@ most likely do not need this tool: the dev server applies the collections to tha
 database at boot, additively. After changing a collection, restart it with
 rebase_dev_stop and rebase_dev_start. …
 ```
+
+<span class="since-badge" data-since="0.25">Da 0.25</span> Da un terminale,
+`rebase db push` e `rebase db migrate` girano su quel database; solo i tool MCP
+vengono rifiutati. Su 0.24 la CLI li rifiuta lì anche lei.
 
 Solo il loopback è considerato locale: `localhost`, `*.localhost`, `127.0.0.0/8`, `::1`.
 Gli intervalli privati come `10.x` e `192.168.x` **non** lo sono — possono altrettanto facilmente essere
@@ -450,7 +454,7 @@ La funzionalità è disattivata a meno che non venga abilitata esplicitamente, e
 
 ```bash
 REBASE_MCP_ENABLED=true
-REBASE_PUBLIC_URL=https://app.example.com   # la reale origine di questo deployment
+REBASE_PUBLIC_URL=https://app.example.com   # this deployment's real origin
 ```
 
 Senza `REBASE_PUBLIC_URL`, un secret JWT o un driver dati in grado di limitare l'ambito di una query

@@ -40,7 +40,7 @@ Configura la struttura del progetto con frontend, backend e pacchetti condivisi.
 | `-y, --yes` | Non richiede mai conferme interattive. **Obbligatorio ovunque non ci sia un terminale per rispondere**, come in CI. Salta git init e l'installazione delle dipendenze — le opzioni predefinite interattive rispondono sì a entrambe, quindi passa `--git` / `--install` se le desideri |
 | `-i, --install` | Installa le dipendenze dopo lo scaffolding |
 | `-g, --git` | Inizializza un repository ed esegue il primo commit |
-| `--database-url <url>` | Usa un database esistente invece di quello gestito |
+| `--database-url <url>` | Usa un database esistente invece di quello gestito. <span class="since-badge" data-since="0.25">Da 0.25</span> Deve essere un URL `postgres://` o `postgresql://`: qualsiasi altra cosa viene rifiutata prima che venga scritto un file, e il prompt interattivo lo richiede di nuovo |
 | `--introspect` | Genera le collection da tale database. Implica `--template blank` e richiede `--install` |
 | `--project <slug>` | Collega lo scaffold a un progetto Rebase Cloud |
 | `--setup-key <key>` | La chiave monouso per autenticare tale collegamento |
@@ -54,7 +54,7 @@ Avvia il server di sviluppo:
 rebase dev
 ```
 
-Avvia sia il frontend che il backend con hot reloading, e rigenera lo schema Drizzle e i tipi dell'SDK (`generated/sdk/`) all'avvio e a ogni salvataggio di una collection. per i tipi dell'SDK — sulla 0.23 rigenera solo lo schema, ed eseguire `rebase generate-sdk` spetta a te.
+Avvia sia il frontend che il backend con hot reloading, e rigenera lo schema Drizzle e i tipi dell'SDK (`generated/sdk/`) all'avvio e a ogni salvataggio di una collection. Sulla 0.23 rigenera solo lo schema, ed eseguire `rebase generate-sdk` spetta a te.
 
 Entrambe le porte sono derivate dal percorso del progetto, consentendo l'esecuzione affiancata di più progetti Rebase. Usa gli URL stampati da `rebase dev`. Puoi fissarne una con `rebase dev --port 3001`.
 
@@ -93,6 +93,12 @@ build e circa 2,4 MB al bundle.
 
 Aggiorna ogni pacchetto `@rebasepro/*` bloccato dal progetto a una singola release, quindi installa con il gestore di pacchetti i nomi indicati nel relativo lockfile. `rebase upgrade` seleziona l'ultima versione; `--to 0.21.0` una versione esatta, senza consultare il registro; `--to canary` un dist-tag. Ogni versione bloccata in `dependencies`, `devDependencies` e `optionalDependencies`, in ogni `package.json` del progetto, mantiene il proprio `^` o `~`, e null'altro nel file viene modificato. Le specifiche per `peerDependencies` e `workspace:`, `link:`, `file:`, git e tag vengono elencate e lasciate invariate. Anche gli override in `pnpm-workspace.yaml` e `package.json` vengono aggiornati, ma un override `link:` o `file:` ha la precedenza su qualsiasi blocco: viene segnalato e `--drop-local-overrides` lo rimuove. `--dry-run` non scrive nulla, `--no-install` salta l'installazione e `--json` stampa un unico documento.
 
+<span class="since-badge" data-since="0.25">Da 0.25</span> Un progetto su una prerelease,
+come un canary, resta sul suo canale a meno che `latest` sia più recente. Un dist-tag che
+sposterebbe un pin all'indietro viene rifiutato (`downgrade_refused` con `--json`) a meno
+che tu non passi `--allow-downgrade`; un `--to` esatto viene applicato, e segnalato come
+downgrade. Su 0.24, `rebase upgrade` prende `latest` in ogni caso.
+
 ### `rebase start`
 
 Esegue il bundle compilato nello stesso modo in cui lo esegue un deployment:
@@ -106,6 +112,12 @@ che impostano. Un `.env` scaffoldato indica `development`, quindi il primo
 account che si registra diventa comunque admin, e `rebase start` lo segnala
 in testa; imposta `NODE_ENV=production` per un server di produzione.
 `rebase start --bundle ./dist-bundle` esegue un bundle posizionato altrove.
+
+`rebase start` non avvia alcun database, e il `.env` dello scaffold non ha
+`DATABASE_URL`, quindi un'esecuzione locale sul database che usa `rebase dev` è
+`DATABASE_URL="$(rebase db url)" rebase start`. <span class="since-badge" data-since="0.25">Da 0.25</span>
+Senza uno, stampa quella riga prima dell'avvio; su 0.24 il runtime si ferma su
+"DATABASE_URL: is required".
 
 ### `rebase apps list`
 
@@ -129,6 +141,12 @@ Scrive l'entrypoint del backend e un `Dockerfile` nel progetto e converte il bac
 
 Visualizzane un'anteprima con `rebase eject --dry-run`, che elenca le modifiche senza applicarle. `--force` sostituisce un file `backend/src/index.ts` o `env.ts` esistente, conservando il file corrente come `<name>.bak`.
 
+<span class="since-badge" data-since="0.25">Da 0.25</span> Il server espulso tiene gli
+upload locali nella cartella `uploads/` del progetto, eseguito dai sorgenti o compilato,
+come fa `rebase dev`. Gira in `backend/`, quindi lì uno `STORAGE_PATH` relativo viene
+letto da `backend/`. Su 0.24 il server compilato usa `backend/dist/uploads`, che la
+build successiva elimina.
+
 ### `rebase schema generate`
 
 Genera lo schema per Drizzle ORM dalle tue collection TypeScript:
@@ -139,73 +157,33 @@ rebase schema generate
 
 Legge le tue collection da `config/collections/` e genera `backend/src/schema.generated.ts` con definizioni di tabelle Drizzle, enum e relazioni.
 
-### `rebase db push`
-
-Invia le modifiche allo schema direttamente al database (solo per sviluppo):
+### `rebase schema stale`
 
 ```bash
-rebase db push
+rebase schema stale          # name what differs from the collections, exit 1 if anything does
+rebase schema stale --fix    # regenerate backend/src/schema.generated.ts instead
 ```
 
-:::caution
-`db push` modifica il database direttamente senza file di migrazione. Usa `db generate` + `db migrate` per l'ambiente di produzione.
-:::
+`rebase dev` mantiene il file aggiornato da sé, quindi questo è il controllo per una build
+o per un passaggio di CI. Vedi [Generazione dello schema](/docs/cli/schema/#rebase-schema-stale).
 
-### `rebase db generate`
-
-Genera file di migrazione SQL a partire dalle modifiche allo schema:
+### `rebase db`
 
 ```bash
-rebase db generate
+rebase db push                 # apply the collections to the database (development)
+rebase db generate             # write a SQL migration file
+rebase db migrate              # apply the pending migrations
+rebase db url                  # print the connection string this project uses
+rebase db pull --from <url>    # copy another database into the local one
+rebase db backup               # pg_dump; db backups list and db restore beside it
+rebase db branch create <name> # a copy to work on; switch, list and prune it too
+rebase db stop                 # stop the managed development database
+rebase db reset                # delete it and start over
 ```
 
-Crea file di migrazione con timestamp in `drizzle/migrations/` che possono essere revisionati e committati.
-
-### `rebase db migrate`
-
-Esegue le migrazioni del database in sospeso:
-
-```bash
-rebase db migrate
-```
-
-Applica tutte le migrazioni non ancora applicate al database.
-
-### `rebase db backup` / `backups` / `restore`
-
-```bash
-rebase db backup --out ./backups        # or s3://bucket/prefix, gs://bucket/prefix
-rebase db backups list                  # list what is stored
-rebase db restore ./backups/<file>.dump --yes
-```
-
-`backup` esegue `pg_dump`; `restore` esegue `pg_restore` e, essendo distruttivo, richiede `--yes`.
-La pianificazione, il file dei ruoli che viaggia con ogni dump e la procedura di ripristino sono in [Backup e ripristino](/docs/deployment/backups/).
-
-### `rebase db pull`
-
-Copia un altro database in quello di sviluppo locale:
-
-```bash
-rebase db pull --from postgres://…  [--anonymize]
-```
-
-`--anonymize` sostituisce i campi personali durante l'importazione, consentendo di lavorare localmente su una copia della produzione senza trasferire dati reali dei clienti su un laptop.
-
-Dato che `pg_dump` rimuove i privilegi, la copia arriverebbe con i criteri RLS di origine ma senza le relative autorizzazioni sottostanti — causando il fallimento di ogni lettura come `rebase_user` con l'errore `permission denied`. L'operazione di pull ripristina successivamente il ruolo dell'applicazione, impiegando la medesima procedura usata all'avvio e da `rebase db push`, garantendo che le tabelle interne di Rebase rimangano protette come previsto.
-
-La destinazione è sempre il database di sviluppo locale di questo progetto e non può essere modificata: il passaggio di `--database-url` viene rifiutato, evitando qualsiasi possibilità di eseguire un "pull verso la produzione". `--from` è l'unica direzione consentita.
-
-### `rebase db url`
-
-Stampa la stringa di connessione utilizzata dal progetto, e nient'altro, facilitando l'uso in pipe:
-
-```bash
-rebase db url
-psql "$(rebase db url)"
-```
-
-Il database di sviluppo gestito è il caso principale che necessita di questo comando: `.env` lascia intenzionalmente `DATABASE_URL` commentato, e la porta è calcolata dal percorso del progetto, per cui nessun elemento su disco la definisce in modo esplicito. Quando imposti un tuo `DATABASE_URL`, viene stampato quello — l'ordine di risoluzione è lo stesso seguito da qualsiasi altro comando. Il comando avvia il database gestito qualora non sia già in esecuzione.
+Ognuno è in [Comandi del database](/docs/cli/database/), con l'ordine in cui un comando
+sceglie il proprio database; `push`, `generate` e `migrate` sono trattati in dettaglio in
+[Generazione dello schema](/docs/cli/schema/).
 
 ### `rebase console`
 
@@ -225,53 +203,30 @@ risolve `rebase db push`, e aprirlo non vi modifica nulla. Con `-e`, il risultat
 `--eval`/`-e`, `--collections`/`-c`, `--database-url`, `--docker`. Vedi
 [Script e console](/docs/backend/scripts/).
 
-### `rebase db stop` / `rebase db reset`
-
-Valido solo per il database di sviluppo gestito:
-
-```bash
-rebase db stop     # stop it; the data is kept
-rebase db reset    # delete it and start over
-```
-
-### `rebase db branch`
-
-```bash
-rebase db branch create <name>
-rebase db branch list
-rebase db branch info <name>
-rebase db branch switch <name>     # work on it; every later command follows
-rebase db branch switch            # say which branch you are on
-rebase db branch switch --off      # back to the main database
-rebase db branch delete <name>
-rebase db branch prune [--older-than 14d] [--include-dev-diff]
-```
-
-PostgreSQL non consente di copiare o eliminare un database a cui è connesso qualsiasi altro processo, e il caso più tipico di "qualsiasi altro processo" è la tua istanza di `rebase dev`. `create` e `delete` indicano cosa sta occupando il database; `--force` disconnette preventivamente tali sessioni.
-
-Ogni branch è una copia completa su disco, pertanto richiede una pulizia periodica. `prune` rimuove tre elementi: una voce il cui database è stato rimosso all'esterno di Rebase, un database di branch la cui voce non è mai stata salvata e — solo specificando `--older-than` — i branch più vecchi dell'età specificata. Salvo l'uso di `--yes`, richiede conferma prima di eliminare qualsiasi cosa.
-
-`switch` registra il branch in `.rebase/branch.json` e non modifica mai `.env`. Ha la precedenza su `DATABASE_URL` presente in `.env` ma cede il passo a `--database-url` o a una variabile `DATABASE_URL` definita nella shell; pertanto, un flag passato da riga di comando ha sempre priorità rispetto a uno switch effettuato precedentemente. L'eliminazione del branch su cui ti trovi ti riporta al database principale, evitando di lasciare l'ambiente puntato su un database inesistente.
-
-:::note[Sul database di sviluppo gestito]
-<span class="since-badge" data-since="0.25">Da 0.25</span> `push`, `generate` e `migrate` pianificano le loro operazioni tramite Atlas, che richiede un secondo database vuoto con cui effettuare il confronto — e il PGlite gestito ne fornisce esattamente uno. Quindi
-sul database gestito ognuno di essi avvia un secondo PGlite temporaneo in memoria
-per Atlas, e lo ferma al termine del comando. È così che una colonna viene eliminata,
-rinominata o ristretta lì: `rebase dev` si limita ad aggiungere. Il blocco sulle operazioni distruttive è lo
-stesso di ovunque. Per far pianificare Atlas su un database vuoto tuo,
-imposta `REBASE_ATLAS_DEV_URL` su di esso; Rebase non crea né elimina un
-database indicato in questo modo.
-
-`branch` viene rifiutato in tale contesto. L'istruzione `CREATE DATABASE ... TEMPLATE` su PGlite registra una voce nel catalogo senza copiare alcunché; di conseguenza, il branch punterebbe al database da cui è stato clonato, facendo confluire nel database di sviluppo ogni scrittura che intendevi isolare. `rebase dev --docker` mette a disposizione un server reale compatibile con la gestione dei branch.
-:::
-
 ### `rebase apps init` / `rebase apps config`
 
 ```bash
 rebase apps list             # the apps this project declares
-rebase apps init <name>      # register a new app in rebase.json
-rebase apps config <app>     # what one app resolves to
+rebase apps init             # write a rebase.json inferred from this project
+rebase apps config <app>     # the client configuration for one app
 ```
+
+`apps init` non accetta un nome: deduce ogni app dal progetto e scrive l'intero
+`rebase.json`, e rifiuta di sostituirne uno esistente a meno che tu non passi
+`--force`.
+
+<span class="since-badge" data-since="0.25">Da 0.25</span> Un argomento nome viene
+rifiutato. `--force` mantiene ciò che l'inferenza non può sapere dal file che sostituisce:
+il nome di ogni app, il suo `path` e la sua route `cms`. Tutto il resto viene dedotto di
+nuovo, e un'app dichiarata che non trova più viene nominata come rimossa, quindi su uno
+scaffold riscrive il `rebase.json` fornito dallo scaffold. Il comando di build dell'app
+statica usa il gestore di pacchetti del progetto. Su 0.24 il nome viene ignorato, e
+`--force` scrive la semplice inferenza: l'app statica diventa `web`, compilata con
+`npm run build --workspace frontend`.
+
+<span class="since-badge" data-since="0.25">Da 0.25</span> Per un checkout non collegato
+a un progetto Cloud, `apps config` fornisce l'URL del backend così come lo serve
+`rebase dev`. Su 0.24 stampa `http://localhost:3001`.
 
 ### `rebase status`
 
@@ -311,7 +266,12 @@ rebase resources --check    # fail if the committed graph is stale
 rebase resources --json     # machine-readable
 ```
 
-`rebase resources --check` è un comando recente — rappresenta il flag utilizzato nei job di CI per segnalare un errore qualora `rebase.resources.json` non corrisponda più al codice di configurazione.
+`rebase resources --check` è il flag utilizzato nei job di CI per segnalare un errore qualora `rebase.resources.json` non corrisponda più al codice di configurazione.
+<span class="since-badge" data-since="0.25">Da 0.25</span> `--json` si combina con esso:
+in caso di drift, `rebase resources --check --json` termina con 1 e una busta di errore
+(`resource_graph_missing` o `resource_graph_stale`), e in caso di successo il grafo porta
+`check.status`. `--write --json` scrive il file e riporta `written.changed`. Su 0.24
+`--json` stampava il grafo e ignorava entrambi i flag.
 
 Una risorsa viene dichiarata nel codice di configurazione — `database("analytics")`, `bucket("media")`, `topic("signups")`, `queue("thumbnails")` — oppure consiste in un file collocato in `backend/crons` o `backend/functions`. Essa non va mai scritta manualmente in `rebase.resources.json`, file generato automaticamente da tali dichiarazioni per consentire all'host di determinare le dipendenze del progetto senza compilarlo. Ogni voce tiene traccia dei relativi utilizzatori (`collection:events`, `property:posts.cover`, `function:report`).
 
@@ -388,6 +348,7 @@ Gestisci le chiavi API di servizio del progetto — le credenziali utilizzate da
 
 ```bash
 rebase api-keys list
+rebase api-keys get abc123-def456
 rebase api-keys create --name "Blog CI" --scopes data:read:posts,data:write:posts --expires-in 90
 rebase api-keys create --name "Ops" --full-access --roles admin --expires-at 2027-01-31
 rebase api-keys revoke abc123-def456
@@ -443,7 +404,14 @@ Per l'elenco esaustivo e la destinazione dei file installati, consulta la sezion
 
 ### `rebase telemetry`
 
-Condivisione anonima dei dati di utilizzo. **`rebase init` formula la richiesta una sola volta per ciascun progetto, impostando la risposta affermativa come predefinita — nessun dato viene inviato senza una tua esplicita risposta:**
+Condivisione anonima dei dati di utilizzo, disattivata finché non dici di sì. Un
+`rebase init` interattivo lo chiede alla fine, e il prompt ha come predefinito no, quindi
+nulla viene condiviso a meno che tu risponda sì. La risposta vale per macchina
+(`~/.rebase/telemetry.json`): dopo un sì `init` non lo chiede più, e dopo un no il
+successivo `init` lo chiede di nuovo. Ogni checkout riceve un id di progetto casuale,
+conservato nel suo `.rebase/telemetry-project.json` escluso da git. <span class="since-badge" data-since="0.25">Da 0.25</span>
+Su 0.24 il prompt ha come predefinito sì, e l'id di progetto cambia a ogni riavvio di
+`rebase dev`.
 
 ```bash
 rebase telemetry status

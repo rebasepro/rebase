@@ -209,6 +209,14 @@ Si posiziona tra la shell e il file di progetto nell'ordine di risoluzione:
 2. `DATABASE_URL` nell'ambiente della shell
 3. **il branch su cui è posizionato questo checkout**
 4. `DATABASE_URL` nel file `.env` del progetto
+5. `--docker`, o l'ultimo `rebase dev` eseguito con esso
+6. il database di sviluppo gestito
+
+<span class="since-badge" data-since="0.25">Da 0.25</span> Il livello 5 segue
+l'ultimo `rebase dev --docker`, quindi un comando branch eseguito dopo di esso
+non ha bisogno di un proprio `--docker`, e un `--docker` che un livello superiore
+supera non avvia alcun container e dichiara di essere stato ignorato. Su 0.24
+conta solo il flag, e uno superato avvia comunque il container.
 
 Un branch deve avere la precedenza su `.env`, altrimenti il passaggio di branch non avrebbe alcun effetto su qualsiasi progetto che
 imposta `DATABASE_URL`; non deve però avere la precedenza sui due livelli superiori, perché un flag specificato su questa
@@ -242,7 +250,7 @@ Il branching **non** funziona con il database di sviluppo gestito — il databas
 
 PGlite gestisce esattamente un solo database. `CREATE DATABASE ... TEMPLATE` su di esso scrive una voce di catalogo e non copia nulla, quindi il "branch" fa riferimento allo stesso database da cui è stato clonato: le scritture che si ritengono isolate finiranno nel database di sviluppo, e non ci sarà una seconda copia a cui ritornare.
 
-Usa il branching su un server reale — la tua istanza PostgreSQL tramite `DATABASE_URL`, o `rebase dev --docker`.
+Usa il branching su un server reale — la tua istanza PostgreSQL tramite `DATABASE_URL`, o `rebase dev --docker`, che i comandi branch poi seguono.
 
 ---
 
@@ -279,6 +287,6 @@ Poiché i branch sono database PostgreSQL separati, non è possibile eseguire qu
 
 ## Risorse correlate
 
-- [Comandi CLI](/docs/cli/) — `rebase db branch` e i suoi flag
+- [Comandi del database](/docs/cli/database/#rebase-db-branch) — `rebase db branch` e i suoi flag
 - [Generazione dello schema](/docs/cli/schema/) — come viene generato lo schema copiato da un branch
 - [Ambiente e configurazione](/docs/getting-started/configuration/) — `DATABASE_URL` e le priorità rispetto a un branch selezionato

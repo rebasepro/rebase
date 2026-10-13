@@ -63,8 +63,9 @@ Nel codice non ce n'è nessuna. Il server legge lo schema del database all'avvio
 ed espone le tabelle che trova, quindi l'API segue le tue migrazioni: modificando
 lo schema, cambieranno anche gli endpoint.
 
-Una tabella viene esposta solo dopo aver definito un modello di autorizzazione:
-row-level security abilitata, più almeno una policy:
+Una tabella viene esposta una volta abilitata su di essa la row-level security. Senza
+alcuna policy viene esposta e non restituisce righe, e l'avvio lo segnala; una policy
+la apre:
 
 ```sql
 ALTER TABLE your_table ENABLE ROW LEVEL SECURITY;
@@ -78,9 +79,9 @@ leggono l'identità della richiesta autenticata. Consulta
 e [rls-check](/docs/rls-check/) per un audit su cosa permettono effettivamente le tue policy.
 
 Una tabella senza RLS viene **ignorata**, deliberatamente: ogni richiesta autenticata
-viene eseguita come `rebase_user`, quindi esporre una tabella priva di policy
-consegnerebbe ogni riga a qualsiasi utente autenticato. Ogni tabella ignorata viene
-indicata all'avvio insieme al codice SQL necessario per proteggerla.
+viene eseguita come `rebase_user`, quindi esporre una tabella che la row-level security
+non protegge consegnerebbe ogni riga a qualsiasi utente autenticato. Ogni tabella
+ignorata viene indicata all'avvio insieme al codice SQL necessario per proteggerla.
 
 :::note
 `baas: { unprotectedTables: "serve" }` le espone comunque. Si tratta di un'opzione di
@@ -161,8 +162,12 @@ Tre fattori possono risolverlo, nell'ordine in cui vale la pena verificarli:
 
 1. **Il database non ha tabelle.** Creale — tramite una migrazione, SQL puro, o un file
    di collezione insieme a `rebase db push` — e riavvia.
-2. **Le tabelle non hanno alcuna policy RLS**, quindi l'avvio le ha ignorate. Il log di
-   avvio elenca ciascuna di esse. Aggiungi una policy, come mostrato sopra.
+2. **Le tabelle non hanno la row-level security abilitata**, quindi l'avvio le ha
+   ignorate. Il log di avvio elenca ciascuna di esse, con l'SQL. Abilitala e aggiungi
+   una policy, come mostrato sopra. <span class="since-badge" data-since="0.25">Da 0.25</span>
+   Lo dice anche la risposta: il suo messaggio nomina le tabelle e fornisce
+   l'`ALTER TABLE … ENABLE ROW LEVEL SECURITY` per esse, e
+   `details.unprotectedTables` le elenca. Su 0.24 dice che il database non ha tabelle.
 3. **`DATABASE_URL` punta a una destinazione diversa** da quella prevista. `rebase status`
    stampa i tre file che determinano a cosa si connette il backend.
 

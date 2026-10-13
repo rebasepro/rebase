@@ -160,7 +160,10 @@ GET /api/storage/file/products/laptop.jpg?width=300&format=webp
 
 Un parametro al di fuori di questi limiti restituisce un **400**, non un valore limitato silenziosamente (clamp) — in precedenza `?width=99999` restituiva un'immagine da 4096px e `?format=tiff` un'immagine in formato webp, senza alcun avviso.
 
-Le miniature delle immagini archiviate nel pannello di amministrazione utilizzano questo endpoint: l'anteprima di una tabella o di una scheda richiede una versione in formato webp di dimensioni pari a circa il doppio della dimensione renderizzata (96–800px) invece dell'originale. `sharp` è una dipendenza opzionale; in sua assenza la trasformazione risponde con 500, quindi il pannello effettua una verifica a ogni caricamento della pagina con una singola richiesta di rendering, mostrando gli originali se il server non è in grado di ridimensionarli. I file SVG e GIF vengono sempre mostrati così come sono.
+Le miniature delle immagini archiviate nel pannello di amministrazione utilizzano questo endpoint: l'anteprima di una tabella o di una scheda richiede una versione in formato webp di dimensioni pari a circa il doppio della dimensione renderizzata (96–800px) invece dell'originale. I file SVG e GIF vengono sempre mostrati così come sono.
+`sharp` è opzionale: <span class="since-badge" data-since="0.25">Da 0.25</span>
+in sua assenza una richiesta di trasformazione riceve l'originale, e il backend avvisa una volta di eseguire
+`pnpm add sharp` in `backend/` (su 0.24 risponde 500, e il pannello mostra gli originali).
 
 ### Prestazioni e caching LRU
 
@@ -200,7 +203,7 @@ Un SVG è un'immagine che funge anche da documento e può contenere tag `<script
 
 Ciascuna sorgente di storage accetta file fino al proprio limite: **50 MB**, a meno che `STORAGE_MAX_FILE_SIZE` (in byte, con suffisso `__<KEY>` per una sorgente con nome) o il valore `maxFileSize` della sorgente non indichino diversamente. Ogni punto di accesso applica lo stesso limite. `POST /api/storage/upload` risponde con `413 PAYLOAD_TOO_LARGE` oltre tale valore; un caricamento ripristinabile viene rifiutato al momento della creazione, prima del suo primo chunk; e `OPTIONS /api/storage/tus` lo notifica come `Tus-Max-Size` — per la sorgente specificata da `?storageId=`, o per quella predefinita in caso contrario.
 
-Per quanto riguarda `STORAGE_MAX_FILE_SIZE`: sulla versione 0.23 solo `maxFileSize` della sorgente definisce il limite, e la variabile non viene letta.
+Sulla versione 0.23 solo `maxFileSize` della sorgente definisce il limite; `STORAGE_MAX_FILE_SIZE` non viene letta.
 
 ```bash
 STORAGE_MAX_FILE_SIZE=209715200          # (default): 200 MB
@@ -244,7 +247,7 @@ export const media = bucket("media", { engine: "s3", label: "Media" });
 
 Quindi esegui `rebase resources --write`, che rigenera `rebase.resources.json` in modo che un host possa leggere la topologia senza dover eseguire una build. Consulta [Sorgenti multiple](/docs/backend/multiple-sources) per approfondire database, bucket e topic insieme.
 
-Ogni sorgente viene configurata tramite gli **stessi nomi di variabili a cui viene aggiunto il proprio suffisso**. La sorgente predefinita non accetta alcun suffisso, quindi un progetto con un singolo bucket continua a usare i nomi semplici sopra indicati e non deve dichiarare nulla:
+Ogni sorgente viene configurata tramite gli **stessi nomi di variabili a cui viene aggiunto il proprio suffisso**. La sorgente predefinita non accetta alcun suffisso, quindi un progetto con un singolo bucket continua a usare i nomi semplici sopra indicati e non deve dichiarare nulla, e dichiarare bucket con nome accanto ad essa non li cambia (<span class="since-badge" data-since="0.25">Da 0.25</span>, [dettagli](/docs/backend/multiple-sources/#which-bucket-receives-an-unqualified-upload)):
 
 ```bash
 S3_BUCKET=app-uploads             # (default)

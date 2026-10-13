@@ -96,8 +96,9 @@ I sistemi che ne sono a conoscenza lo utilizzano in questo modo:
   semplicemente con la home page del frontend.
 - **`rebase apps list`** lo mostra accanto all'app che lo serve.
 
-Tre forme possibili, tutte comuni. per la terza: sulla 0.23 il `path`
-di un'app non può essere un URL, quindi il CMS condivide l'hostname del progetto.
+Tre forme possibili, tutte comuni. Sulla 0.23 il `path` di un'app non può
+essere un URL, quindi la terza non è disponibile lì e il CMS condivide
+l'hostname del progetto.
 
 ```jsonc
 // The whole app is the CMS — what `rebase init` scaffolds.
@@ -141,6 +142,14 @@ da quella delle directory, e `rebase apps init` la rende esplicita su richiesta:
 rebase apps list      # what this repository contributes
 rebase apps init      # write an inferred rebase.json
 ```
+
+L'inferenza non può sapere due cose che il `rebase.json` di uno scaffold
+dichiara. Chiama `web` l'app statica, dove uno scaffold la chiama `admin`, e
+non può conoscere la route `cms` dell'app. Il nome non cambia: Rebase Cloud ha
+registrato `web` per ogni progetto distribuito senza un `rebase.json`. <span class="since-badge" data-since="0.25">Da 0.25</span>
+`rebase apps init --force` mantiene i nomi, il `path` e il `cms` delle app
+dichiarate dal file che sostituisce, e segnala come rimossa un'app che non
+trova più. Su 0.24 scrive la semplice inferenza sopra di essi.
 
 ## Un'app su un hostname tutto suo
 

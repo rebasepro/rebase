@@ -164,7 +164,14 @@ Nel commit non finisce alcun SQL. `rebase db push` e `rebase db generate` scrivo
 Sulla 0.23 il commit porta anche `drizzle/schema.sql`, `drizzle/policies.sql` e
 `drizzle/search.sql`, scritti nella root del progetto.
 
-Il messaggio di commit descrive la modifica piuttosto che limitarsi ad annunciarne una, ed è attribuito alla persona che l'ha effettuata. Una modifica dello schema con un autore e un diff nella cronologia del tuo progetto è qualcosa che né Firebase né Supabase offrono: le modifiche alle loro tabelle sono invisibili al tuo repository.
+Il messaggio di commit descrive la modifica piuttosto che limitarsi ad annunciarne una, ed è attribuito alla persona che l'ha effettuata, con il nome visualizzato e l'email
+dell'account (un utente senza nessuno dei due viene registrato come `<uid>@users.noreply.rebase.pro`).
+<span class="since-badge" data-since="0.25">Da 0.25</span> Su 0.24 i commit
+dell'autenticazione integrata riportano l'uid come nome.
+
+Una modifica dello schema con un autore e un diff nella cronologia del tuo progetto è qualcosa
+che né Firebase né Supabase offrono: le modifiche alle loro tabelle sono invisibili al tuo
+repository.
 
 ## Chi può applicare
 

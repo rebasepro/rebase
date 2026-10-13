@@ -10,7 +10,7 @@ description: I breaking change introdotti da 0.25 per un'app su 0.24 — lo swit
 
 Queste sono le voci `### Breaking` che la versione 0.25 introduce per un'applicazione su 0.24.
 
-Le prime tre derivano dal lavoro sulle prestazioni: lo switch per il conteggio negli elenchi REST, l'elenco delle collezioni MCP e le traduzioni del pannello admin. Il resto proviene dalla revisione del backlog: rifiuti più severi all'avvio e su `OPTIONS`, il percorso cron e le letture offline dell'SDK, il registro delle sorgenti di storage, proprietà inutilizzate della UI kit, l'upsert sulla collezione utenti, una lettura che specifica sia `page` che `offset`, e i nomi predefiniti delle policy su tabelle con nomi lunghi. Le ultime tre sono decisioni di prodotto: la durata predefinita della sessione, la password policy sulle password scelte dall'amministratore e la stringa vuota su un campo obbligatorio. Seguono tre rimozioni: due export del client che fungevano solo da motori interni, un hook admin non necessario e un'opzione di storage mai esposta a nessun client.
+Le prime tre derivano dal lavoro sulle prestazioni: lo switch per il conteggio negli elenchi REST, l'elenco delle collezioni MCP e le traduzioni del pannello admin. Il resto proviene dalla revisione del backlog: rifiuti più severi all'avvio e su `OPTIONS`, il percorso cron e le letture offline dell'SDK, il registro delle sorgenti di storage, proprietà inutilizzate della UI kit, l'upsert sulla collezione utenti, una lettura che specifica sia `page` che `offset`, e i nomi predefiniti delle policy su tabelle con nomi lunghi. Le ultime tre sono decisioni di prodotto: la durata predefinita della sessione, la password policy sulle password scelte dall'amministratore e la stringa vuota su un campo obbligatorio. Seguono tre rimozioni: due export del client che fungevano solo da motori interni, un hook admin non necessario e un'opzione di storage mai esposta a nessun client. L'ultima è la sorgente di storage predefinita, che dichiarare un bucket con nome non sposta più.
 
 :::note[Comportamenti modificati e nomi deprecati]
 La versione 0.25 modifica anche il comportamento di alcune chiamate esistenti, senza renderle incompatibili. Verifica questi aspetti se la tua app fa affidamento sul vecchio comportamento:
@@ -232,3 +232,30 @@ La sorgente del client invia inoltre `public` e `context` durante gli upload (li
 ## 85. `signedUrlExpiration` è stato rimosso dalla configurazione dello storage S3 e GCS
 
 Eliminare la chiave da `storage: { type: "s3" | "gcs", … }`; TypeScript la segnala come proprietà sconosciuta. Non ha mai determinato la durata di un URL ricevuto da un browser. Per modificare la durata di validità dell'URL di un file privato, impostare `storageDownloadTokenTtl` (in secondi; `STORAGE_DOWNLOAD_TOKEN_TTL` su distribuzioni con bundle). Il codice server che chiama direttamente `controller.getSignedUrl()` riceve un URL valido per un'ora.
+
+## 86. Dichiarare un bucket con nome non sposta più la sorgente di storage predefinita
+
+Un progetto che dichiarava solo bucket con nome in `config/resources.ts`, come
+`bucket("media", { engine: "s3" })`, vedeva promosso a predefinito il primo di essi: gli
+upload la cui proprietà non specifica alcuna `storageSource` andavano lì. Il predefinito ora
+legge sempre la propria configurazione, qualunque cosa sia dichiarata: `STORAGE_TYPE`,
+`STORAGE_PATH` (oppure `./uploads`) e le `S3_*` / `GCS_*` senza suffisso.
+
+Se quegli upload devono continuare ad andare al bucket con nome, dillo:
+
+```ts
+// config/resources.ts
+export const media = bucket("media", { engine: "s3", default: true });
+```
+
+Senza il contrassegno, in produzione quegli upload rispondono
+`501 STORAGE_NOT_CONFIGURED` finché il predefinito non viene associato (`STORAGE_TYPE=s3` e
+`S3_BUCKET`, oppure `STORAGE_TYPE=gcs` e `GCS_BUCKET`), e l'avvio registra un solo avviso che
+nomina entrambe le soluzioni. I file scritti dal predefinito promosso si trovano nel bucket
+con nome; con il contrassegno vengono serviti attraverso il predefinito come prima. In
+sviluppo, i file già presenti in `./uploads` tornano a essere serviti.
+
+L'avvio rifiuta anche due sorgenti che si risolvono nella stessa directory (o una dentro
+l'altra), o nello stesso bucket sullo stesso endpoint. Dai alla sorgente con nome una
+posizione propria (`STORAGE_PATH__MEDIA`, `S3_BUCKET__MEDIA`), oppure contrassegnala come
+predefinita.

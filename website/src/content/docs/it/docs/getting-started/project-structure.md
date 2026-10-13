@@ -22,7 +22,10 @@ my-app/
 ├── .env                    # Generated for you: JWT_SECRET, a database password, a free port
 ├── rebase.json             # Which apps this repository contains, and how each is built
 ├── package.json            # Root workspace config
+├── tsconfig.json           # Typechecks scripts/; each workspace typechecks on its own
 ├── docker-compose.yml      # Self-hosting: Postgres + the published runtime image
+├── scripts/
+│   └── example.ts          # The SDK end to end against the running backend: `pnpm example`
 │
 ├── config/                 # Shared by the backend and the admin panel
 │   ├── index.ts            # Re-exports `collections`; the runtime reads `storageAuthorize` from here
@@ -45,6 +48,11 @@ my-app/
     ├── src/main.tsx
     └── vite.config.ts
 ```
+
+`tsc --noEmit` alla radice controlla `scripts/`; in `config/`, `backend/` o `frontend/`
+controlla quel workspace. <span class="since-badge" data-since="0.25">Da 0.25</span>
+Su 0.24 la radice non ha un `tsconfig.json`, e `tsc` lì stampa il proprio aiuto e non
+controlla nulla.
 
 :::note[Non c'è alcun `backend/src/index.ts`]
 E nessun `Dockerfile`. Un progetto generato tramite scaffold dichiara `runtime: "managed"` in `rebase.json`, il che significa che l'**immagine pubblicata `rebasepro/server` avvia il tuo progetto come bundle** — lo stesso artefatto, sia che tu scelga il self-hosting o il deploy su Rebase Cloud. Puoi configurare il server tramite `rebase.json`, `config/` e variabili d'ambiente, anziché scrivendo un entry point.
@@ -127,7 +135,7 @@ Non c'è alcun file server da leggere, ed è proprio così che è stato progetta
 |---|---|
 | `backend/functions/` | Route personalizzate, montate automaticamente su `/api/functions/<filename>` |
 | `backend/crons/` | Job pianificati, individuati allo stesso modo (crea la cartella quando ne hai bisogno) |
-| `backend/src/schema.generated.ts` | Lo schema Drizzle, rigenerato a partire dalle collection a ogni `rebase dev` e `rebase build` |
+| `backend/src/schema.generated.ts` | Lo schema Drizzle delle tue collection: scritto da `rebase init` e rigenerato a ogni `rebase dev` e `rebase build` |
 
 Il runtime configura:
 
@@ -178,8 +186,8 @@ Lo `slug` diventa il percorso URL nell'interfaccia di amministrazione e l'endpoi
 
 Mentre `rebase dev` è in esecuzione, il salvataggio di un file all'interno di `config/collections/` rigenera `backend/src/schema.generated.ts` e i tipi dell'SDK in `generated/sdk/` e riavvia il backend; all'avvio vengono create le tabelle e le colonne mancanti. Al di fuori di `rebase dev`, gli stessi passaggi corrispondono a `rebase schema generate` e `rebase generate-sdk`.
 
-per i tipi dell'SDK: sulla 0.23, `rebase dev` rigenera solo lo schema, e
-`rebase generate-sdk` resta un passaggio separato.
+Sulla 0.23, `rebase dev` rigenera solo lo schema, e `rebase generate-sdk`
+resta un passaggio separato.
 
 ## Prossimi passi
 

@@ -24,23 +24,35 @@ con una pianificazione propria.
 ## Avvio rapido
 
 ```bash
-# Esegui il backup in una cartella locale (formato personalizzato, compresso)
+# Back up to a local directory (custom format, compressed)
 rebase db backup --out ./backups
 
-# Esegui il backup direttamente su object storage privato
+# Back up straight to private object storage
 rebase db backup --out s3://my-private-bucket/backups
 
-# Elenca i backup disponibili
-rebase db backups list --out ./backups
+# List what you have
+rebase db backups list
 
-# Ripristina in un database NUOVO (non toccando quello attivo)
+# Restore into a FRESH database (does not touch the live one)
 rebase db restore ./backups/rebase-app-20260714T030000Z.dump \
   --create-db --target-db app_restored
 ```
 
 La stringa di connessione proviene dall'ambiente del tuo progetto, come per
-ogni altro [comando `rebase db`](/docs/cli/): `DATABASE_URL`, con fallback su
+ogni altro [comando `rebase db`](/docs/cli/database/): `DATABASE_URL`, con fallback su
 `ADMIN_CONNECTION_STRING`.
+
+<span class="since-badge" data-since="0.25">Da 0.25</span> Un `--out` relativo, il
+valore predefinito `./backups` e un percorso di dump passato a `rebase db restore` si
+risolvono tutti rispetto alla directory da cui esegui `rebase`, normalmente la radice del
+progetto, così `rebase db backup` e `rebase db backups list` si incontrano nello stesso
+posto. Un `BACKUP_DESTINATION` relativo si risolve rispetto alla directory del backend,
+dove lo legge anche il server. Tutti e tre i comandi rifiutano un'opzione che non
+accettano prima di eseguire qualsiasi cosa, e nominano quella che probabilmente intendevi.
+La password arriva a `pg_dump`, `pg_dumpall` e `pg_restore` in `PGPASSWORD`, mai sulla loro
+riga di comando, così nessun messaggio di errore né elenco dei processi la mostra. Su 0.24
+il valore predefinito era `backend/backups`, un'opzione scritta male veniva ignorata, e un
+ripristino fallito stampava la stringa di connessione con la sua password.
 
 ## Cos'è un backup
 
@@ -51,7 +63,7 @@ cui si basano l'ordinamento e la retention.
 
 | Opzione | Descrizione |
 | --- | --- |
-| `--out`, `-o` | Un percorso locale, o un URL `s3://bucket/prefix` / `gs://bucket/prefix`. Il valore predefinito è `$BACKUP_DESTINATION`, poi `./backups`. |
+| `--out`, `-o` | Un percorso locale, o un URL `s3://bucket/prefix` / `gs://bucket/prefix`. Il valore predefinito è `$BACKUP_DESTINATION`, poi `./backups` nella directory da cui esegui `rebase`. |
 | `--exclude-schema <s>` | Esclude uno schema dal dump (ripetibile). Non escludere mai `rebase` — vedi sotto. |
 | `--no-owner` | Omette i comandi di proprietà, per ripristinare come un ruolo diverso. |
 | `--enable-row-security` | Esegue il dump come soggetto admin invece di fallire sulla row-level security. **Può produrre un dump parziale** — vedi [Row-level security](#row-level-security-e-il-dump-silenziosamente-incompleto). |
@@ -88,6 +100,11 @@ dei record, la coda dei job, i log dei cron, e le funzioni richiamate dalle
 tue policy RLS e dai trigger di change-capture. Un dump senza di esso non ha
 utenti, e non può essere ripristinato in un database vuoto: le tabelle che
 contiene hanno policy che richiamano funzioni che non contiene.
+
+<span class="since-badge" data-since="0.25">Da 0.25</span> Poiché contiene ogni password
+e hash di chiave, un dump locale e il suo `.globals.sql` vengono creati leggibili solo dal
+proprietario (0600), prima che `pg_dump` vi scriva; lo sono anche i file locali di un
+backup pianificato. Su 0.24 sono 0644.
 
 ## Backup pianificati
 
@@ -154,8 +171,7 @@ valido è stato eliminato. La potatura tocca solo i file il cui nome
 corrisponde al pattern dei backup; qualsiasi altra cosa che condivide il
 bucket o il prefisso resta intatta.
 
-Il cron esegue `pg_dump` all'interno del processo server.
-l'immagine di
+Il cron esegue `pg_dump` all'interno del processo server. L'immagine di
 runtime ufficiale (`rebasepro/server`, vedi
 [Self-hosting](/docs/deployment/self-hosting/)) include a questo scopo gli
 strumenti client di PostgreSQL 18;
@@ -260,13 +276,12 @@ l'orario. **Download** scarica il dump; **Roles file** scarica il suo
 backup contrassegnato **No roles file** non ha il file collaterale: ricrea i
 suoi ruoli a mano prima di ripristinarlo in un nuovo Postgres.
 
-sopra l'elenco
-viene mostrato il job di backup pianificato e la sua ultima esecuzione.
-Un'esecuzione fallita viene mostrata come errore con il proprio messaggio,
+Sopra l'elenco, il pannello riporta il job di backup pianificato e la sua ultima
+esecuzione. Un'esecuzione fallita viene mostrata come errore con il proprio messaggio,
 così un backup notturno che non riesce a eseguirsi è visibile dove sono
 elencati i backup, non solo nel pannello Cron Jobs.
 
-ecco cosa riporta sul job:
+Cosa dice del job:
 
 - **Last scheduled backup** è l'ultima esecuzione fatta dalla pianificazione. Un'esecuzione
   avviata a mano da allora (**Run Now** in Cron Jobs) ha una riga a sé, così un'esecuzione
@@ -282,9 +297,8 @@ ecco cosa riporta sul job:
 - Quando la cronologia delle esecuzioni in `rebase.cron_logs` non può essere letta, il
   pannello lo dice, anziché dire che il backup non è ancora stato eseguito.
 
-l'elenco viene letto
-dal processo server che risponde a `GET /api/admin/backups`, e non sempre è
-il processo che esegue la pianificazione:
+L'elenco viene letto dal processo server che risponde a `GET /api/admin/backups`,
+e non sempre è il processo che esegue la pianificazione:
 
 - Una destinazione `s3://` viene elencata e scaricata tramite un client per quel
   bucket, costruito dalle stesse variabili `S3_*` usate dal cron di backup. Una `gs://`
