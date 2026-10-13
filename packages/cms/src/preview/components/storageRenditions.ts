@@ -11,10 +11,12 @@ import type { PreviewSize } from "../../types/components/PropertyPreviewProps";
  * Firebase or custom source's URL, or an external one, is left as it is — and
  * only for an image the server would transform (not SVG, not GIF).
  *
- * The resize needs `sharp`, which is optional: without it the route answers
- * 500. So whether a server resizes is learned once per page load from one probe
- * image, and no thumbnail asks for a rendition before that is known. A server
- * that cannot resize costs one failed request per page load, not one per row.
+ * The resize needs `sharp`, which is optional: without it the route serves the
+ * original image in place of the rendition (one warning in the server log), so a
+ * thumbnail still loads, only at full size. Whether a server resizes is learned
+ * once per page load from one probe image, and no thumbnail asks for a
+ * rendition before that is known; an older server that answers 500 there costs
+ * one failed request per page load, not one per row.
  */
 
 /** Rendition widths, about twice the rendered box (high-density screens). */
