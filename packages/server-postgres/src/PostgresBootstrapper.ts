@@ -1787,13 +1787,20 @@ schemaHealthCheck: () => probeAuthSchema(db, resolveAuthSchema(authCollection)) 
                 : pgConfig.realtime?.maxSocketsPerUser !== undefined
                     ? parseMaxSocketsPerUser(pgConfig.realtime.maxSocketsPerUser, "realtime.maxSocketsPerUser")
                     : undefined;
+            // The path this adapter was told to answer on wins over the one
+            // the server derived from its mount point.
+            const path = pgConfig.realtime?.path ?? limits?.path;
             createPostgresWebSocket(
                 server as import("http").Server,
                 realtimeService,
                 driver as PostgresBackendDriver,
                 config as { requireAuth?: boolean; jwtSecret?: string; serviceKey?: string },
                 adapter as AuthAdapter | undefined,
-                maxSocketsPerUser !== undefined ? { ...limits, maxSocketsPerUser } : limits
+                {
+                    ...limits,
+                    ...(maxSocketsPerUser !== undefined ? { maxSocketsPerUser } : {}),
+                    ...(path !== undefined ? { path } : {})
+                }
             );
         }
     };

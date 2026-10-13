@@ -15,6 +15,7 @@ import type { User } from "@rebasepro/types";
 
 import { WebSocketServer, WebSocket, type RawData } from "ws";
 import type { Server, IncomingMessage } from "http";
+import type { Duplex } from "stream";
 import { inspect } from "util";
 import { extractUserFromToken, AccessTokenPayload, safeCompare, resolveRequireAuth, assertWriteRequestValid, assertFieldOpsValid, assertNoFieldOpsOnCreate, declaredErrorAnswer, RUNTIME_DEFAULT_MAX_BODY_SIZE, ApiError, resolveConflictTarget, assertNestedWriteAllowed, assertNoUserUpsert, assertUserCreationBodyValid, createUserThroughAuthCollection, type NestedWriteKind } from "@rebasepro/server";
 import { logger, getAccessModel, decideImpersonation, type ImpersonationCredential } from "@rebasepro/server";
@@ -440,6 +441,38 @@ function frameCollection(type: string, payload: unknown): string | undefined {
     return path;
 }
 
+/**
+ * A URL path with its trailing `/` dropped, so `/app` and `/app/` are one
+ * path — and `/` stays `/`.
+ */
+function normalizeSocketPath(path: string): string {
+    const withLeadingSlash = path.startsWith("/") ? path : `/${path}`;
+    const trimmed = withLeadingSlash.replace(/\/+$/, "");
+    return trimmed === "" ? "/" : trimmed;
+}
+
+/** The path an upgrade request asks for, without its query. */
+function upgradePathOf(request: IncomingMessage): string {
+    const url = request.url ?? "/";
+    const queryAt = url.indexOf("?");
+    return normalizeSocketPath(queryAt === -1 ? url : url.slice(0, queryAt));
+}
+
+/**
+ * Answer an upgrade nobody will take with a plain HTTP 404 and close it, so
+ * the client sees a refusal instead of a socket that never opens.
+ */
+function refuseUpgrade(socket: Duplex): void {
+    if (!socket.writable) {
+        socket.destroy();
+        return;
+    }
+    // Destroyed once the answer is flushed — destroying straight away could
+    // drop it, and the client would read a reset instead of the 404.
+    socket.once("finish", () => socket.destroy());
+    socket.end("HTTP/1.1 404 Not Found\r\nConnection: close\r\nContent-Length: 0\r\n\r\n");
+}
+
 /** A frame's size in bytes, however `ws` delivered it. */
 function frameBytes(data: RawData): number {
     if (Array.isArray(data)) return data.reduce((total, chunk) => total + chunk.length, 0);
@@ -530,19 +563,35 @@ export function createPostgresWebSocket(
     // before any handler runs; this is the same limit, enforced by `ws` while
     // it reads the frame. `0` is "none" to both.
     const maxPayload = options?.maxPayload ?? RUNTIME_DEFAULT_MAX_BODY_SIZE;
-    const wss = new WebSocketServer({ server, maxPayload: maxPayload > 0 ? maxPayload : 0 });
+    const wss = new WebSocketServer({ noServer: true, maxPayload: maxPayload > 0 ? maxPayload : 0 });
 
-    // Handle errors on the WSS so that EADDRINUSE from the underlying HTTP
-    // server doesn't surface as an unhandled 'error' event and crash the
-    // process.  The dev-mode `listenWithPortRetry` utility handles retry
-    // logic on the HTTP server side — we just need the WSS not to throw.
-    wss.on("error", (err: NodeJS.ErrnoException) => {
-        if (err.code === "EADDRINUSE") {
-            // Silently absorbed — listenWithPortRetry will retry the next port
-            return;
-        }
+    wss.on("error", (err: Error) => {
         logger.error("❌ [WebSocket Server] Error", { error: err });
     });
+
+    // The host's `http.Server` is shared, so this socket takes the upgrades
+    // on its own path and no others. Given the server, `ws` would claim every
+    // upgrade on it — and refuse a path it was not given with a 400 — so a
+    // host's own WebSocket on `/chat` had both servers answering one socket.
+    //
+    // An upgrade to another path is left alone for whichever listener it is
+    // for. When this listener is the only one, nothing else will answer it,
+    // so it is refused rather than left open until the client gives up. A
+    // dispatcher that lifts this listener off and calls it for the upgrades
+    // it does not claim itself (the cloud control plane does) is then the
+    // only listener, and gets the same refusal.
+    const socketPath = normalizeSocketPath(options?.path ?? "/");
+    const onUpgrade = (request: IncomingMessage, socket: Duplex, head: Buffer) => {
+        if (upgradePathOf(request) !== socketPath) {
+            if (server.listenerCount("upgrade") <= 1) refuseUpgrade(socket);
+            return;
+        }
+        wss.handleUpgrade(request, socket, head, (client) => wss.emit("connection", client, request));
+    };
+    if (typeof server.on === "function") {
+        server.on("upgrade", onUpgrade);
+        wss.on("close", () => server.off("upgrade", onUpgrade));
+    }
 
     // The same predicate the HTTP data routes use, from the same function —
     // this socket is the other enforcement point for one product decision, and

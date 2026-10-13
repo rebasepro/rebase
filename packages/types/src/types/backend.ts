@@ -366,6 +366,13 @@ export interface RealtimeChannelsConfig {
      * `REALTIME_RECOUNT_MIN_ROWS` wins over it.
      */
     recountMinRows?: number;
+    /**
+     * The URL path the realtime socket accepts upgrades on. Defaults to the
+     * one the server derives from where it is mounted — `/` for a server at
+     * `/api`, which is where the SDK dials. Set it when clients dial elsewhere
+     * (a `websocketUrl` with a path). See {@link RealtimeSocketOptions.path}.
+     */
+    path?: string;
 }
 
 /**
