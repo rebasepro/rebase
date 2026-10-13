@@ -190,6 +190,7 @@ export async function createDump(opts: {
     const outDir = opts.outDir ?? fs.mkdtempSync(path.join(os.tmpdir(), "rebase-backup-"));
     fs.mkdirSync(outDir, { recursive: true });
     const localFile = path.join(outDir, fileName);
+    createOwnerOnly(localFile);
 
     const tool = libpqInvocation(opts.connectionString, env);
     const args = buildPgDumpArgs({
@@ -248,6 +249,7 @@ export async function createDump(opts: {
             );
         }
         const globalsFile = globalsFileForDump(localFile);
+        createOwnerOnly(globalsFile);
         try {
             await execa(
                 dumpallBin,
@@ -269,6 +271,22 @@ export async function createDump(opts: {
     }
 
     return result;
+}
+
+/**
+ * Create `file` empty and readable by its owner only, before a tool writes it.
+ *
+ * A dump holds every row, and the `.globals.sql` sidecar every role's password
+ * hash. pg_dump and pg_dumpall create their `--file=` target with the
+ * process's umask — 0644 on most machines, readable by every user — and keep
+ * the mode of a file that is already there. Created 0600 first, the file is
+ * never readable by anyone else, not even while the dump runs; chmod-ing it
+ * afterwards would leave it open for as long as that takes. A file that
+ * already existed is narrowed too.
+ */
+function createOwnerOnly(file: string): void {
+    fs.closeSync(fs.openSync(file, "w", 0o600));
+    fs.chmodSync(file, 0o600);
 }
 
 /**
