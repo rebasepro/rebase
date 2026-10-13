@@ -30,7 +30,10 @@ my-app/
 ├── .env                    # Generated for you: JWT_SECRET, a database password, a free port
 ├── rebase.json             # Which apps this repository contains, and how each is built
 ├── package.json            # Root workspace config
+├── tsconfig.json           # Typechecks scripts/; each workspace typechecks on its own
 ├── docker-compose.yml      # Self-hosting: Postgres + the published runtime image
+├── scripts/
+│   └── example.ts          # The SDK end to end against the running backend: `pnpm example`
 │
 ├── config/                 # Shared by the backend and the admin panel
 │   ├── index.ts            # Re-exports `collections`; the runtime reads `storageAuthorize` from here
@@ -53,6 +56,11 @@ my-app/
     ├── src/main.tsx
     └── vite.config.ts
 ```
+
+`tsc --noEmit` im Root prüft `scripts/`; in `config/`, `backend/` oder `frontend/` prüft es
+jeweils diesen Workspace. <span class="since-badge" data-since="0.25">Seit 0.25</span>
+Unter 0.24 hat das Root keine `tsconfig.json`, und `tsc` gibt dort seine Hilfe aus und prüft
+nichts.
 
 :::note[Es gibt kein `backend/src/index.ts`]
 Und kein `Dockerfile`. Ein neu erstelltes Projekt deklariert `runtime: "managed"` in
@@ -149,7 +157,7 @@ die Runtime einliest:
 |---|---|
 | `backend/functions/` | Eigene Routen, automatisch unter `/api/functions/<filename>` gemountet |
 | `backend/crons/` | Zeitgesteuerte Jobs (Cronjobs), die auf dieselbe Weise erkannt werden (erstellen Sie das Verzeichnis bei Bedarf) |
-| `backend/src/schema.generated.ts` | Das Drizzle-Schema, das bei jedem `rebase dev` und `rebase build` aus Ihren Collections neu generiert wird |
+| `backend/src/schema.generated.ts` | Das Drizzle-Schema Ihrer Collections: von `rebase init` geschrieben und bei jedem `rebase dev` und `rebase build` neu generiert |
 
 Die Runtime richtet Folgendes ein:
 
@@ -220,8 +228,8 @@ generiert und das Backend neu gestartet; beim Hochfahren werden fehlende Tabelle
 Spalten automatisch erstellt. Außerhalb von `rebase dev` entsprechen diese Schritte
 `rebase schema generate` und `rebase generate-sdk`.
 
-für die SDK-Typen: Unter 0.23
-generiert `rebase dev` nur das Schema neu, und `rebase generate-sdk` ist ein eigener Schritt.
+Unter 0.23 generiert `rebase dev` nur das Schema neu, und `rebase generate-sdk` ist ein
+eigener Schritt.
 
 ## Nächste Schritte
 

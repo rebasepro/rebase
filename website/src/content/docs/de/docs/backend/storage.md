@@ -32,7 +32,7 @@ const backend = await initializeRebaseBackend({
     // ...
     storage: {
         type: "local",
-        basePath: "./uploads"   // Verzeichnis für Dateispeicherung
+        basePath: "./uploads"   // Directory for file storage
     }
 });
 ```
@@ -50,8 +50,8 @@ const backend = await initializeRebaseBackend({
         region: env.S3_REGION || "auto",
         accessKeyId: env.S3_ACCESS_KEY_ID || "",
         secretAccessKey: env.S3_SECRET_ACCESS_KEY || "",
-        endpoint: env.S3_ENDPOINT,          // Für MinIO, R2 usw.
-        forcePathStyle: env.S3_FORCE_PATH_STYLE  // Erforderlich für MinIO
+        endpoint: env.S3_ENDPOINT,          // For MinIO, R2, etc.
+        forcePathStyle: env.S3_FORCE_PATH_STYLE  // Required for MinIO
     }
 });
 ```
@@ -90,7 +90,7 @@ image: {
     name: "Image",
     storage: {
         storagePath: "products",
-        storageSource: "media"  // Leitet an das "media" S3-Backend weiter
+        storageSource: "media"  // Routes to the "media" S3 backend
     }
 }
 ```
@@ -189,7 +189,7 @@ Routen akzeptieren wie gewohnt das Zugriffs-JWT.
 Rebase enthält eine integrierte Bildverarbeitungspipeline auf Basis von **Sharp**. Beim Ausliefern von Bild-Assets aus dem Speicher können Sie dynamische Operationen über Abfrageparameter anwenden:
 
 ```bash
-# Bild skaliert auf 300px Breite im WebP-Format ausliefern
+# Serve image scaled to 300px width in webp format
 GET /api/storage/file/products/laptop.jpg?width=300&format=webp
 ```
 
@@ -206,10 +206,10 @@ ohne Rückmeldung darüber zu geben.
 
 Die Thumbnails gespeicherter Bilder im Admin-Panel nutzen diesen Endpunkt: Eine Tabellen- oder Karten-Vorschau
 fordert eine WebP-Version an, die etwa doppelt so groß wie ihre dargestellte Größe ist (96–800px),
-anstatt des Originals. `sharp` ist eine optionale Abhängigkeit; ohne diese antwortet die
-Transformation mit 500. Das Panel prüft dies einmal pro Seitenaufruf mit einer einzelnen
-Transformationsanfrage und zeigt die Originale an, falls der Server keine Größenanpassung vornehmen kann. SVG- und GIF-Dateien
-werden immer unverändert angezeigt.
+anstatt des Originals. SVG- und GIF-Dateien werden immer unverändert angezeigt.
+`sharp` ist optional: <span class="since-badge" data-since="0.25">Seit 0.25</span>
+ohne es erhält eine Transformationsanfrage das Original, und das Backend warnt einmal,
+`pnpm add sharp` in `backend/` auszuführen (unter 0.24 antwortet es mit 500, und das Panel zeigt die Originale).
 
 ### Performance & LRU-Caching
 
@@ -286,11 +286,10 @@ fortsetzbarer Upload wird bereits bei der Erstellung abgelehnt, noch vor seinem 
 `OPTIONS /api/storage/tus` meldet ihn als `Tus-Max-Size` — für die durch `?storageId=` benannte
 Quelle bzw. andernfalls für die Standardquelle.
 
-Zu `STORAGE_MAX_FILE_SIZE`: In Version 0.23 legt ausschließlich das Feld `maxFileSize` der Quelle
-das Limit fest, und die Variable wird nicht ausgewertet.
+In Version 0.23 legt ausschließlich das Feld `maxFileSize` der Quelle das Limit fest; `STORAGE_MAX_FILE_SIZE` wird nicht ausgewertet.
 
 ```bash
-STORAGE_MAX_FILE_SIZE=209715200          # (Standard): 200 MB
+STORAGE_MAX_FILE_SIZE=209715200          # (default): 200 MB
 STORAGE_MAX_FILE_SIZE__MEDIA=1073741824  # media: 1 GB
 ```
 
@@ -332,7 +331,7 @@ Ein Projekt kann mehr als ein Bucket haben. Deklarieren Sie jedes davon in `conf
 ```ts
 import { bucket } from "@rebasepro/types";
 
-export const uploads = bucket({ engine: "s3" });    // Das Standard-Bucket
+export const uploads = bucket({ engine: "s3" });    // the default one
 export const media = bucket("media", { engine: "s3", label: "Media" });
 ```
 
@@ -343,10 +342,11 @@ Topics im Zusammenspiel.
 
 Jede Quelle wird über **dieselben Variablennamen mit ihrem eigenen Suffix** konfiguriert.
 Die Standardquelle verwendet kein Suffix, sodass ein Projekt mit nur einem Bucket weiterhin die
-einfachen Namen von oben nutzen kann und gar nichts deklarieren muss:
+einfachen Namen von oben nutzen kann und gar nichts deklarieren muss, und benannte Buckets daneben zu
+deklarieren ändert sie nicht (<span class="since-badge" data-since="0.25">Seit 0.25</span>, [Details](/docs/backend/multiple-sources/#which-bucket-receives-an-unqualified-upload)):
 
 ```bash
-S3_BUCKET=app-uploads             # (Standard)
+S3_BUCKET=app-uploads             # (default)
 S3_BUCKET__MEDIA=app-media        # media
 S3_ACCESS_KEY_ID__MEDIA=…
 S3_SECRET_ACCESS_KEY__MEDIA=…
@@ -386,9 +386,9 @@ export const avatars = bucket("avatars", { engine: "s3", account: "minio" });
 ```
 
 ```bash
-S3_BUCKET__MEDIA=b-media          # immer pro Bucket
+S3_BUCKET__MEDIA=b-media          # per bucket, always
 S3_BUCKET__AVATARS=b-avatars
-S3_ACCESS_KEY_ID__MINIO=…         # von beiden geteilt
+S3_ACCESS_KEY_ID__MINIO=…         # shared by both
 S3_SECRET_ACCESS_KEY__MINIO=…
 S3_ENDPOINT__MINIO=https://minio.internal
 ```
@@ -409,9 +409,9 @@ import { Rebase } from "@rebasepro/app";
 <Rebase
     apiUrl="https://api.example.com"
     storageSources={[
-        // `engine` benennt den Provider, `transport` bestimmt die Kommunikation:
-        // "server" leitet über das Rebase-Backend weiter, "direct" kommuniziert
-        // vom Client direkt zum Provider (erfordert eine `source`-Implementierung).
+        // `engine` names the provider, `transport` says who talks to it:
+        // "server" proxies through the Rebase backend, "direct" goes
+        // client-to-provider (and needs a `source` implementation).
         { key: "media", engine: "s3", transport: "server", label: "Media CDN" },
         { key: "firebase", engine: "firebase", transport: "server", label: "Firebase Storage" },
     ]}
@@ -508,7 +508,7 @@ await initializeRebaseBackend({
     storage: { type: "s3", bucket: "app-files", /* ... */ },
     storageAuthorize: async ({ key, bucket, operation, user }) => {
         if (!user) return false;
-        // Schlüssel sind strukturiert als `{teamId}/{docId}/...`
+        // Keys are laid out as `{teamId}/{docId}/...`
         const [teamId] = key.split("/");
         return isTeamMember(user.uid, teamId);
     }
@@ -559,7 +559,7 @@ storageTriggers: [
         path: "uploads/:uid/**",
         events: ["finalize"],
         handler: async ({ key, params, size, user }) => {
-            await indexUpload.enqueue({ key, uid: params.uid, size }); // ein `queue()` in config/resources.ts
+            await indexUpload.enqueue({ key, uid: params.uid, size }); // a `queue()` in config/resources.ts
         }
     }
 ]

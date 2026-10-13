@@ -32,7 +32,7 @@ rebase db backup --out ./backups
 rebase db backup --out s3://my-private-bucket/backups
 
 # List what you have
-rebase db backups list --out ./backups
+rebase db backups list
 
 # Restore into a FRESH database (does not touch the live one)
 rebase db restore ./backups/rebase-app-20260714T030000Z.dump \
@@ -40,8 +40,20 @@ rebase db restore ./backups/rebase-app-20260714T030000Z.dump \
 ```
 
 Die Connection-String stammt aus der Umgebung Ihres Projekts, wie bei jedem
-anderen [`rebase db`-Befehl](/docs/cli/): `DATABASE_URL`, mit Rückfall auf
+anderen [`rebase db`-Befehl](/docs/cli/database/): `DATABASE_URL`, mit Rückfall auf
 `ADMIN_CONNECTION_STRING`.
+
+<span class="since-badge" data-since="0.25">Seit 0.25</span> Ein relatives `--out`, der
+Standard `./backups` und ein Dump-Pfad, den Sie `rebase db restore` übergeben, werden alle
+gegen das Verzeichnis aufgelöst, aus dem Sie `rebase` ausführen, normalerweise das
+Projekt-Root, sodass sich `rebase db backup` und `rebase db backups list` an einem Ort
+treffen. Ein relatives `BACKUP_DESTINATION` wird gegen das Backend-Verzeichnis aufgelöst,
+wo der Server es ebenfalls liest. Alle drei Befehle verweigern eine Option, die sie nicht
+kennen, bevor irgendetwas läuft, und nennen die, die Sie vermutlich meinten. Das Passwort
+geht in `PGPASSWORD` an `pg_dump`, `pg_dumpall` und `pg_restore`, nie in deren
+Befehlszeile, sodass keine Fehlermeldung und keine Prozessliste es zeigt. Unter 0.24 war der
+Standard `backend/backups`, eine falsch geschriebene Option wurde ignoriert, und eine
+fehlgeschlagene Wiederherstellung gab den Connection-String mit seinem Passwort aus.
 
 ## Was ein Backup ist
 
@@ -52,7 +64,7 @@ ist das, wonach Retention und Auflistung sortieren.
 
 | Option | Beschreibung |
 | --- | --- |
-| `--out`, `-o` | Ein lokaler Pfad, oder eine `s3://bucket/prefix`- / `gs://bucket/prefix`-URL. Standardmäßig `$BACKUP_DESTINATION`, dann `./backups`. |
+| `--out`, `-o` | Ein lokaler Pfad, oder eine `s3://bucket/prefix`- / `gs://bucket/prefix`-URL. Standardmäßig `$BACKUP_DESTINATION`, dann `./backups` in dem Verzeichnis, aus dem Sie `rebase` ausführen. |
 | `--exclude-schema <s>` | Ein Schema aus dem Dump auslassen (wiederholbar). Lassen Sie `rebase` niemals aus — siehe unten. |
 | `--no-owner` | Eigentumsbefehle auslassen, zum Wiederherstellen als andere Rolle. |
 | `--enable-row-security` | Als Admin-Subjekt dumpen, statt an Row-Level Security zu scheitern. **Kann einen unvollständigen Dump erzeugen** — siehe [Row-Level Security](#row-level-security-und-der-dump-der-still-und-leise-unvollständig-ist). |
@@ -91,6 +103,11 @@ Ihre RLS-Policies und Change-Capture-Trigger aufrufen. Ein Dump ohne dieses
 Schema hat keine Benutzer und kann überhaupt nicht in eine leere Datenbank
 wiederhergestellt werden: Die Tabellen, die er enthält, besitzen Policies, die
 Funktionen aufrufen, die er nicht enthält.
+
+<span class="since-badge" data-since="0.25">Seit 0.25</span> Weil er jedes Passwort und
+jeden Schlüssel-Hash enthält, werden ein lokaler Dump und seine `.globals.sql` nur für ihren
+Eigentümer lesbar (0600) angelegt, bevor `pg_dump` in sie schreibt; die lokalen Dateien eines
+geplanten Backups ebenfalls. Unter 0.24 sind sie 0644.
 
 ## Geplante Backups
 
@@ -162,10 +179,9 @@ Backup gelöscht wurde. Die Bereinigung betrifft nur Dateien, deren Namen dem
 Backup-Muster entsprechen; alles andere, das sich den Bucket oder das Präfix
 teilt, bleibt unberührt.
 
-Der Cron-Job führt `pg_dump` innerhalb des Serverprozesses aus.
-liefert das
+Der Cron-Job führt `pg_dump` innerhalb des Serverprozesses aus. Das
 offizielle Runtime-Image (`rebasepro/server`, siehe
-[Self-Hosting](/docs/deployment/self-hosting/)) die PostgreSQL-18-Client-Tools
+[Self-Hosting](/docs/deployment/self-hosting/)) liefert die PostgreSQL-18-Client-Tools
 dafür mit; auf 0.23 und früher hatte es keine, und jeder geplante Lauf
 scheiterte mit `Could not find the 'pg_dump' binary`. Überall sonst — ein VPS,
 Ihr eigenes Image — installieren Sie die Client-Tools selbst (siehe nächster
@@ -269,13 +285,12 @@ Backup, das als **No roles file** markiert ist, hat kein Sidecar: Legen Sie
 seine Rollen von Hand neu an, bevor Sie es in ein neues Postgres
 wiederherstellen.
 
-meldet es über
-der Liste den geplanten Backup-Job und seinen letzten Lauf. Ein fehlgeschlagener
+Über der Liste meldet das Werkzeug den geplanten Backup-Job und seinen letzten Lauf. Ein fehlgeschlagener
 Lauf wird als Fehler mit seiner Meldung angezeigt, sodass ein nächtliches
 Backup, das nicht laufen kann, dort sichtbar ist, wo die Backups aufgeführt
 sind, nicht nur im Cron-Jobs-Werkzeug.
 
-sagt es über den Job Folgendes:
+Was das Werkzeug über den Job sagt:
 
 - **Last scheduled backup** ist der letzte Lauf, den der Zeitplan ausgeführt hat. Ein
   seitdem von Hand gestarteter Lauf (**Run Now** im Cron-Jobs-Werkzeug) bekommt eine
@@ -291,7 +306,7 @@ sagt es über den Job Folgendes:
 - Wenn der Ausführungsverlauf in `rebase.cron_logs` nicht gelesen werden kann, sagt das
   Werkzeug genau das, statt zu melden, dass das Backup noch nicht gelaufen ist.
 
-wird die Liste von
+Die Liste wird von
 dem Server-Prozess gelesen, der `GET /api/admin/backups` beantwortet, und das ist
 nicht immer der Prozess, der den Zeitplan ausführt:
 

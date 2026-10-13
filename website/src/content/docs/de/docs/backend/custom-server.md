@@ -26,13 +26,18 @@ Rebase stellt mit `loadEnv()` in `@rebasepro/server` ein zentrales Hilfsprogramm
 import dotenv from "dotenv";
 import { loadEnv } from "@rebasepro/server";
 
-dotenv.config({ path: "../../.env" });
+// `rebase dev` and `rebase start` name the project's .env in DOTENV_CONFIG_PATH.
+// Unset, dotenv reads `.env` in the working directory.
+dotenv.config({ path: process.env.DOTENV_CONFIG_PATH, quiet: true });
 
-// Basic — just Rebase env vars:
 export const env = loadEnv();
+```
 
-// Extended — add your own typed vars:
-import { z } from "@rebasepro/server";
+Um eigene typisierte Variablen hinzuzufügen, erweitern Sie das Schema:
+
+```typescript
+import { loadEnv, z } from "@rebasepro/server";
+
 export const env = loadEnv({
     extend: z.object({
         SMTP_HOST: z.string().optional(),
@@ -51,7 +56,7 @@ die die Runtime verwendet, und lassen Sie Ihren Bundler die beiden Kopien dedupl
 :::caution[Das `z`, mit dem Sie erweitern, muss das Zod der Runtime sein]
 Zwei gleichzeitig geladene Kopien von Zod sind die einzige Ursache dafür, dass dieser Aufruf fehlschlägt – und früher geschah dies stillschweigend. `.merge()` akzeptiert ein Schema der anderen Kopie (die Strukturen sind identisch), und anschließend lehnt `.parse()` jedes Feld mit einem `.default()` ab, da ein Standardwert anhand der Klassenidentität erkannt wird. Der Server fuhr hoch, meldete Erfolg und führte keinen seiner Crons aus; keine Fehlermeldung erwähnte Zod.
 
-Deklarieren Sie `zod` nicht in den Abhängigkeiten Ihres Projekts – die Runtime stellt es bereit. Wenn Sie es müssen, stimmen Sie die Major-Version ab und lassen Sie Ihren Bundler deduplizieren. `loadEnv` verweigert jetzt beim Start ein fremdes Schema mit einer Meldung, die die Lösung nennt, anstatt es zu akzeptieren und nur die Hälfte davon zu validieren.
+Die Runtime stellt `zod` bereit. Die `backend/package.json` des Scaffolds führt es in dem Bereich auf, den `@rebasepro/server` verwendet, sodass eine einzige Kopie installiert wird: Halten Sie die beiden gleich. `loadEnv` verweigert jetzt beim Start ein fremdes Schema mit einer Meldung, die die Lösung nennt, anstatt es zu akzeptieren und nur die Hälfte davon zu validieren.
 :::
 
 **Wichtigste Verhaltensweisen:**
@@ -82,32 +87,85 @@ backend.start();
 ```
 
 Das `shutdown()`, das es zurückgibt, schließt auch den Server, der ihm übergeben
-wurde. Hier dasselbe, ausgeschrieben in einem eigenen Server, bereit zum Ändern:
+wurde. Hier dasselbe, ausgeschrieben als `backend/src/index.ts` eines Projekts, bereit
+zum Ändern. `rebase dev` führt diese Datei aus, wenn ein Projekt eine hat, anstelle des
+eigenen Starts der Runtime. In ein Scaffold-Projekt eingefügt, liefert sie aus, was die
+Runtime ausgeliefert hat: die API auf dem Port, den `rebase dev` gewählt hat, Anmeldung
+und Registrierung mit der Users-Collection des Projekts, die Funktionen in
+`backend/functions/`, die Cron-Jobs in `backend/crons/`, die in `config/resources.ts`
+deklarierten Buckets und das CORS, das das Admin-Panel auf seinem eigenen Port braucht.
 
 ```typescript
+import { existsSync } from "node:fs";
 import { createServer } from "node:http";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import dotenv from "dotenv";
 import { Hono } from "hono";
+import { cors } from "hono/cors";
+import { secureHeaders } from "hono/secure-headers";
 import { getRequestListener } from "@hono/node-server";
 import {
+    CORS_EXPOSED_HEADERS,
     createRebaseBackend,
     installShutdownHandlers,
     installUnhandledRejectionHandler,
+    isLocalhostOrigin,
+    loadEnv,
+    logger,
+    resolveStorageSources,
     setDefaultBackend,
     type HonoEnv
 } from "@rebasepro/server";
-import { createPostgresAdapter, createPostgresDatabaseConnection } from "@rebasepro/server-postgres";
-import { collections } from "./collections";
+import {
+    createPostgresAdapter,
+    createPostgresDatabaseConnection,
+    postgresDriverConfigFromEnv
+} from "@rebasepro/server-postgres";
+import { declaredStorageSources } from "@rebasepro/types";
+import "../../config/resources";
+import usersCollection from "../../config/collections/users";
+import { storageAuthorize } from "../../config/storage";
+
+// dotenv never overrides a variable already set, so what `rebase dev` sets wins.
+dotenv.config({ path: process.env.DOTENV_CONFIG_PATH, quiet: true });
+const env = loadEnv();
+
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
+const cronsDir = path.join(root, "backend/crons");
 
 installUnhandledRejectionHandler();
 
 const app = new Hono<HonoEnv>();
+
+// Localhost in development, and the origins in CORS_ORIGINS or FRONTEND_URL.
+const origins = (env.CORS_ORIGINS || env.FRONTEND_URL || "").split(",").map((origin) => origin.trim());
+app.use("/*", cors({
+    origin: (origin) =>
+        origins.includes(origin) || (env.NODE_ENV !== "production" && isLocalhostOrigin(origin)) ? origin : null,
+    credentials: true,
+    exposeHeaders: [...CORS_EXPOSED_HEADERS]
+}));
+app.use("/*", secureHeaders());
+
 const server = createServer({ maxHeaderSize: 64 * 1024 }, getRequestListener(app.fetch));
-const { db, pool, connectionString } = createPostgresDatabaseConnection(process.env.DATABASE_URL!);
+const { db, pool, connectionString } = createPostgresDatabaseConnection(env.DATABASE_URL);
 
 const backend = await createRebaseBackend({
-    collections,
-    database: createPostgresAdapter({ connection: db, connectionString }),
-    auth: { jwtSecret: process.env.JWT_SECRET! },
+    collectionsDir: path.join(root, "config/collections"),
+    functionsDir: path.join(root, "backend/functions"),
+    cronsDir: existsSync(cronsDir) ? cronsDir : undefined,
+    database: createPostgresAdapter(postgresDriverConfigFromEnv({ connection: db, connectionString })),
+    auth: {
+        collection: usersCollection,
+        jwtSecret: env.JWT_SECRET,
+        serviceKey: env.REBASE_SERVICE_KEY,
+        allowRegistration: env.ALLOW_REGISTRATION,
+        cookieAuth: { sameSite: "Lax" }
+    },
+    storage: resolveStorageSources(process.env, declaredStorageSources(), path.join(root, "uploads")),
+    storageAuthorize,
+    history: true,
     provision: true
 });
 
@@ -116,12 +174,35 @@ backend.mount(app, { basePath: "/api" });
 await backend.attachRealtime(server);
 backend.start();
 
-server.listen(3000);
+// The runtime answers health on both paths; an orchestrator probes `/health`.
+for (const healthPath of ["/health", "/api/health"]) {
+    app.get(healthPath, async (c) => {
+        const { healthy } = await backend.healthCheck();
+        return c.json({ status: healthy ? "ok" : "degraded" }, healthy ? 200 : 503);
+    });
+}
+
+// `rebase dev` reads this line to know the backend is up.
+server.listen(env.PORT, () => logger.info(`Server running at http://localhost:${env.PORT}`));
 installShutdownHandlers(
     { shutdown: (timeoutMs) => backend.shutdown(timeoutMs, { server }) },
     { onCleanup: () => pool.end() }
 );
 ```
+
+Die Pfade sind die des Scaffolds. Die Datei verlässt sich auf das, was `rebase dev`
+setzt: den gewählten Port in `PORT`, die verwaltete Datenbank in `DATABASE_URL` und die
+`.env` des Projekts in `DOTENV_CONFIG_PATH`. `loadEnv()` validiert, was darin steht, und
+erzeugt in der Entwicklung `JWT_SECRET`, wenn es nicht gesetzt ist. Lauschen Sie auf
+einem anderen Port, erreicht das Admin-Panel den Server nicht; überspringen Sie
+`loadEnv()`, ist ohne `JWT_SECRET` die Anmeldung aus.
+`rebase dev` wartet außerdem auf die Zeile `Server running at http://localhost:<port>`,
+bevor es das Backend als gestartet meldet. Die `auth`-Optionen sind die des Scaffolds;
+die Runtime liest zusätzlich die OAuth-Provider, E-Mail und die übrigen `AUTH_*`-Variablen,
+geben Sie also die an, die Sie nutzen, wie [Authentifizierung](/docs/backend/authentication/)
+es beschreibt. Ebenso liefert die Datei das gebaute Admin-Panel in Produktion nicht aus:
+Der Entrypoint, den [`rebase eject`](/docs/cli/) schreibt, tut das mit `serveSPA` und
+öffnet eine Verbindung je Datenbank, die in `config/resources.ts` deklariert ist.
 
 `createRebaseBackend` nimmt dieselben Optionen wie `initializeRebaseBackend`, ohne
 `app`, `server` und `basePath` und mit verpflichtendem `provision`. Es baut alles:
@@ -289,10 +370,11 @@ API auf Modulebene: `verifyAccessToken` und die übrigen JWT-Helfer, `getAccessM
 Drei Bausteine arbeiten direkt auf einem Backend, und einer auf gar keinem:
 
 ```typescript
-import { createJwtService, requireScope } from "@rebasepro/server";
+import { createJwtService, requireAuth, requireScope } from "@rebasepro/server";
 
-// Mint a session for this backend, in a test or a login of your own.
-const token = await backend.services.jwt.generateAccessToken("u1", ["editor"]);
+// Mint a session for one of this backend's users, in a test or a login of your
+// own. `userId` is the user's id in the users collection.
+const token = await backend.services.jwt.generateAccessToken(userId, ["editor"]);
 
 // Check a session token or an rk_ API key against this backend, for a socket
 // or a tunnel of your own: its uid, roles, scopes and kind, or null.
@@ -300,16 +382,21 @@ const caller = await backend.verifyCredential(token);
 
 // A route of your own, outside the groups, judged by this backend.
 app.post("/deploy", (c, next) => { c.set("services", backend.services); return next(); },
-    requireScope("project:deploy"), (c) => c.json({ ok: true }));
+    requireAuth, requireScope("project:deploy"), (c) => c.json({ ok: true }));
 
 // A JWT service on its own.
 const jwt = createJwtService({ secret: process.env.JWT_SECRET!, accessExpiresIn: "15m" });
 const payload = await jwt.verifyAccessToken(token);
 ```
 
+Eine erzeugte Sitzung wird bei jeder Anfrage wie jede andere geprüft, daher muss ihre
+uid ein vorhandener Benutzer sein: Bei einer uid ohne Benutzer wird die Anfrage verweigert.
+
 Jede Routengruppe setzt `c.var.services` selbst. Eine Route außerhalb der Gruppen, die
 `requireAuth`, `requireScope` oder einen anderen Guard aus `@rebasepro/server` verwendet,
 liest es dort und fällt auf den Prozess-Standard zurück, wenn es nicht gesetzt ist.
+`requireScope` beurteilt den Aufrufer, den `requireAuth` identifiziert hat, und steht
+deshalb hinter `requireAuth`: Allein verweigert es jede Anfrage mit einem 401.
 
 ## Herunterfahren
 

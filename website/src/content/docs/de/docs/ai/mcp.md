@@ -343,9 +343,9 @@ to allow destructive tools against remote environments.
 
 **Kann überhaupt kein Connection-String aufgelöst werden, werden die geschützten
 DB-Tools verweigert.** Ohne `DATABASE_URL` nutzt die CLI die verwaltete
-Entwicklungsdatenbank, den Standard für ein neues Projekt, und die CLI verweigert dort
-selbst `db push`, `db migrate` und `db branch`. Die Ablehnung sagt das und nennt, was
-stattdessen funktioniert. Sie schlägt das Opt-out nicht vor:
+Entwicklungsdatenbank, den Standard für ein neues Projekt, und das Gate verweigert dort
+seine vier Datenbank-Tools. Die Ablehnung sagt, warum, und nennt, was stattdessen
+funktioniert. Sie schlägt das Opt-out nicht vor:
 
 ```text
 Error: Refusing to run "rebase_db_push": project "default" sets no DATABASE_URL, so the
@@ -354,6 +354,10 @@ most likely do not need this tool: the dev server applies the collections to tha
 database at boot, additively. After changing a collection, restart it with
 rebase_dev_stop and rebase_dev_start. …
 ```
+
+<span class="since-badge" data-since="0.25">Seit 0.25</span> Aus einem Terminal laufen
+`rebase db push` und `rebase db migrate` auf dieser Datenbank; nur die MCP-Tools
+werden verweigert. Unter 0.24 verweigert die CLI sie dort ebenfalls.
 
 Nur Loopback zählt als lokal: `localhost`, `*.localhost`, `127.0.0.0/8`, `::1`.
 Private IP-Bereiche wie `10.x` und `192.168.x` zählen **nicht** dazu – diese könnten

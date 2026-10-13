@@ -19,7 +19,8 @@ und die Standard-Policy-Namen bei langen Tabellen. Die letzten drei sind Produkt
 die Standard-Sitzungsdauer, die Passwortrichtlinie für von Administratoren gewählte Passwörter
 und ein leerer String in einem Pflichtfeld. Danach folgen drei Entfernungen: zwei Client-Exporte,
 die lediglich Engines waren, ein Admin-Hook, der nicht benötigt wird, und eine Storage-Option,
-die keinen Client erreichte.
+die keinen Client erreichte. Die letzte ist die Standard-Storage-Quelle, die das Deklarieren
+eines benannten Buckets nicht mehr verschiebt.
 
 :::note[Geändertes Verhalten und veraltete Namen]
 0.25 ändert außerdem die Funktionsweise einiger bestehender Aufrufe, ohne diese zu brechen.
@@ -370,11 +371,11 @@ Beide dienten als interne Engines hinter Client-Aufrufen.
 ## 84. `useBackendStorageSource` wurde aus `@rebasepro/app` entfernt
 
 ```ts
-// vorher
+// before
 const storageSource = useBackendStorageSource({ apiUrl, getAuthToken });
-// nachher — der Client, den Sie ohnehin an den Admin übergeben
-const storageSource = client.storage;                     // Standardquelle
-const media = client.createStorageSource("media");        // eine benannte Quelle
+// after — the client you already pass to the admin
+const storageSource = client.storage;                     // default source
+const media = client.createStorageSource("media");        // a named source
 ```
 
 Die Quelle des Clients sendet beim Upload auch `public` und `context` (serverseitig
@@ -389,3 +390,30 @@ ein Browser empfangen hat. Um einzustellen, wie lange die URL einer privaten Dat
 ist, setzen Sie `storageDownloadTokenTtl` (in Sekunden; `STORAGE_DOWNLOAD_TOKEN_TTL` bei
 einem Bundle-Deployment). Servercode, der `controller.getSignedUrl()` direkt aufruft,
 erhält eine URL mit einer Gültigkeit von einer Stunde.
+
+## 86. Das Deklarieren eines benannten Buckets verschiebt die Standard-Storage-Quelle nicht mehr
+
+Ein Projekt, das in `config/resources.ts` nur benannte Buckets deklarierte, etwa
+`bucket("media", { engine: "s3" })`, hatte den ersten davon zum Standard befördert:
+Uploads, deren Property keine `storageSource` nennt, gingen dorthin. Der Standard liest
+jetzt immer seine eigene Konfiguration, was auch immer deklariert ist: `STORAGE_TYPE`,
+`STORAGE_PATH` (oder `./uploads`) und die `S3_*` / `GCS_*` ohne Suffix.
+
+Sollen diese Uploads weiter an den benannten Bucket gehen, sagen Sie das:
+
+```ts
+// config/resources.ts
+export const media = bucket("media", { engine: "s3", default: true });
+```
+
+Ohne die Markierung antworten diese Uploads in der Produktion mit
+`501 STORAGE_NOT_CONFIGURED`, bis der Standard gebunden ist (`STORAGE_TYPE=s3` und
+`S3_BUCKET` oder `STORAGE_TYPE=gcs` und `GCS_BUCKET`), und der Start protokolliert eine
+Warnung, die beide Lösungswege nennt. Die Dateien, die der beförderte Standard geschrieben
+hat, liegen im benannten Bucket; mit der Markierung werden sie wie bisher über den Standard
+ausgeliefert. In der Entwicklung werden die Dateien, die bereits in `./uploads` liegen,
+wieder ausgeliefert.
+
+Der Start verweigert außerdem zwei Quellen, die auf ein Verzeichnis (oder eines darin) oder
+auf einen Bucket an einem Endpunkt auflösen. Geben Sie der benannten Quelle einen eigenen
+Speicherort (`STORAGE_PATH__MEDIA`, `S3_BUCKET__MEDIA`) oder markieren Sie sie als Standard.

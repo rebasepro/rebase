@@ -79,7 +79,7 @@ Die drei Bewertungen bedeuten:
 | MCP server + agent skills | Beta | `@rebasepro/mcp` läuft über stdio: zweiundvierzig Tools, Bearer-Auth pro Projekt, destruktive Tools verweigern nicht-lokale Ziele ohne Opt-in. Seit 0.21 kann der Server auch einen Remote-Endpunkt `/mcp` mounten – OAuth 2.1, sechs Daten-Tools, jeder Aufruf unter dem eigenen RLS des angemeldeten Benutzers – standardmäßig deaktiviert, es sei denn `REBASE_MCP_ENABLED=true`, und nur für Postgres |
 | Studio (SQL, schema, RLS, API explorer) | Beta | Täglich in echten Projekten im Einsatz. Branching ist im OSS-Paket vorhanden und wird in Rebase Cloud bewusst nicht angeboten, da das Verschieben eines laufenden Deployments auf einen Branch noch nicht gelöst ist |
 | CMS + admin panel | Beta | Vollständig für CRUD, Relationen, Storage-Felder und Rollen. **Die Datentabelle hat keine Grid-Semantik** – keine `role`, kein `aria-rowindex`, `tabIndex` entfernt – daher können Benutzer von Tastatur und Screenreadern die Hauptansicht nicht bedienen. Keine Entwürfe, keine länderspezifischen Inhalte (Locales), kein Block-Rich-Text |
-| PGlite managed dev database | Beta | Zero-Setup `rebase dev` ohne Docker. Jeweils nur eine Session, sodass Anfragen serialisiert werden und Nebenläufigkeit damit nicht reproduziert werden kann; Atlas-basierte Befehle (`db push`, `generate`, `migrate`) planen gegen eine für den Befehl gestartete, wegwerfbare zweite PGlite-Instanz; `db branch` funktioniert dort nicht und weist darauf hin |
+| PGlite managed dev database | Beta | Zero-Setup `rebase dev` ohne Docker. Jeweils nur eine Session, sodass Anfragen serialisiert werden und Nebenläufigkeit damit nicht reproduziert werden kann; Atlas-basierte Befehle (`db push`, `generate`, `migrate`) planen gegen eine für den Befehl gestartete, wegwerfbare zweite PGlite-Instanz (<span class="since-badge" data-since="0.25">Seit 0.25</span>; unter 0.24 verweigern sie die verwaltete Datenbank); `db branch` funktioniert dort nicht und weist darauf hin |
 | Helm chart | Beta | Rendert die Split-Process-Topologie und wird bei jedem Release in der OCI-Registry veröffentlicht. Der Standard bleibt ein einzelner Container |
 | `@rebasepro/server-mongo` | **Experimental** | Ein funktionierender Treiber mit Change-Stream-Echtzeit und Snapshot-Historie. **Keine Row-Level Security** – das gesamte oben beschriebene Isolationsmodell greift hier nicht – und keine Relationen. Change-Streams erfordern ein Replica Set: Auf einem eigenständigen `mongod` gibt es keinen Ersatz dafür, sodass ein Abonnement nur Schreibvorgänge sieht, die über diesen Rebase-Prozess ausgeführt wurden, und alle anderen verpasst. Kein MFA: Registrierung antwortet mit 501 und die Checks antworten mit „no factor“, sodass bei der Anmeldung nie danach gefragt wird. Das Admin-Aggregate kann keine Collection ansprechen – es liest den Namen aus einer `$from`-Stufe, die MongoDB nicht hat – und gibt daher nichts zurück |
 | `@rebasepro/firebase` | Experimental | Führt das Admin-Panel und das SDK auf Firestore aus. Kein RLS, keine SQL-Oberfläche; der Postgres-Funktionsumfang wird nicht übertragen. Der Firestore-Treiber ignoriert `or(...)`/`and(...)`-Filtergruppen, sodass eine Abfrage, die eine solche verwendet, jede Zeile liest, die ihre einfachen Filter zulassen |
@@ -114,6 +114,19 @@ eintreten kann.
 Rebase Cloud stützt sich exakt auf diese Verträge und auf nichts anderes.
 Alles, was hier nicht aufgeführt ist, ist ein Implementierungsdetail, von dem
 die Plattform nicht abhängt.
+
+### Versions-Badges und Canarys
+
+Die Docs werden aus `main` veröffentlicht, daher kann eine Seite etwas beschreiben,
+das noch kein stabiles Release enthält. Ein *Seit*-Badge nennt das erste stabile
+Release, das es enthält, und der Text daneben sagt, was das Release davor tut.
+
+Ein Canary ist ein Build von `main`, nummeriert nach dem letzten stabilen Release:
+`0.24.1-canary.g<commit>` ist `main` an diesem Commit, einige Zeit nach 0.24.0, und
+`rebase upgrade --to canary` installiert den neuesten. Er enthält alles, was `main`
+erreicht hatte, als er gebaut wurde, sodass auf einem aktuellen Canary ein Badge, das
+die nächste Minor-Version nennt (0.25, nach 0.24.0), für Sie gilt, und der Hinweis zum
+Release davor (unter 0.24) das stabile Release beschreibt, von dem Sie kommen.
 
 ## Die versionierten Verträge
 

@@ -206,6 +206,14 @@ In der Auflösungsreihenfolge steht es zwischen der Shell und der Projektdatei:
 2. `DATABASE_URL` in der Shell-Umgebung
 3. **der Branch, zu dem dieses Checkout gewechselt hat**
 4. `DATABASE_URL` in der `.env`-Datei des Projekts
+5. `--docker` oder der Umstand, dass das letzte `rebase dev` damit lief
+6. die verwaltete Entwicklungsdatenbank
+
+<span class="since-badge" data-since="0.25">Seit 0.25</span> Stufe 5 folgt dem letzten
+`rebase dev --docker`, sodass ein Branch-Befehl danach kein eigenes `--docker` braucht,
+und ein `--docker`, das eine Stufe darüber übertrumpft, startet keinen Container und
+sagt, dass es ignoriert wurde. Unter 0.24 zählt nur das Flag, und ein übertrumpftes
+startet den Container trotzdem.
 
 Ein Branch muss Vorrang vor `.env` haben, da das Umschalten sonst bei keinem Projekt Wirkung zeigen würde, das `DATABASE_URL` setzt; er darf jedoch keinen Vorrang vor den beiden darüber liegenden haben, da ein Flag auf der aktuellen Befehlszeile eine unmittelbarere Anweisung ist als ein Wechsel am Vortag.
 
@@ -236,7 +244,7 @@ Branching funktioniert **nicht** mit der verwalteten Entwicklungsdatenbank – d
 
 PGlite bedient genau eine Datenbank. Ein `CREATE DATABASE ... TEMPLATE` darauf schreibt lediglich einen Katalogeintrag und kopiert nichts, sodass der „Branch“ auf dieselbe Datenbank verweist, von der er geklont wurde: Schreibvorgänge, von denen Sie glauben, dass sie isoliert sind, landen in Ihrer Entwicklungsdatenbank, und es gibt keine zweite Kopie, zu der Sie zurückkehren könnten.
 
-Verwenden Sie Branching mit einem echten Server – Ihrer eigenen PostgreSQL-Instanz über `DATABASE_URL` oder `rebase dev --docker`.
+Verwenden Sie Branching mit einem echten Server – Ihrer eigenen PostgreSQL-Instanz über `DATABASE_URL` oder `rebase dev --docker`, dem die Branch-Befehle dann folgen.
 
 ---
 
@@ -266,6 +274,6 @@ Da Branches separate PostgreSQL-Datenbanken sind, können Sie keine SQL-`JOIN`-A
 
 ## Verwandte Themen
 
-- [CLI-Befehle](/docs/cli/) — `rebase db branch` und dessen Flags
+- [Datenbank-Befehle](/docs/cli/database/#rebase-db-branch) — `rebase db branch` und dessen Flags
 - [Schema-Generierung](/docs/cli/schema/) — wie das Schema erzeugt wird, das ein Branch kopiert
 - [Umgebung & Konfiguration](/docs/getting-started/configuration/) — `DATABASE_URL` und worüber ein aktiv geschalteter Branch Vorrang hat

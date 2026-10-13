@@ -117,6 +117,24 @@ Auf einem verwalteten Cloud-Tenant kann `db push` die Datenbank nicht erreichen 
 
 Wenn eine Tabelle existiert, eine Spalte jedoch nicht, ist die Ursache meist eine Collection-Datei, die bearbeitet wurde, ohne sie neu zu generieren: Führen Sie `rebase schema generate` aus und pushen Sie erneut.
 
+## `Error: EOF` von `db push` auf der verwalteten Datenbank
+
+```
+Error: EOF
+✗ atlas schema apply --to file://.rebase/sql/schema.sql --dry-run failed.
+```
+
+Die verwaltete Entwicklungsdatenbank nimmt nur wenige Verbindungen gleichzeitig an, und ein
+laufendes `rebase dev` hält einige davon. Atlas, das den Push plant, öffnet zwei weitere,
+und eine wurde darunter geschlossen. Es wurde nichts angewendet, der Befehl kann also
+gefahrlos erneut ausgeführt werden; der Dev-Server schließt untätige Verbindungen nach
+30 Sekunden. Scheitert er weiter, stoppen Sie `rebase dev`, während Sie pushen.
+
+<span class="since-badge" data-since="0.25">Seit 0.25</span> Der Push schließt seine eigenen
+Verbindungen, bevor Atlas startet, was Atlas im üblichen Fall Platz lässt, und der Fehler
+sagt, was passiert ist. Unter 0.24 scheitert der erste Push nach dem Start von `rebase dev`
+oft auf diese Weise, nur mit den beiden Zeilen oben.
+
 ## Der Port wird bereits verwendet
 
 ```

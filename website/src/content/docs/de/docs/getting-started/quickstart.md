@@ -70,7 +70,7 @@ Einen Port können Sie mit `rebase dev --port 3001` festlegen.
 | `--headless` | `init` | Ein Backend ohne Collection-Dateien und ohne UI — siehe [Nur Backend](/docs/getting-started/headless/) |
 | `--template <name>` | `init` | Von einer anderen Vorlage als der Standardvorlage starten |
 | `--install` / `--no-install` | `init` | Paketmanager automatisch ausführen oder überspringen |
-| `--docker` | `dev` | PostgreSQL in einem Container anstelle der verwalteten Version verwenden |
+| `--docker` | `dev` | PostgreSQL in einem Container anstelle der verwalteten Version verwenden. <span class="since-badge" data-since="0.25">Seit 0.25</span> Die anderen Befehle folgen ihm, bis `rebase dev` ohne es läuft. Ein `DATABASE_URL` hat Vorrang: Dann startet es nichts und sagt das |
 | `--no-db` | `dev` | Gar keine Datenbank starten — weder den Container noch die verwaltete Version. Setzen Sie `DATABASE_URL` selbst |
 
 ## Variante: Eigene PostgreSQL-Instanz verwenden
@@ -88,7 +88,9 @@ angetastet, und eine URL, die auf einen anderen Rechner verweist, bleibt völlig
 Die Migrationsbefehle planen Änderungen mit [Atlas](https://atlasgo.io/), der Schema-Migrationsengine,
 die Rebase zur Planung nutzt. Atlas benötigt eine zweite leere Datenbank für den Vergleich. Bei einer
 eigenen Datenbank legt Rebase eine daneben an; bei der verwalteten, die exakt eine Datenbank bereitstellt,
-startet es für die Dauer des Befehls eine wegwerfbare PGlite-Instanz. In beiden Fällen:
+startet es für die Dauer des Befehls eine wegwerfbare PGlite-Instanz.
+<span class="since-badge" data-since="0.25">Seit 0.25</span> Unter 0.24 verweigern die
+Migrationsbefehle die verwaltete Datenbank und brauchen Ihre eigene. In beiden Fällen:
 
 ```bash
 pnpm run db:push
@@ -188,19 +190,21 @@ Collections, startet das Backend neu
 und der Bootvorgang erstellt die neue Tabelle — sodass Ihre Collection **Products** in der
 Navigation erscheint.
 
-für die SDK-Typen: Unter 0.23
-generiert `rebase dev` nur das Schema neu, führen Sie daher nach einer Collection-Änderung
+Unter 0.23 generiert `rebase dev` nur das Schema neu, führen Sie daher nach einer Collection-Änderung
 `rebase generate-sdk` aus, bevor Sie deren Typen importieren.
 
 Dasselbe gilt für eine Property, die einer bereits vorhandenen Collection hinzugefügt wird: Speichern,
 und die Spalte ist vorhanden.
 
 `rebase db push` wird für Änderungen benötigt, die der Bootvorgang bewusst auslässt — eine umbenannte
-Spalte, ein eingeschränkter Typ, ein entferntes Feld. Dafür wird ein eigenes PostgreSQL benötigt:
+Spalte, ein eingeschränkter Typ, ein entferntes Feld:
 
 ```bash
 pnpm run db:push
 ```
+
+<span class="since-badge" data-since="0.25">Seit 0.25</span> Es läuft auf der verwalteten
+Datenbank wie auf Ihrer eigenen. Unter 0.24 braucht es Ihr eigenes PostgreSQL.
 
 ## Referenz der Datenbankbefehle
 
@@ -208,9 +212,12 @@ pnpm run db:push
 |---------|-------------|
 | `rebase schema generate` | Drizzle-Schema aus Ihren TypeScript-Collections generieren. Keine Datenbank erforderlich — `rebase dev` führt dies für Sie aus |
 | `rebase schema introspect` | TypeScript-Collections aus einer bestehenden Datenbank generieren |
-| `rebase db push` | Schema-Änderungen direkt in die Datenbank übertragen. Erfordert ein eigenes PostgreSQL |
-| `rebase db generate` | SQL-Migrationsdateien generieren. Erfordert ein eigenes PostgreSQL |
-| `rebase db migrate` | Ausstehende Migrationen ausführen. Erfordert ein eigenes PostgreSQL |
+| `rebase db push` | Schema-Änderungen direkt in die Datenbank übertragen, die verwaltete eingeschlossen |
+| `rebase db generate` | SQL-Migrationsdateien generieren |
+| `rebase db migrate` | Ausstehende Migrationen ausführen |
+
+<span class="since-badge" data-since="0.25">Seit 0.25</span> Die drei `db`-Befehle
+funktionieren auf der verwalteten Datenbank. Unter 0.24 brauchen sie Ihr eigenes PostgreSQL.
 
 ## Nächste Schritte
 

@@ -229,21 +229,36 @@ Die Engine stammt aus der Deklaration, daher muss kein `STORAGE_TYPE` festgelegt
 
 #### Welcher Bucket empfängt einen nicht näher spezifizierten Upload
 
-Eine Storage-Property, die keine `storageSource` angibt, schreibt in den **Standard**-Bucket,
-und ein Projekt mit benannten Buckets muss angeben, welcher das ist. Deklarieren Sie entweder
-den Bucket mit dem Standard-Schlüssel – `export const uploads = bucket();` – oder markieren
-Sie einen der benannten Buckets:
+<span class="since-badge" data-since="0.25">Seit 0.25</span>
+
+Eine Storage-Property, die keine `storageSource` angibt, schreibt in den **Standard**-Bucket.
+Benannte Buckets zu deklarieren, verschiebt ihn nie. Der Standard behält seine eigene
+Konfiguration, was auch immer `config/resources.ts` deklariert: `STORAGE_TYPE`,
+`STORAGE_PATH` (`./uploads`, wenn nicht gesetzt) und die Variablen `S3_*` / `GCS_*` ohne
+Suffix. Wenn Sie `bucket("media", { engine: "s3" })` zu einem Projekt hinzufügen, das bereits
+Dateien in `./uploads` hat, bleiben diese, wo sie sind, und werden weiterhin ausgeliefert.
+`media` liest seine eigenen `__MEDIA`-Variablen und springt in der Entwicklung als eigenes
+Verzeichnis ein, `uploads__media`.
+
+Um nicht näher spezifizierte Uploads stattdessen an einen benannten Bucket zu schicken,
+markieren Sie ihn:
 
 ```ts
 export const media = bucket("media", { engine: "s3", default: true });
 ```
 
-Ohne beides befördert der Boot-Prozess den ersten deklarierten benannten Bucket zum Standard,
-gibt eine Warnung aus und nennt beide Lösungswege. Wählen Sie einen davon: Eine solche
-automatische Beförderung entscheidet anhand der Reihenfolge der Deklarationen, wo die Dateien
-eines Benutzers landen. Das führt vor und nach einem Deployment zu unterschiedlichen Ergebnissen,
-da der lokale Bucket, den die Entwicklung als Ersatz nutzt, in der Produktion verworfen wird,
-die Beförderung jedoch nicht.
+Der Standard *ist* dann `media`. Dateien, die der Standard zuvor hielt, bleiben, wo sie
+sind, und werden nicht mehr darüber ausgeliefert, kopieren Sie sie daher zuerst hinüber:
+`rebase storage move --from "(default)" --to media`.
+
+Zwei Quellen dürfen sich keinen Speicherort teilen. Würde ein benannter Bucket auf das
+Verzeichnis des Standards (oder eines darin) oder auf denselben Object-Store-Bucket am
+selben Endpunkt auflösen, verweigert der Boot den Start und nennt die Variable, die zu
+ändern ist.
+
+Unter 0.24 wird in einem Projekt, das nur benannte Buckets deklariert, der erste deklarierte
+beim Boot mit einer Warnung zum Standard befördert, sodass das Hinzufügen von
+`bucket("media")` den Standard auf `uploads__media` verschiebt.
 
 ### Viele Buckets auf einem Account
 
@@ -395,11 +410,13 @@ nach `/storage/uploads__media`. Mounten Sie das Volume auf deren übergeordnetem
 `STORAGE_PATH` selbst. `STORAGE_PATH__MEDIA` legt das Verzeichnis eines Buckets explizit fest.
 Siehe [Self-Hosting](/docs/deployment/self-hosting/#file-storage).
 
-Eine Konsequenz, die man kennen sollte, wenn man Buckets explizit deklariert: Es wird kein
-Standard-Bucket automatisch für Sie erfunden. Wenn Sie nur `bucket("media")` deklarieren,
-gibt es keinen Standard-Bucket, und eine Property, die keinen benennt, hat kein Ziel –
-dies ist beabsichtigt und verhält sich in der Entwicklung und Produktion identisch. Fügen Sie
-auch `bucket()` hinzu, wenn Sie einen möchten.
+<span class="since-badge" data-since="0.25">Seit 0.25</span> Buckets zu deklarieren ändert
+den Standard-Bucket nicht. Wenn nur `bucket("media")` deklariert ist, liest der Standard
+weiterhin seine eigenen Variablen. In der Entwicklung ist er `./uploads`. In der Produktion
+ist er ungebunden aus, wie jeder ungebundene Bucket: Uploads, die keine `storageSource`
+angeben, antworten mit `501 STORAGE_NOT_CONFIGURED`. Der Boot sagt das einmal, mit beiden
+Lösungswegen: ihn binden (`STORAGE_TYPE=s3` und `S3_BUCKET` oder `STORAGE_TYPE=gcs` und
+`GCS_BUCKET`) oder einen benannten Bucket mit `default: true` markieren.
 
 In der Entwicklung ist ein deklarierter Bucket, den nichts bindet, ein lokales Verzeichnis –
 `uploads__media` neben dem Standard-`uploads` –, unabhängig davon, welche Engine er deklariert.

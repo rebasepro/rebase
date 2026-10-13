@@ -65,8 +65,9 @@ Im Code gibt es keine. Der Server liest Ihr Datenbankschema beim Start ein und
 stellt die gefundenen Tabellen bereit, sodass die API Ihren Migrationen folgt:
 Ändern Sie das Schema, ändern sich die Endpunkte automatisch mit.
 
-Eine Tabelle wird bereitgestellt, sobald sie über ein Autorisierungsmodell
-verfügt – Row-Level Security aktiviert, plus mindestens eine Policy:
+Eine Tabelle wird bereitgestellt, sobald Row-Level Security auf ihr aktiviert ist.
+Ohne Policy wird sie bereitgestellt und liefert keine Zeilen, und der Start warnt
+davor; eine Policy öffnet sie:
 
 ```sql
 ALTER TABLE your_table ENABLE ROW LEVEL SECURITY;
@@ -81,9 +82,9 @@ und [rls-check](/docs/rls-check/) für ein Audit darüber, was Ihre Policies
 tatsächlich erlauben.
 
 Eine Tabelle ohne RLS wird ganz bewusst **übersprungen**: Jede authentifizierte
-Anfrage wird als `rebase_user` ausgeführt. Das Bereitstellen einer Tabelle ohne
-Policy würde somit jede Zeile an jeden angemeldeten Aufrufer übergeben. Jede
-übersprungene Tabelle wird beim Start zusammen mit dem SQL benannt, das sie
+Anfrage wird als `rebase_user` ausgeführt. Das Bereitstellen einer Tabelle, die
+Row-Level Security nicht schützt, würde somit jede Zeile an jeden angemeldeten
+Aufrufer übergeben. Jede übersprungene Tabelle wird beim Start zusammen mit dem SQL benannt, das sie
 schützen würde.
 
 :::note
@@ -170,9 +171,14 @@ Drei Schritte beheben dies, in der empfohlenen Prüfreihenfolge:
 1. **Die Datenbank hat keine Tabellen.** Erstellen Sie diese – per Migration,
    einfachem SQL oder einer Collection-Datei plus `rebase db push` – und starten
    Sie neu.
-2. **Die Tabellen haben keine RLS-Policy**, weshalb sie beim Start übersprungen
-   wurden. Das Startprotokoll nennt jede einzelne davon. Fügen Sie eine Policy
-   hinzu, wie oben beschrieben.
+2. **Die Tabellen haben Row-Level Security nicht aktiviert**, weshalb der Start sie
+   übersprungen hat. Das Startprotokoll nennt jede einzelne davon, mit dem SQL.
+   Aktivieren Sie es und fügen Sie eine Policy hinzu, wie oben beschrieben.
+   <span class="since-badge" data-since="0.25">Seit 0.25</span> Auch die Antwort sagt
+   es: Ihre Meldung nennt die Tabellen und gibt das
+   `ALTER TABLE … ENABLE ROW LEVEL SECURITY` für sie an, und
+   `details.unprotectedTables` listet sie. Unter 0.24 heißt es, die Datenbank habe
+   keine Tabellen.
 3. **`DATABASE_URL` verweist auf ein anderes Ziel** als gedacht. `rebase status`
    gibt die drei Dateien aus, die bestimmen, was das Backend erreicht.
 

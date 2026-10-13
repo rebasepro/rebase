@@ -72,9 +72,8 @@ Solange `rebase dev` läuft, ist das nicht nötig: Es generiert die Typen in
 Selbst ausführen müssen Sie den Befehl in CI, in einem Frontend-Repository ohne
 Collections (`rebase generate-sdk --from link`) oder überall dort, wo `rebase dev`
 nicht läuft.
-für die Neugenerierung: Unter 0.23
-lässt `rebase dev` die SDK-Typen unberührt, führen Sie den Befehl daher nach jeder
-Collection-Änderung aus.
+Unter 0.23 lässt `rebase dev` die SDK-Typen unberührt, führen Sie den Befehl daher nach
+jeder Collection-Änderung aus.
 
 Übergeben Sie anschließend den Typparameter `Database` an `createRebaseClient` für vollständige Autovervollständigung:
 
