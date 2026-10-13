@@ -1,3 +1,4 @@
+import path from "path";
 import {
     DEFAULT_DATA_SOURCE_KEY,
     DEFAULT_STORAGE_SOURCE_KEY,
@@ -9,6 +10,7 @@ import {
 } from "@rebasepro/types";
 import type { BackendStorageConfig } from "../storage/types";
 import { storageBucketVariable } from "../storage/source-variables";
+import { localStorageForced } from "../init/storage";
 import { BundleError } from "./bundle";
 import { logger } from "../utils/logger";
 
@@ -547,6 +549,13 @@ export function resolveStorageBackend(
  * The returned shape is the `Record<key, config>` the backend already accepts,
  * so multiple buckets need nothing new downstream — they were always supported,
  * they just had no way to be configured from the environment.
+ *
+ * The default source — where an upload naming no `storageSource` goes — reads
+ * its own configuration whatever else is declared: `STORAGE_TYPE`,
+ * `STORAGE_PATH` (else `defaultBasePath`) and the unsuffixed `S3_*` / `GCS_*`.
+ * Declaring `bucket("media")` adds a source; it never moves the files the
+ * default already holds. Only the author re-points the default, by declaring
+ * it or by marking one named bucket `default: true`.
  */
 export function resolveStorageSources(
     env: EnvBag,
@@ -559,37 +568,8 @@ export function resolveStorageSources(
 
     const serverSide = declared.filter(d => (d.transport ?? "server") === "server");
 
-    // Synthesize the default bucket only when the project declared *nothing*.
-    //
-    // Inventing one alongside explicitly declared sources is actively harmful.
-    // The synthesized default falls through to local disk; production drops local
-    // backends (files written there die with the container); the storage registry
-    // then promotes whichever backend remains to be the default. So a project
-    // declaring only a "media" bucket would put its default uploads on local disk
-    // in development and in the media bucket in production. Two different
-    // destinations either side of a deploy is worse than having no default
-    // bucket, which at least fails the same way in both.
-    const effective: { key: string; engine?: string; account?: string; default?: boolean }[] = declared.length === 0
-        ? [{ key: DEFAULT_STORAGE_SOURCE_KEY, engine: undefined }]
-        : serverSide;
-
-    // ── Which bucket receives an unqualified upload? ─────────────────────────
-    //
-    // The author's decision, made with `default: true` or by declaring the
-    // default bucket itself. Two claimants is a contradiction and refuses.
-    //
-    // No claimant at all is the shape every project written before the option
-    // existed has — and the shape the control plane resolves one source at a
-    // time — so it cannot refuse: a runtime image the platform rolls out would
-    // stop every such tenant at boot. The first server-side bucket is promoted,
-    // as it always was, but the warning now names the one line that ends the
-    // guessing. (What it guards against is real: a synthesized local default
-    // is dropped in production and the promotion is not, so a project
-    // declaring only `bucket("media")` writes to local disk in development and
-    // into the media bucket in production. Mark one and both agree.)
-    //
-    // Only when this process actually serves storage: a project whose buckets
-    // are all `transport: "direct"` has nothing here to be the default of.
+    // Which bucket receives an unqualified upload is the author's decision,
+    // made with `default: true`. Two claimants is a contradiction and refuses.
     const claimants = serverSide.filter(d => d.default === true);
     if (claimants.length > 1) {
         throw new BundleError(
@@ -598,19 +578,19 @@ export function resolveStorageSources(
             "Exactly one bucket serves uploads that name no `storageSource`. Remove the flag from all but one."
         );
     }
-    let promoted: string | undefined;
-    if (serverSide.length > 0
-        && claimants.length === 0
-        && !serverSide.some(d => d.key === DEFAULT_STORAGE_SOURCE_KEY)) {
-        promoted = serverSide[0].key;
-        const named = serverSide.map(d => `"${d.key}"`).join(", ");
-        logger.warn(
-            `This project declares ${named} and none of them is the default bucket, so "${promoted}" ` +
-            "is serving uploads that name no `storageSource` — by declaration order, not by decision. " +
-            `In \`config/resources.ts\` mark it — bucket("${promoted}", { default: true }) — or declare ` +
-            "the default bucket alongside it: export const uploads = bucket();"
-        );
-    }
+
+    // The default source is synthesized from its own variables unless the
+    // project declared it (as any transport: a `direct` default is one this
+    // backend does not serve) or handed its key to a named bucket. In
+    // production an unbound default resolves to local disk and is dropped like
+    // any other, so its uploads answer 501 — the same verdict it had before a
+    // named bucket existed, and the one the control plane's build log reads
+    // from the same unsuffixed variables.
+    const declaresDefault = declared.some(d => d.key === DEFAULT_STORAGE_SOURCE_KEY);
+    const effective: { key: string; engine?: string; account?: string; default?: boolean }[] =
+        declaresDefault || claimants.length === 1
+            ? serverSide
+            : [{ key: DEFAULT_STORAGE_SOURCE_KEY, engine: undefined }, ...serverSide];
 
     const result: Record<string, BackendStorageConfig> = {};
     for (const definition of effective) {
@@ -638,10 +618,96 @@ export function resolveStorageSources(
         // so an unqualified upload reaches it. Registered rather than renamed:
         // the source keeps its own key, its own `__SUFFIX` variables and its own
         // place in the graph, and only gains a second name.
-        if ((definition.default === true || definition.key === promoted) && definition.key !== DEFAULT_STORAGE_SOURCE_KEY) {
+        if (definition.default === true && definition.key !== DEFAULT_STORAGE_SOURCE_KEY) {
             result[DEFAULT_STORAGE_SOURCE_KEY] = config;
         }
     }
 
+    assertNoSharedLocation(result, env, options);
+
     return Object.keys(result).length > 0 ? result : undefined;
+}
+
+/**
+ * Where a resolved source keeps its files, as one comparable string, or
+ * `undefined` for one that will not serve in this process.
+ *
+ * A local directory is compared by its resolved path, and also matches any
+ * directory inside it: `{basePath}/{bucket}/{key}` is the layout, so a source
+ * nested in another's directory is one of its buckets. An object store is its
+ * bucket on its endpoint — the same name on two providers is two buckets.
+ */
+function storageLocation(
+    config: BackendStorageConfig,
+    env: EnvBag,
+    options: ResolveStorageOptions
+): { describe: string; variable: string; local?: string; remote?: string } | undefined {
+    if (config.type === "local") {
+        // Production drops a local backend unless a durable volume is
+        // acknowledged, so two such configurations share nothing at runtime.
+        if (options.production !== false && !localStorageForced(env)) return undefined;
+        const resolved = path.resolve(config.basePath);
+        return { describe: resolved, variable: "STORAGE_PATH", local: resolved };
+    }
+    if (config.type === "s3") {
+        const endpoint = (config.endpoint ?? "").trim().replace(/\/+$/, "").toLowerCase();
+        return {
+            describe: `s3 bucket "${config.bucket}"${endpoint ? ` at ${endpoint}` : ""}`,
+            variable: "S3_BUCKET",
+            remote: `s3|${endpoint}|${config.bucket}`
+        };
+    }
+    if (config.type === "gcs") {
+        return { describe: `gcs bucket "${config.bucket}"`, variable: "GCS_BUCKET", remote: `gcs|${config.bucket}` };
+    }
+    return undefined;
+}
+
+function isSameOrInside(a: string, b: string): boolean {
+    return a === b || a.startsWith(b + path.sep) || b.startsWith(a + path.sep);
+}
+
+/**
+ * Refuse two sources that would keep their files in one place.
+ *
+ * Two sources over one directory or one bucket are one namespace under two
+ * names: a file uploaded to `media` is listed, served and deletable through
+ * the default, and `rebase storage move` between them copies a directory onto
+ * itself. Nothing fails, so nothing would tell the developer. A source aliased
+ * with `default: true` is one backend with a second name, not two, and is
+ * skipped.
+ */
+function assertNoSharedLocation(
+    resolved: Record<string, BackendStorageConfig>,
+    env: EnvBag,
+    options: ResolveStorageOptions
+): void {
+    const seen: { key: string; config: BackendStorageConfig; location: NonNullable<ReturnType<typeof storageLocation>> }[] = [];
+    for (const [key, config] of Object.entries(resolved)) {
+        const location = storageLocation(config, env, options);
+        if (!location) continue;
+        const other = seen.find(entry => entry.config !== config && (
+            location.local !== undefined && entry.location.local !== undefined
+                ? isSameOrInside(location.local, entry.location.local)
+                : location.remote !== undefined && location.remote === entry.location.remote
+        ));
+        if (other) {
+            // Name the named source first: the default's location is the one
+            // with files in it already, so the other is the one to move.
+            const [moved, kept] = key === DEFAULT_STORAGE_SOURCE_KEY ? [other.key, key] : [key, other.key];
+            const movedLocation = moved === key ? location : other.location;
+            const variable = `${movedLocation.variable}${envSuffixForKey(moved, DEFAULT_STORAGE_SOURCE_KEY)}`;
+            throw new BundleError(
+                `Storage sources "${moved}" and "${kept}" would both store files in ${movedLocation.describe}, ` +
+                "so each would list, serve and delete the other's files.",
+                `Give "${moved}" a ${movedLocation.local !== undefined ? "directory" : "bucket"} of its own ` +
+                `with ${variable}.` +
+                (kept === DEFAULT_STORAGE_SOURCE_KEY
+                    ? ` If uploads that name no \`storageSource\` belong in "${moved}", mark it instead — ` +
+                      `bucket("${moved}", { default: true }).`
+                    : "")
+            );
+        }
+        seen.push({ key, config, location });
+    }
 }

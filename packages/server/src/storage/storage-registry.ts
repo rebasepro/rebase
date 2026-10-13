@@ -144,20 +144,14 @@ export class DefaultStorageRegistry implements StorageRegistry {
                     registry.register(id, controller);
                 }
             }
-            // Deliberately no promotion. This used to register whichever
-            // backend came first under `(default)` with a warning — where a
-            // user's uploaded files land, decided by declaration order — and
-            // the answer differed either side of a deploy, because the
-            // synthesized local default is dropped in production and the
-            // promotion was not. A project declaring only `bucket("media")`
-            // therefore wrote to local disk in development and to the media
-            // bucket in production, with nothing failing in either.
-            //
-            // The refusal lives at the declaration, in `resolveStorageSources`,
-            // where the project's own buckets can be named. Here there may
-            // legitimately be no default: in production a `local` default is
-            // dropped so the rest of the app keeps serving, and uploads answer
-            // `STORAGE_NOT_CONFIGURED` rather than crash-looping the rollout.
+            // Deliberately no promotion: which backend serves `(default)` is
+            // where a user's uploaded files land, and declaration order is not
+            // a decision. `resolveStorageSources` gives the default its own
+            // configuration, or the bucket the project marked `default: true`.
+            // Here there may legitimately be no default: in production a
+            // `local` default is dropped so the rest of the app keeps serving,
+            // and uploads answer `STORAGE_NOT_CONFIGURED` rather than
+            // crash-looping the rollout.
         }
 
         return registry;

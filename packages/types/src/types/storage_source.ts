@@ -100,12 +100,8 @@ export interface StorageSourceDefinition {
      * Serve unqualified uploads — a storage property naming no `storageSource`
      * — from this source.
      *
-     * Declared, never inferred. A project with named buckets and no default
-     * used to have one chosen for it by declaration order, with a warning, and
-     * the choice differed between development and production because the
-     * synthesized local default is dropped in production and the promotion was
-     * not. Where the files land is the author's decision; boot now fails
-     * without one.
+     * Declared, never inferred. A source without it never becomes the default:
+     * the default keeps its own configuration whatever else is declared.
      */
     default?: boolean;
 

@@ -229,14 +229,11 @@ export interface BucketOptions extends DeclareOptions {
      * Serve unqualified uploads — a storage property with no `storageSource` —
      * from this bucket.
      *
-     * A project that declares only `bucket("media")` has no default bucket, and
-     * the registry used to promote the one it found with a warning. That is a
-     * decision about where a user's files land, made by the framework, on the
-     * strength of declaration order; it also produced two different
-     * destinations either side of a deploy, because the synthesized local
-     * default is dropped in production and the promotion is not. So it is now
-     * a boot error, and this is one of the two ways to answer it — the other
-     * being `bucket()`, which declares the default bucket itself.
+     * Without it, declaring `bucket("media")` leaves the default source where
+     * it was: on its own `STORAGE_PATH` / `./uploads`, or the bucket the
+     * unsuffixed `S3_BUCKET` / `GCS_BUCKET` names. Mark a named bucket to make
+     * it the default instead; the files the default held before stay where
+     * they are and are no longer served through it.
      */
     default?: boolean;
     /**

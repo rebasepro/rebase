@@ -39,6 +39,10 @@ export async function initializeStorage(
 
     logger.debug("Configuring storage");
     const controllers: Record<string, StorageController> = {};
+    // The other sources this process was handed, for the one message that
+    // has to name them: a default nobody bound, beside named buckets that are.
+    let namedSources: string[] = [];
+    let unboundDefaultReported = false;
 
     const toController = async (entry: BackendStorageConfig | StorageController, label: string): Promise<StorageController | undefined> => {
         if (typeof (entry as StorageController).putObject === "function") {
@@ -61,6 +65,20 @@ export async function initializeStorage(
             // choice, not a fault. Reported once at INFO: an ERROR on every
             // boot of every project without a bucket hid the real errors.
             if (conf.implicit) {
+                if (label === DEFAULT_STORAGE_ID && namedSources.length > 0) {
+                    // Storage is on — the named buckets serve — and only the
+                    // default has nothing behind it. Named here, once, with
+                    // both ways out; the no-default line below would repeat it.
+                    unboundDefaultReported = true;
+                    logger.warn(
+                        "The default storage source has no backend configured on this deployment, so uploads " +
+                        "that name no `storageSource` answer 501 STORAGE_NOT_CONFIGURED. Bind it with " +
+                        "STORAGE_TYPE=s3 and S3_BUCKET (or STORAGE_TYPE=gcs and GCS_BUCKET), or send those " +
+                        `uploads to a named bucket by marking it in \`config/resources.ts\`: ` +
+                        `bucket("${namedSources[0]}", { default: true }).`
+                    );
+                    return undefined;
+                }
                 logger.info(
                     `File storage is off: storage source "${label}" has no backend configured, so ` +
                     "uploads answer 501 STORAGE_NOT_CONFIGURED. To turn it on, set S3-compatible " +
@@ -115,9 +133,9 @@ export async function initializeStorage(
         );
         if (controller) controllers[DEFAULT_STORAGE_ID] = controller;
     } else {
-        for (const [storageId, entry] of Object.entries(
-            storageConfig as Record<string, BackendStorageConfig | StorageController>
-        )) {
+        const entries = Object.entries(storageConfig as Record<string, BackendStorageConfig | StorageController>);
+        namedSources = entries.map(([storageId]) => storageId).filter(storageId => storageId !== DEFAULT_STORAGE_ID);
+        for (const [storageId, entry] of entries) {
             const controller = await toController(entry, storageId);
             if (controller) controllers[storageId] = controller;
         }
@@ -130,12 +148,13 @@ export async function initializeStorage(
         // to reach this state from a declared project is the branch above:
         // production drops a `local` default so the rest of the app keeps
         // serving rather than crash-looping, and the named buckets survive it.
-        // Nothing is promoted into the gap — that promotion is what made a
-        // project write to local disk in development and into its media bucket
-        // in production — so uploads that name no source answer
-        // `STORAGE_NOT_CONFIGURED` until the project says which bucket they
-        // belong in. `resolveStorageSources` refuses a project that never said.
+        // Nothing is promoted into the gap — the default keeps its own
+        // configuration, and a named bucket serves it only when the project
+        // marks one `default: true` — so uploads that name no source answer
+        // `STORAGE_NOT_CONFIGURED` until the default is bound or a bucket is
+        // marked.
         if (!storageRegistry.has(DEFAULT_STORAGE_ID)) {
+            if (unboundDefaultReported) return { storageRegistry };
             const named = storageRegistry.list();
             logger.error(
                 `No default storage source: this process serves ${named.map(k => `"${k}"`).join(", ")} and ` +

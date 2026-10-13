@@ -7,13 +7,11 @@ import { resolveStorageSources } from "../src/boot/sources";
 /**
  * Which bucket receives an upload that names no `storageSource`.
  *
- * The project's decision, and boot refuses without one. The registry used to
- * take it: no `(default)` storage meant "use the first one", with a warning.
- * That is where a user's files land, chosen by declaration order — and the
- * answer differed either side of a deploy, because a synthesized local default
- * is dropped in production and the promotion was not. A project declaring only
- * `bucket("media")` therefore wrote to local disk in development and into the
- * media bucket in production, and nothing failed in either.
+ * The default source, on its own configuration, unless the project says
+ * otherwise — by declaring the default bucket itself or by marking one named
+ * bucket `default: true`. Declaring a named bucket says nothing about the
+ * default, so it changes nothing about it: the default is never handed the
+ * first named bucket by declaration order.
  */
 
 const S3_ENV = {
@@ -29,21 +27,18 @@ const S3_ENV = {
 const source = (key: string, extra: Partial<StorageSourceDefinition> = {}): StorageSourceDefinition =>
     ({ key, engine: "s3", transport: "server", account: "minio", ...extra }) as StorageSourceDefinition;
 
-describe("the default bucket is declared, or promoted with a warning that names the fix", () => {
-    it("promotes the first named bucket when none is the default, and says which line ends that", () => {
-        // Refusing here would stop every project written before `default: true`
-        // existed — and every tenant whose control plane resolves one source
-        // at a time — at the next runtime rollout. So the promotion stays, and
-        // the warning names both fixes.
+describe("the default bucket is its own, or one the author marks", () => {
+    it("keeps the default on its own configuration when no named bucket is marked", () => {
         const warned: string[] = [];
         const spy = jest.spyOn(logger, "warn").mockImplementation((message: string) => { warned.push(message); });
         try {
             const resolved = resolveStorageSources(S3_ENV, [source("media"), source("avatars")], "/tmp")!;
             expect(Object.keys(resolved).sort()).toEqual(["(default)", "avatars", "media"]);
-            expect(resolved["(default)"]).toBe(resolved.media);
-            expect(warned.join("\n")).toContain("none of them is the default bucket");
-            expect(warned.join("\n")).toContain('bucket("media", { default: true })');
-            expect(warned.join("\n")).toContain("export const uploads = bucket();");
+            expect(resolved["(default)"]).not.toBe(resolved.media);
+            // Undeclared and with no STORAGE_TYPE: the local directory it
+            // always had, exactly as when nothing at all is declared.
+            expect(resolved["(default)"]).toMatchObject({ type: "local", basePath: "/tmp", implicit: true });
+            expect(warned.join("\n")).not.toContain("none of them is the default bucket");
         } finally {
             spy.mockRestore();
         }
