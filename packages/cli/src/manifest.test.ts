@@ -792,6 +792,28 @@ runtime: "managed" });
         expect(manifest.apps.web.type).toBe("static");
     });
 
+    it("writes only what differs from a default, as the scaffold's rebase.json does", () => {
+        mkdir("config/collections");
+        mkdir("backend/functions");
+        mkdir("backend/crons");
+        mkdir("frontend");
+
+        const manifest = synthesizeManifest(scratch);
+
+        expect(manifest.apps.backend).toEqual({ type: "backend", runtime: "managed" });
+        expect(manifest.apps.web).not.toHaveProperty("spa");
+    });
+
+    it("builds the static app with the project's package manager, as init spells it", () => {
+        mkdir("frontend");
+        touch("pnpm-lock.yaml");
+        expect(synthesizeManifest(scratch).apps.web).toMatchObject({ build: "pnpm --filter ./frontend run build" });
+
+        fs.rmSync(path.join(scratch, "pnpm-lock.yaml"));
+        touch("package-lock.json");
+        expect(synthesizeManifest(scratch).apps.web).toMatchObject({ build: "npm run build -w frontend" });
+    });
+
     it("does NOT infer a custom runtime from a stranded entrypoint", () => {
         // Every scaffolded project used to carry `backend/src/index.ts` whether
         // or not it wanted its own server, so inferring from it landed projects

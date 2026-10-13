@@ -29,6 +29,7 @@ import {
     type RebaseStaticAppConfig
 } from "@rebasepro/types";
 import { MANIFEST_FILENAME } from "./utils/project";
+import { detectPackageManager, getPMCommands } from "./utils/package-manager";
 
 /** Runtime range written into new manifests. */
 export const CURRENT_RUNTIME_RANGE = "^1";
@@ -734,9 +735,21 @@ function refuseStorageBlock(raw: unknown, issues: ManifestValidationIssue[]): un
 /**
  * Infer a manifest from a directory that does not have one.
  *
- * This mirrors exactly what the template scaffolds, which is what makes adopting
- * the manifest a no-op for existing projects: the synthesized result is what
- * they would have written by hand.
+ * This mirrors what the template scaffolds, which is what makes adopting the
+ * manifest a no-op for existing projects: the synthesized result is what they
+ * would have written by hand. A field is written only when it says something
+ * its default does not, as the scaffold's own `rebase.json` does — `spa`,
+ * `functions` and `crons` restate their defaults, so they are left out.
+ *
+ * The static app's build command is the project's package manager, spelled the
+ * way `rebase init` spells it, so a pnpm project is never built with npm.
+ *
+ * The static app is named `web`, where the scaffold says `admin`. The name is an
+ * app's identity on a deployed project: Rebase Cloud registered `web` for every
+ * project that deployed without a manifest, and its next deploy has to name the
+ * same app. Nor can an inference know where an app mounts the CMS (`cms`), which
+ * is a client-side route. `rebase apps init --force` therefore keeps the name,
+ * `path` and `cms` a manifest already declares for the app it infers again.
  *
  * The backend's `runtime` is inferred from whether the repository declares a
  * **Dockerfile** — the thing that actually builds an image — and from nothing
@@ -761,8 +774,6 @@ dockerfile,
 context: "." }
             : { type: "backend",
 runtime: "managed" };
-        if (exists(DEFAULT_FUNCTIONS_DIR)) backend.functions = DEFAULT_FUNCTIONS_DIR;
-        if (exists(DEFAULT_CRONS_DIR)) backend.crons = DEFAULT_CRONS_DIR;
         apps.backend = backend;
 
         // Say it out loud. The file looks exactly like the server and is never
@@ -782,10 +793,9 @@ runtime: "managed" };
         apps.web = {
             type: "static",
             root: "frontend",
-            build: "npm run build --workspace frontend",
+            build: getPMCommands(detectPackageManager(projectRoot)).runWorkspace("frontend", "build").join(" "),
             output: "frontend/dist",
-            path: "/",
-            spa: true
+            path: "/"
         };
     }
 

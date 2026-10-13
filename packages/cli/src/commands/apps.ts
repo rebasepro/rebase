@@ -14,7 +14,7 @@
 import fs from "fs";
 import path from "path";
 import chalk from "chalk";
-import type { RebaseAppConfig } from "@rebasepro/types";
+import type { RebaseAppConfig, RebaseProjectManifest } from "@rebasepro/types";
 import { failAsJson, requireProjectRoot } from "../utils/project";
 import { devServerUrl } from "../utils/dev-server";
 import { parseCommandArgs, wantsHelp } from "../utils/args";
@@ -44,7 +44,8 @@ ${chalk.bold("Usage")}
 
 ${chalk.bold("Options")}
   --json                       Machine-readable output
-  --force                      Overwrite an existing rebase.json (apps init)
+  --force                      Replace an existing rebase.json (apps init), keeping
+                               each app's name, path and cms
   -h, --help                   Show this help
 `.trim());
 }
@@ -79,6 +80,14 @@ export async function appsCommand(subcommand: string | undefined, rawArgs: strin
             await listApps(Boolean(args["--json"]));
             break;
         case "init":
+            if (positionals[1] !== undefined) {
+                // It never registered one app: the name was ignored and the
+                // whole manifest inferred, which is not what the reader asked for.
+                console.error(chalk.red(`✗ rebase apps init takes no app name (got "${positionals[1]}").`));
+                console.error(chalk.dim("  It infers every app from this project and writes the whole rebase.json."));
+                console.error(chalk.dim("  To add one app, declare it under \"apps\" in rebase.json."));
+                process.exit(1);
+            }
             await initManifest(Boolean(args["--force"]));
             break;
         case "config":
@@ -169,22 +178,98 @@ async function listApps(asJson: boolean): Promise<void> {
     }
 }
 
+/** A static app's `root`, compared as a directory: `./frontend/` is `frontend`. */
+function sameRoot(a: string, b: string): boolean {
+    const normal = (root: string): string => path.posix.normalize(root.replace(/\\/g, "/")).replace(/\/+$/, "");
+    return normal(a) === normal(b);
+}
+
+/**
+ * Re-infer over a manifest the project already declares, keeping what only the
+ * declaration knows.
+ *
+ * An inferred app takes the name the file gives the app it matches — the
+ * backend, or the static app with the same `root` — and that app's `path` and
+ * `cms`. The name is the app's identity on a deployed project, so renaming it
+ * would deploy a second app beside the first. `path` can carry the hostname the
+ * app is registered on. `cms` is a client-side route that nothing in the project
+ * shows. Everything else is inferred again, which is what `--force` asks for.
+ *
+ * A declared app the inference does not find is returned in `removed`, so the
+ * command can say so rather than drop it in silence.
+ */
+function keepDeclaredIdentity(
+    inferred: RebaseProjectManifest,
+    declared: RebaseProjectManifest
+): { manifest: RebaseProjectManifest; removed: Array<{ name: string; app: RebaseAppConfig }> } {
+    const apps: Record<string, RebaseAppConfig> = {};
+    const matched = new Set<string>();
+
+    for (const [name, app] of Object.entries(inferred.apps)) {
+        if (app.type === "backend") {
+            const backend = findBackendApp(declared);
+            const keptName = backend && !matched.has(backend.name) ? backend.name : name;
+            matched.add(keptName);
+            apps[keptName] = app;
+            continue;
+        }
+        const match = Object.entries(declared.apps).find(([declaredName, candidate]) =>
+            !matched.has(declaredName) && candidate.type === "static" && sameRoot(candidate.root, app.root));
+        const declaredApp = match?.[1];
+        if (!match || declaredApp?.type !== "static") {
+            apps[name] = app;
+            continue;
+        }
+        const keptName = match[0];
+        matched.add(keptName);
+        const address = declaredApp.path ?? app.path;
+        apps[keptName] = {
+            ...app,
+            ...(address !== undefined ? { path: address } : {}),
+            ...(declaredApp.cms !== undefined ? { cms: declaredApp.cms } : {})
+        };
+    }
+
+    const removed = Object.entries(declared.apps)
+        .filter(([name]) => !matched.has(name))
+        .map(([name, app]) => ({ name, app }));
+    return { manifest: { ...inferred, apps }, removed };
+}
+
 async function initManifest(force: boolean): Promise<void> {
     const projectRoot = requireProjectRoot();
 
-    if (manifestExists(projectRoot) && !force) {
-        console.error(chalk.red("✗ rebase.json already exists."));
-        console.error(chalk.dim("  Pass --force to overwrite it."));
-        process.exit(1);
+    let declared: RebaseProjectManifest | undefined;
+    if (manifestExists(projectRoot)) {
+        if (!force) {
+            console.error(chalk.red("✗ rebase.json already exists."));
+            console.error(chalk.dim("  Pass --force to replace it with an inferred one, keeping each app's name, path and cms."));
+            process.exit(1);
+        }
+        try {
+            declared = loadManifest(projectRoot).manifest;
+        } catch (err) {
+            if (!(err instanceof ManifestError)) throw err;
+            const issues = err.issues.map(issue => `${issue.path ? `${issue.path}: ` : ""}${issue.message}`);
+            console.log(chalk.yellow("• The existing rebase.json is invalid, so no app name, path or cms in it is kept:"));
+            for (const issue of issues.length > 0 ? issues : [err.message]) console.log(chalk.dim(`    ${issue}`));
+        }
     }
 
-    const manifest = synthesizeManifest(projectRoot);
+    const inferred = synthesizeManifest(projectRoot);
+    const { manifest, removed } = declared
+        ? keepDeclaredIdentity(inferred, declared)
+        : { manifest: inferred, removed: [] };
     const filePath = writeManifest(projectRoot, manifest);
 
     console.log(chalk.green(`✓ Wrote ${path.relative(projectRoot, filePath)}`));
     console.log("");
     for (const [name, app] of Object.entries(manifest.apps)) {
         console.log(`  ${chalk.cyan(name)} ${chalk.dim(`(${app.type})`)}`);
+    }
+    for (const { name, app } of removed) {
+        const where = app.type === "static" ? `, root ${app.root}` : "";
+        console.log(`  ${chalk.yellow(name)} ${chalk.dim(`(${app.type}${where})`)} ${chalk.yellow("— not found in this project, removed")}`);
     }
 
     const compatibility = assessManagedCompatibility(manifest);
