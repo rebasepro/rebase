@@ -350,7 +350,21 @@ export function checkUnreleasedBadges(root = DEFAULT_ROOT) {
     const files = badgedPages(root);
 
     for (const file of files) {
-        const lines = readFileSync(path.join(root, file), "utf8").split("\n");
+        const text = readFileSync(path.join(root, file), "utf8");
+        const lines = text.split("\n");
+
+        // A badge whose words are the head of its sentence. The release takes
+        // the badge out, and the sentence with it loses its first words.
+        for (const { line, version, sentence } of sentenceCarryingBadges(text)) {
+            findings.push({
+                file,
+                line,
+                message:
+                    `the "Since ${version}" badge is the start of its sentence ("Since ${version} ${sentence}…"), ` +
+                    "and the release removes the badge, leaving the sentence without its first words. " +
+                    "Write the sentence so it reads on its own (\"On <the version before>, …\") and keep the badge beside it."
+            });
+        }
 
         // Section boundaries: every heading starts one. Frontmatter and fenced
         // code are skipped so a `#` in a shell comment does not split a page.
@@ -468,6 +482,75 @@ export function checkUnreleasedBadges(root = DEFAULT_ROOT) {
 /** A whole badge element: the hand-written span `.md` pages use, or `<Since v="…" />`. */
 const BADGE_ELEMENT = /<span\b[^>]*\bclass="since-badge"[^>]*>[^<]*<\/span>|<Since\b[^>]*\/>/g;
 
+/** The version a badge element names. */
+function badgeVersion(el) {
+    return el.match(/data-since="([^"]+)"|\bv=["']([^"']+)["']/)?.slice(1).find(Boolean);
+}
+
+/** The words a badge shows: the span's text, or what `<Since v="…" />` renders. */
+function badgeWords(el) {
+    const text = el.match(/>([^<]*)</)?.[1]?.trim();
+    return text || `Since ${badgeVersion(el)}`;
+}
+
+/**
+ * Whether the badge at `[start, end)` of `lines[i]` is the head of its own
+ * sentence: the sentence starts at the badge, and goes on in lowercase.
+ *
+ * Written `<badge> for the SDK types: on 0.23, …`, the page reads "Since 0.24
+ * for the SDK types: on 0.23, …" — the badge's words are the sentence's
+ * subject. Take the badge out and what is left starts mid-sentence. The 0.24.0
+ * cut did exactly that on ten pages ("above the list it reports…", "for
+ * reading every file, stopping on a broken one, …"), because a badge's words
+ * were never part of what removing it considered.
+ *
+ * "Starts a sentence" means: the text before the badge on its line ends a
+ * sentence, or there is none and the line opens a paragraph, follows a
+ * heading, or follows a line that ends a sentence. Anything else — `and <badge>
+ * the database fills it`, a table cell, a list item after a dash — is a badge
+ * in the middle of a sentence that reads the same without it.
+ *
+ * @param {string[]} lines the page
+ * @param {number} i the badge's line
+ * @param {string} before the line's text before the badge
+ * @param {string} after the line's text after the badge
+ */
+export function carriesItsSentence(lines, i, before, after) {
+    if (!/^\s*\p{Ll}/u.test(after)) return false;
+    const ENDS_A_SENTENCE = /[.!?]["'”’)*_]*$/;
+    const lead = before.trim();
+    if (lead) return ENDS_A_SENTENCE.test(lead);
+    const previous = (lines[i - 1] ?? "").trim();
+    return previous === "" || previous === "---" || /^#{1,6}\s/.test(previous) || ENDS_A_SENTENCE.test(previous);
+}
+
+/**
+ * Every badge in `text`, outside fenced code, that heads its own sentence (see
+ * {@link carriesItsSentence}), as `{ line, version, sentence }`.
+ */
+export function sentenceCarryingBadges(text) {
+    const lines = text.split("\n");
+    const found = [];
+    let inFence = false;
+    let inFrontmatter = lines[0] === "---";
+    for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        if (inFrontmatter) {
+            if (i > 0 && line === "---") inFrontmatter = false;
+            continue;
+        }
+        if (/^\s*(?:`{3,}|~{3,})/.test(line)) { inFence = !inFence; continue; }
+        if (inFence) continue;
+        for (const match of line.matchAll(BADGE_ELEMENT)) {
+            const before = line.slice(0, match.index);
+            const after = line.slice(match.index + match[0].length);
+            if (!carriesItsSentence(lines, i, before, after)) continue;
+            found.push({ line: i + 1, version: badgeVersion(match[0]), sentence: after.trim().slice(0, 60) });
+        }
+    }
+    return found;
+}
+
 /**
  * `text` without the badges whose version `released` accepts, and how many of
  * each it took out (`"badge 0.21" → 2`).
@@ -477,6 +560,12 @@ const BADGE_ELEMENT = /<span\b[^>]*\bclass="since-badge"[^>]*>[^<]*<\/span>|<Sin
  * own goes with the line, and with one of the blank lines around it when it sat
  * between two, so the heading above it keeps the spacing it had. Fenced code is
  * left alone: a badge there is an example of the markup, not a claim.
+ *
+ * A badge that heads its own sentence ({@link carriesItsSentence}) is not taken
+ * out: its words are, as plain text, so "Since 0.21 for the SDK types: on 0.20,
+ * …" still reads as a sentence, and is still true, once 0.21 is out. Those are
+ * counted as `"text 0.21"`. `verify:docs` refuses such a badge on an English
+ * page before the release, so this is the fallback, not the plan.
  */
 export function removeBadges(text, released) {
     const lines = text.split("\n");
@@ -489,8 +578,14 @@ export function removeBadges(text, released) {
         let next = line;
         if (!inFence) {
             for (const el of line.match(BADGE_ELEMENT) ?? []) {
-                const version = el.match(/data-since="([^"]+)"|\bv=["']([^"']+)["']/)?.slice(1).find(Boolean);
+                const version = badgeVersion(el);
                 if (!version || !released(version)) continue;
+                const at = next.indexOf(el);
+                if (carriesItsSentence(lines, i, next.slice(0, at), next.slice(at + el.length))) {
+                    next = next.replace(el, badgeWords(el));
+                    removed.set(`text ${version}`, (removed.get(`text ${version}`) ?? 0) + 1);
+                    continue;
+                }
                 next = next.includes(`${el} `) ? next.replace(`${el} `, "")
                     : next.includes(` ${el}`) ? next.replace(` ${el}`, "")
                         : next.replace(el, "");
@@ -519,7 +614,10 @@ export function removeBadges(text, released) {
  * their translations. Translations that lose the same badges keep their
  * freshness stamp; see `carryStamps`.
  *
- * @returns {{ dropped: {file: string, count: number}[], restamped: string[], leftStale: string[] }}
+ * A badge that heads its own sentence keeps its words as plain text instead
+ * (see {@link removeBadges}); `asText` counts those.
+ *
+ * @returns {{ dropped: {file: string, count: number, asText: number}[], restamped: string[], leftStale: string[] }}
  */
 export function dropReleasedBadges(root = DEFAULT_ROOT) {
     const changelogPath = path.join(root, "CHANGELOG.md");
@@ -543,8 +641,10 @@ export function dropReleasedBadges(root = DEFAULT_ROOT) {
         edits.set(rel, { before,
 after,
 swaps: removed });
+        const counted = (kind) => [...removed].filter(([what]) => what.startsWith(`${kind} `)).reduce((a, [, n]) => a + n, 0);
         dropped.push({ file: rel,
-count: [...removed.values()].reduce((a, b) => a + b, 0) });
+count: counted("badge"),
+asText: counted("text") });
     }
 
     return { dropped,

@@ -287,8 +287,8 @@ resumable upload is refused at creation, before its first chunk; and
 `OPTIONS /api/storage/tus` advertises it as `Tus-Max-Size` — for the source
 named by `?storageId=`, the default one otherwise.
 
-for `STORAGE_MAX_FILE_SIZE`: on 0.23 only the source's `maxFileSize` sets
-the limit, and the variable is not read.
+On 0.23 only the source's `maxFileSize` sets the limit, and
+`STORAGE_MAX_FILE_SIZE` is not read.
 
 ```bash
 STORAGE_MAX_FILE_SIZE=209715200          # (default): 200 MB

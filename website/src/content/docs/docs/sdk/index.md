@@ -73,8 +73,8 @@ While `rebase dev` is running you do not need to: it regenerates the types in
 `generated/sdk/` on start and on every save under `config/collections/`. Run the
 command yourself in CI, in a frontend repository that has no collections
 (`rebase generate-sdk --from link`), or anywhere `rebase dev` is not running.
-for the regeneration: on 0.23, `rebase dev` leaves the SDK types alone, so run
-the command after every collection change.
+On 0.23, `rebase dev` leaves the SDK types alone, so run the command after
+every collection change.
 
 Then pass the `Database` type parameter to `createRebaseClient` for full autocomplete:
 

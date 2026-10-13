@@ -91,8 +91,9 @@ What knows it, does something with it:
   simply the frontend's home page.
 - **`rebase apps list`** shows it beside the app that serves it.
 
-Three shapes, and all of them are ordinary. for the third: on 0.23 an
-app's `path` cannot be a URL, so the CMS shares the project's hostname.
+Three shapes, and all of them are ordinary. On 0.23 an app's `path` cannot be
+a URL, so the third is not available there and the CMS shares the project's
+hostname.
 
 ```jsonc
 // The whole app is the CMS — what `rebase init` scaffolds.

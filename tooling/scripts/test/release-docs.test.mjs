@@ -170,6 +170,60 @@ test("a badge inside a code fence is an example of the markup, and stays", (t) =
     assert.equal(d.read(`${CONTENT}/docs/contributing.md`), en);
 });
 
+test("a badge that starts its sentence is refused before the cut, and leaves its words after it", (t) => {
+    // The 0.24.0 cut turned "Since 0.24 for the SDK types: on 0.23, …" into
+    // "for the SDK types: on 0.23, …" on ten pages: the badge's words were the
+    // sentence's first words, and removing the badge took them along.
+    const page = (v) => `---
+title: CLI
+---
+
+## Generating
+
+Save the file.
+
+${badge(v)} for the SDK types: on 0.20, run it yourself.
+
+Each table gets an \`id\`, and ${badge(v)} the database fills it.
+`;
+    const mdxPage = (v) => `---\ntitle: Backups\n---\n\nThe panel lists them.\n<Since v="${v}" /> above the list it reports the job.\n`;
+    const files = {
+        [at("en")]: page("0.21"),
+        [`${CONTENT}/docs/deployment/backups.mdx`]: mdxPage("0.21")
+    };
+
+    // Before the cut, 0.21 is the coming release: the badge is right, and the
+    // sentence it heads is the finding.
+    const before = tree(t, {
+        ...files,
+        "CHANGELOG.md": "# Changelog\n\n## [Unreleased]\n\n## [0.20.0] - 2026-09-01\n\n### Fixed\n\n- **A fix.**\n"
+    });
+    const refused = checkUnreleasedBadges(before.root).findings.filter(f => /start of its sentence/.test(f.message));
+    assert.deepEqual(refused.map(f => `${f.file}:${f.line}`).sort(), [`${at("en")}:9`, `${CONTENT}/docs/deployment/backups.mdx:6`].sort());
+    assert.match(refused.find(f => f.file === at("en")).message, /"Since 0\.21 for the SDK types: on 0\.20, run it yourself\.…"/);
+
+    // After it, the badge goes and its words stay, so the sentence still has a
+    // head. The badge in the middle of a sentence goes as before.
+    const after = tree(t, { ...files, "CHANGELOG.md": STAMPED });
+    const { dropped } = dropReleasedBadges(after.root);
+
+    assert.equal(after.read(at("en")), `---
+title: CLI
+---
+
+## Generating
+
+Save the file.
+
+Since 0.21 for the SDK types: on 0.20, run it yourself.
+
+Each table gets an \`id\`, and the database fills it.
+`);
+    assert.match(after.read(`${CONTENT}/docs/deployment/backups.mdx`), /\nSince 0\.21 above the list it reports the job\.\n/);
+    assert.deepEqual(dropped.find(d => d.file === at("en")), { file: at("en"), count: 1, asText: 1 });
+    assert.deepEqual(checkUnreleasedBadges(after.root).findings, []);
+});
+
 test("an exemption the release retired is deleted; one still exempting [Unreleased] stays", (t) => {
     const changelog = STAMPED.replace("## [Unreleased]\n", "## [Unreleased]\n\n### Fixed\n\n- **`formView` builders could write.**\n");
     const d = tree(t, {

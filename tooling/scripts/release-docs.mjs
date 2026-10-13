@@ -60,6 +60,17 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
         ? `Dropped ${badgeCount} badge(s) naming a released version, from ${badges.dropped.length} file(s).`
         : "No badge names a released version.");
     for (const d of badges.dropped) console.log(`  ${d.file} (${d.count})`);
+    // A badge that starts its own sentence keeps its words, so the sentence
+    // keeps its head. `verify:docs` refuses those in English before a cut;
+    // one here came from a translation, and is worth a reader's look.
+    const asText = badges.dropped.filter(d => d.asText > 0);
+    if (asText.length) {
+        console.log(
+            `Kept the words of ${asText.reduce((n, d) => n + d.asText, 0)} badge(s) as plain text, ` +
+            "because each one starts its sentence:"
+        );
+        for (const d of asText) console.log(`  ${d.file} (${d.asText})`);
+    }
     console.log(notNew.pruned.length
         ? `Deleted ${notNew.pruned.length} NOT_NEW exemption(s) the release retired: ${notNew.pruned.join(", ")}.`
         : "No NOT_NEW exemption was retired.");

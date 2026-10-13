@@ -149,8 +149,7 @@ can never be the reason your last good backup was deleted. Pruning touches
 only files whose names match the backup pattern; anything else sharing the
 bucket or prefix is left alone.
 
-The cron runs `pg_dump` inside the server process.
-the official
+The cron runs `pg_dump` inside the server process. The official
 runtime image (`rebasepro/server`, see [Self-hosting](/docs/deployment/self-hosting/))
 ships the PostgreSQL 18 client tools for it;
 on 0.23 and earlier it had none, and every scheduled run failed with
@@ -247,12 +246,11 @@ fetches the dump; **Roles file** fetches its `.globals.sql`. Download both and
 keep them in one directory. A backup marked **No roles file** has no sidecar:
 recreate its roles by hand before restoring it into a new Postgres.
 
-above the list it
-reports the scheduled backup job and its last run. A failed run is shown as an
+Above the list, the panel reports the scheduled backup job and its last run. A failed run is shown as an
 error with its message, so a nightly backup that cannot run is visible where
 the backups are listed, not only in the Cron Jobs panel.
 
-what it says about the job:
+What it says about the job:
 
 - **Last scheduled backup** is the last run the schedule made. A run started
   by hand since then (**Run Now** in Cron Jobs) gets a line of its own, so a
@@ -267,9 +265,8 @@ what it says about the job:
 - When the run history in `rebase.cron_logs` cannot be read, the panel says
   so, rather than that the backup has not run yet.
 
-the list is read
-by the server process that answers `GET /api/admin/backups`, and that is not
-always the process that runs the schedule:
+The list is read by the server process that answers `GET /api/admin/backups`,
+and that is not always the process that runs the schedule:
 
 - An `s3://` destination is listed and downloaded through a client for that
   bucket, built from the same `S3_*` variables the backup cron uses. A `gs://`

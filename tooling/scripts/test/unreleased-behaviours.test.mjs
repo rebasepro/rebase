@@ -84,7 +84,7 @@ test("the same section with a badge passes, and so does the section after it", (
     const d = tree(t, {
         "CHANGELOG.md": changelog(true),
         [BEHAVIOURS]: behaviours,
-        [PAGE]: page(`\n${badge} for the SDK types: on 0.23, run \`rebase generate-sdk\`.\n`)
+        [PAGE]: page(`\n${badge} On 0.23, run \`rebase generate-sdk\` for the SDK types.\n`)
     });
 
     assert.deepEqual(checkUnreleasedBadges(d.root).findings, []);
