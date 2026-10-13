@@ -275,14 +275,17 @@ takes precedence over `DATABASE_URL` in `.env` and loses to `--database-url` or 
 switch made earlier. Deleting the branch you are on returns you to the main
 database rather than leaving the checkout pointed at a database that is gone.
 
-:::note[Not on the managed development database]
+:::note[On the managed development database]
 `push`, `generate` and `migrate` plan their work with Atlas, which needs a second
-empty database to compare against — and the managed PGlite serves exactly one.
-Running them there stops with a message saying so. Point `DATABASE_URL` at a real
-PostgreSQL for the migration workflow; `rebase dev` already creates missing tables
-additively on the managed one.
+empty database to compare against — and the managed PGlite serves exactly one. So
+on the managed database each of them starts a second, throwaway PGlite in memory
+for Atlas, and stops it when the command ends. That is how a column is dropped,
+renamed or narrowed there: `rebase dev` only ever adds. The destructive gate is the
+same as everywhere. To have Atlas plan against an empty database of your own
+instead, set `REBASE_ATLAS_DEV_URL` to it; Rebase neither creates nor drops a
+database named that way.
 
-`branch` is refused there for a related reason. `CREATE DATABASE ... TEMPLATE`
+`branch` is refused there. `CREATE DATABASE ... TEMPLATE`
 against PGlite writes a catalog entry and copies nothing, so the branch would
 resolve to the database it was cloned from — every write you meant to sandbox
 would land in your development database. `rebase dev --docker` gives you a real

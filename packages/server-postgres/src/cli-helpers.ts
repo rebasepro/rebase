@@ -459,6 +459,40 @@ export async function closeAppClients(): Promise<void> {
     }));
 }
 
+/**
+ * Names the empty database Atlas plans against, instead of `<db>_dev_diff`.
+ *
+ * The derived one is made with `CREATE DATABASE` beside the real database,
+ * which assumes a server that holds more than one. PGlite — the managed
+ * development database — serves exactly one: the CREATE succeeds and creates
+ * nothing, so Atlas connected straight back to the database it was comparing
+ * and refused it as "not clean". `rebase db push` on the managed database now
+ * starts a second, throwaway PGlite and names it here. Anyone can name their
+ * own the same way; a named database is neither created nor dropped.
+ */
+export const ATLAS_DEV_URL_ENV = "REBASE_ATLAS_DEV_URL";
+
+/**
+ * The database Atlas replays the desired schema into: the one
+ * {@link ATLAS_DEV_URL_ENV} names (`named: true` — not ours to create or
+ * drop), else `<db>_dev_diff`.
+ */
+export function atlasDevDatabaseUrl(
+    databaseUrl: string,
+    env: Readonly<Record<string, string | undefined>>
+): { url: string; named: boolean } {
+    const named = env[ATLAS_DEV_URL_ENV]?.trim();
+    if (!named) return { url: getDevDatabaseUrl(databaseUrl), named: false };
+    if (named === databaseUrl.trim()) {
+        // Atlas would replay the schema into the database it is about to change.
+        throw new Error(
+            `${ATLAS_DEV_URL_ENV} names the same database as DATABASE_URL. It must be a separate, empty ` +
+            "database that Atlas may fill and clear."
+        );
+    }
+    return { url: named, named: true };
+}
+
 export function getDevDatabaseUrl(databaseUrl: string): string {
     try {
         const parsed = new URL(databaseUrl);

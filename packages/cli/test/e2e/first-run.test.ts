@@ -26,6 +26,7 @@ import fs from "fs";
 import path from "path";
 import os from "os";
 import { execa } from "execa";
+import pg from "pg";
 import {
     cliBin,
     getCleanEnv,
@@ -167,28 +168,35 @@ describe("the documented first run", () => {
 });
 
 describe("rebase db push on the managed database", () => {
-    it("refuses up front, and names what to do instead", async () => {
+    it("plans against a throwaway second PGlite, and can drop what boot only adds", async () => {
         // Atlas plans a diff by replaying into a second empty database; PGlite
         // serves exactly one, so `CREATE DATABASE` succeeds without creating
-        // anything and Atlas ends up comparing the database with itself. There
-        // is nothing to fix by trying harder, so the command has to say so —
-        // and it used to fail two errors deep instead, first with
-        // `pq: SSL is not enabled on the server` and then with advice to edit a
-        // DATABASE_URL that is unset precisely because this path is in use.
-        const result = await execa(
-            "node",
-            [cliBin, "db", "push"],
-            { cwd: projectDir, env, reject: false }
-        );
+        // anything and Atlas ended up comparing the database with itself. The
+        // command was refused here — and with it every way to drop, rename or
+        // narrow a column on the managed database. It now starts a throwaway
+        // in-memory PGlite for Atlas, with the dev server still running.
+        const first = await execa("node", [cliBin, "db", "push"], { cwd: projectDir, env, reject: false });
+        const firstOutput = `${first.stdout}\n${first.stderr}`;
+        expect(firstOutput).toContain("completed successfully");
+        expect(first.exitCode).toBe(0);
+        // The two errors it used to produce, and the refusal that replaced them.
+        expect(firstOutput).not.toContain("SSL is not enabled");
+        expect(firstOutput).not.toContain("not clean");
+        expect(firstOutput).not.toContain("does not work on the managed development database");
 
-        expect(result.exitCode).toBe(1);
-        const output = `${result.stdout}\n${result.stderr}`;
-        expect(output).toContain("does not work on the managed development database");
-        // The way out, both halves: what already covers it, and what to switch to.
-        expect(output).toContain("rebase dev");
-        expect(output).toContain("DATABASE_URL");
-        // The two errors it used to produce first.
-        expect(output).not.toContain("SSL is not enabled");
-        expect(output).not.toContain("not clean");
+        // A column no collection declares: boot leaves it, a push plans its
+        // drop — and the destructive gate still stands in the way.
+        const { stdout: url } = await execa("node", [cliBin, "db", "url"], { cwd: projectDir, env });
+        const client = new pg.Client({ connectionString: url.trim() });
+        await client.connect();
+        try {
+            await client.query("ALTER TABLE posts ADD COLUMN stray_note text");
+        } finally {
+            await client.end();
+        }
+        const gated = await execa("node", [cliBin, "db", "push"], { cwd: projectDir, env, reject: false });
+        const gatedOutput = `${gated.stdout}\n${gated.stderr}`;
+        expect(gatedOutput).toMatch(/DROP COLUMN "stray_note"/);
+        expect(gated.exitCode).not.toBe(0);
     });
 });

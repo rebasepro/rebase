@@ -85,10 +85,11 @@ Then start the dev servers as above. A `DATABASE_URL` that is set is never
 touched, and one pointing anywhere other than this machine is left alone
 entirely.
 
-With your own database you also get the migration commands, which the managed one
-cannot offer — they plan changes with [Atlas](https://atlasgo.io/), the schema-migration engine
-Rebase plans with, which needs a second empty database
-to compare against, and PGlite serves exactly one:
+The migration commands plan changes with [Atlas](https://atlasgo.io/), the
+schema-migration engine Rebase plans with, which needs a second empty database to
+compare against. On your own database Rebase makes one beside it; on the managed
+one, which serves exactly one database, it starts a throwaway PGlite for the
+length of the command. Either way:
 
 ```bash
 pnpm run db:push

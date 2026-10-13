@@ -87,7 +87,7 @@ export function parseDaemonArgs(argv: readonly string[]): DaemonArgs {
  * pgvector arrives from a package of its own, so unlike the contrib bundles it
  * can be absent while PGlite itself is fine.
  */
-async function loadExtensions(): Promise<Record<string, unknown>> {
+export async function loadExtensions(): Promise<Record<string, unknown>> {
     const extensions: Record<string, unknown> = {};
     for (const extension of PGLITE_EXTENSIONS) {
         let module: Record<string, unknown>;

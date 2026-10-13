@@ -15,7 +15,7 @@ import {
     describeReinstallCommand,
     resolveLocalBin,
     getTableIncludes,
-    getDevDatabaseUrl,
+    atlasDevDatabaseUrl,
     ensureDevDatabaseExists,
     dropDevDatabase,
     applySearchDdl,
@@ -1747,10 +1747,18 @@ async function runAtlas(
     // instead of letting Atlas surface a raw error.
     await checkDatabaseConnectivity(databaseUrl);
 
-    const devDatabaseUrl = getDevDatabaseUrl(databaseUrl);
+    let devDatabase: { url: string; named: boolean };
+    try {
+        devDatabase = atlasDevDatabaseUrl(databaseUrl, env);
+    } catch (err) {
+        outError(chalk.red(`✗ ${err instanceof Error ? err.message : String(err)}`));
+        process.exit(1);
+    }
+    const devDatabaseUrl = devDatabase.url;
     // Only for the calls that plan against it: `migrate apply`, `hash` and
     // `status` never read `--dev-url`, so `db migrate` makes no scratch copy.
-    if (takesDevUrl(domain, args)) await scratchDatabase.ensure(databaseUrl, devDatabaseUrl);
+    // A database `REBASE_ATLAS_DEV_URL` names is someone else's: not made here.
+    if (takesDevUrl(domain, args) && !devDatabase.named) await scratchDatabase.ensure(databaseUrl, devDatabaseUrl);
 
     // Atlas speaks libpq, which rejects the `sslmode=no-verify` that
     // node-postgres accepts — see `forLibpq`. Rewritten only for the argv, so

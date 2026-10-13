@@ -13,7 +13,7 @@ import {
     databaseUrlOf,
     dbExamples,
     ManagedDatabaseRefusal,
-    refuseAtlasOnManagedDatabase,
+    atlasDevDatabaseFor,
     refuseBranchOnManagedDatabase
 } from "./db.js";
 
@@ -120,54 +120,68 @@ describe("absolutizeLocalPathArgs", () => {
     });
 });
 
-describe("refuseAtlasOnManagedDatabase", () => {
+describe("atlasDevDatabaseFor", () => {
     /**
      * PGlite serves one database; Atlas needs a second empty one to diff
      * against. `CREATE DATABASE` against PGlite reports success and creates
-     * nothing, so Atlas compares the project's database with itself and stops
-     * on "connected database is not clean" — verified on a fresh scaffold, so
-     * no reset fixes it.
-     *
-     * The guard has to fire BEFORE the driver runs, because the first error the
-     * reader used to hit told them to edit a DATABASE_URL that `rebase init`
-     * deliberately leaves unset.
+     * nothing, so push, generate and migrate were refused on the managed
+     * database — and with them every way to drop, rename or narrow a column
+     * there. A throwaway second PGlite now stands in for the scratch database.
      */
-    const call = (args: string[], kind: string) => {
+    const fake = () => {
+        const stop = vi.fn(async () => undefined);
+        const start = vi.fn(async () => ({ url: "postgresql://postgres@127.0.0.1:61000/postgres?sslmode=disable", stop }));
+        return { start, stop };
+    };
+
+    it.each(["push", "generate", "migrate"])("starts one for db %s on the managed database", async (sub) => {
+        const { start } = fake();
+        const dev = await atlasDevDatabaseFor(["node", "rebase", "db", sub], "managed", {}, start);
+        expect(start).toHaveBeenCalledTimes(1);
+        expect(dev?.url).toContain("127.0.0.1:61000");
+    });
+
+    it("starts none against a real Postgres, where the driver makes <db>_dev_diff", async () => {
+        const { start } = fake();
+        for (const kind of ["url", "docker", "external"]) {
+            expect(await atlasDevDatabaseFor(["node", "rebase", "db", "push"], kind, {}, start)).toBeUndefined();
+        }
+        expect(start).not.toHaveBeenCalled();
+    });
+
+    it("starts none for subcommands that do not use Atlas", async () => {
+        const { start } = fake();
+        for (const sub of ["backup", "restore", "backups", "branch", "pull"]) {
+            expect(await atlasDevDatabaseFor(["node", "rebase", "db", sub], "managed", {}, start)).toBeUndefined();
+        }
+        expect(start).not.toHaveBeenCalled();
+    });
+
+    it("starts none when REBASE_ATLAS_DEV_URL already names one", async () => {
+        const { start } = fake();
+        const dev = await atlasDevDatabaseFor(
+            ["node", "rebase", "db", "push"], "managed", { REBASE_ATLAS_DEV_URL: "postgresql://me@localhost/scratch" }, start
+        );
+        expect(dev).toBeUndefined();
+        expect(start).not.toHaveBeenCalled();
+    });
+
+    it("refuses as before, naming the cause and what works, when one cannot be started", async () => {
         const exit = vi.spyOn(process, "exit").mockImplementation((() => {
             throw new Error("the guard must not exit the process");
         }) as never);
         try {
-            refuseAtlasOnManagedDatabase(args, kind);
-        } catch (error) {
-            // The type is the assertion: an exit here would be the bug this
-            // guard caused in `rebase dev`, which runs `db push` in-process.
+            const failing = vi.fn(async () => { throw new Error("Could not load \"@electric-sql/pglite\""); });
+            const error = await atlasDevDatabaseFor(["node", "rebase", "db", "push"], "managed", {}, failing)
+                .then(() => undefined, (e: unknown) => e);
+            // A value, not an exit: `rebase dev` runs this path in-process.
             expect(error).toBeInstanceOf(ManagedDatabaseRefusal);
-            const refusal = error as ManagedDatabaseRefusal;
-            return { refused: true, output: refusal.lines.join("\n"), message: refusal.message };
+            const output = (error as ManagedDatabaseRefusal).lines.join("\n");
+            expect(output).toContain("@electric-sql/pglite");
+            expect(output).toContain("DATABASE_URL");
+            expect(output).toContain("REBASE_ATLAS_DEV_URL");
         } finally {
             exit.mockRestore();
-        }
-        return { refused: false, output: "", message: "" };
-    };
-
-    it.each(["push", "generate", "migrate"])("refuses db %s on the managed database", (sub) => {
-        const { refused, output } = call(["node", "rebase", "db", sub], "managed");
-        expect(refused).toBe(true);
-        // It must name something that works, not merely decline.
-        expect(output).toContain("rebase dev");
-        expect(output).toContain("DATABASE_URL");
-    });
-
-    it("allows the same subcommands against a real Postgres", () => {
-        expect(call(["node", "rebase", "db", "push"], "url").refused).toBe(false);
-        expect(call(["node", "rebase", "db", "push"], "docker").refused).toBe(false);
-    });
-
-    it("leaves subcommands that do not use Atlas alone", () => {
-        // Backups and branches reach the database directly; nothing here is
-        // planned by a diff, so the managed database serves them fine.
-        for (const sub of ["backup", "restore", "backups", "branch", "pull"]) {
-            expect(call(["node", "rebase", "db", sub], "managed").refused).toBe(false);
         }
     });
 });
@@ -229,8 +243,8 @@ describe("refuseBranchOnManagedDatabase", () => {
     });
 
     it("leaves the other db subcommands alone", () => {
-        // push/generate/migrate are refused by refuseAtlasOnManagedDatabase,
-        // with a different message; backup and restore are not refused at all.
+        // push/generate/migrate get a throwaway Atlas database instead (see
+        // atlasDevDatabaseFor); backup and restore are not refused at all.
         for (const sub of ["push", "backup", "restore", "pull"]) {
             expect(call(["node", "rebase", "db", sub], "managed").refused).toBe(false);
         }
@@ -239,16 +253,21 @@ describe("refuseBranchOnManagedDatabase", () => {
 
 describe("the examples in `rebase db --help`", () => {
     /**
-     * Every command the help used to lead with — `db push`, `db generate`,
-     * `db migrate`, `db branch` — is refused on the managed development
-     * database, by the two guards above, in this same file. So on the project
-     * the CLI had just scaffolded, the first thing `rebase db --help` offered
-     * was a command that answers with a refusal.
+     * `db branch` is refused on the managed development database, by the
+     * guard above, in this same file. On the project the CLI had just
+     * scaffolded, the first thing `rebase db --help` offered used to be a
+     * command that answers with a refusal. `db push` works there now, through
+     * a throwaway Atlas database, and is offered.
      */
     // eslint-disable-next-line no-control-regex
     const plain = (kind: Parameters<typeof dbExamples>[0]) => dbExamples(kind).replace(/\x1b\[[0-9;]*m/g, "");
 
-    const REFUSED_ON_MANAGED = ["rebase db push", "rebase db generate", "rebase db migrate", "rebase db branch"];
+    const REFUSED_ON_MANAGED = ["rebase db branch"];
+    const FULL_WORKFLOW = ["rebase db push", "rebase db generate", "rebase db migrate", "rebase db branch"];
+
+    it("offers db push on the managed database, for the changes boot will not make", () => {
+        expect(plain("managed")).toContain("rebase db push");
+    });
 
     it("offers nothing the managed database refuses", () => {
         const examples = plain("managed");
@@ -272,7 +291,7 @@ describe("the examples in `rebase db --help`", () => {
 
     it.each(["external", "docker", null] as const)("keeps the full workflow for %s", (kind) => {
         const examples = plain(kind);
-        for (const command of REFUSED_ON_MANAGED) expect(examples).toContain(command);
+        for (const command of FULL_WORKFLOW) expect(examples).toContain(command);
     });
 });
 

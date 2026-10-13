@@ -25,6 +25,7 @@ import { COLLECTIONS_FLAG_HELP, refuseMissingCollectionsPath } from "../utils/pa
 import { recordEvent } from "../telemetry";
 import { DEV_DATABASE_KIND_ENV, devDatabaseKind, type PreparedDatabase } from "../dev-db/prepare";
 import { type DevDatabase } from "../dev-db/resolve";
+import type { AtlasDevDatabase } from "../dev-db/atlas-dev-database";
 
 /**
  * The connection string a prepared database actually answers on.
@@ -234,50 +235,68 @@ export function printManagedDatabaseRefusal(refusal: ManagedDatabaseRefusal): vo
 }
 
 /**
- * Stop an Atlas-backed subcommand before it fails inside Atlas on the managed
+ * The variable the driver reads for Atlas's dev database
+ * (`ATLAS_DEV_URL_ENV` in `@rebasepro/server-postgres`, which this CLI does not
+ * depend on).
+ */
+export const ATLAS_DEV_URL_ENV = "REBASE_ATLAS_DEV_URL";
+
+/** Loaded only when a command needs one: PGlite is 25 MB of WASM. */
+const startAtlasDevDatabase = async (): Promise<AtlasDevDatabase> =>
+    (await import("../dev-db/atlas-dev-database")).startAtlasDevDatabase();
+
+/**
+ * The empty database an Atlas-backed subcommand plans against, on the managed
  * development database.
  *
- * **PGlite serves exactly one database.** `CREATE DATABASE "postgres_dev_diff"`
- * against it reports success and creates nothing, so Atlas connects its dev-url
- * straight back to the database it is meant to be comparing against, finds the
- * project's own tables there, and stops with
- * `connected database is not clean: found schema "public"`. Verified on a
- * completely fresh scaffold, so this is not a leftover-state problem that a
- * reset would fix — the model does not fit the engine.
+ * **PGlite serves exactly one database.** Atlas computes a change by replaying
+ * the desired schema into a second, empty one; on a real server the driver
+ * makes it as `<db>_dev_diff`, but `CREATE DATABASE` against PGlite reports
+ * success and creates nothing, so Atlas connected straight back to the
+ * database it was comparing and stopped with `connected database is not
+ * clean`. These commands were refused outright on the managed database — and
+ * with them every way to drop, rename or narrow a column there, since boot
+ * only adds.
  *
- * Before this guard the failure was worse than unhelpful. The first thing the
- * reader hit was `pq: SSL is not enabled on the server`, whose remedy box said
- * to append `sslmode=disable` to `DATABASE_URL` — a variable `rebase init`
- * deliberately leaves unset, which is the very reason the managed database was
- * in use. Two errors deep, about a variable that does not exist, for a command
- * the quickstart told them to run.
+ * So a throwaway second PGlite is started for the command instead — in
+ * memory, in this process, gone when the command ends — and handed to the
+ * driver as `REBASE_ATLAS_DEV_URL`. Nothing else about the push changes: the
+ * destructive gate is the driver's, and holds as it does everywhere.
  *
- * There is nothing to fix by trying harder here: Atlas's other dev-url option
- * is `docker://`, and needing Docker is precisely what the managed database
- * exists to avoid. So this says what the managed database can and cannot do,
- * and names the two things that work.
+ * `undefined` when none is needed: another database kind (the driver makes its
+ * own), a subcommand that is not Atlas's, or a `REBASE_ATLAS_DEV_URL` the
+ * developer set. When one cannot be started — PGlite is an optional
+ * dependency — the old refusal stands, with the reason.
  */
-export function refuseAtlasOnManagedDatabase(rawArgs: string[], kind: string): void {
-    if (kind !== "managed") return;
+export async function atlasDevDatabaseFor(
+    rawArgs: string[],
+    kind: string,
+    env: Readonly<Record<string, string | undefined>>,
+    start: () => Promise<AtlasDevDatabase> = startAtlasDevDatabase
+): Promise<AtlasDevDatabase | undefined> {
+    if (kind !== "managed") return undefined;
     const [domain, subcommand] = commandWords(rawArgs, "db");
-    if (domain !== "db" || !ATLAS_BACKED_SUBCOMMANDS.has(subcommand ?? "")) return;
+    if (domain !== "db" || !ATLAS_BACKED_SUBCOMMANDS.has(subcommand ?? "")) return undefined;
+    if (env[ATLAS_DEV_URL_ENV]?.trim()) return undefined;
 
-    const summary = `rebase db ${subcommand} does not work on the managed development database.`;
-
-    throw new ManagedDatabaseRefusal(summary, [
-        "",
-        chalk.red(`  ✗ ${summary}`),
-        "",
-        chalk.gray("  It plans changes with Atlas, which needs a second empty database to"),
-        chalk.gray("  compare against. The managed database is PGlite, which serves exactly one."),
-        "",
-        chalk.gray("  You almost certainly do not need this command:"),
-        chalk.gray(`  ${chalk.cyan("rebase dev")} already applies your collections to it at boot, additively.`),
-        "",
-        chalk.gray("  For migrations, or to drop and rename columns, point the project at a real"),
-        chalk.gray("  Postgres — uncomment DATABASE_URL in .env — and run this command again."),
-        ""
-    ]);
+    try {
+        return await start();
+    } catch (err) {
+        const summary = `rebase db ${subcommand} could not start the database Atlas plans against.`;
+        throw new ManagedDatabaseRefusal(summary, [
+            "",
+            chalk.red(`  ✗ ${summary}`),
+            chalk.gray(`    ${err instanceof Error ? err.message : String(err)}`),
+            "",
+            chalk.gray("  Atlas plans every change against a second, empty database. On the managed"),
+            chalk.gray("  database that is a throwaway PGlite, started for the command."),
+            "",
+            chalk.gray(`  ${chalk.cyan("rebase dev")} still applies your collections at boot, additively. Otherwise,`),
+            chalk.gray(`  set ${ATLAS_DEV_URL_ENV} to an empty Postgres database Atlas may fill and clear,`),
+            chalk.gray("  or point the project at a real Postgres (uncomment DATABASE_URL in .env)."),
+            ""
+        ]);
+    }
 }
 
 /**
@@ -308,9 +327,10 @@ export function refuseAtlasOnManagedDatabase(rawArgs: string[], kind: string): v
  * an invitation to do the broken thing, and `info` would confirm a size for a
  * database that was never made.
  *
- * `refuseAtlasOnManagedDatabase` above is the same shape for a different
- * reason, and its comment named `branch` as one of the subcommands it does not
- * cover. It does now.
+ * Push, generate and migrate had the same problem — Atlas's scratch database
+ * is a second database too — and get a throwaway PGlite of their own instead
+ * (`atlasDevDatabaseFor` above). A branch cannot: it is meant to keep the
+ * project's data, and a throwaway instance has none.
  */
 export function refuseBranchOnManagedDatabase(rawArgs: string[], kind: string): void {
     if (kind !== "managed") return;
@@ -499,7 +519,10 @@ export async function runDriverDbCommand(
         for (const line of managedNotices(prepared)) console.log(chalk.gray(`  ${line}`));
     }
 
-    refuseAtlasOnManagedDatabase(rawArgs, prepared.database.kind);
+    // Started after the managed database, stopped when the driver exits —
+    // whatever it exits with.
+    const atlasDev = await atlasDevDatabaseFor(rawArgs, prepared.database.kind, env);
+    if (atlasDev) env[ATLAS_DEV_URL_ENV] = atlasDev.url;
 
     // Resolved against the directory the developer is standing in, before the
     // child is handed a different one. See absolutizeLocalPathArgs.
@@ -510,7 +533,11 @@ export async function runDriverDbCommand(
     // flag this CLI prints after every failure as the thing to re-run with.
     const childArgs = absolutizeLocalPathArgs(argsFromCommand(rawArgs, "db"), process.cwd());
 
-    await spawnDriverCli({ projectRoot, backendDir, pluginCli, env }, childArgs, options);
+    try {
+        await spawnDriverCli({ projectRoot, backendDir, pluginCli, env }, childArgs, options);
+    } finally {
+        await atlasDev?.stop();
+    }
 }
 
 export async function dbCommand(subcommand: string | undefined, rawArgs: string[]): Promise<void> {
@@ -1445,8 +1472,9 @@ export function dbExamples(kind: DevDatabase["kind"] | null): string {
         return `  ${chalk.gray("# Quick development workflow (this project is on the managed database)")}
   rebase schema generate
   rebase dev                        ${chalk.gray("# boot applies your collections to it, additively")}
+  rebase db push                    ${chalk.gray("# also drops, renames and narrows columns")}
 
-  ${chalk.gray("# push, generate, migrate and branch need a Postgres of your own")}
+  ${chalk.gray("# branch needs a Postgres of your own")}
   rebase dev --docker               ${chalk.gray("# starts one; or uncomment DATABASE_URL in .env")}
 
 `;
