@@ -8,7 +8,7 @@ import { Hook } from "./Hook";
 import { Premise } from "./Premise";
 import { Agents, Define, Secure } from "./Claims";
 import { Build, Claim, EndCard, Manage, Shape } from "./Sections";
-import { FPS, type Section, sectionLength, sectionStart, SECTIONS } from "./score";
+import { FPS, type Section, sectionLength, sectionStart, SECTIONS, type Track } from "./score";
 
 /**
  * RebaseLaunch — a 46-second teaser, cut to its own soundtrack.
@@ -100,7 +100,7 @@ const PARTS: Record<Section, React.FC> = {
     end: EndCard,
 };
 
-export const RebaseLaunch: React.FC = () => (
+export const RebaseLaunch: React.FC<{ track: Track }> = ({ track }) => (
     <AbsoluteFill>
         <Backdrop />
         {ORDER.map((s) => {
@@ -113,6 +113,6 @@ export const RebaseLaunch: React.FC = () => (
                 </Sequence>
             );
         })}
-        <Audio src={staticFile("launch/music.wav")} />
+        <Audio src={staticFile(`launch/music-${track}.wav`)} />
     </AbsoluteFill>
 );

@@ -54,30 +54,11 @@ export const sectionStart = (s: Section) => at(SECTIONS[s].bar);
 export const sectionLength = (s: Section) => SECTIONS[s].bars * BAR;
 
 /**
- * One chord per bar, as MIDI notes: the bass root, then the pad voicing.
- * vi–IV–I–V in C through the body; the claim is a ii–V (Dm7, Gsus) that
- * resolves to I on the logo, then IV–I, so the film ends at rest rather than
- * on a loop point.
+ * The soundtracks, each an arrangement of the same form in
+ * scripts/launch-music/<track>.mjs, written to public/launch/music-<track>.wav
+ * by `pnpm launch:music`. The film plays the default unless rendered with
+ * `--props='{"track":"…"}'`.
  */
-export interface Chord {
-    name: string;
-    root: number;
-    pad: number[];
-}
-
-const Am7: Chord = { name: "Am7", root: 45, pad: [57, 60, 64, 67] };
-const Fmaj7: Chord = { name: "Fmaj7", root: 41, pad: [53, 57, 60, 64] };
-const Cmaj7: Chord = { name: "Cmaj7", root: 48, pad: [55, 59, 60, 64] };
-const G6: Chord = { name: "G6", root: 43, pad: [55, 59, 62, 64] };
-const Dm7: Chord = { name: "Dm7", root: 38, pad: [53, 57, 60, 62] };
-const Gsus: Chord = { name: "Gsus4", root: 43, pad: [55, 60, 62, 67] };
-const Cmaj9: Chord = { name: "Cmaj9", root: 48, pad: [52, 55, 59, 62] };
-const Cadd9: Chord = { name: "Cadd9", root: 48, pad: [55, 60, 62, 64] };
-
-const LOOP = [Am7, Fmaj7, Cmaj7, G6];
-
-export const CHORDS: Chord[] = Array.from({ length: BARS }, (_, bar) => {
-    if (bar >= SECTIONS.end.bar) return [Cmaj9, Fmaj7, Cadd9][bar - SECTIONS.end.bar];
-    if (bar >= SECTIONS.claim.bar) return [Dm7, Gsus][bar - SECTIONS.claim.bar];
-    return LOOP[bar % LOOP.length];
-});
+export const TRACKS = ["keynote", "cinematic", "garage"] as const;
+export type Track = (typeof TRACKS)[number];
+export const DEFAULT_TRACK: Track = "keynote";
