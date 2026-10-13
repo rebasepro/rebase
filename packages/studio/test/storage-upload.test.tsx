@@ -145,3 +145,23 @@ describe("uploading over a file that is already there", () => {
         expect(screen.queryByText(/Replace 1 file/)).toBeNull();
     });
 });
+
+/**
+ * The list view is a list on the sheet, and a list row has no fill of its own
+ * (packages/ui/DESIGN.md). Its rows were the kit's card rows — every row
+ * filled — so the list read as a stack of cards.
+ */
+describe("the storage list view", () => {
+    it("draws its rows with no fill of their own", async () => {
+        store = folder(["report.pdf"]);
+        render(<StorageView/>);
+        await screen.findByText("report.pdf");
+
+        await act(async () => { fireEvent.click(screen.getByRole("button", { name: "List view" })); });
+
+        const row = (await screen.findByText("report.pdf")).closest("tr");
+        expect(row).not.toBeNull();
+        expect(row!.className).not.toMatch(/(^|\s)bg-surface-card(\s|$)/);
+        expect(row!.closest("tbody")!.className).not.toMatch(/(^|\s)bg-surface-card(\s|$)/);
+    });
+});

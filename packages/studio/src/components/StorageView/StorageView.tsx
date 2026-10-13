@@ -1304,7 +1304,8 @@ message: e instanceof Error ? e.message : String(e) });
                             <TableCell className="px-4 py-2 font-medium w-24 text-right">{t("studio_storage_size")}</TableCell>
                             <TableCell className="px-2 py-2 w-10"/>
                         </TableHeader>
-                        <TableBody>
+                        {/* A list on the sheet: rows have no fill of their own. */}
+                        <TableBody variant="list">
                             {folders.map(folder => {
                                 const isChecked = selectedPaths.has(folder.fullPath);
                                 return (

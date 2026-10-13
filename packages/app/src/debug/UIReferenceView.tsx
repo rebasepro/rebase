@@ -1095,6 +1095,26 @@ roles: [] }
                             </TableBody>
                         </Table>
                     </div>
+                    {/* A list of rows on the sheet: no fill of its own, only the hovered row takes an alpha highlight. */}
+                    <Typography variant="caption" color="secondary" className="block mt-8 mb-2">
+                        <code className="font-mono text-xs">TableBody variant=&quot;list&quot;</code> — a list on the sheet (Studio&apos;s storage list)
+                    </Typography>
+                    <div className="overflow-auto">
+                        <Table className="w-full">
+                            <TableHeader>
+                                <TableCell header>Name</TableCell>
+                                <TableCell header align="right">Size</TableCell>
+                            </TableHeader>
+                            <TableBody variant="list">
+                                {[{ name: "report.pdf", size: "1.2 MB" }, { name: "cover.png", size: "320 KB" }].map(file => (
+                                    <TableRow key={file.name} onClick={() => undefined}>
+                                        <TableCell>{file.name}</TableCell>
+                                        <TableCell align="right">{file.size}</TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </div>
                 </SectionBlock>
 
                 {/* ═══════════════════════════════════════════════

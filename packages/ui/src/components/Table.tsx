@@ -26,21 +26,37 @@ export const Table = React.memo(({
     </table>
 ));
 
+/**
+ * `"card"` (the default) paints the body and every row with the card fill —
+ * a table that is an object of its own. `"list"` is a list of rows on the
+ * sheet: no fill of its own, only the hovered row takes an alpha highlight
+ * (packages/ui/DESIGN.md, "a list row has NO fill of its own").
+ */
+export type TableVariant = "card" | "list";
+
+/** The variant a {@link TableBody} gives the rows inside it. */
+const TableVariantContext = React.createContext<TableVariant>("card");
+
 export type TableBodyProps = {
     children?: React.ReactNode;
     className?: string;
+    /** See {@link TableVariant}. Rows inside take it unless they say otherwise. */
+    variant?: TableVariant;
 } & React.HTMLAttributes<HTMLTableSectionElement>;
 
 export const TableBody = React.memo(({
                               children,
                               className,
+                              variant = "card",
                               ...rest
                           }: TableBodyProps) => (
     <tbody
-        className={cls("bg-surface-card text-sm divide-y divide-hairline", className)}
+        className={cls(variant === "card" && "bg-surface-card", "text-sm divide-y divide-hairline", className)}
         {...rest}
     >
-    {children}
+    <TableVariantContext.Provider value={variant}>
+        {children}
+    </TableVariantContext.Provider>
     </tbody>
 ));
 
@@ -83,6 +99,8 @@ export type TableRowProps = {
     style?: React.CSSProperties;
     /** The rendered `<tr>`, e.g. for an IntersectionObserver. */
     ref?: React.Ref<HTMLTableRowElement>;
+    /** See {@link TableVariant}. Defaults to the enclosing {@link TableBody}'s. */
+    variant?: TableVariant;
 } & React.HTMLAttributes<HTMLTableRowElement>;
 
 export const TableRow = React.memo(({
@@ -91,22 +109,27 @@ export const TableRow = React.memo(({
                              onClick,
                              style,
                              ref,
+                             variant,
                              ...rest
-                         }: TableRowProps) => (
-    <tr
-        ref={ref}
-        onClick={onClick}
-        style={style}
-        className={cls(
-            "bg-surface-card",
-            onClick ? "transition-colors duration-150 hover:bg-surface-card-hover cursor-pointer" : "",
-            className
-        )}
-        {...rest}
-    >
-        {children}
-    </tr>
-));
+                         }: TableRowProps) => {
+    const bodyVariant = React.useContext(TableVariantContext);
+    const card = (variant ?? bodyVariant) === "card";
+    return (
+        <tr
+            ref={ref}
+            onClick={onClick}
+            style={style}
+            className={cls(
+                card && "bg-surface-card",
+                onClick ? cls("transition-colors duration-150 cursor-pointer", card ? "hover:bg-surface-card-hover" : "hover:bg-surface-hover") : "",
+                className
+            )}
+            {...rest}
+        >
+            {children}
+        </tr>
+    );
+});
 
 export type TableCellProps = {
     children?: React.ReactNode;
