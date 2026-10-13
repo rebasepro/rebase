@@ -3,7 +3,7 @@ import type { ResourceRef } from "../types/resources";
 import type { RebaseSdkData } from "./data";
 import type { EmailService } from "./email";
 import type { StorageSource } from "./storage";
-import type { CronJobStatus, CronJobLogEntry, CronJobListing } from "../types/cron";
+import type { CronJobStatus, CronJobLogEntry, CronJobListing, CronJobStarted } from "../types/cron";
 import type { BackupDownloadLink, BackupListing } from "../types/backup";
 import type { ApiKeysAPI, PersonalKeysAPI } from "../types/api_keys";
 import type { RoleSummary } from "../types/scopes";
@@ -212,7 +212,18 @@ export interface CronAPI {
     /** The registered jobs, and the cron files and jobs that did not become one. */
     listJobs(): Promise<CronJobListing>;
     getJob(jobId: string): Promise<{ job: CronJobStatus }>;
-    triggerJob(jobId: string): Promise<{ log: CronJobLogEntry; job: CronJobStatus }>;
+    /**
+     * Run a job now and wait for it to finish. A proxy in front of the server
+     * may cut a long run's answer short while the run carries on; pass
+     * `{ async: true }` for those.
+     */
+    triggerJob(jobId: string, options?: { async?: false }): Promise<{ log: CronJobLogEntry; job: CronJobStatus }>;
+    /**
+     * Start a job now and answer as soon as it has started. Read its outcome
+     * from {@link CronAPI.getJobLogs}: the entry with `manual: true` and the
+     * returned `startedAt`.
+     */
+    triggerJob(jobId: string, options: { async: true }): Promise<CronJobStarted>;
     getJobLogs(jobId: string, options?: { limit?: number }): Promise<{ logs: CronJobLogEntry[] }>;
     toggleJob(jobId: string, enabled: boolean): Promise<{ job: CronJobStatus }>;
 }

@@ -304,7 +304,7 @@ See [Roles and scopes](/docs/backend/roles-and-scopes/).
 |--------|------|-------------|
 | `GET` | `/api/admin/cron` | List all registered cron jobs |
 | `GET` | `/api/admin/cron/:id` | Get a single job's status |
-| `POST` | `/api/admin/cron/:id/trigger` | Manually trigger a job — `409` while it is already running |
+| `POST` | `/api/admin/cron/:id/trigger` | Manually trigger a job — `409` while it is already running. `?async=1` answers `202` once the run has started |
 | `GET` | `/api/admin/cron/:id/logs` | Get execution history (`?limit=N`), the last 30 days of it. `503` when `rebase.cron_logs` cannot be read, rather than an empty history |
 | `PUT` | `/api/admin/cron/:id` | Pause or resume a job everywhere (`{ "enabled": false }`); `null` follows the code again |
 
@@ -378,6 +378,27 @@ curl -X POST -H "Authorization: Bearer $TOKEN" \
 While the job is running — here or on any other process — the answer is `409`
 with the code `CRON_JOB_ALREADY_EXECUTING`; see [Concurrency Guarding](/docs/backend/cron-across-instances/#concurrency-guarding).
 
+The call waits for the run to finish and answers `200` with its log. For a job that runs
+longer than a proxy in front of the server holds a request (many stop at 60 seconds), add
+`?async=1`. The answer is then `202` as soon as the run has started:
+
+```bash
+curl -X POST -H "Authorization: Bearer $TOKEN" \
+    "$API_URL/api/admin/cron/nightly-report/trigger?async=1"
+```
+
+```json
+{
+    "accepted": true,
+    "startedAt": "2026-04-24T08:21:04.512Z",
+    "job": { "id": "nightly-report", "state": "running" }
+}
+```
+
+The run carries on after the answer. Its outcome is in `GET /api/admin/cron/:id/logs`, as the
+entry with `"manual": true` and the same `startedAt`. A run that cannot start still answers
+`409`. `?async` takes `1`, `true`, `0` or `false`; any other value is a `400`.
+
 ### Pausing a job
 
 A pause from Studio or
@@ -401,8 +422,11 @@ const { jobs, rejected } = await client.cron.listJobs();
 // Get a single job
 const { job } = await client.cron.getJob("health-check");
 
-// Trigger manually
+// Trigger manually, and wait for the run
 const { log, job: updated } = await client.cron.triggerJob("health-check");
+
+// Trigger manually, and answer once the run has started
+const { startedAt } = await client.cron.triggerJob("nightly-report", { async: true });
 
 // View execution history
 const { logs } = await client.cron.getJobLogs("health-check", { limit: 10 });
@@ -414,7 +438,8 @@ await client.cron.toggleJob("health-check", true);  // resume
 
 `triggerJob()` waits for the run to finish and answers with its log. A proxy in front of the
 server may cut a long job's answer short (many stop at 60 seconds) while the run itself
-carries on. Read its outcome from `getJobLogs()` then.
+carries on. For such a job pass `{ async: true }`: the call answers once the run has started,
+and `getJobLogs()` has the outcome, as the entry with `manual: true` and the returned `startedAt`.
 
 `listJobs()` is typed `CronJobListing`: `jobs`, plus the `skipped`,
 `rejected` and `note` fields described under [Jobs that are not there](#jobs-that-are-not-there).

@@ -77,6 +77,28 @@ job: {} });
                 { method: "POST" }
             );
         });
+
+        it("{ async: true } asks for ?async=1 and answers with the start", async () => {
+            transport.request.mockResolvedValue({ accepted: true, startedAt: "2026-10-13T00:00:00.000Z", job: {} });
+            const cron = createCron(transport);
+
+            const started = await cron.triggerJob("my job", { async: true });
+
+            expect(transport.request).toHaveBeenCalledWith(
+                "/admin/cron/my%20job/trigger?async=1",
+                { method: "POST" }
+            );
+            expect(started.startedAt).toBe("2026-10-13T00:00:00.000Z");
+        });
+
+        it("{ async: false } is the synchronous call", async () => {
+            transport.request.mockResolvedValue({ log: {}, job: {} });
+            const cron = createCron(transport);
+
+            await cron.triggerJob("my-job", { async: false });
+
+            expect(transport.request).toHaveBeenCalledWith("/admin/cron/my-job/trigger", { method: "POST" });
+        });
     });
 
     describe("getJobLogs", () => {

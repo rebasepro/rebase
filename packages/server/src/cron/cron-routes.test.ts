@@ -263,6 +263,100 @@ description: "First job" }),
             release();
             expect((await first).status).toBe(200);
         });
+
+        // ── ?async=1 ────────────────────────────────────────────────
+        //
+        // A long job's synchronous answer is cut by a proxy's timeout (often
+        // 60 s) while the run carries on. `?async=1` answers once the run has
+        // started — 202 — and the outcome is read from the run history.
+
+        it("?async=1 answers 202 once the run has started, before it finishes", async () => {
+            let release!: () => void;
+            const gate = new Promise<void>(r => { release = r; });
+            let finished = false;
+            scheduler.registerJobs([makeJob("long", {
+                handler: async (ctx) => {
+                    ctx.log("began");
+                    await gate;
+                    finished = true;
+                    return { done: true };
+                }
+            })]);
+
+            const res = await app.request("/cron/long/trigger?async=1", { method: "POST" });
+
+            expect(res.status).toBe(202);
+            expect(finished).toBe(false);
+            const body = await jsonBody(res);
+            expect(body.accepted).toBe(true);
+            expect(typeof body.startedAt).toBe("string");
+            expect((body.job as Record<string, unknown>).state).toBe("running");
+            expect(body.log).toBeUndefined();
+
+            release();
+            // The run is the scheduler's to finish: stop() waits for it.
+            await scheduler.stop();
+            expect(finished).toBe(true);
+
+            const logs = (await jsonBody(await app.request("/cron/long/logs"))).logs as Array<Record<string, unknown>>;
+            expect(logs).toHaveLength(1);
+            expect(logs[0].manual).toBe(true);
+            expect(logs[0].success).toBe(true);
+            expect(logs[0].startedAt).toBe(body.startedAt);
+            expect(logs[0].result).toEqual({ done: true });
+        });
+
+        it("?async=true is the same switch", async () => {
+            const res = await app.request("/cron/job-a/trigger?async=true", { method: "POST" });
+            expect(res.status).toBe(202);
+        });
+
+        it("?async=0 keeps the synchronous answer", async () => {
+            const res = await app.request("/cron/job-a/trigger?async=0", { method: "POST" });
+            expect(res.status).toBe(200);
+            expect(((await jsonBody(res)).log as Record<string, unknown>).success).toBe(true);
+        });
+
+        it("refuses an ?async value it cannot read, rather than guessing", async () => {
+            let ran = false;
+            scheduler.registerJobs([makeJob("once", { handler: () => { ran = true; } })]);
+            const res = await app.request("/cron/once/trigger?async=please", { method: "POST" });
+            expect(res.status).toBe(400);
+            expect(ran).toBe(false);
+        });
+
+        it("?async=1 still answers 409 while this process is running the job", async () => {
+            let release!: () => void;
+            const gate = new Promise<void>(r => { release = r; });
+            scheduler.registerJobs([makeJob("slow", { handler: async () => { await gate; } })]);
+
+            const first = await app.request("/cron/slow/trigger?async=1", { method: "POST" });
+            const second = await app.request("/cron/slow/trigger?async=1", { method: "POST" });
+
+            expect(first.status).toBe(202);
+            expect(second.status).toBe(409);
+            expect(((await jsonBody(second)).error as Record<string, unknown>).code).toBe("CRON_JOB_ALREADY_EXECUTING");
+            release();
+            await scheduler.stop();
+        });
+
+        it("?async=1 answers 409 while another process holds the run lease", async () => {
+            const store = makeStateStore({ leaseHolder: "worker-7:1#ab12cd34" });
+            let ran = false;
+            const { app: fleetApp } = appWithStore(store, [makeJob("job-a", { handler: () => { ran = true; } })]);
+
+            const res = await fleetApp.request("/cron/job-a/trigger?async=1", { method: "POST" });
+
+            expect(res.status).toBe(409);
+            const error = (await jsonBody(res)).error as Record<string, unknown>;
+            expect(error.code).toBe("CRON_JOB_ALREADY_EXECUTING");
+            expect(ran).toBe(false);
+        });
+
+        it("?async=1 answers 404 for a job that does not exist", async () => {
+            const res = await app.request("/cron/ghost/trigger?async=1", { method: "POST" });
+            expect(res.status).toBe(404);
+        });
     });
 
     // ── GET /:id/logs ───────────────────────────────────────────────

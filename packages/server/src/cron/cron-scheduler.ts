@@ -524,6 +524,15 @@ const LEASE_GRACE_SECONDS = 30;
 const MAX_UNBOUNDED_LEASE_SECONDS = 3600;
 
 /**
+ * What {@link CronScheduler.startJob} answers: the run began at `startedAt`
+ * (its history entry will carry the same timestamp), or it did not start and
+ * `log` is the skip that says why.
+ */
+export type StartedCronRun =
+    | { started: true; startedAt: string }
+    | { started: false; log: CronJobLogEntry };
+
+/**
  * Whether a log entry records a run that did not happen because one was
  * already executing — on this process, or on another that holds the job's run
  * lease. The shape is the documented marker of a skip, the one the Studio
@@ -1047,6 +1056,44 @@ export class CronScheduler {
     }
 
     /**
+     * Start a job now and answer as soon as the run has begun, not when it
+     * ends — the manual trigger's `?async=1`.
+     *
+     * The synchronous {@link triggerJob} holds its HTTP request open for the
+     * whole run, and a proxy in front of the server (many stop at 60 s) cuts
+     * a long job's answer while the run carries on. This resolves once the
+     * run lease is held and the handler is about to be called, so a run that
+     * cannot start — already executing here or on the lease holder — is still
+     * answered as the skip it is. The run itself is tracked like any other:
+     * `stop()` waits for it, and its outcome lands in the run history, where
+     * the entry carries `manual: true` and the `startedAt` returned here.
+     *
+     * Returns `undefined` if the job doesn't exist.
+     */
+    async startJob(id: string): Promise<StartedCronRun | undefined> {
+        const job = this.jobs.get(id);
+        if (!job) return undefined;
+
+        if (job.executing) {
+            logger.warn(`[cron] Skipping manual trigger of "${id}" — already executing`);
+            return { started: false, log: this.recordSkip(job, "already_executing", true) };
+        }
+
+        let onStart!: (startedAt: string) => void;
+        const begun = new Promise<string>((resolve) => { onStart = resolve; });
+        const run = this.executeJob(job, true, undefined, onStart);
+        // Whichever comes first: the handler being called, or the run ending
+        // without it (a skip). A run that starts settles `begun` first, since
+        // `onStart` is called before the handler is awaited.
+        const first = await Promise.race([
+            begun.then((startedAt) => ({ startedAt })),
+            run.then((log) => ({ log }))
+        ]);
+        if ("startedAt" in first) return { started: true, startedAt: first.startedAt };
+        return { started: false, log: first.log };
+    }
+
+    /**
      * Record a run that did not happen because the previous one had not
      * finished.
      *
@@ -1544,7 +1591,8 @@ export class CronScheduler {
     private executeJob(
         job: RegisteredJob,
         manual: boolean,
-        seedLog?: string
+        seedLog?: string,
+        onStart?: (startedAt: string) => void
     ): Promise<CronJobLogEntry> {
         // Aborted when the run is over before its handler is: the timeout
         // below, or `stop()` giving up on it. Without it the timeout only
@@ -1553,7 +1601,7 @@ export class CronScheduler {
         // request per tick while every run was already marked failed.
         const abort = new AbortController();
         this.runControllers.add(abort);
-        const run = this.runJob(job, manual, abort, seedLog);
+        const run = this.runJob(job, manual, abort, seedLog, onStart);
         this.track(run);
         return run.finally(() => {
             this.runControllers.delete(abort);
@@ -1571,7 +1619,8 @@ export class CronScheduler {
         job: RegisteredJob,
         manual: boolean,
         abort: AbortController,
-        seedLog?: string
+        seedLog?: string,
+        onStart?: (startedAt: string) => void
     ): Promise<CronJobLogEntry> {
         // Checked here as well as by each caller, because each caller awaits
         // something (a claim, a state read) between its own check and this.
@@ -1632,6 +1681,7 @@ export class CronScheduler {
         job.state = "running";
         job.lastRunAt = startedAt;
         job.totalRuns++;
+        onStart?.(startedAt.toISOString());
 
         let success = true;
         let error: string | undefined;

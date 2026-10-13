@@ -302,3 +302,19 @@ export interface CronJobLogEntry {
     /** Whether this was a manual trigger. */
     manual?: boolean;
 }
+
+/**
+ * The answer to a manual trigger made with `?async=1`
+ * (`client.cron.triggerJob(id, { async: true })`): the run has started and
+ * carries on after the answer. Its outcome is in the run history, as the entry
+ * with `manual: true` and this `startedAt`.
+ */
+export interface CronJobStarted {
+    accepted: true;
+
+    /** ISO timestamp the run started at — the `startedAt` of its log entry. */
+    startedAt: string;
+
+    /** The job's status as the run began. */
+    job: CronJobStatus;
+}

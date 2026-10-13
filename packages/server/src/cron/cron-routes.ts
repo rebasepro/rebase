@@ -15,12 +15,25 @@ function actorOf(c: Context<HonoEnv>): string | undefined {
 }
 
 /**
+ * The manual trigger's `?async` switch. Absent means synchronous, as it always
+ * was; anything other than a plain yes or no is refused rather than read as
+ * one, so `?async=yes-please` does not quietly hold the request open.
+ */
+function readAsyncFlag(raw: string | undefined): boolean {
+    if (raw === undefined) return false;
+    const value = raw.trim().toLowerCase();
+    if (value === "1" || value === "true") return true;
+    if (value === "" || value === "0" || value === "false") return false;
+    throw ApiError.badRequest(`?async must be 1, true, 0 or false — got "${raw}"`);
+}
+
+/**
  * Create admin REST routes for managing cron jobs.
  *
  * Routes:
  *   GET    /          → list all cron jobs
  *   GET    /:id       → get a single job's status
- *   POST   /:id/trigger → manually trigger a job
+ *   POST   /:id/trigger → manually trigger a job (`?async=1`: 202 once it has started)
  *   GET    /:id/logs  → get execution logs for a job
  *   PUT    /:id       → update job (enable/disable, or `null` to follow the code)
  *
@@ -86,9 +99,32 @@ export function createCronRoutes(scheduler: CronScheduler, skipped = 0): Hono<Ho
     // Trigger a job manually
     router.post("/:id/trigger", async (c) => {
         const id = c.req.param("id");
+        const asyncRun = readAsyncFlag(c.req.query("async"));
         const job = scheduler.getJob(id);
         if (!job) {
             throw ApiError.notFound(`Cron job "${id}" not found`);
+        }
+
+        // `?async=1`: answer once the run has started rather than when it
+        // ends. A long job's synchronous answer is cut by any proxy with a
+        // shorter timeout than the job (60 s is common) while the run carries
+        // on; this one is not. The outcome is in `GET /:id/logs`, as the entry
+        // with `manual: true` and this `startedAt`.
+        if (asyncRun) {
+            const outcome = await scheduler.startJob(id);
+            if (!outcome) throw ApiError.notFound(`Cron job "${id}" not found`);
+            if (!outcome.started) {
+                throw ApiError.conflict(
+                    `Cron job "${id}" is already executing — try again when that run has finished`,
+                    "CRON_JOB_ALREADY_EXECUTING",
+                    { log: outcome.log }
+                );
+            }
+            return c.json({
+                accepted: true,
+                startedAt: outcome.startedAt,
+                job: await scheduler.fetchJob(id)
+            }, 202);
         }
 
         const log = await scheduler.triggerJob(id);

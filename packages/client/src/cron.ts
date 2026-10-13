@@ -1,5 +1,5 @@
 import { Transport } from "./transport";
-import type { CronJobStatus, CronJobLogEntry, CronJobListing } from "@rebasepro/types";
+import type { CronJobStatus, CronJobLogEntry, CronJobListing, CronJobStarted } from "@rebasepro/types";
 
 export interface CreateCronOptions {
     cronPath?: string;
@@ -19,11 +19,22 @@ export function createCron(transport: Transport, options?: CreateCronOptions) {
         );
     }
 
-    async function triggerJob(jobId: string): Promise<{ log: CronJobLogEntry; job: CronJobStatus }> {
-        return transport.request<{ log: CronJobLogEntry; job: CronJobStatus }>(
-            cronPath + "/" + encodeURIComponent(jobId) + "/trigger",
-            { method: "POST" }
-        );
+    /**
+     * Run a job now. By default the call waits for the run and answers with
+     * its log; `{ async: true }` answers once the run has started (`202`), for
+     * jobs longer than a proxy in front of the server will hold a request.
+     */
+    function triggerJob(jobId: string, options?: { async?: false }): Promise<{ log: CronJobLogEntry; job: CronJobStatus }>;
+    function triggerJob(jobId: string, options: { async: true }): Promise<CronJobStarted>;
+    async function triggerJob(
+        jobId: string,
+        options?: { async?: boolean }
+    ): Promise<{ log: CronJobLogEntry; job: CronJobStatus } | CronJobStarted> {
+        const path = cronPath + "/" + encodeURIComponent(jobId) + "/trigger";
+        if (options?.async) {
+            return transport.request<CronJobStarted>(path + "?async=1", { method: "POST" });
+        }
+        return transport.request<{ log: CronJobLogEntry; job: CronJobStatus }>(path, { method: "POST" });
     }
 
     async function getJobLogs(
