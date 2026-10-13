@@ -56,6 +56,24 @@ rebase schema generate
 rebase schema generate --watch
 ```
 
+### `rebase schema stale`
+
+Check whether the generated schema still matches the collections:
+
+```bash
+rebase schema stale          # report, and exit 1 if anything is stale
+rebase schema stale --fix    # regenerate the file instead
+```
+
+**What it does:**
+- Renders what the collections in `config/collections/` generate and compares it, declaration by declaration, with `backend/src/schema.generated.ts`
+- Names each difference — a missing table, a retyped column, a dropped enum label, or foreign keys named the way an earlier release derived them — and exits non-zero
+- With `--fix`, regenerates the file instead of reporting
+
+`rebase dev` keeps the file current by itself, so this is the check for a build
+or a CI step. It takes `--collections` and `--output` as `rebase schema generate`
+does.
+
 ### `rebase schema introspect`
 
 Reverse-engineer collection definitions from an existing PostgreSQL database:
@@ -74,6 +92,8 @@ rebase schema introspect
 | Flag | Description |
 |------|-------------|
 | `--output, -o` | Output directory for generated collection files |
+| `--schema` | The Postgres schema to read (default: `public`) |
+| `--force, -f` | Overwrite collection files that already exist; without it, an existing file is skipped |
 
 This is useful when adopting Rebase on an existing database — introspect first, then customize the generated collections.
 
@@ -294,10 +314,10 @@ rebase generate-sdk
 `config/collections/`. Run it yourself in CI, in a repository that has no
 collections (see `--from` below), or anywhere `rebase dev` is not running.
 
-for reading every file, stopping on a broken one, `rebase dev` running it
-and `--collections` on this command. On 0.23 it reads the files the `index.ts`
-barrel lists, skips one that does not load with a warning, and takes the
-directory as `--collections-dir`; `rebase dev` regenerates the schema only.
+On 0.23 the command reads only the files the `index.ts` barrel lists, skips
+one that does not load with a warning, and takes the directory as
+`--collections-dir`; and `rebase dev` regenerates the schema only, so the SDK
+types are yours to regenerate.
 
 **Options:**
 

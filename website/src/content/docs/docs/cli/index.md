@@ -53,7 +53,7 @@ Start the development server:
 rebase dev
 ```
 
-Starts both frontend and backend with hot reloading, and regenerates the Drizzle schema and the SDK types (`generated/sdk/`) on start and on every collection save. for the SDK types — on 0.23 it regenerates the schema only, and `rebase generate-sdk` is yours to run.
+Starts both frontend and backend with hot reloading, and regenerates the Drizzle schema and the SDK types (`generated/sdk/`) on start and on every collection save. On 0.23 it regenerates the schema only, and `rebase generate-sdk` is yours to run.
 
 Both ports are derived from the project's path so several Rebase projects can run
 side by side. Use the URLs `rebase dev` prints. Pin one with `rebase dev --port 3001`.
@@ -156,6 +156,22 @@ rebase schema generate
 ```
 
 This reads your collections from `config/collections/` and generates `backend/src/schema.generated.ts` with Drizzle table definitions, enums, and relations.
+
+### `rebase schema stale`
+
+Check whether `backend/src/schema.generated.ts` still matches the collections:
+
+```bash
+rebase schema stale          # report, and exit 1 if anything is stale
+rebase schema stale --fix    # regenerate the file instead
+```
+
+It compares the file with what the collections generate, declaration by
+declaration, and names each difference: a missing table, a retyped column, a
+dropped enum label, or foreign keys named the way an earlier release derived
+them. `rebase dev` keeps the file current by itself, so this is the check for a
+build or a CI step. It takes `--collections` and `--output` as
+`rebase schema generate` does.
 
 ### `rebase db push`
 
@@ -290,8 +306,9 @@ past an age you name. It asks before removing anything unless you pass `--yes`.
  `switch` records the branch in `.rebase/branch.json` and never edits `.env`. It
 takes precedence over `DATABASE_URL` in `.env` and loses to `--database-url` or a
 `DATABASE_URL` in the shell, so a flag on the command line always outranks a
-switch made earlier. Deleting the branch you are on returns you to the main
-database rather than leaving the checkout pointed at a database that is gone.
+switch made earlier. `delete` refuses the branch you are on, since every command
+in the checkout, the delete included, is pointed at it: `switch --off` first,
+then delete it.
 
 :::note[On the managed development database]
 <span class="since-badge" data-since="0.25">Since 0.25</span> `push`, `generate` and `migrate` plan their work with Atlas, which needs a second
