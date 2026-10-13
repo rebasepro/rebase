@@ -219,6 +219,7 @@ export function RebaseFirebaseApp({
                             <NavigationStateContext.Provider value={navigationStateController}>
                                 <Rebase
                                     authController={authController}
+                                    modeController={modeController}
                                     userConfigPersistence={userConfigPersistence}
                         dateTimeFormat={dateTimeFormat}
                         dataSources={[{
