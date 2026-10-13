@@ -24,7 +24,10 @@ const driver: DataDriver = {
     fetchCollection: async ({ path }) => rows[path] ?? [],
     fetchOne: async () => undefined,
     save: async ({ values }) => ({ ...values }),
-    delete: async () => undefined
+    delete: async () => undefined,
+    // Unique when no stored row holds the value. These rows are never edited
+    // here, so there is no row of the caller's own to leave out.
+    checkUniqueField: async (path, name, value) => !(rows[path] ?? []).some(row => row[name] === value)
 };
 
 const authController = {

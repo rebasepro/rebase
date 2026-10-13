@@ -83,7 +83,10 @@ const driver: DataDriver = {
         return saved;
     },
     delete: async () => undefined,
-    count: async ({ path }) => (rows[path] ?? []).length
+    count: async ({ path }) => (rows[path] ?? []).length,
+    // Unique when no other stored row holds the value.
+    checkUniqueField: async (path, name, value, id) => !(rows[path] ?? [])
+        .some(row => row[name] === value && String(row[keyOf(path)]) !== String(id))
 };
 
 const authController = {
