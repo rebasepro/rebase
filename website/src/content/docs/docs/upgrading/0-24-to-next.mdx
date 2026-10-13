@@ -21,7 +21,9 @@ and offline reads, the storage source registry, unused UI kit props, the
 users-collection upsert, a read naming both `page` and `offset`, and the default
 policy names on long tables. The last three are product calls: the default
 session length, the password policy on an administrator's chosen password, and
-an empty string on a required field.
+an empty string on a required field. Three removals follow: two client exports
+that were only engines, an admin hook nothing needs, and a storage option that
+reached no client.
 
 ---
 
@@ -303,3 +305,37 @@ should apply, or drop `required` from fields that may legitimately be empty.
 Collections that declare a `beforeSave` are not checked at the boundary (the
 hook may fill the value), as before. Server code writing in-process
 (`rebase.data`) is not affected.
+
+## 83. `QueryBuilder` and `createBackups` are no longer exported from `@rebasepro/client`
+
+Both were the engines behind client calls.
+
+- `new QueryBuilder(collection).where(…)` → `client.data.<collection>.where(…)`;
+  the `or`, `and`, `not` and `cond` helpers are still exported.
+- `createBackups(transport)` → `client.backups` (same `list`, `download`,
+  `downloadUrl`, `stream`). `CreateBackupsOptions` is gone with it;
+  `BackupStream` is still exported.
+
+`client.ws` is unchanged.
+
+## 84. `useBackendStorageSource` is removed from `@rebasepro/app`
+
+```ts
+// before
+const storageSource = useBackendStorageSource({ apiUrl, getAuthToken });
+// after — the client you already pass to the admin
+const storageSource = client.storage;                     // default source
+const media = client.createStorageSource("media");        // a named source
+```
+
+The client's source also sends `public` and `context` on uploads (property
+limits checked server-side) and `storageId` for named sources, which the hook
+did not.
+
+## 85. `signedUrlExpiration` is removed from S3 and GCS storage config
+
+Delete the key from `storage: { type: "s3" | "gcs", … }`; TypeScript reports it
+as an unknown property. It never set the lifetime of a URL a browser received.
+To change how long a private file's URL works, set `storageDownloadTokenTtl`
+(seconds; `STORAGE_DOWNLOAD_TOKEN_TTL` on a bundle deployment). Server code that
+calls `controller.getSignedUrl()` directly gets a URL good for an hour.

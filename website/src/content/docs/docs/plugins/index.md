@@ -164,7 +164,7 @@ to every markdown field, which continues the text from the cursor. Both appear
 only where the plugin is enabled: the service reports itself available and
 `getConfigForPath` (when you pass one) allows the collection. A field whose
 `customProps.editorProps.aiController` names a controller of its own uses that
-one. Another plugin can give markdown fields a controller the same way, with
+one. <span class="since-badge" data-since="0.25">Since 0.25</span> Another plugin can give markdown fields a controller the same way, with
 `EditorAIControllerProvider` from `@rebasepro/cms` in a form-scoped provider.
 
 ![Data enhancement](/img/data_enhancement.png)

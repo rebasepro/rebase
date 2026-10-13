@@ -276,7 +276,7 @@ switch made earlier. Deleting the branch you are on returns you to the main
 database rather than leaving the checkout pointed at a database that is gone.
 
 :::note[On the managed development database]
-`push`, `generate` and `migrate` plan their work with Atlas, which needs a second
+<span class="since-badge" data-since="0.25">Since 0.25</span> `push`, `generate` and `migrate` plan their work with Atlas, which needs a second
 empty database to compare against — and the managed PGlite serves exactly one. So
 on the managed database each of them starts a second, throwaway PGlite in memory
 for Atlas, and stops it when the command ends. That is how a column is dropped,

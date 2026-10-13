@@ -83,6 +83,10 @@
   a source the panel had not loaded yet uploaded to the default bucket. Call
   `get(key)` where a missing source is expected.
 
+- **useBackendStorageSource is removed from @rebasepro/app.** Use
+  `client.storage`, or `client.createStorageSource(key)` for a named source;
+  both carry `storageId`, `public` and `context`, which the hook dropped.
+
 #### Client SDK
 
 - **client.cron calls `/api/admin/cron` by default, not the deprecated
@@ -95,6 +99,11 @@
   fails with OFFLINE.** They used to return part of the collection as if it
   were all of it, and a count of the cached rows. Catch OFFLINE where the
   app showed those partial results.
+
+- **QueryBuilder, createBackups and CreateBackupsOptions are no longer
+  exported from @rebasepro/client.** They were internal engines: use
+  `client.data.<collection>.where(…)` (with `or`, `and`, `not`, `cond`, still
+  exported) and `client.backups`. `client.ws` is unchanged.
 
 #### UI kit & plugins
 
@@ -125,6 +134,14 @@
   `AuthAdapter.prepareUserCreation` takes an optional third argument,
   `UserCreationOptions { mayWaivePasswordPolicy }`.
 
+#### Storage & email
+
+- **signedUrlExpiration is removed from S3StorageConfig and
+  GCSStorageConfig.** It reached no client: routes hand out metadata and a
+  download token, whose lifetime is `storageDownloadTokenTtl`.
+  `controller.getSignedUrl()` called from your own server code signs for an
+  hour, the old default.
+
 ### Added
 
 #### Storage & email
@@ -137,6 +154,25 @@
   the buffered path. `putObject(props, { uploadLimits: false })` writes without
   the controller's upload limits; only the server's own backup upload passes it
   (see Fixed), and it is not part of the client's upload props.
+
+- **`rebase storage orphans` lists the stored files no row names, and
+  `--delete` deletes them.** Every row of every collection is read,
+  soft-deleted rows included; files newer than `--older-than` hours (24) are
+  left out; nothing is deleted while a collection cannot be read
+  (`409 STORAGE_SCAN_INCOMPLETE`). Behind `GET|DELETE
+  /api/admin/storage/orphans` (`database:read` / `database:write`).
+
+- **`rebase storage move` copies a folder of files to another storage source
+  under the same keys,** resumable, with `--from`, `--to`, `--prefix`, and
+  `--delete-source` to delete each source copy once the target holds it.
+  Behind `POST /api/admin/storage/move` (`database:write`).
+
+- **`storageTargetsInText(text)` lists the objects a text names**
+  (references and pre-reference download URLs), from `@rebasepro/types` and
+  `@rebasepro/client`.
+
+- **Local storage warns at boot when its folder is on a case-insensitive file
+  system** (macOS, Windows), where `Avatar.png` and `avatar.png` are one file.
 
 #### Server & REST
 
@@ -173,6 +209,47 @@
   (`ETag`, `Retry-After`, the resumable-upload headers, …) instead of copying
   the list by hand.
 
+- **Server-side data can be typed from your generated Database.** Register it
+  once (`declare module "@rebasepro/types" { interface Register { database:
+  Database } }`, or `rebase generate-sdk --register`, see CLI) and
+  `context.data` in collection callbacks, `rebase.dataAsAdmin`, and the
+  `rebase` a function or cron receives are typed from it: rows,
+  `where`/`orderBy`, `include`, and `create`/`update` inputs.
+  `defineFunction<Database>()` and `defineCron<Database>()` type a single file
+  without registering. Projects that register nothing are unchanged. See
+  "Typed server-side data".
+
+- **With a Database registered, context.data.collection("my-notes") is typed
+  like context.data.myNotes.** A slug computed at runtime, or one the schema
+  does not declare, stays untyped.
+
+- **`context.data.<collection>.trash` in collection callbacks, and
+  `rebase.data.<collection>.trash` in functions and crons:** `find`, `count`,
+  `restore`, `restoreMany`, `purge` and `purgeMany`, the same trash the
+  browser client has. The reads return only soft-deleted rows; a restore sets
+  the soft-delete field back to `null`; a purge deletes the row for good.
+
+- **`databaseDefault` marks a column the database fills on create**
+  (`NOT NULL DEFAULT gen_random_uuid()` and the like). A required field with
+  it may be left out of a create, by the admin form and the API; a `null` sent
+  on create is left to the database; the generated `Insert` type makes it
+  optional. Given the expression, in the template form `isId` takes
+  (``databaseDefault: "sql`gen_random_uuid()`"``, new type `SqlExpression`),
+  the schema planner writes it as the column's `DEFAULT`, so `rebase db push`
+  keeps it; `databaseDefault: true` declares a `DEFAULT` written elsewhere and
+  writes none. "Import from table" and `rebase schema introspect` set the
+  expression they read on such columns.
+
+- **A built bundle can edit its collections from the admin panel.** Set
+  `REBASE_LIVE_SCHEMA_REPOSITORY=owner/name` and
+  `REBASE_LIVE_SCHEMA_GITHUB_TOKEN` (or `REBASE_LIVE_SCHEMA_GITHUB_APP_ID`,
+  `_INSTALLATION_ID` and `_PRIVATE_KEY`). Each change is planned, committed to
+  that repository, and its DDL applied on the deployment's database. It is off
+  unless set, admin-only, and applied only by a person. A repository named
+  without a usable credential refuses to boot. `REBASE_LIVE_SCHEMA_BRANCH` and
+  `REBASE_LIVE_SCHEMA_COLLECTIONS_PATH` default to `main` and
+  `config/collections`.
+
 #### Client SDK
 
 - **`findById(id, { include })` and `listenById(id, onUpdate, onError,
@@ -202,6 +279,35 @@
   HTTP client sends it, and the in-process accessor now applies it instead of
   dropping it.
 
+- **`client.data.<slug>.trash` lists, counts, restores and purges the rows a
+  soft delete stamped.** It maps to `?deleted=only`, the update setting the
+  stamp to `null` (`{ field }` for a custom soft-delete field), and
+  `?hard=true`. With offline enabled, the trash is never cached or queued, and
+  a call fails with `OFFLINE` without the server.
+
+- **`auth.restoreOutcome()` says how restoring the session on load ended:**
+  `restored`, `none`, `refused` or `unreachable`.
+
+- **`client.data.<collection>.listenCount(params, onCount)` keeps a count
+  current:** the total matching the filter, again whenever a write changes
+  it. The server reads no rows for it.
+
+- **runSqlScript takes an optional signal.** On `SQLAdmin.runSqlScript` and
+  `RebaseWebSocketClient.runSqlScript`, aborting it rejects the run and
+  cancels the statement where the server can.
+
+- **`offline.keepLastUser` (off by default): in cookie mode, an offline reload
+  opens the last signed-in user's local data instead of the signed-out
+  user's.** Their queued writes replay only once the session is confirmed.
+  `offline.status().unverifiedUser` is true meanwhile.
+
+- **`offline.replayBatchSize` (default 1): a run of creates queued offline
+  replays as one createMany instead of one request each.**
+
+- **`offline.onConflict`: a queued edit replays with If-Match, and a row
+  changed on the server since is yours to "overwrite" or "discard".** Without
+  it, the last writer still wins.
+
 #### UI kit & plugins
 
 - **`VirtualTable`, `ListView` and `CardView` accept `undefined` entries in
@@ -225,6 +331,19 @@
 - **formatRelativeTime takes labels, to say "5m ago" in another language
   (`RelativeTimeLabels`, `defaultRelativeTimeLabels`).**
 
+- **TableBody and TableRow take variant="list":** a list of rows on the sheet
+  with no fill of its own, only the hovered row highlighted. Rows inherit the
+  body's variant. Studio's storage list view uses it.
+
+- **DateTimeField takes mode="time":** a time of day alone, kept on
+  1970-01-01 in the field's zone. New `DateTimeFieldMode` type and
+  `UiLabels.openTimePicker`.
+
+- **Markdown fields get the Autocomplete slash command from the AI plugin,**
+  behind the same gate as Autofill (the service available,
+  `getConfigForPath` allowing the collection). A field's own
+  `editorProps.aiController` still wins.
+
 #### Admin (CMS & app)
 
 - **Four translation keys name the split-view dividers and the drawer's
@@ -239,6 +358,27 @@
 - **`EntityAction.nameKey` is a translation key for an action's name.** The
   built-in actions set it.
 
+- **The record form saves with If-Match.** A save made against a version
+  someone has since replaced is refused, and the form says "This record
+  changed since you opened it…". The edit stays in the form, rebased onto the
+  new version, with the conflicting fields marked.
+
+- **The collection toolbar's row count, and the "select all N" offer, follow
+  rows other people add and remove,** wherever the data source can subscribe.
+
+- **A time-column date property is picked and shown as a time of day
+  alone,** in UTC, in the form, the table, the filter and previews — no more
+  01/01/1970 date part (`columnType: "time"`).
+
+- **Creating a collection from a file infers a date for a column of epoch
+  timestamps** (seconds or milliseconds, 2001–2103) whose name ends in a word
+  like `at`, `date`, `time` or `timestamp` (`created_at`, `updatedAt`,
+  `signup_date`).
+
+- **`EditorAIControllerProvider` (from @rebasepro/cms) gives every markdown
+  field below it an AI controller for the editor's Autocomplete slash
+  command.**
+
 #### CLI
 
 - **rebase doctor names a junction table no collection declares
@@ -249,6 +389,24 @@
   writes, and `rebase db migrate --refuse-destructive` refuses one.** The flag
   dry-runs the pending files and exits 1, applying nothing, when one destroys
   data. Without it, `db migrate` is unchanged.
+
+- **`rebase generate-sdk --register` types server-side data:** it writes the
+  generated types and the `Register` declaration to `config/generated/`, where
+  both the backend's and the `config` package's compiles see them, and
+  remembers the choice in `rebase.json` (`registerDatabase` on the backend
+  app). Later runs, `rebase dev`'s and a fresh clone's included, keep them
+  current.
+
+- **rebase db push, db generate and db migrate work on the managed development
+  database (PGlite).** Atlas needs a second, empty database to plan against,
+  which PGlite cannot provide, so the CLI starts a throwaway in-memory PGlite
+  for the command and stops it afterwards. A column can now be dropped,
+  renamed or narrowed there; before, `rebase dev` could only add. The
+  destructive gate is unchanged.
+
+- **`REBASE_ATLAS_DEV_URL` names the empty database Atlas plans against,
+  instead of the derived <db>_dev_diff.** Rebase neither creates nor drops a
+  database named this way.
 
 #### CI & tooling
 
@@ -286,12 +444,69 @@
   the fix. Info is below every `--fail-on` except `info`, so default runs are
   unaffected.
 
+- **anonymous-write-allowed reports Rebase databases.** Every request there
+  runs as `rebase_user`, a signed-out one too when `AUTH_REQUIRE=false` or
+  guest sign-in is on, so a write rule that accepts any row is reported as
+  heuristic, naming the switch. A policy for a role that `anon` inherits is
+  reported too.
+
 #### Studio
 
 - **The property editor warns when a smaller max narrows a varchar or char
   column.** On those column types `validation.max` is the column's width, so
   lowering it is a DDL change: `rebase db push` asks before it narrows a
   column, and the change fails while a stored value is longer.
+
+- **SQL console: Cancel run while a run is in flight.** A server that
+  supports it stops the statement with `pg_cancel_backend`; the console is
+  given back at once either way.
+
+- **SQL console: Export typed JSON writes each value read by its column's
+  type** (numbers a JSON number holds exactly, booleans, json); **Export JSON**
+  is unchanged.
+
+#### Realtime
+
+- **Live row frames carry the row's version.** `etagOf(row)` on a
+  `listenById()` row is the `ETag` a `GET` of it answers, so an edit made
+  against what a frame showed can be saved with `ifMatch` and is refused with
+  412 if the row has moved on. A successful `PATCH` answers with the `ETag` of
+  the version it wrote, and `update()` returns a row that carries it, so
+  conditional edits chain without a read in between.
+
+- **The SDK notices a half-open socket and reconnects.** A browser cannot see
+  pings, so a socket whose network silently died used to look connected
+  forever. A 0.25 server now sends a heartbeat every 30 s to clients that ask,
+  and the SDK reconnects after two missed. Older servers and older clients
+  behave as before.
+
+- **Retained channels fill holes.** A message that arrives past a gap in the
+  sequence (a frame lost between instances, a bus that does not order) is held
+  back while the missed ones are fetched from history, and all are delivered
+  in order. Senders are told the number their own message took
+  (`broadcast_ack`), so their own messages are never mistaken for a gap. This
+  is active only between a 0.25 SDK and a 0.25 server.
+
+- **`REALTIME_MAX_SOCKETS_PER_USER` (or realtime.maxSocketsPerUser) limits how
+  many realtime sockets one user holds on a server.** A sign-in past it is
+  refused with `TOO_MANY_SOCKETS` and the socket is closed (4002). Unset, as by
+  default, there is no limit.
+
+- **`REALTIME_REFETCH_MAX_WAIT_MS` sets the longest a change waits for its live
+  frame (default 1000 ms); `REALTIME_RECOUNT_INTERVAL_MS` and
+  `REALTIME_RECOUNT_MIN_ROWS` let a big list reuse its total for a while.**
+  Instead of counting it on every write; such frames carry `meta.totalAsOf`.
+  Unset, every frame counts, as before. Each has a `realtime.*` option.
+
+#### Jobs & cron
+
+- **POST /api/admin/cron/:id/trigger?async=1 (and
+  client.cron.triggerJob(id, { async: true })) answers 202 { accepted,
+  startedAt, job } as soon as the run has started,** instead of holding the
+  request for the whole run, which a proxy may cut at 60 s. The outcome is in
+  the run history as the entry with `manual: true` and that `startedAt`. A run
+  that cannot start still answers `409`. The synchronous call is unchanged and
+  stays the default.
 
 ### Changed
 
@@ -383,6 +598,14 @@
   row matched.** A typo against an empty table, under a filter that matched
   nothing, on a read of a missing row, or nested below a relation that loaded
   nothing answered 200, and became a 400 the first time a row matched.
+
+- **With liveSchema.repository configured, live schema editing works under
+  NODE_ENV=production and with schemaEditor: false:** it writes only to that
+  repository, never to files beside the process.
+
+- **A server committing to a remote repository makes one schema change per
+  deploy.** After a commit lands, the next apply is refused with
+  `SCHEMA_CHANGE_FAILED`, naming the commit, until the commit is deployed.
 
 #### Postgres
 
@@ -499,6 +722,14 @@
   re-subscribing after a reconnect did once per subscription. Nothing is
   cached past the flight and nothing is shared across sockets; a demotion
   during a shared lookup is seen one frame later.
+
+- **The realtime socket URL gains ?rebase_caps=heartbeat,channel_seq,** and
+  an older server ignores it.
+
+- **The SQL console's cancel is negotiated like the other socket opt-ins.**
+  The SDK asks for `cancel_sql` on the socket URL (`?rebase_caps=…,cancel_sql`)
+  and sends `CANCEL_SQL { requestId }` (an admin-plane frame,
+  `database:write`) only to a server whose `hello` lists it.
 
 #### Admin (CMS & app)
 
@@ -743,6 +974,9 @@
   `posts.where(or(cond("titel", "==", 1)))` and `cond("views", "==", "many")`
   are now compile errors. Relation and JSON paths are not checked.
 
+- **etagOf and withETag now live in @rebasepro/common.** `@rebasepro/client`
+  still exports `etagOf`.
+
 #### Storage & email
 
 - **Storage files are streamed instead of read whole, and a Range request
@@ -870,11 +1104,10 @@
 
 #### Client SDK
 
-- **The client.ws admin methods (executeSql, createBranch, deleteBranch),
-  QueryBuilder and createBackups are deprecated, with no removal date.** Use
-  `client.data.<collection>.where(…)` for queries and `client.backups` for
-  backups, and run SQL server-side. The Studio SQL console still uses
-  `client.ws`, so those methods stay until it has another path.
+- **The client.ws admin methods (executeSql, createBranch, deleteBranch) are
+  deprecated, with no removal date.** Run SQL server-side. The Studio SQL
+  console still uses `client.ws`, so those methods stay until it has another
+  path.
 
 ### Fixed
 
@@ -954,6 +1187,25 @@
   answer names every other key it left out. A masked value (`********`)
   cannot be told apart and is still written back.
 
+- **context.data.myNotes (and rebase.dataAsAdmin.myNotes) reaches the
+  my-notes collection whatever its table is.** The server resolved every
+  property as its snake_case, so a collection whose table was not that name
+  was unreachable under the accessor its generated type offers.
+
+- **A PATCH answered from an Idempotency-Key replay, or with
+  Prefer: return=minimal, carries the ETag of the version it wrote,** like any
+  other successful `PATCH`.
+
+- **With a remote repository, adding a relation to another collection
+  works.** It used to fail with "no file for it in <tmp>".
+
+- **Deleting a collection works with a remote repository.** It is refused
+  while another collection imports it, and its `index.ts` entry is removed in
+  the same commit. It used to be refused outright.
+
+- **SCHEMA_EDITOR_DISABLED and SCHEMA_EDITOR_PRODUCTION now say how to edit
+  collections from a deployment.**
+
 #### Postgres
 
 - **A server that boots while a long report, transaction or `pg_dump` reads
@@ -1007,6 +1259,11 @@
   primary key. The next boot now sets `DEFAULT gen_random_uuid()`, as it
   already did for the implicit key. A SQL strategy's key is still left alone,
   because its function may not exist yet.
+
+- **rebase db generate stops with exit 1 and removes the migration it wrote
+  when it cannot append the RLS policies, search, vector or trigger DDL to
+  it.** It used to warn and say "You can now run rebase db migrate", and that
+  migration created its tables with RLS off.
 
 #### CLI
 
@@ -1222,6 +1479,19 @@
   edited, as the record form does. An invalid edit is still flagged and not
   saved.
 
+- **"Import from table" keeps an unbounded varchar unbounded (as text)
+  instead of declaring VARCHAR(255), and keeps NOT NULL on jsonb and array
+  columns,** so the first push no longer plans narrowing those columns or
+  dropping their NOT NULL. `rebase schema introspect` declares an unbounded
+  `varchar` as `text` too.
+
+- **A collection created with "Import from table" keeps each column's literal
+  default** (`DEFAULT true`, `0`, `'draft'`, `'{}'::jsonb`) as the property's
+  `defaultValue`, and reads `DEFAULT now()` on a date as
+  `autoValue: "on_create"`. Before, the New form sent the type's fallback
+  (`false` for a `DEFAULT true` column), and the first push planned
+  `DROP DEFAULT` on every such column.
+
 #### Studio
 
 - **The SQL console's CSV export follows RFC 4180.** Values with commas,
@@ -1431,6 +1701,12 @@
   (true).** It is critical, under `policy-authenticated-tautology`, and used
   to give no finding.
 
+- **view-bypasses-rls no longer calls a view a certain bypass when its owner
+  is itself subject to the base table's policies** (not a superuser, no
+  BYPASSRLS, not the owner, or the owner under FORCE). Such a view returns what
+  the policies give its owner, to every caller. It is still reported, at the
+  same severity, as heuristic.
+
 #### Storage & email
 
 - **Backups over 50 MB upload.** A backup was held to the storage's upload
@@ -1456,6 +1732,12 @@
 - **A mail server that accepts the connection and never answers fails the send
   after 30 s (`smtp.timeoutMs`).** It took nodemailer's two to ten minutes,
   holding the invite, verification and reset requests that await their mail.
+
+- **Images saved in a markdown field before storage references show again.**
+  Their download URLs' tokens had expired; `resolveStorageReferences`, the
+  admin's markdown preview and editor renew them from the object the token
+  names. `storageReferencesForDownloadUrls(text)` rewrites such text to store
+  references; `storageTargetOfDownloadUrl(url)` reads one URL.
 
 #### Inference
 
@@ -1552,6 +1834,24 @@
 - **`GET /api/storage/sources` is public on purpose, and the storage page says
   why.** It names the configured sources, never a file; listing and reading
   files still need a caller. A test holds it public.
+
+#### Realtime
+
+- **The realtime page's listenById() example reads the row it is given
+  (row.name):** the SDK hands back a flat row, not an `Entity`.
+
+- **Database change capture (CDC) has its own page,** "Database change
+  capture" (`/docs/backend/realtime-cdc/`).
+
+#### Jobs & cron
+
+- **The cron REST API and the typed SDK's client.cron have their own page,**
+  "Cron Jobs API" (`/docs/backend/cron-jobs-api/`).
+
+#### Auth
+
+- **Multi-factor authentication with the SDK has its own page,**
+  "Multi-Factor Authentication" (`/docs/sdk/multi-factor-authentication/`).
 
 ## [0.24.0] - 2026-10-08
 
