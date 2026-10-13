@@ -63,17 +63,21 @@ services:
       # served from.
       # {{/frontend}}
       CORS_ORIGINS: ${CORS_ORIGINS:?set CORS_ORIGINS to the origin you browse to}
-      # A durable named volume, which is the case this flag acknowledges.
-      STORAGE_PATH: /uploads
+      # A durable named volume, which is the case this flag acknowledges. It is
+      # mounted at /storage, one level above STORAGE_PATH, because every bucket
+      # declared in config/resources.ts gets a directory beside this one —
+      # bucket("media") is /storage/uploads__media — and all of them belong on
+      # the volume. The Dockerfile creates /storage for the `rebase` user.
+      STORAGE_PATH: /storage/uploads
       FORCE_LOCAL_STORAGE: "true"
     depends_on:
       db:
         condition: service_healthy
     volumes:
-      - uploads:/uploads
+      - storage:/storage
 
 volumes:
   postgres_data:
     driver: local
-  uploads:
+  storage:
     driver: local

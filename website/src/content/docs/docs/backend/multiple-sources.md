@@ -379,6 +379,14 @@ the next restart — an upload that fails loudly can be retried, one that succee
 into a disk about to be wiped cannot. Set `FORCE_LOCAL_STORAGE=true` only when a
 durable volume really is mounted.
 
+That volume has to hold every local bucket, not just the default one. A named
+local bucket's directory sits beside the default's, `<STORAGE_PATH>__<key>`.
+With `STORAGE_PATH=/storage/uploads`, `bucket("media", { engine: "local" })`
+writes to `/storage/uploads__media`. Mount the volume on their parent,
+`/storage`, as the compose file `rebase init` writes does, and not on
+`STORAGE_PATH` itself. `STORAGE_PATH__MEDIA` sets one bucket's directory
+explicitly. See [Self-hosting](/docs/deployment/self-hosting/#file-storage).
+
 One consequence worth knowing if you declare buckets explicitly: no default
 bucket is invented for you. Declaring only `bucket("media")` means there is no
 default bucket, and a property that does not name one has nowhere to go —

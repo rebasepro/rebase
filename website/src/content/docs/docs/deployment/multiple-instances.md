@@ -31,7 +31,7 @@ some clients never see, or a page that shows different logs on every refresh.
 | Client address behind a proxy | `TRUSTED_PROXY_HOPS=0` | The number of proxies in front, the same everywhere |
 | Collection subscriptions | Shared through the database when CDC is on | `REALTIME_CDC=auto` (the default) |
 | Broadcast channels and presence | In memory | `REALTIME_CHANNEL_BUS=postgres` |
-| Uploaded files, `STORAGE_TYPE=local` | The instance's own disk | S3 or GCS, or one shared volume at `STORAGE_PATH` |
+| Uploaded files, `STORAGE_TYPE=local` | The instance's own disk | S3 or GCS, or one shared volume on the parent of `STORAGE_PATH` |
 | Resumable (TUS) uploads in progress | The instance's disk, at `STORAGE_PATH/.tus-uploads` | One shared volume at `STORAGE_PATH`, or sticky sessions |
 | Image transforms | An in-process cache | `STORAGE_RENDITION_CACHE=true` |
 | Logs Explorer | A ring of the last 10,000 lines | Nothing — ship stdout to a log aggregator |
@@ -86,7 +86,8 @@ when `DATABASE_URL` goes through pgBouncer. See
 
 With `STORAGE_TYPE=local`, uploads are files on the disk of the instance that
 received them, and another instance answers 404 for them. Use S3 or GCS, or
-mount one volume at `STORAGE_PATH` on every instance. See
+mount one volume on every instance, on the parent of `STORAGE_PATH` so it also
+holds each named local bucket's `<STORAGE_PATH>__<key>` directory. See
 [Self-hosting: file storage](/docs/deployment/self-hosting/#file-storage).
 
 **Resumable uploads** (the TUS endpoint) keep each upload's partial file, and

@@ -93,8 +93,10 @@ COPY --from=builder /app/config ./config
 COPY --from=builder /app/frontend/dist ./frontend/dist
 # {{/frontend}}
 
-# Create uploads directory
-RUN mkdir -p /app/backend/uploads && chown -R rebase:rebase /app
+# The storage root docker-compose.custom.yml mounts its volume over. An empty
+# named volume takes the owner of the directory it is mounted on, so without
+# this it is root's and every upload fails EACCES for the `rebase` user.
+RUN mkdir -p /storage && chown -R rebase:rebase /app /storage
 
 USER rebase
 

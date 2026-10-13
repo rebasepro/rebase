@@ -125,8 +125,9 @@ Omitting `storageSource` means `(default)`. The handle works in place of the key
 ## Declared is not configured
 
 In **development**, a declared object-store source with nothing set for it in
-the environment stands in as local disk: an `uploads__<key>` directory beside the
-default source's `uploads` (or `STORAGE_PATH__<KEY>`, when set), which the source
+the environment stands in as local disk: a `<dir>__<key>` directory beside the
+default source's directory `<dir>`, which is `STORAGE_PATH` when set and
+`uploads` otherwise (or `STORAGE_PATH__<KEY>`, when set), which the source
 reports as standing in for its engine. The first upload works before anyone has
 attached a bucket.
 
@@ -187,8 +188,9 @@ account buys, and it is unchanged.
 `rebase dev` uses local disk by default. In **production** a `local` backend is
 dropped rather than honoured: a container filesystem is erased on every restart,
 so uploads would succeed into a disk about to be wiped. Set
-`FORCE_LOCAL_STORAGE=true` only where a durable volume really is mounted at
-`STORAGE_PATH`.
+`FORCE_LOCAL_STORAGE=true` only where a durable volume really holds
+`STORAGE_PATH`, mounted on its parent so the `<STORAGE_PATH>__<key>` directory of
+every named local source is on it too.
 
 ## Access control
 

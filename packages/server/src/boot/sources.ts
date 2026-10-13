@@ -1,3 +1,5 @@
+import fs from "fs";
+import path from "path";
 import {
     DEFAULT_DATA_SOURCE_KEY,
     DEFAULT_STORAGE_SOURCE_KEY,
@@ -105,6 +107,11 @@ function readVar(env: EnvBag, base: string, suffixes: readonly string[]): string
         if (value !== undefined && value.trim() !== "") return value;
     }
     return undefined;
+}
+
+/** `/storage/uploads/` → `/storage/uploads`, so a suffix lands beside it, not inside. */
+function withoutTrailingSeparator(dir: string): string {
+    return dir.replace(/[\\/]+$/, "") || dir;
 }
 
 /**
@@ -405,8 +412,16 @@ export function resolveStorageBackend(
     // worked. The default keeps the plain path, so nothing an existing
     // deployment wrote moves; a named source appends its key the way its
     // variables do: `uploads__media`.
+    //
+    // Beside the directory the default actually uses, which is `STORAGE_PATH`
+    // when that is set. Derived from `defaultBasePath` instead, a named source
+    // ignored `STORAGE_PATH` and landed in the runtime's bundle directory —
+    // the container's own filesystem in the self-host compose file, and
+    // emptied by every `rebase build` — while the default sat on the volume.
+    // Beside it, one volume mounted over their parent holds every source.
+    const defaultDirectory = withoutTrailingSeparator(readVar(env, "STORAGE_PATH", [""]) ?? defaultBasePath);
     const localBasePath = readVar(env, "STORAGE_PATH", suffixes)
-        || (suffix ? `${defaultBasePath}${suffix.toLowerCase()}` : defaultBasePath);
+        || (suffix ? `${defaultDirectory}${suffix.toLowerCase()}` : defaultBasePath);
     // An object store the project declared and the environment did not bind.
     // In production that is "not configured" and stays so — the console's
     // "declared, not configured" state, and a 501 rather than a file written
@@ -634,6 +649,7 @@ export function resolveStorageSources(
             continue;
         }
         result[definition.key] = config;
+        warnOnLeftBehindDirectory(env, definition.key, config, defaultBasePath);
         // `default: true` binds the same backend under the default key as well,
         // so an unqualified upload reaches it. Registered rather than renamed:
         // the source keeps its own key, its own `__SUFFIX` variables and its own
@@ -644,4 +660,46 @@ export function resolveStorageSources(
     }
 
     return Object.keys(result).length > 0 ? result : undefined;
+}
+
+/**
+ * Say where a named local source's files went, when they did not come along.
+ *
+ * Such a source once derived its directory from `defaultBasePath` even when
+ * `STORAGE_PATH` moved the default elsewhere; it now sits beside the default.
+ * Where the two differ and the old directory holds files, those files are no
+ * longer served. Nothing deletes them, and nothing else would say where they are.
+ */
+function warnOnLeftBehindDirectory(
+    env: EnvBag,
+    key: string,
+    config: BackendStorageConfig,
+    defaultBasePath: string
+): void {
+    if (config.type !== "local" || key === DEFAULT_STORAGE_SOURCE_KEY) return;
+    if (readVar(env, "STORAGE_PATH", [""]) === undefined) return;
+    if (readVar(env, "STORAGE_PATH", envSuffixFormsForKey(key, DEFAULT_STORAGE_SOURCE_KEY)) !== undefined) return;
+    const suffix = envSuffixForKey(key, DEFAULT_STORAGE_SOURCE_KEY);
+    const before = path.resolve(`${defaultBasePath}${suffix.toLowerCase()}`);
+    const now = path.resolve(config.basePath);
+    // Compared as real paths: `/var` and `/private/var` are one directory.
+    const real = (dir: string): string | undefined => {
+        try {
+            return fs.realpathSync(dir);
+        } catch {
+            return undefined;
+        }
+    };
+    const realBefore = real(before);
+    if (realBefore === undefined || realBefore === real(now)) return;
+    try {
+        if (fs.readdirSync(realBefore).length === 0) return;
+    } catch {
+        return;
+    }
+    logger.warn(
+        `Storage source "${key}" now keeps its files in ${now}, beside STORAGE_PATH, and ${before} ` +
+        "still holds files an earlier version wrote there, which are no longer served. Move them into " +
+        `${now}, or set STORAGE_PATH${suffix}=${before} to keep serving them from where they are.`
+    );
 }

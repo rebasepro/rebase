@@ -2024,6 +2024,20 @@
 
 #### Storage & email
 
+- **On a self-hosted container, every local bucket's files survive a
+  recreate.** A named local bucket (`bucket("media", { engine: "local" })`)
+  ignored `STORAGE_PATH` and resolved beside the runtime's bundle, on the
+  container's own filesystem in the compose files `rebase init` and
+  `rebase eject` write, so its uploads succeeded and went with the container.
+  It now sits beside the default bucket's directory:
+  `STORAGE_PATH=/storage/uploads` puts `media` in `/storage/uploads__media`.
+  Both compose files mount their volume at `/storage`, which the runtime image
+  and the ejected Dockerfile create for the user they run as. Their old
+  `/uploads` volume was root's, so default-bucket uploads failed with `EACCES`
+  too. A project scaffolded earlier makes the same change to its compose file
+  (see the upgrade guide). Where a named bucket's old directory still holds
+  files, boot names it and the `STORAGE_PATH__<KEY>` that keeps serving it.
+
 - **Backups over 50 MB upload.** A backup was held to the storage's upload
   limits, `maxFileSize` (50 MB unless set) and `allowedMimeTypes`, so
   `rebase db backup` to `s3://` or `gs://`, and the backup cron set up as the

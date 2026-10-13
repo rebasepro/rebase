@@ -38,6 +38,14 @@ these if your app relies on the old behaviour:
 - **The socket gets its token as HTTP does,** so `client.setAuthTokenGetter()`
   now authenticates it, and after a sign-out it no longer falls back to the
   `token` option.
+- **A named local bucket's directory sits beside `STORAGE_PATH`,** as
+  `<STORAGE_PATH>__<key>`, not beside the runtime's own base path. If you set
+  `STORAGE_PATH` and a named local bucket already holds files, boot names the
+  old directory, and `STORAGE_PATH__<KEY>` keeps serving it. A compose file from
+  `rebase init` or `rebase eject` mounts its volume at `/uploads`. That volume
+  holds only the default bucket, and the image's user cannot write to it. Mount
+  it at `/storage` with `STORAGE_PATH: /storage/uploads`, as the new compose
+  files do.
 
 These names still work, warn once at runtime, and have a replacement:
 

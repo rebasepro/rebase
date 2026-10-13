@@ -75,6 +75,9 @@ let scaffoldUp = false;
 const scaffoldComposeFile = path.join(ROOT, "app", `docker-compose.scaffold-verify-${process.pid}.yml`);
 const scaffoldOverrideFile = path.join(ROOT, "app", `docker-compose.scaffold-verify-${process.pid}.override.yml`);
 const scaffoldDir = fs.mkdtempSync(path.join(os.tmpdir(), "rebase-scaffold-verify-"));
+// Files written into the bundle this script built — the scaffold stack's
+// bucket declarations (see "A file in every local bucket") — removed with the rest.
+const writtenIntoBundle: string[] = [];
 // Created up front rather than at its point of use: `teardown` is registered
 // as an exit handler below and removes it, and an early exit (no Docker
 // Compose, a failed image build) fires that handler before the stub tree
@@ -117,6 +120,7 @@ function teardown(): void {
     // the working tree of whoever ran the script.
     fs.rmSync(scaffoldComposeFile, { force: true });
     fs.rmSync(scaffoldOverrideFile, { force: true });
+    for (const file of writtenIntoBundle) fs.rmSync(file, { force: true });
 }
 
 process.on("exit", teardown);
@@ -496,6 +500,26 @@ fs.writeFileSync(scaffoldOverrideFile, [
     ""
 ].join("\n"));
 
+// The buckets a scaffolded project declares in `config/resources.ts`, compiled
+// into the bundle the way `rebase build` compiles them: the default and a named
+// local one. `app/` declares none, and the named one is the case under test —
+// its directory sits beside the default's, so a volume holding only the
+// default's directory loses it with the container.
+const bundleConfigDir = path.join(
+    outDir,
+    JSON.parse(fs.readFileSync(path.join(outDir, "manifest.json"), "utf8")).entry.config
+);
+const resourcesFile = path.join(bundleConfigDir, "resources.js");
+// Replacing the project's own declarations would test something else.
+check("app/ declares no resources this would replace", !fs.existsSync(resourcesFile));
+writtenIntoBundle.push(resourcesFile);
+fs.writeFileSync(resourcesFile, [
+    "import { bucket } from \"@rebasepro/types\";",
+    "export const uploads = bucket();",
+    "export const media = bucket(\"media\", { engine: \"local\" });",
+    ""
+].join("\n"));
+
 // Every `${VAR:?…}` in the generated file must be answerable from the generated
 // `.env`. Asserted on its own because the failure is total — Compose
 // interpolates the whole file before selecting services, so an unanswered
@@ -570,6 +594,74 @@ if (scaffoldUpResult.status === 0) {
             scaffoldService.status === 200,
             `${scaffoldService.status}`
         );
+
+        // ── A file in every local bucket outlives the container ──────────
+        //
+        // The compose file put the default bucket's directory on its volume
+        // with STORAGE_PATH, and `bucket("media")` resolved beside the bundle
+        // instead — the entrypoint's writable copy of it, on the container's
+        // own filesystem — so its uploads succeeded and went with the
+        // container. The volume's mount point was root's, too, so the image's
+        // user could not write the default bucket either. One file goes into
+        // each bucket, the container is RECREATED — a restart keeps the
+        // container's filesystem, which is exactly what would hide a directory
+        // that is not on the volume — and both are read back.
+        const authorization = { authorization: `Bearer ${SCAFFOLD_SERVICE_KEY}` };
+        const stored = new Map<string, string>();
+        for (const source of ["(default)", "media"]) {
+            const content = `${source} ${crypto.randomBytes(8).toString("hex")}`;
+            const form = new FormData();
+            form.append("file", new Blob([content], { type: "text/plain" }), "recreate.txt");
+            form.append("key", "selfhost-verify/recreate.txt");
+            form.append("storageId", source);
+            const upload = await fetch(`${scaffoldBase}/api/storage/upload`, {
+                method: "POST",
+                headers: authorization,
+                body: form
+            });
+            const uploadBody = await upload.text();
+            check(`a file uploads to the "${source}" bucket`, upload.status === 201, `${upload.status} ${uploadBody.slice(0, 120)}`);
+            if (upload.status === 201) stored.set(source, content);
+        }
+
+        console.log("\n\x1b[1m▸ Recreating the api container\x1b[0m");
+        const recreated = scaffoldCompose(["up", "-d", "--force-recreate", "--no-deps", "api"], true);
+        check("the api container is recreated", recreated.status === 0, (recreated.stderr ?? "").trim().split("\n").pop() ?? "");
+        const recreateDeadline = Date.now() + 180_000;
+        let recreatedReady = false;
+        while (Date.now() < recreateDeadline) {
+            try {
+                const res = await fetch(`${scaffoldBase}/health`);
+                if (res.ok) { recreatedReady = true; break; }
+            } catch { /* not up yet */ }
+            await new Promise(resolve => setTimeout(resolve, 2000));
+        }
+        check("the recreated container answers /health", recreatedReady);
+
+        for (const [source, content] of stored) {
+            // `/file/*` takes the download token `/metadata` mints, not a bearer.
+            const query = `storageId=${encodeURIComponent(source)}`;
+            const described = await fetch(
+                `${scaffoldBase}/api/storage/metadata/selfhost-verify/recreate.txt?${query}`,
+                { headers: authorization }
+            );
+            if (described.status !== 200) {
+                // A file the recreate lost is a 404 here, before any token.
+                check(`the "${source}" bucket's file survives the recreate`, false,
+                    `metadata ${described.status} ${(await described.text()).slice(0, 60)}`);
+                continue;
+            }
+            const token: string = (await described.json()).data?.token ?? "";
+            const read = await fetch(
+                `${scaffoldBase}/api/storage/file/selfhost-verify/recreate.txt?${query}&token=${encodeURIComponent(token)}`
+            );
+            const body = await read.text();
+            check(
+                `the "${source}" bucket's file survives the recreate`,
+                read.status === 200 && body === content,
+                `${read.status} ${body.slice(0, 60)}`
+            );
+        }
     }
 }
 

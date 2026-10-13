@@ -118,6 +118,14 @@ compose file mounts a named volume and sets `FORCE_LOCAL_STORAGE=true` to
 acknowledge that. Moving storage off-box means `STORAGE_TYPE=s3` (or `gcs`) and
 dropping both lines.
 
+The volume goes on the **parent** of `STORAGE_PATH` (`storage:/storage` with
+`STORAGE_PATH=/storage/uploads`), never on `STORAGE_PATH` itself: a named local
+bucket keeps its files beside the default's, in `<STORAGE_PATH>__<key>`, and a
+volume holding only the default's directory loses every other bucket's files
+with the container. The runtime image creates `/storage` for the `node` user it
+runs as. A volume mounted anywhere else is root's, and uploads fail with
+`EACCES`.
+
 ### Owning the server code instead
 
 `rebase eject` writes the entrypoint, a Dockerfile and a compose file that

@@ -1,13 +1,13 @@
 ---
-sourceHash: 9f860853c1427015
-title: Storage-Konfiguration
-sidebar_label: Storage-Konfiguration
-description: Konfigurieren Sie lokales Dateisystem, S3-kompatible oder GCS/Firebase Storage-Backends für Datei-Uploads, Bilder und Medien.
+sourceHash: 5be4e3768bac692e
+title: Speicher-Konfiguration
+sidebar_label: Speicher-Konfiguration
+description: Konfigurieren Sie lokales Dateisystem, S3-kompatible Backends oder GCS/Firebase Storage für Datei-Uploads, Bilder und Medien.
 ---
 
 ## Übersicht
 
-Rebase unterstützt drei Storage-Backends:
+Rebase unterstützt drei Speicher-Backends:
 
 - **Lokales Dateisystem** — Auf der Festplatte gespeicherte Dateien (ideal für die Entwicklung)
 - **S3-kompatibel** — AWS S3, MinIO, Cloudflare R2, DigitalOcean Spaces
@@ -16,14 +16,14 @@ Rebase unterstützt drei Storage-Backends:
 ## Konfiguration
 
 :::note[Wo dies hingehört]
-**Managed Runtime** — die `STORAGE_*`-Variablen in `.env` (`STORAGE_TYPE`, `STORAGE_BUCKET` oder `S3_BUCKET` / `GCS_BUCKET`, `STORAGE_PATH`, `STORAGE_PUBLIC_READ`, … — fügen Sie an beliebige davon das Suffix `__<KEY>` für eine benannte Quelle an), plus eine `bucket("<key>")`-Deklaration in `config/resources.ts` für jeden Bucket neben dem Standard-Bucket, und `export const storageAuthorize` aus `config/index.ts`. `storageAuthorize` existiert bewusst nicht als Umgebungsvariable: Keine Variable kann ausdrücken „dieser Benutzer darf diesen Schlüssel lesen“.
+**Managed Runtime** — die `STORAGE_*`-Variablen in `.env` (`STORAGE_TYPE`, `STORAGE_BUCKET` oder `S3_BUCKET` / `GCS_BUCKET`, `STORAGE_PATH`, `STORAGE_PUBLIC_READ`, … — fügen Sie an jede davon das Suffix `__<KEY>` für eine benannte Quelle an), plus eine `bucket("<key>")`-Deklaration in `config/resources.ts` für jedes Bucket über das Standard-Bucket hinaus, und `export const storageAuthorize` aus `config/index.ts`. `storageAuthorize` existiert bewusst nicht als Umgebungsvariable: Keine Variable kann ausdrücken: „Dieser Benutzer darf diesen Schlüssel lesen“.
 
 **Ejected** — der `storage`-Block in `initializeRebaseBackend({ … })`. `storagePolicies` und `storageTriggers` sind nur im Ejected-Modus verfügbar.
 
 Die vollständige Übersicht finden Sie in der [Backend-Übersicht](/docs/backend/#where-each-option-lives).
 :::
 
-Storage wird im `storage`-Block von `initializeRebaseBackend` konfiguriert:
+Der Speicher wird im `storage`-Block von `initializeRebaseBackend` konfiguriert:
 
 ### Lokaler Speicher
 
@@ -32,12 +32,12 @@ const backend = await initializeRebaseBackend({
     // ...
     storage: {
         type: "local",
-        basePath: "./uploads"   // Directory for file storage
+        basePath: "./uploads"   // Verzeichnis für Dateispeicherung
     }
 });
 ```
 
-Der lokale Speicher legt die Metadaten jedes Objekts daneben ab, als `<key>.metadata.json`, daher wird ein Schlüssel, dessen letztes Segment auf `.metadata.json` endet, auf jeder Route mit `400 INVALID_STORAGE_KEY` abgelehnt. S3 und GCS halten Metadaten am Objekt und speichern jeden Schlüssel. Auf einem Dateisystem ohne Groß-/Kleinschreibung (unter macOS und Windows standardmäßig) sind `Avatar.png` und `avatar.png` eine lokale Datei, aber zwei Objekte auf S3, GCS oder einem Linux-Datenträger; der Server warnt daher beim Start, wenn der Speicherordner auf einem solchen liegt.
+Der lokale Speicher legt die Metadaten jedes Objekts direkt daneben ab, als `<key>.metadata.json`. Ein Schlüssel, dessen letztes Segment auf `.metadata.json` endet, wird daher auf jeder Route mit `400 INVALID_STORAGE_KEY` abgelehnt. S3 und GCS speichern Metadaten am Objekt selbst und können beliebige Schlüssel speichern. Auf einem Dateisystem ohne Berücksichtigung der Groß-/Kleinschreibung (standardmäßig unter macOS und Windows) sind `Avatar.png` und `avatar.png` dieselbe lokale Datei, aber zwei unterschiedliche Objekte auf S3, GCS oder einem Linux-Laufwerk. Daher warnt der Server beim Systemstart, wenn der Speicherordner auf einem solchen Dateisystem liegt.
 
 ### S3-Speicher
 
@@ -50,8 +50,8 @@ const backend = await initializeRebaseBackend({
         region: env.S3_REGION || "auto",
         accessKeyId: env.S3_ACCESS_KEY_ID || "",
         secretAccessKey: env.S3_SECRET_ACCESS_KEY || "",
-        endpoint: env.S3_ENDPOINT,          // For MinIO, R2, etc.
-        forcePathStyle: env.S3_FORCE_PATH_STYLE  // Required for MinIO
+        endpoint: env.S3_ENDPOINT,          // Für MinIO, R2 usw.
+        forcePathStyle: env.S3_FORCE_PATH_STYLE  // Erforderlich für MinIO
     }
 });
 ```
@@ -69,9 +69,9 @@ const backend = await initializeRebaseBackend({
 });
 ```
 
-Auf GCP (Cloud Run, GCE, GKE) werden automatisch die Anmeldedaten des Standard-Dienstkontos verwendet. Setzen Sie außerhalb von GCP die Umgebungsvariable `GOOGLE_APPLICATION_CREDENTIALS` auf den Pfad Ihrer Dienstkonto-Schlüsseldatei.
+Auf der GCP (Cloud Run, GCE, GKE) werden die Standard-Anmeldedaten des Dienstkontos automatisch verwendet. Außerhalb der GCP setzen Sie die Umgebungsvariable `GOOGLE_APPLICATION_CREDENTIALS` auf den Pfad Ihrer Dienstkonto-Schlüsseldatei.
 
-### Mehrere Storage-Backends
+### Mehrere Speicher-Backends
 
 Sie können mehrere benannte Backends konfigurieren und verschiedene Felder an unterschiedliche Speicher weiterleiten:
 
@@ -82,7 +82,7 @@ storage: {
 }
 ```
 
-Verweisen Sie anschließend in Ihren Collection-Properties auf ein bestimmtes Backend:
+Verweisen Sie anschließend in Ihren Collection-Eigenschaften auf ein bestimmtes Backend:
 
 ```typescript
 image: {
@@ -90,32 +90,36 @@ image: {
     name: "Image",
     storage: {
         storagePath: "products",
-        storageSource: "media"  // Routes to the "media" S3 backend
+        storageSource: "media"  // Leitet an das "media" S3-Backend weiter
     }
 }
 ```
 
-## Storage-Endpunkte
+## Speicher-Endpunkte
 
 | Methode | Pfad | Beschreibung |
 |--------|------|-------------|
 | `POST` | `/api/storage/upload` | Direkter Datei-Upload |
 | `POST` | `/api/storage/upload?storageId=<key>` | Upload in ein bestimmtes benanntes Backend |
-| `GET` | `/api/storage/file/*` | Datei abrufen — alles nach `/file/` ist der Objektschlüssel |
-| `GET` | `/api/storage/file/*?storageId=<key>` | Datei von einem bestimmten Backend abrufen |
-| `GET` | `/api/storage/metadata/*` | Größe, Content-Type und benutzerdefinierte Metadaten eines Objekts ohne dessen Bytes, plus ein kurzlebiges Download-Token, wenn es privat ist |
+| `GET` | `/api/storage/file/*` | Eine Datei abrufen — alles nach `/file/` ist der Objektschlüssel |
+| `GET` | `/api/storage/file/*?storageId=<key>` | Eine Datei von einem bestimmten Backend abrufen |
+| `GET` | `/api/storage/metadata/*` | Größe, Content-Type und benutzerdefinierte Metadaten eines Objekts ohne dessen Bytes, plus ein kurzlebiges Download-Token, falls es privat ist |
 | `POST` | `/api/storage/metadata` | <span class="since-badge" data-since="0.25">Seit 0.25</span> Dasselbe für bis zu 100 Objekte einer Quelle: Body `{ keys, storageId? }` |
-| `DELETE` | `/api/storage/file/*` | Datei löschen |
-| `GET` | `/api/storage/list` | Objekte unter einem Präfix auflisten (`prefix`, `bucket`, `maxResults`, `pageToken`, `storageId`). Ein `maxResults` unter 1 oder ein `pageToken`, den die Quelle nie ausgegeben hat, ergibt `400 INVALID_LIST_OPTIONS` |
-| `POST` | `/api/storage/folder` | Leere Ordnermarkierung erstellen |
-| `GET` | `/api/storage/sources` | Die Storage-Quellen, die dieses Backend bedient, nach Schlüssel |
+| `DELETE` | `/api/storage/file/*` | Eine Datei löschen |
+| `GET` | `/api/storage/list` | Objekte unter einem Präfix auflisten (`prefix`, `bucket`, `maxResults`, `pageToken`, `storageId`). Ein `maxResults` kleiner als 1 oder ein `pageToken`, den die Quelle nie ausgestellt hat, ergibt `400 INVALID_LIST_OPTIONS` |
+| `POST` | `/api/storage/folder` | Eine leere Ordnermarkierung erstellen |
+| `GET` | `/api/storage/sources` | Die Speicherquellen, die dieses Backend bedient, nach Schlüssel |
 | `OPTIONS` | `/api/storage/tus` | Unterstützte TUS-Protokollfunktionen abfragen |
-| `POST` | `/api/storage/tus` | Resumable TUS-Upload-Sitzung initiieren |
+| `POST` | `/api/storage/tus` | Eine fortsetzbare TUS-Upload-Sitzung initiieren |
 | `HEAD` | `/api/storage/tus/:id` | Upload-Fortschritt prüfen (Byte-Offset) |
 | `PATCH` | `/api/storage/tus/:id` | Daten-Chunk an temporäre Datei anhängen |
 | `DELETE` | `/api/storage/tus/:id` | TUS-Upload-Sitzung beenden/abbrechen |
 
-**Was sie zurückgeben.** Eine einheitliche Envelope-Struktur, dieselbe wie bei `/api/data`: Die Nutzlast befindet sich unter `data`, und ein Fehler ist `{ "error": { message, code, requestId } }` mit den Codes aus der [Fehlerreferenz](/docs/backend/errors/). `/api/storage/file/*` ist die Ausnahme, da die Nutzlast die Datei selbst ist — der Endpunkt liefert die Bytes mit `Content-Type`, `Content-Length` und den Caching-Headern zurück.
+**Was sie antworten.** Ein einheitlicher Umschlag (Envelope), derselbe, den auch `/api/data` verwendet: Die Nutzlast
+liegt unter `data`, und ein Fehler hat das Format `{ "error": { message, code, requestId } }`
+mit den Codes aus der [Fehlerreferenz](/docs/backend/errors/). `/api/storage/file/*`
+ist die Ausnahme, da dessen Nutzlast die Datei selbst ist — es antwortet mit den reinen Bytes sowie
+`Content-Type`, `Content-Length` und den Caching-Headern.
 
 ```json
 // GET /api/storage/list?prefix=products/images/
@@ -123,19 +127,35 @@ image: {
   "size": 48213, "updated": "2026-10-01T12:00:00.000Z", "contentType": "image/jpeg" } ], "prefixes": [] } }
 ```
 
-<span class="since-badge" data-since="0.25">Seit 0.25</span> Eine Auflistung beschreibt jede Datei, die sie zurückgibt: ihre `size` in Bytes und `updated`, wann sie zuletzt geschrieben wurde, bei lokalem Speicher, S3 und GCS, und ihren `contentType` bei lokalem Speicher und GCS. Eine S3-Auflistung trägt den Typ nicht, daher fehlt er bei S3 und `/api/storage/metadata/*` nennt ihn weiterhin. Ein Ordner in `prefixes` trägt keines davon, ebenso wenig ein eigener `StorageController`, der sie nicht setzt.
+<span class="since-badge" data-since="0.25">Seit 0.25</span> Eine Auflistung beschreibt jede Datei, die sie zurückgibt: ihre `size` in Bytes und
+`updated`, wann sie zuletzt geschrieben wurde (im lokalen Speicher, auf S3 und GCS), sowie ihren
+`contentType` im lokalen Speicher und auf GCS. Ein S3-Listing enthält den Typ nicht,
+daher fehlt er bei S3 und `/api/storage/metadata/*` liefert ihn stattdessen. Ein Ordner in
+`prefixes` enthält keines dieser Felder, ebenso wie ein benutzerdefinierter `StorageController`,
+der sie nicht setzt.
 
-`POST /api/storage/upload` antwortet mit `201` und den `{ key, bucket, storageUrl }` des gespeicherten Objekts unter `data`; `GET /api/storage/metadata/*` mit den Metadaten des Objekts und, bei einem privaten Objekt, dem kurzlebigen `token`;
-`POST /api/storage/metadata` mit einem Objekt, das nach den gesendeten Pfaden benannt ist und jeweils enthält, was das `GET` dafür geantwortet hätte (siehe unten).
-Ein Ordner ist kein Objekt: `/metadata` auf einem Schlüssel, der auf `/` endet, ist auf jedem Store `404`, auch dort, wo S3 oder GCS einen `folder/`-Marker führt, sodass für ein Präfix kein Download-Token ausgestellt wird;
-`GET /api/storage/sources` mit dem Array der konfigurierten Quellen und `configured: true`. Auf einem Deployment ganz ohne Storage antwortet es mit `200 {"data": [], "configured": false}`, während jede andere Route mit `501 STORAGE_NOT_CONFIGURED` antwortet. `GET /api/auth/config` meldet dasselbe als `storage: false`, sodass ein Client gar nicht erst fragen muss. `GET /api/storage/sources` ist öffentlich: Es antwortet ohne Token, auch wenn `requireAuth` aktiv ist. Es nennt die Quellen (ihren Schlüssel, ihre Engine, ihren Transport und ihr Label) und nie eine Datei, und das Client-SDK liest es, um seine Quellen einzurichten, was geschehen kann, bevor sich jemand angemeldet hat. Auch eine App, die eine `direct`-Quelle anonym liest, braucht es. Jede Route, die eine Datei auflistet, liest oder schreibt, behält ihre Authentifizierung. `DELETE /api/storage/file/*` und `POST /api/storage/folder` übertragen lediglich eine `message`, da es nichts zurückzugeben gibt.
+`POST /api/storage/upload` antwortet mit `201` und `{ key, bucket, storageUrl }` des gespeicherten Objekts unter `data`;
+`GET /api/storage/metadata/*` mit den Metadaten des Objekts und für private Objekte mit dem kurzlebigen `token`; `POST
+/api/storage/metadata` mit einem Objekt, dessen Schlüssel die übergebenen Pfade sind und die jeweils das enthalten, was der `GET`-Endpunkt dafür
+geantwortet hätte (siehe unten). Ein Ordner ist kein Objekt: Ein `/metadata`-Aufruf auf einen Schlüssel, der auf `/` endet, liefert auf jedem Speicher `404`,
+selbst wenn S3 oder GCS eine `folder/`-Markierung vorhalten; es wird daher kein Download-Token für ein Präfix erzeugt.
+`GET /api/storage/sources` liefert das Array der konfigurierten Quellen mit `configured: true`. In einem Deployment ganz ohne Speicher
+antwortet es mit `200 {"data": [], "configured": false}`, während jede andere Route mit `501 STORAGE_NOT_CONFIGURED` antwortet. `GET /api/auth/config` meldet
+dieselbe Tatsache als `storage: false`, sodass ein Client die Anfrage überspringen kann. `GET /api/storage/sources` ist öffentlich: Es antwortet
+ohne Token, selbst wenn `requireAuth` aktiv ist. Es gibt lediglich die Quellen an (Schlüssel, Engine, Transport und Label) und niemals
+eine Datei; das Client-SDK liest diesen Endpunkt aus, um seine Quellen zu verdrahten, was geschehen kann, bevor sich jemand angemeldet hat. Eine Anwendung,
+die eine `direct`-Quelle anonym ausliest, benötigt dies ebenfalls. Jede Route, die eine Datei auflistet, liest oder schreibt, behält ihre Authentifizierung bei.
+`DELETE /api/storage/file/*` und `POST /api/storage/folder` enthalten lediglich eine `message`, da es nichts zurückzugeben gibt.
 
-Bei S3 und GCS muss ein `bucket` einer sein, den die Quelle bedient, bei Schreib- wie bei Lesezugriffen: Ein Upload, ein `POST /api/storage/folder` oder ein TUS-Upload, der einen anderen Bucket nennt, antwortet mit `404 UNKNOWN_STORAGE_SOURCE`, wie die Auflistung. Lokaler Storage legt einen Bucket weiterhin beim ersten Schreiben an.
+Auf S3 und GCS muss ein `bucket` eines sein, das die Quelle bedient, sowohl bei Schreib- als auch bei
+Leseoperationen: Ein Upload, ein `POST /api/storage/folder` oder ein TUS-Upload mit Angabe eines anderen
+Buckets antwortet mit `404 UNKNOWN_STORAGE_SOURCE`, genau wie das Listing. Der lokale Speicher
+erstellt ein Bucket weiterhin beim ersten Schreibvorgang automatisch.
 
-**Viele Objekte auf einmal.** <span class="since-badge" data-since="0.25">Seit 0.25</span> `POST /api/storage/metadata` nimmt
-`{ "keys": ["photos/a.png", "photos/b.png"], "storageId": "media" }` entgegen — bis zu 100
-Objektpfade einer Quelle, jeweils so geschrieben, wie `GET /api/storage/metadata/<key>`
-sie nimmt — und antwortet mit einem Eintrag pro Schlüssel:
+**Viele Objekte auf einmal.** <span class="since-badge" data-since="0.25">Seit 0.25</span> `POST /api/storage/metadata` akzeptiert
+`{ "keys": ["photos/a.png", "photos/b.png"], "storageId": "media" }` — bis zu 100
+Objektpfade einer einzelnen Quelle, jeweils so formatiert, wie `GET /api/storage/metadata/<key>`
+sie erwartet — und liefert einen Eintrag pro Schlüssel zurück:
 
 ```json
 { "data": {
@@ -144,144 +164,200 @@ sie nimmt — und antwortet mit einem Eintrag pro Schlüssel:
 } }
 ```
 
-Jeder Schlüssel wird genau so beurteilt wie vom `GET` — derselbe `storageAuthorize`-Hook
-und Storage-Scope, dieselbe Public-Regel, ein eigenes Download-Token — und ein
-Schlüssel, der abgelehnt wird, fehlt oder fehlerhaft ist, antwortet mit seinem eigenen `error`, ohne die
-anderen scheitern zu lassen oder zu verraten. Ein Aufrufer ohne Sitzung in einem Deployment, das
-eine verlangt, erhält das `401`, das auch das `GET` antworten würde, es sei denn, jeder Schlüssel ist öffentlich. Mehr als
-100 Schlüssel oder ein Body ohne `keys` ergibt `400 BAD_REQUEST`. Der Rate Limiter zählt
-die Anfrage bei N Schlüsseln als ⌈N/10⌉ Anfragen, sodass eine Seite mit 100 Thumbnails 10 kostet.
-`client.storage.getSignedUrl()` und das Admin-Panel senden die Lookups, die eine Seite gemeinsam stellt,
-auf diese Weise und fallen auf einen `GET` pro Datei zurück, wenn der Server die Route nicht hat.
+Jeder Schlüssel wird exakt so beurteilt wie beim `GET`-Endpunkt — derselbe `storageAuthorize`-Hook,
+derselbe Speicher-Scope, dieselbe Public-Regel, ein eigenes Download-Token. Ein Schlüssel,
+der abgelehnt wird, fehlt oder fehlerhaft ist, liefert seinen eigenen `error` zurück, ohne die anderen
+abzubrechen oder preiszugeben. Ein Aufrufer ohne Sitzung in einem Deployment, das eine solche erfordert,
+erhält den `401`, den auch der `GET`-Endpunkt liefern würde, es sei denn, jeder Schlüssel ist öffentlich. Mehr als
+100 Schlüssel oder ein Body ohne `keys` führen zu `400 BAD_REQUEST`. Der Rate Limiter zählt
+die Anfrage als ⌈N/10⌉ Anfragen für N Schlüssel; eine Seite mit 100 Thumbnails kostet also 10 Einheiten.
+`client.storage.getSignedUrl()` und das Admin-Panel bündeln die Abfragen einer Seite
+auf diese Weise und fallen auf einzelne `GET`-Aufrufe pro Datei zurück, falls der Server die
+Route nicht unterstützt.
 
-**Wie ein Lesezugriff auf Dateien autorisiert wird.** Die Lese-Routen — `/api/storage/file/*` und `/api/storage/metadata/*` — akzeptieren das kurzlebige signierte Token, das von [`getSignedUrl()`](/docs/sdk/storage) generiert wird, übergeben als `?token=<token>` oder als `Bearer`. Ein gewöhnliches Zugriffs-JWT wird auf `/file/*` mit `401 Unauthorized: Access JWT not allowed on file routes` **abgelehnt**: Das Token, das auf jeder anderen Route funktioniert, funktioniert hier mit Absicht nicht, da eine Datei-URL etwas ist, das an einen Browser, ein CDN oder ein `<img>`-Tag weitergegeben wird. Alle anderen oben aufgeführten Zeilen akzeptieren das Zugriffs-JWT wie gewohnt.
+**Wie ein Lesezugriff auf eine Datei autorisiert wird.** Die Lese-Routen — `/api/storage/file/*` und
+`/api/storage/metadata/*` — erwarten das kurzlebige, signierte Token, das
+[`getSignedUrl()`](/docs/sdk/storage) generiert, übergeben als `?token=<token>` oder als
+`Bearer`. Ein reguläres Zugriffs-JWT wird auf `/file/*` mit `401
+Unauthorized: Access JWT not allowed on file routes` **abgelehnt**: Das Token, das auf
+jeder anderen Route funktioniert, funktioniert dort bewusst nicht, da eine Datei-URL
+an einen Browser, ein CDN oder ein `<img>`-Tag weitergegeben wird. Alle anderen oben aufgeführten
+Routen akzeptieren wie gewohnt das Zugriffs-JWT.
 
-## On-the-Fly-Bildtransformationen
+## Bildtransformationen zur Laufzeit (On-the-Fly)
 
-Rebase enthält eine integrierte Bildverarbeitungspipeline auf Basis von **Sharp**. Beim Ausliefern von Bild-Assets aus dem Speicher können Sie dynamische Operationen über Query-Parameter anwenden:
+Rebase enthält eine integrierte Bildverarbeitungspipeline auf Basis von **Sharp**. Beim Ausliefern von Bild-Assets aus dem Speicher können Sie dynamische Operationen über Abfrageparameter anwenden:
 
 ```bash
-# Serve image scaled to 300px width in webp format
+# Bild skaliert auf 300px Breite im WebP-Format ausliefern
 GET /api/storage/file/products/laptop.jpg?width=300&format=webp
 ```
 
 ### Unterstützte Parameter
 
-- `width`, `height`: Begrenzungen für die Größenänderung, `1`–`4096` (das Bild wird niemals vergrößert).
+- `width`, `height`: Abmessungen für die Größenänderung, `1`–`4096` (das Bild wird niemals vergrößert).
 - `quality`: `1`–`100`.
 - `format`: Konvertiert das Bildformat. Unterstützte Formate: `webp`, `jpeg`, `png`, `avif`.
 - `fit`: `cover`, `contain`, `fill`, `inside` oder `outside`.
 
-Ein Parameter außerhalb dieser Grenzen führt zu einem **400**-Fehler, nicht zu einem stillschweigend gekappten Wert — `?width=99999` lieferte früher ein 4096px großes Bild zurück und `?format=tiff` ein WebP-Bild, ohne dass dies mitgeteilt wurde.
+Ein Parameter außerhalb dieser Grenzen führt zu einem **400**-Fehler und wird nicht stillschweigend begrenzt —
+`?width=99999` lieferte früher ein Bild mit 4096px und `?format=tiff` ein WebP-Bild zurück,
+ohne Rückmeldung darüber zu geben.
 
-Die Vorschaubilder gespeicherter Bilder im Admin-Panel nutzen diesen Endpunkt: Eine
-Tabellen- oder Kartenvorschau fordert statt des Originals eine WebP-Rendition an, die
-etwa doppelt so groß ist wie die dargestellte Größe (96–800px). `sharp` ist eine
-optionale Abhängigkeit; ohne sie antwortet die Transformation mit 500, weshalb das
-Panel einmal pro Seitenaufruf mit einer einzigen Rendition-Anfrage prüft und die
-Originale zeigt, wenn der Server die Größe nicht ändern kann. SVG- und GIF-Dateien
+Die Thumbnails gespeicherter Bilder im Admin-Panel nutzen diesen Endpunkt: Eine Tabellen- oder Karten-Vorschau
+fordert eine WebP-Version an, die etwa doppelt so groß wie ihre dargestellte Größe ist (96–800px),
+anstatt des Originals. `sharp` ist eine optionale Abhängigkeit; ohne diese antwortet die
+Transformation mit 500. Das Panel prüft dies einmal pro Seitenaufruf mit einer einzelnen
+Transformationsanfrage und zeigt die Originale an, falls der Server keine Größenanpassung vornehmen kann. SVG- und GIF-Dateien
 werden immer unverändert angezeigt.
 
 ### Performance & LRU-Caching
 
-Das Transformieren ist CPU- und speicherintensiv, und bei einem öffentlichen Objekt ist der Endpunkt anonym erreichbar. Daher ist der Arbeitsaufwand begrenzt und nicht bloß zwischengespeichert:
-- **Kapazität**: Ein global auf **500 Einträge** begrenzter LRU-Cache, indiziert nach Storage-Quelle, Bucket und kanonischem Schlüssel.
+Das Transformieren ist CPU- und speicherintensiv, und bei einem öffentlichen Objekt ist der Endpunkt
+anonym erreichbar. Daher ist die Arbeitslast begrenzt und nicht nur zwischengespeichert:
+- **Kapazität**: Ein LRU-Cache, der global auf **500 Einträge** limitiert ist, aufgeschlüsselt nach Speicherquelle,
+  Bucket und kanonischem Schlüssel.
 - **TTL (Time to Live)**: Zwischengespeicherte Varianten laufen nach **1 Stunde** ab.
-- Parallele Anfragen für dieselbe, noch nicht zwischengespeicherte Variante erzeugen **eine** Transformation, nicht jeweils eine pro Anfrage.
-- Es wird nur eine geringe Anzahl von Transformationen gleichzeitig ausgeführt; ab einem bestimmten Backlog antwortet der Server mit **503 `TRANSFORM_OVERLOADED`**, anstatt Arbeit anzunehmen, die er nicht bewältigen kann.
+- Gleichzeitige Anfragen für dieselbe nicht zwischengespeicherte Variante erzeugen **eine** Transformation,
+  nicht jeweils eine eigene.
+- Eine kleine Anzahl von Transformationen läuft gleichzeitig; jenseits eines begrenzten Backlogs antwortet der Server mit
+  **503 `TRANSFORM_OVERLOADED`**, anstatt Arbeit anzunehmen, die er nicht bewältigen kann.
 
-Dieser Cache liegt im Prozess, was bedeutet, dass er nicht zwischen Instanzen geteilt wird und einen Neustart nicht übersteht. Zwei Replikate berechnen jede Variante separat, und ein Deployment verwirft den gesamten Cache.
+Dieser Cache lebt im Prozess, was bedeutet, dass er nicht zwischen Instanzen geteilt wird
+und einen Neustart nicht übersteht. Zwei Replikate berechnen jede Variante separat, und ein
+Deployment verwirft den gesamten Cache.
 
-### Renditions, die einen Neustart überstehen
+### Renderings, die einen Neustart überstehen
 
-`storageRenditionCache` schreibt jedes abgeleitete Bild zurück in denselben Bucket wie seine Quelle, sodass die Arbeit einmal für das gesamte Deployment erledigt wird und nicht einmal pro Instanz und Release:
+`storageRenditionCache` schreibt jedes abgeleitete Bild zurück in dasselbe Bucket wie seine
+Quelle, sodass die Arbeit einmal für das gesamte Deployment statt einmal pro
+Instanz und Release ausgeführt wird:
 
 ```ts
 storageRenditionCache: { enabled: true }
 ```
 
-oder `STORAGE_RENDITION_CACHE=true` für ein Bundle-Deployment. Renditions werden unter dem reservierten Präfix `_rebase/renditions/` gespeichert, indiziert nach der Version des Quellobjekts — das Ersetzen eines Bildes liefert somit sofort das neue aus.
+oder `STORAGE_RENDITION_CACHE=true` für ein Bundle-Deployment. Renderings werden unter dem
+reservierten Präfix `_rebase/renditions/` gespeichert, verschlüsselt nach der Version des Quellobjekts
+— das Ersetzen eines Bildes liefert also sofort das neue aus.
 
-Drei Dinge, die Sie vor der Aktivierung wissen sollten:
+Drei Dinge, die Sie vor dem Aktivieren beachten sollten:
 
-- **Ein Lesevorgang schreibt nun.** Jede neue Variante kostet einen `PUT`-Aufruf in Ihrem Bucket. Aus diesem Grund ist die Option standardmäßig deaktiviert.
-- **Ein fehlgeschlagener Schreibvorgang ist kein fehlgeschlagener Request.** Read-only-Anmeldedaten oder eine Bucket-Policy, die das Präfix ablehnt, fallen auf den prozessinternen Cache zurück; das Bild wird weiterhin ausgeliefert und die Ursache wird einmalig protokolliert.
-- **Ersetzte Renditions werden nicht automatisch bereinigt.** Das Ersetzen eines Quellobjekts hinterlässt dessen alte Renditions. Richten Sie eine Lifecycle-Regel für `_rebase/renditions/` ein — dieses Präfix ist fest vorgegeben und nicht konfigurierbar, genau damit eine Regel darauf verweisen kann.
+- **Ein Lesevorgang führt nun zu einem Schreibvorgang.** Jede neue Variante kostet einen `PUT`-Aufruf in Ihrem Bucket. Aus diesem Grund ist
+  die Funktion standardmäßig deaktiviert.
+- **Ein fehlgeschlagener Schreibvorgang ist keine fehlgeschlagene Anfrage.** Schreibgeschützte Anmeldedaten oder eine
+  Bucket-Richtlinie, die das Präfix ablehnt, fallen auf den In-Process-Cache zurück; das Bild wird
+  dennoch ausgeliefert und der Grund wird einmalig protokolliert.
+- **Ersetzte Renderings werden nicht bereinigt.** Das Ersetzen eines Quellobjekts
+  lässt alte Renderings verwaist zurück. Richten Sie eine Lifecycle-Regel für `_rebase/renditions/` ein
+  — dieses Präfix ist fest vorgegeben und nicht konfigurierbar, damit eine Regel exakt darauf verweisen kann.
 
-Das Präfix kann nicht über die API adressiert werden. Ein direkter Lese- oder Schreibzugriff darauf antwortet mit **400 `INVALID_STORAGE_KEY`**: Jede Zugriffsregel im Produkt — sowohl `storageAuthorize` als auch die deklarativen Policies — wird gegen den *Quell*-Schlüssel definiert, und eine Rendition, die unter ihrem eigenen Pfad bereitgestellt wird, würde eine Frage beantworten, die niemand gestellt hat.
+Das Präfix kann nicht über die API adressiert werden. Direktes Lesen oder Schreiben darauf
+wird mit **400 `INVALID_STORAGE_KEY`** beantwortet: Jede Zugriffsregel im Produkt —
+sowohl `storageAuthorize` als auch die deklarativen Richtlinien — bezieht sich auf den
+*Quell*-Schlüssel, und ein Rendering, das unter seinem eigenen Pfad ausgeliefert wird, würde eine Anfrage beantworten,
+die niemand gestellt hat.
 
 ### Was ausgeliefert wird
 
-Der gespeicherte Content-Type entspricht dem, was der Uploader deklariert hat — nichts analysiert die Bytes. Daher rendert `/api/storage/file/*` nur eine **strenge Allowlist** inline: Bilder, Video, Audio, `application/pdf` und `text/plain`. Alles andere, einschließlich `text/html`, wird als `application/octet-stream` mit `Content-Disposition: attachment` ausgeliefert, und jede Antwort enthält `X-Content-Type-Options: nosniff`. Storage ist kein Webhost: Eine hochgeladene Seite, die auf dem API-Origin gerendert wird, könnte die Cookies dieses Origins auslesen und dessen Endpunkte aufrufen.
+Der gespeicherte Content-Type entspricht dem, was der Uploader angegeben hat — die Bytes werden
+nicht analysiert. Daher rendert `/api/storage/file/*` inline nur eine **enge Allowlist**:
+Bilder, Video, Audio, `application/pdf` und `text/plain`. Alles andere,
+einschließlich `text/html`, wird als `application/octet-stream` mit
+`Content-Disposition: attachment` ausgeliefert, und jede Antwort enthält
+`X-Content-Type-Options: nosniff`. Der Speicher ist kein Webserver: Eine hochgeladene HTML-Seite,
+die auf dem API-Origin gerendert wird, könnte Cookies dieses Origins auslesen und dessen
+Endpunkte aufrufen.
 
-Ein SVG ist ein Bild, das zugleich ein Dokument ist, und kann `<script>` enthalten. Es wird als `image/svg+xml` ausgeliefert — sodass es in einem `<img>` und in den Vorschaubildern des Admin-Panels gerendert wird — mit `Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'; sandbox` auf jeder Antwort, einschließlich transformierter URLs und Download-Token-URLs. Direkt geöffnet, wird es mit deaktivierten Skripten und einem opaken Origin gerendert, sodass es weder auf die Cookies der API noch auf deren Endpunkte zugreifen kann.
+Ein SVG ist ein Bild, das gleichzeitig ein Dokument ist und `<script>` enthalten kann. Es wird
+als `image/svg+xml` ausgeliefert — sodass es in einem `<img>` und in den Thumbnails des Admin-Panels gerendert wird —,
+jedoch mit `Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'; sandbox`
+bei jeder Antwort, einschließlich transformierter URLs und URLs mit Download-Token. Wird es
+direkt geöffnet, rendert es mit deaktivierten Skripten und einem opaken Origin, sodass es weder auf die
+Cookies noch auf die Endpunkte der API zugreifen kann.
 
-## Wie groß eine Datei sein darf
+## Maximale Dateigröße
 
-Jede Storage-Quelle akzeptiert Dateien bis zu ihrem eigenen Limit: **50 MB**, sofern `STORAGE_MAX_FILE_SIZE` (Bytes, mit dem Suffix `__<KEY>` für eine benannte Quelle) oder das `maxFileSize` der Quelle nichts anderes vorgibt. Jede Tür hält eine Datei an dieselbe Zahl gebunden. `POST /api/storage/upload` antwortet oberhalb davon mit `413 PAYLOAD_TOO_LARGE`; ein fortsetzbarer Upload wird bereits bei der Erstellung abgelehnt, vor seinem ersten Chunk; und `OPTIONS /api/storage/tus` gibt sie als `Tus-Max-Size` an — für die mit `?storageId=` benannte Quelle, sonst für die Standardquelle.
+Jede Speicherquelle akzeptiert Dateien bis zu ihrem eigenen Limit: **50 MB**, sofern nicht
+`STORAGE_MAX_FILE_SIZE` (in Bytes, mit dem Suffix `__<KEY>` für eine benannte Quelle) oder das
+`maxFileSize`-Feld der Quelle etwas anderes festlegt. Jeder Zugangsweg bindet eine Datei an denselben
+Wert. `POST /api/storage/upload` antwortet bei Überschreitung mit `413 PAYLOAD_TOO_LARGE`; ein
+fortsetzbarer Upload wird bereits bei der Erstellung abgelehnt, noch vor seinem ersten Chunk; und
+`OPTIONS /api/storage/tus` meldet ihn als `Tus-Max-Size` — für die durch `?storageId=` benannte
+Quelle bzw. andernfalls für die Standardquelle.
 
-für `STORAGE_MAX_FILE_SIZE`: Auf 0.23 legt ausschließlich das `maxFileSize` der Quelle das Limit fest, und die Variable wird nicht gelesen.
+Zu `STORAGE_MAX_FILE_SIZE`: In Version 0.23 legt ausschließlich das Feld `maxFileSize` der Quelle
+das Limit fest, und die Variable wird nicht ausgewertet.
 
 ```bash
-STORAGE_MAX_FILE_SIZE=209715200          # (default): 200 MB
+STORAGE_MAX_FILE_SIZE=209715200          # (Standard): 200 MB
 STORAGE_MAX_FILE_SIZE__MEDIA=1073741824  # media: 1 GB
 ```
 
-Wie viel von einer Datei der Server auf einmal hält, hängt von der Tür ab.
-`POST /api/storage/upload` ist ein einziger Multipart-Body, den der Server vollständig parst:
-das Drei- bis Fünffache der Datei in seinem Arbeitsspeicher. Ein fortsetzbarer (TUS-)Upload hält jeweils einen
-Chunk. <span class="since-badge" data-since="0.25">Seit 0.25</span> `client.storage.putObject()` und das Admin-Panel senden eine Datei
-über 8 MiB auf dem fortsetzbaren Weg. Siehe
-[Fortsetzbare Uploads (TUS)](/docs/backend/storage-resumable-uploads/) für das
-Protokoll, was es beantwortet und wie es sich über mehrere Instanzen verhält.
+Wie viel einer Datei der Server gleichzeitig im Arbeitsspeicher hält, hängt vom Eingangsweg ab.
+`POST /api/storage/upload` ist ein einzelner Multipart-Body, den der Server vollständig parst:
+das Drei- bis Fünffache der Dateigröße im Arbeitsspeicher. Ein fortsetzbarer Upload (TUS) verarbeitet
+jeweils nur einen Chunk. <span class="since-badge" data-since="0.25">Seit 0.25</span> senden `client.storage.putObject()` und das Admin-Panel Dateien
+über 8 MiB über das fortsetzbare Verfahren. Unter
+[Fortsetzbare Uploads (TUS)](/docs/backend/storage-resumable-uploads/) finden Sie Informationen zum
+Protokoll, zu den Antworten und zum Verhalten über mehrere Instanzen hinweg.
 
 ## Umgebungsvariablen
 
 | Variable | Beschreibung |
 |----------|-------------|
 | `STORAGE_TYPE` | `"local"`, `"s3"` oder `"gcs"` |
-| `STORAGE_PATH` | Lokales Speicherverzeichnis (Standard: `./uploads`) |
-| `S3_BUCKET` | S3-Bucket-Name |
+| `STORAGE_PATH` | Verzeichnis für lokalen Speicher (Standard: `./uploads`). Ein benanntes lokales Bucket speichert seine Dateien daneben in `<STORAGE_PATH>__<key>`, es sei denn, `STORAGE_PATH__<KEY>` definiert einen eigenen Pfad |
+| `S3_BUCKET` | Name des S3-Buckets |
 | `S3_REGION` | AWS-Region (Standard: `"auto"`) |
 | `S3_ACCESS_KEY_ID` | AWS-Access-Key |
 | `S3_SECRET_ACCESS_KEY` | AWS-Secret-Key |
 | `S3_ENDPOINT` | Benutzerdefinierter S3-Endpunkt (für MinIO, R2) |
-| `S3_FORCE_PATH_STYLE` | Pfad-basierte URLs verwenden (für MinIO erforderlich) |
-| `GCS_BUCKET` | Google Cloud Storage Bucket-Name |
+| `S3_FORCE_PATH_STYLE` | Path-Style-URLs erzwingen (erforderlich für MinIO) |
+| `GCS_BUCKET` | Name des Google Cloud Storage Buckets |
 | `GCS_PROJECT_ID` | GCP-Projekt-ID für GCS |
-| `GCS_KEY_FILENAME` | Pfad zu einer GCP-Dienstkonto-Schlüsseldatei (auf GKE weglassen — Workload Identity/ADC liefert Anmeldedaten) |
+| `GCS_KEY_FILENAME` | Pfad zu einer GCP-Dienstkonto-Schlüsseldatei (auf GKE weglassen — Workload Identity/ADC stellt Zugangsdaten bereit) |
 | `GOOGLE_APPLICATION_CREDENTIALS` | Standard-ADC-Variable, die vom Google-SDK selbst gelesen wird (auf GCP mit Standardanmeldedaten nicht erforderlich) |
-| `STORAGE_DOWNLOAD_TOKEN_TTL` | Wie lange die Download-URL einer privaten Datei funktioniert, in Sekunden — die Lebensdauer des Tokens, das `/api/storage/metadata/*` ausstellt (Standard `300`, höchstens `604800`, eine Woche). Erhöhen Sie ihn für privates Video und Audio, die nach dem Rendern der Seite weiterhin Bereiche anfordern. Die Entsprechung von `storageDownloadTokenTtl` als Umgebungsvariable |
-| `STORAGE_MAX_FILE_SIZE` | Größte Datei, die die Quelle akzeptiert, in Bytes (Standard `52428800`, 50 MB). Suffix `__<KEY>` für eine benannte Quelle. Ein Wert, der keine ganze Zahl von Bytes ist, verweigert den Start. Siehe [Wie groß eine Datei sein darf](#wie-groß-eine-datei-sein-darf) |
-| `FORCE_LOCAL_STORAGE` | `STORAGE_TYPE=local` in der Produktion erlauben — siehe unten |
-| `STORAGE_PUBLIC_READ` | Gespeicherte Objekte für unauthentifizierte Leser bereitstellen. Die Entsprechung von `storagePublicRead` als Umgebungsvariable und eine von drei Möglichkeiten, den [Boot-Schutz für die Produktion](#autorisierung-auf-objektebene) zu erfüllen. |
-| `STORAGE_ALLOW_ANY_AUTHENTICATED` | Deaktiviert den Boot-Schutz und stellt das Verhalten wieder her, bei dem jeder angemeldete Benutzer jeden Schlüssel lesen, überschreiben, löschen oder auflisten darf. Die Entsprechung von `storageInsecureAllowAnyAuthenticated` als Umgebungsvariable. Nur vertretbar, wenn jedem angemeldeten Benutzer jede Datei anvertraut werden kann. |
+| `STORAGE_DOWNLOAD_TOKEN_TTL` | Wie lange die Download-URL einer privaten Datei in Sekunden gültig ist — die Lebensdauer des Tokens, das `/api/storage/metadata/*` generiert (Standard `300`, maximal `604800`, d. h. eine Woche). Erhöhen Sie diesen Wert für private Videos und Audios, die nach dem Rendern der Seite weiterhin Byte-Ranges anfragen. Entspricht der Option `storageDownloadTokenTtl` |
+| `STORAGE_MAX_FILE_SIZE` | Größte Datei, die die Quelle akzeptiert, in Bytes (Standard `52428800`, 50 MB). Suffix `__<KEY>` für eine benannte Quelle. Ein Wert, der keine ganze Byte-Zahl ist, verhindert den Systemstart. Siehe [Maximale Dateigröße](#maximale-dateigröße) |
+| `FORCE_LOCAL_STORAGE` | Erlaubt `STORAGE_TYPE=local` in Produktionsumgebungen — siehe unten |
+| `STORAGE_PUBLIC_READ` | Gespeicherte Objekte für unauthentifizierte Leser bereitstellen. Entspricht `storagePublicRead` und ist eine der drei Möglichkeiten, den [Boot-Guard für die Produktion](#objektbezogene-autorisierung) zu erfüllen. |
+| `STORAGE_ALLOW_ANY_AUTHENTICATED` | Deaktiviert den Boot-Guard und stellt das Verhalten wieder her, bei dem jeder angemeldete Benutzer jeden Schlüssel lesen, überschreiben, löschen oder auflisten darf. Entspricht `storageInsecureAllowAnyAuthenticated`. Nur vertretbar, wenn jedem angemeldeten Benutzer jede Datei anvertraut werden kann. |
 
 ## Mehrere Buckets
 
-Ein Projekt kann mehr als einen Bucket besitzen. Deklarieren Sie jeden davon in `config/resources.ts` — der zentralen Stelle, die von der Plattform, der Runtime und der Konsole gemeinsam gelesen wird:
+Ein Projekt kann mehr als ein Bucket haben. Deklarieren Sie jedes davon in `config/resources.ts`
+— dem zentralen Ort, den die Plattform, die Runtime und die Konsole gemeinsam lesen:
 
 ```ts
 import { bucket } from "@rebasepro/types";
 
-export const uploads = bucket({ engine: "s3" });    // the default one
+export const uploads = bucket({ engine: "s3" });    // Das Standard-Bucket
 export const media = bucket("media", { engine: "s3", label: "Media" });
 ```
 
-Führen Sie anschließend `rebase resources --write` aus, wodurch `rebase.resources.json` neu generiert wird, damit ein Host Ihre Topologie auslesen kann, ohne einen Build auszuführen. Siehe [Mehrere Quellen](/docs/backend/multiple-sources) für Datenbanken, Buckets und Topics im Zusammenspiel.
+Führen Sie anschließend `rebase resources --write` aus. Dadurch wird `rebase.resources.json` neu generiert,
+sodass ein Host Ihre Topologie ohne Build-Vorgang auslesen kann. Siehe
+[Mehrere Quellen](/docs/backend/multiple-sources) für Datenbanken, Buckets und
+Topics im Zusammenspiel.
 
-Jede Quelle wird über **dieselben Variablennamen konfiguriert, ergänzt um ihr eigenes Suffix**. Die Standardquelle erhält kein Suffix, sodass ein Projekt mit nur einem Bucket weiterhin die einfachen Namen von oben verwendet und überhaupt nichts deklarieren muss:
+Jede Quelle wird über **dieselben Variablennamen mit ihrem eigenen Suffix** konfiguriert.
+Die Standardquelle verwendet kein Suffix, sodass ein Projekt mit nur einem Bucket weiterhin die
+einfachen Namen von oben nutzen kann und gar nichts deklarieren muss:
 
 ```bash
-S3_BUCKET=app-uploads             # (default)
+S3_BUCKET=app-uploads             # (Standard)
 S3_BUCKET__MEDIA=app-media        # media
 S3_ACCESS_KEY_ID__MEDIA=…
 S3_SECRET_ACCESS_KEY__MEDIA=…
 ```
 
-Das Suffix wird aus dem Schlüssel abgeleitet: Großbuchstaben, nicht-alphanumerische Zeichen durch Unterstriche ersetzt, hinter einem **doppelten** Unterstrich (`media-cdn` → `__MEDIA_CDN`). Ein einzelner Unterstrich würde mit echten Variablennamen kollidieren — `S3_BUCKET_NAME` würde sonst als Bucket `name` geparst werden.
+Das Suffix wird aus dem Schlüssel abgeleitet: Großbuchstaben, nicht-alphanumerische Zeichen durch
+Unterstriche ersetzt, hinter einem **doppelten** Unterstrich (`media-cdn` → `__MEDIA_CDN`). Ein
+einfacher Unterstrich würde mit echten Variablennamen kollidieren — `S3_BUCKET_NAME`
+würde sonst fälschlicherweise als Bucket `name` interpretiert werden.
 
-Leiten Sie eine Eigenschaft mit `storageSource` an eine Quelle weiter:
+Leiten Sie eine Eigenschaft über `storageSource` an eine Quelle weiter:
 
 ```ts
 {
@@ -291,11 +367,18 @@ Leiten Sie eine Eigenschaft mit `storageSource` an eine Quelle weiter:
 }
 ```
 
-Eine Quelle, die Sie deklarieren, aber nie konfigurieren, wird **übersprungen** und führt nicht zu einem fatalen Fehler: Uploads, die an sie weitergeleitet werden, antworten mit `501 STORAGE_SOURCE_NOT_CONFIGURED`. Das Deklarieren eines Buckets erfolgt normalerweise, bevor jemand Speicher daran bindet, und ein Boot-Fehler an dieser Stelle würde das Backend in eine Crash-Schleife versetzen, bis dies nachgeholt wird. Eine Quelle, die von der Umgebung *falsch* konfiguriert wurde — ein Typ ohne Bucket oder ein Bucket ohne Anmeldedaten —, wird beim Booten abgewiesen, da es sich hierbei um einen Fehler und nicht um ein Fehlen handelt.
+Eine Quelle, die Sie deklarieren, aber nie konfigurieren, wird **übersprungen** und führt nicht zu einem Abbruch: Uploads,
+die an sie weitergeleitet werden, antworten mit `501 STORAGE_SOURCE_NOT_CONFIGURED`. Das Deklarieren eines Buckets
+erfolgt meist, bevor jemand Speicher dafür anhängt; ein Startfehler an dieser Stelle würde
+das Backend in einer Crash-Schleife halten. Eine Quelle, die die Umgebung *falsch* konfiguriert
+— ein Typ ohne Bucket oder ein Bucket ohne Anmeldedaten — führt hingegen zum Abbruch beim Start,
+da es sich hierbei um einen Konfigurationsfehler und nicht um ein bewusstes Fehlen handelt.
 
 ### Buckets, die sich ein Konto teilen
 
-Anmeldedaten beschreiben üblicherweise den **Provider**, nicht den Bucket. Fünfzehn Buckets auf einer MinIO-Installation würden andernfalls fünfzehn Kopien desselben Zugriffsschlüssels bedeuten, und eine Schlüsselrotation erforderte fünfzehn synchrone Anpassungen. Vergeben Sie stattdessen einen Kontonamen:
+Anmeldedaten beschreiben üblicherweise den **Provider**, nicht das Bucket. Fünfzehn Buckets auf
+einer MinIO-Installation würden andernfalls fünfzehn Kopien desselben Zugriffsschlüssels bedeuten,
+und eine Rotation erforderte fünfzehn synchrone Änderungen. Benennen Sie stattdessen ein Konto:
 
 ```ts
 export const media = bucket("media", { engine: "s3", account: "minio" });
@@ -303,18 +386,22 @@ export const avatars = bucket("avatars", { engine: "s3", account: "minio" });
 ```
 
 ```bash
-S3_BUCKET__MEDIA=b-media          # per bucket, always
+S3_BUCKET__MEDIA=b-media          # immer pro Bucket
 S3_BUCKET__AVATARS=b-avatars
-S3_ACCESS_KEY_ID__MINIO=…         # shared by both
+S3_ACCESS_KEY_ID__MINIO=…         # von beiden geteilt
 S3_SECRET_ACCESS_KEY__MINIO=…
 S3_ENDPOINT__MINIO=https://minio.internal
 ```
 
-Nur die Variablen auf Kontoebene greifen auf den Fallback zurück — `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_ENDPOINT`, `S3_REGION`, `S3_FORCE_PATH_STYLE` sowie das GCS-Paar `GCS_PROJECT_ID` / `GCS_KEY_FILENAME`. Der Bucket-Name tut dies nie: Er ist das, was eine Quelle von einer anderen unterscheidet. Ein Wert pro Bucket hat immer Vorrang, sodass eine Quelle den Provider wechseln kann, ohne die übrigen zu beeinträchtigen.
+Nur Variablen mit Konto-Geltungsbereich fallen auf den Fallback zurück — `S3_ACCESS_KEY_ID`,
+`S3_SECRET_ACCESS_KEY`, `S3_ENDPOINT`, `S3_REGION`, `S3_FORCE_PATH_STYLE` sowie
+das GCS-Paar `GCS_PROJECT_ID` / `GCS_KEY_FILENAME`. Der Bucket-Name tut dies nie:
+Er unterscheidet eine Quelle von der anderen. Ein Wert auf Bucket-Ebene hat immer Vorrang,
+sodass eine Quelle den Provider wechseln kann, ohne die anderen zu beeinträchtigen.
 
-## Frontend-Storage-Quellen
+## Frontend-Speicherquellen
 
-Wenn Sie mehrere Storage-Backends verwenden, übergeben Sie `storageSources` an den `<Rebase>`-Provider, damit das Frontend weiß, wie Uploads direkt weitergeleitet werden:
+Wenn Sie mehrere Speicher-Backends verwenden, übergeben Sie `storageSources` an den `<Rebase>`-Provider, damit das Frontend weiß, wie Uploads direkt weitergeleitet werden:
 
 ```tsx
 import { Rebase } from "@rebasepro/app";
@@ -322,9 +409,9 @@ import { Rebase } from "@rebasepro/app";
 <Rebase
     apiUrl="https://api.example.com"
     storageSources={[
-        // `engine` names the provider, `transport` says who talks to it:
-        // "server" proxies through the Rebase backend, "direct" goes
-        // client-to-provider (and needs a `source` implementation).
+        // `engine` benennt den Provider, `transport` bestimmt die Kommunikation:
+        // "server" leitet über das Rebase-Backend weiter, "direct" kommuniziert
+        // vom Client direkt zum Provider (erfordert eine `source`-Implementierung).
         { key: "media", engine: "s3", transport: "server", label: "Media CDN" },
         { key: "firebase", engine: "firebase", transport: "server", label: "Firebase Storage" },
     ]}
@@ -333,32 +420,36 @@ import { Rebase } from "@rebasepro/app";
 </Rebase>
 ```
 
-Der `key` jeder Quelle muss mit einem Backend-Schlüssel übereinstimmen, der in der `storage`-Map des Servers registriert ist. Der React-Kontext `StorageSourcesContext` ermittelt die aktive Quelle für jedes Upload-Feld.
+Der `key` jeder Quelle muss mit einem Backend-Schlüssel übereinstimmen, der in der `storage`-Map des Servers registriert ist. Der React-Kontext `StorageSourcesContext` löst die aktive Quelle für jedes Upload-Feld auf.
 
 ## Caching und CDNs
 
-Jedes Objekt wird über den Server weitergeleitet, mit einem `ETag` für eine günstige Revalidierung, einem `Cache-Control`, das davon abhängt, wer es lesen darf, und Byte-Bereichen zum Spulen in Audio und Video. [Storage-Caching und CDNs](/docs/backend/storage-caching/) enthält die Header und das, was an einem vorgeschalteten CDN zu konfigurieren ist.
+Jedes Objekt wird über den Server weitergeleitet — mit einem `ETag` für kostengünstige
+Neuvalidierung, einem `Cache-Control`, das davon abhängt, wer die Datei lesen darf, und Byte-Ranges
+für das Vor- und Zurückspulen in Audio- und Videodateien. Unter [Speicher-Caching und CDNs](/docs/backend/storage-caching/)
+finden Sie die Header und Hinweise zur Konfiguration eines vorgelagerten CDNs.
 
 ## Tipps für die Produktion
 
 :::caution
-**In der Produktion deaktiviert `type: "local"` den Dateispeicher, anstatt ihn zu verwenden.** Auf einer kurzlebigen Plattform (Cloud Run, Heroku, ein Kubernetes-Pod) wird das Dateisystem bei jedem Deploy, Neustart und Eviction gelöscht — Uploads wären somit erfolgreich, ließen sich problemlos auslesen und wären beim nächsten Rollout spurlos verschwunden, ohne dass jemals ein Fehler aufgetreten wäre.
+**In der Produktion deaktiviert `type: "local"` den Dateispeicher, anstatt ihn zu verwenden.** Auf einer flüchtigen Plattform (Cloud Run, Heroku, ein Kubernetes-Pod) wird das Dateisystem bei jedem Deployment, Neustart und bei jeder Eviction gelöscht — Uploads würden zwar gelingen und sich fehlerfrei auslesen lassen, wären aber beim nächsten Rollout spurlos verschwunden, ohne jegliche Fehlermeldung.
 
-Daher wird der lokale Standard nicht registriert, und eine Anfrage an `/api/storage/*`, die keine Storage-Quelle nennt, antwortet mit **`501 STORAGE_NOT_CONFIGURED`** und nennt die bedienten Quellen. Eine benannte Quelle, die konfiguriert ist, etwa `bucket("media", { engine: "s3" })`, bedient weiter. Uploads schlagen unübersehbar und wiederherstellbar fehl; der Rest der Anwendung läuft weiter. Dateispeicher ist in der Produktion ein Opt-in-Feature: Er existiert erst, sobald ein Bucket vorhanden ist.
+Daher wird der lokale Standardwert in der Produktion nicht registriert, und eine Anfrage an `/api/storage/*`, die keine Speicherquelle benennt, antwortet mit **`501 STORAGE_NOT_CONFIGURED`** und listet die tatsächlich verfügbaren Quellen auf. Eine benannte und konfigurierte Quelle, wie z. B. `bucket("media", { engine: "s3" })`, bleibt weiterhin aktiv. Uploads schlagen unübersehbar und nachvollziehbar fehl; der Rest der Anwendung läuft ungestört weiter. Dateispeicher ist in der Produktion ein Opt-in: Er existiert erst, sobald ein Bucket vorhanden ist.
 
-Setzen Sie `STORAGE_TYPE=s3` oder `gcs`. Wenn unter `STORAGE_PATH` tatsächlich ein **persistentes Volume** gemountet ist, setzen Sie `FORCE_LOCAL_STORAGE=true`, um dies explizit anzugeben.
+Setzen Sie `STORAGE_TYPE=s3` oder `gcs`. Wenn ein **dauerhaftes Volume (Durable Volume)** `STORAGE_PATH` bereitstellt, setzen Sie `FORCE_LOCAL_STORAGE=true`, um dies explizit zu bestätigen. Hängen Sie es am übergeordneten Verzeichnis von `STORAGE_PATH` ein, damit das Verzeichnis `<STORAGE_PATH>__<key>` jedes benannten lokalen Buckets ebenfalls darauf liegt.
 :::
 
-- Binden Sie ein **persistentes Volume** ein, wenn Sie lokalen Speicher auf Docker/Kubernetes verwenden, und setzen Sie `FORCE_LOCAL_STORAGE=true`
-- Verwenden Sie **S3** oder kompatible Dienste (R2, MinIO) oder **GCS** für Produktionsumgebungen
-- Schalten Sie ein **CDN** (CloudFront, Cloudflare) vor, um die Performance zu optimieren — siehe [Ein CDN vorschalten](/docs/backend/storage-caching/#putting-a-cdn-in-front)
-- **Jede App mit Speicher in der Produktion muss ein Zugriffsmodell deklarieren** — siehe unten. Dies gilt nicht nur für mandantenfähige Anwendungen: Der Server *weigert sich zu starten*, wenn keines vorhanden ist.
+- Binden Sie ein **persistentes Volume** über das übergeordnete Verzeichnis von `STORAGE_PATH` ein, wenn Sie lokalen Speicher unter Docker/Kubernetes verwenden, und setzen Sie `FORCE_LOCAL_STORAGE=true` — siehe [Self-Hosting](/docs/deployment/self-hosting/#file-storage)
+- Verwenden Sie **S3** oder kompatible Dienste (R2, MinIO) bzw. **GCS** für Produktions-Deployments
+- Schalten Sie aus Performancegründen ein **CDN** (CloudFront, Cloudflare) vor — siehe [Ein CDN vorschalten](/docs/backend/storage-caching/#putting-a-cdn-in-front)
+- **Jede Anwendung mit Speicher in der Produktion muss ein Zugriffsmodell deklarieren** — siehe unten.
+  Nicht nur mandantenfähige Anwendungen: Der Server *verweigert den Start* ohne ein solches Modell.
 
-## Autorisierung auf Objektebene
+## Objektbezogene Autorisierung
 
-### Policies
+### Richtlinien (Policies)
 
-Die deklarative Variante. Eine Liste von Pfadmustern, die ausgewertet wird, ohne Code auszuführen:
+Die deklarative Form. Eine Liste von Pfadmustern, die ausgewertet wird, ohne Code auszuführen:
 
 ```ts
 storagePolicies: [
@@ -367,44 +458,57 @@ storagePolicies: [
 ]
 ```
 
-**Ein Schlüssel, auf den keine Policy zutrifft, wird abgelehnt.** Jede Berechtigungserweiterung muss explizit formuliert werden; ein Versehen führt zur Verweigerung statt zur Freigabe.
+**Ein Schlüssel, auf den keine Richtlinie zutrifft, wird abgelehnt.** Jede Lockerung erfordert eine explizite Zeile,
+und ein Konfigurationsfehler verweigert den Zugriff, anstatt ihn versehentlich zu gewähren.
 
-Muster vergleichen **nach Pfadsegmenten, niemals nach Teilzeichenketten** — `public/**` passt nicht auf `publicity/secret.png`:
+Muster matchen **nach Segmenten, niemals nach Teilzeichenfolgen** — `public/**` matcht nicht
+auf `publicity/secret.png`:
 
-| Muster | Passt auf |
+| Muster | Treffer |
 |---|---|
-| `avatars/logo.png` | exakt diesen Schlüssel |
-| `users/*/avatar.png` | genau ein Segment an der Stelle des `*` |
-| `users/:uid/**` | ein erfasstes Segment, danach der Rest — einschließlich nichts |
+| `avatars/logo.png` | Exakt dieser Schlüssel |
+| `users/*/avatar.png` | Genau ein Segment an der Stelle von `*` |
+| `users/:uid/**` | Ein erfasstes Segment, danach der Rest — einschließlich leerer Pfade |
 
-`**` ist nur als abschließendes Segment zulässig. `:name` erfasst ein einzelnes Segment und erstreckt sich niemals über ein `/`; die erfassten Werte stehen als `params` im Prädikat bereit.
+`**` ist nur als abschließendes Segment zulässig. `:name` erfasst ein Segment und erstreckt
+sich nie über ein `/` hinweg; die Erfassungen werden als `params` an das Prädikat übergeben.
 
-`allow` kann den Wert `"public"` (jeder), `"authenticated"` (jeder Aufrufer mit einer uid) oder ein Prädikat annehmen, das die erfassten Parameter, den Benutzer, die Operation und den Bucket übergeben bekommt. `operations` ist standardmäßig auf alle vier Operationen gesetzt — `read`, `write`, `delete`, `list`.
+`allow` ist `"public"` (jeder), `"authenticated"` (jeder Aufrufer mit einer UID) oder ein
+Prädikat, das die erfassten Parameter, den Benutzer, die Operation und das Bucket empfängt.
+`operations` umfasst standardmäßig alle vier: `read`, `write`, `delete`, `list`.
 
-Policies erfüllen den Boot-Schutz für die Produktion eigenständig; ein fehlerhaftes Muster lässt bereits den Start fehlschlagen und nicht erst den ersten Upload.
+Richtlinien erfüllen den Boot-Guard für die Produktion eigenständig, und ein fehlerhaftes Muster
+lässt den Start scheitern, anstatt erst beim ersten Upload fehlzuschlagen.
 
 ### Der Hook
 
-`requireAuth` und `publicRead` sind *globale* Schalter: Sie entscheiden, ob ein Aufrufer angemeldet sein muss, nicht jedoch, worauf dieser Aufrufer zugreifen darf. Ohne einen Autorisierungs-Hook **kann jeder authentifizierte Benutzer jeden Schlüssel lesen, dessen Namen er kennt** — das Einzige, was die Dateien zweier Mandanten trennt, ist die Unvorhersehbarkeit des Schlüssels, was kein Zugriffskontrollmodell darstellt. Schlimmer noch: Sie können zuvor `GET /storage/list?prefix=` ausführen, sodass die Schlüssel nicht einmal erraten werden müssen.
+`requireAuth` und `publicRead` sind *globale* Schalter: Sie entscheiden, ob ein Aufrufer angemeldet sein muss, nicht worauf dieser Aufrufer zugreifen darf. Ohne einen Autorisierungs-Hook **kann jeder authentifizierte Benutzer jeden Schlüssel lesen, dessen Namen er kennt** — das Einzige, was die Dateien zweier Mandanten trennt, ist die Unvorhersehbarkeit der Schlüssel, was kein tragfähiges Zugriffskontrollmodell darstellt. Schlimmer noch: Sie können zuerst `GET /storage/list?prefix=` aufrufen, sodass Schlüssel nicht einmal erraten werden müssen.
 
-:::caution[Storage startet in der Produktion nicht ohne einen Hook]
-Collections werden durch Row-Level Security geschützt; Storage wird das nicht. Es gibt im Bucket kein Äquivalent auf Objektebene, daher *ist* dieser Hook das Modell — und `initializeRebaseBackend` **wirft beim Start eine Exception** unter `NODE_ENV=production`, wenn Storage konfiguriert ist und keine der folgenden Optionen gesetzt wurde:
+:::caution[Speicher startet in der Produktion nicht ohne Modell]
+Collections werden durch Row-Level Security geschützt; Speicher nicht. Es gibt kein
+objektbezogenes Äquivalent im Bucket, daher *ist* dieser Hook das Modell — und
+`initializeRebaseBackend` **wirft beim Starten** unter `NODE_ENV=production` einen Fehler,
+wenn Speicher konfiguriert ist und keine der folgenden Optionen gesetzt wurde:
 
-- `storageAuthorize` — ein Hook pro Objekt. Empfohlen.
-- `storagePublicRead: true` — der Bucket ist tatsächlich ein öffentliches Read-only-CDN.
-- `storageInsecureAllowAnyAuthenticated: true` — eine Single-Tenant-Anwendung, bei der jedem angemeldeten Benutzer jede Datei anvertraut werden kann. Der Name wurde bewusst so gewählt.
+- `storageAuthorize` — Ein Hook pro Objekt. Empfohlen.
+- `storagePublicRead: true` — Das Bucket dient tatsächlich als rein öffentliches Lese-CDN.
+- `storageInsecureAllowAnyAuthenticated: true` — Eine Single-Tenant-Anwendung, bei der jedem
+  angemeldeten Benutzer jede Datei anvertraut werden kann. Der Name soll zum zweimaligen Nachdenken anregen.
 
-In der Entwicklungsumgebung wird stattdessen eine Warnung ausgegeben, sodass ein Projekt in diesem Punkt fehlerhaft konfiguriert sein und lokal einwandfrei funktionieren kann — bis es deployed wird. Ein neu generiertes Projekt enthält in `config/storage.ts` bereits einen Hook — prüfen Sie diesen, bevor Sie ihn ersetzen, und beachten Sie, dass er die *gemeinsame Medienbibliothek* eines CMS abbildet, was nicht der Struktur benutzerbezogener Dateien entspricht.
+In der Entwicklungsumgebung wird stattdessen nur eine Warnung ausgegeben. Daher kann ein Projekt hier falsch
+konfiguriert sein und lokal einwandfrei funktionieren, bis es produktiv ausgerollt wird. Ein neu generiertes Projekt
+enthält in `config/storage.ts` bereits einen Hook — prüfen Sie diesen, bevor Sie ihn ersetzen. Beachten Sie,
+dass dieser die *gemeinsame Medienbibliothek* eines CMS abbildet, was sich von benutzerspezifischen Dateien unterscheidet.
 :::
 
-`storageAuthorize` ist das Storage-Äquivalent zu den Sicherheitsregeln einer Collection und wird nach der Authentifizierung auf jeder Storage-Route ausgeführt:
+`storageAuthorize` ist das Speicher-Pendant zu den Sicherheitsregeln einer Collection und wird nach der Authentifizierung auf jeder Speicher-Route ausgeführt:
 
 ```typescript no-verify
 await initializeRebaseBackend({
     storage: { type: "s3", bucket: "app-files", /* ... */ },
     storageAuthorize: async ({ key, bucket, operation, user }) => {
         if (!user) return false;
-        // Keys are laid out as `{teamId}/{docId}/...`
+        // Schlüssel sind strukturiert als `{teamId}/{docId}/...`
         const [teamId] = key.split("/");
         return isTeamMember(user.uid, teamId);
     }
@@ -413,38 +517,41 @@ await initializeRebaseBackend({
 
 | Feld | Beschreibung |
 |-------|-------------|
-| `key` | Objektschlüssel, Bucket-Präfix entfernt und Pfad-Traversierung bereinigt |
-| `bucket` | Aufgelöster Bucket (`"default"`, wenn nicht angegeben) |
+| `key` | Objektschlüssel, bereinigt um das Bucket-Präfix und Pfad-Traversal-Muster |
+| `bucket` | Aufgelöstes Bucket (`"default"`, wenn nicht angegeben) |
 | `operation` | `"read"`, `"write"`, `"delete"` oder `"list"` |
-| `user` | `{ uid, email?, roles? }` oder `null`, falls die Route anonymen Zugriff erlaubt |
-| `storageId` | Das benannte Backend, sofern die Anfrage an eines gerichtet war — sein kanonischer Schlüssel (`storageId=%20media` ist `"media"`). Fehlt für die Standardquelle, gleich wie die Anfrage sie benennt (kein Parameter, leer oder `(default)`) |
-| `data` | Vertrauenswürdiger, **RLS-umgehender** Lesezugriff — `data.collection(slug).find(query)` / `.findById(id)`. Die Eigentümerschaft ist in einer Tabellenzeile hinterlegt, nicht in einem Schlüsselpräfix; der Hook benötigt daher eine Lesemöglichkeit, um zu ermitteln: „Wem gehört dieses Objekt?“. Er umgeht Row-Level Security ganz bewusst: Dieser Hook *ist* die Autorisierungsentscheidung, und eine Abfrage über eine Instanz vorzunehmen, die bereits durch die Berechtigungen des Aufrufers eingeschränkt ist, wäre zirkulär. Vom Design her rein lesend. |
+| `user` | `{ uid, email?, roles? }`, oder `null`, falls die Route anonymen Zugriff erlaubt |
+| `storageId` | Das benannte Backend, falls die Anfrage darauf abzielte — dessen kanonischer Schlüssel (`storageId=%20media` wird zu `"media"`). Fehlt für die Standardquelle, unabhängig davon, wie die Anfrage sie benannt hat (kein Parameter, leer oder `(default)`) |
+| `data` | Vertrauenswürdiger Lesezugriff unter **Umgehung von RLS** — `data.collection(slug).find(query)` / `.findById(id)`. Die Eigentümerschaft ist in einem Datensatz hinterlegt, nicht in einem Schlüsselpräfix; der Hook benötigt daher eine Lesemöglichkeit, um zu prüfen: „Wem gehört dieses Objekt?“. Er umgeht die Row-Level Security bewusst: Dieser Hook *ist* die Autorisierungsentscheidung. Würde er über einen Leser laufen, der bereits durch die Rechte des Aufrufers eingeschränkt ist, ergäbe sich ein Zirkelschluss. Konzeptionsbedingt schreibgeschützt. |
 
-Geben Sie `false` zurück, um mit einem **403** abzuweisen. Das Werfen einer Exception führt ebenfalls zur Verweigerung — ein Eigentümerabgleich, der fehlschlägt, öffnet nicht fahrlässig den Zugriff.
+Geben Sie `false` zurück, um mit **403** abzulehnen. Das Werfen eines Fehlers lehnt ebenfalls ab — eine Eigentumsprüfung, die fehlschlägt, öffnet das System nicht fälschlicherweise.
 
 Wissenswertes:
 
-- **Die Metadaten-Route entscheidet maßgeblich über den Lesezugriff.** Sie generiert das kurzlebige, pfadgebundene Download-Token, dem die Datei-Route vertraut; daher schützt der Hook den Zugriff bereits hier. Zwei Lesezugriffe überspringen den Hook, mit Absicht. Einer, der ein solches Token mitführt: Der Hook hat ihn beim Ausstellen des Tokens genehmigt, nur für diesen Pfad und diese Quelle, sodass ein Hook, der nun ablehnen würde (eine inzwischen entzogene Mitgliedschaft), ihn nicht stoppt, bevor das Token abläuft — `storageDownloadTokenTtl`, standardmäßig 300 Sekunden. Und ein Lesezugriff auf einen Schlüssel unter `public/` durch einen Aufrufer ohne Anmeldedaten: Das Präfix ist die Deklaration, dass jeder ihn lesen darf, anonyme Besucher und CDNs eingeschlossen. Der Lesezugriff eines angemeldeten Aufrufers darauf wird weiterhin abgefragt, der eines anonymen aber nicht, sodass ein Hook einen `public/`-Schlüssel nicht privat machen kann; legen Sie die Datei stattdessen außerhalb von `public/` ab. Nur diese beiden Lesezugriffe überspringen ihn: Nach einem Benutzer, den Ihr Auth-Adapter zufällig `public` nennt, wird wie bei jedem anderen gefragt.
-- **Ein Bucket, ein Name.** Auf S3 und GCS ist der `bucket` des Hooks immer `"default"`, auch wenn eine Anfrage den Bucket des Anbieters nennt, der dieselben Objekte erreicht.
-- **Ein Pfad ist öffentlich, wenn der Schlüssel, den er benennt, es ist.** Das Präfix `public/` wird am kanonischen Schlüssel geprüft, den die Route ausliefert — nachdem ein führendes `default/`-Bucket-Segment abgelesen und `//`, `./` sowie ein führendes `/` zusammengefaltet wurden —, niemals an der URL, wie sie geschrieben wurde. `/api/storage/file/notes://public/x.txt` benennt den privaten Schlüssel `notes:/public/x.txt`, und der Schlüssel `default/public/x.txt` (erreichbar als `/api/storage/file/default/default/public/x.txt`) liegt in einem Ordner namens `default`; keiner von beiden ist öffentlich. Prüfen Sie in einem Hook den übergebenen `key` mit `isPublicStorageKey` aus `@rebasepro/types` — `isPublicStoragePath` liest einen clientseitigen Pfad oder eine URL und hält beide für öffentlich.
-- **`list` wird anhand des Präfixes geprüft.** Über das Auflisten lassen sich Schlüssel ermitteln, die einem zuvor nicht bekannt waren.
-- **Fortsetzbare (TUS) Uploads werden bereits bei der Erstellung geprüft**, sodass ein abgelehnter Upload keine temporären Dateien hinterlässt.
-- Das Weglassen des Hooks behält das bisherige Verhalten bei, sodass Single-Tenant-Anwendungen davon unberührt bleiben.
+- **Auf der Metadaten-Route wird der Lesezugriff tatsächlich entschieden.** Sie generiert das kurzlebige, pfadgebundene Download-Token, dem die Datei-Route vertraut; daher schützt der Hook den Zugriff dort. Zwei Lesearten überspringen den Hook bewusst: Erstens eine Anfrage mit einem solchen Token — der Hook hat die Anfrage beim Generieren des Tokens für genau diesen Pfad und diese Quelle freigegeben; ein Hook, der nun ablehnen würde (weil z. B. eine Mitgliedschaft inzwischen entzogen wurde), stoppt den Zugriff nicht, bevor das Token abläuft (`storageDownloadTokenTtl`, standardmäßig 300 Sekunden). Zweitens das Lesen eines Schlüssels unter `public/` durch einen Aufrufer ohne Anmeldedaten: Das Präfix deklariert, dass jeder die Datei lesen darf, einschließlich anonymer Besucher und CDNs. Ein angemeldeter Aufrufer wird dennoch geprüft, ein anonymer jedoch nicht; ein Hook kann einen `public/`-Schlüssel also nicht privat machen; speichern Sie die Datei stattdessen außerhalb von `public/`. Nur diese beiden Fälle überspringen den Hook: Ein Benutzer, den Ihr Auth-Adapter zufällig `public` nennt, wird wie jeder andere geprüft.
+- **Ein Bucket, ein Name.** Auf S3 und GCS lautet das `bucket` des Hooks immer `"default"`, auch wenn eine Anfrage das Bucket des Providers nennt, da dieselben Objekte erreicht werden.
+- **Ein Pfad ist öffentlich, wenn der referenzierte Schlüssel öffentlich ist.** Das `public/`-Präfix wird am kanonischen Schlüssel geprüft, den die Route ausliefert — nachdem ein führendes `default/`-Bucket-Segment entfernt und `//`, `./` sowie ein führendes `/` bereinigt wurden — niemals an der URL im Rohzustand. `/api/storage/file/notes://public/x.txt` referenziert den privaten Schlüssel `notes:/public/x.txt`, und der Schlüssel `default/public/x.txt` (aufgerufen als `/api/storage/file/default/default/public/x.txt`) liegt in einem Ordner namens `default`; beide sind nicht öffentlich. Prüfen Sie in einem Hook den übergebenen `key` mit `isPublicStorageKey` aus `@rebasepro/types` — `isPublicStoragePath` wertet clientseitige Pfade oder URLs aus und würde beide fälschlicherweise als öffentlich einstufen.
+- **`list` wird am Präfix autorisiert.** Über Listenoperationen lassen sich Schlüssel finden, die einem sonst nicht bekannt wären.
+- **Fortsetzbare (TUS) Uploads werden beim Erstellen autorisiert**, sodass ein abgelehnter Upload keine temporäre Datei hinterlässt.
+- Das Weglassen des Hooks behält das bisherige Verhalten bei, sodass Single-Tenant-Anwendungen nicht beeinträchtigt werden.
 
 ### API-Schlüssel und Tokens
 
-Eine angemeldete Person hält jeden Storage-Scope, für sie entscheiden also der Hook und die Policies oben.
-Ein [API-Schlüssel](/docs/backend/api-keys/) braucht zusätzlich den Storage-Scope
-für die Operation, auf der Quelle, die die Anfrage nennt: `storage:read` für
-Downloads, Metadaten und Auflistungen, `storage:write` für Uploads, Ordner und jeden
-Schritt eines fortsetzbaren Uploads, `storage:delete` für Löschvorgänge. Das Ziel ist die
-Quell-ID, und die der Standardquelle ist `(default)`: `storage:read:(default)`,
-`storage:write:avatars`. Ohne ihn lautet die Antwort `403 SCOPE_MISSING`. Mit ihm
-läuft der Hook weiterhin, als diejenige Identität, als die der Schlüssel handelt.
+Ein angemeldeter Benutzer besitzt jeden Speicher-Scope, sodass der Hook und die obigen Richtlinien
+für ihn entscheiden. Ein [API-Schlüssel](/docs/backend/api-keys/) benötigt zusätzlich den Speicher-Scope
+für die jeweilige Operation auf der in der Anfrage benannten Quelle: `storage:read` für
+Downloads, Metadaten und Listings; `storage:write` für Uploads, Ordner und alle
+Schritte eines fortsetzbaren Uploads; `storage:delete` für Löschvorgänge. Das Ziel ist die
+Quell-ID, und die Standardquelle lautet `(default)`: `storage:read:(default)`,
+`storage:write:avatars`. Fehlt der Scope, lautet die Antwort `403 SCOPE_MISSING`. Ist er vorhanden,
+wird der Hook dennoch ausgeführt — stellvertretend für die Identität des Schlüssels.
 
 ## Auf einen Upload reagieren
 
-Auf jeden anderen Schreibvorgang in Rebase kann reagiert werden — eine Tabellenzeile bietet `beforeSave` und `afterSave`, ein Zeitplan besitzt einen Cronjob — ein Upload bot bisher nichts. Alles, was aus einem Upload folgte, musste vom Client in einem zweiten Aufruf erledigt werden. Ging die Verbindung zum Client dazwischen verloren, unterblieb die Aktion vollständig.
+Auf jeden anderen Schreibvorgang in Rebase kann reagiert werden — eine Datenzeile bietet `beforeSave` und
+`afterSave`, ein Zeitplan einen Cron-Job — für Uploads gab es bisher nichts. Alles, was ein
+Upload nach sich zog, musste vom Client in einem zweiten Aufruf erledigt werden. Ging die Verbindung
+des Clients dazwischen verloren, unterblieb die Aktion vollständig.
 
 ```ts
 storageTriggers: [
@@ -452,28 +559,40 @@ storageTriggers: [
         path: "uploads/:uid/**",
         events: ["finalize"],
         handler: async ({ key, params, size, user }) => {
-            await indexUpload.enqueue({ key, uid: params.uid, size }); // a `queue()` in config/resources.ts
+            await indexUpload.enqueue({ key, uid: params.uid, size }); // ein `queue()` in config/resources.ts
         }
     }
 ]
 ```
 
-Die Mustersprache ist identisch mit `storagePolicies` — Literalsegmente, `*` für ein einzelnes Segment, `:name` zum Erfassen eines Segments, `**` für den Rest — und ein fehlerhaftes Muster lässt den Serverstart fehlschlagen, anstatt stillschweigend auf nichts zu passen.
+Die Mustersyntax entspricht der von `storagePolicies` — literale Segmente, `*`
+für ein einzelnes Segment, `:name` zur Erfassung eines Segments, `**` für den Rest. Ein fehlerhaftes
+Muster verhindert den Systemstart, anstatt stillschweigend auf nichts zuzutreffen.
 
 | Ereignis | Wann |
 | --- | --- |
-| `finalize` | nachdem das Objekt dauerhaft geschrieben wurde; niemals bei einem fehlgeschlagenen Schreibvorgang |
-| `delete` | nachdem das Objekt gelöscht wurde |
+| `finalize` | Nachdem das Objekt dauerhaft geschrieben wurde; niemals bei einem fehlgeschlagenen Schreibvorgang |
+| `delete` | Nachdem das Objekt gelöscht wurde |
 
-`finalize` wird sowohl für reguläre Multipart- als auch für fortsetzbare (TUS) Upload-Pfade ausgelöst — genau einmal pro Upload, nicht einmal pro Chunk. Ein fortsetzbarer Upload übergibt dabei den Benutzer, der ihn *erstellt* hat, da dieser der Akteur war, den die Autorisierungsprüfung validiert hat.
+`finalize` wird sowohl für Multipart- als auch für fortsetzbare (TUS) Upload-Pfade ausgelöst — einmal
+pro Upload, nicht einmal pro Chunk. Ein fortsetzbarer Upload meldet den Benutzer, der ihn
+*erstellt* hat, da dies der Principal ist, den die Autorisierung geprüft hat.
 
-Was ein Handler nicht voraussetzen darf:
+Was ein Handler nicht annehmen darf:
 
-- **Ein Handler, der eine Exception wirft, lässt den Request nicht fehlschlagen.** Das Objekt ist zu dem Zeitpunkt, an dem der Handler läuft, bereits gespeichert; dem Client einen Fehler zu melden, würde fälschlicherweise signalisieren, der Upload sei fehlgeschlagen, woraufhin Clients Uploads wiederholen. Fehler werden protokolliert und die HTTP-Antwort bleibt unberührt. Wenn die Folgeverarbeitung zwingend stattfinden muss, reihen Sie einen Job in die Warteschlange ein.
-- **Handler werden sequenziell abgewartet**, in der Reihenfolge ihrer Deklaration, bevor die Antwort gesendet wird — ein Fire-and-Forget-Ansatz würde ein Promise hinterlassen, das eine Serverless-Laufzeitumgebung jederzeit mitten in der Ausführung einfrieren könnte. Ein langsamer Handler verlangsamt folglich den gesamten Upload. Dies ist ein weiterer Grund, Arbeit per Queue auszulagern, anstatt sie direkt hier auszuführen.
-- **Interne Schreibvorgänge lösen keine Trigger aus.** Der Cache für Bildtransformationen schreibt abgeleitete Objekte direkt in den Storage-Controller; ein `**`-Trigger, der darauf anspringen würde, würde auf seine eigene Ausgabe reagieren.
+- **Ein Handler, der einen Fehler wirft, lässt die Anfrage nicht fehlschlagen.** Das Objekt ist zu dem
+  Zeitpunkt, an dem der Handler läuft, bereits gespeichert. Eine Fehlermeldung an den Client würde
+  fälschlicherweise signalisieren, dass der Upload gescheitert sei, woraufhin Clients Uploads wiederholen.
+  Fehler werden protokolliert und die Antwort bleibt unberührt. Wenn die Aufgabe zwingend ausgeführt werden muss,
+  reihen Sie einen Job in eine Warteschlange (Queue) ein.
+- **Handler werden mit `await` blockierend ausgeführt**, in der Reihenfolge ihrer Deklaration, bevor die Antwort gesendet wird —
+  Fire-and-Forget würde ein Promise hinterlassen, das eine Serverless-Laufzeitumgebung mitten in der Ausführung einfrieren könnte.
+  Ein langsamer Handler führt daher zu einem langsamen Upload; dies ist ein weiterer Grund, Arbeiten in eine Queue auszulagern.
+- **Interne Schreibvorgänge lösen keine Trigger aus.** Der Cache für Bildtransformationen schreibt
+  abgeleitete Objekte direkt an den Speicher-Controller; ein `**`-Trigger, der darauf anspringen würde,
+  würde auf seine eigene Ausgabe reagieren.
 
 ## Nächste Schritte
 
-- **[Frontend Storage & Datei-Uploads](/docs/frontend/storage)** — Datei-Upload-Felder und Hooks
-- **[Properties](/docs/collections/properties)** — Konfiguration von Storage-Properties
+- **[Frontend-Speicher & Datei-Uploads](/docs/frontend/storage)** — Felder und Hooks für Datei-Uploads
+- **[Eigenschaften](/docs/collections/properties)** — Konfiguration von Speicher-Eigenschaften

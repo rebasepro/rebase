@@ -1,5 +1,5 @@
 ---
-sourceHash: a8d023c7c5248446
+sourceHash: d33249c4f6560ffc
 title: Self-Hosting
 sidebar_label: Self-Hosting
 description: Führen Sie Rebase überall mit dem offiziellen Runtime-Image und Ihrem Projekt-Bundle aus – Docker Compose, Fly, Railway oder auf einem einfachen VPS.
@@ -7,61 +7,40 @@ description: Führen Sie Rebase überall mit dem offiziellen Runtime-Image und I
 
 ## Übersicht
 
-Rebase selbst zu hosten bedeutet, zwei Dinge auszuführen: eine Postgres-Datenbank und das
-offizielle `rebasepro/server`-Image, in das das Bundle Ihres Projekts gemountet wird.
+Rebase selbst zu hosten bedeutet, zwei Dinge zu betreiben: eine Postgres-Datenbank und das offizielle Image `rebasepro/server`, in das das Bundle Ihres Projekts gemountet ist.
 
-Es muss **kein Anwendungs-Image gebaut werden**. Ihr Projekt wird als Bundle bereitgestellt,
-die Runtime ist bereits veröffentlicht, und ein Upgrade von Rebase besteht aus einer Tag-Änderung
-statt eines Rebuilds. Siehe [Runtime und Bundles](/docs/architecture/runtime-and-bundles/) für
-die Gründe dieser Aufteilung.
+Es muss **kein Anwendungs-Image gebaut werden**. Ihr Projekt wird als Bundle bereitgestellt, die Runtime ist veröffentlicht, und ein Upgrade von Rebase ist lediglich eine Änderung des Tags statt eines Rebuilds. Siehe [Runtime and bundles](/docs/architecture/runtime-and-bundles/) für die Gründe dieser Aufteilung.
 
 ## Docker Compose
 
-**Wenn Ihr Projekt aus `rebase init` stammt, verwenden Sie dessen eigene `docker-compose.yml`.**
-Sie befindet sich in Ihrem Repository, `init` hat die Secrets, das erste Admin-Konto
-und die festgelegte Runtime-Version eingetragen, und es ist genau die Datei, die unter
-[Deployment](/docs/getting-started/deployment/#docker-compose-recommended)
-beschrieben wird:
+**Wenn Ihr Projekt über `rebase init` erstellt wurde, verwenden Sie dessen eigene `docker-compose.yml`.** Sie befindet sich in Ihrem Repository; `init` hat die Secrets, das erste Admin-Konto und die festgelegte Runtime-Version eingetragen, und es ist die Datei, die unter [Deployment](/docs/getting-started/deployment/#docker-compose-recommended) beschrieben wird:
 
 ```bash
 rebase build
 docker compose up -d
 ```
 
-Der Rest dieser Seite beschreibt dasselbe Deployment ohne ein vorgefertigtes Gerüst dahinter –
-das Projekt einer anderen Person, ein in der CI erstelltes Bundle oder die beiden Dinge, die in der
-generierten Datei bewusst weggelassen wurden: ein Connection-Pooler und getrennte Prozessstrukturen.
-Diese Konfiguration liegt im Repository unter
-[`infra/docker/docker-compose.selfhost.yml`](https://github.com/rebasepro/rebase/blob/main/infra/docker/docker-compose.selfhost.yml).
-Verwenden Sie diese Datei, anstatt einen Ausschnitt von dieser Seite zu kopieren: Beide Dateien werden
-bei jedem Push über das projekteigene Acceptance-Gate gestartet, sodass keine der beiden von dem abweichen
-kann, was tatsächlich funktioniert.
+Der Rest dieser Seite behandelt dasselbe Deployment ohne ein Scaffold im Hintergrund – das Projekt einer anderen Person, ein in der CI erstelltes Bundle oder die beiden Dinge, die die generierte Datei bewusst auslässt: ein Connection-Pooler und Split-Process-Architekturen. Diese Datei befindet sich im Repository unter [`infra/docker/docker-compose.selfhost.yml`](https://github.com/rebasepro/rebase/blob/main/infra/docker/docker-compose.selfhost.yml). Verwenden Sie diese Datei, anstatt Code-Auszüge von dieser Seite zu kopieren: Beide Dateien werden bei jedem Push vom projekteigenen Acceptance Gate gestartet, sodass keine von dem abweichen kann, was tatsächlich funktioniert.
 
-Beide stimmen bei jeder Umgebungsvariable überein, außer beim Datenbank-Passwort – und
-das liegt daran, dass jede für ihren eigenen Generator geschrieben wurde: Diese liest
-`POSTGRES_PASSWORD`, das von `quickstart.sh` erzeugt wird; die generierte liest
-`DATABASE_PASSWORD`, das `rebase init` auch in die `DATABASE_URL` einbettet, die
-in Ihre `.env` geschrieben wird.
+Beide stimmen bei allen Umgebungsvariablen überein, abgesehen vom Datenbank-Passwort. Das liegt daran, dass jede für ihren eigenen Ersteller geschrieben wurde: Diese Version liest `POSTGRES_PASSWORD`, das von `quickstart.sh` generiert wird; die generierte Version liest `DATABASE_PASSWORD`, das `rebase init` auch in die `DATABASE_URL` einbettet, die es in Ihre `.env` schreibt.
 
 ```bash
 rebase build                    # produces ./dist-bundle
 ./infra/docker/quickstart.sh    # writes infra/docker/.env if absent, then brings it up
 ```
 
-`quickstart.sh` ist ein einzelner Befehl, der zwei naheliegende Schritte ausführt und beide ausgibt.
-Die ausführliche Variante, falls Sie jeden Schritt selbst kontrollieren möchten:
+`quickstart.sh` ist ein einzelner Befehl, der zwei naheliegende Dinge tut und beide ausgibt. Die ausführliche Variante, falls Sie jeden Schritt selbst kontrollieren möchten:
 
 ```bash
 docker compose -f infra/docker/docker-compose.selfhost.yml \
   --env-file infra/docker/.env up
 ```
 
-Sie müssen die Datenbank nicht separat starten – `api` wartet auf ihren
-Healthcheck.
+Sie müssen die Datenbank nicht separat starten – `api` wartet auf deren Healthcheck.
 
 ### Die sechs benötigten Werte
 
-`quickstart.sh` erzeugt diese Werte für Sie. Um die `.env` manuell zu schreiben:
+`quickstart.sh` generiert diese für Sie. Um die `.env` selbst zu erstellen:
 
 ```bash
 cat > infra/docker/.env <<EOF
@@ -74,156 +53,96 @@ REBASE_ADMIN_PASSWORD=$(openssl rand -hex 16)
 EOF
 ```
 
-Drei Secrets, eine Konfigurationsangabe und das Konto, mit dem Sie sich anmelden:
+Drei Secrets, ein Parameter und das Konto, mit dem Sie sich anmelden:
 
-- **`POSTGRES_PASSWORD`** – das Datenbankpasswort. Eine spätere Änderung erfordert
-  auch die Änderung im Volume; wählen Sie es also sorgfältig.
-- **`JWT_SECRET`** – signiert jede Session. Eine Rotation meldet alle Benutzer ab.
-- **`REBASE_SERVICE_KEY`** – die Anmeldeinformation, die Row-Level Security für
-  Server-zu-Server-Aufrufe umgeht. Behandeln Sie diesen Schlüssel wie ein Root-Passwort:
-  Jeder Dienst, der ihn besitzt, kann jede Zeile lesen.
-- **`CORS_ORIGINS`** – die Origins, von denen Ihr Frontend bereitgestellt wird, durch Kommas getrennt.
-  Kein Secret und nicht optional: Die Runtime verweigert den Start in der Produktion
-  ohne diesen Wert, anstatt Mutmaßungen anzustellen. Denn eine API, die erlaubte Origins
-  errät, erlaubt letztlich die falschen.
-- **`REBASE_ADMIN_EMAIL`** / **`REBASE_ADMIN_PASSWORD`** – der erste
-  Administrator. Eine neue Datenbank enthält keine Benutzer. Außerhalb der Produktion
-  lässt die Registrierungsrichtlinie die erste Registrierung zu und befördert sie zum Admin –
-  andernfalls wäre eine leere Datenbank eine Sackgasse, da das Einrichten eines Admins
-  einen bereits angemeldeten Aufrufer erfordert. Sobald dieser Stack unter einem
-  Hostnamen erreichbar ist, wird dieser Komfort zu einer Race Condition, die der Betreiber
-  verlieren kann. In der Produktion ist dieses Fenster daher geschlossen und das Konto
-  wird stattdessen hier definiert. Die Runtime erstellt es einmalig, solange die Benutzertabelle
-  leer ist, und unternimmt bei jedem nachfolgenden Start nichts weiter.
+- **`POSTGRES_PASSWORD`** — das Datenbank-Passwort. Eine spätere Änderung erfordert auch eine Änderung im Volume; wählen Sie es also einmalig mit Bedacht.
+- **`JWT_SECRET`** — signiert jede Session. Eine Rotation meldet alle Benutzer ab.
+- **`REBASE_SERVICE_KEY`** — die Anmeldeinformation, die Row-Level Security für Server-zu-Server-Aufrufe umgeht. Behandeln Sie diesen Schlüssel wie ein Root-Passwort: Alles, was ihn besitzt, kann jede Zeile lesen.
+- **`CORS_ORIGINS`** — die Origins, von denen Ihr Frontend bereitgestellt wird, kommagetrennt. Kein Secret und nicht optional: Die Runtime verweigert den Start in der Produktion ohne diesen Wert, anstatt Vermutungen anzustellen – denn eine API, die ihre erlaubten Origins errät, erlaubt früher oder später die falsche.
+- **`REBASE_ADMIN_EMAIL`** / **`REBASE_ADMIN_PASSWORD`** — der erste Administrator. Eine neue Datenbank enthält keine Benutzer, und außerhalb der Produktion erlaubt die Registrierungsrichtlinie die erste Registrierung und ernennt diese zum Admin – andernfalls wäre eine leere Datenbank eine Sackgasse, da das Bootstrapping eines Admins einen bereits angemeldeten Aufrufer erfordert. Sobald dieser Stack jedoch unter einem Hostnamen erreichbar ist, wird diese Bequemlichkeit zu einer Race Condition, die der Operator verlieren kann. Daher ist das Zeitfenster in der Produktion geschlossen und das Konto wird stattdessen hier angegeben. Die Runtime erstellt es einmalig, solange die Benutzertabelle leer ist, und unternimmt bei jedem nachfolgenden Start nichts mehr.
 
-Jedes der drei Secrets muss mindestens 32 Zeichen lang sein, das Admin-Passwort
-mindestens 12 Zeichen. Verwenden Sie eine Adresse mit einem Punkt in der Domain: `POST /auth/login`
-validiert den Body mit `z.string().email()`, daher würde `admin@localhost` ein Konto
-erstellen und danach jeden Anmeldeversuch verweigern. Die Compose-Datei deklariert alle sechs Variablen mit
-`${VAR:?…}`, sodass ein fehlender Wert den Stack mit einer entsprechenden Fehlermeldung stoppt,
-anstatt ein halb konfiguriertes System zu starten – und die Selbstregistrierung ist standardmäßig deaktiviert
-(`DISABLE_SELF_REGISTRATION`, Standard: `true`), sodass keine Konten unbefugt beansprucht werden können.
+Jedes der drei Secrets muss mindestens 32 Zeichen lang sein, das Admin-Passwort mindestens 12. Verwenden Sie eine E-Mail-Adresse mit einem Punkt in der Domain: `POST /auth/login` parst den Body mit `z.string().email()`, sodass `admin@localhost` zwar ein Konto anlegen, danach aber jeden Versuch verweigern würde, sich damit anzumelden. Die Compose-Datei deklariert alle sechs mit `${VAR:?…}`, sodass eine fehlende Variable den Stack mit einer Fehlermeldung stoppt, die den Namen nennt, anstatt etwas halb Konfiguriertes zu starten – und die Selbstregistrierung ist standardmäßig deaktiviert (`DISABLE_SELF_REGISTRATION`, Standard `true`), sodass nichts herrenlos bleibt.
 
-Melden Sie sich mit diesen Zugangsdaten an und ändern Sie das Passwort: Die Daten liegen im
-Klartext in einer Datei auf dem Host.
+Melden Sie sich mit diesen Anmeldedaten an und ändern Sie das Passwort: Sie liegen im Klartext in einer Datei auf dem Host.
 
 ## Abhängigkeiten
 
-`rebase build` **installiert die Abhängigkeiten Ihres Projekts standardmäßig direkt in das Bundle**,
-sodass `dist-bundle` mit `node_modules` und einer `package-lock.json`
-neben der `package.json` ausgeliefert wird. Ein so vorbereitetes (vendored) Bundle startet in etwa fünf Sekunden.
+`rebase build` **installiert die Abhängigkeiten Ihres Projekts standardmäßig in das Bundle**, sodass `dist-bundle` ein `node_modules`-Verzeichnis und eine `package-lock.json` neben seiner `package.json` enthält. Ein vorgebündeltes Bundle startet in etwa fünf Sekunden.
 
-Da die Abhängigkeiten bereits enthalten sind, können Sie das Bundle schreibgeschützt (read-only) mounten –
-das ist empfehlenswert, da ein kompromittierter Hook dann den Code nicht umschreiben kann,
-der nach dem nächsten Neustart ausgeführt wird:
+Da sie bereits vorhanden sind, können Sie das Bundle schreibgeschützt (read-only) mounten – was sich empfiehlt, da ein kompromittierter Hook dann nicht den Code umschreiben kann, der nach dem nächsten Neustart ausgeführt wird:
 
 ```yaml
     volumes:
       - ./dist-bundle:/bundle:ro
 ```
 
-Mit `rebase build --no-vendor` deaktivieren Sie dieses Verhalten und erstellen ein Bundle, das seine
-Abhängigkeiten stattdessen beim ersten Start installiert. Dies dauert 40–60 Sekunden pro Start
-und erfordert, dass der Mount beschreibbar ist.
+`rebase build --no-vendor` deaktiviert dies und erzeugt ein Bundle, das seine Abhängigkeiten stattdessen beim ersten Start installiert, was 40–60 Sekunden pro Start dauert und einen beschreibbaren Mount erfordert.
 
-Für ein echtes Deployment empfiehlt es sich, beides in ein Image zu packen, wodurch auch
-exakt festgelegt wird, was ausgeführt wird:
+Für ein echtes Deployment empfiehlt es sich, beides in ein Image einzubetten, was auch exakt festlegt, was ausgeführt wird:
 
 ```dockerfile
 FROM rebasepro/server:0.24.0
 COPY dist-bundle /bundle
 ```
 
-## Erstellen des Schemas
+## Schema erstellen
 
-**Die Runtime erstellt fehlende Tabellen beim Start automatisch, einschließlich derer Ihrer Collections.**
-`REBASE_MIGRATE_ON_BOOT` steht standardmäßig auf `ensure`, was sich über das gesamte
-Schema rein additiv verhält: Es erstellt fehlende Tabellen, Spalten und Enum-Typen und wendet deren
-Row-Level Security an. Ein erster Start mit einer leeren Datenbank stellt Ihre Collections
-sofort und ohne separaten Zwischenschritt bereit.
+**Die Runtime erstellt beim Start fehlende Tabellen, einschließlich derer Ihrer Collections.** `REBASE_MIGRATE_ON_BOOT` ist standardmäßig auf `ensure` gesetzt, was additiv für das gesamte Schema wirkt: Fehlende Tabellen, Spalten und Enum-Typen werden erstellt und deren Row-Level Security angewendet. Ein erster Start gegen eine leere Datenbank stellt Ihre Collections sofort bereit, ohne zusätzlichen Schritt.
 
-Was `ensure` ganz bewusst niemals tut, ist das Ändern bereits vorhandener Strukturen. Es
-ändert keinen Spaltentyp, löscht weder Tabellen noch Spalten und bearbeitet keine bestehenden
-Enum-Werte – denn ein Container-Neustart darf nicht in der Lage sein, ein Schema als
-Nebeneffekt eines Deployments umzustrukturieren.
+Was `ensure` ganz bewusst niemals tut, ist das Ändern bestehender Strukturen. Es ändert keinen Spaltentyp, löscht weder Tabellen noch Spalten und bearbeitet keine Werte bestehender Enums – denn ein Container-Neustart darf niemals in der Lage sein, ein Schema als Nebeneffekt eines Deploys umzustrukturieren.
 
-Daher ist die Ausführung von `rebase db push` weiterhin sinnvoll, für das, was der Startvorgang
-unberührt lässt – jede Änderung, die nicht rein additiv ist: eine umbenannte Spalte, ein
-eingeschränkter Typ, ein entferntes Feld.
+Daher lohnt sich die Ausführung von `rebase db push` weiterhin für all das, was der Startvorgang unangetastet lässt – jede Änderung, die nicht rein additiv ist: eine umbenannte Spalte, ein eingeschränkter Typ, ein entferntes Feld.
 
 ```bash
 rebase db push
 ```
 
-Führen Sie dies aus einem Repository-Checkout oder einem CI-Job aus, der auf die Datenbank
-des Deployments verweist. Der Befehl führt zunächst einen Probelauf (Dry-Run) der Änderung durch,
-verweigert destruktive Änderungen ohne explizite Bestätigung und kann vor der Anwendung
-ein Backup erstellen. Die Datenbank gibt in der Compose-Datei einen Port frei, damit
-dieser Befehl sie vom Host aus erreichen kann. Entfernen Sie dieses Port-Mapping,
-sobald das Schema eingerichtet ist, falls die Datenbank von außen nicht erreichbar sein soll.
+Führen Sie den Befehl aus einem Checkout oder einem CI-Job aus, der auf die Datenbank des Deployments verweist. Die Änderung wird zunächst als Testlauf (Dry-Run) geprüft, destruktive Änderungen werden ohne explizite Bestätigung verweigert, und vor der Anwendung kann ein Backup erstellt werden. Die Datenbank gibt in der Compose-Datei einen Port frei, damit dieser Befehl sie vom Host aus erreichen kann; entfernen Sie dieses Port-Mapping, sobald das Schema eingerichtet ist, falls die Datenbank von außen nicht erreichbar sein soll.
 
-`REBASE_MIGRATE_ON_BOOT` akzeptiert ausschließlich `ensure` und `none` – das Image
-**verweigert den Start** bei `push`, aus dem oben genannten Grund.
+`REBASE_MIGRATE_ON_BOOT` akzeptiert nur `ensure` und `none` – das Image **verweigert den Start** bei `push` aus dem oben genannten Grund.
 
 ## Dateispeicher
 
-Der Speicher ist **deaktiviert**, sofern kein Bucket konfiguriert ist, und das ist beabsichtigt: Die
-alternative Standardeinstellung wäre das Dateisystem des Containers, wodurch jede hochgeladene Datei
-beim nächsten Neustart stillschweigend verloren ginge. Uploads werden mit
-`501 STORAGE_NOT_CONFIGURED` abgelehnt, bis Sie einen Speicher einrichten.
+Der Speicher ist standardmäßig **deaktiviert**, sofern kein Bucket konfiguriert ist, und das ist beabsichtigt: Der alternative Standard wäre das Dateisystem des Containers, wodurch jede hochgeladene Datei beim nächsten Neustart stillschweigend verloren ginge. Uploads werden mit `501 STORAGE_NOT_CONFIGURED` abgewiesen, bis Sie einen Speicher einrichten.
 
-Setzen Sie für einen Bucket `STORAGE_TYPE=s3` (oder `gcs`) sowie den entsprechenden Bucket-Namen und die Zugangsdaten –
-die Compose-Datei listet die Variablen auskommentiert auf.
+Für einen Bucket setzen Sie `STORAGE_TYPE=s3` (oder `gcs`) zusammen mit dem Bucket-Namen und den Zugangsdaten – die Compose-Datei listet die Variablen auskommentiert auf.
 
-Für lokalen Festplattenspeicher, der nur dann geeignet ist, wenn der Pfad ein echtes Volume ist,
-das den Container überdauert:
+Für lokalen Festplattenspeicher, der nur dann geeignet ist, wenn der Pfad ein echtes Volume ist, das über den Container hinaus fortbesteht:
 
 ```yaml
       STORAGE_TYPE: local
-      STORAGE_PATH: /data/uploads
+      # Each declared bucket gets a directory beside this one, bucket("media")
+      # /storage/uploads__media, so the volume goes on their parent.
+      STORAGE_PATH: /storage/uploads
       FORCE_LOCAL_STORAGE: "true"
     volumes:
-      - uploads:/data/uploads
+      - storage:/storage
 ```
 
-`FORCE_LOCAL_STORAGE` ist an dieser Stelle zwingend erforderlich: In der Produktion wird ein
-`local`-Backend standardmäßig verworfen statt registriert, da die Alternative Uploads wären, die
-in einem Dateisystem landen, das kurz vor der Zerstörung steht. Über diese Variable bestätigen Sie,
-dass der Mount persistent ist.
+`FORCE_LOCAL_STORAGE` ist dort nicht optional: In der Produktion wird ein `local`-Backend verworfen statt registriert, da die Alternative Uploads wären, die in einem Dateisystem erfolgreich sind, das kurz vor der Zerstörung steht. Mit dieser Variable bestätigen Sie, dass der Mount persistent ist.
 
-### Speicher erfordert ein Zugriffskontrollmodell
+Mounten Sie das Volume **über** `STORAGE_PATH`, nicht direkt darauf. `STORAGE_PATH` ist das Verzeichnis des Standard-Buckets, und jeder in `config/resources.ts` deklarierte Bucket erhält daneben sein eigenes Verzeichnis, `<STORAGE_PATH>__<key>`. Ein Volume direkt auf `STORAGE_PATH` enthält nur den Standard-Bucket. Jeder andere Bucket schreibt in das Dateisystem des Containers und verliert seine Dateien, wenn der Container neu erstellt wird. `STORAGE_PATH__MEDIA` kann einen Bucket an eine andere Stelle auf dem Volume verschieben. Er kann ihn jedoch nicht in das Verzeichnis eines anderen Buckets verschieben, wie etwa `/storage/uploads/media`, da der Standard-Bucket dessen Dateien sonst auflisten, ausliefern und löschen würde.
 
-Sobald ein Bucket konfiguriert **ist**, **verweigert die Runtime in der Produktion den Start**,
-bis das Deployment festlegt, wie Objekte geschützt werden. Speicher unterliegt nicht
-der Row-Level Security und seine Keys teilen sich einen einzigen flachen Namespace. Ohne eine Regel
-ist das Einzige, was die Dateien zweier Benutzer trennt, die Unvorhersehbarkeit der Keys – was durch
-`GET /storage/list?prefix=` zunichtegemacht wird. Jede der folgenden Optionen erfüllt diese Anforderung:
+<span class="since-badge" data-since="0.25">Since 0.25</span> Das Image erstellt `/storage` für den unprivilegierten `node`-Benutzer, unter dem es ausgeführt wird; deshalb gehört das Volume dorthin. Ein Volume, das an einer Stelle gemountet wird, an der das Image kein Verzeichnis hat, gehört root, und jeder Upload schlägt mit `EACCES` fehl. Die von `rebase init` erstellte Compose-Datei mountet es auf diese Weise.
 
-- Ein **`storageAuthorize`-Hook** (oder `storagePolicies`) in der Konfiguration Ihres Projekts,
-  was die reguläre Lösung ist und standardmäßig in `config/storage.ts` ausgeliefert wird –
-  keine Umgebungsvariable kann die Logik „dieser Benutzer darf diesen Key lesen“ abbilden;
-- **`STORAGE_PUBLIC_READ=true`** für einen Bucket, der tatsächlich ein öffentliches,
-  schreibgeschütztes CDN darstellt;
-- **`STORAGE_ALLOW_ANY_AUTHENTICATED=true`** für eine Single-Tenant-Anwendung, bei der
-  jedem angemeldeten Konto bezüglich jeder Datei vertraut wird.
+### Speicher benötigt ein Zugriffssteuerungsmodell
 
-Außerhalb der Produktion führt dieselbe Bedingung lediglich zu einer deutlichen Warnung statt zu einer Verweigerung.
-Es handelt sich hierbei also um einen Startfehler, der Ihnen erst beim Deployment und nicht auf dem Entwicklungsrechner
-begegnet. Das ist Absicht: Der Fehler, den dies verhindert, bliebe sonst unbemerkt.
+Sobald ein Bucket konfiguriert **ist**, **verweigert die Runtime in der Produktion den Start**, bis das Deployment festlegt, wie Objekte geschützt werden. Der Speicher unterliegt nicht der Row-Level Security und seine Schlüssel teilen sich einen flachen Namensraum. Ohne Regeln ist das Einzige, was die Dateien zweier Benutzer trennt, die Unerratbarkeit der Schlüssel – was durch `GET /storage/list?prefix=` zunichtegemacht wird. Jede der folgenden Optionen erfüllt diese Anforderung:
 
-Setzen Sie auch `MFA_ENCRYPTION_KEY`, wenn Sie TOTP verwenden. Bleibt dieser Wert ungesetzt,
-werden gespeicherte Authentifikator-Secrets mit `JWT_SECRET` verschlüsselt – eine Rotation dieses
-Schlüssels meldet somit nicht nur alle Benutzer ab, *sondern* macht auch jedes registrierte Gerät unentschlüsselbar.
+- ein **`storageAuthorize`-Hook** (oder `storagePolicies`) in der Konfiguration Ihres Projekts, was die eigentliche Lösung ist und standardmäßig im Scaffold in `config/storage.ts` enthalten ist – keine Umgebungsvariable kann ausdrücken: „Dieser Benutzer darf diesen Schlüssel lesen“;
+- **`STORAGE_PUBLIC_READ=true`** für einen Bucket, der tatsächlich ein öffentliches, schreibgeschütztes CDN ist;
+- **`STORAGE_ALLOW_ANY_AUTHENTICATED=true`** für eine Single-Tenant-Anwendung, bei der jedem angemeldeten Konto für jede Datei vertraut wird.
+
+Außerhalb der Produktion führt dieselbe Bedingung lediglich zu einer deutlichen Warnung statt zu einer Startverweigerung. Diesen Startfehler erleben Sie also beim Deploy und nicht auf Ihrem Entwicklungsrechner. Das ist beabsichtigt: Der Fehler, den dies ersetzt, wäre sonst ein stiller Fehler.
+
+Setzen Sie auch `MFA_ENCRYPTION_KEY`, wenn Sie TOTP verwenden. Bleibt dieser ungesetzt, werden gespeicherte Authenticator-Secrets mit `JWT_SECRET` verschlüsselt – eine Rotation dessen meldet also alle Benutzer ab *und* macht jedes registrierte Gerät unentschlüsselbar.
 
 ## Andere Plattformen
 
-Die Runtime ist ein gewöhnlicher Container, der auf `$PORT` lauscht. Alles, was Container
-ausführen kann, ist somit geeignet. Zwei Dinge müssen überall beachtet werden:
+Die Runtime ist ein gewöhnlicher Container, der auf `$PORT` lauscht, sodass alles funktioniert, was Container ausführen kann. Zwei Dinge müssen überall beachtet werden:
 
-1. Das Bundle muss unter `/bundle` liegen (oder an dem Pfad, auf den `REBASE_BUNDLE` verweist),
-   wobei die Abhängigkeiten daneben installiert sein müssen – siehe [Abhängigkeiten](#abhängigkeiten).
-2. Setzen Sie `CORS_ORIGINS`, `JWT_SECRET` und `DATABASE_URL`. Die Runtime verweigert den
-   Start in der Produktion ohne diese Variablen, anstatt Annahmen zu treffen.
+1. Das Bundle muss unter `/bundle` (oder dem Pfad, auf den `REBASE_BUNDLE` zeigt) vorhanden sein, mit den daneben installierten Abhängigkeiten – siehe [Abhängigkeiten](#abhängigkeiten).
+2. Setzen Sie `CORS_ORIGINS`, `JWT_SECRET` und `DATABASE_URL`. Die Runtime verweigert den Start in der Produktion ohne diese Variablen, anstatt Vermutungen anzustellen.
 
 ### Fly.io
 
@@ -238,13 +157,11 @@ ausführen kann, ist somit geeignet. Zwei Dinge müssen überall beachtet werden
   path = "/livez"
 ```
 
-Verwenden Sie die oben beschriebene abgeleitete Image-Variante, damit das Bundle mit der App ausgeliefert wird,
-und führen Sie dann `fly deploy` aus.
+Verwenden Sie die oben beschriebene abgeleitete Image-Form, damit das Bundle mit der App ausgeliefert wird, und führen Sie dann `fly deploy` aus.
 
 ### Railway / Render
 
-Verweisen Sie den Dienst auf das abgeleitete Image, setzen Sie die Umgebungsvariablen und legen Sie
-den Healthcheck-Pfad auf `/livez` fest.
+Verweisen Sie mit dem Dienst auf das abgeleitete Image, setzen Sie die Umgebungsvariablen und stellen Sie den Healthcheck-Pfad auf `/livez` ein.
 
 ### Ein einfacher VPS
 
@@ -253,9 +170,7 @@ npm install -g @rebasepro/server @rebasepro/server-postgres
 rebase-server /srv/myapp/dist-bundle
 ```
 
-`rebase-server --help` listet die Variablen auf, die eingelesen werden. Unter systemd – die
-drei Admin-Zeilen sind neu; unter 0.17.3 wurde stattdessen das erste registrierte Konto
-zum Administrator:
+`rebase-server --help` listet die Variablen auf, die gelesen werden. Unter systemd – die drei Admin-Zeilen sind neu; unter 0.17.3 wurde stattdessen das erste registrierte Konto zum Administrator:
 
 ```ini title="/etc/systemd/system/rebase.service"
 [Service]
@@ -272,33 +187,17 @@ Environment=REBASE_ADMIN_EMAIL=you@example.com
 Environment=REBASE_ADMIN_PASSWORD=...
 ```
 
-`NODE_ENV=production` ist keine reine Formalität. Bleibt der Wert ungesetzt, läuft der Prozess
-im Entwicklungsmodus: Er spiegelt localhost-Origins wider, stellt die OpenAPI-Spezifikation bereit und
-**lässt das First-Admin-Fenster offen** – sodass der erste Fremde, der das
-Registrierungsformular findet, Administrator wird. Die beiden `REBASE_ADMIN_*`-Zeilen ersetzen
-dieses Fenster; siehe [Ihr erster Admin](/docs/getting-started/deployment/#your-first-admin).
+`NODE_ENV=production` ist keine reine Formalität. Bleibt es ungesetzt, läuft der Prozess im Entwicklungsmodus: Er spiegelt Localhost-Origins wider, liefert die OpenAPI-Spezifikation aus und **lässt das Zeitfenster für den ersten Admin offen** – sodass die erste fremde Person, die das Registrierungsformular findet, zum Administrator wird. Die beiden `REBASE_ADMIN_*`-Zeilen ersetzen dieses Zeitfenster; siehe [Ihr erster Admin](/docs/getting-started/deployment/#your-first-admin).
 
-`ALLOW_LOCALHOST_IN_PRODUCTION=true` steht hier, weil die Datenbank auf derselben Maschine
-läuft. In der Produktion verweigert die Runtime jede Variable, die auf localhost verweist – in
-einem Container ist Loopback der Container selbst, daher ist diese Adresse dort immer ein Fehler
-– und diese Zeile sagt ihr, dass die Adresse so gewollt ist. Lassen Sie sie weg, wenn die
-Datenbank anderswo läuft.
+`ALLOW_LOCALHOST_IN_PRODUCTION=true` wird benötigt, weil sich die Datenbank auf derselben Maschine befindet. In der Produktion weist die Runtime jede Variable zurück, die auf localhost verweist – in einem Container ist Loopback der Container selbst, daher ist diese Adresse dort fast immer ein Fehler – und diese Zeile teilt ihr mit, dass die Adresse gewollt ist. Entfernen Sie sie, wenn die Datenbank an anderer Stelle läuft.
 
-Bevorzugen Sie `EnvironmentFile=/etc/rebase.env` mit Dateirechten 0600 gegenüber
-`Environment=`-Zeilen für Secrets: Eine Unit-Datei ist für alle lesbar, und
-`systemctl show` gibt jeden `Environment=`-Wert aus.
+Bevorzugen Sie `EnvironmentFile=/etc/rebase.env` mit Dateirechten 0600 gegenüber `Environment=`-Zeilen für Secrets: Eine Unit-Datei ist für alle lesbar (world-readable), und `systemctl show` gibt jeden `Environment=`-Wert aus.
 
 ## Connection-Pooling
 
-Die Runtime unterhält einen kleinen, langlebigen Pool und benötigt keinen externen Pooler. Was
-einen benötigt, ist alles andere, was mit derselben Datenbank kommuniziert und Verbindungen
-nicht dauerhaft halten kann: Serverless-Funktionen, zeitgesteuerte Skripte, BI-Tools oder Queue-Worker,
-die auf fünfzig Instanzen skalieren. Der `max_connections`-Wert von Postgres ist ein hartes Limit
-im unteren Hunderterbereich und jede Verbindung ist ein eigener *Prozess*. Ein Lambda-Fan-out
-schöpft dieses Limit daher lange aus, bevor die Datenbank ausgelastet ist.
+Die Runtime unterhält einen kleinen, langlebigen Pool und benötigt keinen Pooler. Was ihn jedoch benötigt, ist alles andere, was mit derselben Datenbank kommuniziert und keine dauerhafte Verbindung halten kann: eine Serverless-Funktion, ein zeitgesteuertes Skript, ein BI-Tool, ein Queue-Worker, der auf fünfzig Instanzen skaliert. `max_connections` in Postgres ist ein striktes Limit im unteren Hunderterbereich und jede Verbindung ist ein eigener *Prozess* – ein Lambda-Fan-Out erschöpft dieses Limit daher lange bevor die Datenbank ausgelastet ist.
 
-Die Compose-Datei enthält einen `pgbouncer`-Dienst für diesen Datenverkehr hinter einem Profil,
-damit ein Deployment ohne solche Clients keinen Prozess ausführt, für den es keine Verwendung hat:
+Die Compose-Datei liefert einen `pgbouncer`-Dienst für diesen Datenverkehr mit, der hinter einem Profil liegt, damit ein Deployment ohne solche Aufrufer keinen unnötigen Prozess ausführt:
 
 ```bash
 docker compose --profile pooler up -d
@@ -314,52 +213,30 @@ PGBOUNCER_MAX_CLIENT_CONN=500 # client connections accepted
 PGBOUNCER_POOL_SIZE=20        # server connections used to serve them
 ```
 
-Die Client-Authentifizierung wird beim Start aus `DATABASE_URL` generiert, sodass das
-Passwort nicht doppelt hinterlegt werden muss. Der Pooler authentifiziert sich bei Postgres mit
-`scram-sha-256`, was von Postgres 18 gespeichert wird – der Standardwert `md5` des Images schlägt beim
-*Server*-Login mit `FATAL: server login failed: wrong password type` fehl, was
-wie ein falsches Passwort aussieht, aber keines ist.
+Die Client-Authentifizierung wird beim Start aus `DATABASE_URL` generiert, sodass das Passwort nicht doppelt eingetragen werden muss. Der Pooler authentifiziert sich bei Postgres mittels `scram-sha-256`, was von Postgres 18 gespeichert wird – der Standardwert `md5` des Images lässt das *Server*-Login mit `FATAL: server login failed: wrong password type` fehlschlagen, was wie ein falsches Passwort aussieht, aber keines ist.
 
-Halten Sie die Summe von `PGBOUNCER_POOL_SIZE` über alle Pooler hinweg deutlich unter dem
-`max_connections`-Wert der Datenbank – die Runtime bedient sich aus demselben Budget.
+Halten Sie die Summe von `PGBOUNCER_POOL_SIZE` über alle Pooler hinweg deutlich unter dem `max_connections`-Wert der Datenbank – die Runtime bedient sich aus demselben Kontingent.
 
-### Was sich durch Transaction-Pooling ändert
+### Was Transaction-Pooling ändert
 
-Ein gepoolter Client hält eine Server-Verbindung nur für die Dauer einer Transaktion und
-gibt sie danach wieder frei. Das ermöglicht es 500 Clients, sich 20 Verbindungen zu teilen. Drei
-Dinge funktionieren über diesen Port nicht mehr, und jedes davon wird von Rebase selbst genutzt –
-was genau der Grund ist, warum sich die Runtime direkt verbindet und dieser Port für andere
-Aufrufer gedacht ist:
+Ein gepoolter Client hält eine Serververbindung für die Dauer einer Transaktion und gibt sie danach wieder frei; dadurch können sich 500 Clients 20 Verbindungen teilen. Drei Dinge funktionieren über diesen Port nicht mehr, und jede davon wird von Rebase selbst genutzt – weshalb sich die Runtime direkt verbindet und dieser Port für andere Aufrufer gedacht ist:
 
-- **`LISTEN`/`NOTIFY`.** Realtime basiert darauf, und ein Listener benötigt eine
-  Verbindung, die länger als eine Transaktion besteht. `LISTEN` wird über den Pooler
-  zwar *akzeptiert* – er antwortet mit `LISTEN`, aber es wird nie eine Benachrichtigung zugestellt.
-- **Session-Status**: `SET` (im Gegensatz zu `SET LOCAL`), anweisungsübergreifende Advisory Locks,
-  `WITH HOLD`-Cursor, temporäre Tabellen. Die nächste Transaktion kann auf einer anderen
-  Server-Verbindung landen, die von alldem nichts sieht. Beides schlägt auf dieselbe
-  tückische Weise fehl: Bei einem einzelnen inaktiven Client ist der Status meist noch vorhanden,
-  sodass es beim Testen funktioniert, aber unter der Last zusammenbricht, für die der Pooler
-  eigentlich eingeführt wurde.
-- **Prepared Statements auf Protokollebene.** Die meisten Treiber können so konfiguriert werden,
-  dass sie diese nicht verwenden – `node-postgres` tut dies standardmäßig nicht; `asyncpg` benötigt
-  `statement_cache_size=0`.
+- **`LISTEN`/`NOTIFY`.** Realtime basiert darauf, und ein Listener benötigt eine Verbindung, die über eine Transaktion hinaus fortbesteht. `LISTEN` wird über den Pooler zwar *akzeptiert* – er antwortet auf `LISTEN`, aber es wird nie eine Benachrichtigung eintreffen.
+- **Session-Status**: `SET` (im Gegensatz zu `SET LOCAL`), anweisungsübergreifend gehaltene Advisory Locks, `WITH HOLD`-Cursor, temporäre Tabellen. Die nächste Transaktion landet möglicherweise auf einer anderen Serververbindung, die davon nichts sieht. Beide scheitern auf dieselbe unpraktische Weise: Bei einem einzelnen untätigen Client ist der Status meist noch vorhanden, sodass es beim Testen funktioniert, aber genau unter der Nebenläufigkeit fehlschlägt, für die der Pooler eingeführt wurde.
+- **Prepared Statements auf Protokollebene.** Den meisten Treibern kann mitgeteilt werden, diese nicht zu verwenden – node-postgres tut dies standardmäßig nicht; asyncpg benötigt `statement_cache_size=0`.
 
-`SET LOCAL` ist auf die Transaktion beschränkt und funktioniert. Damit wird auch Row-Level Security
-konfiguriert – RLS verhält sich über den gepoolten Port also identisch.
+`SET LOCAL` ist an die Transaktion gebunden und funktioniert; damit wird auch Row-Level Security gesetzt – RLS verhält sich über den gepoolten Port also identisch.
 
-Lassen Sie das Profil deaktiviert, wenn nichts außerhalb der Runtime eine Verbindung zu Ihrer Datenbank herstellt.
-Ein ungenutzter Port stellt unnötige Angriffsfläche dar.
+Lassen Sie das Profil deaktiviert, wenn sich außerhalb der Runtime nichts mit Ihrer Datenbank verbindet. Ein ungenutzter Port ist Angriffsfläche.
 
 ## Healthchecks
 
-| Pfad | Verwendung |
+| Path | Verwendungszweck |
 | --- | --- |
-| `/livez` | Liveness. Beantwortet die Frage „Lebt dieser Prozess?“, ohne die Datenbank zu kontaktieren. |
+| `/livez` | Liveness. Beantwortet die Frage „Lebt dieser Prozess?“, ohne die Datenbank zu berühren. |
 | `/health` | Readiness. Führt einen Datenbank-Roundtrip durch und meldet die Latenz. |
 
-Richten Sie Liveness-Probes auf `/livez` aus. Eine Liveness-Probe auf `/health` startet einen
-völlig gesunden Prozess bei einem kurzen Schluckauf der Datenbank neu, was genau dem Zweck
-dieser Prüfung widerspricht.
+Richten Sie Liveness-Probes auf `/livez` aus. Eine Liveness-Probe auf `/health` startet bei einem kurzen Datenbankproblem einen vollkommen gesunden Prozess neu – was genau das Gegenteil dessen ist, wofür sie gedacht ist.
 
 ## Metriken
 
@@ -368,60 +245,30 @@ REBASE_METRICS=true
 REBASE_METRICS_TOKEN=<random string>
 ```
 
-Stellt Prometheus-Metriken unter `/metrics` bereit: Anfragezähler und Latenz-Histogramme,
-aufgeschlüsselt nach API-Bereich (data, auth, storage, functions) und Collection, sowie
-Prozess-Gauges. Ohne Token ist der Endpunkt für jeden lesbar, der den Port erreichen kann.
-Setzen Sie daher einen Token, sofern sich der Dienst nicht in einem privaten Netzwerk befindet.
+Stellt Prometheus-Metriken unter `/metrics` bereit: Anzahl der Anfragen und Latenz-Histogramme aufgeschlüsselt nach API-Bereich (data, auth, storage, functions) und Collection, plus Prozess-Gauges. Ohne Token ist der Endpunkt für jeden lesbar, der den Port erreichen kann; setzen Sie also ein Token, es sei denn, er befindet sich in einem privaten Netzwerk.
 
-<span class="since-badge" data-since="0.25">Seit 0.25</span>
-`rebase_db_pool_wait_ms` ist ein Histogramm darüber, wie lange jede Abfrage auf eine
-Verbindung aus dem Datenbank-Pool wartete, das Öffnen einer solchen eingeschlossen, beschriftet mit dem Schlüssel der
-Datenquelle (`source="(default)"` in einem Projekt, das keine Datenquellen deklariert). Ein
-gesunder Pool hält ihn nahe null. Ein Tail, der
-mit dem Traffic wächst, bedeutet, dass Anfragen auf Verbindungen warten — meist
-gehalten von Schreib-Callbacks, die etwas Langsames abwarten; siehe
-[Ein Callback hält eine Verbindung](/docs/collections/context-data-api/#a-callback-holds-a-connection).
+<span class="since-badge" data-since="0.25">Since 0.25</span>
+`rebase_db_pool_wait_ms` ist ein Histogramm darüber, wie lange jede Abfrage auf eine Verbindung aus dem Datenbank-Pool gewartet hat (das Öffnen einer Verbindung inbegriffen), gelabelt nach Datenquellen-Schlüssel (`source="(default)"` in einem Projekt, das keine Datenquellen deklariert). Ein gesunder Pool hält diesen Wert nahe null. Ein Tail, der mit dem Datenverkehr wächst, bedeutet, dass sich Anfragen in einer Warteschlange für Verbindungen stauen – meist gehalten von Schreib-Callbacks, die auf etwas Langsames warten; siehe [A callback holds a connection](/docs/collections/context-data-api/#a-callback-holds-a-connection).
 
 ## Sicherheits-Header
 
-Jede Antwort trägt `X-Frame-Options: SAMEORIGIN`, `X-Content-Type-Options: nosniff`, eine
-`Referrer-Policy` und `Strict-Transport-Security: max-age=15552000` (180 Tage). Der HSTS-Header
-lässt `includeSubDomains` aus: Das würde Browsern sagen, einfaches HTTP auf jeder Subdomain Ihrer
-Domain abzulehnen, einschließlich solcher, mit denen dieser Server nichts zu tun hat, und ein
-Browser behält dies, solange der Header es vorgibt.
-Setzen Sie
-`REBASE_HSTS_INCLUDE_SUBDOMAINS=true`, wenn jede Subdomain ausschließlich HTTPS verwendet; bis
-einschließlich 0.23 trug der Header immer `includeSubDomains`.
+Jede Antwort enthält `X-Frame-Options: SAMEORIGIN`, `X-Content-Type-Options: nosniff`, eine `Referrer-Policy` und `Strict-Transport-Security: max-age=15552000` (180 Tage). Der HSTS-Header lässt `includeSubDomains` aus: Dies würde Browser anweisen, unverschlüsseltes HTTP auf jeder Subdomain Ihrer Domain zu verweigern – einschließlich solcher, mit denen dieser Server nichts zu tun hat –, und ein Browser speichert dies so lange, wie der Header vorgibt.
+Setzen Sie `REBASE_HSTS_INCLUDE_SUBDOMAINS=true`, wenn jede Subdomain ausschließlich HTTPS verwendet; bis einschließlich Version 0.23 enthielt der Header immer `includeSubDomains`.
 
-Die statischen Apps — das CMS-Admin und jedes Frontend, das das Bundle ausliefert — tragen
-außerdem `Content-Security-Policy: frame-ancestors 'self'; object-src 'none'; base-uri 'self'`.
-Das entscheidet, wer die App framen darf, schließt Plugins aus und bindet `<base>` an Ihren
-Origin, schränkt aber sonst nichts ein, sodass Inline-Scripts, Worker und Drittanbieter-Sign-in
-weiter funktionieren. Eine Antwort, die ihre eigene Policy setzt, behält diese. Für etwas
-Strengeres legen Sie die Policy auf den vorgeschalteten Reverse-Proxy.
+Die statischen Apps – die CMS-Admin-Oberfläche und jedes Frontend, das das Bundle ausliefert – enthalten außerdem `Content-Security-Policy: frame-ancestors 'self'; object-src 'none'; base-uri 'self'`. Dies bestimmt, wer die App in einem Frame einbetten darf, schließt Plugins aus und bindet `<base>` an Ihren Origin; darüber hinaus schränkt es nichts ein, sodass Inline-Skripte, Worker und Anmeldungen über Drittanbieter weiterhin funktionieren. Eine Antwort, die ihre eigene Richtlinie setzt, behält diese bei. Für strengere Regeln platzieren Sie die Richtlinie auf dem vorgeschalteten Reverse-Proxy.
 
-## Mehr als eine Instanz
+## Mehrere Instanzen
 
-Ein Container ist der Standard und braucht nichts weiter. Bevor eine zweite Replik Traffic
-übernimmt — oder ein Rolling Deployment zwei nebeneinander laufen lässt — gehen Sie
-[Mehr als eine Instanz ausführen](/docs/deployment/multiple-instances/) durch: Rate-Limits,
-Broadcast-Kanäle, lokale Dateien, fortsetzbare Uploads und der Bild-Cache sind pro Prozess, bis
-eine Einstellung sie teilt.
+Ein einzelner Container ist der Standard und benötigt nichts weiter. Bevor ein zweites Replikat Datenverkehr empfängt – oder ein Rolling Deploy zwei Instanzen nebeneinander ausführt –, lesen Sie [Mehrere Instanzen ausführen](/docs/deployment/multiple-instances/): Rate-Limits, Broadcast-Channels, lokale Dateien, fortsetzbare Uploads und der Image-Cache gelten pro Prozess, bis sie über eine Konfiguration geteilt werden.
 
 ## Funktionen in einem eigenen Prozess ausführen
 
-Alles oben Beschriebene läuft in einem einzigen Container, der das gesamte Projekt bedient –
-dies ist die passende Struktur für fast jedes Deployment. Wenn eine benutzerdefinierte Funktion
-jedoch nicht mehr mit der Daten-API um die Event-Loop konkurrieren soll – oder unabhängig
-skalieren, neu starten und fehlschlagen können soll –, können dasselbe Image und dasselbe Bundle
-als mehrere kooperierende Prozesse gestartet werden. Siehe [Getrennte Prozesse](/docs/deployment/split-processes/).
+Alles oben Beschriebene ist ein einzelner Container, der das gesamte Projekt bereitstellt – was für fast jedes Deployment die richtige Struktur ist. Wenn eine benutzerdefinierte Funktion nicht mehr mit der Daten-API um die Event-Loop konkurrieren soll – oder unabhängig skaliert, neu gestartet werden und fehlschlagen können soll –, können dasselbe Image und dasselbe Bundle als mehrere zusammenarbeitende Prozesse gestartet werden. Siehe [Getrennte Prozesse](/docs/deployment/split-processes/).
 
-## Aktualisierung
+## Upgrade
 
 ```yaml
 image: rebasepro/server:0.24.0
 ```
 
-Starten Sie neu. Ihr Bundle bleibt unverändert. Innerhalb einer Hauptversion (Major) des Runtime-Vertrags
-funktioniert ein einmal validiertes Bundle weiterhin – siehe
-[Kompatibilität](/docs/architecture/runtime-and-bundles/#compatibility).
+Neu starten. Ihr Bundle bleibt unverändert. Innerhalb einer Major-Version des Runtime-Contracts funktioniert ein zuvor validiertes Bundle weiterhin – siehe [Kompatibilität](/docs/architecture/runtime-and-bundles/#compatibility).
