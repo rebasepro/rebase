@@ -109,6 +109,32 @@ describe("the direct-database reset", () => {
         expect(errors.join("\n")).toContain("Password too weak");
     });
 
+    it("says what the backend refused in its own words, not as the raw JSON body", async () => {
+        process.env.REBASE_BASE_URL = "http://127.0.0.1:1";
+        process.env.REBASE_SERVICE_KEY = "service-key-that-is-long-enough-0123456789";
+        const errors: string[] = [];
+        vi.spyOn(console, "error").mockImplementation((line: unknown) => { errors.push(String(line)); });
+        const body = { error: { message: "Password must be at least 8 characters.", code: "WEAK_PASSWORD" } };
+        vi.stubGlobal("fetch", vi.fn(async (url: string) => String(url).includes("/reset-password")
+            ? new Response(JSON.stringify(body), { status: 400, statusText: "Bad Request" })
+            : new Response(JSON.stringify({ users: [{ uid: "u1", email: "admin@example.com" }] }), { status: 200 })));
+        try {
+            await authCommand("reset-password", ["node", "rebase", "auth", "reset-password", "admin@example.com", "short"]);
+            expect(process.exitCode).toBe(1);
+        } finally {
+            vi.unstubAllGlobals();
+            process.exitCode = undefined;
+        }
+
+        const said = errors.join("\n");
+        expect(said).toContain("Password must be at least 8 characters. (WEAK_PASSWORD)");
+        expect(said).not.toContain("{");
+    });
+
+    it("labels a generated password the way the API path does", () => {
+        expect(resetPasswordScript(true)).toContain('console.log("   Password: " + newPassword);');
+    });
+
     /**
      * Run the generated script for real, against stand-ins for its imports.
      * The `pg` client the stand-in hands out records every statement in

@@ -169,6 +169,28 @@ export function generatePassword(): string {
     return randomBytes(18).toString("base64url");
 }
 
+/**
+ * What a refusing backend said, from its `{ error: { message, code } }` body.
+ *
+ * The body used to be printed as it came, so a weak password read
+ * `{"error":{"message":"…","code":"…"}}`. A body that is not the envelope is
+ * still shown, since it is the only account of the refusal there is.
+ */
+async function refusalReason(response: Response): Promise<string> {
+    const text = await response.text().catch(() => "");
+    try {
+        const parsed: unknown = JSON.parse(text);
+        const error = parsed && typeof parsed === "object" && "error" in parsed ? parsed.error : undefined;
+        if (error && typeof error === "object" && "message" in error && typeof error.message === "string") {
+            const code = "code" in error && typeof error.code === "string" ? ` (${error.code})` : "";
+            return `${error.message}${code}`;
+        }
+    } catch {
+        // Not JSON: the text is the answer.
+    }
+    return text.trim() || `${response.status} ${response.statusText}`.trim();
+}
+
 async function resetPassword(rawArgs: string[]): Promise<void> {
     const { email, password: providedPassword } = resolveResetPasswordArgs(rawArgs);
     // Generated once, so both reset paths set and report the same thing.
@@ -261,8 +283,7 @@ async function resetPassword(rawArgs: string[]): Promise<void> {
             });
 
             if (!resetRes.ok) {
-                const errText = await resetRes.text();
-                throw new ApiAnswered(`Password reset endpoint failed: ${errText || resetRes.statusText}`);
+                throw new ApiAnswered(`Password reset refused: ${await refusalReason(resetRes)}`);
             }
 
             console.log("API reset successful.");
@@ -476,7 +497,7 @@ async function resetPassword() {
 
         console.log("✅ Password reset for: " + updated.rows[0].email);
         console.log("   Every session of this account has ended.");
-        ${echoPassword ? 'console.log("   New password: " + newPassword);' : ""}
+        ${echoPassword ? 'console.log("   Password: " + newPassword);' : ""}
         process.exit(0);
     } catch (error) {
         await client.query("ROLLBACK").catch(() => undefined);
