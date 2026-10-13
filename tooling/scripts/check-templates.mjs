@@ -723,6 +723,7 @@ function checkGettingStartedPathsExist() {
      * order to say the scaffold has none.
      */
     const NOT_SHIPPED = new Map([
+        ["backend/src/schema.generated.ts", "`rebase init` writes the chosen preset's copy from packages/cli/templates/generated-schemas/"],
         ["backend/src/index.ts", "only after `rebase eject`; the pages name it to say a scaffold has none"],
         ["backend/src/env.ts", "only after `rebase eject`, where the project owns its own env schema"]
     ]);
