@@ -90,7 +90,11 @@ describe.each(PRESETS)("the %s preset", (preset) => {
 
         // The shipped copy is today's generator output, so a stale one fails
         // here with a diff rather than on somebody's first Studio edit.
-        expect(fs.readFileSync(shippedSchemaPath(preset), "utf-8")).toBe(generated);
+        expect(
+            fs.readFileSync(shippedSchemaPath(preset), "utf-8"),
+            `templates/generated-schemas/${preset}.ts is not what the generator writes today. Refresh it with ` +
+                "REBASE_WRITE_FIXTURE=1 vitest run src/commands/init-generated-schema.test.ts (in packages/cli)."
+        ).toBe(generated);
 
         // What `rebase dev` does before it starts anything. The tree it leaves
         // is the one the Studio's commit is judged against.
