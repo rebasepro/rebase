@@ -86,7 +86,11 @@ const { url } = await client.storage.getSignedUrl(
 ```
 
 Das SDK speichert signierte URLs im Cache, um redundante Serveraufrufe zu vermeiden, bis das
-Download-Token der jeweiligen URL abläuft. Der Cache gehört zu den Zugangsdaten, die ihn befüllt
+Download-Token der jeweiligen URL abläuft. <span class="since-badge" data-since="0.25">Seit 0.25</span> Gemeinsam gestellte
+Abfragen — eine Seite mit Vorschauen, die `getSignedUrl()` im selben Tick aufruft — gehen als ein
+`POST /api/storage/metadata` pro 100 Dateien an den Server, den der Rate Limiter als ein Zehntel der
+ersetzten Anfragen zählt; eine Datei, die ein Aufrufer nicht lesen darf, lässt nur diesen einen Aufruf
+fehlschlagen. Der Cache gehört zu den Zugangsdaten, die ihn befüllt
 haben: Ändert sich das Access-Token — bei einer Abmeldung, wenn sich ein anderer Benutzer anmeldet
 oder bei einer Aktualisierung —, beginnt er von vorn, sodass nie ein Benutzer eine URL erhält, die
 für einen anderen erzeugt wurde.
