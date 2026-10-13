@@ -45,6 +45,15 @@ const instance = await initializeRebaseBackend({
 });
 ```
 
+<span class="since-badge" data-since="0.25">Depuis 0.25</span> Cet unique appel est un
+raccourci au-dessus d'étapes publiques : `installUnhandledRejectionHandler` évite qu'un rejet
+isolé ne mette fin au processus, `createRebaseBackend` construit le backend,
+`setDefaultBackend` en fait celui dont répond l'API de niveau module, et
+`mount`, `attachRealtime` et `start` le servent. Pour ne monter que certains groupes de
+routes, les placer à d'autres chemins, laisser les minuteurs à un autre processus, ou faire
+tourner deux backends dans un même processus, appelez vous-même les étapes. Voir
+[Intégration de serveur personnalisé](/docs/backend/custom-server/).
+
 ## Où réside chaque option
 
 Cet appel représente la forme **éjectée** — celle que vous écrivez vous-même après un `rebase eject`, ou dans un serveur personnalisé. Un projet généré à partir d'un template ne l'a pas : le runtime publié démarre le projet, et chaque option provient d'une variable d'environnement dans `.env`, d'un export depuis `config/index.ts`, ou d'un répertoire que le bundle déclare dans `rebase.json`.
@@ -55,8 +64,8 @@ Les deux voies aboutissent au même `RebaseBackendConfig`. En voici la correspon
 |---|---|
 | `basePath` | `REBASE_BASE_PATH` (par défaut `/api`) |
 | `collections`, `collectionsDir` | le répertoire `config/collections/`, déclaré par `rebase.json` |
-| `functionsDir` | `backend/functions/` |
-| `cronsDir` | `backend/crons/` |
+| `functions`, `functionsDir` | `backend/functions/` |
+| `crons`, `cronsDir` | `backend/crons/` |
 | `bootstrappers`, `database` | `DATABASE_URL`, plus une déclaration `database("<key>")` dans `config/resources.ts` pour chaque base de données au-delà de celle par défaut |
 | `auth` | `JWT_SECRET`, les variables `OAUTH_*` et `config/collections/users` |
 | `storage` | les variables `STORAGE_*`, plus une déclaration `bucket("<key>")` dans `config/resources.ts` pour chaque bucket au-delà de celui par défaut |
@@ -100,9 +109,9 @@ Après l'initialisation, ces routes sont montées :
 | `/api/swagger` | Interface Swagger UI (mode développement, lorsque `enableSwagger: true`) |
 | `/api/meta/contract` | Schéma des collections du projet (exige `schema:read`) |
 | `/api/meta/schema-version` | Chaîne de version pour ce schéma (non authentifié) |
-| `/api/functions/*` | Routes de fonctions personnalisées (lorsque `functionsDir` est défini) |
-| `/api/admin/cron/*` | Gestion des tâches cron (`cron:read` / `cron:write`, lorsque `cronsDir` est défini) |
-| WebSocket sur mise à niveau (upgrade) | Abonnements en temps réel |
+| `/api/functions/*` | Routes de fonctions personnalisées (lorsque `functions` ou `functionsDir` est défini) |
+| `/api/admin/cron/*` | Gestion des tâches cron (`cron:read` / `cron:write`, lorsque `crons` ou `cronsDir` est défini) |
+| WebSocket sur mise à niveau (upgrade) | Abonnements en temps réel, sur `/` pour une API à `/api` |
 
 ---
 
@@ -185,10 +194,12 @@ interface RebaseBackendConfig {
     // OpenAPI/Swagger
     enableSwagger?: boolean;
 
-    // Custom API endpoints
+    // Custom API endpoints: values, or a directory of files (not both)
+    functions?: Record<string, FunctionApp>;  // { "send-invoice": app } → /api/functions/send-invoice
     functionsDir?: string;    // Auto-load Hono routes from a directory
 
-    // Scheduled tasks
+    // Scheduled tasks: values, or a directory of files (not both)
+    crons?: Record<string, CronJobDefinition>; // { "nightly-report": defineCron(…) }
     cronsDir?: string;         // Auto-load cron jobs from a directory
     cronPersistence?: boolean; // Write run logs to rebase.cron_logs (default: true)
 
@@ -219,7 +230,9 @@ Le reste de `RebaseBackendConfig` est soit documenté sur sa propre page (`auth`
 
 ## L'instance du backend
 
-`initializeRebaseBackend` renvoie une instance `RebaseBackendInstance` offrant l'accès aux services internes :
+`initializeRebaseBackend` renvoie le backend qu'il a construit, déjà monté et
+démarré. Son type est `RebaseBackendInstance`, qui est `RebaseBackend`, le
+type que renvoie `createRebaseBackend` :
 
 ```typescript
 const instance = await initializeRebaseBackend(config);
@@ -233,10 +246,19 @@ instance.storageController   // Default storage
 instance.storageRegistry     // All storage backends
 instance.collectionRegistry  // Collection metadata
 instance.history?.historyService // Entity history
-instance.cronScheduler       // Cron job scheduler (when cronsDir is set)
+instance.cronScheduler       // Cron job scheduler (when crons or cronsDir is set)
+instance.jobQueue            // Durable job queue (when jobs are enabled)
+instance.setCollectionCallbacks(slug, callbacks) // Replace a collection's callbacks
+instance.shutdown()          // Drain and stop; also closes the server it was given
 ```
 
-> **Remarque :** Bien que l'`instance` expose ces services internes, le code applicatif (comme les fonctions personnalisées et les tâches cron) doit utiliser le singleton global `rebase` de `@rebasepro/server` pour interagir avec l'API backend.
+<span class="since-badge" data-since="0.25">Depuis 0.25</span> Elle porte aussi
+`rebase`, le client en processus, `fetch(request)`, `routes`, les groupes de routes
+sous forme de sous-applications Hono, `services`, ses propres clés JWT, son modèle d'accès, son
+magasin de clés API et ses limiteurs de débit, ainsi que `verifyCredential(token)` ; voir
+[Intégration de serveur personnalisé](/docs/backend/custom-server/).
+
+> **Remarque :** Bien que l'`instance` expose ces services internes, le code applicatif (comme les fonctions personnalisées et les tâches cron) doit utiliser le singleton `rebase` de `@rebasepro/server` pour interagir avec l'API backend. <span class="since-badge" data-since="0.25">Depuis 0.25</span> Dans une requête, une exécution cron ou un job, `rebase` est le backend qui la sert ; ailleurs, c'est le backend par défaut du processus, que `initializeRebaseBackend` règle sur son propre backend.
 
 ## API REST
 
@@ -263,7 +285,7 @@ Tout paramètre qui n'est pas réservé par le serveur est interprété comme un
 
 ## WebSocket
 
-Le serveur WebSocket se greffe sur le même serveur HTTP et fournit des abonnements en temps réel :
+Le serveur WebSocket se greffe sur le même serveur HTTP et fournit des abonnements en temps réel. <span class="since-badge" data-since="0.25">Depuis 0.25</span> Il répond aux mises à niveau sur un seul chemin, `/` pour une API à `/api`, là où le SDK se connecte, et laisse tous les autres chemins à vos propres écouteurs `upgrade` ; sur la 0.24, il prend toutes les mises à niveau du serveur :
 
 - Abonnement aux **changements de collection** — soyez notifié dès qu'une entité d'une collection est créée, mise à jour ou supprimée
 - Abonnement aux **changements d'entités** — soyez notifié lorsqu'une entité spécifique est modifiée

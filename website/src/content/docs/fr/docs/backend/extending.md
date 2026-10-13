@@ -144,7 +144,7 @@ Un piège de Hono bon à connaître, car il est silencieux : `app.use("/*", guar
 **Portée :** le processus.
 
 <span class="since-badge" data-since="0.25">Depuis 0.25</span>
-`initializeRebaseBackend` est un raccourci au-dessus de quatre appels publics, et cet échelon consiste à
+`initializeRebaseBackend` est un raccourci au-dessus de quelques appels publics, et cet échelon consiste à
 les appeler vous-même. `createRebaseBackend` construit le backend et ne monte, ne démarre et n'écoute
 rien. `backend.routes` contient chaque groupe de routes sous la forme d'une sous-application Hono que
 vous pouvez monter seule, à n'importe quel chemin. `mount`, `attachRealtime` et `start` font le reste,

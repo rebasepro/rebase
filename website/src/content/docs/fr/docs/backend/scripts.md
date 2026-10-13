@@ -173,14 +173,34 @@ test("a user only sees their own posts", async () => {
 
 Cela fonctionne de la même façon sous Vitest ou Jest.
 
+### Collections avec historique
+
+<span class="since-badge" data-since="0.25">Depuis 0.25</span>
+
+Une écriture sur une collection avec [`history: true`](/docs/backend/history/) enregistre son entrée
+comme le fait une écriture du serveur. L'entrée est écrite dans la transaction de la ligne elle-même,
+si bien qu'une écriture annulée ne laisse aucune entrée. Elle est enregistrée sous l'identité avec
+laquelle l'écriture s'est exécutée : `service` pour `dataAsAdmin`, l'`uid` de l'utilisateur avec
+`withAuth`. Les écritures de `rebase console` sont enregistrées de la même façon.
+
+`openRebase` ne crée rien où enregistrer. Si aucun backend avec historique n'a encore démarré sur la
+base de données, la table `rebase.entity_history` est absente. Une écriture sur une collection avec
+historique est alors refusée avec
+[`HISTORY_UNAVAILABLE`](/docs/backend/errors/#data-queries-and-writes) avant que l'un de ses callbacks
+ne s'exécute, et le message nomme ce qui manque. Les lectures fonctionnent comme d'habitude. Démarrez
+le backend une fois avec l'historique activé (`rebase dev` le fait), et les écritures passent.
+
+Les entrées sont enregistrées, jamais purgées. La rétention est un réglage du serveur qu'un script ne
+peut pas voir ; le serveur les purge donc comme d'habitude : à sa prochaine écriture sur l'entité, et
+lors de son balayage horaire.
+
 ### Ce qu'il laisse de côté
 
 <span class="since-badge" data-since="0.25">Depuis 0.25</span>
 
 `openRebase` ouvre la couche de données et rien d'autre. Il ne démarre aucun temps réel, de sorte que
-ses écritures ne sont pas annoncées aux requêtes en direct. Il n'attache aucun service d'historique,
-de sorte qu'une écriture sur une collection avec `history: true` n'enregistre aucune entrée d'historique.
-Le stockage, l'e-mail, l'administration de l'authentification et vos fonctions n'y figurent pas.
+ses écritures ne sont pas annoncées aux requêtes en direct. Le stockage, l'e-mail, l'administration de
+l'authentification et vos fonctions n'y figurent pas.
 
 Lorsqu'un script a aussi besoin de ceux-là, construisez le backend sans le servir :
 `createRebaseBackend({ …, provision: false })` vous donne `backend.rebase`, le

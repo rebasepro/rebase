@@ -178,9 +178,14 @@ Chaque entité conserve également au maximum ses **200** entrées les plus réc
 
 ### Mécanismes du cycle de vie de la purge
 
-Après chaque modification enregistrée, l'entité concernée est purgée : ses entrées plus anciennes que
-la période de rétention sont supprimées, puis tout ce qui dépasse ses 200 plus récentes. Cela s'exécute
-de manière asynchrone et ne retarde pas l'écriture.
+Après chaque modification que le serveur enregistre, l'entité concernée est purgée : ses entrées plus
+anciennes que la période de rétention sont supprimées, puis tout ce qui dépasse ses 200 plus récentes.
+Cela s'exécute de manière asynchrone et ne retarde pas l'écriture.
+
+Une écriture faite par [`openRebase` ou `rebase console`](/docs/backend/scripts/) enregistre son entrée
+d'historique mais ne purge rien, car un script ne peut pas connaître la rétention configurée sur votre
+serveur. Le serveur purge cette entité à sa prochaine écriture sur elle, et lors du balayage horaire
+ci-dessous.
 
 <span class="since-badge" data-since="0.25">Depuis 0.25</span> Une fois par heure, le backend supprime aussi toute entrée plus ancienne que la période de
 rétention, pour toutes les entités. Auparavant, l'historique d'une entité qui n'était plus jamais
