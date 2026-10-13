@@ -165,6 +165,48 @@ describe("PATCH with an Idempotency-Key", () => {
         expect(await second.json()).toEqual(await first.json());
     });
 
+    it("carries the original answer's ETag on the replay", async () => {
+        // A client whose first answer was lost retries under the same key and
+        // chains its next conditional write off the replay's tag, so the
+        // replay must name the version the first answer wrote.
+        const { app } = createHarness();
+
+        const first = await patch(app, { title: "Second" }, "mut-1");
+        const second = await patch(app, { title: "Second" }, "mut-1");
+
+        const etag = first.headers.get("ETag");
+        expect(etag).toMatch(/^"[0-9a-f]{64}"$/);
+        expect(second.headers.get("ETag")).toBe(etag);
+    });
+
+    it("carries the ETag on a 204 answered for Prefer: return=minimal", async () => {
+        const { app } = createHarness();
+
+        const minimal = await app.request("/posts/p1", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json", Prefer: "return=minimal" },
+            body: JSON.stringify({ title: "Second" })
+        });
+
+        expect(minimal.status).toBe(204);
+        expect(minimal.headers.get("Preference-Applied")).toBe("return=minimal");
+        expect(minimal.headers.get("ETag")).toMatch(/^"[0-9a-f]{64}"$/);
+    });
+
+    it("carries the ETag on a replay answered with Prefer: return=minimal", async () => {
+        const { app } = createHarness();
+
+        const first = await patch(app, { title: "Second" }, "mut-1");
+        const second = await app.request("/posts/p1", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json", "Idempotency-Key": "mut-1", Prefer: "return=minimal" },
+            body: JSON.stringify({ title: "Second" })
+        });
+
+        expect(second.status).toBe(204);
+        expect(second.headers.get("ETag")).toBe(first.headers.get("ETag"));
+    });
+
     it("still applies two edits sent under two keys", async () => {
         const { app, saves } = createHarness();
 

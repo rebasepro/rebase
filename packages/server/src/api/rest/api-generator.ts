@@ -86,12 +86,13 @@ function prefersMinimal(c: Context<HonoEnv>): boolean {
         .some((part) => part.trim().toLowerCase().replace(/\s*=\s*/, "=") === "return=minimal");
 }
 
-/** The `204` a minimal write answers with, saying that it honoured the ask. */
-function minimalResponse(): Response {
-    return new Response(null, {
-        status: 204,
-        headers: { "Preference-Applied": "return=minimal" }
-    });
+/**
+ * The `204` a minimal write answers with, saying that it honoured the ask.
+ * Built on the context, so a header the route set (a `PATCH`'s `ETag`) is
+ * kept: the version a write produced is not part of the body it leaves out.
+ */
+function minimalResponse(c: Context<HonoEnv>): Response {
+    return c.body(null, 204, { "Preference-Applied": "return=minimal" });
 }
 
 /**
@@ -880,13 +881,15 @@ export class RestApiGenerator {
      *
      * `respond` is applied to the *stored* result rather than the stored result
      * being a response, so a replay honours the `Prefer` header of the request
-     * replaying it rather than the one that first answered.
+     * replaying it rather than the one that first answered. `replayed` says
+     * the result is the stored one, so a route can restore what it put in a
+     * header rather than the body (the `PATCH`'s `ETag`).
      */
     private async runIdempotent(
         c: Context<HonoEnv>,
         body: unknown,
         run: () => Promise<unknown>,
-        respond: (body: unknown) => Response
+        respond: (body: unknown, replayed: boolean) => Response | Promise<Response>
     ): Promise<Response> {
         const idempotencyKey = c.req.header(IDEMPOTENCY_HEADER);
         const uid = (c.get("user") as { uid?: string } | undefined)?.uid;
@@ -901,7 +904,7 @@ export class RestApiGenerator {
             )
             : undefined;
         if (claimed?.status === "replay") {
-            return respond(claimed.response);
+            return respond(claimed.response, true);
         }
         if (claimed?.status === "mismatch") {
             throw idempotencyKeyReused(idempotencyKey!);
@@ -929,7 +932,7 @@ export class RestApiGenerator {
         if (claimed?.status === "claimed" && idempotencyKey && store) {
             await store.complete(idempotencyKey, uid, response);
         }
-        return respond(response);
+        return respond(response, false);
     }
 
     /**
@@ -1125,7 +1128,7 @@ export class RestApiGenerator {
             });
             return this.formatResponse(entity);
         }, (result) => prefersMinimal(c)
-            ? minimalResponse()
+            ? minimalResponse(c)
             : c.json(result as never, 201));
     }
 
@@ -1190,9 +1193,16 @@ export class RestApiGenerator {
             const etag = await rowETag(entity as Record<string, unknown> | undefined, collection);
             if (etag) c.header(ETAG_HEADER, etag);
             return this.formatResponse(entity);
-        }, (result) => prefersMinimal(c)
-            ? minimalResponse()
-            : c.json(result as never));
+        }, async (result, replayed) => {
+            // A replay answers from the stored body, which is the row this
+            // write answered with: its tag is that row's tag, so the retry of
+            // a lost answer names the same version the answer did.
+            if (replayed && result && typeof result === "object") {
+                const etag = await rowETag(result as Record<string, unknown>, collection);
+                if (etag) c.header(ETAG_HEADER, etag);
+            }
+            return prefersMinimal(c) ? minimalResponse(c) : c.json(result as never);
+        });
     }
 
     /**

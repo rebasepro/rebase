@@ -72,7 +72,9 @@ the `204`.
 refused with `412` if the row has changed in between.
 
 <span class="since-badge" data-since="0.25">Since 0.25</span> A successful `PATCH` answers with the `ETag` of the version it wrote,
-so the next conditional write needs no read first. A live row subscription
+so the next conditional write needs no read first. The tag rides on a
+`204` answered for `Prefer: return=minimal` too, and an answer replayed for an
+`Idempotency-Key` carries the same tag as the first one. A live row subscription
 carries the same tag on every frame (see [Realtime](/docs/backend/realtime/)).
 
 ```bash
