@@ -521,7 +521,13 @@ export async function typecheckSnippets(root, opts = {}) {
         // Snippets compile from a scratch directory, so they need the real location or
         // every backend example reports a missing module.
         hono: [path.join(root, "packages/server/node_modules/hono")],
-        "hono/*": [path.join(root, "packages/server/node_modules/hono/*")],
+        // A `paths` target is a file path, so hono's `exports` map is never
+        // read: `hono/cors` has no file at `hono/cors`. Its middleware lives
+        // under `dist/types/middleware/<name>/`, which is the fallback.
+        "hono/*": [
+            path.join(root, "packages/server/node_modules/hono/*"),
+            path.join(root, "packages/server/node_modules/hono/dist/types/middleware/*")
+        ],
         zod: [path.join(root, "packages/server/node_modules/zod")],
         // React is not a root dependency either, so `useRef<HTMLDivElement>(null)` in a
         // frontend snippet hit "untyped function calls may not accept type arguments" —

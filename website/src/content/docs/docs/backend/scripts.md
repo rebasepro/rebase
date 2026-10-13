@@ -18,7 +18,10 @@ as an object, in two places:
 - **`openRebase`**, the same object in a script or a test of your own.
 
 Both open the database without changing it: no table, role, trigger or
-function is created, and nothing is left running. The object has the
+function is created. A script's `close()` ends what `openRebase` opened. On the
+managed development database, `rebase console` starts that database when it is
+not running and leaves it running afterwards, as the `rebase db` commands do;
+`rebase db stop` stops it. The object has the
 vocabulary a [custom function](/docs/backend/custom-functions/) gets from the
 server, `dataAsAdmin` and `sql`, so a snippet moves between a function, a script
 and the console unchanged.
@@ -87,19 +90,32 @@ exits `1`.
 <span class="since-badge" data-since="0.25">Since 0.25</span>
 
 `openRebase` from `@rebasepro/server-postgres` is what the console calls. Use
-it in a script, a seed, a data fix or a test:
+it in a script, a seed, a data fix or a test. In a scaffolded project, put the
+script under `backend/`, say `backend/scripts/publish-drafts.ts`: the backend
+workspace is the one that depends on `@rebasepro/server-postgres`, and a script
+in the root `scripts/` folder cannot import it.
 
 ```typescript
 import { openRebase } from "@rebasepro/server-postgres";
-import { collections } from "../config/collections";
+import { collections } from "../../config/collections";
 
 const rebase = await openRebase({ databaseUrl: process.env.DATABASE_URL!, collections });
 
 const { data: drafts } = await rebase.dataAsAdmin.posts.find({ where: { status: ["==", "draft"] } });
 console.log(`${drafts.length} drafts`);
-await rebase.dataAsAdmin.posts.update("42", { status: "archived" });
+for (const draft of drafts) {
+    await rebase.dataAsAdmin.posts.update(String(draft.id), { status: "published" });
+}
 
 await rebase.close();
+```
+
+Run it from `backend/`. `rebase db url` prints the URL of the database the
+project uses, the managed development one included:
+
+```bash
+cd backend
+DATABASE_URL="$(pnpm exec rebase db url)" pnpm exec tsx scripts/publish-drafts.ts
 ```
 
 | Member | What it does |
@@ -132,7 +148,7 @@ nothing here.
 
 ```typescript
 import { openRebase } from "@rebasepro/server-postgres";
-import { collections } from "../config/collections";
+import { collections } from "../../config/collections";
 
 const rebase = await openRebase({ databaseUrl: process.env.DATABASE_URL!, collections });
 const ada = await rebase.withAuth({ uid: "ada", roles: ["user"] });
@@ -156,7 +172,7 @@ unfiltered. Run `rebase db push`, or boot the server once, first.
 import { after, before, test } from "node:test";
 import assert from "node:assert/strict";
 import { openRebase, type OpenedRebase } from "@rebasepro/server-postgres";
-import { collections } from "../config/collections";
+import { collections } from "../../config/collections";
 
 let rebase: OpenedRebase;
 before(async () => {
@@ -169,6 +185,13 @@ test("a user only sees their own posts", async () => {
     const { data } = await ada.data.posts.find();
     assert.ok(data.every(post => post.author_id === "ada"));
 });
+```
+
+Run it from `backend/` with Node's test runner, pointing `TEST_DATABASE_URL` at
+a database a Rebase server has booted on:
+
+```bash
+TEST_DATABASE_URL="$(pnpm exec rebase db url)" pnpm exec tsx --test scripts/posts.test.ts
 ```
 
 The same works under Vitest or Jest.
