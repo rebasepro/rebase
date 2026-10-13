@@ -1696,7 +1696,8 @@ export function buildCollectionInputSchema(collection: CollectionConfig): Record
         properties[key] = convertPropertyToSchema(property);
         emitted.add(key);
 
-        if (property.validation?.required) {
+        // A column the database fills may be left out of a create.
+        if (property.validation?.required && !property.databaseDefault) {
             required.push(key);
         }
     }

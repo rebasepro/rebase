@@ -1097,7 +1097,12 @@ export function generateCollectionFile(
             if (!hasGeneratedKey(extra, "autoValue") && !hasGeneratedKey(extra, "defaultValue")) {
                 const fallback = literalDefaultOf(col, finalPropType);
                 if (fallback && "source" in fallback) extra += `\n            defaultValue: ${fallback.source},`;
-                else if (fallback) fileNotes.push(fallback.note);
+                else if (fallback) {
+                    fileNotes.push(fallback.note);
+                    // An expression only the database evaluates: on a NOT NULL
+                    // column, a required value a create may leave to it.
+                    if (col.is_nullable === "NO") extra += "\n            databaseDefault: true,";
+                }
             }
         }
 

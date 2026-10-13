@@ -109,3 +109,31 @@ describe("admin.filledByServer", () => {
         expect(errors).not.toHaveProperty("slug");
     });
 });
+
+/**
+ * `databaseDefault`: the database fills the column (`NOT NULL DEFAULT
+ * gen_random_uuid()`), so the form lets a create leave a required field empty,
+ * as `admin.filledByServer` does, and still requires it on an edit.
+ */
+describe("databaseDefault", () => {
+    const withCode = {
+        slug: "posts",
+        name: "Posts",
+        properties: {
+            title: { type: "string", validation: { required: true } },
+            slug: { type: "string", validation: { required: true }, databaseDefault: true }
+        }
+    };
+
+    it("lets a new record be created without the field", async () => {
+        const { onSubmit, errors } = await submit(withCode, { title: "Hello world", slug: null }, "new");
+        expect(errors).toEqual({});
+        expect(onSubmit).toHaveBeenCalledTimes(1);
+    });
+
+    it("still requires the field when a stored record is edited", async () => {
+        const { onSubmit, errors } = await submit(withCode, { title: "Hello world", slug: "abc" }, "existing");
+        expect(onSubmit).not.toHaveBeenCalled();
+        expect(errors.slug).toBe("Required");
+    });
+});

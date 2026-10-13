@@ -430,6 +430,25 @@ export interface BaseProperty<CustomProps = unknown> {
      */
     access?: FieldAccess;
 
+    /**
+     * The database fills this column when a create leaves it empty: a
+     * `NOT NULL DEFAULT <expression>` column such as `gen_random_uuid()`,
+     * `nextval(…)` or `now()`, whose value no property can state.
+     *
+     * A `validation.required` field with it may be left out of a create, by
+     * the admin form and by the API alike, and a create that sends it as `null`
+     * leaves it to the database rather than storing `NULL`. It is still
+     * required when a stored record is edited. The generated SDK's `Insert`
+     * type makes the field optional. Defaults to `false`.
+     *
+     * A declaration about the database, not an instruction to it: the schema
+     * planner does not write a `DEFAULT` for it (it cannot express the
+     * expression), so `rebase db push` still plans dropping such a default.
+     * "Import from table" and `rebase schema introspect` set it on such
+     * columns.
+     */
+    databaseDefault?: boolean;
+
     // NOTE: `defaultValue` is intentionally NOT on BaseProperty.
     // Each concrete property type (StringProperty, NumberProperty, etc.)
     // defines its own typed `defaultValue` for compile-time safety.

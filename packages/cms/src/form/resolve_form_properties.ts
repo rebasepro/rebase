@@ -54,7 +54,8 @@ export function resolvePropertiesForValidation<M extends Record<string, unknown>
     properties: Properties;
     /**
      * Whether the record is being created. A field marked
-     * `admin.filledByServer` is not required then: the server fills it.
+     * `admin.filledByServer` or `databaseDefault` is not required then: the
+     * server, or the database, fills it.
      */
     isNew?: boolean;
 }): Properties {
@@ -69,7 +70,8 @@ export function resolvePropertiesForValidation<M extends Record<string, unknown>
             property: raw
         });
         if (!formProperty || !isEditableInForm(formProperty)) continue;
-        const resolved = isNew && formProperty.admin?.filledByServer && formProperty.validation?.required
+        const filledOnCreate = formProperty.admin?.filledByServer || formProperty.databaseDefault;
+        const resolved = isNew && filledOnCreate && formProperty.validation?.required
             ? { ...formProperty, validation: { ...formProperty.validation, required: false } } as Property
             : formProperty;
         if (resolved.type === "map" && resolved.properties) {

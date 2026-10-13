@@ -225,6 +225,32 @@ describe("required on create", () => {
         expect(() => assertWriteValuesValid({ title: "Hello", authorId: 1 }, posts, { status: "new" })).not.toThrow();
     });
 
+    it("leaves a databaseDefault column to the database on create, and only on create", () => {
+        // `code uuid NOT NULL DEFAULT gen_random_uuid()`: required, and filled
+        // by the database when the INSERT does not name it.
+        const withCode = {
+            ...posts,
+            properties: {
+                ...posts.properties,
+                code: { type: "string", validation: { required: true }, databaseDefault: true }
+            }
+        } as CollectionConfig;
+        expect(() => assertWriteValuesValid({ title: "Hello", authorId: 1 }, withCode, { status: "new" })).not.toThrow();
+        expect(() => assertWriteValuesValid({ title: "Hello", authorId: 1, code: null }, withCode, { status: "new" })).not.toThrow();
+
+        // Without the flag, the same column is the caller's to send.
+        const withoutFlag = {
+            ...posts,
+            properties: { ...posts.properties, code: { type: "string", validation: { required: true } } }
+        } as CollectionConfig;
+        const error = thrown(() => assertWriteValuesValid({ title: "Hello", authorId: 1 }, withoutFlag, { status: "new" }));
+        expect(details(error).violations?.[0]).toMatchObject({ field: "code", code: "required" });
+
+        // Sent empty is still refused: the caller named the key.
+        const empty = thrown(() => assertWriteValuesValid({ title: "Hello", authorId: 1, code: "" }, withCode, { status: "existing" }));
+        expect(details(empty).violations?.[0]).toMatchObject({ field: "code", code: "required" });
+    });
+
     it("accepts either spelling of an owning relation", () => {
         expect(() => assertWriteValuesValid({ title: "Hello", author: 1 }, posts, { status: "new" })).not.toThrow();
         expect(() => assertWriteValuesValid({ title: "Hello", authorId: 1 }, posts, { status: "new" })).not.toThrow();

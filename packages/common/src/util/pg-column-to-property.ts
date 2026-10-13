@@ -281,14 +281,26 @@ label: prettifyIdentifier(v) })),
  * supplied on create.
  *
  * An expression default (`gen_random_uuid()`, `nextval(…)`, `lower(…)`) has no
- * property form and is left alone, as is a key column's generator. `required`
- * is never touched: it is the planner's NOT NULL. The reading mirrors the CLI
+ * property form: on a NOT NULL column it marks the property `databaseDefault`,
+ * and a key column's generator is left to its `isId`. `required` is never
+ * touched: it is the planner's NOT NULL. The reading mirrors the CLI
  * introspector's (`literalDefaultOf` in `@rebasepro/server-postgres`).
  */
 function applyColumnDefault(property: Property, column: TableColumnInfo): void {
     const raw = column.column_default?.trim();
     if (!raw) return;
     if ("isId" in property && property.isId) return;
+    applyLiteralDefault(property, column, raw);
+    // No property form for it — an expression only the database evaluates. On
+    // a NOT NULL column that is a required value nobody can type, so the
+    // property says the database fills it, and a create may leave it out.
+    const carried = (property as { defaultValue?: unknown }).defaultValue !== undefined
+        || (property as { autoValue?: unknown }).autoValue !== undefined;
+    if (!carried && column.is_nullable === "NO") property.databaseDefault = true;
+}
+
+/** The literal half of {@link applyColumnDefault}: `defaultValue`, or `autoValue` for `now()`. */
+function applyLiteralDefault(property: Property, column: TableColumnInfo, raw: string): void {
 
     // `'text'::type` — the type part may itself be quoted or qualified.
     const quoted = /^'((?:[^']|'')*)'(?:::[\w\s."[\]]+)?$/.exec(raw);

@@ -544,7 +544,9 @@ export function generateTypedefs(input: CollectionConfig[]): string {
             if (prop.type === "relation") continue;
             if (notWritable.has(key)) continue;
             const tsType = propertyToTypeScriptType(prop);
-            const isOptional = !prop.validation?.required || isAutoAssignedId(prop);
+            // A column the database fills (`databaseDefault`) may be left out
+            // of a create, as an id the database generates may.
+            const isOptional = !prop.validation?.required || isAutoAssignedId(prop) || Boolean(prop.databaseDefault);
             lines.push(line(key, writableType(prop, tsType), isOptional));
             emittedKeys.add(key);
         }

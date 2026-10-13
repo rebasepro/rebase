@@ -682,9 +682,10 @@ function collectFieldOperationViolations(
  * `required` on create is only a real requirement for keys the *caller* has to
  * send. A key column the database generates, a `defaultValue` the create path
  * fills in, an `autoValue` timestamp the driver stamps, and a column
- * `excludeFromApi` reserves for the server are all values that exist by the
- * time the INSERT runs — demanding them in the request would refuse writes that
- * are entirely correct.
+ * `excludeFromApi` reserves for the server, and a column whose DEFAULT the
+ * database fills (`databaseDefault`) are all values that exist by the time the
+ * INSERT runs — demanding them in the request would refuse writes that are
+ * entirely correct.
  */
 function isCallerSupplied(property: Property): boolean {
     const p = property as Property & {
@@ -693,6 +694,7 @@ function isCallerSupplied(property: Property): boolean {
         excludeFromApi?: boolean;
         defaultValue?: unknown;
     };
+    if (p.databaseDefault) return false;
     if (p.isId) return false;
     if (p.autoValue) return false;
     if (p.excludeFromApi) return false;

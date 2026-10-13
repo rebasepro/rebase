@@ -40,6 +40,22 @@ describe("applyDefaultValuesOnCreate", () => {
         expect(applyDefaultValuesOnCreate({ currency: null }, properties).currency).toBeNull();
     });
 
+    it("leaves an empty databaseDefault column out, so the database's DEFAULT fills it", () => {
+        // The admin form sends `code: null` for a field nobody filled in, and
+        // an INSERT naming the column with NULL never reaches its DEFAULT.
+        const withCode: Properties = {
+            title: { type: "string" },
+            code: { type: "string", validation: { required: true }, databaseDefault: true }
+        };
+        const result = applyDefaultValuesOnCreate({ title: "Hi", code: null }, withCode);
+        expect(result).toEqual({ title: "Hi" });
+        expect("code" in result).toBe(false);
+        // A value the caller did send is kept.
+        expect(applyDefaultValuesOnCreate({ code: "c-1" }, withCode)).toEqual({ code: "c-1" });
+        // Without the flag, a null stays a null.
+        expect(applyDefaultValuesOnCreate({ title: null }, withCode)).toEqual({ title: null });
+    });
+
     it("invents nothing for a property with no declared default", () => {
         // `getDefaultValuesFor` hands a *form* `null` for an unset string so it
         // has something to render. Writing that would override the column's own

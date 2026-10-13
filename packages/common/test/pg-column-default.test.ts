@@ -100,6 +100,34 @@ describe("importing a column default", () => {
 });
 
 /**
+ * A `NOT NULL DEFAULT <expression>` column — a value only the database can
+ * produce — is marked `databaseDefault`, so a create may leave it to the
+ * database: the form and the API stop demanding a required field nobody can
+ * type.
+ */
+describe("importing an expression default", () => {
+    it("marks a NOT NULL column with an expression default databaseDefault, and keeps it required", () => {
+        expect((props.slug as StringProperty).databaseDefault).toBe(true);
+        expect((props.slug as StringProperty).validation?.required).toBe(true);
+    });
+
+    it("leaves every other column without it", () => {
+        // A literal is a defaultValue, now() an autoValue, a key its isId, and
+        // a column with no default is the caller's to fill.
+        for (const key of ["isActive", "status", "settings", "publishedAt", "id", "title", "motto"]) {
+            expect(props[key]).not.toHaveProperty("databaseDefault");
+        }
+    });
+
+    it("does not mark a nullable column, which needs no value at all", () => {
+        const nullable = buildCollectionFromTableMetadata("items", {
+            columns: [column("code", "text", "text", "lower(md5((random())::text))", "YES")]
+        } as TableMetadata).properties;
+        expect(nullable.code).not.toHaveProperty("databaseDefault");
+    });
+});
+
+/**
  * Two columns whose import changed them on the first push.
  */
 describe("importing column shapes the planner must reproduce", () => {

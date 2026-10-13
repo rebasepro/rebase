@@ -213,6 +213,7 @@ const BASE_PROPERTY_KEYS = [
     "propertyConfig",
     "columnName",
     "defaultValue",
+    "databaseDefault",
     "validation",
     "excludeFromApi",
     "access",

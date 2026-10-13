@@ -195,7 +195,9 @@ export function updateUserAutoValues<M extends Record<string, unknown>>({
  *
  * Only genuinely absent keys are filled. An explicit `null` is a caller saying
  * "no value", which is a different statement from not mentioning the field, and
- * overwriting it would make the default impossible to opt out of.
+ * overwriting it would make the default impossible to opt out of. The exception
+ * is a `databaseDefault` column, whose `null` is taken out of the create so the
+ * database's own DEFAULT fills it.
  *
  * `getDefaultValuesFor` also invents a per-type default for properties with no
  * `defaultValue` at all (`false` for a boolean, `[]` for an array, `null` for
@@ -216,6 +218,13 @@ export function applyDefaultValuesOnCreate<M extends Record<string, unknown>>(
 
     for (const [key, property] of Object.entries(properties)) {
         if (!property) continue;
+        // The database fills this column, and only when the INSERT leaves it
+        // out: a `null` (what a form sends for a field nobody filled in) would
+        // be stored as NULL, or refused by the column's NOT NULL.
+        if (!isPropertyBuilder(property) && (property as Property).databaseDefault && result[key] === null) {
+            delete result[key];
+            continue;
+        }
         const declared = declaresDefault(property as Property);
         if (!declared) continue;
         // Asked of the property, not read out of `getDefaultValuesFor`: that

@@ -205,6 +205,8 @@ export interface SerializableBaseProperty {
     access?: { read?: readonly string[]; write?: readonly string[] };
     validation?: PropertyValidationSchema;
     defaultValue?: unknown;
+    /** The database fills the column on create; see `BaseProperty.databaseDefault`. */
+    databaseDefault?: boolean;
     /**
      * JSON Logic conditions — fully serializable by design.
      * These are the declarative alternative to `dynamicProps` functions.

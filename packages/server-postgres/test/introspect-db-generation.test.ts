@@ -324,6 +324,28 @@ column_default: "'user'::text" })
             expect(roleSection).toContain("required: true");
             expect(roleSection).toContain('defaultValue: "user"');
         });
+
+        it("marks a NOT NULL column with an expression default databaseDefault", () => {
+            // `code text NOT NULL DEFAULT lower(md5(random()::text))`: required,
+            // and a value only the database can produce, so a create may
+            // leave it out.
+            const meta = makeSimpleTable("items", [
+                mkCol("items", "id", { data_type: "uuid",
+udt_name: "uuid",
+is_nullable: "NO" }),
+                mkCol("items", "code", { data_type: "text", udt_name: "text", is_nullable: "NO",
+column_default: "lower(md5((random())::text))" }),
+                mkCol("items", "hint", { data_type: "text", udt_name: "text", is_nullable: "YES",
+column_default: "lower(md5((random())::text))" }),
+                mkCol("items", "role", { data_type: "text", udt_name: "text", is_nullable: "NO",
+column_default: "'user'::text" })
+            ]);
+            const result = generateCollectionFile("items", meta, [], new Set(), new Map([["items", meta]]), new Map());
+            expect(propertyBlock(result, "code")).toContain("databaseDefault: true");
+            expect(propertyBlock(result, "code")).toContain("required: true");
+            expect(propertyBlock(result, "hint")).not.toContain("databaseDefault");
+            expect(propertyBlock(result, "role")).not.toContain("databaseDefault");
+        });
     });
 
     describe("enum support", () => {

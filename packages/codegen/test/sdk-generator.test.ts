@@ -329,6 +329,21 @@ validation: { required: true } }
             expect(ts).toContain("title: string;");
         });
 
+        it("makes a databaseDefault column optional in Insert, and keeps it in Row", () => {
+            const col = {
+                slug: "books",
+                properties: {
+                    code: { type: "string", validation: { required: true }, databaseDefault: true }
+                }
+            } as unknown as CollectionConfig;
+
+            const ts = generateTypedefs([col]);
+            const insert = ts.slice(ts.indexOf("Insert: {"), ts.indexOf("Update: {"));
+            expect(insert).toContain("code?: string;");
+            const row = ts.slice(ts.indexOf("Row: {"), ts.indexOf("Insert: {"));
+            expect(row).toContain("code: string;");
+        });
+
         it("makes isId: 'increment' key optional in Insert even if validation required is true", () => {
             const col = {
                 slug: "books",
