@@ -89,7 +89,7 @@ const NC = "[0m";
 /**
  * Where each `new Hono()` receiver is mounted, with `basePath` at `/api`.
  *
- * Keyed `<file>#<receiver>`: `init.ts` builds fourteen routers at eleven
+ * Keyed `<file>#<receiver>`: `create-backend.ts` builds fourteen routers at eleven
  * prefixes and `boot.ts` two at the root, so a file-keyed map cannot say where
  * any of them live. A module whose only router is a plain `const router = new
  * Hono()` still reads as one line.
@@ -146,28 +146,35 @@ const MOUNTS = new Map([
     ["packages/server/src/mcp/mcp-routes.ts#router", "/mcp"],
     ["packages/server/src/mcp/oauth-routes.ts#router", "/api/oauth"],
 
-    // ── init.ts, one line per router ──────────────────────────────────────
-    ["packages/server/src/init.ts#schemaEditorRouter", "/api/admin/schema-editor"],
-    ["packages/server/src/init.ts#liveSchemaRouter", "/api/admin/schema"],
-    ["packages/server/src/init.ts#storageRouter", "/api/storage"],
-    ["packages/server/src/init.ts#dataRouter", "/api/data"],
-    ["packages/server/src/init.ts#functionsRouter", "/api/functions"],
-    ["packages/server/src/init.ts#cronRouter", "/api/admin/cron"],
-    ["packages/server/src/init.ts#backupRouter", "/api/admin/backups"],
-    ["packages/server/src/init.ts#maintenanceRouter", "/api/admin/storage"],
-    ["packages/server/src/init.ts#rlsAuditRouter", "/api/admin/rls-audit"],
-    ["packages/server/src/init.ts#sqlExportRouter", "/api/admin/sql"],
-    ["packages/server/src/init.ts#devMailRouter", "/api/admin/dev/emails"],
-    ["packages/server/src/init.ts#logsRouter", "/api/admin/logs"],
-    ["packages/server/src/init.ts#contractRouter", "/api/meta"],
-    // Registers nothing itself: it wraps `createPersonalKeyRoutes`, whose
-    // routes are listed in EXTRA_ROUTES — see there.
-    ["packages/server/src/init.ts#personalKeyRouter", "/api/auth/keys"],
+    // ── backend/create-backend.ts, one line per router ────────────────────
+    // `createRebaseBackend` builds them; `mount()` puts them where
+    // `initializeRebaseBackend` always did, which is the layout this index
+    // documents. The personal-key router is assigned to a `let` declared
+    // earlier, so the scan does not see it build one: its routes are listed in
+    // EXTRA_ROUTES — see there.
+    ["packages/server/src/backend/create-backend.ts#schemaEditorRouter", "/api/admin/schema-editor"],
+    ["packages/server/src/backend/create-backend.ts#liveSchemaRouter", "/api/admin/schema"],
+    ["packages/server/src/backend/create-backend.ts#storageRouter", "/api/storage"],
+    ["packages/server/src/backend/create-backend.ts#dataRouter", "/api/data"],
+    ["packages/server/src/backend/create-backend.ts#functionsRouter", "/api/functions"],
+    ["packages/server/src/backend/create-backend.ts#cronRouter", "/api/admin/cron"],
+    ["packages/server/src/backend/create-backend.ts#backupRouter", "/api/admin/backups"],
+    ["packages/server/src/backend/create-backend.ts#maintenanceRouter", "/api/admin/storage"],
+    ["packages/server/src/backend/create-backend.ts#rlsAuditRouter", "/api/admin/rls-audit"],
+    ["packages/server/src/backend/create-backend.ts#sqlExportRouter", "/api/admin/sql"],
+    ["packages/server/src/backend/create-backend.ts#devMailRouter", "/api/admin/dev/emails"],
+    ["packages/server/src/backend/create-backend.ts#logsRouter", "/api/admin/logs"],
+    ["packages/server/src/backend/create-backend.ts#contractRouter", "/api/meta"],
+    // `group()` composes every route group: a router (`composed`) that only
+    // `use`s the backend's services and `route`s the group's handlers. The one
+    // literal route a group registers itself is the auth group's `GET /config`.
+    ["packages/server/src/backend/create-backend.ts#composed", null],
+    ["packages/server/src/backend/create-backend.ts#authGroup", "/api/auth"],
     // Stubs: one `all("/*")` that answers with the reason the surface is off.
     // A 501 explaining itself is not an endpoint anyone looks up.
-    ["packages/server/src/init.ts#unconfigured", null],
-    ["packages/server/src/init.ts#storageStub", null],
-    ["packages/server/src/init.ts#emptyDataStub", null],
+    ["packages/server/src/backend/create-backend.ts#unconfigured", null],
+    ["packages/server/src/backend/create-backend.ts#storageStub", null],
+    ["packages/server/src/backend/create-backend.ts#emptyDataStub", null],
 
     // ── Families and machinery ────────────────────────────────────────────
     // Every route's path is a collection slug or a function name, so it comes
@@ -213,7 +220,8 @@ const NOT_A_ROUTER = new Set(["c", "ctx", "context"]);
  * Routes registered on an app that was handed in, at an interpolated prefix.
  *
  * `init/docs.ts` does `app.get(\`${basePath}/docs\`, …)` on the caller's app,
- * and `init.ts` the same for `/auth/config`: there is no `new Hono()` to key a
+ * and `init.ts` once did the same for `/auth/config` (the auth group now
+ * registers it, and the scan sees it there too): there is no `new Hono()` to key a
  * MOUNTS entry on and no literal path for {@link METHOD} to find, so the scan
  * cannot see them. They are real routes a docs table may name, so they are
  * listed rather than left to be reported as fiction.
@@ -225,7 +233,7 @@ const EXTRA_ROUTES = [
     // A person's own API keys. `createPersonalKeyRoutes` builds its router in
     // `api-key-routes.ts` under the same receiver name as the service-key
     // routes, so MOUNTS — keyed by file and receiver — reads its paths under
-    // `/api/admin/api-keys`; `init.ts` mounts it at `/auth/keys`.
+    // `/api/admin/api-keys`; the auth group mounts it at `/auth/keys`.
     { method: "GET", path: "/api/auth/keys" },
     { method: "POST", path: "/api/auth/keys" },
     { method: "DELETE", path: "/api/auth/keys/:id" }
