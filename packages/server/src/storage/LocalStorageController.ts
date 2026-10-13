@@ -206,6 +206,30 @@ export class LocalStorageController implements StorageController {
     }
 
     /**
+     * Whether the file system under the storage root folds case — macOS and
+     * Windows by default — so `Avatar.png` and `avatar.png` are one file here
+     * and two on S3, GCS or a Linux disk.
+     *
+     * Read by writing a probe file and asking for it in the other case. The
+     * root is created if it is not there yet; the probe is removed. `false`
+     * when the root cannot be written: nothing is known.
+     */
+    async isCaseInsensitive(): Promise<boolean> {
+        const probe = path.join(this.basePath, `.rebase-case-probe-${randomUUID()}`);
+        try {
+            await this.ensureDir(this.basePath);
+            await writeFile(probe, "");
+        } catch {
+            return false;
+        }
+        try {
+            return fs.existsSync(path.join(this.basePath, path.basename(probe).toUpperCase()));
+        } finally {
+            await unlink(probe).catch(() => undefined);
+        }
+    }
+
+    /**
      * The bucket directories that exist under the storage root, plus `default`.
      *
      * Read from disk rather than from config, because a local bucket *is* a

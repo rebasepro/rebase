@@ -36,7 +36,7 @@ const backend = await initializeRebaseBackend({
 });
 ```
 
-Local storage keeps each object's metadata beside it, as `<key>.metadata.json`, so a key whose last segment ends in `.metadata.json` is refused with `400 INVALID_STORAGE_KEY` on every route. S3 and GCS keep metadata on the object and store any key.
+Local storage keeps each object's metadata beside it, as `<key>.metadata.json`, so a key whose last segment ends in `.metadata.json` is refused with `400 INVALID_STORAGE_KEY` on every route. S3 and GCS keep metadata on the object and store any key. On a case-insensitive file system (macOS and Windows by default) `Avatar.png` and `avatar.png` are one local file but two objects on S3, GCS or a Linux disk, so the server warns at boot when the storage folder is on one.
 
 ### S3 Storage
 

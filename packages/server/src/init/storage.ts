@@ -1,6 +1,8 @@
+import path from "path";
 import {
     BackendStorageConfig,
     createStorageController,
+    LocalStorageController,
     DEFAULT_STORAGE_ID,
     DefaultStorageRegistry,
     StorageController,
@@ -89,7 +91,18 @@ export async function initializeStorage(
                 "there, or uploads to it answer 501."
             );
         }
-        return await createStorageController(conf);
+        const controller = await createStorageController(conf);
+        if (conf.type === "local" && controller instanceof LocalStorageController && await controller.isCaseInsensitive()) {
+            // Development, almost always: a Mac. Nothing is refused — the keys
+            // are what they are — but the difference only shows on deploy.
+            logger.warn(
+                `Storage source "${label}" stores files in ${path.resolve(conf.basePath)}, ` +
+                "on a case-insensitive file system: keys that differ only in case (`Avatar.png`, " +
+                "`avatar.png`) are one file here and two on S3, GCS or a Linux disk. Use one spelling " +
+                "for each key, or the files you see now are not the files production keeps."
+            );
+        }
+        return controller;
     };
 
     if (
