@@ -4,11 +4,11 @@ import { unref } from "@rebasepro/utils";
 /**
  * Behaviours a client opts into when it opens the socket.
  *
- * The client names them on the socket URL, `?rebase_caps=heartbeat,channel_seq`,
+ * The client names them on the socket URL, `?rebase_caps=heartbeat,channel_seq,cancel_sql`,
  * and the server answers with a `hello` frame listing the ones it will honour:
  *
  * ```json
- * { "type": "hello", "capabilities": ["heartbeat", "channel_seq"], "heartbeatMs": 30000, "clientId": "client_…" }
+ * { "type": "hello", "capabilities": ["heartbeat", "channel_seq", "cancel_sql"], "heartbeatMs": 30000, "clientId": "client_…" }
  * ```
  *
  * Both halves are needed, so both directions of a version mismatch keep
@@ -17,9 +17,9 @@ import { unref } from "@rebasepro/utils";
  * ignores the query parameter and sends no `hello`, and a newer client that
  * hears none behaves as it always did.
  *
- * Not the frames the server accepts (`CANCEL_SQL`, said in `AUTH_SUCCESS` as
- * `capabilities`): these change what the server *sends*, and a socket that
- * never signs in needs them as much as one that does.
+ * One list for both kinds: what the server sends (`heartbeat`, `channel_seq`)
+ * and the frames it takes beyond the base protocol (`cancel_sql`). Named before
+ * sign-in, so a socket that never signs in is served as one that does.
  *
  * - `heartbeat`: a `{ "type": "heartbeat" }` frame every `heartbeatMs`. A
  *   browser cannot send a WebSocket ping or see one, so a connection that went
@@ -30,6 +30,9 @@ import { unref } from "@rebasepro/utils";
  *   gets the message. Its own messages then leave no hole in the sequence it
  *   watches, so a hole means a message it really missed — see
  *   `RealtimeChannel` in the SDK.
+ * - `cancel_sql`: the server takes `CANCEL_SQL { requestId }`, which stops a
+ *   console run (`EXECUTE_SQL`, `mode: "script"`) of the same socket. A client
+ *   sends it only to a server whose `hello` listed it.
  *
  * @module
  */
@@ -38,7 +41,7 @@ import { unref } from "@rebasepro/utils";
 export const SOCKET_OPT_IN_PARAM = "rebase_caps";
 
 /** Every behaviour this server can be asked for. */
-export const SOCKET_OPT_INS = ["heartbeat", "channel_seq"] as const;
+export const SOCKET_OPT_INS = ["heartbeat", "channel_seq", "cancel_sql"] as const;
 
 export type SocketOptIn = typeof SOCKET_OPT_INS[number];
 

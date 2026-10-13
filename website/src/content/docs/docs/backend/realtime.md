@@ -272,7 +272,7 @@ a vanished client is let go of within a minute. Browsers and the SDK answer
 pings on their own; a client that speaks the protocol directly has to answer
 them too, as most WebSocket libraries do.
 
-<span class="since-badge" data-since="0.25">Since 0.25</span> **The browser side.** A browser cannot send a ping or see one, so a half-open socket looks connected to it forever. The SDK opens the socket with `?rebase_caps=heartbeat,channel_seq`; a server that knows them answers with `{"type":"hello","capabilities":[…],"heartbeatMs":30000}` and sends `{"type":"heartbeat"}` every 30 seconds, and the SDK drops the socket and [reconnects](#auto-reconnect) after two missed. A client that names nothing is sent neither, and an older server ignores the parameter, so an SDK talking to one behaves as before.
+<span class="since-badge" data-since="0.25">Since 0.25</span> **The browser side.** A browser cannot send a ping or see one, so a half-open socket looks connected to it forever. The SDK opens the socket with `?rebase_caps=heartbeat,channel_seq,cancel_sql`; a server that knows them answers with `{"type":"hello","capabilities":[…],"heartbeatMs":30000}`, listing the ones it honours (`cancel_sql`: it takes the SQL console's `CANCEL_SQL` frame), and sends `{"type":"heartbeat"}` every 30 seconds, and the SDK drops the socket and [reconnects](#auto-reconnect) after two missed. A client that names nothing is sent neither, and an older server ignores the parameter, so an SDK talking to one behaves as before.
 
 A socket is also terminated when more than 16&nbsp;MiB of frames sent to it are
 still unread. That is a client that does not read what it is sent, or one so far

@@ -51,7 +51,7 @@ import {
 } from "@rebasepro/types";
 import { logger } from "@rebasepro/server";
 import { resolveRequireAuth } from "../../server/src/auth/require-auth";
-import { createPostgresWebSocket, ADMIN_PLANE_TYPES, PUBLIC_TYPES, SOCKET_CAPABILITIES } from "../src/websocket";
+import { createPostgresWebSocket, ADMIN_PLANE_TYPES, PUBLIC_TYPES } from "../src/websocket";
 import { RealtimeService } from "../src/services/realtimeService";
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
 import { SQL_RESULT_BYTE_BUDGET, SqlResultTooLargeError } from "../src/services/sql-script";
@@ -226,7 +226,7 @@ describe("WebSocket Server authorization", () => {
             expect(lastSent(mockWs)).toEqual({
                 type: "AUTH_SUCCESS",
                 requestId: "auth-editor",
-                payload: { uid: "editor-user", roles: ["editor"], capabilities: SOCKET_CAPABILITIES }
+                payload: { uid: "editor-user", roles: ["editor"] }
             });
             mockWs.send.mockClear();
 
@@ -360,7 +360,7 @@ describe("WebSocket Server authorization", () => {
                 const { mockWs, messageCallback } = connect();
                 await send(messageCallback, { type: "AUTHENTICATE", requestId: "a", payload: { token: "rk_live_x" } });
                 expect(lastSent(mockWs)).toEqual({
-                    type: "AUTH_SUCCESS", requestId: "a", payload: { uid: "api-key:k1", roles: ["service"], capabilities: SOCKET_CAPABILITIES }
+                    type: "AUTH_SUCCESS", requestId: "a", payload: { uid: "api-key:k1", roles: ["service"] }
                 });
                 // Never handed to the JWT verifier.
                 expect(mockExtractUserFromToken).not.toHaveBeenCalled();
@@ -1093,9 +1093,9 @@ describe("WebSocket Server SQL console scripts", () => {
      * Nothing could stop a console run: the Run button spun until the
      * statement ended or `statement_timeout` stopped it. `CANCEL_SQL` names a
      * run of the same socket by its `requestId` and aborts the signal it runs
-     * with. A server says it takes the frame in its sign-in answer
-     * (`capabilities: ["cancel_sql"]`), so a client sends it only to a server
-     * that does; an older client never sends it, and loses nothing.
+     * with. A client asks for `cancel_sql` on the socket URL and a server that
+     * takes the frame lists it in its `hello`, so a client sends it only to a
+     * server that does; an older client never asks, and loses nothing.
      */
     describe("cancelling a run", () => {
         const sent = (mockWs: { send: jest.Mock }) =>
@@ -1112,10 +1112,32 @@ describe("WebSocket Server SQL console scripts", () => {
             return admin;
         };
 
-        it("says in the sign-in answer that this server takes CANCEL_SQL", async () => {
+        /** The first frame a socket opened at `url` is sent. */
+        const helloFor = (url: string) => {
+            const connectionCallback = mockWssInstance.on.mock.calls.find((call: any[]) => call[0] === "connection")[1];
+            const mockWs = { on: jest.fn(), send: jest.fn(), once: jest.fn() } as any;
+            connectionCallback(mockWs, { url, headers: {} });
+            return sent(mockWs)[0];
+        };
+
+        it("says in its hello that it takes CANCEL_SQL, to a client that asks", () => {
+            expect(helloFor("/?rebase_caps=heartbeat,channel_seq,cancel_sql")).toMatchObject({
+                type: "hello",
+                capabilities: ["heartbeat", "channel_seq", "cancel_sql"]
+            });
+            expect(helloFor("/?rebase_caps=cancel_sql")).toEqual({ type: "hello", capabilities: ["cancel_sql"] });
+        });
+
+        it("lists no cancel_sql to a client that did not ask for it", () => {
+            expect(helloFor("/?rebase_caps=heartbeat,channel_seq")).toMatchObject({ capabilities: ["heartbeat", "channel_seq"] });
+            // A client that names no opt-in at all is sent no hello.
+            expect(helloFor("/")).toBeUndefined();
+        });
+
+        it("says nothing about frames in the sign-in answer", async () => {
             const { mockWs } = await signedIn();
             const auth = sent(mockWs).find((frame) => frame.type === "AUTH_SUCCESS");
-            expect(auth.payload.capabilities).toContain("cancel_sql");
+            expect(auth.payload).toEqual({ uid: expect.any(String), roles: expect.any(Array) });
         });
 
         it("aborts the run it names, and the run answers with the database's error", async () => {

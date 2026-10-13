@@ -59,17 +59,6 @@ export function isSocketRealtimeService(provider: RealtimeProvider): provider is
     return socketRealtimeMissing(provider).length === 0;
 }
 
-/**
- * The frames this server takes beyond the protocol every server has spoken,
- * said in the `AUTH_SUCCESS` answer as `capabilities`. A client sends such a
- * frame only to a server that lists it, so a newer client keeps working
- * against an older server; an older client never sends one.
- *
- * - `cancel_sql`: `CANCEL_SQL { requestId }` stops a console run
- *   (`EXECUTE_SQL`, `mode: "script"`) of the same socket.
- */
-export const SOCKET_CAPABILITIES: readonly string[] = ["cancel_sql"];
-
 /** What a script run says besides its rows, which an `EXECUTE_SQL` answer carries as `result`. */
 function scriptDescription({ rows: _rows, ...description }: SqlScriptResult): Omit<SqlScriptResult, "rows"> {
     return description;
@@ -1123,8 +1112,7 @@ fetchAllowanceAt: Date.now() });
                             type: "AUTH_SUCCESS",
                             requestId,
                             payload: { uid: verifiedUser.uid,
-roles: verifiedUser.roles,
-capabilities: SOCKET_CAPABILITIES }
+roles: verifiedUser.roles }
                         }));
                         wsDebug(`🔐 [WebSocket Server] Client ${clientId} authenticated as ${verifiedUser.uid}`);
                     } else {

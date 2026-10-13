@@ -160,22 +160,25 @@ describe("readSqlScriptResult", () => {
 });
 
 /**
- * Cancelling a console run. A server that takes `CANCEL_SQL` says so when the
- * socket signs in (`capabilities: ["cancel_sql"]`); only to such a server does
- * an aborted run send one, naming the run by its `requestId`. Against any
- * server the run's promise rejects at once with the signal's reason, so the
- * console is never left waiting on a statement it gave up on.
+ * Cancelling a console run. The client asks for `cancel_sql` when it opens the
+ * socket (`?rebase_caps=…,cancel_sql`), and a server that takes `CANCEL_SQL`
+ * lists it in its `hello`; only to such a server does an aborted run send one,
+ * naming the run by its `requestId`. Against any server the run's promise
+ * rejects at once with the signal's reason, so the console is never left
+ * waiting on a statement it gave up on.
  */
 describe("runSqlScript with a signal", () => {
+    /** Signed in on a socket whose server said `hello` with `capabilities`, or none at all. */
     async function signedIn(capabilities?: string[]): Promise<MockWebSocket> {
         const ws = await connected();
+        if (capabilities) ws.onmessage!({ data: JSON.stringify({ type: "hello", capabilities }) });
         const auth = client.authenticate("token");
         const frame = lastFrame(ws);
         expect(frame.type).toBe("AUTHENTICATE");
         ws.onmessage!({ data: JSON.stringify({
             type: "AUTH_SUCCESS",
             requestId: frame.requestId,
-            payload: { uid: "u1", roles: ["admin"], ...(capabilities ? { capabilities } : {}) }
+            payload: { uid: "u1", roles: ["admin"] }
         }) });
         await auth;
         return ws;
@@ -200,7 +203,24 @@ describe("runSqlScript with a signal", () => {
         ws.onmessage!({ data: JSON.stringify({ type: "ERROR", requestId: run.requestId, payload: { error: { message: "canceling statement due to user request", code: "SQL_ERROR" } } }) });
     });
 
-    it("sends no CANCEL_SQL to a server that did not say it takes one", async () => {
+    it("asks for cancel_sql on the socket URL, beside the other opt-ins", async () => {
+        const ws = await connected();
+        const asked = new URL(ws.url).searchParams.get("rebase_caps")?.split(",");
+        expect(asked).toEqual(expect.arrayContaining(["heartbeat", "channel_seq", "cancel_sql"]));
+    });
+
+    it("sends no CANCEL_SQL to a server whose hello does not list it", async () => {
+        const ws = await signedIn(["heartbeat", "channel_seq"]);
+        const controller = new AbortController();
+        const pending = client.runSqlScript("SELECT pg_sleep(30)", { signal: controller.signal });
+        await Promise.resolve();
+        controller.abort();
+        await expect(pending).rejects.toMatchObject({ name: "AbortError" });
+        await Promise.resolve();
+        expect(frames(ws).map((frame) => frame.type)).not.toContain("CANCEL_SQL");
+    });
+
+    it("sends no CANCEL_SQL to a server that says no hello (an older server)", async () => {
         const ws = await signedIn();
         const controller = new AbortController();
         const pending = client.runSqlScript("SELECT pg_sleep(30)", { signal: controller.signal });

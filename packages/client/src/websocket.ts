@@ -137,7 +137,7 @@ const OUTAGE_REPORT_AFTER_MS = 14_000;
  * client goes on as it did before there were any.
  */
 const SOCKET_OPT_IN_PARAM = "rebase_caps";
-const SOCKET_OPT_INS = ["heartbeat", "channel_seq"];
+const SOCKET_OPT_INS = ["heartbeat", "channel_seq", "cancel_sql"];
 
 /** Slack on top of two heartbeat intervals before a silent socket is given up on. */
 const HEARTBEAT_GRACE_MS = 5_000;
@@ -488,13 +488,6 @@ export class RebaseWebSocketClient {
     private backendToEntityKey = new Map<string, string>();
 
 
-    /**
-     * The frames beyond the base protocol that the server this socket signed
-     * in to says it takes (`AUTH_SUCCESS` `capabilities`). Such a frame is sent
-     * only to a server that listed it; an older server lists nothing.
-     */
-    private serverCapabilities: ReadonlySet<string> = new Set();
-
     private pendingRequests = new Map<string, {
         resolve: (p: unknown) => void;
         reject: (p: Error) => void;
@@ -662,10 +655,9 @@ export class RebaseWebSocketClient {
             }, 30000);
 
             this.pendingRequests.set(requestId, {
-                resolve: (payload) => {
+                resolve: () => {
                     clearTimeout(timeout);
                     this.isAuthenticated = true;
-                    this.serverCapabilities = readCapabilities(payload);
                     resolve();
                 },
                 reject: (error) => {
@@ -1813,7 +1805,7 @@ options }
 
     /**
      * Stop a console run its caller gave up on: never written if it has not
-     * been yet, and cancelled on a server that takes `CANCEL_SQL`. A server
+     * been yet, and cancelled on a server whose `hello` listed `cancel_sql`. A server
      * that does not is left to finish it, bounded by its `statement_timeout`.
      */
     private cancelSqlRun(message: Record<string, unknown>, requestId: string): void {
@@ -1825,7 +1817,9 @@ options }
         // Still waiting on authentication in `doSendMessage`: it checks this
         // before writing.
         this.abandonedFrames.add(message);
-        if (this.isAuthenticated && this.serverCapabilities.has("cancel_sql")) {
+        // Only to a server whose `hello` said it takes the frame; an older
+        // server would answer an unknown type with an error nobody reads.
+        if (this.isAuthenticated && this.serverOptIns.has("cancel_sql")) {
             this.sendMessage({ type: "CANCEL_SQL", payload: { requestId } }).catch(() => undefined);
         }
     }
@@ -2593,12 +2587,6 @@ onError });
         const include = props.include !== undefined ? `|${JSON.stringify(props.include)}` : "";
         return `${props.path}|${props.id}${include}`;
     }
-}
-
-/** The `capabilities` an `AUTH_SUCCESS` payload lists; none when it lists none. */
-function readCapabilities(payload: unknown): ReadonlySet<string> {
-    const listed = typeof payload === "object" && payload !== null && "capabilities" in payload ? payload.capabilities : undefined;
-    return new Set(Array.isArray(listed) ? listed.filter((item): item is string => typeof item === "string") : []);
 }
 
 /** What an aborted signal rejects with: its reason, or an `AbortError` as `fetch` gives. */

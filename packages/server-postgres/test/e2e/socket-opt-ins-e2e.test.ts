@@ -101,6 +101,8 @@ describe("socket opt-ins (E2E)", () => {
         expect(first.type).toBe("hello");
         // Only what this server does; a name it does not know is left out.
         expect(first.capabilities).toEqual(["heartbeat", "channel_seq"]);
+        // `cancel_sql` only when asked: this client did not.
+        expect(first.capabilities).not.toContain("cancel_sql");
         expect(first.heartbeatMs).toBe(HEARTBEAT_MS);
         expect(first.clientId).toEqual(expect.any(String));
     });
