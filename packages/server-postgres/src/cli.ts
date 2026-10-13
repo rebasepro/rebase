@@ -245,6 +245,9 @@ export async function runPluginCommand(args: string[]) {
             await schemaCommand(subcommand, args);
         } else if (domain === "doctor") {
             await doctorPluginCommand(args);
+        } else if (domain === "console") {
+            const { consoleCommand } = await import("./cli-console");
+            process.exitCode = await consoleCommand(args);
         } else {
             outError(chalk.red(`Unknown domain command: ${domain}`));
             process.exit(1);

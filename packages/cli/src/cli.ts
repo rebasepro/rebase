@@ -53,7 +53,7 @@ export const ROOT_FLAGS = {
  * literal under this name: `help-coverage.test.ts`, `printed-commands.test.ts`
  * and the docs verifier read it out of this file's source.
  */
-const namespacedCommands = ["init", "schema", "db", "dev", "build", "start", "auth", "doctor", "skills", "api-keys", "storage", "cloud", "apps", "eject", "generate-sdk", "telemetry", "resources", "status", "upgrade", "normalize-imports"];
+const namespacedCommands = ["init", "schema", "db", "console", "dev", "build", "start", "auth", "doctor", "skills", "api-keys", "storage", "cloud", "apps", "eject", "generate-sdk", "telemetry", "resources", "status", "upgrade", "normalize-imports"];
 
 /** The words a command group dispatches, and the other spellings it accepts for them. */
 interface CommandVocabulary {
@@ -348,6 +348,12 @@ async function dispatch(
             break;
         }
 
+        case "console": {
+            const { consoleCommand } = await import("./commands/console");
+            await consoleCommand(args);
+            break;
+        }
+
         case "dev": {
             const { devCommand } = await import("./commands/dev");
             await devCommand(args);
@@ -484,6 +490,9 @@ ${chalk.green.bold("Database")}
   ${chalk.blue.bold("db stop")}                 Stop the managed development database ${chalk.gray("(data is kept)")}
   ${chalk.blue.bold("db reset")}                Delete the managed development database and start over
   ${chalk.blue.bold("db")} ${chalk.gray("--help")}               Backup, restore, and every flag
+
+${chalk.green.bold("Explore")}
+  ${chalk.blue.bold("console")}                 A REPL with the project's data in scope ${chalk.gray("(-e <code> runs one snippet)")}
 
 ${chalk.green.bold("SDK")}
   ${chalk.blue.bold("generate-sdk")}            Generate a typed TypeScript SDK from collections

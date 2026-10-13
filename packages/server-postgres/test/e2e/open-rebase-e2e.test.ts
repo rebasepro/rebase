@@ -14,11 +14,16 @@
  * Requires Docker.
  */
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { PassThrough } from "node:stream";
 import pg from "pg";
 import type { CollectionConfig } from "@rebasepro/types";
 
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
 import { createPostgresBootstrapper, createPostgresDatabaseConnection, openRebase, type OpenedRebase } from "../../src/index.js";
+import { consoleCommand } from "../../src/cli-console.js";
 
 const notesCollection: CollectionConfig = {
     name: "Notes",
@@ -216,6 +221,97 @@ describe("openRebase (E2E)", () => {
 
         it("has created nothing in the database by opening it", async () => {
             expect(await catalogue(observer)).toEqual(before);
+        });
+
+        describe("rebase console --eval (the driver's half)", () => {
+            let collectionsDir: string;
+
+            beforeAll(() => {
+                // A project's collections directory, loaded by the loader `db push` uses.
+                collectionsDir = fs.mkdtempSync(path.join(os.tmpdir(), "rebase-console-"));
+                fs.writeFileSync(path.join(collectionsDir, "package.json"), JSON.stringify({ type: "module" }));
+                fs.writeFileSync(path.join(collectionsDir, "notes.js"), `export default ${JSON.stringify(notesCollection)};\n`);
+            });
+
+            afterAll(() => {
+                fs.rmSync(collectionsDir, { recursive: true, force: true });
+            });
+
+            /** One `rebase console --eval`, as the driver runs it: exit code and both streams. */
+            async function evalInConsole(code: string): Promise<{ code: number; stdout: string; stderr: string }> {
+                const stdout: string[] = [];
+                const stderr: string[] = [];
+                const log = vi.spyOn(console, "log").mockImplementation((...args: unknown[]) => { stdout.push(args.join(" ")); });
+                const error = vi.spyOn(console, "error").mockImplementation((...args: unknown[]) => { stderr.push(args.join(" ")); });
+                vi.stubEnv("DATABASE_URL", urlFor(container, "app"));
+                vi.stubEnv("LOG_LEVEL", "error");
+                try {
+                    const exit = await consoleCommand(["console", "--eval", code, "--collections", collectionsDir]);
+                    return { code: exit, stdout: stdout.join("\n"), stderr: stderr.join("\n") };
+                } finally {
+                    vi.unstubAllEnvs();
+                    log.mockRestore();
+                    error.mockRestore();
+                }
+            }
+
+            it("prints an expression's awaited value as JSON", async () => {
+                const result = await evalInConsole("rebase.dataAsAdmin.notes.find()");
+                expect(result.code).toBe(0);
+                const parsed = JSON.parse(result.stdout) as { data: Array<{ title: string }> };
+                expect(parsed.data.map(row => row.title).sort()).toEqual(["ada's", "bob's"]);
+            });
+
+            it("runs statements with top-level await, returning the result", async () => {
+                const result = await evalInConsole(
+                    "const ada = await rebase.withAuth({ uid: 'ada', roles: ['user'] });\n" +
+                    "return (await ada.data.notes.find()).data.map(row => row.title);"
+                );
+                expect(result).toMatchObject({ code: 0 });
+                expect(JSON.parse(result.stdout)).toEqual(["ada's"]);
+            });
+
+            it("has the project's collections and sql in scope", async () => {
+                expect(JSON.parse((await evalInConsole("collections.map(c => c.slug)")).stdout)).toEqual(["notes"]);
+                const counted = await evalInConsole("rebase.sql('SELECT count(*)::int AS n FROM public.notes WHERE owner_id = $1', { params: ['ada'] })");
+                expect(JSON.parse(counted.stdout)).toEqual([{ n: 1 }]);
+            });
+
+            it("without --eval, is a REPL with rebase in scope and top-level await", async () => {
+                const input = new PassThrough();
+                const output = new PassThrough();
+                const lines = [
+                    "const rows = await rebase.sql('SELECT count(*)::int AS n FROM public.notes')",
+                    "rows[0].n * 10",
+                    ".exit"
+                ];
+                let transcript = "";
+                // One line per prompt, as a person types: a line sent before the
+                // previous one's await settles would be evaluated beside it.
+                output.on("data", (chunk: Buffer) => {
+                    transcript += String(chunk);
+                    if (transcript.endsWith("rebase> ") && lines.length > 0) input.write(`${lines.shift()}\n`);
+                });
+                const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
+                vi.stubEnv("DATABASE_URL", urlFor(container, "app"));
+                vi.stubEnv("LOG_LEVEL", "error");
+                try {
+                    const exit = await consoleCommand(["console", "--collections", collectionsDir], { input, output });
+                    expect(exit).toBe(0);
+                } finally {
+                    vi.unstubAllEnvs();
+                    log.mockRestore();
+                }
+                expect(transcript).toContain("20");
+                expect(transcript).not.toMatch(/Uncaught/);
+            });
+
+            it("exits 1 with the error on stderr, and nothing on stdout, when the code throws", async () => {
+                const result = await evalInConsole("rebase.sql('SELECT * FROM no_such_table')");
+                expect(result.code).toBe(1);
+                expect(result.stdout).toBe("");
+                expect(result.stderr).toMatch(/no_such_table/);
+            });
         });
 
         it("close() releases the pool", async () => {

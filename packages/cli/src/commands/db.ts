@@ -361,7 +361,7 @@ export function refuseBranchOnManagedDatabase(rawArgs: string[], kind: string): 
  * `schema generate` reads collection files and writes one file, and starting a
  * database to run it would be a side effect nobody asked for.
  */
-async function resolveDriverCli(): Promise<{
+export async function resolveDriverCli(): Promise<{
     projectRoot: string;
     backendDir: string;
     pluginCli: string;
@@ -1035,7 +1035,7 @@ async function restoreAppRole(target: string): Promise<void> {
  * push. A failure here is reported and not fatal — the command runs and its
  * own connection error follows, which is the same contract `dev` keeps.
  */
-async function ensureDockerDatabase(projectRoot: string, rawArgs: readonly string[]): Promise<void> {
+export async function ensureDockerDatabase(projectRoot: string, rawArgs: readonly string[]): Promise<void> {
     if (!rawArgs.includes("--docker")) return;
 
     const { ensureDevDatabase } = await import("../utils/dev-preflight");

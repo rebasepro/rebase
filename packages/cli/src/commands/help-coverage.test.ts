@@ -375,6 +375,7 @@ describe("every command the dispatch answers parses its flags strictly", () => {
         init: "init.ts",
         schema: "schema.ts",
         db: "db.ts",
+        console: "console.ts",
         dev: "dev.ts",
         build: "build.ts",
         start: "start.ts",
