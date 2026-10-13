@@ -45,7 +45,7 @@ import {
 import { sql as drizzleSql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { DatabaseError, Pool, type PoolClient } from "pg";
-import { sqlRows, applyDefaultValuesOnCreate, buildPropertyCallbacks, hasFieldAccessRules, buildSdkData, callbackRefusal, classifyTable, detectJunctionTables, getTenantConfig, requireCallbackClient, requireCallbackCollection, resolveCollectionRelations, resolveTenantWrite, restoresSoftDeletedRow, tenantBypassRoles, toCallbackError, updateDateAutoValues, updateUserAutoValues } from "@rebasepro/common";
+import { sqlRows, applyDefaultValuesOnCreate, buildPropertyCallbacks, hasFieldAccessRules, buildSdkData, callbackRefusal, createAccessorSlugResolver, classifyTable, detectJunctionTables, getTenantConfig, requireCallbackClient, requireCallbackCollection, resolveCollectionRelations, resolveTenantWrite, restoresSoftDeletedRow, tenantBypassRoles, toCallbackError, updateDateAutoValues, updateUserAutoValues } from "@rebasepro/common";
 import { PostgresCollectionRegistry } from "./collections/PostgresCollectionRegistry";
 import { deriveRowAddress, getPrimaryKeys, parseIdValues } from "./services/collection-helpers";
 import { isJunctionBackedRelation, isNestedPath, resolveNestedPath } from "./services/nested-path";
@@ -447,7 +447,9 @@ export class PostgresBackendDriver implements DataDriver {
         this.realtimeService = realtimeService;
         this.historyService = historyService;
         this.user = user;
-        this.data = buildSdkData(this);
+        // `data.myNotes` is the collection whose accessor is `myNotes` (the
+        // `my-notes` slug, whatever its table), as the generated types say.
+        this.data = buildSdkData(this, { resolveAccessor: createAccessorSlugResolver(() => registry?.getCollections()) });
 
         // Initialize BranchService when adminConnectionString is configured
         if (poolManager) {
@@ -3027,7 +3029,9 @@ export class AuthenticatedPostgresBackendDriver implements DataDriver {
         user: User
     ) {
         this.user = user;
-        this.data = buildSdkData(this);
+        this.data = buildSdkData(this, {
+            resolveAccessor: createAccessorSlugResolver(() => delegate.registry?.getCollections())
+        });
 
         // Delegate admin ops to the base driver (no RLS wrapping for admin)
         this.admin = delegate.admin;

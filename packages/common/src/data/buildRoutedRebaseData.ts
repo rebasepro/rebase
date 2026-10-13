@@ -35,6 +35,12 @@ export interface RoutedRebaseDataParams<T extends RoutableData = RebaseData> {
      * default data source.
      */
     resolveKey: (slugOrPath: string) => string | undefined;
+
+    /**
+     * The slug a property names (`data.myNotes`). Absent, a property is its
+     * snake_case (`my_notes`). See `createAccessorSlugResolver`.
+     */
+    resolveAccessor?: (property: string) => string;
 }
 
 /**
@@ -64,7 +70,8 @@ export interface RoutedRebaseDataParams<T extends RoutableData = RebaseData> {
 export function buildRoutedRebaseData<T extends RoutableData = RebaseData>({
     defaultData,
     sources,
-    resolveKey
+    resolveKey,
+    resolveAccessor
 }: RoutedRebaseDataParams<T>): T {
 
     // Fast path: nothing to route → return the default untouched (preserves
@@ -95,9 +102,9 @@ export function buildRoutedRebaseData<T extends RoutableData = RebaseData>({
             // Ignore internal JS properties
             if (prop === "then" || prop === "toJSON" || prop === "$$typeof") return undefined;
 
-            // Convert camelCase property names to snake_case slugs, mirroring
-            // buildRebaseData so dynamic access routes consistently.
-            return getAccessor(toSnakeCase(prop));
+            // A collection's own accessor name, else camelCase → snake_case,
+            // mirroring buildRebaseData so dynamic access routes consistently.
+            return getAccessor(resolveAccessor?.(prop) ?? toSnakeCase(prop));
         }
     }) as T;
 }

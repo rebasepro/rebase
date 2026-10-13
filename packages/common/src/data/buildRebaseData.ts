@@ -86,6 +86,14 @@ export interface EntityDataOptions {
      * the address is the stored path.
      */
     resolveDataPath?: (path: string) => string | undefined;
+
+    /**
+     * The slug a property of the proxy names (`data.myNotes`). Absent, a
+     * property is its snake_case (`my_notes`). The server passes
+     * `createAccessorSlugResolver` over its collection registry, so a
+     * collection is reachable under the accessor its generated type has.
+     */
+    resolveAccessor?: (property: string) => string;
 }
 
 function createPrimaryKeyResolver(options?: EntityDataOptions) {
@@ -826,9 +834,8 @@ export function buildRebaseData(driver: DataDriver, options?: EntityDataOptions)
             // Ignore internal JS properties
             if (prop === "then" || prop === "toJSON" || prop === "$$typeof") return undefined;
 
-            // Convert camelCase property names to snake_case slugs
-            const slug = toSnakeCase(prop);
-            return getAccessor(slug);
+            // A collection's own accessor name, else camelCase → snake_case.
+            return getAccessor(options?.resolveAccessor?.(prop) ?? toSnakeCase(prop));
         }
     });
 }
@@ -1463,7 +1470,10 @@ export function wrapAsEntityData(sdkData: Pick<RebaseSdkData, "collection">, opt
  * — e.g. the admin routes its Entity data via `useData()` and exposes the
  * same routing as flat `context.data` for callbacks by wrapping it here.
  */
-export function wrapAsSdkData(entityData: RebaseData): RebaseSdkData {
+export function wrapAsSdkData(
+    entityData: RebaseData,
+    options?: Pick<EntityDataOptions, "resolveAccessor">
+): RebaseSdkData {
     const cache = new Map<string, SDKCollectionClient>();
 
     function getAccessor(slug: string): SDKCollectionClient {
@@ -1482,7 +1492,7 @@ export function wrapAsSdkData(entityData: RebaseData): RebaseSdkData {
             if (prop === "collection") return getAccessor;
             if (typeof prop === "symbol") return undefined;
             if (prop === "then" || prop === "toJSON" || prop === "$$typeof") return undefined;
-            return getAccessor(toSnakeCase(prop));
+            return getAccessor(options?.resolveAccessor?.(prop) ?? toSnakeCase(prop));
         }
     });
 }
@@ -1498,7 +1508,13 @@ export function wrapAsSdkData(entityData: RebaseData): RebaseSdkData {
  * the admin's view-model and never reaches here.
  *
  * The admin uses {@link buildRebaseData} (Entity) over its own driver.
+ *
+ * `options.resolveAccessor` names the slug a property is (see
+ * `createAccessorSlugResolver`); absent, `data.myNotes` is `my_notes`.
  */
-export function buildSdkData(driver: DataDriver): RebaseSdkData {
-    return wrapAsSdkData(buildRebaseData(driver));
+export function buildSdkData(
+    driver: DataDriver,
+    options?: Pick<EntityDataOptions, "resolveAccessor">
+): RebaseSdkData {
+    return wrapAsSdkData(buildRebaseData(driver), options);
 }

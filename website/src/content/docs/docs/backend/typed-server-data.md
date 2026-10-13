@@ -96,6 +96,8 @@ and `listen` return the collection's `Row`; `where` and `orderBy` are
 keyed by its columns; `include` names its relations; `create` takes its
 `Insert` and `update` its `Update`. Accessors are the camelCase names from the
 generated file (`order_items` is `orderItems`).
+The server resolves those names through the registered collections, so a
+`my-notes` collection stored in a `notes` table is `context.data.myNotes`.
 
 `collection(slug)` stays untyped on purpose, for a slug you compute at runtime.
 

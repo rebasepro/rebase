@@ -23,7 +23,7 @@ import {
     type AdminScope,
     type AuthConfigDocument
 } from "@rebasepro/types";
-import { createDataSourceRegistry, resolveDataSource, buildSdkData, buildRoutedRebaseData, getEffectiveSecurityRules, assertBeforeQueryIsPostgresOnly } from "@rebasepro/common";
+import { createDataSourceRegistry, resolveDataSource, buildSdkData, buildRoutedRebaseData, createAccessorSlugResolver, getEffectiveSecurityRules, assertBeforeQueryIsPostgresOnly } from "@rebasepro/common";
 import { randomBytes } from "node:crypto";
 import { BackendCollectionRegistry } from "./collections/BackendCollectionRegistry";
 import { loadCollectionsFromDirectory } from "./collections/loader";
@@ -3109,7 +3109,10 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
     const serviceIdentity = SERVICE_IDENTITY;
 
     const scopedDefaultDriver = await scopeDataDriver(defaultDriver, serviceIdentity);
-    const defaultData = buildSdkData(scopedDefaultDriver);
+    // `rebase.dataAsAdmin.myNotes` is the collection whose generated accessor
+    // is `myNotes`, whatever its slug's snake_case or its table is.
+    const resolveAccessor = createAccessorSlugResolver(() => collectionRegistry.getCollections());
+    const defaultData = buildSdkData(scopedDefaultDriver, { resolveAccessor });
 
     // Hand the storage authorize hook its trusted reader. Scoped as the service
     // identity, so an ownership lookup is not itself filtered by the caller's
@@ -3124,13 +3127,14 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         const delegate = driverRegistry.get(driverKey);
         if (!delegate) continue;
         const scopedDelegate = await scopeDataDriver(delegate, serviceIdentity);
-        dataSourcesByKey[driverKey] = buildSdkData(scopedDelegate);
+        dataSourcesByKey[driverKey] = buildSdkData(scopedDelegate, { resolveAccessor });
     }
 
     const serverData = buildRoutedRebaseData({
         defaultData,
         sources: dataSourcesByKey,
-        resolveKey: (slugOrPath: string) => keyForCollectionPath(slugOrPath)
+        resolveKey: (slugOrPath: string) => keyForCollectionPath(slugOrPath),
+        resolveAccessor
     });
 
     // Overwrite the HTTP-transport data proxy with the native driver-backed one.

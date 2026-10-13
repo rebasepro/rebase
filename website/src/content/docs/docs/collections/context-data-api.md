@@ -22,6 +22,11 @@ afterSave: async ({ values, id, context }) => {
 }
 ```
 
+A property is the collection's accessor, the name the generated SDK gives it:
+`context.data.myNotes` is the `my-notes` collection, whatever table it is
+stored in. A name that is no collection's accessor is read as its snake_case,
+so `context.data.auditLog` is `audit_log`.
+
 Rows are untyped (`Record<string, unknown>`) until the project registers its
 generated `Database`; then every accessor is typed from it. See
 [Typed server-side data](/docs/backend/typed-server-data).
