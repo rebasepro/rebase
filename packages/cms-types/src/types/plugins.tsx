@@ -184,9 +184,10 @@ export interface PluginHooks {
     modifyCollection?: (collection: AdminCollection) => AdminCollection;
 
     /**
-     * Async version of modifyCollection — supports fetching remote config.
-     * Runs during navigation resolution. If provided alongside `modifyCollection`,
-     * the sync version runs first, then the async version.
+     * @deprecated Never invoked — this hook never ran. Remove it; use
+     * `modifyCollection` instead, with whatever it needs fetched before
+     * `<Rebase>` renders (keep the plugin `loading: true` until it arrives).
+     * Will be removed in a future release.
      */
     modifyCollectionAsync?: (collection: AdminCollection) => Promise<AdminCollection>;
 
@@ -262,8 +263,10 @@ export interface PluginLifecycle {
     onAuthStateChange?: (user: User | null) => void;
 
     /**
-     * Called when a collection's visible entities change.
-     * Useful for analytics, caching, or cross-plugin coordination.
+     * @deprecated Never invoked — this hook never ran. Remove it; subscribe to
+     * the rows yourself instead: `context.data.collection(slug).listen(...)`
+     * from `onMount`, unsubscribing in `onUnmount`. Will be removed in a
+     * future release.
      */
     onCollectionChange?: (slug: string, entities: unknown[]) => void;
 }

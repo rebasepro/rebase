@@ -9,6 +9,7 @@ import { User, CollectionRegistryController, DataDriver, DataSourceDefinition, R
 import { RebaseContext, UNRENDERED_SLOTS } from "@rebasepro/cms-types";
 import { PluginProviderStack } from "./PluginProviderStack";
 import { PluginLifecycleManager } from "./PluginLifecycleManager";
+import { warnDeprecatedPluginKeys } from "./deprecated_plugin_keys";
 import { AuthControllerContext, CollectionResolverRegistrationContext, CollectionResolver, DataPathResolver } from "../contexts";
 import { useCustomizationController, useRebaseContext, useAuthSubscription } from "../hooks";
 import { ApiConfigProvider, useApiConfig } from "../hooks/ApiConfigContext";
@@ -108,6 +109,11 @@ export function Rebase<USER extends User, DB = unknown>(props: RebaseProps<USER,
             console.error("Duplicate plugin keys detected:", keys.filter((k, i) => keys.indexOf(k) !== i));
         }
     }
+
+    // A plugin key nothing calls is a plugin doing nothing, silently.
+    useEffect(() => {
+        if (plugins) warnDeprecatedPluginKeys(plugins);
+    }, [plugins]);
 
     // Per-user table preferences — a resized column, a reordered one, the view
     // mode a collection was left in — are local by nature, so the panel keeps
