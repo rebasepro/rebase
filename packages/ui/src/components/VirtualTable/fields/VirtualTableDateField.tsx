@@ -1,12 +1,12 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { cls } from "../../../util";
 import { focusedDisabled } from "../../../styles";
-import { DateTimeField } from "../../DateTimeField";
+import { DateTimeField, type DateTimeFieldMode } from "../../DateTimeField";
 
 export function VirtualTableDateField(props: {
     name?: string;
     error?: Error;
-    mode?: "date" | "date_time";
+    mode?: DateTimeFieldMode;
     timezone?: string;
     internalValue: Date | undefined | null;
     updateValue: (newValue: (Date | null)) => void;

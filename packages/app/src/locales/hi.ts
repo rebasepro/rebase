@@ -62,6 +62,7 @@ export const hi: RebaseTranslations = {
     all_entries_loaded: "सभी {{count}} प्रविष्टियाँ लोड हो गईं",
     error_loading_data_message: "डेटा लोड करने में त्रुटि: {{message}}",
     clear_search: "खोज साफ़ करें",
+    open_time_picker: "समय चयनकर्ता खोलें",
     relative_just_now: "अभी-अभी",
     relative_in_a_moment: "कुछ ही क्षण में",
     relative_minutes_ago: "{{count}} मिनट पहले",

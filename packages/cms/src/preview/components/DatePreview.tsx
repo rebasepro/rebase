@@ -8,9 +8,10 @@ import { getLoadedDateFnsLocale, loadDateFnsLocale } from "./date_fns_locales";
 export interface DatePreviewProps {
     date: Date;
     /**
-     * Display mode: "date" for date-only, "date_time" for date and time
+     * Display mode: "date" for date-only, "date_time" for date and time,
+     * "time" for a time of day (a `time` column) with no day at all
      */
-    mode?: "date" | "date_time";
+    mode?: "date" | "date_time" | "time";
     /**
      * IANA timezone identifier (e.g., "America/New_York")
      * When specified, the date will be displayed in this timezone
@@ -74,14 +75,17 @@ export function DatePreview({
 
     // If timezone is specified, format in that timezone using Intl.DateTimeFormat
     if (timezone) {
-        const options: Intl.DateTimeFormatOptions = {
-            year: "numeric",
-            month: "short",
-            day: "numeric",
-            timeZone: timezone
-        };
+        // A time of day travels on 1970-01-01; that day is not part of it.
+        const options: Intl.DateTimeFormatOptions = mode === "time"
+            ? { timeZone: timezone }
+            : {
+                year: "numeric",
+                month: "short",
+                day: "numeric",
+                timeZone: timezone
+            };
 
-        if (mode === "date_time") {
+        if (mode === "date_time" || mode === "time") {
             options.hour = "2-digit";
             options.minute = "2-digit";
         }
@@ -115,7 +119,9 @@ export function DatePreview({
 
     // No timezone specified: use local formatting with date-fns
     let dateFormat: string;
-    if (mode === "date") {
+    if (mode === "time") {
+        dateFormat = "p"; // e.g., "9:30 AM"
+    } else if (mode === "date") {
         // Date-only format (no time)
         dateFormat = customizationController?.dateTimeFormat
             ? customizationController.dateTimeFormat.replace(/[, ]*[HhKk].*$/, "").trim()

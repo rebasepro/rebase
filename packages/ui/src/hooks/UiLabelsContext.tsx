@@ -24,6 +24,8 @@ export interface UiLabels {
     clearSearch: string;
     /** A row's or card's selection checkbox in the collection views. */
     select: string;
+    /** The button that opens a time-of-day field's picker (`DateTimeField mode="time"`). */
+    openTimePicker: string;
     /** The phrases `formatRelativeTime` (`@rebasepro/utils`) takes as `labels`. */
     relativeTime: UiRelativeTimeLabels;
 }
@@ -49,6 +51,7 @@ export const defaultUiLabels: UiLabels = {
     search: "Search",
     clearSearch: "Clear search",
     select: "Select",
+    openTimePicker: "Open time picker",
     relativeTime: {
         justNow: "just now",
         inAMoment: "in a moment",

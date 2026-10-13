@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useCallback, useId, useRef, useState } from "react";
-import { CalendarIcon, XIcon, AlertCircleIcon } from "lucide-react";
+import { CalendarIcon, ClockIcon, XIcon, AlertCircleIcon } from "lucide-react";
 import { iconSize } from "../icons/Icon";
 import { IconButton } from "./IconButton";
 import { fieldBackgroundDisabledMixin, fieldBackgroundHoverMixin, fieldBackgroundMixin } from "../styles";
@@ -10,11 +10,19 @@ import { InputLabel } from "./InputLabel";
 import { Typography } from "./Typography";
 import { cls } from "../util";
 import { useInjectStyles } from "../hooks";
+import { useUiLabels } from "../hooks/UiLabelsContext";
+
+/**
+ * What the field picks: a day, a day and a time, or a time of day alone. A
+ * time of day is a `Date` on 1970-01-01 — how a `time` column travels — read
+ * and written in `timezone`.
+ */
+export type DateTimeFieldMode = "date" | "date_time" | "time";
 
 export type DateTimeFieldProps = {
     value?: Date | null;
     onChange?: (date: Date | null) => void;
-    mode?: "date" | "date_time";
+    mode?: DateTimeFieldMode;
     disabled?: boolean;
     clearable?: boolean;
     error?: boolean;
@@ -91,7 +99,7 @@ function inputPartsFormatter(timeZone: string | undefined): Intl.DateTimeFormat 
 /** A UTC `Date` as the input's value string, in `timezone` (undefined = local). */
 function valueAsInputValue(
     dateValue: Date | null,
-    mode: "date" | "date_time",
+    mode: DateTimeFieldMode,
     timezone: string | undefined
 ): string {
     if (!dateValue || !(dateValue instanceof Date) || isNaN(dateValue.getTime())) {
@@ -108,6 +116,9 @@ function valueAsInputValue(
     const month = getPart("month");
     const day = getPart("day");
 
+    if (mode === "time") {
+        return `${getPart("hour")}:${getPart("minute")}`;
+    }
     if (mode === "date") {
         return `${year}-${month}-${day}`;
     } else {
@@ -137,6 +148,7 @@ export const DateTimeField: React.FC<DateTimeFieldProps> = ({
     "aria-label": ariaLabel
 }) => {
     const inputRef = useRef<HTMLInputElement>(null);
+    const labels = useUiLabels();
     const setInputRef = useCallback((node: HTMLInputElement | null) => {
         inputRef.current = node;
         if (typeof inputRefProp === "function") inputRefProp(node);
@@ -217,7 +229,12 @@ export const DateTimeField: React.FC<DateTimeFieldProps> = ({
         try {
             let year: number, month: number, day: number, hours = 0, minutes = 0;
 
-            if (mode === "date") {
+            if (mode === "time") {
+                // Parse time-only input: "HH:MM" (or "HH:MM:SS"), on the
+                // day a time of day travels on.
+                [year, month, day] = [1970, 1, 1];
+                [hours, minutes] = inputValue.split(":").map(Number);
+            } else if (mode === "date") {
                 // Parse date-only input: "YYYY-MM-DD"
                 [year, month, day] = inputValue.split("-").map(Number);
             } else {
@@ -342,7 +359,7 @@ export const DateTimeField: React.FC<DateTimeFieldProps> = ({
                     id={inputId}
                     aria-labelledby={label ? labelId : undefined}
                     aria-label={label ? undefined : ariaLabel}
-                    type={mode === "date_time" ? "datetime-local" : "date"}
+                    type={mode === "date_time" ? "datetime-local" : mode === "time" ? "time" : "date"}
                     lang={locale}
                     aria-invalid={error || undefined}
                     value={isTyping ? internalValue : displayValue}
@@ -374,7 +391,7 @@ export const DateTimeField: React.FC<DateTimeFieldProps> = ({
                 />
                 {pickerButton && <IconButton
                     size={adornmentSize}
-                    aria-label="Open calendar"
+                    aria-label={mode === "time" ? labels.openTimePicker : "Open calendar"}
                     disabled={disabled}
                     onClick={(e) => {
                         e.stopPropagation();
@@ -388,7 +405,7 @@ export const DateTimeField: React.FC<DateTimeFieldProps> = ({
                     }}
                     className="absolute right-3 top-1/2 transform -translate-y-1/2 text-surface-accent-500!"
                 >
-                    <CalendarIcon/>
+                    {mode === "time" ? <ClockIcon/> : <CalendarIcon/>}
                 </IconButton>}
                 {clearable && value && (
                     <IconButton
@@ -422,13 +439,15 @@ export const DateTimeField: React.FC<DateTimeFieldProps> = ({
 const inputStyles = `
     /* Hide the default calendar icon in Chrome, Safari, Edge, Opera */
     input[type="date"]::-webkit-calendar-picker-indicator,
-    input[type="datetime-local"]::-webkit-calendar-picker-indicator {
+    input[type="datetime-local"]::-webkit-calendar-picker-indicator,
+    input[type="time"]::-webkit-calendar-picker-indicator {
         display: none;
         -webkit-appearance: none;
     }
     /* Hide default calendar icon in Firefox */
     input[type="date"],
-    input[type="datetime-local"] {
+    input[type="datetime-local"],
+    input[type="time"] {
         -moz-appearance:textfield;
     }
   `;

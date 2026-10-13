@@ -446,7 +446,7 @@ cannot manage the full-text search helpers.
 |----------|------|-------------|
 | `mode` | `"date" \| "date_time"` | Date only or date + time (default: `"date_time"`). Picks the widget; the column is the same either way. **Admin form only — not enforced by the API or the database.** |
 | `autoValue` | `"on_create" \| "on_update"` | Auto-set timestamps. `on_create` is a `DEFAULT now()`; `on_update` is a `BEFORE UPDATE` trigger **as well as** an app-layer stamp, so a raw `UPDATE` from a seed or a migration moves the column too |
-| `columnType` | `"timestamp" \| "date" \| "time"` | The database column. Defaults to `timestamp` **with time zone** |
+| `columnType` | `"timestamp" \| "date" \| "time"` | The database column. Defaults to `timestamp` **with time zone**. A `date` column is picked and shown as a day, whatever `mode` says; a `time` column as a time of day alone, in UTC, with no day (it travels as that time on 1970-01-01) |
 | `timezone` | `string` | Which timezone the picker reads and writes the value in. **Admin form only — not enforced by the API or the database.** |
 | `admin.clearable` | `boolean` | Add an icon to clear the value (set to null) |
 

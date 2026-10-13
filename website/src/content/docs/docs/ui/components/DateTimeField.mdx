@@ -14,7 +14,7 @@ import { DateTimeField } from "@rebasepro/ui";
 | --- | --- | --- | --- |
 | `value` | `Date` | — |  |
 | `onChange` | `(date: Date \| null) => void` | — |  |
-| `mode` | `"date" \| "date_time"` | — |  |
+| `mode` | `DateTimeFieldMode` | — | What the field picks: a day, a day and a time, or a time of day alone. A time of day is a `Date` on 1970-01-01 — how a `time` column travels — read and written in `timezone`. |
 | `disabled` | `boolean` | — |  |
 | `clearable` | `boolean` | — |  |
 | `error` | `boolean` | — |  |

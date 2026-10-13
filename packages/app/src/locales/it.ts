@@ -62,6 +62,7 @@ export const it: RebaseTranslations = {
     all_entries_loaded: "Tutte le {{count}} voci caricate",
     error_loading_data_message: "Errore nel caricamento dei dati: {{message}}",
     clear_search: "Cancella ricerca",
+    open_time_picker: "Apri selettore orario",
     relative_just_now: "proprio ora",
     relative_in_a_moment: "tra un attimo",
     relative_minutes_ago: "{{count}} min fa",

@@ -101,11 +101,14 @@ export function getDatePropertyTimezone(property: DateProperty): string | undefi
 }
 
 /**
- * Whether a date property is picked and shown as a day or a day and a time. A
- * `date` column holds no time, so it is a day whatever `mode` says.
+ * Whether a date property is picked and shown as a day, a day and a time, or
+ * a time of day. A `date` column holds no time, so it is a day whatever `mode`
+ * says; a `time` column holds no day, so it is a time of day.
  */
-export function getDatePropertyMode(property: DateProperty): "date" | "date_time" | undefined {
-    return property.columnType === "date" ? "date" : property.mode;
+export function getDatePropertyMode(property: DateProperty): "date" | "date_time" | "time" | undefined {
+    if (property.columnType === "date") return "date";
+    if (property.columnType === "time") return "time";
+    return property.mode;
 }
 
 /**

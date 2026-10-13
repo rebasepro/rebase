@@ -275,6 +275,7 @@ function UiLabelsFromTranslations({ children }: PropsWithChildren) {
         search: t("search"),
         clearSearch: t("clear_search"),
         select: t("select"),
+        openTimePicker: t("open_time_picker"),
         relativeTime: {
             justNow: t("relative_just_now"),
             inAMoment: t("relative_in_a_moment"),

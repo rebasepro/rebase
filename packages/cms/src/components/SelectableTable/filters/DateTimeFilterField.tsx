@@ -1,11 +1,11 @@
 import React, { useState } from "react";
 import { VirtualTableWhereFilterOp } from "@rebasepro/ui";
-import { DateTimeField, Select, SelectItem } from "@rebasepro/ui";
+import { DateTimeField, type DateTimeFieldMode, Select, SelectItem } from "@rebasepro/ui";
 import { useCustomizationController } from "@rebasepro/app";
 
 interface DateTimeFilterFieldProps {
     name: string,
-    mode?: "date" | "date_time",
+    mode?: DateTimeFieldMode,
     value?: [op: VirtualTableWhereFilterOp, fieldValue: unknown];
     setValue: (value?: [op: VirtualTableWhereFilterOp, newValue: unknown]) => void;
     isArray?: boolean;

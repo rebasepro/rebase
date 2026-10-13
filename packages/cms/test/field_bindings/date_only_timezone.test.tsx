@@ -142,3 +142,36 @@ describe("a property with a timezone", () => {
     });
 
 });
+
+/**
+ * A `columnType: "time"` column holds a time of day and travels as that time
+ * on 1970-01-01 UTC. The field picked it as a date and a time, the date part a
+ * meaningless 01/01/1970 (or 12/31/1969 west of Greenwich), and the preview
+ * showed that day. It is picked and shown as a time alone now, in UTC.
+ */
+describe("a time-of-day property", () => {
+    const timeOfDay = { type: "date", name: "Due", columnType: "time", mode: "date_time" };
+    const nineThirty = new Date("1970-01-01T09:30:00.000Z");
+
+    it("is picked as a time alone, the stored time", () => {
+        renderField(timeOfDay, nineThirty);
+        expect(input().type).toEqual("time");
+        expect(input().value).toEqual("09:30");
+    });
+
+    it("writes the picked time on 1970-01-01 UTC", () => {
+        const written: (Date | null)[] = [];
+        renderField(timeOfDay, null, (value) => written.push(value));
+        fireEvent.change(input(), { target: { value: "18:45" } });
+        expect(written[written.length - 1]?.toISOString()).toEqual("1970-01-01T18:45:00.000Z");
+    });
+
+    it("previews the time with no day", () => {
+        render(<PropertyPreview propertyKey={"due"}
+            property={timeOfDay as never}
+            value={nineThirty}
+            size={"medium"}/>);
+        expect(screen.getByText(/09:30/)).toBeTruthy();
+        expect(screen.queryByText(/1970|1969/)).toBeNull();
+    });
+});

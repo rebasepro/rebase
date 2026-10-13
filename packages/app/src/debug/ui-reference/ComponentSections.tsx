@@ -254,9 +254,10 @@ export function MoreControlsSection() {
                     <BooleanSwitchWithLabel label="With an error" value={false} error size="small"/>
                 </div>
                 <div className="col-span-12 sm:col-span-6 flex flex-col gap-3">
-                    <SpecimenLabel>DateTimeField · date, date_time, disabled, error</SpecimenLabel>
+                    <SpecimenLabel>DateTimeField · date, date_time, time, disabled, error</SpecimenLabel>
                     <DateTimeField size="small" mode="date" label="Publish date" value={date} onChange={setDate} clearable/>
                     <DateTimeField size="small" mode="date_time" label="Publish at" value={date} onChange={setDate}/>
+                    <DateTimeField size="small" mode="time" timezone="UTC" label="Opens at" value={date} onChange={setDate}/>
                     <DateTimeField size="small" mode="date" label="Disabled" value={date} onChange={() => {}} disabled/>
                     <DateTimeField size="small" mode="date" label="Error" value={null} onChange={() => {}} error/>
                 </div>

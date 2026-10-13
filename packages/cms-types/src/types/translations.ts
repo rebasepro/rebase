@@ -93,6 +93,8 @@ export interface RebaseTranslations {
     error_loading_data_message?: string;
     /** The search bar's clear button. */
     clear_search?: string;
+    /** The button that opens a time-of-day field's picker. */
+    open_time_picker?: string;
     /** Relative time, as list, card and history dates say it. `{{count}}` is the number. */
     relative_just_now?: string;
     relative_in_a_moment?: string;
