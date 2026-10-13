@@ -25,13 +25,15 @@ const INSTANCE_SLOT = Symbol.for("@rebasepro/server:singleton-instance");
  * A *function* that answers "which client is this call for", for hosts where
  * one answer per process is the wrong shape.
  *
- * A Node server boots once and serves every request from the same client, so
- * {@link INSTANCE_SLOT} is the whole story. An isolate-based host is different
- * in a way that matters: the environment arrives attached to the **request**,
- * not to the module, so there is nothing to publish at import time, and an
- * isolate can be reused across requests that must not share state. Such a host
- * registers a resolver — typically reading an `AsyncLocalStorage` populated per
- * request — and it is consulted first.
+ * {@link INSTANCE_SLOT} is one answer per process: the default backend's. A
+ * Node process can hold several backends, and the code each one runs — a
+ * function, a cron job, a hook — must see that one, so the server registers a
+ * resolver reading the backend scope it enters per request (an
+ * `AsyncLocalStorage`, host-side, in `backend/scope.ts`). An isolate-based
+ * host is different in the same way: the environment arrives attached to the
+ * **request**, not to the module, so there is nothing to publish at import
+ * time, and an isolate can be reused across requests that must not share
+ * state. The resolver is consulted first.
  *
  * This exists now, before there is a host that needs it, because of what it
  * protects: `rebase` is a lazy Proxy, so every property access already goes
@@ -81,8 +83,9 @@ export function _setRebaseResolver(
 }
 
 /**
- * @internal Called once during server initialization to set the backing instance.
- * This is invoked by `initializeRebaseBackend()` — never call it manually.
+ * @internal Set the process default's client — what `rebase` is outside any
+ * backend's scope. Invoked by `setDefaultBackend()` (and so by
+ * `initializeRebaseBackend()`) — never call it manually.
  */
 export function _initRebase(client: RebaseServerClient): void {
     setInstance(client);
@@ -111,10 +114,13 @@ export function _resetRebaseMock(): void {
 }
 
 /**
- * The server-side Rebase singleton.
+ * The server-side Rebase client, as a module-level handle.
  *
- * Initialized automatically during server startup. Provides access to all
- * app-scoped services: **data**, **auth**, **storage**, and **email**.
+ * Inside a request, cron run or job a backend serves, it is that backend's
+ * client (`backend.rebase`) — so with two backends in one process, each one's
+ * functions see their own. Anywhere else it is the process default's, which
+ * `initializeRebaseBackend` (or `setDefaultBackend`) installs. Provides access
+ * to all app-scoped services: **data**, **auth**, **storage**, and **email**.
  *
  * **Admin data plane** (`rebase.dataAsAdmin`):
  * Backed by the native DataDriver — calls go directly to the database without
@@ -180,7 +186,7 @@ export const rebase: RebaseServerClient = new Proxy({} as RebaseServerClient, {
     set(_, prop) {
         throw new Error(
             `Cannot set rebase.${String(prop)} directly. ` +
-            "The singleton is read-only. Use _initRebase() during server startup."
+            "The singleton is read-only. Install a backend with setDefaultBackend(backend), or use backend.rebase."
         );
     }
 });

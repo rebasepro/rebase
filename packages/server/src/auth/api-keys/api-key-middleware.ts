@@ -26,7 +26,7 @@ import type { ApiKeyStore } from "./api-key-store";
 import type { ApiKeyMasked } from "./api-key-types";
 import { scopeDataDriver } from "../rls-scope";
 import { extractBearerToken } from "../bearer-token";
-import { getAccessModel, getKeyOwnerResolver } from "../access";
+import { accessOf, processAccessControl, type AccessControl } from "../access";
 import { logger } from "../../utils/logger";
 import { sha256Hex } from "../../utils/portable-crypto";
 import { ApiError, errorHandler } from "../../api/errors";
@@ -54,8 +54,16 @@ export interface ApiKeyRefusal {
 /**
  * Verify a presented key: it exists, is live, and — for a personal key —
  * personal keys are on and its owner still exists. Records the use.
+ *
+ * `access` is the backend the key belongs to: whether it takes personal keys,
+ * how it finds their owners, and what their roles hold. The process default
+ * when omitted.
  */
-export async function resolveApiKey(store: ApiKeyStore, token: string): Promise<ApiKeyIdentity | ApiKeyRefusal> {
+export async function resolveApiKey(
+    store: ApiKeyStore,
+    token: string,
+    access: AccessControl = processAccessControl
+): Promise<ApiKeyIdentity | ApiKeyRefusal> {
     const apiKey = await store.findByKeyHash(await sha256Hex(token));
 
     if (!apiKey) return { message: "Invalid API key" };
@@ -64,7 +72,7 @@ export async function resolveApiKey(store: ApiKeyStore, token: string): Promise<
 
     let identity: { uid: string; roles: string[]; scopes: string[] };
     if (apiKey.kind === "personal") {
-        const resolveOwner = getKeyOwnerResolver();
+        const resolveOwner = access.resolveKeyOwner;
         if (!resolveOwner || !apiKey.owner_uid) {
             return { message: "Personal API keys are switched off on this backend" };
         }
@@ -73,7 +81,7 @@ export async function resolveApiKey(store: ApiKeyStore, token: string): Promise<
         identity = {
             uid: apiKey.owner_uid,
             roles: owner.roles,
-            scopes: intersectScopes(apiKey.scopes, scopesForRoles(owner.roles, getAccessModel()))
+            scopes: intersectScopes(apiKey.scopes, scopesForRoles(owner.roles, access.model))
         };
     } else {
         identity = {
@@ -136,7 +144,7 @@ export async function validateApiKey(
     token: string,
     options: ApiKeyAuthOptions
 ): Promise<Response | true> {
-    const resolved = await resolveApiKey(options.store, token);
+    const resolved = await resolveApiKey(options.store, token, accessOf(c));
     if (!("uid" in resolved)) {
         return errorHandler(ApiError.unauthenticated(resolved.message), c) as Response;
     }

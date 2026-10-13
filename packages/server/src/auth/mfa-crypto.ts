@@ -39,7 +39,7 @@
 
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from "crypto";
 import { logger } from "../utils/logger";
-import { configuredJwtSecret } from "./jwt";
+import { processJwtService, type JwtService } from "./jwt";
 
 const ALGORITHM = "aes-256-gcm";
 const IV_BYTES = 12;
@@ -68,12 +68,13 @@ source };
 }
 
 /**
- * Every key this process can decrypt with, most-preferred first.
+ * Every key this backend can decrypt with, most-preferred first.
  *
  * The head of the list is the key new ciphertexts are written with; the rest
- * exist so that ciphertexts written before a rotation still open.
+ * exist so that ciphertexts written before a rotation still open. `jwt` is the
+ * backend's, whose secret is the last fallback.
  */
-function keyCandidates(): KeyCandidate[] {
+function keyCandidates(jwt: JwtService): KeyCandidate[] {
     const candidates: KeyCandidate[] = [];
     const seen = new Set<string>();
 
@@ -93,7 +94,7 @@ function keyCandidates(): KeyCandidate[] {
     // `auth.jwtSecret` in code, not under that environment name, had no key
     // at all, and every `/mfa/enroll` answered 500 with the reason only in the
     // log. Last, so a deployment that sets both keeps reading what it wrote.
-    add(configuredJwtSecret(), "auth.jwtSecret");
+    add(jwt.hmacSecret(), "auth.jwtSecret");
 
     if (candidates.length === 0) {
         throw new Error(
@@ -115,18 +116,20 @@ function keyCandidates(): KeyCandidate[] {
 }
 
 /** The key new ciphertexts are written with. */
-function currentKey(): KeyCandidate {
-    return keyCandidates()[0];
+function currentKey(jwt: JwtService): KeyCandidate {
+    return keyCandidates(jwt)[0];
 }
 
 /**
  * Encrypt a plaintext TOTP secret.
  *
  * @param plaintext - The Base32 TOTP secret to encrypt.
+ * @param jwt - The backend whose JWT secret is the last key fallback. The
+ *   process default when omitted.
  * @returns A string in the format `v1.<keyId>:iv_hex:authTag_hex:ciphertext_hex`.
  */
-export function encryptTotpSecret(plaintext: string): string {
-    const { id, key } = currentKey();
+export function encryptTotpSecret(plaintext: string, jwt: JwtService = processJwtService): string {
+    const { id, key } = currentKey(jwt);
     const iv = randomBytes(IV_BYTES);
 
     const cipher = createCipheriv(ALGORITHM, key, iv, { authTagLength: AUTH_TAG_LENGTH });
@@ -161,10 +164,12 @@ export interface OpenedTotpSecret {
  *
  * Accepts both the key-stamped format and the original unstamped
  * `iv:authTag:ciphertext`, which is tried against each candidate in turn.
+ * `jwt` is the backend whose JWT secret is the last key fallback — the process
+ * default when omitted.
  */
-export function openTotpSecret(ciphertext: string): OpenedTotpSecret {
+export function openTotpSecret(ciphertext: string, jwt: JwtService = processJwtService): OpenedTotpSecret {
     const parts = ciphertext.split(":");
-    const candidates = keyCandidates();
+    const candidates = keyCandidates(jwt);
     const current = candidates[0];
 
     if (parts.length === 4) {
@@ -188,7 +193,7 @@ export function openTotpSecret(ciphertext: string): OpenedTotpSecret {
 
         const secret = openWith(named, ivHex, authTagHex, encryptedHex);
         return { secret,
-rewrapped: named.id === current.id ? null : encryptTotpSecret(secret) };
+rewrapped: named.id === current.id ? null : encryptTotpSecret(secret, jwt) };
     }
 
     if (parts.length !== 3) {
@@ -207,7 +212,7 @@ rewrapped: named.id === current.id ? null : encryptTotpSecret(secret) };
             // Always re-wrapped: even when the key is unchanged, stamping it
             // is what lets the next rotation identify this ciphertext.
             return { secret,
-rewrapped: encryptTotpSecret(secret) };
+rewrapped: encryptTotpSecret(secret, jwt) };
         } catch {
             // Wrong key — GCM refused to authenticate. Try the next one.
         }
@@ -227,8 +232,9 @@ rewrapped: encryptTotpSecret(secret) };
  * on whichever key it was written with.
  *
  * @param ciphertext - A stored TOTP secret, in either format.
+ * @param jwt - The backend whose JWT secret is the last key fallback.
  * @returns The original Base32 TOTP secret.
  */
-export function decryptTotpSecret(ciphertext: string): string {
-    return openTotpSecret(ciphertext).secret;
+export function decryptTotpSecret(ciphertext: string, jwt: JwtService = processJwtService): string {
+    return openTotpSecret(ciphertext, jwt).secret;
 }

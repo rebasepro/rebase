@@ -6,6 +6,7 @@ import type { AuthAdapter } from "./auth_adapter";
 import type { HistoryConfig } from "../controllers/client";
 import type { ChannelBusSetting } from "./channel_bus";
 import type { SchemaEditingAdmin } from "./schema_editing";
+import type { AccessModel } from "./scopes";
 
 // =============================================================================
 // DATABASE CONNECTION INTERFACES
@@ -1076,6 +1077,24 @@ export interface RealtimeSocketOptions {
         /** The key itself: its id and `rate_limit` decide which rate-limit bucket its frames count in. */
         apiKey?: { id: string; rate_limit: number | null };
     } | { message: string }>;
+    /**
+     * Verify a session token presented to `AUTHENTICATE` with the backend's own
+     * keys, when the socket has no auth adapter to ask: who it names, or null
+     * when it does not verify. The server passes its backend's; absent, the
+     * driver falls back to the process default.
+     */
+    verifyAccessToken?: (token: string) => Promise<{
+        uid: string;
+        roles?: string[];
+        isAnonymous?: boolean;
+        claims?: Record<string, unknown>;
+    } | null>;
+    /**
+     * The backend's access model — what a session's roles hold on the socket's
+     * admin frames. The server passes its backend's; absent, the driver falls
+     * back to the process default.
+     */
+    accessModel?: AccessModel;
     /**
      * The largest frame accepted, in bytes — the data API's body limit. `0` or
      * less for none. Defaults to the server's default body limit.

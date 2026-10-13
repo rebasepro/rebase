@@ -22,6 +22,7 @@ import {
 } from "./resource-adapters.js";
 
 import { createRebaseBackend } from "../backend/create-backend";
+import { setDefaultBackend } from "../backend/default-backend";
 import type { RebaseBackendInstance } from "../init";
 import { installUnhandledRejectionHandler } from "../init/process-safety";
 import { loadCollectionsFromDirectory } from "../collections/loader";
@@ -421,6 +422,10 @@ export async function bootFromBundle(options: BootOptions = {}): Promise<BootedR
         // Undefined unless set, which leaves the boot exactly as it was.
         liveSchema
     });
+    // The process serves this one backend: the module-level API — `rebase`
+    // in a function file outside a request, the JWT helpers, topics — answers
+    // for it, as it does under `initializeRebaseBackend`.
+    setDefaultBackend(createdBackend);
     createdBackend.mount(app, { basePath: env.REBASE_BASE_PATH });
     await createdBackend.attachRealtime(server);
     createdBackend.start();

@@ -7,8 +7,8 @@ import { HonoEnv } from "../api/types";
 import type { MiddlewareHandler } from "hono";
 import { extractBearerToken } from "./bearer-token";
 import { logger } from "../utils/logger";
-import { strictAuthLimiter, defaultAuthLimiter, requestClientAddress } from "./rate-limiter";
-import { hashRefreshToken } from "./jwt";
+import { requestClientAddress, type AuthLimiters } from "./rate-limiter";
+import { hashRefreshToken, type JwtService } from "./jwt";
 import type { AuthModuleConfig, CreateSessionAndTokens } from "./routes";
 import type { AuthResponsePayload, TransformAuthResponseContext } from "@rebasepro/types";
 import { readRefreshToken, clearRefreshCookie, redactRefreshToken } from "./cookie-utils";
@@ -20,6 +20,10 @@ import { EMAIL_CHANGE_TTL_MS } from "./email-change-routes";
 
 interface SessionRoutesConfig {
     router: Hono<HonoEnv>;
+    /** The backend these routes sign and verify for. */
+    jwt: JwtService;
+    /** The backend's auth limiters. */
+    limiters: AuthLimiters;
     config: AuthModuleConfig;
     /**
      * The caller's guard for a signed-in user, with the revocation watermark
@@ -61,7 +65,7 @@ interface SessionRoutesConfig {
 }
 
 export function mountSessionRoutes(opts: SessionRoutesConfig): void {
-    const { router, config, ops, parseBody, buildAuthResponse, createSessionAndTokens, applyTransformHook, requireLiveSession, registerCaptcha, sendVerificationMail } = opts;
+    const { router, config, jwt, limiters, ops, parseBody, buildAuthResponse, createSessionAndTokens, applyTransformHook, requireLiveSession, registerCaptcha, sendVerificationMail } = opts;
     const authRepo = config.authRepo;
 
     /**
@@ -168,8 +172,7 @@ export function mountSessionRoutes(opts: SessionRoutesConfig): void {
             if (!signedOutUid) {
                 const accessToken = extractBearerToken(c.req.header("authorization"));
                 if (accessToken !== undefined) {
-                    const { verifyAccessToken } = await import("./jwt");
-                    signedOutUid = (await verifyAccessToken(accessToken))?.uid;
+                    signedOutUid = (await jwt.verifyAccessToken(accessToken))?.uid;
                 }
             }
             if (signedOutUid) {
@@ -329,7 +332,7 @@ export function mountSessionRoutes(opts: SessionRoutesConfig): void {
      * field of the looked-up user.
      */
     if (config.allowUserLookup) {
-        router.post("/find-user", defaultAuthLimiter, requireLiveSession, async (c) => {
+        router.post("/find-user", limiters.default, requireLiveSession, async (c) => {
             const userCtx = c.get("user") as { uid: string } | undefined;
             if (!userCtx) {
                 throw ApiError.unauthorized("Not authenticated");
@@ -390,7 +393,7 @@ export function mountSessionRoutes(opts: SessionRoutesConfig): void {
      * POST /auth/anonymous
      * Create an anonymous user with temporary credentials
      */
-    router.post("/anonymous", strictAuthLimiter, async (c) => {
+    router.post("/anonymous", limiters.strict, async (c) => {
         assertAnonymousAuthOpen();
 
         // `email` is NOT NULL, so an anonymous user needs a synthetic address —
@@ -460,7 +463,7 @@ export function mountSessionRoutes(opts: SessionRoutesConfig): void {
      * apps mint guests on page load; the two in a row used to be a way to make
      * an account that passed neither.
      */
-    router.post("/anonymous/link", strictAuthLimiter, requireLiveSession, ...(registerCaptcha ? [registerCaptcha] : []), async (c) => {
+    router.post("/anonymous/link", limiters.strict, requireLiveSession, ...(registerCaptcha ? [registerCaptcha] : []), async (c) => {
         // Gated on the same predicate as `/anonymous`: if anonymous auth is
         // off, any session reaching here predates the switch, and letting it
         // finish would be a second way to reach the state the switch exists to

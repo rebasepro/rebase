@@ -13,11 +13,11 @@
  * @module
  */
 
-import { Hono, type MiddlewareHandler } from "hono";
+import { Hono, type Context, type MiddlewareHandler } from "hono";
 import type { AccessModel } from "@rebasepro/types";
 import { ApiError, errorHandler } from "../../api/errors";
 import { createRequireAuth } from "../middleware";
-import { callerScopes, getAccessModel, requireScopeByMethod } from "../access";
+import { accessOf, callerScopes, requireScopeByMethod } from "../access";
 import type { HonoEnv } from "../../api/types";
 import type { ApiKeyStore } from "./api-key-store";
 import type { UpdateApiKeyRequest } from "./api-key-types";
@@ -48,7 +48,10 @@ export interface ApiKeyRouteOptions {
     revocationRepo?: import("../token-revocation").AccessJudgeRepository;
     /** What a scope's target may name. Unset, targets are not checked for existence. */
     targets?: KeyTargets;
-    /** The access model to validate scopes against. Defaults to the configured one. */
+    /**
+     * The access model to validate scopes against. Defaults to the one of the
+     * backend answering the request.
+     */
     accessModel?: () => AccessModel;
 }
 
@@ -114,7 +117,7 @@ async function readBody(c: Parameters<MiddlewareHandler<HonoEnv>>[0]): Promise<R
  */
 export function createApiKeyRoutes(options: ApiKeyRouteOptions): Hono<HonoEnv> {
     const { store, serviceKey, resolveRoles, revocationRepo, targets } = options;
-    const model = options.accessModel ?? getAccessModel;
+    const model = (c: Context<HonoEnv>): AccessModel => options.accessModel?.() ?? accessOf(c).model;
     const router = new Hono<HonoEnv>();
 
     router.onError(errorHandler);
@@ -139,7 +142,7 @@ export function createApiKeyRoutes(options: ApiKeyRouteOptions): Hono<HonoEnv> {
         const expires_at = readExpiresAt(body.expires_at, true) ?? null;
         const minter = caller(c);
 
-        assertScopesGrantable(scopes, callerScopes(c), model(), targets);
+        assertScopesGrantable(scopes, callerScopes(c), model(c), targets);
         assertRolesGrantable(roles, minter.roles);
 
         const key = await store.createApiKey({
@@ -172,7 +175,7 @@ export function createApiKeyRoutes(options: ApiKeyRouteOptions): Hono<HonoEnv> {
         if (body.name !== undefined) updates.name = readName(body.name);
         if (body.scopes !== undefined) {
             updates.scopes = readScopesField(body.scopes);
-            assertScopesGrantable(updates.scopes, callerScopes(c), model(), targets);
+            assertScopesGrantable(updates.scopes, callerScopes(c), model(c), targets);
         }
         if (body.roles !== undefined) {
             updates.roles = readRolesField(body.roles);
@@ -222,7 +225,7 @@ export interface PersonalKeyRouteOptions {
  */
 export function createPersonalKeyRoutes(options: PersonalKeyRouteOptions): Hono<HonoEnv> {
     const { store, enabled, serviceKey, resolveRoles, revocationRepo, targets } = options;
-    const model = options.accessModel ?? getAccessModel;
+    const model = (c: Context<HonoEnv>): AccessModel => options.accessModel?.() ?? accessOf(c).model;
     const router = new Hono<HonoEnv>();
 
     router.onError(errorHandler);
@@ -282,7 +285,7 @@ export function createPersonalKeyRoutes(options: PersonalKeyRouteOptions): Hono<
         const expires_at = readExpiresAt(body.expires_at, true) ?? null;
         const me = caller(c);
 
-        assertScopesGrantable(scopes, callerScopes(c), model(), targets);
+        assertScopesGrantable(scopes, callerScopes(c), model(c), targets);
 
         const key = await store.createApiKey({
             name,

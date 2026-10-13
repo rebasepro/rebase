@@ -4,7 +4,7 @@ import { ApiError } from "../api/errors";
 import { HonoEnv } from "../api/types";
 import { extractBearerToken } from "./middleware";
 import { logger } from "../utils/logger";
-import { createRateLimiter, strictAuthLimiter, requestClientAddress } from "./rate-limiter";
+import { requestClientAddress, type AuthLimiters } from "./rate-limiter";
 import {
     generateTotpSecret,
     verifyTotpCounter,
@@ -13,12 +13,7 @@ import {
     hashRecoveryCode
 } from "./mfa";
 import { encryptTotpSecret, openTotpSecret } from "./mfa-crypto";
-import {
-    getAccessTokenExpiry,
-    verifyAccessToken,
-    verifyMfaPendingToken,
-    type AccessTokenPayload
-} from "./jwt";
+import type { AccessTokenPayload, JwtService } from "./jwt";
 import type { AuthModuleConfig, CreateSessionAndTokens } from "./routes";
 import type { AuthRepository } from "./interfaces";
 import { redactRefreshToken } from "./cookie-utils";
@@ -42,6 +37,10 @@ const MFA_VERIFICATION_ATTEMPTS_PER_WINDOW = 10;
 interface MfaRoutesConfig {
     router: Hono<HonoEnv>;
     config: AuthModuleConfig;
+    /** The backend these routes sign and verify for; its secret is also the TOTP key's last fallback. */
+    jwt: JwtService;
+    /** The backend's auth limiters. */
+    limiters: AuthLimiters;
     /**
      * The caller's guard for a signed-in user, with the revocation watermark
      * consulted. Enrolling, confirming or removing a factor is a persistence
@@ -107,10 +106,11 @@ interface StepUpPrincipal {
  */
 async function openAndRewrap(
     authRepo: AuthRepository,
+    jwt: JwtService,
     factorId: string,
     secretEncrypted: string
 ): Promise<string> {
-    const { secret, rewrapped } = openTotpSecret(secretEncrypted);
+    const { secret, rewrapped } = openTotpSecret(secretEncrypted, jwt);
     if (!rewrapped) return secret;
 
     // Optional on the interface: a repository that cannot re-store a secret
@@ -129,7 +129,7 @@ async function openAndRewrap(
     return secret;
 }
 
-async function resolveStepUpPrincipal(c: Context<HonoEnv>): Promise<StepUpPrincipal | null> {
+async function resolveStepUpPrincipal(c: Context<HonoEnv>, jwt: JwtService): Promise<StepUpPrincipal | null> {
     // Respect a principal an upstream middleware already resolved, exactly as
     // `requireAuth` does.
     const existing = c.get("user") as AccessTokenPayload | undefined;
@@ -143,7 +143,7 @@ iat: existing.iat };
     const token = extractBearerToken(c.req.header("authorization"));
     if (token === undefined) return null;
 
-    const session = await verifyAccessToken(token);
+    const session = await jwt.verifyAccessToken(token);
     if (session) {
         return { uid: session.uid,
 aal: session.aal === "aal2" ? "aal2" : "aal1",
@@ -151,7 +151,7 @@ pending: false,
 iat: session.iat };
     }
 
-    const pending = await verifyMfaPendingToken(token);
+    const pending = await jwt.verifyMfaPendingToken(token);
     if (pending) {
         return { uid: pending.uid,
 aal: "aal1",
@@ -162,26 +162,26 @@ iat: pending.iat };
     return null;
 }
 
-/**
- * Per-account throttle on code verification.
- *
- * Keyed on the uid rather than the IP because an IP is the attacker's to
- * rotate and the account under attack is not: a distributed run against one
- * account passes an IP-keyed limiter untouched. The IP limiter still runs in
- * front of this one — they bound different things.
- */
-const mfaVerificationLimiter: MiddlewareHandler<HonoEnv> = createRateLimiter({
-    name: "auth-mfa-verify",
-    windowMs: 15 * 60 * 1000,
-    limit: MFA_VERIFICATION_ATTEMPTS_PER_WINDOW,
-    keyGenerator: async (c) => `mfa-verify:${(await resolveStepUpPrincipal(c as Context<HonoEnv>))?.uid ?? "unidentified"}`,
-    message: "Too many verification attempts for this account, please try again later."
-});
-
 export function mountMfaRoutes(opts: MfaRoutesConfig): void {
-    const { router, config, ops, parseBody, buildAuthResponse, createSessionAndTokens, applyTransformHook, requireLiveSession } = opts;
+    const { router, config, jwt, limiters, ops, parseBody, buildAuthResponse, createSessionAndTokens, applyTransformHook, requireLiveSession } = opts;
     const authRepo = config.authRepo;
     const emailConfig = config.emailConfig;
+
+    /**
+     * Per-account throttle on code verification.
+     *
+     * Keyed on the uid rather than the IP because an IP is the attacker's to
+     * rotate and the account under attack is not: a distributed run against
+     * one account passes an IP-keyed limiter untouched. The IP limiter still
+     * runs in front of this one — they bound different things.
+     */
+    const mfaVerificationLimiter: MiddlewareHandler<HonoEnv> = limiters.named({
+        name: "auth-mfa-verify",
+        windowMs: 15 * 60 * 1000,
+        limit: MFA_VERIFICATION_ATTEMPTS_PER_WINDOW,
+        keyGenerator: async (c) => `mfa-verify:${(await resolveStepUpPrincipal(c as Context<HonoEnv>, jwt))?.uid ?? "unidentified"}`,
+        message: "Too many verification attempts for this account, please try again later."
+    });
 
     /**
      * The caller of a challenge route, refused if the user has since ended
@@ -198,7 +198,7 @@ export function mountMfaRoutes(opts: MfaRoutesConfig): void {
      * is held to the same mark.
      */
     async function resolveLiveStepUpPrincipal(c: Context<HonoEnv>): Promise<StepUpPrincipal> {
-        const principal = await resolveStepUpPrincipal(c);
+        const principal = await resolveStepUpPrincipal(c, jwt);
         if (!principal) {
             throw ApiError.unauthorized("Not authenticated");
         }
@@ -255,7 +255,7 @@ export function mountMfaRoutes(opts: MfaRoutesConfig): void {
      * POST /auth/mfa/enroll
      * Start MFA enrollment: generate TOTP secret and recovery codes
      */
-    router.post("/mfa/enroll", strictAuthLimiter, requireLiveSession, async (c) => {
+    router.post("/mfa/enroll", limiters.strict, requireLiveSession, async (c) => {
         const userCtx = c.get("user") as AccessTokenPayload | undefined;
         if (!userCtx) {
             throw ApiError.unauthorized("Not authenticated");
@@ -277,7 +277,7 @@ export function mountMfaRoutes(opts: MfaRoutesConfig): void {
         const { secret, uri } = generateTotpSecret(issuer, user.email);
 
         // Encrypt the TOTP secret before storage (AES-256-GCM envelope encryption)
-        const encryptedSecret = encryptTotpSecret(secret);
+        const encryptedSecret = encryptTotpSecret(secret, jwt);
         const factor = await authRepo.createMfaFactor(
             user.id,
             "totp",
@@ -325,7 +325,7 @@ export function mountMfaRoutes(opts: MfaRoutesConfig): void {
      * factor change does: whoever holds only the password must not be able to
      * swap the codes for ones they know.
      */
-    router.post("/mfa/recovery-codes", strictAuthLimiter, requireLiveSession, async (c) => {
+    router.post("/mfa/recovery-codes", limiters.strict, requireLiveSession, async (c) => {
         const userCtx = c.get("user") as AccessTokenPayload | undefined;
         if (!userCtx) {
             throw ApiError.unauthorized("Not authenticated");
@@ -344,7 +344,7 @@ export function mountMfaRoutes(opts: MfaRoutesConfig): void {
      * POST /auth/mfa/verify
      * Verify TOTP code to complete MFA enrollment
      */
-    router.post("/mfa/verify", strictAuthLimiter, requireLiveSession, mfaVerificationLimiter, async (c) => {
+    router.post("/mfa/verify", limiters.strict, requireLiveSession, mfaVerificationLimiter, async (c) => {
         const userCtx = c.get("user") as AccessTokenPayload | undefined;
         if (!userCtx) {
             throw ApiError.unauthorized("Not authenticated");
@@ -369,7 +369,7 @@ export function mountMfaRoutes(opts: MfaRoutesConfig): void {
         }
 
         // Decrypt and verify the TOTP code
-        const decryptedSecret = await openAndRewrap(authRepo, factor.id, factor.secretEncrypted);
+        const decryptedSecret = await openAndRewrap(authRepo, jwt, factor.id, factor.secretEncrypted);
         const secretBuffer = base32Decode(decryptedSecret);
         const matchedCounter = verifyTotpCounter(secretBuffer, code);
 
@@ -391,7 +391,7 @@ export function mountMfaRoutes(opts: MfaRoutesConfig): void {
      * Open a challenge — either to finish a sign-in that answered
      * `MFA_REQUIRED`, or to step an existing session up to `aal2`.
      */
-    router.post("/mfa/challenge", strictAuthLimiter, async (c) => {
+    router.post("/mfa/challenge", limiters.strict, async (c) => {
         const principal = await resolveLiveStepUpPrincipal(c);
 
         const challengeSchema = z.object({
@@ -424,7 +424,7 @@ export function mountMfaRoutes(opts: MfaRoutesConfig): void {
      * Answer a challenge: this is where an MFA-enrolled account's session is
      * minted, at `aal2`.
      */
-    router.post("/mfa/challenge/verify", strictAuthLimiter, mfaVerificationLimiter, async (c) => {
+    router.post("/mfa/challenge/verify", limiters.strict, mfaVerificationLimiter, async (c) => {
         const principal = await resolveLiveStepUpPrincipal(c);
 
         const challengeVerifySchema = z.object({
@@ -470,7 +470,7 @@ export function mountMfaRoutes(opts: MfaRoutesConfig): void {
         }
 
         // Try TOTP verification first (standard 6-digit codes)
-        const decryptedSecret = await openAndRewrap(authRepo, factor.id, factor.secretEncrypted);
+        const decryptedSecret = await openAndRewrap(authRepo, jwt, factor.id, factor.secretEncrypted);
         const secretBuffer = base32Decode(decryptedSecret);
         const matchedCounter = verifyTotpCounter(secretBuffer, code);
         let isValid = matchedCounter !== null && await claimTotpStep(factor.id, matchedCounter);
@@ -540,7 +540,7 @@ export function mountMfaRoutes(opts: MfaRoutesConfig): void {
                 tokens: {
                     accessToken,
                     refreshToken,
-                    accessTokenExpiresAt: getAccessTokenExpiry()
+                    accessTokenExpiresAt: jwt.getAccessTokenExpiry()
                 }
             };
         if (applyTransformHook) {
@@ -553,7 +553,7 @@ export function mountMfaRoutes(opts: MfaRoutesConfig): void {
      * GET /auth/mfa/factors
      * List enrolled MFA factors for the current user
      */
-    router.get("/mfa/factors", strictAuthLimiter, requireLiveSession, async (c) => {
+    router.get("/mfa/factors", limiters.strict, requireLiveSession, async (c) => {
         const userCtx = c.get("user") as { uid: string; roles?: string[] } | undefined;
         if (!userCtx) {
             throw ApiError.unauthorized("Not authenticated");
@@ -575,7 +575,7 @@ export function mountMfaRoutes(opts: MfaRoutesConfig): void {
      * DELETE /auth/mfa/unenroll
      * Remove an MFA factor
      */
-    router.delete("/mfa/unenroll", strictAuthLimiter, requireLiveSession, async (c) => {
+    router.delete("/mfa/unenroll", limiters.strict, requireLiveSession, async (c) => {
         const userCtx = c.get("user") as AccessTokenPayload | undefined;
         if (!userCtx) {
             throw ApiError.unauthorized("Not authenticated");

@@ -10,7 +10,7 @@ import type { SqlScriptResult } from "@rebasepro/types";
 import { deserializeFilter, redactSqlLiterals, UnknownFilterOperatorError } from "@rebasepro/common";
 import { budgetSendBuffers, reapSilentSockets, terminateIfBacklogged } from "./services/socket-liveness";
 import { DEFAULT_HEARTBEAT_INTERVAL_MS, helloFrame, requestedOptIns, startHeartbeats, type SocketOptIn } from "./socket-opt-ins";
-import { ANONYMOUS_USER_ID, hasAdminRole, isSQLAdmin, isSchemaAdmin, resolveClientListLimit, ListLimitError, scopeGrants, scopesForRoles, type AdminScope } from "@rebasepro/types";
+import { ANONYMOUS_USER_ID, hasAdminRole, isSQLAdmin, isSchemaAdmin, resolveClientListLimit, ListLimitError, scopeGrants, scopesForRoles, type AccessModel, type AdminScope } from "@rebasepro/types";
 import type { User } from "@rebasepro/types";
 
 import { WebSocketServer, WebSocket, type RawData } from "ws";
@@ -420,10 +420,13 @@ function sessionAuthContext(session: ClientSession | undefined): SubscriptionAut
     };
 }
 
-/** Everything a session may do: its credential's scopes, or its roles'. */
-function sessionScopes(session: ClientSession | undefined): string[] {
+/**
+ * Everything a session may do: its credential's scopes, or what its roles hold
+ * in `model` — the backend's access model.
+ */
+function sessionScopes(session: ClientSession | undefined, model: AccessModel): string[] {
     if (!session?.user) return [];
-    return session.user.scopes ?? scopesForRoles(session.user.roles, getAccessModel());
+    return session.user.scopes ?? scopesForRoles(session.user.roles, model);
 }
 
 /**
@@ -600,6 +603,11 @@ export function createPostgresWebSocket(
     // here grants access rather than skipping a check.
     const requireAuth = !!authAdapter || resolveRequireAuth(authConfig as never);
 
+    // The backend's own keys and roles, as the server passes them; a socket
+    // built by hand without them answers for the process default.
+    const verifySessionToken = options?.verifyAccessToken ?? extractUserFromToken;
+    const accessModel = (): AccessModel => options?.accessModel ?? getAccessModel();
+
     if (requireAuth && !authAdapter && !authConfig?.jwtSecret && !authConfig?.serviceKey) {
         logger.warn(
             "🔐 [WebSocket Server] Authentication is required but no adapter, jwtSecret or " +
@@ -674,8 +682,9 @@ export function createPostgresWebSocket(
         }
 
         // Standard JWT path: the signature and the expiry, nothing more —
-        // there is no account store on this path to ask.
-        const jwtPayload = await extractUserFromToken(token);
+        // there is no account store on this path to ask. Verified with the
+        // backend's own keys when the server handed them over.
+        const jwtPayload = await verifySessionToken(token);
         if (!jwtPayload) return { refused: "Invalid or expired token" };
         return {
             credential: "session",
@@ -1204,7 +1213,7 @@ roles: verifiedUser.roles }
                 const adminScope = ADMIN_PLANE_TYPES.get(type);
                 if (adminScope) {
                     const session = clientSessions.get(clientId);
-                    if (!scopeGrants(sessionScopes(session), adminScope)) {
+                    if (!scopeGrants(sessionScopes(session, accessModel()), adminScope)) {
                         sendError("ERROR", "SCOPE_MISSING", `This operation needs the "${adminScope}" scope`);
                         return;
                     }

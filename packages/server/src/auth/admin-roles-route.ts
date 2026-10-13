@@ -11,7 +11,7 @@ import { summarizeRoles } from "@rebasepro/types";
 import { errorHandler } from "../api/errors";
 import type { AuthRepository } from "./interfaces";
 import { createRequireAuth } from "./middleware";
-import { getAccessModel, requireScope } from "./access";
+import { accessOf, requireScope } from "./access";
 import type { HonoEnv } from "../api/types";
 
 export interface AdminRolesRouteConfig {
@@ -36,7 +36,7 @@ export function createAdminRolesRoute(config: AdminRolesRouteConfig): Hono<HonoE
     }));
 
     router.get("/roles", requireScope("users:read"), (c) => {
-        return c.json({ roles: summarizeRoles(getAccessModel()) });
+        return c.json({ roles: summarizeRoles(accessOf(c).model) });
     });
 
     return router;

@@ -16,8 +16,8 @@
  * user's name and email. A key or token narrowed by scopes must also hold
  * `data:write` on that collection.
  *
- * The collections are read through a getter configured at boot, so a schema
- * edited live is what is judged.
+ * The collections are the backend's own (`c.var.services`), read when the
+ * question is asked, so a schema edited live is what is judged.
  *
  * @module
  */
@@ -36,11 +36,21 @@ import {
 import type { HonoEnv } from "../api/types";
 import { hasScope } from "./access";
 
+/**
+ * The collections the picker judges for a route mounted outside any backend:
+ * the process default's. None until a backend is installed as the default, or
+ * a test configures some.
+ */
 let collectionsForPicking: () => readonly CollectionConfig[] = () => [];
 
-/** Tell the picker which collections this backend serves. Called once at boot. */
+/** Tell the process default's picker which collections it serves. */
 export function configureUserPicking(collections: () => readonly CollectionConfig[]): void {
     collectionsForPicking = collections;
+}
+
+/** @internal The process default's collections getter, to snapshot or restore it. */
+export function defaultUserPicking(): () => readonly CollectionConfig[] {
+    return collectionsForPicking;
 }
 
 function propertyReferencesUsers(property: Property | undefined): boolean {
@@ -121,7 +131,8 @@ export function mayPickUsers(c: Context<HonoEnv>): boolean {
     if (hasScope(c, "users:read")) return true;
     const person = personOf(c);
     if (!person) return false;
-    return collectionsForPicking().some(collection => {
+    const collections = c.get("services")?.collections ?? collectionsForPicking;
+    return collections().some(collection => {
         if (!propertiesReferenceUsers(collection.properties) || !hasScope(c, "data:write", collection.slug)) return false;
         const judged = collection.securityRules
             ? { ...collection, securityRules: collection.securityRules.map(failClosedOnRawSql) }

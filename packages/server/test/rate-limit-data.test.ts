@@ -395,8 +395,10 @@ describe("createDataRateLimiter — identity with no auth middleware ahead of it
         jwt.configureJwt({ secret: "test-secret-for-rate-limiter-identity-0123456789" });
         const access = await jwt.generateAccessToken("user-with-token", []);
         const download = await jwt.generateDownloadToken("docs/a.png", 300, null, "user-with-token");
-        const verifyAccess = jest.spyOn(jwt, "verifyAccessToken");
-        const verifyDownload = jest.spyOn(jwt, "verifyDownloadToken");
+        // The limiter verifies with the JWT service of the backend answering —
+        // here, with no backend, the process default's.
+        const verifyAccess = jest.spyOn(jwt.processJwtService, "verifyAccessToken");
+        const verifyDownload = jest.spyOn(jwt.processJwtService, "verifyDownloadToken");
         try {
             const app = bareApp({ anonymous: 1, user: 3 });
 

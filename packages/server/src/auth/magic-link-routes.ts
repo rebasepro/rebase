@@ -12,8 +12,8 @@ import {
     RECIPIENT_ROUTE_FLOOR_MS,
     captureRecipientEmail,
     notBefore,
-    recipientEmailLimiter,
-    strictAuthLimiter, requestClientAddress } from "./rate-limiter";
+    requestClientAddress,
+    type AuthLimiters } from "./rate-limiter";
 import { z } from "zod";
 import { logger } from "../utils/logger";
 import { redactRefreshToken } from "./cookie-utils";
@@ -35,6 +35,8 @@ function getMagicLinkExpiry(): Date {
 export function mountMagicLinkRoutes(deps: {
     router: Hono<HonoEnv>;
     config: AuthModuleConfig;
+    /** The backend's auth limiters. */
+    limiters: AuthLimiters;
     ops: ResolvedAuthHooks;
     parseBody: <T>(schema: z.ZodSchema<T>, body: unknown) => T;
     buildAuthResponse: (
@@ -58,7 +60,7 @@ export function mountMagicLinkRoutes(deps: {
      */
     captchaMiddleware?: MiddlewareHandler<HonoEnv>;
 }) {
-    const { router, config, ops, parseBody, buildAuthResponse, createSessionAndTokens, applyTransformHook, captchaMiddleware } = deps;
+    const { router, config, limiters, ops, parseBody, buildAuthResponse, createSessionAndTokens, applyTransformHook, captchaMiddleware } = deps;
     const { authRepo, emailService, emailConfig } = config;
 
     const magicLinkSchema = z.object({
@@ -87,11 +89,11 @@ export function mountMagicLinkRoutes(deps: {
      */
     router.post(
         "/magic-link",
-        strictAuthLimiter,
+        limiters.strict,
         // Per-address as well as per-IP: an IP is the attacker's to rotate,
         // the mailbox being filled is not. See `recipientEmailLimiter`.
         captureRecipientEmail,
-        recipientEmailLimiter,
+        limiters.recipientEmail,
         ...(captchaMiddleware ? [captchaMiddleware] : []),
         async (c) => {
         const startedAt = Date.now();
@@ -159,7 +161,7 @@ export function mountMagicLinkRoutes(deps: {
      * POST /auth/magic-link/verify
      * Verify magic link token and create session
      */
-    router.post("/magic-link/verify", strictAuthLimiter, async (c) => {
+    router.post("/magic-link/verify", limiters.strict, async (c) => {
         const { token } = parseBody(verifyMagicLinkSchema, await c.req.json());
 
         // Find valid token

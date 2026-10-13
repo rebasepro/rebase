@@ -15,7 +15,7 @@
 
 import { ApiError } from "../api/errors";
 import { logger } from "../utils/logger";
-import { generateMfaPendingToken } from "./jwt";
+import type { JwtService } from "./jwt";
 import type { AuthRepository } from "./interfaces";
 
 /** Error code a client watches for to switch a sign-in into its second step. */
@@ -40,9 +40,10 @@ export interface MfaRequiredDetails {
  *
  * A 401 rather than a 200 with a different body: a client that has not been
  * taught about MFA must fail, not proceed. The credential in `details` is
- * useless for anything except the challenge routes.
+ * useless for anything except the challenge routes, and is signed by `jwt` —
+ * the backend's own key.
  */
-export async function assertMfaSatisfied(authRepo: AuthRepository, uid: string): Promise<void> {
+export async function assertMfaSatisfied(authRepo: AuthRepository, uid: string, jwt: JwtService): Promise<void> {
     if (typeof authRepo.hasVerifiedMfaFactors !== "function") {
         // A custom repository from before MFA existed. It cannot hold a factor
         // either, so there is nothing to enforce — but say so once, because a
@@ -56,7 +57,7 @@ export async function assertMfaSatisfied(authRepo: AuthRepository, uid: string):
 
     const factors = (await authRepo.getMfaFactors(uid)).filter(f => f.verified);
     const details: MfaRequiredDetails = {
-        mfaToken: await generateMfaPendingToken(uid),
+        mfaToken: await jwt.generateMfaPendingToken(uid),
         factors: factors.map(f => ({ id: f.id,
 factorType: f.factorType,
 friendlyName: f.friendlyName }))

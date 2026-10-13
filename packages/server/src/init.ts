@@ -3,8 +3,9 @@
  * stands for.
  *
  * Everything it does is a call a reader can make themselves: build the backend
- * (`createRebaseBackend`), mount it on the application's Hono app, attach the
- * realtime websocket to its server, start the timers. Copy the body and change
+ * (`createRebaseBackend`), make it the process default (`setDefaultBackend`),
+ * mount it on the application's Hono app, attach the realtime websocket to its
+ * server, start the timers. Copy the body and change
  * one line — mount only the data API, put it under another path, leave the
  * timers to another process — and you have the variant you need, built from
  * the same pieces.
@@ -16,6 +17,7 @@ import type { Hono } from "hono";
 import type { HonoEnv } from "./api/types";
 import { installUnhandledRejectionHandler } from "./init/process-safety";
 import { createRebaseBackend, type RebaseBackend } from "./backend/create-backend";
+import { setDefaultBackend } from "./backend/default-backend";
 import type { RebaseBackendOptions } from "./backend/options";
 
 /** What {@link initializeRebaseBackend} takes: a backend's options, and where to serve it. */
@@ -52,18 +54,25 @@ export interface RebaseBackendConfig extends Omit<RebaseBackendOptions, "provisi
 export type RebaseBackendInstance = RebaseBackend;
 
 /**
- * Build a backend and serve it: mounted on `config.app` under
- * `config.basePath`, its websocket on `config.server`, its timers started.
+ * Build a backend and serve it: the process default, mounted on `config.app`
+ * under `config.basePath`, its websocket on `config.server`, its timers
+ * started.
  *
  * Exactly these steps, and nothing else:
  *
  * ```ts
  * installUnhandledRejectionHandler();
  * const backend = await createRebaseBackend({ ...options, provision: true });
+ * setDefaultBackend(backend);
  * backend.mount(app, { basePath });
  * await backend.attachRealtime(server);
  * backend.start();
  * ```
+ *
+ * The default is what the module-level API answers for — `rebase` outside a
+ * request, `verifyAccessToken`, `getAccessModel`, `verifyCredential` — so code
+ * written against those keeps answering for the one backend this process
+ * serves.
  *
  * No try/catch: an init error propagates to the caller. The app entry point
  * (e.g. `startServer()`) should catch it and `process.exit(1)` — returning a
@@ -91,6 +100,9 @@ export async function initializeRebaseBackend(config: RebaseBackendConfig): Prom
         provision: provisionSchema === false ? { collections: false, realtime: false } : true
     });
 
+    // The process serves this one backend, so the module-level API answers
+    // for it.
+    setDefaultBackend(backend);
     backend.mount(app, { basePath });
     await backend.attachRealtime(server);
     backend.start();

@@ -1,7 +1,7 @@
 import { MiddlewareHandler, Context } from "hono";
 import { judgeAccessToken, type AccessJudgeRepository } from "./token-revocation";
 import { ANONYMOUS_USER_ID, DataDriver, hasAdminRole, isPublicStorageKey } from "@rebasepro/types";
-import { verifyAccessToken, AccessTokenPayload, isJwtConfigured, verifyDownloadToken, type DownloadTokenPayload } from "./jwt";
+import { jwtOf, processJwtService, AccessTokenPayload, type DownloadTokenPayload, type JwtService } from "./jwt";
 import type { HonoEnv } from "../api/types";
 import { ApiError, errorHandler } from "../api/errors";
 import { scopeDataDriver } from "./rls-scope";
@@ -126,7 +126,7 @@ export const requireAuth: MiddlewareHandler<HonoEnv> = async (
         return refuse(c, ApiError.unauthenticated("Authorization header missing or invalid"));
     }
 
-    const payload = await verifyAccessToken(token);
+    const payload = await jwtOf(c).verifyAccessToken(token);
 
     if (!payload) {
         return refuse(c, ApiError.unauthenticated("Invalid or expired token"));
@@ -202,8 +202,8 @@ roles: ["admin"] } as AccessTokenPayload);
             return next();
         }
 
-        // Fall back to JWT verification
-        const payload = await verifyAccessToken(token);
+        // Fall back to JWT verification, by the backend answering the request
+        const payload = await jwtOf(c).verifyAccessToken(token);
 
         if (!payload) {
             return refuse(c, ApiError.unauthenticated("Invalid or expired token"));
@@ -300,12 +300,13 @@ export const optionalAuth: MiddlewareHandler<HonoEnv> = async (
 
     const token = extractBearerToken(c.req.header("authorization"));
 
-    // A backend that authenticates through an adapter (Firebase, Clerk) never
-    // calls `configureJwt`, so verifying here would throw — turning a route
-    // that had already accepted anonymous callers into a 500 for every
-    // request that happens to carry a bearer token. Anonymous is the answer.
-    if (token !== undefined && isJwtConfigured()) {
-        const payload = await verifyAccessToken(token);
+    // A backend that authenticates through an adapter (Firebase, Clerk) has
+    // no JWT secret, so verifying here would throw — turning a route that had
+    // already accepted anonymous callers into a 500 for every request that
+    // happens to carry a bearer token. Anonymous is the answer.
+    const jwt = jwtOf(c);
+    if (token !== undefined && jwt.isConfigured()) {
+        const payload = await jwt.verifyAccessToken(token);
         if (payload) {
             c.set("user", payload);
         }
@@ -315,14 +316,21 @@ export const optionalAuth: MiddlewareHandler<HonoEnv> = async (
 };
 
 /**
- * Extract user from token - for WebSocket authentication
+ * Who a session token names, as `jwt` verifies it — or "nobody" rather than a
+ * throw on a backend with no JWT of its own, so a socket closes as
+ * unauthenticated, which is the outcome this describes.
+ */
+export async function userFromToken(jwt: JwtService, token: string): Promise<AccessTokenPayload | null> {
+    if (!jwt.isConfigured()) return null;
+    return jwt.verifyAccessToken(token);
+}
+
+/**
+ * Extract user from token - for WebSocket authentication. Answers for the
+ * process default; a backend's own socket verifies with its own keys.
  */
 export async function extractUserFromToken(token: string): Promise<AccessTokenPayload | null> {
-    // Returns "nobody" rather than throwing on a backend with no JWT of its
-    // own — the socket then closes as unauthenticated, which is the outcome
-    // this function already describes.
-    if (!isJwtConfigured()) return null;
-    return verifyAccessToken(token);
+    return userFromToken(processJwtService, token);
 }
 
 /**
@@ -433,7 +441,7 @@ code: "INTERNAL_ERROR" } }, 500);
                     credential = "api-key";
                 } else {
                     // ── JWT verification ───────────────────────────────────
-                    const payload = await extractUserFromToken(token);
+                    const payload = await userFromToken(jwtOf(c), token);
 
                     if (payload) {
                         credential = "session";
@@ -540,8 +548,9 @@ export const queryTokenAuth: MiddlewareHandler<HonoEnv> = async (c, next) => {
     }
 
     const queryToken = c.req.query("token");
-    if (queryToken && isJwtConfigured()) {
-        const payload = await verifyAccessToken(queryToken);
+    const jwt = jwtOf(c);
+    if (queryToken && jwt.isConfigured()) {
+        const payload = await jwt.verifyAccessToken(queryToken);
         if (payload) {
             c.set("user", payload);
         }
@@ -671,7 +680,7 @@ export const fileTokenAuth: MiddlewareHandler<HonoEnv> = async (c, next) => {
     const bearerToken = extractBearerToken(authHeader);
     if (bearerToken !== undefined) {
         const token = bearerToken;
-        const payload = await verifyDownloadToken(token);
+        const payload = await jwtOf(c).verifyDownloadToken(token);
 
         if (payload) {
             const outcome = evaluateGrant(payload);
@@ -693,7 +702,7 @@ export const fileTokenAuth: MiddlewareHandler<HonoEnv> = async (c, next) => {
 
     // 2. Query param: ?token=<token>
     if (queryToken) {
-        const payload = await verifyDownloadToken(queryToken);
+        const payload = await jwtOf(c).verifyDownloadToken(queryToken);
 
         if (payload) {
             const outcome = evaluateGrant(payload);

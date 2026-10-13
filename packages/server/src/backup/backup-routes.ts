@@ -2,7 +2,7 @@ import { Hono, type Context } from "hono";
 import type { BackupDownloadLink, BackupListing, BackupScheduleStatus } from "@rebasepro/types";
 import type { HonoEnv } from "../api/types";
 import { ApiError, errorHandler } from "../api/errors";
-import { isJwtConfigured, signPurposeToken, verifyPurposeToken } from "../auth/jwt";
+import { jwtOf, type JwtService } from "../auth/jwt";
 import type { StorageController } from "../storage/types";
 import { BackupDestination, findBackup, listBackupObjects, openBackupStream } from "./backup-common";
 import { backupStorageFromEnv, describeBackupDestination, type ObjectBackupDestination } from "./backup-storage";
@@ -45,7 +45,7 @@ function unreadable(dest: BackupDestination, err: unknown): ApiError {
 // ─── Download links ──────────────────────────────────────────────────
 
 /**
- * The `purpose` of a download link's token. {@link verifyAccessToken} refuses
+ * The `purpose` of a download link's token. `verifyAccessToken` refuses
  * any token with a purpose, and the storage, MFA and MCP verifiers each demand
  * their own, so a link is never a session or any other credential, and none of
  * those is a link.
@@ -61,10 +61,13 @@ function linkScope(dest: BackupDestination, key: string): string {
     return `backup:${describeBackupDestination(dest)}:${key}`;
 }
 
-/** Whether `token` is a live link for `key` at `dest`. Never throws: anything else is a no. */
-async function linkGrants(token: string, dest: BackupDestination, key: string): Promise<boolean> {
-    if (!isJwtConfigured()) return false;
-    const claims = await verifyPurposeToken<{ aud?: unknown; scope?: unknown }>(BACKUP_DOWNLOAD_PURPOSE, token)
+/**
+ * Whether `token` is a live link for `key` at `dest`, signed by `jwt` — the
+ * backend answering. Never throws: anything else is a no.
+ */
+async function linkGrants(jwt: JwtService, token: string, dest: BackupDestination, key: string): Promise<boolean> {
+    if (!jwt.isConfigured()) return false;
+    const claims = await jwt.verifyPurposeToken<{ aud?: unknown; scope?: unknown }>(BACKUP_DOWNLOAD_PURPOSE, token)
         .catch(() => null);
     return claims?.aud === BACKUP_DOWNLOAD_AUDIENCE && claims.scope === linkScope(dest, key);
 }
@@ -127,7 +130,7 @@ export function createBackupLinkRoutes(config: Pick<BackupRoutesConfig, "getDest
         if (token === undefined) return next();
         const dest = destinationOf(config);
         const key = c.req.query("key") ?? "";
-        if (!(await linkGrants(token, dest, key))) {
+        if (!(await linkGrants(jwtOf(c), token, dest, key))) {
             throw ApiError.unauthenticated(
                 "This download link is not valid for this backup, or it has expired. Links last " +
                 `${BACKUP_DOWNLOAD_LINK_TTL_SECONDS} seconds: ask for a new one.`
@@ -200,13 +203,14 @@ export function createBackupRoutes(config: BackupRoutesConfig): Hono<HonoEnv> {
         if (!(await findBackup(dest, key, storageOf(dest)))) {
             throw ApiError.notFound(`Backup not found: ${key}`);
         }
-        if (!isJwtConfigured()) {
+        const jwt = jwtOf(c);
+        if (!jwt.isConfigured()) {
             throw ApiError.serviceUnavailable(
                 "Download links are signed with the JWT secret, and this server has none (auth.jwtSecret). " +
                 "Download through GET /download with the Authorization header instead."
             );
         }
-        const token = await signPurposeToken(
+        const token = await jwt.signPurposeToken(
             BACKUP_DOWNLOAD_PURPOSE,
             { aud: BACKUP_DOWNLOAD_AUDIENCE, scope: linkScope(dest, key) },
             BACKUP_DOWNLOAD_LINK_TTL_SECONDS

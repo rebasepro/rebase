@@ -34,7 +34,7 @@ import {
 import { objectValidators, isNotModified, applyCacheHeaders, buildEntityTag } from "./cache-headers";
 import { parseRange, contentRange, unsatisfiableContentRange } from "./range";
 import { requireAuth as jwtRequireAuth, optionalAuth as jwtOptionalAuth, queryTokenAuth, fileTokenAuth, publicObjectAuth } from "../auth/middleware";
-import { generateDownloadToken } from "../auth";
+import { jwtOf, type JwtService } from "../auth/jwt";
 import { ApiError, declaredErrorAnswer, errorHandler } from "../api/errors";
 import { logger } from "../utils/logger";
 import { HonoEnv } from "../api/types";
@@ -1243,6 +1243,8 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
      */
     const describeForDownload = async (
         caller: StorageCaller,
+        /** The backend answering, whose key signs the download token. */
+        jwt: JwtService,
         resolved: StorageController,
         storageId: string | null | undefined,
         bucket: string,
@@ -1294,7 +1296,7 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
                 // Minted for this user, so the reads it buys are charged to
                 // their rate-limit allowance and not to the reader's address.
                 const minter = caller.user?.uid;
-                downloadConfig.metadata.token = await generateDownloadToken(
+                downloadConfig.metadata.token = await jwt.generateDownloadToken(
                     `${bucket}/${resolvedPath}`,
                     downloadTokenTtl,
                     storageId ?? undefined,
@@ -1323,7 +1325,7 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
         const caller = callerOf(c);
         refuseDownloadTokenPrincipal(caller.user);
 
-        return c.json({ data: await describeForDownload(caller, resolved, storageId, bucket, resolvedPath) });
+        return c.json({ data: await describeForDownload(caller, jwtOf(c), resolved, storageId, bucket, resolvedPath) });
     });
 
     /**
@@ -1377,7 +1379,7 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
                 // or — anonymous, on a public key — `publicObjectAuth`'s
                 // principal, which the hook is not asked about.
                 const asked = principal ?? (isPublicStorageKey(key) ? PUBLIC_OBJECT_PRINCIPAL : undefined);
-                const metadata = await describeForDownload({ user: asked, scopes: caller.scopes }, resolved, storageId, bucket, key);
+                const metadata = await describeForDownload({ user: asked, scopes: caller.scopes }, jwtOf(c), resolved, storageId, bucket, key);
                 if (metadata) data[raw] = metadata;
                 else data[raw] = { error: { code: "NOT_FOUND", message: "File not found", status: 404 } };
             } catch (err) {

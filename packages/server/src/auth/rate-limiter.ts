@@ -4,7 +4,7 @@ import { isAnonymousUid, type DataRateLimitCaller } from "@rebasepro/types";
 import { HonoEnv } from "../api/types";
 import { MemoryRateLimitStore, RateLimitDecision, RateLimitStore } from "./rate-limit-store";
 import { extractBearerToken } from "./bearer-token";
-import { isJwtConfigured, verifyAccessToken, verifyDownloadToken } from "./jwt";
+import { jwtOf } from "./jwt";
 import { safeCompare } from "./crypto-utils";
 import { SERVICE_IDENTITY } from "./rls-scope";
 import { logger } from "../utils/logger";
@@ -16,7 +16,7 @@ import { logger } from "../utils/logger";
  * default, which is a per-replica limit and says so. See `rate-limit-store.ts`.
  */
 
-interface RateLimiterOptions {
+export interface RateLimiterOptions {
     /** Time window in milliseconds (default: 15 minutes) */
     windowMs?: number;
     /** Maximum requests per window (default: 100) */
@@ -38,12 +38,13 @@ interface RateLimiterOptions {
      */
     store?: RateLimitStore;
     /**
-     * Count in the deployment's shared store once one is configured, under
+     * Count in the process default's shared store once one is installed, under
      * this name. For a limiter declared at module load, which runs before any
      * configuration exists and so cannot be handed a `store` — see
      * {@link setSharedRateLimitStore}. The name namespaces the limiter's keys
      * there: two limiters keyed by the same IP must not share one count.
-     * Ignored when `store` is given.
+     * Ignored when `store` is given. A backend's own limiters are built by
+     * {@link createAuthLimiters} and never read the process's store.
      */
     name?: string;
     /**
@@ -131,26 +132,31 @@ function warnIfProxiedButUntrusted(hasForwardedFor: boolean): void {
 }
 
 /**
- * The store this deployment shares its counts in, when it has one.
+ * The store the process default's named limiters share their counts in, when
+ * it has one.
  *
- * Module state, because the limiters that read it are module constants: the
- * auth limiters are built at import time, before `initializeRebaseBackend`
- * has read `REBASE_RATE_LIMIT_STORE` or `rateLimit.store`, so they cannot be
- * handed the store the way the data limiter is. Without this they each kept a
- * private memory store whatever the deployment asked for, and on N replicas
- * every login, reset, OTP and MFA limit was N times looser than configured.
+ * Module state, because the limiters that read it are module constants:
+ * {@link defaultAuthLimiter} and its siblings are built at import time, before
+ * any configuration exists, so they cannot be handed a store. A backend never
+ * reads this — it builds its own limiters with {@link createAuthLimiters} — so
+ * it is set only when a backend is installed as the process default.
  */
 let sharedRateLimitStore: RateLimitStore | undefined;
 
 /**
- * Point every named limiter at the deployment's shared store — or, with
- * `undefined`, back at its own memory. Called once per boot with the store
- * the data limiters use, and only when that store is shared (SQL, or one the
- * operator supplied): the default memory store is swept on the data window,
- * which is not every limiter's window.
+ * Point every named limiter of the process default at a shared store — or,
+ * with `undefined`, back at its own memory. `setDefaultBackend` calls it with
+ * the store the installed backend shares (SQL, or one the operator supplied):
+ * the default memory store is swept on the data window, which is not every
+ * limiter's window.
  */
 export function setSharedRateLimitStore(store: RateLimitStore | undefined): void {
     sharedRateLimitStore = store;
+}
+
+/** @internal The process default's shared store, to snapshot or restore it. */
+export function sharedRateLimitStoreOfProcess(): RateLimitStore | undefined {
+    return sharedRateLimitStore;
 }
 
 /** The deployment's store under `name` when there is one, this limiter's own memory otherwise. */
@@ -317,23 +323,25 @@ function clientAddress(
  * Pre-configured rate limiter for general auth endpoints (login, register).
  * 200 requests per 15 minutes per IP.
  */
-export const defaultAuthLimiter = createRateLimiter({
+const DEFAULT_AUTH_LIMIT: NamedRateLimiterOptions = {
     name: "auth-default",
     windowMs: 15 * 60 * 1000,
     limit: 200,
     message: "Too many authentication attempts, please try again later."
-});
+};
+export const defaultAuthLimiter = createRateLimiter(DEFAULT_AUTH_LIMIT);
 
 /**
  * Pre-configured strict rate limiter for sensitive endpoints (password reset, verification).
  * 50 requests per 15 minutes per IP.
  */
-export const strictAuthLimiter = createRateLimiter({
+const STRICT_AUTH_LIMIT: NamedRateLimiterOptions = {
     name: "auth-strict",
     windowMs: 15 * 60 * 1000,
     limit: 50,
     message: "Too many requests to this sensitive endpoint, please try again later."
-});
+};
+export const strictAuthLimiter = createRateLimiter(STRICT_AUTH_LIMIT);
 
 /**
  * Limiter for `POST /auth/send-verification`, keyed by the authenticated user.
@@ -399,7 +407,7 @@ export const captureRecipientEmail: MiddlewareHandler<HonoEnv> = async (c, next)
  * Falls back to the IP bucket for a request whose body named no address, so
  * the limiter is never silently a no-op.
  */
-export const recipientEmailLimiter = createRateLimiter({
+const RECIPIENT_EMAIL_LIMIT: NamedRateLimiterOptions = {
     name: "auth-recipient-email",
     windowMs: 15 * 60 * 1000,
     limit: 5,
@@ -408,7 +416,8 @@ export const recipientEmailLimiter = createRateLimiter({
         return email ? `recipient-email:${email}` : `recipient-email:ip:${defaultKeyGenerator(c)}`;
     },
     message: "Too many emails requested for this address, please try again later."
-});
+};
+export const recipientEmailLimiter = createRateLimiter(RECIPIENT_EMAIL_LIMIT);
 
 /**
  * How long a route that answers "if an account exists…" takes, whoever asked.
@@ -437,7 +446,7 @@ export async function notBefore<T>(startedAt: number, floorMs: number, result: T
     return result;
 }
 
-export const verificationEmailLimiter = createRateLimiter({
+const VERIFICATION_EMAIL_LIMIT: NamedRateLimiterOptions = {
     name: "auth-verification-email",
     windowMs: 15 * 60 * 1000,
     limit: 5,
@@ -448,7 +457,64 @@ export const verificationEmailLimiter = createRateLimiter({
             : `verification-email:ip:${defaultKeyGenerator(c)}`;
     },
     message: "Too many verification emails requested, please try again later."
-});
+};
+export const verificationEmailLimiter = createRateLimiter(VERIFICATION_EMAIL_LIMIT);
+
+/** A limiter's options, with the name it counts under in a shared store. */
+export type NamedRateLimiterOptions = Omit<RateLimiterOptions, "store" | "name"> & { name: string };
+
+/**
+ * One backend's auth limiters — login and registration, the sensitive
+ * endpoints, the per-address and per-account mail budgets — and the way its
+ * route modules build the rest of theirs (the OTP and MFA attempt limits).
+ *
+ * Every backend has its own set ({@link createAuthLimiters}), so a caller
+ * spending one backend's allowance spends nothing of another's in the same
+ * process. The module constants above ({@link defaultAuthLimiter} and its
+ * siblings) are the process default's set, for a router built outside any
+ * backend.
+ */
+export interface AuthLimiters {
+    /** General auth endpoints (login, register): 200 requests per 15 minutes per address. */
+    default: MiddlewareHandler<HonoEnv>;
+    /** Sensitive endpoints (password reset, verification): 50 requests per 15 minutes per address. */
+    strict: MiddlewareHandler<HonoEnv>;
+    /** Mail to an address the caller named: 5 per 15 minutes per address. See {@link recipientEmailLimiter}. */
+    recipientEmail: MiddlewareHandler<HonoEnv>;
+    /** Verification mail for a signed-in caller: 5 per 15 minutes per account. See {@link verificationEmailLimiter}. */
+    verificationEmail: MiddlewareHandler<HonoEnv>;
+    /** Another limiter that counts where these do, under its own name. */
+    named(options: NamedRateLimiterOptions): MiddlewareHandler<HonoEnv>;
+}
+
+/**
+ * Build a backend's auth limiters.
+ *
+ * With `store` — a shared one: SQL, or what the operator passed as
+ * `rateLimit.store` — every limiter counts there under its own name, so the
+ * replicas of one deployment agree. Without one each limiter counts in its own
+ * memory: the data limiter's memory store is swept on the data window, which
+ * is not every limiter's window.
+ */
+export function createAuthLimiters(store?: RateLimitStore): AuthLimiters {
+    const named = (options: NamedRateLimiterOptions): MiddlewareHandler<HonoEnv> => {
+        const windowMs = options.windowMs ?? 15 * 60 * 1000;
+        return createRateLimiter({
+            ...options,
+            windowMs,
+            store: store
+                ? { hit: (key, window, limit) => store.hit(`${options.name}:${key}`, window, limit) }
+                : new MemoryRateLimitStore(windowMs)
+        });
+    };
+    return {
+        default: named(DEFAULT_AUTH_LIMIT),
+        strict: named(STRICT_AUTH_LIMIT),
+        recipientEmail: named(RECIPIENT_EMAIL_LIMIT),
+        verificationEmail: named(VERIFICATION_EMAIL_LIMIT),
+        named
+    };
+}
 
 /**
  * Key generator for API-key-based rate limiting.
@@ -569,10 +635,12 @@ export function createDataRateLimiter(
         const user = c.get("user") as { uid?: string } | undefined;
         if (user?.uid) return isAnonymousUid(user.uid) ? undefined : user.uid;
 
-        // Only meaningful for Rebase-issued JWTs. A deployment authenticating
-        // through an adapter never calls `configureJwt`, and verifying would
-        // throw rather than return null.
-        if (!isJwtConfigured()) return undefined;
+        // Only meaningful for Rebase-issued JWTs, verified by the backend
+        // answering this request. A deployment authenticating through an
+        // adapter has no JWT secret, and verifying would throw rather than
+        // return null.
+        const jwt = jwtOf(c);
+        if (!jwt.isConfigured()) return undefined;
         const token = extractBearerToken(c.req.header("authorization"));
         if (token === undefined) {
             // A file read by download token — an `<img src=…?token=…>`, which
@@ -581,10 +649,10 @@ export function createDataRateLimiter(
             // the anonymous allowance of everyone behind the same NAT.
             const queryToken = c.req.query("token");
             if (!queryToken) return undefined;
-            const grant = await verifyDownloadToken(queryToken);
+            const grant = await jwt.verifyDownloadToken(queryToken);
             return grant?.rl ? `file:${grant.rl}` : undefined;
         }
-        const payload = await verifyAccessToken(token);
+        const payload = await jwt.verifyAccessToken(token);
         if (!payload?.uid || isAnonymousUid(payload.uid)) return undefined;
         return payload.uid;
     };

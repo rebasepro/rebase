@@ -25,8 +25,10 @@ import type {
 import { Hono } from "hono";
 import { hasAdminRole } from "@rebasepro/types";
 import { judgeAccessToken, replaceUserPassword, type AccessTokenVerdict } from "./token-revocation";
-import { customClaimsOf, verifyAccessToken } from "./jwt";
+import { customClaimsOf, processJwtService, type JwtService } from "./jwt";
 import type { AccessTokenPayload } from "./jwt";
+import type { AuthLimiters } from "./rate-limiter";
+import type { AccessControl } from "./access";
 import { createAuthRoutes } from "./routes";
 import type { CaptchaConfig } from "./captcha";
 import { buildBuiltinAuthCapabilities } from "./capabilities";
@@ -54,6 +56,16 @@ import { ApiError, isDataException } from "../api/errors";
 export interface BuiltinAuthAdapterConfig {
     /** The bootstrapper-provided auth repository (users, roles, tokens). */
     authRepository: AuthRepository;
+    /**
+     * The backend this adapter signs and verifies tokens for —
+     * `backend.services.jwt`, or a service of your own from `createJwtService`.
+     * The process default (what `configureJwt` sets) when omitted.
+     */
+    jwt?: JwtService;
+    /** The backend's auth limiters, counting in its own store. The process default's set when omitted. */
+    limiters?: AuthLimiters;
+    /** The backend's access model, which the default role is checked against. The process default when omitted. */
+    access?: AccessControl;
     /** Email service for password resets, verification, etc. */
     emailService?: EmailService;
     /** Email configuration. */
@@ -142,6 +154,7 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
         refreshTokenReuse,
         magicLinkCreatesUsers = false
     } = config;
+    const jwt = config.jwt ?? processJwtService;
 
     const resolvedOps = resolveAuthHooks(authHooks);
 
@@ -222,7 +235,7 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
             }
 
             // JWT verification
-            const payload = await verifyAccessToken(token);
+            const payload = await jwt.verifyAccessToken(token);
             if (!payload) {
                 return null;
             }
@@ -270,7 +283,7 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
             }
 
             // JWT verification
-            const payload = await verifyAccessToken(token);
+            const payload = await jwt.verifyAccessToken(token);
             if (!payload) {
                 return null;
             }
@@ -344,6 +357,9 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
         createAuthRoutes(): Hono<HonoEnv> | undefined {
             return createAuthRoutes({
                 authRepo: authRepository,
+                jwt,
+                limiters: config.limiters,
+                access: config.access,
                 emailService,
                 emailConfig,
                 allowRegistration,

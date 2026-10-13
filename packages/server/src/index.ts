@@ -25,6 +25,17 @@ export type {
     RebaseBackend,
     RebaseRoutes
 } from "./backend/create-backend";
+// A backend's own state — its JWT keys, access model, API-key store, rate
+// limiters — as one value (`backend.services`), and the process default the
+// module-level API (`rebase`, `verifyCredential`, `getAccessModel`, …)
+// answers for: `initializeRebaseBackend` installs its backend there, and
+// `setDefaultBackend` installs one built by hand.
+export { setDefaultBackend } from "./backend/default-backend";
+export type { BackendServices } from "./backend/services";
+export { createJwtService } from "./auth/jwt";
+export type { JwtService, JwtConfig } from "./auth/jwt";
+export type { AccessControl } from "./auth/access";
+export type { AuthLimiters } from "./auth/rate-limiter";
 export { isAuthAdapter } from "./auth/require-auth";
 // The single answer to "does this server require an authenticated caller?".
 // Exported because the drivers' realtime sockets are the other enforcement

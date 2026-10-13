@@ -29,13 +29,7 @@ import type { HonoEnv } from "../api/types.js";
 import { logger } from "../utils/logger.js";
 import { createRateLimiter } from "../auth/rate-limiter.js";
 import { randomHex, constantTimeEqual, sha256Hex } from "../utils/portable-crypto.js";
-import {
-    verifyAccessToken,
-    generateMcpAccessToken,
-    signPurposeToken,
-    verifyPurposeToken,
-    type AccessTokenPayload
-} from "../auth/jwt.js";
+import { processJwtService, type AccessTokenPayload, type JwtService } from "../auth/jwt.js";
 import type { AuthRepository } from "../auth/interfaces.js";
 import { isAccessTokenRevoked } from "../auth/token-revocation.js";
 import type { OAuthStore } from "./oauth-store.js";
@@ -76,6 +70,12 @@ const MAX_REGISTERED_CLIENTS = 5_000;
 
 export interface OAuthRoutesConfig {
     store: OAuthStore;
+    /**
+     * The backend this authorization server issues for: its key signs the
+     * MCP access tokens and the authorize-request token, and verifies the
+     * person's session at consent. The process default when omitted.
+     */
+    jwt?: JwtService;
     /** The externally reachable origin of this deployment. */
     publicUrl: string;
     /** Where `/mcp` is mounted, e.g. `/mcp`. */
@@ -141,6 +141,7 @@ interface AuthorizeRequestClaims {
 export function createOAuthRoutes(config: OAuthRoutesConfig): Hono<HonoEnv> {
     const router = new Hono<HonoEnv>();
     const { store, publicUrl, mcpPath } = config;
+    const jwt = config.jwt ?? processJwtService;
     const issuer = issuerFor(publicUrl);
     const canonicalResource = canonicalResourceUri(publicUrl, mcpPath);
 
@@ -366,7 +367,7 @@ export function createOAuthRoutes(config: OAuthRoutesConfig): Hono<HonoEnv> {
 
         const scope = narrowScope(q.scope);
 
-        const requestToken = await signPurposeToken(
+        const requestToken = await jwt.signPurposeToken(
             "mcp-authorize-request",
             {
                 clientId,
@@ -405,7 +406,7 @@ export function createOAuthRoutes(config: OAuthRoutesConfig): Hono<HonoEnv> {
         const sessionToken = String(form.session_token ?? "");
         const approved = String(form.decision ?? "") === "allow";
 
-        const request = await verifyPurposeToken<AuthorizeRequestClaims>("mcp-authorize-request", requestToken);
+        const request = await jwt.verifyPurposeToken<AuthorizeRequestClaims>("mcp-authorize-request", requestToken);
         if (!request) {
             // The signed request is the only thing that makes this endpoint
             // safe. Without a valid one there is nothing to redirect to that we
@@ -705,7 +706,7 @@ export function createOAuthRoutes(config: OAuthRoutesConfig): Hono<HonoEnv> {
         c: Context<HonoEnv>,
         grant: { clientId: string; uid: string; roles: string[]; scope: string; resource: string; family: string }
     ) {
-        const accessToken = await generateMcpAccessToken({
+        const accessToken = await jwt.generateMcpAccessToken({
             uid: grant.uid,
             roles: grant.roles,
             scope: grant.scope,
@@ -767,7 +768,7 @@ export function createOAuthRoutes(config: OAuthRoutesConfig): Hono<HonoEnv> {
      * minting a grant that outlives the session it was stolen from.
      */
     async function verifiedSession(token: string): Promise<AccessTokenPayload | null> {
-        const session = await verifyAccessToken(token);
+        const session = await jwt.verifyAccessToken(token);
         if (!session) return null;
         const revocation = config.identity?.revocation;
         if (revocation && await isAccessTokenRevoked(revocation, session)) return null;

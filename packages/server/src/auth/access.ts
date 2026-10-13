@@ -3,8 +3,9 @@
  * goes through.
  *
  * The model — the app's declared roles and scopes beside the built-in ones —
- * comes from the users collection's `auth` block and is configured once at
- * boot, like the JWT keys. A process serves one backend's auth, so one model.
+ * comes from the users collection's `auth` block. Each backend holds its own
+ * ({@link AccessControl}) and its route groups put it on the request, so the
+ * checks below judge a caller against the backend answering them.
  *
  * Who holds what:
  *
@@ -71,30 +72,84 @@ export function keyOwnerResolverFor(
     };
 }
 
-let configured: AccessModel = EMPTY_ACCESS_MODEL;
-let keyOwners: KeyOwnerResolver | undefined;
-
-/** The access model the running backend serves. Built-ins only until boot configures it. */
-export function getAccessModel(): AccessModel {
-    return configured;
+/**
+ * One backend's access model — the app's declared roles and scopes beside the
+ * built-in ones — and, when `auth.personalKeys` is on and the backend has an
+ * account store to read owners from, how a personal key finds its owner.
+ *
+ * Every backend holds its own (`backend.services.access`), so a role one
+ * backend declares grants nothing on another in the same process.
+ */
+export interface AccessControl {
+    readonly model: AccessModel;
+    /**
+     * How a personal key finds its owner, or undefined when personal keys are
+     * off — in which case every personal key, however valid, is refused.
+     */
+    readonly resolveKeyOwner?: KeyOwnerResolver;
 }
 
 /**
- * How a personal key finds its owner, or undefined when personal keys are
- * off — in which case every personal key, however valid, is refused.
+ * What the module-level API answers for: {@link getAccessModel},
+ * {@link getKeyOwnerResolver}, and every scope check on a route mounted
+ * outside any backend. Built-ins only until {@link configureAccess} or a
+ * backend installed as the process default sets it.
+ */
+let processAccess: AccessControl = { model: EMPTY_ACCESS_MODEL };
+
+/** The process default's access model. Built-ins only until one is configured. */
+export function getAccessModel(): AccessModel {
+    return processAccess.model;
+}
+
+/**
+ * How a personal key finds its owner in the process default, or undefined
+ * when personal keys are off there.
  */
 export function getKeyOwnerResolver(): KeyOwnerResolver | undefined {
-    return keyOwners;
+    return processAccess.resolveKeyOwner;
 }
 
 /**
- * Install the access model, and — when the app enables `auth.personalKeys`
- * and has an account store to read owners from — how personal keys find
- * their owner. Called once by `initializeRebaseBackend`.
+ * Set the process default's access model, and — when the app enables
+ * `auth.personalKeys` and has an account store to read owners from — how
+ * personal keys find their owner. For a test, or a server wired by hand that
+ * uses the module-level API; a backend built by `createRebaseBackend` carries
+ * its own.
  */
 export function configureAccess(options: { model: AccessModel; resolveKeyOwner?: KeyOwnerResolver }): void {
-    configured = options.model;
-    keyOwners = options.resolveKeyOwner;
+    processAccess = { model: options.model, resolveKeyOwner: options.resolveKeyOwner };
+}
+
+/** @internal The process default itself, to install another or to restore it. */
+export function defaultAccessControl(): AccessControl {
+    return processAccess;
+}
+
+/** @internal See {@link defaultAccessControl}. */
+export function setDefaultAccessControl(access: AccessControl): void {
+    processAccess = access;
+}
+
+/**
+ * The process default as an {@link AccessControl} that follows it — what a
+ * route or a key check built outside any backend falls back to.
+ */
+export const processAccessControl: AccessControl = {
+    get model() {
+        return processAccess.model;
+    },
+    get resolveKeyOwner() {
+        return processAccess.resolveKeyOwner;
+    }
+};
+
+/**
+ * The access control serving this request: the backend's whose route group is
+ * answering it, or the process default for a route mounted outside any.
+ */
+export function accessOf(c: Context<HonoEnv>): AccessControl {
+    return c.get("services")?.access ?? processAccessControl;
 }
 
 /** The resource names Rebase's own scopes use; an app scope may not reuse one. */
@@ -194,7 +249,7 @@ export function callerScopes(c: Context<HonoEnv>): string[] {
     if (narrowed) return narrowed;
     const user = c.get("user");
     if (!user) return [];
-    return scopesForRoles(rolesOf(user), configured);
+    return scopesForRoles(rolesOf(user), accessOf(c).model);
 }
 
 /**
@@ -277,7 +332,7 @@ export function requireScopeByMethod(scopes: { read: string; write: string }): M
  * still cannot hand it out.
  */
 function beyondCaller(c: Context<HonoEnv>, roles: readonly string[]): string[] {
-    const beyond = scopesBeyond(scopesForRoles(roles, configured), callerScopes(c));
+    const beyond = scopesBeyond(scopesForRoles(roles, accessOf(c).model), callerScopes(c));
     if (hasAdminRole(roles) && !hasAdminRole(rolesOf(c.get("user")))) beyond.unshift(ADMIN_ROLE);
     return beyond;
 }

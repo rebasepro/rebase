@@ -8,6 +8,7 @@ import type { VectorSearchParams, IncludeSpec, LogicalCondition, FilterValues, N
 import type { DecodedCursor } from "@rebasepro/common";
 import type { AuthResult } from "../auth/middleware";
 import type { ApiKeyMasked } from "../auth/api-keys/api-key-types";
+import type { BackendServices } from "../backend/services";
 
 /**
  * Hono Environment Variables
@@ -109,6 +110,19 @@ export type HonoEnv = {
          * `api/mount-path.ts`.
          */
         mountPath?: string;
+        /**
+         * The backend answering this request: its JWT keys, access model,
+         * API-key store and rate limiters.
+         *
+         * Set by the first middleware of every route group a backend builds,
+         * so a group verifies tokens and checks scopes against its own
+         * backend wherever it is mounted, and two backends mounted on one app
+         * stay two. Absent on a route mounted outside any backend, where the
+         * helpers that read it (`requireScope`, `callerScopes`, `requireAuth`,
+         * …) answer for the process default. Set it yourself to make such a
+         * route answer for a backend: `c.set("services", backend.services)`.
+         */
+        services?: BackendServices;
     }
 };
 

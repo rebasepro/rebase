@@ -70,9 +70,10 @@ export type { RebaseFunctionContext } from "./define-function";
  *
  * It is safe to hold at module scope, unlike a configuration value, because it
  * is a lazy Proxy: nothing is resolved until a property is read, which happens
- * inside a request. That indirection is also the whole of what a future
- * isolate-based host has to hook — see `_setRebaseResolver` in
- * `../singleton.ts`.
+ * inside a request — and it resolves to the backend serving that request, so
+ * with two backends in one process each one's functions see their own. That
+ * indirection is the whole of what a host hooks — the Node server per request,
+ * an isolate host per isolate — see `_setRebaseResolver` in `../singleton.ts`.
  */
 export { rebase } from "../singleton";
 

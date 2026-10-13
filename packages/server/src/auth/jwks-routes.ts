@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import type { HonoEnv } from "../api/types";
-import { getJwks } from "./jwt";
+import { processJwtService, type JwtService } from "./jwt";
 
 /**
  * `GET /.well-known/jwks.json` — the public keys that verify this issuer's
@@ -15,12 +15,15 @@ import { getJwks } from "./jwt";
  * where every verifier looks — an issuer of `https://api.example.com` implies
  * `https://api.example.com/.well-known/jwks.json`, whatever the API happens to
  * be prefixed with.
+ *
+ * `jwt` is the issuer whose keys these are — a backend's own
+ * (`backend.services.jwt`), or the process default when omitted.
  */
-export function createJwksRoutes(): Hono<HonoEnv> {
+export function createJwksRoutes(jwt: JwtService = processJwtService): Hono<HonoEnv> {
     const router = new Hono<HonoEnv>();
 
     router.get("/jwks.json", (c) => {
-        const jwks = getJwks();
+        const jwks = jwt.getJwks();
 
         // Verifiers cache JWKS and re-fetch on an unknown `kid`, so a long TTL
         // is safe and a short one is wasteful — adding a key is not a reason to

@@ -110,9 +110,7 @@ import {
 } from "../init/surfaces";
 import { injectCallbackClient } from "../init/callback-client";
 import { handGlobalCallbacksTo } from "../init/global-callbacks";
-import { configureJwt, hasAsymmetricSigningKey, isJwtConfigured } from "../auth";
-import { DEFAULT_REFRESH_EXPIRES_IN } from "../auth/jwt";
-import { configureUserPicking } from "../auth/user-picking";
+import { createJwtService, DEFAULT_REFRESH_EXPIRES_IN, processJwtService, type JwtService } from "../auth/jwt";
 import { createJwksRoutes } from "../auth/jwks-routes";
 import { readRuntimeVersion } from "../boot/version-skew";
 import { createStorageMaintenanceRoutes } from "../storage/maintenance-routes";
@@ -138,10 +136,10 @@ import { createApiKeyPreAuth, createFunctionScopeGuard, createTusScopeGuard, res
 import type { KeyTargets } from "../auth/api-keys/key-grant";
 import { createPlatformTokenPreAuth, platformTokensFromEnv } from "../auth/platform-token";
 import { createRequireAuth } from "../auth/middleware";
-import { accessModelFromCollections, callerScopes, configureAccess, keyOwnerResolverFor, requireScope, requireScopeByMethod } from "../auth/access";
+import { accessModelFromCollections, callerScopes, keyOwnerResolverFor, requireScope, requireScopeByMethod, type AccessControl, type KeyOwnerResolver } from "../auth/access";
 import { createScopeRoutes } from "../auth/scope-routes";
-import { configureCredentialStore } from "../auth/verify-credential";
-import { createDataRateLimiter, createDataRateLimitCheck, defaultAuthLimiter, DEFAULT_FUNCTIONS_ANONYMOUS_LIMIT, setSharedRateLimitStore, type DataRateLimitConfig } from "../auth/rate-limiter";
+import { verifyCredentialAgainst, type VerifiedCredential } from "../auth/verify-credential";
+import { createAuthLimiters, createDataRateLimiter, createDataRateLimitCheck, DEFAULT_FUNCTIONS_ANONYMOUS_LIMIT, type DataRateLimitConfig } from "../auth/rate-limiter";
 import { MemoryRateLimitStore } from "../auth/rate-limit-store";
 import { createSqlRateLimitStore } from "../auth/sql-rate-limit-store";
 import { resolveRateLimitStoreKind } from "../auth/resolve-rate-limit-store";
@@ -154,7 +152,6 @@ import type { EmailService } from "../email";
 import { createEmailService, createUnconfiguredEmailService } from "../email";
 import { activeDevEmailSink } from "../email/dev-sink";
 import type { OAuthProvider } from "../auth/interfaces";
-import { _initRebase } from "../singleton";
 import { isAuthAdapter, resolveRequireAuth } from "../auth/require-auth";
 import {
     assertNoReplacedResourceConfig,
@@ -164,12 +161,14 @@ import {
     graphQueues
 } from "../boot/resource-adapters.js";
 import { assertEveryKindBindable } from "../boot/resource-resolvers.js";
-import { installTopicRuntime, topicJobHandlers } from "../topics/runtime.js";
-import { queueJobHandlers, installQueueRuntime } from "../queues/runtime.js";
+import { createTopicRuntime, topicJobHandlers } from "../topics/runtime.js";
+import { createQueueRuntime, queueJobHandlers } from "../queues/runtime.js";
 import type { CronScheduler } from "../cron";
 import type { JobQueue } from "../jobs";
 import type { MetricsHistory } from "../metrics/history-recorder.js";
 import type { ProvisionOptions, RebaseAuthConfig, RebaseBackendOptions } from "./options";
+import type { BackendServices } from "./services";
+import { runInBackendScope, type BackendScope } from "./scope";
 
 /**
  * A backend's HTTP surface, one route group at a time.
@@ -253,13 +252,34 @@ export interface AttachRealtimeOptions {
  */
 export interface RebaseBackend {
     /**
-     * The in-process client — the object `rebase` from `@rebasepro/server` is
-     * once this backend exists. `dataAsAdmin`, `sql`, `storage`, `bucket` and
-     * `email` call the drivers and controllers directly; `auth`, `admin`,
-     * `functions` and `cron` reach this backend's routes in-process, without
-     * an HTTP server and wherever (or whether) the application mounted them.
+     * The in-process client — what `rebase` from `@rebasepro/server` is inside
+     * every request, cron run and job this backend serves (and everywhere,
+     * once it is the process default: {@link setDefaultBackend}).
+     * `dataAsAdmin`, `sql`, `storage`, `bucket` and `email` call the drivers
+     * and controllers directly; `auth`, `admin`, `functions` and `cron` reach
+     * this backend's routes in-process, without an HTTP server and wherever
+     * (or whether) the application mounted them.
      */
     rebase: RebaseServerClient;
+
+    /**
+     * What this backend holds and its requests ask it for: its JWT keys
+     * (`services.jwt` signs and verifies its tokens), its access model, its
+     * API-key store, its rate limiters, its collections. Its own — another
+     * backend in the same process has others.
+     *
+     * ```ts
+     * const token = await backend.services.jwt.generateAccessToken("u1", ["editor"]);
+     * ```
+     */
+    services: BackendServices;
+
+    /**
+     * The identity and scopes behind a bearer credential — a session token or
+     * an `rk_` API key — as this backend verifies it, or null. For an app's
+     * own socket or tunnel.
+     */
+    verifyCredential(token: string): Promise<VerifiedCredential | null>;
     driverRegistry: DriverRegistry;
     driver: DataDriver;
     realtimeServices: Record<string, RealtimeProvider>;
@@ -480,19 +500,28 @@ function resolveProvision(provision: boolean | ProvisionOptions | undefined): Re
  * group. Mounts nothing, starts no timer, adds no process listener — see
  * {@link RebaseBackend} for the steps that do.
  *
- * It does set what is process-wide by nature: the `rebase` singleton (function
- * and cron files import it), the JWT configuration and the access model.
+ * Writes no process global either. The backend holds its own JWT keys, access
+ * model, API-key store, rate-limit counts and client (`backend.services`,
+ * `backend.rebase`), and code it runs — a function, a cron job, a hook — sees
+ * it as `rebase`. The module-level API (`rebase` outside any request,
+ * `verifyAccessToken`, `getAccessModel`, …) answers for the process default,
+ * which {@link setDefaultBackend} sets and `initializeRebaseBackend` sets for
+ * its backend. The one process-wide setting it touches is the log level, and
+ * only when `logging.level` is given: the logger is the process's.
  */
 export async function createRebaseBackend(options: RebaseBackendOptions): Promise<RebaseBackend> {
     const config = options;
     const provision = resolveProvision(config.provision);
 
-    // One level system. This used to also call `configureLogLevel`, which
-    // replaced `console.debug`/`console.log`/`console.warn` with no-ops — so
-    // `LOG_LEVEL=warn` silenced not just this server's info lines but every
-    // `console.log` in the process: a dependency's, and the project's own
-    // debugging. Irreversibly, since the originals were discarded.
-    setLogLevel(config.logging?.level);
+    // One level system, and the process's: every line any backend in this
+    // process writes goes through the one logger, so the level is set only
+    // when this backend was asked to set it. This used to also call
+    // `configureLogLevel`, which replaced `console.debug`/`console.log`/
+    // `console.warn` with no-ops — so `LOG_LEVEL=warn` silenced not just this
+    // server's info lines but every `console.log` in the process: a
+    // dependency's, and the project's own debugging. Irreversibly, since the
+    // originals were discarded.
+    if (config.logging?.level !== undefined) setLogLevel(config.logging.level);
 
     // Before anything reads the config: a project still declaring resources the
     // old way is refused here rather than booted with them ignored. First
@@ -862,11 +891,6 @@ export async function createRebaseBackend(options: RebaseBackendOptions): Promis
     const explicitAuthCollection = config.auth && !isAuthAdapter(config.auth) ? config.auth.collection : undefined;
     const accessCollections = explicitAuthCollection ? [explicitAuthCollection, ...activeCollections] : activeCollections;
     const accessModel = accessModelFromCollections(accessCollections);
-    configureAccess({ model: accessModel });
-    // The user picker answers whoever may write a collection with a
-    // `userSelect` field — judged on the collections as they are now, so a
-    // live schema edit is what counts.
-    configureUserPicking(() => collectionRegistry.getRawCollections());
     const declaredAuth = accessCollections.find(collection => collection.auth === true
         || (typeof collection.auth === "object" && collection.auth !== null && collection.auth.enabled === true))?.auth;
     const personalKeysEnabled = typeof declaredAuth === "object" && declaredAuth !== null && declaredAuth.personalKeys === true;
@@ -875,6 +899,12 @@ export async function createRebaseBackend(options: RebaseBackendOptions): Promis
     let authConfigResult: BootstrappedAuth | undefined = undefined;
     let serviceKey: string | undefined;
     let authAdapter: AuthAdapter | undefined;
+    // This backend's tokens: signed and verified with its own secret and keys
+    // when `auth.jwtSecret` gives it some. A backend given none — one that
+    // authenticates through an adapter, or a server wired by hand that calls
+    // `configureJwt` itself — signs with the process default's, as it always
+    // has: it has no keys of its own to keep apart.
+    let jwt: JwtService = processJwtService;
 
     if (config.auth) {
         if (isAuthAdapter(config.auth)) {
@@ -935,7 +965,7 @@ export async function createRebaseBackend(options: RebaseBackendOptions): Promis
             const collectionAuth = safeAuthConfig.collection ? safeAuthConfig.collection.auth : undefined;
             const collectionAuthConfig = (typeof collectionAuth === "object" && collectionAuth !== null) ? collectionAuth : undefined;
             if (safeAuthConfig.jwtSecret) {
-                configureJwt({
+                jwt = createJwtService({
                     secret: safeAuthConfig.jwtSecret,
                     accessExpiresIn: safeAuthConfig.accessExpiresIn || "1h",
                     refreshExpiresIn: safeAuthConfig.refreshExpiresIn || DEFAULT_REFRESH_EXPIRES_IN,
@@ -1133,13 +1163,11 @@ export async function createRebaseBackend(options: RebaseBackendOptions): Promis
     // auth adapter that keeps accounts elsewhere — no resolver is installed and
     // every personal key is refused, which is also what switching the flag off
     // does to the keys already minted.
+    let resolveKeyOwner: KeyOwnerResolver | undefined;
     if (personalKeysEnabled) {
         if (typeof adminIdentityRepo?.getUserById === "function" && typeof adminIdentityRepo.getUserRoleIds === "function") {
-            configureAccess({
-                model: accessModel,
-                // One read of the owner per request: exists, not disabled, roles.
-                resolveKeyOwner: keyOwnerResolverFor(adminIdentityRepo)
-            });
+            // One read of the owner per request: exists, not disabled, roles.
+            resolveKeyOwner = keyOwnerResolverFor(adminIdentityRepo);
         } else {
             logger.warn(
                 "[Auth] auth.personalKeys is on, but this backend's auth keeps no account store Rebase can " +
@@ -1147,9 +1175,10 @@ export async function createRebaseBackend(options: RebaseBackendOptions): Promis
             );
         }
     }
-
-    // `verifyCredential` — for an app's own socket or tunnel — checks keys here.
-    configureCredentialStore(apiKeyStore);
+    // This backend's roles and scopes. Every scope check on its routes, its
+    // socket and its key verification reads this one, never another
+    // backend's — a role declared here grants nothing anywhere else.
+    const access: AccessControl = { model: accessModel, resolveKeyOwner };
 
     // What a key's scope target may name, read when a key is minted.
     let servedFunctionNames: string[] = [];
@@ -1242,15 +1271,42 @@ export async function createRebaseBackend(options: RebaseBackendOptions): Promis
             : undefined
     );
     const rateLimitStore = sharedRateLimitStore ?? new MemoryRateLimitStore(rateLimitWindowMs);
-    // The auth limiters too — login, reset, the OTP and MFA attempt budgets.
-    // They are built at import time, before this setting is read, so they are
-    // pointed at it here; set on every boot, so a process that boots again
-    // without a shared store does not keep counting in the last one.
-    setSharedRateLimitStore(sharedRateLimitStore);
+    // The auth limiters too — login, reset, the OTP and MFA attempt budgets —
+    // this backend's own, counting in the shared store when there is one and
+    // in their own memory otherwise.
+    const authLimiters = createAuthLimiters(sharedRateLimitStore);
     const rateLimitConfig: DataRateLimitConfig | undefined =
         config.rateLimit?.enabled !== false
             ? { ...config.rateLimit, store: rateLimitStore, serviceKey: internalServiceKey }
             : undefined;
+
+    // ── What this backend's requests ask it for ──────────────────────────
+    //
+    // Everything below that verifies a token, checks a scope, counts a hit or
+    // resolves a key reads it from here — through a closure where a router is
+    // built, through `c.var.services` on a request — never from a process
+    // global. `topics` and `queues` are filled in once the job queue exists.
+    const services: BackendServices = {
+        jwt,
+        access,
+        authLimiters,
+        rateLimitStore: sharedRateLimitStore,
+        apiKeyStore,
+        collections: () => collectionRegistry.getRawCollections()
+    };
+    // The client code this backend runs sees as `rebase`, set once the
+    // in-process client exists further down.
+    let scope: BackendScope | undefined;
+    /**
+     * Every route group's first middleware: this backend's services on the
+     * request, and the rest of the request run in its scope — so a function,
+     * a hook or a callback it reaches sees this backend as `rebase`, however
+     * many backends the process holds.
+     */
+    const provideServices: MiddlewareHandler<HonoEnv> = async (c, next) => {
+        c.set("services", services);
+        return scope ? runInBackendScope(scope, next) : next();
+    };
 
     // 3. Initialize Storage
     const { storageRegistry, storageController } = await initializeStorage(config.storage, isProduction);
@@ -1357,6 +1413,11 @@ export async function createRebaseBackend(options: RebaseBackendOptions): Promis
             const collectionAuthConfig = (typeof reCollectionAuth === "object" && reCollectionAuth !== null) ? reCollectionAuth : undefined;
             authAdapter = createBuiltinAuthAdapter({
                 authRepository: authConfigResult!.authRepository as import("../auth/interfaces").AuthRepository ?? authConfigResult!.userService as import("../auth/interfaces").AuthRepository,
+                // This backend's keys, limits and roles — the adapter signs,
+                // verifies and judges for it alone.
+                jwt,
+                limiters: authLimiters,
+                access,
                 emailService: authConfigResult!.emailService as import("../email").EmailService,
                 emailConfig: safeAuthConfig.email,
                 allowRegistration: safeAuthConfig.allowRegistration ?? false,
@@ -1473,7 +1534,7 @@ export async function createRebaseBackend(options: RebaseBackendOptions): Promis
         if (!publicUrl) {
             logger.warn("[mcp] Surface enabled but REBASE_PUBLIC_URL is not set — not mounting. " +
                 "Set it to this deployment's externally reachable origin, e.g. https://app.example.com");
-        } else if (!isJwtConfigured()) {
+        } else if (!jwt.isConfigured()) {
             logger.warn("[mcp] Surface enabled but no JWT secret is configured — not mounting.");
         } else if (!driver || !supportsRlsScoping(driver)) {
             logger.error("[mcp] Surface enabled but this data driver cannot scope by user — not mounting. " +
@@ -1516,6 +1577,8 @@ export async function createRebaseBackend(options: RebaseBackendOptions): Promis
         const mcpPath = "/mcp";
         const oauthBasePath = `${basePath}/oauth`;
         const mcpConfig = {
+            // Tokens this backend's OAuth server minted, with its own key.
+            jwt,
             publicUrl,
             mcpPath,
             oauthBasePath,
@@ -1540,13 +1603,14 @@ export async function createRebaseBackend(options: RebaseBackendOptions): Promis
             // A client configured with a header instead of an OAuth flow
             // presents a key; its `data:*` scopes decide which tools and
             // collections it reaches.
-            resolveApiKey: apiKeyStore ? (token: string) => resolveApiKey(apiKeyStore, token) : undefined
+            resolveApiKey: apiKeyStore ? (token: string) => resolveApiKey(apiKeyStore, token, access) : undefined
         };
 
         app.route("/", createMcpWellKnownRoutes(mcpConfig));
         app.route(mcpPath, createMcpRoutes(mcpConfig));
         app.route(oauthBasePath, createOAuthRoutes({
             store,
+            jwt,
             publicUrl,
             mcpPath,
             authBasePath: `${basePath}/auth`,
@@ -1598,6 +1662,9 @@ export async function createRebaseBackend(options: RebaseBackendOptions): Promis
      */
     type SurfaceScopes = AdminScope | { read: AdminScope; write: AdminScope };
     const adminGate = (scopes: SurfaceScopes): MiddlewareHandler<HonoEnv>[] => [
+        // This backend's keys and roles judge the caller, wherever the gate is
+        // mounted — the docs route sits outside every group.
+        provideServices,
         ...(apiKeyPreAuth ? [apiKeyPreAuth] : []),
         platformTokenPreAuth,
         createRequireAuth({ serviceKey: internalServiceKey, ...adminGateIdentity }),
@@ -2597,8 +2664,11 @@ export async function createRebaseBackend(options: RebaseBackendOptions): Promis
     // plane has exactly one name. Both now take this value, so "the singleton"
     // means one type in one place.
     const serverSingleton = serverClient as unknown as import("@rebasepro/types").RebaseServerClient;
-    _initRebase(serverSingleton);
-    logger.debug("Rebase singleton initialized");
+    // What `rebase` is inside this backend's scope: every request its groups
+    // answer, every cron run and job it executes. Not the process's — that is
+    // whichever backend `setDefaultBackend` installed.
+    const ownScope: BackendScope = { rebase: serverSingleton };
+    scope = ownScope;
 
     // Retroactively inject the server client into every source's driver so that
     // entity callbacks receive `context.client` at runtime — see
@@ -2786,12 +2856,21 @@ export async function createRebaseBackend(options: RebaseBackendOptions): Promis
             : config.cronsDir
                 ? await readCronsDirectory(config.cronsDir)
                 : { crons: {}, problems: [] };
-        const loadedCronJobs = cronJobsFrom(cronRecord);
+        // Each run in this backend's scope, so a handler that imports `rebase`
+        // gets this backend's client — the one `ctx.rebase` is.
+        const loadedCronJobs = cronJobsFrom(cronRecord).map(job => ({
+            ...job,
+            definition: {
+                ...job.definition,
+                handler: (ctx: Parameters<typeof job.definition.handler>[0]) =>
+                    runInBackendScope(ownScope, () => job.definition.handler(ctx))
+            }
+        }));
 
         cronScheduler = new CronScheduler();
 
-        // The cron scheduler gets the singleton itself, so `ctx.rebase` inside a
-        // cron handler IS the `rebase` you would import — same object, same type,
+        // The cron scheduler gets this backend's client, so `ctx.rebase` inside a
+        // cron handler IS the `rebase` it would import — same object, same type,
         // same `dataAsAdmin` spelling for the admin-scoped plane.
         cronScheduler.setClient(serverSingleton);
 
@@ -2909,16 +2988,25 @@ export async function createRebaseBackend(options: RebaseBackendOptions): Promis
 
         if (store) {
             if (provision.database) await store.ensureTable();
-            jobQueue = createJobQueue(store, jobsOptions);
+            // Each job runs in this backend's scope, so a handler that imports
+            // `rebase`, or publishes to a topic, reaches this backend.
+            const tasks = Object.fromEntries(Object.entries(jobsOptions.tasks ?? {}).map(([task, handler]) => [
+                task,
+                (ctx: Parameters<typeof handler>[0]) => runInBackendScope(ownScope, () => handler(ctx))
+            ]));
+            jobQueue = createJobQueue(store, { ...jobsOptions, tasks });
             // Topics publish through the queue, in every process — enqueueing is
             // a write, so an api pod that runs no workers still publishes. The
             // handlers only *run* where the workers do, which is the same split
-            // the queue already makes.
+            // the queue already makes. This backend's own runtimes: a publish
+            // from code it runs lands in its queue, not another backend's.
             if (declaredTopics.length > 0) {
-                installTopicRuntime({ queue: jobQueue, topics: declaredTopics });
+                ownScope.topics = createTopicRuntime({ queue: jobQueue, topics: declaredTopics });
+                services.topics = ownScope.topics;
             }
             if (declaredQueues.length > 0) {
-                installQueueRuntime({ queue: jobQueue, queues: declaredQueues });
+                ownScope.queues = createQueueRuntime({ queue: jobQueue, queues: declaredQueues });
+                services.queues = ownScope.queues;
             }
             // Constructed either way, started (by `start()`) only where this
             // process owns the workers: `jobQueue.enqueue` must keep working in
@@ -3239,8 +3327,15 @@ export async function createRebaseBackend(options: RebaseBackendOptions): Promis
     // the same handlers, so a caller can mount one in several places and cannot
     // add routes to the copy `mount()` and the in-process client use.
 
-    /** A fresh router over `router`'s handlers. */
-    const fresh = (router: Hono<HonoEnv>): Hono<HonoEnv> => new Hono<HonoEnv>().route("/", router);
+    /**
+     * A group: this backend's services on every request first, then a fresh
+     * router over `router`'s handlers.
+     */
+    const group = (router?: Hono<HonoEnv>): Hono<HonoEnv> => {
+        const composed = new Hono<HonoEnv>();
+        composed.use("/*", provideServices);
+        return router ? composed.route("/", router) : composed;
+    };
 
     const requireSurface = (surface: RuntimeSurface): void => {
         if (surfaces[surface]) return;
@@ -3253,23 +3348,23 @@ export async function createRebaseBackend(options: RebaseBackendOptions): Promis
     const routes: RebaseRoutes = {
         auth: () => {
             requireSurface("auth");
-            const group = new Hono<HonoEnv>();
+            const authGroup = group();
             // The caller's own keys and the scope catalogue first: the adapter's
             // auth router is mounted on the group's root and would otherwise
             // see these requests first.
-            if (personalKeyRouter) group.route("/keys", personalKeyRouter);
-            group.route("/scopes", scopeRouter);
-            if (config.auth) group.get("/config", defaultAuthLimiter, authConfigHandler);
-            if (adapterAuthRouter) group.route("/", adapterAuthRouter);
-            return group;
+            if (personalKeyRouter) authGroup.route("/keys", personalKeyRouter);
+            authGroup.route("/scopes", scopeRouter);
+            if (config.auth) authGroup.get("/config", authLimiters.default, authConfigHandler);
+            if (adapterAuthRouter) authGroup.route("/", adapterAuthRouter);
+            return authGroup;
         },
         data: () => {
             requireSurface("data");
-            return fresh(dataSurface);
+            return group(dataSurface);
         },
         storage: () => {
             requireSurface("storage");
-            return fresh(storageSurface);
+            return group(storageSurface);
         },
         functions: () => {
             if (!functionsSurface) {
@@ -3278,42 +3373,42 @@ export async function createRebaseBackend(options: RebaseBackendOptions): Promis
                     "with the functions surface on, or `functionsUpstream` with it off to forward them."
                 );
             }
-            return fresh(functionsSurface);
+            return group(functionsSurface);
         },
         admin: () => {
             requireSurface("admin");
-            const group = new Hono<HonoEnv>();
+            const adminGroup = group();
             // Order is load-bearing here. Hono runs matching handlers in
             // registration order, and the auth adapter's admin router
             // authenticates everything under the group's root: the credentials
             // it does not know (`rk_` keys, `rpt_` platform tokens) are resolved
             // ahead of it, and the backup download link — which stands in for a
             // credential — is answered before it.
-            if (apiKeyPreAuth) group.use("/*", apiKeyPreAuth);
-            group.use("/*", platformTokenPreAuth);
-            if (backupLinkRouter) group.route("/backups", backupLinkRouter);
-            if (apiKeyRouter) group.route("/api-keys", apiKeyRouter);
-            if (adapterAdminRouter) group.route("/", adapterAdminRouter);
+            if (apiKeyPreAuth) adminGroup.use("/*", apiKeyPreAuth);
+            adminGroup.use("/*", platformTokenPreAuth);
+            if (backupLinkRouter) adminGroup.route("/backups", backupLinkRouter);
+            if (apiKeyRouter) adminGroup.route("/api-keys", apiKeyRouter);
+            if (adapterAdminRouter) adminGroup.route("/", adapterAdminRouter);
             // `/schema` and `/schema-editor` are siblings, not parent and child:
             // nested, every request to the editor would first pass the live
             // editor's gate, which answers 501 itself when no auth is configured.
-            if (liveSchemaSurface) group.route("/schema", liveSchemaSurface);
-            if (schemaEditorSurface) group.route("/schema-editor", schemaEditorSurface);
-            if (storageMaintenanceSurface) group.route("/storage", storageMaintenanceSurface);
-            if (backupSurface) group.route("/backups", backupSurface);
-            if (rlsAuditSurface) group.route("/rls-audit", rlsAuditSurface);
-            if (sqlExportSurface) group.route("/sql", sqlExportSurface);
-            if (devMailSurface) group.route("/dev/emails", devMailSurface);
-            if (logsSurface) group.route("/logs", logsSurface);
-            return group;
+            if (liveSchemaSurface) adminGroup.route("/schema", liveSchemaSurface);
+            if (schemaEditorSurface) adminGroup.route("/schema-editor", schemaEditorSurface);
+            if (storageMaintenanceSurface) adminGroup.route("/storage", storageMaintenanceSurface);
+            if (backupSurface) adminGroup.route("/backups", backupSurface);
+            if (rlsAuditSurface) adminGroup.route("/rls-audit", rlsAuditSurface);
+            if (sqlExportSurface) adminGroup.route("/sql", sqlExportSurface);
+            if (devMailSurface) adminGroup.route("/dev/emails", devMailSurface);
+            if (logsSurface) adminGroup.route("/logs", logsSurface);
+            return adminGroup;
         },
         cron: () => {
             requireSurface("cron");
-            return fresh(cronSurface!);
+            return group(cronSurface!);
         },
         meta: () => {
             requireSurface("meta");
-            return fresh(metaSurface!);
+            return group(metaSurface!);
         }
     };
 
@@ -3372,9 +3467,9 @@ export async function createRebaseBackend(options: RebaseBackendOptions): Promis
         // surface: a process that does not issue tokens has no key set to
         // publish, and serving an empty one from a functions-only replica would
         // tell a verifier the issuer has no public keys.
-        if (isJwtConfigured() && surfaces.auth) {
-            app.route("/.well-known", createJwksRoutes());
-            if (announce && hasAsymmetricSigningKey()) {
+        if (jwt.isConfigured() && surfaces.auth) {
+            app.route("/.well-known", createJwksRoutes(jwt));
+            if (announce && jwt.hasAsymmetricSigningKey()) {
                 logger.info("Access tokens are signed asymmetrically; public keys at /.well-known/jwks.json");
             }
         }
@@ -3473,7 +3568,12 @@ export async function createRebaseBackend(options: RebaseBackendOptions): Promis
             maxPayload: config.maxBodySize,
             dataRateLimit: rateLimitConfig ? createDataRateLimitCheck(rateLimitConfig) : undefined,
             // An API key authenticates the socket as it does a request.
-            resolveApiKey: apiKeyStore ? (token: string) => resolveApiKey(apiKeyStore, token) : undefined,
+            resolveApiKey: apiKeyStore ? (token: string) => resolveApiKey(apiKeyStore, token, access) : undefined,
+            // A session token, verified with this backend's keys, and the
+            // roles it holds read from this backend's access model — for a
+            // socket with no auth adapter to ask.
+            verifyAccessToken: (token: string) => jwt.isConfigured() ? jwt.verifyAccessToken(token) : Promise.resolve(null),
+            accessModel: access.model,
             // Its own path, so it shares the server with the application's
             // websockets instead of claiming every upgrade on it.
             path: attachOptions.path ?? realtimeSocketPath(mountedBasePath)
@@ -3490,7 +3590,13 @@ export async function createRebaseBackend(options: RebaseBackendOptions): Promis
     const start = (): void => {
         if (started) return;
         started = true;
+        // Inside this backend's scope, so every timer started below — the cron
+        // ticks, the job workers' polls, the sweeps — runs its callbacks with
+        // this backend as `rebase`.
+        runInBackendScope(ownScope, startTimers);
+    };
 
+    const startTimers = (): void => {
         // Whether the configured mail server answers — a warning now rather
         // than at the first password reset. A connection, so it waits for
         // `start()`: a script that only builds a backend should not open one.
@@ -3579,6 +3685,8 @@ export async function createRebaseBackend(options: RebaseBackendOptions): Promis
 
     return {
         rebase: serverSingleton,
+        services,
+        verifyCredential: (token: string) => verifyCredentialAgainst(services, token),
         driverRegistry,
         driver: defaultDriver,
         realtimeServices,

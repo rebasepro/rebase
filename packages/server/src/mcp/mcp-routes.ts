@@ -29,7 +29,7 @@ import { untrustedEnvelope } from "@rebasepro/common";
 import type { HonoEnv } from "../api/types.js";
 import { declaredErrorAnswer } from "../api/errors.js";
 import { logger } from "../utils/logger.js";
-import { verifyMcpAccessToken } from "../auth/jwt.js";
+import { processJwtService, type JwtService } from "../auth/jwt.js";
 import { createDataRateLimiter, type DataRateLimitConfig } from "../auth/rate-limiter.js";
 import { RUNTIME_DEFAULT_MAX_BODY_SIZE } from "../deploy/pod-contract.js";
 import {
@@ -76,6 +76,11 @@ const INTERNAL_ERROR = -32603;
 export const MAX_BATCH_MESSAGES = 20;
 
 export interface McpRoutesConfig {
+    /**
+     * The backend whose MCP access tokens this endpoint accepts — its own key
+     * signed them. The process default when omitted.
+     */
+    jwt?: JwtService;
     /**
      * Verify an `rk_` API key, for clients that are configured with a header
      * rather than an OAuth flow. A key reaches the tools its `data:*` scopes
@@ -158,6 +163,7 @@ type McpCallerEnv = HonoEnv & { Variables: { mcpCaller: McpCaller } };
 export function createMcpRoutes(config: McpRoutesConfig): Hono<HonoEnv> {
     const router = new Hono<HonoEnv>();
     const canonicalResource = canonicalResourceUri(config.publicUrl, config.mcpPath);
+    const jwt = config.jwt ?? processJwtService;
 
     const maxBodySize = config.maxBodySize ?? RUNTIME_DEFAULT_MAX_BODY_SIZE;
     if (maxBodySize > 0) {
@@ -219,7 +225,7 @@ export function createMcpRoutes(config: McpRoutesConfig): Hono<HonoEnv> {
         // The audience is passed explicitly on every call. `verifyMcpAccessToken`
         // has no default for it, so this is the check the specification requires
         // — a token minted for another Rebase project cannot be spent here.
-        const payload = await verifyMcpAccessToken(token, canonicalResource);
+        const payload = await jwt.verifyMcpAccessToken(token, canonicalResource);
         if (!payload) {
             return c.json(
                 { error: "invalid_token", error_description: "The access token is invalid, expired, or for another resource." },

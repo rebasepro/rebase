@@ -51,7 +51,7 @@ import type { HonoEnv } from "../api/types";
 import { ApiError } from "../api/errors";
 import { hashToken } from "./admin-user-ops";
 import { getEmailOtpTemplate, resolveEmailBranding } from "../email/templates";
-import { createRateLimiter, strictAuthLimiter, requestClientAddress } from "./rate-limiter";
+import { requestClientAddress, type AuthLimiters, type NamedRateLimiterOptions } from "./rate-limiter";
 import { logger } from "../utils/logger";
 import { redactRefreshToken } from "./cookie-utils";
 import { confirmAddressOwnership } from "./address-ownership";
@@ -101,7 +101,7 @@ export function otpTokenMaterial(email: string, code: string): string {
  * per replica by default, shared with `REBASE_RATE_LIMIT_STORE=sql`. On several
  * replicas with the default, the effective budget is five attempts per replica.
  */
-const otpVerificationLimiter: MiddlewareHandler<HonoEnv> = createRateLimiter({
+const OTP_VERIFICATION_LIMIT: NamedRateLimiterOptions = {
     name: "auth-otp-verify",
     windowMs: 15 * 60 * 1000,
     limit: OTP_ATTEMPTS_PER_WINDOW,
@@ -110,7 +110,7 @@ const otpVerificationLimiter: MiddlewareHandler<HonoEnv> = createRateLimiter({
         return `otp-verify:${email}`;
     },
     message: "Too many verification attempts for this account, please try again later."
-});
+};
 
 /** Codes a single address may be MAILED per window. */
 const OTP_SENDS_PER_WINDOW = 5;
@@ -127,7 +127,7 @@ const OTP_SENDS_PER_WINDOW = 5;
  * Five per fifteen minutes is generous for "I didn't get it, send it again"
  * and useless as a mail bomb, matching `verificationEmailLimiter`.
  */
-const otpSendLimiter: MiddlewareHandler<HonoEnv> = createRateLimiter({
+const OTP_SEND_LIMIT: NamedRateLimiterOptions = {
     name: "auth-otp-send",
     windowMs: 15 * 60 * 1000,
     limit: OTP_SENDS_PER_WINDOW,
@@ -136,7 +136,7 @@ const otpSendLimiter: MiddlewareHandler<HonoEnv> = createRateLimiter({
         return `otp-send:${email}`;
     },
     message: "Too many sign-in codes requested for this account, please try again later."
-});
+};
 
 /**
  * How long the send route takes, whoever asked.
@@ -192,6 +192,8 @@ const captureOtpEmail: MiddlewareHandler<HonoEnv> = async (c, next) => {
 export function mountOtpRoutes(deps: {
     router: Hono<HonoEnv>;
     config: AuthModuleConfig;
+    /** The backend's auth limiters; the per-address ones count where they do. */
+    limiters: AuthLimiters;
     ops: ResolvedAuthHooks;
     parseBody: <T>(schema: z.ZodSchema<T>, body: unknown) => T;
     buildAuthResponse: (
@@ -211,8 +213,10 @@ export function mountOtpRoutes(deps: {
     /** Built by the caller, as for magic link. Absent when captcha is off. */
     captchaMiddleware?: MiddlewareHandler<HonoEnv>;
 }) {
-    const { router, config, ops, parseBody, buildAuthResponse, createSessionAndTokens, applyTransformHook, captchaMiddleware } = deps;
+    const { router, config, limiters, ops, parseBody, buildAuthResponse, createSessionAndTokens, applyTransformHook, captchaMiddleware } = deps;
     const { authRepo, emailService, emailConfig } = config;
+    const otpVerificationLimiter = limiters.named(OTP_VERIFICATION_LIMIT);
+    const otpSendLimiter = limiters.named(OTP_SEND_LIMIT);
 
     const requestSchema = z.object({
         email: z.string().email("Invalid email address").max(255)
@@ -234,7 +238,7 @@ export function mountOtpRoutes(deps: {
      */
     router.post(
         "/otp",
-        strictAuthLimiter,
+        limiters.strict,
         // Per-address, in front of the handler, for the reason `otpSendLimiter`
         // gives: the IP limiter above bounds a machine, and the mailbox being
         // filled belongs to somebody who cannot rotate anything.
@@ -322,7 +326,7 @@ export function mountOtpRoutes(deps: {
     /**
      * POST /auth/otp/verify — trade a code for a session.
      */
-    router.post("/otp/verify", strictAuthLimiter, captureOtpEmail, otpVerificationLimiter, async (c) => {
+    router.post("/otp/verify", limiters.strict, captureOtpEmail, otpVerificationLimiter, async (c) => {
         const { email, code } = parseBody(verifySchema, await c.req.json());
 
         // The lookup and the binding are the same act: a hash that does not

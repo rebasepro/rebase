@@ -4,7 +4,7 @@ import { ApiError, errorHandler } from "../api/errors";
 import { randomBytes, randomUUID } from "crypto";
 import { generateSecureToken, hashToken } from "./admin-user-ops";
 import type { AuthRepository, OAuthProvider, OAuthProviderProfile, CreateUserData } from "./interfaces";
-import { generateAccessToken, generateRefreshToken, hashRefreshToken, getRefreshTokenExpiry, getAccessTokenExpiry, verifyAccessToken } from "./jwt";
+import { generateRefreshToken, hashRefreshToken, processJwtService, type JwtService } from "./jwt";
 import { extractBearerToken } from "./bearer-token";
 import type { AuthHooks } from "./auth-hooks";
 import { resolveAuthHooks } from "./auth-hooks";
@@ -16,11 +16,12 @@ import { HonoEnv } from "../api/types";
 import {
     RECIPIENT_ROUTE_FLOOR_MS,
     captureRecipientEmail,
+    createRateLimiter,
     defaultAuthLimiter,
     notBefore,
     recipientEmailLimiter,
     strictAuthLimiter,
-    verificationEmailLimiter, requestClientAddress } from "./rate-limiter";
+    verificationEmailLimiter, requestClientAddress, type AuthLimiters } from "./rate-limiter";
 import { buildCaptchaMiddlewares, type CaptchaConfig } from "./captcha";
 import { z } from "zod";
 import { logger } from "../utils/logger";
@@ -34,7 +35,7 @@ import { decideOAuthAutoLink, isRedirectUriAllowed } from "./oauth-signin-policy
 import { confirmAddressOwnership, identityProfileData, identityVouchesForAddress } from "./address-ownership";
 import type { AuthResponsePayload, TransformAuthResponseContext } from "@rebasepro/types";
 import { ADMIN_ROLE, isAdminScope, parseScope } from "@rebasepro/types";
-import { getAccessModel } from "./access";
+import { processAccessControl, type AccessControl } from "./access";
 import type { Context } from "hono";
 import { readRefreshToken, redactRefreshToken, clearRefreshCookie } from "./cookie-utils";
 import { isDeliverableAddress } from "./deliverable-address";
@@ -47,6 +48,19 @@ export { isDeliverableAddress };
  */
 export interface AuthModuleConfig {
     authRepo: AuthRepository;
+    /**
+     * The backend these routes sign sessions for: its JWT keys and token
+     * lifetimes. The process default when omitted — the one `configureJwt`
+     * sets.
+     */
+    jwt?: JwtService;
+    /** The backend's auth limiters, counting in its own store. The process default's set when omitted. */
+    limiters?: AuthLimiters;
+    /**
+     * The backend's access model — what the default role may hold is checked
+     * against it. The process default when omitted.
+     */
+    access?: AccessControl;
     /**
      * Bot protection. Off unless `enabled`.
      *
@@ -177,9 +191,11 @@ export interface CookieAuthConfig {
 }
 
 /**
- * Helper to build standard auth response output
+ * Build the standard auth response, with the access token's expiry as `jwt` —
+ * the backend that minted it — reckons it.
  */
-function buildAuthResponse(
+function buildAuthResponseWith(
+    jwt: JwtService,
     user: { id: string; email: string; displayName?: string | null; photoUrl?: string | null; emailVerified?: boolean; isAnonymous?: boolean; metadata?: Record<string, unknown> | null },
     roleIds: string[],
     accessToken: string,
@@ -201,7 +217,7 @@ function buildAuthResponse(
         tokens: {
             accessToken,
             refreshToken,
-            accessTokenExpiresAt: getAccessTokenExpiry()
+            accessTokenExpiresAt: jwt.getAccessTokenExpiry()
         }
     };
 }
@@ -253,8 +269,27 @@ export function createAuthRoutes(config: AuthModuleConfig): Hono<HonoEnv> {
     // Every registrant gets the default role, so it may carry nothing a
     // stranger should hold: not `admin`, and no declared role with an
     // admin-plane scope — from `users:write`, real `admin` is one edit away.
+    // Whose keys sign, whose limits count, whose roles are judged: the
+    // backend's own, or the process default's for a router built outside one.
+    const jwt = config.jwt ?? processJwtService;
+    const access = config.access ?? processAccessControl;
+    const limiters: AuthLimiters = config.limiters ?? {
+        default: defaultAuthLimiter,
+        strict: strictAuthLimiter,
+        recipientEmail: recipientEmailLimiter,
+        verificationEmail: verificationEmailLimiter,
+        named: createRateLimiter
+    };
+    const buildAuthResponse = (
+        user: Parameters<typeof buildAuthResponseWith>[1],
+        roleIds: string[],
+        accessToken: string,
+        refreshToken: string,
+        providerId: string
+    ): AuthResponsePayload => buildAuthResponseWith(jwt, user, roleIds, accessToken, refreshToken, providerId);
+
     if (config.defaultRole) {
-        const declared = getAccessModel().roles;
+        const declared = access.model.roles;
         const adminPlane = config.defaultRole === ADMIN_ROLE
             ? ["every scope"]
             : Object.prototype.hasOwnProperty.call(declared, config.defaultRole)
@@ -506,7 +541,7 @@ export function createAuthRoutes(config: AuthModuleConfig): Hono<HonoEnv> {
         options: SessionOptions
     ) {
         if (!options.skipMfaGate) {
-            await assertMfaSatisfied(authRepo, uid);
+            await assertMfaSatisfied(authRepo, uid, jwt);
         }
         const aal = options.aal ?? "aal1";
         const roleIds = await authRepo.getUserRoleIds(uid);
@@ -547,13 +582,13 @@ aal };
         // revocation forever simply by refreshing. The access token carries
         // the id too (`sid`), so signing this one device out reaches it.
         const sessionId = randomUUID();
-        const accessToken = await generateAccessToken(uid, roleIds, aal, customClaims, isAnonymous, sessionId);
+        const accessToken = await jwt.generateAccessToken(uid, roleIds, aal, customClaims, isAnonymous, sessionId);
         const refreshToken = generateRefreshToken();
 
         await authRepo.createRefreshToken(
             uid,
             await hashRefreshToken(refreshToken),
-            getRefreshTokenExpiry(),
+            jwt.getRefreshTokenExpiry(),
             userAgent,
             ipAddress,
             { id: sessionId, startedAt: new Date(), aal, method: options.method }
@@ -568,7 +603,7 @@ refreshToken };
      * POST /auth/register
      * Create a new account with email/password
      */
-    router.post("/register", defaultAuthLimiter, ...(captcha.register ? [captcha.register] : []), async (c) => {
+    router.post("/register", limiters.default, ...(captcha.register ? [captcha.register] : []), async (c) => {
         const startedAt = Date.now();
         const { email, password, displayName } = parseBody(registerSchema, await c.req.json());
 
@@ -725,7 +760,7 @@ displayName: user.displayName });
      * POST /auth/login
      * Login with email/password
      */
-    router.post("/login", defaultAuthLimiter, ...(captcha.login ? [captcha.login] : []), async (c) => {
+    router.post("/login", limiters.default, ...(captcha.login ? [captcha.login] : []), async (c) => {
         const { email, password } = parseBody(loginSchema, await c.req.json());
 
         // Call beforeLogin hook if provided (throw to reject)
@@ -860,7 +895,7 @@ displayName: user.displayName });
      */
     if (config.oauthProviders && config.oauthProviders.length > 0) {
         for (const provider of config.oauthProviders) {
-            router.post(`/${provider.id}`, defaultAuthLimiter, async (c) => {
+            router.post(`/${provider.id}`, limiters.default, async (c) => {
                 const payload = parseBody(provider.schema, await c.req.json());
                 const externalUser = await verifyProviderPayload(provider, payload);
 
@@ -1038,7 +1073,7 @@ displayName: user.displayName });
              * email plays no part in the decision, so its verification status
              * is irrelevant.
              */
-            router.post(`/link/${provider.id}`, defaultAuthLimiter, requireLiveSession, async (c) => {
+            router.post(`/link/${provider.id}`, limiters.default, requireLiveSession, async (c) => {
                 const userCtx = c.get("user") as { uid: string } | undefined;
                 if (!userCtx) {
                     throw ApiError.unauthorized("Not authenticated");
@@ -1155,14 +1190,14 @@ displayName: user.displayName });
      */
     router.post(
         "/forgot-password",
-        strictAuthLimiter,
+        limiters.strict,
         // Per-address as well as per-IP. `strictAuthLimiter` bounds a machine;
         // an IP is the attacker's to rotate and the mailbox being filled is
         // not, so without this a distributed run puts an unbounded number of
         // reset messages into one person's inbox, from this deployment's
         // domain. See `recipientEmailLimiter`.
         captureRecipientEmail,
-        recipientEmailLimiter,
+        limiters.recipientEmail,
         ...(captcha.forgotPassword ? [captcha.forgotPassword] : []),
         async (c) => {
         const startedAt = Date.now();
@@ -1228,7 +1263,7 @@ displayName: user.displayName }, appName, logoUrl);
      * POST /auth/reset-password
      * Reset password using token
      */
-    router.post("/reset-password", strictAuthLimiter, async (c) => {
+    router.post("/reset-password", limiters.strict, async (c) => {
         const { token, password } = parseBody(resetPasswordSchema, await c.req.json());
 
         // Validate password strength
@@ -1347,7 +1382,7 @@ message: "Password has been reset successfully" });
      * here: the address is unverified by construction, so an attacker can hold a
      * session for a mailbox that is not theirs.
      */
-    router.post("/send-verification", strictAuthLimiter, requireLiveSession, verificationEmailLimiter, async (c) => {
+    router.post("/send-verification", limiters.strict, requireLiveSession, limiters.verificationEmail, async (c) => {
         const userCtx = c.get("user") as { uid: string; roles?: string[] } | undefined;
         if (!userCtx) {
             throw ApiError.unauthorized("Not authenticated");
@@ -1396,7 +1431,7 @@ message: "Verification email sent" });
     async function verificationProof(c: Context<HonoEnv>, user: { id: string; passwordHash?: string | null }, password: string | undefined): Promise<"session" | "password" | "none"> {
         const bearer = extractBearerToken(c.req.header("authorization"));
         if (bearer !== undefined) {
-            const payload = await verifyAccessToken(bearer);
+            const payload = await jwt.verifyAccessToken(bearer);
             if (payload?.uid === user.id && (await judgeAccessToken(authRepo, payload)).live) return "session";
         }
         if (password !== undefined) {
@@ -1424,7 +1459,7 @@ message: "Verification email sent" });
      * session of the account — and removes what nobody proved. See
      * `verificationProof`; `POST` is the same with a password and a choice.
      */
-    router.get("/verify-email", strictAuthLimiter, async (c) => {
+    router.get("/verify-email", limiters.strict, async (c) => {
         const token = c.req.query("token");
         if (!token) {
             throw ApiError.badRequest("Verification token is required", "INVALID_INPUT");
@@ -1453,7 +1488,7 @@ message: "Verification email sent" });
      *   token is left unspent, so the person holding the link can choose:
      *   prove the password, or `removeUnproven: true` to verify without it.
      */
-    router.post("/verify-email", strictAuthLimiter, async (c) => {
+    router.post("/verify-email", limiters.strict, async (c) => {
         const { token, password, removeUnproven } = parseBody(verifyEmailSchema, await c.req.json());
         const user = await accountForVerificationToken(token);
         const proof = await verificationProof(c, user, password);
@@ -1670,7 +1705,7 @@ aal: sessionAal };
         // since been upgraded to a real account should stop being a guest at
         // its next refresh, not at its next sign-in.
         const sessionId = storedToken.sessionId ?? storedToken.id;
-        const newAccessToken = await generateAccessToken(
+        const newAccessToken = await jwt.generateAccessToken(
             storedToken.uid, roleIds, sessionAal, customClaims, user?.isAnonymous === true, sessionId
         );
         const newRefreshToken = generateRefreshToken();
@@ -1714,7 +1749,7 @@ aal: sessionAal };
         const minted = await authRepo.createRefreshToken(
             storedToken.uid,
             await hashRefreshToken(newRefreshToken),
-            getRefreshTokenExpiry(),
+            jwt.getRefreshTokenExpiry(),
             userAgent,
             ipAddress,
             presentedKept ? { ...session, rotatedFrom: tokenHash } : session
@@ -1741,7 +1776,7 @@ aal: sessionAal };
             tokens: {
                 accessToken: newAccessToken,
                 refreshToken: newRefreshToken,
-                accessTokenExpiresAt: getAccessTokenExpiry()
+                accessTokenExpiresAt: jwt.getAccessTokenExpiry()
             }
         };
         let refreshResponse: AuthResponsePayload = tokensOnlyResponse;
@@ -1768,11 +1803,13 @@ aal: sessionAal };
     // ═══════════════════════════════════════════════════════════════════════
     // Self-service email change
     // ═══════════════════════════════════════════════════════════════════════
-    mountEmailChangeRoutes({ router, config, ops, parseBody, requireLiveSession });
+    mountEmailChangeRoutes({ router, config, ops, parseBody, requireLiveSession, limiters });
 
     mountSessionRoutes({
         router,
         config,
+        jwt,
+        limiters,
         ops,
         parseBody,
         buildAuthResponse,
@@ -1789,6 +1826,8 @@ aal: sessionAal };
     mountMfaRoutes({
         router,
         config,
+        jwt,
+        limiters,
         ops,
         parseBody,
         buildAuthResponse,
@@ -1804,6 +1843,7 @@ aal: sessionAal };
         mountMagicLinkRoutes({
             router,
             config,
+            limiters,
             ops,
             parseBody,
             buildAuthResponse,
@@ -1820,6 +1860,7 @@ aal: sessionAal };
         mountOtpRoutes({
             router,
             config,
+            limiters,
             ops,
             parseBody,
             buildAuthResponse,

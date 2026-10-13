@@ -14,8 +14,9 @@ import { rebase } from "../singleton";
  */
 export interface RebaseFunctionContext<DB = RegisteredDatabase> {
     /**
-     * The server-side Rebase singleton (`dataAsAdmin`, `auth`, `storage`,
-     * `email`, `sql`).
+     * The server-side Rebase client (`dataAsAdmin`, `auth`, `storage`,
+     * `email`, `sql`) of the backend serving the request — the same object
+     * the imported `rebase` is there.
      *
      * `rebase.dataAsAdmin` runs as the service identity
      * `{ uid: "service", roles: ["admin"] }` — **admin-scoped, not an RLS
@@ -46,13 +47,14 @@ export interface RebaseFunctionContext<DB = RegisteredDatabase> {
 }
 
 /**
- * The `rebase` singleton, seen through the `Database` a function names.
+ * The `rebase` handle, seen through the `Database` a function names.
  *
- * One object serves every function; `DB` only describes it. Each collection
- * accessor on `dataAsAdmin` is resolved by name at call time, so a generated
- * `Database` adds compile-time checks and changes nothing the object does —
- * the same reason the browser client's `createRebaseClient<Database>()` is one
- * implementation for every `Database`.
+ * One object serves every function; `DB` only describes it. It resolves, per
+ * call, to the backend serving the request — the same answer the imported
+ * `rebase` gives. Each collection accessor on `dataAsAdmin` is resolved by
+ * name at call time, so a generated `Database` adds compile-time checks and
+ * changes nothing the object does — the same reason the browser client's
+ * `createRebaseClient<Database>()` is one implementation for every `Database`.
  */
 function typedSingleton<DB>(): RebaseServerClient<DB> {
     return rebase as RebaseServerClient<unknown> as RebaseServerClient<DB>;

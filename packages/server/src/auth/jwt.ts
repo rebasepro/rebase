@@ -1,3 +1,5 @@
+import type { Context } from "hono";
+import type { HonoEnv } from "../api/types";
 import { decodeProtectedHeader, isExpiredJwtError, signJwt, verifyJwt } from "./jwt-crypto";
 import { randomHex, sha256Hex } from "../utils/portable-crypto";
 import { logger } from "../utils/logger";
@@ -163,53 +165,295 @@ export function customClaimsOf(decoded: Record<string, unknown>): Record<string,
  */
 export const DEFAULT_REFRESH_EXPIRES_IN = "30d";
 
-let jwtConfig: JwtConfig = {
-    secret: "",
-    accessExpiresIn: "1h",
-    // 30 days, sliding — see getRefreshTokenTtlMs. The runtime's
-    // JWT_REFRESH_EXPIRES_IN and initializeRebaseBackend's fallback say the
-    // same, so a session lasts as long whichever way the server was started.
-    refreshExpiresIn: DEFAULT_REFRESH_EXPIRES_IN
-};
+/** How long an access token lives when no lifetime is configured. */
+const DEFAULT_ACCESS_EXPIRES_IN = "1h";
 
 /**
- * The parsed signing keys, and which one mints new access tokens.
+ * One backend's tokens: what it signs with, what it verifies against, and how
+ * long what it mints lives.
  *
- * Both are module state beside `jwtConfig` for the same reason it is: every
- * signing and verifying path in the server reads them through this file, and
- * there is exactly one JWT configuration per process.
+ * Every backend built by `createRebaseBackend` holds its own
+ * (`backend.services.jwt`), so two backends in one process sign and verify
+ * with their own secrets and keys and a token one minted means nothing to the
+ * other. {@link createJwtService} builds one by hand.
+ *
+ * The module-level functions of the same names — `generateAccessToken`,
+ * `verifyAccessToken`, … — answer for the process default instead: what
+ * {@link configureJwt} set, or the backend `initializeRebaseBackend` installed.
  */
-let signingKeys: ResolvedJwtKey[] = [];
-let activeSigningKey: ResolvedJwtKey | null = null;
+export interface JwtService {
+    /** The access-token lifetime, in the grammar {@link parseDurationMs} reads. */
+    readonly accessExpiresIn: string;
+    /** The refresh-token lifetime, in the grammar {@link parseDurationMs} reads. */
+    readonly refreshExpiresIn: string;
+
+    /**
+     * Has this service been given a JWT secret?
+     *
+     * False on every backend that authenticates through an adapter — Firebase,
+     * Clerk, anything with its own tokens — because nothing gives it one there.
+     * Signing paths still throw when it is false, since asking for a token from
+     * a server that cannot mint one is a mistake worth hearing about. Paths
+     * whose contract is *"tolerate the absence of auth"* must ask first:
+     * `optionalAuth` crashing a request because this backend does not do JWT is
+     * a 500 on a route that had already decided anonymous was acceptable.
+     */
+    isConfigured(): boolean;
+
+    /** Is this service signing access tokens asymmetrically? */
+    hasAsymmetricSigningKey(): boolean;
+
+    /**
+     * The public keys, in JWKS form, for `/.well-known/jwks.json`.
+     *
+     * An empty `keys` array on a backend with no asymmetric keys configured is
+     * the correct answer rather than a 404: it says "this issuer publishes
+     * none", which a verifier can act on, where a 404 is indistinguishable from
+     * a misconfigured URL.
+     */
+    getJwks(): { keys: PublicJwk[] };
+
+    /**
+     * The symmetric secret this service signs purpose-scoped tokens with, or
+     * undefined when it has none — for deriving a key of the backend's own.
+     * MFA's encryption falls back to it when no `MFA_ENCRYPTION_KEY` is set.
+     * A method rather than a field, so serialising the service never prints it.
+     */
+    hmacSecret(): string | undefined;
+
+    /**
+     * Generate an access token (short-lived, 1 hour by default).
+     *
+     * @param isAnonymous Whether this session is a guest — anonymous sign-in
+     *   rather than an account. Written into the token so the RLS identity and
+     *   the WebSocket path can tell the two apart without a database lookup.
+     * @param sessionId The sign-in this token belongs to — see
+     *   {@link AccessTokenPayload.sid}. Every token the auth routes mint
+     *   carries one.
+     */
+    generateAccessToken(
+        uid: string,
+        roles: string[],
+        aal?: "aal1" | "aal2",
+        customClaims?: Record<string, unknown>,
+        isAnonymous?: boolean,
+        sessionId?: string
+    ): Promise<string>;
+
+    /**
+     * Verify and decode an access token.
+     *
+     * Every token this service issues is signed with the same secret, so what a
+     * token *is* comes from its claims, not from its signature. A download
+     * token ({@link JwtService.generateDownloadToken}) is therefore a
+     * validly-signed string that must never authenticate anybody: it is scoped
+     * to one file path and handed out in URLs, which is a far weaker thing to
+     * hold than a session.
+     *
+     * Today it is rejected below for want of an id — but only by luck, since
+     * nothing stops a future download token from carrying one. So the purpose
+     * is checked explicitly: a token minted for reading a file is not a token
+     * for being a user.
+     */
+    verifyAccessToken(token: string): Promise<AccessTokenPayload | null>;
+
+    /** The access-token lifetime in milliseconds. */
+    getAccessTokenExpiryMs(): number;
+    /** When an access token minted now expires, in milliseconds since the epoch. */
+    getAccessTokenExpiry(): number;
+
+    /**
+     * How long a refresh token is valid for, in milliseconds.
+     *
+     * Every rotation issues a token with a fresh TTL, so this is a sliding
+     * window: a user who visits at all keeps their session indefinitely, and
+     * one who disappears loses it this long after their last visit. That is
+     * what both Firebase and Supabase do by default, and it is the behaviour
+     * people mean when they say they expect to still be signed in.
+     */
+    getRefreshTokenTtlMs(): number;
+    /** When a refresh token minted now expires. */
+    getRefreshTokenExpiry(): Date;
+
+    /**
+     * Mint the short-lived credential handed back with an `MFA_REQUIRED`
+     * response.
+     *
+     * Short-lived on purpose: it is the window in which a caller who has
+     * proven the first factor may present the second, not a session to be
+     * carried around. Five minutes matches the challenge TTL.
+     */
+    generateMfaPendingToken(uid: string, expiresInSeconds?: number): Promise<string>;
+
+    /**
+     * Verify a pre-auth token and return the user it was minted for.
+     *
+     * Returns `null` for anything else — including a perfectly valid *access*
+     * token, which must not be interchangeable with this one in either
+     * direction.
+     *
+     * `iat` comes back with the uid because this token is a first factor that
+     * was accepted at that instant, and a sign-out everywhere after it has to
+     * void it the way it voids an access token — see `isAccessTokenRevoked`.
+     */
+    verifyMfaPendingToken(token: string): Promise<{ uid: string; iat?: number } | null>;
+
+    /**
+     * Generate a short-lived download token scoped to a specific file path or
+     * prefix *within one storage source*.
+     *
+     * Both halves of that scope are load-bearing. A key is only unique inside
+     * its own bucket, and a project with more than one source routinely holds
+     * the same key in several of them — `avatars/u1.png` in `(default)` and in
+     * `media` are different objects, quite possibly with different owners. A
+     * token that names only the path is therefore a grant on every source at
+     * once: authorize a read on the source whose `storageAuthorize` hook says
+     * yes, then spend the token against `?storageId=` pointing somewhere else.
+     *
+     * `storageId` is optional here only because omitting it *is* the default
+     * source, which is what the overwhelming majority of deployments have. A
+     * mint site that forgets to pass a named source produces a default-scoped
+     * token, which fails closed at `/file/*` rather than over-granting.
+     *
+     * @param principal The user minting it, so the reads it buys are charged
+     *   to them.
+     */
+    generateDownloadToken(
+        path: string,
+        expiresInSeconds?: number,
+        storageId?: string | null,
+        principal?: string | null
+    ): Promise<string>;
+
+    /**
+     * Verify and decode a download token.
+     *
+     * A token minted before `storageId` existed carries no such claim. It is
+     * read as a grant on the **default source** rather than on all of them:
+     * that is the fail-closed reading, and it is what such a token almost
+     * always was, since a named source has to be asked for explicitly. The
+     * cost is bounded by the five-minute TTL — for at most that long after a
+     * deploy, an in-flight token for a *named* source is refused and the
+     * client re-fetches `/metadata`.
+     */
+    verifyDownloadToken(token: string): Promise<DownloadTokenPayload | null>;
+
+    /**
+     * Sign a short-lived token that carries state across a redirect.
+     *
+     * The generalisation of the MFA-pending token: a signed blob the server
+     * hands out and expects back, where the point is that the holder cannot
+     * edit it. The OAuth authorize flow needs one to carry the authorization
+     * request across the sign-in hop — without it, the endpoint the consent
+     * page posts to would mint a code for whatever `client_id` and
+     * `redirect_uri` its caller typed, skipping every check the authorize
+     * endpoint performs.
+     *
+     * The `purpose` is not decoration. {@link JwtService.verifyAccessToken}
+     * refuses any token that has one, so nothing minted here can be replayed
+     * as a session, and {@link JwtService.verifyPurposeToken} refuses a token
+     * whose purpose is not the one the caller named — so a token minted for
+     * one hop cannot be spent on another.
+     */
+    signPurposeToken(purpose: string, claims: Record<string, unknown>, expiresInSeconds: number): Promise<string>;
+
+    /** Verify a token minted by {@link JwtService.signPurposeToken}, for one named purpose. */
+    verifyPurposeToken<T>(purpose: string, token: string): Promise<T | null>;
+
+    /**
+     * Mint an access token for the MCP endpoint.
+     *
+     * Deliberately **not** an ordinary session token, and the `purpose` claim
+     * is what enforces that: {@link JwtService.verifyAccessToken} refuses any
+     * token carrying one, so a credential issued to a third-party MCP client —
+     * Claude, an IDE, anything that completed the OAuth flow — cannot be
+     * replayed against `/api/data`, `/api/admin` or the websocket. It buys
+     * exactly the one resource it names.
+     *
+     * That asymmetry matters more than it first looks. These tokens are handed
+     * to software the user authorized but the operator never vetted, they
+     * live in that software's storage, and they are the only credential in
+     * this system minted for a third party. Without the purpose separation,
+     * "connect Claude to your data" would silently mean "give Claude a full
+     * session".
+     *
+     * The audience is the canonical resource URI, and
+     * {@link JwtService.verifyMcpAccessToken} requires the caller to say which
+     * resource it is checking for. A token minted for another Rebase project —
+     * or another path on this one — fails there.
+     *
+     * HS256 with the shared secret, like the download token: the authorization
+     * server and the resource server are the same process, so nothing outside
+     * it ever needs to verify one, and an asymmetric key here would be a
+     * second key surface bought for nobody.
+     */
+    generateMcpAccessToken(payload: Omit<McpAccessTokenPayload, "purpose">, expiresInSeconds: number): Promise<string>;
+
+    /**
+     * Verify an MCP access token **for a specific resource**.
+     *
+     * `expectedAudience` has no default. The MCP specification requires a
+     * resource server to validate that a token was issued for it
+     * specifically, and a default would be the thing that quietly turns that
+     * check off — the caller has to say what it is, every time, so a new call
+     * site cannot forget by omission.
+     */
+    verifyMcpAccessToken(token: string, expectedAudience: string): Promise<McpAccessTokenPayload | null>;
+}
+
+/** Secrets that are somebody's example, not a secret. */
+const WEAK_SECRETS: ReadonlySet<string> = new Set([
+    "secret",
+    "jwt-secret",
+    "jwt_secret",
+    "your-secret",
+    "your-super-secret-jwt-key-change-in-production",
+    "super-secret-jwt-key-change-in-production",
+    "change-me",
+    "changeme",
+    "password",
+    "test",
+    "mysecret",
+    "my-secret",
+    "my_secret",
+    "example-secret",
+    "please-change-me",
+    "replace-this-with-a-real-secret",
+    "default-secret",
+    "rebase_saas_jwt_secret_must_be_long_long_long_long",
+    "rebase_saas_service_key_must_be_long_long_long_long"
+]);
+
+/** Everything a {@link JwtService} signs and verifies with, already checked. */
+interface JwtState {
+    /** Empty when nothing gave this service a secret: every sign and verify then throws. */
+    secret: string;
+    accessExpiresIn: string;
+    refreshExpiresIn: string;
+    signingKeys: ResolvedJwtKey[];
+    activeSigningKey: ResolvedJwtKey | null;
+}
 
 /**
- * Configure JWT settings - call this during initialization.
- * Validates the secret strength to prevent deployment with default/weak secrets.
+ * Build a {@link JwtService} from a configuration, refusing one it would sign
+ * badly with: a short or well-known secret, an `activeKid` no key carries, a
+ * lifetime that is not one.
+ *
+ * Unset lifetimes take the defaults — an hour for access tokens,
+ * {@link DEFAULT_REFRESH_EXPIRES_IN} for refresh tokens.
+ *
+ * @example
+ * ```ts
+ * const jwt = createJwtService({ secret: process.env.JWT_SECRET! });
+ * const token = await jwt.generateAccessToken("u1", ["editor"]);
+ * const payload = await jwt.verifyAccessToken(token); // { uid: "u1", roles: ["editor"], … }
+ * ```
  */
-export function configureJwt(config: JwtConfig): void {
-    // Reject obviously weak/default secrets
-    const weakSecrets = new Set([
-        "secret",
-        "jwt-secret",
-        "jwt_secret",
-        "your-secret",
-        "your-super-secret-jwt-key-change-in-production",
-        "super-secret-jwt-key-change-in-production",
-        "change-me",
-        "changeme",
-        "password",
-        "test",
-        "mysecret",
-        "my-secret",
-        "my_secret",
-        "example-secret",
-        "please-change-me",
-        "replace-this-with-a-real-secret",
-        "default-secret",
-        "rebase_saas_jwt_secret_must_be_long_long_long_long",
-        "rebase_saas_service_key_must_be_long_long_long_long"
-    ]);
+export function createJwtService(config: JwtConfig): JwtService {
+    return jwtServiceFrom(checkJwtConfig(config));
+}
 
+function checkJwtConfig(config: JwtConfig): JwtState {
     if (!config.secret || config.secret.length < 32) {
         throw new Error(
             "JWT secret is too short. Must be at least 32 characters. " +
@@ -217,15 +461,13 @@ export function configureJwt(config: JwtConfig): void {
         );
     }
 
-    if (weakSecrets.has(config.secret.toLowerCase())) {
+    if (WEAK_SECRETS.has(config.secret.toLowerCase())) {
         throw new Error(
             "JWT secret is a known default/weak value. Please use a strong, randomly generated secret. " +
             "Generate one with: node -e \"logger.info(require('crypto').randomBytes(48).toString('base64'))\""
         );
     }
 
-    // Resolved before `jwtConfig` is replaced, so a malformed key leaves the
-    // previous configuration standing rather than half-applying a new one.
     const resolved = config.signingKeys ? resolveSigningKeys(config.signingKeys) : [];
     let active: ResolvedJwtKey | null = null;
     if (resolved.length > 0) {
@@ -243,13 +485,11 @@ export function configureJwt(config: JwtConfig): void {
         }
     }
 
-    // Checked here, at boot, because both readers of these values fail
-    // quietly: `jsonwebtoken` would sign with what it could make of them, and
-    // the TTL arithmetic below used to fall back to a default for anything it
-    // could not. An unset one keeps the lifetime already configured — spread
-    // as `undefined`, it replaced it, and an access token signed with no
-    // `expiresIn` carries no `exp` at all.
-    const lifetimes: Pick<JwtConfig, "accessExpiresIn" | "refreshExpiresIn"> = {};
+    // Checked here, when the service is built, because both readers of these
+    // values fail quietly: `jsonwebtoken` would sign with what it could make
+    // of them, and the TTL arithmetic below used to fall back to a default for
+    // anything it could not. An unset one takes the default — an access token
+    // signed with no `expiresIn` carries no `exp` at all.
     for (const key of ["accessExpiresIn", "refreshExpiresIn"] as const) {
         const value = config[key];
         if (value === undefined) continue;
@@ -260,135 +500,443 @@ export function configureJwt(config: JwtConfig): void {
                 "A bare number is refused: the signer reads it as milliseconds."
             );
         }
-        lifetimes[key] = value;
     }
 
-    jwtConfig = {
-        ...jwtConfig,
-        ...config,
-        accessExpiresIn: lifetimes.accessExpiresIn ?? jwtConfig.accessExpiresIn,
-        refreshExpiresIn: lifetimes.refreshExpiresIn ?? jwtConfig.refreshExpiresIn
+    return {
+        secret: config.secret,
+        accessExpiresIn: config.accessExpiresIn ?? DEFAULT_ACCESS_EXPIRES_IN,
+        // 30 days, sliding — see getRefreshTokenTtlMs. The runtime's
+        // JWT_REFRESH_EXPIRES_IN and createRebaseBackend's fallback say the
+        // same, so a session lasts as long whichever way the server was started.
+        refreshExpiresIn: config.refreshExpiresIn ?? DEFAULT_REFRESH_EXPIRES_IN,
+        signingKeys: resolved,
+        activeSigningKey: active
     };
-    signingKeys = resolved;
-    activeSigningKey = active;
 }
 
+const UNCONFIGURED: JwtState = {
+    secret: "",
+    accessExpiresIn: DEFAULT_ACCESS_EXPIRES_IN,
+    refreshExpiresIn: DEFAULT_REFRESH_EXPIRES_IN,
+    signingKeys: [],
+    activeSigningKey: null
+};
+
+
+/** `jsonwebtoken`'s payload with the claims this module reads, typed as what they might be. */
+type DecodedAccessToken = Record<string, unknown> & {
+    uid?: string;
+    sub?: string;
+    roles?: string[];
+    aal?: string;
+    isAnonymous?: boolean;
+    purpose?: string;
+    iat?: number;
+    exp?: number;
+    sid?: unknown;
+};
+
+/** Fallback when `refreshExpiresIn` is unset. {@link createJwtService} refuses an unparseable one. */
+const DEFAULT_REFRESH_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+
+function jwtServiceFrom(state: JwtState): JwtService {
+    const { secret, signingKeys, activeSigningKey } = state;
+
+    const requireSecret = (): string => {
+        if (!secret) {
+            throw new Error("JWT secret not configured. Call configureJwt() first.");
+        }
+        return secret;
+    };
+
+    const getAccessTokenExpiryMs = (): number =>
+        parseDurationMs(state.accessExpiresIn || DEFAULT_ACCESS_EXPIRES_IN) ?? 60 * 60 * 1000;
+
+    const getRefreshTokenTtlMs = (): number => {
+        const duration = state.refreshExpiresIn;
+        return (duration ? parseDurationMs(duration) : null) ?? DEFAULT_REFRESH_TTL_MS;
+    };
+
+    return {
+        accessExpiresIn: state.accessExpiresIn,
+        refreshExpiresIn: state.refreshExpiresIn,
+
+        isConfigured: () => Boolean(secret),
+
+        hasAsymmetricSigningKey: () => activeSigningKey !== null,
+
+        getJwks: () => toJwks(signingKeys),
+
+        hmacSecret: () => secret || undefined,
+
+        async generateAccessToken(uid, roles, aal = "aal1", customClaims, isAnonymous = false, sessionId) {
+            const key = requireSecret();
+
+            // The identity claims are written AFTER the custom ones, not before.
+            //
+            // `aal` already was, for a reason that applies just as much to the
+            // other two: the hook is handed a `defaultClaims` object that
+            // already contains them, and the obvious hook — spread the input,
+            // add a field — echoes them straight back, while one that merges a
+            // user-controlled profile object echoes back whatever that object
+            // happened to hold. Spread last, a claim becomes something its own
+            // holder can assert.
+            //
+            // For `aal` that meant a session could claim it had passed a second
+            // factor. For `uid` and `roles` it is worse and was not covered:
+            // `uid` is who the whole request is, down to the RLS identity the
+            // database evaluates policies against, and `roles` is what the admin
+            // gate reads. A custom claims hook is a place to add facts about a
+            // session, not the place its subject is decided.
+            const payload: Record<string, unknown> = {
+                ...customClaims,
+                uid,
+                roles,
+                aal,
+                // An identity claim, so it goes with the others — after the
+                // custom ones, where a hook cannot overwrite it. Omitted when
+                // false to keep the token as small as it was.
+                ...(isAnonymous ? { isAnonymous: true } : {}),
+                // The session is an identity claim too: a hook that could set
+                // it could point a token at somebody else's live session.
+                ...(sessionId ? { sid: sessionId } : {})
+            };
+
+            // The `kid` is what lets a verifier pick the right public key out
+            // of the JWKS, and what lets the previous key keep working while
+            // tokens signed by it are still in circulation.
+            if (activeSigningKey) {
+                return signJwt(payload, activeSigningKey.privateKey, {
+                    expiresIn: state.accessExpiresIn,
+                    algorithm: activeSigningKey.algorithm,
+                    keyid: activeSigningKey.kid
+                });
+            }
+
+            return signJwt(payload, key, {
+                expiresIn: state.accessExpiresIn,
+                algorithm: "HS256"
+            });
+        },
+
+        async verifyAccessToken(token) {
+            const key = requireSecret();
+
+            try {
+                // Which key, and therefore which algorithm, is decided here —
+                // by the `kid` and by nothing else in the token.
+                //
+                // The alternative, passing every algorithm we support and
+                // letting the verifier read `alg` from the header, is the
+                // canonical JWT vulnerability: an attacker takes the RSA public
+                // key we publish at `/.well-known/jwks.json`, HMACs a payload
+                // of their choosing with it, sets `alg: HS256`, and the verifier
+                // — holding that same public key as "the secret" — agrees. Any
+                // uid, any roles. So a token naming a key we hold is verified
+                // with that key's algorithm alone, and a token naming none never
+                // reaches the asymmetric path at all.
+                const header = decodeProtectedHeader(token);
+                const namedKey = resolveVerificationKey(signingKeys, header.kid);
+
+                // A token with a `kid` we do not recognise falls through to the
+                // secret and fails there, which is what a retired key should do.
+                const decoded = (namedKey
+                    ? await verifyJwt(token, namedKey.publicKey, { algorithms: [namedKey.algorithm] })
+                    : await verifyJwt(token, key, { algorithms: ["HS256"] })
+                ) as DecodedAccessToken;
+                if (decoded.purpose) {
+                    logger.error("[JWT] Verification failed: a purpose-scoped token is not an access token", { purpose: decoded.purpose });
+                    return null;
+                }
+                const id = decoded.uid || decoded.sub;
+                if (!id) {
+                    logger.error("[JWT] Verification failed: missing id in payload", { detail: decoded });
+                    return null;
+                }
+
+                const aal = (decoded.aal === "aal1" || decoded.aal === "aal2") ? decoded.aal : "aal1";
+
+                return {
+                    uid: id,
+                    roles: decoded.roles || [],
+                    aal,
+                    // Present only when true, mirroring the mint. Absent means
+                    // "not a guest" on both sides, which is what a token issued
+                    // before this claim existed carries — and reading that as an
+                    // ordinary account is the behaviour that deployment already
+                    // had. Keeping the key off the object also means the verified
+                    // payload has exactly the shape it had, for everything that
+                    // compares whole payloads.
+                    ...(decoded.isAnonymous === true ? { isAnonymous: true as const } : {}),
+                    iat: decoded.iat,
+                    // Present only when the token carries them, like
+                    // `isAnonymous`, so a payload compared whole keeps the shape
+                    // it had.
+                    ...(typeof decoded.exp === "number" ? { exp: decoded.exp } : {}),
+                    ...(typeof decoded.sid === "string" && decoded.sid ? { sid: decoded.sid } : {}),
+                    // Everything the mint's `customClaims` put on the token.
+                    // Absent when there were none, so a payload that had no
+                    // custom claims is byte-for-byte the object it used to be.
+                    ...(() => {
+                        const claims = customClaimsOf(decoded);
+                        return claims ? { claims } : {};
+                    })()
+                };
+            } catch (error) {
+                // An expired token is the 401 that sends a client to refresh —
+                // many times an hour per signed-in client, not an error anyone
+                // should be paged for or find filling the Logs Explorer.
+                if (isExpiredJwtError(error)) {
+                    logger.debug("[JWT] Access token expired");
+                    return null;
+                }
+                // No part of the token. A bearer that fails here may be the
+                // service key or an API key, and its first characters were
+                // going into the log of every refused request.
+                logger.error("[JWT] Verification failed", { error: error });
+                return null;
+            }
+        },
+
+        getAccessTokenExpiryMs,
+
+        getAccessTokenExpiry: () => Date.now() + getAccessTokenExpiryMs(),
+
+        getRefreshTokenTtlMs,
+
+        getRefreshTokenExpiry: () => new Date(Date.now() + getRefreshTokenTtlMs()),
+
+        async generateMfaPendingToken(uid, expiresInSeconds = 300) {
+            const key = requireSecret();
+            return signJwt({ purpose: MFA_PENDING_PURPOSE, uid }, key, {
+                expiresIn: expiresInSeconds,
+                algorithm: "HS256"
+            });
+        },
+
+        async verifyMfaPendingToken(token) {
+            const key = requireSecret();
+            try {
+                const decoded = await verifyJwt(token, key, { algorithms: ["HS256"] }) as { purpose?: string; uid?: string; iat?: number };
+                if (decoded.purpose !== MFA_PENDING_PURPOSE || !decoded.uid) return null;
+                return { uid: decoded.uid, iat: typeof decoded.iat === "number" ? decoded.iat : undefined };
+            } catch {
+                return null;
+            }
+        },
+
+        async generateDownloadToken(path, expiresInSeconds = 300, storageId, principal) {
+            const key = requireSecret();
+
+            const payload: DownloadTokenPayload = {
+                purpose: "file-read",
+                path,
+                storageId: canonicalStorageId(storageId),
+                ...(principal ? { rl: await downloadTokenRateLimitMark(principal) } : {})
+            };
+
+            return signJwt({ ...payload }, key, {
+                expiresIn: expiresInSeconds,
+                algorithm: "HS256"
+            });
+        },
+
+        async verifyDownloadToken(token) {
+            const key = requireSecret();
+
+            try {
+                const decoded = await verifyJwt(token, key, { algorithms: ["HS256"] }) as Record<string, unknown> | undefined;
+                if (decoded && decoded.purpose === "file-read" && typeof decoded.path === "string") {
+                    return {
+                        purpose: "file-read",
+                        path: decoded.path,
+                        storageId: canonicalStorageId(
+                            typeof decoded.storageId === "string" ? decoded.storageId : null
+                        ),
+                        ...(typeof decoded.rl === "string" ? { rl: decoded.rl } : {})
+                    };
+                }
+                return null;
+            } catch (error) {
+                // Below ERROR, every reason alike. The data rate limiter
+                // verifies any `?token=` it sees, on every route it guards — so
+                // this is also handed a function's own query parameter, which
+                // was never a download token, and a five-minute token still
+                // sitting in an open tab's `<img src>`. A refused token is
+                // answered with a 401; nothing here is a server fault.
+                logger.debug("[JWT] Download token verification failed", { error: error });
+                return null;
+            }
+        },
+
+        async signPurposeToken(purpose, claims, expiresInSeconds) {
+            const key = requireSecret();
+            // `purpose` last, so a claims object carrying one cannot rename the token.
+            return signJwt({ ...claims, purpose }, key, {
+                expiresIn: expiresInSeconds,
+                algorithm: "HS256"
+            });
+        },
+
+        async verifyPurposeToken<T>(purpose: string, token: string): Promise<T | null> {
+            const key = requireSecret();
+            if (!token) return null;
+            try {
+                const decoded = await verifyJwt(token, key, { algorithms: ["HS256"] }) as Record<string, unknown> | undefined;
+                if (!decoded || decoded.purpose !== purpose) return null;
+                return decoded as T;
+            } catch (error) {
+                logger.error("[JWT] Purpose token verification failed", { purpose, error });
+                return null;
+            }
+        },
+
+        async generateMcpAccessToken(payload, expiresInSeconds) {
+            const key = requireSecret();
+
+            // `uid` and `roles` are written by this function and come from a
+            // redeemed authorization code, never from anything the client sent.
+            // There is no custom-claims hook on this path on purpose — see
+            // `generateAccessToken` for what a hook that can reach the identity
+            // claims costs.
+            return signJwt(
+                {
+                    purpose: MCP_ACCESS_PURPOSE,
+                    uid: payload.uid,
+                    roles: payload.roles,
+                    scope: payload.scope,
+                    clientId: payload.clientId,
+                    aud: payload.aud,
+                    iss: payload.iss
+                },
+                key,
+                { expiresIn: expiresInSeconds, algorithm: "HS256" }
+            );
+        },
+
+        async verifyMcpAccessToken(token, expectedAudience) {
+            const key = requireSecret();
+
+            try {
+                const decoded = await verifyJwt(token, key, { algorithms: ["HS256"] }) as Record<string, unknown> | undefined;
+                if (!decoded || decoded.purpose !== MCP_ACCESS_PURPOSE) return null;
+                if (typeof decoded.uid !== "string" || !decoded.uid) return null;
+                if (typeof decoded.aud !== "string" || decoded.aud !== expectedAudience) {
+                    logger.error("[JWT] MCP token rejected: audience mismatch", {
+                        expected: expectedAudience,
+                        got: decoded.aud
+                    });
+                    return null;
+                }
+
+                return {
+                    purpose: MCP_ACCESS_PURPOSE,
+                    uid: decoded.uid,
+                    roles: Array.isArray(decoded.roles) ? decoded.roles.map(String) : [],
+                    scope: typeof decoded.scope === "string" ? decoded.scope : "",
+                    clientId: typeof decoded.clientId === "string" ? decoded.clientId : "",
+                    aud: decoded.aud,
+                    iss: typeof decoded.iss === "string" ? decoded.iss : ""
+                };
+            } catch (error) {
+                logger.error("[JWT] MCP token verification failed", { error: error });
+                return null;
+            }
+        }
+    };
+}
+
+// ─── The process default ─────────────────────────────────────────────
+
 /**
- * The public keys, in JWKS form, for `/.well-known/jwks.json`.
+ * The service the module-level functions below answer for.
  *
- * An empty `keys` array on a backend with no asymmetric keys configured is the
- * correct answer rather than a 404: it says "this issuer publishes none",
- * which a verifier can act on, where a 404 is indistinguishable from a
- * misconfigured URL.
+ * Unconfigured until {@link configureJwt} is called or a backend is installed
+ * as the process default (`initializeRebaseBackend`, `setDefaultBackend`).
+ * `createRebaseBackend` never touches it: a backend it builds signs and
+ * verifies with `backend.services.jwt`.
  */
-export function getJwks(): { keys: PublicJwk[] } {
-    return toJwks(signingKeys);
+let processJwt: JwtService = jwtServiceFrom(UNCONFIGURED);
+
+/**
+ * Configure the process default's JWT settings — what `verifyAccessToken`,
+ * `generateAccessToken` and the other module-level functions sign and verify
+ * with.
+ *
+ * Validates the secret strength to prevent deployment with default/weak
+ * secrets. A lifetime left unset keeps the one already configured; a
+ * configuration that fails validation leaves the previous one standing rather
+ * than half-applying a new one.
+ */
+export function configureJwt(config: JwtConfig): void {
+    processJwt = createJwtService({
+        ...config,
+        accessExpiresIn: config.accessExpiresIn ?? processJwt.accessExpiresIn,
+        refreshExpiresIn: config.refreshExpiresIn ?? processJwt.refreshExpiresIn
+    });
 }
 
 /**
- * The secret `configureJwt` was given, or undefined before it is called. For
- * `mfa-crypto.ts`, which falls back to it when no MFA key is set — the secret
- * passed in code, not only the one in `JWT_SECRET`.
+ * @internal The process default itself, to install another or to restore it.
+ * `setDefaultBackend` and tests use these; an application calls
+ * {@link configureJwt} or `setDefaultBackend`.
+ */
+export function defaultJwtService(): JwtService {
+    return processJwt;
+}
+
+/** @internal See {@link defaultJwtService}. */
+export function setDefaultJwtService(service: JwtService): void {
+    processJwt = service;
+}
+
+/**
+ * The JWT service serving this request: the backend's whose route group is
+ * answering it, or the process default for a route mounted outside any
+ * backend.
+ */
+export function jwtOf(c: Context<HonoEnv>): JwtService {
+    return c.get("services")?.jwt ?? processJwtService;
+}
+
+/** See {@link JwtService.getJwks}. Answers for the process default. */
+export function getJwks(): { keys: PublicJwk[] } {
+    return processJwt.getJwks();
+}
+
+/**
+ * The secret {@link configureJwt} was given, or undefined before it is called.
+ * Answers for the process default — see {@link JwtService.hmacSecret}.
  */
 export function configuredJwtSecret(): string | undefined {
-    return jwtConfig.secret || undefined;
+    return processJwt.hmacSecret();
 }
 
-/** Is this backend signing access tokens asymmetrically? */
+/** See {@link JwtService.hasAsymmetricSigningKey}. Answers for the process default. */
 export function hasAsymmetricSigningKey(): boolean {
-    return activeSigningKey !== null;
+    return processJwt.hasAsymmetricSigningKey();
 }
 
-/**
- * Has this server been given a JWT secret?
- *
- * False on every backend that authenticates through an adapter — Firebase,
- * Clerk, anything with its own tokens — because nothing calls
- * {@link configureJwt} there. Signing paths still throw when it is false, since
- * asking for a token from a server that cannot mint one is a mistake worth
- * hearing about. Paths whose contract is *"tolerate the absence of auth"* must
- * ask first: `optionalAuth` crashing a request because this backend does not do
- * JWT is a 500 on a route that had already decided anonymous was acceptable.
- */
+/** See {@link JwtService.isConfigured}. Answers for the process default. */
 export function isJwtConfigured(): boolean {
-    return Boolean(jwtConfig.secret);
+    return processJwt.isConfigured();
 }
 
-/**
- * Generate an access token (short-lived, 1 hour by default)
- */
+/** See {@link JwtService.generateAccessToken}. Answers for the process default. */
 export async function generateAccessToken(
     uid: string,
     roles: string[],
     aal: "aal1" | "aal2" = "aal1",
     customClaims?: Record<string, unknown>,
-    /**
-     * Whether this session is a guest — anonymous sign-in rather than an
-     * account. Written into the token so the RLS identity and the WebSocket
-     * path can tell the two apart without a database lookup.
-     */
     isAnonymous = false,
-    /**
-     * The sign-in this token belongs to — see {@link AccessTokenPayload.sid}.
-     * Every token the auth routes mint carries one.
-     */
     sessionId?: string
 ): Promise<string> {
-    if (!jwtConfig.secret) {
-        throw new Error("JWT secret not configured. Call configureJwt() first.");
-    }
-
-    // The identity claims are written AFTER the custom ones, not before.
-    //
-    // `aal` already was, for a reason that applies just as much to the other
-    // two: the hook is handed a `defaultClaims` object that already contains
-    // them, and the obvious hook — spread the input, add a field — echoes them
-    // straight back, while one that merges a user-controlled profile object
-    // echoes back whatever that object happened to hold. Spread last, a claim
-    // becomes something its own holder can assert.
-    //
-    // For `aal` that meant a session could claim it had passed a second factor.
-    // For `uid` and `roles` it is worse and was not covered: `uid` is who the
-    // whole request is, down to the RLS identity the database evaluates
-    // policies against, and `roles` is what the admin gate reads. A custom
-    // claims hook is a place to add facts about a session, not the place its
-    // subject is decided.
-    const payload: Record<string, unknown> = {
-        ...customClaims,
-        uid,
-        roles,
-        aal,
-        // An identity claim, so it goes with the others — after the custom
-        // ones, where a hook cannot overwrite it. Omitted when false to keep
-        // the token as small as it was.
-        ...(isAnonymous ? { isAnonymous: true } : {}),
-        // The session is an identity claim too: a hook that could set it
-        // could point a token at somebody else's live session.
-        ...(sessionId ? { sid: sessionId } : {})
-    };
-
-    // The `kid` is what lets a verifier pick the right public key out of the
-    // JWKS, and what lets the previous key keep working while tokens signed by
-    // it are still in circulation.
-    if (activeSigningKey) {
-        return signJwt(payload, activeSigningKey.privateKey, {
-            expiresIn: jwtConfig.accessExpiresIn,
-            algorithm: activeSigningKey.algorithm,
-            keyid: activeSigningKey.kid
-        });
-    }
-
-    return signJwt(payload, jwtConfig.secret, {
-        expiresIn: jwtConfig.accessExpiresIn,
-        algorithm: "HS256"
-    });
+    return processJwt.generateAccessToken(uid, roles, aal, customClaims, isAnonymous, sessionId);
 }
 
-/**
- * Get the expiration time of an access token in milliseconds from now
- */
+/** See {@link JwtService.getAccessTokenExpiryMs}. Answers for the process default. */
 export function getAccessTokenExpiryMs(): number {
-    return parseDurationMs(jwtConfig.accessExpiresIn || "1h") ?? 60 * 60 * 1000;
+    return processJwt.getAccessTokenExpiryMs();
 }
 
 const DURATION_UNIT_MS: Readonly<Record<string, number>> = {
@@ -421,108 +969,19 @@ export function parseDurationMs(value: string): number | null {
     return ms > 0 && Number.isFinite(ms) ? ms : null;
 }
 
-/**
- * Get the expiration timestamp for an access token
- */
+/** See {@link JwtService.getAccessTokenExpiry}. Answers for the process default. */
 export function getAccessTokenExpiry(): number {
-    return Date.now() + getAccessTokenExpiryMs();
+    return processJwt.getAccessTokenExpiry();
 }
 
-/**
- * Verify and decode an access token.
- *
- * Every token this server issues is signed with the same secret, so what a
- * token *is* comes from its claims, not from its signature. A download token
- * ({@link generateDownloadToken}) is therefore a validly-signed string that
- * must never authenticate anybody: it is scoped to one file path and handed out
- * in URLs, which is a far weaker thing to hold than a session.
- *
- * Today it is rejected below for want of an id — but only by luck, since
- * nothing stops a future download token from carrying one. So the purpose is
- * checked explicitly: a token minted for reading a file is not a token for
- * being a user.
- */
+/** See {@link JwtService.verifyAccessToken}. Answers for the process default. */
 export async function verifyAccessToken(token: string): Promise<AccessTokenPayload | null> {
-    if (!jwtConfig.secret) {
-        throw new Error("JWT secret not configured. Call configureJwt() first.");
-    }
-
-    try {
-        // Which key, and therefore which algorithm, is decided here — by the
-        // `kid` and by nothing else in the token.
-        //
-        // The alternative, passing every algorithm we support and letting
-        // the verifier read `alg` from the header, is the canonical JWT
-        // vulnerability: an attacker takes the RSA public key we publish at
-        // `/.well-known/jwks.json`, HMACs a payload of their choosing with it,
-        // sets `alg: HS256`, and the verifier — holding that same public key as
-        // "the secret" — agrees. Any uid, any roles. So a token naming a key we
-        // hold is verified with that key's algorithm alone, and a token naming
-        // none never reaches the asymmetric path at all.
-        const header = decodeProtectedHeader(token);
-        const namedKey = resolveVerificationKey(signingKeys, header.kid);
-
-        // A token with a `kid` we do not recognise falls through to the secret
-        // and fails there, which is what a retired key should do.
-        const decoded = (namedKey
-            ? await verifyJwt(token, namedKey.publicKey, { algorithms: [namedKey.algorithm] })
-            : await verifyJwt(token, jwtConfig.secret, { algorithms: ["HS256"] })
-        ) as Record<string, unknown> & { uid?: string; sub?: string; roles?: string[]; aal?: string; isAnonymous?: boolean; purpose?: string; iat?: number; exp?: number; sid?: unknown };
-        if (decoded.purpose) {
-            logger.error("[JWT] Verification failed: a purpose-scoped token is not an access token", { purpose: decoded.purpose });
-            return null;
-        }
-        const id = decoded.uid || decoded.sub;
-        if (!id) {
-            logger.error("[JWT] Verification failed: missing id in payload", { detail: decoded });
-            return null;
-        }
-
-        const aal = (decoded.aal === "aal1" || decoded.aal === "aal2") ? decoded.aal : "aal1";
-
-        return {
-            uid: id,
-            roles: decoded.roles || [],
-            aal,
-            // Present only when true, mirroring the mint. Absent means "not a
-            // guest" on both sides, which is what a token issued before this
-            // claim existed carries — and reading that as an ordinary account
-            // is the behaviour that deployment already had. Keeping the key off
-            // the object also means the verified payload has exactly the shape
-            // it had, for everything that compares whole payloads.
-            ...(decoded.isAnonymous === true ? { isAnonymous: true as const } : {}),
-            iat: decoded.iat,
-            // Present only when the token carries them, like `isAnonymous`, so
-            // a payload compared whole keeps the shape it had.
-            ...(typeof decoded.exp === "number" ? { exp: decoded.exp } : {}),
-            ...(typeof decoded.sid === "string" && decoded.sid ? { sid: decoded.sid } : {}),
-            // Everything the mint's `customClaims` put on the token. Absent when
-            // there were none, so a payload that had no custom claims is
-            // byte-for-byte the object it used to be.
-            ...(() => {
-                const claims = customClaimsOf(decoded);
-                return claims ? { claims } : {};
-            })()
-        };
-    } catch (error) {
-        // An expired token is the 401 that sends a client to refresh — many
-        // times an hour per signed-in client, not an error anyone should be
-        // paged for or find filling the Logs Explorer.
-        if (isExpiredJwtError(error)) {
-            logger.debug("[JWT] Access token expired");
-            return null;
-        }
-        // No part of the token. A bearer that fails here may be the service key
-        // or an API key, and its first characters were going into the log of
-        // every refused request.
-        logger.error("[JWT] Verification failed", { error: error });
-        return null;
-    }
+    return processJwt.verifyAccessToken(token);
 }
 
 /**
  * Generate a random refresh token. Long-lived: 30 days by default, sliding —
- * see {@link getRefreshTokenTtlMs}.
+ * see {@link JwtService.getRefreshTokenTtlMs}.
  */
 export function generateRefreshToken(): string {
     return randomHex(40);
@@ -543,28 +1002,14 @@ export function hashRefreshToken(token: string): Promise<string> {
  */
 export const MAX_COOKIE_AGE_MS = 400 * 24 * 60 * 60 * 1000;
 
-/** Fallback when `refreshExpiresIn` is unset. {@link configureJwt} refuses an unparseable one. */
-const DEFAULT_REFRESH_TTL_MS = 30 * 24 * 60 * 60 * 1000;
-
-/**
- * How long a refresh token is valid for, in milliseconds.
- *
- * Every rotation issues a token with a fresh TTL, so this is a sliding window:
- * a user who visits at all keeps their session indefinitely, and one who
- * disappears loses it this long after their last visit. That is what both
- * Firebase and Supabase do by default, and it is the behaviour people mean
- * when they say they expect to still be signed in.
- */
+/** See {@link JwtService.getRefreshTokenTtlMs}. Answers for the process default. */
 export function getRefreshTokenTtlMs(): number {
-    const duration = jwtConfig.refreshExpiresIn;
-    return (duration ? parseDurationMs(duration) : null) ?? DEFAULT_REFRESH_TTL_MS;
+    return processJwt.getRefreshTokenTtlMs();
 }
 
-/**
- * Calculate refresh token expiration date
- */
+/** See {@link JwtService.getRefreshTokenExpiry}. Answers for the process default. */
 export function getRefreshTokenExpiry(): Date {
-    return new Date(Date.now() + getRefreshTokenTtlMs());
+    return processJwt.getRefreshTokenExpiry();
 }
 
 /**
@@ -572,53 +1017,21 @@ export function getRefreshTokenExpiry(): Date {
  * accepted" and "session issued".
  *
  * A pre-auth token is NOT a session and must never be usable as one:
- * {@link verifyAccessToken} refuses any token carrying a `purpose`, so this
- * value cannot authenticate a request no matter which route it is presented to.
- * The only thing that reads it is the MFA challenge pair, which exchanges it —
- * plus a second factor — for a real session.
+ * {@link JwtService.verifyAccessToken} refuses any token carrying a `purpose`,
+ * so this value cannot authenticate a request no matter which route it is
+ * presented to. The only thing that reads it is the MFA challenge pair, which
+ * exchanges it — plus a second factor — for a real session.
  */
 export const MFA_PENDING_PURPOSE = "mfa-pending";
 
-/**
- * Mint the short-lived credential handed back with an `MFA_REQUIRED` response.
- *
- * Short-lived on purpose: it is the window in which a caller who has proven the
- * first factor may present the second, not a session to be carried around. Five
- * minutes matches the challenge TTL.
- */
+/** See {@link JwtService.generateMfaPendingToken}. Answers for the process default. */
 export async function generateMfaPendingToken(uid: string, expiresInSeconds = 300): Promise<string> {
-    if (!jwtConfig.secret) {
-        throw new Error("JWT secret not configured. Call configureJwt() first.");
-    }
-
-    return signJwt({ purpose: MFA_PENDING_PURPOSE, uid }, jwtConfig.secret, {
-        expiresIn: expiresInSeconds,
-        algorithm: "HS256"
-    });
+    return processJwt.generateMfaPendingToken(uid, expiresInSeconds);
 }
 
-/**
- * Verify a pre-auth token and return the user it was minted for.
- *
- * Returns `null` for anything else — including a perfectly valid *access*
- * token, which must not be interchangeable with this one in either direction.
- *
- * `iat` comes back with the uid because this token is a first factor that was
- * accepted at that instant, and a sign-out everywhere after it has to void it
- * the way it voids an access token — see `isAccessTokenRevoked`.
- */
+/** See {@link JwtService.verifyMfaPendingToken}. Answers for the process default. */
 export async function verifyMfaPendingToken(token: string): Promise<{ uid: string; iat?: number } | null> {
-    if (!jwtConfig.secret) {
-        throw new Error("JWT secret not configured. Call configureJwt() first.");
-    }
-
-    try {
-        const decoded = await verifyJwt(token, jwtConfig.secret, { algorithms: ["HS256"] }) as { purpose?: string; uid?: string; iat?: number };
-        if (decoded.purpose !== MFA_PENDING_PURPOSE || !decoded.uid) return null;
-        return { uid: decoded.uid, iat: typeof decoded.iat === "number" ? decoded.iat : undefined };
-    } catch {
-        return null;
-    }
+    return processJwt.verifyMfaPendingToken(token);
 }
 
 export interface DownloadTokenPayload {
@@ -627,8 +1040,8 @@ export interface DownloadTokenPayload {
     /**
      * The storage source the grant is good for, canonicalized by
      * {@link canonicalStorageId}. Always present on a decoded payload; see
-     * {@link verifyDownloadToken} for how tokens minted before this claim
-     * existed are read.
+     * {@link JwtService.verifyDownloadToken} for how tokens minted before this
+     * claim existed are read.
      */
     storageId: string;
     /**
@@ -640,23 +1053,7 @@ export interface DownloadTokenPayload {
     rl?: string;
 }
 
-/**
- * Generate a short-lived download token scoped to a specific file path or prefix
- * *within one storage source*.
- *
- * Both halves of that scope are load-bearing. A key is only unique inside its
- * own bucket, and a project with more than one source routinely holds the same
- * key in several of them — `avatars/u1.png` in `(default)` and in `media` are
- * different objects, quite possibly with different owners. A token that names
- * only the path is therefore a grant on every source at once: authorize a read
- * on the source whose `storageAuthorize` hook says yes, then spend the token
- * against `?storageId=` pointing somewhere else.
- *
- * `storageId` is optional here only because omitting it *is* the default
- * source, which is what the overwhelming majority of deployments have. A mint
- * site that forgets to pass a named source produces a default-scoped token,
- * which fails closed at `/file/*` rather than over-granting.
- */
+/** See {@link JwtService.generateDownloadToken}. Answers for the process default. */
 export async function generateDownloadToken(
     path: string,
     expiresInSeconds: number = 300,
@@ -664,21 +1061,7 @@ export async function generateDownloadToken(
     /** The user minting it, so the reads it buys are charged to them. */
     principal?: string | null
 ): Promise<string> {
-    if (!jwtConfig.secret) {
-        throw new Error("JWT secret not configured. Call configureJwt() first.");
-    }
-
-    const payload: DownloadTokenPayload = {
-        purpose: "file-read",
-        path,
-        storageId: canonicalStorageId(storageId),
-        ...(principal ? { rl: await downloadTokenRateLimitMark(principal) } : {})
-    };
-
-    return signJwt({ ...payload }, jwtConfig.secret, {
-        expiresIn: expiresInSeconds,
-        algorithm: "HS256"
-    });
+    return processJwt.generateDownloadToken(path, expiresInSeconds, storageId, principal);
 }
 
 /** See {@link DownloadTokenPayload.rl}. */
@@ -686,91 +1069,25 @@ async function downloadTokenRateLimitMark(principal: string): Promise<string> {
     return (await sha256Hex(`download-token-rl:${principal}`)).slice(0, 32);
 }
 
-/**
- * Verify and decode a download token.
- *
- * A token minted before `storageId` existed carries no such claim. It is read
- * as a grant on the **default source** rather than on all of them: that is the
- * fail-closed reading, and it is what such a token almost always was, since a
- * named source has to be asked for explicitly. The cost is bounded by the
- * five-minute TTL — for at most that long after a deploy, an in-flight token
- * for a *named* source is refused and the client re-fetches `/metadata`.
- */
+/** See {@link JwtService.verifyDownloadToken}. Answers for the process default. */
 export async function verifyDownloadToken(token: string): Promise<DownloadTokenPayload | null> {
-    if (!jwtConfig.secret) {
-        throw new Error("JWT secret not configured. Call configureJwt() first.");
-    }
-
-    try {
-        const decoded = await verifyJwt(token, jwtConfig.secret, { algorithms: ["HS256"] }) as Record<string, unknown> | undefined;
-        if (decoded && decoded.purpose === "file-read" && typeof decoded.path === "string") {
-            return {
-                purpose: "file-read",
-                path: decoded.path,
-                storageId: canonicalStorageId(
-                    typeof decoded.storageId === "string" ? decoded.storageId : null
-                ),
-                ...(typeof decoded.rl === "string" ? { rl: decoded.rl } : {})
-            };
-        }
-        return null;
-    } catch (error) {
-        // Below ERROR, every reason alike. The data rate limiter verifies any
-        // `?token=` it sees, on every route it guards — so this is also handed a
-        // function's own query parameter, which was never a download token, and
-        // a five-minute token still sitting in an open tab's `<img src>`. A
-        // refused token is answered with a 401; nothing here is a server fault.
-        logger.debug("[JWT] Download token verification failed", { error: error });
-        return null;
-    }
+    return processJwt.verifyDownloadToken(token);
 }
 
 // ─── Generic purpose-scoped tokens ───────────────────────────────────
 
-/**
- * Sign a short-lived token that carries state across a redirect.
- *
- * The generalisation of the MFA-pending token: a signed blob the server hands
- * out and expects back, where the point is that the holder cannot edit it. The
- * OAuth authorize flow needs one to carry the authorization request across the
- * sign-in hop — without it, the endpoint the consent page posts to would mint a
- * code for whatever `client_id` and `redirect_uri` its caller typed, skipping
- * every check the authorize endpoint performs.
- *
- * The `purpose` is not decoration. {@link verifyAccessToken} refuses any token
- * that has one, so nothing minted here can be replayed as a session, and
- * {@link verifyPurposeToken} refuses a token whose purpose is not the one the
- * caller named — so a token minted for one hop cannot be spent on another.
- */
+/** See {@link JwtService.signPurposeToken}. Answers for the process default. */
 export async function signPurposeToken(
     purpose: string,
     claims: Record<string, unknown>,
     expiresInSeconds: number
 ): Promise<string> {
-    if (!jwtConfig.secret) {
-        throw new Error("JWT secret not configured. Call configureJwt() first.");
-    }
-    // `purpose` last, so a claims object carrying one cannot rename the token.
-    return signJwt({ ...claims, purpose }, jwtConfig.secret, {
-        expiresIn: expiresInSeconds,
-        algorithm: "HS256"
-    });
+    return processJwt.signPurposeToken(purpose, claims, expiresInSeconds);
 }
 
-/** Verify a token minted by {@link signPurposeToken}, for one named purpose. */
+/** See {@link JwtService.verifyPurposeToken}. Answers for the process default. */
 export async function verifyPurposeToken<T>(purpose: string, token: string): Promise<T | null> {
-    if (!jwtConfig.secret) {
-        throw new Error("JWT secret not configured. Call configureJwt() first.");
-    }
-    if (!token) return null;
-    try {
-        const decoded = await verifyJwt(token, jwtConfig.secret, { algorithms: ["HS256"] }) as Record<string, unknown> | undefined;
-        if (!decoded || decoded.purpose !== purpose) return null;
-        return decoded as T;
-    } catch (error) {
-        logger.error("[JWT] Purpose token verification failed", { purpose, error });
-        return null;
-    }
+    return processJwt.verifyPurposeToken<T>(purpose, token);
 }
 
 // ─── MCP access tokens ───────────────────────────────────────────────
@@ -792,97 +1109,50 @@ export interface McpAccessTokenPayload {
     iss: string;
 }
 
-/**
- * Mint an access token for the MCP endpoint.
- *
- * Deliberately **not** an ordinary session token, and the `purpose` claim is
- * what enforces that: {@link verifyAccessToken} refuses any token carrying one,
- * so a credential issued to a third-party MCP client — Claude, an IDE, anything
- * that completed the OAuth flow — cannot be replayed against `/api/data`,
- * `/api/admin` or the websocket. It buys exactly the one resource it names.
- *
- * That asymmetry matters more than it first looks. These tokens are handed to
- * software the user authorized but the operator never vetted, they live in that
- * software's storage, and they are the only credential in this system minted
- * for a third party. Without the purpose separation, "connect Claude to your
- * data" would silently mean "give Claude a full session".
- *
- * The audience is the canonical resource URI, and {@link verifyMcpAccessToken}
- * requires the caller to say which resource it is checking for. A token minted
- * for another Rebase project — or another path on this one — fails there.
- *
- * HS256 with the shared secret, like the download token: the authorization
- * server and the resource server are the same process, so nothing outside it
- * ever needs to verify one, and an asymmetric key here would be a second key
- * surface bought for nobody.
- */
+/** See {@link JwtService.generateMcpAccessToken}. Answers for the process default. */
 export async function generateMcpAccessToken(
     payload: Omit<McpAccessTokenPayload, "purpose">,
     expiresInSeconds: number
 ): Promise<string> {
-    if (!jwtConfig.secret) {
-        throw new Error("JWT secret not configured. Call configureJwt() first.");
-    }
-
-    // `uid` and `roles` are written by this function and come from a redeemed
-    // authorization code, never from anything the client sent. There is no
-    // custom-claims hook on this path on purpose — see `generateAccessToken`
-    // for what a hook that can reach the identity claims costs.
-    return signJwt(
-        {
-            purpose: MCP_ACCESS_PURPOSE,
-            uid: payload.uid,
-            roles: payload.roles,
-            scope: payload.scope,
-            clientId: payload.clientId,
-            aud: payload.aud,
-            iss: payload.iss
-        },
-        jwtConfig.secret,
-        { expiresIn: expiresInSeconds, algorithm: "HS256" }
-    );
+    return processJwt.generateMcpAccessToken(payload, expiresInSeconds);
 }
 
-/**
- * Verify an MCP access token **for a specific resource**.
- *
- * `expectedAudience` has no default. The MCP specification requires a resource
- * server to validate that a token was issued for it specifically, and a default
- * would be the thing that quietly turns that check off — the caller has to say
- * what it is, every time, so a new call site cannot forget by omission.
- */
+/** See {@link JwtService.verifyMcpAccessToken}. Answers for the process default. */
 export async function verifyMcpAccessToken(
     token: string,
     expectedAudience: string
 ): Promise<McpAccessTokenPayload | null> {
-    if (!jwtConfig.secret) {
-        throw new Error("JWT secret not configured. Call configureJwt() first.");
-    }
-
-    try {
-        const decoded = await verifyJwt(token, jwtConfig.secret, { algorithms: ["HS256"] }) as Record<string, unknown> | undefined;
-        if (!decoded || decoded.purpose !== MCP_ACCESS_PURPOSE) return null;
-        if (typeof decoded.uid !== "string" || !decoded.uid) return null;
-        if (typeof decoded.aud !== "string" || decoded.aud !== expectedAudience) {
-            logger.error("[JWT] MCP token rejected: audience mismatch", {
-                expected: expectedAudience,
-                got: decoded.aud
-            });
-            return null;
-        }
-
-        return {
-            purpose: MCP_ACCESS_PURPOSE,
-            uid: decoded.uid,
-            roles: Array.isArray(decoded.roles) ? decoded.roles.map(String) : [],
-            scope: typeof decoded.scope === "string" ? decoded.scope : "",
-            clientId: typeof decoded.clientId === "string" ? decoded.clientId : "",
-            aud: decoded.aud,
-            iss: typeof decoded.iss === "string" ? decoded.iss : ""
-        };
-    } catch (error) {
-        logger.error("[JWT] MCP token verification failed", { error: error });
-        return null;
-    }
+    return processJwt.verifyMcpAccessToken(token, expectedAudience);
 }
 
+/**
+ * The process default as a service object that follows it — every call reads
+ * whatever {@link configureJwt} or `setDefaultBackend` installed last. What a
+ * route built outside any backend falls back to.
+ */
+export const processJwtService: JwtService = {
+    get accessExpiresIn() {
+        return processJwt.accessExpiresIn;
+    },
+    get refreshExpiresIn() {
+        return processJwt.refreshExpiresIn;
+    },
+    isConfigured: isJwtConfigured,
+    hasAsymmetricSigningKey,
+    getJwks,
+    hmacSecret: configuredJwtSecret,
+    generateAccessToken,
+    verifyAccessToken,
+    getAccessTokenExpiryMs,
+    getAccessTokenExpiry,
+    getRefreshTokenTtlMs,
+    getRefreshTokenExpiry,
+    generateMfaPendingToken,
+    verifyMfaPendingToken,
+    generateDownloadToken,
+    verifyDownloadToken,
+    signPurposeToken,
+    verifyPurposeToken,
+    generateMcpAccessToken,
+    verifyMcpAccessToken
+};

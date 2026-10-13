@@ -35,7 +35,7 @@ import { generateSecureToken, hashToken } from "./admin-user-ops";
 import { identityVouchesForAddress } from "./address-ownership";
 import type { resolveAuthHooks } from "./auth-hooks";
 import type { AccessTokenPayload } from "./jwt";
-import { strictAuthLimiter, verificationEmailLimiter } from "./rate-limiter";
+import type { AuthLimiters } from "./rate-limiter";
 import { isDeliverableAddress } from "./deliverable-address";
 import type { AuthModuleConfig } from "./routes";
 
@@ -49,10 +49,12 @@ interface EmailChangeRoutesConfig {
     parseBody: <T>(schema: z.ZodSchema<T>, body: unknown) => T;
     /** A signed-in user, with the revocation watermark consulted. */
     requireLiveSession: MiddlewareHandler<HonoEnv>;
+    /** The backend's auth limiters. */
+    limiters: AuthLimiters;
 }
 
 export function mountEmailChangeRoutes(opts: EmailChangeRoutesConfig): void {
-    const { router, config, ops, parseBody, requireLiveSession } = opts;
+    const { router, config, ops, parseBody, requireLiveSession, limiters } = opts;
     const authRepo = config.authRepo;
     const { emailService, emailConfig } = config;
 
@@ -83,7 +85,7 @@ export function mountEmailChangeRoutes(opts: EmailChangeRoutesConfig): void {
      * machine, and per account, which is what bounds the mail one account can
      * have sent to addresses of its choosing.
      */
-    router.post("/change-email", strictAuthLimiter, requireLiveSession, verificationEmailLimiter, async (c) => {
+    router.post("/change-email", limiters.strict, requireLiveSession, limiters.verificationEmail, async (c) => {
         const userCtx = c.get("user") as AccessTokenPayload | undefined;
         if (!userCtx) {
             throw ApiError.unauthorized("Not authenticated");
@@ -165,7 +167,7 @@ export function mountEmailChangeRoutes(opts: EmailChangeRoutesConfig): void {
      * No session: the link is often opened on another device, and it proves
      * the new inbox, which is all this needs.
      */
-    router.post("/confirm-email-change", strictAuthLimiter, async (c) => {
+    router.post("/confirm-email-change", limiters.strict, async (c) => {
         const { token } = parseBody(confirmSchema, await c.req.json());
         const store = emailChangeStore();
         const tokenHash = hashToken(token);

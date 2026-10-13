@@ -13,7 +13,7 @@
 import { Hono, type MiddlewareHandler } from "hono";
 import { summarizeScopes } from "@rebasepro/types";
 import { errorHandler } from "../api/errors";
-import { callerScopes, getAccessModel } from "./access";
+import { accessOf, callerScopes } from "./access";
 import { createRequireAuth } from "./middleware";
 import type { AccessJudgeRepository } from "./token-revocation";
 import type { HonoEnv } from "../api/types";
@@ -36,7 +36,7 @@ export function createScopeRoutes(options: ScopeRouteOptions): Hono<HonoEnv> {
         revocationRepo: options.revocationRepo
     }));
     router.get("/", (c) => c.json({
-        scopes: summarizeScopes(getAccessModel()),
+        scopes: summarizeScopes(accessOf(c).model),
         held: callerScopes(c)
     }));
     return router;
