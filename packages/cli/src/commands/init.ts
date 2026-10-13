@@ -568,6 +568,139 @@ async function commitScaffold(targetDirectory: string): Promise<void> {
     }
 }
 
+/** What the closing "Next steps" depend on: the project's shape, and what `init` managed to do. */
+export interface InitNextStepsInput {
+    headless: boolean;
+    /** `--database-url` was given, so `.env` names the user's own database. */
+    ownDatabase: boolean;
+    /** Introspection was asked for. */
+    introspect: boolean;
+    /** Introspection ran and produced collections. */
+    introspected: boolean;
+    /** Dependencies were installed. */
+    installed: boolean;
+    /** What the reader types to enter the project; "" when they are in it. */
+    cdTarget: string;
+    pm: PMCommands;
+}
+
+/**
+ * The "Next steps" `init` closes on, every command one that works as printed.
+ *
+ * Each flavour has its own steps, and the branch for one flavour must not run
+ * for another. The `--database-url` branch was checked before the headless one,
+ * so `init --headless --database-url` — the documented BaaS path — opened on
+ * `pnpm run db:push`: a script the headless scaffold does not have, for a
+ * schema it does not declare (its tables are the developer's own), with an
+ * Atlas it does not install. `init-next-steps.test.ts` holds every script
+ * named here to the scaffold it is printed for.
+ */
+export function initNextSteps(input: InitNextStepsInput): string[] {
+    const { headless, ownDatabase, introspect, introspected, installed, cdTarget, pm } = input;
+    const cmd = (parts: string[]): string => `  ${chalk.cyan(parts.join(" "))}`;
+    const note = (text: string): string => chalk.gray(`  # ${text}`);
+    const runDev = cmd(pm.run("dev"));
+    const lines: string[] = [];
+
+    if (cdTarget) lines.push(`  ${chalk.cyan("cd")} ${cdTarget}`);
+    if (!installed) lines.push(cmd(pm.install));
+    lines.push("");
+
+    if (introspected) {
+        lines.push(note("Database has been introspected & collections generated!"));
+        lines.push(note(headless
+            ? "Start the API over it:"
+            : "Start the development server (frontend + backend):"));
+        lines.push(runDev);
+    } else if (introspect) {
+        // Introspection was requested but did not run. Point at the steps that
+        // finish the job rather than claiming collections exist.
+        lines.push(note("Introspection did not run — finish it with:"));
+        lines.push(cmd(pm.exec("rebase", ["schema", "introspect", "--force"])));
+        lines.push(cmd(pm.exec("rebase", ["schema", "generate"])));
+        lines.push("");
+        lines.push(note("Then start the development server:"));
+        lines.push(runDev);
+    } else if (headless) {
+        // One step, then the thing that is actually this mode's job. `dev`
+        // starts the database itself when none is named; a headless project has
+        // no collections, so there is no schema to push and the tables are the
+        // developer's to create — on their own database or the managed one.
+        lines.push(note(ownDatabase
+            ? "Your database is configured in .env (DATABASE_URL)."
+            : "A local database configuration has been generated in .env."));
+        lines.push(note(ownDatabase
+            ? "1. Start the API over it:"
+            : "1. Start everything — the database comes up with it:"));
+        lines.push(runDev);
+        lines.push("");
+        lines.push(note(ownDatabase
+            ? "2. Serve your tables."
+            : "2. Create your tables (migrations, SQL, any tool you like)."));
+        lines.push(note("   A table is served once row-level security is enabled on it, and a"));
+        lines.push(note("   policy is what opens its rows:"));
+        lines.push(cmd(["ALTER TABLE your_table ENABLE ROW LEVEL SECURITY;"]));
+        lines.push(cmd(["CREATE POLICY your_table_owner ON your_table FOR ALL USING (user_id = rebase.uid());"]));
+        lines.push(note("   The API logs any table it skips, and why."));
+    } else if (ownDatabase) {
+        lines.push(note("Your custom database is configured in .env."));
+        lines.push(note("If the database is empty, push the Rebase schema to initialize it:"));
+        lines.push(cmd(pm.run("db:push")));
+        lines.push("");
+        lines.push(note("Then start the development server:"));
+        lines.push(runDev);
+    } else {
+        // The whole first run, in one command.
+        //
+        // Deliberately does NOT say "container". This branch is the one a new
+        // project takes, and it is precisely the branch with no container in it:
+        // `.env` ships DATABASE_URL commented out, so `dev` starts the managed
+        // PGlite database rather than Docker. Saying otherwise sent a reader who
+        // had no Docker installed off to install it, to satisfy a step that was
+        // never going to run — and made the whole quickstart look like it
+        // required a daemon it does not.
+        //
+        // "schema" covers two things `dev` does before serving: generating the
+        // Drizzle schema from the collections, and applying the collections to
+        // the database. The push-and-Docker steps are documented under
+        // `rebase dev --help`.
+        lines.push(note("A local database configuration has been generated in .env."));
+        lines.push(note("Start everything — the database and schema are set up for you,"));
+        lines.push(note("with no Docker and nothing else to install:"));
+        lines.push(runDev);
+        lines.push("");
+        lines.push(note("To use a Postgres of your own instead, uncomment DATABASE_URL in .env."));
+    }
+
+    lines.push("");
+    // Both halves of the first-admin rule, once, here.
+    //
+    // `init` has just written REBASE_ADMIN_EMAIL and a generated password into
+    // `.env`, and they belong to the *production* boot — the compose stack, where
+    // the first-registration window is shut. `rebase dev` reads the same file, so
+    // without this line the honest reading of that `.env` is "these are my
+    // credentials", and the first documented step (register, become the admin)
+    // reads as broken.
+    lines.push(note("Sign in: the first account you register becomes the admin."));
+    lines.push(note("In production (docker compose) that window is shut and the account named by"));
+    lines.push(note("REBASE_ADMIN_EMAIL in .env is created at boot instead."));
+
+    lines.push("");
+    // `--headless --introspect` had these two claims fighting: the step above
+    // announced "collections generated!" and this line then said there are none.
+    // Both were reachable at once, and the reader has to believe one of them.
+    lines.push(headless
+        ? introspected
+            ? chalk.gray("This starts a headless API (Hono + PostgreSQL) over the collections just ")
+                + chalk.gray("generated from your database in config/collections. Edit them to change what the ")
+                + chalk.gray("API exposes; docs are at /api/swagger.")
+            : chalk.gray("This starts a headless API (Hono + PostgreSQL). There are no collection files: ")
+                + chalk.gray("the API is derived from your database schema. Once it serves a table, docs are at /api/swagger.")
+        : chalk.gray("This starts both the backend (Hono + PostgreSQL)")
+            + chalk.gray(" and the frontend (Vite + React) concurrently."));
+    return lines;
+}
+
 /**
  * The closing "AI Agent Skills" lines, each command one its reader can run.
  *
@@ -769,6 +902,8 @@ async function createProject(options: InitOptions) {
     // here is resolved from where the reader runs it — the project root.
     const generateCmd = pmCommands.exec("rebase", ["schema", "generate"]);
 
+    // Whether the install succeeded, so a failed one is printed as a step still to take.
+    let installed = false;
     if (options.installDeps) {
         console.log("");
         console.log(chalk.gray(`  Installing dependencies with ${pm}...`));
@@ -778,6 +913,7 @@ async function createProject(options: InitOptions) {
                 cwd: options.targetDirectory,
                 stdio: "inherit"
             });
+            installed = true;
         } catch {
             console.warn(chalk.yellow(`  Warning: Failed to install dependencies. You may need to run \`${installCmd.join(" ")}\` manually.`));
         }
@@ -828,106 +964,19 @@ async function createProject(options: InitOptions) {
     console.log("");
     console.log(chalk.bold("Next steps:"));
     console.log("");
-    const runDev = pmCommands.run("dev");
-    const runDbPush = pmCommands.run("db:push");
-    const isBaas = options.headless;
-    // The path the user has to type, not the project's basename: `init
-    // apps/my-app` must say `cd apps/my-app`, and `init .` needs no cd at all
-    // because they are already standing in the project.
-    const cdTarget = formatCdTarget(process.cwd(), options.targetDirectory);
-    if (cdTarget) {
-        console.log(`  ${chalk.cyan("cd")} ${cdTarget}`);
-    }
-    if (!options.installDeps) {
-        console.log(`  ${chalk.cyan(installCmd.join(" "))}`);
-    }
-    console.log("");
-
-    if (options.databaseUrl) {
-        if (introspected) {
-            console.log(chalk.gray("  # Database has been introspected & collections generated!"));
-            console.log(chalk.gray("  # Start the development server (frontend + backend):"));
-            console.log(`  ${chalk.cyan(runDev.join(" "))}`);
-        } else if (options.introspect) {
-            // Introspection was requested but did not run. Point at the steps
-            // that finish the job rather than claiming collections exist.
-            console.log(chalk.gray("  # Introspection did not run — finish it with:"));
-            console.log(`  ${chalk.cyan(execCmd.join(" "))}`);
-            console.log(`  ${chalk.cyan(generateCmd.join(" "))}`);
-            console.log("");
-            console.log(chalk.gray("  # Then start the development server:"));
-            console.log(`  ${chalk.cyan(runDev.join(" "))}`);
-        } else {
-            console.log(chalk.gray("  # Your custom database is configured in .env."));
-            console.log(chalk.gray("  # If the database is empty, push the Rebase schema to initialize it:"));
-            console.log(`  ${chalk.cyan(runDbPush.join(" "))}`);
-            console.log("");
-            console.log(chalk.gray("  # Then start the development server:"));
-            console.log(`  ${chalk.cyan(runDev.join(" "))}`);
-        }
-    } else if (isBaas) {
-        // One step, then the thing that is actually this mode's job. `dev`
-        // starts the database itself; a headless project has no collections, so
-        // there is no schema to push and the tables are the developer's to
-        // create.
-        console.log(chalk.gray("  # A local database configuration has been generated in .env."));
-        console.log(chalk.gray("  # 1. Start everything — the database comes up with it:"));
-        console.log(`  ${chalk.cyan(runDev.join(" "))}`);
-        console.log("");
-        console.log(chalk.gray("  # 2. Create your tables (migrations, SQL, any tool you like)."));
-        console.log(chalk.gray("  #    A table is served once it has an authorization model, i.e."));
-        console.log(chalk.gray("  #    row-level security enabled plus at least one policy:"));
-        console.log(`  ${chalk.cyan("ALTER TABLE your_table ENABLE ROW LEVEL SECURITY;")}`);
-        console.log(chalk.gray("  #    The API logs any table it skips, and why."));
-    } else {
-        // The whole first run, in one command.
-        //
-        // Deliberately does NOT say "container". This branch is the one a new
-        // project takes, and it is precisely the branch with no container in it:
-        // `.env` ships DATABASE_URL commented out, so `dev` starts the managed
-        // PGlite database rather than Docker. Saying otherwise sent a reader who
-        // had no Docker installed off to install it, to satisfy a step that was
-        // never going to run — and made the whole quickstart look like it
-        // required a daemon it does not.
-        //
-        // "schema" covers two things `dev` now does before serving: generating
-        // the Drizzle schema from the collections, and applying the collections
-        // to the database. The push-and-Docker steps that used to be printed
-        // here are still documented under `rebase dev --help`.
-        console.log(chalk.gray("  # A local database configuration has been generated in .env."));
-        console.log(chalk.gray("  # Start everything — the database and schema are set up for you,"));
-        console.log(chalk.gray("  # with no Docker and nothing else to install:"));
-        console.log(`  ${chalk.cyan(runDev.join(" "))}`);
-        console.log("");
-        console.log(chalk.gray("  # To use a Postgres of your own instead, uncomment DATABASE_URL in .env."));
-    }
-
-    console.log("");
-    // Both halves of the first-admin rule, once, here.
-    //
-    // `init` has just written REBASE_ADMIN_EMAIL and a generated password into
-    // `.env`, and they belong to the *production* boot — the compose stack, where
-    // the first-registration window is shut. `rebase dev` reads the same file, so
-    // without this line the honest reading of that `.env` is "these are my
-    // credentials", and the first documented step (register, become the admin)
-    // reads as broken.
-    console.log(chalk.gray("  # Sign in: the first account you register becomes the admin."));
-    console.log(chalk.gray("  # In production (docker compose) that window is shut and the account named by"));
-    console.log(chalk.gray("  # REBASE_ADMIN_EMAIL in .env is created at boot instead."));
-
-    console.log("");
-    // `--headless --introspect` had these two claims fighting: the step above
-    // announced "collections generated!" and this line then said there are none.
-    // Both were reachable at once, and the reader has to believe one of them.
-    console.log(isBaas
-        ? introspected
-            ? chalk.gray("This starts a headless API (Hono + PostgreSQL) over the collections just ")
-                + chalk.gray("generated from your database in config/collections. Edit them to change what the ")
-                + chalk.gray("API exposes; docs are at /api/swagger.")
-            : chalk.gray("This starts a headless API (Hono + PostgreSQL). There are no collection files: ")
-                + chalk.gray("the API is derived from your database schema. Once it serves a table, docs are at /api/swagger.")
-        : chalk.gray("This starts both the backend (Hono + PostgreSQL)")
-            + chalk.gray(" and the frontend (Vite + React) concurrently."));
+    const nextSteps = initNextSteps({
+        headless: options.headless,
+        ownDatabase: Boolean(options.databaseUrl),
+        introspect: Boolean(options.introspect),
+        introspected,
+        installed,
+        // The path the user has to type, not the project's basename: `init
+        // apps/my-app` must say `cd apps/my-app`, and `init .` needs no cd at all
+        // because they are already standing in the project.
+        cdTarget: formatCdTarget(process.cwd(), options.targetDirectory),
+        pm: pmCommands
+    });
+    for (const line of nextSteps) console.log(line);
     console.log("");
     console.log(chalk.gray("Docs: https://rebase.pro/docs"));
     console.log(chalk.gray("GitHub: https://github.com/rebasepro/rebase"));
