@@ -1,6 +1,7 @@
 import chalk from "chalk";
 import { outWarn, outError } from "./cli-output";
 import { extractCauseMessage } from "./utils/error-cause";
+import { redactConnectionPasswords } from "./utils/connection-string";
 import { withAppClient } from "./cli-helpers";
 
 /**
@@ -328,9 +329,13 @@ export function diagnoseDbError(err: unknown, databaseUrl?: string): string | nu
  *   it resolved to and the cwd it resolved against, and then throws so the entry
  *   point owns the exit code. Repeating its one-line summary underneath would
  *   undo the "printed once" this whole path exists for.
+ *
+ * Whatever is printed has its connection-string passwords replaced (see
+ * `redactConnectionPasswords`): a driver or tool error can quote the URL it was
+ * given, and this line lands in terminals and CI logs.
  */
 export function reportCommandFailure(error: unknown): void {
-    const message = error instanceof Error ? error.message : String(error ?? "");
+    const message = redactConnectionPasswords(error instanceof Error ? error.message : String(error ?? ""));
 
     if ((error as { alreadyReported?: boolean } | null)?.alreadyReported) return;
     if (!message || /Command failed|exited with code/i.test(message)) return;
@@ -338,7 +343,8 @@ export function reportCommandFailure(error: unknown): void {
     outError("");
     outError(chalk.red(`  ✗ ${message}`));
 
-    const cause = extractCauseMessage(error);
+    const rawCause = extractCauseMessage(error);
+    const cause = rawCause ? redactConnectionPasswords(rawCause) : rawCause;
     if (cause && !message.includes(cause)) {
         outError(chalk.gray(`    ${cause}`));
     }

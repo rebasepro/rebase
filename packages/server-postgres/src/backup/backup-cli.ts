@@ -3,7 +3,7 @@
  * `rebase db backups list`. Kept out of the main `cli.ts` dispatcher so the
  * backup surface stays self-contained.
  */
-import arg from "arg";
+import type arg from "arg";
 import path from "path";
 import fs from "fs";
 import os from "os";
@@ -13,7 +13,8 @@ import chalk from "chalk";
 // Aliased: `out` is already a local in two of the commands below (the `--out`
 // backup destination).
 import { out as print, outWarn, outError } from "../cli-output";
-import { parseDriverLine } from "../cli-flags";
+import { parseCommandFlags } from "../cli-flags";
+import { redactConnectionPasswords } from "../utils/connection-string";
 import { promptConfirm } from "../cli-prompt";
 import type { StorageController } from "@rebasepro/server";
 import {
@@ -97,29 +98,43 @@ function requireConnection(): string {
 // ─────────────────────────────────────────────────────────────────────────
 // rebase db backup
 // ─────────────────────────────────────────────────────────────────────────
-export async function backupCommand(rawArgs: string[]): Promise<void> {
-    const args = arg(
-        {
-            "--out": String,
-            // The same alias `build` and `cloud env pull` carry. `--output` is
-            // the canonical spelling in this CLI and this command took only
-            // `--out`, so `rebase db backup --output ./backups` wrote to
-            // ./backups *and* to the default directory — the flag was ignored
-            // and its value became a positional.
-            "--output": "--out",
-            "--exclude-schema": [String],
-            "--no-owner": Boolean,
-            "--enable-row-security": Boolean,
-            "--row-security-role": String,
-            "-o": "--out"
-        },
-        { argv: rawArgs.slice(2), permissive: true }
-    );
+const BACKUP_FLAGS = {
+    "--out": String,
+    // The same alias `build` and `cloud env pull` carry. `--output` is the
+    // canonical spelling in this CLI, and `rebase db backup --output ./backups`
+    // has to write there.
+    "--output": "--out",
+    "--exclude-schema": [String],
+    "--no-owner": Boolean,
+    "--enable-row-security": Boolean,
+    "--row-security-role": String,
+    "-o": "--out"
+} satisfies arg.Spec;
 
-    if (args._.includes("--help") || rawArgs.includes("--help")) {
+/**
+ * Parse a `rebase db backup …` line. An undeclared flag is refused (see
+ * `parseCommandFlags`), and so is a positional: `rebase db backup ./backups`
+ * means `--out ./backups`, and taken as nothing it wrote to the default
+ * directory.
+ */
+export function parseBackupLine(rawArgs: string[]) {
+    const args = parseCommandFlags(BACKUP_FLAGS, rawArgs.slice(2), "db backup");
+    const [stray] = args._;
+    if (stray !== undefined) {
+        throw new Error(
+            `\`rebase db backup\` takes no argument "${stray}". Nothing was run. ` +
+            `To choose where the backup goes, pass --out ${stray}.`
+        );
+    }
+    return args;
+}
+
+export async function backupCommand(rawArgs: string[]): Promise<void> {
+    if (rawArgs.includes("--help")) {
         printBackupHelp();
         return;
     }
+    const args = parseBackupLine(rawArgs);
 
     const connectionString = requireConnection();
     const dbName = parseDbNameFromUrl(connectionString) ?? "database";
@@ -225,25 +240,44 @@ const RESTORE_FLAGS = {
     "-y": "--yes"
 } satisfies arg.Spec;
 
-/** Parse a `rebase db restore …` line; the first positional is the backup. */
+/**
+ * Parse a `rebase db restore …` line; the one positional is the backup.
+ *
+ * Strict, because this is the command where a typo costs most: parsed
+ * permissively, `--targt-db x` became a second positional, the target fell
+ * back to DATABASE_URL's own database, and the restore ran against the live
+ * one.
+ */
 export function parseRestoreLine(rawArgs: string[]) {
-    return parseDriverLine(RESTORE_FLAGS, rawArgs);
+    const args = parseCommandFlags(RESTORE_FLAGS, rawArgs.slice(2), "db restore");
+    if (args._.length > 1) {
+        throw new Error(
+            `\`rebase db restore\` restores one backup, and was given ${args._.length}: ` +
+            `${args._.map(word => `"${word}"`).join(", ")}. Nothing was run.`
+        );
+    }
+    return args;
 }
 
 export async function restoreCommand(rawArgs: string[]): Promise<void> {
+    if (rawArgs.includes("--help")) {
+        printRestoreHelp();
+        return;
+    }
     const args = parseRestoreLine(rawArgs);
 
     const backupArg = args._[0];
-    if (!backupArg || rawArgs.includes("--help")) {
+    if (!backupArg) {
         printRestoreHelp();
-        if (!backupArg && !rawArgs.includes("--help")) process.exit(1);
-        return;
+        process.exit(1);
     }
 
     const baseConnection = requireConnection();
 
-    // Choose the target connection: an explicit --target-db (or --create-db's
-    // implied fresh db) swaps the database name so the live one isn't clobbered.
+    // Choose the target connection: an explicit --target-db swaps the database
+    // name so the live one isn't clobbered. Without it the target is
+    // DATABASE_URL's own database, and `--create-db` only creates it when it is
+    // missing.
     const targetDb = args["--target-db"] ?? parseDbNameFromUrl(baseConnection) ?? undefined;
     const targetConnection = args["--target-db"]
         ? withDatabaseName(baseConnection, args["--target-db"])
@@ -363,7 +397,10 @@ export async function restoreCommand(rawArgs: string[]): Promise<void> {
         print("");
     } catch (err) {
         reportError(err);
-        process.exit(1);
+        // An exit code, not `process.exit`: exiting here skipped the `finally`
+        // below, and a failed restore from object storage left its downloaded
+        // dump, every row of the database, in the temp directory.
+        process.exitCode = 1;
     } finally {
         if (cleanupTemp && typeof localFile! === "string" && fs.existsSync(localFile!)) {
             fs.rmSync(path.dirname(localFile!), { recursive: true, force: true });
@@ -385,7 +422,11 @@ export async function backupsCommand(rawArgs: string[]): Promise<void> {
         process.exit(1);
     }
 
-    const args = arg({ "--out": String, "--output": "--out", "-o": "--out" }, { argv: rawArgs.slice(3), permissive: true });
+    const args = parseCommandFlags(
+        { "--out": String, "--output": "--out", "-o": "--out" },
+        rawArgs.slice(3),
+        "db backups list"
+    );
     const out = args["--out"] || process.env.BACKUP_DESTINATION || path.join(process.cwd(), "backups");
     const dest = parseBackupDestination(out);
 
@@ -449,12 +490,21 @@ async function assertDumpValid(localFile: string): Promise<void> {
     }
 }
 
+/**
+ * Say why a backup command failed, with no password in it.
+ *
+ * What reaches here is often a client tool's failure, and execa's message
+ * repeats the tool's command line. The tools get the password through
+ * `PGPASSWORD` now, so it is not on that line, but a connection string can
+ * still arrive inside a message from elsewhere; this is the last place to
+ * stop it reaching a terminal or a CI log.
+ */
 function reportError(err: unknown): void {
     if (err instanceof BackupToolError) {
-        outError(chalk.red(`  ✗ ${err.message}`));
-        if (err.hint) outError(chalk.gray(`    ${err.hint}`));
+        outError(chalk.red(`  ✗ ${redactConnectionPasswords(err.message)}`));
+        if (err.hint) outError(chalk.gray(`    ${redactConnectionPasswords(err.hint)}`));
     } else {
-        outError(chalk.red(`  ✗ ${err instanceof Error ? err.message : String(err)}`));
+        outError(chalk.red(`  ✗ ${redactConnectionPasswords(err instanceof Error ? err.message : String(err))}`));
     }
 }
 

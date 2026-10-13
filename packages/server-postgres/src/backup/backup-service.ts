@@ -33,6 +33,28 @@ import {
 } from "./pg-tools";
 import { BackupObject, RetentionOptions, selectBackupsToPrune } from "./retention";
 import { applyGlobalsWith, discardPartialDumpWith, pruneWith } from "./backup-logic";
+import { splitPassword } from "../utils/connection-string";
+
+/**
+ * How a libpq tool is invoked for a connection string: the URL its command
+ * line carries, and the environment it runs in.
+ *
+ * The password goes in `PGPASSWORD`, never on the command line, where every
+ * process listing could read it and every failure printed it back (execa's
+ * error repeats the command). See {@link splitPassword}.
+ */
+function libpqInvocation(
+    connectionString: string,
+    env: Record<string, string | undefined>
+): { connectionString: string; env: Record<string, string> } {
+    const split = splitPassword(connectionString);
+    const toolEnv: Record<string, string> = {};
+    for (const [key, value] of Object.entries(env)) {
+        if (value !== undefined) toolEnv[key] = value;
+    }
+    if (split.password !== null) toolEnv.PGPASSWORD = split.password;
+    return { connectionString: split.connectionString, env: toolEnv };
+}
 
 /**
  * Remove a dump artifact abandoned by a failed tool run. See
@@ -169,8 +191,9 @@ export async function createDump(opts: {
     fs.mkdirSync(outDir, { recursive: true });
     const localFile = path.join(outDir, fileName);
 
+    const tool = libpqInvocation(opts.connectionString, env);
     const args = buildPgDumpArgs({
-        connectionString: opts.connectionString,
+        connectionString: tool.connectionString,
         outFile: localFile,
         excludeSchemas: opts.excludeSchemas,
         noOwner: opts.noOwner,
@@ -180,7 +203,7 @@ export async function createDump(opts: {
     // `PGOPTIONS` is the only way to set a GUC on a tool that takes no SQL.
     // Built from the same object that added `--enable-row-security`, so the
     // flag cannot travel without the identity that makes it safe.
-    const dumpEnv: Record<string, string> = { ...(env as Record<string, string>) };
+    const dumpEnv: Record<string, string> = { ...tool.env };
     if (opts.rowSecurity) {
         dumpEnv.PGOPTIONS = [env.PGOPTIONS, buildRowSecurityPgOptions(opts.rowSecurity)]
             .filter(Boolean).join(" ");
@@ -228,8 +251,8 @@ export async function createDump(opts: {
         try {
             await execa(
                 dumpallBin,
-                buildPgDumpallGlobalsArgs({ connectionString: opts.connectionString, outFile: globalsFile }),
-                { stdio: opts.inheritStdio ? "inherit" : "pipe", env: { ...(env as Record<string, string>) } }
+                buildPgDumpallGlobalsArgs({ connectionString: tool.connectionString, outFile: globalsFile }),
+                { stdio: opts.inheritStdio ? "inherit" : "pipe", env: tool.env }
             );
         } catch (error) {
             // Same reasoning as the pg_dump catch above, and the dump goes with
@@ -338,8 +361,9 @@ export async function restoreDump(opts: {
             "Install the PostgreSQL client tools or set PG_RESTORE_PATH."
         );
     }
+    const tool = libpqInvocation(opts.connectionString, env);
     const args = buildPgRestoreArgs({
-        connectionString: opts.connectionString,
+        connectionString: tool.connectionString,
         inputFile: opts.inputFile,
         clean: opts.clean,
         noOwner: opts.noOwner,
@@ -347,7 +371,7 @@ export async function restoreDump(opts: {
     });
     await execa(bin, args, {
         stdio: opts.inheritStdio ? "inherit" : "pipe",
-        env: { ...(env as Record<string, string>) }
+        env: tool.env
     });
 }
 

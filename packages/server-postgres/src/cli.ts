@@ -44,7 +44,7 @@ import {
     formatForeignGeneratedColumnBanner,
     reportCommandFailure
 } from "./cli-errors";
-import { forLibpq } from "./utils/connection-string";
+import { forLibpq, redactConnectionPasswords } from "./utils/connection-string";
 import { dropLegacyAuthSchema, RLS_BOOTSTRAP_SQL } from "./schema/rls-bootstrap-sql";
 import { detectDestructiveStatements, decidePushSafety, extractPlanStatements, type DestructiveStatement, type ExistingColumnType } from "./schema/destructive-sql";
 import type { LegacyRename } from "./schema/push-legacy-renames";
@@ -1862,7 +1862,9 @@ async function runAtlas(
     subprocess.stderr?.on("data", (chunk: Buffer) => {
         const text = chunk.toString();
         stderrText += text;
-        process.stderr.write(text);
+        // Atlas has the URLs on its command line, and an error such as a URL
+        // it cannot parse quotes one back, password and all.
+        process.stderr.write(redactConnectionPasswords(text));
     });
     try {
         await subprocess;

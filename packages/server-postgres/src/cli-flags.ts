@@ -23,6 +23,7 @@
  * An absent entry is "not checked here", never "takes nothing".
  */
 import arg from "arg";
+import { suggestNearMiss } from "@rebasepro/utils";
 
 /**
  * Flags that reach this process on a line it did not compose.
@@ -255,12 +256,62 @@ export function assertKnownFlags(domain: string, subcommand: string | undefined,
     try {
         arg({ ...RELAYED_FLAGS, ...spec }, { argv: args.slice(2) });
     } catch (err) {
-        if (err instanceof Error && (err as arg.ArgError).code === "ARG_UNKNOWN_OPTION") {
+        const unknown = unknownFlagIn(err);
+        if (unknown !== null && err instanceof Error) {
+            const suggestion = closestFlag(unknown, { ...RELAYED_FLAGS, ...spec });
             throw new Error(
-                `${err.message} — run \`rebase ${domain} --help\` for the options ` +
-                `\`${domain} ${subcommand}\` takes.`
+                `${err.message}${suggestion ? ` (did you mean ${suggestion}?)` : ""} — run ` +
+                `\`rebase ${domain} --help\` for the options \`${domain} ${subcommand}\` takes.`
             );
         }
         throw err;
+    }
+}
+
+/** The flag `arg` refused as undeclared, or `null` for any other failure. */
+function unknownFlagIn(err: unknown): string | null {
+    if (!(err instanceof Error) || !("code" in err) || err.code !== "ARG_UNKNOWN_OPTION") return null;
+    // arg's wording: `unknown or unexpected option: --targt-db`.
+    return /option: (\S+)$/.exec(err.message)?.[1] ?? null;
+}
+
+/** The declared long flag `typed` is one edit away from, if there is one. */
+function closestFlag(typed: string, spec: arg.Spec): string | undefined {
+    const name = typed.split("=")[0];
+    return suggestNearMiss(Object.keys(spec).filter(flag => flag.startsWith("--")), name);
+}
+
+/**
+ * Parse a command that owns its argument handling, refusing what it does not
+ * declare.
+ *
+ * `db backup`, `db restore` and `db backups list` parsed permissively, so an
+ * undeclared flag became a positional and was ignored: `db restore <dump>
+ * --targt-db x --create-db --yes` dropped the misspelled target and restored
+ * into the live database. A typo is refused here before anything runs, naming
+ * the declared flag it is one edit from, or every flag the command takes when
+ * none is that close.
+ *
+ * @param argv the words after the command, e.g. `rawArgs.slice(2)`.
+ * @param command the command as typed, for the message: `"db restore"`.
+ */
+export function parseCommandFlags<S extends arg.Spec>(
+    spec: S,
+    argv: string[],
+    command: string
+): arg.Result<typeof RELAYED_FLAGS & S> {
+    const full = { ...RELAYED_FLAGS, ...spec };
+    try {
+        return arg(full, { argv });
+    } catch (err) {
+        const unknown = unknownFlagIn(err);
+        if (unknown === null) throw err;
+        const suggestion = closestFlag(unknown, full);
+        const flags = Object.keys(spec).filter(flag => flag.startsWith("--"));
+        throw new Error(
+            `\`rebase ${command}\` has no option ${unknown}` +
+            (suggestion ? ` — did you mean ${suggestion}?` : ` — it takes ${flags.join(", ")}.`) +
+            ` Nothing was run. See \`rebase ${command} --help\`.`
+        );
     }
 }
