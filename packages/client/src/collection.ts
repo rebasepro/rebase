@@ -35,6 +35,8 @@ import {
     type ComputedSortField,
     type FieldPath,
     type RelationAggregateSort,
+    type RestoreOptions,
+    type TrashClient,
     RebaseClientError
 } from "@rebasepro/types";
 import { collectAllPages, etagOf, normalizeOrderBy, paginateFind, resolveFindWindow, withETag } from "@rebasepro/common";
@@ -313,58 +315,16 @@ export interface ObserveOptions {
 export interface ObserveByIdOptions<Inc = IncludeSpec> extends ObserveOptions, ByIdReadOptions<Inc> {}
 
 /**
- * Options for {@link TrashClient.restore} and {@link TrashClient.restoreMany}.
+ * {@link TrashClient} and {@link RestoreOptions} are the transport-agnostic
+ * contract in `@rebasepro/types`. On this client every call goes to the
+ * server. With `offline` enabled the trash is not cached and nothing in it is
+ * queued: the local database never holds a trashed row, so it cannot answer
+ * for one, and a restore or a purge made offline would act on a row this
+ * device cannot see. They reject with `OFFLINE` instead (see
+ * `isOfflineError`). A restored row joins the local database; a purged one
+ * leaves it.
  */
-export interface RestoreOptions<M extends Record<string, unknown> = Record<string, unknown>> extends WriteOptions {
-    /**
-     * The collection's soft-delete field, as declared in `softDelete`.
-     * Defaults to `deletedAt`, the field `softDelete: true` uses; pass the
-     * name a `softDelete: { field: "archivedAt" }` collection declares.
-     *
-     * The client cannot discover it: a restore is an ordinary update setting
-     * this field to `null`, which is the one update the server lets reach a
-     * trashed row.
-     */
-    field?: keyof M & string;
-}
-
-/**
- * The trash of a collection that declares `softDelete`: the rows a delete
- * stamped rather than removed. `client.data.<slug>.trash`.
- *
- * Every call goes to the server. On a client with `offline` enabled the trash
- * is not cached and nothing here is queued: the local database never holds a
- * trashed row, so it cannot answer for one, and a restore or a purge made
- * offline would act on a row this device cannot see. They reject with
- * `OFFLINE` instead (see `isOfflineError`). A restored row joins the local
- * database; a purged one leaves it.
- *
- * For a collection that declares `softDelete`. The server ignores
- * `?deleted=` on one that does not, so there `find` and `count` answer for the
- * live rows, `restore` is refused for a field the collection does not have,
- * and `purge` is an ordinary delete.
- */
-export interface TrashClient<M extends Record<string, unknown> = Record<string, unknown>, Inc = IncludeSpec> {
-    /** The trashed rows matching `params` — `GET /data/<slug>?deleted=only`. */
-    find(params?: FindParams<M, Inc>): Promise<FindResult<M>>;
-    /** How many trashed rows match `params` — `GET /data/<slug>/count?deleted=only`. */
-    count(params?: FindParams<M, Inc>): Promise<number>;
-    /**
-     * Bring a trashed row back: `PATCH /data/<slug>/<id>` setting the
-     * soft-delete field to `null`. Resolves with the restored row.
-     */
-    restore(id: string | number, options?: RestoreOptions<M>): Promise<M>;
-    /** {@link TrashClient.restore} for several rows, as one transaction (`PATCH /data/<slug>/bulk`). */
-    restoreMany(ids: (string | number)[], options?: RestoreOptions<M>): Promise<M[]>;
-    /**
-     * Delete a row for good — `DELETE /data/<slug>/<id>?hard=true`. It cannot
-     * be restored afterwards. Needs the same permission an ordinary delete
-     * does, and works on a live row as well as a trashed one.
-     */
-    purge(id: string | number, options?: WriteOptions): Promise<void>;
-    /** {@link TrashClient.purge} for several rows, as one transaction (`POST /data/<slug>/bulk/delete?hard=true`). */
-    purgeMany(ids: (string | number)[], options?: WriteOptions): Promise<void>;
-}
+export type { RestoreOptions, TrashClient };
 
 /** What `softDelete: true` names the field a delete stamps. */
 const DEFAULT_SOFT_DELETE_FIELD = "deletedAt";

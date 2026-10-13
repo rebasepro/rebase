@@ -670,6 +670,14 @@ export interface CollectionAccessor<M extends Record<string, unknown> = Record<s
     listenCount?(params: FindParams<M> | undefined, onCount: (total: number) => void, onError?: (error: Error) => void): () => void;
 
     /**
+     * The rows a soft delete stamped, and the delete that removes a row for
+     * good: what {@link SDKCollectionClient.trash} is built from. A restore is
+     * an ordinary {@link update}. Optional; absent where the data source
+     * cannot read a collection's trash.
+     */
+    trash?: CollectionTrashAccessor<M>;
+
+    /**
      * Count the number of records matching the given filter.
      *
      * Optional on this contract because a data source need not support it, and
@@ -1450,6 +1458,69 @@ export interface WriteOptions {
     ifMatch?: string;
 }
 
+/**
+ * The entity-shaped half of {@link TrashClient}, on a {@link CollectionAccessor}.
+ */
+export interface CollectionTrashAccessor<M extends Record<string, unknown> = Record<string, unknown>> {
+    /** The trashed rows matching `params`. */
+    find(params?: FindParams<M>): Promise<FindResponse<M>>;
+    /** How many trashed rows match `params`. */
+    count(params?: FindParams<M>): Promise<number>;
+    /** Delete a row for good, trashed or live. */
+    purge(id: string | number): Promise<void>;
+    /** {@link purge} for several rows, as one transaction, where the data source can. */
+    purgeMany?(ids: (string | number)[]): Promise<void>;
+}
+
+/**
+ * Options for {@link TrashClient.restore} and {@link TrashClient.restoreMany}.
+ */
+export interface RestoreOptions<M extends Record<string, unknown> = Record<string, unknown>> extends WriteOptions {
+    /**
+     * The collection's soft-delete field, as declared in `softDelete`.
+     * Defaults to `deletedAt`, the field `softDelete: true` uses; pass the
+     * name a `softDelete: { field: "archivedAt" }` collection declares.
+     *
+     * A restore is an ordinary update setting this field to `null`, which is
+     * the one update the server lets reach a trashed row.
+     */
+    field?: keyof M & string;
+}
+
+/**
+ * The trash of a collection that declares `softDelete`: the rows a delete
+ * stamped rather than removed. `client.data.<slug>.trash` in the browser,
+ * `context.data.<slug>.trash` and `rebase.data.<slug>.trash` on the server.
+ *
+ * For a collection that declares `softDelete`. On one that does not, `find`
+ * and `count` answer for the live rows, `restore` is refused for a field the
+ * collection does not have, and `purge` is an ordinary delete.
+ *
+ * Where the data source cannot read a trash, every method is a stub that
+ * throws when called.
+ */
+export interface TrashClient<M extends Record<string, unknown> = Record<string, unknown>, Inc = IncludeSpec> {
+    /** The trashed rows matching `params` — `GET /data/<slug>?deleted=only`. */
+    find(params?: FindParams<M, Inc>): Promise<FindResult<M>>;
+    /** How many trashed rows match `params` — `GET /data/<slug>/count?deleted=only`. */
+    count(params?: FindParams<M, Inc>): Promise<number>;
+    /**
+     * Bring a trashed row back: the update setting the soft-delete field to
+     * `null` (`PATCH /data/<slug>/<id>`). Resolves with the restored row.
+     */
+    restore(id: string | number, options?: RestoreOptions<M>): Promise<M>;
+    /** {@link TrashClient.restore} for several rows, as one transaction (`PATCH /data/<slug>/bulk`). */
+    restoreMany(ids: (string | number)[], options?: RestoreOptions<M>): Promise<M[]>;
+    /**
+     * Delete a row for good — `DELETE /data/<slug>/<id>?hard=true`. It cannot
+     * be restored afterwards. Needs the same permission an ordinary delete
+     * does, and works on a live row as well as a trashed one.
+     */
+    purge(id: string | number, options?: WriteOptions): Promise<void>;
+    /** {@link TrashClient.purge} for several rows, as one transaction (`POST /data/<slug>/bulk/delete?hard=true`). */
+    purgeMany(ids: (string | number)[], options?: WriteOptions): Promise<void>;
+}
+
 export interface SDKCollectionClient<
     M extends Record<string, unknown> = Record<string, unknown>,
     I = Partial<M>,
@@ -1803,6 +1874,12 @@ export interface SDKCollectionClient<
      * throws, as {@link listen} is.
      */
     listenCount(params: FindParams<M, Inc> | undefined, onCount: (total: number) => void, onError?: (error: Error) => void): () => void;
+
+    /**
+     * The collection's trash: list, count, restore and purge the rows a soft
+     * delete stamped. See {@link TrashClient}.
+     */
+    trash: TrashClient<M, Inc>;
 
     /**
      * Count the number of records matching the given filter.

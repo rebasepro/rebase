@@ -1,4 +1,4 @@
-import { CollectionAccessor, DataDriver, DEFAULT_VECTOR_LIST_LIMIT, Entity, EntityValues, FindAllParams, FindParams, FindResponse, FindResult, IterateParams, LogicalCondition, OrderByTuple, PageWalkOptions, RebaseApiError, RebaseData, RebaseSdkData, RelationAggregateSort, SDKCollectionClient, SDKQueryBuilderInterface, sortKeyToString, type AggregateMeta, type AggregateParams, type AggregateResult, type AggregateSelect, type ComputedSortField, type FieldPath, type ByIdReadOptions, type IncludeSpec, type NonColumnFieldPath, type NullsPlacement, type SearchMatch, type UpdateValues, type UpsertOptions, type WriteOptions, RebaseClientError, WhereFilterOp, WhereValueFor, isUnsupported, unsupportedMethod } from "@rebasepro/types";
+import { CollectionAccessor, DataDriver, DEFAULT_VECTOR_LIST_LIMIT, Entity, EntityValues, FindAllParams, FindParams, FindResponse, FindResult, IterateParams, LogicalCondition, OrderByTuple, PageWalkOptions, RebaseApiError, RebaseData, RebaseSdkData, RelationAggregateSort, SDKCollectionClient, SDKQueryBuilderInterface, sortKeyToString, type AggregateMeta, type AggregateParams, type AggregateResult, type AggregateSelect, type ComputedSortField, type FieldPath, type ByIdReadOptions, type IncludeSpec, type NonColumnFieldPath, type NullsPlacement, type SearchMatch, type UpdateValues, type UpsertOptions, type WriteOptions, type RestoreOptions, type TrashClient, RebaseClientError, WhereFilterOp, WhereValueFor, isUnsupported, unsupportedMethod } from "@rebasepro/types";
 import { toSnakeCase, toWireKey } from "@rebasepro/utils";
 import { cursorToStartAfter, decodeCursor, reconcileCursorOrder } from "./cursor";
 import { mergeIncludeSpecs } from "./include-spec";
@@ -50,6 +50,13 @@ function toDriverAggregate(
  * would be wrong under a `limit` and unaffordable without one, and it would look
  * like it had worked.
  */
+/** What a client says when its data source cannot read a collection's trash. */
+const noTrash = (slug: string): string =>
+    `The trash is not available for "${slug}": its data source cannot read soft-deleted rows.`;
+
+/** What `softDelete: true` names the field a delete stamps; a restore clears it. */
+const DEFAULT_SOFT_DELETE_FIELD = "deletedAt";
+
 const noAggregate = (slug: string): string =>
     `Aggregates are not available for "${slug}": its data source does not implement them.`;
 
@@ -344,161 +351,191 @@ function createDriverAccessor<M extends Record<string, unknown> = Record<string,
      */
     storedPath: () => string = () => slug
 ): CollectionAccessor<M> {
-    const accessor: CollectionAccessor<M> = {
-        async find(params?: FindParams<M>): Promise<FindResponse<M>> {
-            // Ensure filters are in canonical [op, value] format even if passed as PostgREST strings
-            const filter = params?.where ? deserializeFilter(params.where as Record<string, unknown>) : undefined;
-            const window = resolveFindWindow(params);
-            const { offset, driverOffset } = window;
-            // A vector search nobody bounded reads the nearest
-            // DEFAULT_VECTOR_LIST_LIMIT rows, as it does over HTTP — not 50
-            // rows ordered by distance. The `page` stride stays the plain one,
-            // as the HTTP parser's does.
-            const limit = params?.limit === undefined && params?.vectorSearch
-                ? DEFAULT_VECTOR_LIST_LIMIT
-                : window.limit;
+    /**
+     * One page of the collection, and its count. `withDeleted: "only"` reads
+     * the trash (see `trash` below) through the same pipeline, so a trashed
+     * page is paged, counted and shaped exactly as a live one.
+     */
+    async function findRows(params?: FindParams<M>, withDeleted?: "only"): Promise<FindResponse<M>> {
+        // Ensure filters are in canonical [op, value] format even if passed as PostgREST strings
+        const filter = params?.where ? deserializeFilter(params.where as Record<string, unknown>) : undefined;
+        const window = resolveFindWindow(params);
+        const { offset, driverOffset } = window;
+        // A vector search nobody bounded reads the nearest
+        // DEFAULT_VECTOR_LIST_LIMIT rows, as it does over HTTP — not 50
+        // rows ordered by distance. The `page` stride stays the plain one,
+        // as the HTTP parser's does.
+        const limit = params?.limit === undefined && params?.vectorSearch
+            ? DEFAULT_VECTOR_LIST_LIMIT
+            : window.limit;
 
-            // Keyset paging, through the same codec and the same driver
-            // comparison the HTTP route uses. The in-process accessor is a
-            // transport like any other: a walk that seeked differently here
-            // than over the wire would be a difference the types cannot see.
-            const cursor = params?.after ? decodeCursor(params.after) : undefined;
-            const sort = cursor
-                ? reconcileCursorOrder(cursor, normalizeOrderBy(params?.orderBy))
-                : normalizeOrderBy(params?.orderBy);
-            // A cursor issued for an unsorted read carries an empty sort; the
-            // HTTP route hands the driver none at all, and so does this.
-            const orderBy = sort && sort.length > 0 ? sort : undefined;
-            const startAfter = cursor ? cursorToStartAfter(cursor) : undefined;
+        // Keyset paging, through the same codec and the same driver
+        // comparison the HTTP route uses. The in-process accessor is a
+        // transport like any other: a walk that seeked differently here
+        // than over the wire would be a difference the types cannot see.
+        const cursor = params?.after ? decodeCursor(params.after) : undefined;
+        const sort = cursor
+            ? reconcileCursorOrder(cursor, normalizeOrderBy(params?.orderBy))
+            : normalizeOrderBy(params?.orderBy);
+        // A cursor issued for an unsorted read carries an empty sort; the
+        // HTTP route hands the driver none at all, and so does this.
+        const orderBy = sort && sort.length > 0 ? sort : undefined;
+        const startAfter = cursor ? cursorToStartAfter(cursor) : undefined;
 
-            // One relation shape, whatever the call looks like.
-            //
-            // This used to fork on `include`: asking for one ran the REST
-            // pipeline, which inlines a relation as the target's own columns;
-            // not asking ran the driver's own fetch, which eagerly loaded
-            // *every* relation and put a `{ __type: "relation" }` envelope
-            // where the foreign key was. The same method answered in two
-            // shapes, the generated types described only one, and a column
-            // typed `string` arrived as an object.
-            //
-            // The REST pipeline is the published contract — the shape the HTTP
-            // API serves for this same query, and what `RestFetchService`
-            // documents — so every read goes through it when the driver has
-            // one. Drivers without one (every browser driver, and so the
-            // admin's own path through `buildRebaseData`) are untouched.
-            //
-            // One row past the page, when seeking — and when not counting.
-            //
-            // `hasMore` on an offset page is `offset + rows.length < total`, and
-            // under a cursor that arithmetic is simply false: every seeked page
-            // runs at offset 0, so it compares one page against the whole
-            // collection and says "more" forever. Without a count there is
-            // nothing to compare against at all. Asking for `limit + 1` and
-            // looking at whether the extra row arrived is the answer both have —
-            // and it costs nothing, where the count it replaces is a second
-            // query over every matching row.
-            //
-            // Counted only where the HTTP listing counts (`RestApiGenerator.readPage`).
-            // A distinct read collapses rows the count would count one by one,
-            // so its total described a different set from the one served, and
-            // `hasMore` — derived from it — offered pages that did not exist.
-            // A vector search with a threshold is a distance computed for every
-            // row of the table, beside a page an index serves in a millisecond.
-            const seeking = startAfter !== undefined;
-            const counting = driver.count !== undefined
-                && params?.count !== "none"
-                && params?.distinct !== true
-                && params?.vectorSearch?.threshold === undefined;
-            const probing = seeking || !counting;
-            const probeLimit = probing ? limit + 1 : limit;
+        // One relation shape, whatever the call looks like.
+        //
+        // This used to fork on `include`: asking for one ran the REST
+        // pipeline, which inlines a relation as the target's own columns;
+        // not asking ran the driver's own fetch, which eagerly loaded
+        // *every* relation and put a `{ __type: "relation" }` envelope
+        // where the foreign key was. The same method answered in two
+        // shapes, the generated types described only one, and a column
+        // typed `string` arrived as an object.
+        //
+        // The REST pipeline is the published contract — the shape the HTTP
+        // API serves for this same query, and what `RestFetchService`
+        // documents — so every read goes through it when the driver has
+        // one. Drivers without one (every browser driver, and so the
+        // admin's own path through `buildRebaseData`) are untouched.
+        //
+        // One row past the page, when seeking — and when not counting.
+        //
+        // `hasMore` on an offset page is `offset + rows.length < total`, and
+        // under a cursor that arithmetic is simply false: every seeked page
+        // runs at offset 0, so it compares one page against the whole
+        // collection and says "more" forever. Without a count there is
+        // nothing to compare against at all. Asking for `limit + 1` and
+        // looking at whether the extra row arrived is the answer both have —
+        // and it costs nothing, where the count it replaces is a second
+        // query over every matching row.
+        //
+        // Counted only where the HTTP listing counts (`RestApiGenerator.readPage`).
+        // A distinct read collapses rows the count would count one by one,
+        // so its total described a different set from the one served, and
+        // `hasMore` — derived from it — offered pages that did not exist.
+        // A vector search with a threshold is a distance computed for every
+        // row of the table, beside a page an index serves in a millisecond.
+        const seeking = startAfter !== undefined;
+        const counting = driver.count !== undefined
+            && params?.count !== "none"
+            && params?.distinct !== true
+            && params?.vectorSearch?.threshold === undefined;
+        const probing = seeking || !counting;
+        const probeLimit = probing ? limit + 1 : limit;
 
-            // The page and its count in one transaction where the driver can
-            // run them so — see `DataDriver.readTogether`.
-            const read = async (reader: DataDriver) => {
-                const fetchService = reader.restFetchService;
-                const fetched = fetchService
-                    ? await fetchService.fetchCollectionForRest(
-                        storedPath(),
-                        {
-                            filter,
-                            // Without this the group was dropped and the read ran
-                            // unfiltered — every row the caller's policies allow,
-                            // in place of the ones they asked for.
-                            logical: params?.logical,
-                            limit: probeLimit,
-                            // A cursor and an offset describe the same window two
-                            // incompatible ways; seeking wins and the offset is not
-                            // sent, or the page would start `offset` rows past
-                            // where the cursor pointed.
-                            offset: seeking ? undefined : driverOffset,
-                            startAfter,
-                            orderBy,
-                            searchString: params?.searchString,
-                            searchExplain: params?.searchExplain,
-                            // Left out, `.vectorSearch(…).find()` in a function
-                            // or a cron read the newest rows in id order, with
-                            // no `_distance` and no error.
-                            vectorSearch: params?.vectorSearch,
-                            fields: params?.fields,
-                            distinct: params?.distinct
-                        },
-                        params?.include
-                    )
-                    : await reader.fetchCollection<M>({
-                        path: storedPath(),
+        // The page and its count in one transaction where the driver can
+        // run them so — see `DataDriver.readTogether`.
+        const read = async (reader: DataDriver) => {
+            const fetchService = reader.restFetchService;
+            const fetched = fetchService
+                ? await fetchService.fetchCollectionForRest(
+                    storedPath(),
+                    {
+                        filter,
+                        // Without this the group was dropped and the read ran
+                        // unfiltered — every row the caller's policies allow,
+                        // in place of the ones they asked for.
+                        logical: params?.logical,
                         limit: probeLimit,
+                        // A cursor and an offset describe the same window two
+                        // incompatible ways; seeking wins and the offset is not
+                        // sent, or the page would start `offset` rows past
+                        // where the cursor pointed.
                         offset: seeking ? undefined : driverOffset,
                         startAfter,
-                        filter,
-                        logical: params?.logical,
                         orderBy,
                         searchString: params?.searchString,
                         searchExplain: params?.searchExplain,
+                        // Left out, `.vectorSearch(…).find()` in a function
+                        // or a cron read the newest rows in id order, with
+                        // no `_distance` and no error.
                         vectorSearch: params?.vectorSearch,
-                        include: params?.include,
                         fields: params?.fields,
-                        distinct: params?.distinct
-                    });
-                // The same narrowing the rows were read with. Counting only by
-                // `filter` reported the whole collection beside a narrowed
-                // page, and `hasMore` was derived from it — so the list offered
-                // a next page that did not exist.
-                const counted = counting && reader.count
-                    ? await reader.count({
-                        path: storedPath(),
-                        filter,
-                        logical: params?.logical,
-                        searchString: params?.searchString,
-                        vectorSearch: params?.vectorSearch
-                    })
-                    : undefined;
-                return { fetched, counted };
-            };
-            const { fetched, counted } = driver.readTogether
-                ? await driver.readTogether(read)
-                : await read(driver);
-
-            // The probe row is evidence, not data — it is never served.
-            const rows = probing ? fetched.slice(0, limit) : fetched;
-
-            // Without a count, the rows up to the end of this page: all a
-            // driver that cannot count has ever been able to report.
-            const total = counted ?? rows.length + offset;
-            const hasMore = probing ? fetched.length > limit : offset + rows.length < total;
-
-            // The cursor for the *next* page, from the last row served. Issued
-            // by the driver, which is the only layer that knows which columns
-            // address a row; absent where it cannot describe one, and the
-            // caller then pages by offset.
-            const last = rows[rows.length - 1] as Record<string, unknown> | undefined;
-            const nextCursor = (hasMore && last && driver.restFetchService?.cursorFor)
-                ? driver.restFetchService.cursorFor(storedPath(), last, orderBy)
+                        distinct: params?.distinct,
+                        ...(withDeleted ? { withDeleted } : {})
+                    },
+                    params?.include
+                )
+                : await reader.fetchCollection<M>({
+                    path: storedPath(),
+                    limit: probeLimit,
+                    offset: seeking ? undefined : driverOffset,
+                    startAfter,
+                    filter,
+                    logical: params?.logical,
+                    orderBy,
+                    searchString: params?.searchString,
+                    searchExplain: params?.searchExplain,
+                    vectorSearch: params?.vectorSearch,
+                    include: params?.include,
+                    fields: params?.fields,
+                    distinct: params?.distinct,
+                    ...(withDeleted ? { withDeleted } : {})
+                });
+            // The same narrowing the rows were read with. Counting only by
+            // `filter` reported the whole collection beside a narrowed
+            // page, and `hasMore` was derived from it — so the list offered
+            // a next page that did not exist.
+            const counted = counting && reader.count
+                ? await reader.count({
+                    path: storedPath(),
+                    filter,
+                    logical: params?.logical,
+                    searchString: params?.searchString,
+                    vectorSearch: params?.vectorSearch,
+                    ...(withDeleted ? { withDeleted } : {})
+                })
                 : undefined;
+            return { fetched, counted };
+        };
+        const { fetched, counted } = driver.readTogether
+            ? await driver.readTogether(read)
+            : await read(driver);
 
-            return {
-                data: rows.map((row: Record<string, unknown>) => rowToEntity<M>(row, slug, getPks(), toViewModel)),
-                meta: { total, limit, offset, hasMore, ...(nextCursor && { nextCursor }) }
-            };
+        // The probe row is evidence, not data — it is never served.
+        const rows = probing ? fetched.slice(0, limit) : fetched;
+
+        // Without a count, the rows up to the end of this page: all a
+        // driver that cannot count has ever been able to report.
+        const total = counted ?? rows.length + offset;
+        const hasMore = probing ? fetched.length > limit : offset + rows.length < total;
+
+        // The cursor for the *next* page, from the last row served. Issued
+        // by the driver, which is the only layer that knows which columns
+        // address a row; absent where it cannot describe one, and the
+        // caller then pages by offset.
+        const last = rows[rows.length - 1] as Record<string, unknown> | undefined;
+        const nextCursor = (hasMore && last && driver.restFetchService?.cursorFor)
+            ? driver.restFetchService.cursorFor(storedPath(), last, orderBy)
+            : undefined;
+
+        return {
+            data: rows.map((row: Record<string, unknown>) => rowToEntity<M>(row, slug, getPks(), toViewModel)),
+            meta: { total, limit, offset, hasMore, ...(nextCursor && { nextCursor }) }
+        };
+    }
+
+    async function countRows(params?: FindParams<M>, withDeleted?: "only"): Promise<number> {
+        if (!driver.count) throw new Error(noCount(slug));
+        const filter = params?.where ? deserializeFilter(params.where as Record<string, unknown>) : undefined;
+        // Every narrowing `find()` applies has to apply here too, or
+        // the count describes a different query than the one it is
+        // reported against.
+        return driver.count({
+            path: storedPath(),
+            filter,
+            logical: params?.logical,
+            searchString: params?.searchString,
+            // A threshold drops rows, so it narrows the count as it
+            // narrows the read — as `GET /count` does.
+            vectorSearch: params?.vectorSearch,
+            ...(withDeleted ? { withDeleted } : {})
+        });
+    }
+
+    const accessor: CollectionAccessor<M> = {
+        find(params?: FindParams<M>): Promise<FindResponse<M>> {
+            return findRows(params);
         },
 
         async findById(id: string | number, options?: ByIdReadOptions): Promise<Entity<M> | undefined> {
@@ -613,23 +650,21 @@ ids });
             }
             : undefined,
 
-        count: driver.count
-            ? async (params?: FindParams<M>): Promise<number> => {
-                const filter = params?.where ? deserializeFilter(params.where as Record<string, unknown>) : undefined;
-                // Every narrowing `find()` applies has to apply here too, or
-                // the count describes a different query than the one it is
-                // reported against.
-                return driver.count!({
-                    path: storedPath(),
-                    filter,
-                    logical: params?.logical,
-                    searchString: params?.searchString,
-                    // A threshold drops rows, so it narrows the count as it
-                    // narrows the read — as `GET /count` does.
-                    vectorSearch: params?.vectorSearch
-                });
-            }
-            : undefined,
+        count: driver.count ? (params?: FindParams<M>) => countRows(params) : undefined,
+
+        // `?deleted=only` and `?hard=true`, in-process. A restore is an
+        // ordinary `update` (the soft-delete field back to `null`), which the
+        // driver already lets reach a trashed row, so it is not here.
+        trash: {
+            find: (params?: FindParams<M>) => findRows(params, "only"),
+            count: (params?: FindParams<M>) => countRows(params, "only"),
+            purge: (id: string | number) => driver.delete({ row: { id, path: storedPath() }, hard: true }),
+            purgeMany: driver.deleteMany
+                ? async (ids: (string | number)[]): Promise<void> => {
+                    await driver.deleteMany!<M>({ path: storedPath(), ids, hard: true });
+                }
+                : undefined
+        },
 
         listen: driver.listenCollection
             ? (params: FindParams<M> | undefined, onUpdate: (response: FindResponse<M>) => void, onError?: (error: Error) => void) => {
@@ -1166,9 +1201,78 @@ data: u.data as Partial<EntityValues<M>> }))
         after: (cursor: string) => new SdkQueryBuilder<M>(client).after(cursor),
         aggregate: snap.aggregate
             ? (params: AggregateParams<M>) => snap.aggregate!(params)
-            : unsupportedMethod(noAggregate(slug))
+            : unsupportedMethod(noAggregate(slug)),
+        trash: toSdkTrashClient(snap, slug, () => client)
     };
     return client;
+}
+
+/**
+ * {@link SDKCollectionClient.trash} over an accessor's
+ * {@link CollectionAccessor.trash}: the same API the browser client has. A
+ * restore is the client's own `update`/`updateMany` setting the soft-delete
+ * field to `null`, so it keeps their refusals and their answer.
+ */
+function toSdkTrashClient<M extends Record<string, unknown>>(
+    snap: CollectionAccessor<M>,
+    slug: string,
+    client: () => SDKCollectionClient<M>
+): TrashClient<M> {
+    const trash = snap.trash;
+    if (!trash) {
+        return {
+            find: unsupportedMethod(noTrash(slug)),
+            count: unsupportedMethod(noTrash(slug)),
+            restore: unsupportedMethod(noTrash(slug)),
+            restoreMany: unsupportedMethod(noTrash(slug)),
+            purge: unsupportedMethod(noTrash(slug)),
+            purgeMany: unsupportedMethod(noTrash(slug))
+        };
+    }
+    const field = (options?: RestoreOptions<M>): string => options?.field ?? DEFAULT_SOFT_DELETE_FIELD;
+    return {
+        async find(params?: FindParams<M>): Promise<FindResult<M>> {
+            const res = await trash.find(params);
+            return { data: res.data.map(entityToRow), meta: res.meta };
+        },
+        count: (params?: FindParams<M>) => trash.count(params),
+        restore: (id: string | number, options?: RestoreOptions<M>) =>
+            client().update(id, { [field(options)]: null } as Partial<M>, writeOptionsOf(options)),
+        restoreMany(ids: (string | number)[], options?: RestoreOptions<M>) {
+            if (!Array.isArray(ids)) {
+                return Promise.reject(new RebaseClientError(
+                    "trash.restoreMany expects an array of ids.", { code: "INVALID_BULK_BODY" }
+                ));
+            }
+            const data = { [field(options)]: null } as Partial<M>;
+            return client().updateMany(ids.map((id) => ({ id, data })), writeOptionsOf(options));
+        },
+        async purge(id: string | number, options?: WriteOptions): Promise<void> {
+            refuseUnhonouredWriteOptions("trash.purge", slug, options);
+            await trash.purge(id);
+        },
+        async purgeMany(ids: (string | number)[], options?: WriteOptions): Promise<void> {
+            refuseUnhonouredWriteOptions("trash.purgeMany", slug, options);
+            if (!Array.isArray(ids)) {
+                throw new RebaseClientError("trash.purgeMany expects an array of ids.", { code: "INVALID_BULK_BODY" });
+            }
+            if (ids.length === 0) return;
+            if (!trash.purgeMany) {
+                throw new Error(
+                    "Bulk deletes are not supported by this collection's data source. " +
+                    "Fall back to trash.purge() per record."
+                );
+            }
+            await trash.purgeMany(ids);
+        }
+    };
+}
+
+/** A {@link RestoreOptions} without its `field`: the write options it carries. */
+function writeOptionsOf<M extends Record<string, unknown>>(options?: RestoreOptions<M>): WriteOptions | undefined {
+    if (!options) return undefined;
+    const { field: _field, ...rest } = options;
+    return rest;
 }
 
 /**
@@ -1274,6 +1378,17 @@ function toEntityAccessor<M extends Record<string, unknown>>(
             ? undefined
             : (params: FindParams<M> | undefined, onCount: (total: number) => void, onError?: (e: Error) => void) =>
                 sdk.listenCount(params, onCount, onError),
+        trash: !sdk.trash || isUnsupported(sdk.trash.find)
+            ? undefined
+            : {
+                async find(params?: FindParams<M>): Promise<FindResponse<M>> {
+                    const res = await sdk.trash.find(params);
+                    return { data: res.data.map((row) => rowToEntity<M>(row, slug, getPks(), toViewModel)), meta: res.meta };
+                },
+                count: (params?: FindParams<M>) => sdk.trash.count(params),
+                purge: (id: string | number) => sdk.trash.purge(id),
+                purgeMany: (ids: (string | number)[]) => sdk.trash.purgeMany(ids)
+            },
         where(columnOrCondition: string | LogicalCondition, operator?: WhereFilterOp, value?: unknown) {
             const builder = new QueryBuilder<M>(accessor);
             if (typeof columnOrCondition === "object") {

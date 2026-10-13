@@ -120,6 +120,11 @@ Use `trash` on a collection that declares `softDelete`. On one that does not,
 the server ignores `?deleted=`, so `trash.find` returns the live rows and
 `trash.purge` is an ordinary delete.
 
+Server code has the same `trash`: `context.data.invoices.trash` in a callback,
+and `rebase.data.invoices.trash` in a function or a cron. It reads and purges
+through the driver, with the caller's privileges, as the rest of
+[`context.data`](/docs/collections/context-data-api) does.
+
 With [offline](/docs/sdk/offline) enabled, the trash is never cached and nothing
 in it is queued. Each call needs the server, and fails with the `OFFLINE` error
 without it. A restored row joins the local database, and a purged one leaves it.

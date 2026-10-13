@@ -128,9 +128,9 @@ const DUE = "2026-01-02T03:04:05.000Z";
 
 /**
  * The doors with a spelling for a hard delete. `_batch` and MCP have none;
- * `data` has none until the SDK grows `delete(id, { hard })` (DD-9).
+ * `data` spells it `trash.purge(id)`.
  */
-const HARD_DELETE_DOORS = new Set<Door>(["rest", "rest-bulk", "socket"]);
+const HARD_DELETE_DOORS = new Set<Door>(["rest", "rest-bulk", "socket", "data"]);
 
 /** A door's spelling of each operation, or `undefined` where it has none. */
 type DoorAdapter = {
@@ -326,8 +326,8 @@ describe("door parity: one operation, one answer (E2E)", () => {
             create: (id, { values }) => settle(async () => ({ ok: true, row: await docs().create({ id, ...values }) })),
             update: (id, { values }) => settle(async () => ({ ok: true, row: await docs().update(id, values) })),
             upsert: (id, { values }) => settle(async () => ({ ok: true, row: await docs().upsert({ id, ...values }) })),
-            delete: (id) => settle(async () => {
-                await docs().delete(id);
+            delete: (id, { hard }) => settle(async () => {
+                await (hard ? docs().trash.purge(id) : docs().delete(id));
                 return { ok: true };
             }),
             get: (id) => settle(async () => {

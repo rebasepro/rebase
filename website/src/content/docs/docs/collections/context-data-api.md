@@ -40,6 +40,7 @@ Each collection accessor (`context.data.<slug>`) provides these methods:
 | `.count()` | `count(params?: FindParams) → number` | Count matching entities |
 | `.listen()` | `listen(params, onUpdate, onError?) → unsubscribe` | Real-time subscription (where supported) |
 | `.listenById()` | `listenById(id, onUpdate, onError?) → unsubscribe` | Listen to a single entity |
+| `.trash` | `trash.find()`, `.count()`, `.restore(id)`, `.restoreMany(ids)`, `.purge(id)`, `.purgeMany(ids)` | The rows a [soft delete](/docs/collections/soft-delete#from-the-sdk) stamped |
 
 ## Querying with `.find()`
 
