@@ -30,6 +30,18 @@ export type DataPathResolver = (path: string) => string | undefined;
  * to be. The views that fetch rows are *below* the registrar, and child effects
  * run before parent effects, so registering in an effect would bind after the
  * first page of rows had already been converted.
+ *
+ * Several layers may own collections at once — the CMS navigation, and each
+ * standalone `CollectionsProvider` on a page — so each registers under its own
+ * `owner` (`"default"` when omitted). A lookup asks every owner and takes the
+ * first that knows the collection. Registering nothing (`undefined` for both)
+ * removes that owner's registration.
  */
+export type CollectionResolverRegistration = (
+    resolver: CollectionResolver | undefined,
+    resolveDataPath?: DataPathResolver,
+    owner?: string
+) => void;
+
 export const CollectionResolverRegistrationContext =
-    React.createContext<(resolver: CollectionResolver | undefined, resolveDataPath?: DataPathResolver) => void>(() => undefined);
+    React.createContext<CollectionResolverRegistration>(() => undefined);

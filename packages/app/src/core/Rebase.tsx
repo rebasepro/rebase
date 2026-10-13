@@ -10,7 +10,7 @@ import { RebaseContext, UNRENDERED_SLOTS } from "@rebasepro/cms-types";
 import { PluginProviderStack } from "./PluginProviderStack";
 import { PluginLifecycleManager } from "./PluginLifecycleManager";
 import { warnDeprecatedPluginKeys } from "./deprecated_plugin_keys";
-import { AuthControllerContext, CollectionResolverRegistrationContext, CollectionResolver, DataPathResolver } from "../contexts";
+import { AuthControllerContext, CollectionResolverRegistrationContext, CollectionResolver, CollectionResolverRegistration, DataPathResolver } from "../contexts";
 import { useCustomizationController, useRebaseContext, useAuthSubscription } from "../hooks";
 import { ApiConfigProvider, useApiConfig } from "../hooks/ApiConfigContext";
 import { ErrorView } from "../components";
@@ -166,15 +166,38 @@ export function Rebase<USER extends User, DB = unknown>(props: RebaseProps<USER,
     // live below us (in RebaseCMS), so they register both resolvers here and we
     // read them lazily, per call. Headless apps register nothing and are
     // unaffected.
-    const collectionResolverRef = useRef<CollectionResolver | undefined>(undefined);
-    const dataPathResolverRef = useRef<DataPathResolver | undefined>(undefined);
-    const registerCollectionResolver = React.useCallback((resolver: CollectionResolver | undefined, resolveDataPath?: DataPathResolver) => {
-        collectionResolverRef.current = resolver;
-        dataPathResolverRef.current = resolveDataPath;
+    //
+    // More than one layer may own collections — the CMS navigation and any
+    // standalone `CollectionsProvider` — each registered under its own owner.
+    const resolversRef = useRef(new Map<string, { resolveCollection?: CollectionResolver, resolveDataPath?: DataPathResolver }>());
+    const registerCollectionResolver = React.useCallback<CollectionResolverRegistration>((resolver, resolveDataPath, owner = "default") => {
+        if (!resolver && !resolveDataPath) {
+            resolversRef.current.delete(owner);
+            return;
+        }
+        resolversRef.current.set(owner, { resolveCollection: resolver, resolveDataPath });
     }, []);
     const entityDataOptions = useMemo(() => ({
-        resolveCollection: (slug: string) => collectionResolverRef.current?.(slug),
-        resolveDataPath: (path: string) => dataPathResolverRef.current?.(path)
+        resolveCollection: (slug: string) => {
+            for (const { resolveCollection } of resolversRef.current.values()) {
+                const collection = resolveCollection?.(slug);
+                if (collection) return collection;
+            }
+            return undefined;
+        },
+        // The owner that knows the collection decides where it is stored; with
+        // none that does, the first that answers (a registry hands an unknown
+        // path back unchanged).
+        resolveDataPath: (path: string) => {
+            const registrations = [...resolversRef.current.values()];
+            const owning = registrations.find(({ resolveCollection }) => resolveCollection?.(path) !== undefined);
+            if (owning?.resolveDataPath) return owning.resolveDataPath(path);
+            for (const { resolveDataPath } of registrations) {
+                const dataPath = resolveDataPath?.(path);
+                if (dataPath !== undefined) return dataPath;
+            }
+            return undefined;
+        }
     }), []);
 
     // Build the data-source context: the declared registry plus a RebaseData
