@@ -73,6 +73,8 @@ If the server assigns its own on replay, the local row and any queued writes sti
 
 Writes replay in the order you made them, across collections — so a create in one collection still lands before the row in another that references it.
 
+Each queued write is one request by default, so 500 rows typed offline take 500 round trips to drain. With `replayBatchSize` set (up to 1 000), a run of consecutive offline creates in one collection replays as one `createMany` instead. Only creates with an id the SDK generated as a string are folded, and never one that references another row of the same run. If the server refuses or defers the run for any reason other than a lost connection, nothing is written (a bulk write is one transaction), and the run replays one write at a time, as it would by default.
+
 ## Live queries
 
 `observe()` is the reactive read, and the one to reach for in a UI:
@@ -238,6 +240,7 @@ createRebaseClient({
         maxRetries: 5,                        // deferrals before a write is given up on
         crossTab: true,                       // default: on for IndexedDB, off for memory
         keepLastUser: false,                  // open the last user's data on an offline reload (cookie mode)
+        replayBatchSize: 1,                   // queued creates sent per request on replay (max 1000)
         onSyncError: (error, mutation) => {}
     }
 });

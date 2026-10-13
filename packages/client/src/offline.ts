@@ -137,6 +137,23 @@ export interface OfflineConfig {
      * user whose session it has not confirmed.
      */
     keepLastUser?: boolean;
+    /**
+     * How many queued creates replay as one request. Defaults to `1`: every
+     * queued write is its own request, in order. Raise it (up to 1 000) and a
+     * run of consecutive offline creates in one collection drains as one
+     * `createMany` — 500 rows typed offline go back in a handful of requests
+     * instead of 500 round trips.
+     *
+     * Only creates whose ids the SDK minted as strings are folded, and never
+     * one that references another row of the same run: those are the writes a
+     * lost answer cannot duplicate (the server refuses the id the second time,
+     * and the create is recognised as its own) and whose values need nothing
+     * from the server first. Anything else — and any run the server refuses or
+     * defers for any reason but a lost connection — replays one write at a
+     * time exactly as with the default, so each write still stands or falls
+     * on its own.
+     */
+    replayBatchSize?: number;
 }
 
 /** A snapshot of the engine's state, for a status indicator. */
@@ -533,6 +550,9 @@ const IN_PROGRESS_MIN_RETRIES = 12;
 /** The scope of whatever is cached and queued while nobody is signed in. */
 const SIGNED_OUT_SCOPE = "anon";
 
+/** The most rows one folded replay sends: the server's default bulk limit. */
+const MAX_REPLAY_BATCH = 1_000;
+
 /**
  * Where {@link OfflineConfig.keepLastUser} keeps the last signed-in user's id.
  * In the cache area but under no user's scope, so clearing one user's data
@@ -550,6 +570,7 @@ export class OfflineManager {
     private readonly inners = new Map<string, SDKCollectionClient<AnyRow>>();
     private readonly connectivity: ConnectivityMonitor;
     private readonly keepLastUser: boolean;
+    private readonly replayBatchSize: number;
 
     private scope = SIGNED_OUT_SCOPE;
     /**
@@ -600,7 +621,8 @@ export class OfflineManager {
      */
     private pendingIndex?: Map<string, PendingIds>;
     /**
-     * The mutation currently on the wire, if any.
+     * The mutations currently on the wire: one, or the members of a folded
+     * run (`replayBatchSize`).
      *
      * `flush` awaits `replay(op)` with `op` still at the head of `queue`, so for
      * the whole duration of that request the in-flight op is also the queue's
@@ -614,10 +636,10 @@ export class OfflineManager {
      *   create. It is seeing it right now, so the row would be created and the
      *   delete never queued — an orphan row nothing will ever remove.
      *
-     * Guarding on the id rather than on a boolean keeps this correct if the
-     * flush loop ever sends more than one op at a time.
+     * Guarding on ids rather than on a boolean is what keeps this correct
+     * when a folded run sends several at once, its last member the tail.
      */
-    private inFlightId: string | null = null;
+    private readonly inFlight = new Set<string>();
     private queueLoad?: Promise<void>;
     /** Serializes enqueues so concurrent writes keep the order the app made them. */
     private enqueueChain: Promise<unknown> = Promise.resolve();
@@ -644,6 +666,8 @@ export class OfflineManager {
         this.maxRetries = config.maxRetries ?? 5;
         this.onSyncError = config.onSyncError;
         this.keepLastUser = config.keepLastUser === true;
+        const batch = Math.floor(config.replayBatchSize ?? 1);
+        this.replayBatchSize = Number.isFinite(batch) ? Math.min(Math.max(batch, 1), MAX_REPLAY_BATCH) : 1;
         this.createInner = createInner;
 
         const maxBackoffMs = config.syncIntervalMs ?? 60_000;
@@ -2357,7 +2381,7 @@ data: u.data as AnyRow })),
             if (mutation.type === "update") {
                 const tail = this.queue[this.queue.length - 1];
                 if (tail
-                    && tail.mutationId !== this.inFlightId
+                    && !this.inFlight.has(tail.mutationId)
                     // Not into a create already sent: if that one committed,
                     // its replay is answered from the server's record of the
                     // first request, which an edit merged in here predates —
@@ -2403,13 +2427,13 @@ data: u.data as AnyRow })),
                     m.collection === mutation.collection && m.type === "create"
                     && m.id === mutation.id && m.generatedId === true
                     && m.sent === undefined
-                    && m.mutationId !== this.inFlightId);
+                    && !this.inFlight.has(m.mutationId));
                 if (hasPendingCreate) {
                     const doomed = this.queue.filter((m) =>
                         m.collection === mutation.collection
                         && m.id === mutation.id
                         && (m.type === "create" || m.type === "update")
-                        && m.mutationId !== this.inFlightId);
+                        && !this.inFlight.has(m.mutationId));
                     for (const op of doomed) await this.store.dequeue(this.queueKey(op));
                     this.queue = this.queue.filter((m) => !doomed.includes(m));
                     this.afterQueueChange();
@@ -2567,6 +2591,9 @@ data: u.data as AnyRow })),
         const touched = new Set<string>();
         const queuedAtStart = this.queue.length;
         let flushed = 0;
+        // Creates a folded replay was refused or deferred for: from then on,
+        // in this drain, they go one at a time — see `replayBatchSize`.
+        const unbatched = new Set<string>();
         try {
             // Stops at a change of user: the queue in memory is theirs now.
             while (this.queue.length > 0 && !this.disposed && this.isCurrent(ticket)) {
@@ -2582,11 +2609,22 @@ data: u.data as AnyRow })),
                     break;
                 }
                 touched.add(op.collection);
+                const run = this.foldableRun(unbatched);
+                if (run.length > 1) {
+                    const outcome = await this.replayRun(run, ticket);
+                    if (outcome === "offline") break;
+                    if (outcome === "unbatch") {
+                        for (const member of run) unbatched.add(member.mutationId);
+                        continue;
+                    }
+                    flushed += run.length;
+                    continue;
+                }
                 // Held across `drop` as well as `replay`: between the ACK and
                 // the dequeue the op is still in `queue`, still the tail, and
                 // still about to be removed — coalescing into it there loses
                 // the write exactly as coalescing during the request does.
-                this.inFlightId = op.mutationId;
+                this.inFlight.add(op.mutationId);
                 try {
                     try {
                         await this.replay(op, ticket);
@@ -2645,7 +2683,7 @@ data: u.data as AnyRow })),
                     await this.drop(op, ticket);
                     flushed++;
                 } finally {
-                    this.inFlightId = null;
+                    this.inFlight.delete(op.mutationId);
                 }
             }
         } finally {
@@ -2670,6 +2708,84 @@ data: u.data as AnyRow })),
         }
         if (this.queue.length === 0) this.patchStatus({ lastSyncedAt: Date.now() });
         return { flushed, remaining: this.queue.length };
+    }
+
+    /**
+     * The creates at the head of the queue that may replay as one request —
+     * see {@link OfflineConfig.replayBatchSize}. Fewer than two means the head
+     * replays on its own.
+     *
+     * Consecutive, so the queue's order holds; one collection, since a bulk
+     * write is one collection's. Each is a create never sent (so its request
+     * is still its own to choose) with an id the SDK minted as a string — a
+     * lost answer then cannot duplicate it, because the server refuses that
+     * id the second time and the single replay recognises the row as its
+     * own. A create whose values name another member's minted id waits: the
+     * server may give that row a different id, which only a replay one at a
+     * time can carry over.
+     */
+    private foldableRun(unbatched: ReadonlySet<string>): PendingMutation[] {
+        if (this.replayBatchSize < 2) return [];
+        const foldable = (op: PendingMutation | undefined, collection?: string): op is PendingMutation =>
+            op !== undefined
+            && op.type === "create"
+            && op.generatedId === true
+            && typeof op.id === "string"
+            && op.sent === undefined
+            && !op.upsert
+            && (op.schemaVersion ?? 1) <= QUEUE_SCHEMA_VERSION
+            && !unbatched.has(op.mutationId)
+            && (collection === undefined || op.collection === collection);
+        const head = this.queue[0];
+        if (!foldable(head)) return [];
+        const run = [head];
+        for (let i = 1; i < this.queue.length && run.length < this.replayBatchSize; i++) {
+            const next = this.queue[i];
+            if (!foldable(next, head.collection)) break;
+            if (run.some((member) => mentionsMintedId(next, member.id!))) break;
+            run.push(next);
+        }
+        return run;
+    }
+
+    /**
+     * Replay a {@link foldableRun} as one `createMany`.
+     *
+     * - `"done"`: every member is acknowledged, adopted and dropped.
+     * - `"offline"`: the connection failed; the members stay queued, as one
+     *   write would.
+     * - `"unbatch"`: anything else — a refusal, a busy server. Nothing was
+     *   written (a bulk write is one transaction), and the caller replays the
+     *   members one at a time, where each refusal, retry budget and recovery
+     *   applies to its own write.
+     *
+     * The key names the run by its first and last member and its length,
+     * which fixes its composition: a run re-sent after a lost answer is the
+     * same request under the same key, and is answered from the server's
+     * record of it.
+     */
+    private async replayRun(run: PendingMutation[], ticket: ScopeTicket): Promise<"done" | "offline" | "unbatch"> {
+        const inner = this.innerFor(run[0].collection);
+        const idempotencyKey = `${run[0].mutationId}..${run[run.length - 1].mutationId}:${run.length}`;
+        for (const member of run) this.inFlight.add(member.mutationId);
+        try {
+            let rows: AnyRow[];
+            try {
+                rows = await inner.createMany(run.map((member) => member.data as AnyRow), { idempotencyKey });
+            } catch (error) {
+                if (!isNetworkError(error)) return "unbatch";
+                this.connectivity.markFailure();
+                return "offline";
+            }
+            this.connectivity.markSuccess();
+            for (let i = 0; i < run.length; i++) {
+                await this.adoptServerRow(run[i], run[i].id, rows[i], ticket);
+                await this.drop(run[i], ticket);
+            }
+            return "done";
+        } finally {
+            for (const member of run) this.inFlight.delete(member.mutationId);
+        }
     }
 
     private async replay(op: PendingMutation, ticket: ScopeTicket): Promise<void> {
