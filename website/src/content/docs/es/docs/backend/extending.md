@@ -221,7 +221,7 @@ Rebase le proporciona a un controlador es algo que hizo un enrutador de Rebase.
 **Alcance:** el proceso.
 
 <span class="since-badge" data-since="0.25">Desde 0.25</span>
-`initializeRebaseBackend` es un atajo sobre cuatro llamadas públicas, y este peldaño
+`initializeRebaseBackend` es un atajo sobre unas pocas llamadas públicas, y este peldaño
 consiste en hacerlas tú mismo. `createRebaseBackend` construye el backend y no monta,
 no pone en marcha ni escucha nada. `backend.routes` contiene cada grupo de rutas como
 una sub-app de Hono que puedes montar por separado, en cualquier ruta. `mount`,
@@ -247,7 +247,7 @@ de Drizzle y de `http.Server` de Node y de nada más, por lo que puedes incrusta
 driver de datos y realtime en Express, Fastify o simplemente Node y dejar fuera por
 completo el servidor de Rebase.
 
-→ [Integración con servidor personalizado](/docs/backend/custom-server)
+→ [Integración de servidor personalizado](/docs/backend/custom-server)
 
 **Lo que no puede alcanzar:** con `createRebaseBackend`, nada queda fuera de alcance;
 asumes el orden de las llamadas. Con solo el driver, todo lo que conecta el servidor
@@ -330,6 +330,6 @@ alternativa era un driver parcheado.
 - [Callbacks por colección](/docs/collections/callbacks)
 - [Hooks globales](/docs/backend/hooks)
 - [Funciones personalizadas](/docs/backend/custom-functions)
-- [Integración con servidor personalizado](/docs/backend/custom-server)
+- [Integración de servidor personalizado](/docs/backend/custom-server)
 - [Búsqueda](/docs/backend/search)
 - [Índice de endpoints](/docs/backend/endpoints) — cada ruta que monta el servidor

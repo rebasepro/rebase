@@ -183,9 +183,14 @@ Cada entidad también conserva como máximo sus **200** entradas más recientes.
 
 ### Mecánica del ciclo de vida del purgado
 
-Tras cada cambio registrado, se purga la entidad modificada: se eliminan sus entradas
-más antiguas que el período de retención y, a continuación, todo lo que supere sus 200
-más recientes. Esto se ejecuta de forma asíncrona y no retiene la escritura.
+Tras cada cambio que registra el servidor, se purga la entidad modificada: se eliminan sus
+entradas más antiguas que el período de retención y, a continuación, todo lo que supere sus
+200 más recientes. Esto se ejecuta de forma asíncrona y no retiene la escritura.
+
+Una escritura hecha mediante [`openRebase` o `rebase console`](/docs/backend/scripts/)
+registra su entrada de historial pero no purga nada, porque un script no puede conocer la
+retención con la que está configurado tu servidor. El servidor purga esa entidad en su
+siguiente escritura sobre ella, y en el barrido horario que sigue.
 
 <span class="since-badge" data-since="0.25">Desde 0.25</span> Una vez por hora, el
 backend elimina además todas las entradas más antiguas que el período de retención, de

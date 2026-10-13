@@ -173,13 +173,35 @@ test("a user only sees their own posts", async () => {
 
 Lo mismo funciona con Vitest o Jest.
 
+### Colecciones con historial
+
+<span class="since-badge" data-since="0.25">Desde 0.25</span>
+
+Una escritura en una colección con [`history: true`](/docs/backend/history/) registra
+su entrada igual que lo hace una escritura del servidor. La entrada se escribe en la
+transacción de la propia fila, así que una escritura que se revierte no deja ninguna
+entrada. Se registra con la identidad con la que se ejecutó la escritura: `service`
+para `dataAsAdmin`, el `uid` del usuario con `withAuth`. Las escrituras desde
+`rebase console` se registran del mismo modo.
+
+`openRebase` no crea nada donde registrar. Si ningún backend con historial ha arrancado
+sobre la base de datos, falta la tabla `rebase.entity_history`. Una escritura en una
+colección con historial se rechaza entonces con
+[`HISTORY_UNAVAILABLE`](/docs/backend/errors/#data-queries-and-writes) antes de que se
+ejecute cualquiera de sus callbacks, y el mensaje nombra lo que falta. Las lecturas
+funcionan como siempre. Arranca el backend una vez con el historial activado
+(`rebase dev` lo hace) y las escrituras pasan.
+
+Las entradas se registran, nunca se purgan. La retención es un ajuste del servidor que
+un script no puede ver, así que el servidor las purga como de costumbre: cuando vuelve
+a escribir la entidad, y en su barrido horario.
+
 ### Lo que deja fuera
 
 <span class="since-badge" data-since="0.25">Desde 0.25</span>
 
 `openRebase` abre la capa de datos y nada más. No inicia realtime, así que
-sus escrituras no se anuncian a las consultas en vivo. No adjunta ningún servicio de historial,
-así que una escritura en una colección con `history: true` no registra ninguna entrada de historial.
+sus escrituras no se anuncian a las consultas en vivo.
 Almacenamiento, correo electrónico, administración de autenticación y tus funciones no están en él.
 
 Cuando un script también necesita esas piezas, construye el backend sin servirlo:
