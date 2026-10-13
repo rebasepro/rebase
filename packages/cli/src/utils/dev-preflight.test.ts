@@ -4,6 +4,7 @@
  * just as happily on a version that also started one against production.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { execa } from "execa";
 import fs from "fs";
 import net from "net";
 import os from "os";
@@ -15,8 +16,98 @@ import {
     ensureDevDatabase,
     parseLoopbackDsn,
     probeTcp,
-    waitForPort
+    waitForPort,
+    waitForQueryable
 } from "./dev-preflight";
+
+/**
+ * A loopback server that resets the first `resets` connections — what Docker's
+ * port proxy does while the container's Postgres is still running initdb — and
+ * then speaks just enough of the PostgreSQL wire protocol to answer a query.
+ *
+ * `resets: Infinity` is a container that never gets there.
+ */
+async function fakePostgres(options: { resets: number; port?: number }): Promise<{
+    port: number;
+    connections: () => number;
+    close: () => Promise<void>;
+}> {
+    let connections = 0;
+    const sockets = new Set<net.Socket>();
+    const int32 = (value: number): Buffer => {
+        const buffer = Buffer.alloc(4);
+        buffer.writeInt32BE(value);
+        return buffer;
+    };
+    const message = (type: string, body: Buffer): Buffer =>
+        Buffer.concat([Buffer.from(type), int32(body.length + 4), body]);
+    const readyForQuery = message("Z", Buffer.from("I"));
+
+    const server = net.createServer((socket) => {
+        connections++;
+        sockets.add(socket);
+        socket.on("close", () => sockets.delete(socket));
+        socket.on("error", () => undefined);
+        if (connections <= options.resets) {
+            socket.resetAndDestroy();
+            return;
+        }
+
+        let buffered = Buffer.alloc(0);
+        let started = false;
+        socket.on("data", (chunk: Buffer) => {
+            buffered = Buffer.concat([buffered, chunk]);
+            for (;;) {
+                if (!started) {
+                    if (buffered.length < 8) return;
+                    const length = buffered.readInt32BE(0);
+                    if (buffered.length < length) return;
+                    const code = buffered.readInt32BE(4);
+                    buffered = buffered.subarray(length);
+                    // SSLRequest: "no", and the real startup message follows.
+                    if (code === 80877103) {
+                        socket.write("N");
+                        continue;
+                    }
+                    started = true;
+                    socket.write(Buffer.concat([message("R", int32(0)), readyForQuery]));
+                    continue;
+                }
+                if (buffered.length < 5) return;
+                const type = String.fromCharCode(buffered[0]);
+                const length = buffered.readInt32BE(1);
+                if (buffered.length < length + 1) return;
+                buffered = buffered.subarray(length + 1);
+                if (type === "Q") {
+                    socket.write(Buffer.concat([message("C", Buffer.from("SELECT 1\0")), readyForQuery]));
+                } else if (type === "X") {
+                    socket.end();
+                    return;
+                }
+            }
+        });
+    });
+    await new Promise<void>(resolve => server.listen(options.port ?? 0, "127.0.0.1", resolve));
+    const port = (server.address() as net.AddressInfo).port;
+
+    return {
+        port,
+        connections: () => connections,
+        close: async () => {
+            for (const socket of sockets) socket.destroy();
+            await new Promise<void>(resolve => server.close(() => resolve()));
+        }
+    };
+}
+
+/** A loopback port nothing is listening on, at the moment it is returned. */
+async function freePort(): Promise<number> {
+    const free = net.createServer();
+    await new Promise<void>(resolve => free.listen(0, "127.0.0.1", resolve));
+    const port = (free.address() as net.AddressInfo).port;
+    await new Promise<void>(resolve => free.close(() => resolve()));
+    return port;
+}
 
 describe("parseLoopbackDsn", () => {
     it.each([
@@ -206,6 +297,38 @@ describe("waitForPort", () => {
     });
 });
 
+describe("waitForQueryable", () => {
+    it("keeps trying through connections the server resets, and answers once a query succeeds", async () => {
+        // Docker's port proxy accepts on the host port before Postgres inside the
+        // container is serving, then resets every connection it cannot forward.
+        // A TCP probe calls that ready; a query does not.
+        const db = await fakePostgres({ resets: 2 });
+        try {
+            const ready = await waitForQueryable(`postgres://u@127.0.0.1:${db.port}/db`, { timeoutMs: 10_000, intervalMs: 50 });
+            expect(ready).toEqual({ ready: true });
+            expect(db.connections()).toBe(3);
+        } finally {
+            await db.close();
+        }
+    });
+
+    it("gives up after its bound, naming the reset as the reason", async () => {
+        const db = await fakePostgres({ resets: Infinity });
+        try {
+            const started = Date.now();
+            const ready = await waitForQueryable(`postgres://u@127.0.0.1:${db.port}/db`, { timeoutMs: 1_000, intervalMs: 50 });
+            expect(ready.ready).toBe(false);
+            if (ready.ready) throw new Error("narrowing");
+            expect(ready.error).toMatch(/ECONNRESET|Connection terminated/);
+            // Bounded, and it retried within the bound rather than trying once.
+            expect(Date.now() - started).toBeLessThan(5_000);
+            expect(db.connections()).toBeGreaterThan(1);
+        } finally {
+            await db.close();
+        }
+    });
+});
+
 describe("ensureDevDatabase", () => {
     let projectRoot: string;
     const silent = (): void => { /* the outcome is what is asserted */ };
@@ -357,12 +480,8 @@ describe("ensureDevDatabase", () => {
     it("starts it when the ports do agree", async () => {
         // The counter-check: the guard must not stop the case it was written
         // around, which is a `.env` that matches the compose file.
-        const free = net.createServer();
-        await new Promise<void>(resolve => free.listen(0, "127.0.0.1", resolve));
-        const port = (free.address() as net.AddressInfo).port;
-        await new Promise<void>(resolve => free.close(() => resolve()));
-
-        const server = net.createServer();
+        const port = await freePort();
+        let db: Awaited<ReturnType<typeof fakePostgres>> | null = null;
         fs.writeFileSync(
             path.join(projectRoot, "docker-compose.yml"),
             ["services:", "  db:", "    image: postgres:18-alpine", "    ports:", `      - "${port}:5432"`].join("\n")
@@ -375,14 +494,14 @@ describe("ensureDevDatabase", () => {
                 projectRoot,
                 databaseUrl: `postgres://u@127.0.0.1:${port}/db`,
                 startDatabase: async () => {
-                    await new Promise<void>(resolve => server.listen(port, "127.0.0.1", resolve));
+                    db = await fakePostgres({ resets: 0, port });
                 },
                 pushSchema: vi.fn()
             });
 
             expect(outcome).toEqual({ action: "started", port, pushed: false });
         } finally {
-            await new Promise<void>(resolve => server.close(() => resolve()));
+            await db?.close();
         }
     });
 
@@ -405,14 +524,11 @@ describe("ensureDevDatabase", () => {
 
         // A port that is closed when the preflight probes it and open by the
         // time it waits for it — which is what starting a container looks like.
-        const server = net.createServer();
-        const free = net.createServer();
-        await new Promise<void>(resolve => free.listen(0, "127.0.0.1", resolve));
-        const port = (free.address() as net.AddressInfo).port;
-        await new Promise<void>(resolve => free.close(() => resolve()));
+        const port = await freePort();
+        let db: Awaited<ReturnType<typeof fakePostgres>> | null = null;
 
         const started = vi.fn(async () => {
-            await new Promise<void>(resolve => server.listen(port, "127.0.0.1", resolve));
+            db = await fakePostgres({ resets: 0, port });
         });
 
         fs.writeFileSync(
@@ -436,7 +552,116 @@ describe("ensureDevDatabase", () => {
             expect(exit).not.toHaveBeenCalled();
         } finally {
             exit.mockRestore();
-            await new Promise<void>(resolve => server.close(() => resolve()));
+            await db?.close();
+        }
+    });
+
+    /** A compose file publishing `port`, and a start that brings `fake` up on it. */
+    function composeOn(port: number): void {
+        fs.writeFileSync(
+            path.join(projectRoot, "docker-compose.yml"),
+            ["services:", "  db:", "    image: postgres:18-alpine", "    ports:", `      - "${port}:5432"`].join("\n")
+        );
+    }
+
+    it("does not push into a database whose port accepts and then resets every connection", async () => {
+        /**
+         * The failure this is the guard for, 3 runs out of 3 on a fresh compose
+         * volume: `✓ Database ready on port 5436`, then `⚠ Schema push failed …
+         * fix the error above` with nothing above it. The port check passed
+         * because Docker's proxy accepts on the host port while Postgres inside
+         * is still in initdb; every query then died on `read ECONNRESET`.
+         */
+        const port = await freePort();
+        composeOn(port);
+        let db: Awaited<ReturnType<typeof fakePostgres>> | null = null;
+        const pushSchema = vi.fn();
+        const logged: string[] = [];
+
+        try {
+            const outcome = await ensureDevDatabase({
+                ...base,
+                projectRoot,
+                databaseUrl: `postgres://u@127.0.0.1:${port}/db`,
+                startDatabase: async () => { db = await fakePostgres({ resets: Infinity, port }); },
+                readyTimeoutMs: 1_000,
+                pushSchema,
+                log: line => logged.push(line)
+            });
+
+            expect(pushSchema).not.toHaveBeenCalled();
+            expect(outcome.action).toBe("start-failed");
+            if (outcome.action !== "start-failed") throw new Error("narrowing");
+            expect(outcome.hint).toMatch(/ECONNRESET|Connection terminated/);
+            expect(outcome.hint).toContain("docker compose logs db");
+            expect(logged.join("\n")).not.toContain("Database ready");
+        } finally {
+            await db?.close();
+        }
+    });
+
+    it("pushes once the database answers a query, not when its port first opens", async () => {
+        const port = await freePort();
+        composeOn(port);
+        let db: Awaited<ReturnType<typeof fakePostgres>> | null = null;
+        let connectionsAtPush = 0;
+
+        try {
+            const outcome = await ensureDevDatabase({
+                ...base,
+                projectRoot,
+                databaseUrl: `postgres://u@127.0.0.1:${port}/db`,
+                startDatabase: async () => { db = await fakePostgres({ resets: 3, port }); },
+                pushSchema: async () => { connectionsAtPush = db?.connections() ?? 0; }
+            });
+
+            expect(outcome).toEqual({ action: "started", port, pushed: true });
+            // Past the three resets, to the query that succeeded, before the push.
+            expect(connectionsAtPush).toBeGreaterThan(3);
+        } finally {
+            await db?.close();
+        }
+    });
+
+    it("shows the push's own output when the push fails", async () => {
+        /**
+         * The push runs quietly — its output is captured, not inherited — so the
+         * message that pointed at "the error above" pointed at nothing. A failed
+         * push now prints what it captured.
+         */
+        const port = await freePort();
+        composeOn(port);
+        let db: Awaited<ReturnType<typeof fakePostgres>> | null = null;
+        const logged: string[] = [];
+
+        try {
+            const outcome = await ensureDevDatabase({
+                ...base,
+                projectRoot,
+                databaseUrl: `postgres://u@127.0.0.1:${port}/db`,
+                startDatabase: async () => { db = await fakePostgres({ resets: 0, port }); },
+                pushSchema: async () => {
+                    // A real child failing the way the driver's push does, so the
+                    // error is execa's own and not a stand-in for it.
+                    await execa(process.execPath, ["-e",
+                        "console.log('Applying RLS policies…'); "
+                        + "console.error('Failed to introspect the database for unmapped tables: read ECONNRESET'); "
+                        + "process.exit(1)"
+                    ], { stdio: "pipe" });
+                },
+                log: line => logged.push(line)
+            });
+
+            expect(outcome).toEqual({ action: "started", port, pushed: false });
+            const output = logged.join("\n");
+            expect(output).toContain("Failed to introspect the database for unmapped tables: read ECONNRESET");
+            expect(output).toContain("Applying RLS policies");
+            // The output comes first, so "above" is true.
+            expect(output.indexOf("read ECONNRESET")).toBeLessThan(output.indexOf("Schema push failed"));
+            // The command line, which carries the database password, is not repeated.
+            expect(output).not.toContain(process.execPath);
+        } finally {
+            await db?.close();
         }
     });
 });

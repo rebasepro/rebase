@@ -32,7 +32,7 @@ import fs from "fs";
 import net from "net";
 import path from "path";
 import chalk from "chalk";
-import { execa } from "execa";
+import { execa, ExecaError } from "execa";
 
 /** Where the preflight stopped, and why. Returned so tests can assert it. */
 export type PreflightOutcome =
@@ -257,10 +257,10 @@ export function probeTcp(host: string, port: number, timeoutMs = 700): Promise<b
 /**
  * Poll until the port answers, or give up.
  *
- * Postgres publishes its port before it is ready to accept queries, so the
- * caller still has to tolerate a first connection that is refused at the
- * protocol level. This only answers "has the container got as far as listening",
- * which is the part that takes the seconds.
+ * This only answers "has the container got as far as listening". It is not
+ * readiness: Docker's port proxy accepts on the host port while Postgres inside
+ * the container is still running initdb, and resets every connection it cannot
+ * forward. {@link waitForQueryable} is the check that a query will work.
  */
 export async function waitForPort(
     host: string,
@@ -274,6 +274,81 @@ export async function waitForPort(
         await new Promise(resolve => setTimeout(resolve, intervalMs));
     }
     return false;
+}
+
+/** Whether a database answered a query, and if not, the last reason it gave. */
+export type QueryReadiness = { ready: true } | { ready: false; error: string };
+
+/**
+ * Poll until `SELECT 1` succeeds on this connection string, or the bound runs out.
+ *
+ * The readiness that matters to everything after it. A fresh compose volume
+ * answers the TCP probe seconds before it answers a query — the official image
+ * runs initdb on a socket-only server, then restarts on TCP — and the schema
+ * push that ran in that gap failed on `read ECONNRESET`, three runs out of
+ * three. Every error is retried: a reset, "the database system is starting up"
+ * and a refused connection all mean "not yet", and the bound is what turns
+ * "not yet" into an answer.
+ */
+export async function waitForQueryable(
+    databaseUrl: string,
+    options: { timeoutMs?: number; intervalMs?: number } = {}
+): Promise<QueryReadiness> {
+    const { timeoutMs = 60_000, intervalMs = 500 } = options;
+    const { Client } = await import("pg");
+    const deadline = Date.now() + timeoutMs;
+    let lastError = "no attempt was made";
+
+    do {
+        const client = new Client({
+            connectionString: databaseUrl,
+            connectionTimeoutMillis: Math.max(250, Math.min(2_000, deadline - Date.now()))
+        });
+        // A reset can arrive after `connect` settles; unhandled, it would take
+        // the process down rather than count as one more "not yet".
+        client.on("error", () => undefined);
+        try {
+            await client.connect();
+            await client.query("SELECT 1");
+            return { ready: true };
+        } catch (error) {
+            lastError = error instanceof Error && error.message ? error.message : String(error);
+        } finally {
+            await client.end().catch(() => undefined);
+        }
+        if (Date.now() + intervalMs >= deadline) break;
+        await new Promise(resolve => setTimeout(resolve, intervalMs));
+    } while (Date.now() < deadline);
+
+    return { ready: false, error: lastError };
+}
+
+/**
+ * What a failed schema push printed, as lines to show.
+ *
+ * `rebase dev` runs the push with its output captured, so a successful start
+ * stays quiet. On a failure that captured output is the diagnosis, and it was
+ * being dropped: the warning said "fix the error above" over nothing at all.
+ * The child's stdout and stderr are what is shown — not execa's own message,
+ * which leads with the command line, and that carries the database password.
+ */
+export function pushFailureOutput(error: unknown): string[] {
+    if (error instanceof ExecaError) {
+        const captured = [streamText(error.stdout), streamText(error.stderr)]
+            .map(stream => stream.trim())
+            .filter(stream => stream.length > 0);
+        if (captured.length > 0) return captured.join("\n").split(/\r?\n/);
+        return [error.originalMessage || `The push exited with code ${error.exitCode ?? "unknown"}.`];
+    }
+    return [error instanceof Error ? error.message : String(error)];
+}
+
+/** A captured stream as text, whichever form execa's options gave it. */
+function streamText(stream: unknown): string {
+    if (typeof stream === "string") return stream;
+    if (stream instanceof Uint8Array) return Buffer.from(stream).toString("utf8");
+    if (Array.isArray(stream)) return stream.map(String).join("\n");
+    return "";
 }
 
 export interface EnsureDevDatabaseOptions {
@@ -293,6 +368,8 @@ export interface EnsureDevDatabaseOptions {
      * untestable while the only way in was a real `docker compose up`.
      */
     startDatabase?: (projectRoot: string) => Promise<void>;
+    /** How long a started database has to answer `SELECT 1`. Defaults to 60s. */
+    readyTimeoutMs?: number;
     log?: (message: string) => void;
 }
 
@@ -380,6 +457,18 @@ export async function ensureDevDatabase(options: EnsureDevDatabaseOptions): Prom
         return { action: "start-failed", hint };
     }
 
+    // Listening is not ready. Nothing is pushed into a database that has not
+    // yet answered a query; see `waitForQueryable`.
+    const readiness = await waitForQueryable(databaseUrl, { timeoutMs: options.readyTimeoutMs });
+    if (!readiness.ready) {
+        const seconds = Math.round((options.readyTimeoutMs ?? 60_000) / 1000);
+        const hint = `The database container is listening on port ${target.port} but did not answer a query `
+            + `within ${seconds}s (${readiness.error}). Run ${chalk.cyan("docker compose logs db")} to see why, `
+            + `then ${chalk.cyan("rebase db push")}.`;
+        log(`  ${chalk.yellow("⚠")} ${chalk.gray(hint)}`);
+        return { action: "start-failed", hint };
+    }
+
     log(`  ${chalk.green("✓")} ${chalk.gray(`Database ready on port ${target.port}`)}`);
 
     if (!hasCollections) return { action: "started", port: target.port, pushed: false };
@@ -389,11 +478,11 @@ export async function ensureDevDatabase(options: EnsureDevDatabaseOptions): Prom
         await pushSchema();
         log(`  ${chalk.green("✓")} ${chalk.gray("Schema pushed")}`);
         return { action: "started", port: target.port, pushed: true };
-    } catch {
-        // The push prints its own diagnostics through inherited stdio, so
-        // repeating them here would only bury them. What is added is the one
-        // thing the reader now needs: the server is still starting, and against
-        // what.
+    } catch (error) {
+        // The push runs with its output captured, so what it printed is shown
+        // here, before the line that refers to it. Then the one thing the
+        // reader needs next: the server is still starting, and against what.
+        for (const line of pushFailureOutput(error)) log(`    ${chalk.gray(line)}`);
         log(`  ${chalk.yellow("⚠")} ${chalk.gray(`Schema push failed. The database is running; fix the error above and run ${chalk.cyan("rebase db push")}.`)}`);
         return { action: "started", port: target.port, pushed: false };
     }
