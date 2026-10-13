@@ -86,7 +86,7 @@ import { resolveStorageAccessControl } from "../storage/policies";
 import { loadOpenApiGenerator, mountOpenApiDocs, type OpenApiGenerator } from "../init/docs";
 import { createHealthCheck } from "../init/health";
 import { createShutdown } from "../init/shutdown";
-import { createLiveSchemaRoutes } from "../api/live-schema-routes";
+import { createLiveSchemaRoutes, readAccountIdentity } from "../api/live-schema-routes";
 import { deprecatedAlias } from "../api/mount";
 import {
     commitPathsFor,
@@ -1961,6 +1961,9 @@ export async function createRebaseBackend(options: RebaseBackendOptions): Promis
                 },
                 getCollections: () => collectionRegistry.getRawCollections(),
                 getAdmin: () => defaultDriver.admin,
+                // The token on the request names the uid only; the commit is
+                // authored by the account's name and address.
+                resolveAuthorIdentity: (uid) => readAccountIdentity(authAdapter, uid),
                 getRepository: (author) => {
                     // A configured repository wins: a deployment that names one
                     // means its source is *there*, even when a working tree

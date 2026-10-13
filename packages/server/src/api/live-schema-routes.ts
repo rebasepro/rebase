@@ -37,6 +37,7 @@ import {
     isSchemaEditingAdmin,
     isSQLAdmin,
     nestCollectionPatchPaths,
+    type AuthAdapter,
     type ClassifiedSchemaChanges,
     type CollectionPatch,
     type CollectionConfig,
@@ -131,6 +132,35 @@ export interface LiveSchemaRoutesConfig {
      * commit, a commit needs an author, and a credential is not an author.
      */
     policy?: SchemaEditPolicy;
+    /**
+     * The account behind a uid, for the commit's author line.
+     *
+     * The request's user is what its access token carries, and the built-in
+     * token carries a uid and roles — no name, no address — so without this a
+     * commit is authored by the uid. Absent, or answering nothing, the commit
+     * falls back to what the request carries.
+     */
+    resolveAuthorIdentity?: (uid: string) => Promise<AccountIdentity | null>;
+}
+
+/** What a commit's author line is made of. */
+export interface AccountIdentity {
+    displayName?: string | null;
+    email?: string | null;
+}
+
+/**
+ * The account behind a uid, read through the auth in use: its user-management
+ * lookup when it has one — a plain read — else `resolveUser`. `null` when the
+ * auth has neither, or knows no such account.
+ */
+export async function readAccountIdentity(
+    adapter: Pick<AuthAdapter, "userManagement" | "resolveUser"> | undefined,
+    uid: string
+): Promise<AccountIdentity | null> {
+    if (adapter?.userManagement) return adapter.userManagement.getUserById(uid);
+    if (adapter?.resolveUser) return adapter.resolveUser(uid);
+    return null;
 }
 
 /**
@@ -166,16 +196,37 @@ export interface ProposedChange {
  * `undefined` when the request carries no user — a service key, say — which
  * lets the repository fall back to its own git config rather than inventing a
  * name for somebody.
+ *
+ * The name and address the request carries win; what it lacks is read from
+ * the account through `resolveAccount`. A lookup that fails costs the commit
+ * its name, never the commit: the author falls back to the uid.
  */
-export function commitAuthor(user: unknown): { name: string; email: string } | undefined {
+export async function commitAuthor(
+    user: unknown,
+    resolveAccount?: (uid: string) => Promise<AccountIdentity | null>
+): Promise<{ name: string; email: string } | undefined> {
     // `unknown` rather than the auth union: `AuthResult` admits `false` and
     // `null` as well as a user, and narrowing here keeps that shape from
     // leaking into every caller.
-    if (!user || typeof user !== "object") return undefined;
-    const { uid, email, displayName } = user as {
-        uid?: string; email?: string; displayName?: string;
-    };
+    if (!isRecord(user)) return undefined;
+    const uid = nonEmptyString(user.uid);
     if (!uid) return undefined;
+    let email = nonEmptyString(user.email);
+    let displayName = nonEmptyString(user.displayName);
+
+    if ((!email || !displayName) && resolveAccount) {
+        try {
+            const account = await resolveAccount(uid);
+            email ??= nonEmptyString(account?.email);
+            displayName ??= nonEmptyString(account?.displayName);
+        } catch (error: unknown) {
+            logger.warn("[live-schema] Could not read the account behind a schema commit; authoring it by uid", {
+                uid,
+                error: error instanceof Error ? error.message : String(error)
+            });
+        }
+    }
+
     return {
         name: displayName || email || uid,
         // A real address when there is one; otherwise a routable-looking local
@@ -183,6 +234,9 @@ export function commitAuthor(user: unknown): { name: string; email: string } | u
         email: email || `${uid}@users.noreply.rebase.pro`
     };
 }
+
+const nonEmptyString = (value: unknown): string | undefined =>
+    typeof value === "string" && value.trim() !== "" ? value : undefined;
 
 /**
  * What a collection id may contain.
@@ -854,7 +908,7 @@ export function createLiveSchemaRoutes(config: LiveSchemaRoutesConfig): Hono<Hon
         // `git log` a month from now still distinguishes the two.
         const author = principal.kind === "machine"
             ? machineCommitAuthor(principal)
-            : commitAuthor(c.get("user"));
+            : await commitAuthor(c.get("user"), config.resolveAuthorIdentity);
         const repository = requireRepository(author);
 
         // One apply at a time, from the plan to the last statement: two at
