@@ -806,28 +806,17 @@ function projectHasCollections(projectRoot: string): boolean {
 /**
  * Make the generated Drizzle schema match the collections before anything reads it.
  *
- * ## The bug this exists for
+ * `rebase init` writes `backend/src/schema.generated.ts` from the preset's own
+ * collections (`templates/generated-schemas/<preset>.ts`), so a new project
+ * starts with the real schema. It is stale the moment a collection changes, and
+ * on the managed PGlite path — the one a new project takes, because `rebase
+ * init` leaves `DATABASE_URL` commented out — no `rebase db push` runs to
+ * regenerate it. So `dev` does.
  *
- * The scaffold ships `backend/src/schema.generated.ts` as a stub — `export const
- * tables = {}` — and something has to replace it. On the Docker path
- * `rebase db push` did, as step one of three. On the **managed PGlite path
- * nothing did**, and that is the path a new project takes, because `rebase init`
- * deliberately leaves `DATABASE_URL` commented out.
- *
- * The result was the worst shape a first run can have: the database was fine.
- * Boot created all 30 tables through the additive ensure, `/health` answered
- * 200, auth worked, the admin panel loaded — and every single
- * `GET /api/data/*` returned a 500, `Table not found for collection 'posts'`,
- * because the driver looked the table up in the generated file rather than in
- * the database. A stranger following the README had no way to guess that
- * `pnpm run schema:generate` was the missing step, and the README told them the
- * schema was pushed for them.
- *
- * That failure is fixed at the root — the driver builds its tables from
- * `information_schema` now, so a stub `schema.generated.ts` cannot empty the
- * API. This still runs, because the file is a real artifact for everything
- * around the server: `db push` diffs it, Atlas plans from it, `eject` writes it
- * out, and application code imports it.
+ * The driver builds its tables from `information_schema`, so a stale file
+ * cannot empty the API. This still runs, because the file is a real artifact
+ * for everything around the server: `db push` diffs it, Atlas plans from it,
+ * `eject` writes it out, and application code imports it.
  *
  * ## Why it runs unconditionally
  *
