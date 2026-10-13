@@ -206,7 +206,7 @@ von einem Rebase-Router ausgeführt.
 **Geltungsbereich:** Der Prozess.
 
 <span class="since-badge" data-since="0.25">Seit 0.25</span>
-`initializeRebaseBackend` ist eine Abkürzung über vier öffentliche Aufrufe, und diese Stufe
+`initializeRebaseBackend` ist eine Abkürzung über einige öffentliche Aufrufe, und diese Stufe
 bedeutet, sie selbst aufzurufen. `createRebaseBackend` baut das Backend und bindet nichts ein,
 startet nichts und lauscht auf nichts. `backend.routes` enthält jede Routengruppe als
 Hono-Sub-App, die Sie allein einbinden können, unter jedem Pfad. `mount`, `attachRealtime` und

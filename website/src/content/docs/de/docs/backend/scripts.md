@@ -172,14 +172,37 @@ test("a user only sees their own posts", async () => {
 
 Dasselbe funktioniert unter Vitest oder Jest.
 
+### Collections mit History
+
+<span class="since-badge" data-since="0.25">Seit 0.25</span>
+
+Ein Schreibvorgang auf eine Collection mit [`history: true`](/docs/backend/history/)
+zeichnet seinen Eintrag so auf, wie es ein Schreibvorgang des Servers tut. Der Eintrag
+wird in der eigenen Transaktion der Zeile geschrieben, sodass ein Schreibvorgang, der
+zurückgerollt wird, keinen Eintrag hinterlässt. Er wird als die Identität aufgezeichnet,
+als die der Schreibvorgang lief: `service` für `dataAsAdmin`, die `uid` des Benutzers
+unter `withAuth`. Schreibvorgänge aus `rebase console` werden auf dieselbe Weise
+aufgezeichnet.
+
+`openRebase` legt nichts an, worin aufgezeichnet werden könnte. Wenn auf der Datenbank
+noch kein Backend mit History gebootet hat, fehlt die Tabelle `rebase.entity_history`.
+Ein Schreibvorgang auf eine Collection mit History wird dann mit
+[`HISTORY_UNAVAILABLE`](/docs/backend/errors/#data-queries-and-writes) verweigert,
+bevor einer seiner Callbacks läuft, und die Meldung nennt, was fehlt. Lesezugriffe
+funktionieren wie gewohnt. Booten Sie das Backend einmal mit aktivierter History
+(`rebase dev` tut das), und die Schreibvorgänge gehen durch.
+
+Einträge werden aufgezeichnet, nie bereinigt. Die Aufbewahrung ist eine Servereinstellung,
+die ein Skript nicht sehen kann, daher bereinigt der Server sie wie gewohnt: wenn er die
+Entität das nächste Mal schreibt und in seinem stündlichen Durchlauf.
+
 ### Was es auslässt
 
 <span class="since-badge" data-since="0.25">Seit 0.25</span>
 
 `openRebase` öffnet die Datenschicht und sonst nichts. Es startet kein Realtime, daher werden
-seine Schreibvorgänge Live-Abfragen nicht mitgeteilt. Es hängt keinen History-Dienst an, daher
-hinterlässt ein Schreibvorgang auf eine Collection mit `history: true` keinen History-Eintrag.
-Storage, E-Mail, Auth-Verwaltung und Ihre Funktionen sind nicht darauf vorhanden.
+seine Schreibvorgänge Live-Abfragen nicht mitgeteilt. Storage, E-Mail, Auth-Verwaltung und
+Ihre Funktionen sind nicht darauf vorhanden.
 
 Braucht ein Skript auch diese, bauen Sie das Backend, ohne es auszuliefern:
 `createRebaseBackend({ …, provision: false })` gibt Ihnen `backend.rebase`, den

@@ -176,7 +176,9 @@ Jede Entität behält zudem höchstens ihre neuesten **200** Einträge. Diese Ob
 
 ### Pruning-Lebenszyklusmechanik
 
-Nach jeder aufgezeichneten Änderung wird die geänderte Entität bereinigt: Ihre Einträge, die älter als der Aufbewahrungszeitraum sind, werden gelöscht, danach alles, was über ihre neuesten 200 hinausgeht. Das läuft asynchron und hält den Schreibvorgang nicht auf.
+Nach jeder Änderung, die der Server aufzeichnet, wird die geänderte Entität bereinigt: Ihre Einträge, die älter als der Aufbewahrungszeitraum sind, werden gelöscht, danach alles, was über ihre neuesten 200 hinausgeht. Das läuft asynchron und hält den Schreibvorgang nicht auf.
+
+Ein Schreibvorgang über [`openRebase` oder `rebase console`](/docs/backend/scripts/) zeichnet seinen History-Eintrag auf, bereinigt aber nichts, denn ein Skript kann nicht wissen, mit welcher Aufbewahrung Ihr Server konfiguriert ist. Der Server bereinigt diese Entität bei seinem nächsten Schreibvorgang darauf und im stündlichen Durchlauf weiter unten.
 
 <span class="since-badge" data-since="0.25">Seit 0.25</span> Einmal pro Stunde löscht das Backend zusätzlich jeden Eintrag, der älter als der Aufbewahrungszeitraum ist, von jeder Entität. Zuvor wurde die Historie einer Entität, in die nie wieder geschrieben wurde — jeder gelöschten —, überhaupt nicht bereinigt. Der Durchlauf:
 

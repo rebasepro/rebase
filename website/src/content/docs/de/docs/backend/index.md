@@ -45,6 +45,15 @@ const instance = await initializeRebaseBackend({
 });
 ```
 
+<span class="since-badge" data-since="0.25">Seit 0.25</span> Dieser eine Aufruf ist
+eine Abkürzung über öffentliche Schritte: `installUnhandledRejectionHandler` verhindert,
+dass eine verirrte Rejection den Prozess beendet, `createRebaseBackend` baut das Backend,
+`setDefaultBackend` macht es zu dem, wofür die API auf Modulebene antwortet, und `mount`,
+`attachRealtime` und `start` liefern es aus. Um nur einige Routengruppen einzubinden, sie
+unter andere Pfade zu legen, die Timer einem anderen Prozess zu überlassen oder zwei
+Backends in einem Prozess zu betreiben, rufen Sie die Schritte selbst auf. Siehe
+[Integration eines eigenen Servers](/docs/backend/custom-server/).
+
 ## Wo die einzelnen Optionen liegen
 
 Dieser Aufruf entspricht der **ejected** Form – derjenigen, die Sie nach `rebase eject` oder in einem Custom Server selbst schreiben. Ein per Scaffolding erstelltes Projekt hat ihn nicht: Die bereitgestellte Runtime bootet das Projekt, und jede Option wird als Umgebungsvariable in `.env`, als Export aus `config/index.ts` oder als Verzeichnis, das das Bundle in `rebase.json` deklariert, übergeben.
@@ -55,8 +64,8 @@ Beide Pfade führen zur selben `RebaseBackendConfig`. Dies ist die vollständige
 |---|---|
 | `basePath` | `REBASE_BASE_PATH` (Standard: `/api`) |
 | `collections`, `collectionsDir` | das von `rebase.json` deklarierte Verzeichnis `config/collections/` |
-| `functionsDir` | `backend/functions/` |
-| `cronsDir` | `backend/crons/` |
+| `functions`, `functionsDir` | `backend/functions/` |
+| `crons`, `cronsDir` | `backend/crons/` |
 | `bootstrappers`, `database` | `DATABASE_URL`, plus eine `database("<key>")`-Deklaration in `config/resources.ts` für jede Datenbank jenseits des Standards |
 | `auth` | `JWT_SECRET`, die `OAUTH_*`-Variablen und `config/collections/users` |
 | `storage` | die `STORAGE_*`-Variablen, plus eine `bucket("<key>")`-Deklaration in `config/resources.ts` für jeden Bucket jenseits des Standards |
@@ -100,9 +109,9 @@ Nach der Initialisierung werden diese Routen gemountet:
 | `/api/swagger` | Swagger UI (Dev-Modus, wenn `enableSwagger: true`) |
 | `/api/meta/contract` | Das Collection-Schema des Projekts (braucht `schema:read`) |
 | `/api/meta/schema-version` | Ein Versions-String für dieses Schema (nicht authentifiziert) |
-| `/api/functions/*` | Benutzerdefinierte Funktionsrouten (wenn `functionsDir` gesetzt ist) |
-| `/api/admin/cron/*` | Cron-Job-Verwaltung (`cron:read` / `cron:write`, wenn `cronsDir` gesetzt ist) |
-| WebSocket beim Upgrade | Echtzeit-Abonnements |
+| `/api/functions/*` | Benutzerdefinierte Funktionsrouten (wenn `functions` oder `functionsDir` gesetzt ist) |
+| `/api/admin/cron/*` | Cron-Job-Verwaltung (`cron:read` / `cron:write`, wenn `crons` oder `cronsDir` gesetzt ist) |
+| WebSocket beim Upgrade | Echtzeit-Abonnements, auf `/` bei einer API unter `/api` |
 
 ---
 
@@ -185,10 +194,12 @@ interface RebaseBackendConfig {
     // OpenAPI/Swagger
     enableSwagger?: boolean;
 
-    // Custom API endpoints
+    // Custom API endpoints: values, or a directory of files (not both)
+    functions?: Record<string, FunctionApp>;  // { "send-invoice": app } → /api/functions/send-invoice
     functionsDir?: string;    // Auto-load Hono routes from a directory
 
-    // Scheduled tasks
+    // Scheduled tasks: values, or a directory of files (not both)
+    crons?: Record<string, CronJobDefinition>; // { "nightly-report": defineCron(…) }
     cronsDir?: string;         // Auto-load cron jobs from a directory
     cronPersistence?: boolean; // Write run logs to rebase.cron_logs (default: true)
 
@@ -219,7 +230,9 @@ Der Rest von `RebaseBackendConfig` ist entweder auf einer eigenen Seite dokument
 
 ## Die Backend-Instanz
 
-`initializeRebaseBackend` gibt eine `RebaseBackendInstance` mit Zugriff auf interne Dienste zurück:
+`initializeRebaseBackend` gibt das Backend zurück, das es gebaut hat, bereits eingebunden und
+gestartet. Sein Typ ist `RebaseBackendInstance`, und das ist `RebaseBackend`, der Typ, den
+`createRebaseBackend` zurückgibt:
 
 ```typescript
 const instance = await initializeRebaseBackend(config);
@@ -233,10 +246,19 @@ instance.storageController   // Default storage
 instance.storageRegistry     // All storage backends
 instance.collectionRegistry  // Collection metadata
 instance.history?.historyService // Entity history
-instance.cronScheduler       // Cron job scheduler (when cronsDir is set)
+instance.cronScheduler       // Cron job scheduler (when crons or cronsDir is set)
+instance.jobQueue            // Durable job queue (when jobs are enabled)
+instance.setCollectionCallbacks(slug, callbacks) // Replace a collection's callbacks
+instance.shutdown()          // Drain and stop; also closes the server it was given
 ```
 
-> **Hinweis:** Obwohl die `instance` diese internen Dienste verfügbar macht, sollte Anwendungscode (wie benutzerdefinierte Funktionen und Cron-Jobs) das globale `rebase`-Singleton aus `@rebasepro/server` verwenden, um mit der Backend-API zu interagieren.
+<span class="since-badge" data-since="0.25">Seit 0.25</span> Es trägt außerdem `rebase`,
+den In-Process-Client, `fetch(request)`, `routes`, die Routengruppen als Hono-Sub-Apps,
+`services`, seine eigenen JWT-Schlüssel, sein Zugriffsmodell, seinen API-Schlüssel-Speicher
+und seine Rate-Limiter, sowie `verifyCredential(token)`; siehe
+[Integration eines eigenen Servers](/docs/backend/custom-server/).
+
+> **Hinweis:** Obwohl die `instance` diese internen Dienste verfügbar macht, sollte Anwendungscode (wie benutzerdefinierte Funktionen und Cron-Jobs) das `rebase`-Singleton aus `@rebasepro/server` verwenden, um mit der Backend-API zu interagieren. <span class="since-badge" data-since="0.25">Seit 0.25</span> Innerhalb eines Requests, Cron-Laufs oder Jobs ist `rebase` das Backend, das ihn bedient; überall sonst ist es der Prozess-Standard, den `initializeRebaseBackend` auf sein Backend setzt.
 
 ## REST-API
 
@@ -263,7 +285,7 @@ Ein Parameter, den der Server nicht reserviert hat, wird als Filter auf die Spal
 
 ## WebSocket
 
-Der WebSocket-Server dockt an denselben HTTP-Server an und bietet Echtzeit-Abonnements:
+Der WebSocket-Server dockt an denselben HTTP-Server an und bietet Echtzeit-Abonnements. <span class="since-badge" data-since="0.25">Seit 0.25</span> Er beantwortet Upgrades auf genau einem Pfad, `/` bei einer API unter `/api`, wo sich das SDK einwählt, und überlässt jeden anderen Pfad Ihren eigenen `upgrade`-Listenern; unter 0.24 nimmt er jedes Upgrade auf dem Server an:
 
 - **Collection-Änderungen** abonnieren — Benachrichtigungen erhalten, wenn eine beliebige Entität in einer Collection erstellt, aktualisiert oder gelöscht wird
 - **Entitätsänderungen** abonnieren — Benachrichtigungen erhalten, wenn sich eine bestimmte Entität ändert
