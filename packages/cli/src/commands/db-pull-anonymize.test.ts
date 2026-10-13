@@ -62,6 +62,13 @@ vi.mock("pg", () => {
     return { Client, default: { Client } };
 });
 
+// The re-grant's driver, which is not what is under test and is slow to load.
+vi.mock("@rebasepro/server-postgres", () => ({
+    REBASE_USER_ROLE: "rebase_user",
+    detectConnectionPosture: async () => ({ privileged: false }),
+    ensureAppRole: async () => undefined
+}));
+
 vi.mock("execa", () => ({
     execa: async (file: string, args: readonly string[]) => {
         if (args[0] === "--version") return { exitCode: 0, stdout: `${file} (PostgreSQL) 17.2`, stderr: "" };

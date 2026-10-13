@@ -985,16 +985,18 @@ async function pullIntoLocal(projectRoot: string, rawArgs: readonly string[]): P
  */
 async function restoreAppRole(target: string): Promise<void> {
     const { Client } = await import("pg");
-    const { detectConnectionPosture, ensureAppRole, REBASE_USER_ROLE } =
-        await import("@rebasepro/server-postgres");
     const { provisionableSchemas } = await import("../dev-db/pull");
 
     const client = new Client({ connectionString: target });
     client.on("error", () => undefined);
     try {
         // Inside the `try`: a refused connection is the same warning as a
-        // refused grant, not an exception past the pull's own verdict.
+        // refused grant, not an exception past the pull's own verdict. And
+        // before the driver is loaded, which there is no point in doing for a
+        // database that cannot be reached.
         await client.connect();
+        const { detectConnectionPosture, ensureAppRole, REBASE_USER_ROLE } =
+            await import("@rebasepro/server-postgres");
         const runSql = async (text: string) => (await client.query(text)).rows as Record<string, unknown>[];
         const posture = await detectConnectionPosture(runSql);
         if (!posture.privileged) {
