@@ -302,9 +302,112 @@ describe("rebase upgrade, for a person", () => {
         const fake = io();
         await upgradeCommand(["node", "rebase", "upgrade", "--help"], fake);
         const text = stdout.join("\n");
-        for (const flag of ["--to", "--drop-local-overrides", "--no-install", "--dry-run", "--json"]) {
+        for (const flag of ["--to", "--allow-downgrade", "--drop-local-overrides", "--no-install", "--dry-run", "--json"]) {
             expect(text).toContain(flag);
         }
+        expect(fake.npmView).not.toHaveBeenCalled();
+    });
+});
+
+/** A project scaffolded by a canary CLI: every pin on one canary build. */
+function canaryProject(version = "0.24.1-canary.gcb918fc"): void {
+    write(".git/HEAD", "ref: refs/heads/main\n");
+    write("rebase.json", JSON.stringify({ rebase: "^1", apps: { backend: { type: "backend", runtime: "managed" } } }, null, 4));
+    write("pnpm-lock.yaml", "lockfileVersion: '9.0'\n");
+    write("package.json", JSON.stringify({ devDependencies: { "@rebasepro/cli": version } }, null, 2) + "\n");
+    write("backend/package.json", JSON.stringify({ dependencies: { "@rebasepro/server": version } }, null, 2) + "\n");
+    process.chdir(root);
+}
+
+/** A registry whose dist-tags are `tags`; any other tag is a 404. */
+function registry(tags: Record<string, string>): ReturnType<typeof vi.fn> {
+    return vi.fn(async (spec: string) => {
+        const tag = spec.slice(spec.lastIndexOf("@") + 1);
+        if (!(tag in tags)) throw new Error(`npm error 404 No match found for version ${tag}`);
+        return `${tags[tag]}\n`;
+    });
+}
+
+/**
+ * `rebase upgrade` with no flags, on a project a canary CLI scaffolded, moved
+ * all sixteen pins to `latest` — 0.24.0, older than the 0.24.1 canary the
+ * project was on — labelled the lines `(older)`, and installed. A command
+ * called upgrade went backwards without stopping.
+ */
+describe("rebase upgrade on a prerelease", () => {
+    it("stays on the project's channel by default", async () => {
+        canaryProject();
+        const fake = io({ npmView: registry({ latest: "0.24.0", canary: "0.24.1-canary.g8c5a265" }) });
+
+        expect(await run(["--no-install", "--json"], fake)).toBe(0);
+
+        // Two canary builds of one version are ordered by when they were
+        // published, which their git hashes do not say — the tag does.
+        const doc = JSON.parse(stdout.join("\n"));
+        expect(doc.target).toBe("0.24.1-canary.g8c5a265");
+        expect(read("package.json")).toContain("0.24.1-canary.g8c5a265");
+    });
+
+    it("takes the stable release when it is ahead of the channel", async () => {
+        canaryProject();
+        const fake = io({ npmView: registry({ latest: "0.25.0", canary: "0.24.1-canary.g8c5a265" }) });
+
+        expect(await run(["--no-install", "--json"], fake)).toBe(0);
+
+        expect(JSON.parse(stdout.join("\n")).target).toBe("0.25.0");
+    });
+
+    it("refuses to move it back to latest, says how to stay or move, and writes nothing", async () => {
+        canaryProject();
+        const before = read("package.json");
+        const fake = io({ npmView: registry({ latest: "0.24.0", canary: "0.24.1-canary.g8c5a265" }) });
+
+        expect(await run(["--to", "latest", "--json"], fake)).toBe(1);
+
+        const doc = JSON.parse(stdout.join("\n"));
+        expect(doc.error.code).toBe("downgrade_refused");
+        expect(doc.error.message).toContain("0.24.0");
+        expect(doc.error.message).toContain("0.24.1-canary.gcb918fc");
+        expect(doc.error.hint).toContain("rebase upgrade --to canary");
+        expect(doc.error.hint).toContain("--allow-downgrade");
+        expect(read("package.json")).toBe(before);
+        expect(fake.install).not.toHaveBeenCalled();
+    });
+
+    it("refuses by default too, when the channel cannot be resolved", async () => {
+        canaryProject();
+        const before = read("package.json");
+        const fake = io({ npmView: registry({ latest: "0.24.0" }) });
+
+        expect(await run(["--json"], fake)).toBe(1);
+
+        expect(JSON.parse(stdout.join("\n")).error.code).toBe("downgrade_refused");
+        expect(read("package.json")).toBe(before);
+    });
+
+    it("moves it back with --allow-downgrade, and says it is older", async () => {
+        canaryProject();
+        const fake = io({ npmView: registry({ latest: "0.24.0", canary: "0.24.1-canary.g8c5a265" }) });
+
+        expect(await run(["--to", "latest", "--allow-downgrade", "--no-install"], fake)).toBe(0);
+
+        // eslint-disable-next-line no-control-regex
+        const text = stdout.join("\n").replace(/\x1b\[[0-9;]*m/g, "");
+        expect(text).toContain("(older)");
+        expect(text).toMatch(/older release/);
+        expect(read("package.json")).toContain("\"0.24.0\"");
+    });
+
+    it("takes an exact older version as asked, and names it as a downgrade", async () => {
+        canaryProject();
+        const fake = io();
+
+        expect(await run(["--to", "0.24.0", "--no-install"], fake)).toBe(0);
+
+        // eslint-disable-next-line no-control-regex
+        const text = stdout.join("\n").replace(/\x1b\[[0-9;]*m/g, "");
+        expect(text).toMatch(/older release/);
+        expect(read("package.json")).toContain("\"0.24.0\"");
         expect(fake.npmView).not.toHaveBeenCalled();
     });
 });

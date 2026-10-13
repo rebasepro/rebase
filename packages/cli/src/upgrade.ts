@@ -1089,9 +1089,17 @@ function firstLine(text: string): string {
 }
 
 /**
- * Whether moving from `from` to `to` goes backwards, for the one-word note the
- * summary prints. Prerelease identifiers compare as SemVer orders them: a
- * release outranks its own prereleases.
+ * Whether moving from `from` to `to` goes backwards — the note the summary
+ * prints, and what `rebase upgrade` refuses without `--allow-downgrade`.
+ *
+ * Prerelease identifiers compare as SemVer orders them: a release outranks its
+ * own prereleases, numbers compare as numbers, and the channel (`alpha` <
+ * `beta` < `rc`) compares as text. One case SemVer orders and this does not:
+ * two builds on one channel told apart by a non-numeric identifier. A canary
+ * is `0.24.1-canary.g<git hash>`, and hashes sort in no order at all — so
+ * `canary.gcb918fc` → `canary.g8c5a265` is neither forwards nor backwards as
+ * far as the version can say, and the `canary` tag, which points at the newest
+ * build, is the only thing that knows.
  */
 export function isDowngrade(from: string, to: string): boolean {
     const a = SEMVER.exec(from.replace(/^[\^~]/, ""));
@@ -1119,7 +1127,34 @@ export function isDowngrade(from: string, to: string): boolean {
         if (!Number.isNaN(nx) && !Number.isNaN(ny)) return nx > ny;
         if (!Number.isNaN(nx)) return false;
         if (!Number.isNaN(ny)) return true;
+        // Past the channel, two words are a build id, not an order.
+        if (i > 0) return false;
         return x > y;
     }
     return false;
+}
+
+/**
+ * The prerelease channel a project's pins are on — `canary` for
+ * `0.24.1-canary.gcb918fc` — or null when none is on a prerelease, or they are
+ * on more than one channel.
+ *
+ * The channel is the prerelease's first identifier, which is also the dist-tag
+ * it is published under. `rebase upgrade` with no `--to` stays on it rather than
+ * defaulting to `latest`, which for a canary project is usually older than the
+ * build it already has.
+ */
+export function prereleaseChannel(versions: readonly string[]): string | null {
+    const channels = new Set<string>();
+    for (const version of versions) {
+        const prerelease = SEMVER.exec(version.replace(/^[\^~]/, ""))?.[4];
+        const channel = prerelease?.split(".")[0];
+        if (channel && /^[A-Za-z][0-9A-Za-z-]*$/.test(channel)) channels.add(channel);
+    }
+    return channels.size === 1 ? [...channels][0] : null;
+}
+
+/** The pins a plan moves to an older release. */
+export function downgradedPins(plan: UpgradePlan): ChangedPin[] {
+    return plan.changed.filter(pin => isDowngrade(pin.from, pin.to));
 }

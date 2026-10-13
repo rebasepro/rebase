@@ -14,9 +14,12 @@ import { loadManifest, ManifestError } from "../manifest";
 import {
     applyUpgradePlan,
     detectInstaller,
+    downgradedPins,
     installCommand,
     isDowngrade,
+    isExactVersion,
     planUpgrade,
+    prereleaseChannel,
     resolveTarget,
     UpgradeError,
     type ChangedPin,
@@ -29,6 +32,7 @@ import {
 /** Every flag `rebase upgrade` accepts. Its help page and the docs verifier read this. */
 export const UPGRADE_FLAGS = {
     "--to": String,
+    "--allow-downgrade": Boolean,
     "--drop-local-overrides": Boolean,
     "--no-install": Boolean,
     "--dry-run": Boolean,
@@ -44,7 +48,12 @@ ${chalk.bold("Usage")}
 
 ${chalk.bold("Options")}
   --to <version|tag>          The release: an exact version (0.21.0) or a dist-tag
-                              (latest, canary). Default: latest
+                              (latest, canary). Default: latest — or, for a project
+                              on a prerelease, its channel (canary), unless latest
+                              is newer
+  --allow-downgrade           Let a dist-tag move pins to an older release. Without
+                              it that is refused; an exact --to version is taken
+                              as asked
   --drop-local-overrides      Remove link: and file: overrides of @rebasepro packages,
                               which win over every pin
   --no-install                Rewrite the package.json files, but do not install
@@ -63,7 +72,8 @@ ${chalk.bold("What it changes")}
   where a catalog: pin's version lives.
 
 ${chalk.bold("Examples")}
-  rebase upgrade                          Move to the latest release and install
+  rebase upgrade                          Move to the newest release on this project's channel
+  rebase upgrade --to latest --allow-downgrade   Move a canary project back to stable
   rebase upgrade --to canary --dry-run    See what the canary would change
   rebase upgrade --to 0.21.0 --no-install --json
 `.trim());
@@ -175,13 +185,50 @@ export async function upgradeCommand(rawArgs: string[], io: UpgradeIo = defaultI
         throw err;
     }
 
+    const requested = flags["--to"];
     let plan: UpgradePlan;
+    let channel: string | null = null;
     try {
-        const target = await resolveTarget(flags["--to"] ?? "latest", spec => io.npmView(spec, projectRoot));
-        plan = planUpgrade(projectRoot, target, { dropLocalOverrides: flags["--drop-local-overrides"] === true });
+        const npmView = (spec: string) => io.npmView(spec, projectRoot);
+        const planFor = (target: string) =>
+            planUpgrade(projectRoot, target, { dropLocalOverrides: flags["--drop-local-overrides"] === true });
+        plan = planFor(await resolveTarget(requested ?? "latest", npmView));
+        channel = prereleaseChannel(plan.changed.map(pin => pin.from));
+        // A project on a prerelease stays on its channel by default: for a
+        // canary scaffold `latest` is usually the release *before* it. The
+        // channel wins only when it is ahead, so a stable release that has
+        // overtaken the channel is still where "upgrade" goes.
+        if (requested === undefined && channel) {
+            const onChannel = await resolveTarget(channel, npmView).catch(() => null);
+            if (onChannel && isDowngrade(onChannel, plan.target)) {
+                if (!json) {
+                    console.log(chalk.gray(`  This project is on the ${channel} channel, so this stays on it: ${channel} is ${onChannel}.`));
+                    console.log(chalk.gray(`  \`rebase upgrade --to latest\` is the stable release, ${plan.target}.`));
+                }
+                plan = planFor(onChannel);
+            }
+        }
     } catch (err) {
         if (err instanceof UpgradeError) refuse(err.message, err.code, err.hint);
         throw err;
+    }
+
+    // Going backwards is never a side effect. A dist-tag — `latest` above all,
+    // the default — that names an older release than the project is on is
+    // refused unless asked for; an exact `--to` version already is asking.
+    const backwards = downgradedPins(plan);
+    const exactRequest = requested !== undefined && isExactVersion(requested.trim().replace(/^v(?=\d)/, ""));
+    if (backwards.length > 0 && !exactRequest && flags["--allow-downgrade"] !== true && !dryRun) {
+        const tag = requested?.trim() ?? "latest";
+        const current = [...new Set(backwards.map(pin => pin.from.replace(/^[\^~]/, "")))].join(", ");
+        refuse(
+            `\`${tag}\` is ${plan.target}, older than this project's ${current}: ` +
+                `upgrading to it would move ${backwards.length} pin${backwards.length === 1 ? "" : "s"} backwards. Nothing was changed.`,
+            "downgrade_refused",
+            channel
+                ? `Stay on the ${channel} channel with \`rebase upgrade --to ${channel}\`, or pass --allow-downgrade to move to ${plan.target}.`
+                : `Pass --allow-downgrade to move to ${plan.target} anyway, or --to <version> for an exact release.`
+        );
     }
 
     if (!dryRun) applyUpgradePlan(plan);
@@ -191,7 +238,16 @@ export async function upgradeCommand(rawArgs: string[], io: UpgradeIo = defaultI
     const [bin, args] = installCommand(installer);
     const installLine = [bin, ...args].join(" ");
 
-    if (!json) printSummary(plan, dryRun);
+    if (!json) {
+        printSummary(plan, dryRun);
+        if (backwards.length > 0) {
+            const pins = `${backwards.length} pin${backwards.length === 1 ? "" : "s"}`;
+            console.log(chalk.yellow(exactRequest || flags["--allow-downgrade"] === true
+                ? `  ⚠ ${plan.target} is an older release than ${pins} here ${dryRun ? "are" : "were"} on: this is a downgrade.`
+                : `  ⚠ ${plan.target} is an older release than ${pins} here are on. A real run refuses it without --allow-downgrade.`));
+            console.log("");
+        }
+    }
 
     let installed = false;
     if (install) {

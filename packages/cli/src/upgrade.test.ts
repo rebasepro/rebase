@@ -21,6 +21,7 @@ import {
     isExactVersion,
     overrideTarget,
     planUpgrade,
+    prereleaseChannel,
     resolveTarget,
     UpgradeError
 } from "./upgrade";
@@ -780,5 +781,30 @@ describe("isDowngrade", () => {
         expect(isDowngrade("0.21.0-canary.1", "0.21.0")).toBe(false);
         expect(isDowngrade("0.21.1-canary.10", "0.21.1-canary.9")).toBe(true);
         expect(isDowngrade("0.21.0", "0.21.0")).toBe(false);
+        expect(isDowngrade("0.25.0-beta.1", "0.25.0-alpha.3")).toBe(true);
+    });
+
+    it("does not order two builds of one channel by their hashes", () => {
+        // SemVer compares `gcb918fc` and `g8c5a265` as text, which says nothing
+        // about which canary was published first — and read as an order, it
+        // refused half of all canary-to-canary upgrades as downgrades.
+        expect(isDowngrade("0.24.1-canary.gcb918fc", "0.24.1-canary.g8c5a265")).toBe(false);
+        expect(isDowngrade("0.24.1-canary.g8c5a265", "0.24.1-canary.gcb918fc")).toBe(false);
+        expect(isDowngrade("0.24.1-canary.gcb918fc", "0.24.0")).toBe(true);
+        expect(isDowngrade("0.24.1-canary.gcb918fc", "0.24.1")).toBe(false);
+    });
+});
+
+describe("prereleaseChannel", () => {
+    it("names the channel the pins are on", () => {
+        expect(prereleaseChannel(["0.24.1-canary.gcb918fc", "^0.24.1-canary.gcb918fc"])).toBe("canary");
+        expect(prereleaseChannel(["0.24.0", "0.24.1-canary.gcb918fc"])).toBe("canary");
+    });
+
+    it("is null on a release, on two channels, or on a bare number", () => {
+        expect(prereleaseChannel(["0.24.0", "~0.23.1"])).toBeNull();
+        expect(prereleaseChannel(["0.25.0-beta.1", "0.24.1-canary.gcb918fc"])).toBeNull();
+        expect(prereleaseChannel(["0.25.0-1"])).toBeNull();
+        expect(prereleaseChannel([])).toBeNull();
     });
 });
