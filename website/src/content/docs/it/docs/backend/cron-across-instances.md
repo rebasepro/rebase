@@ -65,7 +65,7 @@ richiesta è stata servita da un processo `api` che non esegue timer. Sopravvive
 anche a riavvii e nuovi deploy: un job messo in pausa in Studio resta in pausa.
 
 `$TOKEN` è un token di accesso da amministratore e `$API_URL` l'indirizzo
-stampato da `rebase dev`; vedi l'[API REST](/docs/backend/cron-jobs/#rest-api).
+stampato da `rebase dev`; vedi l'[API REST](/docs/backend/cron-jobs-api/).
 
 ```bash
 # Mettere in pausa, per ogni processo, finché qualcuno non lo riprende

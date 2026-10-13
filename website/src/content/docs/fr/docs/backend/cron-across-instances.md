@@ -67,7 +67,7 @@ survit aussi aux redémarrages et aux redéploiements : une tâche mise en pause
 dans Studio reste en pause.
 
 `$TOKEN` est un jeton d'accès administrateur et `$API_URL` l'adresse affichée
-par `rebase dev` ; voir l'[API REST](/docs/backend/cron-jobs/#rest-api).
+par `rebase dev` ; voir l'[API REST](/docs/backend/cron-jobs-api/).
 
 ```bash
 # Mettre en pause, pour tous les processus, jusqu'à ce que quelqu'un la reprenne

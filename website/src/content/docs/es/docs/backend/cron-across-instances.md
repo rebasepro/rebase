@@ -65,7 +65,7 @@ petición la atendió un proceso `api` que no ejecuta temporizadores. También
 sobrevive a reinicios y redespliegues: una tarea pausada en Studio sigue pausada.
 
 `$TOKEN` es un token de acceso de administrador y `$API_URL` la dirección que
-imprimió `rebase dev`; consulta la [API REST](/docs/backend/cron-jobs/#rest-api).
+imprimió `rebase dev`; consulta la [API REST](/docs/backend/cron-jobs-api/).
 
 ```bash
 # Pausar, para todos los procesos, hasta que alguien la reanude

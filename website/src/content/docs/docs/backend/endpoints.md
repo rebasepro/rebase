@@ -134,7 +134,7 @@ a collection reaches none of this. See [Roles and scopes](/docs/backend/roles-an
 | `GET` | `/api/admin/cron/:id` | `cron:read` | [Cron Jobs](/docs/backend/cron-jobs/) |
 | `PUT` | `/api/admin/cron/:id` | `cron:write` | Enable or disable a job |
 | `GET` | `/api/admin/cron/:id/logs` | `cron:read` | [Cron Jobs](/docs/backend/cron-jobs/) |
-| `POST` | `/api/admin/cron/:id/trigger` | `cron:write` | Run a job now. <span class="since-badge" data-since="0.25">Since 0.25</span> `?async=1` answers `202` once it has started — [Cron Jobs](/docs/backend/cron-jobs/#example-trigger-a-job-manually) |
+| `POST` | `/api/admin/cron/:id/trigger` | `cron:write` | Run a job now. <span class="since-badge" data-since="0.25">Since 0.25</span> `?async=1` answers `202` once it has started — [Cron Jobs API](/docs/backend/cron-jobs-api/#example-trigger-a-job-manually) |
 | `GET` | `/api/admin/backups` | `backups:read` | Backup inventory |
 | `GET` | `/api/admin/backups/download` | `backups:read` | Streams one backup. With `?token=` from a download link, no header is needed, for that backup only |
 | `POST` | `/api/admin/backups/download-url` | `backups:read` | <span class="since-badge" data-since="0.25">Since 0.25</span> A link to one backup, `{ key }` → `{ url, token, expiresIn }`, good for 60 seconds — [Backups](/docs/deployment/backups/#download-a-backup) |

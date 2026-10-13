@@ -483,7 +483,7 @@ account has; `mfa.regenerateRecoveryCodes()` replaces them when asked.
 
 **What to change:** show the codes only when they are there, and offer
 regeneration where you offered re-enrolment. See
-[Enrolling a factor](/docs/sdk/authentication/#enrolling-a-factor).
+[Enrolling a factor](/docs/sdk/multi-factor-authentication/#enrolling-a-factor).
 
 ```diff lang="ts"
   const { totp, recoveryCodes } = await client.auth.mfa.enroll({ friendlyName: "Phone" });

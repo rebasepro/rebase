@@ -66,7 +66,7 @@ Sie übersteht außerdem Neustarts und Redeploys: Ein in Studio pausierter Job
 bleibt pausiert.
 
 `$TOKEN` ist ein Admin-Access-Token und `$API_URL` die Adresse, die
-`rebase dev` ausgegeben hat — siehe [REST-API](/docs/backend/cron-jobs/#rest-api).
+`rebase dev` ausgegeben hat — siehe [REST-API](/docs/backend/cron-jobs-api/).
 
 ```bash
 # Pausieren, für jeden Prozess, bis jemand ihn fortsetzt

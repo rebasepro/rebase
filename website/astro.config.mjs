@@ -194,6 +194,7 @@ export default defineConfig({
                         { label: "Vector Search", slug: "docs/backend/vector-search" },
                         { label: "Indexes", slug: "docs/backend/indexes" },
                         { label: "Cron Jobs", slug: "docs/backend/cron-jobs" },
+                        { label: "Cron Jobs API", slug: "docs/backend/cron-jobs-api" },
                         { label: "Cron across instances", slug: "docs/backend/cron-across-instances" },
                         { label: "Background Jobs", slug: "docs/backend/jobs" },
                         { label: "Custom Functions", slug: "docs/backend/custom-functions" },
@@ -261,6 +262,7 @@ export default defineConfig({
                         { label: "Aggregates & search", slug: "docs/sdk/aggregates-and-search" },
                         { label: "Relations", slug: "docs/sdk/relations" },
                         { label: "Authentication", slug: "docs/sdk/authentication" },
+                        { label: "Multi-Factor Authentication", slug: "docs/sdk/multi-factor-authentication" },
                         { label: "Realtime Subscriptions", slug: "docs/sdk/realtime" },
                         { label: "Offline & Local-First", slug: "docs/sdk/offline" },
                         { label: "Storage & Files", slug: "docs/sdk/storage" }

@@ -62,7 +62,7 @@ the worker, when the request was served by an `api` process that runs no timers.
 It also survives restarts and redeploys: a job paused in Studio stays paused.
 
 `$TOKEN` is an admin access token and `$API_URL` the address `rebase dev`
-printed — see the [REST API](/docs/backend/cron-jobs/#rest-api).
+printed — see the [REST API](/docs/backend/cron-jobs-api/).
 
 ```bash
 # Pause, for every process, until someone resumes it
