@@ -250,6 +250,53 @@
   `REBASE_LIVE_SCHEMA_COLLECTIONS_PATH` default to `main` and
   `config/collections`.
 
+- **`createRebaseBackend` builds a backend and mounts, starts and listens to
+  nothing: each of those is a call you make.** `routes.auth()`, `data()`,
+  `storage()`, `functions()`, `admin()`, `cron()` and `meta()` are the route
+  groups as Hono sub-apps. Each carries its own auth context, rate limits and
+  admin gate, so one can be mounted alone at any path, a parameterised one such
+  as `/:tenant/data` included, and `getUser(c)` and `getDriver(c)` work inside
+  it. `mount(app, { basePath })` is the whole layout `initializeRebaseBackend`
+  serves; `attachRealtime(server)`, `start()` (cron, job workers, sweeps) and
+  `shutdown()` are the rest. `backend.rebase` is the in-process client, and
+  `backend.fetch(request)` serves the whole backend as one fetch handler, for a
+  script or a test with no server. See "Custom Server Integration".
+
+- **Boot-time DDL is a decision: `createRebaseBackend` requires a provision
+  option, which is `true`, `false` or `{ collections, realtime }`.** `true` creates what
+  the backend serves: the collection tables and their RLS policies, change
+  capture, the request role and the framework's own tables. `false` opens the
+  database without changing it, for a script, a test or a second process.
+  `{ collections: false, realtime: false }` keeps the framework's tables and
+  the role, for a process that does not own the schema in a split deployment.
+  `initializeRebaseBackend` passes `true`, and `REBASE_MIGRATE_ON_BOOT=none`
+  still turns the collection schema off for any backend.
+
+- **Functions and cron jobs are values, and `loadFunctions` and `loadCrons`
+  read a directory into them.** `functions: { "send-invoice": sendInvoice }`
+  and `crons: { nightly: defineCron({ … }) }` sit beside `collections`; the
+  record key is the URL segment or the job id. `functions: await
+  loadFunctions(dir)` serves what `functionsDir: dir` serves, and the same holds
+  for crons; `onSkip` receives each file a loader skips. Loading declares
+  nothing: `declareCrons(crons)` records crons in the resource graph, for a
+  build step that wants them there. A directory and values for the same kind
+  are refused at boot, naming both.
+
+- **`composeCallbacks` combines several sets of collection callbacks into
+  one, the way the backend combines its own global, collection and property
+  tiers.** `beforeSave` and `afterRead` chain, `beforeQuery` narrowings are
+  AND-ed, any `false` from `beforeDelete` vetoes, and the `after*` hooks run
+  in order. From `@rebasepro/cms-types`, `@rebasepro/server` and
+  `@rebasepro/common`. `setCollectionCallbacks` still replaces a collection's
+  declared callbacks, and its warning now names `composeCallbacks(declared,
+  mine)` as the way to keep them.
+
+- **`createCallContext` builds the `context` a collection callback receives,
+  so a hook can be unit-tested by calling it.** Fields you pass are used as
+  they are; a missing `client`, `data` or `storageSource` throws on first use,
+  naming the field; `user` stays absent unless passed. From
+  `@rebasepro/server` and `@rebasepro/common`.
+
 #### Client SDK
 
 - **`findById(id, { include })` and `listenById(id, onUpdate, onError,
@@ -344,6 +391,10 @@
   `getConfigForPath` allowing the collection). A field's own
   `editorProps.aiController` still wins.
 
+- **`warnDeprecated(key, message)` from `@rebasepro/common` prints a
+  deprecation message once per process per key.** Rebase's own deprecated
+  names warn through it, and a plugin or library can use it for its own.
+
 #### Admin (CMS & app)
 
 - **Four translation keys name the split-view dividers and the drawer's
@@ -379,6 +430,27 @@
   field below it an AI controller for the editor's Autocomplete slash
   command.**
 
+- **`EntityFormPanel` and `CollectionsProvider` put one record's form, or one
+  collection's table, in a page of your own app.** `<CollectionPanel
+  collection={postsCollection}/>` now takes the collection as a value, and
+  `<EntityFormPanel collection={postsCollection} entityId="123"/>` loads one
+  record (or starts a new one without `entityId`) and saves it through
+  `<Rebase>`'s data layer, with `onSaved` and `onClose`. Both work under
+  `<Rebase>` and any React Router router, without `<RebaseCMS>`,
+  `<RebaseNavigation>` or `<RebaseShell>`, and bring their own
+  `CollectionsProvider` when none is above them. Records open over the page,
+  in a side panel or a dialog, never by URL.
+
+- **The `modeController` prop of `<Rebase>` hands Rebase your app's light and
+  dark mode.**
+  Rebase then leaves `<html>`, `prefers-color-scheme` and localStorage alone.
+  `useBuildModeController({ enabled: false })` builds an inert controller.
+
+- **Several layers can register collections with `<Rebase>` at once.** A
+  `CollectionResolverRegistrationContext` registration takes an optional
+  `owner` as its third argument, and `UrlController.routesMounted` is `false`
+  where no CMS route serves the page.
+
 #### CLI
 
 - **rebase doctor names a junction table no collection declares
@@ -407,6 +479,15 @@
 - **`REBASE_ATLAS_DEV_URL` names the empty database Atlas plans against,
   instead of the derived <db>_dev_diff.** Rebase neither creates nor drops a
   database named this way.
+
+- **`rebase console` opens a Node REPL with the project's data in scope.**
+  `rebase` is what `openRebase` returns and `collections` the project's
+  collections, with top-level await. The project, `.env`, database and
+  `--collections` are resolved the way `rebase db push` resolves them, and a
+  managed database is started if the project uses one. `rebase console -e
+  "<code>"` runs one snippet instead: an expression's value, or a function
+  body's `return`, is printed as JSON on stdout, with notices on stderr, and a
+  throw exits 1. History is kept in `.rebase/console_history`.
 
 #### CI & tooling
 
@@ -498,6 +579,12 @@
   Instead of counting it on every write; such frames carry `meta.totalAsOf`.
   Unset, every frame counts, as before. Each has a `realtime.*` option.
 
+- **`realtime.path` on the Postgres adapter, and `attachRealtime(server,
+  { path })`, set the URL path the realtime socket answers.** The default is
+  the base path given to `mount()` with a trailing `/api` removed (`/api` →
+  `/`, `/x/api` → `/x`), which is where the SDK dials. `RealtimeSocketOptions`
+  in `@rebasepro/types` carries it to a driver as `path`.
+
 #### Jobs & cron
 
 - **POST /api/admin/cron/:id/trigger?async=1 (and
@@ -507,6 +594,27 @@
   the run history as the entry with `manual: true` and that `startedAt`. A run
   that cannot start still answers `409`. The synchronous call is unchanged and
   stays the default.
+
+#### Postgres
+
+- **`openRebase` opens a project's data from a script, a REPL or a test, with
+  no server.** It returns `dataAsAdmin` and `sql`, the accessors a function
+  gets, `withAuth(user)` for that user's row-level-security-scoped `data`, and
+  `close()`. Opening changes nothing in the database and reads no environment
+  variable. Against a database no server has booted on, `withAuth` fails rather
+  than run unfiltered. From `@rebasepro/server-postgres`; see "Scripts and the
+  Console".
+
+- **`openPostgresDriver` and `postgresDriverConfigFromEnv` are the driver open
+  and the boot's environment reading, as two public pieces.**
+  `createPostgresAdapter` is one step above them, and `openPostgresDriver`
+  reads no environment variable. The adapter's `initializeDriver` config takes
+  `provision: false`, which opens the driver with no DDL of any kind, and
+  `realtime: false`, which takes no part in realtime.
+
+- **`realtime.cdc` and `directConnectionString` on the Postgres adapter
+  config** are the explicit forms of `REALTIME_CDC` and `DATABASE_DIRECT_URL`.
+  Both variables keep working, and still win or fill in as before.
 
 ### Changed
 
@@ -607,6 +715,19 @@
   deploy.** After a commit lands, the next apply is refused with
   `SCHEMA_CHANGE_FAILED`, naming the commit, until the commit is deployed.
 
+- **initializeRebaseBackend is now the public steps it stands for:
+  createRebaseBackend, mount, attachRealtime and start.** Its options, routes
+  and behaviour are unchanged, and its `shutdown()` still closes the server it
+  was given; a backend from `createRebaseBackend` closes one only when passed
+  `{ server }`. `RebaseBackendInstance` is now `RebaseBackend`, a superset of
+  its old members. To change one step, copy those lines and change it.
+
+- **The server client's control-plane calls (rebase.auth, rebase.admin,
+  rebase.functions, rebase.cron) reach the backend's own routes in-process,
+  not the application's Hono app.** They work wherever, or whether, the routes
+  are mounted. Middleware the application added to its own app no longer runs
+  on them.
+
 #### Postgres
 
 - **A server booting against an unchanged database runs about a tenth of the
@@ -656,6 +777,18 @@
 - **Schema planning scales linearly with the number of collections.** At 1,000
   collections it takes 55 ms instead of 164. Boot, `rebase db push` and
   `rebase db generate` plan the schema.
+
+- **The Postgres adapter reads its environment variables on the boot path,
+  through postgresDriverConfigFromEnv, not while the driver opens.** Every
+  variable and its precedence is unchanged. A mistyped
+  `REALTIME_MAX_SOCKETS_PER_USER` now fails `initializeDriver` instead of
+  `initializeWebsockets`, with the same message.
+  `createPostgresDatabaseConnection` and `resolveChannelBusSetting` take an
+  optional trailing `env`.
+
+- **collectionRegistry is optional on the adapter's initializeDriver config;**
+  no bundled driver reads it, so a script no longer passes
+  `collectionRegistry: undefined as never`.
 
 #### Realtime
 
@@ -730,6 +863,12 @@
   The SDK asks for `cancel_sql` on the socket URL (`?rebase_caps=…,cancel_sql`)
   and sends `CANCEL_SQL { requestId }` (an admin-plane frame,
   `database:write`) only to a server whose `hello` lists it.
+
+- **The realtime socket answers WebSocket upgrades on its own path only,**
+  `/` for an API at `/api`, which is where the SDK dials. An upgrade to any
+  other path is left to the host app's own `upgrade` listeners, or answered
+  404 when there are none. Before, the socket took every upgrade on the
+  server (see Fixed).
 
 #### Admin (CMS & app)
 
@@ -850,6 +989,18 @@
 - **CollectionViewHeaderAction and PropertyAddColumnComponent are removed.**
   They were not exported and mounted nowhere.
 
+- **Component overrides compose across scopes: a collection's wrap override
+  receives the app's override of the same component as OriginalComponent.**
+  Before, it always received the built-in component. A collection override
+  that replaces the component still replaces both.
+
+- **When Rebase owns the theme, it removes the dark class it added to the
+  html element when it unmounts.** A `dark` class the page already had is
+  left.
+
+- **@rebasepro/cms-types depends on @rebasepro/common,** for the
+  `composeCallbacks` it re-exports.
+
 #### UI kit & plugins
 
 - **Importing one component from `@rebasepro/ui` bundles that component, not
@@ -881,6 +1032,13 @@
 - **The editor's slash autocomplete sends at most 8,000 characters on each
   side of the cursor (`MAX_AUTOCOMPLETE_CONTEXT`).** That is exactly what the
   hosted service reads. It used to upload the whole document on every request.
+
+- **Plugin field wrappers compose: every plugin's `fieldBuilder.wrap` gets
+  the field as the plugins before it left it, and all the wrappers render.**
+  `params.Field` is the previous plugin's wrapper, so the first plugin's is
+  innermost; a plugin that returns `null` or `enabled: false` passes the field
+  on unchanged. Before, only the last plugin that returned a wrapper
+  rendered.
 
 #### Studio
 
@@ -976,6 +1134,15 @@
 
 - **etagOf and withETag now live in @rebasepro/common.** `@rebasepro/client`
   still exports `etagOf`.
+
+- **The realtime socket gets its token the way HTTP requests do: the token
+  getter first, then the held token (the session, setToken() or the token
+  option).** After a sign-out it no longer falls back to the `token` option,
+  which HTTP never did. Installing a token getter or calling `setToken()`
+  rebuilds an open socket, so it authenticates as the new credential.
+
+- **The token client option is read each time a token is needed,** so it may
+  be declared as a getter, on HTTP as well as on the socket.
 
 #### Storage & email
 
@@ -1109,6 +1276,37 @@
   console still uses `client.ws`, so those methods stay until it has another
   path.
 
+- **`client.ws.setAuthTokenGetter()` is deprecated: use
+  `client.setAuthTokenGetter()`, which authenticates HTTP and the socket
+  together.** It keeps its old meaning, the socket alone, and warns once.
+
+#### Server & REST
+
+- **`loadFunctionsFromDirectory` and `loadFunctionsWithDiagnostics` are
+  deprecated: use `loadFunctions(dir)`, with `onSkip` for the skipped
+  files.** Both keep their old shape and behaviour, and warn once per
+  process.
+
+- **`loadCronJobsFromDirectory` and `loadCronJobsWithDiagnostics` are
+  deprecated: use `loadCrons(dir)`, and `declareCrons(crons)` where the old
+  pair declared them.** Both keep their old shape and behaviour, still declare
+  what they load, and warn once per process.
+
+- **`DatabaseAdapter.mountRoutes` and `BackendBootstrapper.mountRoutes` are
+  deprecated.** The server never called them, and its adapter wrappers no
+  longer forward them. The types still accept them. A driver that needs HTTP
+  routes exports a route factory for the application to mount.
+
+#### UI kit & plugins
+
+- **The plugin hooks `hooks.modifyCollectionAsync` and
+  `lifecycle.onCollectionChange` are deprecated; neither was ever called.**
+  Fetch the data before rendering `<Rebase>` and build the plugin from it, so
+  its `hooks.modifyCollection` reads data it already has; subscribe with
+  `context.data.collection(slug).listen(…)` from `lifecycle.onMount`,
+  unsubscribing in `onUnmount`. A plugin that sets either still compiles, and
+  `<Rebase>` warns once per plugin, naming the replacement.
+
 ### Fixed
 
 #### Server & REST
@@ -1206,6 +1404,9 @@
 - **SCHEMA_EDITOR_DISABLED and SCHEMA_EDITOR_PRODUCTION now say how to edit
   collections from a deployment.**
 
+- **`GET /api/auth/config` is no longer served by a process with the auth
+  surface off,** such as the `functions` and `worker` roles.
+
 #### Postgres
 
 - **A server that boots while a long report, transaction or `pg_dump` reads
@@ -1264,6 +1465,13 @@
   when it cannot append the RLS policies, search, vector or trigger DDL to
   it.** It used to warn and say "You can now run rebase db migrate", and that
   migration created its tables with RLS off.
+
+- **A backend created with provision false no longer creates or migrates the
+  auth tables, creates the history table and its function, or re-grants the
+  request role after the driver opens.**
+
+- **`readConnectionString` on the Postgres adapter config is honoured.** It
+  was declared and ignored, and only `DATABASE_READ_URL` worked.
 
 #### CLI
 
@@ -1498,6 +1706,18 @@
   (`false` for a `DEFAULT true` column), and the first push planned
   `DROP DEFAULT` on every such column.
 
+- **Record forms, side panels and split views no longer throw outside a React
+  Router data router.** `NavigationBlockerProvider` works under any router;
+  under a plain `<BrowserRouter>`, unsaved-changes guards fall back to the
+  browser's leave-page prompt.
+
+- **Importing @rebasepro/app no longer adds a resize listener to window or
+  reads matchMedia;** `useLargeLayout` listens only while something reads
+  it.
+
+- **A record form reported each save twice:** `onSaved`, and the side
+  panel's `onUpdate`, ran twice per save.
+
 #### Studio
 
 - **The SQL console's CSV export follows RFC 4180.** Values with commas,
@@ -1548,6 +1768,10 @@
   `NOT_FOUND`, as REST does, and a frame with an unknown `type` with
   `UNKNOWN_MESSAGE_TYPE`.** They were answered `INTERNAL_ERROR`, or left to
   time out.
+
+- **A host app running its own WebSocket server on the same http.Server no
+  longer collides with the realtime socket** ("handleUpgrade() was called more
+  than once").
 
 #### Client SDK
 
@@ -1624,6 +1848,15 @@
 - **upsert() errors no longer carry the bulk route's `Row 0 of 1 (id …)
   failed:` prefix.** Code, status and details are unchanged, and `createMany`
   keeps the prefix.
+
+- **`client.setAuthTokenGetter()` authenticates the realtime socket as well
+  as HTTP requests.** A host signing users in with its own provider (Clerk,
+  Firebase Auth, its own session) got an anonymous socket, so its live queries
+  ran as a visitor. `client.setToken()` and `client.setOnUnauthorized()` reach
+  the socket too.
+
+- **An HTTP request made while a token refresh was in flight no longer goes
+  out with the token of an account that signed out during that refresh.**
 
 #### Auth
 
@@ -1858,6 +2091,12 @@
 
 - **Multi-factor authentication with the SDK has its own page,**
   "Multi-Factor Authentication" (`/docs/sdk/multi-factor-authentication/`).
+
+#### Server & REST
+
+- **Scripts and the console have their own page,** "Scripts and the Console"
+  (`/docs/backend/scripts/`), and "Custom Server Integration" teaches the
+  backend as public pieces.
 
 ## [0.24.0] - 2026-10-08
 
