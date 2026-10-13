@@ -1,79 +1,183 @@
 import React from "react";
-import { AbsoluteFill, interpolate, OffthreadVideo, Sequence, staticFile, useCurrentFrame } from "remotion";
-import { ramp } from "../components/motion";
-import { BEAT, FPS } from "./score";
-import { Vignette } from "./kit";
+import { AbsoluteFill, Easing, interpolate, OffthreadVideo, staticFile, useCurrentFrame, useVideoConfig } from "remotion";
+import { Code } from "../components/Code";
+import { pop, ramp, SHIFT, SPRING } from "../components/motion";
+import { FONT, FRAME, INK, SURFACE } from "../theme";
+import { LEAD } from "./kit";
+import { BAR, BEAT, FPS } from "./score";
 
 /**
- * The first two bars: the product, up close, cut every two beats.
+ * The first two bars: the whole product at once.
  *
- * No type and no window — just the real panel and Studio, magnified until
- * the UI is texture, the way a teaser opens on a detail before it says what
- * the thing is. Footage is the demo's own (public/demo, 2560x1600 renders of
- * the live demo), so every frame here is the shipped product.
+ * A wall of live windows — cards, tables, a board, records, the schema
+ * editor, SQL, and the one file they all come from — tilted away from the
+ * camera, dealt in from the centre on the first three beats, drifting while
+ * it pulses with the kick, then flown through into the headline.
+ *
+ * It replaced four macro close-ups of the same footage. Those were Teasr's
+ * opening for a hardware product, where a close-up of a knob is a beautiful
+ * object; a close-up of an admin panel is a cropped word ("ee maker"), and
+ * at 2x the footage was the softest image in the film (3x upscaled in the 4K
+ * master). Every tile here shows its clip at or below its native size, so the
+ * opening is as sharp as everything after it, and it says what the product
+ * IS — a lot of real screens — before the headline says it in words.
  */
 
-interface MacroShot {
-    file: string;
+interface Tile {
+    file?: string;
     /** Seconds into the clip. */
-    from: number;
-    rate?: number;
-    /** Point of the clip held at frame centre, as fractions, start → end. */
-    focus: [[number, number], [number, number]];
-    zoom: [number, number];
+    from?: number;
+    position?: string;
 }
 
-const SHOT = BEAT * 2;
+const COLLECTION = `export const products = defineCollection({
+  slug: "products",
+  table: "products",
+  name: "Products",
+  properties: {
+    name: { name: "Name", type: "string" },
+    price: { name: "Price", type: "number" },
+    in_stock: { name: "In stock", type: "boolean" },
+  },
+});`;
 
-const SHOTS: MacroShot[] = [
-    // The product grid, scrolling: photos, prices, status chips.
-    { file: "demo/panel.mp4", from: 0.3, focus: [[0.36, 0.34], [0.46, 0.4]], zoom: [1.9, 2.1] },
-    // Studio's SQL editor mid-keystroke, its autocomplete open.
-    { file: "demo/studio.mp4", from: 8.5, rate: 1.4, focus: [[0.34, 0.08], [0.4, 0.1]], zoom: [2.3, 2.5] },
-    // The schema editor: an enum's values, one per row.
-    { file: "demo/schema.mp4", from: 5.4, focus: [[0.72, 0.66], [0.76, 0.6]], zoom: [2.1, 2.3] },
-    // Orders, scrolling past: the status column.
-    { file: "demo/orders.mp4", from: 1.2, rate: 1.3, focus: [[0.36, 0.44], [0.46, 0.5]], zoom: [2.0, 2.2] },
+/** Row by row. The empty tile is the collection file, at the centre, so the
+ *  first thing to land is the thing the rest is generated from. */
+const WALL: Tile[][] = [
+    [
+        { file: "demo/bento/b_cards.mp4", from: 2.5 },
+        { file: "demo/orders.mp4", from: 1 },
+        { file: "demo/bento/b_tickets.mp4", from: 2 },
+        { file: "demo/studio.mp4", from: 15.8 },
+    ],
+    [
+        { file: "demo/bento/b_customers.mp4", from: 2 },
+        {},
+        { file: "demo/panel.mp4", from: 0.3 },
+        { file: "demo/schema.mp4", from: 5 },
+    ],
+    [
+        { file: "demo/bento/b_posts.mp4", from: 2.5 },
+        { file: "demo/bento/b_record.mp4", from: 2, position: "center top" },
+        { file: "demo/bento/b_exercises.mp4", from: 2 },
+        { file: "demo/bento/b_authors.mp4", from: 2 },
+    ],
 ];
 
-/** The clip fills the frame at `zoom` x its cover size; the focus point is
- *  held at centre unless that would show past the clip's edge. */
-const Macro: React.FC<{ shot: MacroShot }> = ({ shot }) => {
+const TILE = { w: 600, h: 375, gap: 30 } as const;
+const COLS = WALL[0].length;
+const ROWS = WALL.length;
+const W = COLS * TILE.w + (COLS - 1) * TILE.gap;
+const H = ROWS * TILE.h + (ROWS - 1) * TILE.gap;
+
+/** Centre-out rings. The middle two are already there on the first frame (an
+ *  opening frame with two small tiles on it is an empty frame); the six
+ *  around them land on the first kick, the corners on the second. */
+const ring = (r: number, c: number) => Math.floor(Math.abs(r - (ROWS - 1) / 2) + Math.abs(c - (COLS - 1) / 2));
+
+/** The flight out: accelerating, so it reads as moving through, not fading. */
+const EXIT_AT = BAR * 2 - 22;
+const EXIT = Easing.bezier(0.55, 0, 1, 0.45);
+
+const CollectionFile: React.FC = () => (
+    <div style={{ position: "absolute", inset: 0, background: SURFACE.well }}>
+        <div
+            style={{
+                height: 40,
+                display: "flex",
+                alignItems: "center",
+                padding: "0 18px",
+                borderBottom: `1px solid ${SURFACE.hairline}`,
+                fontFamily: FONT.mono,
+                fontSize: 15,
+                color: INK.copy,
+            }}
+        >
+            collections/products.ts
+        </div>
+        <div style={{ padding: "18px 22px", fontVariantLigatures: "none" }}>
+            <Code code={COLLECTION} size={16} delay={-60} />
+        </div>
+    </div>
+);
+
+const TileView: React.FC<{ tile: Tile; r: number; c: number }> = ({ tile, r, c }) => {
     const frame = useCurrentFrame();
-    const t = frame / SHOT;
-    // A short punch on the cut: the shot lands slightly closer and settles.
-    const punch = 1 + 0.06 * (1 - ramp(frame, 0, 14));
-    const zoom = interpolate(t, [0, 1], shot.zoom) * punch;
-    const fx = interpolate(t, [0, 1], [shot.focus[0][0], shot.focus[1][0]]);
-    const fy = interpolate(t, [0, 1], [shot.focus[0][1], shot.focus[1][1]]);
-
-    const w = 1920 * zoom;
-    const h = 1200 * zoom;
-    const left = Math.min(0, Math.max(1920 - w, 960 - fx * w));
-    const top = Math.min(0, Math.max(1080 - h, 540 - fy * h));
-
+    const { fps } = useVideoConfig();
+    const p = pop(frame, fps, (ring(r, c) - 1) * BEAT - LEAD, SPRING.card);
     return (
-        <AbsoluteFill style={{ overflow: "hidden", background: "#000" }}>
-            <div style={{ position: "absolute", left, top, width: w, height: h }}>
+        <div
+            style={{
+                position: "absolute",
+                left: c * (TILE.w + TILE.gap),
+                top: r * (TILE.h + TILE.gap),
+                width: TILE.w,
+                height: TILE.h,
+                borderRadius: FRAME.radius,
+                border: FRAME.border,
+                background: FRAME.background,
+                overflow: "hidden",
+                opacity: Math.min(1, p * 1.5),
+                transform: `translateY(${(1 - p) * 60}px) scale(${0.9 + 0.1 * p})`,
+            }}
+        >
+            {tile.file ? (
                 <OffthreadVideo
-                    src={staticFile(shot.file)}
-                    trimBefore={Math.round(shot.from * FPS)}
-                    playbackRate={shot.rate ?? 1}
+                    src={staticFile(tile.file)}
+                    trimBefore={Math.round((tile.from ?? 0) * FPS)}
                     muted
-                    style={{ width: "100%", height: "100%" }}
+                    style={{
+                        width: "100%",
+                        height: "100%",
+                        objectFit: "cover",
+                        objectPosition: tile.position ?? "left top",
+                    }}
                 />
-            </div>
-            <Vignette />
-        </AbsoluteFill>
+            ) : (
+                <CollectionFile />
+            )}
+        </div>
     );
 };
 
-export const Hook: React.FC = () => (
-    <AbsoluteFill>
-        {SHOTS.map((shot, i) => (
-            <Sequence key={shot.file} from={i * SHOT} durationInFrames={SHOT}>
-                <Macro shot={shot} />
-            </Sequence>
-        ))}
-    </AbsoluteFill>
-);
+export const Hook: React.FC = () => {
+    const frame = useCurrentFrame();
+    const length = BAR * 2;
+
+    // A slow diagonal drift across the wall, a turn on the second downbeat,
+    // and a pulse on every kick.
+    const panX = interpolate(frame, [0, length], [150, -150]);
+    const panY = interpolate(frame, [0, length], [50, -40]);
+    const turn = ramp(frame, BAR, 40, SHIFT);
+    const rotateZ = -12 + 4 * turn;
+    const pump = 0.014 * Math.exp(-(frame % BEAT) / 7);
+    const exit = ramp(frame, EXIT_AT, 22, EXIT);
+    const scale = interpolate(frame, [0, length], [0.98, 1.06]) * (1 + pump) * (1 + 0.45 * exit);
+
+    return (
+        <AbsoluteFill
+            style={{
+                perspective: 2400,
+                perspectiveOrigin: "50% 40%",
+                opacity: 1 - exit,
+                // The wall's far edges dissolve into the ground rather than
+                // being cut by the frame.
+                maskImage: "radial-gradient(ellipse 62% 66% at 50% 50%, #000 55%, transparent 100%)",
+                WebkitMaskImage: "radial-gradient(ellipse 62% 66% at 50% 50%, #000 55%, transparent 100%)",
+            }}
+        >
+            <div
+                style={{
+                    position: "absolute",
+                    left: "50%",
+                    top: "50%",
+                    width: W,
+                    height: H,
+                    transform: `translate(-50%, -50%) translate(${panX}px, ${panY}px) rotateX(24deg) rotateZ(${rotateZ}deg) scale(${scale})`,
+                }}
+            >
+                {WALL.map((row, r) => row.map((tile, c) => <TileView key={`${r}-${c}`} tile={tile} r={r} c={c} />))}
+            </div>
+        </AbsoluteFill>
+    );
+};

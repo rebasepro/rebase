@@ -345,13 +345,3 @@ export const Drift: React.FC<{ children: React.ReactNode; frames: number }> = ({
     );
 };
 
-/** A soft darkening at the frame's edges, for full-bleed footage. */
-export const Vignette: React.FC = () => (
-    <div
-        style={{
-            position: "absolute",
-            inset: 0,
-            background: "radial-gradient(ellipse at center, rgba(0,0,0,0) 55%, rgba(0,0,0,0.55) 100%)",
-        }}
-    />
-);
