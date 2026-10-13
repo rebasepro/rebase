@@ -12,7 +12,7 @@ import { toFilterTuples } from "../data/filter-conditions";
  * makes them one set, so neither has to know about the other:
  *
  * ```ts
- * import { composeCallbacks, defineCollection } from "@rebasepro/cms-types";
+ * import { composeCallbacks, defineCollection } from "@rebasepro/common";
  *
  * export default defineCollection({
  *     slug: "posts",
@@ -20,6 +20,9 @@ import { toFilterTuples } from "../data/filter-conditions";
  *     callbacks: composeCallbacks(auditTrail, slugFromTitle)
  * });
  * ```
+ *
+ * `@rebasepro/cms-types` and `@rebasepro/server` re-export it, so a collection
+ * file written against the panel's `defineCollection` takes both from there.
  *
  * Each hook combines exactly as the backend combines its own tiers — global,
  * then collection, then property — so composing two sets into the collection's
