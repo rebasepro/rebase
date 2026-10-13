@@ -15,7 +15,7 @@
  * fine**. Boot created every table through the additive ensure, registration
  * worked, the admin panel loaded — and every `GET /api/data/*` answered 500,
  * because the driver looks a table up in `backend/src/schema.generated.ts`,
- * which the scaffold ships as `export const tables = {}`. On the container path
+ * which the scaffold then shipped as `export const tables = {}`. On the container path
  * `db push` rewrote that file as step one of three. On this path nothing did.
  * Nothing in the suite noticed, because nothing in the suite took this path.
  *
@@ -108,16 +108,19 @@ describe("the documented first run", () => {
         expect(backend?.output()).toContain("managed development database");
     });
 
-    it("regenerates the schema the scaffold ships as a stub", () => {
-        // The precondition, asserted rather than assumed: a template that starts
-        // shipping a real schema changes what this file is guarding.
-        expect(shippedSchema).toContain("export const tables = {}");
+    it("regenerates exactly the schema the scaffold ships", () => {
+        // The scaffold ships each preset's real generated schema, so the
+        // regeneration `dev` runs before anything else must rewrite nothing.
+        // When it did — a 13-line stub became the 127-line schema — the file
+        // was dirty before the user had touched anything, and the Studio's
+        // first schema edit was refused with SCHEMA_EDIT_DIRTY_TREE.
+        expect(shippedSchema).not.toContain("export const tables = {}");
 
         const generated = fs.readFileSync(
             path.join(projectDir, "backend", "src", "schema.generated.ts"),
             "utf8"
         );
-        expect(generated).not.toContain("export const tables = {}");
+        expect(generated).toBe(shippedSchema);
         expect(generated).toContain("posts");
     });
 

@@ -730,7 +730,8 @@ async function createProject(options: InitOptions) {
         if (options.introspect && options.preset !== "blank") {
             console.log(chalk.gray("  Using the blank template: collections will come from your database."));
         }
-        await applyPreset(options.targetDirectory, options.introspect ? "blank" : options.preset);
+        const applied = await applyPreset(options.targetDirectory, options.introspect ? "blank" : options.preset);
+        writeShippedSchema(options.targetDirectory, applied);
     }
 
     // Reduce the project to the selected shape
@@ -798,9 +799,9 @@ async function createProject(options: InitOptions) {
                     cwd: options.targetDirectory,
                     stdio: "inherit"
                 });
-                // The template ships a schema.generated.ts for the example blog
-                // collections; regenerate it from the introspected collections or
-                // the backend serves a schema that doesn't match the database.
+                // The scaffold holds the blank preset's schema.generated.ts;
+                // regenerate it from the introspected collections or the
+                // backend serves a schema that doesn't match the database.
                 await execa(generateCmd[0], generateCmd.slice(1), {
                     cwd: options.targetDirectory,
                     stdio: "inherit"
@@ -1053,7 +1054,8 @@ async function writeProjectPackageManagerIntoManifest(
     }
 }
 
-async function applyPreset(targetDirectory: string, preset: TemplatePreset): Promise<void> {
+/** Swap in the preset's collection files. Returns the preset actually applied. */
+async function applyPreset(targetDirectory: string, preset: TemplatePreset): Promise<TemplatePreset> {
     const collectionsDir = path.join(targetDirectory, "config", "collections");
     const presetsDir = path.join(collectionsDir, "presets");
 
@@ -1062,7 +1064,7 @@ async function applyPreset(targetDirectory: string, preset: TemplatePreset): Pro
         if (!fs.existsSync(presetDir)) {
             console.warn(chalk.yellow(`  Warning: Preset "${preset}" not found, falling back to blog template.`));
             cleanupPresets(presetsDir);
-            return;
+            return "blog";
         }
 
         // Remove the default blog collection files (keep users.ts — it's shared)
@@ -1086,6 +1088,40 @@ async function applyPreset(targetDirectory: string, preset: TemplatePreset): Pro
 
     // Always clean up the presets directory — it shouldn't ship with the final project
     cleanupPresets(presetsDir);
+    return preset;
+}
+
+/**
+ * Where the generated Drizzle schema for each preset ships, beside the template.
+ *
+ * `rebase dev` regenerates `backend/src/schema.generated.ts` on every start, and
+ * the Studio's schema editor refuses to commit over a dirty copy of it — a
+ * schema change must not sweep up somebody's work in progress. So whatever
+ * `init` writes there, and commits under `--git`, has to be byte-for-byte what
+ * that first regeneration produces. A stub (`export const tables = {}`) was
+ * rewritten on the first `rebase dev`, and every new project's first Studio
+ * edit was refused with `SCHEMA_EDIT_DIRTY_TREE` before its owner had changed
+ * a thing.
+ *
+ * The file cannot be generated here: generation loads the collection files,
+ * and they import `@rebasepro/cms-types`, which the project does not have
+ * until it is installed — `init --git` without `--install` commits first. So
+ * each preset's output is generated in this repository and shipped, and
+ * `init-generated-schema.test.ts` fails the moment one of them differs from
+ * what the generator writes for that preset's collections.
+ *
+ * Outside `templates/template` on purpose: a preset's schema must not be
+ * copied into a project that chose another preset.
+ */
+export function shippedSchemaPath(preset: TemplatePreset): string {
+    return path.resolve(cliRoot!, "templates", "generated-schemas", `${preset}.ts`);
+}
+
+/** Write the preset's generated schema to `backend/src/schema.generated.ts`. */
+function writeShippedSchema(targetDirectory: string, preset: TemplatePreset): void {
+    const destination = path.join(targetDirectory, "backend", "src", "schema.generated.ts");
+    fs.mkdirSync(path.dirname(destination), { recursive: true });
+    fs.copyFileSync(shippedSchemaPath(preset), destination);
 }
 
 function cleanupPresets(presetsDir: string): void {

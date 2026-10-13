@@ -11,7 +11,7 @@ import os from "os";
 import { cp } from "fs/promises";
 import inquirer from "inquirer";
 import net from "net";
-import { configureEnvFile, buildInitQuestions, validateProjectName, formatCdTarget, printInitHelp, resolveRuntimeImageTag, isPortAvailable, TEMPLATE_PLACEHOLDER_FILES, INIT_FLAGS, scaffoldDirectoryConflicts, scaffoldConflictMessage, initGitRepository, SCAFFOLD_TOLERATED_ENTRIES, agentNextSteps } from "./init.js";
+import { configureEnvFile, buildInitQuestions, validateProjectName, formatCdTarget, printInitHelp, resolveRuntimeImageTag, isPortAvailable, TEMPLATE_PLACEHOLDER_FILES, INIT_FLAGS, scaffoldDirectoryConflicts, scaffoldConflictMessage, initGitRepository, SCAFFOLD_TOLERATED_ENTRIES, agentNextSteps, shippedSchemaPath } from "./init.js";
 import { getPMCommands } from "../utils/package-manager.js";
 import { execFileSync } from "child_process";
 import { SCAFFOLD_DEFAULT_PORT } from "./dev.js";
@@ -139,8 +139,14 @@ describe("template structure", () => {
         expect(fs.existsSync(path.join(TEMPLATE_DIR, "README.md"))).toBe(true);
     });
 
-    it("contains the generated schema", () => {
-        expect(fs.existsSync(path.join(TEMPLATE_DIR, "backend", "src", "schema.generated.ts"))).toBe(true);
+    it("ships a generated schema per preset, and none inside the template", () => {
+        // `init` writes the chosen preset's copy; one inside the template would
+        // be copied into every project whatever its preset, and would have to
+        // be the wrong schema for two of the three. See shippedSchemaPath.
+        expect(fs.existsSync(path.join(TEMPLATE_DIR, "backend", "src", "schema.generated.ts"))).toBe(false);
+        for (const preset of ["blog", "ecommerce", "blank"] as const) {
+            expect(fs.existsSync(shippedSchemaPath(preset)), preset).toBe(true);
+        }
     });
 
     it("scaffolds NO backend entry point, because the runtime never loads one", () => {
