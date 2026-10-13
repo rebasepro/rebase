@@ -135,7 +135,7 @@ booting and prints that line.
 | Command | Description |
 |---------|-------------|
 | `rebase schema generate` | Generate Drizzle schema from collection definitions |
-| `rebase schema introspect` | Introspect a live database → generate Rebase collection files |
+| `rebase schema introspect` | Introspect a live database → generate Rebase collection files. Since 0.25 each table's RLS policies land in its `securityRules` (the `<table>_default_*` ones Rebase adds are left out), so the `db push` after it keeps them |
 | `rebase schema stale` | Report generated schema files the collections have moved past. `--fix` regenerates them |
 | `rebase schema --help` | Show schema command help |
 
@@ -162,7 +162,7 @@ booting and prints that line.
 | `rebase db push` | Apply schema directly to database (development only) |
 | `rebase db generate` | Generate SQL migration files |
 | `rebase db migrate` | Run pending SQL migrations |
-| `rebase db branch` | Database branching (create, list, switch, delete, info, prune) — needs a real PostgreSQL |
+| `rebase db branch` | Database branching (create, list, switch, delete, info, prune) — needs a real PostgreSQL. `prune` asks first; with no terminal it needs `--yes`, and since 0.25 it exits 1 without it |
 | `rebase db backup` | Write a backup of the current database (default `./backups` where you run `rebase`; unknown options are refused) |
 | `rebase db backups list` | List the backups taken so far |
 | `rebase db restore` | Restore the database from a backup |

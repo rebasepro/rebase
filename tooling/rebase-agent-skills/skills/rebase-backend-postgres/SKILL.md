@@ -655,6 +655,9 @@ The `shutdown(timeoutMs?: number, options?: { server })` method (default timeout
 ## Important Notes
 
 - **To import a legacy database**, use `rebase schema introspect` to generate Rebase Collections.
+  Since 0.25 it writes each table's RLS policies into the collection's `securityRules`, so the
+  `db push` after it recreates them as they were; on 0.24 a push could drop a hand-written
+  policy named like a generated one (`<table>_<op>_<hash>`).
 - **Never use `schema introspect` then `db migrate`** — introspected databases already have the tables
 - **Always backup before production migrations** — `ALTER COLUMN` or `DROP COLUMN` can cause data loss
 - **Tables not in schema are ignored** — custom tables and internal Rebase tables are safe

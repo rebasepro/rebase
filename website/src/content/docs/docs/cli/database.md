@@ -69,6 +69,9 @@ and the default `./backups`, resolve against the directory you run `rebase`
 from, so the three lines above meet in one directory; an option a command does
 not take is refused before anything runs. On 0.24 the default is
 `backend/backups`, so list it with `--out ./backups`.
+<span class="since-badge" data-since="0.25">Since 0.25</span> The dump and its roles file are readable by you only (0600), and
+against a database that is not running, `backup` and `restore` print the
+banner `db push` does. On 0.24 dumps are 0644.
 Scheduling, the roles file that travels with each dump, and the restore procedure are in [Backups and restore](/docs/deployment/backups/).
 
 ### `rebase db pull`
@@ -152,8 +155,11 @@ what is holding the database open; `--force` disconnects those sessions first.
 Every branch is a full copy on disk, so they need clearing out. `prune` removes
 three things: an entry whose database was dropped outside Rebase, a branch
 database whose entry was never written, and — only with `--older-than` — branches
-past an age you name. It asks before removing anything unless you pass `--yes`;
-with no terminal to ask on, such as in CI, it removes nothing and exits 0.
+past an age you name. It asks before removing anything unless you pass `--yes`.
+<span class="since-badge" data-since="0.25">Since 0.25</span> With no terminal to ask on, such as in CI, it removes nothing, says to
+pass `--yes`, and exits 1; on 0.24 it says "Nothing was changed." and exits 0.
+`list` and `info` only read: a database no branch was made on has none, and
+they create no `rebase` schema there. On 0.24 they create the registry.
 
 `switch` records the branch in `.rebase/branch.json` and never edits `.env`. It
 takes precedence over `DATABASE_URL` in `.env` and loses to `--database-url` or a

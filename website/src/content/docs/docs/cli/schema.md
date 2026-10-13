@@ -86,6 +86,21 @@ rebase schema introspect
 - Connects to your database (using the connection string from your `.env`)
 - Inspects all tables, columns, types, and foreign keys
 - Generates collection definition files
+- <span class="since-badge" data-since="0.25">Since 0.25</span> Reads each
+  table's row-level security policies into its collection's `securityRules`:
+  name, command, mode, `TO` list, `USING` and `WITH CHECK`. The
+  `<table>_default_*` policies Rebase adds itself are left out. So the
+  `db push` after it recreates every policy as it was. On 0.24 the policies
+  stay out of the files, and a push can drop one whose name has the shape a
+  generated policy has (`<table>_<op>_<hash>`)
+- <span class="since-badge" data-since="0.25">Since 0.25</span> Generates a
+  table whose policies give each user their own rows (they read `rebase.uid()`,
+  `app.uid` or the JWT) as an entity in the navigation, however few rows it
+  has. On 0.24 a small table is a code list, and a table owned through another
+  is hidden as its child
+- <span class="since-badge" data-since="0.25">Since 0.25</span> Against a
+  database that is not running, prints the same banner `db push` does, once,
+  and creates nothing. It prints the output directory as an absolute path
 
 **Options:**
 
@@ -190,6 +205,8 @@ That used to matter a great deal: Postgres ORs `PERMISSIVE` policies together, s
 `db push` now reconciles this: it drops generated policies that no longer match any rule, and reports — without dropping — any custom-named policy your collections don't describe, since those are indistinguishable from SQL someone wrote deliberately.
 
 To audit a database that was pushed before this landed, run `rebase doctor --policies`. It works as a CI gate: it exits non-zero on drift, and also when it could not run the check at all — no `DATABASE_URL`, a `--collections` path that does not resolve, a `pg_policies` read the CI role is not granted. A gate that could not look has not passed.
+
+<span class="since-badge" data-since="0.25">Since 0.25</span> `doctor` and `db push` tell the two kinds of orphan apart. A policy with a generated name was superseded, and the next push drops it. Any other name was written by hand or by another tool and is still in force: describe it in its collection's `securityRules` to keep it (Studio's RLS view imports it), or drop it by hand if it is stale. On 0.24 both are "left behind by an earlier push".
 :::
 
 :::caution

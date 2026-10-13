@@ -159,6 +159,12 @@ Preview it with `rebase eject --dry-run`, which lists what would change and
 changes nothing. `--force` replaces an existing `backend/src/index.ts` or
 `env.ts`, keeping the current file as `<name>.bak`.
 
+<span class="since-badge" data-since="0.25">Since 0.25</span> The ejected server
+keeps local uploads in the project's `uploads/`, run from source or compiled, as
+`rebase dev` does. It runs in `backend/`, so a relative `STORAGE_PATH` there is
+read from `backend/`. On 0.24 the compiled server uses `backend/dist/uploads`,
+which the next build deletes.
+
 ### `rebase schema generate`
 
 Generate Drizzle ORM schema from your TypeScript collections:

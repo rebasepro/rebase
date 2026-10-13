@@ -534,7 +534,7 @@ API keys are long-lived bearer credentials (`rk_live_…`) for agents, MCP clien
 
 | Refusal | When |
 |---|---|
-| `400 INVALID_SCOPES` | malformed / unknown scope, or a target on a scope that takes none (`details.validScopes` lists them) |
+| `400 INVALID_SCOPES` | malformed / unknown scope, or a target on a scope that takes none (`details.validScopes` lists the scopes a key may hold, never `keys:*`, since 0.25) |
 | `400 UNKNOWN_SCOPE_TARGET` | the target names a collection, storage source or function this backend does not serve |
 | `400 KEY_MANAGEMENT_SCOPE` | `keys:*` requested |
 | `403 SCOPE_EXCEEDS_CREATOR` | a scope the creator does not hold — a key never holds more than its minter |

@@ -342,6 +342,7 @@ The `details` field is optional and only present when additional context is avai
 | `413` | `PAYLOAD_TOO_LARGE` | Request body exceeds max size (default 10MB) |
 | `500` | `INTERNAL_ERROR` | Unexpected server error |
 | `503` | `SERVICE_UNAVAILABLE` | Service not available |
+| `503` | `DATABASE_UNAVAILABLE` | The database could not be reached (0.25+). Sent with `Retry-After: 5`, by every route and the realtime socket |
 
 ### ApiError Factory Methods
 
@@ -355,6 +356,23 @@ ApiError.notFound("Entity not found");
 ApiError.conflict("Email already registered", "EMAIL_EXISTS");
 ApiError.internal("Database connection failed");
 ApiError.serviceUnavailable("Service is down");
+```
+
+From 0.25, a route that catches a database error itself answers an outage the
+way the built-in routes do with `isDatabaseUnreachable` and
+`ApiError.databaseUnavailable()`, both from `@rebasepro/server`:
+
+```typescript
+import { ApiError, isDatabaseUnreachable, rebase } from "@rebasepro/server";
+
+export async function countOrders() {
+    try {
+        return await rebase.sql("SELECT count(*) FROM orders");
+    } catch (error) {
+        if (isDatabaseUnreachable(error)) throw ApiError.databaseUnavailable(); // 503 + Retry-After
+        throw error;
+    }
+}
 ```
 
 ## Authentication

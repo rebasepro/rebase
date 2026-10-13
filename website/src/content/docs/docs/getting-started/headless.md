@@ -164,7 +164,11 @@ Three things resolve it, in the order worth checking:
    collection file plus `rebase db push` — and restart.
 2. **The tables do not have row-level security enabled**, so boot skipped
    them. The boot log names each one, with the SQL. Enable it and add a policy,
-   as above.
+   as above. <span class="since-badge" data-since="0.25">Since 0.25</span> The
+   response says so too: its message names the tables and gives the
+   `ALTER TABLE … ENABLE ROW LEVEL SECURITY` for them, and
+   `details.unprotectedTables` lists them. On 0.24 it says the database has no
+   tables.
 3. **`DATABASE_URL` points somewhere else** than you think. `rebase status`
    prints the three files that decide what the backend reaches.
 

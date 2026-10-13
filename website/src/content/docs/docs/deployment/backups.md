@@ -98,6 +98,11 @@ call. A dump without it has no users, and cannot be restored into an empty
 database at all: the tables it does contain have policies that call functions
 it does not.
 
+<span class="since-badge" data-since="0.25">Since 0.25</span> Because it holds
+every password and key hash, a local dump and its `.globals.sql` are created
+readable by their owner only (0600), before `pg_dump` writes to them; a
+scheduled backup's local files are too. On 0.24 they are 0644.
+
 ## Scheduled backups
 
 A scheduled backup is a [cron job](/docs/backend/cron-jobs/) that dumps the

@@ -186,6 +186,11 @@
 
 #### Server & REST
 
+- **`isDatabaseUnreachable()`, `ApiError.databaseUnavailable()` and
+  `DATABASE_UNAVAILABLE_MESSAGE` in `@rebasepro/server`**, for a custom route or
+  function that wants to answer an unreachable database the way the built-in
+  routes do: `503 DATABASE_UNAVAILABLE` with `Retry-After: 5`.
+
 - **A list can skip its count, with `?count=none` over REST or
   `count: "none"` on `find()`; a value the server does not know is a 400
   `INVALID_COUNT`.** `meta.total` is a `COUNT(*)` over every matching row,
@@ -490,6 +495,11 @@
 
 #### CLI
 
+- **Schema introspection writes each table's row-level security policies into
+  its collection's securityRules**, with their names, commands, modes, `TO`
+  lists and clauses, so the `rebase db push` after it recreates them as they
+  were. The `<table>_default_*` policies Rebase adds itself are left out.
+
 - **rebase doctor names a junction table no collection declares
   (orphaned_junction, info).** It shows the `DROP TABLE` fix and never runs
   it.
@@ -690,6 +700,16 @@
 ### Changed
 
 #### Server & REST
+
+- **A database that cannot be reached is answered with 503
+  DATABASE_UNAVAILABLE, and Retry-After: 5, on every door:** the data API,
+  sign-in and the other auth routes, the admin routes, a service-key or API-key
+  request, the realtime socket (an `ERROR` frame, also on `AUTHENTICATE`) and a
+  subscription. They answered `503 ROLE_LOOKUP_FAILED` "Could not verify your
+  permissions", `500 INTERNAL_ERROR`, a 500 with the code `ECONNREFUSED`, or,
+  on the socket, `AUTH_ERROR INVALID_TOKEN`, which sent the SDK to refresh a
+  valid session. `ROLE_LOOKUP_FAILED` remains for a role lookup the database
+  answered and that still failed.
 
 - **A list page and its count are read in one transaction.** A
   `GET /posts?limit=25` was 8 statements in 2 transactions and is 5 in 1 (4
@@ -1166,6 +1186,10 @@
 
 #### CLI
 
+- **Schema introspection classifies a table whose policies give each user
+  their own rows as an entity,** not as a code list or as a child hidden from
+  the navigation, however few rows it has.
+
 - **`rebase dev` no longer reads through the node_modules folder under config
   before it starts the backend.** tsx's default ignores apply only under the
   project root, so with a `config/node_modules`, as in the monorepo's example
@@ -1463,6 +1487,17 @@
 
 #### Server & REST
 
+- **`NO_COLLECTIONS` on `/api/data` and `/api/docs` names the tables that were
+  skipped because row-level security is off on them,** with the SQL to enable
+  it, and `details.unprotectedTables` lists them. It said the database had no
+  tables.
+
+- **A `400 INVALID_SCOPES` no longer offers `keys:read` and `keys:write` as
+  valid scopes for a key**, in its message or in `details.validScopes`.
+
+- **A backend with a single database driver no longer warns
+  `No "(default)" driver provided` at every boot.**
+
 - **A `via` relation loads on a booted schema.** `include`, get-by-id, and the
   nested listing whose path ends on a foreign key returned the relation absent:
   a join column written in column terms (`author_id`) was looked up as a
@@ -1646,6 +1681,43 @@
   `rebase schema generate`, which leaves the database as it is.
 
 #### CLI
+
+- **`rebase db push` after `rebase schema introspect` no longer drops a policy
+  whose name has the shape an unnamed rule compiles to** (`<table>_<op>_<hash>`,
+  as on a database Rebase built), and `rebase doctor --policies` no longer
+  reports an introspected database's own policies as orphans.
+
+- **`rebase doctor --policies` and `rebase db push` tell a superseded policy
+  from one written by hand.** The first is dropped by the next push; the second
+  is still in force, and is kept by describing it in `securityRules`. Both were
+  "left behind by an earlier push".
+
+- **`rebase db backup`, `rebase db restore`, `rebase db branch` and
+  `rebase schema introspect` against a database that is not running print the
+  banner `rebase db push` prints,** "Cannot connect to PostgreSQL at
+  host:port", instead of a raw `connect ECONNREFUSED` or a Drizzle
+  `Failed query: CREATE SCHEMA …`.
+
+- **Listing branches, and asking about one, only reads.** `rebase db branch
+  list` and `info` created the `rebase` schema and the branch registry.
+
+- **`rebase db branch prune` with no terminal and no `--yes` exits 1 and says to
+  pass `--yes`,** instead of printing "Nothing was changed." and exiting 0.
+
+- **`rebase db push --yes` says it proceeded because `--yes` was passed**, not
+  `--allow-destructive`.
+
+- **`rebase schema introspect` no longer leaves an empty output directory when
+  it cannot connect,** says why once, and prints the output directory as an
+  absolute path.
+
+- **Backups and their `.globals.sql` roles file are readable by their owner
+  only (0600)**, from `rebase db backup` and from scheduled backups. They were
+  0644.
+
+- **A server created by `rebase eject` keeps local uploads in the project's
+  `uploads/` when it runs compiled,** as it does under `rebase dev`. Compiled,
+  it used `backend/dist/uploads`, which the next build deleted.
 
 - **`pnpm run build` in a new project no longer warns that "Some chunks are
   larger than 500 kB".** The chunks it named were the admin's, already
@@ -2502,10 +2574,9 @@
   the badges for the next minor describe; its users read "On 0.24 there is
   none" as applying to them.
 
-- **The CLI reference lists the api-keys get command, the database flags of
-  db push, and what branch prune does with no terminal.** `rebase db push`
-  takes `--database-url` and `--docker`, as `generate`, `migrate`, `branch`,
-  `backup` and `restore` do.
+- **The CLI reference lists the api-keys get command and the database flags
+  of db push.** `rebase db push` takes `--database-url` and `--docker`, as
+  `generate`, `migrate`, `branch`, `backup` and `restore` do.
 
 - **The agent skill and the MCP page no longer say the CLI refuses db push on
   the managed database.** The MCP gate still refuses its database tools there;
