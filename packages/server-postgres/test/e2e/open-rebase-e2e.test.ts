@@ -474,6 +474,42 @@ describe("openRebase (E2E)", () => {
                 expect(transcript).not.toMatch(/Uncaught/);
             });
 
+            it("with piped input, runs each line after the one before has settled, without colours", async () => {
+                // Every line in one write, as `printf '…' | rebase console`
+                // delivers them: the second reads what the first awaited.
+                const input = new PassThrough();
+                const output = new PassThrough();
+                let transcript = "";
+                output.on("data", (chunk: Buffer) => { transcript += String(chunk); });
+                input.end([
+                    "const { data } = await rebase.dataAsAdmin.notes.find({ limit: 2 })",
+                    "data.length * 7",
+                    "const [{ n }] = await rebase.sql('SELECT 6 * 7 AS n')",
+                    "n",
+                    "notes.missing.property",
+                    "'still running'",
+                    ".exit",
+                    ""
+                ].join("\n"));
+                const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
+                vi.stubEnv("DATABASE_URL", urlFor(container, "app"));
+                vi.stubEnv("LOG_LEVEL", "error");
+                try {
+                    const exit = await consoleCommand(["console", "--collections", collectionsDir], { input, output });
+                    expect(exit).toBe(0);
+                } finally {
+                    vi.unstubAllEnvs();
+                    log.mockRestore();
+                }
+                expect(transcript).toContain("14");
+                expect(transcript).toContain("42");
+                // An error in one line is that line's answer, and the next still runs.
+                expect(transcript.match(/Uncaught/g)).toHaveLength(1);
+                expect(transcript).toMatch(/Uncaught ReferenceError: notes is not defined/);
+                expect(transcript).toContain("'still running'");
+                expect(transcript).not.toContain("\u001b[");
+            });
+
             describe("as the CLI runs it: its own process, the project's .env loaded", () => {
                 const packageRoot = path.resolve(fileURLToPath(new URL("../..", import.meta.url)));
                 let projectDir: string;
@@ -528,6 +564,17 @@ describe("openRebase (E2E)", () => {
                     expect(result.code).toBe(0);
                     expect(JSON.parse(result.stdout)).toBe(42);
                     expect(result.stderr).toMatch(/RLS enforcement active/);
+                }, 60_000);
+
+                it("piped into the REPL, runs the documented two-line example as typed", async () => {
+                    const result = await runConsole([], {
+                        stdin: "const { data } = await rebase.dataAsAdmin.notes.find({ limit: 3 })\ndata.map(n => n.ownerId).sort().join('+')\n.exit\n"
+                    });
+                    expect(result.code).toBe(0);
+                    expect(result.stdout).toMatch(/'ada\+bob/);
+                    expect(result.stdout).not.toMatch(/Uncaught/);
+                    expect(result.stdout).not.toContain("\u001b[");
+                    expect(result.stdout).not.toMatch(/\[INFO\]/);
                 }, 60_000);
             });
 

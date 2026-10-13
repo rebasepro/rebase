@@ -14,7 +14,10 @@
 import arg from "arg";
 import fs from "fs";
 import path from "path";
+import readline from "node:readline";
 import repl from "node:repl";
+import { PassThrough } from "node:stream";
+import tty from "node:tty";
 import { inspect } from "node:util";
 import { setLogOutput } from "@rebasepro/server";
 import type { CollectionConfig } from "@rebasepro/types";
@@ -166,7 +169,7 @@ async function openAndRun(
     }
 }
 
-/** The interactive half: a Node REPL until `.exit` or Ctrl-D. */
+/** The interactive half: a Node REPL until `.exit`, Ctrl-D or the end of piped input. */
 async function startRepl(scope: ConsoleScope, options: { history?: string; database: string } & ConsoleStreams): Promise<void> {
     out("");
     out(`  rebase console — ${options.database}, ${scope.collections.length} collection(s)`);
@@ -174,15 +177,22 @@ async function startRepl(scope: ConsoleScope, options: { history?: string; datab
     out("  Try: await rebase.dataAsAdmin.<collection>.find({ limit: 5 })");
     out("");
 
-    const interactive = options.input === undefined;
+    const input = options.input ?? process.stdin;
+    const output = options.output ?? process.stdout;
+    // Typed at a terminal, the REPL reads it as one. Anything else — a pipe, a
+    // file, a stream handed in — reaches it a line at a time through `feed`
+    // (see `feedLineByLine`).
+    const feed = input instanceof tty.ReadStream && input.isTTY ? undefined : new PassThrough();
+    // Colours for a terminal only: piped to a file or another program, the
+    // escape codes are noise in the text.
+    const colors = output instanceof tty.WriteStream && output.isTTY;
     // Started without a prompt, and given one once the scope is in place: a
     // line that arrives with the first prompt must already see `rebase`.
     const server = repl.start({
         prompt: "",
         useGlobal: false,
-        ...(options.input ? { input: options.input, terminal: false } : {}),
-        ...(options.output ? { output: options.output } : {}),
-        writer: (value: unknown) => inspect(value, { colors: interactive, depth: 6 })
+        ...(feed ? { input: feed, output, terminal: false } : { input, output }),
+        writer: (value: unknown) => inspect(value, { colors, depth: 6 })
     });
     server.context.rebase = scope.rebase;
     server.context.collections = scope.collections;
@@ -201,5 +211,57 @@ async function startRepl(scope: ConsoleScope, options: { history?: string; datab
 
     const exited = new Promise<void>((resolve) => server.once("exit", () => resolve()));
     server.displayPrompt();
+    if (feed) await feedLineByLine(input, server, feed, exited);
     await exited;
+}
+
+/**
+ * Hand input that is not typed at a terminal to the REPL a line at a time,
+ * each once the REPL has finished the one before.
+ *
+ * Typed, the REPL holds keystrokes back while a top-level `await` is pending.
+ * Piped, every line arrives at once and each is evaluated as it arrives, so in
+ * `const { data } = await …` followed by `data.map(…)` the second line read
+ * `data` before the first had assigned it.
+ *
+ * The REPL is paused as each line reaches it, and it resumes its input when it
+ * displays its prompt again: once the line's value has settled, its error has
+ * been printed, or it needs the next line to complete it. That resumption is
+ * when the next line goes in. Lines are written one per chunk, because a
+ * chunk holding several is split and every line of it handed over at once.
+ */
+async function feedLineByLine(
+    source: NodeJS.ReadableStream,
+    server: repl.REPLServer,
+    feed: PassThrough,
+    exited: Promise<void>
+): Promise<void> {
+    let evaluated: (() => void) | undefined;
+    const ready = () => {
+        const resolve = evaluated;
+        evaluated = undefined;
+        resolve?.();
+    };
+    // Before the REPL's own handler, so a line it evaluates at once resumes
+    // after this pause rather than before it.
+    server.prependListener("line", () => {
+        if (!server.editorMode) server.pause();
+    });
+    // `.editor` collects lines with no prompt until Ctrl-D: they go straight in.
+    server.on("line", () => {
+        if (!server.editorMode) return;
+        server.resume();
+        ready();
+    });
+    server.on("resume", ready);
+
+    const closed = exited.then(() => "closed" as const);
+    const lines = readline.createInterface({ input: source, crlfDelay: Infinity });
+    for await (const line of lines) {
+        const done = new Promise<"done">((resolve) => { evaluated = () => resolve("done"); });
+        feed.write(`${line}\n`);
+        // `.exit`: the rest of the input is not for this REPL.
+        if (await Promise.race([done, closed]) === "closed") break;
+    }
+    feed.end();
 }
