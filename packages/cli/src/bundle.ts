@@ -1030,8 +1030,15 @@ export function commentSpans(source: string): Array<[number, number]> {
  * the (extremely common) extensionless style to rewrite all of its imports. The
  * rewrite is mechanical and verifiable: only relative specifiers are touched, and
  * only when the target file actually exists on disk.
+ *
+ * `write: false` computes the same answer and leaves every file as it was —
+ * `rebase normalize-imports --check`, which reports and must not repair.
  */
-export function normalizeEsmSpecifiers(outDir: string): { rewritten: number; unresolved: string[] } {
+export function normalizeEsmSpecifiers(
+    outDir: string,
+    options: { write?: boolean } = {}
+): { rewritten: number; unresolved: string[] } {
+    const write = options.write !== false;
     const unresolved: string[] = [];
     let rewritten = 0;
 
@@ -1086,7 +1093,7 @@ export function normalizeEsmSpecifiers(outDir: string): { rewritten: number; unr
             return match;
         });
 
-        if (updated !== original) {
+        if (write && updated !== original) {
             fs.writeFileSync(file, updated, "utf8");
         }
     };

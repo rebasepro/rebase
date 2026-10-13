@@ -96,25 +96,37 @@ export async function normalizeImportsCommand(rawArgs: string[]): Promise<void> 
         );
     }
 
-    const { rewritten, unresolved } = normalizeEsmSpecifiers(outDir);
+    // `--check` reports and writes nothing: it is what a CI job runs to ask
+    // whether the build did this step, and a check that repaired the output
+    // would answer "no" once and "yes" for ever after.
+    const check = flags["--check"] === true;
+    const { rewritten, unresolved } = normalizeEsmSpecifiers(outDir, { write: !check });
+    // A failed check is a verdict, on stderr with exit 1 — not a thrown error,
+    // whose handler adds a stack-trace hint to an answer that has no stack.
+    const say = check ? console.error : console.log;
 
     if (unresolved.length > 0) {
-        console.log(chalk.yellow(`  ⚠ ${unresolved.length} relative import(s) resolve to no file:`));
+        say(chalk.yellow(`  ⚠ ${unresolved.length} relative import(s) resolve to no file:`));
         for (const specifier of unresolved.slice(0, 10)) {
-            console.log(chalk.dim(`      ${specifier}`));
+            say(chalk.dim(`      ${specifier}`));
         }
         if (unresolved.length > 10) {
-            console.log(chalk.dim(`      …and ${unresolved.length - 10} more`));
+            say(chalk.dim(`      …and ${unresolved.length - 10} more`));
         }
-        console.log(chalk.dim("    These will throw ERR_MODULE_NOT_FOUND at run time."));
+        say(chalk.dim("    These will throw ERR_MODULE_NOT_FOUND at run time. This command cannot complete them:"));
+        say(chalk.dim("    there is no file to point them at — fix the import, or the build that should emit it."));
     }
 
-    if (flags["--check"]) {
-        if (rewritten > 0 || unresolved.length > 0) {
-            throw new Error(
-                `${rewritten} import(s) are incomplete for Node ESM. `
+    if (check) {
+        if (rewritten > 0) {
+            console.error(chalk.red(
+                `✗ ${rewritten} relative import(s) in ${target} are incomplete for Node ESM. `
                 + `Run \`rebase normalize-imports ${target}\` as part of the build.`
-            );
+            ));
+        }
+        if (rewritten > 0 || unresolved.length > 0) {
+            process.exitCode = 1;
+            return;
         }
         console.log(chalk.green(`✓ every relative import in ${target} is complete`));
         return;
