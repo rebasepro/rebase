@@ -233,4 +233,46 @@ test.describe("BaaS REST Data API", () => {
             await request.delete(`${baseUrl}/api/data/authors/${author.id}`, { headers: authHeaders });
         }
     });
+
+    test("links an existing tag to a post through the post's path, and unlinks it", async ({ request }) => {
+        const stamp = Date.now();
+        const tagRes = await request.post(`${baseUrl}/api/data/tags`, {
+            headers: authHeaders,
+            data: { name: `Linked Tag ${stamp}` }
+        });
+        expect(tagRes.status()).toBe(201);
+        const tag = (await tagRes.json()) as TagEntity;
+        const postRes = await request.post(`${baseUrl}/api/data/posts`, {
+            headers: authHeaders,
+            data: { title: `Linked Tag Post ${stamp}`, slug: `linked-tag-post-${stamp}`, status: "draft" }
+        });
+        expect(postRes.status()).toBe(201);
+        const post = (await postRes.json()) as PostEntity;
+        const tagsOfPost = async () => {
+            const res = await request.get(`${baseUrl}/api/data/posts/${post.id}/tags`, { headers: authHeaders });
+            expect(res.status()).toBe(200);
+            return ((await res.json()) as DataListResponse<TagEntity>).data.map(row => String(row.id));
+        };
+
+        try {
+            // What the admin's "Add existing" sends: the tag's address under
+            // the post, with no values. Linking is what makes it a member, so
+            // the row it addresses is not one yet.
+            const link = await request.patch(`${baseUrl}/api/data/posts/${post.id}/tags/${tag.id}`, {
+                headers: authHeaders,
+                data: {}
+            });
+            expect(link.status(), "PATCH /api/data/posts/:id/tags/:tagId should link the tag").toBe(200);
+            expect(await tagsOfPost()).toEqual([String(tag.id)]);
+
+            // Unlinking drops the link and leaves the tag.
+            const unlink = await request.delete(`${baseUrl}/api/data/posts/${post.id}/tags/${tag.id}`, { headers: authHeaders });
+            expect(unlink.status()).toBe(204);
+            expect(await tagsOfPost()).toEqual([]);
+            expect((await request.get(`${baseUrl}/api/data/tags/${tag.id}`, { headers: authHeaders })).status()).toBe(200);
+        } finally {
+            await request.delete(`${baseUrl}/api/data/posts/${post.id}`, { headers: authHeaders });
+            await request.delete(`${baseUrl}/api/data/tags/${tag.id}`, { headers: authHeaders });
+        }
+    });
 });
