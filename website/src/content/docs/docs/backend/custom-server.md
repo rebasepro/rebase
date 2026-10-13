@@ -199,9 +199,10 @@ installShutdownHandlers(
 
 The paths are the scaffold's. The file relies on what `rebase dev` sets: the
 port it picked in `PORT`, the managed database in `DATABASE_URL`, and the
-project's `.env` in `DOTENV_CONFIG_PATH`, from which `loadEnv()` reads
-`JWT_SECRET` (or generates one in development). Listen on another port, or read
-no `.env`, and the admin panel cannot reach the server, or sign-in is off.
+project's `.env` in `DOTENV_CONFIG_PATH`. `loadEnv()` validates what that
+holds, and generates `JWT_SECRET` in development when it is unset. Listen on
+another port and the admin panel cannot reach the server; skip `loadEnv()` and,
+with no `JWT_SECRET`, sign-in is off.
 `rebase dev` also waits for the `Server running at http://localhost:<port>` line
 before it reports the backend up. The `auth` options are the scaffold's; the
 runtime also reads the OAuth providers, email and the other `AUTH_*` variables,

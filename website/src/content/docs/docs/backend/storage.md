@@ -205,10 +205,15 @@ neither said so.
 
 The admin panel's thumbnails of stored images use this endpoint: a table or card
 preview asks for a webp rendition about twice its rendered size (96–800px)
-rather than the original. `sharp` is an optional dependency; without it the
-transform answers 500, so the panel checks once per page load, with a single
-rendition request, and shows originals if the server cannot resize. SVG and GIF
-files are always shown as they are.
+rather than the original. SVG and GIF files are always shown as they are.
+
+`sharp` is an optional dependency. <span class="since-badge" data-since="0.25">Since 0.25</span>
+Without it, a transform request is served the original image, with its own
+content type and a 60-second cache window, and the backend logs one warning
+naming `pnpm add sharp`. Install it in the package that runs the backend
+(`backend/` in a scaffolded project) and restart to get renditions. On 0.24 the
+transform answers 500 and logs the error on every request; the panel then shows
+originals.
 
 ### Performance & LRU Caching
 
@@ -344,7 +349,10 @@ topics together.
 
 Each source is configured from the **same variable names carrying its own
 suffix**. The default source takes no suffix, so a single-bucket project keeps
-using the plain names above and needs to declare nothing at all:
+using the plain names above and needs to declare nothing at all. Declaring
+named buckets beside it does not change which variables the default reads
+(<span class="since-badge" data-since="0.25">Since 0.25</span>; see
+[Which bucket receives an unqualified upload](/docs/backend/multiple-sources/#which-bucket-receives-an-unqualified-upload)):
 
 ```bash
 S3_BUCKET=app-uploads             # (default)

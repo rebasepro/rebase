@@ -226,20 +226,34 @@ The engine comes from the declaration, so there is no `STORAGE_TYPE` to set.
 
 #### Which bucket receives an unqualified upload
 
+<span class="since-badge" data-since="0.25">Since 0.25</span>
+
 A storage property that names no `storageSource` writes to the **default**
-bucket, and a project of named buckets has to say which one that is. Either
-declare the default-keyed bucket — `export const uploads = bucket();` — or mark
-one of the named ones:
+bucket. Declaring named buckets never moves it. The default keeps its own
+configuration whatever `config/resources.ts` declares: `STORAGE_TYPE`,
+`STORAGE_PATH` (`./uploads` when unset), and the unsuffixed `S3_*` / `GCS_*`
+variables. Adding `bucket("media", { engine: "s3" })` to a project that already
+has files in `./uploads` leaves them where they are and still served. `media`
+reads its own `__MEDIA` variables and, in development, stands in as its own
+directory, `uploads__media`.
+
+To send unqualified uploads to a named bucket instead, mark it:
 
 ```ts
 export const media = bucket("media", { engine: "s3", default: true });
 ```
 
-Without either, boot promotes the first named bucket declared and warns, naming
-both fixes. Take one of them: a promotion decides where a user's files land by
-declaration order, and it gives different answers either side of a deploy,
-because the local bucket development stands in with is dropped in production
-and the promotion is not.
+The default then *is* `media`. Files the default held before stay where they
+are and are no longer served through it, so copy them across first:
+`rebase storage move --from "(default)" --to media`.
+
+Two sources may not share a location. If a named bucket would resolve to the
+default's directory (or one inside it), or to the same object-store bucket on
+the same endpoint, boot refuses and names the variable to change.
+
+On 0.24, a project that declares only named buckets has the first one declared
+promoted to the default at boot, with a warning, so adding `bucket("media")`
+moves the default onto `uploads__media`.
 
 ### Many buckets on one account
 
@@ -379,11 +393,13 @@ the next restart — an upload that fails loudly can be retried, one that succee
 into a disk about to be wiped cannot. Set `FORCE_LOCAL_STORAGE=true` only when a
 durable volume really is mounted.
 
-One consequence worth knowing if you declare buckets explicitly: no default
-bucket is invented for you. Declaring only `bucket("media")` means there is no
-default bucket, and a property that does not name one has nowhere to go —
-deliberately, and identically in development and production. Add `bucket()` too
-if you want one.
+<span class="since-badge" data-since="0.25">Since 0.25</span> Declaring
+buckets does not change the default bucket. With only `bucket("media")`
+declared, the default still reads its own variables. In development it is
+`./uploads`. In production, unbound, it is off like any unbound bucket: uploads
+that name no `storageSource` answer `501 STORAGE_NOT_CONFIGURED`. Boot says so
+once, with both fixes: bind it (`STORAGE_TYPE=s3` and `S3_BUCKET`, or
+`STORAGE_TYPE=gcs` and `GCS_BUCKET`), or mark a named bucket `default: true`.
 
 In development, a declared bucket nothing binds is a local directory —
 `uploads__media` beside the default `uploads` — whatever engine it declares, so
