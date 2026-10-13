@@ -234,6 +234,11 @@ rebase db restore ./backups/<file>.dump --yes
 ```
 
 `backup` runs `pg_dump`; `restore` runs `pg_restore` and, being destructive, needs `--yes`.
+<span class="since-badge" data-since="0.25">Since 0.25</span> Relative paths,
+and the default `./backups`, resolve against the directory you run `rebase`
+from, so the three lines above meet in one directory; an option a command does
+not take is refused before anything runs. On 0.24 the default is
+`backend/backups`, so list it with `--out ./backups`.
 Scheduling, the roles file that travels with each dump, and the restore procedure are in [Backups and restore](/docs/deployment/backups/).
 
 ### `rebase db pull`

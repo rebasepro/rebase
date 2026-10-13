@@ -29,7 +29,7 @@ rebase db backup --out ./backups
 rebase db backup --out s3://my-private-bucket/backups
 
 # List what you have
-rebase db backups list --out ./backups
+rebase db backups list
 
 # Restore into a FRESH database (does not touch the live one)
 rebase db restore ./backups/rebase-app-20260714T030000Z.dump \
@@ -40,6 +40,18 @@ The connection string comes from your project's environment, as for every
 other [`rebase db` command](/docs/cli/): `DATABASE_URL`, falling
 back to `ADMIN_CONNECTION_STRING`.
 
+<span class="since-badge" data-since="0.25">Since 0.25</span> A relative
+`--out`, the default `./backups` and a dump path given to `rebase db restore`
+all resolve against the directory you run `rebase` from, normally the project
+root, so `rebase db backup` and `rebase db backups list` meet in one place. A
+relative `BACKUP_DESTINATION` resolves against the backend directory, where the
+server reads it too. All three commands refuse an option they do not take
+before running anything, and name the one you probably meant. The password goes
+to `pg_dump`, `pg_dumpall` and `pg_restore` in `PGPASSWORD`, never on their
+command line, so no error message or process list shows it. On 0.24 the default
+was `backend/backups`, a misspelled option was ignored, and a failed restore
+printed the connection string with its password.
+
 ## What a backup is
 
 `rebase db backup` runs `pg_dump` in custom format (`-Fc`), which is compressed
@@ -49,7 +61,7 @@ retention and listing sort by.
 
 | Option | Description |
 | --- | --- |
-| `--out`, `-o` | A local path, or an `s3://bucket/prefix` / `gs://bucket/prefix` URL. Defaults to `$BACKUP_DESTINATION`, then `./backups`. |
+| `--out`, `-o` | A local path, or an `s3://bucket/prefix` / `gs://bucket/prefix` URL. Defaults to `$BACKUP_DESTINATION`, then `./backups` in the directory you run `rebase` from. |
 | `--exclude-schema <s>` | Leave a schema out of the dump (repeatable). Never leave out `rebase` — see below. |
 | `--no-owner` | Omit ownership commands, for restoring as a different role. |
 | `--enable-row-security` | Dump as an admin subject instead of failing on row-level security. **May produce a partial dump** — see [Row-level security](#row-level-security-and-the-dump-that-is-silently-short). |

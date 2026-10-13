@@ -127,8 +127,9 @@ rebase db push
   change that can lose values (`timestamptz` → `date`, `numeric` → `integer`),
   or a primary key change — `(id)` → `(id, locale)` gives every row a new id, so
   links, foreign keys and ids stored elsewhere stop finding their row.
-  It asks on a terminal and refuses otherwise; `--allow-destructive` (or
-  `--yes`) applies it anyway
+  It asks on a terminal, where Ctrl-C or Ctrl-D answers no, and refuses
+  otherwise; `--allow-destructive` (or `--yes`) applies it anyway. A push that
+  stops there drops its scratch `<db>_dev_diff` database on the way out
 - Switches row-level security on for every collection table, junctions included, right after the
   schema change and before any step that can fail, so a push that stops part-way leaves a new table
   denying every request rather than open to it
@@ -255,6 +256,8 @@ rebase db migrate
 ```
 
 The version is the numeric prefix of the migration file that describes what is in the database *now*. That migration and everything before it are recorded as applied; everything after it runs. On a database nothing has ever booted against, no baseline is needed — migrate straight away.
+
+The same happens later in the ordinary loop: edit a collection while `rebase dev` runs, and boot adds the column before `rebase db generate` writes the migration that adds it, so `rebase db migrate` stops on `column … already exists (42701)`. Baseline that migration the same way. <span class="since-badge" data-since="0.25">Since 0.25</span> `--baseline` works on a database that already records migrations: it marks everything up to the version as applied with `atlas migrate set`, and says so, or says there is nothing to record when the history already reaches it. On 0.24 Atlas ignores `--baseline` once any migration is recorded, so the same error comes back.
 
 ### `rebase db branch`
 
@@ -401,6 +404,8 @@ rebase db migrate
 | `db push` fails on production | Use `db generate` + `db migrate` instead |
 | A migration must not drop data in CI or production | <span class="since-badge" data-since="0.25">Since 0.25</span> `rebase db migrate --refuse-destructive` exits 1 and applies nothing when a pending statement destroys data |
 | `db migrate` fails with `already exists (42710)` | Boot or `db push` already provisioned the schema — record it with `rebase db migrate --baseline <version>` |
+| `db migrate` fails with `column … already exists (42701)` | `rebase dev` added the column at boot — baseline that migration the same way |
+| `db push` on the managed database fails with `Error: EOF` | Atlas lost a connection the running `rebase dev` holds. Run it again; if it keeps failing, stop `rebase dev` first |
 
 ## Next Steps
 

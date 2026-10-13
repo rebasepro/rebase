@@ -69,8 +69,8 @@ rebase db migrate
 | `rebase db generate` | Generate schema + create SQL migration files | Production prep |
 | `rebase db migrate` | Run pending migrations | Production deploy |
 | `rebase db branch` | Create / list / inspect / switch / delete / prune a database branch | Feature work (needs a real PostgreSQL) |
-| `rebase db backup` | Write a backup of the current database | Before a risky change |
-| `rebase db backups` | List the backups taken so far | Picking one to restore |
+| `rebase db backup` | Write a backup of the current database (default `./backups` where you run `rebase`) | Before a risky change |
+| `rebase db backups list` | List the backups taken so far | Picking one to restore |
 | `rebase db restore` | Restore the database from a backup | Recovery |
 | `rebase db pull` | Copy another database into local dev (`--from <url>`, `--anonymize`, all-or-nothing); never writes to the source | Working against real data locally |
 | `rebase db url` | Print the connection string this project uses | Piping into `psql` |

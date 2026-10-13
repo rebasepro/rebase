@@ -163,8 +163,8 @@ booting and prints that line.
 | `rebase db generate` | Generate SQL migration files |
 | `rebase db migrate` | Run pending SQL migrations |
 | `rebase db branch` | Database branching (create, list, switch, delete, info, prune) — needs a real PostgreSQL |
-| `rebase db backup` | Write a backup of the current database |
-| `rebase db backups` | List the backups taken so far |
+| `rebase db backup` | Write a backup of the current database (default `./backups` where you run `rebase`; unknown options are refused) |
+| `rebase db backups list` | List the backups taken so far |
 | `rebase db restore` | Restore the database from a backup |
 | `rebase db pull` | Copy another database into local development: `--from <url>`, optionally `--anonymize` (name-based and best-effort, in one transaction: if it fails, the affected tables are emptied and named and it exits 1). One-directional — it can never write to a remote database. (Turning a database into collection files is `rebase schema introspect`) |
 | `rebase db url` | Print the connection string this project uses — nothing else goes to stdout, so it pipes. After `rebase dev --docker` it, like every command, uses the Docker database until a `rebase dev` without the flag |

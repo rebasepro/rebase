@@ -153,6 +153,24 @@ If a table exists but a column does not, the usual cause is a collection file
 that was edited without regenerating: run `rebase schema generate` and push
 again.
 
+## `Error: EOF` from `db push` on the managed database
+
+```
+Error: EOF
+✗ atlas schema apply --to file://.rebase/sql/schema.sql --dry-run failed.
+```
+
+The managed development database takes a few connections at a time, and a
+running `rebase dev` holds some of them. Atlas, which plans the push, opens two
+more, and one was closed under it. Nothing was applied, so the command is safe
+to run again; the dev server closes idle connections after 30 seconds. If it
+keeps failing, stop `rebase dev` while you push.
+
+<span class="since-badge" data-since="0.25">Since 0.25</span> The push closes its
+own connections before Atlas starts, which leaves Atlas room in the usual case,
+and the error says what happened. On 0.24 the first push after `rebase dev`
+starts often fails this way, with only the two lines above.
+
 ## The port is already in use
 
 ```
