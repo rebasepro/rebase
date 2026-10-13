@@ -464,14 +464,23 @@ export async function deriveResourceGraph(options: DeriveOptions): Promise<{ gra
         const previousLevel = process.env.LOG_LEVEL;
         process.env.LOG_LEVEL = "error";
         try {
-            const { loadCronJobsWithDiagnostics } = await import("@rebasepro/server");
+            const { loadCrons, declareCrons } = await import("@rebasepro/server");
+            const reportProblem = (problem: string) => {
+                issues.push({ path: path.relative(projectRoot, cronsDir), message: cronLoadIssue(problem) });
+            };
             // This process's own `import()`, not the loader's `new Function`
             // one: tsx's hooks are registered here, and a test runner's module
             // sandbox answers the other with "a dynamic import callback was
             // not specified" — the same trap the split-roles e2e records.
-            const { problems } = await loadCronJobsWithDiagnostics(cronsDir, url => import(url));
-            for (const problem of problems) {
-                issues.push({ path: path.relative(projectRoot, cronsDir), message: cronLoadIssue(problem) });
+            const crons = await loadCrons(cronsDir, { importModule: url => import(url), onSkip: reportProblem });
+            // One at a time, so a cron the graph refuses is reported by name
+            // and the others are still declared.
+            for (const [id, definition] of Object.entries(crons)) {
+                try {
+                    declareCrons({ [id]: definition });
+                } catch (err) {
+                    reportProblem(`${id} (threw: ${err instanceof Error ? err.message : String(err)})`);
+                }
             }
         } catch (err) {
             issues.push({
