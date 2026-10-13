@@ -17,6 +17,7 @@ import { parseCommandArgs, wantsHelp } from "../utils/args";
 import { detectPackageManager, getPMCommands } from "../utils/package-manager";
 import { DEFAULT_BUNDLE_DIR } from "../bundle";
 import type { RebaseBundleStatic } from "@rebasepro/types";
+import type { DevDatabase } from "../dev-db/resolve";
 
 function printHelp(): void {
     console.log(`
@@ -35,6 +36,9 @@ in whatever NODE_ENV the shell or .env sets. A scaffolded .env says
 development, which keeps development behaviour on — the first account to
 register becomes the admin. For a production server, run it with
 NODE_ENV=production; it says so at start when it is not one.
+
+It needs a DATABASE_URL, and starts no database of its own. To run it on the
+database ${chalk.cyan("rebase dev")} uses: ${chalk.cyan('DATABASE_URL="$(rebase db url)" rebase start')}
 
 Build first with ${chalk.cyan("rebase build")}.
 `.trim());
@@ -98,6 +102,43 @@ export function hostRoutedNotice(staticApps: readonly RebaseBundleStatic[], port
         }),
         chalk.gray(`  (or point ${routed.map(app => app.host).join(", ")} at 127.0.0.1 in /etc/hosts)`),
         ""
+    ];
+}
+
+/**
+ * What to say when there is no DATABASE_URL for the runtime, or `null`.
+ *
+ * The runtime requires one, and its refusal — `DATABASE_URL: is required`, and
+ * a link to the self-hosting docs — is right for a deployment and says nothing
+ * to the reader most likely to see it: someone running the scaffold's own
+ * `.env`, which leaves DATABASE_URL commented out because `rebase dev` brings a
+ * database of its own. That database is one command away, so this names it.
+ *
+ * `kind` is what `rebase dev` runs this project on, so the line can say which
+ * database `rebase db url` will print. A blank value is unset, as the runtime
+ * reads it.
+ */
+export function missingDatabaseUrl(
+    env: Record<string, string | undefined>,
+    kind: DevDatabase["kind"] | null
+): string[] | null {
+    if (env.DATABASE_URL?.trim()) return null;
+
+    const which = kind === "docker"
+        ? "the Docker database `rebase dev --docker` uses"
+        : kind === "managed"
+            ? "the managed development database (PGlite) `rebase dev` uses"
+            : "this project's development database";
+    return [
+        chalk.red("✗ DATABASE_URL is not set, so the runtime has no database to start against."),
+        chalk.gray("  `rebase start` runs the bundle the way a deployment does, against the database you name;"),
+        chalk.gray("  `rebase dev` is the command that brings one of its own."),
+        "",
+        `  To run it on ${which}:`,
+        `    ${chalk.cyan('DATABASE_URL="$(rebase db url)" rebase start')}`,
+        "",
+        chalk.gray("  For a deployment, set DATABASE_URL in the environment or in .env."),
+        chalk.gray("  See https://rebase.pro/docs/deployment/self-hosting/ for the variables a deployment needs.")
     ];
 }
 
@@ -168,6 +209,17 @@ export async function startCommand(rawArgs: string[] = []): Promise<void> {
     if (envFile && fs.existsSync(envFile)) {
         const dotenv = await import("dotenv");
         dotenv.config({ path: envFile, quiet: true });
+    }
+
+    // Before the runtime, which would refuse with a message written for a
+    // deployment. See `missingDatabaseUrl`.
+    if (!process.env.DATABASE_URL?.trim()) {
+        const { devDatabaseKind } = await import("../dev-db/prepare");
+        const missing = missingDatabaseUrl(process.env, devDatabaseKind(projectRoot));
+        if (missing) {
+            for (const line of missing) console.error(line);
+            process.exit(1);
+        }
     }
 
     process.env.REBASE_BUNDLE = bundleDir;
