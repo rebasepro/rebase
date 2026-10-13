@@ -3,6 +3,7 @@ import {
     detectDestructiveStatements,
     splitSqlStatements,
     decidePushSafety,
+    destructiveOptInFlag,
     isLosslessTypeChange,
     COLUMN_TYPES_SQL,
     type ExistingColumnType
@@ -79,6 +80,19 @@ describe("decidePushSafety", () => {
 
     it("REFUSES destructive changes in a non-interactive shell (CI / agent / pipe)", () => {
         expect(decidePushSafety({ destructiveCount: 1, allowDestructive: false, interactive: false })).toBe("refuse");
+    });
+});
+
+describe("destructiveOptInFlag", () => {
+    // `db push --yes` printed "Proceeding because --allow-destructive was passed".
+    it("names the flag that was given", () => {
+        expect(destructiveOptInFlag({ "--yes": true })).toBe("--yes");
+        expect(destructiveOptInFlag({ "--allow-destructive": true })).toBe("--allow-destructive");
+        expect(destructiveOptInFlag({ "--allow-destructive": true, "--yes": true })).toBe("--allow-destructive");
+    });
+
+    it("is undefined when neither was", () => {
+        expect(destructiveOptInFlag({})).toBeUndefined();
     });
 });
 

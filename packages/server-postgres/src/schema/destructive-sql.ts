@@ -529,6 +529,19 @@ export function isLosslessTypeChange(from: string, to: string): boolean {
 export type PushDecision = "apply" | "confirm" | "refuse";
 
 /**
+ * The flag that opted a push into destructive changes, as it was given —
+ * `--allow-destructive`, or its alias `--yes` / `-y` — or `undefined` for
+ * none. The line that says why a destructive push went ahead names the one
+ * the user typed: "because --allow-destructive was passed" to someone who
+ * typed `--yes` reads like a flag they never set.
+ */
+export function destructiveOptInFlag(args: { "--allow-destructive"?: boolean; "--yes"?: boolean }): "--allow-destructive" | "--yes" | undefined {
+    if (args["--allow-destructive"] === true) return "--allow-destructive";
+    if (args["--yes"] === true) return "--yes";
+    return undefined;
+}
+
+/**
  * Decide how `db push` should proceed given the plan's destructiveness and
  * the invocation context.
  *

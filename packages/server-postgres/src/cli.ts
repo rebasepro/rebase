@@ -46,7 +46,7 @@ import {
 } from "./cli-errors";
 import { forLibpq, redactConnectionPasswords } from "./utils/connection-string";
 import { dropLegacyAuthSchema, RLS_BOOTSTRAP_SQL } from "./schema/rls-bootstrap-sql";
-import { detectDestructiveStatements, decidePushSafety, extractPlanStatements, type DestructiveStatement, type ExistingColumnType } from "./schema/destructive-sql";
+import { detectDestructiveStatements, decidePushSafety, destructiveOptInFlag, extractPlanStatements, type DestructiveStatement, type ExistingColumnType } from "./schema/destructive-sql";
 import type { LegacyRename } from "./schema/push-legacy-renames";
 import {
     parseColumnMutations,
@@ -797,10 +797,10 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
                 throw new CommandStopped("A generated column Rebase does not own blocks the push.");
             }
 
-            const allowDestructive = argsList["--allow-destructive"] === true || argsList["--yes"] === true;
+            const optIn = destructiveOptInFlag(argsList);
             const decision = decidePushSafety({
                 destructiveCount: destructive.length,
-                allowDestructive,
+                allowDestructive: optIn !== undefined,
                 interactive: process.stdin.isTTY === true
             });
 
@@ -827,8 +827,8 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
                         throw new CommandStopped("The destructive push was declined.");
                     }
                 } else {
-                    // decision === "apply" via --allow-destructive
-                    outWarn(chalk.yellow("  Proceeding because --allow-destructive was passed."));
+                    // decision === "apply" via --allow-destructive or --yes
+                    outWarn(chalk.yellow(`  Proceeding because ${optIn ?? "--allow-destructive"} was passed.`));
                 }
             }
 
