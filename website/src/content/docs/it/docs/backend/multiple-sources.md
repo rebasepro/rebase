@@ -46,7 +46,7 @@ nome, scritto una volta sola:
 
 ```ts
 import { defineCollection } from "@rebasepro/cms-types";
-import { analytics } from "../../../docs/resources";
+import { analytics } from "../resources";
 
 const pageViewsCollection = defineCollection({
     name: "Page Views",
@@ -60,7 +60,7 @@ const pageViewsCollection = defineCollection({
 ...o una proprietà di un file:
 
 ```ts
-import { media } from "../../../docs/resources";
+import { media } from "../resources";
 
 coverImage: {
     name: "Cover image",

@@ -53,7 +53,7 @@ Pointez ensuite une collection vers l'une d'elles, par handle — le même nom,
 
 ```ts
 import { defineCollection } from "@rebasepro/cms-types";
-import { analytics } from "../../../docs/resources";
+import { analytics } from "../resources";
 
 const pageViewsCollection = defineCollection({
     name: "Page Views",
@@ -67,7 +67,7 @@ const pageViewsCollection = defineCollection({
 ...ou une propriété de fichier :
 
 ```ts
-import { media } from "../../../docs/resources";
+import { media } from "../resources";
 
 coverImage: {
     name: "Cover image",
