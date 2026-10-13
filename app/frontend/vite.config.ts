@@ -105,6 +105,17 @@ export default defineConfig({
                             test: /[\\/]packages[\\/](common|utils|types)[\\/]src[\\/]/,
                             tags: ["$initial"]
                         },
+                        // @rebasepro/client: the same, and for the same reason.
+                        // Its offline engine is fetched with `import()` when a
+                        // client turns offline on; without this group the
+                        // modules the entry shares with it (transport, collection
+                        // client, query builder) come out as an eager chunk named
+                        // after whichever of them sorts first.
+                        {
+                            name: "rebase-client",
+                            test: /[\\/]packages[\\/]client[\\/]src[\\/]/,
+                            tags: ["$initial"]
+                        },
                         {
                             name(id) {
                                 // Heavy vendor libraries — split into individually cached chunks.
