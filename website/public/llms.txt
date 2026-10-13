@@ -102,7 +102,8 @@
 - [Global Backend Hooks](https://rebase.pro/docs/backend/hooks): Apply cross-cutting lifecycle callbacks to every collection at the server level using CollectionCallbacks.
 - [Entity History](https://rebase.pro/docs/backend/history): Track every change to your entities with a full audit trail — who changed what, when, and the complete before/after entity.
 - [Database Branching](https://rebase.pro/docs/backend/branching): Create isolated database branches for development, staging, and testing using PostgreSQL's CREATE DATABASE ... TEMPLATE — instant, full-fidelity copies with zero downtime.
-- [Custom Server Integration](https://rebase.pro/docs/backend/custom-server): How to embed Rebase Database and Realtime services into your own custom Node.js backend without using Hono or the Rebase coordinator.
+- [Custom Server Integration](https://rebase.pro/docs/backend/custom-server): Build the Rebase backend from public pieces in your own server — createRebaseBackend, its route groups, mount, attachRealtime and start — or embed the Postgres driver in Express.
+- [Scripts and the Console](https://rebase.pro/docs/backend/scripts): Open a project's data from a script, a test or a REPL with openRebase, or from the terminal with rebase console. No server, no schema changes.
 - [Frontend Overview](https://rebase.pro/docs/frontend): Build and customize the panel — Rebase CMS and Rebase Studio — with React: controllers, scaffold, routing, and views.
 - [Extending Rebase](https://rebase.pro/docs/frontend/extending): A decision guide for choosing the right extension mechanism — plugins, slots, component overrides, entity views, actions, and more.
 - [Styling Custom UI](https://rebase.pro/docs/frontend/styling): Build custom views, home pages and actions out of the same components and theme tokens as the rest of the admin, so they look native and follow the theme.

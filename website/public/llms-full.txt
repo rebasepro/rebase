@@ -766,8 +766,8 @@ ships), `STORAGE_PUBLIC_READ`, or `STORAGE_ALLOW_ANY_AUTHENTICATED`.
 | `DB_POOL_MAX` | Maximum pooled connections | `20` |
 | `DB_POOL_IDLE_TIMEOUT` | Milliseconds an idle connection is kept | `30000` |
 | `DB_POOL_CONNECT_TIMEOUT` | Milliseconds to wait for a connection | `10000` |
-| `DATABASE_DIRECT_URL` | Direct (non-pooled) connection. [Realtime](/docs/backend/realtime) needs one: `LISTEN`/`NOTIFY` does not survive a transaction pooler such as PgBouncer, and without it change notifications are disabled with a warning rather than silently lost. The [job worker](/docs/backend/jobs) holds its wake-up `LISTEN` on it too. | — |
-| `DATABASE_READ_URL` | Read replica. Reads go there when it is set and differs from `DATABASE_URL`; if the connection fails, everything falls back to the primary with a warning. | — |
+| `DATABASE_DIRECT_URL` | Direct (non-pooled) connection. [Realtime](/docs/backend/realtime) needs one: `LISTEN`/`NOTIFY` does not survive a transaction pooler such as PgBouncer, and without it change notifications are disabled with a warning rather than silently lost. The [job worker](/docs/backend/jobs) holds its wake-up `LISTEN` on it too. <span class="since-badge" data-since="0.25">Since 0.25</span> Fills the Postgres adapter's `directConnectionString` when that is unset. | — |
+| `DATABASE_READ_URL` | Read replica. Reads go there when it is set and differs from `DATABASE_URL`; if the connection fails, everything falls back to the primary with a warning. <span class="since-badge" data-since="0.25">Since 0.25</span> Fills the Postgres adapter's `readConnectionString` when that is unset; on 0.24 that option is ignored. | — |
 | `REBASE_DB_POOL_MAX` | A ceiling on every pool in the process, applied whatever each one asked for. Plain digits only: a malformed value is ignored rather than silently serializing the server. | — |
 
 #### Runtime behaviour
@@ -789,7 +789,7 @@ image. A project that has ejected owns these decisions in its own code instead.
 | `REBASE_METRICS_TOKEN` | Bearer token guarding `/metrics`. Unset leaves the endpoint open to anything that can reach the port — fine on a private network, not on a public one, and the boot logs say so. | — |
 | `REBASE_MIGRATE_ON_BOOT` | What the runtime may do to the schema at boot. `ensure` (the default, everywhere — production included) runs the **additive** pass: create missing tables, columns and enum types, never drop or rewrite one. `none` touches nothing. The published image accepts only those two and **refuses to boot on `push`**. In a [split deployment](/docs/deployment/split-processes) exactly one process may provision, so every other role must set `none` or refuse to boot. | `ensure` |
 | `REBASE_REQUIRE_SCHEMA_MATCH` | Refuse to boot when the database was last provisioned from a different set of collections than this process was built from. Unset (or anything other than `true`/`1`) warns instead. | warn |
-| `REALTIME_CDC` | Database-level change capture: `auto` (enable where the connection supports it, silently fall back otherwise), `trigger` (force it, warn if impossible), `wal` (degrades to `trigger` today), `off`. See [Realtime](/docs/backend/realtime-cdc/). | `auto` |
+| `REALTIME_CDC` | Database-level change capture: `auto` (enable where the connection supports it, silently fall back otherwise), `trigger` (force it, warn if impossible), `wal` (degrades to `trigger` today), `off`. See [Realtime](/docs/backend/realtime-cdc/). <span class="since-badge" data-since="0.25">Since 0.25</span> Wins over `realtime.cdc`. | `auto` |
 | `REALTIME_CHANNEL_BUS` | Cross-instance transport for broadcast channels and presence: `memory` or `postgres`. Ignored when `realtime.bus` was given a constructed transport. | `memory` |
 | `REALTIME_MAX_SUBSCRIPTIONS_PER_SOCKET` | How many subscriptions one realtime socket may hold; the next is refused with `TOO_MANY_SUBSCRIPTIONS`. A positive whole number — anything else stops the server at boot. Wins over `realtime.maxSubscriptionsPerSocket`. See [Realtime](/docs/backend/realtime#what-a-write-costs-and-the-limits). | `1000` |
 | `REALTIME_MAX_SOCKETS_PER_USER` | <span class="since-badge" data-since="0.25">Since 0.25</span> How many realtime sockets one user may hold open on one server instance. The next one's sign-in is refused with `TOO_MANY_SOCKETS` and the socket closed (4002); the SDK keeps retrying, so it gets in when another closes. A positive whole number — anything else stops the server at boot. Wins over `realtime.maxSocketsPerUser`. | No ceiling |
@@ -1037,6 +1037,11 @@ await initializeRebaseBackend({
     }
 });
 ```
+
+<span class="since-badge" data-since="0.25">Since 0.25</span> The same options,
+without `app`, `server` and `basePath` and with a required `provision`, build a
+backend that serves nothing until you mount it: `createRebaseBackend`. See
+[Custom Server Integration](/docs/backend/custom-server/).
 
 #### Changing `basePath`
 
@@ -1423,6 +1428,37 @@ session length, the password policy on an administrator's chosen password, and
 an empty string on a required field. Three removals follow: two client exports
 that were only engines, an admin hook nothing needs, and a storage option that
 reached no client.
+
+:::note[Changed behaviour and deprecated names]
+0.25 also changes what a few existing calls do, without breaking them. Check
+these if your app relies on the old behaviour:
+
+- **Plugin field wrappers compose.** Every plugin's `fieldBuilder.wrap` renders,
+  each around the field the plugins before it left, instead of only the last.
+- **Component overrides compose.** A collection's `wrap: true` override receives
+  the app's override of the same component as `OriginalComponent`, not the
+  built-in one.
+- **`rebase.auth`, `rebase.admin`, `rebase.functions` and `rebase.cron` on the
+  server reach the backend's routes in-process,** so middleware you added to
+  your own Hono app no longer runs on them.
+- **The realtime socket answers its own path only** (`/` for an API at `/api`).
+  A client that dialled another path on the same server gets a 404, or your own
+  `upgrade` listener.
+- **The socket gets its token as HTTP does,** so `client.setAuthTokenGetter()`
+  now authenticates it, and after a sign-out it no longer falls back to the
+  `token` option.
+
+These names still work, warn once at runtime, and have a replacement:
+
+| Deprecated | Use |
+|---|---|
+| `loadFunctionsFromDirectory`, `loadFunctionsWithDiagnostics` | `loadFunctions(dir, { onSkip })` |
+| `loadCronJobsFromDirectory`, `loadCronJobsWithDiagnostics` | `loadCrons(dir, { onSkip })`, then `declareCrons(crons)` where the old pair declared them |
+| `client.ws.setAuthTokenGetter()` | `client.setAuthTokenGetter()` |
+| plugin `hooks.modifyCollectionAsync` (never called) | `hooks.modifyCollection`, with the data fetched before `<Rebase>` renders |
+| plugin `lifecycle.onCollectionChange` (never called) | `context.data.collection(slug).listen(…)` from `lifecycle.onMount` |
+| `DatabaseAdapter.mountRoutes`, `BackendBootstrapper.mountRoutes` (never called) | a route factory your app mounts |
+:::
 
 ---
 
@@ -4173,6 +4209,75 @@ yet, listed so that nobody reads a promise into them:
   `REBASE_LIVE_SCHEMA_COLLECTIONS_PATH` default to `main` and
   `config/collections`.
 
+- **`createRebaseBackend` builds a backend and mounts, starts and listens to
+  nothing: each of those is a call you make.** `routes.auth()`, `data()`,
+  `storage()`, `functions()`, `admin()`, `cron()` and `meta()` are the route
+  groups as Hono sub-apps. Each carries its own auth context, rate limits and
+  admin gate, so one can be mounted alone at any path, a parameterised one such
+  as `/:tenant/data` included, and `getUser(c)` and `getDriver(c)` work inside
+  it. `mount(app, { basePath })` is the whole layout `initializeRebaseBackend`
+  serves; `attachRealtime(server)`, `start()` (cron, job workers, sweeps) and
+  `shutdown()` are the rest. `backend.rebase` is the in-process client, and
+  `backend.fetch(request)` serves the whole backend as one fetch handler, for a
+  script or a test with no server. See "Custom Server Integration".
+
+- **Boot-time DDL is a decision: `createRebaseBackend` requires a provision
+  option, which is `true`, `false` or `{ collections, realtime }`.** `true` creates what
+  the backend serves: the collection tables and their RLS policies, change
+  capture, the request role and the framework's own tables. `false` opens the
+  database without changing it, for a script, a test or a second process.
+  `{ collections: false, realtime: false }` keeps the framework's tables and
+  the role, for a process that does not own the schema in a split deployment.
+  `initializeRebaseBackend` passes `true`, and `REBASE_MIGRATE_ON_BOOT=none`
+  still turns the collection schema off for any backend.
+
+- **Functions and cron jobs are values, and `loadFunctions` and `loadCrons`
+  read a directory into them.** `functions: { "send-invoice": sendInvoice }`
+  and `crons: { nightly: defineCron({ … }) }` sit beside `collections`; the
+  record key is the URL segment or the job id. `functions: await
+  loadFunctions(dir)` serves what `functionsDir: dir` serves, and the same holds
+  for crons; `onSkip` receives each file a loader skips. Loading declares
+  nothing: `declareCrons(crons)` records crons in the resource graph, for a
+  build step that wants them there. A directory and values for the same kind
+  are refused at boot, naming both.
+
+- **`composeCallbacks` combines several sets of collection callbacks into
+  one, the way the backend combines its own global, collection and property
+  tiers.** `beforeSave` and `afterRead` chain, `beforeQuery` narrowings are
+  AND-ed, any `false` from `beforeDelete` vetoes, and the `after*` hooks run
+  in order. From `@rebasepro/cms-types`, `@rebasepro/server` and
+  `@rebasepro/common`. `setCollectionCallbacks` still replaces a collection's
+  declared callbacks, and its warning now names `composeCallbacks(declared,
+  mine)` as the way to keep them.
+
+- **`createCallContext` builds the `context` a collection callback receives,
+  so a hook can be unit-tested by calling it.** Fields you pass are used as
+  they are; a missing `client`, `data` or `storageSource` throws on first use,
+  naming the field; `user` stays absent unless passed. From
+  `@rebasepro/server` and `@rebasepro/common`.
+
+- **Each backend keeps its own state in `backend.services`, and
+  `backend.verifyCredential(token)` checks a credential against it.**
+  `services.jwt` (a `JwtService`: sessions, JWKS, download and purpose
+  tokens), `access` (the access model and the personal-key owner resolver),
+  `apiKeyStore`, `rateLimitStore`, `authLimiters`, `collections()`, `topics` and
+  `queues`. `createJwtService(config)` builds a JWT service on its own, and
+  `JwtService`, `AccessControl`, `AuthLimiters`, `BackendServices` and
+  `JwtConfig` are exported types. Every route group sets `c.var.services`; set
+  it yourself, `c.set("services", backend.services)`, to make a route of your
+  own answer for a backend.
+
+- **`setDefaultBackend` makes a backend built by hand the process default:**
+  the one the module-level API answers for, namely `rebase` outside a request,
+  `verifyAccessToken` and the other JWT helpers, `getAccessModel`,
+  `verifyCredential`, and topics and queues published outside a request.
+  `initializeRebaseBackend` does this for its backend.
+
+- **`installUnhandledRejectionHandler()` is exported,** so a backend built by
+  hand can repeat `initializeRebaseBackend`'s first step. It returns a function
+  that uninstalls the handler, or `undefined` when one was already installed or
+  `REBASE_EXIT_ON_UNHANDLED_REJECTION` is set.
+
 ##### Client SDK
 
 - **`findById(id, { include })` and `listenById(id, onUpdate, onError,
@@ -4267,6 +4372,10 @@ yet, listed so that nobody reads a promise into them:
   `getConfigForPath` allowing the collection). A field's own
   `editorProps.aiController` still wins.
 
+- **`warnDeprecated(key, message)` from `@rebasepro/common` prints a
+  deprecation message once per process per key.** Rebase's own deprecated
+  names warn through it, and a plugin or library can use it for its own.
+
 ##### Admin (CMS & app)
 
 - **Four translation keys name the split-view dividers and the drawer's
@@ -4302,6 +4411,27 @@ yet, listed so that nobody reads a promise into them:
   field below it an AI controller for the editor's Autocomplete slash
   command.**
 
+- **`EntityFormPanel` and `CollectionsProvider` put one record's form, or one
+  collection's table, in a page of your own app.** `<CollectionPanel
+  collection={postsCollection}/>` now takes the collection as a value, and
+  `<EntityFormPanel collection={postsCollection} entityId="123"/>` loads one
+  record (or starts a new one without `entityId`) and saves it through
+  `<Rebase>`'s data layer, with `onSaved` and `onClose`. Both work under
+  `<Rebase>` and any React Router router, without `<RebaseCMS>`,
+  `<RebaseNavigation>` or `<RebaseShell>`, and bring their own
+  `CollectionsProvider` when none is above them. Records open over the page,
+  in a side panel or a dialog, never by URL.
+
+- **The `modeController` prop of `<Rebase>` hands Rebase your app's light and
+  dark mode.**
+  Rebase then leaves `<html>`, `prefers-color-scheme` and localStorage alone.
+  `useBuildModeController({ enabled: false })` builds an inert controller.
+
+- **Several layers can register collections with `<Rebase>` at once.** A
+  `CollectionResolverRegistrationContext` registration takes an optional
+  `owner` as its third argument, and `UrlController.routesMounted` is `false`
+  where no CMS route serves the page.
+
 ##### CLI
 
 - **rebase doctor names a junction table no collection declares
@@ -4330,6 +4460,15 @@ yet, listed so that nobody reads a promise into them:
 - **`REBASE_ATLAS_DEV_URL` names the empty database Atlas plans against,
   instead of the derived <db>_dev_diff.** Rebase neither creates nor drops a
   database named this way.
+
+- **`rebase console` opens a Node REPL with the project's data in scope.**
+  `rebase` is what `openRebase` returns and `collections` the project's
+  collections, with top-level await. The project, `.env`, database and
+  `--collections` are resolved the way `rebase db push` resolves them, and a
+  managed database is started if the project uses one. `rebase console -e
+  "<code>"` runs one snippet instead: an expression's value, or a function
+  body's `return`, is printed as JSON on stdout, with notices on stderr, and a
+  throw exits 1. History is kept in `.rebase/console_history`.
 
 ##### CI & tooling
 
@@ -4421,6 +4560,12 @@ yet, listed so that nobody reads a promise into them:
   Instead of counting it on every write; such frames carry `meta.totalAsOf`.
   Unset, every frame counts, as before. Each has a `realtime.*` option.
 
+- **`realtime.path` on the Postgres adapter, and `attachRealtime(server,
+  { path })`, set the URL path the realtime socket answers.** The default is
+  the base path given to `mount()` with a trailing `/api` removed (`/api` →
+  `/`, `/x/api` → `/x`), which is where the SDK dials. `RealtimeSocketOptions`
+  in `@rebasepro/types` carries it to a driver as `path`.
+
 ##### Jobs & cron
 
 - **POST /api/admin/cron/:id/trigger?async=1 (and
@@ -4430,6 +4575,37 @@ yet, listed so that nobody reads a promise into them:
   the run history as the entry with `manual: true` and that `startedAt`. A run
   that cannot start still answers `409`. The synchronous call is unchanged and
   stays the default.
+
+##### Postgres
+
+- **`openRebase` opens a project's data from a script, a REPL or a test, with
+  no server.** It returns `dataAsAdmin` and `sql`, the accessors a function
+  gets, `withAuth(user)` for that user's row-level-security-scoped `data`, and
+  `close()`. Opening changes nothing in the database and reads no environment
+  variable. Against a database no server has booted on, `withAuth` fails rather
+  than run unfiltered. From `@rebasepro/server-postgres`; see "Scripts and the
+  Console".
+
+- **Writes through `openRebase` and `rebase console` record entity history.**
+  A write to a `history: true` collection gets its entry the way a server
+  write does: in the write's transaction, so a write that rolls back leaves no
+  entry, and as the identity it ran as (`service` for `dataAsAdmin`, the
+  user's `uid` under `withAuth`). Nothing is created for it. If the history
+  table or its `rebase.record_history` function is missing, writes to those
+  collections are refused with `HISTORY_UNAVAILABLE` before any callback runs,
+  and reads still work. A script prunes no entries, because retention is the
+  server's setting.
+
+- **`openPostgresDriver` and `postgresDriverConfigFromEnv` are the driver open
+  and the boot's environment reading, as two public pieces.**
+  `createPostgresAdapter` is one step above them, and `openPostgresDriver`
+  reads no environment variable. The adapter's `initializeDriver` config takes
+  `provision: false`, which opens the driver with no DDL of any kind, and
+  `realtime: false`, which takes no part in realtime.
+
+- **`realtime.cdc` and `directConnectionString` on the Postgres adapter
+  config** are the explicit forms of `REALTIME_CDC` and `DATABASE_DIRECT_URL`.
+  Both variables keep working, and still win or fill in as before.
 
 #### Changed
 
@@ -4530,6 +4706,37 @@ yet, listed so that nobody reads a promise into them:
   deploy.** After a commit lands, the next apply is refused with
   `SCHEMA_CHANGE_FAILED`, naming the commit, until the commit is deployed.
 
+- **initializeRebaseBackend is now the public steps it stands for:
+  installUnhandledRejectionHandler, createRebaseBackend, setDefaultBackend,
+  mount, attachRealtime and start.** Its options, routes
+  and behaviour are unchanged, and its `shutdown()` still closes the server it
+  was given; a backend from `createRebaseBackend` closes one only when passed
+  `{ server }`. `RebaseBackendInstance` is now `RebaseBackend`, a superset of
+  its old members. To change one step, copy those lines and change it.
+
+- **The server client's control-plane calls (rebase.auth, rebase.admin,
+  rebase.functions, rebase.cron) reach the backend's own routes in-process,
+  not the application's Hono app.** They work wherever, or whether, the routes
+  are mounted. Middleware the application added to its own app no longer runs
+  on them.
+
+- **Two backends in one process no longer share state.** Each signs and
+  verifies sessions with its own JWT keys, judges scopes by its own access
+  model, checks API keys in its own store and counts rate limits in its own
+  store. `createRebaseBackend` writes no process global; the module-level API
+  answers for the process default, which `configureJwt`, `configureAccess`,
+  `setDefaultBackend` and `initializeRebaseBackend` set. A backend given no
+  `auth.jwtSecret` follows the process default's JWT configuration, as
+  before.
+
+- **Inside a request, cron run or job a backend serves, rebase (imported or
+  ctx.rebase), topic publish and queue enqueue reach that backend.** Anywhere
+  else they reach the process default.
+
+- **createRebaseBackend sets the log level only when logging.level is
+  given;** the logger is process-wide, and building a backend no longer resets
+  it to `LOG_LEVEL`.
+
 ##### Postgres
 
 - **A server booting against an unchanged database runs about a tenth of the
@@ -4579,6 +4786,18 @@ yet, listed so that nobody reads a promise into them:
 - **Schema planning scales linearly with the number of collections.** At 1,000
   collections it takes 55 ms instead of 164. Boot, `rebase db push` and
   `rebase db generate` plan the schema.
+
+- **The Postgres adapter reads its environment variables on the boot path,
+  through postgresDriverConfigFromEnv, not while the driver opens.** Every
+  variable and its precedence is unchanged. A mistyped
+  `REALTIME_MAX_SOCKETS_PER_USER` now fails `initializeDriver` instead of
+  `initializeWebsockets`, with the same message.
+  `createPostgresDatabaseConnection` and `resolveChannelBusSetting` take an
+  optional trailing `env`.
+
+- **collectionRegistry is optional on the adapter's initializeDriver config;**
+  no bundled driver reads it, so a script no longer passes
+  `collectionRegistry: undefined as never`.
 
 ##### Realtime
 
@@ -4653,6 +4872,17 @@ yet, listed so that nobody reads a promise into them:
   The SDK asks for `cancel_sql` on the socket URL (`?rebase_caps=…,cancel_sql`)
   and sends `CANCEL_SQL { requestId }` (an admin-plane frame,
   `database:write`) only to a server whose `hello` lists it.
+
+- **The realtime socket answers WebSocket upgrades on its own path only,**
+  `/` for an API at `/api`, which is where the SDK dials. An upgrade to any
+  other path is left to the host app's own `upgrade` listeners, or answered
+  404 when there are none. Before, the socket took every upgrade on the
+  server (see Fixed).
+
+- **The realtime socket verifies sessions and reads roles through what the
+  server passes it,** `verifyAccessToken` and `accessModel` on
+  `RealtimeSocketOptions`, so it uses its own backend's keys and access model.
+  A socket built by hand without them uses the process default.
 
 ##### Admin (CMS & app)
 
@@ -4773,6 +5003,18 @@ yet, listed so that nobody reads a promise into them:
 - **CollectionViewHeaderAction and PropertyAddColumnComponent are removed.**
   They were not exported and mounted nowhere.
 
+- **Component overrides compose across scopes: a collection's wrap override
+  receives the app's override of the same component as OriginalComponent.**
+  Before, it always received the built-in component. A collection override
+  that replaces the component still replaces both.
+
+- **When Rebase owns the theme, it removes the dark class it added to the
+  html element when it unmounts.** A `dark` class the page already had is
+  left.
+
+- **@rebasepro/cms-types depends on @rebasepro/common,** for the
+  `composeCallbacks` it re-exports.
+
 ##### UI kit & plugins
 
 - **Importing one component from `@rebasepro/ui` bundles that component, not
@@ -4804,6 +5046,13 @@ yet, listed so that nobody reads a promise into them:
 - **The editor's slash autocomplete sends at most 8,000 characters on each
   side of the cursor (`MAX_AUTOCOMPLETE_CONTEXT`).** That is exactly what the
   hosted service reads. It used to upload the whole document on every request.
+
+- **Plugin field wrappers compose: every plugin's `fieldBuilder.wrap` gets
+  the field as the plugins before it left it, and all the wrappers render.**
+  `params.Field` is the previous plugin's wrapper, so the first plugin's is
+  innermost; a plugin that returns `null` or `enabled: false` passes the field
+  on unchanged. Before, only the last plugin that returned a wrapper
+  rendered.
 
 ##### Studio
 
@@ -4899,6 +5148,15 @@ yet, listed so that nobody reads a promise into them:
 
 - **etagOf and withETag now live in @rebasepro/common.** `@rebasepro/client`
   still exports `etagOf`.
+
+- **The realtime socket gets its token the way HTTP requests do: the token
+  getter first, then the held token (the session, setToken() or the token
+  option).** After a sign-out it no longer falls back to the `token` option,
+  which HTTP never did. Installing a token getter or calling `setToken()`
+  rebuilds an open socket, so it authenticates as the new credential.
+
+- **The token client option is read each time a token is needed,** so it may
+  be declared as a getter, on HTTP as well as on the socket.
 
 ##### Storage & email
 
@@ -5032,6 +5290,37 @@ yet, listed so that nobody reads a promise into them:
   console still uses `client.ws`, so those methods stay until it has another
   path.
 
+- **`client.ws.setAuthTokenGetter()` is deprecated: use
+  `client.setAuthTokenGetter()`, which authenticates HTTP and the socket
+  together.** It keeps its old meaning, the socket alone, and warns once.
+
+##### Server & REST
+
+- **`loadFunctionsFromDirectory` and `loadFunctionsWithDiagnostics` are
+  deprecated: use `loadFunctions(dir)`, with `onSkip` for the skipped
+  files.** Both keep their old shape and behaviour, and warn once per
+  process.
+
+- **`loadCronJobsFromDirectory` and `loadCronJobsWithDiagnostics` are
+  deprecated: use `loadCrons(dir)`, and `declareCrons(crons)` where the old
+  pair declared them.** Both keep their old shape and behaviour, still declare
+  what they load, and warn once per process.
+
+- **`DatabaseAdapter.mountRoutes` and `BackendBootstrapper.mountRoutes` are
+  deprecated.** The server never called them, and its adapter wrappers no
+  longer forward them. The types still accept them. A driver that needs HTTP
+  routes exports a route factory for the application to mount.
+
+##### UI kit & plugins
+
+- **The plugin hooks `hooks.modifyCollectionAsync` and
+  `lifecycle.onCollectionChange` are deprecated; neither was ever called.**
+  Fetch the data before rendering `<Rebase>` and build the plugin from it, so
+  its `hooks.modifyCollection` reads data it already has; subscribe with
+  `context.data.collection(slug).listen(…)` from `lifecycle.onMount`,
+  unsubscribing in `onUnmount`. A plugin that sets either still compiles, and
+  `<Rebase>` warns once per plugin, naming the replacement.
+
 #### Fixed
 
 ##### Server & REST
@@ -5129,6 +5418,13 @@ yet, listed so that nobody reads a promise into them:
 - **SCHEMA_EDITOR_DISABLED and SCHEMA_EDITOR_PRODUCTION now say how to edit
   collections from a deployment.**
 
+- **`GET /api/auth/config` is no longer served by a process with the auth
+  surface off,** such as the `functions` and `worker` roles.
+
+- **A functions record of what defineFunction returns typechecks:**
+  `functions: { "send-invoice": defineFunction(…) }` was refused, because
+  `FunctionApp` was `Hono<Env>`; it is `Hono<HonoEnv>`.
+
 ##### Postgres
 
 - **A server that boots while a long report, transaction or `pg_dump` reads
@@ -5187,6 +5483,15 @@ yet, listed so that nobody reads a promise into them:
   when it cannot append the RLS policies, search, vector or trigger DDL to
   it.** It used to warn and say "You can now run rebase db migrate", and that
   migration created its tables with RLS off.
+
+- **A backend created with provision false no longer creates or migrates the
+  auth tables, creates the history table and its function, or re-grants the
+  request role after the driver opens.** On a database without the history
+  table, it refuses writes to `history: true` collections with
+  `HISTORY_UNAVAILABLE` before any callback runs.
+
+- **`readConnectionString` on the Postgres adapter config is honoured.** It
+  was declared and ignored, and only `DATABASE_READ_URL` worked.
 
 ##### CLI
 
@@ -5421,6 +5726,18 @@ yet, listed so that nobody reads a promise into them:
   (`false` for a `DEFAULT true` column), and the first push planned
   `DROP DEFAULT` on every such column.
 
+- **Record forms, side panels and split views no longer throw outside a React
+  Router data router.** `NavigationBlockerProvider` works under any router;
+  under a plain `<BrowserRouter>`, unsaved-changes guards fall back to the
+  browser's leave-page prompt.
+
+- **Importing @rebasepro/app no longer adds a resize listener to window or
+  reads matchMedia;** `useLargeLayout` listens only while something reads
+  it.
+
+- **A record form reported each save twice:** `onSaved`, and the side
+  panel's `onUpdate`, ran twice per save.
+
 ##### Studio
 
 - **The SQL console's CSV export follows RFC 4180.** Values with commas,
@@ -5471,6 +5788,10 @@ yet, listed so that nobody reads a promise into them:
   `NOT_FOUND`, as REST does, and a frame with an unknown `type` with
   `UNKNOWN_MESSAGE_TYPE`.** They were answered `INTERNAL_ERROR`, or left to
   time out.
+
+- **A host app running its own WebSocket server on the same http.Server no
+  longer collides with the realtime socket** ("handleUpgrade() was called more
+  than once").
 
 ##### Client SDK
 
@@ -5547,6 +5868,15 @@ yet, listed so that nobody reads a promise into them:
 - **upsert() errors no longer carry the bulk route's `Row 0 of 1 (id …)
   failed:` prefix.** Code, status and details are unchanged, and `createMany`
   keeps the prefix.
+
+- **`client.setAuthTokenGetter()` authenticates the realtime socket as well
+  as HTTP requests.** A host signing users in with its own provider (Clerk,
+  Firebase Auth, its own session) got an anonymous socket, so its live queries
+  ran as a visitor. `client.setToken()` and `client.setOnUnauthorized()` reach
+  the socket too.
+
+- **An HTTP request made while a token refresh was in flight no longer goes
+  out with the token of an account that signed out during that refresh.**
 
 ##### Auth
 
@@ -5781,6 +6111,12 @@ yet, listed so that nobody reads a promise into them:
 
 - **Multi-factor authentication with the SDK has its own page,**
   "Multi-Factor Authentication" (`/docs/sdk/multi-factor-authentication/`).
+
+##### Server & REST
+
+- **Scripts and the console have their own page,** "Scripts and the Console"
+  (`/docs/backend/scripts/`), and "Custom Server Integration" teaches the
+  backend as public pieces.
 
 ### [0.24.0] - 2026-10-08
 
@@ -20184,6 +20520,66 @@ const articlesCollection = defineCollection({
 });
 ```
 
+### Combining callback sets
+
+<span class="since-badge" data-since="0.25">Since 0.25</span> On 0.24, combine
+sets by hand.
+
+A collection has one `callbacks` object. When several concerns each want a hook,
+such as timestamps, an audit trail and a tenant scope, write each as its own set
+and combine them with `composeCallbacks`:
+
+```typescript
+import { composeCallbacks, defineCollection } from "@rebasepro/cms-types";
+import type { CollectionCallbacks } from "@rebasepro/types";
+
+const timestamps: CollectionCallbacks = {
+    beforeSave: ({ values, status }) => ({
+        ...values,
+        ...(status === "new" ? { createdAt: new Date().toISOString() } : {}),
+        updatedAt: new Date().toISOString()
+    })
+};
+
+const auditTrail: CollectionCallbacks = {
+    afterSave: async ({ context, id, status }) => {
+        await context.data.audit_log.create({ entity: "articles", entityId: String(id), action: status });
+    }
+};
+
+export default defineCollection({
+    slug: "articles",
+    name: "Articles",
+    table: "articles",
+    properties: {
+        title: { name: "Title", type: "string" },
+        createdAt: { name: "Created at", type: "string" },
+        updatedAt: { name: "Updated at", type: "string" }
+    },
+    callbacks: composeCallbacks(timestamps, auditTrail)
+});
+```
+
+The sets run in the order given, and each hook combines the way the backend
+combines its own [global](/docs/backend/hooks), collection and property tiers:
+
+| Hook | Combined |
+|---|---|
+| `beforeSave` | Chained: each set sees the values the previous one returned, shallow-merged over what it was given |
+| `afterRead` | Chained: each set gets the row the previous one returned |
+| `beforeQuery` | AND-ed: every set sees the caller's query, and a row must pass every narrowing |
+| `beforeDelete` | Any `false` vetoes the delete; every set still runs |
+| `afterSave`, `afterDelete` | Run in order, each awaited; a throw stops the rest |
+| `afterSaveError` | Run in order; a throw does not stop the next set, and the first error is rethrown at the end |
+
+A hook is in the result only if some set has it, and an `undefined` set is
+skipped. `composeCallbacks` is also exported from `@rebasepro/server` and
+`@rebasepro/common`.
+
+Attaching callbacks after boot with `backend.setCollectionCallbacks(slug,
+callbacks)` **replaces** the ones the collection declared. To add yours to
+them, pass `composeCallbacks(declared, yours)`.
+
 ### Callback Reference
 
 #### `beforeQuery`
@@ -20464,6 +20860,46 @@ Other cross-collection patterns:
 - **Audit logging**: Use `afterSave` / `afterDelete` to write to an audit log collection
 - **Counters**: Use `afterSave` / `afterDelete` to update count fields on related entities
 
+### Testing a callback
+
+<span class="since-badge" data-since="0.25">Since 0.25</span>
+
+A callback is a plain function of one props object, so a unit test calls it.
+`createCallContext` builds the `context` prop: the fields you pass are used as
+they are, and any you leave out is a stand-in that throws on first use, naming
+itself, so a test supplies only what the hook really touches.
+
+```typescript
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { createCallContext } from "@rebasepro/server";
+import type { User } from "@rebasepro/types";
+import articlesCollection from "../config/collections/articles";
+
+const editor: User = {
+    uid: "u1", displayName: null, email: null, photoURL: null,
+    providerId: "password", isAnonymous: false, roles: ["editor"]
+};
+
+test("beforeSave derives the slug from the title", async () => {
+    const values = await articlesCollection.callbacks!.beforeSave!({
+        collection: articlesCollection,
+        path: "articles",
+        status: "new",
+        values: { title: "Hello World" },
+        context: createCallContext({ user: editor })
+    });
+    assert.equal(values.slug, "hello-world");
+});
+```
+
+A hook that reads or writes through `context.data` needs a driver: pass
+`createCallContext({ data: buildSdkData(driver) })`, with `buildSdkData` from
+`@rebasepro/common` and any `DataDriver`, an in-memory one included. `user`
+stays absent unless you pass it, as it is on a write with no caller, so an
+`if (context.user)` branch is tested honestly. To run hooks against a real
+database instead, see [Scripts and the Console](/docs/backend/scripts/).
+
 ### Full Context Reference
 
 Every callback receives a `context` object of type `RebaseCallContext`:
@@ -20485,7 +20921,8 @@ interface RebaseCallContext {
 
 Query through `context.data`. `context.client` has no `data`: server-side it is
 the `rebase` singleton, whose only data plane is the admin-scoped `dataAsAdmin`,
-so `context.client.data` is a compile error.
+so `context.client.data` is a compile error. To build one of these for a test,
+see [Testing a callback](#testing-a-callback).
 
 ### Next Steps
 
@@ -21501,6 +21938,15 @@ const instance = await initializeRebaseBackend({
 });
 ```
 
+<span class="since-badge" data-since="0.25">Since 0.25</span> That one call is
+a shortcut over public steps: `installUnhandledRejectionHandler` keeps a stray
+rejection from ending the process, `createRebaseBackend` builds the backend,
+`setDefaultBackend` makes it the one the module-level API answers for, and
+`mount`, `attachRealtime` and `start` serve it. To mount only some route
+groups, put them at other paths, leave the timers to another process, or run
+two backends in one process, call the steps yourself. See
+[Custom Server Integration](/docs/backend/custom-server/).
+
 ### Where each option lives
 
 That call is the **ejected** shape — the one you write yourself after `rebase
@@ -21515,8 +21961,8 @@ Both paths reach the same `RebaseBackendConfig`. This is the whole map.
 |---|---|
 | `basePath` | `REBASE_BASE_PATH` (default `/api`) |
 | `collections`, `collectionsDir` | the `config/collections/` directory, declared by `rebase.json` |
-| `functionsDir` | `backend/functions/` |
-| `cronsDir` | `backend/crons/` |
+| `functions`, `functionsDir` | `backend/functions/` |
+| `crons`, `cronsDir` | `backend/crons/` |
 | `bootstrappers`, `database` | `DATABASE_URL`, plus a `database("<key>")` declaration in `config/resources.ts` for every database beyond the default |
 | `auth` | `JWT_SECRET`, the `OAUTH_*` variables, and `config/collections/users` |
 | `storage` | the `STORAGE_*` variables, plus a `bucket("<key>")` declaration in `config/resources.ts` for every bucket beyond the default |
@@ -21563,9 +22009,9 @@ After initialization, these routes are mounted:
 | `/api/swagger` | Swagger UI (dev mode, when `enableSwagger: true`) |
 | `/api/meta/contract` | The project's collection schema (needs `schema:read`) |
 | `/api/meta/schema-version` | A version string for that schema (unauthenticated) |
-| `/api/functions/*` | Custom function routes (when `functionsDir` is set) |
-| `/api/admin/cron/*` | Cron job management (`cron:read` / `cron:write`, when `cronsDir` is set) |
-| WebSocket on upgrade | Real-time subscriptions |
+| `/api/functions/*` | Custom function routes (when `functions` or `functionsDir` is set) |
+| `/api/admin/cron/*` | Cron job management (`cron:read` / `cron:write`, when `crons` or `cronsDir` is set) |
+| WebSocket on upgrade | Real-time subscriptions, on `/` for an API at `/api` |
 
 ---
 
@@ -21662,10 +22108,12 @@ interface RebaseBackendConfig {
     // OpenAPI/Swagger
     enableSwagger?: boolean;
 
-    // Custom API endpoints
+    // Custom API endpoints: values, or a directory of files (not both)
+    functions?: Record<string, FunctionApp>;  // { "send-invoice": app } → /api/functions/send-invoice
     functionsDir?: string;    // Auto-load Hono routes from a directory
 
-    // Scheduled tasks
+    // Scheduled tasks: values, or a directory of files (not both)
+    crons?: Record<string, CronJobDefinition>; // { "nightly-report": defineCron(…) }
     cronsDir?: string;         // Auto-load cron jobs from a directory
     cronPersistence?: boolean; // Write run logs to rebase.cron_logs (default: true)
 
@@ -21702,7 +22150,9 @@ disagree with the runtime about what this process is.
 
 ### The Backend Instance
 
-`initializeRebaseBackend` returns a `RebaseBackendInstance` with access to internal services:
+`initializeRebaseBackend` returns the backend it built, already mounted and
+started. Its type is `RebaseBackendInstance`, which is `RebaseBackend`, the
+type `createRebaseBackend` returns:
 
 ```typescript
 const instance = await initializeRebaseBackend(config);
@@ -21716,10 +22166,19 @@ instance.storageController   // Default storage
 instance.storageRegistry     // All storage backends
 instance.collectionRegistry  // Collection metadata
 instance.history?.historyService // Entity history
-instance.cronScheduler       // Cron job scheduler (when cronsDir is set)
+instance.cronScheduler       // Cron job scheduler (when crons or cronsDir is set)
+instance.jobQueue            // Durable job queue (when jobs are enabled)
+instance.setCollectionCallbacks(slug, callbacks) // Replace a collection's callbacks
+instance.shutdown()          // Drain and stop; also closes the server it was given
 ```
 
-> **Note:** While the `instance` exposes these internal services, application code (such as custom functions and cron jobs) should use the global `rebase` singleton from `@rebasepro/server` to interact with the backend API.
+<span class="since-badge" data-since="0.25">Since 0.25</span> It also carries
+`rebase`, the in-process client, `fetch(request)`, `routes`, the route groups
+as Hono sub-apps, `services`, its own JWT keys, access model, API-key store and
+rate limiters, and `verifyCredential(token)`; see
+[Custom Server Integration](/docs/backend/custom-server/).
+
+> **Note:** While the `instance` exposes these internal services, application code (such as custom functions and cron jobs) should use the `rebase` singleton from `@rebasepro/server` to interact with the backend API. <span class="since-badge" data-since="0.25">Since 0.25</span> Inside a request, cron run or job, `rebase` is the backend serving it; elsewhere it is the process default, which `initializeRebaseBackend` sets to its backend.
 
 ### REST API
 
@@ -21752,7 +22211,7 @@ that name, so an invented one does not fail: it silently matches nothing.
 
 ### WebSocket
 
-The WebSocket server attaches to the same HTTP server and provides real-time subscriptions:
+The WebSocket server attaches to the same HTTP server and provides real-time subscriptions. <span class="since-badge" data-since="0.25">Since 0.25</span> It answers upgrades on one path, `/` for an API at `/api`, where the SDK dials, and leaves every other path to your own `upgrade` listeners; on 0.24 it takes every upgrade on the server:
 
 - Subscribe to **collection changes** — get notified when any entity in a collection is created, updated, or deleted
 - Subscribe to **entity changes** — get notified when a specific entity changes
@@ -21842,13 +22301,16 @@ longer reach your project. So climb only as far as you have to.
 
 ### The ladder
 
+<span class="since-badge" data-since="0.25">Since 0.25</span> Rung 5's
+`createRebaseBackend` is new; on 0.24 that rung is the driver alone.
+
 | ## | Rung | Reaches | Does **not** reach | Cost of being here |
 |---|---|---|---|---|
 | 1 | **Declaration** — a property, a relation, an index, a `search` block, a security rule | The schema, the generated SDK, the admin panel, the migration planner | Anything that has to run code | None. This is the supported path |
 | 2 | **Collection callback** — `beforeQuery`, `afterRead`, `beforeSave`, `afterSave`, `beforeDelete`, `afterDelete` | Every read and write of one collection, on every transport, inside the request's own transaction | Requests that touch no collection; the response envelope; anything asynchronous to the write | Runs on the hot path, holding the transaction open |
 | 3 | **Custom function** — a Hono app in `functions/` | Its own URL, with auth resolved, the driver scoped to the caller and `rebase` in hand | The built-in `/api/data` routes. It sits *beside* them, not in front | One more surface to authorize; no SDK method is generated for it |
 | 4 | **Your own routes and middleware** on the Hono app | Anything HTTP, including paths that run *before* Rebase's routers | The driver and the caller's identity, unless you guard the route yourself | Outside every Rebase router: no auth middleware has run |
-| 5 | **Your own server** — embed the driver in Express, Fastify or plain `http` | The data adapter and realtime, in a process you wrote | Everything `initializeRebaseBackend` wires up: auth routes, storage, jobs, cron, admin API, the MCP server | You assemble the backend. Rebase is a library here, not a coordinator |
+| 5 | **Your own server** — build the backend with `createRebaseBackend` and mount the route groups you want, or embed the driver alone in Express, Fastify or plain `http` | Each route group, at the path you choose, and which process starts the timers; at the bottom, the data adapter and realtime alone | With the driver alone: everything else, from auth routes and storage to cron and the admin API | You call each step `initializeRebaseBackend` made for you |
 | 6 | **`rebase eject`** | The entrypoint and the `Dockerfile`, in your repository | — | **Platform runtime upgrades stop reaching this project.** CORS, auth wiring, storage and shutdown become yours |
 
 :::tip[Two rungs are commonly skipped for no reason]
@@ -21970,7 +22432,7 @@ that is not Postgres. Redaction that works on every engine is `afterRead`.
 **Scope:** one URL under `/api/functions`.
 
 A Hono app in `backend/functions/`, discovered by filename the way collections
-and cron jobs are. Auth middleware has already run when your handler is reached,
+and cron jobs are, or passed as a value (`functions: { promote }`). Auth middleware has already run when your handler is reached,
 the driver is scoped to the caller, and `rebase` is in hand for storage, email,
 jobs and `dataAsAdmin`.
 
@@ -22001,7 +22463,8 @@ method; callers reach it with `client.functions.invoke(...)` or plain `fetch`.
 `initializeRebaseBackend` takes the app you pass it, so anything you register on
 that app *before* calling it runs before every Rebase router — see
 [Route Registration Order](/docs/backend/custom-functions#route-registration-order)
-for the shape.
+for the shape. A route group you mount yourself from `backend.routes` (rung 5)
+is not one of these routes: it carries its own auth middleware.
 
 :::caution[No auth middleware has run there]
 A route registered this way is **outside** every Rebase router, so
@@ -22026,22 +22489,43 @@ a thing a Rebase router did.
 
 **Scope:** the process.
 
-`@rebasepro/server-postgres` is framework-agnostic: it depends on Drizzle and
-Node's `http.Server` and nothing else. So you can embed the data adapter and
-realtime into Express, Fastify or plain Node and skip the coordinator entirely.
+<span class="since-badge" data-since="0.25">Since 0.25</span>
+`initializeRebaseBackend` is a shortcut over a few public calls, and this rung
+is calling them yourself. `createRebaseBackend` builds the backend and mounts,
+starts and listens to nothing. `backend.routes` holds each route group as a
+Hono sub-app you can mount alone, at any path. `mount`, `attachRealtime` and
+`start` do the rest, if you want them:
+
+```typescript
+const backend = await createRebaseBackend({ database: adapter, auth, collections, provision: true });
+
+app.route("/v2/data", backend.routes.data());   // only the parts you want,
+app.route("/v2/auth", backend.routes.auth());   // at the paths you want
+await backend.attachRealtime(server);
+backend.start();                                // cron, job workers, sweeps
+```
+
+A group carries its own auth context, rate limits and admin gate, so
+`getDriver(c)` works in a group mounted anywhere. What it does not carry is the
+process-wide middleware `mount()` adds: the body limit, compression, CSRF and
+the error envelope are yours to add when you mount groups one by one.
+
+One step further down, `@rebasepro/server-postgres` is framework-agnostic: it
+depends on Drizzle and Node's `http.Server` and nothing else, so you can embed
+the data driver and realtime in Express, Fastify or plain Node and leave the
+Rebase server out entirely.
 
 → [Custom Server Integration](/docs/backend/custom-server)
 
-**What it cannot reach:** everything `initializeRebaseBackend` wires up, which
-is most of the backend — the auth routes and token refresh, storage, the job
-queue, cron, the admin API the Studio talks to, the MCP server, the error
-envelope, the middleware stack. Each of those is available to assemble by hand;
-none of them assembles itself. Rebase is a library at this rung, not a
-coordinator.
+**What it cannot reach:** with `createRebaseBackend`, nothing is out of reach;
+you take on the order of the calls. With the driver alone, everything the
+server wires up is yours to build: the auth routes and token refresh, storage,
+the job queue, cron, the admin API the Studio talks to, the MCP server, the
+error envelope and the middleware stack.
 
-Reach for it when you have an existing server that must stay the entrypoint. If
-what you actually want is one custom route, that is rung 3 or 4, at a fraction
-of the surface.
+Reach for it when you have an existing server that must stay the entrypoint, or
+when only part of the backend belongs in this process. If what you actually
+want is one custom route, that is rung 3 or 4, at a fraction of the surface.
 
 ### 6. `rebase eject`
 
@@ -23579,6 +24063,7 @@ the ID you got. Read the response header.
 | `DB_POOL_EXHAUSTED` | 503 | Every pooled database connection stayed busy for `DB_POOL_CONNECT_TIMEOUT`, so this request never reached the database. Load, not a fault; sent with `Retry-After`. The server logs the remedy once a minute. | Retry; the SDK does. Raise `DB_POOL_MAX`, or find the slow queries or long transactions holding connections. |
 | `FIELD_NOT_READABLE` | 400 | A filter, `orderBy`, `fields`, aggregate `select` or `groupBy` names a field this caller's roles cannot read (`access.read`), a nested path or an aggregate sort names a relation they cannot read — or a field operation (`$inc`, `$push`, …) targets one, where a refused bound would reveal the stored value. A field no response can carry has to be one no query can interrogate, or the value is readable one predicate at a time. A filter through a relation (`author.salary`) and an aggregate sort over a relation's field (`max(staff.salary)`) are judged by the target's rule. `details.violations` names each field. A field hidden with `excludeFromApi` answers as if it did not exist: a filter, `orderBy`, `fields`, `include`, aggregate `select` or `groupBy`, or `vector_search` naming one gets exactly the answer a misspelt name gets (`UNKNOWN_FILTER_FIELD`, `UNKNOWN_ORDER_BY_FIELD`, `UNKNOWN_FIELD`, `UNKNOWN_RELATION`, `UNKNOWN_AGGREGATE_FIELD` or `UNKNOWN_VECTOR_PROPERTY`), and no unknown-field answer lists one. | Drop the field from the query, or acquire the role. See [Field access](/docs/collections/field-access/). |
 | `FIELD_NOT_WRITABLE` | 400 | The body sets a field this caller's roles cannot write (`access.write`). Refused rather than dropped: a write that discards a field would report success for an edit that did not happen. The same code refuses a write through a parent that sets a relation the caller may not write, and an update that sets a `softDelete` field to a value — only a delete stamps it. `details.violations` names each field. | Remove the field, or acquire the role. A field nobody may write answers `VALIDATION_EXCLUDED_FIELDS` instead. |
+| `HISTORY_UNAVAILABLE` | 503 | A write to a collection with `history: true` was refused because its history entry could not be recorded: the database has no `rebase.entity_history` table, or, for `openRebase` and `rebase console`, no `rebase.record_history` function. No backend with history has booted on this database. Nothing ran, callbacks included, and reads are unaffected. Thrown by `openRebase`, and answered by a backend created with `provision: false`. | Boot the backend once with history on and `provision: true` (`rebase dev` does), then retry. |
 | `IDEMPOTENCY_KEY_IN_PROGRESS` | 409 | An earlier request with the same `Idempotency-Key` is still running. | Retry once it finishes. |
 | `IDEMPOTENCY_KEY_REUSED` | 422 | The same `Idempotency-Key` arrived with a different body. | Use a new key, or send the original body. |
 | `INVALID_AGGREGATE_FUNCTION` | 400 | `?select=` named a function that is not `count`, `sum`, `avg`, `min` or `max`. | Use one of those; the message lists them. |
@@ -26015,6 +26500,25 @@ const backend = await initializeRebaseBackend({
 });
 ```
 
+##### The client half
+
+<span class="since-badge" data-since="0.25">Since 0.25</span> On 0.24 the getter
+authenticates HTTP requests only, and the realtime socket stays anonymous.
+
+The adapter verifies the provider's token; the client has to send it. Give the
+Rebase client a getter for it, once:
+
+```typescript
+client.setAuthTokenGetter(() => clerk.session?.getToken() ?? Promise.resolve(null));
+```
+
+With Firebase Auth the getter is
+`() => auth.currentUser?.getIdToken() ?? Promise.resolve(null)`. The client
+asks it for every HTTP request and every time the realtime socket
+authenticates, so live queries run as the same user as REST calls. In the
+admin panel, set it on the client you pass to `<Rebase client>`. See
+[Using your own auth provider](/docs/sdk/authentication#using-your-own-auth-provider).
+
 ---
 
 #### Mounting Auth Routes and Panel Actions
@@ -27294,6 +27798,14 @@ For multi-instance deployments, Rebase uses PostgreSQL's `LISTEN/NOTIFY` to carr
 
 Realtime is enabled out of the box. There is no flag to flip or service to start — if your Rebase server is running, the WebSocket endpoint is available.
 
+#### Which path the socket answers
+
+<span class="since-badge" data-since="0.25">Since 0.25</span> On 0.24 the socket takes every WebSocket upgrade on the server, whatever its path.
+
+The socket answers upgrades on one path: the API's base path with a trailing `/api` removed, so `/` for an API at `/api`. That is where the SDK dials: it connects to its `baseUrl`, while its HTTP requests go to `${baseUrl}/api`. An upgrade to any other path is left to the server's other `upgrade` listeners, so your app can run its own WebSocket server on the same `http.Server`. With no other listener, such an upgrade is answered `404`.
+
+In a [custom server](/docs/backend/custom-server/), `backend.attachRealtime(server, { path })` sets the path, and the Postgres adapter's `realtime.path` overrides what the server derived.
+
 > By default, Rebase also emits realtime events for writes made **outside** the API (via `psql`, another service, or Studio's SQL editor) whenever the database connection supports it — see [database-level change capture](/docs/backend/realtime-cdc/).
 
 ### Typed SDK Subscriptions
@@ -28029,6 +28541,10 @@ CDC is controlled by the `REALTIME_CDC` environment variable:
 | `wal` | Prefer WAL logical replication. Not yet bundled — degrades to `trigger` and logs the active mode. |
 | `off` | Application-level realtime only. Use this to avoid the per-write trigger overhead on write-heavy workloads. A boot with `off` that owns the schema also **removes** the capture triggers and functions an earlier boot installed, and logs how many it took off; unset it and the next boot installs them again. |
 
+<span class="since-badge" data-since="0.25">Since 0.25</span> The same setting is
+the Postgres adapter's `realtime.cdc` option, for a server that configures it in
+code. `REALTIME_CDC`, when set, wins.
+
 On boot you'll see a log line stating the active mode, e.g.:
 
 ```
@@ -28055,7 +28571,9 @@ If the connection can't support it, `auto` logs an informational line instead an
 
 ### Requirements & Notes
 
-- CDC requires a direct connection string (`DATABASE_DIRECT_URL` or the primary connection) for the `LISTEN` client — connection poolers in transaction mode do not support long-lived `LISTEN` sessions.
+<span class="since-badge" data-since="0.25">Since 0.25</span> `directConnectionString` is the adapter option; on 0.24 use `DATABASE_DIRECT_URL`.
+
+- CDC requires a direct connection string (`DATABASE_DIRECT_URL`, the adapter's `directConnectionString`, or the primary connection) for the `LISTEN` client — connection poolers in transaction mode do not support long-lived `LISTEN` sessions.
 - Triggers are installed only on tables backed by a registered collection. Writes to unmapped tables are ignored.
 - A collection whose table has not yet been migrated is skipped with a warning rather than blocking CDC for the rest.
 - Native WAL logical-replication streaming (`wal2json`/`pgoutput`) is planned; today `REALTIME_CDC=wal` degrades to the trigger-based path, which provides equivalent database-level coverage.
@@ -28943,7 +29461,7 @@ The **filename** (without extension) becomes the job's unique ID — e.g., `heal
 :::note[Where this goes]
 **Managed runtime** — put the files in `backend/crons/`; the runtime discovers that directory on its own, and `entry.crons` in `rebase.json` is only needed if you moved it. `REBASE_CRON_SCHEDULER` in `.env` decides whether *this* process runs the timers.
 
-**Ejected** — `cronsDir` on `initializeRebaseBackend({ … })`, as below.
+**Ejected** — `cronsDir` on `initializeRebaseBackend({ … })`, as below, or `crons` with the jobs as values.
 
 The full map is in [Backend Overview](/docs/backend/#where-each-option-lives).
 :::
@@ -28965,6 +29483,30 @@ That's it. Rebase will:
 3. Auto-create the `rebase.cron_logs`, `rebase.cron_claims` and `rebase.cron_job_state` tables in PostgreSQL (if the driver supports SQL)
 4. Start the scheduler and seed counters from existing DB logs
 5. Mount admin REST routes at `/api/admin/cron`
+
+#### Cron jobs as values
+
+<span class="since-badge" data-since="0.25">Since 0.25</span> On 0.24 cron jobs come from a directory only.
+
+`crons` takes the jobs as a record from job id to definition, beside `collections`. A directory is one way to build it: `loadCrons(dir)` reads one into exactly that shape.
+
+```typescript
+import path from "path";
+import { defineCron, initializeRebaseBackend, loadCrons } from "@rebasepro/server";
+
+const nightlyReport = defineCron({
+    schedule: "0 3 * * *",
+    async handler({ log }) {
+        log("building the report");
+    }
+});
+
+await initializeRebaseBackend({ app, server, crons: { "nightly-report": nightlyReport } });
+// the same as cronsDir:
+await initializeRebaseBackend({ app, server, crons: await loadCrons(path.resolve(__dirname, "../crons")) });
+```
+
+Give `crons` or `cronsDir`, not both: the boot refuses the pair. Building the backend registers the jobs; what starts their timers is `start()`, which `initializeRebaseBackend` calls for you. With [`createRebaseBackend`](/docs/backend/custom-server/) you call it yourself, in the process that should run them. `loadCronJobsFromDirectory` and `loadCronJobsWithDiagnostics` still work, are deprecated, and warn once.
 
 ### Schedule Syntax
 
@@ -29342,6 +29884,16 @@ The handler runs in the deployment, where those variables exist. A top-level
 import of the same module makes the graph derivable only on a machine that
 happens to have a `.env` — and it loads the whole dependency into every boot
 that merely registers the job.
+
+<span class="since-badge" data-since="0.25">Since 0.25</span> Loading a cron
+declares nothing. A build step of your own that wants crons in the graph says
+so, with `declareCrons`:
+
+```ts
+import { declareCrons, loadCrons } from "@rebasepro/server";
+
+declareCrons(await loadCrons("./crons", { onSkip: (problem) => console.warn(problem) }));
+```
 
 ### Next Steps
 
@@ -29959,7 +30511,7 @@ See [Runtime portability](#runtime-portability) for the full contract.
 
 :::note[Where this goes]
 **Managed runtime:** nothing to configure — the runtime discovers `backend/functions/` on its own (`entry.functions` in `rebase.json` if you moved it). `REBASE_FUNCTIONS_ONLY` / `REBASE_FUNCTIONS_EXCLUDE` narrow which ones a process serves.
-**Ejected:** `initializeRebaseBackend({ functionsDir })` in `backend/src/index.ts`.
+**Ejected:** `initializeRebaseBackend({ functionsDir })`, or `functions` (below), in `backend/src/index.ts`.
 :::
 
 Enable custom functions by adding `functionsDir` to your backend config:
@@ -29979,6 +30531,24 @@ Rebase will:
 2. Validate each default export is a Hono app (duck-typed via `.fetch()` + `.routes`)
 3. Mount each app at `/api/functions/<filename>`
 4. Apply the auth middleware (see [Authentication](#authentication-and-context-propagation) below)
+
+#### Functions as values
+
+<span class="since-badge" data-since="0.25">Since 0.25</span> On 0.24 functions come from a directory only.
+
+A directory is one way to produce what the server serves: a record from URL segment to Hono app. Pass that record yourself as `functions`, or read a directory into it with `loadFunctions`:
+
+```typescript
+import path from "path";
+import { initializeRebaseBackend, loadFunctions } from "@rebasepro/server";
+import sendInvoice from "../functions/send-invoice";
+
+await initializeRebaseBackend({ app, server, functions: { "send-invoice": sendInvoice } }); // → /api/functions/send-invoice
+// the same as functionsDir:
+await initializeRebaseBackend({ app, server, functions: await loadFunctions(path.resolve(__dirname, "../functions")) });
+```
+
+Give `functions` or `functionsDir`, not both: the boot refuses the pair. `loadFunctions(dir, { onSkip })` hands you each file it skipped, with the reason. `loadFunctionsFromDirectory` and `loadFunctionsWithDiagnostics` still work, are deprecated, and warn once. On its own, the functions group mounts at any path with `app.route("/hooks", backend.routes.functions())`, and `getUser(c)` and `getDriver(c)` work inside it; see [Custom Server Integration](/docs/backend/custom-server/#mounting-only-the-groups-you-want).
 
 ### File Naming and Route Mapping
 
@@ -30033,33 +30603,11 @@ export default function () {
 
 ### Under the Hood: The Duck-Typing Loader
 
-When compiling codebases with multiple nested directories or in monorepos, you may run into **Hono package duplication**.
-
-If the Rebase framework depends on one Hono version and your local function directory resolves to another, standard class inheritance checks (`exported instanceof Hono`) will fail because their prototypes exist in separate memory spaces.
-
-To prevent false negatives and reject loading functioning routers, Rebase uses a duck-typed validator (`isHonoLike`):
-- It verifies the exported object is a non-null `object`.
-- It checks that the object exposes a `.fetch` method (required to route requests).
-- It verifies that `.routes` is an `array`.
-
-```typescript no-verify
-function isHonoLike(obj: unknown): boolean {
-    if (!obj || typeof obj !== "object") return false;
-    const record = obj as Record<string, unknown>;
-    return typeof record.fetch === "function" && Array.isArray(record.routes);
-}
-```
+In a monorepo your functions may resolve a different copy of Hono from the one Rebase uses, and then `exported instanceof Hono` is false for a working router. So the loader checks the shape instead (`isHonoLike`): a non-null object with a `.fetch` method and a `.routes` array.
 
 #### ES Module Compiler Escape
 
-To import TypeScript and JavaScript files dynamically on both Windows and Posix systems, the loader converts file paths to standard file URIs via `pathToFileURL(filePath).href`.
-
-To prevent TypeScript compilation from rewriting native ESM dynamic imports (`import(url)`) into CommonJS `require()` calls (which would throw errors at runtime under ESM runtimes), Rebase executes a runtime compiler escape:
-
-```typescript no-verify
-const dynamicImport = new Function("url", "return import(url)");
-const mod = await dynamicImport(fileUrl);
-```
+The loader turns each file path into a file URL (`pathToFileURL(filePath).href`), so it imports on Windows and POSIX alike, and calls `import(url)` through `new Function("url", "return import(url)")`, so a TypeScript build cannot rewrite it into a `require()` that fails under ESM.
 
 ---
 
@@ -30659,6 +31207,15 @@ const instance = await initializeRebaseBackend({
 });
 ```
 
+<span class="since-badge" data-since="0.25">Since 0.25</span> `callbacks` takes
+one set. To keep several concerns apart, write each as its own set and pass
+`composeCallbacks(tenantScope, auditTrail)`: they combine exactly as the tiers
+above do. See
+[Combining callback sets](/docs/collections/callbacks/#combining-callback-sets).
+The same goes for `backend.setCollectionCallbacks(slug, callbacks)`, which
+replaces the callbacks a collection declared: pass
+`composeCallbacks(declared, yours)` to keep them.
+
 ---
 
 ### `CollectionCallbacks` Type
@@ -31092,9 +31649,14 @@ has no setting.
 
 #### Pruning Lifecycle Mechanics
 
-After each recorded change, the entity that changed is pruned: its entries older
-than the retention period go, then everything beyond its newest 200. This runs
-asynchronously and does not hold up the write.
+After each change the server records, the entity that changed is pruned: its
+entries older than the retention period go, then everything beyond its newest
+200. This runs asynchronously and does not hold up the write.
+
+A write made through [`openRebase` or `rebase console`](/docs/backend/scripts/)
+records its history entry but prunes nothing, because a script cannot know the
+retention your server is configured with. The server prunes that entity on its
+next write to it, and in the hourly sweep below.
 
 <span class="since-badge" data-since="0.25">Since 0.25</span> Once an hour, the
 backend also deletes every entry older than the retention period, of every
@@ -31408,9 +31970,16 @@ Because branches are separate PostgreSQL databases, you cannot perform SQL `JOIN
 
 ## Custom Server Integration
 
-Rebase was built to be completely modular. While the `initializeRebaseBackend` coordinator provides a full batteries-included backend using Hono, you can completely bypass it and embed the core **Database Adapter** and **Realtime WebSockets** directly into your own custom Node.js application (like Express, Fastify, or plain Node.js HTTP).
+`initializeRebaseBackend` is a shortcut. It builds the whole backend, mounts
+it on your Hono app under `/api`, attaches the realtime socket to your HTTP
+server and starts the background work, in one call. When that is what you want,
+use it.
 
-The `@rebasepro/server-postgres` package is completely framework-agnostic. It depends only on Drizzle ORM and standard Node.js `http.Server`.
+When it is not, take one step down. Every part of that call is a public piece
+you can call yourself: build the backend, then mount all of it or only the
+route groups you want, at the paths you want, and decide which process starts
+the timers. The last section goes one step further and embeds the Postgres
+driver alone in an Express app.
 
 ### Environment Configuration
 
@@ -31464,80 +32033,335 @@ and validating half of it.
 
 See `.env.example` in the scaffolded app for the full list of supported variables.
 
-### Using Rebase with Express
+### One step under `initializeRebaseBackend`
 
-Here is a complete example of how to initialize the Rebase PostgreSQL adapter and Realtime WebSockets inside a standard Express application, manage read replicas, access Drizzle directly, and implement clean server terminations.
+<span class="since-badge" data-since="0.25">Since 0.25</span> On 0.24,
+`initializeRebaseBackend` is the only way in, and none of the pieces below is
+exported.
+
+`initializeRebaseBackend` is these calls, and nothing else:
+
+```typescript
+import { createRebaseBackend, installUnhandledRejectionHandler, setDefaultBackend } from "@rebasepro/server";
+
+installUnhandledRejectionHandler();
+const backend = await createRebaseBackend({ ...options, provision: true });
+setDefaultBackend(backend);
+backend.mount(app, { basePath: "/api" });
+await backend.attachRealtime(server);
+backend.start();
+```
+
+The `shutdown()` it returns also closes the server it was given. Here is the
+same thing written out in a server of your own, ready to change:
+
+```typescript
+import { createServer } from "node:http";
+import { Hono } from "hono";
+import { getRequestListener } from "@hono/node-server";
+import {
+    createRebaseBackend,
+    installShutdownHandlers,
+    installUnhandledRejectionHandler,
+    setDefaultBackend,
+    type HonoEnv
+} from "@rebasepro/server";
+import { createPostgresAdapter, createPostgresDatabaseConnection } from "@rebasepro/server-postgres";
+import { collections } from "./collections";
+
+installUnhandledRejectionHandler();
+
+const app = new Hono<HonoEnv>();
+const server = createServer({ maxHeaderSize: 64 * 1024 }, getRequestListener(app.fetch));
+const { db, pool, connectionString } = createPostgresDatabaseConnection(process.env.DATABASE_URL!);
+
+const backend = await createRebaseBackend({
+    collections,
+    database: createPostgresAdapter({ connection: db, connectionString }),
+    auth: { jwtSecret: process.env.JWT_SECRET! },
+    provision: true
+});
+
+setDefaultBackend(backend);
+backend.mount(app, { basePath: "/api" });
+await backend.attachRealtime(server);
+backend.start();
+
+server.listen(3000);
+installShutdownHandlers(
+    { shutdown: (timeoutMs) => backend.shutdown(timeoutMs, { server }) },
+    { onCleanup: () => pool.end() }
+);
+```
+
+`createRebaseBackend` takes the same options as `initializeRebaseBackend`,
+without `app`, `server` and `basePath`, and with `provision` required. It
+builds everything: it opens the database, sets up auth and storage, loads the
+functions and cron jobs, and builds every route group and the in-process
+client. It mounts nothing, starts no timer and adds no process listener. Each
+of the rest is a call you make, or leave out:
+
+| Call | What it does | Leave it out and |
+|---|---|---|
+| `installUnhandledRejectionHandler()` | Logs a promise rejection nothing handled, such as a fire-and-forget call in a custom function, instead of letting Node end the process. Process-wide, so it is the process's decision, not a backend's. Returns a function that uninstalls it, or `undefined` when one was already installed or `REBASE_EXIT_ON_UNHANDLED_REJECTION` is set. | an unhandled rejection ends the process, Node's default |
+| `setDefaultBackend(backend)` | Makes this backend the [process default](#several-backends-in-one-process): what `import { rebase }` and the rest of the module-level API answer for outside the requests, cron runs and jobs a backend serves | that API has no backend to answer for there |
+| `backend.mount(app, { basePath })` | Every route group under `basePath` (default `/api`), behind the process-wide middleware: request ids, the body limit, compression, CSRF, the request log, and the JSON envelope for errors and unknown paths. Also the JWKS document, the MCP server, the OpenAPI docs and the legacy route aliases. | nothing is served over HTTP; `backend.rebase` and `backend.fetch` still work |
+| `backend.attachRealtime(server, { path })` | The realtime socket, on `server`, answering upgrades on `path` only | there are no live queries |
+| `backend.start()` | The cron scheduler, the job workers, the expired-token and history-retention sweeps, the metrics sampler and the scheduled RLS audit, each where `ownership` gives it to this process. Safe to call twice. | none of them runs, which is what a request-serving process in a [split deployment](/docs/deployment/split-processes/) wants |
+| `backend.shutdown(timeoutMs, { server })` | Stops what `start()` and `attachRealtime()` started, waiting for cron runs and jobs in flight. Closes `server` only when you pass it. | |
+
+The socket's default `path` is the base path given to `mount()` with a trailing
+`/api` removed, so `/api` gives `/` and `/x/api` gives `/x`. That is where the
+SDK dials, because it connects to its `baseUrl` while its HTTP requests go to
+`${baseUrl}/api`. An upgrade to any other path is left to the server's other
+`upgrade` listeners, so your app can run its own WebSocket server on the same
+`http.Server`.
+
+#### What creating a backend may change: `provision`
+
+<span class="since-badge" data-since="0.25">Since 0.25</span>
+
+Creating a backend can run DDL, so `createRebaseBackend` asks you to decide:
+
+| `provision` | Creates | For |
+|---|---|---|
+| `true` | Everything the backend serves: the collection tables and their RLS policies, change capture for realtime, the role requests run as, and the framework's own tables (API keys, cron runs, jobs, metrics). | a single-process deployment; what `initializeRebaseBackend` passes |
+| `false` | Nothing. The schema must already be there, applied by `rebase db push`, a migration, or another process. A missing table fails when it is used. | a script, a test, a REPL, a process that only reads |
+| `{ collections: false, realtime: false }` | The framework's tables and the role, but not the collection schema or change capture. | a process that does not own the schema in a split deployment |
+
+It is an option rather than a later step on purpose. The driver reads the
+tables as it opens, and attaches change capture to the ones that exist then.
+A `provision()` called afterwards would run after the driver had already
+decided what exists. `REBASE_MIGRATE_ON_BOOT=none` still turns the collection
+schema off for any backend in the process.
+
+### Mounting only the groups you want
+
+<span class="since-badge" data-since="0.25">Since 0.25</span>
+
+`backend.routes` holds the route groups. Each one is a Hono sub-app you can
+mount on its own, at any path:
+
+```typescript
+import { Hono } from "hono";
+import { createRebaseBackend, type HonoEnv } from "@rebasepro/server";
+
+const app = new Hono<HonoEnv>();
+const backend = await createRebaseBackend({ database: adapter, auth, collections, functions, provision: true });
+
+app.route("/v2/data", backend.routes.data());      // the data API, at a path of your own
+app.route("/hooks", backend.routes.functions());   // getUser(c) and getDriver(c) work inside
+```
+
+| Group | Normally at | Serves |
+|---|---|---|
+| `routes.auth()` | `/api/auth` | sign-in, sessions, OAuth, password reset, `GET /config`, the caller's own API keys and the scope catalogue |
+| `routes.data()` | `/api/data` | the collections' REST routes and their history |
+| `routes.storage()` | `/api/storage` | file storage, or the router that answers `STORAGE_NOT_CONFIGURED` |
+| `routes.functions()` | `/api/functions` | your [custom functions](/docs/backend/custom-functions/), or the forwarder to the process that serves them |
+| `routes.admin()` | `/api/admin` | users and roles, service keys, schema editing, storage maintenance, backups, the RLS audit, SQL export, the development mailbox and the logs |
+| `routes.cron()` | `/api/admin/cron` | the cron admin surface |
+| `routes.meta()` | `/api/meta` | the project contract a generated SDK reads |
+
+Each group carries the middleware it needs: the auth context that puts the
+caller's `user`, `driver` and `scopes` on the request, its rate limits and its
+admin gate. So it answers the same wherever it is mounted, under a
+parameterised path such as `/:tenant/data` too. A group also reads where it was
+mounted, so the data API still routes each collection to its data source and
+the functions listing names the paths it is really served at.
+
+What a group does not carry is the process-wide middleware `mount()` puts in
+front of everything. Mounting groups one by one, add what you want of it
+yourself: a body limit (`bodyLimit` from `hono/body-limit`), compression, and
+the JSON error envelope:
+
+```typescript
+import { errorHandler } from "@rebasepro/server";
+
+app.onError(errorHandler);
+```
+
+Every call returns a fresh router over the same handlers, so you can mount a
+group in two places. Asking for a group whose surface this backend was created
+without (`surfaces: { data: false }`) throws, because the backend never built
+it. The OpenAPI docs and the MCP server have no group: they describe the URLs
+of the `mount()` layout, so only `mount()` serves them.
+
+### The backend without a server
+
+<span class="since-badge" data-since="0.25">Since 0.25</span>
+
+A backend you have built can be used without mounting anything.
+`backend.rebase` is its in-process client, and `backend.fetch(request)`
+answers a `Request` as `mount()` would at `/api`:
+
+```typescript
+const backend = await createRebaseBackend({ database: adapter, collections, provision: false });
+
+const { data } = await backend.rebase.dataAsAdmin.posts.find({ limit: 5 });
+const res = await backend.fetch(new Request("http://local/api/meta/schema-version"));
+
+await backend.shutdown();
+```
+
+The control-plane calls on that client (`rebase.auth`, `rebase.admin`,
+`rebase.functions` and `rebase.cron`) reach the backend's own routes
+in-process. They work wherever, or whether, you mounted the groups, and
+middleware you added to your own app does not run on them.
+
+For a script that only needs the data, [`openRebase`](/docs/backend/scripts/)
+opens the database without building a backend at all.
+
+### Several backends in one process
+
+<span class="since-badge" data-since="0.25">Since 0.25</span> On 0.24 the JWT
+configuration, the access model, the API-key store, the rate-limit store and
+`rebase` are process globals, and the last backend built wins all of them.
+
+`createRebaseBackend` writes no process global. Each backend holds its own
+state in `backend.services`, so two of them in one process stay two: each
+signs and verifies sessions with its own keys, judges scopes by its own roles,
+checks API keys in its own store and counts rate limits in its own store.
+
+```typescript
+const a = await createRebaseBackend({ database: adapterA, auth: { jwtSecret: SECRET_A }, collections, provision: true });
+const b = await createRebaseBackend({ database: adapterB, auth: { jwtSecret: SECRET_B }, collections, provision: true });
+
+app.route("/a/data", a.routes.data());
+app.route("/b/data", b.routes.data());   // a session from `a` is a 401 here
+```
+
+| `backend.services` | What it is |
+|---|---|
+| `jwt` | The backend's JWT service: signs and verifies sessions, download links and its other tokens, and serves its JWKS |
+| `access` | Its access model (roles to scopes) and the resolver for a personal key's owner |
+| `apiKeyStore` | Where its API keys are checked |
+| `rateLimitStore`, `authLimiters` | Its rate-limit counters, and the limiters on its auth routes |
+| `collections()` | The collections it serves |
+| `topics`, `queues` | Its topic and queue runtimes |
+
+A backend given no `auth.jwtSecret`, such as one whose `auth` is an adapter,
+signs nothing of its own, so its `services.jwt` follows the process default.
+
+**Where `rebase` goes.** Inside a request, a cron run or a job that a backend
+serves, `rebase`, whether imported from `@rebasepro/server` or received as
+`ctx.rebase`, is that backend, and so are topic `publish` and queue `enqueue`.
+Anywhere else (module scope, a script, a test) they answer for the **process
+default**, which `setDefaultBackend(backend)` sets, and which
+`initializeRebaseBackend` sets to its own backend. So does the rest of the
+module-level API: `verifyAccessToken` and the other JWT helpers,
+`getAccessModel`, `verifyCredential` and `extractUserFromToken`.
+
+Three pieces work on one backend directly, and one on no backend at all:
+
+```typescript
+import { createJwtService, requireScope } from "@rebasepro/server";
+
+// Mint a session for this backend, in a test or a login of your own.
+const token = await backend.services.jwt.generateAccessToken("u1", ["editor"]);
+
+// Check a session token or an rk_ API key against this backend, for a socket
+// or a tunnel of your own: its uid, roles, scopes and kind, or null.
+const caller = await backend.verifyCredential(token);
+
+// A route of your own, outside the groups, judged by this backend.
+app.post("/deploy", (c, next) => { c.set("services", backend.services); return next(); },
+    requireScope("project:deploy"), (c) => c.json({ ok: true }));
+
+// A JWT service on its own.
+const jwt = createJwtService({ secret: process.env.JWT_SECRET!, accessExpiresIn: "15m" });
+const payload = await jwt.verifyAccessToken(token);
+```
+
+Every route group sets `c.var.services` itself. A route outside the groups
+that uses `requireAuth`, `requireScope` or another guard from
+`@rebasepro/server` reads it there, and falls back to the process default when
+it is unset.
+
+### Shutting down
+
+<span class="since-badge" data-since="0.25">Since 0.25</span> A backend from
+`createRebaseBackend` is new; the rest of this section holds for 0.24 too.
+
+From `initializeRebaseBackend`, hand the backend to the built-in helper rather
+than writing a signal handler. It drains HTTP, stops the cron scheduler, tears
+down realtime, closes the SMTP pool once nothing can send, guards against
+repeated signals, and force-exits if shutdown hangs:
+
+```typescript
+import { initializeRebaseBackend, installShutdownHandlers } from "@rebasepro/server";
+
+const backend = await initializeRebaseBackend({ app, server, database: adapter, collections });
+installShutdownHandlers(backend, { onCleanup: () => pool.end() });
+```
+
+Do **not** combine it with your own `server.close()`: that backend's
+`shutdown()` already closes the server it was given, and a second close
+deadlocks. A backend from `createRebaseBackend` closes a server only when you
+pass it, `backend.shutdown(timeoutMs, { server })`, as in the example at the
+top of this page.
+
+### Embedding the Postgres driver in Express
+
+One step further down, `@rebasepro/server-postgres` works without the Rebase
+server at all. It depends on Drizzle and Node's `http.Server`, so you can open
+the data driver and the realtime socket inside Express, Fastify or plain Node.
+At this level you assemble the backend yourself: there are no auth routes, no
+storage and no admin API unless you build them.
 
 #### 1. Installation
-
-Install the required core packages along with Express:
 
 ```bash
 npm install @rebasepro/server-postgres @rebasepro/types express pg
 ```
 
-#### 2. Initialization and Graceful Shutdown Example
+#### 2. Opening the driver and the socket
+
+<span class="since-badge" data-since="0.25">Since 0.25</span> `openPostgresDriver`
+and `postgresDriverConfigFromEnv` are exported. On 0.24, open the driver with
+`createPostgresBootstrapper(pgConfig).initializeDriver(…)`, whose `internals` is
+untyped.
 
 ```typescript
 import express from "express";
-import { createServer } from "http";
-import pg from "pg";
-import { createPostgresBootstrapper } from "@rebasepro/server-postgres";
+import { createServer } from "node:http";
+import { sql } from "drizzle-orm";
+import {
+    createPostgresDatabaseConnection,
+    createPostgresWebSocket,
+    openPostgresDriver,
+    postgresDriverConfigFromEnv
+} from "@rebasepro/server-postgres";
+import { collections } from "./collections";
 
 async function startServer() {
     const app = express();
-    
-    // 1. WebSocket Upgrade Guard
-    // WebSockets require hijacking the HTTP Upgrade header. You must bind
-    // Rebase to a raw Node.js http.Server instance. 64 KB of headers, as the
-    // Rebase runtime takes: a vector search in the URL outgrows Node's 16 KB.
+
+    // The socket needs the raw http.Server, so listen on it, not on app.listen.
+    // 64 KB of headers, as the Rebase runtime takes: a vector search in the URL
+    // outgrows Node's 16 KB.
     const server = createServer({ maxHeaderSize: 64 * 1024 }, app);
 
-    // 2. Configure the connection pool
-    const pool = new pg.Pool({
-        connectionString: process.env.DATABASE_URL,
-        max: 20, // Max concurrent database connections
-        idleTimeoutMillis: 30000
-    });
+    const { db, pool, connectionString } = createPostgresDatabaseConnection(process.env.DATABASE_URL!);
 
-    // 3. Initialize the Postgres Bootstrapper
-    const bootstrapper = createPostgresBootstrapper({
-        connection: pool,
-        connectionString: process.env.DATABASE_URL,
-        adminConnectionString: process.env.ADMIN_CONNECTION_STRING, // Required for branching
-        schema: {
-            tables: {},   // Place your custom Drizzle tables here
-            relations: {} // Place your custom Drizzle relations here
-        }
-    });
+    // The environment, read the way the Rebase server's boot reads it:
+    // DATABASE_READ_URL, DATABASE_DIRECT_URL and the REALTIME_* variables.
+    // Leave this call out and the driver reads no environment variable at all.
+    const pgConfig = postgresDriverConfigFromEnv({ connection: db, connectionString });
 
-    // 4. Initialize the Driver and Services
-    // Connects to Postgres, verifies connection, starts cross-instance listeners
-    const { driver, realtimeProvider, internals } = await bootstrapper.initializeDriver({
-        collections: [] // Pass Rebase CollectionConfigs if using schema-as-code
-    });
+    // `provision: false` if the schema is applied elsewhere (`rebase db push`).
+    const { driver, internals } = await openPostgresDriver(pgConfig, { collections });
 
-    // Access the underlying schema-aware Drizzle client if needed.
-    // `internals` is an *opaque handle* on the DatabaseAdapter contract — the shape is
-    // the driver's business, so narrow it to what the Postgres bootstrapper puts there.
-    // (named `driverInternals` rather than `pg`, which is the node-postgres import)
-    const driverInternals = internals as {
-        db: any;                                    // Drizzle NodePgDatabase
-        readDb?: any;                               // Read replica, when DATABASE_READ_URL is set
-        poolManager?: { destroy(): Promise<void> };
-    };
-    const db = driverInternals.db;
-    const readDb = driverInternals.readDb;
-
-    // 5. Mount Realtime WebSockets
-    // Both halves are optional on the contract: a driver need not create a
-    // realtime provider, and a bootstrapper need not serve websockets at all.
-    if (!realtimeProvider || !bootstrapper.initializeWebsockets) {
-        throw new Error("This driver does not support realtime websockets.");
-    }
-    await bootstrapper.initializeWebsockets(server, realtimeProvider, driver, {
-        requireAuth: true // Enforces authentication token checks
-    });
+    // The realtime socket. It answers upgrades on `path` only, so a WebSocket
+    // server of your own can share the same http.Server.
+    createPostgresWebSocket(
+        server,
+        internals.realtimeService,
+        internals.driver,
+        { requireAuth: true, jwtSecret: process.env.JWT_SECRET },
+        undefined,
+        { path: "/" }
+    );
 
     app.use(express.json());
 
@@ -31545,7 +32369,7 @@ async function startServer() {
         res.json({ status: "healthy" });
     });
 
-    // Direct Driver CRUD Operation
+    // A write through the driver
     app.post("/api/products", async (req, res) => {
         try {
             const result = await driver.save({
@@ -31559,49 +32383,28 @@ async function startServer() {
         }
     });
 
-    // Raw Drizzle SQL Execution (RLS bypass)
+    // Drizzle directly, typed: `internals.db`, and `internals.readDb` when a
+    // read replica is configured.
     app.get("/api/stats", async (req, res) => {
-        try {
-            const countResult = await db.select().from(...); // Perform standard Drizzle operations
-            res.json(countResult);
-        } catch (error) {
-            res.status(500).json({ error: error instanceof Error ? error.message : "Internal Server Error" });
-        }
+        const result = await internals.db.execute(sql`select count(*) from products`);
+        res.json(result.rows);
     });
 
-    // Start listening (Using the HTTP Server, NOT app.listen)
     const port = process.env.PORT || 3000;
-    server.listen(port, () => {
-        console.log(`🚀 Server and WebSocket engine running on port ${port}`);
-    });
+    server.listen(port);
 
-    // 6. Graceful Shutdown Handler
-    // Terminate listeners and drain connection pools on process termination signals
-    const handleShutdown = async (signal: string) => {
-        console.log(`\nShutdown triggered via ${signal}. Cleaning up resources...`);
-        
+    // Graceful shutdown: stop listening, stop the LISTEN client, evict branch
+    // pools, then end the main pool.
+    const handleShutdown = (signal: string) => {
+        console.log(`Shutdown triggered via ${signal}.`);
         server.close(async () => {
-            console.log("✔ HTTP Server closed.");
             try {
-                // Terminate cross-instance pg LISTEN/NOTIFY client
-                if (realtimeProvider && typeof realtimeProvider.stopListening === "function") {
-                    await realtimeProvider.stopListening();
-                    console.log("✔ Realtime listeners stopped.");
-                }
-
-                // Disconnect dynamic branch connection pools
-                if (driverInternals.poolManager) {
-                    await driverInternals.poolManager.destroy();
-                    console.log("✔ Branch connection pools evicted.");
-                }
-
-                // End the main database pool
+                await internals.realtimeService.stopListening();
+                await internals.poolManager?.shutdown();
                 await pool.end();
-                console.log("✔ Database connection pool drained.");
-
                 process.exit(0);
             } catch (err) {
-                console.error("❌ Error during graceful shutdown:", err);
+                console.error("Error during graceful shutdown:", err);
                 process.exit(1);
             }
         });
@@ -31614,29 +32417,26 @@ async function startServer() {
 startServer();
 ```
 
-> **Standard path:** if your server uses `initializeRebaseBackend` (like the scaffolded template does), don't hand-roll the shutdown handler above — use the built-in helper instead. It drains HTTP, stops the cron scheduler, tears down realtime services, closes the SMTP connection pool once nothing can send, guards against repeated signals, and force-exits if shutdown hangs:
->
-> ```ts
-> import { installShutdownHandlers } from "@rebasepro/server";
->
-> const backend = await initializeRebaseBackend({ ... });
-> installShutdownHandlers(backend, { onCleanup: () => pool.end() });
-> ```
->
-> Do **not** combine it with your own `server.close()` — `backend.shutdown()` already closes the server, and a second close deadlocks. The manual handler shown in the example above is only for fully custom setups that bypass `initializeRebaseBackend`.
+`openPostgresDriver` is what `createPostgresAdapter` runs when the Rebase server
+boots, after `postgresDriverConfigFromEnv` has read the environment into the
+config. Its second argument says what to open: the `collections`, whether
+opening may change the database (`provision`, default `true`), and what part
+this process takes in realtime (`realtime: false` for none).
 
 ---
 
 ### Key Backend Concepts
 
 #### Read Replica Connections
-If you define the `DATABASE_READ_URL` environment variable, Rebase automatically spawns a secondary connection pool targeting your read replica. The bootstrapper registers this under `internals.readDb`. The core `EntityFetchService` routes all SELECT queries to the replica pool to optimize performance, while mutation queries remain on the primary pool.
+Set `readConnectionString` on the driver config, or the `DATABASE_READ_URL` environment variable, which the server's boot and `postgresDriverConfigFromEnv` read into it, and the driver opens a second connection pool against your read replica, under `internals.readDb`. Reads go to the replica; writes stay on the primary.
+
+<span class="since-badge" data-since="0.25">Since 0.25</span> The `readConnectionString` option is honoured. On 0.24 it was declared and ignored, and only `DATABASE_READ_URL` worked.
 
 #### Drizzle Integration
-You do not have to choose between Rebase and Drizzle. The bootstrapper compiles your schemas dynamically. You can access the compiled Drizzle NodePgDatabase client via `internals.db`, allowing you to run raw SQL migrations or invoke type-safe Drizzle builders alongside Rebase's REST services.
+You do not have to choose between Rebase and Drizzle. The driver compiles your schemas dynamically, and `internals.db` is the Drizzle `NodePgDatabase` client, typed, for raw SQL or type-safe Drizzle builders alongside Rebase's REST services.
 
 #### Graceful Connection Draining
-In serverless environments or orchestrators (like Kubernetes), terminating pods can result in broken connections. Always implement signal handlers that invoke `realtimeProvider.stopListening()` (which terminates the dedicated pg LISTEN client) and `pool.end()` to prevent leaking connection slots in your database server.
+In serverless environments or orchestrators (like Kubernetes), terminating pods can result in broken connections. Always implement signal handlers that call `internals.realtimeService.stopListening()` (which ends the dedicated pg LISTEN client) and `pool.end()`, so you do not leak connection slots on your database server.
 
 #### CORS for a browser frontend
 A custom server owns its CORS config, and a frontend on another origin can read
@@ -31671,9 +32471,224 @@ they expose none of these headers, so a frontend on another origin reads no `ETa
 
 ### Related
 
+- [Scripts and the Console](/docs/backend/scripts/) — the project's data from a script, a test or a REPL, with no server
 - [Backend Overview](/docs/backend/) — where each option lives when the runtime boots instead
 - [Split Processes](/docs/deployment/split-processes/) — the roles a custom server has to reproduce
 - [Storage Configuration](/docs/backend/storage/) — the sources a custom server must resolve itself
+
+## Scripts and the Console
+
+### Overview
+
+<span class="since-badge" data-since="0.25">Since 0.25</span> On 0.24 there is
+no `openRebase` and no `rebase console`: a script has to build a backend, or
+call the REST API of a running server.
+
+To look at some rows, fix one, try a filter or check what a policy lets a user
+see, you should not have to start a server. Rebase gives you the project's data
+as an object, in two places:
+
+- **`rebase console`**, a Node REPL in your terminal with the project open;
+- **`openRebase`**, the same object in a script or a test of your own.
+
+Both open the database without changing it: no table, role, trigger or
+function is created, and nothing is left running. The object has the
+vocabulary a [custom function](/docs/backend/custom-functions/) gets from the
+server, `dataAsAdmin` and `sql`, so a snippet moves between a function, a script
+and the console unchanged.
+
+### `rebase console`
+
+<span class="since-badge" data-since="0.25">Since 0.25</span>
+
+Run it in your project:
+
+```bash
+rebase console
+```
+
+```text
+> const { data } = await rebase.dataAsAdmin.posts.find({ limit: 3 })
+> data.map(p => p.title)
+[ 'Hello', 'Second post', 'Draft' ]
+> const ada = await rebase.withAuth({ uid: "ada", roles: ["user"] })
+> (await ada.data.posts.find()).data.length
+1
+```
+
+Two names are in scope, and top-level `await` works:
+
+| Name | What it is |
+|---|---|
+| `rebase` | What [`openRebase`](#openrebase) returns: `dataAsAdmin`, `sql`, `withAuth(user)` and `close()` |
+| `collections` | The project's collections, loaded the way `rebase db push` loads them |
+
+The console opens the project the way `rebase db push` does: the same `.env`,
+the same database, and the same collections. A project on the managed
+development database gets it started first. The history of what you typed is
+kept in `.rebase/console_history`, which the scaffold's `.gitignore` already
+leaves out.
+
+#### One snippet: `--eval`
+
+<span class="since-badge" data-since="0.25">Since 0.25</span>
+
+`rebase console -e "<code>"` runs one piece of code instead of the REPL. An
+expression's value, or a function body's `return`, is awaited and printed as
+JSON on stdout, so the output can be piped:
+
+```bash
+rebase console -e "rebase.dataAsAdmin.posts.find({ limit: 5 })"
+rebase console -e "rebase.sql('select count(*) from posts')" | jq .
+rebase console -e "const u = await rebase.withAuth({ uid: 'u1', roles: ['user'] }); return (await u.data.posts.find()).data"
+```
+
+What the database resolution has to say goes to stderr, so stdout holds the
+result and nothing else. A snippet that throws prints the error on stderr and
+exits `1`.
+
+#### Options
+
+| Flag | What it does |
+|---|---|
+| `--eval`, `-e` | Run this code instead of the REPL, print its awaited result as JSON, and exit 1 if it throws |
+| `--collections`, `-c` | Path to the collections directory, if not the project's own |
+| `--database-url` | Open this database instead of the project's |
+| `--docker` | Use the database from docker compose, starting it if needed |
+
+### `openRebase`
+
+<span class="since-badge" data-since="0.25">Since 0.25</span>
+
+`openRebase` from `@rebasepro/server-postgres` is what the console calls. Use
+it in a script, a seed, a data fix or a test:
+
+```typescript
+import { openRebase } from "@rebasepro/server-postgres";
+import { collections } from "../config/collections";
+
+const rebase = await openRebase({ databaseUrl: process.env.DATABASE_URL!, collections });
+
+const { data: drafts } = await rebase.dataAsAdmin.posts.find({ where: { status: ["==", "draft"] } });
+console.log(`${drafts.length} drafts`);
+await rebase.dataAsAdmin.posts.update("42", { status: "archived" });
+
+await rebase.close();
+```
+
+| Member | What it does |
+|---|---|
+| `dataAsAdmin` | Every collection, read and written as the server's service identity (`{ uid: "service", roles: ["admin"] }`): admin, and still evaluated by your RLS policies, exactly like `rebase.dataAsAdmin` in a function |
+| `sql(query, { params })` | Raw SQL on the owner connection, with the same calling convention as `rebase.sql` in a function |
+| `withAuth(user)` | Resolves to `{ data }`: the collections as that user sees them. Every read and write runs as them, filtered by row-level security, as an HTTP request from that user would be |
+| `collections` | The collections it was opened with |
+| `close()` | Ends the connection pool `openRebase` created. Safe to call twice |
+
+Its options:
+
+| Option | What it does |
+|---|---|
+| `databaseUrl` | The database to open. `openRebase` creates the pool and `close()` ends it |
+| `connection` | A Drizzle connection you already hold (`createPostgresDatabaseConnection(url).db`), instead of `databaseUrl`. It stays yours: `close()` leaves it open |
+| `collections` | The project's collections. An empty array reads them from the database instead, as a server with no collection files does, and serves them read-only |
+| `pool` | Pool settings, with `databaseUrl` |
+| `dataSourceKey` | The data source these collections are served from. Default `(default)` |
+
+`openRebase` reads no environment variable. The `DATABASE_URL` above is read by
+your script, and settings such as `REBASE_DB_POOL_MAX` or `REALTIME_CDC` change
+nothing here.
+
+#### Checking what a user can see
+
+<span class="since-badge" data-since="0.25">Since 0.25</span>
+
+`withAuth` is the quickest way to test a security rule against real data:
+
+```typescript
+import { openRebase } from "@rebasepro/server-postgres";
+import { collections } from "../config/collections";
+
+const rebase = await openRebase({ databaseUrl: process.env.DATABASE_URL!, collections });
+const ada = await rebase.withAuth({ uid: "ada", roles: ["user"] });
+const { data } = await ada.data.posts.find();
+console.log(data.every(post => post.author_id === "ada"));
+```
+
+A user is `{ uid, roles?, isAnonymous?, claims? }`; `claims` are what
+`rebase.jwt()` reads in a policy.
+
+`withAuth` runs as the restricted role a server boot creates (`rebase_user`).
+Against a database no Rebase server has booted on, that role does not exist, and
+`withAuth` requests fail with Postgres' unknown-role error rather than run
+unfiltered. Run `rebase db push`, or boot the server once, first.
+
+#### In a test
+
+<span class="since-badge" data-since="0.25">Since 0.25</span>
+
+```typescript
+import { after, before, test } from "node:test";
+import assert from "node:assert/strict";
+import { openRebase, type OpenedRebase } from "@rebasepro/server-postgres";
+import { collections } from "../config/collections";
+
+let rebase: OpenedRebase;
+before(async () => {
+    rebase = await openRebase({ databaseUrl: process.env.TEST_DATABASE_URL!, collections });
+});
+after(() => rebase.close());
+
+test("a user only sees their own posts", async () => {
+    const ada = await rebase.withAuth({ uid: "ada", roles: ["user"] });
+    const { data } = await ada.data.posts.find();
+    assert.ok(data.every(post => post.author_id === "ada"));
+});
+```
+
+The same works under Vitest or Jest.
+
+#### Collections with history
+
+<span class="since-badge" data-since="0.25">Since 0.25</span>
+
+A write to a collection with [`history: true`](/docs/backend/history/) records
+its entry the way a server write does. The entry is written in the row's own
+transaction, so a write that rolls back leaves no entry. It is recorded as the
+identity the write ran as: `service` for `dataAsAdmin`, the user's `uid` under
+`withAuth`. Writes from `rebase console` are recorded the same way.
+
+`openRebase` creates nothing to record into. If no backend with history has
+booted on the database, the `rebase.entity_history` table is missing. A write to
+a collection with history is then refused with
+[`HISTORY_UNAVAILABLE`](/docs/backend/errors/#data-queries-and-writes) before
+any of its callbacks run, and the message names what is missing. Reads work as
+usual. Boot the backend once with history on (`rebase dev` does), and the writes
+go through.
+
+Entries are recorded, never pruned. Retention is a server setting a script
+cannot see, so the server prunes them as usual: when it next writes the entity,
+and in its hourly sweep.
+
+#### What it leaves out
+
+<span class="since-badge" data-since="0.25">Since 0.25</span>
+
+`openRebase` opens the data layer and nothing else. It starts no realtime, so
+its writes are not announced to live queries. Storage, email, auth
+administration and your functions are not on it.
+
+When a script needs those too, build the backend without serving it:
+`createRebaseBackend({ …, provision: false })` gives you `backend.rebase`, the
+full in-process client, with nothing mounted and nothing started. See
+[the backend without a server](/docs/backend/custom-server/#the-backend-without-a-server).
+To test one collection callback without a database at all, call it with
+[`createCallContext`](/docs/collections/callbacks/#testing-a-callback).
+
+### Related
+
+- [Custom Server Integration](/docs/backend/custom-server/) — the backend as public pieces
+- [CLI reference](/docs/cli/) — every `rebase` command
+- [Security Rules](/docs/collections/security-rules/) — what `withAuth` is filtered by
 
 ## Frontend Overview
 
@@ -31734,7 +32749,7 @@ you have the developer tools alone. To lay the shell out by hand instead, see
 
 `<Rebase>` is the root provider that makes all Rebase functionality available to child components via context. It accepts:
 
-All twenty-two of them, in full — the table used to list ten, and two of those
+All twenty-three of them, in full — the table used to list ten, and two of those
 were props the component never read:
 
 <!-- rebase-props:start -->
@@ -31760,6 +32775,7 @@ were props the component never read:
 | `collectionViews` | Custom collection view modes, available to any collection by `key` |
 | `entityActions` | Global entity actions |
 | `effectiveRoleController` | Simulate a different role while dev mode is on |
+| `modeController` | <span class="since-badge" data-since="0.25">Since 0.25</span> Hand Rebase the host app's light/dark mode; Rebase then never touches `<html>`, `prefers-color-scheme` or localStorage — see [Styling](#styling) |
 | `translations` | Override or extend any UI string, keyed by locale — see [Translations](/docs/frontend/i18n) |
 | `components` | Replace built-in components — see [Component Overrides](/docs/frontend/component-overrides) |
 <!-- rebase-props:end -->
@@ -31807,6 +32823,83 @@ const { data: entities } = await data.collection("posts").find();
 entities[0].values.title;
 ```
 
+### One collection or one record in a page of your own
+
+<span class="since-badge" data-since="0.25">Since 0.25</span> On 0.24
+`CollectionPanel` takes only a registered `path` and renders "Collection not
+found" outside the full admin tree, and `EntityFormPanel` and
+`CollectionsProvider` do not exist.
+
+You do not need the whole admin to show one table. `<CollectionPanel>` takes
+the collection as a value and works anywhere under `<Rebase>` and a React
+Router router, with no `<RebaseCMS>`, `<RebaseNavigation>` or `<RebaseShell>`:
+
+```tsx
+import { Rebase, useRebaseAuthController } from "@rebasepro/app";
+import { CollectionPanel } from "@rebasepro/cms";
+import { postsCollection } from "../config/collections/posts";
+// Plus BrowserRouter, or any other router, from "react-router".
+
+export function App() {
+    const authController = useRebaseAuthController({ client });
+
+    return (
+        <Rebase client={client} authController={authController}>
+            <BrowserRouter>
+                <MyPageLayout>
+                    <CollectionPanel collection={postsCollection}/>
+                </MyPageLayout>
+            </BrowserRouter>
+        </Rebase>
+    );
+}
+```
+
+A record opens over your page, in a side panel or a dialog, and never by URL:
+no admin route serves the page, so `full_screen` and `split` open as a side
+panel, and `useUrlController().routesMounted` is `false` for your own
+components there. Any router works: a plain `<BrowserRouter>`, a
+`<MemoryRouter>`, or a data router. A router is still required. A data router
+also lets a record with unsaved changes stop in-app navigation; under the
+others only the browser's leave-page prompt guards it. Wrap the panel in `<RebaseAuthGate>` if the page
+should show Rebase's sign-in first.
+
+`<EntityFormPanel>` does the same for one record's form. It loads the record
+by `entityId`, saves it through `<Rebase>`'s data layer as the admin's own
+form does, and calls `onSaved` after every save. Omit `entityId` to create a
+record. `onClose` is called when the form asks to be left, for example after
+its record is deleted:
+
+```tsx
+<EntityFormPanel
+    collection={postsCollection}
+    entityId={postId}
+    onSaved={({ entity }) => console.log("saved", entity.id)}
+    onClose={() => navigate("/posts")}/>
+```
+
+Both bring their own `CollectionsProvider` when none is above them. That is
+the step underneath, and you can mount it yourself to share one scope between
+several panels, or to use the lower-level pieces (`CollectionViewBinding`,
+`useSidePanel`) under it. Inside it, a panel can name its collection by `path`:
+
+```tsx
+import { CollectionPanel, CollectionsProvider } from "@rebasepro/cms";
+
+const collections = [postsCollection, authorsCollection];
+
+<CollectionsProvider collections={collections}>
+    <CollectionPanel path="posts"/>
+    <CollectionPanel path="authors"/>
+</CollectionsProvider>
+```
+
+`CollectionsProvider` holds a registry of the collections you hand it, with
+your plugins' `modifyCollection` and `injectCollections` applied as in the
+admin, plus the side panels and dialogs records open in, and the
+unsaved-changes guard. Keep the `collections` array stable: a module constant,
+or `useMemo`.
+
 ### Advanced: manual layout
 
 Everything below replaces `<RebaseShell>`. You need it only when the stock
@@ -31837,6 +32930,11 @@ RebaseLayout`. `RebaseAuthGate` shows the login view until there is a user, so
 nothing below it renders for a signed-out visitor; `RebaseNavigation` builds
 the navigation, URL and collection-registry controllers that `RebaseRouteDefs`
 and every collection view read, so `RebaseRouteDefs` outside it throws.
+<span class="since-badge" data-since="0.25">Since 0.25</span> To embed a
+collection view or a record form in a page of your own, without the
+admin's routes, the lighter `CollectionsProvider` builds those controllers
+instead — see
+[One collection or one record in a page of your own](#one-collection-or-one-record-in-a-page-of-your-own).
 
 Each layer is usable on its own. `<RebaseAuthGate>` alone gates your own app
 behind Rebase's login. Swap `<RebaseLayout>` for your own component to keep the
@@ -31918,12 +33016,28 @@ const urlController = useBuildUrlController({
 
 ##### `useBuildModeController`
 
-Manages light/dark theme:
+Manages the light/dark theme. While enabled it owns the page's theme: it puts
+the `dark` class on `<html>`, follows `prefers-color-scheme` until the user
+picks a mode, and remembers that pick in localStorage.
 
 ```typescript
 const modeController = useBuildModeController();
-// Provides: modeController.mode ("light" | "dark"), modeController.toggleMode()
+
+modeController.mode;             // "light" | "dark"
+modeController.setMode("dark");  // "light" | "dark" | "system" — "system" follows the OS again
 ```
+
+`<Rebase>` builds one of these itself.
+
+<span class="since-badge" data-since="0.25">Since 0.25</span> When the
+component using it unmounts, it removes the `dark` class it added; a `dark`
+class the page already had stays. Build your own
+above `<Rebase>` only when components outside it need the mode too, and hand
+it over with the [`modeController` prop](#styling), so there is one controller
+and not two. `useBuildModeController({ enabled: false })` builds an inert
+controller: it keeps `mode` in React state and touches no class, media query
+or localStorage. When your app already owns the theme you do not need this
+hook at all: pass your own controller as `modeController`.
 
 ##### `useBuildAdminModeController`
 
@@ -32005,7 +33119,7 @@ To put a view under **Studio** instead of the CMS, pass it to
 Rebase uses **Tailwind CSS v4** and supports light/dark modes. Customize via:
 
 - **CSS custom properties** — Override design tokens
-- **`ModeControllerProvider`** — Control light/dark mode
+- **`<Rebase modeController>`** — Hand Rebase your app's light/dark mode
 - **Tailwind config** — Standard Tailwind customization
 
 ```css
@@ -32016,6 +33130,54 @@ Rebase uses **Tailwind CSS v4** and supports light/dark modes. Customize via:
     --font-mono: "JetBrains Mono", monospace;
 }
 ```
+
+#### Light and dark mode
+
+By default `<Rebase>` owns the page's theme: it puts the `dark` class on
+`<html>`, follows `prefers-color-scheme` until the user picks a mode in the
+admin, and remembers that pick in localStorage.
+
+<span class="since-badge" data-since="0.25">Since 0.25</span> When `<Rebase>`
+unmounts, it removes the `dark` class it added; a class the page already had
+stays. On 0.24 the class stays behind.
+
+<span class="since-badge" data-since="0.25">Since 0.25</span> When your app
+already has a theme, pass it as `modeController`. Rebase reads `mode` from it,
+calls its `setMode` from its own theme toggle, and never touches `<html>`,
+`prefers-color-scheme` or localStorage:
+
+```tsx
+import { useEffect, useMemo, useState } from "react";
+import { Rebase, type ModeController } from "@rebasepro/app";
+
+export function App() {
+    const [mode, setMode] = useState<"light" | "dark">("light");
+    const modeController = useMemo<ModeController>(() => ({
+        mode,
+        setMode: (next) => setMode(next === "dark" ? "dark" : "light")
+    }), [mode]);
+
+    // Your app applies the mode, as it does for the rest of the page.
+    useEffect(() => {
+        document.documentElement.classList.toggle("dark", mode === "dark");
+    }, [mode]);
+
+    return (
+        <Rebase client={client} modeController={modeController}>
+            <MyAdmin/>
+        </Rebase>
+    );
+}
+```
+
+The scaffold's CSS styles dark mode under any element with the `dark` class
+(`@custom-variant dark (&:where(.dark, .dark *))`). Side panels, dialogs and
+menus render in a portal on `<body>`, so put the class on `<html>` or `<body>`
+rather than on a wrapper around `<Rebase>`.
+
+Wrapping `<Rebase>` in a `ModeControllerProvider` does not do this:
+`<Rebase>` provides a controller of its own inside it. On 0.24 the prop does
+not exist, and there is no way to hand `<Rebase>` your app's mode.
 
 ### Next Steps
 
@@ -32257,10 +33419,10 @@ panel shows, this is the wrong page. The server has its own ladder:
 
 ### Precedence Summary
 
-- **`collection.components` beats global `components`** inside that collection (simple spread merge in `DataCollectionView`).
+- **`collection.components` applies over global `components`** inside that collection. A collection replacement replaces both; <span class="since-badge" data-since="0.25">Since 0.25</span> a collection `wrap: true` override wraps the global override when there is one (on 0.24 it wraps the built-in, and the global override is skipped). See [Component Overrides](/docs/frontend/component-overrides#when-both-scopes-override-a-component).
 - **Collection `Actions` and `collection.actions` slot are additive** — `Actions` render first, then slot contributions.
 - **Collection-level `entityActions` and `entityViews` extend (not replace) global ones.**
-- **Plugin contributions are merged in `key` order.**
+- **Plugins apply in the order of the `plugins` array**, not by `key`. Slot contributions render by their `order` (lower first, 50 by default), and ties keep that order. <span class="since-badge" data-since="0.25">Since 0.25</span> Field wrappers from several plugins compose in that order, the first plugin's innermost; on 0.24 only the last wrapper rendered. See [Plugins](/docs/plugins#field-wrappers-from-several-plugins).
 
 ## Styling Custom UI
 
@@ -32515,7 +33677,7 @@ renders as written.
 
 Rebase allows you to override default UI components with your own custom implementations. This implements a Docusaurus-style component swizzling model that supports two customization patterns:
 - **Eject mode** (default): Your component fully replaces the built-in one.
-- **Wrap mode** (`wrap: true`): Your component wraps the original. The built-in component is passed as the `OriginalComponent` prop so you can render it inside your custom layout/logic.
+- **Wrap mode** (`wrap: true`): Your component wraps the original. What it wraps (usually the built-in component) is passed as the `OriginalComponent` prop so you can render it inside your custom layout/logic.
 
 Component overrides can be applied **globally** at the application level (on the `<Rebase>` provider) or **locally** at the collection level (inside individual collection definitions).
 
@@ -32592,7 +33754,7 @@ export const productsCollection = defineCollection({
 });
 ```
 
-The wrapping component lives with the rest of your frontend code, and receives the built-in one as `OriginalComponent`:
+The wrapping component lives with the rest of your frontend code, and receives what it wraps as `OriginalComponent` — the built-in component, unless your app overrides it too (see [When both scopes override a component](#when-both-scopes-override-a-component)):
 
 ```tsx
 // frontend/src/ProductsEmptyState.tsx
@@ -32615,6 +33777,21 @@ export default function ProductsEmptyState({ OriginalComponent, ...props }: {
 Each module needs a **default export**. The collections Vite plugin rewrites a path into a lazy import, so the component is its own chunk and loads the first time the override renders. That rewrite covers the files inside the configured `collectionsDir`. A path in a file outside it reaches the admin as a bare string: the console says so, and the built-in component renders in its place. Outside `collectionsDir`, write the lazy import yourself: `Component: () => import("../../frontend/src/ProductCustomForm")`.
 
 A direct reference (`Component: ProductCustomForm`) also works, but only in a collection file nothing on the server loads, because importing the component also imports React and everything it pulls in.
+
+#### When both scopes override a component
+
+<span class="since-badge" data-since="0.25">Since 0.25</span> On 0.24 a collection's wrapper always receives the built-in component, and the app-level override is skipped inside that collection.
+
+The two scopes compose. The app-level override (`<Rebase components>`) is applied to the built-in component first, and the collection's (`admin.components`) is applied to the result:
+
+| App level | Collection level | What renders inside that collection |
+|---|---|---|
+| any | none | what renders everywhere else: the app-level override, or the built-in component |
+| none | wrap | the collection's wrapper around the built-in component |
+| replace or wrap | wrap | the collection's wrapper around the app-level override, passed as `OriginalComponent` |
+| any | replace | the collection's component alone; it replaces both |
+
+So a collection can add something around a component your app already customises without losing that customisation. To drop the app-level version for one collection, replace instead of wrapping.
 
 ---
 
@@ -32709,6 +33886,28 @@ authController.getAuthToken() // Get current JWT for API calls
 ```
 
 Pass the `authController` to the Rebase navigation controller to gate the entire admin panel behind authentication.
+
+### Your Own Auth Provider
+
+<span class="since-badge" data-since="0.25">Since 0.25</span> On 0.24 the
+getter authenticates HTTP requests only, and the panel's realtime socket stays
+anonymous.
+
+If your app signs users in with its own provider (Clerk, Firebase Auth, a
+session of its own), give the client you pass to `<Rebase client>` a token
+getter. The panel's HTTP requests and its realtime socket both send what it
+returns, so live collection views run as the same user:
+
+```typescript
+client.setAuthTokenGetter(() => clerk.session?.getToken() ?? Promise.resolve(null));
+```
+
+The `authController` beside it then reports your provider's signed-in user
+(an `AuthController` from `@rebasepro/cms-types`) instead of wrapping
+`client.auth`. The backend has to accept the token too: see
+[Custom auth adapters](/docs/backend/auth-adapters), and
+[Using your own auth provider](/docs/sdk/authentication#using-your-own-auth-provider)
+for the client side in full.
 
 ### Login View
 
@@ -34193,6 +35392,31 @@ the **[Slots](/docs/frontend/slots)** page.
   a sign-in, `null` on sign-out. The plugin stays mounted across both.
 - `onUnmount()` runs when `<Rebase>` unmounts.
 
+<span class="since-badge" data-since="0.25">Since 0.25</span>
+`lifecycle.onCollectionChange` is deprecated. Nothing ever called it, on 0.24
+or before. A plugin that sets it still compiles, and `<Rebase>` warns once per
+plugin. To follow a collection's rows, subscribe from `onMount` and
+unsubscribe in `onUnmount`:
+
+```tsx
+import type { RebasePlugin } from "@rebasepro/cms-types";
+
+let stopListening: (() => void) | undefined;
+
+const openOrdersPlugin: RebasePlugin = {
+    key: "open_orders",
+    lifecycle: {
+        onMount: (context) => {
+            stopListening = context.data.collection("orders").listen(
+                { where: { status: ["==", "open"] } },
+                ({ data }) => console.log(`${data.length} open orders`)
+            );
+        },
+        onUnmount: () => stopListening?.()
+    }
+};
+```
+
 ### Using Plugins
 
 Plugins go on `<Rebase>`, next to the client. Everything below it — the
@@ -34267,7 +35491,7 @@ function useMyPlugin(): RebasePlugin {
         ],
 
         // `fieldBuilder` is top-level and takes a `wrap` function that returns
-        // a *component* (or null to leave the default field alone) — it is not
+        // a *component* (or null to leave the field as it is) — it is not
         // a render function and no longer lives under `form`.
         fieldBuilder: {
             wrap: ({ property }) =>
@@ -34275,6 +35499,41 @@ function useMyPlugin(): RebasePlugin {
         }
     };
 }
+```
+
+#### Field wrappers from several plugins
+
+<span class="since-badge" data-since="0.25">Since 0.25</span> On 0.24 each
+plugin's `wrap` received the built-in field, and only the last wrapper
+returned was rendered.
+
+Wrappers from several plugins compose, in the order of the `plugins` array.
+Each plugin's `wrap` receives, as `params.Field`, the field as the plugins
+before it left it, so the first plugin's wrapper is innermost and the last
+one's outermost. A plugin whose `wrap` returns `null`, or whose `enabled`
+guard returns `false` for the field, passes it on unchanged. A wrapper that
+renders `Field` therefore keeps every wrapper before it:
+
+```tsx
+import type { RebasePlugin } from "@rebasepro/cms-types";
+import { Typography } from "@rebasepro/ui";
+
+const descriptionPlugin: RebasePlugin = {
+    key: "description_below",
+    fieldBuilder: {
+        // `Field` is the built-in field, or the earlier plugins' wrapper of it.
+        wrap: ({ Field, property }) => property.description
+            ? (props) => (
+                <>
+                    <Field {...props}/>
+                    <Typography variant="caption" color="secondary">
+                        {property.description}
+                    </Typography>
+                </>
+            )
+            : null
+    }
+};
 ```
 
 ### Built-in Plugins
@@ -34342,7 +35601,6 @@ Plugins can modify existing collections:
 ```typescript
 hooks: {
     // Receives one collection, returns the modified one.
-    // Use `modifyCollectionAsync` when the change needs a fetch.
     modifyCollection: (collection) => ({
         ...collection,
         properties: {
@@ -34356,6 +35614,54 @@ hooks: {
     })
 }
 ```
+
+`modifyCollection` is synchronous, and the admin applies it when it resolves
+its collections, not each time the plugin changes. When the change needs data
+you have to fetch, fetch it before rendering `<Rebase>` and build the plugin
+from what came back:
+
+```tsx
+import { useEffect, useMemo, useState } from "react";
+import { Rebase, useRebaseAuthController } from "@rebasepro/app";
+import { RebaseCMS, RebaseShell } from "@rebasepro/cms";
+import type { RebasePlugin } from "@rebasepro/cms-types";
+import { CircularProgressCenter } from "@rebasepro/ui";
+
+export function App() {
+    const authController = useRebaseAuthController({ client });
+    const [labels, setLabels] = useState<Record<string, string>>();
+
+    useEffect(() => {
+        fetch("/collection-labels.json")
+            .then((response) => response.json())
+            .then(setLabels);
+    }, []);
+
+    const labelsPlugin = useMemo<RebasePlugin | undefined>(() => labels && {
+        key: "collection_labels",
+        hooks: {
+            modifyCollection: (collection) => ({
+                ...collection,
+                name: labels[collection.slug] ?? collection.name
+            })
+        }
+    }, [labels]);
+
+    if (!labelsPlugin) return <CircularProgressCenter/>;
+
+    return (
+        <Rebase client={client} authController={authController} plugins={[labelsPlugin]}>
+            <RebaseCMS collections={collections}/>
+            <RebaseShell title="My App"/>
+        </Rebase>
+    );
+}
+```
+
+<span class="since-badge" data-since="0.25">Since 0.25</span>
+`hooks.modifyCollectionAsync` is deprecated. Nothing ever called it, on 0.24
+or before. A plugin that sets it still compiles, and `<Rebase>` warns once per
+plugin. Use `modifyCollection` as above.
 
 ### Next Steps
 
@@ -34802,7 +36108,7 @@ function CustomAction() {
 
 ### `useUnsavedChangesDialog`
 
-Prevent navigation or page unload when form data has unsaved changes. It automatically intercepts internal React Router navigation via `useBlocker` as well as browser-level reloads via `beforeunload`.
+Prevent navigation or page unload when form data has unsaved changes. It asks before a reload or a closed tab (`beforeunload`) and, inside the admin under a React Router data router (`createBrowserRouter`), before in-app navigation too, via `useBlocker`. Under any other router, such as a plain `<BrowserRouter>`, only the browser-level prompt applies.
 
 ```typescript
 import { useUnsavedChangesDialog } from "@rebasepro/app";
@@ -42932,6 +44238,49 @@ const client = createRebaseClient({
 });
 ```
 
+### Using your own auth provider
+
+<span class="since-badge" data-since="0.25">Since 0.25</span> On 0.24 a token
+getter authenticates HTTP requests only, and the realtime socket stays
+anonymous.
+
+When users sign in with a provider of your own (Clerk, Firebase Auth, or a
+session your app already has), `client.auth` is not involved. Give the client a
+getter for the provider's token instead. It is asked each time a token is
+needed: for every HTTP request, and every time the realtime socket
+authenticates.
+
+```typescript
+import { createRebaseClient } from "@rebasepro/client";
+
+const client = createRebaseClient({ baseUrl: import.meta.env.VITE_API_URL });
+
+client.setAuthTokenGetter(() => clerk.session?.getToken() ?? Promise.resolve(null));
+
+// Optional: let Clerk recover a refused token, on HTTP and the socket alike.
+client.setOnUnauthorized(async () => {
+    await clerk.session?.reload();
+    return true;
+});
+
+// The socket authenticates as the Clerk user.
+client.data.posts.listen({}, (response) => render(response.data));
+```
+
+- The getter wins over the client's own session. When it answers `null` or
+  throws, the client sends the token it holds, if any: its session's, one set
+  with `client.setToken()`, or the `token` option.
+- The `token` option is read each time a token is needed, until `setToken()` or
+  a sign-in replaces it, so it may be declared as a getter
+  (`get token() { return currentToken; }`).
+- `setOnUnauthorized` covers a 401 over HTTP and an auth error on the socket,
+  and replaces the client's own session refresh.
+
+The backend has to verify the provider's token: see
+[Custom auth adapters](/docs/backend/auth-adapters). In the admin panel, set
+the getter on the client you pass to `<Rebase client>`
+([Your Own Auth Provider](/docs/frontend/authentication#your-own-auth-provider)).
+
 ### User Object Shape
 
 ```typescript
@@ -43303,7 +44652,7 @@ The WebSocket client handles authentication automatically:
 - `client.ws.state` is the connection's state — `idle`, `connecting`, `connected`, `reconnecting`, `disconnected` or `closed` — and `client.ws.onStateChange(listener)` is told every change. `disconnected` is the state in which `CONNECTION_LOST` has been reported.
 - Requests sent over the socket are **at-most-once**. One that was sent when the connection dropped fails with `CONNECTION_LOST` and is never sent again, since the server may already have run it. One that is still waiting for a socket after 30 seconds fails with `REQUEST_TIMEOUT` without being sent.
 
-for everything in the list after sign-out. On 0.23 the client gives up after
+Everything in the list after sign-out arrived in 0.24. On 0.23 the client gives up after
 five failed reconnection attempts, queues requests made while disconnected and
 sends them on reconnect, has no `client.ws.state`, and the server never closes a
 socket whose session has ended.
@@ -43327,7 +44676,43 @@ const unsubscribe = client.data.orders.listen(
 );
 ```
 
-No manual token management is needed — the integration between `client.auth` and the WebSocket layer is handled internally.
+#### Which token the socket sends
+
+<span class="since-badge" data-since="0.25">Since 0.25</span> On 0.24 the
+socket uses only the client's own session and the `token` option: a getter
+installed with `client.setAuthTokenGetter()` never reaches it, so a host using
+its own auth provider gets an anonymous socket.
+
+The socket authenticates with the same token an HTTP request would carry. That
+is the getter installed with `client.setAuthTokenGetter()` first; when there is
+none, or it answers `null` or throws, it is the token the client holds: its
+session's, one set with `client.setToken()`, or the `token` option. With the
+built-in `client.auth` there is nothing to wire.
+
+For an external auth provider (Clerk, Firebase Auth, a session of your own),
+install the getter once. It covers HTTP and the socket:
+
+```typescript
+client.setAuthTokenGetter(() => provider.getToken());
+
+// Optional: let the provider recover a refused token, on HTTP and the socket alike.
+client.setOnUnauthorized(async () => {
+    await provider.refresh();
+    return true; // retry with the token resolved again
+});
+```
+
+- `client.setOnUnauthorized(handler)` answers a refused token on both: a 401
+  over HTTP, and an auth error on the socket. Resolve `true` to retry with the
+  token resolved again. It replaces the client's own session refresh.
+- Installing a getter, or calling `client.setToken()`, rebuilds an open socket:
+  the new one authenticates with the new credential and re-sends every live
+  subscription and channel as it, and nothing the previous identity held
+  carries over. With no socket open, the next one authenticates itself.
+- `client.ws.setAuthTokenGetter()` is deprecated. It still works, replacing
+  only the socket's getter, and warns once. Use `client.setAuthTokenGetter()`.
+
+See [Using your own auth provider](/docs/sdk/authentication#using-your-own-auth-provider).
 
 #### The connection is lazy
 
@@ -45356,6 +46741,24 @@ project path, so nothing on disk names it. When you have set a `DATABASE_URL`
 of your own, that is what this prints — the resolution order is the same one
 every other command follows. It starts the managed database if it is not
 already running.
+
+#### `rebase console`
+
+<span class="since-badge" data-since="0.25">Since 0.25</span>
+
+A Node REPL with the project's data open, or one snippet run with `-e`:
+
+```bash
+rebase console
+rebase console -e "rebase.dataAsAdmin.posts.find({ limit: 5 })"
+```
+
+`rebase` (`dataAsAdmin`, `sql`, `withAuth(user)`) and `collections` are in
+scope, and top-level `await` works. The database is resolved as `rebase db push`
+resolves it, and opening it changes nothing in it. With `-e`, the awaited result
+is printed as JSON on stdout and a throw exits `1`. Flags: `--eval`/`-e`,
+`--collections`/`-c`, `--database-url`, `--docker`. See
+[Scripts and the Console](/docs/backend/scripts/).
 
 #### `rebase db stop` / `rebase db reset`
 
@@ -47912,9 +49315,17 @@ const router = createBrowserRouter([
 ], { basename });
 ```
 
-The admin needs a **data router** — `createBrowserRouter`, not the plain
-`BrowserRouter` — because unsaved-changes blocking uses `useBlocker`, which only
-the data router provides.
+Keep the admin on a **data router** — `createBrowserRouter` with
+`<RouterProvider>`, as the scaffold does. Under it, a record with unsaved
+changes also stops in-app navigation (a link in the drawer, the browser's back
+button) and asks first, through `useBlocker`, which only a data router
+provides.
+
+<span class="since-badge" data-since="0.25">Since 0.25</span> The admin also
+runs under a plain `<BrowserRouter>`. There the unsaved-changes guard falls
+back to the browser's own leave-page prompt, which covers a reload, closing the
+tab or typing a URL; navigating inside the app goes ahead without asking. On
+0.24 the admin throws outside a data router.
 
 **Backend** — if you move the API too, update its base path:
 
@@ -47961,8 +49372,9 @@ const router = isAdmin
 root.render(<RouterProvider router={router}/>);
 ```
 
-One router for both halves, because the admin needs the data router anyway and
-there is no reason for the product app to be on a different one.
+One router for both halves: the admin is better off on a data router, which
+lets unsaved changes stop in-app navigation, and there is no reason for the
+product app to be on a different one.
 
 The backend needs no changes for this pattern — the API stays at `/api` and the SPA
 catch-all serves `index.html` for both `/` and `/admin/*`.
@@ -48753,6 +50165,10 @@ REBASE_ROLE=all        # the default: everything, one process
 Health and metrics are on every role without exception. A process an
 orchestrator cannot probe is a process it cannot roll.
 
+<span class="since-badge" data-since="0.25">Since 0.25</span> `GET /api/auth/config`,
+what the sign-in screen reads, follows the rest of `/api/auth`: only `api` and
+`all` serve it. On 0.24 a `functions` or `worker` process answered it too.
+
 Realtime is on the list because it costs something whether or not anyone uses
 it: a process that consumes change events holds a `LISTEN` connection outside
 the pool for as long as it runs, and installs the capture triggers at boot. Only
@@ -48859,6 +50275,15 @@ default refuses to start, and says so. `CREATE … IF NOT EXISTS` reads the cata
 and then writes to it as two separate steps, so processes booting together do
 collide — and a deployment where several of them race to provision the same
 schema is not one anybody designed.
+
+<span class="since-badge" data-since="0.25">Since 0.25</span> In a
+[custom server](/docs/backend/custom-server/), the same decision is the
+`provision` option of `createRebaseBackend`: `true` in the process that owns the
+schema, and `{ collections: false, realtime: false }` in every other one, which
+still keeps the framework's own tables. `REBASE_MIGRATE_ON_BOOT=none` turns the
+collection schema off there as well. Background work is decided the same way:
+a process that never calls `start()` runs no cron scheduler and no job workers,
+and one that does runs those its `ownership` option gives it.
 
 ### Serving one function per process
 
@@ -51015,6 +52440,13 @@ Only the webhook's id is stored on the job, so its signing secret never sits in 
 destination the dispatcher refuses, or a receiver that answers with a redirect, is dead-lettered
 after one attempt with the reason; anything else is retried like any job. See
 [Durable webhooks](/docs/backend/jobs#durable-webhooks).
+
+`setCollectionCallbacks` **replaces** the callbacks the `orders` collection
+declares. If it declares some, keep them:
+<span class="since-badge" data-since="0.25">Since 0.25</span> pass
+`composeCallbacks(declared, { afterSave })`, with `composeCallbacks` from
+`@rebasepro/server` and `declared` the collection's own `callbacks`. See
+[Combining callback sets](/docs/collections/callbacks/#combining-callback-sets).
 
 #### Without a job queue
 
