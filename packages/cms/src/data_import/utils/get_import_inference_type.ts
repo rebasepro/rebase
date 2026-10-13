@@ -20,14 +20,3 @@ export function getInferenceType(value: any): DataType {
     return "map";
 }
 
-
-function isUnixTimestamp(num: number): boolean {
-    const numString = num.toString();
-    // check if the number has 13 digits
-    const isLengthValid = numString.length === 13;
-
-    // check if it falls in the expected Unix timestamp range (from 1970 to 2100)
-    const isInRange = num >= 0 && num <= 4102444800000;
-
-    return isLengthValid && isInRange;
-}

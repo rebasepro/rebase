@@ -383,7 +383,9 @@ function buildPropertyFromCount(
             totalDocsCount,
             valuesResult
         };
-        if (mostProbableType === "string") {
+        if ((mostProbableType === "number" || mostProbableType === "string") && isEpochColumn(key, valuesResult?.values)) {
+            result = { type: "date" } as Property;
+        } else if (mostProbableType === "string") {
             result = buildStringProperty(propertyProps);
         } else if (mostProbableType === "reference") {
             result = buildReferenceProperty(propertyProps);
@@ -404,6 +406,33 @@ function buildPropertyFromCount(
     }
 
     return result;
+}
+
+/** The words that end a column name holding a moment: `created_at`, `updatedOn`, `birth_date`, `timestamp`. */
+const MOMENT_NAME_ENDINGS = new Set(["at", "on", "date", "time", "datetime", "timestamp", "ts"]);
+
+/** An epoch in seconds from 2001-09-09 to 2103, or in milliseconds over the same span. */
+function isEpochNumber(value: number): boolean {
+    return Number.isInteger(value)
+        && ((value >= 1e9 && value < 4.2e9) || (value >= 1e12 && value < 4.2e12));
+}
+
+/**
+ * Whether a column holds epoch timestamps: its name ends in a word that says
+ * it holds a moment, and every value it has is a whole number of seconds or
+ * milliseconds since 1970 (written as a number, or as the digits a CSV
+ * writes) in the range a timestamp of this century falls in. Both, because
+ * either alone is an order number or a `response_time` in milliseconds. The
+ * import reads such a value into a date as soon as the column is one.
+ */
+function isEpochColumn(key: string, values: unknown[] | undefined): boolean {
+    const words = key.replace(/([a-z0-9])([A-Z])/g, "$1 $2").toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+    if (words.length === 0 || !MOMENT_NAME_ENDINGS.has(words[words.length - 1])) return false;
+    const present = (values ?? []).filter(value => !isBlank(value));
+    return present.length > 0 && present.every(value =>
+        typeof value === "number"
+            ? isEpochNumber(value)
+            : typeof value === "string" && /^\d+$/.test(value.trim()) && isEpochNumber(Number(value.trim())));
 }
 
 function buildPropertiesFromCount(

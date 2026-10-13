@@ -380,3 +380,43 @@ describe("the README's quick start", () => {
         expect(inferTypeFromValue(new Date())).toBe("date");
     });
 });
+
+// ─────────────────────────────────────────────────────────────
+// Epoch timestamps
+// ─────────────────────────────────────────────────────────────
+/**
+ * A column of epoch numbers under a name that says it holds a moment
+ * (`created_at`, `updatedAt`, `timestamp`) was inferred as a number, so the
+ * collection made from the file stored `1704448800` where a date belonged —
+ * though the import reads epoch seconds and milliseconds into a date as soon
+ * as the column is one. Such a column is a date now. A name that says nothing
+ * of time, or a number outside 2001–2103, is left a number.
+ */
+describe("epoch timestamps", () => {
+    const typeOf = async (rows: object[], key: string) =>
+        (await buildEntityPropertiesFromData(rows, inferType))[key].type;
+
+    it("reads epoch seconds under a time-named column as a date", async () => {
+        expect(await typeOf([{ created_at: 1704448800 }, { created_at: 1704535200 }], "created_at")).toBe("date");
+    });
+
+    it("reads epoch milliseconds, and camelCase names", async () => {
+        expect(await typeOf([{ updatedAt: 1704448800000 }, { updatedAt: 1704535200123 }], "updatedAt")).toBe("date");
+        expect(await typeOf([{ timestamp: 1704448800 }], "timestamp")).toBe("date");
+    });
+
+    it("reads a CSV's digits the same way, blanks aside", async () => {
+        expect(await typeOf([{ last_login: "x" }], "last_login")).toBe("string");
+        expect(await typeOf([{ signup_date: "1704448800" }, { signup_date: "" }, { signup_date: "1704535200" }], "signup_date")).toBe("date");
+    });
+
+    it("leaves a number whose name says nothing of time", async () => {
+        expect(await typeOf([{ order_no: 1704448800 }, { order_no: 1704535200 }], "order_no")).toBe("number");
+    });
+
+    it("leaves a time-named number outside the epoch range, or with a fraction", async () => {
+        expect(await typeOf([{ response_time: 230 }, { response_time: 412 }], "response_time")).toBe("number");
+        expect(await typeOf([{ created_at: 1704448800.5 }], "created_at")).toBe("number");
+        expect(await typeOf([{ created_at: 1704448800 }, { created_at: 12 }], "created_at")).toBe("number");
+    });
+});

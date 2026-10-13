@@ -70,7 +70,7 @@ A new row in the users collection is a user creation: a `password` column is has
 
 ### Creating a collection from a file
 
-When you create a collection from a file, each column's type is inferred from its values. A column is a number only if every value in it is a number or text that converts to one exactly, so a column of zip codes, product codes with leading zeros, long SKUs or phone numbers stays text. A column that mixes types (numbers and words, booleans and numbers) is text. Blank cells do not count, so a mostly empty column is not marked required.
+When you create a collection from a file, each column's type is inferred from its values. A column is a number only if every value in it is a number or text that converts to one exactly, so a column of zip codes, product codes with leading zeros, long SKUs or phone numbers stays text. A column that mixes types (numbers and words, booleans and numbers) is text. Blank cells do not count, so a mostly empty column is not marked required. A column of whole numbers whose name ends in a word that says it holds a moment (`created_at`, `updatedAt`, `signup_date`, `timestamp`) is a date when every value is an epoch timestamp of 2001–2103, in seconds or milliseconds; under any other name, or with any other value, it stays a number.
 
 ### Import Configuration
 
