@@ -168,6 +168,27 @@ relations. A change to a related row alone sends no frame: editing a tag's name 
 refresh a post listened to with `include: ["tags"]` until the post changes too. To follow
 the related rows, listen to their collection as well.
 
+## Watching a Count
+
+<span class="since-badge" data-since="0.25">Since 0.25</span> `listenCount()` keeps a count current: the total of what a list's filter matches, for a
+toolbar or a "select all N" offer that should not go stale while other people add and remove rows.
+The callback runs with the total once it is known, and again whenever a write changes it.
+
+```typescript
+const stop = client.data.orders.listenCount(
+    { where: { status: ["==", "open"] } },
+    (total) => console.log(`${total} open orders`),
+    (error) => console.error(error)
+);
+```
+
+Only the filter counts — `where`, `logical` and `searchString`; a `limit`, an `offset` or a sort is
+ignored. The server reads no rows for it, only the count, under the subscriber's identity like any
+other frame. A server older than 0.25 does not know the request; it is answered with one row and the
+same total, and the SDK reads the total from that. On a client with no socket, `listenCount()` is a
+stub that throws, as `listen()` is. With [offline support](/docs/sdk/offline/) on, the count is the
+server's: queued writes are not in it until they replay.
+
 ## Fluent Query Builder
 
 You can also subscribe through the fluent query builder. This is equivalent to calling `listen()` with params, but lets you chain `.where()`, `.orderBy()`, etc.:

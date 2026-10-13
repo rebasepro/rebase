@@ -1511,7 +1511,10 @@ data: u.data as AnyRow })),
             // wrapper does not turn "realtime is off on this client" into
             // "this method does not exist" — the two used to be the same thing.
             listen: inner.listen,
-            listenById: inner.listenById
+            listenById: inner.listenById,
+            // The server's count, live. Not offline-aware: it is a number the
+            // server keeps, and the queue's writes are not in it until they replay.
+            listenCount: inner.listenCount
         };
 
         // Realtime stays a live server stream — everything it delivers feeds

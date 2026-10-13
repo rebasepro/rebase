@@ -1620,7 +1620,7 @@ export function EntitiesCount({
 
     useEffect(() => {
         const accessor = dataClientRef.current.collection(path);
-        if (!accessor.count) {
+        if (!accessor.count && !accessor.listenCount) {
             onCountChangeRef.current?.(undefined);
             return;
         }
@@ -1633,6 +1633,20 @@ export function EntitiesCount({
             ? sortBy.map(([field, direction]) => [String(field), direction] as OrderByTuple)
             : undefined;
 
+        // Live where the data source can subscribe: the total then follows the
+        // rows other people add and remove, not only this view's own deletes,
+        // and so does the "select all N" offer built on it.
+        if (accessor.listenCount) {
+            return accessor.listenCount(
+                { where: whereParams, searchString },
+                (total) => onCountChangeRef.current?.(total),
+                (error) => {
+                    console.warn("Error counting", error);
+                    onCountChangeRef.current?.(undefined);
+                }
+            );
+        }
+
         // Deduplicate inflight count requests (e.g. React StrictMode double-mount)
         // The search term is part of the query, so it is part of the key. The
         // cache is module-level and outlives an unmount, so a key that omits it
@@ -1643,7 +1657,7 @@ export function EntitiesCount({
         const cacheKey = `${path}|${filterKey}|${sortKey}|${searchString ?? ""}|${refreshKey ?? ""}`;
         let countPromise = inflightCountRequests.get(cacheKey);
         if (!countPromise) {
-            countPromise = accessor.count({
+            countPromise = accessor.count!({
                 where: whereParams,
                 orderBy: orderByParams,
                 searchString

@@ -664,6 +664,12 @@ export interface CollectionAccessor<M extends Record<string, unknown> = Record<s
     listenById?(id: string | number, onUpdate: (entity: Entity<M> | undefined) => void, onError?: (error: Error) => void, options?: ByIdReadOptions): () => void;
 
     /**
+     * {@link SDKCollectionClient.listenCount}: the matching rows' count, live.
+     * Optional method; absent where the data source cannot subscribe.
+     */
+    listenCount?(params: FindParams<M> | undefined, onCount: (total: number) => void, onError?: (error: Error) => void): () => void;
+
+    /**
      * Count the number of records matching the given filter.
      *
      * Optional on this contract because a data source need not support it, and
@@ -1784,6 +1790,19 @@ export interface SDKCollectionClient<
      * the row as `findById(id, options)` reads it, relations included.
      */
     listenById(id: string | number, onUpdate: (row: M | undefined) => void, onError?: (error: Error) => void, options?: ByIdReadOptions<Inc>): () => void;
+
+    /**
+     * The number of rows matching `params`, kept current: `onCount` is called
+     * with the total once it is known, and again whenever a write changes it.
+     * The live counterpart of {@link count} — a list's total, or a "select all
+     * N" offer, that does not go stale while other people add and remove rows.
+     * Only the filter (`where`, `logical`, `searchString`) counts; the window
+     * and sort are ignored.
+     *
+     * Always present; on a client that cannot subscribe it is a stub that
+     * throws, as {@link listen} is.
+     */
+    listenCount(params: FindParams<M, Inc> | undefined, onCount: (total: number) => void, onError?: (error: Error) => void): () => void;
 
     /**
      * Count the number of records matching the given filter.

@@ -968,7 +968,8 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
         // realtime?", which is `isUnsupported()` and is what the admin panel
         // actually asks before choosing to poll instead.
         listen: unsupportedMethod(NO_SOCKET),
-        listenById: unsupportedMethod(NO_SOCKET)
+        listenById: unsupportedMethod(NO_SOCKET),
+        listenCount: unsupportedMethod(NO_SOCKET)
     };
 
     if (ws) {
@@ -1107,6 +1108,45 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
                 onError
             );
 
+            return () => {
+                active = false;
+                unsub();
+            };
+        };
+
+        /**
+         * The count as a subscription of its own: `countOnly` asks the server
+         * to read no rows. One that predates it reads the single row
+         * `limit: 1` asks for and counts as usual, and the frame's `meta`
+         * answers either way. One that sends no `meta` at all is asked with
+         * `count()` on each frame instead.
+         */
+        client.listenCount = (params: FindParams<M> | undefined, onCount: (total: number) => void, onError?: (error: Error) => void) => {
+            let active = true;
+            let last: number | undefined;
+            const emit = (total: number) => {
+                if (!active || total === last) return;
+                last = total;
+                onCount(total);
+            };
+            const unsub = ws.listenCollection(
+                {
+                    path: slug,
+                    filter: params?.where,
+                    logical: params?.logical,
+                    searchString: params?.searchString,
+                    limit: 1,
+                    countOnly: true
+                },
+                (_rows, meta) => {
+                    if (typeof meta?.total === "number") emit(meta.total);
+                    // `partial`: the count failed this time; the last total stands.
+                    else if (!meta) client.count(params).then(emit).catch((error: unknown) => {
+                        if (active) onError?.(error instanceof Error ? error : new Error(String(error)));
+                    });
+                },
+                onError
+            );
             return () => {
                 active = false;
                 unsub();

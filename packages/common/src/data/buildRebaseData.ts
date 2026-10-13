@@ -1136,6 +1136,10 @@ data: u.data as Partial<EntityValues<M>> }))
             ? (id: string | number, onUpdate: (r: M | undefined) => void, onError?: (e: Error) => void, options?: ByIdReadOptions) =>
                 snap.listenById!(id, (s) => onUpdate(s ? entityToRow(s) : undefined), onError, options)
             : unsupportedMethod(noRealtime(slug)),
+        listenCount: snap.listenCount
+            ? (params: FindParams<M> | undefined, onCount: (total: number) => void, onError?: (e: Error) => void) =>
+                snap.listenCount!(params, onCount, onError)
+            : unsupportedMethod(noRealtime(slug)),
         where(columnOrCondition: string | LogicalCondition, operator?: WhereFilterOp, value?: unknown) {
             const builder = new SdkQueryBuilder<M>(client);
             if (typeof columnOrCondition === "object") {
@@ -1266,6 +1270,10 @@ function toEntityAccessor<M extends Record<string, unknown>>(
             ? undefined
             : (id: string | number, onUpdate: (s: Entity<M> | undefined) => void, onError?: (e: Error) => void, options?: ByIdReadOptions) =>
                 sdk.listenById(id, (row) => onUpdate(row ? rowToEntity<M>(row, slug, getPks(), toViewModel) : undefined), onError, options),
+        listenCount: isUnsupported(sdk.listenCount)
+            ? undefined
+            : (params: FindParams<M> | undefined, onCount: (total: number) => void, onError?: (e: Error) => void) =>
+                sdk.listenCount(params, onCount, onError),
         where(columnOrCondition: string | LogicalCondition, operator?: WhereFilterOp, value?: unknown) {
             const builder = new QueryBuilder<M>(accessor);
             if (typeof columnOrCondition === "object") {

@@ -262,6 +262,13 @@ export type ListenCollectionProps<M extends Record<string, unknown> = Record<str
          * the two spellings then disagreed about what a page was.
          */
         page?: number;
+        /**
+         * Subscribe to the count alone: the server reads no rows, and each
+         * frame carries `rows: []` and `meta.total`. A server that predates it
+         * ignores the key and answers with the rows asked for (so ask for
+         * `limit: 1`) and the same `meta`. See `listenCount`.
+         */
+        countOnly?: boolean;
         onUpdate: (rows: Record<string, unknown>[], meta?: CollectionUpdateMeta) => void;
         onError?: (error: Error) => void;
     };

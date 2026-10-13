@@ -191,6 +191,13 @@ type StoredCollectionRequest = {
     fields?: string[];
     /** `SELECT DISTINCT` over the projection. */
     distinct?: boolean;
+    /**
+     * A subscription to the count alone (`listenCount`): no rows are read,
+     * and each frame carries `rows: []` and the `meta` with the total. A
+     * server that predates it reads the rows it was asked for (the SDK asks
+     * for one) and counts them as usual, so the same frame answers it.
+     */
+    countOnly?: boolean;
 };
 
 type RealTimeListenEntityProps = ListenOneProps & {
@@ -1556,7 +1563,8 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
                 // both were.
                 include: request.include,
                 fields: request.fields,
-                distinct: request.distinct
+                distinct: request.distinct,
+                ...(request.countOnly === true && { countOnly: true })
             };
             const target = { type: "collection" as const, path: request.path, collectionRequest, authContext };
             const subscription: Subscription = {
@@ -2041,7 +2049,8 @@ roles: ["anon"] };
                     // browser, from the collection config it already has — see
                     // `toViewModelValues` in `buildRebaseData`. There is no
                     // second wire shape to keep in step with this one.
-                    const fetchedEntities = await txEntityService.fetchCollectionForRest(notifyPath, {
+                    // A count subscription reads no rows: the count below is the frame.
+                    const fetchedEntities = collectionRequest.countOnly ? [] : await txEntityService.fetchCollectionForRest(notifyPath, {
                         filter: collectionRequest.filter as FilterValues<string>,
                         // The subscription stored a group; the search branch used to
                         // drop it, so a filtered live search widened to every row
@@ -2135,7 +2144,7 @@ roles: ["anon"] };
         // it stands in for, which is the defect the paragraph above describes
         // one clause at a time.
         return await withFieldViewer({ roles: authContext?.roles ?? [] }, async () => {
-            const rows = await this.dataService.fetchCollectionForRest(notifyPath, {
+            const rows = collectionRequest.countOnly ? [] : await this.dataService.fetchCollectionForRest(notifyPath, {
                 filter: collectionRequest.filter as FilterValues<string>,
                 logical: collectionRequest.logical,
                 orderBy: collectionRequest.orderBy,
@@ -2185,7 +2194,9 @@ roles: ["anon"] };
         const offset = collectionRequest.offset ?? 0;
 
         const wholeSet = collectionRequest.limit !== undefined && rows.length < collectionRequest.limit &&
-            offset === 0 && !collectionRequest.startAfter && !collectionRequest.searchString && !collectionRequest.distinct;
+            offset === 0 && !collectionRequest.startAfter && !collectionRequest.searchString && !collectionRequest.distinct &&
+            // No rows were read, so their number says nothing.
+            !collectionRequest.countOnly;
 
         let total: number;
         // When a big group's total was counted recently enough, it is reused
