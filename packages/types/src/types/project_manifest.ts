@@ -86,6 +86,14 @@ export interface RebaseBackendAppConfig {
      * its default export. Default `collections/users`.
      */
     usersCollection?: string;
+    /**
+     * Type server-side data from the generated `Database`. When `true`, every
+     * `rebase generate-sdk` — `rebase dev`'s included, and the first one on a
+     * fresh clone — writes the types and the `Register` declaration to
+     * `<config>/generated/`. `rebase generate-sdk --register` sets it.
+     * Default `false`.
+     */
+    registerDatabase?: boolean;
 
     /**
      * `runtime: "custom"` only. Dockerfile path relative to the repository root.

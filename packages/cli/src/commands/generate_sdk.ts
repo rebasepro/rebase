@@ -15,6 +15,7 @@ import { CollectionConfig, computeSchemaVersion, deserializeCollections } from "
 import { CodegenError, generateSDK, GeneratedFile, toCollectionAccessor } from "@rebasepro/codegen";
 import { detectPackageManager, getPMCommands } from "../utils/package-manager";
 import { findProjectRoot } from "../utils/project";
+import { findBackendApp, loadManifest, manifestExists, writeManifest } from "../manifest";
 import { readLink } from "./cloud/context";
 import { COLLECTIONS_FLAG_HELP, COLLECTIONS_PATH_RULE } from "../utils/path-flags";
 import { isLoadedCollectionFile } from "../utils/collection-drift";
@@ -40,6 +41,11 @@ interface GenerateSDKArgs {
      * {@link writeRegistration}.
      */
     register?: boolean;
+    /**
+     * The directory holding `rebase.json`, where `--register` is remembered.
+     * Found from `cwd` when not given.
+     */
+    projectRoot?: string;
     help?: boolean;
 }
 
@@ -116,6 +122,49 @@ function writeRegistration(dir: string, databaseTypes: string): void {
     fs.mkdirSync(dir, { recursive: true });
     writeIfChanged(path.join(dir, "database.types.ts"), databaseTypes);
     writeIfChanged(registerPath, REGISTER_SOURCE);
+}
+
+/**
+ * Whether `rebase.json` asks for the registration (`registerDatabase: true` on
+ * the backend app). That is what survives a clone: `generated/` is gitignored,
+ * so a `register.ts` from an earlier run is not there to say it.
+ *
+ * An unreadable manifest answers no; `rebase build` is where it is reported.
+ */
+function manifestRegisters(projectRoot: string | undefined): boolean {
+    if (!projectRoot || !manifestExists(projectRoot)) return false;
+    try {
+        return findBackendApp(loadManifest(projectRoot).manifest)?.app.registerDatabase === true;
+    } catch {
+        return false;
+    }
+}
+
+/**
+ * Remember `--register` in `rebase.json`, so later runs, `rebase dev` and a
+ * fresh clone keep registering. Returns where it was written, or why not.
+ *
+ * Never creates the file: a project without one is synthesized from its
+ * layout, and writing one is `rebase apps init`'s decision, not this flag's.
+ */
+function rememberRegistration(projectRoot: string | undefined): { written: string } | { skipped: string } {
+    if (!projectRoot || !manifestExists(projectRoot)) {
+        return { skipped: "No rebase.json here, so the choice lasts as long as the generated files." };
+    }
+    let loaded: ReturnType<typeof loadManifest>;
+    try {
+        loaded = loadManifest(projectRoot);
+    } catch (error) {
+        return { skipped: `rebase.json could not be read (${error instanceof Error ? error.message : String(error)}).` };
+    }
+    const backend = findBackendApp(loaded.manifest);
+    if (!backend) return { skipped: "rebase.json declares no backend app to remember it on." };
+    if (backend.app.registerDatabase === true) return { written: loaded.filePath ?? projectRoot };
+    const manifest = {
+        ...loaded.manifest,
+        apps: { ...loaded.manifest.apps, [backend.name]: { ...backend.app, registerDatabase: true } }
+    };
+    return { written: writeManifest(projectRoot, manifest) };
 }
 
 /**
@@ -237,8 +286,8 @@ ${chalk.bold("Options")}
       --token <token>          Bearer token for the contract endpoint
                                (default: $REBASE_SERVICE_KEY)
       --register               Also type server-side data: write the types and the
-                               Register declaration to config/generated/. Later runs
-                               keep it current.
+                               Register declaration to config/generated/, and
+                               remember it in rebase.json so later runs keep it.
   -h, --help                   Show this help
 
 ${chalk.bold("Examples")}
@@ -537,7 +586,8 @@ export const SCHEMA_VERSION = ${JSON.stringify(schemaVersion)};
     // project has it, so `rebase dev` regenerating the SDK never leaves the
     // server typed against an older schema than the client.
     const registerDir = registrationDir(resolvedCollectionsDir);
-    if (args.register || hasRegistration(registerDir)) {
+    const projectRoot = args.projectRoot ?? findProjectRoot(cwd) ?? undefined;
+    if (args.register || hasRegistration(registerDir) || manifestRegisters(projectRoot)) {
         if (!fs.existsSync(path.dirname(registerDir))) {
             console.log(chalk.red(`  ✗ No ${path.dirname(registerDir)} to register the Database in.`));
             console.log(chalk.gray("    --register writes beside the collections directory; pass --collections."));
@@ -554,6 +604,14 @@ export const SCHEMA_VERSION = ${JSON.stringify(schemaVersion)};
                 return;
             }
             console.log(chalk.green(`  ✓ Registered the Database for server-side code in ${registerDir}`));
+            if (args.register) {
+                const remembered = rememberRegistration(projectRoot);
+                if ("written" in remembered) {
+                    console.log(chalk.gray(`    Remembered in ${path.relative(cwd, remembered.written) || "rebase.json"} (registerDatabase).`));
+                } else {
+                    console.log(chalk.yellow(`    ${remembered.skipped}`));
+                }
+            }
         }
     }
 

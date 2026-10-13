@@ -90,8 +90,15 @@ describe("generate-sdk --register", () => {
         collectionsDir,
         output: path.join(root, "generated/sdk"),
         cwd: root,
+        projectRoot: root,
         ...(register ? { register } : {})
     });
+
+    const writeManifest = (backend: Record<string, unknown>) => fs.writeFileSync(
+        path.join(root, "rebase.json"),
+        JSON.stringify({ rebase: "^1", apps: { backend: { type: "backend", runtime: "managed", ...backend } }, telemetry: false })
+    );
+    const readManifest = () => JSON.parse(fs.readFileSync(path.join(root, "rebase.json"), "utf-8"));
 
     it("writes nothing into config/ without the flag", async () => {
         const collectionsDir = scaffold(root);
@@ -142,6 +149,49 @@ describe("generate-sdk --register", () => {
         await generate(collectionsDir);
 
         expect(fs.readFileSync(path.join(root, "config/generated/database.types.ts"), "utf-8")).toContain("tags");
+    });
+
+    it("remembers --register in rebase.json, keeping the rest of the file", async () => {
+        const collectionsDir = scaffold(root);
+        writeManifest({ functions: "backend/functions" });
+
+        await generate(collectionsDir, true);
+
+        const manifest = readManifest();
+        expect(manifest.apps.backend.registerDatabase).toBe(true);
+        expect(manifest.apps.backend.functions).toBe("backend/functions");
+        expect(manifest.telemetry).toBe(false);
+    });
+
+    it("registers on a fresh clone, where only rebase.json remembers the choice", async () => {
+        // `config/generated/` is gitignored: a clone has the manifest and no register.ts.
+        const collectionsDir = scaffold(root);
+        writeManifest({ registerDatabase: true });
+
+        await generate(collectionsDir);
+
+        expect(fs.readFileSync(path.join(root, "config/generated", REGISTER_FILE), "utf-8"))
+            .toContain("database: Database;");
+        expect(exitSpy).not.toHaveBeenCalled();
+    });
+
+    it("does not register when rebase.json leaves it off", async () => {
+        const collectionsDir = scaffold(root);
+        writeManifest({});
+
+        await generate(collectionsDir);
+
+        expect(fs.existsSync(path.join(root, "config/generated"))).toBe(false);
+        expect(readManifest().apps.backend).not.toHaveProperty("registerDatabase");
+    });
+
+    it("writes no rebase.json into a project that has none", async () => {
+        const collectionsDir = scaffold(root);
+
+        await generate(collectionsDir, true);
+
+        expect(fs.existsSync(path.join(root, "config/generated", REGISTER_FILE))).toBe(true);
+        expect(fs.existsSync(path.join(root, "rebase.json"))).toBe(false);
     });
 
     it("leaves a register.ts it did not write alone", async () => {

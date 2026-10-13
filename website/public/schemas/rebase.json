@@ -94,6 +94,10 @@
                     "type": "string",
                     "description": "Module path (relative to config) exporting the auth users collection. Default \"collections/users\"."
                 },
+                "registerDatabase": {
+                    "type": "boolean",
+                    "description": "Type server-side data from the generated Database. When true, every `rebase generate-sdk` (`rebase dev`'s included, and the first one on a fresh clone) writes the types and the Register declaration to <config>/generated/. `rebase generate-sdk --register` sets it. Default false."
+                },
                 "dockerfile": {
                     "$ref": "#/$defs/relativePath",
                     "description": "Custom runtime only. Dockerfile path. Default \"Dockerfile\"."

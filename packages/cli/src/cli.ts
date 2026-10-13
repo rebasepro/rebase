@@ -329,6 +329,7 @@ async function dispatch(
                 from: sdkArgs["--from"],
                 token: sdkArgs["--token"],
                 register: sdkArgs["--register"],
+                projectRoot: sdkHelp ? undefined : sdkRoot,
                 help: sdkHelp,
                 cwd: process.cwd()
             });

@@ -46,12 +46,14 @@ registration types your functions, your cron jobs and the callbacks in your
 collection files, in both compiles. It is a declaration only: the runtime does
 exactly what it did before.
 
-Once `config/generated/register.ts` exists, every later `rebase generate-sdk`,
-and `rebase dev` on each collection change, keeps both files current. The
-scaffold's `.gitignore` ignores `generated/` directories, so after a fresh
-clone (and in CI) run `rebase generate-sdk --register` again, or put the flag in
-the `generate:sdk` script. Delete `config/generated/` to go back to untyped
-server-side data.
+The flag is remembered in `rebase.json`, as `"registerDatabase": true` on the
+backend app, so every later `rebase generate-sdk`, and `rebase dev` on each
+collection change, keeps both files current. That holds on a fresh clone and in
+CI too: the scaffold's `.gitignore` ignores `generated/` directories, and the
+first `rebase generate-sdk` or `rebase dev` writes them again. A project with
+no `rebase.json` keeps registering for as long as `config/generated/register.ts`
+is there. To go back to untyped server-side data, remove `registerDatabase` and
+delete `config/generated/`.
 
 You can also write the registration yourself, in any file the backend compiles
 (`backend/src/rebase-env.d.ts`, importing `../../generated/sdk/database.types`).

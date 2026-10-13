@@ -270,6 +270,25 @@ dockerfile: "Dockerfile" }
         });
     });
 
+    describe("backend.registerDatabase", () => {
+        it("is carried through the parse, so a rewrite keeps it", () => {
+            const { manifest, issues } = validateManifest({
+                rebase: "^1",
+                apps: { backend: { type: "backend", runtime: "managed", registerDatabase: true } }
+            });
+            expect(issues).toEqual([]);
+            expect(manifest?.apps.backend).toMatchObject({ registerDatabase: true });
+        });
+
+        it("must be a boolean", () => {
+            const { issues } = validateManifest({
+                rebase: "^1",
+                apps: { backend: { type: "backend", runtime: "managed", registerDatabase: "yes" } }
+            });
+            expect(issues.find(i => i.path === "apps.backend.registerDatabase")?.message).toBe("must be a boolean");
+        });
+    });
+
     it("reports backend.mode as removed rather than ignoring it", () => {
         const { issues } = validateManifest({
             rebase: "^1",

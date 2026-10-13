@@ -351,7 +351,7 @@ message: "must stay inside the project directory" });
 /** Fields each app type understands. Anything else is a typo or a newer CLI. */
 const KNOWN_APP_FIELDS: Record<string, readonly string[]> = {
     backend: ["type", "runtime", "config", "functions", "crons", "schema",
-        "usersCollection", "dockerfile", "context", "port"],
+        "usersCollection", "registerDatabase", "dockerfile", "context", "port"],
     static: ["type", "root", "build", "output", "path", "spa", "cms"]
 };
 
@@ -505,6 +505,10 @@ message: `"${type}" is no longer an app type — ${REMOVED_APP_TYPES[type]}` });
                 issues.push({ path: `${base}.port`,
 message: "must be an integer" });
             }
+            if (raw.registerDatabase !== undefined && typeof raw.registerDatabase !== "boolean") {
+                issues.push({ path: `${base}.registerDatabase`,
+message: "must be a boolean" });
+            }
             // Constructed, not asserted. Everything above pushes an issue for a
             // field it does not like and then leaves the field alone, so
             // `raw as unknown as RebaseAppConfig` handed the caller the *whole
@@ -523,6 +527,7 @@ message: "must be an integer" });
                 crons: raw.crons as string | undefined,
                 schema: raw.schema as string | undefined,
                 usersCollection: raw.usersCollection as string | undefined,
+                registerDatabase: raw.registerDatabase as boolean | undefined,
                 dockerfile: raw.dockerfile as string | undefined,
                 context: raw.context as string | undefined,
                 port: raw.port as number | undefined
