@@ -178,8 +178,12 @@ works indefinitely. The SDK moves at a major, together with the aliases.
 
 ## 8. Moving a surface that has shipped
 
-Use `mountWithLegacyAlias` (`src/api/mount.ts`). It serves the same router at
-both paths, so the two cannot drift — one set of handlers, one gate.
+Mount the router at its new path, and `deprecatedAlias(router, canonical)`
+(`src/api/mount.ts`) at the old one. It serves the same router at both paths,
+so the two cannot drift — one set of handlers, one gate. Then mark the row in
+the audit below "**moved** from `/api/<old>`; aliased":
+`pnpm check:legacy-api-paths` fails while the aliases the server mounts and the
+rows marked so disagree.
 
 Responses through the legacy path carry:
 
@@ -199,10 +203,10 @@ logs rather than discovering them when it is gone.
 
 ## The audit
 
-Taken from the mounted surfaces in `init.ts`, plus the probes `boot/boot.ts`
-mounts outside it. "Gate" is what stands in front of the router. Paths are
-relative to `basePath` unless they start at `/.well-known`, `/mcp`, `/livez`,
-`/health` or `/metrics`, which sit at the root.
+Taken from the mounted surfaces in `backend/create-backend.ts`, plus the probes
+`boot/boot.ts` mounts outside it. "Gate" is what stands in front of the router.
+Paths are relative to `basePath` unless they start at `/.well-known`, `/mcp`,
+`/livez`, `/health` or `/metrics`, which sit at the root.
 
 ### Admin — under `/api/admin`
 

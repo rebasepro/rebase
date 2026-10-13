@@ -3,18 +3,28 @@
  * First-party clients call an admin surface by its canonical path, never by
  * the legacy alias the server keeps for older callers.
  *
- * The server mounts each admin surface that moved under `/api/admin` twice,
- * through `mountWithLegacyAlias`: the canonical path, and the old one, which
- * answers with `Deprecation` headers and is removed at the next major. The
- * shipped panel kept calling three of the old ones — the collection editor
- * `/api/schema-editor`, the Logs Explorer `/api/logs`, the client SDK's cron
- * API `/api/cron` — so every page load drew deprecation headers, and removing
- * the aliases as documented would have broken the panel that shipped with them.
+ * The server mounts each admin surface that moved under `/api/admin` twice:
+ * the canonical path, and the old one through `deprecatedAlias`
+ * (`packages/server/src/api/mount.ts`), which answers with `Deprecation`
+ * headers and is removed at the next major. The shipped panel kept calling
+ * three of the old ones — the collection editor `/api/schema-editor`, the Logs
+ * Explorer `/api/logs`, the client SDK's cron API `/api/cron` — so every page
+ * load drew deprecation headers, and removing the aliases as documented would
+ * have broken the panel that shipped with them.
  *
- * The legacy paths are read from the server's `legacy:` entries, so a surface
- * moved later is covered without editing this script. A source string calls
- * one when the path follows an interpolation (`${apiBase}/logs?…`) or is a
- * whole literal (`"/cron"`) that is not the tail of a concatenation.
+ * The legacy paths are read from where the server mounts them —
+ * `app.route(`${basePath}/<old>`, deprecatedAlias(router, `${basePath}/<new>`))`,
+ * anywhere under `packages/server/src` — so a surface moved later is covered
+ * without editing this script. A source string calls one when the path follows
+ * an interpolation (`${apiBase}/logs?…`) or is a whole literal (`"/cron"`) that
+ * is not the tail of a concatenation.
+ *
+ * The aliases are also held to `docs/api-conventions.md`, whose audit table
+ * marks each moved surface "**moved** from `/api/<old>`; aliased": an alias
+ * mounted or removed without that row changing fails here, so the page that
+ * tells an operator which old paths still answer cannot drift from the server.
+ * And finding no alias at all is a failure rather than a pass — it means the
+ * mount this reads changed shape, not that every alias is gone.
  *
  *     pnpm check:legacy-api-paths
  */
@@ -41,25 +51,78 @@ function walk(dir, out = []) {
     return out;
 }
 
-/** Every `legacy: \`${basePath}/<path>\`` the server mounts, as `/<path>`. */
-function legacyPaths() {
-    const found = new Set();
+/**
+ * A deprecated alias as the server mounts it:
+ * `.route(\`${basePath}/cron\`, deprecatedAlias(cronSurface, \`${basePath}/admin/cron\`))`.
+ * Both paths relative to the base path, which is any one interpolation.
+ */
+const ALIAS_MOUNT = /\.route\(\s*`\$\{[A-Za-z_$][\w$]*\}(\/[A-Za-z0-9/_-]+)`\s*,\s*deprecatedAlias\(\s*[^,()]+,\s*`\$\{[A-Za-z_$][\w$]*\}(\/[A-Za-z0-9/_-]+)`\s*\)/g;
+
+/** Every alias the server mounts: legacy path → canonical path, both under the base path. */
+function mountedAliases() {
+    const found = new Map();
     for (const file of walk(path.join(ROOT, "packages/server/src"))) {
+        if (TEST.test(path.relative(ROOT, file))) continue;
         const text = fs.readFileSync(file, "utf8");
-        for (const match of text.matchAll(/legacy:\s*`\$\{basePath\}(\/[A-Za-z0-9/_-]+)`/g)) {
-            found.add(match[1]);
-        }
+        for (const match of text.matchAll(ALIAS_MOUNT)) found.set(match[1], match[2]);
     }
-    return [...found];
+    return found;
+}
+
+const API_CONVENTIONS = "docs/api-conventions.md";
+/** The default base path, which the audit table writes its moved-from paths under. */
+const DOC_BASE = "/api";
+
+/**
+ * Every row of the audit table that marks a surface as moved and aliased:
+ * `| \`/admin/cron\` | … | **moved** from \`/api/cron\`; aliased |`, as legacy
+ * path → canonical path, both under the base path.
+ */
+function documentedAliases() {
+    const found = new Map();
+    const text = fs.readFileSync(path.join(ROOT, API_CONVENTIONS), "utf8");
+    for (const line of text.split("\n")) {
+        const row = line.match(/^\|\s*`(\/[^`]+)`.*\*\*moved\*\* from `([^`]+)`; aliased/);
+        if (!row) continue;
+        const [, canonical, legacyPath] = row;
+        found.set(legacyPath.startsWith(`${DOC_BASE}/`) ? legacyPath.slice(DOC_BASE.length) : legacyPath, canonical);
+    }
+    return found;
 }
 
 const escape = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-const legacy = legacyPaths();
-if (legacy.length === 0) {
-    console.error("✗ legacy API paths: found no `legacy:` entry in packages/server/src — the pattern this gate reads has changed.");
+const aliases = mountedAliases();
+if (aliases.size === 0) {
+    console.error(
+        "✗ legacy API paths: found no `.route(`${basePath}/…`, deprecatedAlias(…))` mount in packages/server/src — " +
+        "the pattern this gate reads has changed."
+    );
     process.exit(1);
 }
+
+const documented = documentedAliases();
+const drift = [];
+for (const [legacyPath, canonical] of aliases) {
+    const row = documented.get(legacyPath);
+    if (row === undefined) {
+        drift.push(`${DOC_BASE}${legacyPath} is mounted as an alias of ${DOC_BASE}${canonical}, and ${API_CONVENTIONS} has no "**moved** from \`${DOC_BASE}${legacyPath}\`; aliased" row for it.`);
+    } else if (row !== canonical) {
+        drift.push(`${DOC_BASE}${legacyPath} is mounted as an alias of ${DOC_BASE}${canonical}, and ${API_CONVENTIONS} says it moved to ${DOC_BASE}${row}.`);
+    }
+}
+for (const [legacyPath, canonical] of documented) {
+    if (!aliases.has(legacyPath)) {
+        drift.push(`${API_CONVENTIONS} says ${DOC_BASE}${legacyPath} is still served as an alias of ${DOC_BASE}${canonical}, and nothing in packages/server/src mounts it.`);
+    }
+}
+if (drift.length > 0) {
+    console.error(`✗ legacy API paths: the aliases the server mounts and the ones ${API_CONVENTIONS} lists disagree:\n`);
+    for (const problem of drift) console.error(`  ${problem}`);
+    process.exit(1);
+}
+
+const legacy = [...aliases.keys()];
 
 const problems = [];
 for (const pkg of CLIENT_PACKAGES) {
@@ -75,7 +138,7 @@ for (const pkg of CLIENT_PACKAGES) {
                 const afterInterpolation = new RegExp(`\\}${p}(?=[/?\`"'])`);
                 const wholeLiteral = new RegExp(`(?<!\\+\\s*)(["'\`])${p}\\1`);
                 if (afterInterpolation.test(line) || wholeLiteral.test(line)) {
-                    problems.push(`${relative}:${index + 1}: calls the legacy alias ${legacyPath} — use /admin${legacyPath}\n    ${trimmed}`);
+                    problems.push(`${relative}:${index + 1}: calls the legacy alias ${legacyPath} — use ${aliases.get(legacyPath)}\n    ${trimmed}`);
                 }
             }
         });
