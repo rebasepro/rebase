@@ -56,7 +56,7 @@ Carica un elenco di entità di una collezione e vi si sottoscrive. Se il driver 
 ```typescript
 import { useCollection } from "@rebasepro/app";
 import type { User } from "@rebasepro/types";
-import { productsCollection } from "../../../docs/config/collections";
+import { productsCollection } from "../config/collections";
 
 function ProductList() {
     // The row shape drives `filterValues`, `sortBy` and `entity.values` — without it
@@ -117,7 +117,7 @@ Carica una singola entità per ID e vi si sottoscrive. Viene renderizzata subito
 
 ```typescript
 import { useFetch } from "@rebasepro/app";
-import { productsCollection } from "../../../docs/config/collections";
+import { productsCollection } from "../config/collections";
 
 function ProductDetail({ productId }) {
     const { entity, dataLoading, dataLoadingError } = useFetch({
@@ -161,7 +161,7 @@ Hook per valutare ruoli e permessi dell'utente corrente. Ti evita di passare man
 
 ```typescript
 import { usePermissions } from "@rebasepro/app";
-import { productsCollection } from "../../../docs/config/collections";
+import { productsCollection } from "../config/collections";
 
 function CreateProductButton() {
     const { canCreate } = usePermissions();
@@ -386,7 +386,7 @@ Gestire selezioni di relazioni complesse, con ricerca, debouncing e paginazione 
 
 ```typescript
 import { useRelationSelector } from "@rebasepro/app";
-import { categoriesCollection } from "../../../docs/config/collections";
+import { categoriesCollection } from "../config/collections";
 
 function CategorySelector({ onSelect }) {
     const { items, isLoading, search, loadMore, hasMore } = useRelationSelector({
@@ -443,7 +443,7 @@ function CustomAction() {
 
 ## `useUnsavedChangesDialog`
 
-Impedisce la navigazione o l'abbandono della pagina quando un form ha modifiche non salvate. Intercetta automaticamente la navigazione interna di React Router tramite `useBlocker` e i ricaricamenti a livello di browser tramite `beforeunload`.
+Impedisce la navigazione o l'abbandono della pagina quando un form ha modifiche non salvate. Chiede conferma prima di un ricaricamento o della chiusura di una scheda (`beforeunload`) e, nell'admin sotto un data router di React Router (`createBrowserRouter`), anche prima della navigazione interna all'app, tramite `useBlocker`. Con qualsiasi altro router, come un semplice `<BrowserRouter>`, vale solo il prompt a livello di browser.
 
 ```typescript
 import { useUnsavedChangesDialog } from "@rebasepro/app";

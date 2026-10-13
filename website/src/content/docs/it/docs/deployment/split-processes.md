@@ -43,6 +43,10 @@ REBASE_ROLE=all        # the default: everything, one process
 Health e metriche sono presenti su ciascun ruolo senza eccezioni. Un processo che un
 orchestratore non può sottoporre a probe è un processo di cui non può effettuare il rollout.
 
+<span class="since-badge" data-since="0.25">Da 0.25</span> `GET /api/auth/config`,
+ciò che legge la schermata di accesso, segue il resto di `/api/auth`: lo servono solo `api` e
+`all`. Su 0.24 lo rendeva disponibile anche un processo `functions` o `worker`.
+
 Il realtime è presente nell'elenco perché ha un costo a prescindere dal fatto che venga usato o
 meno: un processo che consuma eventi di modifica mantiene attiva una connessione `LISTEN` al di fuori
 del pool per tutta la sua esecuzione, e installa i trigger di acquisizione all'avvio. Solo
@@ -149,6 +153,15 @@ valore predefinito rifiuta di avviarsi, segnalandolo esplicitamente. `CREATE …
 e successivamente vi scrive in due passaggi separati, quindi processi avviati contemporaneamente entrano in
 conflitto — e un deployment in cui più istanze competono per effettuare il provisioning dello stesso
 schema non è uno scenario previsto.
+
+<span class="since-badge" data-since="0.25">Da 0.25</span> In un
+[server personalizzato](/docs/backend/custom-server/), la stessa decisione è l'opzione
+`provision` di `createRebaseBackend`: `true` nel processo che possiede lo schema, e
+`{ collections: false, realtime: false }` in tutti gli altri, che mantiene comunque le
+tabelle proprie del framework. Anche `REBASE_MIGRATE_ON_BOOT=none` disattiva lì lo schema
+delle collection. Il lavoro in background si decide allo stesso modo: un processo che non
+chiama mai `start()` non esegue né lo scheduler del cron né i worker dei job, e uno che lo
+chiama esegue quelli che gli assegna la sua opzione `ownership`.
 
 ## Esecuzione di una sola funzione per processo
 

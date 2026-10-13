@@ -55,6 +55,31 @@ Ognuna di queste proprietà è facoltativa tranne `key`. L'elenco completo dei n
 - `onAuthStateChange(user)` viene eseguito a ogni successivo cambio di utente: con il nuovo utente all'accesso, con `null` alla disconnessione. Il plugin resta montato in entrambi i casi.
 - `onUnmount()` viene eseguito quando `<Rebase>` viene smontato.
 
+<span class="since-badge" data-since="0.25">Da 0.25</span>
+`lifecycle.onCollectionChange` è deprecato. Nessuno lo ha mai chiamato, su 0.24
+o prima. Un plugin che lo imposta continua a compilare, e `<Rebase>` avvisa una
+volta per plugin. Per seguire le righe di una collection, sottoscrivi da `onMount` e
+annulla la sottoscrizione in `onUnmount`:
+
+```tsx
+import type { RebasePlugin } from "@rebasepro/cms-types";
+
+let stopListening: (() => void) | undefined;
+
+const openOrdersPlugin: RebasePlugin = {
+    key: "open_orders",
+    lifecycle: {
+        onMount: (context) => {
+            stopListening = context.data.collection("orders").listen(
+                { where: { status: ["==", "open"] } },
+                ({ data }) => console.log(`${data.length} open orders`)
+            );
+        },
+        onUnmount: () => stopListening?.()
+    }
+};
+```
+
 ## Utilizzo dei plugin
 
 I plugin vengono passati a `<Rebase>`, accanto al client. Tutto ciò che si trova al di sotto di esso — la navigazione, le viste delle collection, i form — li legge da lì:
@@ -121,7 +146,7 @@ function useMyPlugin(): RebasePlugin {
         ],
 
         // `fieldBuilder` is top-level and takes a `wrap` function that returns
-        // a *component* (or null to leave the default field alone) — it is not
+        // a *component* (or null to leave the field as it is) — it is not
         // a render function and no longer lives under `form`.
         fieldBuilder: {
             wrap: ({ property }) =>
@@ -129,6 +154,41 @@ function useMyPlugin(): RebasePlugin {
         }
     };
 }
+```
+
+### Wrapper di campo da più plugin
+
+<span class="since-badge" data-since="0.25">Da 0.25</span> Su 0.24 il `wrap` di ogni
+plugin riceveva il campo integrato, e veniva renderizzato solo l'ultimo wrapper
+restituito.
+
+I wrapper di più plugin si compongono, nell'ordine dell'array `plugins`.
+Il `wrap` di ciascun plugin riceve, come `params.Field`, il campo così come lo hanno
+lasciato i plugin precedenti, quindi il wrapper del primo plugin è il più interno e quello
+dell'ultimo il più esterno. Un plugin il cui `wrap` restituisce `null`, o la cui guardia
+`enabled` restituisce `false` per il campo, lo passa avanti invariato. Un wrapper che
+renderizza `Field` mantiene quindi tutti i wrapper che lo precedono:
+
+```tsx
+import type { RebasePlugin } from "@rebasepro/cms-types";
+import { Typography } from "@rebasepro/ui";
+
+const descriptionPlugin: RebasePlugin = {
+    key: "description_below",
+    fieldBuilder: {
+        // `Field` is the built-in field, or the earlier plugins' wrapper of it.
+        wrap: ({ Field, property }) => property.description
+            ? (props) => (
+                <>
+                    <Field {...props}/>
+                    <Typography variant="caption" color="secondary">
+                        {property.description}
+                    </Typography>
+                </>
+            )
+            : null
+    }
+};
 ```
 
 ## Plugin integrati
@@ -189,7 +249,6 @@ I plugin possono modificare le collection esistenti:
 ```typescript
 hooks: {
     // Receives one collection, returns the modified one.
-    // Use `modifyCollectionAsync` when the change needs a fetch.
     modifyCollection: (collection) => ({
         ...collection,
         properties: {
@@ -203,6 +262,54 @@ hooks: {
     })
 }
 ```
+
+`modifyCollection` è sincrono, e l'admin lo applica quando risolve le proprie collection,
+non a ogni cambiamento del plugin. Quando la modifica richiede dati da recuperare,
+recuperali prima di renderizzare `<Rebase>` e costruisci il plugin a partire da ciò che è
+tornato:
+
+```tsx
+import { useEffect, useMemo, useState } from "react";
+import { Rebase, useRebaseAuthController } from "@rebasepro/app";
+import { RebaseCMS, RebaseShell } from "@rebasepro/cms";
+import type { RebasePlugin } from "@rebasepro/cms-types";
+import { CircularProgressCenter } from "@rebasepro/ui";
+
+export function App() {
+    const authController = useRebaseAuthController({ client });
+    const [labels, setLabels] = useState<Record<string, string>>();
+
+    useEffect(() => {
+        fetch("/collection-labels.json")
+            .then((response) => response.json())
+            .then(setLabels);
+    }, []);
+
+    const labelsPlugin = useMemo<RebasePlugin | undefined>(() => labels && {
+        key: "collection_labels",
+        hooks: {
+            modifyCollection: (collection) => ({
+                ...collection,
+                name: labels[collection.slug] ?? collection.name
+            })
+        }
+    }, [labels]);
+
+    if (!labelsPlugin) return <CircularProgressCenter/>;
+
+    return (
+        <Rebase client={client} authController={authController} plugins={[labelsPlugin]}>
+            <RebaseCMS collections={collections}/>
+            <RebaseShell title="My App"/>
+        </Rebase>
+    );
+}
+```
+
+<span class="since-badge" data-since="0.25">Da 0.25</span>
+`hooks.modifyCollectionAsync` è deprecato. Nessuno lo ha mai chiamato, su 0.24
+o prima. Un plugin che lo imposta continua a compilare, e `<Rebase>` avvisa una
+volta per plugin. Usa `modifyCollection` come sopra.
 
 ## Passaggi successivi
 

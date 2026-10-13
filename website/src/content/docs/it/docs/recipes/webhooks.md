@@ -89,6 +89,13 @@ destinazione che il dispatcher rifiuta, o un destinatario che risponde con un re
 dopo un solo tentativo con la motivazione; tutto il resto viene ritentato come qualsiasi job. Vedi
 [Webhook persistenti](/docs/backend/jobs#durable-webhooks).
 
+`setCollectionCallbacks` **sostituisce** i callback che la collezione `orders`
+dichiara. Se ne dichiara alcuni, mantienili:
+<span class="since-badge" data-since="0.25">Da 0.25</span> passa
+`composeCallbacks(declared, { afterSave })`, con `composeCallbacks` da
+`@rebasepro/server` e `declared` i `callbacks` della collezione stessa. Vedi
+[Combinare Insiemi di Callback](/docs/collections/callbacks/#combining-callback-sets).
+
 ### Senza una coda di job
 
 Ometti `jobQueue` — oppure usa un driver senza SQL, dove il backend non ne ha una — e le

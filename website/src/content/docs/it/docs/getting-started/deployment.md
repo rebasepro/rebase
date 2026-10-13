@@ -43,7 +43,7 @@ deliberatamente: un connection pooler e l'esecuzione delle funzioni e del worker
 dei job come processi propri.
 
 ```bash
-rebase build          # produce ./dist-bundle
+rebase build          # produces ./dist-bundle
 docker compose up -d
 ```
 
@@ -289,7 +289,18 @@ const router = createBrowserRouter([
 ], { basename });
 ```
 
-L'amministrazione ha bisogno di un **data router** — `createBrowserRouter`, non il semplice `BrowserRouter` — perché il blocco delle modifiche non salvate usa `useBlocker`, che solo il data router fornisce.
+Tieni l'amministrazione su un **data router** — `createBrowserRouter` con
+`<RouterProvider>`, come fa lo scaffold. Con esso, un record con modifiche non salvate
+ferma anche la navigazione interna all'app (un link nel drawer, il pulsante indietro del
+browser) e chiede prima conferma, tramite `useBlocker`, che solo un data router
+fornisce.
+
+<span class="since-badge" data-since="0.25">Da 0.25</span> L'amministrazione funziona
+anche sotto un semplice `<BrowserRouter>`. In quel caso la guardia delle modifiche non
+salvate ricade sul prompt di uscita dalla pagina del browser, che copre un ricaricamento,
+la chiusura della scheda o la digitazione di un URL; la navigazione all'interno dell'app
+procede senza chiedere. Su 0.24 l'amministrazione genera un errore fuori da un data
+router.
 
 **Backend** — se sposti anche l'API, aggiorna il suo percorso di base:
 
@@ -336,7 +347,7 @@ const router = isAdmin
 root.render(<RouterProvider router={router}/>);
 ```
 
-Un solo router per entrambe le metà: l'amministrazione ha comunque bisogno del data router, e non c'è motivo perché l'app di prodotto stia su un altro.
+Un solo router per entrambe le metà: l'amministrazione sta meglio su un data router, che permette alle modifiche non salvate di fermare la navigazione interna all'app, e non c'è motivo perché l'app di prodotto stia su un altro.
 
 Il backend non necessita di modifiche per questo pattern — l'API rimane a `/api` e il catch-all della SPA
 serve `index.html` sia per `/` sia per `/admin/*`.

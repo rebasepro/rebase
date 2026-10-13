@@ -9,7 +9,7 @@ description: Esegui l'override dei componenti UI predefiniti con implementazioni
 
 Rebase consente di sovrascrivere (eseguire l'override) dei componenti UI predefiniti con implementazioni personalizzate. Questo approccio implementa un modello di swizzling dei componenti in stile Docusaurus che supporta due pattern di personalizzazione:
 - **Modalità Eject** (predefinita): Il tuo componente sostituisce completamente quello integrato.
-- **Modalità Wrap** (`wrap: true`): Il tuo componente avvolge (effettua il wrap di) quello originale. Il componente integrato viene passato tramite la prop `OriginalComponent`, consentendoti di effettuarne il rendering all'interno del tuo layout/della tua logica personalizzata.
+- **Modalità Wrap** (`wrap: true`): Il tuo componente avvolge (effettua il wrap di) quello originale. Ciò che avvolge (di solito il componente integrato) viene passato tramite la prop `OriginalComponent`, consentendoti di effettuarne il rendering all'interno del tuo layout/della tua logica personalizzata.
 
 Gli override dei componenti possono essere applicati a livello **globale** per l'intera applicazione (sul provider `<Rebase>`) o a livello **locale** per ciascuna collection (all'interno delle singole definizioni delle collection).
 
@@ -86,7 +86,7 @@ export const productsCollection = defineCollection({
 });
 ```
 
-Il componente che effettua il wrapping risiede insieme al resto del codice frontend e riceve quello integrato come `OriginalComponent`:
+Il componente che effettua il wrapping risiede insieme al resto del codice frontend e riceve ciò che avvolge come `OriginalComponent` — il componente integrato, a meno che anche la tua app non lo sovrascriva (vedi [Quando entrambi gli ambiti sovrascrivono un componente](#quando-entrambi-gli-ambiti-sovrascrivono-un-componente)):
 
 ```tsx
 // frontend/src/ProductsEmptyState.tsx
@@ -109,6 +109,21 @@ export default function ProductsEmptyState({ OriginalComponent, ...props }: {
 Ogni modulo necessita di un **default export**. Il plugin Vite delle collection riscrive un percorso in un import lazy, in modo che il componente costituisca un chunk a sé stante e venga caricato la prima volta che l'override viene renderizzato. Questa riscrittura include i file all'interno della directory `collectionsDir` configurata. Un percorso all'interno di un file esterno ad essa giungerà all'admin come una semplice stringa: verrà segnalato nella console e al suo posto verrà renderizzato il componente integrato. Al di fuori di `collectionsDir`, scrivi tu stesso l'import lazy: `Component: () => import("../../frontend/src/ProductCustomForm")`.
 
 Anche un riferimento diretto (`Component: ProductCustomForm`) funziona, ma solo all'interno di un file di collection che non viene caricato da nulla sul server, poiché importare il componente importa anche React e tutte le sue dipendenze.
+
+### Quando entrambi gli ambiti sovrascrivono un componente
+
+<span class="since-badge" data-since="0.25">Da 0.25</span> Su 0.24 il wrapper di una collection riceve sempre il componente integrato, e l'override a livello di app viene saltato all'interno di quella collection.
+
+I due ambiti si compongono. L'override a livello di app (`<Rebase components>`) viene applicato per primo al componente integrato, e quello della collection (`admin.components`) viene applicato al risultato:
+
+| Livello app | Livello collection | Cosa viene renderizzato all'interno di quella collection |
+|---|---|---|
+| qualsiasi | nessuno | ciò che viene renderizzato ovunque altrove: l'override a livello di app, o il componente integrato |
+| nessuno | wrap | il wrapper della collection attorno al componente integrato |
+| sostituzione o wrap | wrap | il wrapper della collection attorno all'override a livello di app, passato come `OriginalComponent` |
+| qualsiasi | sostituzione | solo il componente della collection; sostituisce entrambi |
+
+Così una collection può aggiungere qualcosa attorno a un componente che la tua app personalizza già, senza perdere quella personalizzazione. Per scartare la versione a livello di app per una sola collection, sostituisci invece di avvolgere.
 
 ---
 

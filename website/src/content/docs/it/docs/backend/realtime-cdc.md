@@ -20,6 +20,10 @@ CDC è controllato dalla variabile d'ambiente `REALTIME_CDC`:
 | `wal` | Predilige la replica logica WAL. Non ancora integrata — degrada a `trigger` e registra nei log la modalità attiva. |
 | `off` | Solo realtime a livello applicativo. Usalo per evitare l'overhead dei trigger per ogni scrittura su carichi di lavoro ad alta intensità di scrittura. Un boot con `off` che possiede lo schema **rimuove** anche i trigger e le funzioni di cattura che un boot precedente aveva installato, e registra quanti ne ha tolti; rimuovi l'impostazione e il boot successivo li installa di nuovo. |
 
+<span class="since-badge" data-since="0.25">Da 0.25</span> La stessa impostazione è
+l'opzione `realtime.cdc` dell'adattatore Postgres, per un server che la configura nel
+codice. `REALTIME_CDC`, se impostata, prevale.
+
 All'avvio vedrai una riga di log che indica la modalità attiva, ad esempio:
 
 ```
@@ -46,7 +50,9 @@ Se la connessione non lo supporta, `auto` registra invece una riga informativa e
 
 ## Requisiti e note
 
-- CDC richiede una stringa di connessione diretta (`DATABASE_DIRECT_URL` o la connessione primaria) per il client `LISTEN` — i connection pooler in modalità transazione non supportano sessioni `LISTEN` persistenti.
+<span class="since-badge" data-since="0.25">Da 0.25</span> `directConnectionString` è l'opzione dell'adattatore; su 0.24 usa `DATABASE_DIRECT_URL`.
+
+- CDC richiede una stringa di connessione diretta (`DATABASE_DIRECT_URL`, la `directConnectionString` dell'adattatore o la connessione primaria) per il client `LISTEN` — i connection pooler in modalità transazione non supportano sessioni `LISTEN` persistenti.
 - I trigger vengono installati solo su tabelle collegate a una collezione registrata. Le scritture su tabelle non mappate vengono ignorate.
 - Una collezione la cui tabella non è ancora stata migrata viene ignorata con un avviso invece di bloccare CDC per il resto.
 - Lo streaming di replica logica WAL nativo (`wal2json`/`pgoutput`) è pianificato; attualmente `REALTIME_CDC=wal` degrada al percorso basato su trigger, che garantisce una copertura equivalente a livello di database.

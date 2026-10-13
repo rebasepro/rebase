@@ -17,13 +17,16 @@ La regola che la scala riflette: **ogni gradino comporta un costo rispetto a ci�
 
 ## La scala
 
+<span class="since-badge" data-since="0.25">Da 0.25</span> `createRebaseBackend`, al gradino 5,
+è nuovo; su 0.24 quel gradino è il solo driver.
+
 | # | Gradino | Raggiunge | **Non** raggiunge | Costo di questa scelta |
 |---|---|---|---|---|
 | 1 | **Dichiarazione** — una proprietà, una relazione, un indice, un blocco `search`, una regola di sicurezza | Lo schema, l'SDK generato, il pannello di amministrazione, il pianificatore delle migrazioni | Tutto ciò che richiede l'esecuzione di codice | Nessuno. Questo è il percorso supportato |
 | 2 | **Callback di collezione** — `beforeQuery`, `afterRead`, `beforeSave`, `afterSave`, `beforeDelete`, `afterDelete` | Ogni lettura e scrittura di una collezione, su qualsiasi trasporto, all'interno della transazione della richiesta stessa | Richieste che non toccano alcuna collezione; l'involucro della risposta; tutto ciò che è asincrono rispetto alla scrittura | Viene eseguito sull'hot path, mantenendo aperta la transazione |
 | 3 | **Funzione personalizzata** — un'app Hono in `functions/` | Il proprio URL, con autenticazione risolta, il driver limitato al chiamante e `rebase` a disposizione | Le rotte `/api/data` integrate. Si posiziona *accanto* ad esse, non davanti | Una superficie in più da autorizzare; nessun metodo SDK generato per essa |
 | 4 | **Rotte e middleware personalizzati** sull'app Hono | Qualsiasi elemento HTTP, inclusi i percorsi eseguiti *prima* dei router di Rebase | Il driver e l'identità del chiamante, a meno che non protegga tu stesso la rotta | Fuori da ogni router Rebase: nessun middleware di autenticazione è stato eseguito |
-| 5 | **Server personalizzato** — incorpora il driver in Express, Fastify o semplice `http` | L'adattatore dati e il realtime, in un processo scritto da te | Tutto ciò che `initializeRebaseBackend` configura: rotte di autenticazione, storage, job, cron, API di amministrazione, il server MCP | Assembli tu il backend. Rebase qui è una libreria, non un coordinatore |
+| 5 | **Server personalizzato** — costruisci il backend con `createRebaseBackend` e monta i gruppi di rotte che vuoi, oppure incorpora il solo driver in Express, Fastify o semplice `http` | Ogni gruppo di rotte, al percorso che scegli, e quale processo avvia i timer; in fondo, solo l'adattatore dati e il realtime | Con il solo driver: tutto il resto, dalle rotte di autenticazione e lo storage al cron e all'API di amministrazione | Chiami tu ogni passaggio che `initializeRebaseBackend` faceva al tuo posto |
 | 6 | **`rebase eject`** | L'entrypoint e il `Dockerfile`, nel tuo repository | — | **Gli aggiornamenti del runtime della piattaforma non raggiungono più questo progetto.** CORS, configurazione dell'autenticazione, storage e shutdown diventano a carico tuo |
 
 :::tip[Due gradini vengono spesso saltati senza motivo]
@@ -144,7 +147,7 @@ diversa da Postgres. L'offuscamento che funziona su qualsiasi engine è `afterRe
 **Ambito:** un URL sotto `/api/functions`.
 
 Un'app Hono in `backend/functions/`, rilevata in base al nome del file come avviene per collezioni
-e cron job. Il middleware di autenticazione è già stato eseguito quando viene raggiunto il tuo gestore,
+e cron job, oppure passata come valore (`functions: { promote }`). Il middleware di autenticazione è già stato eseguito quando viene raggiunto il tuo gestore,
 il driver è limitato al chiamante e `rebase` è disponibile per storage, email,
 job e `dataAsAdmin`.
 
@@ -175,7 +178,8 @@ alcun metodo SDK per essa; i chiamanti la raggiungono con `client.functions.invo
 `initializeRebaseBackend` accetta l'app passata come parametro, pertanto tutto ciò che registri su
 tale app *prima* di chiamarlo viene eseguito prima di ogni router di Rebase — consulta
 [Ordine di registrazione delle rotte](/docs/backend/custom-functions#route-registration-order)
-per i dettagli sulla struttura.
+per i dettagli sulla struttura. Un gruppo di rotte che monti tu stesso da `backend.routes` (gradino 5)
+non è una di queste rotte: porta con sé il proprio middleware di autenticazione.
 
 :::caution[Nessun middleware di autenticazione è stato eseguito qui]
 Una rotta registrata in questo modo si trova **all'esterno** di ogni router Rebase, quindi
@@ -199,21 +203,43 @@ frutto dell'elaborazione svolta dal router Rebase stesso.
 
 **Ambito:** il processo.
 
-`@rebasepro/server-postgres` è agnostico rispetto al framework: dipende solo da Drizzle e da
-`http.Server` di Node. Puoi quindi incorporare l'adattatore dati e il realtime in
-Express, Fastify o semplice Node e saltare del tutto il coordinatore.
+<span class="since-badge" data-since="0.25">Da 0.25</span>
+`initializeRebaseBackend` è una scorciatoia su quattro chiamate pubbliche, e questo gradino
+consiste nel chiamarle tu stesso. `createRebaseBackend` costruisce il backend e non monta,
+non avvia e non ascolta nulla. `backend.routes` contiene ogni gruppo di rotte come
+sotto-app Hono che puoi montare da sola, a qualsiasi percorso. `mount`, `attachRealtime` e
+`start` fanno il resto, se li vuoi:
+
+```typescript
+const backend = await createRebaseBackend({ database: adapter, auth, collections, provision: true });
+
+app.route("/v2/data", backend.routes.data());   // only the parts you want,
+app.route("/v2/auth", backend.routes.auth());   // at the paths you want
+await backend.attachRealtime(server);
+backend.start();                                // cron, job workers, sweeps
+```
+
+Un gruppo porta con sé il proprio contesto di autenticazione, i rate limit e la protezione
+riservata agli admin, quindi `getDriver(c)` funziona in un gruppo montato ovunque. Ciò che non
+porta con sé è il middleware a livello di processo che aggiunge `mount()`: il limite del body,
+la compressione, il CSRF e l'involucro degli errori toccano a te quando monti i gruppi uno per uno.
+
+Un passo più in basso, `@rebasepro/server-postgres` è agnostico rispetto al framework: dipende
+solo da Drizzle e da `http.Server` di Node, quindi puoi incorporare il driver dei dati e il
+realtime in Express, Fastify o semplice Node e lasciare fuori del tutto il server Rebase.
 
 → [Integrazione server personalizzato](/docs/backend/custom-server)
 
-**Ciò che non può raggiungere:** tutto ciò che `initializeRebaseBackend` configura,
-ovvero la maggior parte del backend — le rotte di autenticazione e il refresh dei token, lo storage,
-la coda dei job, il cron, l'API di amministrazione con cui comunica lo Studio, il server MCP, l'involucro degli errori,
-lo stack dei middleware. Ciascuno di questi elementi può essere assemblato manualmente;
-nessuno si configura da solo. A questo gradino, Rebase è una libreria, non un coordinatore.
+**Ciò che non può raggiungere:** con `createRebaseBackend`, nulla è fuori portata;
+ti assumi l'ordine delle chiamate. Con il solo driver, tutto ciò che il server configura
+è da costruire a tuo carico: le rotte di autenticazione e il refresh dei token, lo storage,
+la coda dei job, il cron, l'API di amministrazione con cui comunica lo Studio, il server MCP,
+l'involucro degli errori e lo stack dei middleware.
 
-Fai ricorso ad esso quando hai un server esistente che deve rimanere l'entrypoint. Se
-ciò che desideri in realtà è una sola rotta personalizzata, passa al gradino 3 o 4, con una
-superficie di esposizione nettamente inferiore.
+Fai ricorso ad esso quando hai un server esistente che deve rimanere l'entrypoint, o
+quando solo una parte del backend appartiene a questo processo. Se ciò che desideri in realtà
+è una sola rotta personalizzata, passa al gradino 3 o 4, con una superficie di esposizione
+nettamente inferiore.
 
 ## 6. `rebase eject`
 

@@ -223,7 +223,7 @@ Il client WebSocket gestisce l'autenticazione automaticamente:
 - `client.ws.state` è lo stato della connessione — `idle`, `connecting`, `connected`, `reconnecting`, `disconnected` o `closed` — e `client.ws.onStateChange(listener)` viene informato di ogni cambiamento. `disconnected` è lo stato in cui `CONNECTION_LOST` è stato segnalato.
 - Le richieste inviate tramite il socket sono **at-most-once**. Una che è stata inviata quando la connessione è caduta fallisce con `CONNECTION_LOST` e non viene mai rinviata, poiché il server potrebbe averla già eseguita. Una che attende ancora un socket dopo 30 secondi fallisce con `REQUEST_TIMEOUT` senza essere inviata.
 
-per tutto quanto elencato dopo il logout. Sulla 0.23 il client rinuncia dopo
+Tutto quanto elencato dopo il logout è arrivato con la 0.24. Sulla 0.23 il client rinuncia dopo
 cinque tentativi di riconnessione falliti, accoda le richieste fatte mentre è
 disconnesso e le invia alla riconnessione, non ha `client.ws.state`, e il
 server non chiude mai un socket la cui sessione è terminata.
@@ -247,7 +247,43 @@ const unsubscribe = client.data.orders.listen(
 );
 ```
 
-Non è richiesta alcuna gestione manuale dei token — l'integrazione tra `client.auth` e il layer WebSocket viene gestita internamente.
+### Quale token invia il socket
+
+<span class="since-badge" data-since="0.25">Da 0.25</span> Su 0.24 il
+socket usa solo la sessione propria del client e l'opzione `token`: un getter
+installato con `client.setAuthTokenGetter()` non lo raggiunge mai, quindi un host che usa
+un proprio provider di autenticazione ottiene un socket anonimo.
+
+Il socket si autentica con lo stesso token che porterebbe una richiesta HTTP. Questo è
+anzitutto il getter installato con `client.setAuthTokenGetter()`; quando non ce n'è
+nessuno, o risponde `null` o lancia un errore, è il token che il client possiede: quello
+della sua sessione, uno impostato con `client.setToken()`, o l'opzione `token`. Con il
+`client.auth` integrato non c'è nulla da collegare.
+
+Per un provider di autenticazione esterno (Clerk, Firebase Auth, una sessione tua),
+installa il getter una sola volta. Copre HTTP e il socket:
+
+```typescript
+client.setAuthTokenGetter(() => provider.getToken());
+
+// Optional: let the provider recover a refused token, on HTTP and the socket alike.
+client.setOnUnauthorized(async () => {
+    await provider.refresh();
+    return true; // retry with the token resolved again
+});
+```
+
+- `client.setOnUnauthorized(handler)` risponde a un token rifiutato su entrambi: un 401
+  via HTTP, e un errore di autenticazione sul socket. Risolvi `true` per riprovare con il
+  token risolto di nuovo. Sostituisce il refresh della sessione proprio del client.
+- Installare un getter, o chiamare `client.setToken()`, ricostruisce un socket aperto:
+  quello nuovo si autentica con la nuova credenziale e reinvia ogni sottoscrizione e canale
+  attivi come tale, e nulla di ciò che deteneva l'identità precedente viene portato
+  avanti. Se non c'è alcun socket aperto, il successivo si autentica da sé.
+- `client.ws.setAuthTokenGetter()` è deprecato. Funziona ancora, sostituendo
+  solo il getter del socket, e avvisa una volta. Usa `client.setAuthTokenGetter()`.
+
+Vedi [Usare il tuo provider di autenticazione](/docs/sdk/authentication#using-your-own-auth-provider).
 
 ### La connessione è lazy
 

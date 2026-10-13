@@ -174,8 +174,8 @@ Applica tutte le migrazioni non ancora applicate al database.
 ### `rebase db backup` / `backups` / `restore`
 
 ```bash
-rebase db backup --out ./backups        # o s3://bucket/prefix, gs://bucket/prefix
-rebase db backups list                  # elenca i backup archiviati
+rebase db backup --out ./backups        # or s3://bucket/prefix, gs://bucket/prefix
+rebase db backups list                  # list what is stored
 rebase db restore ./backups/<file>.dump --yes
 ```
 
@@ -207,13 +207,31 @@ psql "$(rebase db url)"
 
 Il database di sviluppo gestito è il caso principale che necessita di questo comando: `.env` lascia intenzionalmente `DATABASE_URL` commentato, e la porta è calcolata dal percorso del progetto, per cui nessun elemento su disco la definisce in modo esplicito. Quando imposti un tuo `DATABASE_URL`, viene stampato quello — l'ordine di risoluzione è lo stesso seguito da qualsiasi altro comando. Il comando avvia il database gestito qualora non sia già in esecuzione.
 
+### `rebase console`
+
+<span class="since-badge" data-since="0.25">Da 0.25</span>
+
+Un REPL Node con i dati del progetto aperti, oppure un singolo snippet eseguito con `-e`:
+
+```bash
+rebase console
+rebase console -e "rebase.dataAsAdmin.posts.find({ limit: 5 })"
+```
+
+`rebase` (`dataAsAdmin`, `sql`, `withAuth(user)`) e `collections` sono
+disponibili, e l'`await` di primo livello funziona. Il database viene risolto come lo
+risolve `rebase db push`, e aprirlo non vi modifica nulla. Con `-e`, il risultato atteso
+(awaited) viene stampato come JSON su stdout e un errore lanciato termina con `1`. Flag:
+`--eval`/`-e`, `--collections`/`-c`, `--database-url`, `--docker`. Vedi
+[Script e console](/docs/backend/scripts/).
+
 ### `rebase db stop` / `rebase db reset`
 
 Valido solo per il database di sviluppo gestito:
 
 ```bash
-rebase db stop     # arresta il database; i dati vengono conservati
-rebase db reset    # lo elimina e riparte da capo
+rebase db stop     # stop it; the data is kept
+rebase db reset    # delete it and start over
 ```
 
 ### `rebase db branch`
@@ -222,9 +240,9 @@ rebase db reset    # lo elimina e riparte da capo
 rebase db branch create <name>
 rebase db branch list
 rebase db branch info <name>
-rebase db branch switch <name>     # lavora su questo branch; tutti i comandi successivi lo seguiranno
-rebase db branch switch            # mostra il branch corrente
-rebase db branch switch --off      # torna al database principale
+rebase db branch switch <name>     # work on it; every later command follows
+rebase db branch switch            # say which branch you are on
+rebase db branch switch --off      # back to the main database
 rebase db branch delete <name>
 rebase db branch prune [--older-than 14d] [--include-dev-diff]
 ```
@@ -250,9 +268,9 @@ database indicato in questo modo.
 ### `rebase apps init` / `rebase apps config`
 
 ```bash
-rebase apps list             # le app dichiarate da questo progetto
-rebase apps init <name>      # registra una nuova app in rebase.json
-rebase apps config <app>     # configurazione a cui corrisponde una specifica app
+rebase apps list             # the apps this project declares
+rebase apps init <name>      # register a new app in rebase.json
+rebase apps config <app>     # what one app resolves to
 ```
 
 ### `rebase status`
@@ -260,8 +278,8 @@ rebase apps config <app>     # configurazione a cui corrisponde una specifica ap
 Tutto ciò che il progetto dichiara e il rispettivo stato di associazione all'interno dell'ambiente:
 
 ```bash
-rebase status               # ogni risorsa e le variabili che legge
-rebase status --json        # formato leggibile da macchina
+rebase status               # every resource, and the variables it reads
+rebase status --json        # machine-readable
 ```
 
 ```
@@ -287,10 +305,10 @@ Il simbolo `○` denota lo stato che è utile rilevare prima del deployment anzi
 Ciò di cui il progetto dichiara di aver bisogno — i database, i bucket, i topic e le code richiesti dal codice di configurazione, nonché i cron e le funzioni definiti dai suoi file:
 
 ```bash
-rebase resources            # elenca le risorse
-rebase resources --write    # rigenera rebase.resources.json
-rebase resources --check    # fallisce se il grafo tracciato nel commit non è aggiornato
-rebase resources --json     # formato leggibile da macchina
+rebase resources            # list them
+rebase resources --write    # regenerate rebase.resources.json
+rebase resources --check    # fail if the committed graph is stale
+rebase resources --json     # machine-readable
 ```
 
 `rebase resources --check` è un comando recente — rappresenta il flag utilizzato nei job di CI per segnalare un errore qualora `rebase.resources.json` non corrisponda più al codice di configurazione.
