@@ -1,6 +1,7 @@
 import type { AuthRepository } from "./interfaces";
 import type { AccessTokenPayload } from "./jwt";
 import { logger } from "../utils/logger";
+import { isDataException } from "../api/errors";
 
 /**
  * Has this access token been revoked?
@@ -120,8 +121,26 @@ export type AccessTokenVerdict =
  * Throws when the repository does. Unlike the watermark read on its own, this
  * one decides the roles a request runs with, so a failure is a refusal (the
  * callers answer 503) rather than a guess.
+ *
+ * Except one failure that is an answer: the store refusing the uid as a value
+ * its id column cannot hold — `u1` against a UUID key. That names no account,
+ * exactly as a well-formed id nobody has does, so it is `account-deleted` and
+ * the caller answers 401. Answered as a failure it was a 503 asking the
+ * client to try again, which it would do forever.
  */
 export async function judgeAccessToken(
+    authRepo: AccessJudgeRepository,
+    payload: Pick<AccessTokenPayload, "uid" | "iat" | "sid">
+): Promise<AccessTokenVerdict> {
+    try {
+        return await readAccessVerdict(authRepo, payload);
+    } catch (error: unknown) {
+        if (isDataException(error)) return { live: false, refusal: "account-deleted" };
+        throw error;
+    }
+}
+
+async function readAccessVerdict(
     authRepo: AccessJudgeRepository,
     payload: Pick<AccessTokenPayload, "uid" | "iat" | "sid">
 ): Promise<AccessTokenVerdict> {
