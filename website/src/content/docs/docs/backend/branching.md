@@ -209,6 +209,12 @@ It sits between the shell and the project file in the resolution order:
 2. `DATABASE_URL` in the shell environment
 3. **the branch this checkout is switched to**
 4. `DATABASE_URL` in the project's `.env`
+5. `--docker`, or the last `rebase dev` having run with it
+6. the managed development database
+
+<span class="since-badge" data-since="0.25">Since 0.25</span> Rung 5 follows the
+last `rebase dev --docker`, so a branch command after it needs no `--docker` of
+its own. On 0.24 only the flag counts.
 
 A branch has to outrank `.env` or switching would do nothing on any project that
 sets `DATABASE_URL`; it must not outrank the two above it, because a flag on this
@@ -242,7 +248,7 @@ Branching does **not** work against the managed development database — the zer
 
 PGlite serves exactly one database. `CREATE DATABASE ... TEMPLATE` against it writes a catalog entry and copies nothing, so the "branch" resolves to the database it was cloned from: writes you believe are isolated land in your development database, and there is no second copy to go back to.
 
-Use branching against a real server — your own PostgreSQL via `DATABASE_URL`, or `rebase dev --docker`.
+Use branching against a real server — your own PostgreSQL via `DATABASE_URL`, or `rebase dev --docker`, which the branch commands then follow.
 
 ---
 

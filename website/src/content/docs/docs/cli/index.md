@@ -127,6 +127,18 @@ set. A scaffolded `.env` says `development`, so the first account to register
 still becomes the admin, and `rebase start` says so at the top; set `NODE_ENV=production`
 for a production server. `rebase start --bundle ./dist-bundle` runs a bundle elsewhere.
 
+`rebase start` starts no database, so it needs a `DATABASE_URL`, and the
+scaffold's `.env` leaves it commented out for the managed one. For a local run
+on the database `rebase dev` uses:
+
+```bash
+DATABASE_URL="$(rebase db url)" rebase start
+```
+
+<span class="since-badge" data-since="0.25">Since 0.25</span> Without one,
+`rebase start` says so and prints that line before it boots anything. On 0.24
+the runtime stops on "DATABASE_URL: is required".
+
 ### `rebase apps list`
 
 Show the apps this repository declares:
@@ -233,7 +245,15 @@ rebase db pull --from postgres://…  [--anonymize]
 ```
 
 `--anonymize` replaces personal fields on the way in, so a production copy can be
-worked on locally without carrying real customer data onto a laptop.
+worked on locally without carrying real customer data onto a laptop. It matches
+columns by name and is best-effort: emails become `user-<random hex>@example.invalid`,
+a column under a unique index gets a distinct value per row, values are cut to
+the column's length, and NULLs stay NULL.
+<span class="since-badge" data-since="0.25">Since 0.25</span> The pass is one
+transaction. If it fails, the tables it would have rewritten are emptied and
+named, and the command exits 1, so real data is never left behind silently. On
+0.24 a pull from a database whose users had signed in more than once failed on
+the unique `token_hash`, after the copy and part of the pass.
 
 `pg_dump` strips privileges, so the copy would arrive with the source's RLS
 policies and none of the grants behind them — every read as `rebase_user` failing
@@ -261,6 +281,12 @@ project path, so nothing on disk names it. When you have set a `DATABASE_URL`
 of your own, that is what this prints — the resolution order is the same one
 every other command follows. It starts the managed database if it is not
 already running.
+
+<span class="since-badge" data-since="0.25">Since 0.25</span> After
+`rebase dev --docker`, `db url` and the other commands use that Docker database
+(and say so on stderr) until a `rebase dev` runs without the flag. The choice is
+kept in `.rebase/dev-database.json` and ranks where `--docker` does, below every
+connection string. On 0.24 every command needs its own `--docker`.
 
 ### `rebase console`
 
@@ -389,8 +415,13 @@ rebase resources --check    # fail if the committed graph is stale
 rebase resources --json     # machine-readable
 ```
 
-`rebase resources --check` is new — the flag a CI job uses to fail
-on a `rebase.resources.json` that no longer matches the config code.
+`rebase resources --check` is the flag a CI job uses to fail on a
+`rebase.resources.json` that no longer matches the config code.
+<span class="since-badge" data-since="0.25">Since 0.25</span> `--json` combines
+with it: on drift, `rebase resources --check --json` exits 1 with an error
+envelope (`resource_graph_missing` or `resource_graph_stale`), and on success
+the graph carries `check.status`. `--write --json` writes the file and reports
+`written.changed`. On 0.24 `--json` printed the graph and ignored both flags.
 
 A resource is declared in config code — `database("analytics")`,
 `bucket("media")`, `topic("signups")`, `queue("thumbnails")` — or is a file

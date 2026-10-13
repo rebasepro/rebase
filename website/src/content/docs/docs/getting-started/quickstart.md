@@ -69,7 +69,7 @@ Pin a port with `rebase dev --port 3001`.
 | `--headless` | `init` | A backend with no collection files and no UI — see [Backend only](/docs/getting-started/headless/) |
 | `--template <name>` | `init` | Start from a template other than the default |
 | `--install` / `--no-install` | `init` | Run the package manager for you, or leave it |
-| `--docker` | `dev` | Use PostgreSQL in a container instead of the managed one |
+| `--docker` | `dev` | Use PostgreSQL in a container instead of the managed one. <span class="since-badge" data-since="0.25">Since 0.25</span> The other commands follow it until `rebase dev` runs without it |
 | `--no-db` | `dev` | Start no database at all — not the container and not the managed one. Set `DATABASE_URL` yourself |
 
 ## Variant: use your own PostgreSQL

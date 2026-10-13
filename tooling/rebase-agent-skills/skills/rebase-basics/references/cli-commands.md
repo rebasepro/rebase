@@ -125,6 +125,11 @@ Runs a built bundle through the Rebase runtime — the same path the official co
 rebase build && rebase start
 ```
 
+`rebase start` starts no database. The scaffold's `.env` has no `DATABASE_URL`
+(it uses the managed one), so a local run is
+`DATABASE_URL="$(rebase db url)" rebase start`; without one it stops before
+booting and prints that line.
+
 ### Schema Commands
 
 | Command | Description |
@@ -161,8 +166,8 @@ rebase build && rebase start
 | `rebase db backup` | Write a backup of the current database |
 | `rebase db backups` | List the backups taken so far |
 | `rebase db restore` | Restore the database from a backup |
-| `rebase db pull` | Copy another database into local development: `--from <url>`, optionally `--anonymize`. One-directional — it can never write to a remote database. (Turning a database into collection files is `rebase schema introspect`) |
-| `rebase db url` | Print the connection string this project uses — nothing else goes to stdout, so it pipes |
+| `rebase db pull` | Copy another database into local development: `--from <url>`, optionally `--anonymize` (name-based and best-effort, in one transaction: if it fails, the affected tables are emptied and named and it exits 1). One-directional — it can never write to a remote database. (Turning a database into collection files is `rebase schema introspect`) |
+| `rebase db url` | Print the connection string this project uses — nothing else goes to stdout, so it pipes. After `rebase dev --docker` it, like every command, uses the Docker database until a `rebase dev` without the flag |
 | `rebase db stop` | Stop the managed local database |
 | `rebase db reset` | Delete and recreate the managed local database |
 | `rebase db --help` | Show database command help |
@@ -258,7 +263,7 @@ rebase auth reset-password user@example.com MyNewPass!
 |---------|-------------|
 | `rebase doctor` | Detect three-way schema drift between collections, Drizzle schema, and live DB |
 | `rebase status` | Show every declared resource (databases, buckets, topics, queues, crons, functions) and whether the variables it reads are set. `--json` for scripts |
-| `rebase resources` | List the resources this project declares, declared and implicit. `--write` regenerates the committed resource graph; `--check` fails when it is stale |
+| `rebase resources` | List the resources this project declares, declared and implicit. `--write` regenerates the committed resource graph; `--check` fails when it is stale, and `--check --json` is the CI form (error envelope, exit 1) |
 
 > **IMPORTANT FOR AGENTS:** `rebase doctor` compares collection definitions, the generated Drizzle schema (`schema.generated.ts`), and the actual PostgreSQL database. Run it after any manual DB changes or when suspecting schema drift.
 
