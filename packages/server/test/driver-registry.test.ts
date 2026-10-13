@@ -236,6 +236,18 @@ describe("DriverRegistry", () => {
                 consoleSpy.mockRestore();
             });
 
+            it("makes a lone driver the default without a warning, since there was no choice", () => {
+                const consoleSpy = jest.spyOn(console, "warn").mockImplementation();
+
+                const only = createMockDataDriverDelegate("postgres");
+                const registry = DefaultDriverRegistry.create({ postgres: only });
+
+                expect(registry.getDefault()).toBe(only);
+                expect(consoleSpy).not.toHaveBeenCalledWith(expect.stringContaining('No "(default)" driver provided'));
+
+                consoleSpy.mockRestore();
+            });
+
             it("should handle empty map gracefully", () => {
                 const registry = DefaultDriverRegistry.create({});
 

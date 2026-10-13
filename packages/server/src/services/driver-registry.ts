@@ -94,12 +94,16 @@ export class DefaultDriverRegistry implements DriverRegistry {
             }
             // Ensure there's a default if not explicitly provided
             if (!registry.has(DEFAULT_DRIVER_ID) && registry.size() > 0) {
-                // If no explicit "(default)", use the first one as default
+                // If no explicit "(default)", use the first one as default.
+                // With one driver there is no choice to report: a backend
+                // composed from one `database` adapter keys it by its type,
+                // and said a warning on every boot about the only driver it
+                // has. With several, which one is the default is a decision
+                // worth seeing.
                 const firstId = Object.keys(input)[0];
-                logger.warn(
-                    `[DriverRegistry] No "${DEFAULT_DRIVER_ID}" driver provided. ` +
-                    `Using "${firstId}" as the default.`
-                );
+                const line = `[DriverRegistry] No "${DEFAULT_DRIVER_ID}" driver provided. Using "${firstId}" as the default.`;
+                if (registry.size() > 1) logger.warn(line);
+                else logger.debug(line);
                 registry.register(DEFAULT_DRIVER_ID, input[firstId]);
             }
         }
