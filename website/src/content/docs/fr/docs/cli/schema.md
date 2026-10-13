@@ -113,6 +113,18 @@ C'est utile lors de l'adoption de Rebase sur une base de données existante — 
 
 **Introspecter, puis pousser, ne change rien.** Les propriétés générées indiquent exactement ce qu'est chaque colonne — `columnType`, `precision`/`scale`, `defaultValue`, `required`, l'`isId` d'une clé (`"increment"` pour une identité entière, `columnType: "serial"` pour un serial, `"manual"` pour une clé sans valeur par défaut), l'`onDelete` d'une relation — et son `index: false` là où la base de données n'a aucun index sur la colonne de la clé, puisqu'un `belongsTo` est [indexé par défaut](/docs/backend/indexes#foreign-keys-are-indexed-for-you) (supprimez la ligne pour qu'il en soit construit un) — et le bloc `search` d'une collection relu depuis la colonne qu'il a construite — si bien que `rebase db push --dry-run` juste après une introspection ne planifie aucun changement. Lorsqu'aucune propriété ne peut représenter une colonne — un `timestamp` sans fuseau horaire, un `interval`, un `inet`, un type enum qui ne s'appelle pas `<table>_<column>`, une valeur par défaut comme `CURRENT_DATE` — l'introspection le signale, colonne par colonne, dans le terminal et en tête du fichier, avec ce qu'un push lui ferait et, quand il en existe une, l'instruction qui les met en accord (`ALTER TYPE "mood" RENAME TO "customers_current_mood";`). Une table dont la clé porte sur plusieurs colonnes revient comme une clé composite, chaque colonne de la clé portant son `isId`. Elle est laissée de côté, avec sa raison, quand une colonne de la clé ne peut pas porter `isId` (un timestamp, par exemple) ou que la clé étrangère d'une autre table pointe vers elle, ce qu'une relation à une seule colonne ne peut pas faire ; `db push` laisse intacte une table qui n'est pas une collection. Sur la 0.23 le push juste après une introspection peut encore planifier des changements de type, des valeurs par défaut et des NOT NULL supprimés, et une clé `id` fantôme.
 
+**À quoi ressemblent les fichiers générés**
+
+L'introspection écrit les collections avec `defineCollection`, qui garde les clés de propriété *littérales* — de sorte que `propertiesOrder`, `listProperties`, `sort` et `display.title` complètent sur les noms de vos propres colonnes, et qu'une clé laissée derrière par une colonne renommée est une erreur de compilation plutôt qu'une ligne qui ne fait silencieusement rien. L'import utilisé dépend de ce dont votre projet dépend, et se décide à chaque exécution :
+
+| Votre projet déclare | Les collections générées utilisent | Bloc `admin` |
+|------|------|------|
+| `@rebasepro/cms-types` (un projet avec le panneau) | `defineCollection` de `@rebasepro/cms-types` | oui |
+| `@rebasepro/common` (un projet `--headless`) | `defineCollection` de `@rebasepro/common` | non |
+| ni l'un ni l'autre | une annotation `PostgresCollectionConfig`, avec un avertissement | non |
+
+Un projet headless n'a pas de panneau d'administration, et les types du noyau ne déclarent aucun champ `admin` — le bloc n'y est donc pas émis. C'est de la présentation (`icon`, `propertiesOrder`, `multiline`) ; rien dans le schéma, l'API ou vos données n'en dépend.
+
 ### `rebase db push`
 
 Poussez les changements de schéma directement vers la base de données sans fichiers de migration :
@@ -256,6 +268,12 @@ rebase db branch info feature_auth
 rebase db branch delete feature_auth
 ```
 
+`rebase db branch switch` (et `switch --off`) et `rebase db branch prune`
+sont nouveaux. `create`, `list`, `info` et `delete` existent depuis la 0.17.
+
+Chaque branche est une copie complète de la base de données réalisée avec `CREATE DATABASE ... TEMPLATE`,
+elle exige donc un véritable serveur PostgreSQL et coûte le même espace disque que sa source.
+
 ### `rebase doctor`
 
 Détectez la dérive à trois voies entre vos définitions de collections, le schéma Drizzle généré et la base de données PostgreSQL en direct :
@@ -327,7 +345,13 @@ const client = createRebaseClient<Database>({
 const { data } = await client.data.products.find();
 ```
 
-Les noms de champs dans les types générés sont ceux que l'API sert, inchangés : une colonne `createdAt` est `row.createdAt`. Seul l'*accesseur* de collection devient un nom de propriété (`my-notes` → `client.data.myNotes`), ce que `collectionsDictionary` remappe vers le slug.
+Les noms de champs dans les types générés sont ceux que l'API sert. Le nom d'un champ
+sur le réseau est sa clé de propriété, et l'API est en camelCase de bout en bout :
+l'introspection génère une colonne `created_at` comme une propriété `createdAt` portant
+`columnName: "created_at"`, et la sert comme `row.createdAt`. La colonne elle-même
+n'est pas modifiée. L'*accesseur* de collection est transformé de la même façon en nom
+de propriété (`my-notes` → `client.data.myNotes`), ce que `collectionsDictionary`
+remappe vers le slug.
 
 ## Flux de travail de développement
 
