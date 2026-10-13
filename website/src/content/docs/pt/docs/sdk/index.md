@@ -71,8 +71,8 @@ Enquanto o `rebase dev` estiver em execução, você não precisa fazer isso: el
 `generated/sdk/` ao iniciar e a cada salvamento em `config/collections/`. Execute o
 comando você mesmo no CI, em um repositório de frontend que não tem coleções
 (`rebase generate-sdk --from link`), ou onde quer que o `rebase dev` não esteja em execução.
-para a regeneração: na versão 0.23, o `rebase dev` não toca nos tipos do SDK,
-então execute o comando após cada alteração de coleção.
+Na versão 0.23, o `rebase dev` não toca nos tipos do SDK, então execute o comando
+após cada alteração de coleção.
 
 Em seguida, passe o parâmetro de tipo `Database` para `createRebaseClient` para obter autocompletar completo:
 

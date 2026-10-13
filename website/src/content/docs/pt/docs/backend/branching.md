@@ -205,6 +205,14 @@ Ele fica posicionado entre a shell e o arquivo do projeto na ordem de resoluçã
 2. `DATABASE_URL` no ambiente da shell
 3. **a branch para a qual este checkout foi alternado**
 4. `DATABASE_URL` no `.env` do projeto
+5. `--docker`, ou o último `rebase dev` ter rodado com ele
+6. o banco de dados de desenvolvimento gerenciado
+
+<span class="since-badge" data-since="0.25">Desde 0.25</span> O item 5 segue o
+último `rebase dev --docker`, de modo que um comando de branch depois dele não
+precisa de um `--docker` próprio, e um `--docker` que um item acima dele supera
+não inicia nenhum container e informa que foi ignorado. Na 0.24 só a flag conta,
+e uma flag superada ainda inicia o container.
 
 Uma branch precisa ter precedência sobre o `.env`, caso contrário, alternar não faria efeito em nenhum projeto que defina `DATABASE_URL`; mas ela não pode ter precedência sobre os dois itens acima dela, pois uma flag nessa linha de comando é uma instrução mais imediata do que uma alternância feita ontem.
 
@@ -235,7 +243,7 @@ O branching **não** funciona com o banco de dados de desenvolvimento gerenciado
 
 O PGlite atende a exatamente um banco de dados. Executar `CREATE DATABASE ... TEMPLATE` nele grava uma entrada no catálogo e não copia nada, portanto a "branch" resolve para o banco de dados do qual foi clonada: as gravações que você acredita estarem isoladas acabam no seu banco de dados de desenvolvimento, e não há uma segunda cópia para a qual retornar.
 
-Use o branching com um servidor real — seu próprio PostgreSQL via `DATABASE_URL`, ou `rebase dev --docker`.
+Use o branching com um servidor real — seu próprio PostgreSQL via `DATABASE_URL`, ou `rebase dev --docker`, que os comandos de branch então seguem.
 
 ---
 
@@ -265,6 +273,6 @@ Como as branches são bancos de dados PostgreSQL separados, você não pode exec
 
 ## Relacionado
 
-- [Comandos da CLI](/docs/cli/) — `rebase db branch` e suas flags
+- [Comandos de Banco de Dados](/docs/cli/database/#rebase-db-branch) — `rebase db branch` e suas flags
 - [Geração de Esquema](/docs/cli/schema/) — como o esquema que uma branch copia é gerado
 - [Ambiente e Configuração](/docs/getting-started/configuration/) — `DATABASE_URL` e sobre o que uma branch alternada tem precedência

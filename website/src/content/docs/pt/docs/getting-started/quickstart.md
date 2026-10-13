@@ -70,7 +70,7 @@ Fixe uma porta com `rebase dev --port 3001`.
 | `--headless` | `init` | Um backend sem arquivos de collection e sem UI — veja [Backend only](/docs/getting-started/headless/) |
 | `--template <name>` | `init` | Começar a partir de um template diferente do padrão |
 | `--install` / `--no-install` | `init` | Executar o gerenciador de pacotes para você, ou ignorar |
-| `--docker` | `dev` | Usar o PostgreSQL em um contêiner em vez do gerenciado |
+| `--docker` | `dev` | Usar o PostgreSQL em um contêiner em vez do gerenciado. <span class="since-badge" data-since="0.25">Desde 0.25</span> Os outros comandos o seguem até que o `rebase dev` rode sem ele. Uma `DATABASE_URL` tem precedência sobre ele: então ele não inicia nada, e diz isso |
 | `--no-db` | `dev` | Não iniciar nenhum banco de dados — nem o contêiner nem o gerenciado. Defina `DATABASE_URL` manualmente |
 
 ## Variante: use seu próprio PostgreSQL
@@ -90,7 +90,9 @@ Os comandos de migração planejam alterações com o [Atlas](https://atlasgo.io
 utilizado pelo Rebase, que precisa de um segundo banco de dados vazio para
 comparação. No seu próprio banco de dados, o Rebase cria um ao lado dele; no gerenciado,
 que atende exatamente a um banco de dados, ele inicia um PGlite descartável pela
-duração do comando. Em ambos os casos:
+duração do comando. <span class="since-badge" data-since="0.25">Desde 0.25</span>
+Na 0.24 os comandos de migração recusam o banco de dados gerenciado e exigem o seu próprio.
+Em ambos os casos:
 
 ```bash
 pnpm run db:push
@@ -190,18 +192,21 @@ Salve o arquivo. Essa é toda a etapa: o `rebase dev` regenera
 collections, reinicia o backend, e a inicialização cria a nova tabela — assim, sua collection **Products** aparece na
 navegação.
 
-para os tipos do SDK: na versão 0.23, o `rebase dev` regenera apenas o schema, então
+Na versão 0.23, o `rebase dev` regenera apenas o schema, então
 execute `rebase generate-sdk` depois de alterar uma collection, antes de importar os tipos dela.
 
 O mesmo vale para uma propriedade adicionada a uma collection que você já possui: salve,
 e a coluna estará lá.
 
 O `rebase db push` é para as alterações que a inicialização deliberadamente ignora — uma coluna
-renomeada, um tipo restringido, um campo removido. Ele requer o seu próprio PostgreSQL:
+renomeada, um tipo restringido, um campo removido:
 
 ```bash
 pnpm run db:push
 ```
+
+<span class="since-badge" data-since="0.25">Desde 0.25</span> Ele roda no banco de dados
+gerenciado como no seu próprio. Na 0.24 ele requer o seu próprio PostgreSQL.
 
 ## Referência de Comandos de Banco de Dados
 
@@ -209,9 +214,12 @@ pnpm run db:push
 |---------|-------------|
 | `rebase schema generate` | Gera o schema do Drizzle a partir de suas collections em TypeScript. Nenhum banco de dados é necessário — o `rebase dev` executa isso para você |
 | `rebase schema introspect` | Gera collections em TypeScript a partir de um banco de dados existente |
-| `rebase db push` | Aplica as alterações de schema diretamente ao banco de dados. Requer seu próprio PostgreSQL |
-| `rebase db generate` | Gera arquivos de migração SQL. Requer seu próprio PostgreSQL |
-| `rebase db migrate` | Executa migrações pendentes. Requer seu próprio PostgreSQL |
+| `rebase db push` | Aplica as alterações de schema diretamente ao banco de dados, inclusive o gerenciado |
+| `rebase db generate` | Gera arquivos de migração SQL |
+| `rebase db migrate` | Executa migrações pendentes |
+
+<span class="since-badge" data-since="0.25">Desde 0.25</span> Os três comandos `db`
+funcionam no banco de dados gerenciado. Na 0.24 eles requerem o seu próprio PostgreSQL.
 
 ## Próximos Passos
 

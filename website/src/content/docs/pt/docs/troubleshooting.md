@@ -153,6 +153,25 @@ Se uma tabela existir, mas uma coluna não, a causa comum é um arquivo de cole�
 que foi editado sem ser regenerado: execute `rebase schema generate` e faça o push
 novamente.
 
+## `Error: EOF` do `db push` no banco de dados gerenciado
+
+```
+Error: EOF
+✗ atlas schema apply --to file://.rebase/sql/schema.sql --dry-run failed.
+```
+
+
+O banco de dados de desenvolvimento gerenciado aceita poucas conexões por vez, e um
+`rebase dev` em execução mantém algumas delas. O Atlas, que planeja o push, abre mais
+duas, e uma foi fechada debaixo dele. Nada foi aplicado, então é seguro executar o
+comando de novo; o servidor de desenvolvimento fecha as conexões ociosas depois de
+30 segundos. Se continuar falhando, pare o `rebase dev` enquanto você faz o push.
+
+<span class="since-badge" data-since="0.25">Desde 0.25</span> O push fecha as suas
+próprias conexões antes de o Atlas começar, o que deixa espaço para o Atlas no caso
+habitual, e o erro diz o que aconteceu. Na 0.24 o primeiro push depois de o `rebase dev`
+iniciar costuma falhar assim, apenas com as duas linhas acima.
+
 ## A porta já está em uso
 
 ```

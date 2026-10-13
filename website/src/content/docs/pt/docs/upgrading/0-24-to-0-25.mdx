@@ -19,7 +19,7 @@ de políticas em tabelas com nomes longos. As últimas três são decisões de p
 da sessão, a política de senhas em uma senha escolhida por um administrador e
 uma string vazia em um campo obrigatório. Em seguida, três remoções: duas exportações do cliente
 que eram apenas mecanismos internos, um hook do painel de administração que nada necessita e uma opção de armazenamento que
-não chegava a nenhum cliente.
+não chegava a nenhum cliente. A última é a fonte de armazenamento padrão, que declarar um bucket nomeado não move mais.
 
 :::note[Comportamentos alterados e nomes obsoletos]
 A versão 0.25 também altera o funcionamento de algumas chamadas existentes, sem quebrá-las. Verifique
@@ -351,11 +351,11 @@ Ambos atuavam como mecanismos internos por trás das chamadas do cliente.
 ## 84. `useBackendStorageSource` foi removido de `@rebasepro/app`
 
 ```ts
-// antes
+// before
 const storageSource = useBackendStorageSource({ apiUrl, getAuthToken });
-// depois — utilize a instância de cliente já fornecida ao admin
-const storageSource = client.storage;                     // fonte padrão
-const media = client.createStorageSource("media");        // fonte nomeada
+// after — the client you already pass to the admin
+const storageSource = client.storage;                     // default source
+const media = client.createStorageSource("media");        // a named source
 ```
 
 A fonte obtida pelo cliente também transmite `public` e `context` em uploads (limites
@@ -369,3 +369,30 @@ como uma propriedade desconhecida. Ela nunca definiu o tempo de validade da URL 
 Para definir por quanto tempo a URL de um arquivo privado permanece funcional, configure `storageDownloadTokenTtl`
 (em segundos; `STORAGE_DOWNLOAD_TOKEN_TTL` em implantações empacotadas via bundle). Códigos de servidor que
 chamem `controller.getSignedUrl()` diretamente obtêm URLs válidas por uma hora.
+
+## 86. Declarar um bucket nomeado não move mais a fonte de armazenamento padrão
+
+Um projeto que declarava apenas buckets nomeados em `config/resources.ts`, como
+`bucket("media", { engine: "s3" })`, tinha o primeiro deles promovido a padrão:
+os uploads cuja propriedade não especifica nenhum `storageSource` iam para ele. O padrão agora
+sempre lê a sua própria configuração, seja qual for o que está declarado: `STORAGE_TYPE`,
+`STORAGE_PATH` (ou `./uploads`) e as `S3_*` / `GCS_*` sem sufixo.
+
+Se esses uploads devem continuar indo para o bucket nomeado, diga isso:
+
+```ts
+// config/resources.ts
+export const media = bucket("media", { engine: "s3", default: true });
+```
+
+
+Sem a marca, em produção esses uploads respondem
+`501 STORAGE_NOT_CONFIGURED` até que o padrão seja vinculado (`STORAGE_TYPE=s3` e
+`S3_BUCKET`, ou `STORAGE_TYPE=gcs` e `GCS_BUCKET`), e o boot registra um aviso
+nomeando as duas soluções. Os arquivos que o padrão promovido gravou estão no bucket nomeado;
+com a marca, eles são servidos pelo padrão como antes. Em desenvolvimento, os
+arquivos que já estão em `./uploads` voltam a ser servidos.
+
+O boot também recusa duas fontes que resolvem para um mesmo diretório (ou um dentro do
+outro), ou para um mesmo bucket em um mesmo endpoint. Dê à fonte nomeada uma localização
+própria (`STORAGE_PATH__MEDIA`, `S3_BUCKET__MEDIA`), ou marque-a como padrão.

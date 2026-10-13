@@ -193,9 +193,14 @@ Na 0.23 o commit também carrega `drizzle/schema.sql`, `drizzle/policies.sql` e
 `drizzle/search.sql`, escritos na raiz do projeto.
 
 A mensagem de commit descreve a alteração em vez de simplesmente anunciar uma, e
-é atribuída à pessoa que a realizou. Uma alteração de schema com autor e
-diff no histórico do seu projeto é algo que nem o Firebase nem o Supabase
-oferecem — as edições de tabela deles são invisíveis para o seu repositório.
+é atribuída à pessoa que a realizou, pelo nome de exibição e pelo e-mail da conta
+(um usuário sem nenhum dos dois é registrado como `<uid>@users.noreply.rebase.pro`).
+<span class="since-badge" data-since="0.25">Desde 0.25</span> Na 0.24, os commits
+da autenticação integrada levam o uid como nome.
+
+Uma alteração de schema com autor e diff no histórico do seu projeto é algo que
+nem o Firebase nem o Supabase oferecem — as edições de tabela deles são
+invisíveis para o seu repositório.
 
 ## Quem pode aplicar
 

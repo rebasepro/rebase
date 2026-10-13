@@ -206,10 +206,10 @@ nenhum dos dois avisava sobre isso.
 
 As miniaturas de imagens armazenadas no painel administrativo utilizam este endpoint: uma tabela ou prévia
 em card solicita uma versão em webp com cerca do dobro do tamanho renderizado (96–800px)
-em vez do original. O `sharp` é uma dependência opcional; sem ele, a
-transformação responde 500, portanto o painel verifica isso uma vez por carregamento de página, com uma única
-requisição de renderização, e exibe os originais se o servidor não puder redimensionar. Arquivos
-SVG e GIF são sempre exibidos como estão.
+em vez do original. Arquivos SVG e GIF são sempre exibidos como estão.
+O `sharp` é opcional: <span class="since-badge" data-since="0.25">Desde 0.25</span>
+sem ele, uma requisição de transformação recebe o original, e o backend avisa uma vez
+para executar `pnpm add sharp` em `backend/` (na 0.24 ele responde 500, e o painel exibe os originais).
 
 ### Desempenho e Cache LRU
 
@@ -288,8 +288,7 @@ upload retomável é recusado na criação, antes de seu primeiro bloco; e
 `OPTIONS /api/storage/tus` o divulga como `Tus-Max-Size` — para a fonte
 indicada por `?storageId=`, ou a padrão caso contrário.
 
-para `STORAGE_MAX_FILE_SIZE`: na versão 0.23 apenas o `maxFileSize` da fonte define
-o limite, e a variável não é lida.
+Na versão 0.23 apenas o `maxFileSize` da fonte define o limite; `STORAGE_MAX_FILE_SIZE` não é lido.
 
 ```bash
 STORAGE_MAX_FILE_SIZE=209715200          # (default): 200 MB
@@ -345,7 +344,8 @@ tópicos juntos.
 
 Cada fonte é configurada a partir dos **mesmos nomes de variáveis carregando seu próprio
 sufixo**. A fonte padrão não leva sufixo, portanto, um projeto de bucket único continua
-usando os nomes comuns acima e não precisa declarar nada:
+usando os nomes comuns acima e não precisa declarar nada, e declarar buckets
+nomeados ao lado dele não os altera (<span class="since-badge" data-since="0.25">Desde 0.25</span>, [detalhes](/docs/backend/multiple-sources/#which-bucket-receives-an-unqualified-upload)):
 
 ```bash
 S3_BUCKET=app-uploads             # (default)

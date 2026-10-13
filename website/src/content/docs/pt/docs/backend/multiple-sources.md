@@ -227,20 +227,34 @@ O engine provém da declaração, portanto não há `STORAGE_TYPE` a ser configu
 
 #### Qual bucket recebe um upload não qualificado
 
-Uma propriedade de armazenamento que não especifica nenhum `storageSource` grava no bucket **padrão**,
-e um projeto com buckets nomeados precisa indicar qual bucket é esse. Declare o bucket
-com chave padrão — `export const uploads = bucket();` — ou marque
-um dos buckets nomeados:
+<span class="since-badge" data-since="0.25">Desde 0.25</span>
+
+Uma propriedade de armazenamento que não especifica nenhum `storageSource` grava no bucket **padrão**.
+Declarar buckets nomeados nunca o move. O padrão mantém a sua própria
+configuração, seja qual for o conteúdo de `config/resources.ts`: `STORAGE_TYPE`,
+`STORAGE_PATH` (`./uploads` quando não definido) e as variáveis `S3_*` / `GCS_*` sem
+sufixo. Adicionar `bucket("media", { engine: "s3" })` a um projeto que já tem
+arquivos em `./uploads` os deixa onde estão e ainda servidos. O `media` lê as suas
+próprias variáveis `__MEDIA` e, em desenvolvimento, vira um diretório próprio,
+`uploads__media`.
+
+Para enviar os uploads não qualificados a um bucket nomeado, marque-o:
 
 ```ts
 export const media = bucket("media", { engine: "s3", default: true });
 ```
 
-Sem nenhuma dessas opções, o boot promove o primeiro bucket nomeado que foi declarado e emite um aviso, indicando
-ambas as soluções. Escolha uma delas: uma promoção decide onde os arquivos do usuário vão parar com base
-na ordem de declaração, e produz resultados diferentes dependendo do ambiente,
-pois o bucket local substituto usado no desenvolvimento é descartado em produção,
-mas a promoção não.
+O padrão então *é* `media`. Os arquivos que o padrão guardava antes ficam onde
+estão e deixam de ser servidos por ele, então copie-os primeiro:
+`rebase storage move --from "(default)" --to media`.
+
+Duas fontes não podem compartilhar uma localização. Se um bucket nomeado resolvesse
+para o diretório do padrão (ou para um dentro dele), ou para o mesmo bucket de
+armazenamento de objetos no mesmo endpoint, o boot recusa e indica a variável a alterar.
+
+Na 0.24, um projeto que declara apenas buckets nomeados tem o primeiro declarado
+promovido a padrão no boot, com um aviso, de modo que adicionar `bucket("media")`
+move o padrão para `uploads__media`.
 
 ### Múltiplos buckets em uma única conta
 
@@ -388,11 +402,13 @@ grava em `/storage/uploads__media`. Monte o volume no diretório pai,
 `STORAGE_PATH`. `STORAGE_PATH__MEDIA` define o diretório de um bucket
 específico explicitamente. Consulte [Auto-hospedagem](/docs/deployment/self-hosting/#file-storage).
 
-Uma consequência importante a notar se você declarar buckets explicitamente: nenhum bucket padrão
-é gerado automaticamente para você. Declarar apenas `bucket("media")` significa que não há
-bucket padrão, e uma propriedade que não referencie nenhum não terá onde gravar arquivos —
-intencionalmente, e com comportamento idêntico em desenvolvimento e produção. Adicione também `bucket()`
-se desejar um.
+<span class="since-badge" data-since="0.25">Desde 0.25</span> Declarar buckets
+não altera o bucket padrão. Com apenas `bucket("media")` declarado, o padrão
+ainda lê as suas próprias variáveis. Em desenvolvimento é `./uploads`. Em produção,
+sem vinculação, ele fica desativado como qualquer bucket sem vinculação: os uploads
+que não especificam nenhum `storageSource` respondem `501 STORAGE_NOT_CONFIGURED`. O boot
+avisa uma vez, com as duas soluções: vincule-o (`STORAGE_TYPE=s3` e `S3_BUCKET`, ou
+`STORAGE_TYPE=gcs` e `GCS_BUCKET`), ou marque um bucket nomeado com `default: true`.
 
 Em desenvolvimento, um bucket declarado que não possua vinculação passa a ser um diretório local —
 `uploads__media` ao lado do `uploads` padrão — independentemente do engine declarado, de forma que

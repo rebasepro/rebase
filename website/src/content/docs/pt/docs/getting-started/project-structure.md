@@ -22,7 +22,10 @@ my-app/
 ├── .env                    # Generated for you: JWT_SECRET, a database password, a free port
 ├── rebase.json             # Which apps this repository contains, and how each is built
 ├── package.json            # Root workspace config
+├── tsconfig.json           # Typechecks scripts/; each workspace typechecks on its own
 ├── docker-compose.yml      # Self-hosting: Postgres + the published runtime image
+├── scripts/
+│   └── example.ts          # The SDK end to end against the running backend: `pnpm example`
 │
 ├── config/                 # Shared by the backend and the admin panel
 │   ├── index.ts            # Re-exports `collections`; the runtime reads `storageAuthorize` from here
@@ -45,6 +48,11 @@ my-app/
     ├── src/main.tsx
     └── vite.config.ts
 ```
+
+O `tsc --noEmit` na raiz verifica `scripts/`; em `config/`, `backend/` ou
+`frontend/` ele verifica aquele workspace. <span class="since-badge" data-since="0.25">Desde 0.25</span>
+Na 0.24 a raiz não tem `tsconfig.json`, e o `tsc` ali imprime a sua ajuda e não
+verifica nada.
 
 :::note[Não há `backend/src/index.ts`]
 E nenhum `Dockerfile`. Um projeto gerado declara `runtime: "managed"` no `rebase.json`, o que significa que a **imagem publicada de `rebasepro/server` inicializa seu projeto como um bundle** — o mesmo artefato, quer você faça auto-hospedagem ou implante no Rebase Cloud. Você configura o servidor através do `rebase.json`, `config/` e variáveis de ambiente, em vez de escrever um ponto de entrada.
@@ -127,7 +135,7 @@ Não há nenhum arquivo de servidor para ler, e esse é o design pretendido: um 
 |---|---|
 | `backend/functions/` | Rotas personalizadas, montadas automaticamente em `/api/functions/<filename>` |
 | `backend/crons/` | Tarefas agendadas, descobertas da mesma forma (crie quando precisar de uma) |
-| `backend/src/schema.generated.ts` | O schema do Drizzle, regenerado a partir de suas coleções a cada `rebase dev` e `rebase build` |
+| `backend/src/schema.generated.ts` | O schema do Drizzle das suas coleções: escrito pelo `rebase init` e regenerado a cada `rebase dev` e `rebase build` |
 
 O runtime configura:
 
@@ -178,8 +186,8 @@ O `slug` torna-se o caminho da URL na interface administrativa e o endpoint da A
 
 Enquanto o `rebase dev` estiver em execução, salvar um arquivo em `config/collections/` regenera `backend/src/schema.generated.ts` e os tipos do SDK em `generated/sdk/`, reinicia o backend, e a inicialização cria as tabelas e colunas que estiverem faltando. Fora do `rebase dev`, essas mesmas etapas são realizadas com `rebase schema generate` e `rebase generate-sdk`.
 
-para os tipos do SDK: na versão 0.23, o `rebase dev` regenera apenas o schema, e
-o `rebase generate-sdk` é uma etapa própria.
+Na versão 0.23, o `rebase dev` regenera apenas o schema, e o `rebase generate-sdk`
+é uma etapa própria.
 
 ## Próximos Passos
 

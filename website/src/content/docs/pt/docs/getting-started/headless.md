@@ -63,8 +63,9 @@ Não há nenhuma no código. O servidor lê o esquema do seu banco de dados na i
 expõe as tabelas que encontrar, de modo que a API acompanha suas migrações: altere o
 esquema e os endpoints mudarão juntos.
 
-Uma tabela é disponibilizada assim que possuir um modelo de autorização — row-level
-security (RLS) habilitado, mais pelo menos uma policy:
+Uma tabela é disponibilizada assim que tiver a row-level security (RLS) habilitada.
+Sem nenhuma policy, ela é disponibilizada e não retorna linhas, e a inicialização avisa
+isso; uma policy a abre:
 
 ```sql
 ALTER TABLE your_table ENABLE ROW LEVEL SECURITY;
@@ -79,7 +80,7 @@ e [rls-check](/docs/rls-check/) para fazer uma auditoria do que suas policies re
 permitem.
 
 Uma tabela sem RLS é **ignorada**, deliberadamente: toda requisição autenticada
-é executada como `rebase_user`, portanto expor uma tabela sem policy entregaria
+é executada como `rebase_user`, portanto expor uma tabela que a row-level security não protege entregaria
 todas as linhas para qualquer chamador autenticado. Cada tabela ignorada é listada
 na inicialização, junto com o SQL necessário para protegê-la.
 
@@ -162,8 +163,13 @@ Três coisas resolvem isso, na ordem em que vale a pena verificar:
 
 1. **O banco de dados não tem tabelas.** Crie-as — por meio de uma migração, SQL puro
    ou um arquivo de coleção acompanhado de `rebase db push` — e reinicie.
-2. **As tabelas não possuem policy de RLS**, então a inicialização as ignorou. O log
-   de boot informa o nome de cada uma. Adicione uma policy, como mostrado acima.
+2. **As tabelas não têm a row-level security habilitada**, então a inicialização as
+   ignorou. O log de boot informa o nome de cada uma, com o SQL. Habilite-a e adicione
+   uma policy, como mostrado acima. <span class="since-badge" data-since="0.25">Desde 0.25</span>
+   A resposta também diz isso: a mensagem nomeia as tabelas e traz o
+   `ALTER TABLE … ENABLE ROW LEVEL SECURITY` para elas, e
+   `details.unprotectedTables` as lista. Na 0.24 ela diz que o banco de dados não tem
+   tabelas.
 3. **A `DATABASE_URL` aponta para outro lugar** diferente do que você pensa. O comando
    `rebase status` exibe os três arquivos que determinam o que o backend acessa.
 

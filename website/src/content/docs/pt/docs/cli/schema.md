@@ -57,6 +57,25 @@ O **modo watch** é útil durante o desenvolvimento — edite um arquivo de cole
 rebase schema generate --watch
 ```
 
+### `rebase schema stale`
+
+Verifique se o esquema gerado ainda corresponde às coleções:
+
+```bash
+rebase schema stale          # report, and exit 1 if anything is stale
+rebase schema stale --fix    # regenerate the file instead
+```
+
+
+**O que ele faz:**
+- Renderiza o que as coleções em `config/collections/` geram e o compara, declaração por declaração, com `backend/src/schema.generated.ts`
+- Nomeia cada diferença — uma tabela ausente, uma coluna com outro tipo, um rótulo de enum removido, ou chaves estrangeiras nomeadas como uma versão anterior as derivava — e sai com código diferente de zero
+- Com `--fix`, regenera o arquivo em vez de reportar
+
+O `rebase dev` mantém o arquivo atualizado por conta própria, então esta é a verificação
+para um build ou uma etapa de CI. Ele aceita `--collections` e `--output` como o
+`rebase schema generate` aceita.
+
 ### `rebase schema introspect`
 
 Faça engenharia reversa das definições de coleções a partir de um banco de dados PostgreSQL existente:
@@ -69,12 +88,29 @@ rebase schema introspect
 - Conecta-se ao seu banco de dados (usando a string de conexão do seu `.env`)
 - Inspeciona todas as tabelas, colunas, tipos e chaves estrangeiras
 - Gera arquivos de definição de coleções
+- <span class="since-badge" data-since="0.25">Desde 0.25</span> Lê as políticas de
+  segurança em nível de linha de cada tabela para as `securityRules` da sua coleção:
+  nome, comando, modo, lista `TO`, `USING` e `WITH CHECK`. As políticas
+  `<table>_default_*` que o próprio Rebase adiciona ficam de fora. Assim, o
+  `db push` depois dela recria cada política como estava. Na 0.24 as políticas
+  ficam fora dos arquivos, e um push pode remover uma cujo nome tem a forma de uma
+  política gerada (`<table>_<op>_<hash>`)
+- <span class="since-badge" data-since="0.25">Desde 0.25</span> Gera uma tabela
+  cujas políticas dão a cada usuário as suas próprias linhas (elas leem `rebase.uid()`,
+  `app.uid` ou o JWT) como uma entidade na navegação, por menos linhas que tenha.
+  Na 0.24 uma tabela pequena é uma lista de códigos, e uma tabela que pertence a
+  outra é ocultada como filha dela
+- <span class="since-badge" data-since="0.25">Desde 0.25</span> Contra um banco de
+  dados que não está em execução, imprime o mesmo banner que o `db push` imprime,
+  uma vez, e não cria nada. Imprime o diretório de saída como um caminho absoluto
 
 **Opções:**
 
 | Flag | Descrição |
 |------|-------------|
 | `--output, -o` | Diretório de saída para os arquivos de coleção gerados |
+| `--schema` | O schema do Postgres a ler (padrão: `public`) |
+| `--force, -f` | Sobrescreve os arquivos de coleção que já existem; sem ele, um arquivo existente é ignorado |
 
 Isso é útil ao adotar a Rebase em um banco de dados existente — faça a introspecção primeiro, depois personalize as coleções geradas.
 
@@ -91,7 +127,7 @@ rebase db push
 **O que ele faz:**
 - Lê o esquema Drizzle gerado
 - Aplica as mudanças diretamente ao banco de dados (CREATE, ALTER, DROP)
-- Executa o plano primeiro em modo dry run e para antes de tudo o que destrói dados: uma tabela, coluna, schema, view ou tipo removidos, um `TRUNCATE`, uma mudança de tipo de coluna que pode perder valores (`timestamptz` → `date`, `numeric` → `integer`), ou uma mudança de chave primária: `(id)` → `(id, locale)` dá a cada linha um id novo, de modo que links, chaves estrangeiras e ids guardados em outros lugares deixam de encontrar sua linha. Pergunta em um terminal e recusa caso contrário; `--allow-destructive` (ou `--yes`) aplica mesmo assim
+- Executa o plano primeiro em modo dry run e para antes de tudo o que destrói dados: uma tabela, coluna, schema, view ou tipo removidos, um `TRUNCATE`, uma mudança de tipo de coluna que pode perder valores (`timestamptz` → `date`, `numeric` → `integer`), ou uma mudança de chave primária: `(id)` → `(id, locale)` dá a cada linha um id novo, de modo que links, chaves estrangeiras e ids guardados em outros lugares deixam de encontrar sua linha. Pergunta em um terminal, onde Ctrl-C ou Ctrl-D responde não, e recusa caso contrário; `--allow-destructive` (ou `--yes`) aplica mesmo assim. Um push que para aí remove, ao sair, o seu banco de dados temporário `<db>_dev_diff`
 - Ativa a segurança em nível de linha em todas as tabelas de coleção, incluindo as tabelas de junção, logo após a mudança de schema e antes de qualquer etapa que possa falhar, de modo que um push que para no meio deixa uma tabela nova negando todas as requisições em vez de aberta a elas
 - Aplica as políticas RLS das suas coleções e **remove as políticas que um push anterior substituiu**
 - <span class="since-badge" data-since="0.25">Desde 0.25</span> Constrói qualquer
@@ -141,6 +177,8 @@ Isso importava muito antes: o Postgres combina políticas `PERMISSIVE` com OR, e
 Agora o `db push` reconcilia isso: remove as políticas geradas que não correspondem mais a nenhuma regra e informa — sem remover — qualquer política com nome personalizado que suas coleções não descrevem, já que ela não se distingue de SQL que alguém escreveu de propósito.
 
 Para auditar um banco de dados que recebeu push antes dessa mudança, execute `rebase doctor --policies`. Funciona como um gate de CI: sai com código diferente de zero quando há drift, e também quando não conseguiu executar a verificação — sem `DATABASE_URL`, um caminho `--collections` que não se resolve, uma leitura de `pg_policies` não concedida ao papel de CI. Um gate que não conseguiu olhar não passou.
+
+<span class="since-badge" data-since="0.25">Desde 0.25</span> O `doctor` e o `db push` distinguem os dois tipos de política órfã. Uma política com nome gerado foi substituída, e o próximo push a remove. Qualquer outro nome foi escrito à mão ou por outra ferramenta e ainda está em vigor: descreva-a nas `securityRules` da sua coleção para mantê-la (a visão de RLS do Studio a importa), ou remova-a à mão se estiver obsoleta. Na 0.24 ambas são "left behind by an earlier push".
 :::
 
 :::caution
@@ -203,15 +241,27 @@ rebase db migrate
 
 A versão é o prefixo numérico do ficheiro de migração que descreve o que está no banco de dados *agora*. Essa migração e todas as anteriores ficam registadas como aplicadas; tudo o que vem depois é executado. Num banco de dados que nunca arrancou não é precisa baseline — migre diretamente.
 
+O mesmo acontece mais tarde no ciclo habitual: edite uma coleção enquanto o `rebase dev` corre, e o arranque adiciona a coluna antes de o `rebase db generate` escrever a migração que a adiciona, de modo que o `rebase db migrate` para em `column … already exists (42701)`. Registe essa migração como baseline do mesmo modo. <span class="since-badge" data-since="0.25">Desde 0.25</span> O `--baseline` funciona num banco de dados que já regista migrações: marca tudo até à versão como aplicado com `atlas migrate set` e informa isso, ou informa que não há nada a registar quando o histórico já a alcança. Na 0.24 o Atlas ignora o `--baseline` assim que qualquer migração está registada, pelo que o mesmo erro volta.
+
 ### `rebase db branch`
 
 Ramificação de banco de dados para desenvolvimento paralelo:
 
 ```bash
 rebase db branch create feature_auth
+rebase db branch switch feature_auth
 rebase db branch list
+rebase db branch switch --off
+
+rebase db branch info feature_auth
 rebase db branch delete feature_auth
 ```
+
+`rebase db branch switch` (e `switch --off`) e `rebase db branch prune` são novos.
+`create`, `list`, `info` e `delete` foram lançados na 0.17.
+
+Cada branch é uma cópia completa do banco de dados feita com `CREATE DATABASE ... TEMPLATE`,
+portanto precisa de um servidor PostgreSQL real e custa o mesmo espaço em disco que a sua origem.
 
 ### `rebase doctor`
 
@@ -249,10 +299,9 @@ O `rebase dev` executa isto para você ao iniciar e a cada salvamento em
 `config/collections/`. Execute-o você mesmo no CI, em um repositório que não tem
 coleções (veja `--from` abaixo), ou onde quer que o `rebase dev` não esteja em execução.
 
-para ler todo arquivo, parando no primeiro que estiver quebrado, para o `rebase dev` executá-lo
-e para o `--collections` neste comando. Na 0.23 ele lê os arquivos que o barril `index.ts`
-lista, pula um que não carrega com um aviso, e toma o
-diretório como `--collections-dir`; o `rebase dev` só regenera o esquema.
+Na 0.23 o comando lê apenas os arquivos que o barril `index.ts` lista, pula um que
+não carrega com um aviso, e toma o diretório como `--collections-dir`; e o `rebase dev`
+só regenera o esquema, de modo que os tipos do SDK são seus para regenerar.
 
 **Opções:**
 
@@ -261,9 +310,14 @@ diretório como `--collections-dir`; o `rebase dev` só regenera o esquema.
 | `-c`, `--collections` | Diretório de coleções (padrão: `config/collections/`); caminhos relativos são resolvidos a partir de onde você executa o comando. `--collections-dir` também é aceito. |
 | `-o`, `--output` | Diretório de saída para o SDK (padrão: `generated/sdk/`) |
 | `--from <link\|url>` | Lê o esquema de um projeto em execução em vez do código local. `link` usa o projeto vinculado a este checkout. |
-| `--token` | Token Bearer para o endpoint de contrato (padrão: `$REBASE_SERVICE_KEY`) |
+| `--token` | Token Bearer para o endpoint de contrato (padrão: `$REBASE_SERVICE_KEY` do shell; o `.env` não é lido) |
 
-`--from` é o que permite que um repositório sem coleções — um frontend separado, uma segunda aplicação web, uma aplicação móvel — gere um cliente tipado a partir do projeto com que fala. `REBASE_SERVICE_KEY` só é enviado ao projeto vinculado a este checkout; para qualquer outro host, passe `--token` explicitamente.
+`--from` é o que permite que um repositório sem coleções — um frontend separado, uma segunda aplicação web, uma aplicação móvel — gere um cliente tipado a partir do projeto com que fala. `REBASE_SERVICE_KEY` só é enviado ao projeto vinculado a este checkout; para qualquer outro host, passe `--token` explicitamente. A chave no `.env` pertence ao seu
+backend local e nunca é enviada.
+<span class="since-badge" data-since="0.25">Desde 0.25</span> Uma recusa diz qual
+destes casos aconteceu: um `--token` recusado, uma chave do shell recusada, uma chave
+retida de um host que não está vinculado, uma chave apenas no `.env`, ou nenhuma chave.
+Na 0.24 ela sempre diz para passar `--token` ou definir `REBASE_SERVICE_KEY`.
 
 **Uso após a geração:**
 
@@ -313,7 +367,7 @@ git add drizzle/migrations/
 
 # 6. Apply in production
 #    A database Rebase has already booted needs a baseline the first time —
-#    see the baselining section above.
+#    see "Baselining a database Rebase has already booted" above.
 rebase db migrate
 ```
 
@@ -327,6 +381,8 @@ rebase db migrate
 | `db push` falha em produção | Use `db generate` + `db migrate` em vez disso |
 | Uma migração não pode destruir dados em CI ou produção | <span class="since-badge" data-since="0.25">Desde 0.25</span> `rebase db migrate --refuse-destructive` sai com 1 e não aplica nada quando uma instrução pendente destrói dados |
 | `db migrate` falha com `already exists (42710)` | O arranque ou `db push` já provisionaram o esquema — registe-o com `rebase db migrate --baseline <version>` |
+| `db migrate` falha com `column … already exists (42701)` | O `rebase dev` adicionou a coluna no arranque — registe essa migração como baseline do mesmo modo |
+| `db push` no banco de dados gerenciado falha com `Error: EOF` | O Atlas perdeu uma conexão que o `rebase dev` em execução mantém. Execute-o de novo; se continuar falhando, pare primeiro o `rebase dev` |
 
 ## Próximos Passos
 

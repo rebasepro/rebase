@@ -325,8 +325,8 @@ to allow destructive tools against remote environments.
 
 **Se nenhuma string de conexão puder ser resolvida, as ferramentas de DB protegidas são recusadas.**
 Sem `DATABASE_URL`, o CLI usa o banco de dados de desenvolvimento gerenciado, que é
-o padrão de um projeto novo, e o próprio CLI recusa `db push`, `db migrate` e
-`db branch` ali. A recusa diz isso e indica o que funciona no lugar. Ela
+o padrão de um projeto novo, e o gate recusa ali as suas quatro ferramentas de
+banco de dados. A recusa diz por quê e indica o que funciona no lugar. Ela
 não sugere a opção de desativar a proteção:
 
 ```text
@@ -336,6 +336,10 @@ most likely do not need this tool: the dev server applies the collections to tha
 database at boot, additively. After changing a collection, restart it with
 rebase_dev_stop and rebase_dev_start. …
 ```
+
+<span class="since-badge" data-since="0.25">Desde 0.25</span> A partir de um
+terminal, `rebase db push` e `rebase db migrate` rodam nesse banco de dados;
+apenas as ferramentas do MCP são recusadas. Na 0.24 o CLI também as recusa ali.
 
 Apenas o loopback é considerado local: `localhost`, `*.localhost`, `127.0.0.0/8`, `::1`.
 Faixas privadas como `10.x` e `192.168.x` **não** são — essas têm tanta probabilidade de ser

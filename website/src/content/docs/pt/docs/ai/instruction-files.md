@@ -33,9 +33,9 @@ Please refer to and follow the instructions defined in [ai-instructions.md](./ai
 The Rebase skills for this assistant live in `.claude/skills/`. If they are not there yet, install them, with the Rebase MCP server: `rebase skills install --agent claude --mcp`.
 ```
 
-para esta terceira linha e o `.mcp.json` abaixo: na 0.23
-a terceira linha apenas diz ao assistente para executar `rebase skills install --agent claude`,
-e o `.mcp.json` inicia o servidor com `npx -y @rebasepro/mcp` a partir do registro.
+Na 0.23 a terceira linha apenas diz ao assistente para executar
+`rebase skills install --agent claude`, e o `.mcp.json` abaixo inicia o
+servidor com `npx -y @rebasepro/mcp` a partir do registro.
 
 Os demais diferem apenas no diretório de skills do agente e no seu valor de
 `--agent` — `--agent cursor`, `--agent windsurf`, `--agent codex`,
@@ -103,10 +103,11 @@ sessão:
    Enquanto `pnpm dev` está rodando, salvar o arquivo da coleção é o passo
    inteiro: o boot regenera o schema do Drizzle e cria as tabelas e colunas que
    faltam. `pnpm db:push` serve apenas para o que o boot deliberadamente deixa em
-   paz — uma coluna renomeada, um tipo mais estreito, um campo removido — e exige
-   o seu próprio PostgreSQL, não o banco de dados de desenvolvimento gerenciado.
-   Em produção o par é
-   `pnpm db:generate` e depois `pnpm db:migrate`.
+   paz — uma coluna renomeada, um tipo mais estreito, um campo removido — tanto no
+   banco de dados de desenvolvimento gerenciado quanto no seu próprio PostgreSQL.
+   Em produção o par é `pnpm db:generate` e depois `pnpm db:migrate`.
+   <span class="since-badge" data-since="0.25">Desde 0.25</span> Na 0.24,
+   `pnpm db:push` exige o seu próprio PostgreSQL, e o arquivo diz isso.
 3. **Use o SDK.** Acesse via `rebase.dataAsAdmin.<slug>` para trabalho feito com a
    identidade do serviço, ou `getDriver(c)` dentro de uma função quando a leitura
    deve rodar como o chamador. No servidor o cliente não expõe um acessor `data` simples. SQL puro e chamadas diretas do Drizzle

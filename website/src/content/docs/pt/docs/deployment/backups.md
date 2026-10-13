@@ -24,23 +24,36 @@ uploads separadamente, em sua própria programação.
 ## Início rápido
 
 ```bash
-# Backup para um diretório local (formato customizado, compactado)
+# Back up to a local directory (custom format, compressed)
 rebase db backup --out ./backups
 
-# Backup direto para armazenamento de objetos privado
+# Back up straight to private object storage
 rebase db backup --out s3://my-private-bucket/backups
 
-# Listar o que você tem
-rebase db backups list --out ./backups
+# List what you have
+rebase db backups list
 
-# Restaurar em um banco de dados NOVO (não toca no banco em produção)
+# Restore into a FRESH database (does not touch the live one)
 rebase db restore ./backups/rebase-app-20260714T030000Z.dump \
   --create-db --target-db app_restored
 ```
 
 A string de conexão vem do ambiente do seu projeto, como em qualquer outro
-[comando `rebase db`](/docs/cli/): `DATABASE_URL`, recorrendo a
+[comando `rebase db`](/docs/cli/database/): `DATABASE_URL`, recorrendo a
 `ADMIN_CONNECTION_STRING` como alternativa.
+
+<span class="since-badge" data-since="0.25">Desde 0.25</span> Um `--out` relativo,
+o padrão `./backups` e um caminho de dump passado ao `rebase db restore` são todos
+resolvidos a partir do diretório em que você executa o `rebase`, normalmente a raiz
+do projeto, de modo que `rebase db backup` e `rebase db backups list` se encontram
+no mesmo lugar. Um `BACKUP_DESTINATION` relativo é resolvido a partir do diretório
+do backend, onde o servidor também o lê. Os três comandos recusam uma opção que não
+aceitam antes de executar qualquer coisa, e nomeiam a que você provavelmente quis
+dizer. A senha vai para o `pg_dump`, o `pg_dumpall` e o `pg_restore` em `PGPASSWORD`,
+nunca na linha de comando deles, de modo que nenhuma mensagem de erro nem lista de
+processos a mostra. Na 0.24 o padrão era `backend/backups`, uma opção com erro de
+grafia era ignorada, e uma restauração que falhava imprimia a string de conexão com
+a sua senha.
 
 ## O que é um backup
 
@@ -51,7 +64,7 @@ retenção e a listagem usam para ordenar.
 
 | Opção | Descrição |
 | --- | --- |
-| `--out`, `-o` | Um caminho local, ou uma URL `s3://bucket/prefix` / `gs://bucket/prefix`. O padrão é `$BACKUP_DESTINATION`, depois `./backups`. |
+| `--out`, `-o` | Um caminho local, ou uma URL `s3://bucket/prefix` / `gs://bucket/prefix`. O padrão é `$BACKUP_DESTINATION`, depois `./backups` no diretório em que você executa o `rebase`. |
 | `--exclude-schema <s>` | Deixa de fora um schema do dump (repetível). Nunca deixe de fora o `rebase` — veja abaixo. |
 | `--no-owner` | Omite comandos de ownership, para restaurar como uma role diferente. |
 | `--enable-row-security` | Faz o dump como um subject admin em vez de falhar por row-level security. **Pode produzir um dump parcial** — veja [Row-level security](#row-level-security-e-o-dump-que-fica-incompleto-silenciosamente). |
@@ -88,6 +101,11 @@ registros, a fila de jobs, logs de cron, e as funções que suas políticas de
 RLS e os triggers de change-capture chamam. Um dump sem ele não tem usuários,
 e não pode ser restaurado em um banco de dados vazio de forma alguma: as
 tabelas que ele contém têm políticas que chamam funções que ele não tem.
+
+<span class="since-badge" data-since="0.25">Desde 0.25</span> Como contém todas as
+senhas e hashes de chaves, um dump local e o seu `.globals.sql` são criados legíveis
+apenas pelo seu dono (0600), antes de o `pg_dump` escrever neles; os arquivos locais de
+um backup agendado também são. Na 0.24 eles são 0644.
 
 ## Backups agendados
 
@@ -153,8 +171,7 @@ excluído. O descarte toca apenas arquivos cujos nomes correspondem ao padrão
 de backup; qualquer outra coisa que compartilhe o bucket ou o prefixo é
 deixada intacta.
 
-O cron executa o `pg_dump` dentro do processo do servidor.
-a imagem de
+O cron executa o `pg_dump` dentro do processo do servidor. A imagem de
 runtime oficial (`rebasepro/server`, veja [Auto-hospedagem](/docs/deployment/self-hosting/))
 inclui as ferramentas de cliente do PostgreSQL 18 para isso;
 na 0.23 e anteriores ela não tinha nenhuma, e toda execução agendada falhava
@@ -258,13 +275,12 @@ Baixe os dois e mantenha-os no mesmo diretório. Um backup marcado como **No
 roles file** não tem o complemento: recrie suas roles manualmente antes de
 restaurá-lo em um Postgres novo.
 
-acima da lista
-ele reporta o job de backup agendado e sua última execução. Uma execução
+Acima da lista, o painel reporta o job de backup agendado e sua última execução. Uma execução
 falha é exibida como um erro com sua mensagem, então um backup noturno que
 não conseguiu rodar fica visível onde os backups são listados, não apenas no
 painel Cron Jobs.
 
-o que ele diz sobre o job:
+O que ele diz sobre o job:
 
 - **Last scheduled backup** é a última execução feita pelo agendamento. Uma execução
   iniciada manualmente depois disso (**Run Now** em Cron Jobs) ganha uma linha própria,
@@ -280,9 +296,8 @@ o que ele diz sobre o job:
 - Quando o histórico de execuções em `rebase.cron_logs` não pode ser lido, o painel
   diz isso, em vez de dizer que o backup ainda não foi executado.
 
-a lista é lida
-pelo processo do servidor que responde a `GET /api/admin/backups`, e esse nem
-sempre é o processo que executa o agendamento:
+A lista é lida pelo processo do servidor que responde a `GET /api/admin/backups`,
+e esse nem sempre é o processo que executa o agendamento:
 
 - Um destino `s3://` é listado e baixado por meio de um cliente para esse
   bucket, montado a partir das mesmas variáveis `S3_*` que o cron de backup usa. Um

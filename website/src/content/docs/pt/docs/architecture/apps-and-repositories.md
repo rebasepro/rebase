@@ -93,8 +93,9 @@ O que sabe disso, faz algo a respeito:
   simplesmente a página inicial do frontend.
 - O **`rebase apps list`** o exibe ao lado do app que o serve.
 
-Três formatos, e todos são comuns. para o terceiro: na 0.23 o
-`path` de um app não pode ser uma URL, então o CMS compartilha o hostname do projeto.
+Três formatos, e todos são comuns. Na 0.23 o `path` de um app não pode ser uma
+URL, então o terceiro não está disponível ali e o CMS compartilha o hostname do
+projeto.
 
 ```jsonc
 // The whole app is the CMS — what `rebase init` scaffolds.
@@ -138,6 +139,15 @@ torná-lo explícito:
 rebase apps list      # what this repository contributes
 rebase apps init      # write an inferred rebase.json
 ```
+
+A dedução não consegue saber duas coisas que o `rebase.json` de um scaffold
+declara. Ela dá ao app estático o nome `web`, onde um scaffold o chama de
+`admin`, e não consegue saber a rota `cms` do app. O nome não muda: o Rebase
+Cloud registrou `web` para todo projeto que fez deploy sem um `rebase.json`.
+<span class="since-badge" data-since="0.25">Desde 0.25</span>
+`rebase apps init --force` mantém os nomes, o `path` e o `cms` dos apps que o
+arquivo substituído declara, e indica como removido um app que ele não encontra
+mais. Na 0.24 ele escreve a dedução simples por cima.
 
 ## Um app em um hostname só seu
 
