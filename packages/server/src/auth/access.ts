@@ -284,12 +284,14 @@ export function scopeMissing(c: Context<HonoEnv>, scope: string, target?: string
  * Refuse a request whose caller does not hold `scope`.
  *
  * `target` narrows the check to one collection, bucket, function or app
- * resource, and may be read from the request. Mount after authentication: a
- * request with no caller is refused as unauthenticated, not as unscoped.
+ * resource, and may be read from the request. A guard, not an authenticator:
+ * it judges the caller an auth middleware identified, so mount it after one —
+ * `requireAuth`, or a route group's own. A request with no caller is refused
+ * as unauthenticated, not as unscoped.
  *
  * @example
  * ```ts
- * app.post("/deploy/:project", requireScope("project:deploy", c => c.req.param("project")), handler);
+ * app.post("/deploy/:project", requireAuth, requireScope("project:deploy", c => c.req.param("project")), handler);
  * ```
  */
 export function requireScope(
@@ -298,7 +300,7 @@ export function requireScope(
 ): MiddlewareHandler<HonoEnv> {
     return async (c, next) => {
         if (!c.get("user")) {
-            return refuse(c, ApiError.unauthenticated("Authentication required"));
+            return refuse(c, noCallerRefusal(c));
         }
         const resolvedTarget = typeof target === "function" ? target(c) : target;
         if (!hasScope(c, scope, resolvedTarget)) {
@@ -306,6 +308,25 @@ export function requireScope(
         }
         return next();
     };
+}
+
+/**
+ * The 401 for a guard that found no caller.
+ *
+ * A request that sent a credential, on a route where no auth middleware ran —
+ * it sets `driver` for every caller, anonymous included — never had that
+ * credential read. "Authentication required" sends whoever holds a valid
+ * session to check it, so this names the wiring instead.
+ */
+function noCallerRefusal(c: Context<HonoEnv>): ApiError {
+    if (c.req.header("authorization") !== undefined && c.get("driver") === undefined) {
+        return ApiError.unauthenticated(
+            "Authentication required: this request carries a credential, but nothing on this route verified it. " +
+            "requireScope judges the caller an auth middleware identified; put requireAuth in front of it — " +
+            "app.post(path, requireAuth, requireScope(scope), handler)."
+        );
+    }
+    return ApiError.unauthenticated("Authentication required");
 }
 
 /**
