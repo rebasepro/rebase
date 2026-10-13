@@ -611,6 +611,8 @@ function sortKeyToString
 function storageEnvSuffix
 function storageObjectPath
 function storageReference
+function storageReferencesForDownloadUrls
+function storageTargetOfDownloadUrl
 function summarizeRoles
 function summarizeScopes
 function toCanonicalOp
@@ -1103,6 +1105,8 @@ function or { conditions, type }
 function parseStorageReference
 function resolveStorageReferences
 function storageReference
+function storageReferencesForDownloadUrls
+function storageTargetOfDownloadUrl
 interface AdminUser { createdAt, disabled, displayName, email, metadata, photoURL, providerId, roles, uid, updatedAt }
 interface AggregateMeta { hasMore, limit, offset }
 interface AggregateParams { groupBy, limit, logical, offset, orderBy, searchString, select, where }

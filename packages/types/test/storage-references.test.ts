@@ -3,6 +3,8 @@ import {
     parseStorageReference,
     resolveStorageReferences,
     storageReference,
+    storageReferencesForDownloadUrls,
+    storageTargetOfDownloadUrl,
     STORAGE_REFERENCE_SCHEME
 } from "../src/controllers/storage";
 
@@ -148,5 +150,67 @@ describe("resolveStorageReferences against a client", () => {
         const client = { storage: source("default") as never };
         const text = `![m](${storageReference("missing.png")}) ![n](${storageReference("n.png", "media")})`;
         expect(await resolveStorageReferences(text, client)).toBe(text);
+    });
+});
+
+/**
+ * Text saved before references existed holds the download URL itself, its
+ * token long expired. The token says which object it was for, so a reader can
+ * still find the object and give it a fresh URL.
+ */
+describe("download URLs saved in text before references", () => {
+    const base64url = (value: string) => Buffer.from(value, "utf-8").toString("base64")
+        .replace(/=+$/, "").replace(/\+/g, "-").replace(/\//g, "_");
+    /** A token shaped as the server mints one: only the payload is read. */
+    const token = (payload: Record<string, unknown>) =>
+        `${base64url(JSON.stringify({ alg: "HS256", typ: "JWT" }))}.${base64url(JSON.stringify({ exp: 1, ...payload }))}.c2lnbmF0dXJl`;
+    const legacy = (key: string, payload: Record<string, unknown> = { purpose: "file-read", path: `default/${key}`, storageId: "(default)" }, query = "") =>
+        `https://api.example.com/api/storage/file/${key.split("/").map(encodeURIComponent).join("/")}?token=${token(payload)}${query}`;
+
+    it("names the object its token was minted for", () => {
+        expect(storageTargetOfDownloadUrl(legacy("posts/cover.png"))).toEqual({ key: "posts/cover.png" });
+        expect(storageTargetOfDownloadUrl(legacy("posts/My Photo (1).png"))).toEqual({ key: "posts/My Photo (1).png" });
+        expect(storageTargetOfDownloadUrl(legacy("caffè.png"))).toEqual({ key: "caffè.png" });
+    });
+
+    it("keeps a named source, from the URL or from the token", () => {
+        expect(storageTargetOfDownloadUrl(legacy("a.png", { purpose: "file-read", path: "default/a.png", storageId: "media" }, "&storageId=media")))
+            .toEqual({ key: "a.png", storageId: "media" });
+        expect(storageTargetOfDownloadUrl(legacy("a.png", { purpose: "file-read", path: "default/a.png", storageId: "media" })))
+            .toEqual({ key: "a.png", storageId: "media" });
+        // Minted before tokens named their source: the default one.
+        expect(storageTargetOfDownloadUrl(legacy("a.png", { purpose: "file-read", path: "default/a.png" })))
+            .toEqual({ key: "a.png" });
+    });
+
+    it("is not fooled by a URL that only looks like one", () => {
+        expect(storageTargetOfDownloadUrl("https://cdn.example.com/storage/file/a.png?token=abc")).toBeNull();
+        expect(storageTargetOfDownloadUrl(legacy("a.png", { purpose: "access", path: "default/a.png" }))).toBeNull();
+        expect(storageTargetOfDownloadUrl(legacy("a.png", { purpose: "file-read", path: "default/b.png" }))).toBeNull();
+        expect(storageTargetOfDownloadUrl("https://api.example.com/api/storage/file/public/a.png")).toBeNull();
+        expect(storageTargetOfDownloadUrl("not a url")).toBeNull();
+    });
+
+    it("are rendered with a fresh URL, as references are", async () => {
+        const text = `![a](${legacy("posts/cover.png")}) ![b](${storageReference("b.png")}) ![c](https://cdn.example.com/c.png?token=x.y.z)`;
+        const asked: string[] = [];
+        const resolved = await resolveStorageReferences(text, async ({ key, storageId }) => {
+            asked.push(`${storageId ?? "(default)"}:${key}`);
+            return `https://api.example.com/fresh/${key}`;
+        });
+        expect(asked.sort()).toEqual(["(default):b.png", "(default):posts/cover.png"]);
+        expect(resolved).toBe("![a](https://api.example.com/fresh/posts/cover.png) ![b](https://api.example.com/fresh/b.png) " +
+            "![c](https://cdn.example.com/c.png?token=x.y.z)");
+    });
+
+    it("keep the old URL when the object cannot be found", async () => {
+        const text = `![a](${legacy("gone.png")})`;
+        expect(await resolveStorageReferences(text, async () => null)).toBe(text);
+    });
+
+    it("can be rewritten into references for good", () => {
+        const text = `![a](${legacy("posts/cover.png")} "Cover") and ![b](https://cdn.example.com/b.png)`;
+        expect(storageReferencesForDownloadUrls(text))
+            .toBe(`![a](${storageReference("posts/cover.png")} "Cover") and ![b](https://cdn.example.com/b.png)`);
     });
 });

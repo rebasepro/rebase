@@ -1,5 +1,5 @@
 import { useCallback, useRef } from "react";
-import { parseStorageReference, type StorageReferenceTarget } from "@rebasepro/types";
+import { parseStorageReference, storageTargetOfDownloadUrl, type StorageReferenceTarget } from "@rebasepro/types";
 import { useStorageSource, useStorageSources } from "@rebasepro/app";
 
 /**
@@ -38,15 +38,17 @@ export function useStorageReferenceResolver(): (target: StorageReferenceTarget) 
 }
 
 /**
- * The same, for one `src`: a reference is resolved, anything else — an
- * ordinary URL — is answered as it is.
+ * The same, for one `src`: a reference is resolved, and so is a private file's
+ * download URL saved before references existed (its token has expired, but
+ * still names the object); anything else — an ordinary URL — is answered as
+ * it is.
  *
  * @internal
  */
 export function useImageSrcResolver(): (src: string) => Promise<string | null> {
     const resolve = useStorageReferenceResolver();
     return useCallback(async (src: string) => {
-        const target = parseStorageReference(src);
+        const target = parseStorageReference(src) ?? storageTargetOfDownloadUrl(src);
         return target ? resolve(target) : src;
     }, [resolve]);
 }

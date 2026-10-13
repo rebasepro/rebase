@@ -68,7 +68,15 @@ export { or, and, not, cond } from "@rebasepro/common";
 // `rebase-storage:` reference, never a URL whose download token expires;
 // `resolveStorageReferences(text, client)` exchanges each one for a fresh URL
 // when the text is rendered.
-export { resolveStorageReferences, storageReference, parseStorageReference, isStorageReference, STORAGE_REFERENCE_SCHEME } from "@rebasepro/types";
+export {
+    resolveStorageReferences,
+    storageReference,
+    parseStorageReference,
+    isStorageReference,
+    STORAGE_REFERENCE_SCHEME,
+    storageTargetOfDownloadUrl,
+    storageReferencesForDownloadUrls
+} from "@rebasepro/types";
 export type { StorageReferenceTarget, StorageReferenceResolver } from "@rebasepro/types";
 
 // Auth: session/token types, config, and the pluggable storage strategies.

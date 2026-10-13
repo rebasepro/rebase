@@ -216,6 +216,99 @@ export function parseStorageReference(value: string | null | undefined): Storage
     return storageId && storageId !== DEFAULT_STORAGE_SOURCE_KEY ? { key, storageId } : { key };
 }
 
+/** The JSON in a JWT's payload segment, or `undefined` for anything else. */
+function jwtPayload(token: string): Record<string, unknown> | undefined {
+    const segments = token.split(".");
+    if (segments.length !== 3) return undefined;
+    try {
+        const base64 = segments[1].replace(/-/g, "+").replace(/_/g, "/");
+        const binary = atob(base64.padEnd(Math.ceil(base64.length / 4) * 4, "="));
+        const json = new TextDecoder().decode(Uint8Array.from(binary, (c) => c.charCodeAt(0)));
+        const payload: unknown = JSON.parse(json);
+        return payload && typeof payload === "object" && !Array.isArray(payload)
+            ? payload as Record<string, unknown>
+            : undefined;
+    } catch {
+        return undefined;
+    }
+}
+
+/**
+ * The object a private file's download URL was minted for, or `null` for any
+ * other URL.
+ *
+ * Text written before storage references stored such URLs —
+ * `…/storage/file/posts/cover.png?token=…` — and their tokens expired minutes
+ * later. The token still names the object it was minted for, so the URL can be
+ * traded for a fresh one, or for a reference. Read without verifying the
+ * token: it grants nothing here, it only says which object is meant, and the
+ * key in the URL must agree with it. Host-agnostic, since a URL written
+ * through one origin may be read through another.
+ *
+ * @group Models
+ */
+export function storageTargetOfDownloadUrl(url: string): StorageReferenceTarget | null {
+    let parsed: URL;
+    try {
+        parsed = new URL(url, "http://relative.invalid");
+    } catch {
+        return null;
+    }
+    const marker = "/storage/file/";
+    const at = parsed.pathname.indexOf(marker);
+    const token = parsed.searchParams.get("token");
+    if (at === -1 || !token) return null;
+
+    let key: string;
+    try {
+        key = parsed.pathname.slice(at + marker.length).split("/").map(decodeURIComponent).join("/");
+    } catch {
+        return null;
+    }
+    if (!key || key.split("/").some((segment) => segment === "..")) return null;
+
+    const payload = jwtPayload(token);
+    if (payload?.purpose !== "file-read" || typeof payload.path !== "string") return null;
+    // The token's path is `<bucket>/<key>`.
+    const slash = payload.path.indexOf("/");
+    if (payload.path !== key && payload.path.slice(slash + 1) !== key) return null;
+
+    const named = parsed.searchParams.get("storageId")
+        ?? (typeof payload.storageId === "string" ? payload.storageId : undefined);
+    return named && named !== DEFAULT_STORAGE_SOURCE_KEY ? { key, storageId: named } : { key };
+}
+
+/**
+ * A private file's download URL as it may appear in text. Parentheses are
+ * allowed in the path, where an unencoded file name puts them; the query, a
+ * token, has none, so the match ends where a markdown destination does.
+ */
+const DOWNLOAD_URL_PATTERN = /(?:https?:\/\/[^\s()<>"'\]]+)?\/storage\/file\/[^\s<>"'?#\]]+\?[^\s()<>"'#\]]*/g;
+
+/** Each download URL in `text` that names an object, with its reference. */
+function downloadUrlsIn(text: string): Map<string, string> {
+    const found = new Map<string, string>();
+    if (!text.includes("/storage/file/")) return found;
+    for (const url of text.match(DOWNLOAD_URL_PATTERN) ?? []) {
+        const target = storageTargetOfDownloadUrl(url);
+        if (target) found.set(url, storageReference(target.key, target.storageId));
+    }
+    return found;
+}
+
+/**
+ * `text` with every private file's download URL replaced by the storage
+ * reference for its object — for rewriting text saved before references, so
+ * it stores what new text stores. Any other URL is left as it is.
+ *
+ * @group Models
+ */
+export function storageReferencesForDownloadUrls(text: string): string {
+    const urls = downloadUrlsIn(text);
+    if (urls.size === 0) return text;
+    return text.replace(DOWNLOAD_URL_PATTERN, (url) => urls.get(url) ?? url);
+}
+
 /**
  * Where {@link resolveStorageReferences} gets URLs from: a function that
  * answers one, or anything shaped like a Rebase client — its `storage` for the
@@ -244,15 +337,22 @@ export type StorageReferenceResolver =
  * source) is left as it was, so a missing object reads as a missing image
  * rather than as a failed render.
  *
+ * A private file's download URL saved in the text before references existed
+ * is renewed the same way: its expired token still names the object (see
+ * {@link storageTargetOfDownloadUrl}). One that cannot be resolved is left as
+ * it was.
+ *
  * @group Models
  */
 export async function resolveStorageReferences(
     text: string,
     from: StorageReferenceResolver
 ): Promise<string> {
-    if (!text || !text.includes(STORAGE_REFERENCE_SCHEME)) return text;
+    if (!text) return text;
+    const downloadUrls = downloadUrlsIn(text);
+    if (!text.includes(STORAGE_REFERENCE_SCHEME) && downloadUrls.size === 0) return text;
     const resolve = typeof from === "function" ? from : resolverFromSources(from);
-    const references = new Set(text.match(STORAGE_REFERENCE_PATTERN) ?? []);
+    const references = new Set([...(text.match(STORAGE_REFERENCE_PATTERN) ?? []), ...downloadUrls.values()]);
     const urls = new Map<string, string>();
     await Promise.all([...references].map(async (reference) => {
         const target = parseStorageReference(reference);
@@ -265,7 +365,12 @@ export async function resolveStorageReferences(
         }
     }));
     if (urls.size === 0) return text;
-    return text.replace(STORAGE_REFERENCE_PATTERN, (reference) => {
+    const renewed = downloadUrls.size === 0 ? text : text.replace(DOWNLOAD_URL_PATTERN, (saved) => {
+        const reference = downloadUrls.get(saved);
+        const url = reference === undefined ? undefined : urls.get(reference);
+        return url === undefined ? saved : asLinkDestination(url);
+    });
+    return renewed.replace(STORAGE_REFERENCE_PATTERN, (reference) => {
         const url = urls.get(reference);
         return url === undefined ? reference : asLinkDestination(url);
     });

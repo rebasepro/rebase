@@ -14,14 +14,16 @@ const withoutReferences = (source: string) =>
 /**
  * Markdown whose images may be stored as `rebase-storage:` references — what
  * the markdown editor writes for an uploaded image — rendered with a freshly
- * signed URL for each.
+ * signed URL for each. Text saved before references holds the download URLs
+ * themselves, their tokens expired; those are renewed the same way.
  *
  * @internal
  */
 export function StorageMarkdown({ source, ...props }: MarkdownProps) {
     const resolve = useStorageReferenceResolver();
     const text = typeof source === "string" ? source : "";
-    const hasReferences = text.includes(STORAGE_REFERENCE_SCHEME);
+    // A private file's download URL saved before references is renewed too.
+    const hasReferences = text.includes(STORAGE_REFERENCE_SCHEME) || text.includes("/storage/file/");
     const [resolved, setResolved] = useState<string | undefined>(undefined);
 
     useEffect(() => {

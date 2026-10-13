@@ -58,4 +58,21 @@ describe("the editor's image node", () => {
 
         expect(container.querySelector("img")?.getAttribute("src")).toBe("https://cdn.example.com/x.png");
     });
+
+    it("renews an image whose URL was saved before references, showing the saved one meanwhile", async () => {
+        const base64url = (value: string) => Buffer.from(value, "utf-8").toString("base64")
+            .replace(/=+$/, "").replace(/\+/g, "-").replace(/\//g, "_");
+        const payload = base64url(JSON.stringify({ purpose: "file-read", path: "default/posts/old.png", exp: 1 }));
+        const saved = `https://api.example.com/api/storage/file/posts/old.png?token=${base64url("{}")}.${payload}.c2ln`;
+        const asked: string[] = [];
+        const { container } = render(<ImageComponent
+            node={image(saved)}
+            view={view(async (src) => { asked.push(src); return "https://api.example.com/api/storage/file/posts/old.png?token=fresh"; })}
+            getPos={() => 0}/>);
+
+        expect(container.querySelector("img")?.getAttribute("src")).toBe(saved);
+        await waitFor(() => expect(container.querySelector("img")?.getAttribute("src"))
+            .toBe("https://api.example.com/api/storage/file/posts/old.png?token=fresh"));
+        expect(asked).toEqual([saved]);
+    });
 });

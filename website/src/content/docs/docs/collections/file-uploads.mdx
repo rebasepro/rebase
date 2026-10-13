@@ -121,8 +121,11 @@ they show it; a site that renders the field does the same with
 `resolveStorageReferences(text, client)` — see
 [Files inside text](/docs/sdk/storage#files-inside-text).
 
-Text saved before this change holds the URLs themselves, and their tokens have
-expired; re-insert those images to store references.
+Text saved before references holds the download URLs themselves, with expired
+tokens. The editor, the previews and `resolveStorageReferences` renew them when
+they show the text, because a token still names its object; re-inserting the image
+or rewriting the text with `storageReferencesForDownloadUrls(text)` stores a
+reference.
 
 ### Where the file is allowed to go
 

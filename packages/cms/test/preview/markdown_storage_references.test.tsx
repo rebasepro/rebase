@@ -3,7 +3,7 @@
  */
 import React from "react";
 import { describe, expect, it, jest } from "@jest/globals";
-import { render, waitFor } from "@testing-library/react";
+import { render, renderHook, waitFor } from "@testing-library/react";
 
 /**
  * A markdown value's images, in the panel's preview.
@@ -33,6 +33,15 @@ jest.mock("@rebasepro/app", () => {
 });
 
 import { StorageMarkdown } from "../../src/preview/components/StorageMarkdown";
+import { useImageSrcResolver } from "../../src/hooks/useStorageReferenceResolver";
+
+const base64url = (value: string) => Buffer.from(value, "utf-8").toString("base64")
+    .replace(/=+$/, "").replace(/\+/g, "-").replace(/\//g, "_");
+/** A private file's URL as the editor wrote it into text before references: its token long expired. */
+const savedDownloadUrl = (key: string) => {
+    const payload = base64url(JSON.stringify({ purpose: "file-read", path: `default/${key}`, storageId: "(default)", exp: 1 }));
+    return `https://api.example.com/api/storage/file/${key}?token=${base64url("{\"alg\":\"HS256\"}")}.${payload}.c2ln`;
+};
 
 describe("the markdown preview", () => {
     it("shows an image stored by reference, from a freshly signed URL", async () => {
@@ -62,5 +71,25 @@ describe("the markdown preview", () => {
         await waitFor(() => expect(container.querySelector("img")?.getAttribute("src"))
             .toBe("https://cdn.example.com/x.png"));
         expect(getSignedUrl).not.toHaveBeenCalled();
+    });
+
+    it("renews an image whose URL was saved in the text before references", async () => {
+        getSignedUrl.mockClear();
+        const { container } = render(<StorageMarkdown source={`![old](${savedDownloadUrl("posts/old.png")})`} size="small"/>);
+
+        await waitFor(() => expect(container.querySelector("img")?.getAttribute("src"))
+            .toMatch(/^https:\/\/api\.example\.com\/api\/storage\/file\/posts\/old\.png\?token=t\d+$/));
+        expect(getSignedUrl).toHaveBeenCalledWith("posts/old.png");
+    });
+});
+
+describe("the editor's image resolver", () => {
+    it("renews a download URL saved before references, and leaves any other URL alone", async () => {
+        getSignedUrl.mockClear();
+        const { result } = renderHook(() => useImageSrcResolver());
+
+        await expect(result.current(savedDownloadUrl("posts/old.png"))).resolves.toMatch(/posts\/old\.png\?token=t\d+$/);
+        await expect(result.current("https://cdn.example.com/x.png")).resolves.toBe("https://cdn.example.com/x.png");
+        expect(getSignedUrl).toHaveBeenCalledTimes(1);
     });
 });

@@ -119,6 +119,14 @@ keeps working however long ago it was uploaded. A reference that names an
 object that no longer exists is left as it is. `storageReference(key,
 storageId?)` builds one, for text you write yourself.
 
+Text saved before references existed holds a private file's download URL
+itself, `…/storage/file/posts/cover.png?token=…`, whose token expired minutes
+after it was written. `resolveStorageReferences` renews those too: the token
+still names the object, so the URL is replaced by a fresh one. To store
+references instead, rewrite the text once with
+`storageReferencesForDownloadUrls(text)`, which leaves every other URL as it
+is.
+
 ## Download a File
 
 Retrieve a file as a `File` object:

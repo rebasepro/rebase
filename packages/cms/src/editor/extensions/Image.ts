@@ -1,7 +1,7 @@
 import { cls, defaultBorderMixin } from "@rebasepro/ui";
 import { Decoration, DecorationSet, EditorView } from "prosemirror-view";
 import { EditorState, Plugin, PluginKey } from "prosemirror-state";
-import { isStorageReference } from "@rebasepro/types";
+import { isStorageReference, storageTargetOfDownloadUrl } from "@rebasepro/types";
 
 export type UploadFn = (image: File) => Promise<string>;
 
@@ -36,15 +36,25 @@ export function imageSrcResolverOf(state: EditorState): ImageSrcResolver | undef
 }
 
 /**
+ * Whether a stored `src` is renewed when shown: a reference, or a private
+ * file's download URL saved before references (its token has expired).
+ */
+export function isRenewableImageSrc(src: string): boolean {
+    return isStorageReference(src) || storageTargetOfDownloadUrl(src) !== null;
+}
+
+/**
  * The URL to load for a stored `src`: a reference resolved, anything else as
- * it is, and `undefined` for a reference this editor cannot resolve.
+ * it is, and `undefined` for a reference this editor cannot resolve. A saved
+ * download URL is renewed, and kept as it is when it cannot be.
  */
 export async function loadableImageSrc(state: EditorState, src: string): Promise<string | undefined> {
-    if (!isStorageReference(src)) return src;
+    if (!isRenewableImageSrc(src)) return src;
+    const fallback = isStorageReference(src) ? undefined : src;
     try {
-        return (await imageSrcResolverOf(state)?.(src)) ?? undefined;
+        return (await imageSrcResolverOf(state)?.(src)) ?? fallback;
     } catch {
-        return undefined;
+        return fallback;
     }
 }
 
