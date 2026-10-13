@@ -35,7 +35,7 @@ All auth endpoints are mounted at `/api/auth/`:
 | `POST` | `/api/auth/otp` | Email a six-digit sign-in code. Answers the same whether or not the address has an account |
 | `POST` | `/api/auth/otp/verify` | Exchange `{ email, code }` for a session |
 | `POST` | `/api/auth/anonymous` | Create an anonymous session (opt-in — `ALLOW_ANONYMOUS`) |
-| `POST` | `/api/auth/anonymous/link` | Attach real credentials to the anonymous account already signed in |
+| `POST` | `/api/auth/anonymous/link` | Attach real credentials to the anonymous account already signed in. Needs `allowAnonymous` and open registration both: `403 ANONYMOUS_AUTH_DISABLED` once anonymous sign-in is off, guests signed in before included, and `403 REGISTRATION_DISABLED` while registration is closed |
 | `GET` | `/api/auth/sessions` | List the caller's active sessions, one per sign-in. The caller's own is marked `isCurrentSession` |
 | `DELETE` | `/api/auth/sessions` | Revoke every session, this one included — remote logout on every device |
 | `DELETE` | `/api/auth/sessions/:id` | Revoke one session: its refresh token, and the access token that device holds |

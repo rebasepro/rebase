@@ -160,7 +160,8 @@ await client.auth.linkAnonymous("user@example.com", "correct-horse-battery");
 
 | Failure | Means |
 |---------|-------|
-| `ANONYMOUS_AUTH_DISABLED` (403) | The backend has not enabled anonymous auth |
+| `ANONYMOUS_AUTH_DISABLED` (403) | The backend has not enabled anonymous auth, or turned it off since this guest signed in: a guest becomes an account only while `allowAnonymous` is on |
+| `REGISTRATION_DISABLED` (403) | Registration is closed on the backend, and becoming an account is registration |
 | `NOT_ANONYMOUS` (400) | The current session belongs to an ordinary account |
 | `EMAIL_EXISTS` (409) | The address already has an account — sign in to that one instead |
 

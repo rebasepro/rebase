@@ -191,3 +191,32 @@ describe("POST /auth/link/:provider on a guest", () => {
         expect(store.providersOf(guest.json.user.uid)).toEqual([]);
     });
 });
+
+/**
+ * `/anonymous/link` is gated on `allowAnonymous` as `/anonymous` is. Turning
+ * anonymous sign-in off therefore also closes the door for the guests already
+ * signed in: none of them can become an account, and the docs say so.
+ */
+describe("POST /auth/anonymous/link after anonymous sign-in is switched off", () => {
+    it("refuses the guests signed in before", async () => {
+        const store = new MemoryAuthStore();
+        const app = (allowAnonymous: boolean) => {
+            const hono = new Hono<HonoEnv>();
+            hono.onError(errorHandler);
+            hono.route("/auth", createAuthRoutes({ authRepo: store.repo(), authHooks: HOOKS, allowRegistration: true, allowAnonymous }));
+            return hono;
+        };
+        const signedIn = await app(true).request("/auth/anonymous", { method: "POST" });
+        expect(signedIn.status).toBe(201);
+        const { tokens } = await signedIn.json() as { tokens: { accessToken: string } };
+
+        const res = await app(false).request("/auth/anonymous/link", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${tokens.accessToken}` },
+            body: JSON.stringify({ email: "late@corp.com", password: PASSWORD })
+        });
+
+        expect(res.status).toBe(403);
+        expect((await res.json() as { error: { code: string } }).error.code).toBe("ANONYMOUS_AUTH_DISABLED");
+    });
+});
