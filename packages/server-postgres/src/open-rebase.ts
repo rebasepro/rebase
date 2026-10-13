@@ -17,6 +17,7 @@ import {
     type CollectionConfig,
     type RebaseSdkData,
     type RebaseServerClient,
+    type RegisteredDatabase,
     type User
 } from "@rebasepro/types";
 import { buildSdkData, createAccessorSlugResolver } from "@rebasepro/common";
@@ -61,14 +62,19 @@ export interface OpenRebaseOptions {
 /**
  * An open project. `dataAsAdmin` and `sql` are the accessors of the same name
  * a server-side function gets (`RebaseServerClient`).
+ *
+ * Typed by `DB`, which defaults to the `Database` the project registered
+ * (`rebase generate-sdk --register`, see `Register` in `@rebasepro/types`) —
+ * the type a function's `rebase.dataAsAdmin` has — and is untyped when it
+ * registered none.
  */
-export interface OpenedRebase extends Pick<RebaseServerClient<unknown>, "dataAsAdmin" | "sql"> {
+export interface OpenedRebase<DB = RegisteredDatabase> extends Pick<RebaseServerClient<DB>, "dataAsAdmin" | "sql"> {
     /**
      * The data as `user` sees it: every read and write runs as them, filtered
      * by the collections' row-level security policies — the scoping an HTTP
      * request from that user gets. Named after the driver method it uses.
      */
-    withAuth(user: RebaseIdentity): Promise<{ data: RebaseSdkData }>;
+    withAuth(user: RebaseIdentity): Promise<{ data: RebaseSdkData<DB> }>;
     /** The collections this was opened with, or the ones the database described. */
     readonly collections: CollectionConfig[];
     /** End the pool `openRebase` created. Safe to call twice; a `connection` you passed stays open. */
@@ -115,8 +121,11 @@ function userFor(identity: RebaseIdentity): User {
  * entry. A `withAuth` request on a connection that bypasses row-level
  * security runs as the restricted role a server boot provisions; against a
  * database no server has booted on, it fails rather than run unfiltered.
+ *
+ * Its accessors are typed from the `Database` the project registered, as a
+ * function's are; `openRebase<Database>(…)` names one for this call instead.
  */
-export async function openRebase(options: OpenRebaseOptions): Promise<OpenedRebase> {
+export async function openRebase<DB = RegisteredDatabase>(options: OpenRebaseOptions): Promise<OpenedRebase<DB>> {
     if (!options.databaseUrl && !options.connection) {
         throw new Error("openRebase needs a `databaseUrl` or a `connection`.");
     }
@@ -177,8 +186,8 @@ export async function openRebase(options: OpenRebaseOptions): Promise<OpenedReba
         }
     }
     const resolveAccessor = createAccessorSlugResolver(() => registry.getCollections());
-    const dataAs = async (identity: RebaseIdentity): Promise<RebaseSdkData> =>
-        buildSdkData(await driver.withAuth(userFor(identity)), { resolveAccessor });
+    const dataAs = async (identity: RebaseIdentity): Promise<RebaseSdkData<DB>> =>
+        buildSdkData<DB>(await driver.withAuth(userFor(identity)), { resolveAccessor });
 
     const dataAsAdmin = await dataAs(SERVICE_IDENTITY);
     const admin = driver.admin;

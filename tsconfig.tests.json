@@ -195,7 +195,11 @@
     // does not declare, and the other half is a literal annotated with the
     // type — a compile error only tsc can report, because this package's jest
     // transpiles with `isolatedModules` and checks no types at all.
-    "packages/server-postgres/test/callback-context-client.test.ts"
+    "packages/server-postgres/test/callback-context-client.test.ts",
+    // `openRebase<Database>()` and `OpenedRebase<Database>`: typed accessors,
+    // and a nonsense collection or field an error. Every assertion is a
+    // `@ts-expect-error` or an annotation, so the file is inert unread.
+    "packages/server-postgres/test/open-rebase-types.type-test.ts"
   ],
   "exclude": [
     "**/node_modules",
