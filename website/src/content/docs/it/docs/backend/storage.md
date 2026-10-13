@@ -1,31 +1,31 @@
 ---
-sourceHash: 9f860853c1427015
-title: Configurazione dello Storage
-sidebar_label: Configurazione dello Storage
-description: Configura backend di storage su filesystem locale, compatibili con S3 o GCS/Firebase Storage per il caricamento di file, immagini e contenuti multimediali.
+sourceHash: 5be4e3768bac692e
+title: Configurazione dello storage
+sidebar_label: Configurazione dello storage
+description: Configura backend di storage per filesystem locale, compatibili con S3 o GCS/Firebase Storage per il caricamento di file, immagini e contenuti multimediali.
 ---
 
 ## Panoramica
 
 Rebase supporta tre backend di storage:
 
-- **Filesystem locale** — File archiviati su disco (ottimo per lo sviluppo)
+- **Filesystem locale** — File archiviati su disco (ideale per lo sviluppo)
 - **Compatibile con S3** — AWS S3, MinIO, Cloudflare R2, DigitalOcean Spaces
-- **Google Cloud Storage / Firebase Storage** — Supporto nativo GCS tramite `@google-cloud/storage`
+- **Google Cloud Storage / Firebase Storage** — Supporto nativo per GCS tramite `@google-cloud/storage`
 
 ## Configurazione
 
 :::note[Dove va inserito]
-**Runtime gestito** — le variabili `STORAGE_*` in `.env` (`STORAGE_TYPE`, `STORAGE_BUCKET` o `S3_BUCKET` / `GCS_BUCKET`, `STORAGE_PATH`, `STORAGE_PUBLIC_READ`, … — aggiungi il suffisso `__<KEY>` a una qualsiasi di esse per una sorgente con nome), più una dichiarazione `bucket("<key>")` in `config/resources.ts` per ogni bucket oltre a quello predefinito, ed `export const storageAuthorize` da `config/index.ts`. `storageAuthorize` non ha intenzionalmente una forma basata su variabili d'ambiente: nessuna variabile può esprimere "questo utente può leggere questa chiave".
+**Runtime gestito** — le variabili `STORAGE_*` in `.env` (`STORAGE_TYPE`, `STORAGE_BUCKET` o `S3_BUCKET` / `GCS_BUCKET`, `STORAGE_PATH`, `STORAGE_PUBLIC_READ`, … — aggiungi a ciascuna di esse il suffisso `__<KEY>` per una sorgente con nome), più una dichiarazione `bucket("<key>")` in `config/resources.ts` per ogni bucket oltre a quello predefinito, ed `export const storageAuthorize` da `config/index.ts`. `storageAuthorize` non ha intenzionalmente una forma basata su variabili d'ambiente: nessuna variabile può esprimere "questo utente può leggere questa chiave".
 
-**Ejected** — il blocco `storage` su `initializeRebaseBackend({ … })`. `storagePolicies` e `storageTriggers` sono disponibili solo in modalità ejected.
+**Ejected** — il blocco `storage` in `initializeRebaseBackend({ … })`. `storagePolicies` e `storageTriggers` sono disponibili solo in modalità ejected.
 
-La mappatura completa si trova in [Panoramica del Backend](/docs/backend/#where-each-option-lives).
+La mappa completa si trova in [Panoramica del backend](/docs/backend/#where-each-option-lives).
 :::
 
 Lo storage viene configurato nel blocco `storage` di `initializeRebaseBackend`:
 
-### Storage Locale
+### Storage locale
 
 ```typescript no-verify
 const backend = await initializeRebaseBackend({
@@ -37,7 +37,7 @@ const backend = await initializeRebaseBackend({
 });
 ```
 
-Lo storage locale conserva i metadati di ogni oggetto accanto a esso, come `<key>.metadata.json`, quindi una chiave il cui ultimo segmento termina con `.metadata.json` viene rifiutata con `400 INVALID_STORAGE_KEY` su ogni route. S3 e GCS conservano i metadati sull'oggetto e memorizzano qualsiasi chiave. Su un file system insensibile alle maiuscole (macOS e Windows per impostazione predefinita) `Avatar.png` e `avatar.png` sono un solo file locale ma due oggetti su S3, GCS o un disco Linux, quindi il server emette un avviso all'avvio quando la cartella di storage si trova su uno di essi.
+Lo storage locale conserva i metadati di ogni oggetto accanto ad esso, come `<key>.metadata.json`, quindi una chiave il cui ultimo segmento termina con `.metadata.json` viene rifiutata con `400 INVALID_STORAGE_KEY` su ogni route. S3 e GCS mantengono i metadati sull'oggetto e archiviano qualsiasi chiave. Su un file system senza distinzione tra maiuscole e minuscole (case-insensitive, come macOS e Windows per impostazione predefinita), `Avatar.png` e `avatar.png` rappresentano un unico file locale ma due oggetti distinti su S3, GCS o su un disco Linux; pertanto, il server genera un avviso all'avvio se la cartella di storage si trova su uno di essi.
 
 ### Storage S3
 
@@ -56,7 +56,7 @@ const backend = await initializeRebaseBackend({
 });
 ```
 
-### Storage GCS / Firebase
+### GCS / Firebase Storage
 
 ```typescript no-verify
 const backend = await initializeRebaseBackend({
@@ -69,9 +69,9 @@ const backend = await initializeRebaseBackend({
 });
 ```
 
-Su GCP (Cloud Run, GCE, GKE), le credenziali predefinite del service account vengono utilizzate automaticamente. Al di fuori di GCP, imposta la variabile d'ambiente `GOOGLE_APPLICATION_CREDENTIALS` sul percorso del file delle chiavi del service account.
+Su GCP (Cloud Run, GCE, GKE), le credenziali del service account predefinito vengono utilizzate automaticamente. Al di fuori di GCP, imposta la variabile d'ambiente `GOOGLE_APPLICATION_CREDENTIALS` sul percorso del file della chiave del tuo service account.
 
-### Backend di Storage Multipli
+### Backend di storage multipli
 
 È possibile configurare più backend con nome e indirizzare campi diversi verso storage differenti:
 
@@ -82,7 +82,7 @@ storage: {
 }
 ```
 
-Quindi, nelle proprietà della tua collezione, fai riferimento a uno specifico backend:
+Successivamente, nelle proprietà della tua collection, fai riferimento a uno specifico backend:
 
 ```typescript
 image: {
@@ -95,31 +95,27 @@ image: {
 }
 ```
 
-## Endpoint di Storage
+## Endpoint di storage
 
 | Metodo | Percorso | Descrizione |
-|--------|----------|-------------|
+|--------|------|-------------|
 | `POST` | `/api/storage/upload` | Caricamento diretto di file |
-| `POST` | `/api/storage/upload?storageId=<key>` | Caricamento verso uno specifico backend con nome |
+| `POST` | `/api/storage/upload?storageId=<key>` | Caricamento su uno specifico backend con nome |
 | `GET` | `/api/storage/file/*` | Recupera un file — tutto ciò che segue `/file/` è la chiave dell'oggetto |
 | `GET` | `/api/storage/file/*?storageId=<key>` | Recupera un file da uno specifico backend |
-| `GET` | `/api/storage/metadata/*` | Dimensione, content type e metadati personalizzati di un oggetto, senza i suoi byte, più un token di download di breve durata quando è privato |
-| `POST` | `/api/storage/metadata` | <span class="since-badge" data-since="0.25">Da 0.25</span> Lo stesso per fino a 100 oggetti di una sorgente: body `{ keys, storageId? }` |
+| `GET` | `/api/storage/metadata/*` | Dimensioni, tipo di contenuto e metadati personalizzati di un oggetto, senza i relativi byte, più un token di download di breve durata quando è privato |
+| `POST` | `/api/storage/metadata` | <span class="since-badge" data-since="0.25">Da 0.25</span> Lo stesso per un massimo di 100 oggetti di una sorgente: body `{ keys, storageId? }` |
 | `DELETE` | `/api/storage/file/*` | Elimina un file |
 | `GET` | `/api/storage/list` | Elenca gli oggetti sotto un prefisso (`prefix`, `bucket`, `maxResults`, `pageToken`, `storageId`). Un `maxResults` inferiore a 1, o un `pageToken` mai emesso dalla sorgente, restituisce `400 INVALID_LIST_OPTIONS` |
-| `POST` | `/api/storage/folder` | Crea un marker di cartella vuota |
+| `POST` | `/api/storage/folder` | Crea un marcatore di cartella vuota |
 | `GET` | `/api/storage/sources` | Le sorgenti di storage servite da questo backend, per chiave |
-| `OPTIONS` | `/api/storage/tus` | Interroga le funzionalità supportate dal protocollo TUS |
-| `POST` | `/api/storage/tus` | Avvia una sessione di caricamento TUS ripristinabile |
+| `OPTIONS` | `/api/storage/tus` | Interroga le funzionalità supportate del protocollo TUS |
+| `POST` | `/api/storage/tus` | Avvia una sessione di caricamento ripristinabile (resumable) TUS |
 | `HEAD` | `/api/storage/tus/:id` | Verifica l'avanzamento del caricamento (offset dei byte) |
-| `PATCH` | `/api/storage/tus/:id` | Aggiunge un blocco di dati al file temporaneo |
+| `PATCH` | `/api/storage/tus/:id` | Aggiunge un chunk di dati al file temporaneo |
 | `DELETE` | `/api/storage/tus/:id` | Termina/interrompe la sessione di caricamento TUS |
 
-**Cosa restituiscono.** Un singolo envelope, lo stesso utilizzato da `/api/data`: il payload
-si trova sotto `data`, e un fallimento è `{ "error": { message, code, requestId } }`
-con i codici presenti nel [riferimento degli errori](/docs/backend/errors/). `/api/storage/file/*`
-fa eccezione, poiché il suo payload è il file stesso — restituisce i byte, con
-`Content-Type`, `Content-Length` e gli header di caching.
+**Cosa restituiscono.** Un unico envelope, lo stesso utilizzato da `/api/data`: il payload si trova sotto `data`, e un errore corrisponde a `{ "error": { message, code, requestId } }` con i codici presenti nel [riferimento degli errori](/docs/backend/errors/). `/api/storage/file/*` rappresenta un'eccezione, poiché il suo payload è il file stesso: restituisce i byte, insieme a `Content-Type`, `Content-Length` e agli header di caching.
 
 ```json
 // GET /api/storage/list?prefix=products/images/
@@ -127,32 +123,13 @@ fa eccezione, poiché il suo payload è il file stesso — restituisce i byte, c
   "size": 48213, "updated": "2026-10-01T12:00:00.000Z", "contentType": "image/jpeg" } ], "prefixes": [] } }
 ```
 
-<span class="since-badge" data-since="0.25">Da 0.25</span> Un elenco descrive ogni file che restituisce: la sua `size` in byte e
-`updated`, quando è stato scritto per l'ultima volta, su storage locale, S3 e GCS, e il suo
-`contentType` su storage locale e GCS. Un elenco S3 non porta il tipo,
-quindi su S3 è assente e `/api/storage/metadata/*` lo dice comunque. Una cartella in
-`prefixes` non ne porta nessuno, e nemmeno uno `StorageController` personalizzato che
-non li imposta.
+<span class="since-badge" data-since="0.25">Da 0.25</span> Un elenco descrive ciascun file restituito: la sua dimensione `size` in byte e `updated`, data dell'ultima scrittura, su storage locale, S3 e GCS, e il suo `contentType` su storage locale e GCS. Un elenco S3 non include il tipo, quindi su S3 questo campo è assente e `/api/storage/metadata/*` continua a fornirlo. Una cartella in `prefixes` non include nessuno di questi valori, così come un `StorageController` personalizzato che non li imposta.
 
-`POST /api/storage/upload` risponde con `201` contenente `{ key, bucket, storageUrl }`
-dell'oggetto archiviato sotto `data`; `GET /api/storage/metadata/*` con i metadati dell'oggetto
-e, per un oggetto privato, il `token` di breve durata;
-`POST /api/storage/metadata` con un oggetto indicizzato dai percorsi che gli sono stati inviati, ciascuno con ciò che la `GET` avrebbe risposto per esso (vedi sotto).
-Una cartella non è un oggetto: `/metadata` su una chiave che termina con `/` è `404` su ogni store, anche dove S3 o GCS conservano un marcatore `folder/`, quindi nessun token di download viene emesso per un prefisso;
-`GET /api/storage/sources` con l'array delle sorgenti configurate e `configured: true`. Su un deployment senza alcuno storage risponde `200 {"data": [], "configured": false}`, mentre ogni altra route risponde `501 STORAGE_NOT_CONFIGURED`. `GET /api/auth/config` riporta lo stesso dato come `storage: false`, così un client può evitare di chiedere. `GET /api/storage/sources` è pubblica: risponde senza token anche quando `requireAuth` è attivo. Nomina le sorgenti (chiave, engine, trasporto ed etichetta) e mai un file, e l'SDK client la legge per configurare le proprie sorgenti, cosa che può avvenire prima che qualcuno abbia effettuato l'accesso. Un'app che legge anonimamente una sorgente `direct` ne ha bisogno a sua volta. Ogni route che elenca, legge o scrive un file mantiene la propria autenticazione.
-`DELETE /api/storage/file/*` e `POST /api/storage/folder` contengono solo un
-`message`, poiché non c'è nulla da restituire.
+`POST /api/storage/upload` restituisce `201` con l'oggetto `{ key, bucket, storageUrl }` memorizzato sotto `data`; `GET /api/storage/metadata/*` restituisce i metadati dell'oggetto e, per un oggetto privato, il `token` di breve durata; `POST /api/storage/metadata` restituisce un oggetto indicizzato per i percorsi inviati, ciascuno contenente ciò che avrebbe restituito la `GET` per esso (vedi sotto). Una cartella non è un oggetto: chiamare `/metadata` su una chiave che termina con `/` restituisce `404` su ogni storage, anche laddove S3 o GCS mantengono un marcatore `folder/`, quindi non viene generato alcun token di download per un prefisso; `GET /api/storage/sources` restituisce l'array delle sorgenti configurate, con `configured: true`. Su un deployment senza alcuno storage configurato, restituisce `200 {"data": [], "configured": false}`, mentre ogni altra route restituisce `501 STORAGE_NOT_CONFIGURED`. `GET /api/auth/config` riporta lo stesso fatto con `storage: false`, in modo che un client possa evitare di richiederlo. `GET /api/storage/sources` è pubblico: risponde senza token anche quando `requireAuth` è attivo. Riporta le sorgenti (chiave, motore, trasporto ed etichetta) e mai un file, e l'SDK client lo legge per collegare le proprie sorgenti, il che può avvenire prima che chiunque abbia effettuato l'accesso. Anche un'app che legge una sorgente `direct` in modo anonimo ne ha bisogno. Ogni route che elenca, legge o scrive un file mantiene la propria autenticazione. `DELETE /api/storage/file/*` e `POST /api/storage/folder` contengono solo un `message`, poiché non c'è nulla da restituire.
 
-Su S3 e GCS, un `bucket` deve essere uno di quelli serviti dalla sorgente, in
-scrittura come in lettura: un caricamento, un `POST /api/storage/folder` o un
-caricamento TUS che nomina un altro bucket risponde
-`404 UNKNOWN_STORAGE_SOURCE`, come l'elenco. Lo storage locale crea ancora un
-bucket alla prima scrittura.
+Su S3 e GCS, un `bucket` deve essere tra quelli serviti dalla sorgente, sia in scrittura che in lettura: un caricamento, un `POST /api/storage/folder` o un caricamento TUS che specifichi qualsiasi altro bucket restituisce `404 UNKNOWN_STORAGE_SOURCE`, così come l'elenco. Lo storage locale continua a creare un bucket alla prima scrittura.
 
-**Molti oggetti in una volta.** <span class="since-badge" data-since="0.25">Da 0.25</span> `POST /api/storage/metadata` accetta
-`{ "keys": ["photos/a.png", "photos/b.png"], "storageId": "media" }` — fino a 100
-percorsi di oggetti di una sorgente, ciascuno scritto come lo accetta `GET /api/storage/metadata/<key>`
-— e risponde con una voce per chiave:
+**Molti oggetti contemporaneamente.** <span class="since-badge" data-since="0.25">Da 0.25</span> `POST /api/storage/metadata` accetta `{ "keys": ["photos/a.png", "photos/b.png"], "storageId": "media" }` — fino a 100 percorsi di oggetti di una sorgente, ciascuno formattato come farebbe `GET /api/storage/metadata/<key>` — e restituisce una voce per chiave:
 
 ```json
 { "data": {
@@ -161,175 +138,102 @@ percorsi di oggetti di una sorgente, ciascuno scritto come lo accetta `GET /api/
 } }
 ```
 
-Ogni chiave viene giudicata esattamente come la giudica la `GET` — lo stesso hook
-`storageAuthorize` e lo stesso scope di storage, la stessa regola di pubblico, un token di download
-proprio — e una chiave rifiutata, mancante o malformata risponde con il proprio `error` senza far fallire
-né rivelare le altre. Un chiamante senza sessione in un deployment che ne richiede una
-riceve il `401` che risponderebbe la `GET`, a meno che ogni chiave sia pubblica. Più di
-100 chiavi, o un body senza `keys`, è `400 BAD_REQUEST`. Il rate limiter conta
-la richiesta come ⌈N/10⌉ richieste per N chiavi, quindi una pagina di 100 miniature ne costa 10.
-`client.storage.getSignedUrl()` e il pannello di amministrazione inviano in questo modo le ricerche che una pagina fa
-insieme, e ripiegano su una `GET` per file su un server privo della
-route.
+Ciascuna chiave viene valutata esattamente come farebbe la `GET` — con lo stesso hook `storageAuthorize` e scope di storage, la stessa regola pubblica, un proprio token di download — e una chiave rifiutata, mancante o non valida restituisce il proprio `error` senza fallire o esporre le altre. Un chiamante senza sessione in un deployment che ne richiede una riceve il `401` che la `GET` avrebbe restituito, a meno che tutte le chiavi non siano pubbliche. Più di 100 chiavi, o un body privo di `keys`, restituisce `400 BAD_REQUEST`. Il rate limiter conteggia la richiesta come ⌈N/10⌉ richieste per N chiavi, quindi una pagina di 100 miniature costa 10. `client.storage.getSignedUrl()` e il pannello di amministrazione inviano in questo modo le ricerche aggregate effettuate da una pagina, ricorrendo a una `GET` per file sui server privi della route.
 
-**Come viene autorizzata la lettura di un file.** Le rotte di lettura — `/api/storage/file/*` e
-`/api/storage/metadata/*` — accettano il token firmato di breve durata generato da
-[`getSignedUrl()`](/docs/sdk/storage), passato come `?token=<token>` o come
-`Bearer`. Un normale JWT di accesso viene **rifiutato** su `/file/*` con `401
-Unauthorized: Access JWT not allowed on file routes`: il token valido su
-qualsiasi altra rotta non funziona lì, intenzionalmente, poiché l'URL di un file è
-qualcosa che si passa a un browser, a una CDN o a un tag `<img>`. Tutte le altre
-righe sopra indicate accettano il normale JWT di accesso.
+**Come viene autorizzata la lettura di un file.** Le route di lettura — `/api/storage/file/*` e `/api/storage/metadata/*` — accettano il token firmato di breve durata generato da [`getSignedUrl()`](/docs/sdk/storage), passato come `?token=<token>` o come `Bearer`. Un normale JWT di accesso viene **rifiutato** su `/file/*` con `401 Unauthorized: Access JWT not allowed on file routes`: il token che funziona su ogni altra route non funziona lì, di proposito, perché l'URL di un file è qualcosa che viene fornito a un browser, a una CDN o a un tag `<img>`. Tutte le altre route sopra indicate accettano il JWT di accesso come di consueto.
 
-## Trasformazioni delle Immagini al Volo
+## Trasformazioni di immagini al volo
 
-Rebase include una pipeline integrata di elaborazione delle immagini basata su **Sharp**. Quando si servono asset di immagini dallo storage, è possibile applicare operazioni dinamiche utilizzando i parametri di query:
+Rebase include una pipeline integrata di elaborazione delle immagini basata su **Sharp**. Quando si distribuiscono risorse grafiche dallo storage, è possibile applicare operazioni dinamiche utilizzando parametri di query:
 
 ```bash
 # Serve image scaled to 300px width in webp format
 GET /api/storage/file/products/laptop.jpg?width=300&format=webp
 ```
 
-### Parametri Supportati
+### Parametri supportati
 
 - `width`, `height`: Limiti di ridimensionamento, da `1` a `4096` (l'immagine non viene mai ingrandita).
-- `quality`: `1`–`100`.
+- `quality`: Da `1` a `100`.
 - `format`: Converte il formato dell'immagine. Formati supportati: `webp`, `jpeg`, `png`, `avif`.
 - `fit`: `cover`, `contain`, `fill`, `inside` o `outside`.
 
-Un parametro al di fuori di questi limiti restituisce un **400**, non un valore
-limitato silenziosamente — in passato `?width=99999` restituiva un'immagine a 4096px
-e `?format=tiff` una webp, senza alcun avviso.
+Un parametro al di fuori di questi limiti restituisce un **400**, non un valore limitato silenziosamente (clamp) — in precedenza `?width=99999` restituiva un'immagine da 4096px e `?format=tiff` un'immagine in formato webp, senza alcun avviso.
 
-Le miniature delle immagini archiviate nel pannello di amministrazione usano questo endpoint: l'anteprima
-di una tabella o di una card richiede una rendition webp di circa il doppio della dimensione a cui viene
-visualizzata (96–800px) anziché l'originale. `sharp` è una dipendenza facoltativa; senza di essa la
-trasformazione risponde 500, quindi il pannello verifica una sola volta per caricamento di pagina, con una
-singola richiesta di rendition, e mostra gli originali se il server non può ridimensionare. I file SVG e GIF
-vengono sempre mostrati così come sono.
+Le miniature delle immagini archiviate nel pannello di amministrazione utilizzano questo endpoint: l'anteprima di una tabella o di una scheda richiede una versione in formato webp di dimensioni pari a circa il doppio della dimensione renderizzata (96–800px) invece dell'originale. `sharp` è una dipendenza opzionale; in sua assenza la trasformazione risponde con 500, quindi il pannello effettua una verifica a ogni caricamento della pagina con una singola richiesta di rendering, mostrando gli originali se il server non è in grado di ridimensionarli. I file SVG e GIF vengono sempre mostrati così come sono.
 
-### Prestazioni e Caching LRU
+### Prestazioni e caching LRU
 
-La trasformazione è onerosa in termini di CPU e memoria, e su un oggetto pubblico
-l'endpoint è accessibile anonimamente, per cui il lavoro viene limitato oltre che
-semplicemente memorizzato nella cache:
-- **Capacità**: una LRU limitata a **500 voci** a livello globale, indicizzata per sorgente
-  di storage, bucket e chiave canonica.
-- **TTL (Time to Live)**: Le varianti nella cache scadono dopo **1 ora**.
-- Richieste concorrenti per la stessa variante non presente nella cache producono **una sola**
-  trasformazione, non una per ciascuna.
-- Viene eseguito solo un numero limitato di trasformazioni contemporaneamente; superata una
-  coda delimitata, il server risponde con **503 `TRANSFORM_OVERLOADED`** invece di
-  accettare lavoro che non riuscirà a completare.
+La trasformazione richiede un uso intensivo di CPU e memoria e, per gli oggetti pubblici, l'endpoint è raggiungibile in modo anonimo; pertanto, il carico di lavoro viene delimitato oltre che memorizzato nella cache:
+- **Capacità**: una cache LRU con un limite massimo di **500 voci** a livello globale, indicizzata per sorgente di storage, bucket e chiave canonica.
+- **TTL (Time to Live)**: Le varianti in cache scadono dopo **1 ora**.
+- Richieste simultanee per la stessa variante non presente in cache generano **una sola** trasformazione, non una per ciascuna richiesta.
+- Viene eseguito un numero limitato di trasformazioni contemporaneamente; oltre una determinata coda di attesa, il server risponde con **503 `TRANSFORM_OVERLOADED`** invece di accettare elaborazioni che non riuscirebbe a gestire.
 
-Tale cache risiede nel processo, il che significa che non è condivisa tra le istanze
-e non sopravvive a un riavvio. Due repliche elaborano ciascuna ogni variante e un
-deploy cancella tutto.
+Questa cache risiede nel processo, il che significa che non è condivisa tra istanze e non sopravvive a un riavvio. Due repliche calcolano ciascuna ogni variante, e un nuovo deployment cancella tutto.
 
-### Rendition che sopravvivono a un riavvio
+### Versioni renderizzate che sopravvivono a un riavvio
 
-`storageRenditionCache` riscrive ciascuna immagine derivata nello stesso bucket della
-sua sorgente, in modo che il lavoro venga svolto una sola volta per l'intero deployment
-anziché una volta per istanza per ogni release:
+`storageRenditionCache` riscrive ciascuna immagine derivata nello stesso bucket della sorgente, in modo che l'elaborazione venga eseguita una sola volta per l'intero deployment anziché una volta per istanza a ogni release:
 
 ```ts
 storageRenditionCache: { enabled: true }
 ```
 
-oppure `STORAGE_RENDITION_CACHE=true` per un bundle deployment. Le rendition vengono
-archiviate sotto il prefisso riservato `_rebase/renditions/`, indicizzate in base alla versione
-dell'oggetto sorgente — pertanto la sostituzione di un'immagine serve immediatamente quella nuova.
+oppure `STORAGE_RENDITION_CACHE=true` per un deployment in bundle. Le versioni renderizzate vengono archiviate sotto il prefisso riservato `_rebase/renditions/`, indicizzate in base alla versione dell'oggetto sorgente — quindi la sostituzione di un'immagine rende immediatamente disponibile la nuova versione.
 
-Tre aspetti da sapere prima di abilitarla:
+Tre aspetti da considerare prima di abilitarlo:
 
-- **Una lettura ora comporta una scrittura.** Ogni nuova variante richiede una `PUT` nel tuo
-  bucket. Per questo motivo è disabilitata per impostazione predefinita.
-- **Una scrittura fallita non equivale a una richiesta fallita.** Credenziali in sola lettura
-  o una policy del bucket che rifiuta il prefisso effettuano il fallback sulla cache in-process;
-  l'immagine viene comunque servita e la motivazione viene registrata una volta nei log.
-- **Le rendition sostituite non vengono eliminate automaticamente.** La sostituzione di un oggetto
-  sorgente abbandona le sue vecchie rendition. Imposta una regola del ciclo di vita (lifecycle rule)
-  su `_rebase/renditions/` — tale prefisso è fisso e non configurabile, proprio per consentire a una
-  regola di farvi riferimento.
+- **Una lettura ora scrive.** Ogni nuova variante comporta una `PUT` nel tuo bucket. Per questa ragione è disabilitato per impostazione predefinita.
+- **Una scrittura non riuscita non equivale a una richiesta non riuscita.** Credenziali di sola lettura o una policy del bucket che rifiuta il prefisso causano un degrado alla cache interna al processo; l'immagine viene comunque servita e il motivo viene registrato nei log una sola volta.
+- **Le versioni sostituite non vengono eliminate automaticamente.** La sostituzione di un oggetto sorgente abbandona le sue vecchie versioni generate. Configura una regola di ciclo di vita (lifecycle rule) su `_rebase/renditions/` — questo prefisso è fisso e non configurabile proprio per consentire a una regola di farvi riferimento.
 
-Il prefisso non è indirizzabile dall'API. La lettura o scrittura diretta
-restituisce **400 `INVALID_STORAGE_KEY`**: qualsiasi regola di accesso nel prodotto —
-sia `storageAuthorize` sia le policy dichiarative — è scritta rispetto alla chiave
-*sorgente*, e una rendition servita sotto il proprio percorso risponderebbe a una
-domanda mai formulata.
+Il prefisso non è accessibile direttamente tramite l'API. Leggerlo o scriverlo direttamente risponde con **400 `INVALID_STORAGE_KEY`**: ogni regola di accesso nel prodotto — sia `storageAuthorize` che le policy dichiarative — è scritta rispetto alla chiave *sorgente*, e una versione renderizzata servita tramite il proprio percorso risponderebbe a una richiesta non prevista.
 
 ### Cosa viene servito
 
-Il content type archiviato corrisponde a quanto dichiarato dall'autore del caricamento —
-nulla esamina i byte — pertanto `/api/storage/file/*` eseguirà il rendering inline solo per
-una **ristretta allowlist**: immagini, video, audio, `application/pdf` e `text/plain`.
-Qualsiasi altra cosa, incluso `text/html`, viene servita come
-`application/octet-stream` con `Content-Disposition: attachment`, e ogni
-risposta include `X-Content-Type-Options: nosniff`. Lo storage non è un web host:
-una pagina caricata e renderizzata sull'origine dell'API potrebbe leggere i cookie di
-quell'origine e chiamare i suoi endpoint.
+Il content type memorizzato corrisponde a quello dichiarato da chi carica il file — non viene effettuato alcuno sniffing dei byte — quindi `/api/storage/file/*` effettuerà il rendering inline solo per una **allowlist limitata**: immagini, video, audio, `application/pdf` e `text/plain`. Qualsiasi altra cosa, incluso `text/html`, viene servita come `application/octet-stream` con `Content-Disposition: attachment`, e ogni risposta include `X-Content-Type-Options: nosniff`. Lo storage non è un web host: una pagina caricata e renderizzata sull'origine dell'API potrebbe leggere i cookie di quell'origine e chiamarne gli endpoint.
 
-Un SVG è un'immagine che è anche un documento, e può contenere `<script>`. Viene
-servito come `image/svg+xml` — quindi viene renderizzato in un `<img>` e nelle
-miniature del pannello di amministrazione — con
-`Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'; sandbox`
-su ogni risposta, incluse le URL trasformate e quelle con token di download.
-Aperto direttamente, viene renderizzato con gli script disattivati e un'origine
-opaca, quindi non può raggiungere i cookie o gli endpoint dell'API.
+Un SVG è un'immagine che funge anche da documento e può contenere tag `<script>`. Viene servito come `image/svg+xml` — in modo da essere renderizzato in un tag `<img>` e nelle miniature del pannello di amministrazione — con `Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'; sandbox` su ogni risposta, inclusi gli URL trasformati e quelli con token di download. Se aperto direttamente, viene renderizzato con gli script disabilitati e un'origine opaca, impedendogli di accedere ai cookie o agli endpoint dell'API.
 
-## Quanto può essere grande un file
+## Limiti di dimensione dei file
 
-Ogni sorgente di storage accetta file fino al proprio limite: **50 MB** a meno
-che `STORAGE_MAX_FILE_SIZE` (in byte, con suffisso `__<KEY>` per una sorgente
-con nome) o il `maxFileSize` della sorgente non dicano altro. Ogni canale
-applica lo stesso numero a un file. `POST /api/storage/upload` risponde
-`413 PAYLOAD_TOO_LARGE` sopra quel limite; un caricamento riprendibile viene
-rifiutato alla creazione, prima del suo primo chunk; e
-`OPTIONS /api/storage/tus` lo annuncia come `Tus-Max-Size` — per la sorgente
-indicata da `?storageId=`, altrimenti quella predefinita.
+Ciascuna sorgente di storage accetta file fino al proprio limite: **50 MB**, a meno che `STORAGE_MAX_FILE_SIZE` (in byte, con suffisso `__<KEY>` per una sorgente con nome) o il valore `maxFileSize` della sorgente non indichino diversamente. Ogni punto di accesso applica lo stesso limite. `POST /api/storage/upload` risponde con `413 PAYLOAD_TOO_LARGE` oltre tale valore; un caricamento ripristinabile viene rifiutato al momento della creazione, prima del suo primo chunk; e `OPTIONS /api/storage/tus` lo notifica come `Tus-Max-Size` — per la sorgente specificata da `?storageId=`, o per quella predefinita in caso contrario.
 
-per `STORAGE_MAX_FILE_SIZE`: sulla 0.23 solo il `maxFileSize` della sorgente
-imposta il limite, e la variabile non viene letta.
+Per quanto riguarda `STORAGE_MAX_FILE_SIZE`: sulla versione 0.23 solo `maxFileSize` della sorgente definisce il limite, e la variabile non viene letta.
 
 ```bash
-STORAGE_MAX_FILE_SIZE=209715200          # (predefinito): 200 MB
+STORAGE_MAX_FILE_SIZE=209715200          # (default): 200 MB
 STORAGE_MAX_FILE_SIZE__MEDIA=1073741824  # media: 1 GB
 ```
 
-Quanto di un file il server tiene in memoria in una volta dipende dalla porta.
-`POST /api/storage/upload` è un unico body multipart, che il server analizza per
-intero: da tre a cinque volte il file nella sua memoria. Un caricamento
-riprendibile (TUS) tiene un solo chunk alla volta. <span class="since-badge" data-since="0.25">Da 0.25</span> `client.storage.putObject()` e il pannello di amministrazione inviano un file
-oltre 8 MiB nel modo riprendibile. Vedi
-[Caricamenti riprendibili (TUS)](/docs/backend/storage-resumable-uploads/) per il
-protocollo, cosa risponde e come si comporta tra le istanze.
+La quantità di file che il server gestisce contemporaneamente in memoria dipende dal punto di accesso. `POST /api/storage/upload` è un corpo multipart singolo, che il server analizza per intero: da tre a cinque volte la dimensione del file nella sua memoria. Un caricamento ripristinabile (TUS) gestisce un chunk alla volta. <span class="since-badge" data-since="0.25">Da 0.25</span> `client.storage.putObject()` e il pannello di amministrazione inviano i file superiori a 8 MiB in modalità ripristinabile. Consulta [Caricamenti ripristinabili (TUS)](/docs/backend/storage-resumable-uploads/) per i dettagli sul protocollo, sulle risposte e sul comportamento tra le diverse istanze.
 
-## Variabili d'Ambiente
+## Variabili d'ambiente
 
 | Variabile | Descrizione |
 |-----------|-------------|
-| `STORAGE_TYPE` | `"local"`, `"s3"` o `"gcs"` |
-| `STORAGE_PATH` | Directory di storage locale (predefinito: `./uploads`) |
+| `STORAGE_TYPE` | `"local"`, `"s3"`, o `"gcs"` |
+| `STORAGE_PATH` | Directory di storage locale (predefinita: `./uploads`). Un bucket locale con nome conserva i propri file accanto ad esso, in `<STORAGE_PATH>__<key>`, a meno che `STORAGE_PATH__<KEY>` non specifichi il proprio |
 | `S3_BUCKET` | Nome del bucket S3 |
 | `S3_REGION` | Regione AWS (predefinita: `"auto"`) |
 | `S3_ACCESS_KEY_ID` | Access key AWS |
 | `S3_SECRET_ACCESS_KEY` | Secret key AWS |
 | `S3_ENDPOINT` | Endpoint S3 personalizzato (per MinIO, R2) |
-| `S3_FORCE_PATH_STYLE` | Usa URL in path-style (richiesto per MinIO) |
+| `S3_FORCE_PATH_STYLE` | Utilizza URL in stile path-style (richiesto per MinIO) |
 | `GCS_BUCKET` | Nome del bucket Google Cloud Storage |
 | `GCS_PROJECT_ID` | ID progetto GCP per GCS |
-| `GCS_KEY_FILENAME` | Percorso di un file di chiavi di un service account GCP (omettere su GKE — Workload Identity/ADC fornisce le credenziali) |
-| `GOOGLE_APPLICATION_CREDENTIALS` | Variabile ADC standard, letta direttamente dall'SDK Google (non necessaria su GCP con credenziali predefinite) |
-| `STORAGE_DOWNLOAD_TOKEN_TTL` | Per quanto tempo funziona l'URL di download di un file privato, in secondi — la durata del token che `/api/storage/metadata/*` emette (predefinito `300`, al massimo `604800`, una settimana). Aumentala per video e audio privati, che continuano a richiedere range dopo il rendering della pagina. La forma env di `storageDownloadTokenTtl` |
-| `STORAGE_MAX_FILE_SIZE` | Il file più grande accettato dalla sorgente, in byte (predefinito `52428800`, 50 MB). Suffisso `__<KEY>` per una sorgente con nome. Un valore che non è un numero intero di byte impedisce l'avvio. Vedi [Quanto può essere grande un file](#quanto-può-essere-grande-un-file) |
+| `GCS_KEY_FILENAME` | Percorso del file della chiave del service account GCP (omettere su GKE — Workload Identity/ADC fornisce le credenziali) |
+| `GOOGLE_APPLICATION_CREDENTIALS` | Variabile standard ADC, letta direttamente dall'SDK di Google (non necessaria su GCP con credenziali predefinite) |
+| `STORAGE_DOWNLOAD_TOKEN_TTL` | Durata di validità dell'URL di download di un file privato, in secondi — il tempo di vita del token generato da `/api/storage/metadata/*` (predefinito `300`, massimo `604800`, ovvero una settimana). Da aumentare per video e audio privati, che continuano a richiedere intervalli di byte dopo il rendering della pagina. È la versione variabile d'ambiente di `storageDownloadTokenTtl` |
+| `STORAGE_MAX_FILE_SIZE` | Dimensione massima del file accettata dalla sorgente, in byte (predefinita `52428800`, 50 MB). Aggiungi il suffisso `__<KEY>` per una sorgente con nome. Un valore che non sia un numero intero di byte impedisce l'avvio. Consulta [Limiti di dimensione dei file](#limiti-di-dimensione-dei-file) |
 | `FORCE_LOCAL_STORAGE` | Consente `STORAGE_TYPE=local` in produzione — vedi sotto |
-| `STORAGE_PUBLIC_READ` | Serve gli oggetti archiviati a lettori non autenticati. Versione per variabili d'ambiente di `storagePublicRead`, e uno dei tre modi per soddisfare il [guard di avvio in produzione](#autorizzazione-per-oggetto). |
-| `STORAGE_ALLOW_ANY_AUTHENTICATED` | Disattiva il guard di avvio, ripristinando il comportamento in cui qualsiasi utente autenticato può leggere, sovrascrivere, eliminare o elencare qualsiasi chiave. Versione per variabili d'ambiente di `storageInsecureAllowAnyAuthenticated`. Giustificabile solo se ogni utente autenticato è ritenuto affidabile per qualsiasi file. |
+| `STORAGE_PUBLIC_READ` | Distribuisce gli oggetti archiviati a lettori non autenticati. È la versione variabile d'ambiente di `storagePublicRead`, e uno dei tre modi per soddisfare il [controllo di sicurezza all'avvio in produzione](#autorizzazione-per-singolo-oggetto). |
+| `STORAGE_ALLOW_ANY_AUTHENTICATED` | Disattiva il controllo di sicurezza all'avvio, ripristinando il comportamento in cui qualsiasi utente autenticato può leggere, sovrascrivere, eliminare o elencare qualsiasi chiave. È la versione variabile d'ambiente di `storageInsecureAllowAnyAuthenticated`. Accettabile solo quando ogni utente autenticato è considerato affidabile per ogni file. |
 
-## Più Bucket
+## Bucket multipli
 
-Un progetto può avere più di un bucket. Dichiarane ciascuno in `config/resources.ts`
-— l'unico punto letto dalla piattaforma, dal runtime e dalla console:
+Un progetto può avere più di un bucket. Dichiarane ciascuno in `config/resources.ts` — l'unico punto letto dalla piattaforma, dal runtime e dalla console:
 
 ```ts
 import { bucket } from "@rebasepro/types";
@@ -338,14 +242,9 @@ export const uploads = bucket({ engine: "s3" });    // the default one
 export const media = bucket("media", { engine: "s3", label: "Media" });
 ```
 
-Esegui quindi `rebase resources --write`, che rigenera `rebase.resources.json`
-in modo che un host possa leggere la tua topologia senza dover eseguire una build. Consulta
-[Sorgenti Multiple](/docs/backend/multiple-sources) per database, bucket e
-topic insieme.
+Quindi esegui `rebase resources --write`, che rigenera `rebase.resources.json` in modo che un host possa leggere la topologia senza dover eseguire una build. Consulta [Sorgenti multiple](/docs/backend/multiple-sources) per approfondire database, bucket e topic insieme.
 
-Ciascuna sorgente viene configurata tramite i **medesimi nomi di variabile provvisti del proprio
-suffisso**. La sorgente predefinita non richiede alcun suffisso, pertanto un progetto a singolo bucket
-continua a utilizzare i nomi semplici sopra indicati e non necessita di alcuna dichiarazione aggiuntiva:
+Ogni sorgente viene configurata tramite gli **stessi nomi di variabili a cui viene aggiunto il proprio suffisso**. La sorgente predefinita non accetta alcun suffisso, quindi un progetto con un singolo bucket continua a usare i nomi semplici sopra indicati e non deve dichiarare nulla:
 
 ```bash
 S3_BUCKET=app-uploads             # (default)
@@ -354,10 +253,7 @@ S3_ACCESS_KEY_ID__MEDIA=…
 S3_SECRET_ACCESS_KEY__MEDIA=…
 ```
 
-Il suffisso è ricavato dalla chiave: convertita in maiuscolo, caratteri non alfanumerici
-trasformati in trattini bassi, preceduta da un **doppio** trattino basso (`media-cdn` → `__MEDIA_CDN`). Un
-singolo trattino basso entrerebbe in collisione con nomi di variabile reali — `S3_BUCKET_NAME`
-verrebbe interpretato come bucket `name`.
+Il suffisso deriva dalla chiave: trasformata in maiuscolo, i caratteri non alfanumerici convertiti in underscore, preceduti da un **doppio** underscore (`media-cdn` → `__MEDIA_CDN`). Un singolo underscore entrerebbe in conflitto con i nomi reali delle variabili — `S3_BUCKET_NAME` verrebbe interpretato come bucket `name`.
 
 Indirizza una proprietà a una sorgente con `storageSource`:
 
@@ -369,19 +265,11 @@ Indirizza una proprietà a una sorgente con `storageSource`:
 }
 ```
 
-Una sorgente dichiarata ma mai configurata viene **ignorata**, senza conseguenze fatali:
-i caricamenti indirizzati verso di essa rispondono con `501 STORAGE_SOURCE_NOT_CONFIGURED`. La dichiarazione
-di un bucket avviene solitamente prima che vi venga collegato uno storage, e un errore di
-avvio in questo caso provocherebbe un crash-loop del backend. Una sorgente configurata in modo
-*errato* tramite variabili d'ambiente — un tipo senza bucket o un bucket senza credenziali — viene
-invece rifiutata all'avvio, trattandosi di un errore piuttosto che di una semplice assenza.
+Una sorgente dichiarata ma mai configurata viene **ignorata**, senza provocare errori irreversibili: i caricamenti indirizzati verso di essa rispondono con `501 STORAGE_SOURCE_NOT_CONFIGURED`. La dichiarazione di un bucket avviene solitamente prima che qualcuno vi colleghi effettivamente dello storage, e un errore di avvio causerebbe un crash loop del backend finché l'operazione non viene completata. Una sorgente configurata in modo *errato* nell'ambiente — ad esempio un tipo senza bucket, o un bucket senza credenziali — viene invece rifiutata all'avvio, trattandosi di un errore e non di una semplice assenza.
 
 ### Bucket che condividono un unico account
 
-Le credenziali descrivono solitamente il **provider**, non il bucket. Quindici bucket su
-una singola installazione di MinIO significherebbero altrimenti quindici copie della stessa
-access key, e una rotazione richiederebbe quindici modifiche correlate. È possibile invece
-assegnare un nome a un account:
+Le credenziali descrivono solitamente il **provider**, non il bucket. Altrimenti, quindici bucket su una singola installazione MinIO richiederebbero quindici copie della stessa chiave di accesso, e una rotazione comporterebbe quindici modifiche coordinate. È possibile invece assegnare un nome a un account:
 
 ```ts
 export const media = bucket("media", { engine: "s3", account: "minio" });
@@ -396,15 +284,11 @@ S3_SECRET_ACCESS_KEY__MINIO=…
 S3_ENDPOINT__MINIO=https://minio.internal
 ```
 
-Solo le variabili con ambito account (account-scoped) effettuano il fallback — `S3_ACCESS_KEY_ID`,
-`S3_SECRET_ACCESS_KEY`, `S3_ENDPOINT`, `S3_REGION`, `S3_FORCE_PATH_STYLE` e
-la coppia GCS `GCS_PROJECT_ID` / `GCS_KEY_FILENAME`. Il nome del bucket non lo fa mai:
-è ciò che distingue una sorgente dall'altra. Un valore specificato per singolo bucket ha
-comunque la precedenza, consentendo a una sorgente di cambiare provider senza interrompere le altre.
+Solo le variabili con ambito account (account-scoped) utilizzano il fallback — `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_ENDPOINT`, `S3_REGION`, `S3_FORCE_PATH_STYLE` e la coppia GCS `GCS_PROJECT_ID` / `GCS_KEY_FILENAME`. Il nome del bucket non usa mai il fallback: è ciò che distingue una sorgente dall'altra. Un valore impostato a livello di singolo bucket ha comunque sempre la precedenza, consentendo a una sorgente di cambiare provider senza compromettere le altre.
 
-## Sorgenti di Storage per il Frontend
+## Sorgenti di storage nel frontend
 
-Quando si utilizzano più backend di storage, passa `storageSources` al provider `<Rebase>` in modo che il frontend sappia come instradare direttamente i caricamenti:
+Quando si utilizzano più backend di storage, passa `storageSources` al provider `<Rebase>` in modo che il frontend sappia come instradare i caricamenti direttamente:
 
 ```tsx
 import { Rebase } from "@rebasepro/app";
@@ -423,37 +307,33 @@ import { Rebase } from "@rebasepro/app";
 </Rebase>
 ```
 
-La `key` di ciascuna sorgente deve corrispondere a una chiave backend registrata nella mappa `storage` del server. Il contesto React `StorageSourcesContext` risolve la sorgente attiva per ciascun campo di caricamento.
+La proprietà `key` di ciascuna sorgente deve corrispondere a una chiave backend registrata nella mappa `storage` del server. Il contesto React `StorageSourcesContext` risolve la sorgente attiva per ciascun campo di caricamento.
 
 ## Caching e CDN
 
-Ogni oggetto viene veicolato tramite proxy attraverso il server, con un `ETag`
-per una riconvalida economica, un `Cache-Control` che dipende da chi è
-autorizzato a leggerlo, e range in byte per il seeking in audio e video.
-[Caching dello storage e CDN](/docs/backend/storage-caching/) riporta gli
-header, e cosa configurare su una CDN davanti.
+Ogni oggetto viene veicolato tramite proxy attraverso il server, con un `ETag` per una convalida efficiente, un `Cache-Control` che varia in base a chi è autorizzato a leggerlo e intervalli di byte per la ricerca (seeking) in contenuti audio e video. La documentazione su [Caching dello storage e CDN](/docs/backend/storage-caching/) illustra gli header e la configurazione di una CDN a monte.
 
-## Consigli per la Produzione
+## Suggerimenti per la produzione
 
 :::caution
-**In produzione, `type: "local"` disabilita l'archiviazione dei file anziché utilizzarla.** Su una piattaforma effimera (Cloud Run, Heroku, un pod Kubernetes) il filesystem viene cancellato a ogni deploy, riavvio o eviction — pertanto i caricamenti andrebbero a buon fine, verrebbero letti correttamente, ma svanirebbero al successivo rollout, senza generare alcun errore in nessun momento.
+**In produzione, `type: "local"` disabilita lo storage dei file invece di utilizzarlo.** Su una piattaforma effimera (Cloud Run, Heroku, un pod Kubernetes) il filesystem viene cancellato a ogni deploy, riavvio o eviction — pertanto i caricamenti andrebbero a buon fine, la lettura funzionerebbe regolarmente, ma i file scomparirebbero al rollout successivo, senza alcun errore in nessun momento.
 
-Di conseguenza il default locale non viene registrato, e una richiesta a `/api/storage/*` che non nomina alcuna sorgente di storage risponde con **`501 STORAGE_NOT_CONFIGURED`**, indicando le sorgenti servite. Una sorgente con nome configurata, come `bucket("media", { engine: "s3" })`, continua a funzionare. I caricamenti falliscono in modo esplicito e recuperabile; il resto dell'applicazione continua a funzionare. L'archiviazione dei file richiede un'abilitazione esplicita in produzione: esiste solo nel momento in cui è presente un bucket.
+Pertanto, l'opzione locale predefinita non viene registrata e una richiesta a `/api/storage/*` che non specifichi alcuna sorgente di storage risponde con **`501 STORAGE_NOT_CONFIGURED`**, indicando le sorgenti effettivamente servite. Una sorgente con nome configurata, come `bucket("media", { engine: "s3" })`, continuerà a funzionare. I caricamenti falliscono in modo esplicito e recuperabile; il resto dell'applicazione continua a funzionare regolarmente. Lo storage dei file è opt-in in produzione: esiste solo a partire dal momento in cui viene configurato un bucket.
 
-Imposta `STORAGE_TYPE=s3` o `gcs`. Se è effettivamente montato un **volume permanente** su `STORAGE_PATH`, imposta `FORCE_LOCAL_STORAGE=true` per specificarlo esplicitamente.
+Imposta `STORAGE_TYPE=s3` o `gcs`. Se `STORAGE_PATH` risiede effettivamente su un **volume permanente**, imposta `FORCE_LOCAL_STORAGE=true` per dichiararlo esplicitamente. Montalo sulla directory padre di `STORAGE_PATH`, in modo che anche la directory `<STORAGE_PATH>__<key>` di ciascun bucket locale con nome sia inclusa in esso.
 :::
 
-- Monta un **volume persistente** se utilizzi lo storage locale su Docker/Kubernetes, e imposta `FORCE_LOCAL_STORAGE=true`
-- Utilizza **S3** o compatibili (R2, MinIO), oppure **GCS**, per i deployment in produzione
-- Configura una **CDN** (CloudFront, Cloudflare) davanti per migliorare le prestazioni — vedi [Inserire una CDN davanti](/docs/backend/storage-caching/#putting-a-cdn-in-front)
-- **Qualsiasi applicazione con storage in produzione deve dichiarare un modello di accesso** — vedi sotto.
-  Non solo quelle multi-tenant: il server *rifiuterà di avviarsi* senza di esso.
+- Monta un **volume persistente** sulla cartella padre di `STORAGE_PATH` se utilizzi lo storage locale su Docker/Kubernetes e imposta `FORCE_LOCAL_STORAGE=true` — vedi [Self-hosting](/docs/deployment/self-hosting/#file-storage)
+- Utilizza **S3** o compatibili (R2, MinIO), oppure **GCS**, per i deployment di produzione
+- Configura una **CDN** (CloudFront, Cloudflare) a monte per migliorare le prestazioni — vedi [Posizionare una CDN a monte](/docs/backend/storage-caching/#putting-a-cdn-in-front)
+- **Qualsiasi app con storage in produzione deve dichiarare un modello di accesso** — vedi sotto.
+  Non solo quelle multi-tenant: il server *rifiuta l'avvio* se ne è sprovvisto.
 
-## Autorizzazione per Oggetto
+## Autorizzazione per singolo oggetto
 
 ### Policy
 
-La forma dichiarativa. Un elenco di pattern di percorso, letti senza eseguire nulla:
+La forma dichiarativa. Un elenco di pattern di percorso, analizzati senza eseguire codice:
 
 ```ts
 storagePolicies: [
@@ -462,56 +342,37 @@ storagePolicies: [
 ]
 ```
 
-**Una chiave che non corrisponde ad alcuna policy viene rifiutata.** Ogni estensione
-dei permessi è una riga esplicita, e un errore nega l'accesso anziché concederlo.
+**Una chiave che non corrisponde ad alcuna policy viene rifiutata.** Ogni estensione dei permessi richiede una riga esplicita, e un errore nega l'accesso anziché concederlo.
 
-I pattern effettuano il match **per segmento, mai per sottostringa** — `public/**` non
-corrisponde a `publicity/secret.png`:
+I pattern effettuano la corrispondenza **per segmento, mai per sottostringa** — `public/**` non corrisponde a `publicity/secret.png`:
 
 | Pattern | Corrispondenza |
 |---|---|
-| `avatars/logo.png` | quella chiave esattamente |
-| `users/*/avatar.png` | esattamente un segmento dove si trova `*` |
-| `users/:uid/**` | un segmento catturato, poi il resto — compreso il vuoto |
+| `avatars/logo.png` | esattamente quella chiave |
+| `users/*/avatar.png` | esattamente un segmento al posto di `*` |
+| `users/:uid/**` | un segmento catturato, poi il resto — compreso nulla |
 
-`**` è valido solo come segmento finale. `:name` cattura un segmento e non oltrepassa mai
-uno `/`; le catture arrivano come `params` nel predicato.
+`**` è valido solo come segmento finale. `:name` cattura un segmento e non include mai uno `/`; le acquisizioni arrivano come `params` nel predicato.
 
-`allow` può essere `"public"` (chiunque), `"authenticated"` (qualsiasi chiamante con uno uid),
-oppure un predicato che riceve i parametri catturati, l'utente, l'operazione e il bucket.
-`operations` assume come valore predefinito tutte e quattro le operazioni — `read`, `write`, `delete`, `list`.
+`allow` può essere `"public"` (chiunque), `"authenticated"` (qualsiasi chiamante dotato di uid), oppure un predicato che riceve i parametri catturati, l'utente, l'operazione e il bucket. Per impostazione predefinita, `operations` include tutti e quattro — `read`, `write`, `delete`, `list`.
 
-Le policy soddisfano autonomamente il boot guard di produzione, e un pattern non valido
-fa fallire l'avvio anziché il primo caricamento.
+Le policy soddisfano autonomamente il controllo di sicurezza all'avvio in produzione, e un pattern malformato causa il fallimento dell'avvio anziché del primo caricamento.
 
 ### L'hook
 
-`requireAuth` e `publicRead` sono switch *globali*: determinano se un chiamante debba essere
-autenticato, non cosa tale chiamante possa toccare. Senza un hook di autorizzazione, **qualsiasi utente
-autenticato può leggere qualsiasi chiave di cui conosca il nome** — l'unica cosa che separa i file
-di due tenant è l'impossibilità di indovinare le chiavi, che non costituisce un modello di controllo
-accessi. Peggio ancora, possono prima eseguire `GET /storage/list?prefix=`, quindi le chiavi non
-devono nemmeno essere indovinate.
+`requireAuth` e `publicRead` sono selettori *globali*: determinano se un chiamante debba essere autenticato, non cosa tale chiamante possa toccare. Senza un hook di autorizzazione, **qualsiasi utente autenticato può leggere qualsiasi chiave di cui conosca il nome** — l'unico fattore a separare i file di due tenant diversi è l'imprevedibilità delle chiavi, che non costituisce un modello di controllo accessi. Peggio ancora, è possibile effettuare preliminarmente una richiesta `GET /storage/list?prefix=`, eliminando persino la necessità di indovinare le chiavi.
 
-:::caution[Lo storage non si avvierà in produzione senza di esso]
-Le collezioni sono protette dalla row-level security; lo storage no. Non esiste un
-equivalente per-oggetto nel bucket, pertanto questo hook *è* il modello — e
-`initializeRebaseBackend` **genera un'eccezione all'avvio** con `NODE_ENV=production` quando
-lo storage è configurato e nessuno di questi elementi è impostato:
+:::caution[In produzione lo storage non si avvia in assenza di una configurazione]
+Le collection sono protette da row-level security; lo storage no. Nel bucket non esiste un equivalente a livello di singolo oggetto, pertanto questo hook *è* il modello — e `initializeRebaseBackend` **genera un'eccezione all'avvio** con `NODE_ENV=production` quando lo storage è configurato e nessuno di questi elementi è impostato:
 
-- `storageAuthorize` — un hook per singolo oggetto. Consigliato.
-- `storagePublicRead: true` — il bucket è a tutti gli effetti una CDN pubblica in sola lettura.
-- `storageInsecureAllowAnyAuthenticated: true` — un'app single-tenant in cui ogni
-  utente autenticato è considerato affidabile per ogni file. Denominato appositamente per invitare a rileggerlo con cautela.
+- `storageAuthorize` — un hook, per singolo oggetto. Consigliato.
+- `storagePublicRead: true` — il bucket è effettivamente una CDN pubblica in sola lettura.
+- `storageInsecureAllowAnyAuthenticated: true` — un'app single-tenant in cui ogni utente autenticato è ritenuto affidabile per qualunque file. Denominato appositamente per richiedere una seconda lettura.
 
-In ambiente di sviluppo registra invece un avviso, quindi un progetto può essere configurato
-male sotto questo aspetto e funzionare correttamente in locale fino al momento del deployment.
-Un progetto generato tramite scaffolding include già un hook in `config/storage.ts` — leggilo prima
-di sostituirlo e tieni presente che modella una *libreria di contenuti condivisa* tipica di un CMS,
-che non ha la stessa struttura dei file per singolo utente.
+In fase di sviluppo viene invece registrato un avviso nei log, consentendo al progetto di avere una configurazione scorretta e funzionare localmente fino al momento del deployment. Un progetto generato tramite scaffold include già un hook in `config/storage.ts` — leggilo prima di sostituirlo e tieni presente che modella una *libreria di contenuti condivisa* tipica di un CMS, con una struttura diversa rispetto ai file specifici per utente.
 :::
 
-`storageAuthorize` è l'analogo per lo storage delle regole di sicurezza di una collezione, ed viene eseguito dopo l'autenticazione su ciascuna rotta di storage:
+`storageAuthorize` è l'equivalente per lo storage delle regole di sicurezza di una collection, e viene eseguito dopo l'autenticazione su ogni route di storage:
 
 ```typescript no-verify
 await initializeRebaseBackend({
@@ -527,42 +388,31 @@ await initializeRebaseBackend({
 
 | Campo | Descrizione |
 |-------|-------------|
-| `key` | Chiave dell'oggetto, senza prefisso del bucket e ripulita da directory traversal |
+| `key` | Chiave dell'oggetto, privata del prefisso del bucket e ripulita da problemi di path traversal |
 | `bucket` | Bucket risolto (`"default"` se non specificato) |
 | `operation` | `"read"`, `"write"`, `"delete"` o `"list"` |
-| `user` | `{ uid, email?, roles? }`, oppure `null` dove la rotta consente l'accesso anonimo |
-| `storageId` | Il backend con nome, quando la richiesta ne ha preso di mira uno — la sua chiave canonica (`storageId=%20media` è `"media"`). Assente per la sorgente predefinita, comunque la richiesta la indichi (nessun parametro, vuoto o `(default)`) |
-| `data` | Accesso in lettura affidabile che **ignora l'RLS** — `data.collection(slug).find(query)` / `.findById(id)`. La proprietà risiede in una riga, non nel prefisso di una chiave, quindi l'hook necessita di un lettore per rispondere a "chi possiede questo oggetto?". Ignora deliberatamente la row-level security: questo hook *è* la decisione di autorizzazione, e prenderla attraverso un lettore già limitato dai permessi del chiamante stesso risulterebbe circolare. In sola lettura per progettazione. |
+| `user` | `{ uid, email?, roles? }`, oppure `null` dove la route consente l'accesso anonimo |
+| `storageId` | Il backend con nome, se la richiesta ne indicava uno — la sua chiave canonica (`storageId=%20media` corrisponde a `"media"`). Assente per la sorgente predefinita, indipendentemente da come la richiesta l'abbia indicata (senza parametro, vuota o `(default)`) |
+| `data` | Accesso in lettura affidabile che **ignora la RLS** — `data.collection(slug).find(query)` / `.findById(id)`. La proprietà risiede in un record, non nel prefisso di una chiave, quindi l'hook necessita di un lettore per stabilire "chi è il proprietario di questo oggetto?". Bypassa intenzionalmente la row-level security: questo hook *costituisce* la decisione di autorizzazione, e subordinarla a un lettore già vincolato dai permessi del chiamante creerebbe un paradosso circolare. Di sola lettura per progettazione. |
 
-Restituisci `false` per negare l'accesso con un **403**. Anche il sollevamento di un'eccezione
-(throw) nega l'accesso — un controllo di proprietà fallito non lascia la porta aperta.
+Restituisci `false` per negare l'accesso con un codice **403**. Anche il lancio di un'eccezione nega l'accesso — un controllo di proprietà fallito non lascia le porte aperte.
 
-Da sapere:
+Informazioni utili:
 
-- **La rotta dei metadati è il punto in cui viene realmente decisa l'autorizzazione di lettura.** È qui che viene generato il token di download temporaneo associato al percorso di cui la rotta del file si fida, perciò l'hook ne regola l'accesso in questo punto. Due letture saltano l'hook, per scelta. Una che porta tale token: l'hook l'ha approvata quando il token è stato emesso, solo per quel percorso e quella sorgente, quindi un hook che ora rifiuterebbe (un'appartenenza revocata nel frattempo) non la ferma prima che il token scada — `storageDownloadTokenTtl`, 300 secondi per impostazione predefinita. E una lettura di una chiave sotto `public/` da parte di un chiamante senza credenziali: il prefisso è la dichiarazione che chiunque può leggerla, visitatori anonimi e CDN compresi. La lettura dello stesso file da parte di un chiamante autenticato viene comunque sottoposta all'hook, ma quella anonima no, quindi un hook non può rendere privata una chiave `public/`; archivia invece il file fuori da `public/`. Solo queste due letture lo saltano: un utente che il tuo auth adapter chiama `public` viene interrogato come chiunque altro.
-- **Un bucket, un nome.** Su S3 e GCS il `bucket` dell'hook è sempre `"default"`, anche quando una richiesta nomina il bucket del provider, che raggiunge gli stessi oggetti.
-- **Un percorso è pubblico quando lo è la chiave che indica.** Il prefisso `public/` viene verificato sulla chiave canonica servita dalla rotta — dopo aver letto un eventuale segmento di bucket `default/` iniziale e aver compresso `//`, `./` e una `/` iniziale —, mai sull'URL così come è scritto. `/api/storage/file/notes://public/x.txt` indica la chiave privata `notes:/public/x.txt`, e la chiave `default/public/x.txt` (raggiunta come `/api/storage/file/default/default/public/x.txt`) si trova in una cartella chiamata `default`; nessuna delle due è pubblica. In un hook, verifica la `key` che ricevi con `isPublicStorageKey` di `@rebasepro/types` — `isPublicStoragePath` legge un percorso o un URL lato client, e considera pubblici entrambi i casi.
-- **`list` è regolato in base al prefisso.** L'elenco è il modo in cui si scoprono chiavi di cui nessuno ti ha parlato.
-- **I caricamenti ripristinabili (TUS) vengono regolati al momento della creazione**, evitando che un caricamento negato lasci file temporanei residui.
-- L'omissione dell'hook mantiene il comportamento precedente, non impattando le app single-tenant.
+- **La route dei metadati è il luogo in cui viene realmente decisa l'autorizzazione di lettura.** È qui che viene generato il token di download temporaneo vincolato al percorso considerato valido dalla route del file, quindi l'hook ne controlla l'accesso a questo livello. Due letture ignorano l'hook, per progettazione. La prima è quella che include tale token: l'hook l'ha già approvata al momento della generazione del token, limitatamente a quel percorso e a quella sorgente, quindi un hook che ora rifiuterebbe l'accesso (ad esempio per una revoca di appartenenza avvenuta nel frattempo) non lo blocca prima della scadenza del token — definita da `storageDownloadTokenTtl`, pari a 300 secondi per impostazione predefinita. La seconda è la lettura di una chiave situata sotto `public/` da parte di un chiamante privo di credenziali: il prefisso costituisce la dichiarazione che chiunque può leggerla, compresi i visitatori anonimi e le CDN. La lettura della stessa da parte di un utente autenticato viene comunque verificata, ma quella anonima no; di conseguenza, un hook non può rendere privata una chiave sotto `public/`; archivia invece il file al di fuori di `public/`. Solo queste due modalità di lettura lo ignorano: un utente che il tuo adapter di autenticazione per coincidenza chiama `public` viene verificato normalmente come chiunque altro.
+- **Un solo bucket, un solo nome.** Su S3 e GCS il valore di `bucket` nell'hook è sempre `"default"`, anche quando una richiesta menziona il bucket del provider, raggiungendo gli stessi oggetti.
+- **Un percorso è pubblico solo quando lo è la chiave a cui fa riferimento.** Il prefisso `public/` viene verificato sulla chiave canonica servita dalla route — dopo che il segmento iniziale del bucket `default/` è stato rimosso e sequenze come `//`, `./` e lo `/` iniziale sono state normalizzate — mai sull'URL così come scritto. `/api/storage/file/notes://public/x.txt` fa riferimento alla chiave privata `notes:/public/x.txt`, e la chiave `default/public/x.txt` (raggiunta come `/api/storage/file/default/default/public/x.txt`) risiede in una cartella denominata `default`; nessuna delle due è pubblica. All'interno di un hook, verifica la `key` ricevuta con `isPublicStorageKey` da `@rebasepro/types` — `isPublicStoragePath` analizza un percorso o URL lato client, e interpreterebbe entrambi come pubblici.
+- **`list` è vincolato al prefisso.** L'elenco è la modalità con cui si scoprono chiavi di cui non si conosceva l'esistenza.
+- **I caricamenti ripristinabili (TUS) sono vincolati al momento della creazione**, evitando che un caricamento rifiutato lasci file temporanei residui.
+- L'omissione dell'hook preserva il comportamento precedente, non impattando sulle applicazioni single-tenant.
 
 ### Chiavi API e token
 
-Una persona autenticata possiede ogni scope dello storage, quindi per lei decidono l'hook e le policy descritti sopra.
-Una [chiave API](/docs/backend/api-keys/) ha bisogno anche dello scope dello storage
-per l'operazione, sulla sorgente indicata dalla richiesta: `storage:read` per
-download, metadati ed elenchi, `storage:write` per caricamenti, cartelle e ogni
-passaggio di un caricamento ripristinabile, `storage:delete` per le eliminazioni. Il target è
-l'id della sorgente, e quello della sorgente predefinita è `(default)`: `storage:read:(default)`,
-`storage:write:avatars`. Senza di esso la risposta è `403 SCOPE_MISSING`. Con esso,
-l'hook viene comunque eseguito, con l'identità con cui agisce la chiave.
+Un utente autenticato possiede tutti gli scope di storage, per cui la decisione spetta all'hook e alle policy descritte sopra. Una [chiave API](/docs/backend/api-keys/) necessita inoltre dello scope di storage appropriato per l'operazione, sulla sorgente specificata dalla richiesta: `storage:read` per download, metadati ed elenchi, `storage:write` per caricamenti, cartelle e ogni fase di un caricamento ripristinabile, `storage:delete` per le eliminazioni. La destinazione è l'id della sorgente, e quello della sorgente predefinita è `(default)`: `storage:read:(default)`, `storage:write:avatars`. Senza di esso, la risposta è `403 SCOPE_MISSING`. Con lo scope presente, l'hook viene comunque eseguito impersonando l'identità associata alla chiave.
 
-## Reagire a un Caricamento
+## Reagire a un caricamento
 
-In Rebase è possibile reagire a qualsiasi altra scrittura — una riga dispone di `beforeSave` e
-`afterSave`, una pianificazione ha un cron job — mentre per un caricamento non c'era nulla.
-Qualsiasi azione derivante da un caricamento doveva essere eseguita dal client, con una seconda
-chiamata, il che significa che non veniva eseguita affatto se il client si disconnetteva nel frattempo.
+In Rebase è possibile reagire a qualsiasi altra operazione di scrittura — un record dispone di `beforeSave` e `afterSave`, una pianificazione di un cron job — mentre per un caricamento non era previsto nulla. Tutto ciò che un caricamento comportava doveva essere eseguito dal client con una seconda chiamata, il che significava che l'operazione non veniva affatto eseguita se il client si disconnetteva nel frattempo.
 
 ```ts
 storageTriggers: [
@@ -576,35 +426,22 @@ storageTriggers: [
 ]
 ```
 
-La sintassi dei pattern è la stessa di `storagePolicies` — segmenti letterali, `*`
-per un segmento, `:name` per catturarne uno, `**` per il resto — e un pattern malformato
-causa il fallimento dell'avvio anziché non corrispondere silenziosamente a nulla.
+Il linguaggio dei pattern è lo stesso di `storagePolicies` — segmenti letterali, `*` per un singolo segmento, `:name` per catturarne uno, `**` per i restanti — e un pattern malformato causa il fallimento dell'avvio anziché non corrispondere a nulla silenziosamente.
 
 | Evento | Quando |
 | --- | --- |
 | `finalize` | dopo che l'oggetto è stato scritto in modo persistente; mai per una scrittura fallita |
-| `delete` | dopo che l'oggetto è stato rimosso |
+| `delete` | dopo che l'oggetto è stato eliminato |
 
-`finalize` si attiva sia per i percorsi multipart sia per quelli ripristinabili (TUS) — una
-volta per caricamento, non una volta per blocco — e un caricamento ripristinabile riporta l'utente
-che lo ha *creato*, poiché è il principal verificato durante l'autorizzazione.
+`finalize` scatta sia per i caricamenti multipart che per quelli ripristinabili (TUS) — una sola volta per caricamento, non per singolo chunk — e un caricamento ripristinabile segnala l'utente che lo ha *creato*, poiché è l'entità verificata dall'autorizzazione.
 
 Cosa un handler non deve presumere:
 
-- **Un handler che solleva un'eccezione non fa fallire la richiesta.** L'oggetto è già stato
-  archiviato nel momento in cui l'handler viene eseguito, pertanto rispondere al client con un
-  errore indicherebbe che il caricamento è fallito quando in realtà non è così, e i client
-  ritentano i caricamenti. Gli errori vengono registrati nei log e la risposta rimane invariata.
-  Se il lavoro deve essere necessariamente completato, accoda un job.
-- **Gli handler vengono attesi (`await`)**, nell'ordine di dichiarazione, prima dell'invio della
-  risposta — eseguire operazioni in modalità 'fire and forget' lascerebbe una promise che un runtime
-  serverless è libero di congelare a metà esecuzione. Un handler lento rende pertanto lento il
-  caricamento, ed è questo l'altro motivo per accodare un job anziché eseguire il lavoro qui.
-- **Le scritture interne non attivano i trigger.** La cache delle rendition di immagini scrive gli
-  oggetti derivati direttamente nel controller di storage; un trigger `**` che scattasse su di essi
-  si attiverebbe sul proprio stesso output.
+- **Un handler che genera un'eccezione non fa fallire la richiesta.** L'oggetto è già stato archiviato nel momento in cui l'handler viene eseguito, quindi rispondere al client con un errore indicherebbe che il caricamento è fallito anche se non è così, inducendo i client a ritentare. I fallimenti vengono registrati nei log e la risposta rimane inalterata. Se l'operazione deve essere necessariamente completata, inserisci un job in coda.
+- **Gli handler vengono attesi (awaited)**, nell'ordine di dichiarazione, prima dell'invio della risposta — un approccio di tipo "fire-and-forget" lascerebbe una promise che un runtime serverless potrebbe congelare a metà esecuzione. Un handler lento rallenta di conseguenza il caricamento, motivo per cui è preferibile accodare l'attività anziché elaborarla qui.
+- **Le scritture interne non attivano i trigger.** La cache delle versioni renderizzate delle immagini scrive gli oggetti derivati direttamente nel controller di storage; un trigger `**` attivato su di essi scatterebbe sul proprio stesso output.
 
-## Passaggi Successivi
+## Passaggi successivi
 
-- **[Storage frontend e caricamento file](/docs/frontend/storage)** — Campi e hook per il caricamento di file
+- **[Storage lato frontend e caricamento file](/docs/frontend/storage)** — Campi e hook per il caricamento dei file
 - **[Proprietà](/docs/collections/properties)** — Configurazione delle proprietà di storage

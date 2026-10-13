@@ -729,7 +729,7 @@ ships), `STORAGE_PUBLIC_READ`, or `STORAGE_ALLOW_ANY_AUTHENTICATED`.
 |----------|-------------|---------|
 | `STORAGE_TYPE` | Storage backend: `local`, `s3` or `gcs`. In production `local` disables storage unless `FORCE_LOCAL_STORAGE=true` | `local` |
 | `STORAGE_PATH` | Base path for local storage | `./uploads` |
-| `FORCE_LOCAL_STORAGE` | Allow local storage in production — only with a durable volume mounted at `STORAGE_PATH` | `false` |
+| `FORCE_LOCAL_STORAGE` | Allow local storage in production — only with a durable volume holding `STORAGE_PATH` and the `<STORAGE_PATH>__<key>` directories of named local buckets beside it | `false` |
 | `STORAGE_DOWNLOAD_TOKEN_TTL` | Seconds a private file's download URL works — the token `getSignedUrl()` puts in it. At most `604800` (a week) | `300` |
 | `STORAGE_MAX_FILE_SIZE` | Largest file the source accepts, in bytes, on every upload path — `__<KEY>` for a named source. Not a whole number of bytes refuses the boot | `52428800` (50 MB) |
 | `S3_BUCKET` | S3 bucket name (when `STORAGE_TYPE=s3`) | — |
@@ -1447,6 +1447,14 @@ these if your app relies on the old behaviour:
 - **The socket gets its token as HTTP does,** so `client.setAuthTokenGetter()`
   now authenticates it, and after a sign-out it no longer falls back to the
   `token` option.
+- **A named local bucket's directory sits beside `STORAGE_PATH`,** as
+  `<STORAGE_PATH>__<key>`, not beside the runtime's own base path. If you set
+  `STORAGE_PATH` and a named local bucket already holds files, boot names the
+  old directory, and `STORAGE_PATH__<KEY>` keeps serving it. A compose file from
+  `rebase init` or `rebase eject` mounts its volume at `/uploads`. That volume
+  holds only the default bucket, and the image's user cannot write to it. Mount
+  it at `/storage` with `STORAGE_PATH: /storage/uploads`, as the new compose
+  files do.
 
 These names still work, warn once at runtime, and have a replacement:
 
@@ -5306,6 +5314,14 @@ yet, listed so that nobody reads a promise into them:
   pair declared them.** Both keep their old shape and behaviour, still declare
   what they load, and warn once per process.
 
+- **The `prefix` option of `bucket()` is deprecated; nothing ever applied
+  it.** A source declared with `prefix: "tenant-a/"` stored its objects at the
+  root of the bucket, so two sources sharing one bucket shared one namespace,
+  and nothing said so. Give each source a bucket of its own (`S3_BUCKET__<KEY>`,
+  `GCS_BUCKET__<KEY>`, or `STORAGE_PATH__<KEY>` for a local one), or put the
+  folder in each storage property's `storagePath`. A declaration that sets it
+  still compiles and deploys, and the backend warns once per bucket at boot.
+
 - **`DatabaseAdapter.mountRoutes` and `BackendBootstrapper.mountRoutes` are
   deprecated.** The server never called them, and its adapter wrappers no
   longer forward them. The types still accept them. A driver that needs HTTP
@@ -5974,6 +5990,20 @@ yet, listed so that nobody reads a promise into them:
   same severity, as heuristic.
 
 ##### Storage & email
+
+- **On a self-hosted container, every local bucket's files survive a
+  recreate.** A named local bucket (`bucket("media", { engine: "local" })`)
+  ignored `STORAGE_PATH` and resolved beside the runtime's bundle, on the
+  container's own filesystem in the compose files `rebase init` and
+  `rebase eject` write, so its uploads succeeded and went with the container.
+  It now sits beside the default bucket's directory:
+  `STORAGE_PATH=/storage/uploads` puts `media` in `/storage/uploads__media`.
+  Both compose files mount their volume at `/storage`, which the runtime image
+  and the ejected Dockerfile create for the user they run as. Their old
+  `/uploads` volume was root's, so default-bucket uploads failed with `EACCES`
+  too. A project scaffolded earlier makes the same change to its compose file
+  (see the upgrade guide). Where a named bucket's old directory still holds
+  files, boot names it and the `STORAGE_PATH__<KEY>` that keeps serving it.
 
 - **Backups over 50 MB upload.** A backup was held to the storage's upload
   limits, `maxFileSize` (50 MB unless set) and `allowedMimeTypes`, so
@@ -26894,7 +26924,7 @@ protocol, what it answers and how it behaves across instances.
 | Variable | Description |
 |----------|-------------|
 | `STORAGE_TYPE` | `"local"`, `"s3"`, or `"gcs"` |
-| `STORAGE_PATH` | Local storage directory (default: `./uploads`) |
+| `STORAGE_PATH` | Local storage directory (default: `./uploads`). A named local bucket keeps its files beside it, in `<STORAGE_PATH>__<key>`, unless `STORAGE_PATH__<KEY>` names its own |
 | `S3_BUCKET` | S3 bucket name |
 | `S3_REGION` | AWS region (default: `"auto"`) |
 | `S3_ACCESS_KEY_ID` | AWS access key |
@@ -27023,10 +27053,10 @@ has the headers, and what to configure on a CDN in front.
 
 So the local default is not registered, and a request to `/api/storage/*` that names no storage source answers **`501 STORAGE_NOT_CONFIGURED`**, naming the sources that are served. A named source that is configured, such as `bucket("media", { engine: "s3" })`, keeps serving. Uploads fail loudly and recoverably; the rest of the app keeps serving. File storage is opt-in in production: it exists once a bucket does.
 
-Set `STORAGE_TYPE=s3` or `gcs`. If a **durable volume** really is mounted at `STORAGE_PATH`, set `FORCE_LOCAL_STORAGE=true` to say so explicitly.
+Set `STORAGE_TYPE=s3` or `gcs`. If a **durable volume** really holds `STORAGE_PATH`, set `FORCE_LOCAL_STORAGE=true` to say so explicitly. Mount it on the parent of `STORAGE_PATH`, so the `<STORAGE_PATH>__<key>` directory of every named local bucket is on it too.
 :::
 
-- Mount a **persistent volume** if using local storage on Docker/Kubernetes, and set `FORCE_LOCAL_STORAGE=true`
+- Mount a **persistent volume** over the parent of `STORAGE_PATH` if using local storage on Docker/Kubernetes, and set `FORCE_LOCAL_STORAGE=true` — see [Self-hosting](/docs/deployment/self-hosting/#file-storage)
 - Use **S3** or compatible (R2, MinIO), or **GCS**, for production deployments
 - Configure a **CDN** (CloudFront, Cloudflare) in front for performance — see [Putting a CDN in front](/docs/backend/storage-caching/#putting-a-cdn-in-front)
 - **Any app with storage in production must declare an access model** — see below.
@@ -27701,6 +27731,14 @@ With no bucket configured, storage is **off** in production and uploads answer
 the next restart — an upload that fails loudly can be retried, one that succeeded
 into a disk about to be wiped cannot. Set `FORCE_LOCAL_STORAGE=true` only when a
 durable volume really is mounted.
+
+That volume has to hold every local bucket, not just the default one. A named
+local bucket's directory sits beside the default's, `<STORAGE_PATH>__<key>`.
+With `STORAGE_PATH=/storage/uploads`, `bucket("media", { engine: "local" })`
+writes to `/storage/uploads__media`. Mount the volume on their parent,
+`/storage`, as the compose file `rebase init` writes does, and not on
+`STORAGE_PATH` itself. `STORAGE_PATH__MEDIA` sets one bucket's directory
+explicitly. See [Self-hosting](/docs/deployment/self-hosting/#file-storage).
 
 One consequence worth knowing if you declare buckets explicitly: no default
 bucket is invented for you. Declaring only `bucket("media")` means there is no
@@ -49895,16 +49933,33 @@ outlives the container:
 
 ```yaml
       STORAGE_TYPE: local
-      STORAGE_PATH: /data/uploads
+      # Each declared bucket gets a directory beside this one, bucket("media")
+      # /storage/uploads__media, so the volume goes on their parent.
+      STORAGE_PATH: /storage/uploads
       FORCE_LOCAL_STORAGE: "true"
     volumes:
-      - uploads:/data/uploads
+      - storage:/storage
 ```
 
 `FORCE_LOCAL_STORAGE` is not optional there: in production a `local` backend is
 dropped rather than registered, because the alternative is uploads that succeed
 into a filesystem about to be destroyed. The variable is how you say the mount
 is durable.
+
+Mount the volume **above** `STORAGE_PATH`, not at it. `STORAGE_PATH` is the
+default bucket's directory, and every bucket declared in `config/resources.ts`
+gets its own beside it, `<STORAGE_PATH>__<key>`. A volume at `STORAGE_PATH`
+itself holds the default bucket only. Every other bucket writes to the
+container's filesystem and loses its files when the container is recreated.
+`STORAGE_PATH__MEDIA` can move one bucket elsewhere on the volume. It cannot
+move it inside another bucket's directory, such as `/storage/uploads/media`,
+because the default bucket would then list, serve and delete its files.
+
+<span class="since-badge" data-since="0.25">Since 0.25</span> The image creates
+`/storage` for the unprivileged `node` user it runs as, which is why the volume
+goes there. A volume mounted where the image has no directory belongs to root,
+and every upload fails with `EACCES`. The compose file `rebase init` writes
+mounts it this way.
 
 #### Storage needs an access-control model
 
@@ -50473,7 +50528,7 @@ some clients never see, or a page that shows different logs on every refresh.
 | Client address behind a proxy | `TRUSTED_PROXY_HOPS=0` | The number of proxies in front, the same everywhere |
 | Collection subscriptions | Shared through the database when CDC is on | `REALTIME_CDC=auto` (the default) |
 | Broadcast channels and presence | In memory | `REALTIME_CHANNEL_BUS=postgres` |
-| Uploaded files, `STORAGE_TYPE=local` | The instance's own disk | S3 or GCS, or one shared volume at `STORAGE_PATH` |
+| Uploaded files, `STORAGE_TYPE=local` | The instance's own disk | S3 or GCS, or one shared volume on the parent of `STORAGE_PATH` |
 | Resumable (TUS) uploads in progress | The instance's disk, at `STORAGE_PATH/.tus-uploads` | One shared volume at `STORAGE_PATH`, or sticky sessions |
 | Image transforms | An in-process cache | `STORAGE_RENDITION_CACHE=true` |
 | Logs Explorer | A ring of the last 10,000 lines | Nothing — ship stdout to a log aggregator |
@@ -50528,7 +50583,8 @@ when `DATABASE_URL` goes through pgBouncer. See
 
 With `STORAGE_TYPE=local`, uploads are files on the disk of the instance that
 received them, and another instance answers 404 for them. Use S3 or GCS, or
-mount one volume at `STORAGE_PATH` on every instance. See
+mount one volume on every instance, on the parent of `STORAGE_PATH` so it also
+holds each named local bucket's `<STORAGE_PATH>__<key>` directory. See
 [Self-hosting: file storage](/docs/deployment/self-hosting/#file-storage).
 
 **Resumable uploads** (the TUS endpoint) keep each upload's partial file, and

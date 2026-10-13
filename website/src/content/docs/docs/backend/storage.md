@@ -307,7 +307,7 @@ protocol, what it answers and how it behaves across instances.
 | Variable | Description |
 |----------|-------------|
 | `STORAGE_TYPE` | `"local"`, `"s3"`, or `"gcs"` |
-| `STORAGE_PATH` | Local storage directory (default: `./uploads`) |
+| `STORAGE_PATH` | Local storage directory (default: `./uploads`). A named local bucket keeps its files beside it, in `<STORAGE_PATH>__<key>`, unless `STORAGE_PATH__<KEY>` names its own |
 | `S3_BUCKET` | S3 bucket name |
 | `S3_REGION` | AWS region (default: `"auto"`) |
 | `S3_ACCESS_KEY_ID` | AWS access key |
@@ -437,10 +437,10 @@ has the headers, and what to configure on a CDN in front.
 
 So the local default is not registered, and a request to `/api/storage/*` that names no storage source answers **`501 STORAGE_NOT_CONFIGURED`**, naming the sources that are served. A named source that is configured, such as `bucket("media", { engine: "s3" })`, keeps serving. Uploads fail loudly and recoverably; the rest of the app keeps serving. File storage is opt-in in production: it exists once a bucket does.
 
-Set `STORAGE_TYPE=s3` or `gcs`. If a **durable volume** really is mounted at `STORAGE_PATH`, set `FORCE_LOCAL_STORAGE=true` to say so explicitly.
+Set `STORAGE_TYPE=s3` or `gcs`. If a **durable volume** really holds `STORAGE_PATH`, set `FORCE_LOCAL_STORAGE=true` to say so explicitly. Mount it on the parent of `STORAGE_PATH`, so the `<STORAGE_PATH>__<key>` directory of every named local bucket is on it too.
 :::
 
-- Mount a **persistent volume** if using local storage on Docker/Kubernetes, and set `FORCE_LOCAL_STORAGE=true`
+- Mount a **persistent volume** over the parent of `STORAGE_PATH` if using local storage on Docker/Kubernetes, and set `FORCE_LOCAL_STORAGE=true` — see [Self-hosting](/docs/deployment/self-hosting/#file-storage)
 - Use **S3** or compatible (R2, MinIO), or **GCS**, for production deployments
 - Configure a **CDN** (CloudFront, Cloudflare) in front for performance — see [Putting a CDN in front](/docs/backend/storage-caching/#putting-a-cdn-in-front)
 - **Any app with storage in production must declare an access model** — see below.

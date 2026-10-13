@@ -1236,12 +1236,15 @@ describe("docker-compose.yml", () => {
         // deleting the FORCE_LOCAL_STORAGE line — the very thing that makes the
         // mount necessary — turned this into an empty test rather than a failure.
         const compose = fs.readFileSync(path.join(TEMPLATE_DIR, "docker-compose.yml"), "utf-8");
+        //
+        // `selfhost-storage.test.ts` asks the stronger question: whether every
+        // bucket's directory, as boot resolves it, is on that volume.
         expect(compose).toContain("FORCE_LOCAL_STORAGE");
-        expect(compose).toContain("STORAGE_PATH: /uploads");
-        expect(compose).toContain("uploads:/uploads");
+        expect(compose).toContain("STORAGE_PATH: /storage/uploads");
+        expect(compose).toContain("storage:/storage");
         // ...and the volume has to be declared, not just referenced.
         expect(compose).toMatch(/^volumes:/m);
-        expect(compose).toMatch(/^\s{2}uploads:/m);
+        expect(compose).toMatch(/^\s{2}storage:/m);
     });
 
     it("backend depends on healthy db", () => {

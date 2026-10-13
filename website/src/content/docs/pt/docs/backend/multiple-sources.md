@@ -1,35 +1,40 @@
 ---
-sourceHash: 32b4fa7fcbf16375
+sourceHash: 6eb6098e26cb24c0
 title: Múltiplos Bancos de Dados e Buckets
 sidebar_label: Múltiplas Fontes
-description: Especifique rotas de coleções para diferentes bancos de dados e propriedades para diferentes buckets de armazenamento, e configure cada um a partir do ambiente.
+description: Direcione coleções para diferentes bancos de dados e propriedades para diferentes buckets de armazenamento, e configure cada um a partir do ambiente.
 ---
 
-## Visão geral
+## Visão Geral
 
-Um projeto não está limitado a apenas um banco de dados e um bucket. Tudo o que um projeto precisa e tem um nome — um banco de dados, um bucket, um tópico, uma fila — é **declarado com um construtor na sua configuração**, e configurado a partir do ambiente por uma variável derivada da sua chave. Crons e funções são arquivos, e entram no mesmo grafo sob o nome do arquivo.
+Um projeto não está limitado a um banco de dados e um bucket. Cada item nomeado de que um
+projeto precisa — um banco de dados, um bucket, um tópico, uma fila — é **declarado com um
+construtor na sua configuração**, e configurado a partir do ambiente por uma variável
+derivada de sua chave. Crons e funções são arquivos, e eles entram no mesmo
+grafo sob o nome do arquivo.
 
-Uma única regra, seja qual for o tipo: não há um segundo lugar onde procurar, e nada que precise ser mantido sincronizado à mão.
+Uma regra, independentemente do tipo: não há um segundo lugar para procurar, e nada que
+precise ser mantido em sincronia manualmente.
 
-## Declarar os recursos
+## Declarando recursos
 
-Coloque-os em `config/resources.ts`. Exportá-los é boa prática — dá a você algo
-para importar — mas o que os registra é a declaração.
+Coloque-os em `config/resources.ts`. Exportá-los é uma boa prática — fornece
+algo para você importar — mas a declaração é o que os registra.
 
 ```ts
 // config/resources.ts
 import { bucket, database, queue, topic } from "@rebasepro/types";
 
-/** A base de dados do projeto. Lê DATABASE_URL, como sempre leu. */
+/** The project's database. Reads DATABASE_URL, as it always did. */
 export const main = database();
 
-/** Uma segunda. Lê DATABASE_URL__ANALYTICS. */
+/** A second one. Reads DATABASE_URL__ANALYTICS. */
 export const analytics = database("analytics", { label: "Analytics warehouse" });
 
-/** Um bucket. Lê S3_BUCKET__MEDIA. */
+/** A bucket. Reads S3_BUCKET__MEDIA. */
 export const media = bucket("media", { engine: "s3", label: "Public media" });
 
-/** Um tópico, entregue através da fila de trabalhos durável. */
+/** A topic, delivered through the durable job queue. */
 export const signups = topic<{ userId: string }>("signups");
 
 signups.subscription("send-welcome", async (event) => {
@@ -38,11 +43,10 @@ signups.subscription("send-welcome", async (event) => {
 ```
 
 `queue()` é novo. `database()`, `bucket()` e `topic()`
-são declaráveis desde a 0.17, então um projeto na versão lançada declara esses
-três e alcança o trabalho em segundo plano através de `jobs.tasks`.
+podem ser declarados desde a versão 0.17, portanto, um projeto na versão lançada declara
+esses três e acessa trabalhos em segundo plano por meio de `jobs.tasks`.
 
-Depois aponte uma coleção para um deles, pelo handle — o mesmo nome, escrito uma
-única vez:
+Em seguida, aponte uma coleção para um deles, por meio do handle — o mesmo nome, digitado uma única vez:
 
 ```ts
 import { defineCollection } from "@rebasepro/cms-types";
@@ -69,13 +73,16 @@ coverImage: {
 }
 ```
 
-`defineCollection` registra a chave do handle, então daí em diante uma coleção é dado simples: ela serializa, ela se compara, ela chega à interface de administração. A forma em string (`dataSource: "analytics"`) continua funcionando; o handle é o que uma renomeação acompanha e onde "ir para a definição" aterrissa.
+`defineCollection` registra a chave do handle, de modo que, a partir desse ponto, uma coleção é
+apenas dado puro — ela serializa, compara e chega à interface de administração (UI). A forma
+em string (`dataSource: "analytics"`) ainda funciona; o handle é o elemento que uma renomeação
+acompanha e onde o "jump-to-definition" vai parar.
 
-Dentro de uma função, os mesmos handles alcançam o recurso:
+Em uma função, os mesmos handles acessam o recurso:
 
 ```ts
 import { defineFunction } from "@rebasepro/server/functions";
-import { analytics, media } from "../../../config/resources";
+import { analytics, media } from "../../config/resources";
 
 export default defineFunction((app, { rebase }) => {
     app.post("/report", async (c) => {
@@ -87,40 +94,49 @@ export default defineFunction((app, { rebase }) => {
 });
 ```
 
-### Ver o que você declarou
+### Visualizando o que você declarou
 
 ```bash
-rebase resources            # listá-los
-rebase resources --write    # regerar rebase.resources.json
-rebase resources --check    # falhar se esse arquivo estiver desatualizado
+rebase resources            # list them
+rebase resources --write    # regenerate rebase.resources.json
+rebase resources --check    # fail if that file is stale
 ```
 
-`rebase.resources.json` é **gerado** e versionado. É o que um host lê para decidir o que aprovisionar *antes* de executar qualquer coisa — é assim que um console consegue dizer "este projeto quer um bucket `media` e não tem nenhum" no primeiro deploy. Edite as declarações, nunca o arquivo; `--check` faz uma build falhar se os dois divergirem.
+`rebase.resources.json` é **gerado** e comitado no repositório. É o que o host lê
+para decidir o que provisionar *antes* de executar qualquer coisa — é assim que um console
+pode dizer "este projeto precisa de um bucket `media` e não possui nenhum" no primeiro deploy.
+Edite as declarações, nunca o arquivo; `--check` falha o build caso os dois
+estejam em desacordo.
 
-Cada entrada registra também **quem o usa** — `collection:page_views` num banco de dados, `property:posts.cover` num bucket, `function:report` no que a função importar de `resources.ts`. Esse é o mapa de que um console precisa para responder "o que quebra se eu remover isto".
+Cada entrada também registra **quem a utiliza** — `collection:page_views` em um
+banco de dados, `property:posts.cover` em um bucket, `function:report` em tudo o que
+a função importa de `resources.ts`. Esse é o mapeamento de que o console precisa para
+responder a "o que quebra se eu remover isto".
 
-`rebase status` vai um passo além: para cada declaração ele diz se o ambiente a vincula, usando os mesmos resolvedores que a inicialização usa, de modo que não pode tranquilizá-lo sobre uma implantação que está prestes a se recusar a iniciar.
+O comando `rebase status` vai um passo além: para cada declaração, ele informa se
+o ambiente a vincula, usando os mesmos resolvedores usados na inicialização (boot), evitando
+passar uma falsa segurança sobre uma implantação que está prestes a falhar ao iniciar.
 
-### Um motor de que a build nunca ouviu falar
+### Um engine desconhecido pelo build
 
-Cada tipo é dono da sua própria lista de motores, e um desconhecido é recusado no local da chamada em vez de aceito e posto em falha mais tarde. Algo genuinamente fora da lista escreve-se `custom:`:
+Cada tipo possui sua própria lista de engines, e um engine desconhecido é recusado no local da
+chamada em vez de ser aceito para falhar mais tarde. Algo genuinamente fora da lista é
+declarado usando `custom:`:
 
 ```ts
 export const objects = bucket("objects", { engine: "custom:minio" });
 ```
 
-### Corrigir um kind que já foi publicado
+### Corrigindo um tipo que já foi lançado
 
-Para autores de drivers. A definição registada de um kind de recurso fica
-**congelada** assim que um pacote que a transporta é publicado: cada driver
-publicado inclui a sua própria cópia de `@rebasepro/types`, e essa cópia compara
-a entrada do registo partilhado com o seu próprio literal e lança um erro
-perante qualquer diferença. Editar o literal mata, por isso, todos os bundles
-construídos com um driver mais antigo, no carregamento do driver.
+Para autores de drivers. A definição registrada de um tipo de recurso é **congelada** uma vez que
+um pacote que a contenha tenha sido publicado: cada driver publicado embute sua própria
+cópia de `@rebasepro/types`, e essa cópia compara a entrada do registro compartilhado
+com seu próprio literal e lança um erro diante de qualquer diferença. Portanto, editar o literal
+inutiliza todo bundle construído com um driver mais antigo durante o carregamento do driver.
 
-`amendResourceKind` corrige aquilo a que um kind *se liga* — as suas bases de
-variáveis de ambiente, as suas chaves de opções — sem tocar no literal que uma
-cópia mais antiga compara:
+`amendResourceKind` corrige o que um tipo *vincula* — suas bases de variáveis de ambiente, suas
+chaves de opção — sem modificar o literal com o qual qualquer cópia mais antiga se compara:
 
 ```ts
 import { amendResourceKind } from "@rebasepro/types";
@@ -130,17 +146,19 @@ amendResourceKind("database", {
 });
 ```
 
-A correção aplica-se apenas às leituras através desta cópia, por isso um driver
-mais antigo continua a ligar-se como o fazia quando foi publicado. Use-a para
-qualquer correção a um kind já publicado; use `registerResourceKind` apenas para
-um kind que ninguém publicou.
+A alteração aplica-se apenas a leituras feitas por meio desta cópia, permitindo que um driver mais antigo continue
+vinculando da forma como fazia quando foi publicado. Use-a para qualquer correção em um
+tipo já lançado; use `registerResourceKind` apenas para um tipo que ninguém tenha publicado ainda.
 
-### Entregá-los ao frontend
+### Disponibilizando-os para o frontend
 
-O provider `<Rebase>` precisa saber quais fontes existem e como cada uma é alcançada — uma fonte `direct` é uma com a qual o próprio navegador conversa. Ele importa o mesmo pacote de configuração que o backend, então pode reutilizar as declarações em vez de repeti-las:
+O provedor `<Rebase>` precisa saber quais fontes existem e como cada uma é
+acessada — uma fonte `direct` é aquela com a qual o navegador se comunica diretamente. Ele importa o
+mesmo pacote de configuração que o backend importa, podendo reutilizar as declarações em vez
+de repeti-las:
 
 ```tsx
-import "../config/resources";                 // registra-as
+import "../config/resources";                 // registers them
 import { declaredDataSources, declaredStorageSources } from "@rebasepro/types";
 
 <Rebase
@@ -151,20 +169,25 @@ import { declaredDataSources, declaredStorageSources } from "@rebasepro/types";
 </Rebase>
 ```
 
-O import por efeito colateral é deliberado: declarar é o que registra, então um bundler que descartasse um módulo não usado deixaria as duas listas vazias.
+A importação por efeito colateral (side-effect import) é intencional: declarar é o que registra, portanto, um bundler
+que descartasse um módulo não utilizado deixaria ambas as listas vazias.
 
 ## Configurando cada fonte
 
-Os nomes das variáveis de ambiente são derivados da chave do recurso, portanto não há nada que precise ser mantido sincronizado manualmente:
+Os nomes das variáveis de ambiente são derivados da chave do recurso, logo não há
+nada para manter em sincronia manualmente:
 
 ```
 <VARIABLE>              the default resource   DATABASE_URL, S3_BUCKET
 <VARIABLE>__<KEY>       a named resource       DATABASE_URL__ANALYTICS, S3_BUCKET__MEDIA
 ```
 
-A chave é convertida para maiúsculas e os caracteres não alfanuméricos se tornam sublinhados, então `media-cdn` lê `S3_BUCKET__MEDIA_CDN`.
+A chave é convertida para maiúsculas e caracteres não alfanuméricos tornam-se underscores, de modo que
+`media-cdn` lê `S3_BUCKET__MEDIA_CDN`.
 
-O separador é um sublinhado **duplo** de propósito. Um único entraria em conflito com nomes de variáveis reais — `S3_BUCKET_NAME` seria interpretado como o bucket de uma fonte chamada `name`.
+O separador é intencionalmente um underscore **duplo**. Um underscore simples colidiria
+com nomes de variáveis reais — `S3_BUCKET_NAME` seria interpretado como o bucket de uma
+fonte chamada `name`.
 
 ### Bancos de dados
 
@@ -177,11 +200,19 @@ DB_POOL_MAX__ANALYTICS=5
 REBASE_DRIVER__ANALYTICS=@rebasepro/server-postgres
 ```
 
-O driver é escolhido a partir do `engine` declarado (`postgres` e `mongodb` são conhecidos), e `REBASE_DRIVER__<KEY>` o substitui para qualquer outro caso. `REBASE_DB_POOL_MAX` é um teto para o processo inteiro, não um vínculo por fonte, portanto não recebe sufixo.
+O driver é escolhido a partir do `engine` declarado (`postgres` e `mongodb` são
+reconhecidos), e `REBASE_DRIVER__<KEY>` o sobrescreve para qualquer outro caso.
+`REBASE_DB_POOL_MAX` é um limite para todo o processo, não uma vinculação por fonte; por isso,
+ele não aceita sufixo.
 
-Em desenvolvimento você não configura nada disso: `rebase dev` serve cada banco de dados declarado a partir do seu Postgres gerenciado — uma segunda instância para `analytics`, iniciada sob demanda — e exporta `DATABASE_URL__ANALYTICS` por conta própria. Uma variável que você definir à mão nunca é sobrescrita.
+Em desenvolvimento você não precisa configurar nada disso: `rebase dev` provê cada banco de dados
+declarado a partir de seu Postgres gerenciado — uma segunda instância para `analytics`, iniciada
+sob demanda — e exporta `DATABASE_URL__ANALYTICS` automaticamente. Uma variável definida
+manualmente nunca é sobrescrita.
 
-Tabelas e políticas de segurança em nível de linha são aprovisionadas **por fonte**: uma coleção roteada para `analytics` recebe a sua tabela, e as suas políticas, no banco de dados analytics.
+Tabelas e políticas de row-level-security são provisionadas **por fonte**: uma
+coleção direcionada para `analytics` recebe sua tabela e suas políticas no
+banco de dados de analytics.
 
 ### Armazenamento
 
@@ -192,31 +223,31 @@ S3_ACCESS_KEY_ID__MEDIA=…
 S3_SECRET_ACCESS_KEY__MEDIA=…
 ```
 
-O motor vem da declaração, portanto não há nenhum `STORAGE_TYPE` a definir.
+O engine provém da declaração, portanto não há `STORAGE_TYPE` a ser configurado.
 
-#### Que bucket recebe um carregamento não qualificado
+#### Qual bucket recebe um upload não qualificado
 
-Uma propriedade de armazenamento que não nomeia nenhuma `storageSource` escreve
-no bucket **padrão**, e um projeto com buckets nomeados tem de dizer qual é.
-Ou declara o bucket com a chave padrão — `export const uploads = bucket();` — ou
-marca um dos nomeados:
+Uma propriedade de armazenamento que não especifica nenhum `storageSource` grava no bucket **padrão**,
+e um projeto com buckets nomeados precisa indicar qual bucket é esse. Declare o bucket
+com chave padrão — `export const uploads = bucket();` — ou marque
+um dos buckets nomeados:
 
 ```ts
 export const media = bucket("media", { engine: "s3", default: true });
 ```
 
-Sem nenhuma das duas, o arranque promove o primeiro bucket nomeado declarado e
-avisa, nomeando as duas soluções. Escolha uma delas: uma promoção decide onde os
-ficheiros de um utilizador vão parar pela ordem de declaração, e dá respostas
-diferentes de um lado e do outro de um deploy, porque o bucket local com que o
-desenvolvimento faz de substituto é descartado em produção — e a promoção não.
+Sem nenhuma dessas opções, o boot promove o primeiro bucket nomeado que foi declarado e emite um aviso, indicando
+ambas as soluções. Escolha uma delas: uma promoção decide onde os arquivos do usuário vão parar com base
+na ordem de declaração, e produz resultados diferentes dependendo do ambiente,
+pois o bucket local substituto usado no desenvolvimento é descartado em produção,
+mas a promoção não.
 
-### Vários buckets em uma só conta
+### Múltiplos buckets em uma única conta
 
-Cada variável é lida por chave: isso está certo para o *nome* do bucket e errado
-para as credenciais — quinze buckets na mesma instalação MinIO significariam
-quinze cópias da mesma access key. Indique uma `account` e as variáveis ao nível
-do fornecedor são lidas uma só vez:
+Cada variável é lida por chave, o que é correto para o nome do bucket e incorreto para
+as credenciais — quinze buckets em uma mesma instalação do MinIO exigiriam quinze cópias
+da mesma chave de acesso. Defina um `account` e as variáveis em nível de provedor serão
+lidas uma única vez:
 
 ```ts
 export const media   = bucket("media",   { engine: "s3", account: "minio" });
@@ -224,35 +255,38 @@ export const avatars = bucket("avatars", { engine: "s3", account: "minio" });
 ```
 
 ```bash
-S3_BUCKET__MEDIA=project-media       # por bucket, nunca partilhado
+S3_BUCKET__MEDIA=project-media       # per bucket, never shared
 S3_BUCKET__AVATARS=project-avatars
-S3_ACCESS_KEY_ID__MINIO=…            # lida uma vez, por ambos
+S3_ACCESS_KEY_ID__MINIO=…            # read once, by both
 S3_SECRET_ACCESS_KEY__MINIO=…
 S3_ENDPOINT__MINIO=https://minio.internal
 ```
 
-A forma com conta cobre as variáveis que descrevem o *fornecedor*:
+A especificação de conta abrange as variáveis que descrevem o *provedor*:
 `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_ENDPOINT`, `S3_REGION`,
 `S3_FORCE_PATH_STYLE`, `GCS_PROJECT_ID` e `GCS_KEY_FILENAME`. O nome do bucket
-não é uma delas e nunca recai sobre a conta — se recaísse, dois buckets numa
-mesma conta tornar-se-iam silenciosamente um só.
+não faz parte dessa lista e nunca possui fallback — se possuísse, dois buckets em uma mesma conta
+se fundiriam silenciosamente em um só.
 
-Um valor por bucket continua a ganhar, por isso uma fonte pode ser movida para
-outro fornecedor sem separar as restantes da sua conta partilhada. Não existe
-deliberadamente qualquer recurso à variável sem sufixo: essa pertence à fonte
-padrão, e deixar um bucket nomeado herdá-la significaria que uma chave mal
-escrita assina com as credenciais de outra fonte.
+Um valor definido por bucket ainda tem precedência onde estiver configurado, permitindo que uma única fonte seja migrada
+para outro provedor sem desvincular as demais de sua conta compartilhada.
+Não há, propositalmente, fallback para a variável sem sufixo: essa variável pertence à
+fonte padrão, e permitir que um bucket nomeado a herdasse faria com que uma chave digitada incorretamente
+assinasse operações com as credenciais de outra fonte.
 
 ## Tópicos e filas
 
-Um tópico é entregue através da fila de trabalhos durável: publicar escreve **uma linha por assinatura**, de modo que cada assinante repete conforme o seu próprio calendário e um deles quebrado não bloqueia os outros nem os faz executar de novo.
+Um tópico tem suas mensagens entregues por meio da fila de jobs durável: publicar escreve **uma linha
+por inscrição**, de modo que cada inscrito tenta novamente no seu próprio cronograma e uma inscrição com falha
+não bloqueia as outras nem força sua reexecução.
 
 ```ts
 await signups.publish({ userId });
 ```
 
-Uma fila é a outra forma de trabalho em segundo plano: uma lista de trabalhos com **um único handler**, em que quem chama fica com o id do job. As filas são novas
- — os tópicos chegaram na 0.17.
+Uma fila é a outra forma de trabalho em segundo plano: uma lista de trabalho com **um
+único handler**, onde o chamador retém o id do job. Filas são novas
+ — tópicos foram lançados na versão 0.17.
 
 ```ts
 export const thumbnails = queue<{ key: string }>("thumbnails");
@@ -261,13 +295,24 @@ thumbnails.handler(async ({ key }, { attempt }) => { /* … */ });
 const { id } = await thumbnails.enqueue({ key }, { runAt: new Date(Date.now() + 60_000) });
 ```
 
-Ambos são **at-least-once**. Um worker que morre segurando um job o libera e o próximo começa o handler do início, então um handler precisa tolerar ver um evento duas vezes. Publicar ou enfileirar dentro de uma transação que sofre rollback nunca aconteceu: é a inserção de uma linha.
+Ambos operam no modelo **pelo menos uma vez** (at-least-once). Um worker que falhe enquanto processa um job o libera,
+e o próximo inicia o handler desde o início; portanto, um handler deve tolerar o recebimento
+de um evento em duplicidade. Publicações ou enfileiramentos dentro de uma transação revertida (rollback)
+nunca existiram — trata-se de uma inserção de linha no banco.
 
-Declarar qualquer um dos dois liga a fila de trabalhos por si só, em todos os caminhos de inicialização — um projeto no runtime gerenciado, que não tem um entrypoint por onde passar `jobs.tasks`, recebe os seus handlers por essa via. Publicar num tópico que ninguém declara, ou enfileirar numa fila sem handler, lança um erro em vez de escrever linhas que nenhum worker atende.
+Declarar qualquer um deles ativa a fila de jobs automaticamente em qualquer fluxo de inicialização — um
+projeto no runtime gerenciado, que não tem ponto de entrada para passar `jobs.tasks`,
+obtém seus handlers desta forma. Publicar em um tópico que nada declara, ou
+enfileirar em uma fila sem handler, lança uma exceção em vez de gravar linhas que nenhum
+worker irá processar.
 
 ## Crons e funções
 
-Ambos são arquivos — `backend/crons/<name>.ts`, `backend/functions/<name>.ts` — e ambos entram no grafo sob o nome do arquivo, que é também o id com que o agendador executa um cron e o caminho em que uma função é montada. Nenhum dos dois se vincula a partir do ambiente; eles estão no grafo para que um host conheça os agendamentos de um projeto antes de executar qualquer coisa.
+Ambos são arquivos — `backend/crons/<name>.ts`, `backend/functions/<name>.ts` —
+e ambos entram no grafo com o nome do arquivo, que também é o id com o qual o
+agendador executa o cron e o caminho onde a função é montada. Nenhum dos dois obtém configurações
+do ambiente; eles estão no grafo para que o host conheça os agendamentos do projeto
+antes de executar qualquer coisa.
 
 ```ts
 export default defineCron({
@@ -278,21 +323,36 @@ export default defineCron({
 });
 ```
 
-Sem `timezone` o agendamento é lido no fuso do próprio host — UTC em quase todo container, o seu num laptop — de modo que `0 3 * * *` significa uma hora diferente de um lado e do outro de um deploy. Um fuso desconhecido é recusado quando o job carrega.
+Sem `timezone`, o agendamento é interpretado no fuso horário do próprio host — UTC em praticamente
+todos os containers, ou o seu fuso horário local no seu computador — portanto, `0 3 * * *` significará um horário diferente
+dependendo do ambiente de deploy. Um fuso horário desconhecido é recusado no carregamento do job.
 
 ## Comportamento em caso de falha
 
-Uma fonte de dados declarada com transporte de servidor sem uma string de conexão **faz a inicialização falhar**, indicando o nome da variável a ser definida. Isso é deliberado e vale a pena entender: a alternativa é que as coleções roteadas para a fonte ausente recorram silenciosamente ao banco de dados padrão. Isso significa dados indo parar no lugar errado por trás de um servidor que se declara saudável — muito pior do que um container que se recusa a iniciar.
+Uma fonte de dados com transporte de servidor declarada sem string de conexão **causa falha na
+inicialização (boot)**, informando o nome da variável que deve ser definida. Isso é intencional e importante de compreender:
+a alternativa seria fazer com que as coleções roteadas para a fonte inexistente usassem silenciosamente
+o banco de dados padrão. Isso significaria dados gravados no local errado por trás de um
+servidor que relata estar saudável — algo muito pior do que um container que se recusa a
+iniciar.
 
-Duas chaves que derivariam o mesmo nome de variável também são rejeitadas, porque uma delas leria silenciosamente a configuração da outra.
+Duas chaves que gerariam o mesmo nome de variável também são rejeitadas, pois uma
+delas leria silenciosamente a configuração da outra.
 
-Fontes declaradas com `transport: "direct"` são ignoradas por completo: o cliente conversa diretamente com elas, então o backend não mantém nenhuma conexão e não exige nenhuma configuração para elas.
+Fontes declaradas com `transport: "direct"` são completamente ignoradas: o cliente
+comunica-se diretamente com elas, de modo que o backend não mantém conexão e não requer
+nenhuma configuração para elas.
 
 ## Controle de acesso ao armazenamento
 
-As chaves de armazenamento compartilham um único namespace plano e não estão sob segurança em nível de linha, portanto, sem um modelo explícito de controle de acesso, o padrão seria "qualquer usuário autenticado pode ler, sobrescrever, excluir ou listar qualquer objeto". A produção se recusa a iniciar em vez de assumir isso.
+As chaves de armazenamento compartilham um único namespace simples e não estão sob row-level security, portanto,
+sem um modelo explícito de controle de acesso, o padrão seria "qualquer usuário autenticado
+pode ler, sobrescrever, excluir ou listar qualquer objeto". O ambiente de produção se recusa a iniciar
+em vez de assumir essa premissa.
 
-A maneira de dizer o que acesso significa para o seu projeto é um export `storageAuthorize` do pacote de configuração — uma função, porque nenhuma variável de ambiente consegue expressar "este usuário pode ler esta chave":
+A forma de definir o que o acesso significa para o seu projeto é exportar `storageAuthorize`
+a partir do pacote de configuração — uma função, já que nenhuma variável de ambiente consegue expressar
+"este usuário pode ler esta chave":
 
 ```ts
 // config/index.ts
@@ -305,21 +365,46 @@ export const storageAuthorize: StorageAuthorize = async ({ key, user, operation 
 };
 ```
 
-Existem duas saídas por variável de ambiente para os casos em que esse realmente é o modelo:
+Existem duas opções de escape via variáveis de ambiente para os casos em que esse é realmente o modelo desejado:
 
-- `STORAGE_PUBLIC_READ=true` — o bucket é uma CDN pública, somente leitura. Escritas, exclusões e listagens ainda exigem autenticação.
-- `STORAGE_ALLOW_ANY_AUTHENTICATED=true` — todo usuário autenticado é confiável com todos os arquivos. Defensável para uma aplicação single-tenant, nunca para uma multi-tenant.
+- `STORAGE_PUBLIC_READ=true` — o bucket funciona como uma CDN pública, somente leitura. Operações de escrita,
+  exclusão e listagem continuam exigindo autenticação.
+- `STORAGE_ALLOW_ANY_AUTHENTICATED=true` — todo usuário autenticado tem permissão sobre
+  qualquer arquivo. Aceitável para uma aplicação single-tenant, nunca para uma aplicação multi-tenant.
 
 ## Armazenamento em produção
 
-Sem nenhum bucket configurado, o armazenamento fica **desligado** em produção e os uploads respondem `501`. O disco local é o sistema de arquivos do container, então os arquivos escritos ali desaparecem no próximo reinício — um upload que falha ruidosamente pode ser repetido, um que teve sucesso num disco prestes a ser apagado não. Defina `FORCE_LOCAL_STORAGE=true` apenas quando um volume durável estiver realmente montado.
+Sem nenhum bucket configurado, o armazenamento fica **desativado** em produção e os uploads retornam
+`501`. O disco local é o sistema de arquivos do container, portanto os arquivos gravados nele desaparecem
+na próxima reinicialização — um upload que falha explicitamente pode ser tentado novamente; um upload que obteve sucesso
+em um disco prestes a ser apagado, não. Defina `FORCE_LOCAL_STORAGE=true` apenas quando um
+volume durável estiver realmente montado.
 
-Uma consequência importante de saber se você declarar buckets explicitamente: nenhum bucket padrão é inventado para você. Declarar apenas `bucket("media")` significa que não existe bucket padrão, e uma propriedade que não nomeia um não tem para onde ir — deliberadamente, e identicamente em desenvolvimento e produção. Adicione também `bucket()` se quiser um.
+Esse volume precisa conter todos os buckets locais, e não apenas o padrão. O diretório de um bucket
+local nomeado fica posicionado ao lado do diretório padrão: `<STORAGE_PATH>__<key>`.
+Com `STORAGE_PATH=/storage/uploads`, `bucket("media", { engine: "local" })`
+grava em `/storage/uploads__media`. Monte o volume no diretório pai,
+`/storage`, como faz o arquivo compose gerado por `rebase init`, e não diretamente no
+`STORAGE_PATH`. `STORAGE_PATH__MEDIA` define o diretório de um bucket
+específico explicitamente. Consulte [Auto-hospedagem](/docs/deployment/self-hosting/#file-storage).
 
-Em desenvolvimento, um bucket declarado que nada vincula é um diretório local — `uploads__media` ao lado do `uploads` padrão — qualquer que seja o motor que ele declare, então `bucket("media", { engine: "s3" })` mais `rebase dev` já basta para enviar um arquivo. A inicialização diz por qual motor o diretório está substituindo, e `rebase status` o mostra em amarelo ao lado do visto. Isso nunca acontece em produção, nem no runtime gerenciado: um bucket inventado ali escreveria os uploads num sistema de arquivos de container que desaparece no próximo rollout, então um bucket não vinculado continua não vinculado e responde 501.
+Uma consequência importante a notar se você declarar buckets explicitamente: nenhum bucket padrão
+é gerado automaticamente para você. Declarar apenas `bucket("media")` significa que não há
+bucket padrão, e uma propriedade que não referencie nenhum não terá onde gravar arquivos —
+intencionalmente, e com comportamento idêntico em desenvolvimento e produção. Adicione também `bucket()`
+se desejar um.
 
-## Relacionado
+Em desenvolvimento, um bucket declarado que não possua vinculação passa a ser um diretório local —
+`uploads__media` ao lado do `uploads` padrão — independentemente do engine declarado, de forma que
+`bucket("media", { engine: "s3" })` juntamente com `rebase dev` é suficiente para enviar um
+arquivo. O boot informa qual engine o diretório está emulando, e o comando `rebase
+status` exibe isso em amarelo ao lado do ícone de confirmação. Isso nunca acontece em produção
+ou no runtime gerenciado: um bucket criado dessa forma gravaria uploads no sistema
+de arquivos do container que desaparece no rollout seguinte, logo um bucket sem vinculação
+permanece desvinculado e responde 501.
 
-- [Visão geral do backend](/docs/backend/) — `dataSources` e onde vive a declaração
-- [Configuração do armazenamento](/docs/backend/storage/) — a mesma forma para os buckets
-- [Ambiente e configuração](/docs/getting-started/configuration/) — a convenção `__SUFFIX` que vincula uma fonte às suas variáveis
+## Relacionados
+
+- [Visão Geral do Backend](/docs/backend/) — `dataSources` e onde fica a declaração
+- [Configuração de Armazenamento](/docs/backend/storage/) — a mesma estrutura para buckets
+- [Ambiente e Configuração](/docs/getting-started/configuration/) — a convenção `__SUFFIX` que vincula uma fonte às suas variáveis

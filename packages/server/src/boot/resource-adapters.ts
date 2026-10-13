@@ -12,6 +12,7 @@
  * collection resolver to land a config change, which is how a config change
  * becomes a rewrite and then does not ship.
  */
+import { warnDeprecated } from "@rebasepro/common";
 import {
     resourceToDataSource,
     resourceToStorageSource,
@@ -36,6 +37,29 @@ export function graphToDataSources(graph: ResourceGraph): DataSourceDefinition[]
 /** Buckets in the graph, as the storage layer's definitions. */
 export function graphToStorageSources(graph: ResourceGraph): StorageSourceDefinition[] {
     return graph.resources.filter(r => r.kind === "bucket").map(resourceToStorageSource);
+}
+
+/**
+ * Warn, once per bucket, about a declared `prefix`.
+ *
+ * `bucket(key, { prefix })` was accepted and carried into the graph, and
+ * nothing ever applied it: every object lands at the root of its bucket. A
+ * project that set `prefix: "tenant-a/"` to share one bucket between two
+ * sources has two sources writing into one namespace, and nothing said so.
+ * The option has no call site of its own, so it warns here, where the backend
+ * reads the declarations.
+ */
+export function warnOnDeprecatedBucketOptions(graph: ResourceGraph): void {
+    for (const resource of graph.resources) {
+        if (resource.kind !== "bucket" || resource.options.prefix === undefined) continue;
+        warnDeprecated(
+            `server.bucket.prefix:${resource.key}`,
+            `bucket("${resource.key}") sets \`prefix\`, which is deprecated and was never applied: its objects ` +
+            "are stored at the root of the bucket, not under the prefix. Remove it, and give each source a " +
+            "bucket of its own (S3_BUCKET__<KEY>, GCS_BUCKET__<KEY>, or STORAGE_PATH__<KEY> for a local one), " +
+            "or put the folder in each storage property's `storagePath`."
+        );
+    }
 }
 
 /** Topics in the graph, for the runtime to publish through and the worker to wire. */

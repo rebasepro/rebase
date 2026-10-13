@@ -179,16 +179,33 @@ outlives the container:
 
 ```yaml
       STORAGE_TYPE: local
-      STORAGE_PATH: /data/uploads
+      # Each declared bucket gets a directory beside this one, bucket("media")
+      # /storage/uploads__media, so the volume goes on their parent.
+      STORAGE_PATH: /storage/uploads
       FORCE_LOCAL_STORAGE: "true"
     volumes:
-      - uploads:/data/uploads
+      - storage:/storage
 ```
 
 `FORCE_LOCAL_STORAGE` is not optional there: in production a `local` backend is
 dropped rather than registered, because the alternative is uploads that succeed
 into a filesystem about to be destroyed. The variable is how you say the mount
 is durable.
+
+Mount the volume **above** `STORAGE_PATH`, not at it. `STORAGE_PATH` is the
+default bucket's directory, and every bucket declared in `config/resources.ts`
+gets its own beside it, `<STORAGE_PATH>__<key>`. A volume at `STORAGE_PATH`
+itself holds the default bucket only. Every other bucket writes to the
+container's filesystem and loses its files when the container is recreated.
+`STORAGE_PATH__MEDIA` can move one bucket elsewhere on the volume. It cannot
+move it inside another bucket's directory, such as `/storage/uploads/media`,
+because the default bucket would then list, serve and delete its files.
+
+<span class="since-badge" data-since="0.25">Since 0.25</span> The image creates
+`/storage` for the unprivileged `node` user it runs as, which is why the volume
+goes there. A volume mounted where the image has no directory belongs to root,
+and every upload fails with `EACCES`. The compose file `rebase init` writes
+mounts it this way.
 
 ### Storage needs an access-control model
 

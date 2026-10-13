@@ -1,6 +1,15 @@
 import { afterEach, describe, expect, it, jest } from "@jest/globals";
 import { Hono } from "hono";
-import type { BackendBootstrapper, CollectionConfig, DataDriver, InitializedDriver } from "@rebasepro/types";
+import { resetDeprecationWarningsForTests } from "@rebasepro/common";
+import {
+    bucket,
+    declaredResources,
+    resetDeclaredResources,
+    type BackendBootstrapper,
+    type CollectionConfig,
+    type DataDriver,
+    type InitializedDriver
+} from "@rebasepro/types";
 
 import {
     createRebaseBackend,
@@ -313,5 +322,27 @@ describe("provision", () => {
     it("is a decision the caller has to make", async () => {
         await expect(createRebaseBackend({ bootstrappers: [bootstrapper(recorder())] } as never))
             .rejects.toThrow(/needs `provision`/);
+    });
+});
+
+describe("a bucket's deprecated `prefix`", () => {
+    afterEach(() => resetDeclaredResources());
+
+    it("is still accepted, and the backend warns once per bucket that sets it, naming the replacement", async () => {
+        resetDeprecationWarningsForTests();
+        const warn = jest.spyOn(console, "warn").mockImplementation(() => undefined);
+        bucket("media", { engine: "s3", prefix: "tenant-a/" });
+        bucket("avatars", { engine: "s3" });
+
+        await create();
+        await create();
+
+        // Carried into the graph as before: the control plane records it.
+        expect(declaredResources("bucket").find(r => r.key === "media")?.options.prefix).toBe("tenant-a/");
+        const lines = warn.mock.calls.map(call => String(call[0])).filter(line => line.includes("Deprecated"));
+        expect(lines).toHaveLength(1);
+        expect(lines[0]).toContain('bucket("media") sets `prefix`');
+        expect(lines[0]).toContain("S3_BUCKET__<KEY>");
+        expect(lines[0]).toContain("`storagePath`");
     });
 });

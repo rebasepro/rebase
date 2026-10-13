@@ -285,7 +285,7 @@ The backend validates storage-related environment variables via a Zod schema. Th
 | Variable | Type | Default | Description |
 |----------|------|---------|-------------|
 | `STORAGE_TYPE` | `"local" \| "s3" \| "gcs"` | `"local"` | Storage provider type |
-| `STORAGE_PATH` | `string` | `"./uploads"` | Base path for local storage / TUS temp directory |
+| `STORAGE_PATH` | `string` | `"./uploads"` | Base path for local storage / TUS temp directory. A named local bucket keeps its files beside it, in `<STORAGE_PATH>__<key>`, so a durable volume goes on its parent |
 | `FORCE_LOCAL_STORAGE` | `"true" \| "false"` | `false` | Allow local storage in production. Without it the local backend is not registered and uploads answer `501 STORAGE_NOT_CONFIGURED` — the backend still boots |
 | `S3_BUCKET` | `string` | — | S3 bucket name |
 | `S3_REGION` | `string` | — | S3 region |

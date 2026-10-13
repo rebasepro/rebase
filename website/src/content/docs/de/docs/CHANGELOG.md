@@ -1356,6 +1356,14 @@ Die Übersetzung steht noch aus. Der Inhalt unten ist auf Englisch.
   pair declared them.** Both keep their old shape and behaviour, still declare
   what they load, and warn once per process.
 
+- **The `prefix` option of `bucket()` is deprecated; nothing ever applied
+  it.** A source declared with `prefix: "tenant-a/"` stored its objects at the
+  root of the bucket, so two sources sharing one bucket shared one namespace,
+  and nothing said so. Give each source a bucket of its own (`S3_BUCKET__<KEY>`,
+  `GCS_BUCKET__<KEY>`, or `STORAGE_PATH__<KEY>` for a local one), or put the
+  folder in each storage property's `storagePath`. A declaration that sets it
+  still compiles and deploys, and the backend warns once per bucket at boot.
+
 - **`DatabaseAdapter.mountRoutes` and `BackendBootstrapper.mountRoutes` are
   deprecated.** The server never called them, and its adapter wrappers no
   longer forward them. The types still accept them. A driver that needs HTTP
@@ -2024,6 +2032,20 @@ Die Übersetzung steht noch aus. Der Inhalt unten ist auf Englisch.
   same severity, as heuristic.
 
 #### Storage & email
+
+- **On a self-hosted container, every local bucket's files survive a
+  recreate.** A named local bucket (`bucket("media", { engine: "local" })`)
+  ignored `STORAGE_PATH` and resolved beside the runtime's bundle, on the
+  container's own filesystem in the compose files `rebase init` and
+  `rebase eject` write, so its uploads succeeded and went with the container.
+  It now sits beside the default bucket's directory:
+  `STORAGE_PATH=/storage/uploads` puts `media` in `/storage/uploads__media`.
+  Both compose files mount their volume at `/storage`, which the runtime image
+  and the ejected Dockerfile create for the user they run as. Their old
+  `/uploads` volume was root's, so default-bucket uploads failed with `EACCES`
+  too. A project scaffolded earlier makes the same change to its compose file
+  (see the upgrade guide). Where a named bucket's old directory still holds
+  files, boot names it and the `STORAGE_PATH__<KEY>` that keeps serving it.
 
 - **Backups over 50 MB upload.** A backup was held to the storage's upload
   limits, `maxFileSize` (50 MB unless set) and `allowedMimeTypes`, so

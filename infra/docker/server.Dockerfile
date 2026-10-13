@@ -238,7 +238,13 @@ COPY infra/docker/entrypoint.mjs ./entrypoint.mjs
 
 # An empty mount point, so `docker run` without a volume fails with the runtime's
 # own "no bundle here" message rather than an ENOENT from the loader.
-RUN mkdir -p /bundle && chown -R node:node /app /bundle
+#
+# And `/storage`, where the scaffolded compose file mounts its storage volume.
+# An empty named volume takes the owner of the directory it is mounted over,
+# and one mounted where the image has nothing is root's — every upload then
+# failed EACCES for the `node` user below. Every local bucket's directory sits
+# under it (`/storage/uploads`, `/storage/uploads__media`), on that one volume.
+RUN mkdir -p /bundle /storage && chown -R node:node /app /bundle /storage
 
 # Unprivileged: nothing here needs root, and a compromised hook should not be
 # able to write to the image.

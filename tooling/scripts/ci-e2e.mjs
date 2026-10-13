@@ -174,7 +174,9 @@ unauthenticated read, the collections served to a service key, a seeded admin
 who can sign in — then restarts the api, because provisioning runs on every boot
 and the second one is where a non-idempotent step surfaces. Then again with the
 compose file \`rebase init\` generates, whose environment contract is a different
-one answered by a different writer.`
+one answered by a different writer — and there a file uploaded to the default
+bucket and to a named local one is read back after the container is recreated,
+which only a volume holding both directories survives.`
             },
             {
                 run: "verify:corpus",

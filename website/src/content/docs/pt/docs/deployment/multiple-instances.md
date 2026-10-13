@@ -1,168 +1,158 @@
 ---
-sourceHash: 5fa5e7d348432b22
+sourceHash: 3116577a359d845f
 title: Executando mais de uma instância
 sidebar_label: Mais de uma instância
-description: Todo estado que um processo Rebase mantém só para si, e a configuração que o compartilha — o que definir antes de uma segunda réplica, um deploy rolling ou uma implantação dividida receber tráfego.
+description: Cada fragmento de estado que um processo do Rebase mantém para si e a configuração que o compartilha — o que definir antes que uma segunda réplica, um rolling deploy ou um split deployment receba tráfego.
 ---
 
-## Visão geral
+## Visão Geral
 
-A maior parte de uma implantação do Rebase já vive no banco de dados: linhas,
-usuários e sessões, chaves de API, a fila de jobs, claims de cron, chaves de
-idempotência, histórico de registros, os tokens do servidor OAuth do MCP. Um
-segundo processo apontado para o mesmo banco de dados vê tudo isso.
+A maior parte de uma implantação do Rebase já reside no banco de dados: linhas, usuários e
+sessões, chaves de API, a fila de jobs, reivindicações de cron, chaves de idempotência, histórico
+de registros e os tokens do servidor OAuth MCP. Um segundo processo apontado para o mesmo
+banco de dados enxerga tudo isso.
 
-Algumas coisas não. Cada uma é por processo por padrão, porque um único
-processo é a implantação padrão e compartilhar custa algo — uma tabela, uma
-escrita em bucket, uma conexão de banco de dados. Executar dois processos
-atrás de um load balancer, escalar além de um, ou um deploy rolling que
-brevemente executa o antigo e o novo lado a lado — tudo isso coloca você nesta
-página. O mesmo vale para uma [implantação dividida](/docs/deployment/split-processes/),
-que por definição é vários processos.
+Algumas coisas não ficam no banco. Cada uma delas é isolada por processo por padrão, porque um
+único processo é a implantação padrão e o compartilhamento tem um custo — uma tabela, uma gravação
+em bucket, uma conexão com o banco de dados. Executar dois processos atrás de um balanceador de carga,
+fazer autoscaling para mais de uma instância ou realizar um rolling deploy que execute brevemente a versão
+antiga e a nova lado a lado trazem você a esta página. O mesmo vale para um [split deployment](/docs/deployment/split-processes/),
+que é, por definição, composto por vários processos.
 
-Percorra a lista abaixo antes de o segundo receber tráfego. Nada nela falha
-ruidosamente: cada item aparece como um limite aplicado três vezes, um evento
-que alguns clientes nunca veem, ou uma página que mostra logs diferentes a
-cada atualização.
+Revise a lista abaixo antes que a segunda instância passe a receber tráfego. Nada nela
+falha de forma óbvia: cada item se manifesta como um limite aplicado três vezes a mais, um evento
+que alguns clientes nunca recebem ou uma página que exibe logs diferentes a cada atualização.
 
-## A lista de verificação
+## O checklist
 
-| O quê | Por processo por padrão | O que compartilha |
+| O que | Por processo por padrão | O que compartilha |
 | --- | --- | --- |
-| Segredos de assinatura | Gerados por processo em desenvolvimento | `JWT_SECRET` e `REBASE_SERVICE_KEY`, definidos explicitamente e **idênticos** em todo lugar |
-| Contadores de rate limit | Em memória | `REBASE_RATE_LIMIT_STORE=sql` |
-| Endereço do cliente atrás de um proxy | `TRUSTED_PROXY_HOPS=0` | O número de proxies na frente, igual em todo lugar |
-| Assinaturas de coleções | Compartilhadas pelo banco de dados quando o CDC está ativo | `REALTIME_CDC=auto` (o padrão) |
-| Canais de broadcast e presença | Em memória | `REALTIME_CHANNEL_BUS=postgres` |
-| Arquivos enviados, `STORAGE_TYPE=local` | O próprio disco da instância | S3 ou GCS, ou um volume compartilhado em `STORAGE_PATH` |
+| Segredos de assinatura | Gerados por processo em desenvolvimento | `JWT_SECRET` e `REBASE_SERVICE_KEY`, definidos explicitamente e **idênticos** em todos os lugares |
+| Contadores de rate limit | Na memória | `REBASE_RATE_LIMIT_STORE=sql` |
+| Endereço do cliente atrás de um proxy | `TRUSTED_PROXY_HOPS=0` | O número de proxies à frente, igual em todos os lugares |
+| Assinaturas de coleções | Compartilhadas através do banco de dados quando o CDC está ativo | `REALTIME_CDC=auto` (o padrão) |
+| Canais de broadcast e presença | Na memória | `REALTIME_CHANNEL_BUS=postgres` |
+| Arquivos enviados, `STORAGE_TYPE=local` | O disco da própria instância | S3 ou GCS, ou um volume compartilhado no diretório pai de `STORAGE_PATH` |
 | Uploads retomáveis (TUS) em andamento | O disco da instância, em `STORAGE_PATH/.tus-uploads` | Um volume compartilhado em `STORAGE_PATH`, ou sticky sessions |
-| Transformações de imagem | Um cache em processo | `STORAGE_RENDITION_CACHE=true` |
-| Logs Explorer | Um anel com as últimas 10.000 linhas | Nada — envie o stdout para um agregador de logs |
-| Timers de cron | Todo processo que executa o scheduler | Reivindicado no banco de dados: uma execução por slot. `REBASE_CRON_SCHEDULER` decide onde os timers vivem |
-| Auditoria de RLS agendada | Todo processo que a possui | `REBASE_RLS_AUDIT=false` em todos exceto um |
-| O `index.html` de um app estático | Lido uma vez por processo | Reinicie cada instância quando o build mudar |
-| `/metrics` | Cada processo conta apenas o seu | Faça scrape de cada instância |
+| Transformações de imagem | Um cache em memória no processo | `STORAGE_RENDITION_CACHE=true` |
+| Logs Explorer | Um buffer circular das últimas 10.000 linhas | Nada — envie o stdout para um agregador de logs |
+| Temporizadores de cron | Cada processo que executa o agendador | Reivindicados no banco de dados: uma execução por slot. `REBASE_CRON_SCHEDULER` define onde os temporizadores residem |
+| Auditoria agendada de RLS | Cada processo que a possui | `REBASE_RLS_AUDIT=false` em todas as instâncias, exceto uma |
+| O `index.html` de uma aplicação estática | Lido uma vez por processo | Reinicie todas as instâncias quando o build mudar |
+| `/metrics` | Cada processo contabiliza o seu próprio | Faça scrape de cada instância |
 
-As seções abaixo explicam o que cada um faz quando deixado por processo.
+As seções abaixo explicam o comportamento de cada item quando deixado na configuração padrão por processo.
 
 ## Segredos de assinatura
 
-O `JWT_SECRET` assina toda sessão e o `REBASE_SERVICE_KEY` autentica chamadas
-servidor-para-servidor. Em desenvolvimento, cada processo gera o seu próprio
-quando eles não estão definidos, então um token emitido por um processo é
-recusado pelo próximo. A produção já se recusa a iniciar sem eles; o que
-importa com vários processos é que todos recebam os **mesmos** valores — a
-partir de um único segredo, não um por réplica.
+O `JWT_SECRET` assina cada sessão e o `REBASE_SERVICE_KEY` autentica
+chamadas de servidor para servidor. Em desenvolvimento, cada processo gera seus próprios segredos
+quando eles não estão definidos; portanto, um token emitido por um processo é recusado pelo
+próximo. Em produção, a inicialização já é bloqueada sem eles; o que importa ao executar
+vários processos é que todos recebam os **mesmos** valores — a partir de um único segredo, e não um por réplica.
 
 ## Rate limits e o endereço do cliente
 
-Os rate limiters — o orçamento por chamador nas APIs de data, storage e
-functions, e os limitadores de autenticação em login, redefinição de senha,
-códigos de uso único e tentativas de MFA — contam em memória por padrão. Um
-processo não consegue ver quantos pares ele tem, então três réplicas no padrão
-aplicam cada limite três vezes. Defina `REBASE_RATE_LIMIT_STORE=sql` e os
-contadores passam a viver no banco de dados.
+Os limitadores de taxa — a cota por cliente nas APIs de dados, armazenamento e funções,
+bem como os limitadores de autenticação em login, redefinição de senha, códigos de uso único
+e tentativas de MFA — contam na memória por padrão. Um processo não consegue ver quantos pares
+ele possui; portanto, três réplicas com a configuração padrão aplicam cada limite três vezes. Defina
+`REBASE_RATE_LIMIT_STORE=sql` e os contadores passarão a residir no banco de dados.
 
-Atrás de um load balancer, o limitador também precisa do endereço real do
-cliente, que chega em `X-Forwarded-For`. O `TRUSTED_PROXY_HOPS` diz quantos
-proxies ignorar; no padrão `0`, toda requisição parece vir do load balancer e
-todo cliente compartilha um único bucket. Veja
+Atrás de um balanceador de carga, o limitador também precisa do endereço real do cliente, que
+chega em `X-Forwarded-For`. O `TRUSTED_PROXY_HOPS` define quantos proxies devem ser ignorados;
+no padrão `0`, cada requisição parece vir do balanceador de carga e todos os clientes compartilham
+a mesma cota. Consulte
 [Configuração](/docs/getting-started/configuration/#runtime-behaviour).
 
-## Tempo real
+## Realtime
 
-**As assinaturas de coleções** funcionam entre instâncias quando a captura de
-alterações em nível de banco de dados está ativa, o que ocorre por padrão
-(`REALTIME_CDC=auto`): um trigger anuncia cada gravação confirmada, e o
-listener de cada instância refaz a busca para seus próprios assinantes. Se o
-CDC estiver desativado, ou se o `auto` não conseguiu provisioná-lo (o log de
-inicialização diz o motivo), uma assinatura vê apenas as gravações feitas
-através da instância a cujo socket ela está conectada. Veja
-[Tempo real](/docs/backend/realtime-cdc/).
+As **assinaturas de coleções** funcionam entre instâncias quando a captura de alterações
+no nível do banco de dados (CDC) está ativada, o que é o padrão (`REALTIME_CDC=auto`): um trigger
+anuncia cada gravação confirmada (commit), e o listener de cada instância busca novamente os dados para
+seus próprios assinantes. Se o CDC estiver desativado, ou se `auto` não conseguir provisioná-lo
+(o log de boot informa o motivo), uma assinatura verá apenas as gravações feitas através da instância à
+qual seu socket está conectado. Consulte
+[Realtime](/docs/backend/realtime-cdc/).
 
-**Canais de broadcast e presença** são em processo a menos que um barramento
-os carregue: dois clientes em instâncias diferentes no mesmo canal não se
-ouvem, e cada instância responde "quem está aqui?" com apenas a sua metade.
-Defina `REALTIME_CHANNEL_BUS=postgres`. O barramento escuta o banco de dados,
-o que exige uma conexão direta em vez de um pooler de transação — defina
-`DATABASE_DIRECT_URL` quando `DATABASE_URL` passa pelo pgBouncer. Veja
+**Canais de broadcast e presença** ocorrem dentro do processo, a menos que um barramento os transporte:
+dois clientes em instâncias diferentes no mesmo canal não ouvem um ao outro, e cada instância
+responde "quem está aqui?" apenas com a sua parte. Defina `REALTIME_CHANNEL_BUS=postgres`.
+O barramento escuta o banco de dados, o que exige uma conexão direta em vez de um pooler de transações — defina
+`DATABASE_DIRECT_URL` quando o `DATABASE_URL` passar pelo pgBouncer. Consulte
 [Canais e presença entre instâncias](/docs/backend/realtime-transports/#channels-and-presence-across-instances).
 
 ## Arquivos
 
-Com `STORAGE_TYPE=local`, os uploads são arquivos no disco da instância que os
-recebeu, e outra instância responde 404 para eles. Use S3 ou GCS, ou monte um
-único volume em `STORAGE_PATH` em todas as instâncias. Veja
+Com `STORAGE_TYPE=local`, os uploads são arquivos no disco da instância que
+os recebeu, e outra instância responderá com 404 para eles. Use S3 ou GCS, ou
+monte um volume em todas as instâncias, no diretório pai de `STORAGE_PATH`, para que ele também
+contenha o diretório `<STORAGE_PATH>__<key>` de cada bucket local nomeado. Consulte
 [Auto-hospedagem: armazenamento de arquivos](/docs/deployment/self-hosting/#file-storage).
 
-**Os uploads retomáveis** (o endpoint TUS) mantêm o arquivo parcial de cada upload e,
-<span class="since-badge" data-since="0.25">Desde 0.25</span> um registro do upload ao lado dele, no disco da instância que o
-criou, em `STORAGE_PATH/.tus-uploads` — mesmo quando os arquivos finalizados vão para o
-S3 ou o GCS. Monte um volume em `STORAGE_PATH` em toda instância e qualquer instância
-atende qualquer upload; um restart ou um deploy rolling retoma um upload de onde ele
-parou. Sem um volume compartilhado, um chunk que chega a outra instância recebe
-404: direcione as requisições de upload de um cliente para uma única instância (sticky sessions
-no load balancer). O SDK e o painel de admin, que usam esse endpoint para
-arquivos acima de 8 MiB, então enviam o arquivo por `POST /upload`, e continuam
-fazendo isso pelo resto da sessão. Uploads comuns via `POST /upload` são uma única requisição
-e não são afetados. Na 0.23 o estado do upload ficava na memória do processo,
-então um volume compartilhado não ajudava e um restart devolvia um upload ao byte 0.
+**Uploads retomáveis** (o endpoint TUS) mantêm o arquivo parcial de cada upload e,
+<span class="since-badge" data-since="0.25">A partir da 0.25</span> um registro do upload ao lado dele, no disco da instância
+que o criou, sob `STORAGE_PATH/.tus-uploads` — mesmo quando os arquivos finalizados vão para
+o S3 ou GCS. Monte um volume em `STORAGE_PATH` em todas as instâncias e qualquer instância
+poderá atender a qualquer upload; uma reinicialização ou um rolling deploy retomará o upload de onde
+ele parou. Sem um volume compartilhado, um chunk que chegue em outra instância receberá resposta 404:
+roteie as requisições de upload de um cliente para uma única instância (sticky sessions
+no balanceador de carga). O SDK e o painel de administração, que utilizam esse endpoint para
+arquivos maiores que 8 MiB, passarão a enviar o arquivo via `POST /upload` e continuarão
+fazendo isso pelo restante da sessão. Uploads comuns via `POST /upload` consistem em uma única requisição
+e não são afetados. Na versão 0.23, o estado do upload ficava na memória do processo,
+de modo que um volume compartilhado não resolvia e uma reinicialização reiniciava o upload no byte 0.
 
-**As transformações de imagem** (`?width=400&format=webp`) são armazenadas em
-cache na memória, então cada instância calcula cada variante uma vez, e uma
-instância nova começa fria. Defina `STORAGE_RENDITION_CACHE=true` para gravar
-cada rendition de volta no bucket de onde ela veio, onde toda instância a
-encontra. Isso faz com que um `GET` grave no seu bucket, por isso fica
-desativado a menos que seja solicitado. Veja
+**Transformações de imagem** (`?width=400&format=webp`) são armazenadas em cache na memória; portanto, cada
+instância processa cada variante uma vez, e uma nova instância começa com o cache frio. Defina
+`STORAGE_RENDITION_CACHE=true` para gravar cada renderização de volta no bucket de
+origem, onde qualquer instância poderá encontrá-la. Isso faz com que um `GET` realize uma gravação no seu
+bucket, razão pela qual essa opção fica desativada a menos que seja solicitada. Consulte
 [Armazenamento](/docs/backend/storage/).
 
 ## Logs Explorer
 
-O Logs Explorer do Studio lê um anel com as últimas 10.000 linhas de log
-mantidas pelo processo que atende a requisição. Atrás de um load balancer,
-cada atualização pode mostrar as linhas de uma instância diferente, e nenhuma
-delas mostra a implantação inteira.
-O Logs Explorer indica qual instância está mostrando.
-Não há configuração que compartilhe o anel: o runtime grava uma linha JSON por
-evento no stdout em produção, e é isso que
-deve ser coletado — o serviço de log da sua plataforma, o Loki, ou qualquer
-coisa que leia a saída do contêiner.
+O Logs Explorer do Studio lê um buffer circular das últimas 10.000 linhas de log mantidas pelo
+processo que atende à requisição. Atrás de um balanceador de carga, cada atualização de página pode exibir
+as linhas de uma instância diferente, e nenhuma delas mostra a implantação completa.
+O explorer indica o nome da instância que está exibindo.
+Não existe uma configuração para compartilhar esse buffer: o runtime grava uma linha JSON por evento no
+stdout em produção, e é isso o que deve ser coletado — pelo serviço de logs da sua plataforma,
+Loki ou qualquer ferramenta que leia a saída de containers.
 
 ## Cron e a fila de jobs
 
-Todo processo que executa o scheduler de cron arma seus próprios timers, e a
-execução é reivindicada no banco de dados primeiro, então um slot roda **uma
-vez**, independentemente de quantos processos disparam para ele. Pausar um
-job, e o lease que mantém um disparo manual fora de uma execução em
-andamento, são compartilhados da mesma forma. Nada para configurar, desde que
-o banco de dados seja Postgres. `REBASE_CRON_SCHEDULER` e
-`REBASE_JOB_WORKERS` decidem quais processos executam timers e workers —
-veja [Processos divididos](/docs/deployment/split-processes/).
+Cada processo que executa o agendador de cron ativa seus próprios temporizadores, e a execução é
+reivindicada primeiro no banco de dados; portanto, um slot é executado **uma única vez**, independentemente de quantos
+processos o acionem. Pausar um job e o lease que impede que um acionamento manual concorra com uma
+execução em andamento são compartilhados da mesma forma. Não há nada a configurar, desde que o banco
+de dados seja o Postgres. `REBASE_CRON_SCHEDULER` e `REBASE_JOB_WORKERS` decidem quais
+processos executam temporizadores e workers — consulte
+[Processos divididos](/docs/deployment/split-processes/).
 
-A auditoria de RLS agendada é a exceção: ela não é reivindicada, então todo
-processo que a possui faz a varredura em seu próprio timer. Isso é redundante,
-não inseguro; defina `REBASE_RLS_AUDIT=false` em todos exceto um.
+A auditoria agendada de RLS é a exceção: ela não é reivindicada, portanto cada processo
+que a executa realiza a varredura em seu próprio temporizador. Isso é redundante, mas não inseguro; defina
+`REBASE_RLS_AUDIT=false` em todas as instâncias, exceto em uma.
 
-## Apps estáticos
+## Aplicações estáticas
 
 Um processo que serve o frontend ou o CMS (`REBASE_SERVE_STATIC`, ativado por
-padrão) lê o `index.html` de cada app uma vez e o mantém. Substituir o build
-em um volume compartilhado não alcança um processo em execução: ele continua
-servindo o documento antigo, que nomeia chunks que podem não existir mais.
-Entregue um build novo reiniciando ou fazendo o rolling de cada instância —
-o que uma imagem ou bundle novo faz de qualquer forma. Com uma CDN na frente e
-`REBASE_SERVE_STATIC=false`, isso não se aplica.
+padrão) lê o `index.html` de cada aplicação uma vez e o mantém em memória. Substituir o build
+em um volume compartilhado não atualiza um processo em execução: ele continua servindo o documento
+antigo, que referencia chunks que podem nem mais existir. Publique um novo build
+reiniciando ou fazendo um deploy gradual (rolling) de cada instância — o que uma nova imagem ou bundle já faz por padrão.
+Com uma CDN à frente e `REBASE_SERVE_STATIC=false`, isso não se aplica.
 
 ## Métricas
 
-O `/metrics` reporta o processo que o atende. Faça scrape de cada instância —
-um job de service discovery do Prometheus por pod, não um único target atrás
-do load balancer — e some na query.
+O endpoint `/metrics` reporta os dados do processo que responde à requisição. Faça o scrape de cada instância — um
+job de service discovery do Prometheus por pod, e não um único alvo atrás do balanceador
+de carga — e faça a soma na consulta.
 
 ## Provisionamento no boot
 
-Toda instância executa a passagem aditiva de schema no boot
-(`REBASE_MIGRATE_ON_BOOT=ensure`). Instâncias da mesma role podem executá-la
-ao mesmo tempo: ela é escrita para tolerar um par criando a mesma tabela um
-instante antes. Em uma implantação dividida, exatamente uma role provisiona e
-toda outra define `none` — veja [Processos divididos](/docs/deployment/split-processes/).
+Cada instância executa a etapa aditiva de migração de esquema na inicialização
+(`REBASE_MIGRATE_ON_BOOT=ensure`). Instâncias da mesma função (role) podem executá-la ao
+mesmo tempo: ela foi desenvolvida para tolerar que outra instância crie a mesma tabela um instante
+antes. Em um split deployment, exatamente uma função provisiona o esquema e todas as outras definem
+`none` — consulte [Processos divididos](/docs/deployment/split-processes/).
