@@ -65,11 +65,36 @@ When contributing to the Rebase monorepo, you MUST adhere strictly to the follow
 - **Clean state documentation**: Documentation and comments must describe what the code *is* and what it *does*, not what it *used to be* or the *process* of how it evolved.
 - **No legacy references**: Never include phrases like "this is the modern alternative to X", "this is the successor to Y", or "we migrated this because Z". 
 - **Treat the codebase as new**: The user considers this a new project. Historical context about soft-deprecations or transitions should be kept out of inline source code comments.
+- **A `@deprecated` tag is not history.** It says what a public name *is* today: still working, and replaced by another. Write it per §12 and keep the story of how the name came to be replaced out of it.
 
 ## 11. NO POLLING FOR DATA SYNC (Use Realtime Sync)
 - **Zero Tolerance for REST Polling**: Never use `setInterval` or background polling loops (`setInterval(fetchProjects, 5000)`) in React components to get live database updates. Rebase is built around a WebSocket real-time sync engine.
 - **Use Subscriptions**: Always use `rebaseClient.data.<slug>.listen()` — or `.listenById()` to track one row — for live data. Use `rebaseClient.data.collection("<slug>")` when the slug is dynamic. It streams inserts, updates and deletes, respecting Postgres RLS rules.
 - **Graceful Fallback**: Wrap subscription calls in support checks (e.g., `if (collection.listen)`) to handle environments where WebSockets are unavailable and fallback gracefully to one-time REST requests.
 - **RPC Telemetry Polling**: Telemetry or metrics endpoints (which run custom server-side RPC functions) can be polled, but only when their respective tab/component is actively visible in the UI to minimize server overhead.
+
+## 12. Deprecate Public API, Delete Internal Names
+Rebase is past its public beta, so other people's code calls it. Breaking changes are allowed; breaking a caller without warning is not.
+
+- **What counts as public**: anything exported from a package entry (`@rebasepro/*`, root or subpath), a config option, prop or plugin key a user writes, a CLI command or flag, and a wire form (a route, a header, a frame).
+- **A public removal or rename keeps a thin alias.** The old name stays and delegates to the new one. It is never a second implementation:
+
+  ```typescript
+  import { warnDeprecated } from "@rebasepro/common";
+
+  /** @deprecated Use `newName` instead. Will be removed in a future release. */
+  export function oldName(...args: Parameters<typeof newName>): ReturnType<typeof newName> {
+      warnDeprecated("server.oldName", "`oldName` is deprecated; use `newName` instead.");
+      return newName(...args);
+  }
+  ```
+
+  - The JSDoc `@deprecated` line names the replacement, so the editor strikes the old name through and says what to write.
+  - At runtime it calls `warnDeprecated(key, message)` from `@rebasepro/common`, which prints once per process per key. Key it `<package>.<name>`; the message names the replacement.
+  - A deprecated type, prop or plugin key that has no call site of its own warns where Rebase reads it (for example, `<Rebase>` warns once per plugin that sets a deprecated hook).
+- **Do not change what an existing public name means.** If behaviour must change, add a new name with the new behaviour and deprecate the old one. A change that cannot take a new name goes under `### Changed` in the CHANGELOG, saying what callers will see.
+- **An alias gets a test.** One test proves the old name still works and warns exactly once.
+- **The CHANGELOG gets a `### Deprecated` entry** for every alias, naming its replacement.
+- **Internal names are deleted outright.** A name that no package entry exports gets no alias: delete it and update every caller in the same change. Before removing or renaming an export, search the cloud control plane (`~/rebase/saas`) for it; if it is used there, it is public.
 
 *These rules were instated because lazy abstractions, dynamic requires, REST polling on a real-time framework, and hacking around problems instead of fixing the root cause have previously caused critical technical debt and system instability.*
