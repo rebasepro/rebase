@@ -34,7 +34,7 @@
   "server": {
     "as any": 5,
     "as never": 26,
-    "as unknown as": 10
+    "as unknown as": 9
   },
   "server-mongo": {
     "as unknown as": 1
