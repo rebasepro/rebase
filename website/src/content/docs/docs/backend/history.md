@@ -179,9 +179,14 @@ has no setting.
 
 ### Pruning Lifecycle Mechanics
 
-After each recorded change, the entity that changed is pruned: its entries older
-than the retention period go, then everything beyond its newest 200. This runs
-asynchronously and does not hold up the write.
+After each change the server records, the entity that changed is pruned: its
+entries older than the retention period go, then everything beyond its newest
+200. This runs asynchronously and does not hold up the write.
+
+A write made through [`openRebase` or `rebase console`](/docs/backend/scripts/)
+records its history entry but prunes nothing, because a script cannot know the
+retention your server is configured with. The server prunes that entity on its
+next write to it, and in the hourly sweep below.
 
 <span class="since-badge" data-since="0.25">Since 0.25</span> Once an hour, the
 backend also deletes every entry older than the retention period, of every

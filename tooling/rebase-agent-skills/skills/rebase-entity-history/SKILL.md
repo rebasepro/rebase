@@ -327,7 +327,7 @@ CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_history_updated_at
 
 ## Retention and Automatic Pruning
 
-The history service automatically prunes old entries to prevent unbounded storage growth: **non-blocking** after every insert, for that entity, and **once an hour** for every entity (since 0.25).
+The history service automatically prunes old entries to prevent unbounded storage growth: **non-blocking** after every insert the server makes, for that entity, and **once an hour** for every entity (since 0.25). Writes through `openRebase` / `rebase console` record history but never prune: a script cannot know the server's retention, so the server prunes on its next write to that entity and in the hourly sweep.
 
 ### Retention Configuration
 
