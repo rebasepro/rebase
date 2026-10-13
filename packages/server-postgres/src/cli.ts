@@ -2282,7 +2282,14 @@ async function schemaCommand(
                 env: { ...process.env as Record<string, string> }
             });
         } catch (err: unknown) {
-            outError(chalk.red(`✗ Failed to run schema introspector: ${err instanceof Error ? err.message : String(err)}`));
+            // A child that ran and exited non-zero already said why, through
+            // the inherited stdio; repeating execa's "Command failed with exit
+            // code 1: node --import …" under it only buried that. A child that
+            // never started printed nothing, so that one is said here.
+            const exitCode = typeof err === "object" && err !== null ? Reflect.get(err, "exitCode") : undefined;
+            if (typeof exitCode !== "number") {
+                outError(chalk.red(`✗ Failed to run schema introspector: ${err instanceof Error ? err.message : String(err)}`));
+            }
             process.exit(1);
         }
     } else {

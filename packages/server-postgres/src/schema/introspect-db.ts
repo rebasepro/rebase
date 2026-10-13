@@ -20,6 +20,7 @@ import { classifyTables, lookupCandidates, LOOKUP_MAX_ROWS } from "./introspect-
 import { parseCheckConstraints } from "./introspect-db-constraints";
 import { out, outWarn, outError } from "../cli-output";
 import { promptConfirm } from "../cli-prompt";
+import { diagnoseDbError } from "../cli-errors";
 
 async function main() {
     const args = arg(
@@ -43,13 +44,12 @@ async function main() {
         ? path.resolve(cwd, "..", "config", "collections")
         : path.resolve(cwd, "config", "collections");
 
-    const outDir = args["--output"] || args["--collections"] || defaultOutDir;
+    // Absolute, because it is printed: the driver runs in `backend/`, and the
+    // default `../config/collections` read from the project root named a
+    // directory beside it.
+    const outDir = path.resolve(args["--output"] || args["--collections"] || defaultOutDir);
     const force = args["--force"] || false;
     const pgSchema = args["--schema"] || "public";
-
-    if (!fs.existsSync(outDir)) {
-        fs.mkdirSync(outDir, { recursive: true });
-    }
 
     // Load env
     const envPaths = [
@@ -77,9 +77,22 @@ async function main() {
     try {
         await client.connect();
     } catch (err) {
-        outError(chalk.red(`✗ Failed to connect to database: ${err instanceof Error ? err.message : String(err)}`));
-        outError(chalk.gray("  Check your DATABASE_URL and ensure the database is reachable."));
+        // The banner `db push` prints for the same failure, when it is one of
+        // the ones it knows.
+        const banner = diagnoseDbError(err, databaseUrl);
+        if (banner) {
+            outError(banner);
+        } else {
+            outError(chalk.red(`✗ Failed to connect to database: ${err instanceof Error ? err.message : String(err)}`));
+            outError(chalk.gray("  Check your DATABASE_URL and ensure the database is reachable."));
+        }
         process.exit(1);
+    }
+
+    // Only once there is something to write into: created before connecting,
+    // a run against a database that was down left an empty directory behind.
+    if (!fs.existsSync(outDir)) {
+        fs.mkdirSync(outDir, { recursive: true });
     }
 
     // Log the host portion safely — handle URLs without "@"
