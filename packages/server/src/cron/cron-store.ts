@@ -16,7 +16,12 @@ import { createDdlBootstrapper, hasInCauseChain } from "../boot/ddl-bootstrap.js
  * occurs, and a pause or a trigger's "already executing" is per process.
  */
 export interface CronStore {
-    /** Ensure the backing table exists. Called once on startup. */
+    /**
+     * Ensure the backing tables exist and are locked away from end users. Runs
+     * once per process per database, however many stores ask: concurrent
+     * callers share the attempt in flight, and an attempt that fell short is
+     * made again on the next call.
+     */
     ensureTable(): Promise<void>;
 
     /** Persist a single log entry after execution. */
@@ -274,6 +279,35 @@ function isUniqueViolation(err: unknown): boolean {
     );
 }
 
+/**
+ * The setup each database is going through right now, in this process. The
+ * scheduler, the expired-token sweep and the history retention sweep each make
+ * a store on the same driver, and three setups at once ran the same REVOKEs
+ * concurrently — which Postgres can answer with "tuple concurrently updated",
+ * failing a security control at boot. Keyed on the driver, so a second
+ * database gets a setup of its own.
+ *
+ * Only the attempt in flight is shared. A later call runs the setup again —
+ * every statement in it is idempotent — because the tables can be gone by
+ * then: a database reset under a running server, or a suite that drops the
+ * schema between tests. A process that remembered "set up" would never bring
+ * them back.
+ */
+const setUpsInFlight = new WeakMap<DataDriver, Promise<void>>();
+
+/** Databases this process has already said "ready" for, so it says so once. */
+const announcedReady = new WeakSet<DataDriver>();
+
+function ensureSharedInFlight(driver: DataDriver, setUp: () => Promise<boolean>): Promise<void> {
+    const current = setUpsInFlight.get(driver);
+    if (current) return current;
+    const attempt = setUp().then(() => undefined).finally(() => {
+        if (setUpsInFlight.get(driver) === attempt) setUpsInFlight.delete(driver);
+    });
+    setUpsInFlight.set(driver, attempt);
+    return attempt;
+}
+
 export function createCronStore(driver: DataDriver): Required<CronStore> | undefined {
     const admin = driver.admin;
     if (!isSQLAdmin(admin)) {
@@ -377,186 +411,199 @@ export function createCronStore(driver: DataDriver): Required<CronStore> | undef
         }
     };
 
+    /**
+     * The boot setup. Resolves with whether every table came up and was locked
+     * away; anything short of that has been reported, and is worth another try.
+     */
+    const announceReady = (): void => {
+        if (announcedReady.has(driver)) return;
+        announcedReady.add(driver);
+        logger.info("✅ Cron logs table ready");
+    };
+
+    const setUp = async (): Promise<boolean> => {
+        // A warm boot: everything is there and locked away. The future
+        // claims are about the slots this boot is about to fire, so they
+        // are released either way.
+        if (await bootIsCurrent()) {
+            await releaseFutureClaims();
+            announceReady();
+            return true;
+        }
+
+        // Creation. Every statement here is idempotent, so losing the race
+        // to a peer that booted at the same moment is survivable — but only
+        // if the loser retries rather than abandoning everything below it.
+        // One step each, so a hard failure on any one of them does not take
+        // the others with it. The claims table in particular must not be
+        // lost because an index on the *logs* table could not be built.
+        await ddl.ensureObject("Creating schema rebase", "CREATE SCHEMA IF NOT EXISTS rebase");
+
+        await ddl.ensureObject(`Creating ${TABLE}`, `
+            CREATE TABLE IF NOT EXISTS ${TABLE} (
+                id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+                job_id TEXT NOT NULL,
+                started_at TIMESTAMPTZ NOT NULL,
+                finished_at TIMESTAMPTZ NOT NULL,
+                duration_ms INTEGER NOT NULL,
+                success BOOLEAN NOT NULL DEFAULT true,
+                error TEXT,
+                result JSONB,
+                logs JSONB,
+                manual BOOLEAN NOT NULL DEFAULT false
+            )
+        `);
+
+        await ddl.ensureObject("Creating idx_cron_logs_job", `
+            CREATE INDEX IF NOT EXISTS idx_cron_logs_job
+            ON ${TABLE}(job_id, started_at DESC)
+        `);
+
+        // Whether a run is in its job's counters. A run logged by this
+        // server is counted in the statement that logs it; NULL is a run
+        // written before the counters existed, or by an older server
+        // during a rolling deploy, which `sweepLogs` counts. Asked of the
+        // catalog first: `ADD COLUMN IF NOT EXISTS` takes an ACCESS
+        // EXCLUSIVE lock on the table even when the column is there.
+        if (!(await hasColumn("cron_logs", "counted"))) {
+            await ddl.ensureObject(`Adding ${TABLE}.counted`, `
+                ALTER TABLE ${TABLE} ADD COLUMN IF NOT EXISTS counted BOOLEAN
+            `);
+        }
+
+        // The runs not counted yet — every row of a history that predates
+        // the counters, then nothing. What the counting sweep walks, and
+        // what a listing adds to the counters until it has.
+        await ddl.ensureObject("Creating idx_cron_logs_uncounted", `
+            CREATE INDEX IF NOT EXISTS idx_cron_logs_uncounted
+            ON ${TABLE}(job_id, started_at DESC) WHERE counted IS NULL
+        `);
+
+        // The retention sweep's index: it deletes the oldest rows first,
+        // whatever job wrote them.
+        await ddl.ensureObject("Creating idx_cron_logs_started", `
+            CREATE INDEX IF NOT EXISTS idx_cron_logs_started
+            ON ${TABLE}(started_at)
+        `);
+
+        // It held the failed runs, for a failure count over the whole
+        // history on every listing. The count is a counter now.
+        await ddl.ensureObject("Dropping idx_cron_logs_job_failures",
+            "DROP INDEX IF EXISTS rebase.idx_cron_logs_job_failures");
+
+        await ddl.ensureObject(`Creating ${CLAIMS_TABLE}`, `
+            CREATE TABLE IF NOT EXISTS ${CLAIMS_TABLE} (
+                job_id TEXT NOT NULL,
+                slot TIMESTAMPTZ NOT NULL,
+                claimed_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+                PRIMARY KEY (job_id, slot)
+            )
+        `);
+
+        // One row per job that has been paused, resumed or run under a
+        // lease. `enabled` NULL means "follow the code"; `updated_at` and
+        // `updated_by` say who last set it, and stay NULL on a row that has
+        // only ever held a lease. Created here rather than by a migration,
+        // so a database that predates it gains it on its next boot.
+        await ddl.ensureObject(`Creating ${STATE_TABLE}`, `
+            CREATE TABLE IF NOT EXISTS ${STATE_TABLE} (
+                job_id TEXT PRIMARY KEY,
+                enabled BOOLEAN,
+                updated_at TIMESTAMPTZ,
+                updated_by TEXT,
+                running_until TIMESTAMPTZ,
+                running_by TEXT
+            )
+        `);
+
+        // Each job's all-time run counts and its last run, kept in the
+        // statement that logs the run, so a listing is one row per job
+        // however long the history — and outlives its retention.
+        if (!(await hasColumn("cron_job_state", "total_runs"))) {
+            await ddl.ensureObject(`Adding the run counters to ${STATE_TABLE}`, `
+                ALTER TABLE ${STATE_TABLE}
+                    ADD COLUMN IF NOT EXISTS total_runs BIGINT NOT NULL DEFAULT 0,
+                    ADD COLUMN IF NOT EXISTS total_failures BIGINT NOT NULL DEFAULT 0,
+                    ADD COLUMN IF NOT EXISTS last_run_at TIMESTAMPTZ,
+                    ADD COLUMN IF NOT EXISTS last_duration_ms INTEGER,
+                    ADD COLUMN IF NOT EXISTS last_success BOOLEAN,
+                    ADD COLUMN IF NOT EXISTS last_error TEXT
+            `);
+        }
+
+        // Everything from here is keyed on what actually exists, not on
+        // whether *this* instance is the one that created it. A single
+        // failure above used to abandon the rest of this method, which meant
+        // the loser of a boot race skipped the sweeps and — far worse — the
+        // privilege revocation, leaving the claims table writable by end
+        // users on an instance that reported nothing but a warning about
+        // log persistence.
+        const [logsReady, claimsReady, stateReady] = await Promise.all([
+            ddl.isReadable(TABLE),
+            ddl.isReadable(CLAIMS_TABLE),
+            ddl.isReadable(STATE_TABLE)
+        ]);
+
+        if (claimsReady) {
+            await releaseFutureClaims();
+
+            // The retention sweep is not here any more: it ran at boot
+            // and only at boot, so a scheduler that lived for months kept
+            // every claim it made — 525,000 a year for one per-minute job
+            // — until the next deploy deleted them in the boot path. The
+            // scheduler runs `sweepClaims` on a timer instead.
+        }
+
+        // Neither table is a collection, so neither carries RLS, while the
+        // Postgres driver's schema-wide grant reaches both. Cron logs hold
+        // job output — arbitrary application data — and a writable
+        // `cron_claims` lets any signed-in user suppress a scheduled run by
+        // claiming its slot. This is a security control, so it is re-applied
+        // by every instance on every boot, whatever else went wrong.
+        if (logsReady) {
+            await ddl.step("Revoking end-user access to cron_logs", () =>
+                exec(revokeInternalTableSql("rebase", "cron_logs")));
+        }
+        if (claimsReady) {
+            await ddl.step("Revoking end-user access to cron_claims", () =>
+                exec(revokeInternalTableSql("rebase", "cron_claims")));
+        }
+        // A writable `cron_job_state` would let any signed-in user pause a
+        // job for the whole fleet, or hold its run lease so that nothing
+        // runs it.
+        if (stateReady) {
+            await ddl.step("Revoking end-user access to cron_job_state", () =>
+                exec(revokeInternalTableSql("rebase", "cron_job_state")));
+        }
+
+        if (logsReady && claimsReady && stateReady) {
+            announceReady();
+            return true;
+        }
+        // Say which capability is gone, and what it costs. "Continuing
+        // without cron log persistence" undersold this: the claims table is
+        // the only thing stopping every instance from running every job.
+        if (!claimsReady) {
+            logger.error(
+                `❌ [cron-store] ${CLAIMS_TABLE} is unavailable — scheduled runs cannot be coordinated. ` +
+                "With more than one app instance, every instance will now run every job on every tick."
+            );
+        }
+        if (!logsReady) {
+            logger.warn(`⚠️ [cron-store] ${TABLE} is unavailable — cron run history will not be persisted.`);
+        }
+        if (!stateReady) {
+            logger.warn(
+                `⚠️ [cron-store] ${STATE_TABLE} is unavailable — pausing a job reaches only the process ` +
+                "that served the request, and jobs run as their code declares on every other one. " +
+                "A manual trigger is not kept off a run another process is making."
+            );
+        }
+        return false;
+    };
+
     return {
-        async ensureTable(): Promise<void> {
-            // A warm boot: everything is there and locked away. The future
-            // claims are about the slots this boot is about to fire, so they
-            // are released either way.
-            if (await bootIsCurrent()) {
-                await releaseFutureClaims();
-                logger.info("✅ Cron logs table ready");
-                return;
-            }
-
-            // Creation. Every statement here is idempotent, so losing the race
-            // to a peer that booted at the same moment is survivable — but only
-            // if the loser retries rather than abandoning everything below it.
-            // One step each, so a hard failure on any one of them does not take
-            // the others with it. The claims table in particular must not be
-            // lost because an index on the *logs* table could not be built.
-            await ddl.ensureObject("Creating schema rebase", "CREATE SCHEMA IF NOT EXISTS rebase");
-
-            await ddl.ensureObject(`Creating ${TABLE}`, `
-                CREATE TABLE IF NOT EXISTS ${TABLE} (
-                    id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
-                    job_id TEXT NOT NULL,
-                    started_at TIMESTAMPTZ NOT NULL,
-                    finished_at TIMESTAMPTZ NOT NULL,
-                    duration_ms INTEGER NOT NULL,
-                    success BOOLEAN NOT NULL DEFAULT true,
-                    error TEXT,
-                    result JSONB,
-                    logs JSONB,
-                    manual BOOLEAN NOT NULL DEFAULT false
-                )
-            `);
-
-            await ddl.ensureObject("Creating idx_cron_logs_job", `
-                CREATE INDEX IF NOT EXISTS idx_cron_logs_job
-                ON ${TABLE}(job_id, started_at DESC)
-            `);
-
-            // Whether a run is in its job's counters. A run logged by this
-            // server is counted in the statement that logs it; NULL is a run
-            // written before the counters existed, or by an older server
-            // during a rolling deploy, which `sweepLogs` counts. Asked of the
-            // catalog first: `ADD COLUMN IF NOT EXISTS` takes an ACCESS
-            // EXCLUSIVE lock on the table even when the column is there.
-            if (!(await hasColumn("cron_logs", "counted"))) {
-                await ddl.ensureObject(`Adding ${TABLE}.counted`, `
-                    ALTER TABLE ${TABLE} ADD COLUMN IF NOT EXISTS counted BOOLEAN
-                `);
-            }
-
-            // The runs not counted yet — every row of a history that predates
-            // the counters, then nothing. What the counting sweep walks, and
-            // what a listing adds to the counters until it has.
-            await ddl.ensureObject("Creating idx_cron_logs_uncounted", `
-                CREATE INDEX IF NOT EXISTS idx_cron_logs_uncounted
-                ON ${TABLE}(job_id, started_at DESC) WHERE counted IS NULL
-            `);
-
-            // The retention sweep's index: it deletes the oldest rows first,
-            // whatever job wrote them.
-            await ddl.ensureObject("Creating idx_cron_logs_started", `
-                CREATE INDEX IF NOT EXISTS idx_cron_logs_started
-                ON ${TABLE}(started_at)
-            `);
-
-            // It held the failed runs, for a failure count over the whole
-            // history on every listing. The count is a counter now.
-            await ddl.ensureObject("Dropping idx_cron_logs_job_failures",
-                "DROP INDEX IF EXISTS rebase.idx_cron_logs_job_failures");
-
-            await ddl.ensureObject(`Creating ${CLAIMS_TABLE}`, `
-                CREATE TABLE IF NOT EXISTS ${CLAIMS_TABLE} (
-                    job_id TEXT NOT NULL,
-                    slot TIMESTAMPTZ NOT NULL,
-                    claimed_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-                    PRIMARY KEY (job_id, slot)
-                )
-            `);
-
-            // One row per job that has been paused, resumed or run under a
-            // lease. `enabled` NULL means "follow the code"; `updated_at` and
-            // `updated_by` say who last set it, and stay NULL on a row that has
-            // only ever held a lease. Created here rather than by a migration,
-            // so a database that predates it gains it on its next boot.
-            await ddl.ensureObject(`Creating ${STATE_TABLE}`, `
-                CREATE TABLE IF NOT EXISTS ${STATE_TABLE} (
-                    job_id TEXT PRIMARY KEY,
-                    enabled BOOLEAN,
-                    updated_at TIMESTAMPTZ,
-                    updated_by TEXT,
-                    running_until TIMESTAMPTZ,
-                    running_by TEXT
-                )
-            `);
-
-            // Each job's all-time run counts and its last run, kept in the
-            // statement that logs the run, so a listing is one row per job
-            // however long the history — and outlives its retention.
-            if (!(await hasColumn("cron_job_state", "total_runs"))) {
-                await ddl.ensureObject(`Adding the run counters to ${STATE_TABLE}`, `
-                    ALTER TABLE ${STATE_TABLE}
-                        ADD COLUMN IF NOT EXISTS total_runs BIGINT NOT NULL DEFAULT 0,
-                        ADD COLUMN IF NOT EXISTS total_failures BIGINT NOT NULL DEFAULT 0,
-                        ADD COLUMN IF NOT EXISTS last_run_at TIMESTAMPTZ,
-                        ADD COLUMN IF NOT EXISTS last_duration_ms INTEGER,
-                        ADD COLUMN IF NOT EXISTS last_success BOOLEAN,
-                        ADD COLUMN IF NOT EXISTS last_error TEXT
-                `);
-            }
-
-            // Everything from here is keyed on what actually exists, not on
-            // whether *this* instance is the one that created it. A single
-            // failure above used to abandon the rest of this method, which meant
-            // the loser of a boot race skipped the sweeps and — far worse — the
-            // privilege revocation, leaving the claims table writable by end
-            // users on an instance that reported nothing but a warning about
-            // log persistence.
-            const [logsReady, claimsReady, stateReady] = await Promise.all([
-                ddl.isReadable(TABLE),
-                ddl.isReadable(CLAIMS_TABLE),
-                ddl.isReadable(STATE_TABLE)
-            ]);
-
-            if (claimsReady) {
-                await releaseFutureClaims();
-
-                // The retention sweep is not here any more: it ran at boot
-                // and only at boot, so a scheduler that lived for months kept
-                // every claim it made — 525,000 a year for one per-minute job
-                // — until the next deploy deleted them in the boot path. The
-                // scheduler runs `sweepClaims` on a timer instead.
-            }
-
-            // Neither table is a collection, so neither carries RLS, while the
-            // Postgres driver's schema-wide grant reaches both. Cron logs hold
-            // job output — arbitrary application data — and a writable
-            // `cron_claims` lets any signed-in user suppress a scheduled run by
-            // claiming its slot. This is a security control, so it is re-applied
-            // by every instance on every boot, whatever else went wrong.
-            if (logsReady) {
-                await ddl.step("Revoking end-user access to cron_logs", () =>
-                    exec(revokeInternalTableSql("rebase", "cron_logs")));
-            }
-            if (claimsReady) {
-                await ddl.step("Revoking end-user access to cron_claims", () =>
-                    exec(revokeInternalTableSql("rebase", "cron_claims")));
-            }
-            // A writable `cron_job_state` would let any signed-in user pause a
-            // job for the whole fleet, or hold its run lease so that nothing
-            // runs it.
-            if (stateReady) {
-                await ddl.step("Revoking end-user access to cron_job_state", () =>
-                    exec(revokeInternalTableSql("rebase", "cron_job_state")));
-            }
-
-            if (logsReady && claimsReady && stateReady) {
-                logger.info("✅ Cron logs table ready");
-                return;
-            }
-            // Say which capability is gone, and what it costs. "Continuing
-            // without cron log persistence" undersold this: the claims table is
-            // the only thing stopping every instance from running every job.
-            if (!claimsReady) {
-                logger.error(
-                    `❌ [cron-store] ${CLAIMS_TABLE} is unavailable — scheduled runs cannot be coordinated. ` +
-                    "With more than one app instance, every instance will now run every job on every tick."
-                );
-            }
-            if (!logsReady) {
-                logger.warn(`⚠️ [cron-store] ${TABLE} is unavailable — cron run history will not be persisted.`);
-            }
-            if (!stateReady) {
-                logger.warn(
-                    `⚠️ [cron-store] ${STATE_TABLE} is unavailable — pausing a job reaches only the process ` +
-                    "that served the request, and jobs run as their code declares on every other one. " +
-                    "A manual trigger is not kept off a run another process is making."
-                );
-            }
-        },
+        ensureTable: () => ensureSharedInFlight(driver, setUp),
 
         async sweepClaims(): Promise<number> {
             // Garbage-collect old claims — except each job's most recent one.

@@ -278,6 +278,105 @@ describe("createCronStore", () => {
         });
     });
 
+    // ── One setup per database ───────────────────────────────────────
+    //
+    // The scheduler, the expired-token sweep and the history retention sweep
+    // each make their own store on the same driver. Three setups at once ran
+    // the same REVOKEs concurrently, and Postgres answered one of them with
+    // "tuple concurrently updated" — a security control failing at boot.
+
+    describe("one setup per database", () => {
+        const readyLines = (spy: { mock: { calls: unknown[][] } }) =>
+            spy.mock.calls.filter(([message]) => message === "✅ Cron logs table ready");
+
+        it("runs the setup once when three stores on one driver ask at the same time", async () => {
+            const info = jest.spyOn(logger, "info").mockImplementation(() => { /* silence */ });
+            const { driver, statements } = recordingDriver();
+
+            await Promise.all([
+                createCronStore(driver)!.ensureTable(),
+                createCronStore(driver)!.ensureTable(),
+                createCronStore(driver)!.ensureTable()
+            ]);
+
+            expect(statements.filter(s => s.includes("CREATE TABLE IF NOT EXISTS rebase.cron_logs"))).toHaveLength(1);
+            expect(revokesIn(statements)).toHaveLength(3);
+            expect(readyLines(info)).toHaveLength(1);
+        });
+
+        it("runs it again for a later call, so tables dropped meanwhile come back, and says ready once", async () => {
+            // Only a setup in flight is shared. A database reset under a
+            // running server (`rebase db reset`, an e2e suite dropping the
+            // schema) leaves the tables gone, and a process that remembered
+            // "set up" would never bring them back.
+            const info = jest.spyOn(logger, "info").mockImplementation(() => { /* silence */ });
+            const { driver, statements } = recordingDriver();
+
+            await createCronStore(driver)!.ensureTable();
+            const after = statements.length;
+            await createCronStore(driver)!.ensureTable();
+
+            expect(statements.length).toBeGreaterThan(after);
+            expect(readyLines(info)).toHaveLength(1);
+        });
+
+        it("runs it for each database", async () => {
+            jest.spyOn(logger, "info").mockImplementation(() => { /* silence */ });
+            const first = recordingDriver();
+            const second = recordingDriver();
+
+            await Promise.all([
+                createCronStore(first.driver)!.ensureTable(),
+                createCronStore(second.driver)!.ensureTable()
+            ]);
+
+            expect(revokesIn(first.statements)).toHaveLength(3);
+            expect(revokesIn(second.statements)).toHaveLength(3);
+        });
+
+        it("reports a failed setup and runs it again on the next attempt", async () => {
+            const info = jest.spyOn(logger, "info").mockImplementation(() => { /* silence */ });
+            const errors = jest.spyOn(logger, "error").mockImplementation(() => { /* silence */ });
+            jest.spyOn(logger, "warn").mockImplementation(() => { /* silence */ });
+            let claimsBroken = true;
+            const { driver, statements } = recordingDriver((sql) => {
+                if (claimsBroken && sql.includes("cron_claims")) {
+                    throw new Error('relation "rebase.cron_claims" does not exist');
+                }
+            });
+
+            await createCronStore(driver)!.ensureTable();
+            expect(errors.mock.calls.some(([m]) => /every instance will now run every job/i.test(String(m)))).toBe(true);
+            expect(readyLines(info)).toHaveLength(0);
+
+            claimsBroken = false;
+            await createCronStore(driver)!.ensureTable();
+
+            expect(statements.filter(s => s.includes("CREATE TABLE IF NOT EXISTS rebase.cron_claims")).length).toBeGreaterThan(1);
+            expect(revokesIn(statements).filter(s => s.includes("cron_claims"))).toHaveLength(1);
+            expect(readyLines(info)).toHaveLength(1);
+        });
+
+        it("runs it again after an attempt that threw", async () => {
+            // Nothing in the setup is meant to throw, but a promise that
+            // rejected once must not be handed to every later caller.
+            let first = true;
+            jest.spyOn(logger, "info").mockImplementation(() => {
+                if (first) {
+                    first = false;
+                    throw new Error("log sink closed");
+                }
+            });
+            const { driver, statements } = recordingDriver();
+
+            await expect(createCronStore(driver)!.ensureTable()).rejects.toThrow("log sink closed");
+            const after = statements.length;
+            await createCronStore(driver)!.ensureTable();
+
+            expect(statements.length).toBeGreaterThan(after);
+        });
+    });
+
     describe("tryClaimRun", () => {
         const SLOT = "2026-07-18T12:00:00.000Z";
 

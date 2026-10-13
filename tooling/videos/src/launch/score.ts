@@ -61,4 +61,4 @@ export const sectionLength = (s: Section) => SECTIONS[s].bars * BAR;
  */
 export const TRACKS = ["keynote", "cinematic", "garage"] as const;
 export type Track = (typeof TRACKS)[number];
-export const DEFAULT_TRACK: Track = "keynote";
+export const DEFAULT_TRACK: Track = "garage";

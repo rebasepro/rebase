@@ -1545,6 +1545,13 @@ La traducción está pendiente. El contenido siguiente está en inglés.
 
 #### CLI
 
+- **`pnpm run build` in a new project no longer warns that "Some chunks are
+  larger than 500 kB".** The chunks it named were the admin's, already
+  code-split, which the project's author did not write and cannot split. The
+  template's `vite.config.ts` sets `chunkSizeWarningLimit: Infinity`, as the
+  repository's example app does. An existing project can add the same line
+  under `build`.
+
 - **`rebase doctor` and `rebase db push` no longer report every
   `policy.authenticated()` and `policy.registered()` policy as the insecure
   `uid() IS NOT NULL` tautology.** The drift check accepted only
@@ -2051,6 +2058,16 @@ La traducción está pendiente. El contenido siguiente está en inglés.
 #### Inference
 
 - **inferTypeFromValue calls a `Date` a `date`.**
+
+#### Jobs & cron
+
+- **The cron tables' end-user revokes no longer fail at boot with "tuple
+  concurrently updated", and "Cron logs table ready" is logged once.** The
+  scheduler, the expired-token sweep and the history retention sweep each ran
+  the setup on the same database at the same time, so the concurrent `REVOKE`s
+  on `rebase.cron_logs` could fail. Callers on one database now share the setup
+  in flight; a later call runs it again, so tables dropped under a running
+  server (a database reset) come back.
 
 #### MCP
 

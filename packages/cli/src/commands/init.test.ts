@@ -94,12 +94,14 @@ describe("template structure", () => {
     /**
      * Output a new project prints on its first run that its author did not
      * cause: Vite 8's "Both esbuild and oxc options were set" on every dev
-     * start and build, and dotenv 17's advertisement banner from
-     * `pnpm run example` and the ejected server.
+     * start and build, Vite's "Some chunks are larger than 500 kB" about the
+     * admin's own chunks on every build, and dotenv 17's advertisement banner
+     * from `pnpm run example` and the ejected server.
      */
     it("ships no file that makes its own tools print warnings or banners", () => {
         const viteConfig = fs.readFileSync(path.join(TEMPLATE_DIR, "frontend", "vite.config.ts"), "utf-8");
         expect(viteConfig).not.toMatch(/^\s*esbuild\s*:/m);
+        expect(viteConfig).toMatch(/^\s*chunkSizeWarningLimit\s*:\s*Infinity\s*,/m);
 
         const templatesRoot = path.dirname(TEMPLATE_DIR);
         const loud: string[] = [];

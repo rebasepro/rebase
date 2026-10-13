@@ -151,7 +151,8 @@ this list, in this order.
 
 | Script | What it protects | Bank / fix |
 |---|---|---|
-| `test` | Every package's unit suite, serialized (`--workspace-concurrency=1`) and `--no-bail`, so every package reports. CI runs it under `TZ=America/Los_Angeles`: a timezone test that runs in the machine's own zone cannot fail in UTC, the runner's zone, and developer machines are east of Greenwich. A test that needs one zone pins it per file — `tooling/scripts/jest/zone-environment.cjs`. | — |
+| `test:unit` | Every package's unit suite except server-postgres's, serialized (`--workspace-concurrency=1`) and `--no-bail`, so every package reports. CI runs it under `TZ=America/Los_Angeles`: a timezone test that runs in the machine's own zone cannot fail in UTC, the runner's zone, and developer machines are east of Greenwich. A test that needs one zone pins it per file — `tooling/scripts/jest/zone-environment.cjs`. | — |
+| `test:unit:postgres` | server-postgres's unit suite, on its own CI runner with two jest workers, each restarted once it holds 1.5 GB: run after every other package's suite in one job, its workers' PGlite and Postgres instances shut the 16 GB runner down for memory (2026-10-13). `pnpm test` still runs both, serialized, for a local run. | — |
 | `test:harness` | The agent harness's own tests. | — |
 | `test:saas-console` | The Cloud console's suite, run from **this** repository. The console resolves `@rebasepro/*` to this checkout, so a change here can break it — and did: a hook that grew an `i18n` member turned the control plane's CI red for three runs, from a commit made here. Needs `saas/` checked out beside this repo (it is part of this workspace); CI skips the step when it has no credential for that repository. | — |
 
@@ -219,3 +220,4 @@ Run by `publish.yml` and `release.sh`, not on a pull request.
 | `check:runtime-image:live` | The published image tag actually answers, which the hermetic check deliberately does not ask. | — |
 | `check:published-schema:live` | rebase.pro is serving the schema this repo has. Until the website deploys, every editor validates `rebase.json` against the older one — which reports a field the CLI accepts as an error. | `website/scripts/scheduled-publish.sh` |
 | `verify:docs` | The non-strict form, for working locally before `verify:docs:strict` gates the PR. | — |
+| `test` | Every package's unit suite, serialized and `--no-bail`: `release.sh` runs it before a local publish. CI runs the same suites split in two, `test:unit` and `test:unit:postgres`. | — |

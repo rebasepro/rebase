@@ -10,6 +10,8 @@
   "homepage": "https://rebase.pro",
   "scripts": {
     "test": "pnpm -r --no-bail --workspace-concurrency=1 test",
+    "test:unit": "pnpm -r --no-bail --workspace-concurrency=1 --filter '!@rebasepro/server-postgres' test",
+    "test:unit:postgres": "pnpm --filter @rebasepro/server-postgres test --maxWorkers=2 --workerIdleMemoryLimit=1536MB",
     "dev": "cd app && run-s dev",
     "web": "cd website && run-s dev",
     "saas": "cd saas && pnpm run dev",

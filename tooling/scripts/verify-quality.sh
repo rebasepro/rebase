@@ -86,11 +86,19 @@ fi
 #    machines are east of Greenwich — so the zone CI covers is the one that
 #    would otherwise be covered nowhere. See the unit job in verify.yml.
 section "4. Unit Tests Suite"
-echo "Running unit tests (pnpm test, TZ=America/Los_Angeles)..."
-if TZ=America/Los_Angeles pnpm test; then
+# CI runs these as two jobs (unit, unit-postgres): server-postgres's suite ran
+# a shared runner out of memory, so it gets its own, with capped workers.
+echo "Running unit tests (pnpm test:unit, TZ=America/Los_Angeles)..."
+if TZ=America/Los_Angeles pnpm test:unit; then
     ok "All unit tests passed successfully."
 else
     err "Some unit tests failed."
+fi
+echo "Running server-postgres's unit tests (pnpm test:unit:postgres, TZ=America/Los_Angeles)..."
+if TZ=America/Los_Angeles pnpm test:unit:postgres; then
+    ok "server-postgres's unit tests passed."
+else
+    err "Some server-postgres unit tests failed."
 fi
 echo "Running the agent harness's tests (pnpm test:harness)..."
 if pnpm run test:harness; then

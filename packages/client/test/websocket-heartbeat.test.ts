@@ -68,14 +68,20 @@ describe("heartbeats", () => {
         expect(server.sockets).toHaveLength(1);
         expect(server.receivedOfType("subscribe_one")).toHaveLength(1);
 
+        const states: string[] = [];
+        client.onStateChange((state) => states.push(state));
         server.halfOpen();
         // One beat late is not yet two missed.
         await jest.advanceTimersByTimeAsync(HEARTBEAT_MS * 2);
         expect(server.sockets).toHaveLength(1);
+        expect(states).not.toContain("reconnecting");
 
         await jest.advanceTimersByTimeAsync(HEARTBEAT_MS * 2);
         // Given up on: what a close would have done, without waiting for one.
-        expect(client.state).toBe("reconnecting");
+        // Read as a transition, not the state at this instant: the redial's
+        // jittered delay can land inside the same advance, and the client is
+        // then already connected again.
+        expect(states).toContain("reconnecting");
         await jest.advanceTimersByTimeAsync(5_000);
         expect(server.sockets.length).toBeGreaterThanOrEqual(2);
         expect(client.state).toBe("connected");

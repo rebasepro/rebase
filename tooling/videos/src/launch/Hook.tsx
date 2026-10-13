@@ -1,7 +1,7 @@
 import React from "react";
 import { AbsoluteFill, Easing, interpolate, OffthreadVideo, staticFile, useCurrentFrame, useVideoConfig } from "remotion";
 import { Code } from "../components/Code";
-import { pop, ramp, SHIFT, SPRING } from "../components/motion";
+import { pop, ramp, SPRING } from "../components/motion";
 import { FONT, FRAME, INK, SURFACE } from "../theme";
 import { LEAD } from "./kit";
 import { BAR, BEAT, FPS } from "./score";
@@ -11,8 +11,8 @@ import { BAR, BEAT, FPS } from "./score";
  *
  * A wall of live windows — cards, tables, a board, records, the schema
  * editor, SQL, and the one file they all come from — tilted away from the
- * camera, dealt in from the centre on the first three beats, drifting while
- * it pulses with the kick, then flown through into the headline.
+ * camera, dealt in from the centre on the first three beats, drifting, then
+ * flown through into the headline.
  *
  * It replaced four macro close-ups of the same footage. Those were Teasr's
  * opening for a hardware product, where a close-up of a knob is a beautiful
@@ -144,15 +144,15 @@ export const Hook: React.FC = () => {
     const frame = useCurrentFrame();
     const length = BAR * 2;
 
-    // A slow diagonal drift across the wall, a turn on the second downbeat,
-    // and a pulse on every kick.
+    // One continuous move: a steady diagonal drift and a slow push, at a fixed
+    // angle. The beat lives in the tiles landing, not in the camera. It used
+    // to pulse on every beat and turn 4 degrees on the second downbeat; under
+    // a two-step, whose kicks skip beats, the pulse landed on nothing and the
+    // turn read as a wobble (Francesco, 2026-10-13: "pulse and rotate oddly").
     const panX = interpolate(frame, [0, length], [150, -150]);
     const panY = interpolate(frame, [0, length], [50, -40]);
-    const turn = ramp(frame, BAR, 40, SHIFT);
-    const rotateZ = -12 + 4 * turn;
-    const pump = 0.014 * Math.exp(-(frame % BEAT) / 7);
     const exit = ramp(frame, EXIT_AT, 22, EXIT);
-    const scale = interpolate(frame, [0, length], [0.98, 1.06]) * (1 + pump) * (1 + 0.45 * exit);
+    const scale = interpolate(frame, [0, length], [0.98, 1.06]) * (1 + 0.45 * exit);
 
     return (
         <AbsoluteFill
@@ -173,7 +173,7 @@ export const Hook: React.FC = () => {
                     top: "50%",
                     width: W,
                     height: H,
-                    transform: `translate(-50%, -50%) translate(${panX}px, ${panY}px) rotateX(24deg) rotateZ(${rotateZ}deg) scale(${scale})`,
+                    transform: `translate(-50%, -50%) translate(${panX}px, ${panY}px) rotateX(24deg) rotateZ(-12deg) scale(${scale})`,
                 }}
             >
                 {WALL.map((row, r) => row.map((tile, c) => <TileView key={`${r}-${c}`} tile={tile} r={r} c={c} />))}

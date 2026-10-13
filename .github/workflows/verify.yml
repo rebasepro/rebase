@@ -39,7 +39,10 @@ permissions:
 #
 #   static         everything that reads SOURCE — no build, no database.
 #   build-gates    `pnpm run build` and the gates that read what it emitted.
-#   unit           the unit suites, which run serialized by design.
+#   unit           the unit suites, which run serialized by design — all but
+#                  server-postgres.
+#   unit-postgres  server-postgres's unit suite on its own runner: in the same
+#                  job as the rest it ran the 16 GB runner out of memory.
 #   e2e-cli        scaffolds and boots projects; owns the screenshot artifact.
 #   e2e-admin      the browser suite; the only job needing Playwright's deps.
 #   e2e-selfhost   self-host and bundle acceptance, plus the RLS scan that reads
@@ -250,10 +253,10 @@ jobs:
       # ones that do not know they depend on the zone. `verify-quality.sh` sets
       # the same zone.
       #
-      # `pnpm test` is `pnpm -r --no-bail …`: every package reports, rather than
-      # the first failing one hiding the rest.
+      # `pnpm test:unit` is `pnpm -r --no-bail …`: every package reports, rather
+      # than the first failing one hiding the rest.
       - name: Run tests
-        run: pnpm test
+        run: pnpm test:unit
         env:
           NODE_OPTIONS: "--max_old_space_size=4096"
           TZ: America/Los_Angeles
@@ -265,6 +268,52 @@ jobs:
       - name: Harness tests
         if: always()
         run: pnpm run test:harness
+
+  # server-postgres's suite, apart: each jest worker keeps the PGlite and
+  # Postgres instances its files start, and after every other package's suite
+  # in the same job the runner was shut down for memory twice (2026-10-13, run
+  # 38389994665). Two workers, each restarted once it holds 1.5 GB.
+  unit-postgres:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build packages
+        run: pnpm run build
+        env:
+          NODE_OPTIONS: "--max_old_space_size=4096"
+
+      # In Los Angeles, not the runner's UTC. A timezone regression test that
+      # runs in "whatever zone the machine is in" cannot fail in UTC: the cms
+      # date-only fix (b23a4263a) passed here with the fix reverted, and failed
+      # only on a laptop east of Greenwich. The developer machines run east, so
+      # CI runs west, and between them both halves are exercised. A test that
+      # needs one particular zone pins it per file instead (see
+      # tooling/scripts/jest/zone-environment.cjs); this is the guard for the
+      # ones that do not know they depend on the zone. `verify-quality.sh` sets
+      # the same zone.
+      #
+      - name: Run tests
+        run: pnpm test:unit:postgres
+        env:
+          TZ: America/Los_Angeles
 
   # Scaffolding a project and driving it: `init`, the BaaS template, and the
   # client SDK over a real socket. Playwright is installed because cli-init-e2e

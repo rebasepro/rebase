@@ -55,9 +55,11 @@ export function compose(s) {
         reverb: 0.2,
         width: 1.3,
     });
+    // The hook, held a little back from the front (Francesco, 2026-10-13:
+    // "a little more subtle"): -2.5 dB and a softer presence lift than at first.
     const vox = s.stem("vox", {
-        level: 1.1,
-        eq: [{ type: "hp", f: 220 }, { type: "peak", f: 3000, q: 1, gain: 2 }],
+        level: 0.82,
+        eq: [{ type: "hp", f: 220 }, { type: "peak", f: 3000, q: 1, gain: 1 }],
         comp: { threshold: -20, ratio: 3, attack: 0.004, release: 0.08 },
         reverb: 0.28,
         delay: 0.24,
