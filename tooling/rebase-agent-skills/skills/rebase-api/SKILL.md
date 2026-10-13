@@ -623,7 +623,9 @@ Unauthenticated and deliberately tiny — `{ "schemaVersion": "a1b2c3…" }`. Us
 
 ## Server Configuration (RebaseBackendConfig)
 
-The backend is configured by the object passed to `initializeRebaseBackend(config)`. The type is **`RebaseBackendConfig`**, defined in `packages/server/src/init.ts`. There is no `ApiConfig` type.
+The backend is configured by the object passed to `initializeRebaseBackend(config)`. The type is **`RebaseBackendConfig`**, defined in `packages/server/src/init.ts`: the backend's options, **`RebaseBackendOptions`** (`packages/server/src/backend/options.ts`), plus `app`, `server` and `basePath`. There is no `ApiConfig` type.
+
+`createRebaseBackend(options)` (new in 0.25) takes `RebaseBackendOptions` itself, with a required `provision`, and mounts nothing: the routes this skill describes are then `backend.mount(app, { basePath })` — the same layout — or one group at a time, at any path, with `app.route("/v2/data", backend.routes.data())` (`routes.auth()`, `data()`, `storage()`, `functions()`, `admin()`, `cron()`, `meta()`). Every path below assumes the default `/api` base path.
 
 > A scaffolded project does not build this object itself. `rebase dev` and the published runtime boot from the bundle: collections and `storageAuthorize` come from `config/index.ts`, and everything else from environment variables. Pass this object directly only when embedding Rebase in a server you own.
 
@@ -655,7 +657,8 @@ A `?limit` above the maximum is a **400, not a clamp** — the request is reject
 - **Query Parser:** `packages/server/src/api/rest/query-parser.ts`
 - **OpenAPI Generator:** `packages/server/src/api/openapi-generator.ts`
 - **Error Handling:** `packages/server/src/api/errors.ts`
-- **Server Setup / config type:** `packages/server/src/init.ts`
+- **Server Setup:** `packages/server/src/init.ts` (`initializeRebaseBackend`, `RebaseBackendConfig`) and `packages/server/src/backend/create-backend.ts` (`createRebaseBackend`, `routes`, `mount`)
+- **Backend options:** `packages/server/src/backend/options.ts` (`RebaseBackendOptions`)
 - **Bundle boot (health, CORS, static apps):** `packages/server/src/boot/boot.ts`
 - **API Types:** `packages/server/src/api/types.ts`
 - **Auth Middleware:** `packages/server/src/auth/middleware.ts`

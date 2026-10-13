@@ -830,14 +830,14 @@ process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
 process.on("SIGINT", () => gracefulShutdown("SIGINT"));
 ```
 
-`shutdown(timeoutMs?: number)`:
+`shutdown(timeoutMs?: number, options?: { server })`:
 - Default timeout: `15000` ms
-- Stops cron scheduler
+- Stops cron scheduler (and the job workers), waiting for work in flight within the budget
 - Destroys realtime services (LISTEN clients, debounce timers)
-- Closes HTTP server and drains in-flight requests
+- Closes HTTP server and drains in-flight requests — the server `initializeRebaseBackend` was given; a backend built with `createRebaseBackend` (0.25+) closes only the server passed as `{ server }`
 - Pass `0` to skip the force-exit timer (useful in tests)
 
-> **WARNING FOR AGENTS:** Do NOT call `server.close()` separately when using `backend.shutdown()` — it already closes the HTTP server internally. Calling `server.close()` twice will deadlock.
+> **WARNING FOR AGENTS:** Do NOT call `server.close()` separately when `backend.shutdown()` closes the HTTP server — always for the backend `initializeRebaseBackend` returns. Calling `server.close()` twice will deadlock.
 
 ---
 

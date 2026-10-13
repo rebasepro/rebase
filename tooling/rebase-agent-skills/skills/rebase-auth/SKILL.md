@@ -31,7 +31,7 @@ Rebase ships a complete, built-in authentication system with JWT sessions, OAuth
 
 ## Server-Side Configuration
 
-Authentication is configured via the `auth` property of `initializeRebaseBackend()`. It accepts **either** a `RebaseAuthConfig` object (built-in auth) or an `AuthAdapter` (external auth).
+Authentication is configured via the `auth` property of `initializeRebaseBackend()` — or of `createRebaseBackend()`, which takes the same options (0.25+). It accepts **either** a `RebaseAuthConfig` object (built-in auth) or an `AuthAdapter` (external auth).
 
 > **Auth & multiple data sources.** The built-in auth system (users, sessions, API keys) is bootstrapped on the **default** data source — the auth collection must live there (the backend warns at boot otherwise). **RLS only protects Postgres**: server collections on engines without row-level security (e.g. MongoDB) still require authentication but enforce authorization at the app layer (the backend warns for these). **Direct data sources (e.g. Firestore) bypass Rebase auth entirely** — they're governed by the external backend's own rules/token; use an `AuthAdapter` to unify identity. See the **rebase-collections** skill for the data-source model.
 
@@ -1078,6 +1078,39 @@ await initializeRebaseBackend({
 });
 ```
 
+### The client half: send your provider's token
+
+The adapter verifies the token; the client has to send it. With your own sign-in
+(Clerk, Firebase Auth, a session of your own), install one token getter on the
+client:
+
+```typescript
+import { createRebaseClient } from "@rebasepro/client";
+
+const client = createRebaseClient({ baseUrl: "https://api.example.com" });
+
+// Asked before every HTTP request and every time the realtime socket authenticates.
+client.setAuthTokenGetter(() => clerk.session?.getToken() ?? Promise.resolve(null));
+
+// Optional: answer a refused token — a 401, or an auth error on the socket.
+client.setOnUnauthorized(async () => {
+  await clerk.session?.reload();
+  return true;   // retry with the token resolved again
+});
+```
+
+- The getter comes before the client's own session and the `token` option, which
+  are used when it answers `null` or throws. Installing it (or calling
+  `client.setToken()`) rebuilds an open socket so it authenticates as the new
+  credential.
+- **Since 0.25 this one call covers the realtime socket too.** In 0.24 and
+  earlier `client.setAuthTokenGetter()` reached HTTP only: the socket stayed
+  anonymous and live queries ran as a visitor — there, also call
+  `client.ws?.setAuthTokenGetter(getter)`. That socket-only call is deprecated
+  from 0.25: it still works and warns once.
+- The client you hand `<Rebase client>` authenticates the admin panel the same
+  way, HTTP and realtime.
+
 ### AuthAdapterCapabilities
 
 The frontend reads these from `GET /api/auth/config` to dynamically show/hide UI:
@@ -1404,7 +1437,8 @@ All auth endpoints validate input with Zod schemas:
 - Source: `packages/server/src/auth/auth-hooks.ts` — Lifecycle hooks
 - Source: `packages/server/src/auth/api-keys/` — API key system
 - Source: `packages/server/src/auth/rate-limiter.ts` — Rate limiting
-- Source: `packages/server/src/init.ts` — `RebaseAuthConfig` and backend init
+- Source: `packages/server/src/backend/options.ts` — `RebaseAuthConfig` and every backend option
+- Source: `packages/server/src/init.ts` / `packages/server/src/backend/create-backend.ts` — `initializeRebaseBackend` / `createRebaseBackend`
 - Source: `packages/client/src/auth.ts` — Client SDK auth module
 - Source: `packages/types/src/types/auth_adapter.ts` — `AuthAdapter` interface
 - Source: `packages/server/src/auth/rls-scope.ts` — RLS scoping

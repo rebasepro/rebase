@@ -23,7 +23,9 @@ import { initializeRebaseBackend } from "@rebasepro/server";
 await initializeRebaseBackend({
     app,
     server,
-    database: createPostgresAdapter({ connectionString: env.DATABASE_URL }),
+    // `db` from `createPostgresDatabaseConnection(env.DATABASE_URL)`: the adapter
+    // needs the connection; a connection string alone opens no pool.
+    database: createPostgresAdapter({ connection: db, connectionString: env.DATABASE_URL }),
     collections: [...collections],
 
     // ── Enable entity history globally ──
@@ -438,6 +440,7 @@ await initializeRebaseBackend({
     app,
     server,
     database: createPostgresAdapter({
+        connection: db, // from createPostgresDatabaseConnection(env.DATABASE_URL)
         connectionString: env.DATABASE_URL,
     }),
     collections: [productsCollection, logsCollection, defaultUsersCollection],

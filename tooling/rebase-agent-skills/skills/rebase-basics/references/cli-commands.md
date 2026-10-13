@@ -188,6 +188,33 @@ rebase db branch switch feature_auth
 rebase db branch switch --off   # back to the main database
 ```
 
+### Explore
+
+| Command | Description |
+|---------|-------------|
+| `rebase console` | New in 0.25. A Node REPL with the project open: `rebase` (`dataAsAdmin`, `sql(query, { params })`, `withAuth(user)` → `{ data }`) and `collections` in scope, top-level await. Opening the database changes nothing in it |
+
+| Option | Alias | Description |
+|--------|-------|-------------|
+| `--eval` | `-e` | Run this code instead of the REPL, print its awaited result as JSON on stdout, and exit 1 if it throws |
+| `--collections` | `-c` | Collections directory (default: `config/collections`) |
+| `--database-url` | — | Open this database instead of the project's |
+| `--docker` | — | Use the database from docker compose, starting it if needed |
+
+The database is resolved as `rebase db push` resolves it — the managed one is
+started if that is what the project uses. `--eval` takes an expression (its
+value is the result) or a function body (`return` gives the result).
+
+```bash
+rebase console
+rebase console -e "rebase.dataAsAdmin.posts.find({ limit: 5 })"
+rebase console -e "const u = await rebase.withAuth({ uid: 'u1', roles: ['user'] }); return (await u.data.posts.find()).data"
+rebase console -e "rebase.sql('select count(*) from posts')" | jq .
+```
+
+The same object from a script is `openRebase` from `@rebasepro/server-postgres`
+— see *Exploring data from a script* in the `rebase-basics` skill.
+
 ### SDK Generation
 
 | Command | Description |

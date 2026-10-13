@@ -30,7 +30,7 @@ For multi-instance deployments, PostgreSQL `LISTEN/NOTIFY` broadcasts **row chan
 
 ### Zero Configuration
 
-Realtime is enabled out of the box. There is no flag to flip or service to start. If the Rebase server is running, the WebSocket endpoint is available on the same HTTP port.
+Realtime is enabled out of the box. There is no flag to flip or service to start. If the Rebase server is running, the WebSocket endpoint is available on the same HTTP port — at the server's root (`/`) for an API at `/api`, which is where the SDK dials. See [The socket's path](#the-sockets-path).
 
 ## Client SDK Subscriptions (Recommended)
 
@@ -222,7 +222,7 @@ Deduplication keys are computed deterministically:
 
 ## WebSocket Protocol (Raw / Low-Level)
 
-For environments where the SDK is not available, you can use the raw WebSocket protocol. The connection URL is the same HTTP endpoint (no special path required).
+For environments where the SDK is not available, you can use the raw WebSocket protocol. Connect to the same host and port as the HTTP API, at the socket's path — `/` for an API at `/api` (`ws://localhost:3001`, not `ws://localhost:3001/api`). From 0.25 an upgrade to any other path is not answered by Rebase.
 
 ### Connection Lifecycle
 
@@ -770,14 +770,14 @@ The client SDK handles authentication automatically:
 
 - On connect, if `getAuthToken` is configured, the client authenticates immediately.
 - On-demand authentication: if a non-auth message is sent before authentication, the client calls `ensureAuthenticated()` with up to 3 retries and backoff.
-- `setAuthTokenGetter()` can be called after construction to provide the token getter dynamically.
+- The socket resolves its token exactly as HTTP does: `client.setAuthTokenGetter(getter)` first, then the token the client holds (its session, `client.setToken()`, or the `token` option). One `client.setAuthTokenGetter()` call — for a host signing users in with Clerk, Firebase Auth or its own session — authenticates HTTP **and** the socket (0.25+), and rebuilds an open socket as the new credential. `client.ws.setAuthTokenGetter()` is deprecated: it still works, replaces only the socket's getter and warns once. In 0.24 and earlier `client.setAuthTokenGetter()` reached HTTP only, and the socket needed `client.ws.setAuthTokenGetter()` as well.
 - `reauthenticate()` forces re-authentication (call after token refresh).
 
 ### Auth Failure Recovery
 
 When the server returns an `AUTH_ERROR` or `UNAUTHORIZED` error for any request or subscription:
 
-1. The client calls `onUnauthorized()` (if configured) to attempt a token refresh.
+1. The client calls `onUnauthorized()` (if configured) to attempt a token refresh — the handler set with `client.setOnUnauthorized()` answers socket auth errors as well as HTTP 401s (0.25+).
 2. If the refresh succeeds, the failed request is retried automatically.
 3. If the refresh fails, the error is propagated to the callback.
 
@@ -843,6 +843,23 @@ Notes:
 
 ## Server Configuration
 
+### The socket's path
+
+The Postgres driver's socket shares the HTTP server and answers WebSocket
+upgrades on **one path only** (0.25+): `/` by default, where the SDK dials — it
+opens the socket at `baseUrl` while HTTP goes to `${baseUrl}/api`. The server
+derives the path from the base path it is mounted under, minus a trailing
+`/api`: `/api` → `/`, `/x/api` → `/x`.
+Override it with `backend.attachRealtime(server, { path })` on a backend built
+with `createRebaseBackend`, or the Postgres adapter's `realtime.path`; point the
+client's `websocketUrl` at the same path.
+
+An upgrade to any other path is left to the host's own `upgrade` listeners — so
+your app can run its own WebSocket server on the same `http.Server` — or
+answered `404` when there are none. Before 0.25 the socket took every upgrade on
+the server, and a second WebSocket server on the same `http.Server` collided
+with it ("handleUpgrade() was called more than once").
+
 ### Multiple data sources
 
 With more than one realtime-capable engine in a single instance (e.g. Postgres + MongoDB), the single WebSocket server routes each subscription to the provider owning the subscribed collection — Postgres via `LISTEN/NOTIFY`, MongoDB via change streams — based on the collection's resolved data source. Broadcast channels and presence use the default provider (they're engine-agnostic). Firestore (`direct` transport) realtime is handled entirely **client-side** by its SDK and never reaches the backend WebSocket. No extra configuration is needed beyond registering the engines; single-engine setups are unaffected. See the **rebase-collections** skill for the data-source model.
@@ -870,11 +887,10 @@ DATABASE_URL=postgres://user:pass@pgbouncer:6432/mydb
 DATABASE_DIRECT_URL=postgres://user:pass@postgres:5432/mydb
 ```
 
-The bootstrapper prefers `DATABASE_DIRECT_URL` over `connectionString` for the LISTEN client:
-
-```
-const directUrl = process.env.DATABASE_DIRECT_URL || pgConfig.connectionString;
-```
+The LISTEN client connects to the adapter's `directConnectionString` (new in
+0.25), and falls back to `connectionString`. At boot, `DATABASE_DIRECT_URL`
+fills `directConnectionString` when the config leaves it unset — so the variable
+works as before, and the option is the same setting in code.
 
 ### Debounce Window
 

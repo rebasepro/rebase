@@ -1,6 +1,7 @@
 # The `rebase` singleton
 
-After `initializeRebaseBackend()` completes, a server-side singleton is available:
+Once `initializeRebaseBackend()` has completed — and inside every request, cron
+run and job a backend serves — a server-side singleton is available:
 
 ```typescript
 import { rebase } from "@rebasepro/server";
@@ -11,7 +12,7 @@ import { rebase } from "@rebasepro/server";
 ### How It Works
 
 The singleton is a JavaScript `Proxy` object. Any property access on `rebase.*` is intercepted:
-- If the server **has** been initialized (`_initRebase()` called by `initializeRebaseBackend()`), the access is forwarded to the internal `RebaseClient` instance.
+- If a backend is running, the access is forwarded to that backend's in-process client — the object a backend exposes as `backend.rebase`.
 - If the server **has not** been initialized yet, a descriptive error is thrown: `"rebase.<prop>: server not initialized yet"`.
 - The proxy is **read-only** — attempting to assign `rebase.anything = value` throws.
 
@@ -21,8 +22,12 @@ The singleton has **two planes**, and they do not work the same way:
   serialization, no HTTP dispatch, no middleware. It is scoped once, at boot, as
   `{ uid: "service", roles: ["admin"] }`: **admin-scoped, not RLS-bypassing**.
 - **Control plane** (`rebase.auth`, `rebase.admin`, `rebase.cron`,
-  `rebase.storage`, …) routes through the Hono app's internal request handler
-  (`app.request()`, so no network hop) with an internal per-boot service key.
+  `rebase.functions`) reaches the backend's own routes in-process — no network
+  hop, and wherever (or whether) the application mounted them — with an internal
+  per-boot service key. Middleware your application added to its own Hono app
+  does not run on these calls (0.25+; in 0.24 they went through the
+  application's app). `rebase.storage` and `rebase.email` call their
+  controllers directly.
 
 `rebase.sql()` is the one unconditional bypass: owner connection, no policies.
 

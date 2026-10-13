@@ -152,7 +152,7 @@ function createReadReplicaConnection(
 ): { db: NodePgDatabase; pool: Pool; connectionString: string }
 ```
 
-> **IMPORTANT FOR AGENTS:** The bootstrapper automatically creates a read replica connection when `DATABASE_READ_URL` is set and differs from the primary `connectionString`. You do NOT need to call this manually in most cases.
+> **IMPORTANT FOR AGENTS:** The bootstrapper automatically creates a read replica connection when `DATABASE_READ_URL` (or, from 0.25, the adapter's `readConnectionString`) is set and differs from the primary `connectionString`. You do NOT need to call this manually in most cases.
 
 ### createDirectDatabaseConnection()
 
@@ -177,7 +177,7 @@ function createDirectDatabaseConnection(
 ): { db: NodePgDatabase; pool: Pool; connectionString: string }
 ```
 
-> **IMPORTANT FOR AGENTS:** The bootstrapper uses `DATABASE_DIRECT_URL` automatically to bypass PgBouncer for LISTEN/NOTIFY realtime. If `DATABASE_DIRECT_URL` is not set, it falls back to the primary `connectionString`.
+> **IMPORTANT FOR AGENTS:** The bootstrapper uses `DATABASE_DIRECT_URL` (or, from 0.25, the adapter's `directConnectionString`) automatically to bypass PgBouncer for LISTEN/NOTIFY realtime. If neither is set, it falls back to the primary `connectionString`.
 
 ### PostgresPoolConfig
 
@@ -283,6 +283,11 @@ const backend = await initializeRebaseBackend({
 server.listen(3001);
 ```
 
+`initializeRebaseBackend` builds, mounts and starts in one call. One step under
+it, `createRebaseBackend` (new in 0.25) takes the same options plus a required
+`provision` and mounts and starts nothing — see
+`../rebase-basics/references/backend-configuration.md`.
+
 ### Option B: createPostgresBootstrapper()
 
 The bootstrapper protocol — database-specific logic is encapsulated in bootstrapper objects:
@@ -319,20 +324,60 @@ The config object passed to both `createPostgresAdapter()` and `createPostgresBo
 | `schema` | `{ tables, enums, relations }` | ✅ | Generated Drizzle schema objects |
 | `connectionString` | `string` | No | Primary connection URL — enables LISTEN/NOTIFY realtime |
 | `adminConnectionString` | `string` | No | Admin-level connection — enables `DatabasePoolManager`, SQL editor, branching |
+| `readConnectionString` | `string` | No | A read replica: reads go there, writes stay on the primary. At boot `DATABASE_READ_URL` fills it when unset. Honoured since 0.25 — before, only the variable worked |
+| `directConnectionString` | `string` | No | New in 0.25. A direct (non-pooled) URL for the `LISTEN` connections realtime holds — PgBouncer in transaction mode keeps none. Defaults to `connectionString`; at boot `DATABASE_DIRECT_URL` fills it when unset |
+| `realtime` | `RealtimeChannelsConfig` | No | Realtime options: `bus` (cross-instance channels/presence), `channels` (history retention), `cdc` (`"auto" \| "wal" \| "trigger" \| "off"`, new in 0.25 — `REALTIME_CDC` wins over it), `path` (new in 0.25 — the one URL path the socket answers upgrades on; defaults to the one the server derives, `/` for an API at `/api`), and the `max*`/`refetch*`/`recount*` limits, each with a `REALTIME_*` variable that wins over it |
+
+**Where the environment comes in** (0.25+): `createPostgresAdapter` and
+`createPostgresBootstrapper` read the `DATABASE_*_URL` and `REALTIME_*`
+variables once at boot, through `postgresDriverConfigFromEnv(config, env)`, and
+open the driver with the result. The driver open itself,
+`openPostgresDriver(pgConfig, init)`, reads no environment variable — a script
+that calls it gets exactly the config it passed.
 
 ### Bootstrapper Lifecycle
 
-The `initializeRebaseBackend()` coordinator calls bootstrapper methods in this order:
+`createRebaseBackend()` — and so `initializeRebaseBackend()` — calls bootstrapper methods in this order:
 
 | Step | Method | Purpose |
 |------|--------|---------|
-| 1 | `initializeDriver(config)` | Creates the `PostgresBackendDriver`, registry, realtime service, read replica, pool manager |
-| 2 | `initializeAuth(config, driverResult)` | Creates auth tables, `UserService`, `PostgresAuthRepository` |
-| 3 | `initializeHistory(config, driverResult)` | Creates the `rebase.entity_history` table and `HistoryService` |
+| 1 | `initializeDriver(config)` | Creates the `PostgresBackendDriver`, registry, realtime service, read replica, pool manager. `config.provision: false` opens it with no DDL of any kind (no role, branch table, channel-history tables or capture triggers); `config.realtime: false` takes no part in realtime. `config.collectionRegistry` is optional — no bundled driver reads it (0.25+) |
+| 2 | `initializeAuth(config, driverResult)` | Creates auth tables, `UserService`, `PostgresAuthRepository`. After a `provision: false` open it creates nothing and only checks the existing tables are compatible |
+| 3 | `initializeHistory(config, driverResult)` | Creates the `rebase.entity_history` table and `HistoryService`. After a `provision: false` open it creates nothing and attaches to what an earlier boot left |
 | 4 | `initializeRealtime(config, driverResult)` | Returns the `RealtimeService` for WebSocket subscriptions |
-| 5 | `initializeWebsockets(server, ...)` | Creates the WebSocket upgrade handler for realtime |
+| 5 | `initializeWebsockets(server, ...)` | Called by `backend.attachRealtime(server)`. Attaches the socket to the server's `upgrade` event for its own path only (`limits.path`, or `realtime.path`); other upgrades are left to the host's listeners, or answered 404 when there are none |
 | 6 | `getAdmin(driverResult)` | Returns the `DatabaseAdmin` for SQL execution |
-| 7 | `mountRoutes(app, basePath, driverResult)` | Hook for driver-specific routes (currently a no-op for Postgres) |
+| 7 | `mountRoutes(app, basePath, driverResult)` | **Deprecated, never called** — still accepted by the types. A driver that needs HTTP routes exports a route factory for the app to mount |
+
+### Opening the driver yourself (0.25+)
+
+Under `createPostgresAdapter` are two public pieces: `postgresDriverConfigFromEnv`
+(the boot's environment reading) and `openPostgresDriver` (the open). For a
+script that only reads and writes rows, `openRebase` is the shortcut above both:
+
+```typescript
+import {
+    createPostgresDatabaseConnection,
+    openPostgresDriver,
+    openRebase,
+    postgresDriverConfigFromEnv
+} from "@rebasepro/server-postgres";
+import collections from "../../config/collections";
+
+// The shortcut: dataAsAdmin, sql, withAuth(user), close(). No DDL, no env reads.
+const rebase = await openRebase({ databaseUrl: process.env.DATABASE_URL!, collections });
+await rebase.close();
+
+// One step down, assembling your own boot: no DDL, no part in realtime.
+const { db, connectionString } = createPostgresDatabaseConnection(process.env.DATABASE_URL!);
+const pgConfig = postgresDriverConfigFromEnv({ connection: db, connectionString });
+const { driver, internals } = await openPostgresDriver(pgConfig, { collections, provision: false, realtime: false });
+```
+
+`internals` is typed (`PostgresDriverInternals`: `db`, `readDb`, `registry`,
+`realtimeService`, `driver`, `poolManager`, `provisioned`), so nothing needs a
+cast. `rebase console` is `openRebase` in a REPL — see the `rebase-basics`
+skill.
 
 ### RebaseBackendConfig Options
 
@@ -556,6 +601,7 @@ const gracefulShutdown = async (signal: string) => {
 
     try {
         // 1. backend.shutdown() stops cron, destroys realtime, closes HTTP server
+        //    (a backend from createRebaseBackend closes it only with { server })
         await backend.shutdown();
 
         // 2. Drain the database connection pool
@@ -575,14 +621,14 @@ process.on("SIGINT", () => gracefulShutdown("SIGINT"));
 
 ### backend.shutdown() Sequence
 
-The `shutdown(timeoutMs?: number)` method (default timeout: 15000ms) performs:
+The `shutdown(timeoutMs?: number, options?: { server })` method (default timeout: 15000ms) performs:
 
-1. **Stop cron scheduler** — prevents new cron executions
+1. **Stop cron scheduler** (and the job workers and sweeps) — prevents new executions, waits for one in flight within the budget
 2. **Destroy realtime services** — tears down LISTEN clients, debounce timers, subscriptions (must happen before pool.end())
-3. **Close HTTP server** — stops accepting new connections, drains in-flight requests
+3. **Close HTTP server** — stops accepting new connections, drains in-flight requests. The backend `initializeRebaseBackend` returns closes the server it was given; one built with `createRebaseBackend` closes only the server passed as `{ server }`
 4. **Force-resolve** after timeout (pass `0` to disable, useful in tests)
 
-> **WARNING FOR AGENTS:** Call `backend.shutdown()` FIRST, then `pool.end()`. Do NOT call `server.close()` separately — `backend.shutdown()` already closes the HTTP server internally. Calling both will deadlock.
+> **WARNING FOR AGENTS:** Call `backend.shutdown()` FIRST, then `pool.end()`. Do NOT call `server.close()` separately when `backend.shutdown()` closes the HTTP server (always, from `initializeRebaseBackend`; with `{ server }`, from `createRebaseBackend`). Calling both will deadlock.
 
 ## JWT Dual-Package Hazard
 
@@ -634,14 +680,14 @@ The `shutdown(timeoutMs?: number)` method (default timeout: 15000ms) performs:
 - **Solution:** Ensure `adminConnectionString` is passed to `createPostgresBootstrapper` or `createPostgresAdapter` (typically `adminConnectionString: env.ADMIN_CONNECTION_STRING || env.DATABASE_URL`) and ensure `getAdmin()` is not overridden to return `undefined`.
 
 ### 3. Read Replica Not Being Used
-- **Symptoms:** All queries go to the primary database even though `DATABASE_READ_URL` is set.
-- **Cause:** The bootstrapper only creates the read replica connection when `DATABASE_READ_URL` differs from the primary `connectionString`.
-- **Solution:** Ensure `DATABASE_READ_URL` is a different URL from `DATABASE_URL` and points to an actual read replica.
+- **Symptoms:** All queries go to the primary database even though `DATABASE_READ_URL` (or `readConnectionString`) is set.
+- **Cause:** The bootstrapper only creates the read replica connection when the read URL differs from the primary `connectionString`. In 0.24 and earlier the `readConnectionString` option was ignored, and only `DATABASE_READ_URL` worked.
+- **Solution:** Ensure the read URL is a different URL from `DATABASE_URL` and points to an actual read replica.
 
 ### 4. PgBouncer Breaks Realtime (LISTEN/NOTIFY)
 - **Symptoms:** Realtime subscriptions don't receive updates in production.
 - **Cause:** PgBouncer in transaction mode does not support session-level LISTEN/NOTIFY.
-- **Solution:** Set `DATABASE_DIRECT_URL` to a connection string that bypasses PgBouncer and connects directly to PostgreSQL.
+- **Solution:** Set `DATABASE_DIRECT_URL` (or, from 0.25, the adapter's `directConnectionString`) to a connection string that bypasses PgBouncer and connects directly to PostgreSQL.
 
 ## References
 

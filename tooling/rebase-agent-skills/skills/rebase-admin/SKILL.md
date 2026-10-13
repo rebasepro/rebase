@@ -7,7 +7,7 @@ description: Guide for navigating the Rebase admin panel, opening entities in si
 
 The `@rebasepro/cms` package provides the admin-panel layer for Rebase. It handles collection views, entity editing, navigation, side panels (drawers), URL routing, breadcrumbs, and the full admin context. This skill covers the **programmatic APIs** for navigating and interacting with the admin.
 
-> **IMPORTANT FOR AGENTS:** All hooks in this skill must be called **inside** the `<RebaseShell>` component tree. They rely on React contexts provided by `<RebaseNavigation>`, `<SidePanelProvider>`, and `<RebaseRouteDefs>`.
+> **IMPORTANT FOR AGENTS:** All hooks in this skill must be called **inside** the `<RebaseShell>` component tree. They rely on React contexts provided by `<RebaseNavigation>`, `<SidePanelProvider>`, and `<RebaseRouteDefs>`. In a page of your own app with no shell, a `CollectionsProvider` provides the collection, URL, side-panel and side-dialog controllers instead (0.25+, see §4).
 
 > **Building the view itself?** This skill covers navigation and admin plumbing. For what the view should *look* like, read the **`rebase-design-language`** skill first — custom views render inside the admin shell and must match it. It ships whole-view skeletons and points at the UI reference (`UIReferenceView`, from `@rebasepro/app/debug`).
 
@@ -19,6 +19,7 @@ The `@rebasepro/cms` package provides the admin-panel layer for Rebase. It handl
 | Navigate to a collection view | `useUrlController()` | `@rebasepro/cms` |
 | Look up a collection by slug | `useCollectionRegistryController()` | `@rebasepro/cms` |
 | Embed a collection in a custom page | `<CollectionPanel>` | `@rebasepro/cms` |
+| One record's form in your own page | `<EntityFormPanel>` | `@rebasepro/cms` |
 | Add custom top-level views | `<RebaseCMS views={[...]}>` | `@rebasepro/cms` |
 | Replace how one property is edited or shown | `admin: { Field, Preview }` | see §12 |
 | Open an entity selection dialog | `useSelectionDialog()` | `@rebasepro/cms` |
@@ -289,7 +290,7 @@ registry.collections?.forEach(c => {
 
 ## 4. Embedding Collections with CollectionPanel
 
-`CollectionPanel` is a high-level wrapper for embedding collection views inside custom pages (dashboards, home pages, entity detail views).
+`CollectionPanel` is a high-level wrapper for embedding collection views inside custom pages (dashboards, home pages, entity detail views). Name the collection by `path` (registered with `<RebaseCMS>`), or hand it over as a value with `collection` (0.25+) — then it works in a page of your own app too, with no CMS around it (see *Outside the CMS* below).
 
 ```typescript
 import { CollectionPanel } from "@rebasepro/cms";
@@ -298,9 +299,13 @@ import { CollectionPanel } from "@rebasepro/cms";
 ### CollectionPanelProps
 
 ```typescript
+// One of `path` and `collection` is required (the real type is a union of the two shapes).
 type CollectionPanelProps = {
-    /** Collection slug to display (e.g. "tasks") — required */
-    path: string;
+    /** Collection slug to display (e.g. "tasks"). Required unless `collection` is given */
+    path?: string;
+
+    /** The collection as a value (0.25+). Required unless `path` names a registered one */
+    collection?: AdminCollection;
 
     /** Title above the collection. `false` to hide. Defaults to collection name. */
     title?: string | false;
@@ -354,6 +359,59 @@ type CollectionPanelProps = {
 ```
 
 > **IMPORTANT FOR AGENTS:** `CollectionPanel` defaults `updateUrl` to `false` so embedded panels don't hijack the browser URL. Only set `updateUrl={true}` if you explicitly need URL sync.
+
+### Outside the CMS: your own page, any router (0.25+)
+
+A collection's table, or one record's form, can live in a page of your own app
+with no `<RebaseCMS>`, `<RebaseNavigation>` or `<RebaseShell>`. They need
+`<Rebase>` above them and a React Router router — any router (`<BrowserRouter>`
+works; a data router is not required), at any path. A router is required:
+there is no router-less mode.
+
+```tsx
+import { Rebase } from "@rebasepro/app";
+import { CollectionPanel, EntityFormPanel } from "@rebasepro/cms";
+
+<Rebase client={client} authController={authController}>
+    <BrowserRouter>
+        {/* A collection's table, the collection passed as a value */}
+        <CollectionPanel collection={postsCollection}/>
+
+        {/* One record's form — loaded by id, saved through <Rebase>'s data layer.
+            Leave out entityId to create a record. */}
+        <EntityFormPanel collection={postsCollection} entityId="123"
+            onSaved={({ entity }) => console.log("saved", entity.id)}
+            onClose={() => navigate("/posts")}/>
+    </BrowserRouter>
+</Rebase>
+```
+
+- No CMS route serves the page, so a record clicked in the table opens in a
+  side panel or dialog **over** the page — never by URL (`full_screen` and
+  `split` become `side_panel`).
+- Given a `collection`, each panel brings its own `CollectionsProvider` when
+  none is above it. Mount one yourself to share a scope between several panels,
+  or to use the lower-level pieces (`CollectionViewBinding`, `useSidePanel`)
+  under it:
+
+```tsx
+import { CollectionPanel, CollectionsProvider } from "@rebasepro/cms";
+
+<CollectionsProvider collections={[postsCollection, authorsCollection]}>
+    <CollectionPanel path="posts"/>
+    <CollectionPanel path="authors"/>
+</CollectionsProvider>
+```
+
+- Unsaved-changes guards work under any router: a data router
+  (`createBrowserRouter`) blocks in-app navigation too; under `<BrowserRouter>`
+  they fall back to the browser's leave-page prompt. In 0.24 and earlier the
+  record views threw outside a data router.
+- **Theme:** `<Rebase>` puts a `dark` class on `<html>` and follows
+  `prefers-color-scheme` unless the host app owns the theme. To own it, pass your
+  controller — `<Rebase modeController={{ mode, setMode }}>` (0.25+, a
+  `ModeController`: `mode: "light" | "dark"`, `setMode("light" | "dark" | "system")`)
+  — and Rebase never touches `<html>`, the media query or localStorage.
 
 ---
 
@@ -711,6 +769,23 @@ const myPlugin: RebasePlugin = {
 
 All views (admin, builder, plugin) are merged in order: **admin views → Studio dev views → Plugin views**.
 
+### Plugins: what composes, and two hooks that never ran
+
+- **Field wrappers compose** (0.25+). Every plugin's `fieldBuilder.wrap` receives
+  the field as the plugins before it left it (`params.Field`), and every wrapper
+  renders — the first plugin's innermost, the last plugin's outermost. In 0.24
+  and earlier only the last plugin that returned a wrapper rendered.
+- **`hooks.modifyCollectionAsync` and `lifecycle.onCollectionChange` are
+  deprecated: nothing ever invoked them.** They still compile, and `<Rebase>`
+  warns once per plugin that sets one. For a change that needs data, fetch the
+  data before rendering `<Rebase>`, then build the plugin from the result, so its
+  `hooks.modifyCollection` is synchronous over data it already has — a plugin's
+  `loading: true` does not hold back `<Rebase>`'s plain children, and
+  `modifyCollection` is not re-applied when data arrives later. To react to
+  changes, subscribe with `context.data.collection(slug).listen(...)` from
+  `lifecycle.onMount`, unsubscribing in `onUnmount`. (The `onCollectionChange`
+  an entity action's `onClick` receives is a different, working API.)
+
 ### Role Filtering
 
 The `roles` field provides declarative access control. When set, the view is excluded entirely (not just hidden from nav) if the user doesn't have at least one matching role:
@@ -760,7 +835,8 @@ const isAdmin = window.location.pathname.startsWith("/admin");
 const ProductApp = lazy(() => import("./App"));
 const AdminApp = lazy(() => import("./AdminApp"));
 
-// The admin uses useBlocker → needs a DATA router. Use one for both halves.
+// A data router lets the admin's unsaved-changes guards block in-app
+// navigation too (any router works; others fall back to a leave-page prompt).
 const router = isAdmin
     ? createBrowserRouter([{ path: "/*", element: <AdminApp/> }], { basename: "/admin" })
     : createBrowserRouter([{ path: "/*", element: <ProductApp/> }]);
@@ -781,7 +857,7 @@ no `basename`, is to tell the CMS about the prefix instead:
 <RebaseCMS collections={collections} basePath="/admin" />
 ```
 
-> **IMPORTANT FOR AGENTS:** Choose **either** a router `basename="/admin"` **or** `<RebaseCMS basePath="/admin">` — never both, or the prefix is applied twice. Without either, collection views hang on a spinner because URL⇄collection resolution never matches. `<RebaseCMS>` requires a **data router** (`createBrowserRouter`) because it uses `useBlocker`.
+> **IMPORTANT FOR AGENTS:** Choose **either** a router `basename="/admin"` **or** `<RebaseCMS basePath="/admin">` — never both, or the prefix is applied twice. Without either, collection views hang on a spinner because URL⇄collection resolution never matches. `<RebaseCMS>` works under any React Router router (0.25+; in 0.24 and earlier it required a **data router**, `createBrowserRouter`, because of `useBlocker`). Prefer a data router anyway: under it, unsaved-changes guards also block in-app navigation, where under `<BrowserRouter>` they can only prompt when leaving the app.
 
 ---
 
@@ -841,7 +917,9 @@ The admin package exports the following components (from `@rebasepro/cms`):
 |-----------|-------------|
 | `RebaseCMS` | Declarative admin config (collections, views, editor) — renders nothing |
 | `RebaseShell` | App shell (drawer, nav, routes, layout) — renders the actual UI |
-| `CollectionPanel` | Embed a collection view inside custom pages |
+| `CollectionPanel` | Embed a collection view inside custom pages — by slug, or with the collection as a value |
+| `EntityFormPanel` | One record's form in a page of your own app (0.25+) |
+| `CollectionsProvider` | The minimal scope for collection views and record forms outside the CMS (0.25+) |
 | `CollectionViewBinding` | The collection view, bound to Rebase data |
 | `CollectionTableBinding` | The table rendering of a collection |
 | `CollectionCardViewBinding` | The card/grid rendering of a collection |

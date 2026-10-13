@@ -1517,6 +1517,88 @@ title: {
 }
 ```
 
+### Combining callback sets — `composeCallbacks` (0.25+)
+
+A collection has one `callbacks` object. When two independent behaviours belong
+on it — an audit trail and a slug generator, a tenant scope and a soft-delete
+filter — compose them instead of merging the bodies by hand:
+
+```typescript
+import { composeCallbacks, defineCollection } from "@rebasepro/cms-types";
+import type { CollectionCallbacks } from "@rebasepro/types";
+
+const slugFromTitle: CollectionCallbacks = {
+    beforeSave: ({ values }) =>
+        typeof values.title === "string"
+            ? { ...values, slug: values.title.toLowerCase().replace(/[^a-z0-9]+/g, "-") }
+            : values
+};
+
+const auditTrail: CollectionCallbacks = {
+    afterSave: async ({ id, context }) => {
+        await context.data.collection("audit_log").create({ entity: "posts", entity_id: String(id), by: context.user?.uid ?? null });
+    }
+};
+
+export default defineCollection({
+    slug: "posts",
+    name: "Posts",
+    table: "posts",
+    properties: {
+        title: { type: "string", name: "Title" },
+        slug: { type: "string", name: "Slug" }
+    },
+    callbacks: composeCallbacks(slugFromTitle, auditTrail)
+});
+```
+
+`composeCallbacks(...sets)` (from `@rebasepro/cms-types` or `@rebasepro/server`)
+runs the sets in the order given, and each hook combines exactly as the backend
+combines its global → collection → property tiers:
+
+- `beforeSave` and `afterRead` **chain**: each set sees what the previous one
+  returned (a returned object is shallow-merged over the values).
+- `beforeQuery` narrowings are **AND-ed**: every set sees the caller's query.
+- `beforeDelete` **vetoes** if any set returns `false`; every set still runs.
+- `afterSave` and `afterDelete` run in order, awaited; a throw stops them.
+- `afterSaveError`: every set runs even if one throws; the first error is
+  rethrown at the end.
+- A hook exists on the result only if some set has it; `undefined` sets are
+  skipped.
+
+> **IMPORTANT FOR AGENTS:** `backend.setCollectionCallbacks(slug, callbacks)`
+> **replaces** the callbacks the collection declared — it does not add to them.
+> To attach more at runtime and keep the declared ones, compose them:
+> `backend.setCollectionCallbacks("posts", composeCallbacks(posts.callbacks, mine))`.
+
+### Testing a callback — `createCallContext` (0.25+)
+
+A callback is a plain function of one props object, so a unit test calls it.
+`createCallContext(partial)` (from `@rebasepro/server` or `@rebasepro/common`)
+builds the `context` it receives:
+
+```typescript
+import { createCallContext } from "@rebasepro/server";
+import type { User } from "@rebasepro/types";
+import posts from "../config/collections/posts";
+
+const editor: User = { uid: "u1", displayName: null, email: null, photoURL: null,
+    providerId: "password", isAnonymous: false, roles: ["editor"] };
+
+const values = await posts.callbacks!.beforeSave!({
+    collection: posts, path: "posts", status: "new",
+    values: { title: "Hello World" },
+    context: createCallContext({ user: editor })
+});
+```
+
+- A field you pass is used as it is. `user` stays **absent** unless you pass it
+  — how a write with no signed-in caller looks on the server.
+- A `client`, `data` or `storageSource` you leave out throws on first **use**,
+  naming the field (`context.data was not provided to createCallContext…`), so
+  the test fails at the line that needed it. For a real data plane pass
+  `data: buildSdkData(driver)` (`@rebasepro/common`).
+
 ### Common Use Cases
 
 - **Syncing data between collections** — Use `afterSave` to copy/move entities from one collection to another (e.g., approved submissions → published jobs)
@@ -1742,6 +1824,12 @@ const productsCollection: PostgresCollectionConfig = {
 };
 
 ```
+
+`OriginalComponent` is the component as the app level left it: when
+`<Rebase components>` also overrides `"Entity.Form"`, the collection's wrapper
+receives that app-level override, not the built-in (0.25+; in 0.24 and earlier
+it always received the built-in, and the app-level override did not render for
+this collection). An eject at collection level (no `wrap`) replaces both.
 
 ### Collection-Scoped Overridable Components
 

@@ -27,13 +27,56 @@ Custom functions let you add arbitrary HTTP endpoints to your Rebase backend. Th
 
 **Nothing to enable in a scaffolded project.** `rebase dev`, `rebase build` and the runtime discover `backend/functions/` on their own — the scaffold ships `backend/functions/hello.ts` — and the backend app's `functions` key in `rebase.json` moves the directory if you need to. There is no `backend/src/index.ts` to edit.
 
-Only an **ejected** project, or a server you wire yourself, passes the directory to `initializeRebaseBackend`:
+Only an **ejected** project, or a server you wire yourself, hands the functions
+to the backend — as values, or as a directory:
 
-```typescript no-verify
-const backend = await initializeRebaseBackend({
-    // ... other config
-    functionsDir: path.resolve(__dirname, "../functions"),  // ← add this
+```typescript
+import path from "node:path";
+import { initializeRebaseBackend, loadFunctions } from "@rebasepro/server";
+import { createPostgresAdapter, createPostgresDatabaseConnection } from "@rebasepro/server-postgres";
+import sendInvoice from "../functions/send-invoice";
+
+const { db, connectionString } = createPostgresDatabaseConnection(process.env.DATABASE_URL!);
+const database = createPostgresAdapter({ connection: db, connectionString });
+
+// Values (new in 0.25): the key is the URL segment — /api/functions/send-invoice.
+await initializeRebaseBackend({ app, server, database, functions: { "send-invoice": sendInvoice } });
+
+// Or every file in a directory, read into that same { name: app } shape:
+//     functions: await loadFunctions(path.resolve("backend/functions"))
+// Or the directory itself, which works on every version:
+//     functionsDir: path.resolve("backend/functions")
+```
+
+Values let you generate a function, wrap one, or pick which to serve.
+`functions: await loadFunctions(dir)` serves exactly what `functionsDir: dir`
+serves; give one or the other — passing both `functions` and `functionsDir` is
+refused at boot. `loadFunctions(dir, { onSkip })` reports each file it skipped
+(a module-scope throw, a missing default export, `send.ts` beside `send.js`).
+`loadFunctionsFromDirectory` and `loadFunctionsWithDiagnostics` are deprecated:
+they still work, warn once per process, and `loadFunctions` replaces both.
+
+### Mounting the functions router yourself (0.25+)
+
+With `createRebaseBackend`, the functions router is a route group you mount
+where you want it. It carries its own auth context, so `getUser(c)`,
+`getDriver(c)` and the `require*` guards work inside it at any path:
+
+```typescript
+import { createRebaseBackend, loadFunctions, type HonoEnv } from "@rebasepro/server";
+import { createPostgresAdapter, createPostgresDatabaseConnection } from "@rebasepro/server-postgres";
+import { Hono } from "hono";
+
+const { db, connectionString } = createPostgresDatabaseConnection(process.env.DATABASE_URL!);
+const backend = await createRebaseBackend({
+    database: createPostgresAdapter({ connection: db, connectionString }),
+    auth: { jwtSecret: process.env.JWT_SECRET! },
+    functions: await loadFunctions("backend/functions"),
+    provision: false   // the schema is already there; change nothing
 });
+
+const app = new Hono<HonoEnv>();
+app.route("/hooks", backend.routes.functions());   // /hooks/send-invoice
 ```
 
 ## Creating a Function

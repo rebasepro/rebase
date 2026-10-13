@@ -619,7 +619,7 @@ import type { HonoEnv } from "@rebasepro/server";
 import { getRequestListener } from "@hono/node-server";
 import { createServer } from "http";
 import { initializeRebaseBackend, loadEnv } from "@rebasepro/server";
-import { createPostgresAdapter } from "@rebasepro/server-postgres";
+import { createPostgresAdapter, createPostgresDatabaseConnection } from "@rebasepro/server-postgres";
 import { defaultUsersCollection } from "@rebasepro/common";
 import { z } from "zod";
 
@@ -640,8 +640,11 @@ const env = loadEnv({
 const app = new Hono<HonoEnv>();
 const server = createServer(getRequestListener(app.fetch));
 
-// 3. Create database adapter
+// 3. Create database adapter (the connection, not only its string: a string
+//    alone opens no pool)
+const { db } = createPostgresDatabaseConnection(env.DATABASE_URL);
 const postgresAdapter = createPostgresAdapter({
+    connection: db,
     connectionString: env.DATABASE_URL,
 });
 

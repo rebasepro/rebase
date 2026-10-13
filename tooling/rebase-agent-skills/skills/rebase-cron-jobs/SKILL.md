@@ -25,12 +25,35 @@ Rebase includes a built-in cron job scheduler for running recurring background t
 
 **Nothing to enable in a scaffolded project.** Create `backend/crons/` and drop a file in it: `rebase dev`, `rebase build` and the runtime discover that directory on their own, and the backend app's `crons` key in `rebase.json` moves it if you need to. There is no `backend/src/index.ts` to edit.
 
-Only an **ejected** project, or a server you wire yourself, passes the directory to `initializeRebaseBackend`:
+Only an **ejected** project, or a server you wire yourself, hands the jobs to
+the backend — as values, or as a directory:
 
-```typescript no-verify
-const backend = await initializeRebaseBackend({
-    // ... other config
-    cronsDir: path.resolve(__dirname, "../crons"),  // ← add this
+```typescript
+import path from "node:path";
+import { defineCron, initializeRebaseBackend, loadCrons } from "@rebasepro/server";
+import { createPostgresAdapter, createPostgresDatabaseConnection } from "@rebasepro/server-postgres";
+
+const { db, connectionString } = createPostgresDatabaseConnection(process.env.DATABASE_URL!);
+
+const nightlyReport = defineCron({
+    schedule: "0 3 * * *",
+    async handler(ctx) {
+        const { data } = await ctx.rebase.dataAsAdmin.collection("orders").find({ limit: 100 });
+        return { orders: data.length };
+    }
+});
+
+await initializeRebaseBackend({
+    app,
+    server,
+    database: createPostgresAdapter({ connection: db, connectionString }),
+    // Values (new in 0.25): the key is the job id.
+    crons: { "nightly-report": nightlyReport },
+    // Or every file in a directory, read into that same { id: definition } shape:
+    //     crons: await loadCrons(path.resolve("backend/crons")),
+    // Or the directory itself, which works on every version:
+    //     cronsDir: path.resolve("backend/crons"),
+    cronPersistence: false   // keep run logs in memory only
 });
 ```
 
@@ -38,27 +61,41 @@ const backend = await initializeRebaseBackend({
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `cronsDir` | `string` | — | Absolute path to the directory containing cron job files. The runtime sets it from `rebase.json`; pass it yourself only on a hand-wired server. |
+| `crons` | `Record<string, CronJobDefinition>` | — | New in 0.25. Jobs as values, keyed by job id. `await loadCrons(dir)` returns this shape. |
+| `cronsDir` | `string` | — | Absolute path to the directory containing cron job files. The same as `crons: await loadCrons(dir)`. The runtime sets it from `rebase.json`; pass it yourself only on a hand-wired server. Passing both `crons` and `cronsDir` is refused at boot. |
 | `cronPersistence` | `boolean` | `true` | Enable/disable database persistence for execution logs. When `false`, logs are kept in-memory only. |
 
-```typescript no-verify
-const backend = await initializeRebaseBackend({
-    cronsDir: path.resolve(__dirname, "../crons"),
-    cronPersistence: false,  // disable DB persistence (in-memory only)
-});
+**Building the backend registers the jobs; `start()` schedules them.**
+`initializeRebaseBackend` calls `start()` for you. A backend built with
+`createRebaseBackend` (0.25+) runs no job until you call `backend.start()` —
+leave it out on a process that should serve requests but not run the schedule.
+
+**Loading declares nothing** (0.25+). `loadCrons(dir)` returns the definitions
+as written. To record them in the project's resource graph — what
+`rebase resources` lists — call `declareCrons(crons)` on them:
+
+```typescript
+import { declareCrons, loadCrons } from "@rebasepro/server";
+
+const problems: string[] = [];
+declareCrons(await loadCrons("backend/crons", { onSkip: (problem) => problems.push(problem) }));
 ```
+
+`loadCronJobsFromDirectory` and `loadCronJobsWithDiagnostics` are deprecated:
+they still work (and still declare, as before), warn once per process, and
+`loadCrons` with `declareCrons` replaces them.
 
 ### What Happens on Startup
 
 Rebase will:
-1. Scan the directory for `.ts` / `.js` files
+1. Scan the directory for `.ts` / `.js` files (or take the `crons` values as given)
 2. **Validate** each job's cron schedule — invalid schedules are rejected with an error and the job is NOT registered
 3. Register each default export as a cron job
-4. If a **duplicate job ID** is found, the previous job is overwritten with a warning
-5. Auto-create the `rebase.cron_logs` table in PostgreSQL (unless `cronPersistence: false`)
+4. Use the filename as the job id — so two files with one name and different extensions (`x.ts`, `x.js`) are one job, not two; keep one
+5. Auto-create the `rebase.cron_logs` table in PostgreSQL (unless `cronPersistence: false`, or the backend was built with `provision: false`)
 6. Mount admin REST routes at `/api/admin/cron` (reads need the `cron:read` scope, trigger/pause need `cron:write`)
 7. Seed in-memory counters (`totalRuns`, `totalFailures`, `lastRunAt`) from the database
-8. Start the scheduler
+8. Start the scheduler — `backend.start()`, which `initializeRebaseBackend` calls for you
 
 ## Defining a Cron Job
 
@@ -215,7 +252,7 @@ interface CronJobDefinition {
 
 ## CronJobContext (Handler Argument)
 
-> **IMPORTANT FOR AGENTS**: `ctx.rebase` **is** the server singleton, not a copy of it. Its data plane (`dataAsAdmin`) is backed by the native DataDriver — no JSON serialization, no HTTP dispatch, no middleware — while the control plane (`auth`, `admin`, `cron`, `functions`, `storage`) still routes through Hono's internal request handler. Use `rebase.dataAsAdmin` for all data operations inside cron handlers.
+> **IMPORTANT FOR AGENTS**: `ctx.rebase` **is** the server singleton, not a copy of it. Its data plane (`dataAsAdmin`) is backed by the native DataDriver — no JSON serialization, no HTTP dispatch, no middleware — while the control plane (`auth`, `admin`, `cron`, `functions`) reaches the backend's own routes in-process, with no HTTP server involved; `storage` and `email` call their controllers directly. Use `rebase.dataAsAdmin` for all data operations inside cron handlers.
 
 ```typescript
 interface CronJobContext {
@@ -698,7 +735,7 @@ await client.cron.toggleJob("cleanup-sessions", true);
 | Scenario | Behavior |
 |----------|----------|
 | **Invalid cron expression** | Job is rejected at registration with a warning log. Not registered. |
-| **Duplicate job ID** (same filename in crons dir) | Previous job is stopped and overwritten with a warning log. |
+| **Duplicate job ID** (`x.ts` and `x.js` in the crons dir) | One job: the directory is read into one record keyed by id, so the file read last wins. Keep one file per id. |
 | **Job still running when next tick fires** | Scheduled tick is skipped; scheduler re-schedules for the next tick. |
 | **Manual trigger while running** | Returns immediately with `{ skipped: true, reason: "already_executing" }`. |
 | **Handler throws an exception** | Marked as failed; `error` field populated; `totalFailures` incremented; `executing` flag cleared. |

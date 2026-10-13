@@ -67,7 +67,7 @@ Please adhere to these principles when working with Rebase, as they ensure relia
 
 7. **Never deploy unless explicitly asked:** Agents should never run `rebase cloud deploy`, `firebase deploy`, `gcloud deploy`, or any command that pushes code to live infrastructure unless the user explicitly asks you to deploy in the current conversation. Provide the exact command and let the user run it themselves if they prefer.
 
-8. **Scripting and Data Tasks:** Default to using the Rebase SDK (`@rebasepro/client` or `@rebasepro/server`) to write scripts or tasks for manipulating data. For standalone scripts running locally, you can dynamically read the active backend URL from the `.rebase-dev-url` temp file automatically created by the dev server. For internal server-side backend tasks, use the global `import { rebase } from "@rebasepro/server"` singleton. For calling custom backend functions from the frontend, use `client.functions.invoke('name', payload)` — NEVER manually construct `/api/functions/` URLs or extract auth tokens from `localStorage`. NEVER default to using raw `psql` queries or raw REST API calls (`fetch`/`curl`) unless explicitly instructed or the SDK lacks the functionality.
+8. **Scripting and Data Tasks:** Default to using the Rebase SDK (`@rebasepro/client` or `@rebasepro/server`) to write scripts or tasks for manipulating data. For standalone scripts running locally, you can dynamically read the active backend URL from the `.rebase-dev-url` temp file automatically created by the dev server. For internal server-side backend tasks, use the global `import { rebase } from "@rebasepro/server"` singleton. To read or change the project's data from a script or a terminal with no server running, use `openRebase` from `@rebasepro/server-postgres` or `rebase console` (0.25+; see *Exploring data from a script* below). For calling custom backend functions from the frontend, use `client.functions.invoke('name', payload)` — NEVER manually construct `/api/functions/` URLs or extract auth tokens from `localStorage`. NEVER default to using raw `psql` queries or raw REST API calls (`fetch`/`curl`) unless explicitly instructed or the SDK lacks the functionality.
 
 # Recipes
 
@@ -180,9 +180,10 @@ When you initialize a Rebase project via the CLI (`rebase init`), the generated 
 > **There is no `backend/src/index.ts`.** A scaffolded project has no hand-written
 > server entry point: `rebase dev`, `rebase start` and the published image all boot
 > from the bundle, reading `config/index.ts` for collections and `storageAuthorize`
-> and taking everything else from the environment. `initializeRebaseBackend()` is
-> called by the runtime, not by the project. Run `rebase eject` if you want to own
-> the entry point — that is what writes `backend/src/index.ts` and `backend/src/env.ts`.
+> and taking everything else from the environment. The runtime builds and starts
+> the backend, not the project. Run `rebase eject` if you want to own the entry
+> point — that is what writes `backend/src/index.ts` (an `initializeRebaseBackend()`
+> call) and `backend/src/env.ts`.
 
 ### Key Files
 
@@ -198,6 +199,74 @@ When you initialize a Rebase project via the CLI (`rebase init`), the generated 
 | `.rebase-dev-port` | Written by `rebase dev` — stores the resolved backend port |
 | `.rebase-dev-url` | Written by `rebase dev` — stores `http://localhost:<port>` for scripts |
 
+# When you own the server
+
+An ejected project, or Rebase inside a server you already run, calls the backend
+itself. Your code calls Rebase, and every shortcut sits one step above public
+pieces you can call yourself:
+
+- **`initializeRebaseBackend({ app, server, … })`** — the shortcut: build the
+  backend, mount every route group under `/api`, attach the realtime socket,
+  start the timers. What `rebase eject` writes.
+- **`createRebaseBackend({ …, provision })`** (new in 0.25) — the step under it:
+  builds everything, and mounts, starts and listens to nothing. Then
+  `backend.mount(app, { basePath })`, `await backend.attachRealtime(server)`,
+  `backend.start()`, and `backend.shutdown(timeoutMs, { server })`. Or mount only
+  the groups you want, at your own paths:
+  `app.route("/hooks", backend.routes.functions())` — `routes.auth()`, `data()`,
+  `storage()`, `functions()`, `admin()`, `cron()`, `meta()`. `backend.fetch(request)`
+  serves the whole API with no server, and `backend.rebase` is the in-process client.
+- **`provision` is required on `createRebaseBackend`:** `true` creates what the
+  backend serves (tables, RLS policies, change capture), `false` changes nothing
+  in the database (a script, a test, a second process), and
+  `{ collections, realtime }` picks. `initializeRebaseBackend` passes `true`.
+- **Functions and crons are values** (0.25+): `functions: { "send-invoice": sendInvoice }`
+  and `crons: { nightly: defineCron({ … }) }`, or `functions: await loadFunctions(dir)`
+  and `crons: await loadCrons(dir)`, which read a directory into that same shape.
+  `functionsDir` / `cronsDir` still work; passing both forms of one kind is refused
+  at boot.
+
+Every option, the return value, and the composition written out:
+`references/backend-configuration.md`.
+
+# Exploring data from a script
+
+To read or fix data from a script — a seed, a check, a question while debugging —
+open the project from code (new in 0.25) instead of booting a server or reaching
+for `psql`:
+
+```typescript
+import { openRebase } from "@rebasepro/server-postgres";
+import collections from "../config/collections";
+
+const rebase = await openRebase({ databaseUrl: process.env.DATABASE_URL!, collections });
+const { data: posts } = await rebase.dataAsAdmin.posts.find({ limit: 10 });
+
+// The same data as one user sees it, under row-level security.
+const ada = await rebase.withAuth({ uid: "ada", roles: ["user"] });
+const { data: hers } = await ada.data.posts.find();
+
+await rebase.sql("SELECT count(*) FROM posts WHERE author_id = $1", { params: ["ada"] });
+await rebase.close();
+```
+
+- `dataAsAdmin` and `sql` are the accessors a function's `rebase` has, so a
+  snippet moves between a function and a script unchanged.
+- Opening changes nothing in the database and reads no environment variable.
+  `withAuth` against a database no server has booted on fails rather than run
+  unfiltered.
+- A write made this way records no entity history.
+
+`rebase console` opens the same object in a Node REPL, with `rebase` and the
+project's `collections` in scope and top-level await. It finds the database the
+way `rebase db push` does, the managed one included. `rebase console -e "<code>"`
+runs one snippet and prints its result as JSON on stdout:
+
+```bash
+rebase console -e "rebase.dataAsAdmin.posts.find({ limit: 5 })"
+rebase console -e "rebase.sql('select count(*) from posts')" | jq .
+```
+
 # Reference files
 
 Read these when you need them, not before.
@@ -205,7 +274,7 @@ Read these when you need them, not before.
 - **`references/monorepo.md`** — the framework's own layout and what each `@rebasepro/*` package is for
 - **`references/cli-commands.md`** — every command, subcommand and flag, with examples
 - **`references/environment.md`** — `loadEnv()`, the validated schema, production checks, generated dev secrets
-- **`references/backend-configuration.md`** — `initializeRebaseBackend()` and the full `RebaseBackendConfig` interface
+- **`references/backend-configuration.md`** — `initializeRebaseBackend()`, `createRebaseBackend()`, every backend option, and what the backend returns
 - **`references/singleton.md`** — what the server-side singleton exposes, and how to mock it in tests
 - **`references/mcp-tools.md`** — the tools an assistant gets over a project, by group
 
@@ -245,12 +314,14 @@ Read these when you need them, not before.
 - **Node.js version mismatch:** a scaffolded project declares `node >= 22.22.0` in its `package.json` `engines`. Use `nvm install 22.22.0 && nvm use 22.22.0`.
 - **`Could not find tsx binary`:** Install tsx in your project: `pnpm add -D tsx`.
 - **`Could not detect an active database plugin`:** Ensure `@rebasepro/server-postgres` (or another driver) is listed in `backend/package.json` dependencies.
-- **`No bootstrappers or database adapter provided`:** The `initializeRebaseBackend()` call is missing the `database` (or `bootstrappers`) property. See the backend configuration section above.
+- **`No bootstrappers or database adapter provided`:** The `initializeRebaseBackend()` (or `createRebaseBackend()`) call is missing the `database` (or `bootstrappers`) property. See `references/backend-configuration.md`.
+- **"createRebaseBackend needs `provision`":** Pass `provision: true` to create what the backend serves, or `false` to change nothing in the database.
+- **"Both `functions` and `functionsDir` are set"** (or `crons` and `cronsDir`): keep one. `functions: await loadFunctions(dir)` is the same as `functionsDir: dir`.
 - **`Could not find CLI entry point for <plugin>`:** The database driver plugin's CLI script is missing or not found. Reinstall the plugin: `pnpm add @rebasepro/server-postgres`.
 
 ### Singleton Errors
 
-- **`rebase.<prop>: server not initialized yet`:** You are accessing the `rebase` singleton at module import time or before `initializeRebaseBackend()` has completed. Move the access inside a handler, hook, or function body.
+- **`rebase.<prop>: server not initialized yet`:** You are accessing the `rebase` singleton at module import time or before `initializeRebaseBackend()` (or `createRebaseBackend()`) has completed. Move the access inside a handler, hook, or function body. A standalone script has no backend to wait for: use `openRebase` (see *Exploring data from a script*).
 - **`Cannot set rebase.<prop> directly`:** The singleton is read-only. You cannot assign properties to it.
 - **`_setRebaseMock can only be called in a test environment`:** Set `NODE_ENV=test` before calling `_setRebaseMock()`.
 

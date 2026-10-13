@@ -233,6 +233,13 @@ import { MyAppBar } from "./MyAppBar";
 </Rebase>
 ```
 
+**Overrides compose across scopes.** A collection's `wrap: true` override (in
+its `admin.components`) receives as `OriginalComponent` whatever the app-level
+`<Rebase components>` made of that component — the app's override when there is
+one, the built-in otherwise. A collection-level eject (no `wrap`) replaces both.
+In 0.24 and earlier a collection's `wrap` always received the built-in, and the
+app-level override did not render for that collection.
+
 ### Overridable Component Scopes
 
 #### App-scoped Components (`AppComponentName`)
@@ -247,7 +254,7 @@ These components can only be overridden at the root `<Rebase>` provider, as they
 - `"Auth.LoginView"` — The login screen overlay.
 
 #### Collection-scoped Components (`CollectionComponentName`)
-These components can be overridden globally on `<Rebase>` (which acts as a fallback for all collections) or overridden on individual collections inside their definitions.
+These components can be overridden globally on `<Rebase>` (applied to every collection) or on individual collections inside their definitions — a collection's `wrap: true` override wraps the global one (see above).
 
 - `"Collection.View"` — The container view for the collection.
 - `"Collection.Table"` — The default tabular data view.
@@ -647,6 +654,10 @@ const { mode, setMode } = useModeController();
 setMode("dark");     // Force dark mode
 setMode("system");   // Follow OS preference
 ```
+
+When the host app owns the theme, hand Rebase its controller with
+`<Rebase modeController={…}>` (0.25+): Rebase then reads `mode`, calls
+`setMode`, and never touches `<html>`, `prefers-color-scheme` or localStorage.
 
 ### useClipboard
 

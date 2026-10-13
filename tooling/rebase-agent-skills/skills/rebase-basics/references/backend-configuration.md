@@ -1,24 +1,53 @@
 # Backend configuration
 
-## `initializeRebaseBackend()`
+## Two calls, one set of options
 
-The main entry point for initializing a Rebase backend server. Returns a `RebaseBackendInstance` with access to drivers, auth, storage, and lifecycle methods.
+A backend you wire yourself comes from one of two calls in `@rebasepro/server`.
+They take the same options; what differs is who mounts and starts it.
 
-### `RebaseBackendConfig` — Full Interface
+- **`initializeRebaseBackend(config)`** — the one-call boot. It builds the
+  backend, mounts every route group on your Hono `app` under `basePath`,
+  attaches the realtime socket to your `server`, starts the timers (cron, job
+  workers, sweeps), and returns the backend. This is what an ejected project's
+  entry point calls.
+- **`createRebaseBackend(options)`** (new in 0.25) — builds the same backend and
+  mounts, starts and listens to **nothing**. `initializeRebaseBackend` is this
+  followed by `backend.mount(app, { basePath })`, `await backend.attachRealtime(server)`
+  and `backend.start()`, plus the process-wide setup a backend built by hand
+  leaves to you (a `process.on("unhandledRejection")` handler that logs instead
+  of exiting). Drop to it when the shortcut stops fitting: only some route
+  groups, another path, timers in another process, or no server at all.
+
+A scaffolded project builds neither: `rebase dev` and the published runtime boot
+from the bundle, reading collections and hooks from `config/` and everything else
+from environment variables. Pass these options directly only when you own the
+server process (an ejected project, or Rebase embedded in your own server).
+
+### Options — `RebaseBackendOptions` / `RebaseBackendConfig`
 
 ```typescript
-import { initializeRebaseBackend, RebaseBackendConfig } from "@rebasepro/server";
+import {
+    createRebaseBackend,
+    initializeRebaseBackend,
+    type RebaseBackendConfig,
+    type RebaseBackendOptions
+} from "@rebasepro/server";
 ```
 
-A scaffolded project does not build this object: `rebase dev` and the published runtime boot from the bundle, reading collections and hooks from `config/` and everything else from environment variables. Pass it directly only when you own the server process (an ejected project, or Rebase embedded in your own server). Where the runtime fills an option from the environment, the row says so.
+The options are `RebaseBackendOptions` (`packages/server/src/backend/options.ts`),
+what `createRebaseBackend` takes. `RebaseBackendConfig`, what
+`initializeRebaseBackend` takes, is the same options without `provision`, plus
+`app`, `server` and `basePath`. Where the runtime fills an option from the
+environment, the row says so.
 
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
-| `server` | `Server` (Node `http.Server`) | — | **Required.** The HTTP server instance — used for the WebSocket upgrade and graceful shutdown |
-| `app` | `Hono<HonoEnv>` | — | **Required.** The Hono application instance |
+| `server` | `Server` (Node `http.Server`) | — | **Required by `initializeRebaseBackend`.** The HTTP server — the realtime socket attaches to it, and its `shutdown()` closes it. With `createRebaseBackend` you pass it to `attachRealtime(server)` and `shutdown(t, { server })` instead |
+| `app` | `Hono<HonoEnv>` | — | **Required by `initializeRebaseBackend`**, which mounts onto it. With `createRebaseBackend`: `backend.mount(app)`, or `app.route(path, backend.routes.data())` per group |
+| `provision` | `boolean \| { collections?: boolean; realtime?: boolean }` | — | **Required by `createRebaseBackend`** (new in 0.25); `initializeRebaseBackend` passes `true`. What building the backend may change in the database. `true`: the collection tables and their RLS policies, change capture for realtime, the role requests run as, and the framework's own tables (API keys, cron runs, jobs, metrics). `false`: nothing — the schema must already be there (a migration, or another process built with `true`), and a missing table fails on use, not at boot; what a script, a test or a second process wants. `{ collections: false, realtime: false }`: the framework's tables and the role only — a process that is not the schema's owner. `REBASE_MIGRATE_ON_BOOT=none` still turns the collection schema off |
 | `collections` | `AnyCollectionConfig[]` | `[]` | Inline collection definitions. Declaring **none** (and no `collectionsDir`) is what makes the server derive them from the live database instead, so every RLS-protected table is served with nothing to define. There is no `mode` flag — it was removed, because it could only ever agree with this or contradict it |
-| `collectionsDir` | `string` | — | Directory to auto-discover collection files (used if `collections` is empty) |
-| `basePath` | `string` | `"/api"` | Base path for all API routes |
+| `collectionsDir` | `string` | — | Directory to auto-discover collection files (used if `collections` is empty). Also what the schema editor rewrites, so passing it beside `collections` is not ambiguous: the values are served, the directory is edited |
+| `basePath` | `string` | `"/api"` | `initializeRebaseBackend` only: base path for all API routes. With `createRebaseBackend`: `backend.mount(app, { basePath })` |
 | `database` | `DatabaseAdapter` | — | Database adapter (takes precedence over `bootstrappers`) |
 | `bootstrappers` | `BackendBootstrapper[]` | — | Internal: the runtime builds these from the `database()` declarations in `config/resources.ts`, one per data source, and `collection.dataSource` routes by their `id`. Pass `database` instead |
 | ~~`dataSources`~~ | — | — | **Removed.** Declare each one with `database("<key>")` in `config/resources.ts`. The backend reads the declarations; passing this key is refused at boot, by name, with the replacement in the message. Collections on a `direct`/`custom` transport are still client-only — the backend skips data routes for them |
@@ -26,8 +55,10 @@ A scaffolded project does not build this object: `rebase dev` and the published 
 | `storage` | `BackendStorageConfig \| StorageController \| Record<string, ...>` | — | File storage configuration. Supports `"local"`, `"s3"`, and `"gcs"` (GCS/Firebase Storage) backends. Use `Record<string, StorageController>` for multi-backend setups with named sources, and include a `"(default)"` key — none is promoted. The runtime builds it from the `bucket()` declarations |
 | `history` | `HistoryConfig` (`boolean \| { retention?: number }`) | off | Entity history / audit log. `retention` is in days. Omitted here means off; the runtime passes `REBASE_HISTORY`, which defaults to `true` |
 | `enableSwagger` | `boolean` | `true` | `true` serves the OpenAPI spec at `/api/docs` publicly; `false` serves it to admins only. Swagger UI at `/api/swagger` is mounted outside production either way. The runtime passes `REBASE_ENABLE_SWAGGER`, and `false` in production when that is unset |
-| `functionsDir` | `string` | — | Directory for auto-discovered custom function handlers. The runtime discovers `backend/functions` |
-| `cronsDir` | `string` | — | Directory for auto-discovered cron job handlers. The runtime discovers `backend/crons` |
+| `functions` | `Record<string, FunctionApp>` | — | New in 0.25. Custom functions as values: the key is the URL segment, the value a Hono app (`defineFunction(...)`) — `{ "send-invoice": sendInvoice }` serves `/api/functions/send-invoice`. `await loadFunctions(dir)` reads a directory into exactly this shape. Give this or `functionsDir`, not both: the boot refuses the pair |
+| `functionsDir` | `string` | — | Directory for auto-discovered custom function handlers, one file per URL segment. The same as `functions: await loadFunctions(dir)`, plus the directory's skipped files reported on `GET /api/functions`. The runtime discovers `backend/functions` |
+| `crons` | `Record<string, CronJobDefinition>` | — | New in 0.25. Cron jobs as values: the key is the job id, the value a `defineCron(...)` definition. `await loadCrons(dir)` reads a directory into this shape. Scheduled by `start()`. Give this or `cronsDir`, not both: the boot refuses the pair |
+| `cronsDir` | `string` | — | Directory for auto-discovered cron job handlers, the filename the job id. The same as `crons: await loadCrons(dir)`. The runtime discovers `backend/crons` |
 | `cronPersistence` | `boolean` | `true` | Persist cron job execution logs to the database |
 | `maxBodySize` | `number` | `10485760` (10 MB) | Max request body size in bytes. Set `0` to disable. Storage uploads use the storage config's `maxFileSize` instead |
 | `csrf` | `{ origin: string \| string[] \| ((origin: string) => boolean) }` | — | CSRF protection (opt-in, disabled by default: mobile apps, cross-origin SPAs and CLIs consume the same API) |
@@ -51,7 +82,7 @@ A scaffolded project does not build this object: `rebase dev` and the published 
 | `functionsUpstream` | `string` | — | Internal: forward `/api/functions/*` to another process (`REBASE_FUNCTIONS_UPSTREAM`). Only consulted when the `functions` surface is off |
 | `surfaces` | `RuntimeSurfaceOptions` | all but `mcp` | Which HTTP surfaces this process mounts, as `{ auth, data, storage, admin, functions, cron, meta, realtime, mcp }` booleans; name only what differs. Every surface is on unless named, except `mcp`, which is off unless named. The runtime derives it from `REBASE_ROLE` |
 | `ownership` | `RuntimeOwnershipOptions` | all | Which background singletons this process runs: `{ cronScheduler, jobWorkers, rlsAudit }`. Separate from `surfaces` — serving the cron admin routes and firing the jobs are different questions |
-| `provisionSchema` | `boolean` | `true` | Internal: whether **this process** runs the boot DDL. Exactly one process in a split deployment may; derived from `REBASE_ROLE` |
+| `provisionSchema` | `boolean` | `true` | Internal, `initializeRebaseBackend` only: whether **this process** runs the collection DDL. Exactly one process in a split deployment may; derived from `REBASE_ROLE`. `false` becomes `provision: { collections: false, realtime: false }` |
 | `rlsAudit` | `RlsAuditConfig` | off | Periodic RLS audit served at `GET /api/admin/rls-audit`: `{ enabled, intervalMs, runOnBoot, schemas }`. Needs the optional peer `@rebasepro/rls-check` |
 | `corsHandled` | `boolean` | `false` | Internal: declares that the app installs its own CORS middleware, suppressing the "no CORS configuration detected" warning |
 | `schemaVersion` / `runtimeVersion` | `string` | — | Stamps carried from the bundle manifest |
@@ -109,10 +140,20 @@ A scaffolded project does not build this object: `rebase dev` and the published 
 | `slack` | `clientId`, `clientSecret` | Slack OAuth |
 | `spotify` | `clientId`, `clientSecret` | Spotify OAuth |
 
-### `RebaseBackendInstance` — Return Value
+### `RebaseBackend` — Return Value
+
+Both calls return a `RebaseBackend`. `RebaseBackendInstance`, the name
+`initializeRebaseBackend`'s return type has always had, is the same type — in
+0.24 and earlier it had every member below except those marked new in 0.25.
 
 | Property / Method | Type | Description |
 |-------------------|------|-------------|
+| `rebase` | `RebaseServerClient` | New in 0.25. The in-process client — what `import { rebase } from "@rebasepro/server"` answers inside the requests, cron runs and jobs this backend serves. `dataAsAdmin`, `sql`, `storage`, `bucket`, `email` call the drivers directly; `auth`, `admin`, `functions`, `cron` reach this backend's own routes in-process, mounted or not |
+| `routes` | `RebaseRoutes` | New in 0.25. `auth()`, `data()`, `storage()`, `functions()`, `admin()`, `cron()`, `meta()` — each a self-contained Hono sub-app (auth context, rate limits, scope guards, admin gate) to mount at any path: `app.route("/v2/data", backend.routes.data())`. A group whose surface is off throws |
+| `mount(app, { basePath })` | `void` | New in 0.25. Every group under `basePath` (default `/api`), with the process-wide middleware in front — the exact layout `initializeRebaseBackend` produces |
+| `attachRealtime(server, { path })` | `Promise<void>` | New in 0.25. Attach the realtime socket. It answers upgrades on `path` only — by default the `mount()` base path minus `/api` (`/api` → `/`, where the SDK dials) — and leaves other upgrades to the server's other listeners. Once only |
+| `start()` | `void` | New in 0.25. Start the timers: cron scheduler, job workers, expired-token and history-retention sweeps, metrics sampler, RLS audit — each where `ownership` gives it to this process. Idempotent |
+| `fetch(request)` | `Promise<Response>` | New in 0.25. The whole backend as one fetch handler, laid out at `/api` — for tests and scripts, no server or port: `backend.fetch(new Request("http://local/api/data/posts"))` |
 | `driver` | `DataDriver` | The default data driver |
 | `driverRegistry` | `DriverRegistry` | Registry of all initialized drivers |
 | `realtimeService` | `RealtimeProvider` | Default realtime provider |
@@ -121,17 +162,19 @@ A scaffolded project does not build this object: `rebase dev` and the published 
 | `storageRegistry` | `StorageRegistry \| undefined` | All storage backends |
 | `storageController` | `StorageController \| undefined` | Default storage controller |
 | `collectionRegistry` | `BackendCollectionRegistry` | Registry of all active collections |
-| `cronScheduler` | `CronScheduler \| undefined` | The cron job scheduler (if configured) |
+| `cronScheduler` | `CronScheduler \| undefined` | The cron job scheduler (if configured). Its jobs are registered at build; `start()` starts its timers |
+| `jobQueue` | `JobQueue \| undefined` | The durable job queue, when `jobs.enabled`. Enqueueing works at once; `start()` starts the workers |
+| `setCollectionCallbacks(slug, callbacks)` | `void` | Attach callbacks after the backend is built. It **replaces** the callbacks the collection declared — attach `composeCallbacks(declared, mine)` to keep them |
 | `healthCheck()` | `() => Promise<HealthCheckResult>` | Deep health check (verifies DB connectivity, returns latency) |
-| `shutdown(timeoutMs?)` | `(timeoutMs?: number) => Promise<void>` | Graceful shutdown (stops cron, destroys realtime, drains HTTP, default 15s timeout) |
+| `shutdown(timeoutMs?, { server })` | `Promise<void>` | Graceful shutdown, default 15s budget. Closes the HTTP server only when it has one: the backend `initializeRebaseBackend` returns closes the `server` it was given; one from `createRebaseBackend` closes the server you pass as `{ server }` |
 
 ### Shutdown Behavior
 
 When `shutdown()` is called, it performs these steps in order:
 
-1. **Stops the cron scheduler** (if configured)
+1. **Stops the timers** — the cron scheduler, the job workers, the sweeps, the metrics sampler — and waits for a cron run, a job or a `waitUntil()` task in flight, within part of the budget
 2. **Destroys realtime services** (LISTEN clients, debounce timers, subscriptions) — this happens **before** pool close to prevent timer callbacks firing against a closed pool
-3. **Closes the HTTP server** (stops accepting, drains in-flight requests)
+3. **Closes the HTTP server** (stops accepting, drains in-flight requests) — when there is one to close (see the `shutdown` row above)
 4. **Force-resolves** after `timeoutMs` (default 15000ms). Pass `0` to disable the force timer (useful in tests)
 
 ### Minimal Backend Example
@@ -142,13 +185,16 @@ import type { BackendStorageConfig, HonoEnv } from "@rebasepro/server";
 import { getRequestListener } from "@hono/node-server";
 import { createServer } from "http";
 import { initializeRebaseBackend, loadEnv } from "@rebasepro/server";
-import { createPostgresAdapter } from "@rebasepro/server-postgres";
+import { createPostgresAdapter, createPostgresDatabaseConnection } from "@rebasepro/server-postgres";
 import { defaultUsersCollection } from "@rebasepro/common";
 import collections from "../config/collections";
 import dotenv from "dotenv";
 
 dotenv.config({ path: "../../.env" });
 const env = loadEnv();
+
+// The adapter queries through `connection`; a `connectionString` alone opens no pool.
+const { db, connectionString } = createPostgresDatabaseConnection(env.DATABASE_URL);
 
 const app = new Hono<HonoEnv>();
 const server = createServer(getRequestListener(app.fetch));
@@ -171,9 +217,7 @@ const storage: BackendStorageConfig = env.STORAGE_TYPE === "s3"
 await initializeRebaseBackend({
     app,
     server,
-    database: createPostgresAdapter({
-        connectionString: env.DATABASE_URL,
-    }),
+    database: createPostgresAdapter({ connection: db, connectionString }),
     collections: [...collections, defaultUsersCollection],
     collectionsDir: "../config/collections",
     functionsDir: "./src/functions",
@@ -193,6 +237,57 @@ await initializeRebaseBackend({
 
 console.log(`Server running at http://localhost:${env.PORT}`);
 ```
+
+### The same backend, one step down (0.25+)
+
+`createRebaseBackend`, then the public steps `initializeRebaseBackend` takes
+after it. Each line is yours to change: mount only some groups, put them under
+another path, attach no socket, or leave `start()` to another process.
+
+```typescript
+import { createServer } from "node:http";
+import { Hono } from "hono";
+import { getRequestListener } from "@hono/node-server";
+import { createRebaseBackend, installShutdownHandlers, loadFunctions, type HonoEnv } from "@rebasepro/server";
+import { createPostgresAdapter, createPostgresDatabaseConnection } from "@rebasepro/server-postgres";
+import collections from "../config/collections";
+
+const { db, pool, connectionString } = createPostgresDatabaseConnection(process.env.DATABASE_URL!);
+const app = new Hono<HonoEnv>();
+const server = createServer(getRequestListener(app.fetch));
+
+// Builds everything; mounts, starts and listens to nothing.
+const backend = await createRebaseBackend({
+    database: createPostgresAdapter({ connection: db, connectionString }),
+    collections,
+    auth: { jwtSecret: process.env.JWT_SECRET! },
+    functions: await loadFunctions("./src/functions"),   // { name: app }
+    provision: true                                     // required: may it run DDL?
+});
+
+backend.mount(app, { basePath: "/api" });   // or: app.route("/v2/data", backend.routes.data())
+await backend.attachRealtime(server);        // the socket answers on "/" for an API at /api
+backend.start();                             // crons, job workers, sweeps
+
+installShutdownHandlers(
+    { shutdown: (timeoutMs) => backend.shutdown(timeoutMs, { server }) },
+    { onCleanup: () => pool.end() }
+);
+server.listen(3001);
+```
+
+A group mounted on its own (`app.route(path, backend.routes.functions())`)
+carries its own auth context, rate limits and admin gate, so `getUser(c)` and
+`getDriver(c)` work inside it. What only `mount()` adds is the process-wide HTTP
+hygiene in front of every group: request ids, the global body limit,
+compression, CSRF, the request log and the JSON error envelope. Mounting groups
+one by one, add your own (`hono/body-limit`, `app.onError(errorHandler)`).
+
+With `provision: false` and no server, the same call is how a test or a script
+gets a whole backend: `backend.rebase.dataAsAdmin`, or `backend.fetch(request)`
+against its routes, then `await backend.shutdown()`. For data alone,
+`openRebase` from `@rebasepro/server-postgres` is lighter — see *Exploring
+data from a script* in this skill's `SKILL.md`.
 
 ## Default security rules live with the collections, not here
 

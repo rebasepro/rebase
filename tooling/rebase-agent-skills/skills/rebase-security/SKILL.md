@@ -707,7 +707,7 @@ Use this checklist when setting up security for a Rebase project:
 - **API keys**: `packages/server/src/auth/api-keys/` — `api-key-middleware.ts` (verification), `key-grant.ts` (minting rules)
 - **REST API Generator**: `packages/server/src/api/rest/api-generator.ts` — request/response path
 - **Callback Types**: `packages/types/src/types/entity_callbacks.ts` — `CollectionCallbacks`, `AfterReadProps`, `BeforeSaveProps`
-- **Backend Init**: `packages/server/src/init.ts` — `hooks` config property
+- **Backend Options**: `packages/server/src/backend/options.ts` — `RebaseBackendOptions.callbacks`, the global callbacks
 - **Reserved Identity Values**: See Identity Types table above — `"service"`, `"anon"`, `"api-key:{id}"` are system-assigned identities in `context.user`
 - **Collection Callbacks**: See `rebase-collections` skill → Collection Callbacks section
 - **Auth Configuration**: See `rebase-auth` skill → Server-Side Configuration section
