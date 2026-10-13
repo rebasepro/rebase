@@ -47,7 +47,7 @@ Questo avviene a ogni `rebase init`, per ogni preset incluso `--headless`.
 Non ci sono flag né richieste di conferma.
 
 `rebase init` scrive anche `.mcp.json`, che indirizza Claude Code, Cursor e
-qualsiasi altro client MCP al [server MCP di Rebase](/it/docs/ai/mcp) — la
+qualsiasi altro client MCP al [server MCP di Rebase](/docs/ai/mcp) — la
 copia propria del progetto, una devDependency fissata insieme alla CLI
 (`npx --no rebase-mcp` in un progetto npm):
 
@@ -70,7 +70,7 @@ nella radice del progetto, e un percorso assoluto è l'unica riga di quel file c
 non può essere committata. C'è perché `~/.rebase/projects.json` vale per l'intera
 macchina — un progetto che non nomina una directory propria ricade su ciò che vi
 ha salvato l'ultimo progetto di quella macchina. Vedi
-[la precedenza](/it/docs/ai/mcp#su-quale-directory-opera).
+[la precedenza](/docs/ai/mcp#which-directory-it-acts-on).
 
 ## Perché un puntatore invece di una copia
 
