@@ -160,13 +160,11 @@ export function startExpiredTokenSweep(wiring: ExpiredTokenSweepWiring): Expired
     const store = wiring.persistClaims !== false && isSQLAdmin(wiring.driver.admin)
         ? createCronStore(wiring.driver)
         : undefined;
-    let ready: Promise<void> | undefined;
     const sweep = createExpiredTokenSweep({
         authRepo: { deleteExpiredTokens },
         claimSlot: store
             ? async (jobId, slot) => {
-                ready ??= store.ensureTable();
-                await ready;
+                await store.ensureTable();
                 return store.tryClaimRun(jobId, slot);
             }
             : undefined

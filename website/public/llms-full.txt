@@ -5672,6 +5672,16 @@ yet, listed so that nobody reads a promise into them:
 
 - **inferTypeFromValue calls a `Date` a `date`.**
 
+##### Jobs & cron
+
+- **The cron tables are set up once per boot, and their end-user revokes no
+  longer fail with "tuple concurrently updated".** The scheduler, the
+  expired-token sweep and the history retention sweep each ran the setup on
+  the same database at the same time, so every boot logged "Cron logs table
+  ready" more than once and the concurrent `REVOKE`s on `rebase.cron_logs`
+  could fail. Stores on one database now share one setup per process; a setup
+  that falls short is reported and tried again on the next call.
+
 ##### MCP
 
 - **On the managed development database, a refused DB tool explains what to do
