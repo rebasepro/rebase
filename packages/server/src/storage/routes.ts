@@ -38,7 +38,7 @@ import { jwtOf, type JwtService } from "../auth/jwt";
 import { ApiError, declaredErrorAnswer, errorHandler } from "../api/errors";
 import { logger } from "../utils/logger";
 import { HonoEnv } from "../api/types";
-import { parseTransformOptions, transformImage, transformContentType, isTransformableImage, TransformCache, InvalidTransformOptionsError, TransformOverloadedError, UntransformableImageError, type ImageTransformOptions } from "./image-transform";
+import { parseTransformOptions, transformImage, transformContentType, isTransformableImage, imageTransformsAvailable, TransformCache, InvalidTransformOptionsError, TransformOverloadedError, UntransformableImageError, type ImageTransformOptions } from "./image-transform";
 import { TusHandler } from "./tus-handler";
 import { storageRequestWildcard } from "./requested-object";
 import { isDownloadTokenGrant, isPublicObjectGrant, PUBLIC_OBJECT_PRINCIPAL } from "./request-principals";
@@ -949,8 +949,10 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
                 // Ignore metadata errors (file may not exist)
             }
 
-            // Apply image transforms if requested and the file is a transformable image
-            if (transformOpts && isTransformableImage(contentType)) {
+            // Apply image transforms if requested and the file is a transformable image.
+            // Without `sharp` a rendition request is served the original: the
+            // caller asked for a smaller copy of an image it may read anyway.
+            if (transformOpts && isTransformableImage(contentType) && await imageTransformsAvailable()) {
                 const sourceVersion = buildEntityTag(localStat.size, localStat.mtimeMs);
                 const cacheKey = transformMemory.cache.buildKey(`${transformKeyPrefix}@${sourceVersion}`, transformOpts);
                 const transformed = await transformOnce(
@@ -1051,7 +1053,7 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
                 throw ApiError.notFound("File not found");
             }
 
-            if (transformOpts && isTransformableImage(info.contentType)) {
+            if (transformOpts && isTransformableImage(info.contentType) && await imageTransformsAvailable()) {
                 const sourceVersion = buildEntityTag(info.size, info.lastModified);
                 const cacheKey = transformMemory.cache.buildKey(`${transformKeyPrefix}@${sourceVersion}`, transformOpts);
                 const transformed = await transformOnce(
@@ -1159,7 +1161,7 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
         const remoteContentType = fileObject.type || "application/octet-stream";
 
         // Apply image transforms for remote storage too
-        if (transformOpts && isTransformableImage(remoteContentType)) {
+        if (transformOpts && isTransformableImage(remoteContentType) && await imageTransformsAvailable()) {
             const sourceVersion = buildEntityTag(fileObject.size, fileObject.lastModified);
             const cacheKey = transformMemory.cache.buildKey(`${transformKeyPrefix}@${sourceVersion}`, transformOpts);
             const transformed = await transformOnce(

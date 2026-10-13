@@ -7,6 +7,7 @@
  */
 
 import os from "node:os";
+import { logger } from "../utils/logger";
 
 /**
  * The second argument is the decoder's own limits — see `MAX_INPUT_PIXELS` and
@@ -20,22 +21,56 @@ interface SharpOptions {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-let sharpFactory: ((input: Buffer | Uint8Array, options?: SharpOptions) => any) | undefined;
+type SharpFactory = (input: Buffer | Uint8Array, options?: SharpOptions) => any;
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function getSharp(): Promise<(input: Buffer | Uint8Array, options?: SharpOptions) => any> {
-    if (!sharpFactory) {
-        try {
-            const mod = await import("sharp");
-            sharpFactory = mod.default;
-        } catch (err) {
-            throw new Error("Failed to load optional 'sharp' dependency for image transformation.");
+/**
+ * The one load of `sharp` this process makes: its factory, or `undefined` when
+ * the package cannot be loaded. Settled once — a dependency is installed or it
+ * is not, and asking again per thumbnail would only repeat the answer.
+ */
+let sharpLoad: Promise<SharpFactory | undefined> | undefined;
+
+function loadSharp(): Promise<SharpFactory | undefined> {
+    sharpLoad ??= import("sharp").then(
+        mod => mod.default,
+        (err: unknown) => {
+            // Once per process, at WARN: an optional dependency that is absent
+            // is a choice the project made, not a fault in a request. Every
+            // transform request is served the original image instead.
+            logger.warn(
+                "Image transforms are off: the optional `sharp` package could not be loaded " +
+                `(${err instanceof Error ? err.message : String(err)}), so a request for a resized or ` +
+                "converted image (`?width=`, `?format=`, …) is served the original. To turn them on, " +
+                "install it in the package that runs the backend — `pnpm add sharp` in `backend/` for a " +
+                "scaffolded project — and restart."
+            );
+            return undefined;
         }
+    );
+    return sharpLoad;
+}
+
+/**
+ * Raised by {@link transformImage} when `sharp` is not installed. The storage
+ * routes never reach it: they ask {@link imageTransformsAvailable} first and
+ * serve the original.
+ */
+export class ImageTransformUnavailableError extends Error {
+    constructor() {
+        super("Image transforms need the optional `sharp` package, which is not installed. Install it with `pnpm add sharp`.");
+        this.name = "ImageTransformUnavailableError";
     }
-    if (!sharpFactory) {
-        throw new Error("Failed to load optional 'sharp' dependency for image transformation.");
-    }
-    return sharpFactory;
+}
+
+/** Whether this process can transform images — whether `sharp` loads. */
+export async function imageTransformsAvailable(): Promise<boolean> {
+    return (await loadSharp()) !== undefined;
+}
+
+async function getSharp(): Promise<SharpFactory> {
+    const factory = await loadSharp();
+    if (!factory) throw new ImageTransformUnavailableError();
+    return factory;
 }
 
 /** Options that can be specified via query parameters. */
