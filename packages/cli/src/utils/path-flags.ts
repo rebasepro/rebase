@@ -41,6 +41,30 @@ function typedCollectionsPath(args: readonly string[]): string | null {
 }
 
 /**
+ * What a refusal over a missing `--collections` path spared, by what the command
+ * would have done with it. Only a schema writer drops tables; a console or a
+ * doctor run over nothing does something else wrong, and says so.
+ */
+const MISSING_COLLECTIONS_CONSEQUENCE = {
+    schema: [
+        "Nothing was generated and nothing was applied — a schema generated from a",
+        "directory that is not there is an empty one, and applying it would drop",
+        "every table it does not describe."
+    ],
+    console: [
+        "Nothing was started — a console over a directory that is not there would",
+        "load none of this project's collections."
+    ],
+    doctor: [
+        "Nothing was checked — a directory that is not there has no collections, so",
+        "every collection check would pass over it."
+    ]
+} as const;
+
+/** What a command does with its `--collections` path. */
+export type CollectionsPathUse = keyof typeof MISSING_COLLECTIONS_CONSEQUENCE;
+
+/**
  * The refusal for a `--collections` path that does not exist, or `null`.
  *
  * Checked by the CLI, in the reader's terms, before the driver is spawned: the
@@ -51,7 +75,12 @@ function typedCollectionsPath(args: readonly string[]): string | null {
  * Scripts written for the old rule (`--collections ../config/collections`,
  * run from the root) land here, and the message says exactly what to change.
  */
-export function missingCollectionsPath(args: readonly string[], cwd: string, backendDir: string): string[] | null {
+export function missingCollectionsPath(
+    args: readonly string[],
+    cwd: string,
+    backendDir: string,
+    use: CollectionsPathUse = "schema"
+): string[] | null {
     const typed = typedCollectionsPath(args);
     if (typed === null) return null;
     const resolved = path.resolve(cwd, typed);
@@ -70,18 +99,18 @@ export function missingCollectionsPath(args: readonly string[], cwd: string, bac
             chalk.yellow(`  Leave the flag out (config/collections is the default), or write it from here: ${path.relative(cwd, fromBackend) || "."}`)
         );
     }
-    lines.push(
-        "",
-        chalk.gray("  Nothing was generated and nothing was applied — a schema generated from a"),
-        chalk.gray("  directory that is not there is an empty one, and applying it would drop"),
-        chalk.gray("  every table it does not describe.")
-    );
+    lines.push("", ...MISSING_COLLECTIONS_CONSEQUENCE[use].map(line => chalk.gray(`  ${line}`)));
     return lines;
 }
 
 /** Print {@link missingCollectionsPath}'s refusal and exit 1, or return. */
-export function refuseMissingCollectionsPath(args: readonly string[], cwd: string, backendDir: string): void {
-    const lines = missingCollectionsPath(args, cwd, backendDir);
+export function refuseMissingCollectionsPath(
+    args: readonly string[],
+    cwd: string,
+    backendDir: string,
+    use: CollectionsPathUse = "schema"
+): void {
+    const lines = missingCollectionsPath(args, cwd, backendDir, use);
     if (!lines) return;
     console.error("");
     for (const line of lines) console.error(line);

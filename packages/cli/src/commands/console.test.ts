@@ -108,6 +108,21 @@ describe("rebase console", () => {
         expect(spawned().args).toContain(fs.realpathSync(path.join(scratch, "config", "collections")));
     });
 
+    it("refuses a --collections path that is not there in its own terms, not db push's", async () => {
+        vi.spyOn(process, "exit").mockImplementation((code?: string | number | null) => {
+            throw new Error(`process.exit(${code})`);
+        });
+
+        await expect(consoleCommand(["node", "rebase", "console", "--collections", path.join(scratch, "nope")]))
+            .rejects.toThrow("process.exit(1)");
+
+        const said = stderr.join("\n");
+        expect(said).toContain("Collections path not found");
+        expect(said).toContain("Nothing was started");
+        expect(said).not.toContain("drop");
+        expect(execaSpy).not.toHaveBeenCalled();
+    });
+
     it("refuses an unknown flag before a database is resolved", async () => {
         await expect(consoleCommand(["node", "rebase", "console", "--evel", "1"])).rejects.toThrow(/--evel/);
         expect(prepareSpy).not.toHaveBeenCalled();

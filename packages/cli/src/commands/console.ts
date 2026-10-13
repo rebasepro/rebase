@@ -94,7 +94,7 @@ export async function consoleCommand(rawArgs: string[]): Promise<void> {
 
     const resolved = await resolveDriverCli();
     const { projectRoot, backendDir } = resolved;
-    refuseMissingCollectionsPath(rawArgs, process.cwd(), backendDir);
+    refuseMissingCollectionsPath(rawArgs, process.cwd(), backendDir, "console");
     await ensureDockerDatabase(projectRoot, rawArgs);
 
     // With --eval, stdout is the result and nothing else, so it can be piped

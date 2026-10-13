@@ -121,6 +121,20 @@ describe("a --collections path that is not there", () => {
         expect(text).toMatch(/leave the flag out/i);
         expect(text).toContain("config/collections");
     });
+
+    it("says what was spared in the terms of the command that refused", () => {
+        // The schema writers' warning — an empty schema drops every table — was
+        // printed by `rebase console` and `rebase doctor` too, which drop nothing.
+        const root = path.join(scratch, "app");
+        const said = (use?: "schema" | "console" | "doctor") =>
+            missingCollectionsPath(["x", "--collections", "nope"], root, path.join(root, "backend"), use)!.join("\n").replace(ANSI, "");
+        expect(said()).toContain("applying it would drop");
+        expect(said("schema")).toContain("applying it would drop");
+        expect(said("console")).toContain("Nothing was started");
+        expect(said("doctor")).toContain("Nothing was checked");
+        expect(said("console")).not.toContain("drop");
+        expect(said("doctor")).not.toContain("drop");
+    });
 });
 
 describe("every help page states the rule in the same words", () => {

@@ -499,7 +499,7 @@ export async function doctorCommand(rawArgs: string[]): Promise<void> {
 
     const projectRoot = requireProjectRoot();
     const backendDir = requireBackendDir(projectRoot);
-    refuseMissingCollectionsPath(rawArgs, process.cwd(), backendDir);
+    refuseMissingCollectionsPath(rawArgs, process.cwd(), backendDir, "doctor");
 
     const activePlugin = getActiveBackendPlugin(backendDir);
     if (!activePlugin) {
