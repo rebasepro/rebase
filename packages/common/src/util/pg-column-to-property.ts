@@ -260,6 +260,66 @@ label: prettifyIdentifier(v) })),
 }
 
 /**
+ * A column's DEFAULT, as the property that keeps it.
+ *
+ * A literal default — `true`, `0`, `'draft'::character varying`,
+ * `'{}'::jsonb` — becomes the property's `defaultValue`; `now()` on a date
+ * becomes `autoValue: "on_create"`. Each is what the schema planner writes back
+ * as the same DEFAULT, so the first push plans no `DROP DEFAULT`; the New form
+ * opens with the database's value instead of the type's fallback (`false` for
+ * a `DEFAULT true` boolean, sent and stored); and the API counts the field as
+ * supplied on create.
+ *
+ * An expression default (`gen_random_uuid()`, `nextval(…)`, `lower(…)`) has no
+ * property form and is left alone, as is a key column's generator. `required`
+ * is never touched: it is the planner's NOT NULL. The reading mirrors the CLI
+ * introspector's (`literalDefaultOf` in `@rebasepro/server-postgres`).
+ */
+function applyColumnDefault(property: Property, column: TableColumnInfo): void {
+    const raw = column.column_default?.trim();
+    if (!raw) return;
+    if ("isId" in property && property.isId) return;
+
+    // `'text'::type` — the type part may itself be quoted or qualified.
+    const quoted = /^'((?:[^']|'')*)'(?:::[\w\s."[\]]+)?$/.exec(raw);
+    const unquoted = quoted ? quoted[1].replace(/''/g, "'") : undefined;
+
+    switch (property.type) {
+        case "string":
+            if (unquoted === undefined) return;
+            if (property.enum && Array.isArray(column.enum_values) && !column.enum_values.includes(unquoted)) return;
+            property.defaultValue = unquoted;
+            return;
+        case "number": {
+            const text = unquoted ?? raw.replace(/^\((.*)\)$/, "$1").replace(/::[\w\s]+$/, "");
+            if (/^-?\d+(\.\d+)?$/.test(text) && Number.isFinite(Number(text))) property.defaultValue = Number(text);
+            return;
+        }
+        case "boolean":
+            if (/^true$/i.test(raw)) property.defaultValue = true;
+            else if (/^false$/i.test(raw)) property.defaultValue = false;
+            return;
+        case "date":
+            if (/^(now\(\)|CURRENT_TIMESTAMP)$/i.test(raw)) property.autoValue = "on_create";
+            return;
+        case "map": {
+            if (unquoted === undefined) return;
+            try {
+                const parsed: unknown = JSON.parse(unquoted);
+                if (parsed !== null && typeof parsed === "object" && !Array.isArray(parsed)) {
+                    property.defaultValue = Object.fromEntries(Object.entries(parsed));
+                }
+            } catch {
+                // Not JSON: no property form.
+            }
+            return;
+        }
+        default:
+            return;
+    }
+}
+
+/**
  * Builds a collection description from PostgreSQL table metadata.
  * This is used when creating a new collection from an existing database table.
  */
@@ -285,6 +345,7 @@ export function buildCollectionFromTableMetadata(
     for (const column of metadata.columns) {
         const property = pgTypeToRebaseProperty(column);
         if (property) {
+            applyColumnDefault(property, column);
             const propRecord = property as unknown as Record<string, unknown>;
             Object.keys(propRecord).forEach(key => propRecord[key] === undefined && delete propRecord[key]);
 
