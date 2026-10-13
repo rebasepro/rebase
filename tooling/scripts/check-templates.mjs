@@ -313,33 +313,50 @@ function checkPinnedTypesAreDeclared() {
         return `@types/${entry}`;
     };
 
-    for (const workspace of ["config", "backend", "frontend"]) {
-        const tsconfigPath = path.join(templateRoot, workspace, "tsconfig.json");
-        const manifestPath = path.join(templateRoot, workspace, "package.json");
-        if (!fs.existsSync(tsconfigPath) || !fs.existsSync(manifestPath)) continue;
+    // Every flavour, as `rebase init` lays it out. The headless overlay replaces
+    // some of the template's files and keeps the rest, so a workspace there pairs
+    // whichever tsconfig and package.json the project actually ends up with: the
+    // overlay's `config/package.json` replaced the template's — dropping
+    // `@types/node` — while `config/tsconfig.json`, which pins it, came from the
+    // template. Checking the template alone could not see that pair.
+    const flavours = [
+        { label: "template", roots: [templateRoot], workspaces: [".", "config", "backend", "frontend"] },
+        { label: "baas overlay", roots: [baasOverlay, templateRoot], workspaces: [".", "config", "backend"] }
+    ];
+    /** The first root that ships `relative`: the overlay's copy wins over the template's. */
+    const scaffolded = (roots, relative) =>
+        roots.map(root => path.join(root, relative)).find(candidate => fs.existsSync(candidate));
 
-        // The template tsconfigs carry explanatory comments, so this is JSONC.
-        const raw = stripJsonComments(fs.readFileSync(tsconfigPath, "utf8"));
-        let pinned;
-        try {
-            pinned = JSON.parse(raw).compilerOptions?.types;
-        } catch (e) {
-            problems.push(`${workspace}/tsconfig.json could not be parsed after stripping comments: ${e.message}`);
-            continue;
-        }
-        if (!Array.isArray(pinned)) continue;
+    for (const { label, roots, workspaces } of flavours) {
+        for (const workspace of workspaces) {
+            const tsconfigPath = scaffolded(roots, path.join(workspace, "tsconfig.json"));
+            const manifestPath = scaffolded(roots, path.join(workspace, "package.json"));
+            if (!tsconfigPath || !manifestPath) continue;
+            const where = (file) => `${label}: ${path.relative(repoRoot, file)}`;
 
-        const pkg = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
-        const declared = new Set(Object.keys({ ...pkg.dependencies, ...pkg.devDependencies }));
+            // The template tsconfigs carry explanatory comments, so this is JSONC.
+            const raw = stripJsonComments(fs.readFileSync(tsconfigPath, "utf8"));
+            let pinned;
+            try {
+                pinned = JSON.parse(raw).compilerOptions?.types;
+            } catch (e) {
+                problems.push(`${where(tsconfigPath)} could not be parsed after stripping comments: ${e.message}`);
+                continue;
+            }
+            if (!Array.isArray(pinned)) continue;
 
-        for (const entry of pinned) {
-            const provider = providerOf(entry);
-            if (!declared.has(provider)) {
-                problems.push(
-                    `${workspace}/tsconfig.json pins types: ["${entry}"] but ${workspace}/package.json ` +
-                    `does not depend on ${provider} — under pnpm the workspace cannot compile itself ` +
-                    `(TS2688)`
-                );
+            const pkg = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+            const declared = new Set(Object.keys({ ...pkg.dependencies, ...pkg.devDependencies }));
+
+            for (const entry of pinned) {
+                const provider = providerOf(entry);
+                if (!declared.has(provider)) {
+                    problems.push(
+                        `${where(tsconfigPath)} pins types: ["${entry}"] but ${where(manifestPath)} ` +
+                        `does not depend on ${provider} — under pnpm the workspace cannot compile itself ` +
+                        `(TS2688)`
+                    );
+                }
             }
         }
     }
