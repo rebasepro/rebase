@@ -39,6 +39,30 @@ The authenticated user's identity is available in SQL via:
 
 These are set automatically per-transaction by the Rebase backend.
 
+### Policies a collection gets without writing them
+
+The policies on a table are more than the collection's own `securityRules`:
+
+- **`defaultSecurityRules`**, exported from `config/collections/index.ts`. A
+  collection whose `securityRules` is absent or empty takes all of them in its
+  place, as if it had written them. A collection that declares even one rule of
+  its own takes none: the two lists are never merged.
+- **The admin baseline.** Every collection also gets
+  `<table>_default_admin_read` and `<table>_default_admin_write_insert`,
+  `_update` and `_delete`: permissive policies that let the server context and
+  the `admin` role read and write every row. They sit beside whichever rules the
+  collection ends up with, its own or the inherited defaults, and permissive
+  policies are OR'd, so they widen both. The users collection also gets a
+  self-read and a restrictive write gate that keeps `roles` admin-only.
+- **Tenancy.** A tenant-scoped collection gets a restrictive rule that confines
+  every operation to the caller's tenant; the server context passes it.
+
+`disableDefaultPolicies: true` on a collection removes the permissive baseline,
+and keeps the restrictive gates. It is per collection: `defaultSecurityRules`
+carries no such flag, so a collection that inherits the defaults keeps the
+baseline unless it sets the flag itself. The generated DDL marks every injected
+policy, and `rebase db push` puts back one dropped by hand.
+
 ## Convenience Shortcuts
 
 ### Owner-based Access
