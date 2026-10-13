@@ -189,6 +189,7 @@ export default defineConfig({
                         { label: "MongoDB", slug: "docs/backend/mongodb" },
                         { label: "Realtime & WebSocket", slug: "docs/backend/realtime" },
                         { label: "Realtime across instances", slug: "docs/backend/realtime-transports" },
+                        { label: "Database change capture", slug: "docs/backend/realtime-cdc" },
                         { label: "Search", slug: "docs/backend/search" },
                         { label: "Vector Search", slug: "docs/backend/vector-search" },
                         { label: "Indexes", slug: "docs/backend/indexes" },

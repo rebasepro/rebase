@@ -72,7 +72,7 @@ each committed write, and every instance's listener refetches for its own
 subscribers. If CDC is off, or `auto` could not provision it (the boot log says
 which), a subscription sees only the writes made through the instance its
 socket is connected to. See
-[Realtime](/docs/backend/realtime/#database-level-change-capture-cdc).
+[Realtime](/docs/backend/realtime-cdc/).
 
 **Broadcast channels and presence** are in-process unless a bus carries them:
 two clients on different instances in the same channel do not hear each other,

@@ -83,7 +83,7 @@ propios suscriptores. Si el CDC está desactivado, o si `auto` no pudo
 aprovisionarlo (el log de arranque indica por qué), una suscripción solo ve las
 escrituras hechas a través de la instancia a la que está conectado su socket.
 Consulta
-[Tiempo real](/docs/backend/realtime/#database-level-change-capture-cdc).
+[Tiempo real](/docs/backend/realtime-cdc/).
 
 Los **canales de difusión (broadcast) y la presencia** son en proceso a menos
 que un bus los transporte: dos clientes en instancias distintas dentro del

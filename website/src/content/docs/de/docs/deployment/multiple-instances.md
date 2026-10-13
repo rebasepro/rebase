@@ -71,7 +71,7 @@ Datenbankebene aktiv ist, was standardmäßig der Fall ist (`REALTIME_CDC=auto`)
 jeden committeten Schreibvorgang an, und der Listener jeder Instanz führt für ihre eigenen Abonnenten
 ein Refetch durch. Ist CDC aus, oder konnte `auto` es nicht bereitstellen (das Boot-Log nennt den
 Grund), sieht ein Abonnement nur die Schreibvorgänge, die über die Instanz erfolgt sind, mit der sein
-Socket verbunden ist. Siehe [Realtime](/docs/backend/realtime/#database-level-change-capture-cdc).
+Socket verbunden ist. Siehe [Realtime](/docs/backend/realtime-cdc/).
 
 **Broadcast-Kanäle und Presence** laufen prozessintern, sofern kein Bus sie trägt: Zwei Clients auf
 unterschiedlichen Instanzen im selben Channel hören sich nicht, und jede Instanz beantwortet „Wer ist

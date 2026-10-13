@@ -78,7 +78,7 @@ listener de cada instância refaz a busca para seus próprios assinantes. Se o
 CDC estiver desativado, ou se o `auto` não conseguiu provisioná-lo (o log de
 inicialização diz o motivo), uma assinatura vê apenas as gravações feitas
 através da instância a cujo socket ela está conectada. Veja
-[Tempo real](/docs/backend/realtime/#database-level-change-capture-cdc).
+[Tempo real](/docs/backend/realtime-cdc/).
 
 **Canais de broadcast e presença** são em processo a menos que um barramento
 os carregue: dois clientes em instâncias diferentes no mesmo canal não se

@@ -76,7 +76,7 @@ modifications au niveau de la base de données (CDC) est active, ce qui est le c
 instance relit les données pour ses propres abonnés. Si la CDC est désactivée, ou si `auto` n'a pas
 pu la provisionner (le journal de démarrage indique lequel des deux), un abonnement ne voit que les
 écritures effectuées via l'instance à laquelle son socket est connecté. Voir
-[Temps réel](/docs/backend/realtime/#database-level-change-capture-cdc).
+[Temps réel](/docs/backend/realtime-cdc/).
 
 **Les canaux de diffusion et la présence** restent internes au processus à moins qu'un bus ne les
 relaie : deux clients sur des instances différentes dans le même canal ne s'entendent pas, et

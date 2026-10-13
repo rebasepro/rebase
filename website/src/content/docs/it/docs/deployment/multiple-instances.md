@@ -79,7 +79,7 @@ scrittura confermata, e il listener di ogni istanza esegue un nuovo fetch per
 i propri sottoscrittori. Se il CDC è disattivato, o se `auto` non è riuscito a
 configurarlo (il log di avvio indica il motivo), una sottoscrizione vede solo
 le scritture effettuate tramite l'istanza a cui è connesso il suo socket.
-Vedi [Realtime](/docs/backend/realtime/#database-level-change-capture-cdc).
+Vedi [Realtime](/docs/backend/realtime-cdc/).
 
 I **canali di broadcast e presence** sono in-process a meno che un bus non li
 veicoli: due client su istanze diverse nello stesso canale non si sentono a
