@@ -44,7 +44,7 @@ weglässt: einen Connection Pooler und den Betrieb von Functions und Job-Worker
 als eigene Prozesse.
 
 ```bash
-rebase build          # erzeugt ./dist-bundle
+rebase build          # produces ./dist-bundle
 docker compose up -d
 ```
 

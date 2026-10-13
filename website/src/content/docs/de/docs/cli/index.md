@@ -192,8 +192,8 @@ Wendet alle noch nicht angewendeten Migrationen auf die Datenbank an.
 ### `rebase db backup` / `backups` / `restore`
 
 ```bash
-rebase db backup --out ./backups        # oder s3://bucket/prefix, gs://bucket/prefix
-rebase db backups list                  # auflisten, was gespeichert ist
+rebase db backup --out ./backups        # or s3://bucket/prefix, gs://bucket/prefix
+rebase db backups list                  # list what is stored
 rebase db restore ./backups/<file>.dump --yes
 ```
 
@@ -262,8 +262,8 @@ abgewartete Ergebnis als JSON auf stdout ausgegeben, und ein Fehler beendet mit 
 Nur für die verwaltete Entwicklungsdatenbank:
 
 ```bash
-rebase db stop     # stoppen; die Daten bleiben erhalten
-rebase db reset    # löschen und von vorne beginnen
+rebase db stop     # stop it; the data is kept
+rebase db reset    # delete it and start over
 ```
 
 ### `rebase db branch`
@@ -272,9 +272,9 @@ rebase db reset    # löschen und von vorne beginnen
 rebase db branch create <name>
 rebase db branch list
 rebase db branch info <name>
-rebase db branch switch <name>     # daran arbeiten; alle späteren Befehle folgen
-rebase db branch switch            # anzeigen, auf welchem Branch Sie sich befinden
-rebase db branch switch --off      # zurück zur Hauptdatenbank
+rebase db branch switch <name>     # work on it; every later command follows
+rebase db branch switch            # say which branch you are on
+rebase db branch switch --off      # back to the main database
 rebase db branch delete <name>
 rebase db branch prune [--older-than 14d] [--include-dev-diff]
 ```
@@ -313,9 +313,9 @@ Server, mit dem Branches funktionieren.
 ### `rebase apps init` / `rebase apps config`
 
 ```bash
-rebase apps list             # die von diesem Projekt deklarierten Apps
-rebase apps init <name>      # eine neue App in rebase.json registrieren
-rebase apps config <app>     # worauf eine App aufgelöst wird
+rebase apps list             # the apps this project declares
+rebase apps init <name>      # register a new app in rebase.json
+rebase apps config <app>     # what one app resolves to
 ```
 
 ### `rebase status`
@@ -323,8 +323,8 @@ rebase apps config <app>     # worauf eine App aufgelöst wird
 Alles, was dieses Projekt deklariert, und ob die Umgebung es tatsächlich bindet:
 
 ```bash
-rebase status               # jede Ressource und die Variablen, die sie liest
-rebase status --json        # maschinenlesbar
+rebase status               # every resource, and the variables it reads
+rebase status --json        # machine-readable
 ```
 
 ```
@@ -357,10 +357,10 @@ Was dieses Projekt deklariertermaßen benötigt — die Datenbanken, Buckets, To
 Queues, die sein Konfigurationscode anfordert, und die Crons und Funktionen, die seine Dateien definieren:
 
 ```bash
-rebase resources            # auflisten
-rebase resources --write    # rebase.resources.json neu generieren
-rebase resources --check    # fehlschlagen, wenn der committete Graph veraltet ist
-rebase resources --json     # maschinenlesbar
+rebase resources            # list them
+rebase resources --write    # regenerate rebase.resources.json
+rebase resources --check    # fail if the committed graph is stale
+rebase resources --json     # machine-readable
 ```
 
 `rebase resources --check` ist neu — das Flag, das ein CI-Job verwendet, um
