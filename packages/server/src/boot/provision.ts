@@ -18,8 +18,10 @@ import { schemaRecoveryGuidance } from "./version-skew";
  * a green deploy and no failing check anywhere. It stayed that way for weeks.
  *
  * The fix is structural rather than a second copy of the logic in the other
- * path: `initializeRebaseBackend` is the one function BOTH paths go through, so
- * provisioning belongs there, and this module is what it calls.
+ * path: `createRebaseBackend` is the one function every path goes through —
+ * `initializeRebaseBackend` and the bundle boot are compositions of it — so
+ * provisioning belongs there, under its `provision` option, and this module is
+ * what it calls.
  */
 
 /** How the process-wide provisioning attempt turned out. */

@@ -21,7 +21,9 @@ import {
     graphToStorageSources
 } from "./resource-adapters.js";
 
-import { initializeRebaseBackend, type RebaseBackendInstance } from "../init";
+import { createRebaseBackend } from "../backend/create-backend";
+import type { RebaseBackendInstance } from "../init";
+import { installUnhandledRejectionHandler } from "../init/process-safety";
 import { loadCollectionsFromDirectory } from "../collections/loader";
 import type { HonoEnv } from "../api/types";
 import { installRootErrorHandler } from "../api/root-error-handler";
@@ -329,22 +331,37 @@ export async function bootFromBundle(options: BootOptions = {}): Promise<BootedR
     // ── Schema ───────────────────────────────────────────────────────────────
     //
     // Collection tables and their RLS policies are created by
-    // `initializeRebaseBackend`, not here. This is where that used to live, and
-    // living here was the bug: it meant managed tenants got provisioned and
-    // every app that boots by calling `initializeRebaseBackend` directly — its
-    // own image, `runtimeMode: custom` — got nothing, came up serving sign-in,
-    // and 500'd every data route. Provisioning belongs in the function both
-    // paths go through. See ../boot/provision.
+    // `createRebaseBackend`, as its `provision` option says, not here. This is
+    // where that used to live, and living here was the bug: it meant managed
+    // tenants got provisioned and every app that boots by calling the backend
+    // directly — its own image, `runtimeMode: custom` — got nothing, came up
+    // serving sign-in, and 500'd every data route. Provisioning belongs in the
+    // function both paths go through. See ../boot/provision.
     //
     // What stays here is the one diagnosis that needs the bundle to make: a
     // build that produced a config package with no collections directory looks,
     // from inside the runtime, exactly like a project that declared nothing.
     warnOnUnusableBundleShape(bundle);
 
-    const backend = await initializeRebaseBackend({
-        server,
-        app,
-        basePath: env.REBASE_BASE_PATH,
+    // ── Backend ──────────────────────────────────────────────────────────────
+    //
+    // The same public steps `initializeRebaseBackend` is made of, written out
+    // because this process decides two of them itself: what it provisions
+    // (from `REBASE_ROLE`) and where its health routes sit around the mount.
+    //
+    // The image is one tenant's process — on the managed runtime, a process
+    // shared with others — so one floating promise in a function file must not
+    // end it. See `init/process-safety.ts`.
+    installUnhandledRejectionHandler();
+
+    const ownsSchema = options.provisionSchema ?? runtimeRole.provisionSchema;
+    const createdBackend = await createRebaseBackend({
+        // One process provisions. A process that does not own the schema still
+        // keeps the framework's own tables current, as every process always
+        // has; only the collection schema and change capture are left to the
+        // owner. `REBASE_MIGRATE_ON_BOOT=none` turns the collection schema off
+        // on top of this, where the DDL runs.
+        provision: ownsSchema ? true : { collections: false, realtime: false },
         // The schema hooks run before any driver initializes, so they need a
         // stand-in for the result they are declared to take. This path has one
         // — the coordinator opened the connection itself — and passes it
@@ -358,10 +375,6 @@ export async function bootFromBundle(options: BootOptions = {}): Promise<BootedR
         collectionsDir: bundle.collectionsDir,
         functionsDir: bundle.functionsDir,
         cronsDir: bundle.cronsDir,
-        // One process provisions. `bootFromBundle` no longer does this itself —
-        // it moved into `initializeRebaseBackend` so every boot path gets it —
-        // so the role's answer travels as an option rather than as a call here.
-        provisionSchema: options.provisionSchema ?? runtimeRole.provisionSchema,
         surfaces: runtimeRole.surfaces,
         ownership: runtimeRole.ownership,
         functionsSelection: runtimeRole.functionsSelection,
@@ -400,7 +413,7 @@ export async function bootFromBundle(options: BootOptions = {}): Promise<BootedR
         // greyed out "Edit collections" on every scaffold — with no reason
         // anywhere on screen, while the docs said the editor rewrites your
         // TypeScript. `undefined` is not "on": it hands the decision back to
-        // `initializeRebaseBackend`, which already weighs `collectionsDir`,
+        // `createRebaseBackend`, which already weighs `collectionsDir`,
         // `baas` mode and `NODE_ENV`, and reports whichever of those said no.
         schemaEditor: bundle.isSource ? undefined : false,
         // The one way a bundle edits its schema: through a repository it names
@@ -408,6 +421,15 @@ export async function bootFromBundle(options: BootOptions = {}): Promise<BootedR
         // Undefined unless set, which leaves the boot exactly as it was.
         liveSchema
     });
+    createdBackend.mount(app, { basePath: env.REBASE_BASE_PATH });
+    await createdBackend.attachRealtime(server);
+    createdBackend.start();
+    // This process owns the server, so the backend's shutdown drains and
+    // closes it — the signal handlers and `BootedRuntime.shutdown` rely on it.
+    const backend: RebaseBackendInstance = {
+        ...createdBackend,
+        shutdown: (timeoutMs, shutdownOptions) => createdBackend.shutdown(timeoutMs, { server, ...shutdownOptions })
+    };
 
     // Restrict metric labels to collections that exist, now that they do.
     metrics?.setKnownCollections(
@@ -417,7 +439,7 @@ export async function bootFromBundle(options: BootOptions = {}): Promise<BootedR
     );
 
     // ── Health ───────────────────────────────────────────────────────────────
-    // Not part of `initializeRebaseBackend` because it sits outside `basePath`:
+    // Not part of the backend's `mount()` because it sits outside `basePath`:
     // orchestrators probe `/health`, not `/api/health`.
     //
     // Registered under `basePath` as well, because every other route a developer
@@ -1005,7 +1027,7 @@ export function warnOnDriverSkew(
 /**
  * Warn about a bundle whose shape makes provisioning impossible.
  *
- * `initializeRebaseBackend` provisions the collection schema for every boot
+ * `createRebaseBackend` provisions the collection schema for every boot
  * path, and it decides from what actually resolved: a project with no
  * collections reads them from the database and creates nothing. That rule is
  * right, but from inside the runtime it cannot tell "this project declares no

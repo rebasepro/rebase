@@ -131,7 +131,7 @@ describe("the bundle boot reads it", () => {
         // eslint-disable-next-line @typescript-eslint/no-require-imports
         const source: string = require("node:fs").readFileSync(require("node:path").join(__dirname, "../src/boot/boot.ts"), "utf8");
         expect(source).toMatch(/const liveSchema = resolveLiveSchemaOptions\(env\);/);
-        const call = source.slice(source.indexOf("= await initializeRebaseBackend({"));
+        const call = source.slice(source.indexOf("= await createRebaseBackend({"));
         expect(call.slice(0, call.indexOf("\n    });"))).toMatch(/\n\s+liveSchema,?\s*$/);
     });
 });
