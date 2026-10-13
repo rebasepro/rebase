@@ -297,6 +297,28 @@
   naming the field; `user` stays absent unless passed. From
   `@rebasepro/server` and `@rebasepro/common`.
 
+- **Each backend keeps its own state in `backend.services`, and
+  `backend.verifyCredential(token)` checks a credential against it.**
+  `services.jwt` (a `JwtService`: sessions, JWKS, download and purpose
+  tokens), `access` (the access model and the personal-key owner resolver),
+  `apiKeyStore`, `rateLimitStore`, `authLimiters`, `collections()`, `topics` and
+  `queues`. `createJwtService(config)` builds a JWT service on its own, and
+  `JwtService`, `AccessControl`, `AuthLimiters`, `BackendServices` and
+  `JwtConfig` are exported types. Every route group sets `c.var.services`; set
+  it yourself, `c.set("services", backend.services)`, to make a route of your
+  own answer for a backend.
+
+- **`setDefaultBackend` makes a backend built by hand the process default:**
+  the one the module-level API answers for, namely `rebase` outside a request,
+  `verifyAccessToken` and the other JWT helpers, `getAccessModel`,
+  `verifyCredential`, and topics and queues published outside a request.
+  `initializeRebaseBackend` does this for its backend.
+
+- **`installUnhandledRejectionHandler()` is exported,** so a backend built by
+  hand can repeat `initializeRebaseBackend`'s first step. It returns a function
+  that uninstalls the handler, or `undefined` when one was already installed or
+  `REBASE_EXIT_ON_UNHANDLED_REJECTION` is set.
+
 #### Client SDK
 
 - **`findById(id, { include })` and `listenById(id, onUpdate, onError,
@@ -716,7 +738,8 @@
   `SCHEMA_CHANGE_FAILED`, naming the commit, until the commit is deployed.
 
 - **initializeRebaseBackend is now the public steps it stands for:
-  createRebaseBackend, mount, attachRealtime and start.** Its options, routes
+  installUnhandledRejectionHandler, createRebaseBackend, setDefaultBackend,
+  mount, attachRealtime and start.** Its options, routes
   and behaviour are unchanged, and its `shutdown()` still closes the server it
   was given; a backend from `createRebaseBackend` closes one only when passed
   `{ server }`. `RebaseBackendInstance` is now `RebaseBackend`, a superset of
@@ -727,6 +750,23 @@
   not the application's Hono app.** They work wherever, or whether, the routes
   are mounted. Middleware the application added to its own app no longer runs
   on them.
+
+- **Two backends in one process no longer share state.** Each signs and
+  verifies sessions with its own JWT keys, judges scopes by its own access
+  model, checks API keys in its own store and counts rate limits in its own
+  store. `createRebaseBackend` writes no process global; the module-level API
+  answers for the process default, which `configureJwt`, `configureAccess`,
+  `setDefaultBackend` and `initializeRebaseBackend` set. A backend given no
+  `auth.jwtSecret` follows the process default's JWT configuration, as
+  before.
+
+- **Inside a request, cron run or job a backend serves, rebase (imported or
+  ctx.rebase), topic publish and queue enqueue reach that backend.** Anywhere
+  else they reach the process default.
+
+- **createRebaseBackend sets the log level only when logging.level is
+  given;** the logger is process-wide, and building a backend no longer resets
+  it to `LOG_LEVEL`.
 
 #### Postgres
 
@@ -869,6 +909,11 @@
   other path is left to the host app's own `upgrade` listeners, or answered
   404 when there are none. Before, the socket took every upgrade on the
   server (see Fixed).
+
+- **The realtime socket verifies sessions and reads roles through what the
+  server passes it,** `verifyAccessToken` and `accessModel` on
+  `RealtimeSocketOptions`, so it uses its own backend's keys and access model.
+  A socket built by hand without them uses the process default.
 
 #### Admin (CMS & app)
 
@@ -1406,6 +1451,10 @@
 
 - **`GET /api/auth/config` is no longer served by a process with the auth
   surface off,** such as the `functions` and `worker` roles.
+
+- **A functions record of what defineFunction returns typechecks:**
+  `functions: { "send-invoice": defineFunction(…) }` was refused, because
+  `FunctionApp` was `Hono<Env>`; it is `Hono<HonoEnv>`.
 
 #### Postgres
 
