@@ -58,7 +58,7 @@ describe("driver.data resolves accessors through the registry", () => {
         // The scoped driver reads inside its own transaction; only the address
         // it asks for is under test here.
         Object.defineProperty(scoped, "restFetchService", { get: () => fetchService });
-        await accessor(scoped.data, "myNotes").findById("n1");
+        await accessor("data" in scoped ? scoped.data : undefined, "myNotes").findById("n1");
         expect(paths).toEqual(["my-notes"]);
     });
 });
