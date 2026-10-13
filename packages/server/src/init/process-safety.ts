@@ -34,8 +34,13 @@ type GlobalWithHandler = typeof globalThis & {
  *
  * Set `REBASE_EXIT_ON_UNHANDLED_REJECTION=1` to restore Node's default.
  *
- * @returns An uninstall function (used by tests), or `undefined` when nothing
- * was installed.
+ * `initializeRebaseBackend` calls it first. A process that builds its backend
+ * with `createRebaseBackend` calls it itself if it wants the same — it is the
+ * process's decision, not a backend's. Idempotent across every copy of this
+ * package in the process.
+ *
+ * @returns An uninstall function, or `undefined` when nothing was installed
+ * (already installed, or switched off by the variable).
  */
 export function installUnhandledRejectionHandler(): (() => void) | undefined {
     if (parseEnvBoolean(process.env.REBASE_EXIT_ON_UNHANDLED_REJECTION) === true) return undefined;

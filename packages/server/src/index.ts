@@ -447,6 +447,11 @@ export { serveSPA } from "./serve-spa";
 // Graceful shutdown
 // =============================================================================
 export { installShutdownHandlers } from "./init/shutdown";
+// The first of `initializeRebaseBackend`'s steps: a floating promise in a
+// function file is logged rather than ending the process. Process-wide, so a
+// backend built with `createRebaseBackend` leaves it to the caller that owns
+// the process.
+export { installUnhandledRejectionHandler } from "./init/process-safety";
 export type { ShutdownHandlerOptions } from "./init/shutdown";
 
 // =============================================================================
