@@ -1667,6 +1667,14 @@ function timeAgo(date: Date): string {
 
 
 /**
+ * Whether DATABASE_URL is the managed development database (PGlite), as the
+ * CLI resolved it and says in `REBASE_DEV_DATABASE_KIND`.
+ */
+function managedDatabase(): boolean {
+    return process.env.REBASE_DEV_DATABASE_KIND === "managed";
+}
+
+/**
  * The Atlas scratch database this process created, dropped once the db
  * command that needed it succeeds — see `ScratchDatabase`.
  */
@@ -1857,6 +1865,14 @@ async function runAtlas(
 
     const atlasArgs = buildAtlasArgs({ domain, args, url: atlasUrl, devUrl: atlasDevUrl, excludes });
 
+    // On the managed database a connection is the scarce thing. PGlite is one
+    // session behind a socket server that accepts only a few, a running
+    // `rebase dev` holds some of them, and `schema apply` opens two. The one
+    // over the limit is closed unanswered, and Atlas says only `Error: EOF`.
+    // So the connection this process keeps between steps is let go while Atlas
+    // runs; the next step opens another, which locally costs milliseconds.
+    if (managedDatabase()) await closeAppClients();
+
     // Stream stdout live but tee stderr so we can inspect Atlas's error text
     // for known, actionable failure modes (e.g. a dependency-drop that leaves
     // the schema half-applied) after the process exits. When capturing (used
@@ -1899,7 +1915,8 @@ async function runAtlas(
             args,
             stderr: stderrText,
             databaseUrl,
-            latestMigrationVersion: latestMigrationVersion()
+            latestMigrationVersion: latestMigrationVersion(),
+            managedDatabase: managedDatabase()
         });
         const hint = atlasHint ?? diagnoseDbError({ message: stderrText }, databaseUrl);
         if (hint) {

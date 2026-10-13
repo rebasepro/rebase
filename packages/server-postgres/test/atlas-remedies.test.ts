@@ -22,6 +22,8 @@ import {
     diagnoseAtlasFailure,
     failedStatementTable,
     formatBaselineRemedy,
+    formatConnectionEofBanner,
+    parseConnectionEof,
     formatGeneratedColumnRefusalBanner,
     formatEnumLabelDropBanner,
     formatNotNullViolationBanner,
@@ -347,5 +349,54 @@ describe("an Atlas failure with no known remedy", () => {
             args: ["apply"],
             stderr: "Error: something nobody has classified yet"
         })).toBeNull();
+    });
+});
+
+/**
+ * A connection closed before the database answered.
+ *
+ * The first `rebase db push --dry-run` on the managed database after `rebase
+ * dev` started printed only `Error: EOF` and `✗ atlas schema apply … failed`.
+ * Reproduced against the managed daemon's own layout (PGlite behind the
+ * notification proxy, four connections allowed): with three held, as a running
+ * dev server and the push's own connection do, Atlas's second connection is
+ * closed unanswered.
+ */
+describe("Atlas losing its connection", () => {
+    it("recognises the bare EOF, and the one with the step in front", () => {
+        expect(parseConnectionEof("Error: EOF\n")).toBe(true);
+        expect(parseConnectionEof("Error: postgres: querying system variables: EOF")).toBe(true);
+    });
+
+    it("is not fooled by an EOF that is about a file", () => {
+        expect(parseConnectionEof("Error: parse schema.sql: unexpected EOF")).toBe(false);
+        expect(parseConnectionEof("Error: pq: syntax error at end of input (42601)")).toBe(false);
+    });
+
+    it("names the managed database's connection limit and says to run it again", async () => {
+        const hint = await diagnoseAtlasFailure({
+            domain: "schema",
+            args: ["apply", "--to", "file://.rebase/sql/schema.sql", "--dry-run"],
+            stderr: "Error: EOF\n",
+            managedDatabase: true
+        });
+
+        expect(hint).toContain("Atlas lost its connection to the database (EOF)");
+        expect(hint).toContain("rebase dev");
+        expect(hint).toContain("Run the command again");
+    });
+
+    it("names what closes connections on a real server", () => {
+        const banner = formatConnectionEofBanner(false);
+        expect(banner).toContain("a restart, a connection limit, or a reaper for idle connections");
+        expect(banner).not.toContain("managed development database");
+    });
+
+    it("fires for migrate as well as push", async () => {
+        expect(await diagnoseAtlasFailure({
+            domain: "migrate",
+            args: ["apply", "--dir", "file://drizzle/migrations"],
+            stderr: "Error: EOF"
+        })).toContain("lost its connection");
     });
 });

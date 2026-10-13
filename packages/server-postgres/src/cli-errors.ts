@@ -443,6 +443,55 @@ export function formatBaselineRemedy(version: string | null, object?: string, fa
     );
 }
 
+/**
+ * Atlas's whole report when a connection was closed before it answered:
+ * `Error: EOF`, sometimes with the step in front (`Error: postgres: querying
+ * system variables: EOF`). The line names neither the database nor the
+ * connection, so on its own it reads like a crash.
+ */
+export function parseConnectionEof(text: string): boolean {
+    return /^Error: (?:.*: )?EOF\s*$/m.test(text);
+}
+
+/**
+ * What a closed connection means, and that running the command again is safe.
+ *
+ * On the managed development database it is almost always the connection
+ * limit. PGlite is one session behind a socket server that accepts only a few
+ * connections; a running `rebase dev` holds some, `atlas schema apply` opens
+ * two, and the one over the limit is closed unanswered. Measured: with the
+ * daemon's limit of four and three held, `db push --dry-run` failed with a
+ * bare `Error: EOF`; with two held it passed. The dev server's pool lets an
+ * idle connection go after 30 seconds (`idleTimeoutMillis` in connection.ts),
+ * which is why a later attempt usually works.
+ */
+export function formatConnectionEofBanner(managed: boolean): string {
+    const why = managed
+        ? `  The managed development database accepts only a few connections at a\n` +
+          `  time, and a running ${chalk.bold("rebase dev")} holds some of them. Atlas opened one more,\n` +
+          `  and it was closed before the database answered.\n`
+        : `  The server, or a proxy or pooler in front of it, closed the connection:\n` +
+          `  a restart, a connection limit, or a reaper for idle connections.\n`;
+    const next = managed
+        ? `  Run the command again in a moment: it is safe to repeat, and the dev\n` +
+          `  server lets an idle connection go after 30 seconds. If it keeps failing,\n` +
+          `  stop ${chalk.bold("rebase dev")} while you run it.\n`
+        : `  Run the command again: it is safe to repeat. If it keeps failing, check\n` +
+          `  the server's connection limit and that it is up: ${chalk.bold("rebase doctor")}.\n`;
+    return (
+        `\n` +
+        `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+        `  ❌  Atlas lost its connection to the database (EOF)\n` +
+        `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+        `\n` +
+        why +
+        `\n` +
+        next +
+        `\n` +
+        `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`
+    );
+}
+
 /** `ALTER TABLE … SET NOT NULL` on a table that already holds rows (23502). */
 export function parseNotNullViolation(text: string): { table: string; column: string } | null {
     const match = /column "([^"]+)" of relation "([^"]+)" contains null values/.exec(text);
@@ -903,8 +952,12 @@ export async function diagnoseAtlasFailure(context: {
     databaseUrl?: string;
     /** The newest migration version on disk, named in the baseline remedy. */
     latestMigrationVersion?: string | null;
+    /** DATABASE_URL is the managed development database (PGlite). */
+    managedDatabase?: boolean;
 }): Promise<string | null> {
     const { domain, args, stderr, databaseUrl } = context;
+
+    if (parseConnectionEof(stderr)) return formatConnectionEofBanner(context.managedDatabase === true);
 
     if (domain === "migrate" && args.includes("apply")) {
         const provisioned = parseAlreadyProvisioned(stderr);
