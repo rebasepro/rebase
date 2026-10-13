@@ -1,15 +1,22 @@
 ---
 sourceHash: b807a42cae57ce6e
 title: Integrazione Server Personalizzato
-sidebar_label: Server Personalizzato (Express)
-description: Come integrare i servizi Rebase Database e Realtime nel tuo backend Node.js personalizzato senza utilizzare Hono o il coordinator di Rebase.
+sidebar_label: Server Personalizzato
+description: Costruisci il backend Rebase da componenti pubblici nel tuo server — createRebaseBackend, i suoi gruppi di rotte, mount, attachRealtime e start — oppure incorpora il driver Postgres in Express.
 ---
 
 # Integrazione Server Personalizzato
 
-Rebase è stato progettato per essere completamente modulare. Sebbene il coordinator `initializeRebaseBackend` fornisca un backend completo "chiavi in mano" basato su Hono, puoi bypassarlo del tutto e incorporare il **Database Adapter** principale e i **Realtime WebSocket** direttamente nella tua applicazione Node.js personalizzata (come Express, Fastify o semplicemente Node.js HTTP).
+`initializeRebaseBackend` è una scorciatoia. Costruisce l'intero backend, lo monta
+sulla tua app Hono sotto `/api`, aggancia il socket realtime al tuo server HTTP e
+avvia il lavoro in background, in una sola chiamata. Quando è ciò che vuoi,
+usala.
 
-Il pacchetto `@rebasepro/server-postgres` è completamente agnostico rispetto al framework. Dipende unicamente da Drizzle ORM e dal modulo standard `http.Server` di Node.js.
+Quando non lo è, scendi di un gradino. Ogni parte di quella chiamata è un componente
+pubblico che puoi chiamare tu stesso: costruisci il backend, poi monta tutto o solo
+i gruppi di rotte che vuoi, ai percorsi che vuoi, e decidi quale processo avvia i
+timer. L'ultima sezione va un passo oltre e incorpora il solo driver Postgres in
+un'app Express.
 
 ## Configurazione dell'Ambiente
 
@@ -63,80 +70,336 @@ e validarlo solo a metà.
 
 Consulta `.env.example` nell'applicazione generata tramite scaffolding per l'elenco completo delle variabili supportate.
 
-## Utilizzo di Rebase con Express
+## Un gradino sotto `initializeRebaseBackend`
 
-Di seguito è riportato un esempio completo su come inizializzare l'adapter PostgreSQL di Rebase e i Realtime WebSocket all'interno di un'applicazione standard Express, gestire le read replica, accedere direttamente a Drizzle e implementare una terminazione corretta del server (graceful shutdown).
+<span class="since-badge" data-since="0.25">Da 0.25</span> Su 0.24,
+`initializeRebaseBackend` è l'unico ingresso, e nessuno dei componenti qui sotto è
+esportato.
+
+`initializeRebaseBackend` è queste chiamate, e nient'altro:
+
+```typescript
+import { createRebaseBackend, installUnhandledRejectionHandler, setDefaultBackend } from "@rebasepro/server";
+
+installUnhandledRejectionHandler();
+const backend = await createRebaseBackend({ ...options, provision: true });
+setDefaultBackend(backend);
+backend.mount(app, { basePath: "/api" });
+await backend.attachRealtime(server);
+backend.start();
+```
+
+Lo `shutdown()` che restituisce chiude anche il server che gli è stato passato. Ecco la
+stessa cosa scritta per esteso in un server tuo, pronta da modificare:
+
+```typescript
+import { createServer } from "node:http";
+import { Hono } from "hono";
+import { getRequestListener } from "@hono/node-server";
+import {
+    createRebaseBackend,
+    installShutdownHandlers,
+    installUnhandledRejectionHandler,
+    setDefaultBackend,
+    type HonoEnv
+} from "@rebasepro/server";
+import { createPostgresAdapter, createPostgresDatabaseConnection } from "@rebasepro/server-postgres";
+import { collections } from "./collections";
+
+installUnhandledRejectionHandler();
+
+const app = new Hono<HonoEnv>();
+const server = createServer({ maxHeaderSize: 64 * 1024 }, getRequestListener(app.fetch));
+const { db, pool, connectionString } = createPostgresDatabaseConnection(process.env.DATABASE_URL!);
+
+const backend = await createRebaseBackend({
+    collections,
+    database: createPostgresAdapter({ connection: db, connectionString }),
+    auth: { jwtSecret: process.env.JWT_SECRET! },
+    provision: true
+});
+
+setDefaultBackend(backend);
+backend.mount(app, { basePath: "/api" });
+await backend.attachRealtime(server);
+backend.start();
+
+server.listen(3000);
+installShutdownHandlers(
+    { shutdown: (timeoutMs) => backend.shutdown(timeoutMs, { server }) },
+    { onCleanup: () => pool.end() }
+);
+```
+
+`createRebaseBackend` accetta le stesse opzioni di `initializeRebaseBackend`, senza
+`app`, `server` e `basePath`, e con `provision` obbligatorio. Costruisce tutto: apre il
+database, configura autenticazione e storage, carica le funzioni e i cron job, e
+costruisce ogni gruppo di rotte e il client in-process. Non monta nulla, non avvia alcun
+timer e non aggiunge alcun listener di processo. Ognuna delle altre è una chiamata che
+fai tu, oppure ometti:
+
+| Chiamata | Cosa fa | Se la ometti |
+|---|---|---|
+| `installUnhandledRejectionHandler()` | Registra nei log una promise rejection che nessuno ha gestito, come una chiamata fire-and-forget in una funzione personalizzata, invece di lasciare che Node termini il processo. Vale per l'intero processo, quindi è una decisione del processo, non di un backend. Restituisce una funzione che lo disinstalla, oppure `undefined` se ne era già installato uno o se `REBASE_EXIT_ON_UNHANDLED_REJECTION` è impostata. | una rejection non gestita termina il processo, il comportamento predefinito di Node |
+| `setDefaultBackend(backend)` | Rende questo backend il [default del processo](#più-backend-nello-stesso-processo): ciò a cui rispondono `import { rebase }` e il resto dell'API a livello di modulo fuori dalle richieste, dalle esecuzioni cron e dai job che un backend serve | quell'API non ha alcun backend a cui rispondere lì |
+| `backend.mount(app, { basePath })` | Ogni gruppo di rotte sotto `basePath` (predefinito `/api`), dietro il middleware valido per l'intero processo: id delle richieste, limite del corpo, compressione, CSRF, log delle richieste e envelope JSON per gli errori e i percorsi sconosciuti. Inoltre il documento JWKS, il server MCP, la documentazione OpenAPI e gli alias di rotta legacy. | nulla viene servito via HTTP; `backend.rebase` e `backend.fetch` funzionano comunque |
+| `backend.attachRealtime(server, { path })` | Il socket realtime, su `server`, che risponde solo agli upgrade su `path` | non ci sono query live |
+| `backend.start()` | Lo scheduler cron, i worker dei job, le pulizie dei token scaduti e della retention della cronologia, il campionatore delle metriche e l'audit RLS pianificato, ciascuno dove `ownership` lo assegna a questo processo. Si può chiamare due volte senza rischi. | nessuno di essi viene eseguito, ed è ciò che vuole un processo che serve richieste in un [deployment a processi suddivisi](/docs/deployment/split-processes/) |
+| `backend.shutdown(timeoutMs, { server })` | Ferma ciò che `start()` e `attachRealtime()` hanno avviato, attendendo le esecuzioni cron e i job in corso. Chiude `server` solo se lo passi. | |
+
+Il `path` predefinito del socket è il percorso base passato a `mount()` privato di un
+`/api` finale, quindi `/api` dà `/` e `/x/api` dà `/x`. È lì che si connette l'SDK,
+perché si collega al proprio `baseUrl` mentre le sue richieste HTTP vanno a
+`${baseUrl}/api`. Un upgrade verso qualsiasi altro percorso viene lasciato agli altri
+listener `upgrade` del server, quindi la tua app può eseguire un proprio server
+WebSocket sullo stesso `http.Server`.
+
+### Cosa può cambiare la creazione di un backend: `provision`
+
+<span class="since-badge" data-since="0.25">Da 0.25</span>
+
+La creazione di un backend può eseguire DDL, quindi `createRebaseBackend` ti chiede di
+decidere:
+
+| `provision` | Crea | Per |
+|---|---|---|
+| `true` | Tutto ciò che il backend serve: le tabelle delle collection e le loro policy RLS, l'acquisizione delle modifiche per il realtime, il ruolo con cui girano le richieste e le tabelle del framework (chiavi API, esecuzioni cron, job, metriche). | un deployment a processo singolo; ciò che passa `initializeRebaseBackend` |
+| `false` | Nulla. Lo schema deve essere già presente, applicato da `rebase db push`, da una migrazione o da un altro processo. Una tabella mancante fa fallire la chiamata nel momento in cui viene usata. | uno script, un test, un REPL, un processo che si limita a leggere |
+| `{ collections: false, realtime: false }` | Le tabelle del framework e il ruolo, ma non lo schema delle collection né l'acquisizione delle modifiche. | un processo che, in un deployment suddiviso, non possiede lo schema |
+
+È un'opzione e non un passaggio successivo, di proposito. Il driver legge le tabelle
+mentre si apre e collega l'acquisizione delle modifiche a quelle che esistono in quel
+momento. Un `provision()` chiamato dopo verrebbe eseguito quando il driver ha già
+deciso che cosa esiste. `REBASE_MIGRATE_ON_BOOT=none` continua a disattivare lo schema
+delle collection per qualsiasi backend del processo.
+
+## Montare solo i gruppi che vuoi
+
+<span class="since-badge" data-since="0.25">Da 0.25</span>
+
+`backend.routes` contiene i gruppi di rotte. Ciascuno è una sotto-app Hono che puoi
+montare da sola, a qualsiasi percorso:
+
+```typescript
+import { Hono } from "hono";
+import { createRebaseBackend, type HonoEnv } from "@rebasepro/server";
+
+const app = new Hono<HonoEnv>();
+const backend = await createRebaseBackend({ database: adapter, auth, collections, functions, provision: true });
+
+app.route("/v2/data", backend.routes.data());      // the data API, at a path of your own
+app.route("/hooks", backend.routes.functions());   // getUser(c) and getDriver(c) work inside
+```
+
+| Gruppo | Normalmente a | Serve |
+|---|---|---|
+| `routes.auth()` | `/api/auth` | accesso, sessioni, OAuth, reimpostazione della password, `GET /config`, le chiavi API personali del chiamante e il catalogo degli scope |
+| `routes.data()` | `/api/data` | le rotte REST delle collection e la loro cronologia |
+| `routes.storage()` | `/api/storage` | lo storage dei file, oppure il router che risponde `STORAGE_NOT_CONFIGURED` |
+| `routes.functions()` | `/api/functions` | le tue [funzioni personalizzate](/docs/backend/custom-functions/), oppure il forwarder verso il processo che le serve |
+| `routes.admin()` | `/api/admin` | utenti e ruoli, chiavi di servizio, modifica dello schema, manutenzione dello storage, backup, l'audit RLS, l'export SQL, la casella di posta di sviluppo e i log |
+| `routes.cron()` | `/api/admin/cron` | la superficie di amministrazione del cron |
+| `routes.meta()` | `/api/meta` | il contratto del progetto che legge un SDK generato |
+
+Ogni gruppo porta con sé il middleware di cui ha bisogno: il contesto di autenticazione
+che mette `user`, `driver` e `scopes` del chiamante sulla richiesta, i suoi rate limit e
+il suo controllo d'accesso admin. Quindi risponde allo stesso modo ovunque sia montato,
+anche sotto un percorso parametrizzato come `/:tenant/data`. Un gruppo legge anche dove
+è stato montato, così l'API dei dati instrada ancora ogni collection verso la sua
+sorgente dati e l'elenco delle funzioni riporta i percorsi a cui sono realmente servite.
+
+Ciò che un gruppo non porta con sé è il middleware valido per l'intero processo che
+`mount()` mette davanti a tutto. Montando i gruppi uno per uno, aggiungi tu ciò che ti
+serve: un limite del corpo (`bodyLimit` da `hono/body-limit`), la compressione e
+l'envelope JSON degli errori:
+
+```typescript
+import { errorHandler } from "@rebasepro/server";
+
+app.onError(errorHandler);
+```
+
+Ogni chiamata restituisce un router nuovo sugli stessi handler, quindi puoi montare un
+gruppo in due posti. Chiedere un gruppo la cui superficie questo backend è stato creato
+senza (`surfaces: { data: false }`) genera un errore, perché il backend non l'ha mai
+costruito. La documentazione OpenAPI e il server MCP non hanno un gruppo: descrivono gli
+URL del layout di `mount()`, quindi li serve solo `mount()`.
+
+## Il backend senza un server
+
+<span class="since-badge" data-since="0.25">Da 0.25</span>
+
+Un backend che hai costruito può essere usato senza montare nulla. `backend.rebase` è il
+suo client in-process, e `backend.fetch(request)` risponde a una `Request` come farebbe
+`mount()` su `/api`:
+
+```typescript
+const backend = await createRebaseBackend({ database: adapter, collections, provision: false });
+
+const { data } = await backend.rebase.dataAsAdmin.posts.find({ limit: 5 });
+const res = await backend.fetch(new Request("http://local/api/meta/schema-version"));
+
+await backend.shutdown();
+```
+
+Le chiamate del piano di controllo su quel client (`rebase.auth`, `rebase.admin`,
+`rebase.functions` e `rebase.cron`) raggiungono in-process le rotte del backend stesso.
+Funzionano ovunque, o a prescindere dal fatto che tu abbia montato i gruppi, e il
+middleware che hai aggiunto alla tua app non viene eseguito su di esse.
+
+Per uno script che ha bisogno solo dei dati, [`openRebase`](/docs/backend/scripts/)
+apre il database senza costruire affatto un backend.
+
+## Più backend nello stesso processo
+
+<span class="since-badge" data-since="0.25">Da 0.25</span> Su 0.24 la configurazione
+JWT, il modello di accesso, l'archivio delle chiavi API, l'archivio dei rate limit e
+`rebase` sono globali di processo, e vince l'ultimo backend costruito, per tutti.
+
+`createRebaseBackend` non scrive alcun globale di processo. Ogni backend tiene il proprio
+stato in `backend.services`, quindi due backend nello stesso processo restano due:
+ciascuno firma e verifica le sessioni con le proprie chiavi, valuta gli scope in base ai
+propri ruoli, controlla le chiavi API nel proprio archivio e conta i rate limit nel
+proprio archivio.
+
+```typescript
+const a = await createRebaseBackend({ database: adapterA, auth: { jwtSecret: SECRET_A }, collections, provision: true });
+const b = await createRebaseBackend({ database: adapterB, auth: { jwtSecret: SECRET_B }, collections, provision: true });
+
+app.route("/a/data", a.routes.data());
+app.route("/b/data", b.routes.data());   // a session from `a` is a 401 here
+```
+
+| `backend.services` | Che cos'è |
+|---|---|
+| `jwt` | Il servizio JWT del backend: firma e verifica sessioni, link di download e i suoi altri token, e serve il proprio JWKS |
+| `access` | Il suo modello di accesso (da ruoli a scope) e il resolver per il proprietario di una chiave personale |
+| `apiKeyStore` | Dove vengono controllate le sue chiavi API |
+| `rateLimitStore`, `authLimiters` | I suoi contatori dei rate limit, e i limiter sulle sue rotte di autenticazione |
+| `collections()` | Le collection che serve |
+| `topics`, `queues` | I suoi runtime di topic e di code |
+
+Un backend a cui non è stato dato alcun `auth.jwtSecret`, come uno il cui `auth` è un
+adapter, non firma nulla di suo, quindi il suo `services.jwt` segue il default del
+processo.
+
+**Dove va `rebase`.** All'interno di una richiesta, di un'esecuzione cron o di un job che
+un backend serve, `rebase`, sia importato da `@rebasepro/server` sia ricevuto come
+`ctx.rebase`, è quel backend, e lo sono anche `publish` di un topic ed `enqueue` di una
+coda. Altrove (ambito del modulo, uno script, un test) rispondono per il **default del
+processo**, che imposta `setDefaultBackend(backend)` e che `initializeRebaseBackend`
+imposta sul proprio backend. Lo stesso vale per il resto dell'API a livello di modulo:
+`verifyAccessToken` e gli altri helper JWT, `getAccessModel`, `verifyCredential` ed
+`extractUserFromToken`.
+
+Tre componenti lavorano direttamente su un backend, e uno su nessun backend:
+
+```typescript
+import { createJwtService, requireScope } from "@rebasepro/server";
+
+// Mint a session for this backend, in a test or a login of your own.
+const token = await backend.services.jwt.generateAccessToken("u1", ["editor"]);
+
+// Check a session token or an rk_ API key against this backend, for a socket
+// or a tunnel of your own: its uid, roles, scopes and kind, or null.
+const caller = await backend.verifyCredential(token);
+
+// A route of your own, outside the groups, judged by this backend.
+app.post("/deploy", (c, next) => { c.set("services", backend.services); return next(); },
+    requireScope("project:deploy"), (c) => c.json({ ok: true }));
+
+// A JWT service on its own.
+const jwt = createJwtService({ secret: process.env.JWT_SECRET!, accessExpiresIn: "15m" });
+const payload = await jwt.verifyAccessToken(token);
+```
+
+Ogni gruppo di rotte imposta da sé `c.var.services`. Una rotta fuori dai gruppi che usa
+`requireAuth`, `requireScope` o un altro guard di `@rebasepro/server` lo legge da lì, e
+ripiega sul default del processo quando non è impostato.
+
+## Arresto
+
+<span class="since-badge" data-since="0.25">Da 0.25</span> Un backend creato con
+`createRebaseBackend` è una novità; il resto di questa sezione vale anche per 0.24.
+
+Da `initializeRebaseBackend`, passa il backend all'helper integrato invece di scrivere un
+signal handler. Svuota le richieste HTTP, arresta lo scheduler cron, smonta il realtime,
+chiude il pool SMTP quando nulla può più inviare, protegge da segnali ripetuti ed esce
+forzatamente se l'arresto si blocca:
+
+```typescript
+import { initializeRebaseBackend, installShutdownHandlers } from "@rebasepro/server";
+
+const backend = await initializeRebaseBackend({ app, server, database: adapter, collections });
+installShutdownHandlers(backend, { onCleanup: () => pool.end() });
+```
+
+**Non** combinarlo con un tuo `server.close()`: lo `shutdown()` di quel backend chiude
+già il server che gli è stato passato, e una seconda chiusura porta a un deadlock. Un
+backend creato con `createRebaseBackend` chiude un server solo quando glielo passi,
+`backend.shutdown(timeoutMs, { server })`, come nell'esempio in cima a questa pagina.
+
+## Incorporare il driver Postgres in Express
+
+Un passo più in basso, `@rebasepro/server-postgres` funziona senza alcun server Rebase.
+Dipende da Drizzle e dall'`http.Server` di Node, quindi puoi aprire il driver dei dati e
+il socket realtime dentro Express, Fastify o Node semplice. A questo livello assembli tu
+il backend: non ci sono rotte di autenticazione, né storage, né API di amministrazione, a
+meno che non le costruisca tu.
 
 ### 1. Installazione
-
-Installa i pacchetti core richiesti insieme a Express:
 
 ```bash
 npm install @rebasepro/server-postgres @rebasepro/types express pg
 ```
 
-### 2. Esempio di Inizializzazione e Graceful Shutdown
+### 2. Aprire il driver e il socket
+
+<span class="since-badge" data-since="0.25">Da 0.25</span> `openPostgresDriver`
+e `postgresDriverConfigFromEnv` sono esportati. Su 0.24, apri il driver con
+`createPostgresBootstrapper(pgConfig).initializeDriver(…)`, il cui `internals` non è
+tipizzato.
 
 ```typescript
 import express from "express";
-import { createServer } from "http";
-import pg from "pg";
-import { createPostgresBootstrapper } from "@rebasepro/server-postgres";
+import { createServer } from "node:http";
+import { sql } from "drizzle-orm";
+import {
+    createPostgresDatabaseConnection,
+    createPostgresWebSocket,
+    openPostgresDriver,
+    postgresDriverConfigFromEnv
+} from "@rebasepro/server-postgres";
+import { collections } from "./collections";
 
 async function startServer() {
     const app = express();
-    
-    // 1. WebSocket Upgrade Guard
-    // WebSockets require hijacking the HTTP Upgrade header. You must bind
-    // Rebase to a raw Node.js http.Server instance. 64 KB of headers, as the
-    // Rebase runtime takes: a vector search in the URL outgrows Node's 16 KB.
+
+    // The socket needs the raw http.Server, so listen on it, not on app.listen.
+    // 64 KB of headers, as the Rebase runtime takes: a vector search in the URL
+    // outgrows Node's 16 KB.
     const server = createServer({ maxHeaderSize: 64 * 1024 }, app);
 
-    // 2. Configure the connection pool
-    const pool = new pg.Pool({
-        connectionString: process.env.DATABASE_URL,
-        max: 20, // Max concurrent database connections
-        idleTimeoutMillis: 30000
-    });
+    const { db, pool, connectionString } = createPostgresDatabaseConnection(process.env.DATABASE_URL!);
 
-    // 3. Initialize the Postgres Bootstrapper
-    const bootstrapper = createPostgresBootstrapper({
-        connection: pool,
-        connectionString: process.env.DATABASE_URL,
-        adminConnectionString: process.env.ADMIN_CONNECTION_STRING, // Required for branching
-        schema: {
-            tables: {},   // Place your custom Drizzle tables here
-            relations: {} // Place your custom Drizzle relations here
-        }
-    });
+    // The environment, read the way the Rebase server's boot reads it:
+    // DATABASE_READ_URL, DATABASE_DIRECT_URL and the REALTIME_* variables.
+    // Leave this call out and the driver reads no environment variable at all.
+    const pgConfig = postgresDriverConfigFromEnv({ connection: db, connectionString });
 
-    // 4. Initialize the Driver and Services
-    // Connects to Postgres, verifies connection, starts cross-instance listeners
-    const { driver, realtimeProvider, internals } = await bootstrapper.initializeDriver({
-        collections: [] // Pass Rebase CollectionConfigs if using schema-as-code
-    });
+    // `provision: false` if the schema is applied elsewhere (`rebase db push`).
+    const { driver, internals } = await openPostgresDriver(pgConfig, { collections });
 
-    // Access the underlying schema-aware Drizzle client if needed.
-    // `internals` is an *opaque handle* on the DatabaseAdapter contract — the shape is
-    // the driver's business, so narrow it to what the Postgres bootstrapper puts there.
-    // (named `driverInternals` rather than `pg`, which is the node-postgres import)
-    const driverInternals = internals as {
-        db: any;                                    // Drizzle NodePgDatabase
-        readDb?: any;                               // Read replica, when DATABASE_READ_URL is set
-        poolManager?: { destroy(): Promise<void> };
-    };
-    const db = driverInternals.db;
-    const readDb = driverInternals.readDb;
-
-    // 5. Mount Realtime WebSockets
-    // Both halves are optional on the contract: a driver need not create a
-    // realtime provider, and a bootstrapper need not serve websockets at all.
-    if (!realtimeProvider || !bootstrapper.initializeWebsockets) {
-        throw new Error("This driver does not support realtime websockets.");
-    }
-    await bootstrapper.initializeWebsockets(server, realtimeProvider, driver, {
-        requireAuth: true // Enforces authentication token checks
-    });
+    // The realtime socket. It answers upgrades on `path` only, so a WebSocket
+    // server of your own can share the same http.Server.
+    createPostgresWebSocket(
+        server,
+        internals.realtimeService,
+        internals.driver,
+        { requireAuth: true, jwtSecret: process.env.JWT_SECRET },
+        undefined,
+        { path: "/" }
+    );
 
     app.use(express.json());
 
@@ -144,7 +407,7 @@ async function startServer() {
         res.json({ status: "healthy" });
     });
 
-    // Direct Driver CRUD Operation
+    // A write through the driver
     app.post("/api/products", async (req, res) => {
         try {
             const result = await driver.save({
@@ -158,49 +421,28 @@ async function startServer() {
         }
     });
 
-    // Raw Drizzle SQL Execution (RLS bypass)
+    // Drizzle directly, typed: `internals.db`, and `internals.readDb` when a
+    // read replica is configured.
     app.get("/api/stats", async (req, res) => {
-        try {
-            const countResult = await db.select().from(...); // Perform standard Drizzle operations
-            res.json(countResult);
-        } catch (error) {
-            res.status(500).json({ error: error instanceof Error ? error.message : "Internal Server Error" });
-        }
+        const result = await internals.db.execute(sql`select count(*) from products`);
+        res.json(result.rows);
     });
 
-    // Start listening (Using the HTTP Server, NOT app.listen)
     const port = process.env.PORT || 3000;
-    server.listen(port, () => {
-        console.log(`🚀 Server and WebSocket engine running on port ${port}`);
-    });
+    server.listen(port);
 
-    // 6. Graceful Shutdown Handler
-    // Terminate listeners and drain connection pools on process termination signals
-    const handleShutdown = async (signal: string) => {
-        console.log(`\nShutdown triggered via ${signal}. Cleaning up resources...`);
-        
+    // Graceful shutdown: stop listening, stop the LISTEN client, evict branch
+    // pools, then end the main pool.
+    const handleShutdown = (signal: string) => {
+        console.log(`Shutdown triggered via ${signal}.`);
         server.close(async () => {
-            console.log("✔ HTTP Server closed.");
             try {
-                // Terminate cross-instance pg LISTEN/NOTIFY client
-                if (realtimeProvider && typeof realtimeProvider.stopListening === "function") {
-                    await realtimeProvider.stopListening();
-                    console.log("✔ Realtime listeners stopped.");
-                }
-
-                // Disconnect dynamic branch connection pools
-                if (driverInternals.poolManager) {
-                    await driverInternals.poolManager.destroy();
-                    console.log("✔ Branch connection pools evicted.");
-                }
-
-                // End the main database pool
+                await internals.realtimeService.stopListening();
+                await internals.poolManager?.shutdown();
                 await pool.end();
-                console.log("✔ Database connection pool drained.");
-
                 process.exit(0);
             } catch (err) {
-                console.error("❌ Error during graceful shutdown:", err);
+                console.error("Error during graceful shutdown:", err);
                 process.exit(1);
             }
         });
@@ -213,29 +455,26 @@ async function startServer() {
 startServer();
 ```
 
-> **Percorso standard:** se il tuo server utilizza `initializeRebaseBackend` (come nel template di scaffolding), non implementare manualmente l'handler di shutdown mostrato sopra: usa invece l'helper integrato. Questo si occupa di svuotare le richieste HTTP, arrestare il cron scheduler, arrestare i servizi realtime, chiudere il pool di connessioni SMTP quando nulla può più inviare, proteggere da segnali ripetuti ed eseguire un'uscita forzata se la chiusura si blocca:
->
-> ```ts
-> import { installShutdownHandlers } from "@rebasepro/server";
->
-> const backend = await initializeRebaseBackend({ ... });
-> installShutdownHandlers(backend, { onCleanup: () => pool.end() });
-> ```
->
-> **Non** combinarlo con il tuo `server.close()` — `backend.shutdown()` chiude già il server, e una seconda chiusura porterebbe a un deadlock. L'handler manuale mostrato nell'esempio precedente è riservato esclusivamente a configurazioni interamente personalizzate che bypassano `initializeRebaseBackend`.
+`openPostgresDriver` è ciò che `createPostgresAdapter` esegue quando il server Rebase si
+avvia, dopo che `postgresDriverConfigFromEnv` ha letto l'ambiente nella configurazione.
+Il suo secondo argomento dice che cosa aprire: le `collections`, se l'apertura può
+modificare il database (`provision`, predefinito `true`) e quale parte ha questo processo
+nel realtime (`realtime: false` per nessuna).
 
 ---
 
 ## Concetti Chiave del Backend
 
 ### Connessioni alle Read Replica
-Se definisci la variabile d'ambiente `DATABASE_READ_URL`, Rebase avvia automaticamente un connection pool secondario indirizzato alla tua read replica. Il bootstrapper lo registra sotto `internals.readDb`. Il componente principale `EntityFetchService` instrada tutte le query SELECT verso il pool di replica per ottimizzare le prestazioni, mentre le query di mutazione rimangono sul pool primario.
+Imposta `readConnectionString` nella configurazione del driver, oppure la variabile d'ambiente `DATABASE_READ_URL`, che l'avvio del server e `postgresDriverConfigFromEnv` leggono in essa, e il driver apre un secondo connection pool verso la tua read replica, sotto `internals.readDb`. Le letture vanno alla replica; le scritture restano sul primario.
+
+<span class="since-badge" data-since="0.25">Da 0.25</span> L'opzione `readConnectionString` viene rispettata. Su 0.24 era dichiarata e ignorata, e funzionava solo `DATABASE_READ_URL`.
 
 ### Integrazione con Drizzle
-Non devi scegliere tra Rebase e Drizzle. Il bootstrapper compila i tuoi schemi dinamicamente. Puoi accedere al client Drizzle NodePgDatabase compilato tramite `internals.db`, consentendoti di eseguire migrazioni SQL raw o invocare i query builder type-safe di Drizzle insieme ai servizi REST di Rebase.
+Non devi scegliere tra Rebase e Drizzle. Il driver compila i tuoi schemi dinamicamente, e `internals.db` è il client Drizzle `NodePgDatabase`, tipizzato, per SQL raw o per i query builder type-safe di Drizzle accanto ai servizi REST di Rebase.
 
 ### Drenaggio Corretto delle Connessioni (Graceful Draining)
-Negli ambienti serverless o negli orchestratori (come Kubernetes), la chiusura dei pod può causare interruzioni anomale delle connessioni. Implementa sempre signal handler che richiamino `realtimeProvider.stopListening()` (il quale chiude il client dedicato a pg LISTEN) e `pool.end()` per prevenire il leak di slot di connessione nel tuo server di database.
+Negli ambienti serverless o negli orchestratori (come Kubernetes), la chiusura dei pod può causare interruzioni anomale delle connessioni. Implementa sempre signal handler che richiamino `internals.realtimeService.stopListening()` (il quale chiude il client dedicato a pg LISTEN) e `pool.end()`, per prevenire il leak di slot di connessione nel tuo server di database.
 
 ### CORS per un frontend nel browser
 Un server personalizzato possiede la propria configurazione CORS, e un frontend
@@ -270,6 +509,7 @@ Il runtime di Rebase e il backend ottenuto con `rebase eject` inviano già quest
 
 ## Correlati
 
+- [Script e console](/docs/backend/scripts/) — i dati del progetto da uno script, da un test o da un REPL, senza alcun server
 - [Panoramica Backend](/docs/backend/) — dove risiede ciascuna opzione quando viene invece avviato il runtime
 - [Processi Suddivisi](/docs/deployment/split-processes/) — i ruoli che un server personalizzato deve riprodurre
 - [Configurazione dello Storage](/docs/backend/storage/) — le sorgenti che un server personalizzato deve risolvere autonomamente

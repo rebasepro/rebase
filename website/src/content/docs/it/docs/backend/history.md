@@ -183,7 +183,12 @@ Ciascuna entità mantiene inoltre al massimo le sue **200** voci più recenti. Q
 
 ### Meccanica del ciclo di vita del pruning
 
-Dopo ogni modifica registrata viene eseguito il pruning dell'entità modificata: vengono eliminate le sue voci più vecchie del periodo di retention, e successivamente tutto ciò che eccede le sue 200 più recenti. Questo avviene in modo asincrono e non fa attendere la scrittura.
+Dopo ogni modifica che il server registra viene eseguito il pruning dell'entità modificata: vengono eliminate le sue voci più vecchie del periodo di retention, e successivamente tutto ciò che eccede le sue 200 più recenti. Questo avviene in modo asincrono e non fa attendere la scrittura.
+
+Una scrittura fatta tramite [`openRebase` o `rebase console`](/docs/backend/scripts/)
+registra la propria voce di cronologia ma non elimina nulla, perché uno script non può
+conoscere la retention con cui è configurato il tuo server. Il server esegue il pruning di
+quell'entità alla sua prossima scrittura su di essa, e nella pulizia oraria qui sotto.
 
 <span class="since-badge" data-since="0.25">Da 0.25</span> Una volta all'ora, il
 backend elimina inoltre ogni voce più vecchia del periodo di retention, di ogni

@@ -204,7 +204,7 @@ frutto dell'elaborazione svolta dal router Rebase stesso.
 **Ambito:** il processo.
 
 <span class="since-badge" data-since="0.25">Da 0.25</span>
-`initializeRebaseBackend` è una scorciatoia su quattro chiamate pubbliche, e questo gradino
+`initializeRebaseBackend` è una scorciatoia su alcune chiamate pubbliche, e questo gradino
 consiste nel chiamarle tu stesso. `createRebaseBackend` costruisce il backend e non monta,
 non avvia e non ascolta nulla. `backend.routes` contiene ogni gruppo di rotte come
 sotto-app Hono che puoi montare da sola, a qualsiasi percorso. `mount`, `attachRealtime` e

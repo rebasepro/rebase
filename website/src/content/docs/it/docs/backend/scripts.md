@@ -173,15 +173,36 @@ test("a user only sees their own posts", async () => {
 
 Lo stesso funziona con Vitest o Jest.
 
+### Collection con cronologia
+
+<span class="since-badge" data-since="0.25">Da 0.25</span>
+
+Una scrittura su una collection con [`history: true`](/docs/backend/history/) registra
+la sua voce come fa una scrittura del server. La voce viene scritta nella transazione
+della riga stessa, quindi una scrittura che viene annullata non lascia alcuna voce. Viene
+registrata con l'identità con cui la scrittura è stata eseguita: `service` per
+`dataAsAdmin`, l'`uid` dell'utente con `withAuth`. Le scritture da `rebase console`
+vengono registrate allo stesso modo.
+
+`openRebase` non crea nulla in cui registrare. Se nessun backend con la cronologia si è
+mai avviato su quel database, la tabella `rebase.entity_history` non esiste. Una
+scrittura su una collection con cronologia viene allora rifiutata con
+[`HISTORY_UNAVAILABLE`](/docs/backend/errors/#data-queries-and-writes) prima che venga
+eseguito uno qualsiasi dei suoi callback, e il messaggio indica che cosa manca. Le
+letture funzionano come al solito. Avvia il backend una volta con la cronologia attiva
+(`rebase dev` lo fa), e le scritture passano.
+
+Le voci vengono registrate, mai eliminate. La retention è un'impostazione del server che
+uno script non vede, quindi è il server a eseguirne il pruning come di consueto: alla sua
+prossima scrittura sull'entità, e nella sua pulizia oraria.
+
 ### Cosa lascia fuori
 
 <span class="since-badge" data-since="0.25">Da 0.25</span>
 
 `openRebase` apre il livello dei dati e nient'altro. Non avvia alcun realtime, quindi le
-sue scritture non vengono annunciate alle query live. Non collega alcun servizio di
-cronologia, quindi una scrittura su una collection con `history: true` non registra
-alcuna voce di cronologia. Storage, email, amministrazione dell'autenticazione e le tue
-funzioni non ne fanno parte.
+sue scritture non vengono annunciate alle query live. Storage, email, amministrazione
+dell'autenticazione e le tue funzioni non ne fanno parte.
 
 Quando uno script ha bisogno anche di quelli, costruisci il backend senza servirlo:
 `createRebaseBackend({ …, provision: false })` ti dà `backend.rebase`, il client
