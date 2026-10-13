@@ -11,6 +11,7 @@ import os from "os";
 import path from "path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { appsCommand, describeApp } from "./apps";
+import { getProjectPort } from "../utils/dev-server";
 
 // eslint-disable-next-line no-control-regex
 const plain = (text: string): string => text.replace(/\u001b\[[0-9;]*m/g, "");
@@ -107,6 +108,14 @@ describe("rebase apps config", () => {
         // A pid nothing is running as: far above any real pid_max.
         devState(2 ** 30);
         expect((await json("web")).apiUrl).toBeNull();
+    });
+
+    it("prints this project's dev port, not a fixed 3001, for an unlinked checkout", async () => {
+        manifest({ backend: { type: "backend", runtime: "custom", dockerfile: "Dockerfile" }, web: { type: "static", root: "web", path: "/", output: "web/dist" } });
+        await appsCommand("config", ["node", "rebase", "apps", "config", "web"]);
+        const text = plain(out.join("\n"));
+        expect(text).toContain(`VITE_API_URL=http://localhost:${getProjectPort(root)}`);
+        if (getProjectPort(root) !== 3001) expect(text).not.toContain("localhost:3001");
     });
 
     it("uses the address of the dev server that is running", async () => {

@@ -28,6 +28,7 @@ import { computeStatus, type ResourceStatus } from "../resources/status";
 import { findRunningDaemon, managedUrl } from "../dev-db/daemon";
 import { resolveActiveBranch, resolveComposeUrl } from "../dev-db/prepare";
 import { resolveDevDatabase } from "../dev-db/resolve";
+import { readLastDevDocker } from "../dev-db/last-dev-database";
 import type { RebaseBackendAppConfig } from "@rebasepro/types";
 
 function usage(): void {
@@ -188,6 +189,10 @@ export async function statusCommand(rawArgs: string[]): Promise<void> {
     const database = resolveDevDatabase({
         env: {},
         envFile: env,
+        // The database the last `rebase dev` ran on, as every other command
+        // follows it: without it, a project on `dev --docker` read as a managed
+        // database that is not running.
+        lastDevDocker: readLastDevDocker(projectRoot),
         branch: resolveActiveBranch(projectRoot, env),
         composeUrl: resolveComposeUrl(projectRoot, env)
     });

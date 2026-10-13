@@ -16,6 +16,7 @@ import path from "path";
 import chalk from "chalk";
 import type { RebaseAppConfig } from "@rebasepro/types";
 import { failAsJson, requireProjectRoot } from "../utils/project";
+import { devServerUrl } from "../utils/dev-server";
 import { parseCommandArgs, wantsHelp } from "../utils/args";
 import {
     assessManagedCompatibility,
@@ -271,7 +272,9 @@ async function printAppConfig(appName: string | undefined, asJson: boolean): Pro
 
     console.log(chalk.bold(`# ${appName}`));
     console.log("");
-    console.log(`VITE_API_URL=${apiUrl ?? "http://localhost:3001"}`);
+    // Unlinked: the dev backend this project runs on, not a fixed 3001 — `rebase dev`
+    // derives a port per project.
+    console.log(`VITE_API_URL=${apiUrl ?? devServerUrl(projectRoot).url}`);
     console.log("");
     console.log(chalk.dim("Then, in the app:"));
     console.log(chalk.dim("  const rebase = createRebaseClient({ baseUrl: import.meta.env.VITE_API_URL });"));
