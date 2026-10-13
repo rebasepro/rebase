@@ -294,7 +294,7 @@ Read these when you need them, not before.
 ### Database & Connection
 
 - **`DATABASE_URL is not set`:** Usually the wrong diagnosis. A scaffolded project has no `DATABASE_URL` on purpose — `rebase dev` starts the managed PostgreSQL (PGlite) under `.rebase/`. Run `rebase db url` to see which database is in use, and start `rebase dev` if nothing is running. Only set `DATABASE_URL` when the user asked for their own Postgres.
-- **`rebase db push does not work on the managed development database`:** Correct, and not a fault. `db push` plans with Atlas, which needs a second empty database; the managed one serves exactly one. Boot applies the schema additively instead. Set `DATABASE_URL` to your own Postgres if you need push or migrations.
+- **`rebase db push` on the managed development database:** It works. `db push`, `db generate` and `db migrate` plan with Atlas, which needs a second empty database; on the managed one (which serves exactly one) the CLI starts a throwaway in-memory PGlite for the command and stops it afterwards. `REBASE_ATLAS_DEV_URL` names an empty database of your own to plan against instead. On 0.24 and earlier these commands refuse the managed database: set `DATABASE_URL` to your own Postgres there. `db branch` stays refused on the managed database; use `rebase dev --docker` for branches.
 - **`DATABASE_URL must be a valid URL`:** The value must be a proper PostgreSQL URL including protocol (`postgresql://`). Check for missing or malformed values.
 - **Connection refused on port 5432:** Only relevant with your own database. PostgreSQL is not running — start it with `docker compose up -d db` or verify your local Postgres service. The managed database has no port to conflict with.
 - **`CORS_ORIGINS or FRONTEND_URL must be set in production`:** In `NODE_ENV=production`, set `CORS_ORIGINS=https://yourapp.com` or `FRONTEND_URL=https://yourapp.com` in `.env`.
@@ -317,7 +317,7 @@ Read these when you need them, not before.
 - **Schema out of sync:** Run `rebase doctor` to detect three-way drift between collections, generated Drizzle schema, and the live database.
 - **`schema.generated.ts` is stale:** Run `rebase schema generate` to regenerate it from your collection definitions.
 - **Migrations pending:** Run `rebase db migrate` to apply outstanding migration files.
-- **Column type mismatch after manual DB edit:** Never edit the database manually. Always modify collection files → restart `rebase dev` (managed database) or `rebase schema generate` → `rebase db push` (your own, dev) or `rebase db generate && rebase db migrate` (prod).
+- **Column type mismatch after manual DB edit:** Never edit the database manually. Always modify collection files → restart `rebase dev`, which adds what is missing, then `rebase db push` for a rename, a narrowed type or a removed field (dev, the managed database included), or `rebase db generate && rebase db migrate` (prod).
 
 ### CLI & Tooling
 

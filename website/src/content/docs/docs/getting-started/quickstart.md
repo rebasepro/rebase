@@ -89,7 +89,9 @@ The migration commands plan changes with [Atlas](https://atlasgo.io/), the
 schema-migration engine Rebase plans with, which needs a second empty database to
 compare against. On your own database Rebase makes one beside it; on the managed
 one, which serves exactly one database, it starts a throwaway PGlite for the
-length of the command. Either way:
+length of the command. <span class="since-badge" data-since="0.25">Since 0.25</span>
+On 0.24 the migration commands refuse the managed database, and need your own.
+Either way:
 
 ```bash
 pnpm run db:push
@@ -188,18 +190,21 @@ Save the file. That is the whole step: `rebase dev` regenerates
 collections, restarts the backend, and boot creates the new table — so your **Products** collection appears in the
 navigation.
 
-for the SDK types: on 0.23, `rebase dev` regenerates the schema only, so run
+On 0.23, `rebase dev` regenerates the schema only, so run
 `rebase generate-sdk` after a collection change before importing its types.
 
 The same is true of a property added to a collection you already have: save,
 and the column is there.
 
 `rebase db push` is for the changes boot deliberately leaves alone — a renamed
-column, a narrowed type, a removed field. It needs your own PostgreSQL:
+column, a narrowed type, a removed field:
 
 ```bash
 pnpm run db:push
 ```
+
+<span class="since-badge" data-since="0.25">Since 0.25</span> It runs on the
+managed database as on your own. On 0.24 it needs your own PostgreSQL.
 
 ## Database Commands Reference
 
@@ -207,9 +212,12 @@ pnpm run db:push
 |---------|-------------|
 | `rebase schema generate` | Generate the Drizzle schema from your TypeScript collections. No database needed — `rebase dev` runs it for you |
 | `rebase schema introspect` | Generate TypeScript collections from an existing database |
-| `rebase db push` | Push schema changes directly to the database. Needs your own PostgreSQL |
-| `rebase db generate` | Generate SQL migration files. Needs your own PostgreSQL |
-| `rebase db migrate` | Run pending migrations. Needs your own PostgreSQL |
+| `rebase db push` | Push schema changes directly to the database, the managed one included |
+| `rebase db generate` | Generate SQL migration files |
+| `rebase db migrate` | Run pending migrations |
+
+<span class="since-badge" data-since="0.25">Since 0.25</span> The three `db`
+commands work on the managed database. On 0.24 they need your own PostgreSQL.
 
 ## What's Next
 

@@ -108,9 +108,10 @@ DATABASE_URL=postgresql://username:password@localhost:5432/your_database
 ```
 
 A `DATABASE_URL` that is set always wins, and one pointing anywhere other than
-this machine is left alone entirely. With your own database you also get the
-migration commands the managed one cannot offer (`rebase db push`,
-`rebase db generate && rebase db migrate`).
+this machine is left alone entirely. The migration commands (`rebase db push`,
+`rebase db generate && rebase db migrate`) work on either; on 0.24 and earlier
+they need your own database. What your own database adds is real concurrency
+and `rebase db branch`, which the managed one refuses.
 
 The scaffold ships a `docker-compose.yml` if a container is what the user wants:
 

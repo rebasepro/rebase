@@ -32,9 +32,9 @@ Please refer to and follow the instructions defined in [ai-instructions.md](./ai
 The Rebase skills for this assistant live in `.claude/skills/`. If they are not there yet, install them, with the Rebase MCP server: `rebase skills install --agent claude --mcp`.
 ```
 
-for this third line and the `.mcp.json` below: on 0.23
-the third line only tells the assistant to run `rebase skills install --agent claude`,
-and `.mcp.json` starts the server with `npx -y @rebasepro/mcp` from the registry.
+On 0.23 the third line only tells the assistant to run
+`rebase skills install --agent claude`, and the `.mcp.json` below starts the
+server with `npx -y @rebasepro/mcp` from the registry.
 
 The others differ only in the agent's skills directory and its `--agent` value —
 `--agent cursor`, `--agent windsurf`, `--agent codex`, `--agent copilot` — and in
@@ -102,9 +102,10 @@ session:
    is running, saving the collection file is the whole step: boot regenerates the
    Drizzle schema and creates the missing tables and columns. `pnpm db:push` is
    only for what boot deliberately leaves alone — a renamed column, a narrowed
-   type, a removed field — and it needs your own PostgreSQL,
-   not the managed development database. Production is `pnpm db:generate` then
-   `pnpm db:migrate`.
+   type, a removed field — on the managed development database as on your own
+   PostgreSQL. Production is `pnpm db:generate` then `pnpm db:migrate`.
+   <span class="since-badge" data-since="0.25">Since 0.25</span> On 0.24,
+   `pnpm db:push` needs your own PostgreSQL, and the file says so.
 3. **Use the SDK.** Go through `rebase.dataAsAdmin.<slug>` for work done as the
    service identity, or `getDriver(c)` inside a function when the read should run
    as the caller. The server client has no plain `data` accessor. Raw SQL and direct
