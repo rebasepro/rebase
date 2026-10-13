@@ -13,7 +13,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { anonymizableColumns, anonymizeStatements, describeTarget, dumpArgs, provisionableSchemas, replacementFor, restoreArgs, restoreOutcome, shouldAnonymize, type ColumnRef } from "./pull";
+import { anonymizableColumns, anonymizeStatements, describeTarget, dumpArgs, dumpEnv, provisionableSchemas, replacementFor, restoreArgs, restoreEnv, restoreOutcome, shouldAnonymize, type ColumnRef } from "./pull";
 
 function column(overrides: Partial<ColumnRef> & { column: string }): ColumnRef {
     return { schema: "public", table: "users", dataType: "text", ...overrides };
@@ -206,6 +206,23 @@ describe("pg_dump and pg_restore arguments", () => {
         expect(args).toContain("--clean");
         expect(args).toContain("--if-exists");
         expect(args[args.length - 1]).toBe("/tmp/dump.pgcustom");
+    });
+
+    it("keeps passwords off both command lines, and hands each tool its own", () => {
+        // A command line is readable in every process listing, and execa's
+        // error repeats it. Each tool gets the password of the URL it opens.
+        const withPasswords = { ...plan, target: "postgresql://postgres:localpw@127.0.0.1:5555/postgres?sslmode=disable" };
+        const dump = dumpArgs(withPasswords).join(" ");
+        const restore = restoreArgs(withPasswords, "/tmp/dump").join(" ");
+
+        expect(dump).not.toContain("pw@");
+        expect(restore).not.toContain("localpw");
+        expect(dump).toContain("postgresql://u@prod/app");
+        expect(restore).toContain("sslmode=disable");
+        expect(dumpEnv(withPasswords)).toEqual({ PGPASSWORD: "pw" });
+        expect(restoreEnv(withPasswords)).toEqual({ PGPASSWORD: "localpw" });
+        expect(dumpEnv({ ...plan, source: "postgresql://u@prod/app" })).toEqual({});
+        expect(restoreEnv({ ...plan, target: "postgresql://u@h/db?password=p%40ss" })).toEqual({ PGPASSWORD: "p@ss" });
     });
 
     it("never names a remote database as the restore target", () => {

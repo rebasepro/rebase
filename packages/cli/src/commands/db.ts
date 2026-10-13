@@ -813,7 +813,7 @@ async function manageLocalDatabase(
  * and the wrong one here means overwriting production with a laptop.
  */
 async function pullIntoLocal(projectRoot: string, rawArgs: readonly string[]): Promise<void> {
-    const { describeTarget, dumpArgs, findPgTool, restoreArgs, restoreOutcome } =
+    const { describeTarget, dumpArgs, dumpEnv, findPgTool, restoreArgs, restoreEnv, restoreOutcome } =
         await import("../dev-db/pull");
     const { prepareDatabaseEnv } = await import("../dev-db/prepare");
     const { readEnvFile } = await import("../utils/project");
@@ -919,7 +919,7 @@ async function pullIntoLocal(projectRoot: string, rawArgs: readonly string[]): P
     let anonymizeFailure: string[] | null = null;
     try {
         console.log(chalk.gray("  Dumping…"));
-        await execa("pg_dump", [...dumpArgs(plan), "--file", dumpFile], { stdio: ["ignore", "inherit", "inherit"] });
+        await execa("pg_dump", [...dumpArgs(plan), "--file", dumpFile], { stdio: ["ignore", "inherit", "inherit"], env: dumpEnv(plan) });
 
         console.log(chalk.gray("  Restoring…"));
         // stderr is shown as it arrives and kept, for the count in its summary
@@ -927,6 +927,7 @@ async function pullIntoLocal(projectRoot: string, rawArgs: readonly string[]): P
         // and a failure is reported only after whatever did arrive has been
         // anonymized.
         const restored = restoreOutcome(await execa("pg_restore", restoreArgs(plan, dumpFile), {
+            env: restoreEnv(plan),
             stdin: "ignore",
             stdout: "inherit",
             stderr: ["pipe", "inherit"],

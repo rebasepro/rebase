@@ -349,9 +349,66 @@ export interface PullPlan {
 export function dumpArgs(plan: PullPlan): string[] {
     const args = ["--format=custom", "--no-owner", "--no-acl", "--no-privileges"];
     for (const schema of plan.schemas) args.push("--schema", schema);
-    args.push("--dbname", plan.source);
+    args.push("--dbname", splitPassword(plan.source).connectionString);
 
     return args;
+}
+
+/** The environment `pg_dump` runs with: the source's password, if it has one. */
+export function dumpEnv(plan: PullPlan): Record<string, string> {
+    return passwordEnv(plan.source);
+}
+
+/** The environment `pg_restore` runs with: the target's password, if it has one. */
+export function restoreEnv(plan: PullPlan): Record<string, string> {
+    return passwordEnv(plan.target);
+}
+
+function passwordEnv(connectionString: string): Record<string, string> {
+    const { password } = splitPassword(connectionString);
+    return password === null ? {} : { PGPASSWORD: password };
+}
+
+/**
+ * A libpq connection string without its password, and the password.
+ *
+ * The password goes in `PGPASSWORD`, never on a command line, where every
+ * process listing can read it and every failure prints it back (execa's error
+ * repeats the command). The same rule `db backup` follows; this mirrors
+ * `splitPassword` in `@rebasepro/server-postgres`'s connection-string utils,
+ * which is not exported. Covers the user-info password and a `password=`
+ * parameter; anything that does not parse as a postgres URL is left alone.
+ */
+function splitPassword(connectionString: string): { connectionString: string; password: string | null } {
+    let url: URL;
+    try {
+        url = new URL(connectionString);
+    } catch {
+        return { connectionString, password: null };
+    }
+    if (url.protocol !== "postgres:" && url.protocol !== "postgresql:") return { connectionString, password: null };
+
+    const fromUserInfo = url.password ? decodePercent(url.password) : null;
+    const fromParameter = url.searchParams.get("password");
+    if (fromUserInfo === null && fromParameter === null) return { connectionString, password: null };
+
+    url.password = "";
+    if (fromParameter !== null) {
+        url.searchParams.delete("password");
+        // By hand: URLSearchParams writes a space as `+`, which libpq reads literally.
+        url.search = Array.from(url.searchParams.entries())
+            .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`)
+            .join("&");
+    }
+    return { connectionString: url.toString(), password: fromUserInfo ?? fromParameter };
+}
+
+function decodePercent(value: string): string {
+    try {
+        return decodeURIComponent(value);
+    } catch {
+        return value;
+    }
 }
 
 /**
@@ -362,7 +419,7 @@ export function dumpArgs(plan: PullPlan): string[] {
  * them. `--no-owner` for the same reason as the dump.
  */
 export function restoreArgs(plan: PullPlan, dumpFile: string): string[] {
-    return ["--clean", "--if-exists", "--no-owner", "--no-privileges", "--dbname", plan.target, dumpFile];
+    return ["--clean", "--if-exists", "--no-owner", "--no-privileges", "--dbname", splitPassword(plan.target).connectionString, dumpFile];
 }
 
 /**
