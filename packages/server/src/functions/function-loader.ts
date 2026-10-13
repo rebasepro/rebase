@@ -2,6 +2,7 @@ import * as fs from "fs";
 import * as path from "path";
 import { pathToFileURL } from "url";
 import { Hono } from "hono";
+import type { HonoEnv } from "../api/types";
 import { logger } from "../utils/logger.js";
 import { nativeDynamicImport, type ModuleImporter } from "../utils/dynamic-import.js";
 import { describeLoadFailure, SYNTAX_ERROR_ADVICE } from "../utils/load-failure.js";
@@ -10,12 +11,13 @@ import { warnDeprecated } from "@rebasepro/common";
 /**
  * One custom function: a Hono app, served at `<functions mount>/<name>`.
  *
- * What `defineFunction(...)` returns, and what a function file default-exports.
- * Any Hono-compatible app works — the loader checks for `.fetch()` and
- * `.routes` rather than an `instanceof`, because a project and the server can
- * hold two copies of hono.
+ * What `defineFunction(...)` returns, and what a function file default-exports:
+ * a Hono app over {@link HonoEnv}, the environment a function runs in — build
+ * one by hand as `new Hono<HonoEnv>()`. Any Hono-compatible app works at
+ * runtime — the loader checks for `.fetch()` and `.routes` rather than an
+ * `instanceof`, because a project and the server can hold two copies of hono.
  */
-export type FunctionApp = Hono<import("hono").Env>;
+export type FunctionApp = Hono<HonoEnv>;
 
 /**
  * Functions as values: the URL segment each one answers at, to its app.
@@ -216,7 +218,7 @@ export async function readFunctionsDirectory(
                 // Accept a Hono instance — use duck-typing to handle different
                 // Hono versions which may not share the same prototype.
                 const app = isHonoLike(exported)
-                    ? exported as Hono
+                    ? exported as FunctionApp
                     // Also accept a factory function that returns a Hono instance
                     : typeof exported === "function" ? exported() : undefined;
                 if (isHonoLike(app)) {
@@ -229,7 +231,7 @@ export async function readFunctionsDirectory(
                         problems.push(`${file} (another file is already served as '${name}')`);
                         continue;
                     }
-                    functions[name] = app as Hono;
+                    functions[name] = app as FunctionApp;
                     logger.debug(`⚡ Loaded function route: ${name}`);
                     continue;
                 }
