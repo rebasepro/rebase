@@ -113,6 +113,18 @@ Esto es útil al adoptar Rebase en una base de datos existente — primero haga 
 
 **Hacer introspección y luego push no cambia nada.** Las propiedades generadas indican exactamente qué es cada columna — `columnType`, `precision`/`scale`, `defaultValue`, `required`, el `isId` de una clave (`"increment"` para una identidad entera, `columnType: "serial"` para un serial, `"manual"` para una clave sin valor por defecto), el `onDelete` de una relación — y su `index: false` donde la base de datos no tiene índice sobre la columna de la clave, ya que una `belongsTo` está [indexada por defecto](/docs/backend/indexes#foreign-keys-are-indexed-for-you) (borra la línea para que se construya uno) — y el bloque `search` de una colección leído de vuelta a partir de la columna que construyó — así que `rebase db push --dry-run` justo después de una introspección no planea ningún cambio. Donde ninguna propiedad puede representar una columna — un `timestamp` sin zona horaria, un `interval`, un `inet`, un tipo enum que no se llama `<table>_<column>`, un valor por defecto como `CURRENT_DATE` — la introspección lo indica, columna por columna, en la terminal y en la parte superior del archivo, con lo que haría un push sobre ella y, cuando existe, la sentencia que hace que ambas coincidan (`ALTER TYPE "mood" RENAME TO "customers_current_mood";`). Una tabla con clave sobre más de una columna vuelve como una clave compuesta, con su `isId` en cada columna de la clave. Se omite, con su motivo, cuando una columna de la clave no puede llevar `isId` (un timestamp, por ejemplo) o la clave foránea de otra tabla apunta a ella, algo que una relación de una sola columna no puede hacer; `db push` deja en paz a una tabla que no es una colección. En 0.23, el push justo después de una introspección aún podía planear cambios de tipo, valores por defecto eliminados y NOT NULL, y una clave `id` fantasma.
 
+**Cómo son los archivos generados**
+
+La introspección escribe las colecciones con `defineCollection`, que mantiene las claves de las propiedades *literales* — de modo que `propertiesOrder`, `listProperties`, `sort` y `display.title` se autocompletan sobre los nombres de sus propias columnas, y una clave que queda de una columna renombrada es un error de compilación en lugar de una línea que no hace nada en silencio. Cuál importa depende de aquello de lo que dependa su proyecto, y se decide en cada ejecución:
+
+| Su proyecto declara | Las colecciones generadas usan | Bloque `admin` |
+|------|------|------|
+| `@rebasepro/cms-types` (un proyecto con el panel) | `defineCollection` de `@rebasepro/cms-types` | sí |
+| `@rebasepro/common` (un proyecto `--headless`) | `defineCollection` de `@rebasepro/common` | no |
+| ninguno | una anotación `PostgresCollectionConfig`, con una advertencia | no |
+
+Un proyecto headless no tiene panel de administración, y los tipos del núcleo no declaran ningún campo `admin` — así que el bloque no se emite allí. Es presentación (`icon`, `propertiesOrder`, `multiline`); nada del esquema, la API o sus datos depende de él.
+
 ### `rebase db push`
 
 Envíe los cambios de esquema directamente a la base de datos sin archivos de migración:
@@ -176,7 +188,6 @@ Ahora `db push` lo reconcilia: elimina las políticas generadas que ya no corres
 Para auditar una base de datos a la que se hizo push antes de este cambio, ejecute `rebase doctor --policies`. Funciona como control de CI: termina con un código distinto de cero si hay deriva, y también cuando no pudo ejecutar la comprobación — sin `DATABASE_URL`, una ruta `--collections` que no se resuelve, una lectura de `pg_policies` que el rol de CI no tiene concedida. Un control que no pudo mirar no ha pasado.
 
 <span class="since-badge" data-since="0.25">Desde 0.25</span> `doctor` y `db push` distinguen los dos tipos de huérfana. Una política con un nombre generado fue reemplazada, y el siguiente push la elimina. Cualquier otro nombre lo escribió a mano una persona u otra herramienta y sigue en vigor: descríbala en los `securityRules` de su colección para conservarla (la vista RLS de Studio la importa), o elimínela a mano si está obsoleta. En la 0.24 ambas son «dejadas atrás por un push anterior».
-
 :::
 
 :::caution
@@ -258,6 +269,12 @@ rebase db branch info feature_auth
 rebase db branch delete feature_auth
 ```
 
+`rebase db branch switch` (y `switch --off`) y `rebase db branch prune`
+son nuevos. `create`, `list`, `info` y `delete` se publicaron en la 0.17.
+
+Cada rama es una copia completa de la base de datos hecha con `CREATE DATABASE ... TEMPLATE`,
+por lo que necesita un servidor PostgreSQL real y cuesta el mismo disco que su origen.
+
 ### `rebase doctor`
 
 Detecte la desviación de tres vías entre sus definiciones de colecciones, el esquema de Drizzle generado y la base de datos PostgreSQL en vivo:
@@ -272,6 +289,8 @@ rebase doctor
 - Colecciones ↔ Base de datos — ¿hay alguna desviación inesperada?
 
 Ejecute `doctor` cada vez que algo parezca desincronizado. Señala exactamente dónde está la discrepancia.
+
+La comparación con la base de datos necesita `DATABASE_URL` (o `ADMIN_CONNECTION_STRING`). Sin una, esa fase se informa como **omitida** en lugar de superada, y la ejecución nunca termina con "All schemas are in sync" — una comprobación que no ocurrió no es un certificado de buena salud.
 
 <span class="since-badge" data-since="0.25">Desde 0.25</span> También nombra cada colección sin [bloque `search`](/docs/backend/search) cuya tabla contiene más de unas 10.000 filas. Una búsqueda ahí — el cuadro de búsqueda del administrador, `.search()`, `?searchString=` — es `ILIKE '%term%'` sobre las columnas de texto, que ningún índice puede servir, así que cada una lee la tabla entera, y su conteo la lee otra vez (alrededor de un tercio de segundo con 100.000 filas, creciendo con la tabla). El número de filas es la estimación propia de Postgres, así que la comprobación no escanea nada. Es una pista: no cambia el código de salida, y nada se indexa por ti.
 
@@ -321,7 +340,7 @@ const client = createRebaseClient<Database>({
 const { data } = await client.data.products.find();
 ```
 
-Los nombres de campo en los tipos generados son los que sirve la API, sin cambios: una columna `createdAt` es `row.createdAt`. Solo el *accessor* de la colección se convierte en un nombre de propiedad (`my-notes` → `client.data.myNotes`), que es lo que `collectionsDictionary` devuelve al slug.
+Los nombres de campo en los tipos generados son los que sirve la API. El nombre de un campo en el cable es la clave de su propiedad, y la API es camelCase en todo: la introspección genera una columna `created_at` como una propiedad `createdAt` que lleva `columnName: "created_at"`, y la sirve como `row.createdAt`. La columna en sí no se toca. El *accessor* de la colección se convierte en un nombre de propiedad de la misma manera (`my-notes` → `client.data.myNotes`), que es lo que `collectionsDictionary` devuelve al slug.
 
 ## Flujo de Trabajo de Desarrollo
 
