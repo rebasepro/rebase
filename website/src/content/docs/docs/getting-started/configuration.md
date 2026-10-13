@@ -286,6 +286,26 @@ container's job title.
 | `REBASE_PUBLIC_URL` | This deployment's externally reachable origin, e.g. `https://app.example.com`. The MCP surface cannot derive it — taking the origin from the `Host` header would make the issuer identity, and the audience its own tokens are checked against, a value the caller supplies. | — |
 | `REBASE_MCP_OPEN_REGISTRATION` | Allow OAuth dynamic client registration (RFC 7591), so a client can enrol itself. Set to `false` to require clients be registered ahead of time. | `true` |
 
+### Live schema editing from a bundle
+
+Off unless `REBASE_LIVE_SCHEMA_REPOSITORY` is set. A built bundle has no
+collection source to edit, so with these set the admin's collection editor reads
+the source from the repository, commits each change back, and runs its DDL on
+this database. Admin-only, and applied by a person unless
+`REBASE_LIVE_SCHEMA_ALLOW_MACHINE_APPLY` says otherwise. A repository named with
+no usable credential refuses to boot. See
+[Live schema editing](/docs/backend/live-schema-editing#from-a-built-bundle).
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `REBASE_LIVE_SCHEMA_REPOSITORY` | The GitHub repository to commit schema changes to, as `owner/name`. Setting it is what turns the feature on. | — |
+| `REBASE_LIVE_SCHEMA_BRANCH` | The branch the commit lands on. | `main` |
+| `REBASE_LIVE_SCHEMA_COLLECTIONS_PATH` | Where the collection source lives in that repository, repo-relative. | `config/collections` |
+| `REBASE_LIVE_SCHEMA_GITHUB_TOKEN` | A fine-grained token with read and write access to the repository's contents. Set this or the three `_GITHUB_APP_*` variables, not both. | — |
+| `REBASE_LIVE_SCHEMA_GITHUB_APP_ID` | A GitHub App's id, to commit as the app instead of with a token. | — |
+| `REBASE_LIVE_SCHEMA_GITHUB_APP_INSTALLATION_ID` | The app's installation on the repository. | — |
+| `REBASE_LIVE_SCHEMA_GITHUB_APP_PRIVATE_KEY` | The app's private key: PEM, PEM with escaped newlines, or base64. | — |
+
 ### Backups
 
 | Variable | Description | Default |

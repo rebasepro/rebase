@@ -94,7 +94,15 @@ export interface LiveSchemaConfig extends SchemaEditPolicy {
      * read from the repository, rewritten, and committed back through the Git
      * Data API — no clone, no working tree.
      *
-     * Absent, live schema editing needs the project mounted and says so.
+     * Configuring it is the opt-in for a deployment with no source of its own:
+     * live editing then works under `NODE_ENV=production` and with
+     * `schemaEditor: false` (which a bundle boots with), because the write
+     * goes to this repository and never to the files beside the process. The
+     * collections directory is read from it whole, so a relation can name
+     * another collection and a deletion can check its importers.
+     *
+     * Absent, live schema editing needs the project mounted and says so. A
+     * bundle sets it from `REBASE_LIVE_SCHEMA_REPOSITORY` and its credential.
      */
     repository?: RemoteRepositoryConfig;
 }
@@ -480,10 +488,12 @@ export interface RebaseBackendConfig {
     /**
      * Live schema editing — changing the database and committing the change.
      *
-     * Distinct from `schemaEditor`, which only rewrites collection source.
-     * There is nothing to switch on here: the surface mounts whenever there is
-     * a `collectionsDir`, and refuses in its own words when it cannot act. What
-     * this configures is *who* may act.
+     * Distinct from `schemaEditor`, which only rewrites collection source on
+     * this machine. Without a `repository`, live editing writes through that
+     * editor, so it is on exactly where the editor is. With one, it is on
+     * whatever `schemaEditor` and `NODE_ENV` say — that is the opt-in for a
+     * built bundle, which has no source to edit locally (see
+     * {@link LiveSchemaConfig.repository}). Either way it is admin-only.
      */
     liveSchema?: LiveSchemaConfig;
 
@@ -2273,6 +2283,10 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         router.use("/*", ...adminGate(scopes));
     };
 
+    /** Where a server with no editable source of its own can still edit collections. */
+    const LIVE_SCHEMA_REPOSITORY_HINT = "To edit collections from a deployment, name a repository to commit " +
+        "them to: `liveSchema.repository`, or REBASE_LIVE_SCHEMA_REPOSITORY for a built bundle.";
+
     // The schema editor rewrites collection files, so it needs a collectionsDir
     // to write to and is off in baas mode (no files) and in production.
     const schemaEditorEnabled =
@@ -2292,9 +2306,12 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
      * it can write, and says why not, and the client asks instead of guessing.
      */
     const schemaEditorUnavailable = (): { code: string, message: string } | undefined => {
+        // A built bundle lands here: its runtime passes `schemaEditor: false`.
+        // The second sentence is how its operator finds the opt-in.
         if (config.schemaEditor === false) return {
             code: "SCHEMA_EDITOR_DISABLED",
-            message: "The schema editor is turned off for this server (`schemaEditor: false`)."
+            message: "The schema editor is turned off for this server (`schemaEditor: false`). " +
+                LIVE_SCHEMA_REPOSITORY_HINT
         };
         if (!config.collectionsDir) return {
             code: "SCHEMA_EDITOR_NO_COLLECTIONS_DIR",
@@ -2310,7 +2327,8 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
             code: "SCHEMA_EDITOR_PRODUCTION",
             message: "The schema editor is off under NODE_ENV=production: it edits collection source " +
                 "files, and a deployed server's files are rebuilt from your repository on every " +
-                "deploy, so an edit here would be discarded. Edit collections in development and deploy."
+                "deploy, so an edit here would be discarded. Edit collections in development and deploy. " +
+                LIVE_SCHEMA_REPOSITORY_HINT
         };
         return {
             code: "SCHEMA_EDITOR_DISABLED",
@@ -2389,14 +2407,18 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         }
 
         // ── Live schema editing ───────────────────────────────────────────
-        // Writing goes through the source-only editor above (`writeSource` is
-        // built only from `schemaSourceEditor`), so live editing is on exactly
+        // Two write paths. Without a configured repository, writing goes
+        // through the source-only editor above, so live editing is on exactly
         // where that editor is: a `collectionsDir` on disk, `schemaEditor` not
         // false, and NODE_ENV other than production unless `schemaEditor:
-        // true`. A built bundle has none of that — its runtime passes
-        // `schemaEditor: false` — and `/status` says so. A configured
-        // `liveSchema.repository` changes where the commit goes, not whether
-        // there is an editor to make it.
+        // true`.
+        //
+        // With `liveSchema.repository`, the write never touches this machine's
+        // files: the collection files are fetched, rewritten in a scratch
+        // directory and committed back. That path does not depend on the
+        // source-only editor's gate — a built bundle boots with `schemaEditor:
+        // false` under production, and the repository is how one opts in. It
+        // needs only `ts-morph`, checked below so `/status` can name it.
         //
         // Mounted either way; the routes themselves decide what is possible, so
         // the reason a change is refused arrives as a message rather than as a
@@ -2411,6 +2433,27 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         // local working tree.
         const remoteRepo = config.liveSchema?.repository;
         const canEditSchema = Boolean(config.collectionsDir) || Boolean(remoteRepo);
+
+        // The remote write path's one dependency. Loaded at boot rather than on
+        // the first apply, so a server without `ts-morph` says so on `/status`
+        // instead of offering the control and failing when it is pressed.
+        let remoteEditor: typeof import("./api/ast-schema-editor") | undefined;
+        let remoteEditingOff: { code: string, message: string } | undefined;
+        if (remoteRepo) {
+            try {
+                remoteEditor = await import("./api/ast-schema-editor");
+            } catch (err) {
+                if ((err as { code?: string })?.code !== "ERR_MODULE_NOT_FOUND") throw err;
+                remoteEditingOff = {
+                    code: "SCHEMA_EDITOR_MISSING_DEPENDENCY",
+                    message: "Live schema editing rewrites collection source with `ts-morph`, which is " +
+                        "not installed on this server. Run `pnpm add -D ts-morph@28.0.0` to enable it."
+                };
+                logger.warn(`Live schema editing disabled: ${remoteEditingOff.message}`);
+            }
+            logger.info(`Live schema editing commits to ${remoteRepo.owner}/${remoteRepo.repo}` +
+                ` (${remoteRepo.branch ?? "main"}, ${remoteRepo.collectionsPath ?? DEFAULT_COLLECTIONS_PATH}).`);
+        }
 
         if (!canEditSchema) {
             const unconfigured = new Hono<HonoEnv>();
@@ -2439,6 +2482,13 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
                 ? await findRepositoryRoot(collectionsDir)
                 : undefined;
             const liveSchemaRouter = new Hono<HonoEnv>();
+            // A commit to the remote repository that this process is not
+            // running yet. The generated schema files in a commit are built
+            // from the collections this process serves, and a remote commit
+            // does not change those until it is deployed — so a second change
+            // before then would commit generated files that leave the first
+            // one out. Set only once a commit has landed.
+            let undeployedCommit: string | undefined;
             // `apply` additionally needs `schema:write` — checked on its route.
             applyAdminGate(liveSchemaRouter, "Live schema editing", "schema:read");
 
@@ -2472,7 +2522,10 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
                 // only set when the editor routes were built, which is skipped
                 // for *every* `schemaEditorOff` reason, so all of them were
                 // reported as the missing dependency. One reason, the true one.
-                sourceEditingOff: schemaEditorOff,
+                //
+                // With a repository the source-only editor's reasons do not
+                // apply — that path never uses it — so only its own does.
+                sourceEditingOff: remoteRepo ? remoteEditingOff : schemaEditorOff,
                 // Only answerable for a project on this machine. A deployment
                 // committing to a remote repository is a built bundle, which is
                 // provisioned by boot-ensure rather than by replaying
@@ -2495,13 +2548,21 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
                     // means its source is *there*, even when a working tree
                     // happens to exist beside the running process.
                     if (remoteRepo) {
-                        return createGitHubRepository({
+                        const repository = createGitHubRepository({
                             auth: remoteRepo.auth,
                             owner: remoteRepo.owner,
                             repo: remoteRepo.repo,
                             branch: remoteRepo.branch ?? "main",
                             author
                         });
+                        return {
+                            ...repository,
+                            commit: async (paths, message) => {
+                                const sha = await repository.commit(paths, message);
+                                undeployedCommit = sha;
+                                return sha;
+                            }
+                        };
                     }
                     if (!repositoryRoot) return undefined;
                     return createLocalGitRepository({ root: repositoryRoot, author });
@@ -2516,55 +2577,54 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
                 // `SCHEMA_EDITOR_MISSING_DEPENDENCY`, the panel never offers the
                 // control, and a caller that asks anyway gets a refusal that
                 // names the missing dependency.
-                writeSource: schemaSourceEditor ? async (change) => {
-                    // The edit is applied the one way it is implemented,
-                    // wherever the file came from (`editCollectionSource`):
-                    // a second implementation of keeping a collection file's
-                    // imports, comments and formatting for the remote case
-                    // would be a second thing to get wrong.
-                    if (change.remove && remoteRepo) {
-                        throw new Error("Deleting a collection is not available with a remote repository yet. Delete it in the repository instead.");
-                    }
-
-                    // No source on this machine: fetch it, rewrite it in a
-                    // scratch directory, hand back the result. This is the whole
-                    // of what kept live schema editing local-only — not
-                    // authentication, not the Git Data API, but the editor
-                    // needing a file to open.
-                    if (remoteRepo) {
-                        const repository = config.liveSchema?.repository
-                            ? createGitHubRepository({
-                                auth: remoteRepo.auth,
-                                owner: remoteRepo.owner,
-                                repo: remoteRepo.repo,
-                                branch: remoteRepo.branch ?? "main"
-                            })
-                            : undefined;
-                        if (!repository) return [];
+                writeSource: remoteRepo
+                    ? (remoteEditor ? async (change) => {
+                        // No source on this machine: fetch the collections
+                        // directory, rewrite it in a scratch directory, hand
+                        // back what changed. The edit is applied the one way it
+                        // is implemented (`editCollectionSource`, or the
+                        // editor's own deletion) — a second implementation of
+                        // keeping a collection file's imports, comments and
+                        // formatting for the remote case would be a second
+                        // thing to get wrong.
+                        if (undeployedCommit) {
+                            throw new Error(
+                                `This deployment already committed a schema change (${undeployedCommit.slice(0, 9)}) ` +
+                                "that it is not running yet. Deploy that commit, then make the next change: " +
+                                "until then a change here is planned against the collections this deployment " +
+                                "runs, and its generated schema files would leave the first change out. " +
+                                "Nothing was changed."
+                            );
+                        }
+                        const { AstSchemaEditor } = remoteEditor!;
                         return rewriteRemoteCollection(
                             {
-                                repository,
+                                repository: createGitHubRepository({
+                                    auth: remoteRepo.auth,
+                                    owner: remoteRepo.owner,
+                                    repo: remoteRepo.repo,
+                                    branch: remoteRepo.branch ?? "main"
+                                }),
                                 collectionsPath: remoteRepo.collectionsPath ?? DEFAULT_COLLECTIONS_PATH,
-                                // A scratch directory holding the one file:
-                                // an editor of its own costs a single parse.
-                                edit: async (dir, collectionId, edit) => {
-                                    const { AstSchemaEditor } = await import("./api/ast-schema-editor");
-                                    await editCollectionSource(new AstSchemaEditor(dir), collectionId, edit);
+                                edit: async (dir, collectionId, edit: typeof change) => {
+                                    const editor = new AstSchemaEditor(dir);
+                                    if (edit.remove) await editor.deleteCollection(collectionId);
+                                    else await editCollectionSource(editor, collectionId, edit);
                                 }
                             },
                             change.collectionId,
                             change
                         );
-                    }
-
-                    // This machine's source: through the process's editor,
-                    // queued behind any edit already running in either router.
-                    return writeLocalCollectionSource(
-                        schemaSourceEditor,
-                        { collectionsDir: collectionsDir!, repositoryRoot: repositoryRoot! },
-                        change
-                    );
-                } : undefined,
+                    } : undefined)
+                    : schemaSourceEditor ? async (change) => {
+                        // This machine's source: through the process's editor,
+                        // queued behind any edit already running in either router.
+                        return writeLocalCollectionSource(
+                            schemaSourceEditor,
+                            { collectionsDir: collectionsDir!, repositoryRoot: repositoryRoot! },
+                            change
+                        );
+                    } : undefined,
                 // The same path `writeSource` resolves, derived without writing
                 // anything — the dirty-tree check has to know it before the
                 // edit, or it sees this change's own file and refuses.
@@ -2572,7 +2632,10 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
                     if (remoteRepo) {
                         const dir = (remoteRepo.collectionsPath ?? DEFAULT_COLLECTIONS_PATH)
                             .replace(/\/+$/, "");
-                        return [`${dir}/${change.collectionId}.ts`];
+                        return [
+                            `${dir}/${change.collectionId}.ts`,
+                            ...(change.remove ? [`${dir}/index.ts`] : [])
+                        ];
                     }
                     if (!collectionsDir || !repositoryRoot) return [];
                     return [

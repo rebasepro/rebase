@@ -65,6 +65,16 @@ export interface SchemaEditRepository {
      */
     readFile?(path: string): Promise<string | undefined>;
     /**
+     * Every file under `dir` (repo-relative, recursive), as repo-relative paths.
+     *
+     * Needed by the same deployment as {@link readFile}: the editor reads a
+     * collection's siblings — the file a relation picked by slug imports, the
+     * importers a deletion must refuse over, the `index.ts` it edits — so the
+     * whole collections directory is brought over, not only the edited file.
+     * An empty answer for a directory that does not exist yet.
+     */
+    listFiles?(dir: string): Promise<string[]>;
+    /**
      * Put these files back exactly as they were — `undefined` contents meaning
      * the file did not exist — and unstage them.
      *

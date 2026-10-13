@@ -238,6 +238,31 @@ export function createGitHubRepository(options: GitHubRepositoryOptions): Schema
             return Buffer.from(body.content, "base64").toString("utf8");
         },
 
+        /**
+         * Every file under `dir` on the branch, from one recursive tree read.
+         *
+         * A truncated tree (GitHub caps a recursive listing) is refused: a
+         * sibling missing from it reads as "nothing imports this collection",
+         * which is exactly the check a deletion depends on.
+         */
+        async listFiles(dir: string): Promise<string[]> {
+            const auth = await bearer();
+            const listing = await call<{ tree?: { path: string; type: string }[]; truncated?: boolean }>(
+                `/repos/${owner}/${repo}/git/trees/${encodeURIComponent(branch)}?recursive=1`,
+                { auth }
+            );
+            if (listing.truncated) {
+                throw new Error(
+                    `The repository ${owner}/${repo} is too large for GitHub to list in one request (the tree ` +
+                    "came back truncated), so the collection files cannot all be read. Nothing was changed."
+                );
+            }
+            const prefix = `${dir.replace(/\/+$/, "")}/`;
+            return (listing.tree ?? [])
+                .filter(entry => entry.type === "blob" && entry.path.startsWith(prefix))
+                .map(entry => entry.path);
+        },
+
         async commit(paths: string[], message: string): Promise<string> {
             if (staged.length === 0) throw new Error("Refusing to commit with nothing staged.");
 

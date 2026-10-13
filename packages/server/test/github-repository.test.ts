@@ -234,3 +234,56 @@ describe("the shape a working tree has and this does not", () => {
         expect(makeRepo(stubGitHub()).root).toBe("rebasepro/customer-project");
     });
 });
+
+/**
+ * Listing the collections directory, so a bundle deployment's editor sees the
+ * siblings of the file it rewrites (a relation's target, a deletion's
+ * importers, `index.ts`).
+ */
+describe("listing a directory", () => {
+    function treeStub(tree: { path: string; type: string }[], truncated = false) {
+        const calls: string[] = [];
+        const fetchImpl = (async (url: string) => {
+            calls.push(url.replace("https://api.github.com", ""));
+            return {
+                ok: true,
+                status: 200,
+                json: async () => ({ sha: "t", tree, truncated }),
+                text: async () => ""
+            } as unknown as Response;
+        }) as unknown as typeof fetch;
+        const repository = createGitHubRepository({
+            auth: { kind: "token", token: "ghp_x" },
+            owner: "rebasepro",
+            repo: "customer-project",
+            branch: "release/1",
+            fetchImpl,
+            now: () => NOW
+        });
+        return { repository, calls };
+    }
+
+    it("answers the blobs under the directory, recursively, from the branch it commits onto", async () => {
+        const { repository, calls } = treeStub([
+            { path: "config", type: "tree" },
+            { path: "config/collections", type: "tree" },
+            { path: "config/collections/posts.ts", type: "blob" },
+            { path: "config/collections/nested/tags.ts", type: "blob" },
+            { path: "config/collections-old/x.ts", type: "blob" },
+            { path: "config/other.ts", type: "blob" }
+        ]);
+
+        expect(await repository.listFiles!("config/collections/")).toEqual([
+            "config/collections/posts.ts",
+            "config/collections/nested/tags.ts"
+        ]);
+        expect(calls).toEqual(["/repos/rebasepro/customer-project/git/trees/release%2F1?recursive=1"]);
+    });
+
+    it("refuses a truncated listing rather than editing with files missing", async () => {
+        // A missing sibling reads as "nothing imports this", which is the
+        // check a deletion depends on.
+        const { repository } = treeStub([{ path: "config/collections/posts.ts", type: "blob" }], true);
+        await expect(repository.listFiles!("config/collections")).rejects.toThrow(/truncated/);
+    });
+});

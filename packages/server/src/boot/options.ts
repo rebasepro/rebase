@@ -1,11 +1,13 @@
 import type { CollectionConfig } from "@rebasepro/types";
-import type { RebaseAuthConfig } from "../init";
+import type { LiveSchemaConfig, RebaseAuthConfig } from "../init";
 import type { EmailConfig } from "../email";
 import { createDevEmailSink, registerDevEmailSink } from "../email/dev-sink";
 import type { CaptchaConfig, CaptchaRoute } from "../auth/captcha";
 import type { RebaseBootEnv } from "./env";
 import { normalizePemFromEnv } from "../auth/jwt-keys";
 import { logger } from "../utils/logger";
+import { BundleError } from "./bundle";
+import { DEFAULT_COLLECTIONS_PATH } from "../schema-edit/project-root";
 
 /**
  * True when an emailed link would be followable — i.e. when there is an
@@ -234,4 +236,94 @@ export function resolveAuthOptions(
     }
 
     return auth;
+}
+
+const LIVE_SCHEMA_DOCS = "See https://rebase.pro/docs/backend/live-schema-editing/ for live schema editing from a bundle.";
+
+/**
+ * Live schema editing for a built bundle, from the environment — or nothing.
+ *
+ * Opt-in: `undefined` unless `REBASE_LIVE_SCHEMA_REPOSITORY` names the
+ * repository to commit to, and then a bundle boots exactly as it did. A
+ * bundle has no code of its own to pass `liveSchema.repository` from, so this
+ * is the only way one can name a write target.
+ *
+ * A target that is named but cannot be reached — no credential, two
+ * credentials, half a GitHub App, a repository that is not `owner/name`, a
+ * collections path that leaves the repository — fails the boot. The other
+ * outcome is an "Edit collection" button that fails on press, on a deployment
+ * whose operator was sure they had configured it.
+ */
+export function resolveLiveSchemaOptions(env: RebaseBootEnv): LiveSchemaConfig | undefined {
+    const repositoryName = env.REBASE_LIVE_SCHEMA_REPOSITORY?.trim();
+    const token = env.REBASE_LIVE_SCHEMA_GITHUB_TOKEN?.trim();
+    const app = {
+        REBASE_LIVE_SCHEMA_GITHUB_APP_ID: env.REBASE_LIVE_SCHEMA_GITHUB_APP_ID?.trim(),
+        REBASE_LIVE_SCHEMA_GITHUB_APP_INSTALLATION_ID: env.REBASE_LIVE_SCHEMA_GITHUB_APP_INSTALLATION_ID?.trim(),
+        REBASE_LIVE_SCHEMA_GITHUB_APP_PRIVATE_KEY: env.REBASE_LIVE_SCHEMA_GITHUB_APP_PRIVATE_KEY?.trim()
+    };
+    const appSet = Object.entries(app).filter(([, value]) => Boolean(value)).map(([name]) => name);
+
+    if (!repositoryName) {
+        if (token || appSet.length > 0) {
+            logger.warn(
+                "A live schema editing credential is set but REBASE_LIVE_SCHEMA_REPOSITORY is not, so " +
+                "live schema editing stays off. Set REBASE_LIVE_SCHEMA_REPOSITORY=owner/name to turn it on."
+            );
+        }
+        return undefined;
+    }
+
+    const match = /^([A-Za-z0-9-]+)\/([A-Za-z0-9._-]+)$/.exec(repositoryName);
+    if (!match) {
+        throw new BundleError(
+            `REBASE_LIVE_SCHEMA_REPOSITORY must be a GitHub repository as owner/name (e.g. acme/shop), not "${repositoryName}".`,
+            LIVE_SCHEMA_DOCS
+        );
+    }
+
+    if (token && appSet.length > 0) {
+        throw new BundleError(
+            "Live schema editing has both REBASE_LIVE_SCHEMA_GITHUB_TOKEN and a GitHub App " +
+            `(${appSet.join(", ")}) set. Set one, so which credential commits is not a guess.`,
+            LIVE_SCHEMA_DOCS
+        );
+    }
+    if (!token && appSet.length < 3) {
+        const missing = Object.keys(app).filter(name => !appSet.includes(name));
+        throw new BundleError(
+            `REBASE_LIVE_SCHEMA_REPOSITORY=${repositoryName} needs a credential to commit with: ` +
+            "REBASE_LIVE_SCHEMA_GITHUB_TOKEN, or a GitHub App" +
+            (appSet.length > 0 ? ` (missing ${missing.join(", ")})` : ` (${missing.join(", ")})`) + ".",
+            LIVE_SCHEMA_DOCS
+        );
+    }
+
+    const collectionsPath = (env.REBASE_LIVE_SCHEMA_COLLECTIONS_PATH?.trim() || DEFAULT_COLLECTIONS_PATH)
+        .replace(/^\.\//, "")
+        .replace(/\/+$/, "");
+    if (!collectionsPath || collectionsPath.startsWith("/") || collectionsPath.split("/").some(part => part === ".." || part === "")) {
+        throw new BundleError(
+            `REBASE_LIVE_SCHEMA_COLLECTIONS_PATH must be a path inside the repository, like config/collections, not "${env.REBASE_LIVE_SCHEMA_COLLECTIONS_PATH}".`,
+            LIVE_SCHEMA_DOCS
+        );
+    }
+
+    return {
+        repository: {
+            kind: "github",
+            owner: match[1],
+            repo: match[2],
+            branch: env.REBASE_LIVE_SCHEMA_BRANCH?.trim() || "main",
+            collectionsPath,
+            auth: token
+                ? { kind: "token", token }
+                : {
+                    kind: "app",
+                    appId: app.REBASE_LIVE_SCHEMA_GITHUB_APP_ID!,
+                    installationId: app.REBASE_LIVE_SCHEMA_GITHUB_APP_INSTALLATION_ID!,
+                    privateKey: normalizePemFromEnv(app.REBASE_LIVE_SCHEMA_GITHUB_APP_PRIVATE_KEY!)
+                }
+        }
+    };
 }

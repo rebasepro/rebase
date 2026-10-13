@@ -185,6 +185,42 @@ describe("collection editing follows the backend, not the bundle", () => {
         ));
     });
 
+    it("is editable on a bundle with live schema editing, though its source-only editor is off", async () => {
+        // A bundle boots with `schemaEditor: false`, so the source-only editor
+        // says SCHEMA_EDITOR_DISABLED — and with a repository configured, live
+        // editing is on. Every write goes through live editing when it is, so
+        // the source-only answer must not lock the editor.
+        global.fetch = jest.fn(async (url: string) => {
+            const body = String(url).endsWith("/schema-editor/status")
+                ? { enabled: false, code: "SCHEMA_EDITOR_DISABLED", reason: "turned off for this server" }
+                : { enabled: true, canPlan: true, canApply: true, repository: "acme/shop", branch: "main" };
+            return { ok: true, status: 200, json: async () => body, text: async () => JSON.stringify(body) } as unknown as Response;
+        }) as unknown as typeof fetch;
+
+        const { result } = renderHook(() => useLocalCollectionsConfigController(client, []));
+
+        // Both at once: before either answer arrives the build-mode guess
+        // already says "editable", with the generic reason beside it.
+        await waitFor(() => {
+            expect(result.current.readOnly).toBe(false);
+            expect(result.current.readOnlyReason).toBeUndefined();
+        });
+    });
+
+    it("stays read-only on a bundle whose live schema editing is off too", async () => {
+        global.fetch = jest.fn(async (url: string) => {
+            const body = String(url).endsWith("/schema-editor/status")
+                ? { enabled: false, code: "SCHEMA_EDITOR_DISABLED", reason: "turned off for this server" }
+                : { enabled: false, canPlan: true, code: "SCHEMA_EDITOR_DISABLED", reason: "turned off for this server" };
+            return { ok: true, status: 200, json: async () => body, text: async () => JSON.stringify(body) } as unknown as Response;
+        }) as unknown as typeof fetch;
+
+        const { result } = renderHook(() => useLocalCollectionsConfigController(client, []));
+
+        await waitFor(() => expect(result.current.readOnly).toBe(true));
+        expect(result.current.readOnlyReason).toBe("turned off for this server");
+    });
+
     it("stays usable when the backend is unreachable", async () => {
         global.fetch = jest.fn(async () => {
             throw new TypeError("Failed to fetch");

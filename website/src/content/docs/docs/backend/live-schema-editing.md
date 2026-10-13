@@ -291,10 +291,16 @@ So a failed apply is **not an error**. The response says so:
 ## Where this works
 
 Live schema editing rewrites your collection source with the same editor the
-panel's source-only saves use, so it runs where that editor runs: a server with
-your **collection source on disk** (`collectionsDir`) and its schema editor on.
-The schema editor is off under `NODE_ENV=production` unless the server sets
-`schemaEditor: true`, and it needs `ts-morph` installed.
+panel's source-only saves use (it needs `ts-morph` installed). Where that source
+comes from decides where it runs:
+
+- **On disk** (`collectionsDir`, the default): it runs where the source-only
+  editor runs. That editor is off under `NODE_ENV=production` unless the server
+  sets `schemaEditor: true`.
+- **In a repository you name** (`liveSchema.repository`, or
+  `REBASE_LIVE_SCHEMA_REPOSITORY` for a bundle): the source is read from
+  GitHub and the change is committed back there, so it runs anywhere,
+  production included. This is the opt-in for a built bundle.
 
 ### MongoDB
 
@@ -315,20 +321,59 @@ so rather than leaving you to assume the relational answer.
 |---|---|
 | `rebase dev` on your machine | yes |
 | Self-host with the project and its git working tree mounted | yes, when `NODE_ENV` is not `production`, or with `schemaEditor: true` |
-| A built bundle: a self-host serving a build, or Rebase Cloud | no |
+| A built bundle: a self-host serving a build, or the published image | only when it opts in with `REBASE_LIVE_SCHEMA_REPOSITORY` — see [From a built bundle](#from-a-built-bundle) |
+| Any server with `liveSchema.repository` configured | yes, `NODE_ENV=production` included |
 
 A bundle is compiled output, so there is no collection source in it, and the
-runtime that serves it turns the schema editor off. `/api/admin/schema/status`
-answers `enabled: false` with the code `SCHEMA_EDITOR_DISABLED`. Edit
-collections in development, commit, and deploy.
+runtime that serves it turns the source-only editor off. Unless it names a
+repository, `/api/admin/schema/status` answers `enabled: false` with the code
+`SCHEMA_EDITOR_DISABLED`: edit collections in development, commit, and deploy.
+
+### From a built bundle
+
+A bundle has no code of its own to configure, so it opts in with environment
+variables. Nothing changes for a bundle that does not set them.
+
+```bash
+REBASE_LIVE_SCHEMA_REPOSITORY=acme/storefront     # turns it on
+REBASE_LIVE_SCHEMA_GITHUB_TOKEN=github_pat_…       # or the three _GITHUB_APP_* variables
+# REBASE_LIVE_SCHEMA_BRANCH=main                   # default
+# REBASE_LIVE_SCHEMA_COLLECTIONS_PATH=config/collections   # default
+```
+
+The full list is in [Configuration](/docs/getting-started/configuration#live-schema-editing-from-a-bundle).
+A repository named without a usable credential (none, both kinds, half a GitHub
+App), or a value that is not `owner/name`, refuses to boot, rather than serving
+an editor that fails when somebody presses Apply.
+
+What stays the same when it is on:
+
+- It is an `/api/admin` surface: no answer at all without `schema:read`, and
+  `/apply` needs `schema:write` and a person (see [Who may apply](#who-may-apply)).
+- The write target is only the repository you named. The source-only editor,
+  which writes files beside the process, stays off.
+- Each change is planned, shown, committed, then applied, exactly as on your
+  machine.
+
+One thing is different. The running deployment keeps serving the collections it
+was built with until your pipeline builds and deploys the commit. The database
+has the change at once; the admin panel and the API see the new collection
+definition after that deploy.
+
+So a deployment makes **one change per deploy**. After a commit lands, the next
+apply is refused with `SCHEMA_CHANGE_FAILED`, naming the commit, until a process
+running that commit replaces this one. A second change planned against the
+collections this deployment still runs would commit generated schema files that
+leave the first change out. Planning stays available meanwhile.
 
 ### Committing to a remote repository
 
 `liveSchema.repository` makes the server commit each change to a GitHub
 repository through the Git Data API instead of running `git commit` in a
-working tree. It takes effect only on a server whose schema editor is on,
-which means a server with `collectionsDir` on disk (see the table above). A
-built bundle does not read it.
+working tree. It does not depend on the source-only editor being on: with a
+repository configured, live editing works under `NODE_ENV=production` and with
+`schemaEditor: false`, because nothing on this machine is written. A bundle
+sets it through the variables above.
 
 ```typescript no-verify
 initializeRebaseBackend({
@@ -348,12 +393,13 @@ initializeRebaseBackend({
 })
 ```
 
-The changed collection file is then read from the repository, rewritten with
-the same editor that runs locally, and committed back through the Git Data API:
-a blob, a tree, a commit and a ref update. Nothing is cloned and nothing is
-left on disk. Only that one file is fetched, so two changes cannot be made in
-this mode: adding a relation that targets another collection, and deleting a
-collection.
+The collections directory is then read from the repository, rewritten with the
+same editor that runs locally, and what changed is committed back through the
+Git Data API: a blob per file, a tree, a commit and a ref update. Nothing is
+cloned and nothing is left on disk. The whole directory is read, not only the
+edited file, so a relation can target another collection (its file is
+imported) and deleting a collection works as it does locally: refused while
+another collection imports it, and removed from `index.ts` in the same commit.
 
 `auth` takes a token or a GitHub App installation:
 

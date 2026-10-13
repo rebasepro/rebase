@@ -323,10 +323,10 @@ so a panel can grey the feature out instead of showing an error.
 | `SCHEMA_EDITING_NO_REPOSITORY` | 503 | Planning works; there is no repository to commit the change to. | Configure `liveSchema.repository`. |
 | `SCHEMA_EDITING_UNSUPPORTED` | 503 | This driver cannot plan schema changes. | Live editing is available on Postgres. |
 | `SCHEMA_EDITOR_BAAS_MODE` | 501 | Collections are introspected from the database here, so there are no source files to edit. | Change the schema with a migration. |
-| `SCHEMA_EDITOR_DISABLED` | 501 | The schema editor is turned off for this server. | Turn it on with `schemaEditor`. |
+| `SCHEMA_EDITOR_DISABLED` | 501 | The schema editor is turned off for this server. A built bundle always answers this. | Turn it on with `schemaEditor`. On a bundle, set `REBASE_LIVE_SCHEMA_REPOSITORY` to edit collections through a repository — see [Live schema editing](/docs/backend/live-schema-editing#from-a-built-bundle). |
 | `SCHEMA_EDITOR_MISSING_DEPENDENCY` | 501 | The schema editor needs `ts-morph`, which is not installed. | `pnpm add -D ts-morph@28.0.0`. |
 | `SCHEMA_EDITOR_NO_COLLECTIONS_DIR` | 501 | The server has no `collectionsDir`, so the editor has nothing to write to. | Set `collectionsDir`. |
-| `SCHEMA_EDITOR_PRODUCTION` | 501 | The editor is off under `NODE_ENV=production`: a deployed server's files are rebuilt from your repository on every deploy, so an edit here would be discarded. | Edit collections in development and deploy. |
+| `SCHEMA_EDITOR_PRODUCTION` | 501 | The editor is off under `NODE_ENV=production`: a deployed server's files are rebuilt from your repository on every deploy, so an edit here would be discarded. | Edit collections in development and deploy, or configure `liveSchema.repository` to commit them there. |
 | `SQL_EXPORT_UNSUPPORTED` | 501 | <span class="since-badge" data-since="0.25">Since 0.25</span> `POST /api/admin/sql/csv` cannot stream a result here: the in-process development database (PGlite) has one connection, and a cursor held across a download would hold every other query behind it; or the data source has no SQL cursor. | Point `DATABASE_URL` at a Postgres of your own (`rebase dev --docker` starts one), or add a `LIMIT` and export the rows on screen. |
 
 ## Generic codes

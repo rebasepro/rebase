@@ -225,13 +225,19 @@ export function useLocalCollectionsConfigController(
         await liveSchema.reviewChange(proposed);
     };
 
+    // Live schema editing, when it is on, is where every write goes (`write`
+    // above), so the source-only editor's answer does not lock the editor
+    // then. That is the case of a bundle with `REBASE_LIVE_SCHEMA_REPOSITORY`:
+    // it has no source of its own, so its source-only editor is off, and its
+    // writes are committed to the repository instead.
+    const liveEditing = liveSchema.status?.enabled === true;
     const readOnly = forcedReadOnly
-        ?? (availability.state === "known" ? !availability.enabled : buildModeGuess());
+        ?? (liveEditing ? false : availability.state === "known" ? !availability.enabled : buildModeGuess());
 
     // No reason of our own for a user without schema access. Each surface
     // has a generic "editing is disabled" for that, and the user's scopes may
     // still be loading, so a specific reason could be wrong.
-    const readOnlyReason = noSchemaAccess
+    const readOnlyReason = noSchemaAccess || liveEditing
         ? undefined
         : availability.state === "known" && availability.reason
             ? availability.reason

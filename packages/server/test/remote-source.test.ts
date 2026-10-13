@@ -151,3 +151,162 @@ describe("rewriting a remote collection", () => {
         )).rejects.toThrow(/cannot read a file/);
     });
 });
+
+/**
+ * The whole collections directory, not one file.
+ *
+ * The scratch directory used to hold only the collection being edited. The
+ * editor reads its siblings for two things — a relation picked by slug imports
+ * the target's file, and a deletion refuses while another file imports the
+ * one going and edits `index.ts` — so in a bundle deployment adding a
+ * relation threw "no file for it in <tmp>" and deleting a collection was
+ * refused outright. With a repository that can list a directory, every
+ * collection file is brought over, and what comes back is exactly what the
+ * editor changed: edited files, new files, and deletions.
+ */
+describe("rewriting a remote collection with its siblings", () => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { AstSchemaEditor } = require("../src/api/ast-schema-editor") as typeof import("../src/api/ast-schema-editor");
+
+    const collectionFile = (slug: string, extra = "", imports = "") => [
+        "import { defineCollection } from \"@rebasepro/cms-types\";",
+        imports,
+        `const ${slug}Collection = defineCollection({`,
+        `    name: "${slug}",`,
+        `    slug: "${slug}",`,
+        `    table: "${slug}",`,
+        "    properties: {",
+        `        name: { name: "Name", type: "string" }${extra}`,
+        "    }",
+        "});",
+        "",
+        `export default ${slug}Collection;`,
+        ""
+    ].join("\n");
+
+    const INDEX = [
+        "import postsCollection from \"./posts\";",
+        "import authorsCollection from \"./authors\";",
+        "import tagsCollection from \"./tags\";",
+        "",
+        "export const collections = [postsCollection, authorsCollection, tagsCollection];",
+        ""
+    ].join("\n");
+
+    /** A repository that can list a directory, as the GitHub one can. */
+    function listingRepository(files: Record<string, string>) {
+        const repository = repositoryWith(files);
+        const listed: string[] = [];
+        return Object.assign(repository, {
+            listed,
+            listFiles: async (dir: string) => {
+                listed.push(dir);
+                return Object.keys(files).filter(p => p.startsWith(`${dir}/`));
+            }
+        });
+    }
+
+    const PROJECT = {
+        "config/collections/posts.ts": collectionFile("posts"),
+        "config/collections/authors.ts": collectionFile("authors"),
+        "config/collections/tags.ts": collectionFile("tags"),
+        "config/collections/index.ts": INDEX,
+        "config/other.ts": "export const unrelated = 1;\n"
+    };
+
+    /** What `init.ts` hands over: the real editor, removal included. */
+    const realEditor = async (
+        dir: string,
+        id: string,
+        change: { patch?: never[]; remove?: boolean } | Record<string, unknown>
+    ) => {
+        const editor = new AstSchemaEditor(dir);
+        if ((change as { remove?: boolean }).remove) {
+            await editor.deleteCollection(id);
+            return;
+        }
+        await editor.applyPatch(id, (change as { patch: never[] }).patch);
+    };
+
+    it("links a relation to another collection picked by its slug", async () => {
+        const repository = listingRepository(PROJECT);
+        const files = await rewriteRemoteCollection(
+            { repository, collectionsPath: "config/collections", edit: realEditor as never },
+            "posts",
+            {
+                patch: [{
+                    op: "set",
+                    path: ["properties", "author"],
+                    value: { name: "Author", type: "relation", relation: { kind: "belongsTo", target: "authors" } }
+                }]
+            }
+        );
+
+        expect(repository.listed).toEqual(["config/collections"]);
+        // Only the edited file: the siblings were read, not rewritten.
+        expect(files.map(f => f.path)).toEqual(["config/collections/posts.ts"]);
+        expect(files[0].contents).toContain("import authorsCollection from \"./authors.js\";");
+        expect(files[0].contents).toContain("target: () => authorsCollection");
+    });
+
+    it("deletes a collection, taking it out of index.ts in the same change", async () => {
+        const repository = listingRepository(PROJECT);
+        const files = await rewriteRemoteCollection(
+            { repository, collectionsPath: "config/collections", edit: realEditor as never },
+            "tags",
+            { remove: true }
+        );
+
+        const byPath = Object.fromEntries(files.map(f => [f.path, f]));
+        expect(Object.keys(byPath).sort()).toEqual([
+            "config/collections/index.ts",
+            "config/collections/tags.ts"
+        ]);
+        expect(byPath["config/collections/tags.ts"]).toMatchObject({ contents: "", deleted: true });
+        expect(byPath["config/collections/index.ts"].contents).not.toMatch(/tags/i);
+        expect(byPath["config/collections/index.ts"].contents).toContain("postsCollection, authorsCollection");
+    });
+
+    it("refuses to delete a collection another one imports, naming it", async () => {
+        const repository = listingRepository({
+            ...PROJECT,
+            "config/collections/posts.ts": collectionFile(
+                "posts",
+                ",\n        tags: { name: \"Tags\", type: \"relation\", relation: { kind: \"manyToMany\", target: () => tagsCollection } }",
+                "import tagsCollection from \"./tags.js\";"
+            )
+        });
+        await expect(rewriteRemoteCollection(
+            { repository, collectionsPath: "config/collections", edit: realEditor as never },
+            "tags",
+            { remove: true }
+        )).rejects.toThrow(/Cannot delete "tags": posts\.ts imports it/);
+    });
+
+    it("refuses a deletion when it can only see the one file", async () => {
+        // Without the siblings, nothing can tell whether another collection
+        // imports this one, and index.ts cannot be edited: committing the
+        // deletion alone is the change that stops every collection loading.
+        const repository = repositoryWith({ "config/collections/tags.ts": collectionFile("tags") });
+        await expect(rewriteRemoteCollection(
+            { repository, collectionsPath: "config/collections", edit: realEditor as never },
+            "tags",
+            { remove: true }
+        )).rejects.toThrow(/list/);
+    });
+
+    it("never writes a listed path outside the scratch directory", async () => {
+        const repository = repositoryWith({
+            "config/collections/posts.ts": collectionFile("posts"),
+            "config/collections/../../escape.ts": "export const x = 1;\n"
+        });
+        Object.assign(repository, {
+            listFiles: async () => ["config/collections/posts.ts", "config/collections/../../escape.ts"]
+        });
+        await expect(rewriteRemoteCollection(
+            { repository, collectionsPath: "config/collections", edit: writesFile("x") },
+            "posts",
+            {}
+        )).rejects.toThrow(/outside/);
+    });
+});

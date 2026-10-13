@@ -48,7 +48,7 @@ import { resolveDataSources, resolveStorageSources } from "./sources";
 import { planStaticAppMounts, staticAppsShadowedByApi } from "./static-routing";
 import { bundleResolutionRoots, initializeDataSources, probeDataSource, type InitializedDataSource } from "./driver";
 import { resolveRlsAuditOptions } from "./rls-audit-option";
-import { resolveAuthOptions } from "./options";
+import { resolveAuthOptions, resolveLiveSchemaOptions } from "./options";
 import { createMetricsRoutes, createMetricsMiddleware } from "../metrics";
 import { recordPoolWaits } from "../metrics/pool-wait";
 import { fetchBundle, shouldFetchBundle, usableBundleFallback, dedupeRuntimePackages, imageModulesDir, BUNDLE_URL_ENV, BUNDLE_TOKEN_ENV, BUNDLE_FETCH_DIR_ENV } from "./fetch-bundle.js";
@@ -240,6 +240,11 @@ export async function bootFromBundle(options: BootOptions = {}): Promise<BootedR
     // that cannot boot must say so at once rather than after opening a pool and
     // half-mounting a server.
     const runtimeRole = resolveRole(env);
+
+    // Live schema editing from this bundle — off unless the environment names
+    // a repository to commit to. Resolved here, beside the role, so a target
+    // that is named but unusable stops the boot before a pool is opened.
+    const liveSchema = resolveLiveSchemaOptions(env);
     if (runtimeRole.role !== "all") {
         logger.info(`Runtime role: ${runtimeRole.role}`, {
             provisionsSchema: runtimeRole.provisionSchema,
@@ -397,7 +402,11 @@ export async function bootFromBundle(options: BootOptions = {}): Promise<BootedR
         // TypeScript. `undefined` is not "on": it hands the decision back to
         // `initializeRebaseBackend`, which already weighs `collectionsDir`,
         // `baas` mode and `NODE_ENV`, and reports whichever of those said no.
-        schemaEditor: bundle.isSource ? undefined : false
+        schemaEditor: bundle.isSource ? undefined : false,
+        // The one way a bundle edits its schema: through a repository it names
+        // (`REBASE_LIVE_SCHEMA_REPOSITORY`), never the compiled files beside it.
+        // Undefined unless set, which leaves the boot exactly as it was.
+        liveSchema
     });
 
     // Restrict metric labels to collections that exist, now that they do.

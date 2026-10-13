@@ -340,7 +340,32 @@ export const bootEnvExtension = z.object({
      * instead of mounting them, so a split deployment presents the identical URL
      * surface and nobody has to run a reverse proxy to try one.
      */
-    REBASE_FUNCTIONS_UPSTREAM: z.string().optional()
+    REBASE_FUNCTIONS_UPSTREAM: z.string().optional(),
+
+    // ── Live schema editing from a bundle ────────────────────────────────────
+    /**
+     * Turn on live schema editing for a built bundle, committing to this
+     * GitHub repository (`owner/name`).
+     *
+     * Off unless set. A bundle ships compiled collections, so the admin's
+     * collection editor has no source to rewrite; with this set, a change is
+     * read from the repository, rewritten, committed back through the Git Data
+     * API, and its DDL run on this database. Admin-only, like the rest of
+     * `/api/admin`, and applied only by a person (see
+     * `REBASE_LIVE_SCHEMA_ALLOW_MACHINE_APPLY`). Needs one credential:
+     * `REBASE_LIVE_SCHEMA_GITHUB_TOKEN`, or the three `_GITHUB_APP_*`.
+     */
+    REBASE_LIVE_SCHEMA_REPOSITORY: z.string().optional(),
+    /** The branch the commit lands on. Defaults to `main`. */
+    REBASE_LIVE_SCHEMA_BRANCH: z.string().optional(),
+    /** Where the collection source lives in that repository. Defaults to `config/collections`. */
+    REBASE_LIVE_SCHEMA_COLLECTIONS_PATH: z.string().optional(),
+    /** A token with read and write access to the repository's contents. */
+    REBASE_LIVE_SCHEMA_GITHUB_TOKEN: z.string().optional(),
+    /** A GitHub App instead of a token: its id, installation and private key (PEM, escaped PEM or base64). */
+    REBASE_LIVE_SCHEMA_GITHUB_APP_ID: z.string().optional(),
+    REBASE_LIVE_SCHEMA_GITHUB_APP_INSTALLATION_ID: z.string().optional(),
+    REBASE_LIVE_SCHEMA_GITHUB_APP_PRIVATE_KEY: z.string().optional()
 });
 
 export type RebaseBootEnv = RebaseEnv & z.infer<typeof bootEnvExtension>;
