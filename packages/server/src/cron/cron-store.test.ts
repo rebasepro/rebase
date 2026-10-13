@@ -304,15 +304,20 @@ describe("createCronStore", () => {
             expect(readyLines(info)).toHaveLength(1);
         });
 
-        it("does not run it again for a store made after it succeeded", async () => {
-            jest.spyOn(logger, "info").mockImplementation(() => { /* silence */ });
+        it("runs it again for a later call, so tables dropped meanwhile come back, and says ready once", async () => {
+            // Only a setup in flight is shared. A database reset under a
+            // running server (`rebase db reset`, an e2e suite dropping the
+            // schema) leaves the tables gone, and a process that remembered
+            // "set up" would never bring them back.
+            const info = jest.spyOn(logger, "info").mockImplementation(() => { /* silence */ });
             const { driver, statements } = recordingDriver();
 
             await createCronStore(driver)!.ensureTable();
             const after = statements.length;
             await createCronStore(driver)!.ensureTable();
 
-            expect(statements).toHaveLength(after);
+            expect(statements.length).toBeGreaterThan(after);
+            expect(readyLines(info)).toHaveLength(1);
         });
 
         it("runs it for each database", async () => {

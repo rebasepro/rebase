@@ -165,11 +165,18 @@ export function startHistoryRetentionSweep(wiring: HistoryRetentionSweepWiring):
     const store = wiring.persistClaims !== false && isSQLAdmin(wiring.driver.admin)
         ? createCronStore(wiring.driver)
         : undefined;
+    let ready: Promise<void> | undefined;
     const sweep = createHistoryRetentionSweep({
         pruneExpired,
         claimSlot: store
             ? async (jobId, slot) => {
-                await store.ensureTable();
+                // Once per sweep, not on every hourly claim; an attempt that
+                // threw is dropped so the next claim tries again.
+                ready ??= store.ensureTable().catch((err: unknown) => {
+                    ready = undefined;
+                    throw err;
+                });
+                await ready;
                 return store.tryClaimRun(jobId, slot);
             }
             : undefined

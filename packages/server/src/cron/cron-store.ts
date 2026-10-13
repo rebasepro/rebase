@@ -280,34 +280,31 @@ function isUniqueViolation(err: unknown): boolean {
 }
 
 /**
- * The setup each database is going through, or has been through, in this
- * process. The scheduler, the expired-token sweep and the history retention
- * sweep each make a store on the same driver, and three setups at once run the
- * same REVOKEs concurrently — which Postgres can answer with "tuple
- * concurrently updated", failing a security control at boot. Keyed on the
- * driver, so a second database gets a setup of its own.
+ * The setup each database is going through right now, in this process. The
+ * scheduler, the expired-token sweep and the history retention sweep each make
+ * a store on the same driver, and three setups at once ran the same REVOKEs
+ * concurrently — which Postgres can answer with "tuple concurrently updated",
+ * failing a security control at boot. Keyed on the driver, so a second
+ * database gets a setup of its own.
+ *
+ * Only the attempt in flight is shared. A later call runs the setup again —
+ * every statement in it is idempotent — because the tables can be gone by
+ * then: a database reset under a running server, or a suite that drops the
+ * schema between tests. A process that remembered "set up" would never bring
+ * them back.
  */
-const setUps = new WeakMap<DataDriver, Promise<void>>();
+const setUpsInFlight = new WeakMap<DataDriver, Promise<void>>();
 
-/**
- * Run `setUp` once per driver: concurrent callers share the attempt in flight,
- * and later callers the one that succeeded. An attempt that fell short — it
- * reported a table it could not bring up, or it threw — is forgotten once it
- * settles, so the next call tries again.
- */
-function ensureOncePerDatabase(driver: DataDriver, setUp: () => Promise<boolean>): Promise<void> {
-    const current = setUps.get(driver);
+/** Databases this process has already said "ready" for, so it says so once. */
+const announcedReady = new WeakSet<DataDriver>();
+
+function ensureSharedInFlight(driver: DataDriver, setUp: () => Promise<boolean>): Promise<void> {
+    const current = setUpsInFlight.get(driver);
     if (current) return current;
-    const attempt = setUp().then(
-        (complete) => {
-            if (!complete && setUps.get(driver) === attempt) setUps.delete(driver);
-        },
-        (err: unknown) => {
-            if (setUps.get(driver) === attempt) setUps.delete(driver);
-            throw err;
-        }
-    );
-    setUps.set(driver, attempt);
+    const attempt = setUp().then(() => undefined).finally(() => {
+        if (setUpsInFlight.get(driver) === attempt) setUpsInFlight.delete(driver);
+    });
+    setUpsInFlight.set(driver, attempt);
     return attempt;
 }
 
@@ -418,13 +415,19 @@ export function createCronStore(driver: DataDriver): Required<CronStore> | undef
      * The boot setup. Resolves with whether every table came up and was locked
      * away; anything short of that has been reported, and is worth another try.
      */
+    const announceReady = (): void => {
+        if (announcedReady.has(driver)) return;
+        announcedReady.add(driver);
+        logger.info("✅ Cron logs table ready");
+    };
+
     const setUp = async (): Promise<boolean> => {
         // A warm boot: everything is there and locked away. The future
         // claims are about the slots this boot is about to fire, so they
         // are released either way.
         if (await bootIsCurrent()) {
             await releaseFutureClaims();
-            logger.info("✅ Cron logs table ready");
+            announceReady();
             return true;
         }
 
@@ -574,7 +577,7 @@ export function createCronStore(driver: DataDriver): Required<CronStore> | undef
         }
 
         if (logsReady && claimsReady && stateReady) {
-            logger.info("✅ Cron logs table ready");
+            announceReady();
             return true;
         }
         // Say which capability is gone, and what it costs. "Continuing
@@ -600,7 +603,7 @@ export function createCronStore(driver: DataDriver): Required<CronStore> | undef
     };
 
     return {
-        ensureTable: () => ensureOncePerDatabase(driver, setUp),
+        ensureTable: () => ensureSharedInFlight(driver, setUp),
 
         async sweepClaims(): Promise<number> {
             // Garbage-collect old claims — except each job's most recent one.

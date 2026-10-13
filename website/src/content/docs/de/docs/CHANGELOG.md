@@ -1767,13 +1767,13 @@ Die Übersetzung steht noch aus. Der Inhalt unten ist auf Englisch.
 
 #### Jobs & cron
 
-- **The cron tables are set up once per boot, and their end-user revokes no
-  longer fail with "tuple concurrently updated".** The scheduler, the
-  expired-token sweep and the history retention sweep each ran the setup on
-  the same database at the same time, so every boot logged "Cron logs table
-  ready" more than once and the concurrent `REVOKE`s on `rebase.cron_logs`
-  could fail. Stores on one database now share one setup per process; a setup
-  that falls short is reported and tried again on the next call.
+- **The cron tables' end-user revokes no longer fail at boot with "tuple
+  concurrently updated", and "Cron logs table ready" is logged once.** The
+  scheduler, the expired-token sweep and the history retention sweep each ran
+  the setup on the same database at the same time, so the concurrent `REVOKE`s
+  on `rebase.cron_logs` could fail. Callers on one database now share the setup
+  in flight; a later call runs it again, so tables dropped under a running
+  server (a database reset) come back.
 
 #### MCP
 
