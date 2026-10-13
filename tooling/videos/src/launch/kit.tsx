@@ -29,6 +29,13 @@ export const SIZE = {
  *  near-black ground it is 10:1 — a label you can read at feed size. */
 export const ACCENT = CHROMA.cyan;
 
+/** The callout hue on the current ground: cyan on near-black, white on a
+ *  chroma field, where cyan is too close in value to the blue to read. */
+function useAccent(): string {
+    const tone = useTone();
+    return tone.high === "#FFFFFF" ? tone.high : ACCENT;
+}
+
 /** Left margin every section aligns to. */
 export const GUTTER = 140;
 
@@ -176,11 +183,13 @@ function camera(frame: number, focus: Focus[]) {
  * shadow — the treatment theme.ts gives every product surface. It arrives
  * from the right on the section's downbeat.
  */
-export const ProductWindow: React.FC<{ children: React.ReactNode; at?: number; focus?: Focus[] }> = ({
-    children,
-    at = 0,
-    focus = [],
-}) => {
+export const ProductWindow: React.FC<{
+    children: React.ReactNode;
+    at?: number;
+    focus?: Focus[];
+    /** A window that is not the standard one (the camera assumes WINDOW). */
+    rect?: { x: number; y: number; width: number; height: number };
+}> = ({ children, at = 0, focus = [], rect = WINDOW }) => {
     const frame = useCurrentFrame();
     // Lands on the downbeat with the verb, rather than starting from it.
     const t = ramp(frame, at - LEAD * 2, 30);
@@ -189,10 +198,10 @@ export const ProductWindow: React.FC<{ children: React.ReactNode; at?: number; f
         <div
             style={{
                 position: "absolute",
-                left: WINDOW.x,
-                top: WINDOW.y,
-                width: WINDOW.width,
-                height: WINDOW.height,
+                left: rect.x,
+                top: rect.y,
+                width: rect.width,
+                height: rect.height,
                 borderRadius: FRAME.radius,
                 border: FRAME.border,
                 background: FRAME.background,
@@ -239,6 +248,7 @@ export const Callout: React.FC<CalloutSpec> = ({ label, text, target, at, until 
     const frame = useCurrentFrame();
     const { width, height } = useVideoConfig();
     const tone = useTone();
+    const accent = useAccent();
 
     const on = ramp(frame, at, 18);
     const off = until === undefined ? 0 : ramp(frame, until, 10, SHIFT);
@@ -270,13 +280,13 @@ export const Callout: React.FC<CalloutSpec> = ({ label, text, target, at, until 
                 <path
                     d={path}
                     fill="none"
-                    stroke={ACCENT}
+                    stroke={accent}
                     strokeWidth={2}
                     strokeDasharray={length}
                     strokeDashoffset={(1 - line) * length}
                 />
-                <circle cx={tx} cy={ty} r={18 * ring} fill="none" stroke={ACCENT} strokeWidth={2} opacity={ring} />
-                <circle cx={tx} cy={ty} r={6 * ring} fill={ACCENT} />
+                <circle cx={tx} cy={ty} r={18 * ring} fill="none" stroke={accent} strokeWidth={2} opacity={ring} />
+                <circle cx={tx} cy={ty} r={6 * ring} fill={accent} />
             </svg>
             <div
                 style={{
@@ -295,7 +305,7 @@ export const Callout: React.FC<CalloutSpec> = ({ label, text, target, at, until 
                         lineHeight: "24px",
                         textTransform: "uppercase",
                         letterSpacing: TRACKING.eyebrow,
-                        color: ACCENT,
+                        color: accent,
                     }}
                 >
                     {label}
@@ -320,16 +330,93 @@ export const Callout: React.FC<CalloutSpec> = ({ label, text, target, at, until 
 
 /** The verb that names a section, with the eyebrow that says which product
  *  it is. Set on the downbeat. */
-export const Verb: React.FC<{ word: string; product: string }> = ({ word, product }) => (
-    <div style={{ position: "absolute", left: GUTTER, top: 250 }}>
-        <Eyebrow at={4}>{product}</Eyebrow>
-        <div style={{ marginTop: 22 }}>
-            <Word at={0} size={SIZE.word} duration={20}>
-                {word}
-            </Word>
+/** The widest a verb may set: the left column, short of the window. */
+const VERB_MAX = WINDOW.x - GUTTER - 60;
+
+const widths = new Map<string, number>();
+
+/**
+ * A display string's width, measured with the loaded face. Measured rather
+ * than estimated because the verbs differ by a third in length ("Build." to
+ * "Delegate.") and at a fixed size the long ones ran into the window. Only
+ * cached once the face is really there, so a fallback measurement taken
+ * before fonts resolve is never kept.
+ */
+function displayWidth(text: string, size: number): number {
+    const key = `${size}|${text}`;
+    const known = widths.get(key);
+    if (known !== undefined) return known;
+    const ctx = document.createElement("canvas").getContext("2d");
+    if (!ctx) return 0;
+    const font = `600 ${size}px 'Instrument Sans'`;
+    ctx.font = font;
+    const tracking = parseFloat(TRACKING.display) * size;
+    const width = ctx.measureText(text).width + tracking * text.length;
+    if (document.fonts.check(font)) widths.set(key, width);
+    return width;
+}
+
+export const Verb: React.FC<{ word: string; product: string }> = ({ word, product }) => {
+    const size = Math.min(SIZE.word, Math.floor((SIZE.word * VERB_MAX) / Math.max(1, displayWidth(word, SIZE.word))));
+    return (
+        <div style={{ position: "absolute", left: GUTTER, top: 250 }}>
+            <Eyebrow at={4}>{product}</Eyebrow>
+            <div style={{ marginTop: 22 }}>
+                <Word at={0} size={size} duration={20}>
+                    {word}
+                </Word>
+            </div>
         </div>
-    </div>
-);
+    );
+};
+
+/** A label and its sentence in the callout position, with no line: for a
+ *  section whose picture is a diagram that already draws its own. */
+export const Caption: React.FC<{ label: string; text: string; at: number }> = ({ label, text, at }) => {
+    const frame = useCurrentFrame();
+    const tone = useTone();
+    const accent = useAccent();
+    const on = ramp(frame, at, 18);
+    if (frame < at) return null;
+    return (
+        <div
+            style={{
+                position: "absolute",
+                left: GUTTER,
+                top: CALLOUT.top,
+                width: CALLOUT.width,
+                opacity: on,
+                transform: `translateY(${(1 - on) * 14}px)`,
+            }}
+        >
+            <div
+                style={{
+                    fontFamily: FONT.mono,
+                    fontSize: 20,
+                    lineHeight: "24px",
+                    textTransform: "uppercase",
+                    letterSpacing: TRACKING.eyebrow,
+                    color: accent,
+                }}
+            >
+                {label}
+            </div>
+            <div
+                style={{
+                    marginTop: 18,
+                    fontFamily: FONT.body,
+                    fontSize: 32,
+                    lineHeight: 1.35,
+                    letterSpacing: "-0.01em",
+                    color: tone.copy,
+                    textWrap: "balance",
+                }}
+            >
+                {text}
+            </div>
+        </div>
+    );
+};
 
 /**
  * A type slide's slow push: the frame is never quite still while it is

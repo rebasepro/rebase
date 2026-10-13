@@ -335,8 +335,9 @@ function pluck(time, midi, vel = 1, bright = 1, pan = 0) {
 
 // ─── the arrangement ────────────────────────────────────────────────────────
 
-const sectionOf = (bar) =>
-    Object.entries(SECTIONS).find(([, s]) => bar >= s.bar && bar < s.bar + s.bars)[0];
+const ORDER = Object.entries(SECTIONS).map(([name, s]) => ({ name, ...s }));
+const sectionOf = (bar) => ORDER.find((s) => bar >= s.bar && bar < s.bar + s.bars);
+const VERBS = ORDER.filter((s) => s.kind === "verb");
 
 /** The arp walks the chord an octave up: a fixed figure, so it reads as a
  *  motif rather than a run of notes. */
@@ -345,13 +346,16 @@ const FIGURE = [0, 2, 1, 3, 2, 4, 3, 1, 0, 2, 1, 3, 4, 2, 3, 1];
 for (let bar = 0; bar < BARS; bar++) {
     const t0 = bar * BAR_S;
     const chord = CHORDS[bar];
-    const sec = sectionOf(bar);
+    const section = sectionOf(bar);
+    const sec = section.kind;
+    // Verbs open up as the film goes: the filter climbs section by section.
+    const verbIndex = VERBS.findIndex((v) => v.name === section.name);
     const beat = (b) => t0 + b * BEAT_S;
     const tones = [...chord.pad.map((m) => m + 12), chord.pad[0] + 24];
     const lastBar = bar === BARS - 1;
 
     // Pad: under everything, opening up as the film goes.
-    const cutoff = { hook: 1500, premise: 1900, build: 2300, manage: 2300, shape: 2500, claim: 3200, end: 2600 }[sec];
+    const cutoff = sec === "verb" ? 2100 + 100 * verbIndex : { hook: 1500, premise: 1900, claim: 3200, end: 2600 }[sec];
     const padVel = { hook: 0.75, premise: 0.95, claim: 1.15, end: 1 }[sec] ?? 0.85;
     pad(t0, chord.pad, lastBar ? BAR_S - 0.6 : BAR_S, padVel, cutoff);
 
@@ -378,7 +382,7 @@ for (let bar = 0; bar < BARS; bar++) {
     }
 
     // Drums.
-    const groove = sec === "hook" || sec === "build" || sec === "manage" || sec === "shape" || (sec === "end" && !lastBar);
+    const groove = sec === "hook" || sec === "verb" || (sec === "end" && !lastBar);
     if (groove) {
         for (let b = 0; b < 4; b++) kick(beat(b));
         clap(beat(1), 0.85);
@@ -388,7 +392,7 @@ for (let bar = 0; bar < BARS; bar++) {
             else if (sec !== "hook" || s % 2 === 0) hat(t0 + (s * BEAT_S) / 4, s % 2 ? 0.32 : 0.5);
         }
     } else if (sec === "premise") {
-        const lead = bar === SECTIONS.premise.bar + SECTIONS.premise.bars - 1;
+        const lead = bar === section.bar + section.bars - 1;
         for (let b = 0; b < (lead ? 3 : 4); b++) kick(beat(b), 0.8);
         for (let e = 0; e < 8; e++) if (e % 2) hat(beat(e / 2), 0.28);
     } else if (sec === "claim") {
@@ -400,20 +404,19 @@ for (let bar = 0; bar < BARS; bar++) {
     }
 
     // A fill into each new verb, so the cut is announced a beat early.
-    if (bar === 5 || bar === 7 || bar === 9) {
+    const next = sectionOf(bar + 1);
+    if (sec === "verb" && next && next.kind === "verb" && next.bar === bar + 1) {
         for (let s = 0; s < 4; s++) snare(beat(3 + s / 4), 0.35 + 0.15 * s);
     }
 }
 
 // Impacts on the section changes; risers into the two drops.
 impact(0, 0.9);
-impact(SECTIONS.build.bar * BAR_S, 0.85);
-impact(SECTIONS.manage.bar * BAR_S, 0.55);
-impact(SECTIONS.shape.bar * BAR_S, 0.55);
+VERBS.forEach((v, i) => impact(v.bar * BAR_S, i === 0 ? 0.85 : 0.55));
 impact(SECTIONS.claim.bar * BAR_S, 0.7);
 impact(SECTIONS.end.bar * BAR_S, 1);
 impact((BARS - 1) * BAR_S, 0.8);
-riser((SECTIONS.build.bar - 1) * BAR_S, BAR_S, 0.8);
+riser((VERBS[0].bar - 1) * BAR_S, BAR_S, 0.8);
 riser(SECTIONS.claim.bar * BAR_S + BAR_S, BAR_S, 1);
 
 // The roll that carries the claim into the logo: eighths, sixteenths, then

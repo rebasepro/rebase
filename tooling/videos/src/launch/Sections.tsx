@@ -108,9 +108,10 @@ export const Build: React.FC = () => {
 
 export const Manage: React.FC = () => {
     const { callouts, focus } = beats(
-        { label: "Views", text: "Cards, tables and boards over any table.", target: [0.42, 0.44], scale: 1.2 },
+        { label: "Views", text: "Tables, cards and boards over any collection.", target: [0.42, 0.44], scale: 1.2 },
         // The record's image strip, once the card has opened.
-        { label: "Forms", text: "Media, relations and validation, from one file.", target: [0.3, 0.5], scale: 1.45 },
+        // Claim three: the panel is a client of the API like any other.
+        { label: "Same policies", text: "The panel is just another client of your API.", target: [0.3, 0.5], scale: 1.45 },
     );
     return (
         <AbsoluteFill>
@@ -125,8 +126,8 @@ export const Manage: React.FC = () => {
 
 export const Shape: React.FC = () => {
     const { callouts, focus } = beats(
-        // The enum's values, open in the property editor.
-        { label: "Schema", text: "Fields, enums and relations, edited visually.", target: [0.66, 0.7], scale: 1.3 },
+        // A relation open in the property editor: its target collection.
+        { label: "Schema", text: "Collections and relations, edited visually.", target: [0.64, 0.555], scale: 1.3 },
         // The result grid, which arrives on beat two: the clip is cut so the
         // query runs half a second after the downbeat. The camera pulls back
         // to the whole editor — the query and its rows are one picture.
@@ -134,10 +135,10 @@ export const Shape: React.FC = () => {
     );
     return (
         <AbsoluteFill>
-            <Verb word="Shape." product="Studio" />
+            <Verb word="Explore." product="Studio" />
             <ProductWindow focus={focus}>
                 <Sequence durationInFrames={BAR}>
-                    <Clip file="demo/schema.mp4" from={4.4} />
+                    <Clip file="demo/schema.mp4" from={7.7} />
                 </Sequence>
                 <Sequence from={BAR}>
                     <Clip file="demo/studio.mp4" from={15.5} />
