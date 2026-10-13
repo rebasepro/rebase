@@ -18,7 +18,8 @@ policy names on long tables. The last three are product calls: the default
 session length, the password policy on an administrator's chosen password, and
 an empty string on a required field. Three removals follow: two client exports
 that were only engines, an admin hook nothing needs, and a storage option that
-reached no client.
+reached no client. The last is the default storage source, which declaring a
+named bucket no longer moves.
 
 :::note[Changed behaviour and deprecated names]
 0.25 also changes what a few existing calls do, without breaking them. Check
@@ -365,3 +366,29 @@ as an unknown property. It never set the lifetime of a URL a browser received.
 To change how long a private file's URL works, set `storageDownloadTokenTtl`
 (seconds; `STORAGE_DOWNLOAD_TOKEN_TTL` on a bundle deployment). Server code that
 calls `controller.getSignedUrl()` directly gets a URL good for an hour.
+
+## 86. Declaring a named bucket no longer moves the default storage source
+
+A project that declared only named buckets in `config/resources.ts`, such as
+`bucket("media", { engine: "s3" })`, had the first one promoted to the default:
+uploads whose property names no `storageSource` went to it. The default now
+always reads its own configuration, whatever is declared: `STORAGE_TYPE`,
+`STORAGE_PATH` (or `./uploads`), and the unsuffixed `S3_*` / `GCS_*`.
+
+If those uploads should keep going to the named bucket, say so:
+
+```ts
+// config/resources.ts
+export const media = bucket("media", { engine: "s3", default: true });
+```
+
+Without the mark, in production those uploads answer
+`501 STORAGE_NOT_CONFIGURED` until the default is bound (`STORAGE_TYPE=s3` and
+`S3_BUCKET`, or `STORAGE_TYPE=gcs` and `GCS_BUCKET`), and boot logs one warning
+naming both fixes. The files the promoted default wrote are in the named bucket;
+with the mark they are served through the default as before. In development, the
+files already in `./uploads` are served again.
+
+Boot also refuses two sources that resolve to one directory (or one inside
+another), or to one bucket on one endpoint. Give the named source a location of
+its own (`STORAGE_PATH__MEDIA`, `S3_BUCKET__MEDIA`), or mark it the default.

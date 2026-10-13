@@ -206,14 +206,9 @@ neither said so.
 The admin panel's thumbnails of stored images use this endpoint: a table or card
 preview asks for a webp rendition about twice its rendered size (96–800px)
 rather than the original. SVG and GIF files are always shown as they are.
-
-`sharp` is an optional dependency. <span class="since-badge" data-since="0.25">Since 0.25</span>
-Without it, a transform request is served the original image, with its own
-content type and a 60-second cache window, and the backend logs one warning
-naming `pnpm add sharp`. Install it in the package that runs the backend
-(`backend/` in a scaffolded project) and restart to get renditions. On 0.24 the
-transform answers 500 and logs the error on every request; the panel then shows
-originals.
+`sharp` is optional: <span class="since-badge" data-since="0.25">Since 0.25</span>
+without it a transform request gets the original, and the backend warns once to
+`pnpm add sharp` in `backend/` (on 0.24 it answers 500, and the panel shows originals).
 
 ### Performance & LRU Caching
 
@@ -292,8 +287,7 @@ resumable upload is refused at creation, before its first chunk; and
 `OPTIONS /api/storage/tus` advertises it as `Tus-Max-Size` — for the source
 named by `?storageId=`, the default one otherwise.
 
-On 0.23 only the source's `maxFileSize` sets the limit, and
-`STORAGE_MAX_FILE_SIZE` is not read.
+On 0.23 only the source's `maxFileSize` sets the limit; `STORAGE_MAX_FILE_SIZE` is not read.
 
 ```bash
 STORAGE_MAX_FILE_SIZE=209715200          # (default): 200 MB
@@ -349,10 +343,8 @@ topics together.
 
 Each source is configured from the **same variable names carrying its own
 suffix**. The default source takes no suffix, so a single-bucket project keeps
-using the plain names above and needs to declare nothing at all. Declaring
-named buckets beside it does not change which variables the default reads
-(<span class="since-badge" data-since="0.25">Since 0.25</span>; see
-[Which bucket receives an unqualified upload](/docs/backend/multiple-sources/#which-bucket-receives-an-unqualified-upload)):
+using the plain names above and needs to declare nothing at all, and declaring
+named buckets beside it does not change them (<span class="since-badge" data-since="0.25">Since 0.25</span>, [details](/docs/backend/multiple-sources/#which-bucket-receives-an-unqualified-upload)):
 
 ```bash
 S3_BUCKET=app-uploads             # (default)

@@ -103,6 +103,9 @@ const NOT_OURS = new Map([
     // sets it; a reader who did would only be lying to the driver about which
     // database they are on.
     ["REBASE_DEV_DATABASE_KIND", "set by the CLI for the driver child it spawns"],
+    // The driver runs in `backend/`, so it cannot see where `rebase` was run;
+    // the CLI tells it, and backup paths resolve against that. Nobody sets it.
+    ["REBASE_INVOCATION_CWD", "set by the CLI for the driver child it spawns"],
     ["REBASE_JSON", "set by the CLI for its own subprocesses"],
     // Only in the frozen 0.17.3 `bucket` literal in resource_kinds.ts; the
     // runtime binds from the amendment, which the page documents.
