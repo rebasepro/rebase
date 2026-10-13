@@ -22,6 +22,8 @@
     "scripts": {
         "dev": "remotion studio",
         "intro": "remotion render RebaseIntro out/rebase-intro.mp4",
+        "launch:music": "node scripts/compose-launch-music.mjs",
+        "launch": "node scripts/compose-launch-music.mjs && remotion render RebaseLaunch out/rebase-launch.mp4",
         "intro:poster": "remotion still RebaseIntro out/rebase-intro-poster.png --frame=230",
         "scene": "remotion render",
         "render": "remotion render",

@@ -4,3 +4,5 @@ node_modules/
 # Recorded takes: personal footage, hundreds of MB each (pnpm live).
 takes/
 public/takes/
+# The launch film's soundtrack, written by `pnpm launch:music`.
+public/launch/
