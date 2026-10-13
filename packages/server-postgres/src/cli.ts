@@ -1561,6 +1561,15 @@ max: 3 });
                 out("");
 
                 if (parsed["--yes"] !== true) {
+                    // Without a terminal nobody can answer, and "Nothing was
+                    // changed." with exit 0 read as a prune that found nothing
+                    // to do. Refused, as `db reset` and `db pull` refuse.
+                    if (!process.stdin.isTTY) {
+                        outError(chalk.red("  ✗ Nothing was pruned: there is no terminal to confirm on."));
+                        outError(chalk.gray("    Re-run with --yes to remove what is listed above."));
+                        outError("");
+                        process.exit(1);
+                    }
                     // Dropping a database is not undoable and a branch may be
                     // the only copy of an afternoon's work.
                     const confirmed = await promptConfirm("  Remove these? (y/N) ");

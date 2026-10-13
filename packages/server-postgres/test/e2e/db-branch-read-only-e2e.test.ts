@@ -1,5 +1,6 @@
 /**
- * `rebase db branch list` and `info` read, and write nothing.
+ * `rebase db branch list` and `info` read, and write nothing; `prune` writes
+ * nothing it was not told to.
  *
  * Both ran `CREATE SCHEMA IF NOT EXISTS rebase` and created the branch
  * registry before reading it, so a read-only command needed DDL rights, and
@@ -88,6 +89,22 @@ describe("db branch list and info on a database with no branches", () => {
         expect(await run(["db", "branch", "list"])).toBe(0);
         expect(stdout.join("\n")).toContain("No branches found");
         expect(await rebaseSchemaExists()).toBe(false);
+    });
+
+    it("refuses to prune without a terminal or --yes, instead of exiting 0 having done nothing", async () => {
+        // A registry entry whose database is gone: something prune would remove.
+        await admin.query(`CREATE SCHEMA IF NOT EXISTS rebase;
+            CREATE TABLE IF NOT EXISTS rebase.branches (name text PRIMARY KEY, db_name text NOT NULL UNIQUE,
+                parent_db text NOT NULL, created_at timestamptz NOT NULL DEFAULT now(), metadata jsonb DEFAULT '{}');
+            INSERT INTO rebase.branches (name, db_name, parent_db) VALUES ('gone', 'rb_gone', 'rebase')`);
+        try {
+            expect(await run(["db", "branch", "prune"])).toBe(1);
+            expect(stderr.join("\n")).toContain("no terminal to confirm on");
+            expect(stderr.join("\n")).toContain("--yes");
+            expect((await admin.query("SELECT 1 FROM rebase.branches WHERE name = 'gone'")).rows).toHaveLength(1);
+        } finally {
+            await admin.query("DROP SCHEMA rebase CASCADE");
+        }
     });
 
     it("says a branch is not found, exits 1, and creates nothing", async () => {
