@@ -128,7 +128,7 @@ export type {
 // `MemoryOfflineStore` is exported for tests and as the reference
 // implementation, while the IndexedDB store is wired automatically in the
 // browser and needs no direct construction.
-export type { OfflineApi, OfflineConfig, OfflineQueueOptions, OfflineStatus } from "./offline";
+export type { ConflictResolution, OfflineApi, OfflineConfig, OfflineQueueOptions, OfflineStatus } from "./offline";
 export { isOfflineError } from "./offline";
 export type { LiveResult, ObserveByIdOptions, ObserveOptions, RowSnapshotMeta } from "./collection";
 // The reader for a fetched row's version. A function rather than a field so the

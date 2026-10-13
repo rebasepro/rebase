@@ -113,6 +113,13 @@ export interface PendingMutation {
     lastError?: string;
     /** Local state to restore if the server rejects this mutation. */
     rollback?: MutationRollback;
+    /**
+     * An `update`'s precondition: the version of the row its edit was made
+     * against, sent as `If-Match` on replay. Set only on a client with
+     * `offline.onConflict`, and only when that version is known — see
+     * `OfflineConfig.onConflict`.
+     */
+    ifMatch?: string;
 }
 
 /**

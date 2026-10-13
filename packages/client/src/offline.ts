@@ -1,7 +1,7 @@
 import { buildQueryString, FindParams, RebaseApiError } from "./transport";
 import { FindAllParams, FindResult, IterateParams, LogicalCondition, SDKCollectionClient, WhereFilterOp, WhereValueFor, WriteOptions, hasFieldOperation, isUnsupported, type ByIdReadOptions, type UpdateValues, type UpsertOptions } from "@rebasepro/types";
 import { collectAllPages, normalizeOrderBy, paginateFind } from "@rebasepro/common";
-import { CollectionClient, LiveResult, ObserveOptions, RowSnapshotMeta, byIdRead, invalidBulkBody, type ObserveByIdOptions, type RestoreOptions, type TrashClient } from "./collection";
+import { CollectionClient, LiveResult, ObserveOptions, RowSnapshotMeta, byIdRead, etagOf, invalidBulkBody, type ObserveByIdOptions, type RestoreOptions, type TrashClient } from "./collection";
 import { SDKQueryBuilder } from "./sdk_query_builder";
 import { dehydrateMutation, dehydrateRow, hydrateMutation, hydrateRow, setOwn } from "./offline-codec";
 import { RebaseClientError } from "./errors";
@@ -113,6 +113,31 @@ export interface OfflineConfig {
      */
     onSyncError?: (error: Error, mutation: PendingMutation) => void;
     /**
+     * Detect conflicts when a queued edit replays: an `update` made offline
+     * is sent with `If-Match`, the version of the row it was made against,
+     * and if someone changed the row on the server since, this decides what
+     * happens to the edit:
+     *
+     * - `"overwrite"`: send it again without the precondition. Last writer
+     *   wins, as without this option.
+     * - `"discard"`: drop it. The row goes back to what it was before the
+     *   edit, as for a rejection, but it is not reported to `onSyncError`
+     *   (writes queued on top of it are, as `DEPENDENCY_REJECTED`), and the
+     *   row is read again from the server.
+     *
+     * The edit's version is the one the row's last read reported: a
+     * `findById`, a `listenById` frame, or the answer to an earlier `update`.
+     * A row last seen in a `find()` or `listen()` list has no version, and an
+     * edit made on top of another queued write to the same row has none
+     * either; those replay without a precondition. A caller's own `ifMatch` is
+     * kept on a queued edit too.
+     *
+     * The queue waits while this runs, so a prompt can ask the user. Without
+     * it — the default — replay sends no precondition and the last writer
+     * wins, per field.
+     */
+    onConflict?: (error: RebaseApiError, mutation: PendingMutation) => ConflictResolution | Promise<ConflictResolution>;
+    /**
      * Remember, on this device, the last user who signed in, and open their
      * local database when a reload cannot reach the server to restore the
      * session. Off by default.
@@ -155,6 +180,9 @@ export interface OfflineConfig {
      */
     replayBatchSize?: number;
 }
+
+/** What {@link OfflineConfig.onConflict} does with an edit the row has moved past. */
+export type ConflictResolution = "overwrite" | "discard";
 
 /** A snapshot of the engine's state, for a status indicator. */
 export interface OfflineStatus {
@@ -360,6 +388,11 @@ function callSafely(callback: () => void): void {
 }
 
 /** The server has no such row — deleted by someone else, or never visible to this user. */
+/** A `412`: the row is no longer the version an `If-Match` named. */
+function isPreconditionFailed(error: unknown): error is RebaseApiError {
+    return error instanceof RebaseApiError && error.status === 412;
+}
+
 function isNotFoundError(error: unknown): boolean {
     return error instanceof RebaseApiError && error.status === 404;
 }
@@ -507,6 +540,13 @@ interface CollectionState {
     freshRows: Set<string>;
     /** Ids the server has confirmed do not exist — a negative cache. */
     absent: Set<string>;
+    /**
+     * Per row id, the version the server last reported for it — the
+     * `If-Match` of an edit queued against it ({@link OfflineConfig.onConflict}).
+     * In memory only: a version is a fact about a read, and a row read back off
+     * disk has not been read from the server.
+     */
+    etags?: Map<string, string>;
     loaded?: Promise<void>;
     /**
      * True once the persisted rows are in memory. Observers must not emit
@@ -566,6 +606,7 @@ export class OfflineManager {
     private readonly maxCachedRows: number;
     private readonly maxRetries: number;
     private readonly onSyncError?: OfflineConfig["onSyncError"];
+    private readonly onConflict?: OfflineConfig["onConflict"];
     private readonly createInner: InnerFactory;
     private readonly inners = new Map<string, SDKCollectionClient<AnyRow>>();
     private readonly connectivity: ConnectivityMonitor;
@@ -665,6 +706,7 @@ export class OfflineManager {
         this.maxCachedRows = config.maxCachedRowsPerCollection ?? 5_000;
         this.maxRetries = config.maxRetries ?? 5;
         this.onSyncError = config.onSyncError;
+        this.onConflict = config.onConflict;
         this.keepLastUser = config.keepLastUser === true;
         const batch = Math.floor(config.replayBatchSize ?? 1);
         this.replayBatchSize = Number.isFinite(batch) ? Math.min(Math.max(batch, 1), MAX_REPLAY_BATCH) : 1;
@@ -1341,12 +1383,19 @@ data: u.data as AnyRow })),
                     );
                 }
                 const base = this.rawLocalRow(slug, id);
+                // The version this edit was made against. On top of another
+                // queued write it is that write's row, which has no version
+                // until it replays — so none.
+                const ifMatch = this.onConflict
+                    ? options?.ifMatch ?? (this.hasPending(slug, id) ? undefined : this.etagFor(slug, id))
+                    : undefined;
                 await this.enqueue({
                     collection: slug,
                     type: "update",
                     id,
                     data: data as AnyRow,
                     ...(sent ? { sent: { idempotencyKey } } : {}),
+                    ...(ifMatch ? { ifMatch } : {}),
                     rollback: { rows: { [String(id)]: base ?? null } }
                 }, ticket);
                 const optimistic = optimisticRow<M>({ ...(base ?? {}), ...(data as AnyRow) }, id);
@@ -2096,6 +2145,22 @@ data: u.data as AnyRow })),
         return generateOfflineStringId();
     }
 
+    /**
+     * Keep the version a server row came with, or forget the one held when it
+     * came with none: a row from a list carries no version, and may be newer
+     * than the one held. Only with `onConflict`, the one reader of it.
+     */
+    private noteETag(state: CollectionState, key: string, row: AnyRow): void {
+        if (!this.onConflict) return;
+        const etag = etagOf(row);
+        if (etag) (state.etags ??= new Map()).set(key, etag);
+        else state.etags?.delete(key);
+    }
+
+    private etagFor(slug: string, id: string | number): string | undefined {
+        return this.collections.get(slug)?.etags?.get(String(id));
+    }
+
     private rawLocalRow(slug: string, id: string | number): AnyRow | undefined {
         const entry = this.collections.get(slug)?.rows.get(String(id));
         return entry ? { ...entry.row } : undefined;
@@ -2130,6 +2195,7 @@ data: u.data as AnyRow })),
         const state = this.collectionState(slug);
         const key = String(id);
         const existed = state.rows.delete(key);
+        state.etags?.delete(key);
         if (known) {
             state.absent.add(key);
             state.freshRows.add(key);
@@ -2172,6 +2238,7 @@ data: u.data as AnyRow })),
         for (const raw of rows) {
             if (!raw || raw.id === undefined || raw.id === null) continue;
             const key = String(raw.id);
+            this.noteETag(state, key, raw);
             const existing = state.rows.get(key);
             if (projection && !existing) continue;
             const base = projection && existing ? { ...existing.row, ...raw } : { ...raw };
@@ -2304,7 +2371,10 @@ data: u.data as AnyRow })),
             .sort((a, b) => a[1].cachedAt - b[1].cachedAt);
         const excess = state.rows.size - this.maxCachedRows;
         const doomed = evictable.slice(0, excess);
-        for (const [key] of doomed) state.rows.delete(key);
+        for (const [key] of doomed) {
+            state.rows.delete(key);
+            state.etags?.delete(key);
+        }
         if (doomed.length > 0) void this.deleteCache(doomed.map(([key]) => this.rowKey(slug, key)));
     }
 
@@ -2634,6 +2704,13 @@ data: u.data as AnyRow })),
                             this.connectivity.markFailure();
                             break;
                         }
+                        // The row moved on since the edit was made. Not a
+                        // failure of the write: the app decides.
+                        if (op.type === "update" && op.ifMatch && isPreconditionFailed(error)) {
+                            this.connectivity.markSuccess();
+                            await this.resolveConflict(op, error, ticket);
+                            continue;
+                        }
                         op.attempts = (op.attempts ?? 0) + 1;
                         op.lastError = (error as Error)?.message ?? String(error);
                         // A key the server is still holding gets a longer
@@ -2892,7 +2969,10 @@ data: u.data as AnyRow })),
                 op.sent = { idempotencyKey: op.mutationId };
                 await this.persistMutation(`${ticket.scope}|${op.mutationId}`, op).catch(() => undefined);
             }
-            const row = await inner.update(op.id!, op.data as AnyRow, { idempotencyKey: op.sent.idempotencyKey });
+            const row = await inner.update(op.id!, op.data as AnyRow, {
+                idempotencyKey: op.sent.idempotencyKey,
+                ...(op.ifMatch ? { ifMatch: op.ifMatch } : {})
+            });
             await this.ingestReplaced(op, op.id!, row, ticket);
         } else if (op.type === "deleteMany") {
             const ids = op.ids ?? [];
@@ -3037,6 +3117,7 @@ data: u.data as AnyRow })),
         const state = await this.ensureCollection(slug);
         if (!this.isCurrent(ticket)) return;
         const key = String(id);
+        this.noteETag(state, key, row);
         const merged = this.applyPendingToRow(slug, key, { ...row }, op.mutationId);
         if (merged === undefined) {
             // A queued delete is still waiting behind this write.
@@ -3064,7 +3145,7 @@ data: u.data as AnyRow })),
      * of it, so both stand on their own and are kept — dropping them would
      * silently lose writes the server would have accepted.
      */
-    private async rejectMutation(op: PendingMutation, error: Error, ticket: ScopeTicket): Promise<void> {
+    private async rejectMutation(op: PendingMutation, error: Error, ticket: ScopeTicket, report = true): Promise<void> {
         // Refused after its user signed out. Rolling back and reporting it
         // would put their write, and its error, in front of whoever is signed
         // in now; it stays in their queue and is refused again, to them, when
@@ -3135,8 +3216,50 @@ data: u.data as AnyRow })),
         // discarded along with it were never sent, and say so — with that
         // answer as their cause, so "why" is one property away.
         for (const dropped of doomed) {
+            // A write the app chose to discard is not news to it.
+            if (dropped === op && !report) continue;
             callSafely(() => this.onSyncError?.(dropped === op ? error : dependencyRejected(op, error), dropped));
         }
+    }
+
+    /**
+     * An edit replayed with `If-Match` and refused with a 412: ask
+     * {@link OfflineConfig.onConflict}, and do what it says. A callback that
+     * throws, or none, is "overwrite" — what replay did before it knew of
+     * conflicts.
+     */
+    private async resolveConflict(op: PendingMutation, error: RebaseApiError, ticket: ScopeTicket): Promise<ConflictResolution> {
+        let resolution: ConflictResolution = "overwrite";
+        if (this.onConflict) {
+            try {
+                resolution = await this.onConflict(error, op) === "discard" ? "discard" : "overwrite";
+            } catch (callbackError) {
+                console.error("Error in offline onConflict:", callbackError);
+            }
+        }
+        if (resolution === "overwrite") {
+            // Sent again under the same key: a refused precondition hands the
+            // key back, and the body is the same.
+            delete op.ifMatch;
+            await this.persistMutation(`${ticket.scope}|${op.mutationId}`, op).catch(() => undefined);
+            return resolution;
+        }
+        await this.rejectMutation(op, error, ticket, false);
+        // The row as the server has it now, which is what the user is left
+        // looking at once their edit is gone.
+        const slug = op.collection;
+        const id = op.id!;
+        try {
+            const row = await this.innerFor(slug).findById(id);
+            if (this.isCurrent(ticket)) {
+                if (row) await this.ingest(slug, [row], ticket);
+                else if (!this.hasPending(slug, id)) this.removeLocalRow(slug, id, ticket, true);
+                this.notifyCollection(slug);
+            }
+        } catch {
+            // The next read or realtime frame brings it.
+        }
+        return resolution;
     }
 
     /**
@@ -3159,6 +3282,9 @@ data: u.data as AnyRow })),
                 id: op.id,
                 data: { ...part },
                 queuedAt: op.queuedAt,
+                // The version the first edit was made against; the rest were
+                // made on top of it.
+                ...(index === 0 && op.ifMatch ? { ifMatch: op.ifMatch } : {}),
                 rollback: { rows: { [idKey]: before === null ? null : { ...before } } }
             };
             if (before !== null) before = { ...before, ...part };

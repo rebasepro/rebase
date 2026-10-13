@@ -160,6 +160,29 @@ The cascade is narrow: an `update` is discarded along with the write it edited, 
 
 Consecutive edits to one row while offline are merged into a single queued write, so a form being typed into does not grow the queue. If the server refuses the merged write over its contents (a 400, 403 or 422 — say, a field removed by a schema change while the user was offline), the engine splits it back into the separate edits and replays each one. Only the edit the server refuses is rolled back and reported; the others are kept.
 
+### Conflicts
+
+By default an edit queued offline overwrites whatever the server has for the fields it changes, even if someone else changed them meanwhile. To find out instead, pass `onConflict`. A queued `update` then replays with `If-Match`, the version of the row it was made against, and when the row has changed since, the server refuses it with a 412 and `onConflict` decides:
+
+```typescript
+const client = createRebaseClient({
+    baseUrl: API_URL,
+    offline: {
+        onConflict: async (error, mutation) =>
+            (await askUser(`${mutation.collection} changed while you were offline. Keep your edit?`))
+                ? "overwrite"
+                : "discard"
+    }
+});
+```
+
+- `"overwrite"` sends the edit again without the precondition: the last writer wins, as without `onConflict`.
+- `"discard"` drops the edit. The row goes back to what it was before it, as for a rejection, and is read again from the server. It is not reported to `onSyncError`; writes queued on top of it are, as `DEPENDENCY_REJECTED`.
+
+The queue waits while `onConflict` runs, so it can ask the user. If it throws, the edit is overwritten.
+
+The version an edit is made against is the one the row's last read reported: `findById()`, a `listenById()` frame, or the answer to an earlier `update()`. A row last read in a `find()` or `listen()` list has no version, and neither has an edit made on top of another queued write to the same row. Those replay without a precondition. An `ifMatch` you pass to `update()` yourself is kept when the edit queues.
+
 A failure that is merely temporary — a 429, a 503, a dropped connection — is not a rejection. Those stay queued and are retried; only after `maxRetries` deferrals does a write get rolled back.
 
 ## Multiple tabs
@@ -241,6 +264,7 @@ createRebaseClient({
         crossTab: true,                       // default: on for IndexedDB, off for memory
         keepLastUser: false,                  // open the last user's data on an offline reload (cookie mode)
         replayBatchSize: 1,                   // queued creates sent per request on replay (max 1000)
+        onConflict: (error, mutation) => "overwrite", // or "discard"; default: no conflict check
         onSyncError: (error, mutation) => {}
     }
 });
@@ -272,7 +296,7 @@ The client is not a replica of your database, and it does not pretend to be:
 - **`count()` offline needs a count the server gave this device for the same query.** Writes queued since then move it: creates, edits that take a row into or out of the filter, and deletes. Without one it fails with the `OFFLINE` error rather than counting the rows this device happens to hold. On 0.24 it returned that number.
 - **`searchString` is approximated** as a case-insensitive substring scan over cached string fields. The server runs real full-text search over the collection's configured columns.
 - **`include`d relations cannot be evaluated locally** — the related rows live in collections the query never loaded. Such a query is always marked `partial` when answered from the cache.
-- **Conflicts are last-writer-wins, per field, with no detection.** A replayed `update` sends the fields the user changed and nothing else, so fields they did not touch keep whatever the server has. For a field they *did* change, a change someone else made on the server while they were offline is overwritten when the queue replays, and neither user is told. Nothing compares versions on replay.
+- **Conflicts are last-writer-wins, per field, unless you pass `onConflict`.** A replayed `update` sends the fields the user changed and nothing else, so fields they did not touch keep whatever the server has. For a field they *did* change, a change someone else made on the server while they were offline is overwritten when the queue replays, and neither user is told. With [`onConflict`](#conflicts), an edit whose row version is known is checked against the server's, and the app decides. Creates, deletes and bulk writes are never checked.
 - **Replay is at-least-once.** A write that reaches the server but whose response is lost may be sent again. Prefer idempotent writes (`createMany` with `upsert`) where duplicates would matter.
 - **The trash needs the server.** The local database holds live rows only, so `trash.find()`, `trash.count()`, `trash.restore()` and `trash.purge()` (see [soft delete](/docs/collections/soft-delete#from-the-sdk)) are never answered locally or queued: offline they fail with the `OFFLINE` error. A restore or purge of a row with a write still queued syncs the queue first, and is refused with `TRASH_PENDING_WRITE` if the write cannot be sent yet.
 - **An upsert on a natural key needs the server.** Which row an `onConflict` target names is the server's to find, so `upsert()` on a natural key (or without the row's id), and a `createMany()` with `onConflict` that was never sent, are refused while offline with `OFFLINE_UPSERT_UNSUPPORTED`. An upsert on the primary key, with the key in each row, is queued.
