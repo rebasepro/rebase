@@ -11,7 +11,8 @@ import { createStorage } from "./storage";
 import { ClientStorageSourceRegistry } from "./storage-registry";
 import { RebaseWebSocketClient } from "./websocket";
 import { RebaseRealtimeChannel, type ChannelOptions } from "./realtime-channel";
-import { OfflineManager, type OfflineApi, type OfflineConfig } from "./offline";
+import type { OfflineApi, OfflineConfig } from "./offline";
+import { LazyOfflineManager } from "./offline-lazy";
 import {
     type BatchOperation,
     type BatchResult,
@@ -130,7 +131,7 @@ export type {
 // implementation, while the IndexedDB store is wired automatically in the
 // browser and needs no direct construction.
 export type { ConflictResolution, OfflineApi, OfflineConfig, OfflineQueueOptions, OfflineStatus } from "./offline";
-export { isOfflineError } from "./offline";
+export { isOfflineError } from "./offline-errors";
 export type { LiveResult, ObserveByIdOptions, ObserveOptions, RowSnapshotMeta } from "./collection";
 // The reader for a fetched row's version. A function rather than a field so the
 // version never enters the generated `Row` type — see `etagOf`.
@@ -648,7 +649,7 @@ export function createRebaseClient<DB = Record<string, unknown>>(options: Create
     // write queue. Replay goes through *unwrapped* clients (the factory below)
     // so a failing replay can never re-queue itself.
     const offlineManager = options.offline
-        ? new OfflineManager(
+        ? new LazyOfflineManager(
             typeof options.offline === "object" ? options.offline : {},
             (slug) => createCollectionClient(transport, slug)
         )

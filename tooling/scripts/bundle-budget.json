@@ -3,9 +3,10 @@
         "app/frontend/dist": {
             "chunks": {
                 "rebase-core": 452113,
-                "index": 313639,
+                "index": 195538,
                 "rebase-ui": 247128,
                 "vendor-react-dom": 178415,
+                "rebase-client": 99756,
                 "vendor-dnd": 49884,
                 "vendor-fuse": 26336,
                 "rebase-common": 19043,
@@ -21,10 +22,10 @@
         },
         "sdk-minimal": {
             "chunks": {
-                "sdk-minimal": 145656
+                "sdk-minimal": 120966
             },
-            "totalBytes": 145656,
-            "totalGzipBytes": 41701
+            "totalBytes": 120966,
+            "totalGzipBytes": 36614
         },
         "cms-shell": {
             "chunks": {

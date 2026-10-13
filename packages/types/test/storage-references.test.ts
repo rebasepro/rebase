@@ -7,7 +7,7 @@ import {
     storageTargetOfDownloadUrl,
     storageTargetsInText,
     STORAGE_REFERENCE_SCHEME
-} from "../src/controllers/storage";
+} from "../src/controllers/storage-references";
 
 /**
  * A stored object named inside text — a markdown body above all.

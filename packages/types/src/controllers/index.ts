@@ -7,5 +7,6 @@ export * from "./data_driver";
 export * from "./effective_role";
 
 export * from "./storage";
+export * from "./storage-references";
 export * from "./email";
 export * from "./client";
