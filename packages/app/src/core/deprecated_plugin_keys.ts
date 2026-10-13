@@ -15,9 +15,8 @@ export function warnDeprecatedPluginKeys(plugins: readonly RebasePlugin[]): void
             warnDeprecated(
                 `plugin:${plugin.key}:hooks.modifyCollectionAsync`,
                 `Plugin "${plugin.key}" sets \`hooks.modifyCollectionAsync\`, which is deprecated: ` +
-                "nothing has ever called it. Remove it and use `hooks.modifyCollection` instead — fetch what " +
-                "the change needs before rendering `<Rebase>` (keep the plugin `loading: true` until it arrives) " +
-                "and apply it there synchronously."
+                "nothing has ever called it. Remove it: fetch what the change needs before rendering " +
+                "`<Rebase>`, then build the plugin from that data and apply it in `hooks.modifyCollection`."
             );
         }
         if (plugin.lifecycle?.onCollectionChange !== undefined) {

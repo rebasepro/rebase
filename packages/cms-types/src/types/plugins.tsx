@@ -184,9 +184,9 @@ export interface PluginHooks {
     modifyCollection?: (collection: AdminCollection) => AdminCollection;
 
     /**
-     * @deprecated Never invoked — this hook never ran. Remove it; use
-     * `modifyCollection` instead, with whatever it needs fetched before
-     * `<Rebase>` renders (keep the plugin `loading: true` until it arrives).
+     * @deprecated Never invoked — this hook never ran. Remove it; fetch what
+     * the change needs before rendering `<Rebase>`, then build the plugin
+     * from that data and apply it in `modifyCollection`.
      * Will be removed in a future release.
      */
     modifyCollectionAsync?: (collection: AdminCollection) => Promise<AdminCollection>;
