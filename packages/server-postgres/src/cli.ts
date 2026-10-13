@@ -29,6 +29,8 @@ import {
     readTriggersDdl,
     getTableExcludes,
     getForeignIndexExcludes,
+    getUndeclaredConstraintExcludes,
+    queryUndeclarableConstraints,
     ExcludeIntrospectionError,
     queryGeneratedColumnDependencies,
     queryColumnTypes,
@@ -57,6 +59,7 @@ import {
     describeConflict
 } from "./schema/generated-column-conflicts";
 import { stripCarvedOutStatements } from "./schema/carved-out-migration";
+import type { ExistingConstraint } from "./schema/undeclarable-constraints";
 import { finishNewMigration } from "./schema/migration-post-process";
 import { acceptsExcludeFlag, buildAtlasArgs, migrateApplyArgs, takesDevUrl } from "./schema/atlas-argv";
 import { CommandStopped, ScratchDatabase } from "./cli-scratch-database";
@@ -382,6 +385,21 @@ async function columnTypesOrNone(databaseUrl: string | undefined): Promise<Exist
 }
 
 /**
+ * The CHECK and EXCLUDE constraints `detectDestructiveStatements` reads a
+ * `DROP CONSTRAINT` against, or none when the database cannot be asked. A
+ * report then cannot tell a dropped CHECK from a dropped foreign key, and says
+ * nothing about either, as before.
+ */
+async function constraintsOrNone(databaseUrl: string | undefined): Promise<ExistingConstraint[]> {
+    if (!databaseUrl) return [];
+    try {
+        return await queryUndeclarableConstraints(databaseUrl);
+    } catch {
+        return [];
+    }
+}
+
+/**
  * Say what in the migration `db generate` just wrote destroys data.
  *
  * `db push` stops before a destructive change; `db generate` wrote the same
@@ -391,7 +409,7 @@ async function columnTypesOrNone(databaseUrl: string | undefined): Promise<Exist
  * A report, not a refusal — the exit code is unchanged.
  */
 async function reportDestructiveMigration(migrationSql: string, migrationFile: string, databaseUrl: string | undefined): Promise<void> {
-    const destructive = detectDestructiveStatements(migrationSql, await columnTypesOrNone(databaseUrl));
+    const destructive = detectDestructiveStatements(migrationSql, await columnTypesOrNone(databaseUrl), await constraintsOrNone(databaseUrl));
     if (destructive.length === 0) return;
     outWarn("");
     outWarn(chalk.yellow(`  ⚠️  ${migrationFile} includes ${destructive.length} destructive change(s) that will DESTROY data when applied:`));
@@ -691,10 +709,13 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
             );
             // The columns' current types, because an `ALTER COLUMN … TYPE`
             // loses data or does not depending on what the column is now.
-            // Without them every type change is gated.
+            // Without them every type change is gated. And the CHECK and
+            // EXCLUDE constraints, so a drop of one that the excludes missed
+            // is gated too.
             const destructive = detectDestructiveStatements(
                 plan,
-                databaseUrl ? await queryColumnTypes(databaseUrl) : []
+                databaseUrl ? await queryColumnTypes(databaseUrl) : [],
+                databaseUrl ? await queryUndeclarableConstraints(databaseUrl) : []
             );
             // What to show a person: the statements, once each. Atlas's report
             // prints every one twice and wraps them in timings; when the gate
@@ -903,7 +924,7 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
                     collectionsPath,
                     { captureStdout: true }
                 );
-                const destructive = detectDestructiveStatements(plan, await columnTypesOrNone(databaseUrl));
+                const destructive = detectDestructiveStatements(plan, await columnTypesOrNone(databaseUrl), await constraintsOrNone(databaseUrl));
                 if (destructive.length > 0) {
                     outError(chalk.red(`  ✗ Refusing to migrate: the pending migrations include ${destructive.length} destructive change(s):`));
                     outError("");
@@ -1875,6 +1896,25 @@ async function runAtlas(
                 const hint = diagnoseDbError(err.cause ?? err, databaseUrl);
                 if (hint) outError(hint);
                 throw new CommandStopped("Could not determine which indexes to protect.");
+            }
+            throw err;
+        }
+
+        // And the CHECK and EXCLUDE constraints, which a collection cannot
+        // declare: left out of the plan, Atlas drops every one of them in the
+        // first push after `schema introspect`. Same fail-closed contract.
+        try {
+            const desiredSqlFile = path.join(generatedSqlDir(), "schema.sql");
+            const desiredSql = fs.existsSync(desiredSqlFile) ? fs.readFileSync(desiredSqlFile, "utf-8") : "";
+            excludes.push(...await getUndeclaredConstraintExcludes(databaseUrl, desiredSql));
+        } catch (err) {
+            if (err instanceof ExcludeIntrospectionError) {
+                outError(chalk.red("\n✗ Aborting push: could not determine which constraints to protect."));
+                outError(chalk.gray(`  ${err.message}`));
+                outError(chalk.gray("  Refusing to apply — a partial exclude list could drop a CHECK or EXCLUDE constraint the database enforces."));
+                const hint = diagnoseDbError(err.cause ?? err, databaseUrl);
+                if (hint) outError(hint);
+                throw new CommandStopped("Could not determine which constraints to protect.");
             }
             throw err;
         }

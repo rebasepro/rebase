@@ -20,9 +20,17 @@
  * "<table>_pkey", ADD PRIMARY KEY ("id", "locale")` keeps every value and
  * gives every row a new address. It is gated like a drop.
  *
+ * So is the drop of a CHECK or EXCLUDE constraint. It keeps every row and
+ * stops refusing the ones the rule was there to refuse. `db push` keeps Atlas
+ * away from those constraints (`schema/undeclarable-constraints.ts`), so a plan
+ * that still drops one is a pattern that missed, and the gate is the second
+ * line. Which constraints those are is read from the catalogue by the caller.
+ *
  * Everything in this file is side-effect free so it can be unit-tested
  * without Atlas or a database.
  */
+
+import type { ExistingConstraint } from "./undeclarable-constraints";
 
 /**
  * SQL fragments that destroy data or data-bearing objects. Matched
@@ -225,10 +233,15 @@ export const COLUMN_TYPES_SQL = `
  * `columnTypes` is what the database holds now. A type change to a column it
  * does not list is flagged: not knowing what a column is means not knowing
  * whether the change keeps its values.
+ *
+ * `constraints` are the CHECK and EXCLUDE constraints the database holds now.
+ * A `DROP CONSTRAINT` of one of them is flagged; of any other constraint (a
+ * foreign key, a `UNIQUE`) it is not, as before.
  */
 export function detectDestructiveStatements(
     planSql: string,
-    columnTypes: readonly ExistingColumnType[] = []
+    columnTypes: readonly ExistingColumnType[] = [],
+    constraints: readonly ExistingConstraint[] = []
 ): DestructiveStatement[] {
     const found: DestructiveStatement[] = [];
     const { statements, announced } = readPlan(planSql);
@@ -257,9 +270,11 @@ export function detectDestructiveStatements(
             .filter(({ change, from }) => from === undefined || !isLosslessTypeChange(from, change.to))
             .map(({ change, from }) => `"${change.column}" ${from ?? "(current type unknown)"} → ${change.to}`)
             .join("; ");
-        const kind = dropped?.label ?? (rekeyed ? "PRIMARY KEY CHANGE" : lossy ? "ALTER COLUMN TYPE" : undefined);
+        const unenforced = describeConstraintDrops(statement, constraints);
+        const kind = dropped?.label
+            ?? (rekeyed ? "PRIMARY KEY CHANGE" : lossy ? "ALTER COLUMN TYPE" : unenforced ? "DROP CONSTRAINT" : undefined);
         if (!kind) continue;
-        const detail = [rekeyed, lossy].filter(Boolean).join("; ");
+        const detail = [rekeyed, lossy, unenforced].filter(Boolean).join("; ");
         found.push(detail ? { statement, kind, detail } : { statement, kind });
     }
     return found;
@@ -398,6 +413,35 @@ function describePrimaryKeyChange(statement: string): string | undefined {
     }
     if (dropped) return `${table} loses its primary key ${dropped}: ${ROW_ADDRESS_LOST}`;
     return undefined;
+}
+
+/**
+ * The CHECK and EXCLUDE constraints an `ALTER TABLE` drops, in a sentence — or
+ * `undefined` when it drops none.
+ *
+ * Matched by name on the statement's table, in its schema when the plan names
+ * one (Atlas always does). A constraint the catalogue does not list as a CHECK
+ * or an EXCLUDE — a foreign key, a `UNIQUE`, the primary key — is not this.
+ */
+function describeConstraintDrops(statement: string, constraints: readonly ExistingConstraint[]): string | undefined {
+    if (constraints.length === 0) return undefined;
+    const alter = ALTER_TABLE_RE.exec(fromAlterTable(statement));
+    if (!alter) return undefined;
+    const [schema, table] = alter[2] ? [unquote(alter[1]), unquote(alter[2])] : [undefined, unquote(alter[1])];
+
+    const lost: string[] = [];
+    for (const clause of splitClauses(alter[3])) {
+        const drop = DROP_CONSTRAINT_RE.exec(clause);
+        if (!drop) continue;
+        const name = unquote(drop[1]);
+        const constraint = constraints.find(c => c.table === table && c.name === name
+            && (schema === undefined || c.schema === schema));
+        if (constraint) lost.push(`${constraint.kind === "check" ? "CHECK" : "EXCLUDE"} "${name}"`);
+    }
+    if (lost.length === 0) return undefined;
+    const subject = schema ? `${schema}.${table}` : table;
+    return `${subject} loses ${lost.join(", ")}: no row is lost, and the database accepts every row ` +
+        `${lost.length === 1 ? "it refuses" : "they refuse"} today`;
 }
 
 /**

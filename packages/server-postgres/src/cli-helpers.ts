@@ -7,6 +7,7 @@ import chalk from "chalk";
 import { isRebaseIndexName } from "./schema/collection-index";
 import type { GeneratedColumnDependency } from "./schema/generated-column-conflicts";
 import { COLUMN_TYPES_SQL, type ExistingColumnType } from "./schema/destructive-sql";
+import { UNDECLARABLE_CONSTRAINTS_SQL, undeclaredConstraintExcludes, type ExistingConstraint } from "./schema/undeclarable-constraints";
 import { out, outWarn } from "./cli-output";
 import type { CollectionConfig } from "@rebasepro/types";
 import { moduleDir as __helpersDirname } from "./module-dir";
@@ -947,6 +948,40 @@ async function managedIndexNames(collectionsPath: string): Promise<Set<string>> 
         names.add(pattern.slice(pattern.lastIndexOf(".") + 1));
     }
     return names;
+}
+
+/** Every CHECK and EXCLUDE constraint the database holds. @see UNDECLARABLE_CONSTRAINTS_SQL */
+export async function queryUndeclarableConstraints(databaseUrl: string): Promise<ExistingConstraint[]> {
+    return withAppClient(databaseUrl, async client =>
+        (await client.query<ExistingConstraint>(UNDECLARABLE_CONSTRAINTS_SQL)).rows);
+}
+
+/**
+ * Patterns keeping Atlas away from the CHECK and EXCLUDE constraints the
+ * collections do not declare — which, since a collection cannot declare
+ * either, is all of them. See `schema/undeclarable-constraints.ts`.
+ *
+ * Fails CLOSED, like {@link getTableExcludes}: without the catalogue nothing
+ * says which constraints are there, and a partial list lets the push drop a
+ * rule the database enforces. `desiredSql` is the `schema.sql` Atlas is about
+ * to diff against; a constraint it declares is Atlas's to manage.
+ */
+export async function getUndeclaredConstraintExcludes(
+    databaseUrl: string,
+    desiredSql: string,
+    deps: { queryConstraints?: (databaseUrl: string) => Promise<ExistingConstraint[]> } = {}
+): Promise<string[]> {
+    const queryConstraints = deps.queryConstraints ?? queryUndeclarableConstraints;
+    let existing: ExistingConstraint[];
+    try {
+        existing = await queryConstraints(databaseUrl);
+    } catch (err) {
+        throw new ExcludeIntrospectionError(
+            `Failed to introspect the database for CHECK and EXCLUDE constraints: ${err instanceof Error ? err.message : String(err)}`,
+            err
+        );
+    }
+    return undeclaredConstraintExcludes(existing, desiredSql);
 }
 
 export async function queryExistingTables(databaseUrl: string): Promise<string[]> {
