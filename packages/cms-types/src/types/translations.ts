@@ -994,6 +994,8 @@ export interface RebaseTranslations {
     studio_sql_time?: string;
     studio_sql_copy_markdown?: string;
     studio_sql_export_json?: string;
+    /** Export the SQL console's result as JSON with each value read by its column's type. */
+    studio_sql_export_json_typed?: string;
     studio_sql_export_csv?: string;
     studio_sql_format_sql?: string;
     studio_sql_explain?: string;

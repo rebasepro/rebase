@@ -49,7 +49,7 @@ import { useApiBase, useApiConfig, useRebaseContext, useSnackbarController, Conf
 import { isArrayValue, isRecordValue, readStoredJson, readStoredString, writeStoredJson, writeStoredString } from "@rebasepro/utils";
 import { MonacoEditor, type MonacoEditorHandle } from "./MonacoEditor";
 import { SQLEditorSidebar, Snippet } from "./SQLEditorSidebar";
-import { buildExplainSql, formatSql, keepLatestColumnWidths, needsDestructiveConfirmation, quoteIdentifier, groupSchemaRows, quoteTableName, rememberColumnWidth, resolveCellEdit, resolveQueryCollections, resultsToCsv, withAutoLimit, type CellEditResolution, type ColumnWidthsByQuery, type ResolvedQueryCollection, type ResultProvenance } from "../../utils/sql_utils";
+import { buildExplainSql, formatSql, keepLatestColumnWidths, needsDestructiveConfirmation, quoteIdentifier, groupSchemaRows, quoteTableName, rememberColumnWidth, resolveCellEdit, resolveQueryCollections, resultsToCsv, typedJsonRows, withAutoLimit, type CellEditResolution, type ColumnWidthsByQuery, type ResolvedQueryCollection, type ResultProvenance } from "../../utils/sql_utils";
 import { ExplainVisualizer } from "./ExplainVisualizer";
 
 import type { SQLEditorColumnInfo, TableInfo } from "./sql_editor_types";
@@ -1108,8 +1108,24 @@ truncatedFrom: null });
 
     const handleExportJSON = () => {
         if (!results || results.length === 0) return;
+        downloadJson(results);
+    };
 
-        const json = JSON.stringify(results, null, 2);
+    /**
+     * The result's columns say their types when the script door ran it: each
+     * value read by its type (numbers, booleans, json), where Export JSON
+     * writes the database's text as the grid holds it.
+     */
+    const typedColumns = activeTab.lastProvenance?.columns.some(column => column.type !== undefined)
+        ? activeTab.lastProvenance.columns
+        : null;
+    const handleExportTypedJSON = () => {
+        if (!results || results.length === 0 || !typedColumns) return;
+        downloadJson(typedJsonRows(results, typedColumns));
+    };
+
+    const downloadJson = (rows: Record<string, unknown>[]) => {
+        const json = JSON.stringify(rows, null, 2);
         const blob = new Blob([json], { type: "application/json" });
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement("a");
@@ -1419,6 +1435,14 @@ id: String(ra.entityId) })}
                         >
                             {t("studio_sql_export_json")}
                         </Button>
+                        {typedColumns && <Button
+                            size="small"
+                            variant="text"
+                            className="whitespace-nowrap"
+                            onClick={handleExportTypedJSON}
+                        >
+                            {t("studio_sql_export_json_typed")}
+                        </Button>}
                         <Button
                             size="small"
                             variant="text"

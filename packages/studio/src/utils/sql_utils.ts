@@ -534,3 +534,64 @@ export function groupSchemaRows(data: Record<string, unknown>[]): Record<string,
     }
     return grouped;
 }
+
+const INTEGER_TYPES = new Set(["smallint", "integer", "bigint"]);
+const FLOAT_TYPES = new Set(["real", "double precision"]);
+
+/** How many significant digits a plain decimal (`-0012.3400`) has. */
+function significantDigits(decimal: string): number {
+    const digits = decimal.replace(/^-/, "").replace(".", "").replace(/^0+/, "");
+    return digits.replace(/0+$/, "").length;
+}
+
+/**
+ * One value of the console's result, read by its column's type: an integer a
+ * double holds exactly, a float, a numeric of at most 15 significant digits,
+ * a boolean (`t`/`f`), json. Anything else — and any value that would change
+ * on the way (a bigint past 2^53, a 20-digit numeric, `NaN`) — stays the
+ * database's text. A value that is not text (a backend that returned typed
+ * rows) or a column with no type is left as it came.
+ */
+function typedValue(value: unknown, type: string | undefined): unknown {
+    if (typeof value !== "string" || !type) return value;
+    const base = type.replace(/\(.*\)$/, "").trim();
+    if (INTEGER_TYPES.has(base)) {
+        const number = Number(value);
+        return /^-?\d+$/.test(value) && Number.isSafeInteger(number) ? number : value;
+    }
+    if (FLOAT_TYPES.has(base)) {
+        const number = Number(value);
+        return value.trim() !== "" && Number.isFinite(number) ? number : value;
+    }
+    if (base === "numeric") {
+        return /^-?\d+(\.\d+)?$/.test(value) && significantDigits(value) <= 15 ? Number(value) : value;
+    }
+    if (base === "boolean") {
+        return value === "t" ? true : value === "f" ? false : value;
+    }
+    if (base === "json" || base === "jsonb") {
+        try {
+            return JSON.parse(value);
+        } catch {
+            return value;
+        }
+    }
+    return value;
+}
+
+/**
+ * The console's rows for a typed JSON export: each value read by the type of
+ * the column it is in (see `typedValue`), where "Export JSON" writes the
+ * database's text as the console holds it. A row holds the last of two
+ * columns that share a name, so that column's type is the one read.
+ */
+export function typedJsonRows(
+    rows: Record<string, unknown>[],
+    columns: readonly { name: string; type?: string }[]
+): Record<string, unknown>[] {
+    const typeByName = new Map<string, string | undefined>();
+    for (const column of columns) typeByName.set(column.name, column.type);
+    return rows.map(row => Object.fromEntries(
+        Object.entries(row).map(([key, value]) => [key, typedValue(value, typeByName.get(key))])
+    ));
+}

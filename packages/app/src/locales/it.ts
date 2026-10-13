@@ -893,6 +893,7 @@ export const it: RebaseTranslations = {
     studio_sql_time: "Time:",
     studio_sql_copy_markdown: "Copia come Markdown",
     studio_sql_export_json: "Esporta JSON",
+    studio_sql_export_json_typed: "Esporta JSON tipizzato",
     studio_sql_export_csv: "Esporta CSV",
     studio_sql_format_sql: "Formatta SQL",
     studio_sql_explain: "Explain",
