@@ -1,4 +1,4 @@
-import { createTransport, RebaseClientConfig } from "./transport";
+import { createTransport, RebaseApiError, RebaseClientConfig } from "./transport";
 import { RebaseClientError } from "./errors";
 import { createAuth, CreateAuthOptions } from "./auth";
 import { createAdmin, CreateAdminOptions } from "./admin";
@@ -73,7 +73,7 @@ export type { StorageReferenceTarget, StorageReferenceResolver } from "@rebasepr
 
 // Auth: session/token types, config, and the pluggable storage strategies.
 export { createCookieStorage, createMemoryStorage } from "./auth";
-export type { AuthConfig, AuthStorage, CookieStorageOptions, CreateAuthOptions } from "./auth";
+export type { AuthConfig, AuthStorage, CookieStorageOptions, CreateAuthOptions, SessionRestoreOutcome } from "./auth";
 // `User` is re-exported alongside the session types because `client.auth` hands
 // one back and a browser app installs `@rebasepro/client` only — `@rebasepro/types`
 // is a transitive dependency there, not something a consumer can import from.
@@ -663,7 +663,35 @@ export function createRebaseClient<DB = Record<string, unknown>>(options: Create
         auth.onAuthStateChange((event, session) => {
             offlineManager.setScope(event === "SIGNED_OUT" ? undefined : session?.user?.uid);
         });
-        void auth.isInitialized().then(() => offlineManager.setScope(auth.getSession()?.user?.uid));
+        void auth.isInitialized().then(() => {
+            const uid = auth.getSession()?.user?.uid;
+            // No session, and only because the server could not be asked:
+            // with `keepLastUser`, the last user's data rather than the
+            // signed-out user's. Never when the server answered.
+            if (!uid && auth.restoreOutcome() === "unreachable" && offlineManager.keepsLastUser) {
+                void offlineManager.resumeLastUser();
+                return;
+            }
+            offlineManager.setScope(uid);
+        });
+        if (offlineManager.keepsLastUser) {
+            // Once the connection is back, ask again — the restore on load
+            // could not. Success announces the session, which confirms the
+            // user (or switches to whoever it really is); a refusal means
+            // there is no session, and the device is signed out.
+            let confirming = false;
+            offlineManager.api.onStatusChange((status) => {
+                if (!status.online || !status.unverifiedUser || confirming || auth.getSession()) return;
+                confirming = true;
+                auth.refreshSession().catch((error: unknown) => {
+                    const refused = error instanceof RebaseApiError
+                        && error.status !== undefined && error.status >= 400 && error.status < 500;
+                    if (refused && !auth.getSession()) offlineManager.setScope(undefined);
+                }).finally(() => {
+                    confirming = false;
+                });
+            });
+        }
     }
 
     const collectionClients = new Map<string, CollectionClient<Record<string, unknown>>>();

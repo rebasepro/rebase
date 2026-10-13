@@ -112,6 +112,31 @@ export interface OfflineConfig {
      * Network failures are not errors: those mutations stay queued.
      */
     onSyncError?: (error: Error, mutation: PendingMutation) => void;
+    /**
+     * Remember, on this device, the last user who signed in, and open their
+     * local database when a reload cannot reach the server to restore the
+     * session. Off by default.
+     *
+     * This matters in cookie mode, where nothing about the session is stored
+     * on the device: without it, an offline reload has no user, so it shows
+     * the signed-out local database and queues the user's writes as the
+     * signed-out user's. With it, the reload shows the last user's rows, and
+     * writes made meanwhile go into their queue. That queue is not replayed
+     * until the session is confirmed — by a refresh once the connection is
+     * back, or a sign-in. If the server then refuses the session, or someone
+     * else signs in, the device switches users and the queue waits, kept, for
+     * its author.
+     *
+     * The trade-off is the reason it is opt-in: on a shared device, the
+     * previous user's cached rows can be read offline without a session.
+     * Turn it on for installs that belong to one person. The id is forgotten
+     * at sign-out, and when the server refuses the session; it is never used
+     * when the server answered that there is no session.
+     *
+     * {@link OfflineStatus.unverifiedUser} is `true` while the device shows a
+     * user whose session it has not confirmed.
+     */
+    keepLastUser?: boolean;
 }
 
 /** A snapshot of the engine's state, for a status indicator. */
@@ -134,6 +159,13 @@ export interface OfflineStatus {
      * asked, and where there is nothing to ask.
      */
     persisted?: boolean;
+    /**
+     * `true` while the local data shown is the last signed-in user's, opened
+     * without a confirmed session ({@link OfflineConfig.keepLastUser}): their
+     * writes queue, and none replays until the session is confirmed. Unset
+     * otherwise.
+     */
+    unverifiedUser?: boolean;
 }
 
 export type { LiveResult, ObserveByIdOptions, ObserveOptions, RowSnapshotMeta } from "./collection";
@@ -501,6 +533,13 @@ const IN_PROGRESS_MIN_RETRIES = 12;
 /** The scope of whatever is cached and queued while nobody is signed in. */
 const SIGNED_OUT_SCOPE = "anon";
 
+/**
+ * Where {@link OfflineConfig.keepLastUser} keeps the last signed-in user's id.
+ * In the cache area but under no user's scope, so clearing one user's data
+ * leaves it alone.
+ */
+const LAST_USER_KEY = "rebase-offline:last-user";
+
 export class OfflineManager {
     private readonly store: OfflineStore;
     private readonly maxCachedQueries: number;
@@ -510,8 +549,16 @@ export class OfflineManager {
     private readonly createInner: InnerFactory;
     private readonly inners = new Map<string, SDKCollectionClient<AnyRow>>();
     private readonly connectivity: ConnectivityMonitor;
+    private readonly keepLastUser: boolean;
 
     private scope = SIGNED_OUT_SCOPE;
+    /**
+     * The scope is the last signed-in user's, taken without a confirmed
+     * session ({@link resumeLastUser}). Nothing replays while it is set: the
+     * queue is sent under the credentials of whoever is signed in, and nobody
+     * is yet.
+     */
+    private unverified = false;
     /**
      * Set while the manager does not know whose data it holds: from
      * {@link holdScope} until the next {@link setScope}. `scope` is not
@@ -596,6 +643,7 @@ export class OfflineManager {
         this.maxCachedRows = config.maxCachedRowsPerCollection ?? 5_000;
         this.maxRetries = config.maxRetries ?? 5;
         this.onSyncError = config.onSyncError;
+        this.keepLastUser = config.keepLastUser === true;
         this.createInner = createInner;
 
         const maxBackoffMs = config.syncIntervalMs ?? 60_000;
@@ -689,18 +737,71 @@ export class OfflineManager {
      * replay under the credentials that made them — so neither may ever leak
      * across a sign-out/sign-in on a shared browser.
      */
-    setScope(uid: string | undefined): void {
+    setScope(uid: string | undefined, options?: { unverified?: boolean }): void {
         const next = uid || SIGNED_OUT_SCOPE;
+        const unverified = next !== SIGNED_OUT_SCOPE && options?.unverified === true;
+        if (!unverified) this.rememberUser(uid);
         const hold = this.scopeHold;
-        if (!hold && next === this.scope) return;
+        if (!hold && next === this.scope) {
+            if (this.unverified && !unverified) {
+                // The user this device was showing is the one signed in: their
+                // rows stay where they are, and their queue can go now.
+                this.unverified = false;
+                this.patchStatus({ unverifiedUser: undefined });
+                void this.sync().catch(() => undefined);
+            }
+            return;
+        }
         this.scope = next;
+        this.unverified = unverified;
         this.scopeHold = undefined;
         this.leaveScope();
+        this.patchStatus({ unverifiedUser: unverified || undefined });
         // What was waiting for a user runs for this one.
         hold?.release();
         this.revalidateAll();
         // The returning user's queue may hold writes from a previous session.
         void this.sync().catch(() => undefined);
+    }
+
+    /** Whether the manager was created with {@link OfflineConfig.keepLastUser}. */
+    get keepsLastUser(): boolean {
+        return this.keepLastUser;
+    }
+
+    /**
+     * Take the scope of the last user who signed in on this device, without a
+     * session — for a load whose session restore could not reach the server.
+     * See {@link OfflineConfig.keepLastUser}. With no user remembered (or the
+     * option off) this is the signed-out scope, as it would have been anyway.
+     *
+     * Only while the scope is still held: an auth event that settled it while
+     * the id was being read is newer news.
+     */
+    async resumeLastUser(): Promise<void> {
+        let uid: string | undefined;
+        if (this.keepLastUser) {
+            try {
+                const entry = await this.store.getCache(LAST_USER_KEY);
+                if (typeof entry?.value === "string" && entry.value) uid = entry.value;
+            } catch {
+                // A store that cannot be read has no user to offer.
+            }
+        }
+        if (!this.scopeHold) return;
+        this.setScope(uid, { unverified: uid !== undefined });
+    }
+
+    /**
+     * Keep the signed-in user's id for {@link resumeLastUser}, or forget it at
+     * sign-out. Forgetting does not depend on the option, so turning it off
+     * does not leave the last id behind for good.
+     */
+    private rememberUser(uid: string | undefined): void {
+        const write = uid
+            ? (this.keepLastUser ? this.store.setCache(LAST_USER_KEY, { value: uid, cachedAt: Date.now() }) : undefined)
+            : this.store.deleteCache([LAST_USER_KEY]);
+        void write?.catch(() => undefined);
     }
 
     /**
@@ -2455,6 +2556,9 @@ data: u.data as AnyRow })),
         // Another tab may have queued or drained work since we last looked.
         await this.reloadQueue();
         if (this.queue.length === 0) return { flushed: 0, remaining: 0 };
+        // A user taken without a session: nobody's credentials are theirs to
+        // replay under yet. See `keepLastUser`.
+        if (this.unverified) return { flushed: 0, remaining: this.queue.length };
         // No `shouldAttempt` guard: every caller of `sync` — the app, the
         // retry timer, an `online` event, a sign-in — is asking for a real
         // attempt, and its outcome is what reopens the connection.

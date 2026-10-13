@@ -128,7 +128,7 @@ const { online, pending, syncing, lastSyncedAt, lastError } = client.offline!.st
 
 | Method | Purpose |
 |--------|---------|
-| `status()` | Current connectivity, queue depth, sync activity, last error, and `persisted`: whether the browser agreed to keep the offline database (asked when the first write is queued; `false` means it may be evicted under storage pressure, unsent writes included) |
+| `status()` | Current connectivity, queue depth, sync activity, last error, and `persisted`: whether the browser agreed to keep the offline database (asked when the first write is queued; `false` means it may be evicted under storage pressure, unsent writes included). `unverifiedUser` is `true` while an offline reload shows the last user's data without a confirmed session (see [`keepLastUser`](#offline-reloads-in-cookie-mode)) |
 | `onStatusChange(fn)` | Subscribe to the above |
 | `onQueueChange(fn)` | Just the number of unsent writes, for a badge |
 | `pending()` | The queued mutations themselves, oldest first. `pending({ orphaned: true })`: the ones queued while signed out — see [Users](#users) |
@@ -195,6 +195,36 @@ client.auth.onAuthStateChange(async (event) => {
 
 `clear({ orphaned: true })` discards them, with the local rows they were applied to; the signed-in user's own outbox is left alone. If the app does nothing with them, they replay the next time nobody is signed in. While nobody is signed in they are simply the current outbox, and `pending({ orphaned: true })` lists nothing.
 
+### Offline reloads in cookie mode
+
+In cookie mode nothing about the session is stored on the device, so a reload
+that cannot reach the server has no user. By default it is treated as signed
+out: the user's local rows are hidden, and writes made then queue as the
+signed-out user's.
+
+`keepLastUser: true` changes that. The client remembers the last user who
+signed in on the device (their id only), and an offline reload opens that
+user's local database instead. Writes made then queue as theirs, but none
+replays until the session is confirmed: when the connection is back the
+client refreshes the session, and a sign-in confirms it too. If the server
+refuses the session, or someone else signs in, the device switches users, and
+the queued writes stay with their author until they sign in again. Meanwhile
+`status().unverifiedUser` is `true`.
+
+```typescript
+createRebaseClient({
+    baseUrl: API_URL,
+    auth: { authFlowMode: "cookie" },
+    offline: { keepLastUser: true }
+});
+```
+
+It is off by default because on a shared device it lets the previous user's
+cached rows be read offline without a session. Turn it on for installs that
+belong to one person. The id is forgotten at sign-out and when the server
+refuses the session. It is never used when the server answers that there is no
+session.
+
 ## Configuration
 
 ```typescript
@@ -207,6 +237,7 @@ createRebaseClient({
         syncIntervalMs: 60_000,               // ceiling for the retry backoff; 0 disables auto-retry
         maxRetries: 5,                        // deferrals before a write is given up on
         crossTab: true,                       // default: on for IndexedDB, off for memory
+        keepLastUser: false,                  // open the last user's data on an offline reload (cookie mode)
         onSyncError: (error, mutation) => {}
     }
 });

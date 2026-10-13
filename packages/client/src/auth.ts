@@ -140,6 +140,13 @@ export function createAuth(transport: Transport, options?: CreateAuthOptions) {
     const isInitialized = new Promise<void>((resolve) => {
         resolveInitialized = resolve;
     });
+    /** See {@link SessionRestoreOutcome}. Set once, before `isInitialized` settles. */
+    let restoreOutcome: SessionRestoreOutcome = "pending";
+    /** Settle the load-time restore, saying how it ended. */
+    function settleRestore(outcome: Exclude<SessionRestoreOutcome, "pending">) {
+        if (restoreOutcome === "pending") restoreOutcome = outcome;
+        resolveInitialized!();
+    }
 
     function authUrl(endpoint: string) {
         return transport.baseUrl + transport.apiPath + authPath + endpoint;
@@ -1451,13 +1458,16 @@ refreshToken: session.refreshToken };
                 currentSession = stored;
                 transport.setToken(stored.accessToken);
                 scheduleRefresh(stored.expiresAt);
-                resolveInitialized!();
+                settleRestore("restored");
             } else if (authFlowMode === "cookie" || stored.refreshToken) {
                 currentSession = stored;
                 const epoch = sessionEpoch;
                 refreshSession().then(() => {
-                    resolveInitialized!();
+                    settleRestore("restored");
                 }).catch((err: unknown) => {
+                    let outcome: Exclude<SessionRestoreOutcome, "pending"> = isFatalRefreshError(err) || isMalformedRefreshError(err)
+                        ? "refused"
+                        : "unreachable";
                     if (epoch === sessionEpoch && currentSession) {
                         if (isFatalRefreshError(err)) {
                             // The refresh token itself was refused: there is no
@@ -1477,27 +1487,37 @@ refreshToken: session.refreshToken };
                             transport.setToken(currentSession.accessToken);
                             if (autoRefresh && !isMalformedRefreshError(err)) scheduleRetry(0);
                         }
+                    } else {
+                        // Signed out, or someone else signed in, while it was
+                        // in flight: whatever this refresh hit is not about
+                        // the session there is now.
+                        outcome = currentSession ? "restored" : "none";
                     }
-                    resolveInitialized!();
+                    settleRestore(outcome);
                 });
             } else {
-                resolveInitialized!();
+                settleRestore("none");
             }
         } else if (authFlowMode === "cookie") {
             // Silent refresh on boot to pick up httpOnly session
             const restore = refreshSession().then(() => {
-                resolveInitialized!();
-            }).catch(() => {
-                resolveInitialized!();
+                settleRestore("restored");
+            }).catch((err: unknown) => {
+                // A 401 is the usual answer — no cookie, or an expired one —
+                // and means there is nothing to restore. Only a failure to
+                // reach the server leaves the question open.
+                settleRestore(isFatalRefreshError(err) || isMalformedRefreshError(err)
+                    ? (currentSession ? "restored" : "none")
+                    : (currentSession ? "restored" : "unreachable"));
             }).finally(() => {
                 if (cookieRestore === restore) cookieRestore = null;
             });
             cookieRestore = restore;
         } else {
-            resolveInitialized!();
+            settleRestore("none");
         }
     } else {
-        resolveInitialized!();
+        settleRestore("none");
     }
 
     return {
@@ -1549,9 +1569,30 @@ refreshToken: session.refreshToken };
         // answer rather than a reason to ask the server. See the docblock on
         // `AuthClient.canRestoreSession`.
         canRestoreSession: () => persistSession || authFlowMode === "cookie",
-        isInitialized: () => isInitialized
+        isInitialized: () => isInitialized,
+        /**
+         * How restoring the session on load ended — see
+         * {@link SessionRestoreOutcome}. `"unreachable"` with no session is
+         * the one case where "signed out" is not known to be true: the
+         * device could not ask.
+         */
+        restoreOutcome: (): SessionRestoreOutcome => restoreOutcome
     };
 }
+
+/**
+ * How restoring the session on load ended — `auth.restoreOutcome()`.
+ *
+ * - `"pending"`: still restoring (`isInitialized()` has not settled).
+ * - `"restored"`: a session was restored, from storage or from the server.
+ * - `"none"`: there was nothing to restore.
+ * - `"refused"`: there was a session to restore, and the server refused it.
+ * - `"unreachable"`: the server could not be reached (or answered 5xx), so the
+ *   session was neither confirmed nor refused. With a stored session the
+ *   client keeps it and retries; in cookie mode, where nothing is stored on the
+ *   device, it has no session until a later refresh or sign-in succeeds.
+ */
+export type SessionRestoreOutcome = "pending" | "restored" | "none" | "refused" | "unreachable";
 
 export interface CookieStorageOptions {
     path?: string;

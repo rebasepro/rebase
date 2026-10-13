@@ -404,6 +404,19 @@ silently. So a listener cannot tell you the restore finished: a boot that emits
 nothing is indistinguishable from one still in progress. Await `isInitialized()`
 for that question and use the listener for changes after it.
 
+`restoreOutcome()` says how the restore ended, once `isInitialized()` has
+resolved: `"restored"`, `"none"` (nothing to restore), `"refused"` (the server
+refused the session), or `"unreachable"` (the server could not be reached, so
+the session was neither confirmed nor refused). In cookie mode, `"unreachable"`
+with no session is the one case where "signed out" is not known to be true:
+
+```typescript
+await client.auth.isInitialized();
+if (!client.auth.getSession() && client.auth.restoreOutcome() === "unreachable") {
+    console.log("Offline: could not check the session.");
+}
+```
+
 ## Auth State Listener
 
 React to authentication changes across your application:
