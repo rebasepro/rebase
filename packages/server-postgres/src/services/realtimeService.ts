@@ -401,6 +401,22 @@ export function parseMaxSubscriptionsPerSocket(value: unknown, source: string): 
 }
 
 /**
+ * Read `REALTIME_MAX_SOCKETS_PER_USER` / `realtime.maxSocketsPerUser`. Like the
+ * subscription ceiling, a value someone set and mistyped stops the boot rather
+ * than quietly becoming no ceiling.
+ */
+export function parseMaxSocketsPerUser(value: unknown, source: string): number {
+    const parsed = typeof value === "string" && value.trim() !== "" ? Number(value.trim()) : value;
+    if (typeof parsed !== "number" || !Number.isInteger(parsed) || parsed < 1) {
+        throw new Error(
+            `${source} must be a positive whole number of sockets per user — got ${JSON.stringify(value)}. ` +
+            "Leave it unset for no ceiling."
+        );
+    }
+    return parsed;
+}
+
+/**
  * How long a client gets to answer the close frame at shutdown before its
  * socket is dropped. `ws` would otherwise wait its own 30s close timeout, which
  * is longer than the whole shutdown budget.

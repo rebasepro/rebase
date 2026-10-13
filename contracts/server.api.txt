@@ -814,10 +814,10 @@ interface RawPolicyExpression { kind, sql }
 interface RawSQLCheckOnlySecurityRule { access, check, condition, mode, name, operation, operations, ownerField, pgRoles, roles, using, withCheck }
 interface RawSQLSecurityRule { access, check, condition, mode, name, operation, operations, ownerField, pgRoles, roles, using, withCheck }
 interface ReadQuery { fields, filter, limit, logical, offset, orderBy, relatedTo, searchString }
-interface RealtimeChannelsConfig { bus, channels, maxSubscriptionsPerSocket }
+interface RealtimeChannelsConfig { bus, channels, maxSocketsPerUser, maxSubscriptionsPerSocket }
 interface RealtimeListenerHealth { connected, downSince, name }
 interface RealtimeProvider { destroy, health, notifyUpdate, onServerReady, stopListening, subscribeToCollection, subscribeToOne, unsubscribe }
-interface RealtimeSocketOptions { dataRateLimit, heartbeatIntervalMs, identityRecheckIntervalMs, maxPayload, resolveApiKey }
+interface RealtimeSocketOptions { dataRateLimit, heartbeatIntervalMs, identityRecheckIntervalMs, maxPayload, maxSocketsPerUser, resolveApiKey }
 interface RebaseBackendAppConfig { config, context, crons, dockerfile, functions, port, runtime, schema, type, usersCollection }
 interface RebaseBundleEntrypoints { collections, config, crons, functions, schema, static, usersCollection }
 interface RebaseBundleFunction { file, name, portable, requires }

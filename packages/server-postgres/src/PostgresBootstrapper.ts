@@ -1766,13 +1766,22 @@ schemaHealthCheck: () => probeAuthSchema(db, resolveAuthSchema(authCollection)) 
                     `${socketRealtimeMissing(realtimeService).join(", ")}. Every socket would fail on its first frame.`
                 );
             }
+            // The per-identity socket ceiling, opt-in. Read here, at boot, and
+            // refused if mistyped rather than quietly becoming no ceiling.
+            const { parseMaxSocketsPerUser } = await import("./services/realtimeService");
+            const socketsFromEnv = process.env.REALTIME_MAX_SOCKETS_PER_USER?.trim();
+            const maxSocketsPerUser = socketsFromEnv
+                ? parseMaxSocketsPerUser(socketsFromEnv, "REALTIME_MAX_SOCKETS_PER_USER")
+                : pgConfig.realtime?.maxSocketsPerUser !== undefined
+                    ? parseMaxSocketsPerUser(pgConfig.realtime.maxSocketsPerUser, "realtime.maxSocketsPerUser")
+                    : undefined;
             createPostgresWebSocket(
                 server as import("http").Server,
                 realtimeService,
                 driver as PostgresBackendDriver,
                 config as { requireAuth?: boolean; jwtSecret?: string; serviceKey?: string },
                 adapter as AuthAdapter | undefined,
-                limits
+                maxSocketsPerUser !== undefined ? { ...limits, maxSocketsPerUser } : limits
             );
         }
     };

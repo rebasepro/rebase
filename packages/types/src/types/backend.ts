@@ -336,6 +336,16 @@ export interface RealtimeChannelsConfig {
      * Defaults to 1000. `REALTIME_MAX_SUBSCRIPTIONS_PER_SOCKET` wins over it.
      */
     maxSubscriptionsPerSocket?: number;
+    /**
+     * How many sockets one user (one identity: a signed-in user, an API key's
+     * user, an impersonated user) may hold open on one server instance. The
+     * next one's `AUTHENTICATE` is refused with `TOO_MANY_SOCKETS` and the
+     * socket closed with 4002; the SDK keeps retrying with backoff, so it gets
+     * in once another closes. A positive whole number, checked at boot.
+     * Unset (the default) is no ceiling. `REALTIME_MAX_SOCKETS_PER_USER` wins
+     * over it.
+     */
+    maxSocketsPerUser?: number;
 }
 
 /**
@@ -1053,6 +1063,12 @@ export interface RealtimeSocketOptions {
      * is sent one, in ms (default 30 000). The SDK redials after two missed.
      */
     heartbeatIntervalMs?: number;
+    /**
+     * How many sockets one identity may hold open on this server; the next
+     * one's `AUTHENTICATE` is refused with `TOO_MANY_SOCKETS` and the socket
+     * closed (4002). Unset for no ceiling. See `realtime.maxSocketsPerUser`.
+     */
+    maxSocketsPerUser?: number;
 }
 
 /**

@@ -270,6 +270,13 @@ const CHANNEL_RECHECK_MIN_MS = 1_000;
 export const SESSION_ENDED_CLOSE_CODE = 4001;
 
 /**
+ * The close code for a socket refused because its user already holds
+ * `REALTIME_MAX_SOCKETS_PER_USER` sockets on this server. The SDK reconnects
+ * with backoff, so a tab refused this way gets in once another one closes.
+ */
+export const TOO_MANY_SOCKETS_CLOSE_CODE = 4002;
+
+/**
  * When a JWT expires, in ms, or undefined for a credential that is not one
  * (an API key, the service key, an adapter's opaque token).
  *
@@ -506,6 +513,8 @@ export function createPostgresWebSocket(
     /** The sockets that opted into heartbeats — see `socket-opt-ins.ts`. */
     const heartbeatSockets = new Set<WebSocket>();
     const heartbeatIntervalMs = options?.heartbeatIntervalMs ?? DEFAULT_HEARTBEAT_INTERVAL_MS;
+    /** How many sockets one identity may hold here; unset is no ceiling. See `REALTIME_MAX_SOCKETS_PER_USER`. */
+    const maxSocketsPerUser = options?.maxSocketsPerUser;
 
     const isProduction = process.env.NODE_ENV === "production";
     /**
@@ -1070,6 +1079,29 @@ fetchAllowanceAt: Date.now() });
 
                     if (verifiedUser) {
                         const session = clientSessions.get(clientId);
+                        // The per-identity ceiling, when one is set: a socket
+                        // re-authenticating as whom it already is does not
+                        // count against itself. Refused with an `ERROR`, not
+                        // an `AUTH_ERROR` — the credential is fine, and an
+                        // auth error sends the SDK to refresh the session —
+                        // then closed, so the tab does not run on as nobody.
+                        if (maxSocketsPerUser !== undefined && session) {
+                            let held = 0;
+                            for (const other of clientSessions.values()) {
+                                if (other !== session && other.user?.uid === verifiedUser.uid) held++;
+                            }
+                            if (held >= maxSocketsPerUser) {
+                                logger.warn(`[WebSocket Server] Refused a socket for ${verifiedUser.uid}: ${held} already open, ceiling ${maxSocketsPerUser}`);
+                                sendError(
+                                    "ERROR",
+                                    "TOO_MANY_SOCKETS",
+                                    `This user already has ${held} realtime connections open on this server, the most it allows ` +
+                                    "(REALTIME_MAX_SOCKETS_PER_USER). Close another tab or client and try again."
+                                );
+                                ws.close(TOO_MANY_SOCKETS_CLOSE_CODE, "Too many realtime connections for this user");
+                                return;
+                            }
+                        }
                         if (session) {
                             session.user = verifiedUser;
                             session.authenticated = true;
