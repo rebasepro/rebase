@@ -30,7 +30,6 @@
         "packages/common/src/index.ts",
         "packages/common/src/table-classification.ts",
         "packages/client/src/collection.ts",
-        "packages/client/src/query_builder.ts",
         "packages/client/src/sdk_query_builder.ts",
         "packages/client/src/reviver.ts",
         "packages/server/src/services/driver-registry.ts",
@@ -159,6 +158,7 @@
       "title": "Realtime, channels and offline sync",
       "paths": [
         "packages/server-postgres/src/websocket.ts",
+        "packages/server-postgres/src/socket-opt-ins.ts",
         "packages/server-postgres/src/services/cdc/**",
         "packages/server-postgres/src/services/channel-bus/**",
         "packages/server-postgres/src/services/channel-*.ts",
