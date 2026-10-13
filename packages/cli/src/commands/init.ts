@@ -169,6 +169,35 @@ export type InitQuestion =
     | { type: "confirm"; name: string; message: string; default: boolean; when?: (answers: Record<string, unknown>) => boolean }
     | { type: "select"; name: string; message: string; choices: ReadonlyArray<{ name: string; value: unknown; short: string }>; default: unknown; when?: (answers: Record<string, unknown>) => boolean };
 
+/**
+ * Why `input` cannot be this project's `DATABASE_URL`, or null when it can.
+ *
+ * The runtime refuses anything that is not a URL, and only a Postgres one can
+ * work, so `init` refuses the same — before the scaffold is written around it.
+ * The value itself is never repeated back: it may hold a password.
+ */
+export function databaseUrlProblem(input: string): string | null {
+    const expected = "(expected postgresql://user:password@host:5432/database)";
+    let parsed: URL;
+    try {
+        parsed = new URL(input.trim());
+    } catch {
+        return `not a PostgreSQL connection string ${expected}`;
+    }
+    if (parsed.protocol !== "postgresql:" && parsed.protocol !== "postgres:") {
+        return `not a PostgreSQL connection string: it starts with ${parsed.protocol}// ${expected}`;
+    }
+    return null;
+}
+
+/** One line saying `dir` already holds files, or null when it may be scaffolded into. */
+function scaffoldConflictLine(dir: string): string | null {
+    const conflicts = scaffoldDirectoryConflicts(dir);
+    if (conflicts.length === 0) return null;
+    const shown = conflicts.slice(0, 4).join(", ") + (conflicts.length > 4 ? `, and ${conflicts.length - 4} more` : "");
+    return `"${path.basename(dir)}" already holds files a new project would overwrite or mix with (${shown}). Choose another name.`;
+}
+
 export function buildInitQuestions(params: BuildQuestionsParams): InitQuestion[] {
     const { nameArg, templateArg, headlessArg, hasGitFlag, hasInstallFlag, pm } = params;
     const questions: InitQuestion[] = [];
@@ -179,7 +208,11 @@ export function buildInitQuestions(params: BuildQuestionsParams): InitQuestion[]
             name: "projectName",
             message: "Project name:",
             default: "my-app",
-            validate: (input: string) => validateProjectName(input) ?? true
+            // The directory is checked here, while the name can still be
+            // changed, rather than after every other question is answered.
+            validate: (input: string) => validateProjectName(input)
+                ?? scaffoldConflictLine(path.resolve(process.cwd(), input))
+                ?? true
         });
     }
 
@@ -229,10 +262,14 @@ export function buildInitQuestions(params: BuildQuestionsParams): InitQuestion[]
         message: "PostgreSQL connection string (blank = a managed database for this project, no setup):",
         default: "",
         validate: (input: string) => {
-            if (input.trim() && /[\r\n]/.test(input)) {
+            if (!input.trim()) return true;
+            if (/[\r\n]/.test(input)) {
                 return "Database URL cannot contain newline characters.";
             }
-            return true;
+            // `n` here was an answer to the yes/no question the reader thought
+            // this was, and it became DATABASE_URL=n.
+            const problem = databaseUrlProblem(input);
+            return problem ? `That is ${problem}. Leave it blank for the managed database.` : true;
         }
     });
 
@@ -365,6 +402,26 @@ async function promptForOptions(rawArgs: string[], pm: PackageManager): Promise<
         const nameError = validateProjectName(resolvedName);
         if (nameError) {
             console.error(chalk.red(`Invalid project name "${resolvedName}": ${nameError}`));
+            process.exit(1);
+        }
+        // Before any question: the answer cannot change, so asking first only
+        // wastes every answer the reader gives.
+        const targetDirectory = path.resolve(process.cwd(), nameArg);
+        const conflicts = scaffoldDirectoryConflicts(targetDirectory);
+        if (conflicts.length > 0) {
+            for (const line of scaffoldConflictMessage(resolvedName, formatCdTarget(process.cwd(), targetDirectory), conflicts)) {
+                console.error(line);
+            }
+            process.exit(1);
+        }
+    }
+
+    const databaseUrlArg = args["--database-url"]?.trim();
+    if (databaseUrlArg) {
+        const problem = databaseUrlProblem(databaseUrlArg);
+        if (problem) {
+            console.error(chalk.red(`✗ --database-url is ${problem}.`));
+            console.error(chalk.gray("  Leave the flag out to use a managed database for this project, with no setup."));
             process.exit(1);
         }
     }
