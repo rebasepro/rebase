@@ -42,6 +42,10 @@ REBASE_ROLE=all        # the default: everything, one process
 Health und Metriken sind ausnahmslos in jeder Rolle enthalten. Ein Prozess, den ein
 Orchestrator nicht abfragen kann, ist ein Prozess, den er nicht rollierend aktualisieren kann.
 
+<span class="since-badge" data-since="0.25">Seit 0.25</span> `GET /api/auth/config`,
+das, was der Anmeldebildschirm liest, folgt dem Rest von `/api/auth`: Nur `api` und
+`all` liefern es aus. Unter 0.24 hat es auch ein `functions`- oder `worker`-Prozess beantwortet.
+
 Echtzeit steht auf der Liste, weil sie Ressourcen kostet, unabhängig davon, ob jemand sie nutzt:
 Ein Prozess, der Änderungsereignisse konsumiert, hält während seiner gesamten Laufzeit eine `LISTEN`-Verbindung
 außerhalb des Pools aufrecht und installiert beim Start die Erfassungstrigger. Nur ein Prozess, der
@@ -146,6 +150,15 @@ Standardeinstellungen verweigert den Start und meldet dies entsprechend. `CREATE
 Katalog und schreibt in zwei separaten Schritten darauf, sodass gleichzeitig startende Prozesse kollidieren –
 und ein Deployment, bei dem mehrere Prozesse um die Bereitstellung desselben Schemas konkurrieren, ist von
 niemandem so vorgesehen.
+
+<span class="since-badge" data-since="0.25">Seit 0.25</span> In einem
+[eigenen Server](/docs/backend/custom-server/) ist dieselbe Entscheidung die
+Option `provision` von `createRebaseBackend`: `true` in dem Prozess, dem das
+Schema gehört, und `{ collections: false, realtime: false }` in jedem anderen, der
+die eigenen Tabellen des Frameworks dennoch behält. `REBASE_MIGRATE_ON_BOOT=none` schaltet
+dort ebenfalls das Collection-Schema ab. Hintergrundarbeit wird auf dieselbe Weise entschieden:
+Ein Prozess, der nie `start()` aufruft, führt weder einen Cron-Scheduler noch Job-Worker aus,
+und einer, der es tut, führt diejenigen aus, die seine Option `ownership` ihm gibt.
 
 ## Eine Funktion pro Prozess bereitstellen
 

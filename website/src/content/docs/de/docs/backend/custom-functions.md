@@ -87,7 +87,7 @@ Siehe [Laufzeit-Portabilität](#laufzeit-portabilität) für den vollständigen 
 
 :::note[Wo dies hingehört]
 **Managed Runtime:** Nichts zu konfigurieren – die Runtime erkennt `backend/functions/` von selbst (`entry.functions` in `rebase.json`, falls Sie es verschoben haben). `REBASE_FUNCTIONS_ONLY` / `REBASE_FUNCTIONS_EXCLUDE` schränken ein, welche Funktionen ein Prozess bedient.
-**Ejected:** `initializeRebaseBackend({ functionsDir })` in `backend/src/index.ts`.
+**Ejected:** `initializeRebaseBackend({ functionsDir })` oder `functions` (unten) in `backend/src/index.ts`.
 :::
 
 Aktivieren Sie benutzerdefinierte Funktionen, indem Sie `functionsDir` zu Ihrer Backend-Konfiguration hinzufügen:
@@ -107,6 +107,24 @@ Rebase wird:
 2. Validieren, dass jeder Standard-Export eine Hono-App ist (Duck-Typing über `.fetch()` + `.routes`)
 3. Jede App unter `/api/functions/<filename>` einbinden
 4. Die Auth-Middleware anwenden (siehe [Authentifizierung](#authentifizierung-und-kontext-weitergabe) unten)
+
+### Funktionen als Werte
+
+<span class="since-badge" data-since="0.25">Seit 0.25</span> Unter 0.24 stammen Funktionen nur aus einem Verzeichnis.
+
+Ein Verzeichnis ist eine Möglichkeit, das zu erzeugen, was der Server ausliefert: einen Record vom URL-Segment zur Hono-App. Übergeben Sie diesen Record selbst als `functions`, oder lesen Sie mit `loadFunctions` ein Verzeichnis in ihn ein:
+
+```typescript
+import path from "path";
+import { initializeRebaseBackend, loadFunctions } from "@rebasepro/server";
+import sendInvoice from "../functions/send-invoice";
+
+await initializeRebaseBackend({ app, server, functions: { "send-invoice": sendInvoice } }); // → /api/functions/send-invoice
+// the same as functionsDir:
+await initializeRebaseBackend({ app, server, functions: await loadFunctions(path.resolve(__dirname, "../functions")) });
+```
+
+Geben Sie `functions` oder `functionsDir` an, nicht beides: Der Boot lehnt das Paar ab. `loadFunctions(dir, { onSkip })` übergibt Ihnen jede übersprungene Datei samt Begründung. `loadFunctionsFromDirectory` und `loadFunctionsWithDiagnostics` funktionieren weiterhin, sind veraltet (deprecated) und warnen einmalig. Für sich allein lässt sich die Functions-Gruppe an jedem Pfad mit `app.route("/hooks", backend.routes.functions())` einbinden, und `getUser(c)` sowie `getDriver(c)` funktionieren darin; siehe [Eigene Server-Integration](/docs/backend/custom-server/#mounting-only-the-groups-you-want).
 
 ## Dateibenennung und Routen-Mapping
 
@@ -161,33 +179,11 @@ export default function () {
 
 ## Unter der Haube: Der Duck-Typing-Loader
 
-Beim Kompilieren von Codebasen mit mehreren verschachtelten Verzeichnissen oder in Monorepos kann es zu **Hono-Paketduplikaten** kommen.
-
-Wenn das Rebase-Framework von einer Hono-Version abhängt und Ihr lokales functions-Verzeichnis zu einer anderen auflöst, schlagen standardmäßige Klassenvererbungsprüfungen (`exported instanceof Hono`) fehl, da ihre Prototypen in getrennten Speicherbereichen existieren.
-
-Um falsch-negative Ergebnisse zu vermeiden und das Laden funktionierender Router nicht fälschlicherweise abzulehnen, verwendet Rebase einen duck-typisierten Validator (`isHonoLike`):
-- Er prüft, ob das exportierte Objekt ein Nicht-Null-`object` ist.
-- Er überprüft, ob das Objekt eine `.fetch`-Methode bereitstellt (erforderlich zum Routen von Anfragen).
-- Er stellt sicher, dass `.routes` ein `array` ist.
-
-```typescript no-verify
-function isHonoLike(obj: unknown): boolean {
-    if (!obj || typeof obj !== "object") return false;
-    const record = obj as Record<string, unknown>;
-    return typeof record.fetch === "function" && Array.isArray(record.routes);
-}
-```
+In einem Monorepo können Ihre Funktionen eine andere Kopie von Hono auflösen als die, die Rebase verwendet; dann ist `exported instanceof Hono` für einen funktionierenden Router falsch. Der Loader prüft daher stattdessen die Form (`isHonoLike`): ein Nicht-Null-Objekt mit einer `.fetch`-Methode und einem `.routes`-Array.
 
 ### ES-Modul-Compiler-Escape
 
-Um TypeScript- und JavaScript-Dateien sowohl auf Windows- als auch auf POSIX-Systemen dynamisch zu importieren, konvertiert der Loader Dateipfade über `pathToFileURL(filePath).href` in Standard-Datei-URIs.
-
-Um zu verhindern, dass die TypeScript-Kompilierung native dynamische ESM-Imports (`import(url)`) in CommonJS-`require()`-Aufrufe umschreibt (was zur Laufzeit unter ESM-Runtimes zu Fehlern führen würde), führt Rebase einen Laufzeit-Compiler-Escape aus:
-
-```typescript no-verify
-const dynamicImport = new Function("url", "return import(url)");
-const mod = await dynamicImport(fileUrl);
-```
+Der Loader wandelt jeden Dateipfad in eine Datei-URL um (`pathToFileURL(filePath).href`), sodass er auf Windows und POSIX gleichermaßen importiert, und ruft `import(url)` über `new Function("url", "return import(url)")` auf, damit ein TypeScript-Build es nicht in ein `require()` umschreiben kann, das unter ESM fehlschlägt.
 
 ---
 

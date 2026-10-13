@@ -485,6 +485,48 @@ const client = createRebaseClient({
 });
 ```
 
+## Einen eigenen Auth-Provider verwenden
+
+<span class="since-badge" data-since="0.25">Seit 0.25</span> Unter 0.24 authentifiziert ein
+Token-Getter nur HTTP-Anfragen, und der Realtime-Socket bleibt anonym.
+
+Wenn sich Benutzer mit einem eigenen Provider anmelden (Clerk, Firebase Auth oder eine
+Session, die Ihre App bereits hat), ist `client.auth` nicht beteiligt. Geben Sie dem Client
+stattdessen einen Getter für das Token des Providers. Er wird jedes Mal gefragt, wenn ein
+Token gebraucht wird: bei jeder HTTP-Anfrage und jedes Mal, wenn sich der Realtime-Socket
+authentifiziert.
+
+```typescript
+import { createRebaseClient } from "@rebasepro/client";
+
+const client = createRebaseClient({ baseUrl: import.meta.env.VITE_API_URL });
+
+client.setAuthTokenGetter(() => clerk.session?.getToken() ?? Promise.resolve(null));
+
+// Optional: let Clerk recover a refused token, on HTTP and the socket alike.
+client.setOnUnauthorized(async () => {
+    await clerk.session?.reload();
+    return true;
+});
+
+// The socket authenticates as the Clerk user.
+client.data.posts.listen({}, (response) => render(response.data));
+```
+
+- Der Getter hat Vorrang vor der eigenen Session des Clients. Antwortet er mit `null` oder
+  wirft er einen Fehler, sendet der Client das Token, das er hält, falls vorhanden: das seiner
+  Session, eines, das mit `client.setToken()` gesetzt wurde, oder die Option `token`.
+- Die Option `token` wird jedes Mal gelesen, wenn ein Token gebraucht wird, bis `setToken()` oder
+  eine Anmeldung sie ersetzt; sie kann daher als Getter deklariert werden
+  (`get token() { return currentToken; }`).
+- `setOnUnauthorized` deckt ein 401 über HTTP und einen Auth-Fehler auf dem Socket ab
+  und ersetzt die eigene Session-Aktualisierung des Clients.
+
+Das Backend muss das Token des Providers verifizieren: siehe
+[Benutzerdefinierte Auth-Adapter](/docs/backend/auth-adapters). Setzen Sie im Admin-Panel
+den Getter auf dem Client, den Sie an `<Rebase client>` übergeben
+([Ihr eigener Auth-Provider](/docs/frontend/authentication#your-own-auth-provider)).
+
 ## Struktur des User-Objekts
 
 ```typescript

@@ -29,6 +29,14 @@ Bei Bereitstellungen mit mehreren Instanzen verwendet Rebase PostgreSQLs `LISTEN
 
 Realtime ist standardmäßig aktiviert. Es muss kein Flag gesetzt oder ein Dienst gestartet werden – wenn Ihr Rebase-Server läuft, ist der WebSocket-Endpunkt verfügbar.
 
+### Welchen Pfad der Socket beantwortet
+
+<span class="since-badge" data-since="0.25">Seit 0.25</span> Unter 0.24 nimmt der Socket jedes WebSocket-Upgrade auf dem Server an, gleich welchen Pfad es hat.
+
+Der Socket beantwortet Upgrades auf einem Pfad: dem Basispfad der API ohne ein abschließendes `/api`, also `/` für eine API unter `/api`. Dorthin wählt sich das SDK ein: Es verbindet sich mit seiner `baseUrl`, während seine HTTP-Anfragen an `${baseUrl}/api` gehen. Ein Upgrade auf jeden anderen Pfad bleibt den anderen `upgrade`-Listenern des Servers überlassen, sodass Ihre App auf demselben `http.Server` einen eigenen WebSocket-Server betreiben kann. Ohne einen weiteren Listener wird ein solches Upgrade mit `404` beantwortet.
+
+In einem [eigenen Server](/docs/backend/custom-server/) legt `backend.attachRealtime(server, { path })` den Pfad fest, und `realtime.path` des Postgres-Adapters überschreibt, was der Server abgeleitet hat.
+
 > Standardmäßig gibt Rebase auch Realtime-Events für Schreibvorgänge aus, die **außerhalb** der API getätigt werden (über `psql`, einen anderen Dienst oder den SQL-Editor von Studio), sofern die Datenbankverbindung dies unterstützt – siehe [Change Capture auf Datenbankebene (CDC)](/docs/backend/realtime-cdc/).
 
 ## Abonnements im typisierten SDK

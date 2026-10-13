@@ -37,6 +37,27 @@ authController.getAuthToken() // Get current JWT for API calls
 
 Übergeben Sie den `authController` an den Rebase-Navigations-Controller, um das gesamte Admin-Panel durch eine Authentifizierung zu schützen.
 
+## Ihr eigener Auth-Provider
+
+<span class="since-badge" data-since="0.25">Seit 0.25</span> Unter 0.24 authentifiziert der
+Getter nur HTTP-Anfragen, und der Realtime-Socket des Panels bleibt anonym.
+
+Wenn Ihre App Benutzer mit einem eigenen Provider anmeldet (Clerk, Firebase Auth, eine
+eigene Session), geben Sie dem Client, den Sie an `<Rebase client>` übergeben, einen
+Token-Getter. Die HTTP-Anfragen des Panels und sein Realtime-Socket senden beide, was er
+zurückgibt, sodass Live-Collection-Ansichten als derselbe Benutzer laufen:
+
+```typescript
+client.setAuthTokenGetter(() => clerk.session?.getToken() ?? Promise.resolve(null));
+```
+
+Der `authController` daneben meldet dann den angemeldeten Benutzer Ihres Providers
+(ein `AuthController` aus `@rebasepro/cms-types`), statt `client.auth` zu umhüllen. Auch das
+Backend muss das Token akzeptieren: siehe
+[Benutzerdefinierte Auth-Adapter](/docs/backend/auth-adapters) und
+[Einen eigenen Auth-Provider verwenden](/docs/sdk/authentication#using-your-own-auth-provider)
+für die Client-Seite im Ganzen.
+
 ## Login-Ansicht
 
 Die Komponente `LoginView` stellt ein vollständiges Formular für Anmeldung und Registrierung bereit:

@@ -239,6 +239,24 @@ abgeleitet, sodass nichts auf der Festplatte ihn benennt. Wenn Sie eine eigene
 dieselbe, der auch jeder andere Befehl folgt. Startet die verwaltete Datenbank, falls sie
 noch nicht läuft.
 
+### `rebase console`
+
+<span class="since-badge" data-since="0.25">Seit 0.25</span>
+
+Eine Node-REPL mit geöffneten Projektdaten, oder ein einzelnes Snippet, das mit `-e` ausgeführt wird:
+
+```bash
+rebase console
+rebase console -e "rebase.dataAsAdmin.posts.find({ limit: 5 })"
+```
+
+`rebase` (`dataAsAdmin`, `sql`, `withAuth(user)`) und `collections` sind im Geltungsbereich,
+und `await` auf oberster Ebene funktioniert. Die Datenbank wird so aufgelöst, wie
+`rebase db push` sie auflöst, und das Öffnen verändert nichts an ihr. Mit `-e` wird das
+abgewartete Ergebnis als JSON auf stdout ausgegeben, und ein Fehler beendet mit `1`. Flags:
+`--eval`/`-e`, `--collections`/`-c`, `--database-url`, `--docker`. Siehe
+[Skripte und die Konsole](/docs/backend/scripts/).
+
 ### `rebase db stop` / `rebase db reset`
 
 Nur für die verwaltete Entwicklungsdatenbank:

@@ -197,6 +197,25 @@ const backend = await initializeRebaseBackend({
 });
 ```
 
+#### Die Client-Seite
+
+<span class="since-badge" data-since="0.25">Seit 0.25</span> Unter 0.24 authentifiziert der Getter
+nur HTTP-Anfragen, und der Realtime-Socket bleibt anonym.
+
+Der Adapter verifiziert das Token des Providers; der Client muss es senden. Geben Sie dem
+Rebase-Client einmalig einen Getter dafür:
+
+```typescript
+client.setAuthTokenGetter(() => clerk.session?.getToken() ?? Promise.resolve(null));
+```
+
+Bei Firebase Auth lautet der Getter
+`() => auth.currentUser?.getIdToken() ?? Promise.resolve(null)`. Der Client
+ruft ihn bei jeder HTTP-Anfrage und bei jeder Authentifizierung des Realtime-Sockets auf,
+sodass Live-Abfragen als derselbe Benutzer laufen wie REST-Aufrufe. Setzen Sie ihn im
+Admin-Panel auf dem Client, den Sie an `<Rebase client>` übergeben. Siehe
+[Einen eigenen Auth-Provider verwenden](/docs/sdk/authentication#using-your-own-auth-provider).
+
 ---
 
 ### Einbinden von Auth-Routen und Panel-Aktionen

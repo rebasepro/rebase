@@ -20,6 +20,10 @@ CDC wird über die Umgebungsvariable `REALTIME_CDC` gesteuert:
 | `wal` | Bevorzugt logische WAL-Replikation. Noch nicht integriert – fällt auf `trigger` zurück und protokolliert den aktiven Modus. |
 | `off` | Nur Realtime auf Anwendungsebene. Verwenden Sie dies, um den Trigger-Overhead pro Schreibvorgang bei schreibintensiven Workloads zu vermeiden. Ein Start mit `off`, der das Schema besitzt, **entfernt** außerdem die Capture-Trigger und -Funktionen, die ein früherer Start installiert hat, und loggt, wie viele er entfernt hat; setzen Sie den Wert zurück, installiert der nächste Start sie wieder. |
 
+<span class="since-badge" data-since="0.25">Seit 0.25</span> Dieselbe Einstellung ist die
+Option `realtime.cdc` des Postgres-Adapters, für einen Server, der sie im Code konfiguriert.
+`REALTIME_CDC` hat, sofern gesetzt, Vorrang.
+
 Beim Start wird eine Protokollzeile mit dem aktiven Modus ausgegeben, z. B.:
 
 ```
@@ -46,7 +50,9 @@ Wenn die Verbindung dies nicht unterstützt, gibt `auto` stattdessen eine Inform
 
 ## Anforderungen & Hinweise
 
-- CDC erfordert einen direkten Connection-String (`DATABASE_DIRECT_URL` oder die primäre Verbindung) für den `LISTEN`-Client – Connection-Pooler im Transaktionsmodus unterstützen keine langlebigen `LISTEN`-Sitzungen.
+<span class="since-badge" data-since="0.25">Seit 0.25</span> `directConnectionString` ist die Adapter-Option; unter 0.24 verwenden Sie `DATABASE_DIRECT_URL`.
+
+- CDC erfordert einen direkten Connection-String (`DATABASE_DIRECT_URL`, das `directConnectionString` des Adapters oder die primäre Verbindung) für den `LISTEN`-Client – Connection-Pooler im Transaktionsmodus unterstützen keine langlebigen `LISTEN`-Sitzungen.
 - Trigger werden nur auf Tabellen installiert, die einer registrierten Collection zugeordnet sind. Schreibvorgänge in nicht zugeordnete Tabellen werden ignoriert.
 - Eine Collection, deren Tabelle noch nicht migriert wurde, wird mit einer Warnung übersprungen, anstatt CDC für die übrigen zu blockieren.
 - Natives WAL-Logical-Replication-Streaming (`wal2json`/`pgoutput`) ist geplant; derzeit fällt `REALTIME_CDC=wal` auf den triggerbasierten Pfad zurück, der eine gleichwertige Abdeckung auf Datenbankebene bietet.

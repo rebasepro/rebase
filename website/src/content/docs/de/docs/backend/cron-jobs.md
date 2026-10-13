@@ -61,7 +61,7 @@ Der **Dateiname** (ohne Erweiterung) wird zur eindeutigen ID des Jobs – z. B. 
 :::note[Wo dies hingehört]
 **Verwaltete Laufzeit** — legen Sie die Dateien in `backend/crons/` ab; die Laufzeit erkennt dieses Verzeichnis selbstständig, und `entry.crons` in `rebase.json` wird nur benötigt, wenn Sie es verschoben haben. `REBASE_CRON_SCHEDULER` in `.env` bestimmt, ob *dieser* Prozess die Timer ausführt.
 
-**Ausgekoppelt (Ejected)** — `cronsDir` bei `initializeRebaseBackend({ … })`, wie unten gezeigt.
+**Ausgekoppelt (Ejected)** — `cronsDir` bei `initializeRebaseBackend({ … })`, wie unten gezeigt, oder `crons` mit den Jobs als Werten.
 
 Die vollständige Übersicht finden Sie in der [Backend-Übersicht](/docs/backend/#where-each-option-lives).
 :::
@@ -83,6 +83,30 @@ Das ist alles. Rebase wird:
 3. Die Tabellen `rebase.cron_logs`, `rebase.cron_claims` und `rebase.cron_job_state` in PostgreSQL automatisch erstellen (sofern der Treiber SQL unterstützt)
 4. Den Scheduler starten und Zähler aus vorhandenen DB-Logs initialisieren
 5. Admin-REST-Routen unter `/api/admin/cron` mounten
+
+### Cron-Jobs als Werte
+
+<span class="since-badge" data-since="0.25">Seit 0.25</span> Unter 0.24 stammen Cron-Jobs nur aus einem Verzeichnis.
+
+`crons` nimmt die Jobs als Record von der Job-ID zur Definition entgegen, neben `collections`. Ein Verzeichnis ist eine Möglichkeit, ihn zu bauen: `loadCrons(dir)` liest eines in genau diese Form ein.
+
+```typescript
+import path from "path";
+import { defineCron, initializeRebaseBackend, loadCrons } from "@rebasepro/server";
+
+const nightlyReport = defineCron({
+    schedule: "0 3 * * *",
+    async handler({ log }) {
+        log("building the report");
+    }
+});
+
+await initializeRebaseBackend({ app, server, crons: { "nightly-report": nightlyReport } });
+// the same as cronsDir:
+await initializeRebaseBackend({ app, server, crons: await loadCrons(path.resolve(__dirname, "../crons")) });
+```
+
+Geben Sie `crons` oder `cronsDir` an, nicht beides: Der Boot lehnt das Paar ab. Das Bauen des Backends registriert die Jobs; was ihre Timer startet, ist `start()`, das `initializeRebaseBackend` für Sie aufruft. Mit [`createRebaseBackend`](/docs/backend/custom-server/) rufen Sie es selbst auf, in dem Prozess, der sie ausführen soll. `loadCronJobsFromDirectory` und `loadCronJobsWithDiagnostics` funktionieren weiterhin, sind veraltet (deprecated) und warnen einmalig.
 
 ## Zeitplan-Syntax
 
@@ -430,6 +454,16 @@ async handler({ log }) {
 ```
 
 Der Handler läuft im Deployment, wo diese Variablen existieren. Ein Top-Level-Import desselben Moduls sorgt dafür, dass der Graph nur auf einer Maschine abgeleitet werden kann, die zufällig eine `.env`-Datei hat – und er lädt die gesamte Abhängigkeit bei jedem Bootvorgang, der den Job lediglich registrieren will.
+
+<span class="since-badge" data-since="0.25">Seit 0.25</span> Das Laden eines Crons
+deklariert nichts. Ein eigener Build-Schritt, der Crons im Graphen haben möchte, sagt
+das mit `declareCrons`:
+
+```ts
+import { declareCrons, loadCrons } from "@rebasepro/server";
+
+declareCrons(await loadCrons("./crons", { onSkip: (problem) => console.warn(problem) }));
+```
 
 ## Nächste Schritte
 

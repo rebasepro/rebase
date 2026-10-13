@@ -9,7 +9,7 @@ description: Überschreiben Sie Standard-UI-Komponenten mit benutzerdefinierten 
 
 Rebase ermöglicht es Ihnen, Standard-UI-Komponenten durch Ihre eigenen benutzerdefinierten Implementierungen zu überschreiben. Dies implementiert ein Komponenten-Swizzling-Modell im Docusaurus-Stil, das zwei Anpassungsmuster unterstützt:
 - **Eject-Modus** (Standard): Ihre Komponente ersetzt die integrierte Komponente vollständig.
-- **Wrap-Modus** (`wrap: true`): Ihre Komponente kapselt (wrappt) das Original. Die integrierte Komponente wird als `OriginalComponent`-Prop übergeben, sodass Sie sie innerhalb Ihres benutzerdefinierten Layouts bzw. Ihrer Logik rendern können.
+- **Wrap-Modus** (`wrap: true`): Ihre Komponente kapselt (wrappt) das Original. Das, was sie kapselt (in der Regel die integrierte Komponente), wird als `OriginalComponent`-Prop übergeben, sodass Sie sie innerhalb Ihres benutzerdefinierten Layouts bzw. Ihrer Logik rendern können.
 
 Komponenten-Overrides können **global** auf Anwendungsebene (am `<Rebase>`-Provider) oder **lokal** auf Collection-Ebene (innerhalb einzelner Collection-Definitionen) angewendet werden.
 
@@ -86,7 +86,7 @@ export const productsCollection = defineCollection({
 });
 ```
 
-Die wrappende Komponente liegt zusammen mit dem Rest Ihres Frontend-Codes und erhält die integrierte Komponente als `OriginalComponent`:
+Die wrappende Komponente liegt zusammen mit dem Rest Ihres Frontend-Codes und erhält das, was sie kapselt, als `OriginalComponent` — die integrierte Komponente, es sei denn, Ihre App überschreibt sie ebenfalls (siehe [Wenn beide Gültigkeitsbereiche eine Komponente überschreiben](#wenn-beide-gültigkeitsbereiche-eine-komponente-überschreiben)):
 
 ```tsx
 // frontend/src/ProductsEmptyState.tsx
@@ -109,6 +109,21 @@ export default function ProductsEmptyState({ OriginalComponent, ...props }: {
 Jedes Modul benötigt einen **Default-Export**. Das Vite-Plugin für Collections schreibt einen Pfad in einen Lazy-Import um, sodass die Komponente ein eigener Chunk ist und erst geladen wird, wenn das Override zum ersten Mal gerendert wird. Diese Umschreibung deckt Dateien innerhalb des konfigurierten `collectionsDir` ab. Ein Pfad in einer Datei außerhalb davon erreicht das Admin-Panel als einfacher String: Dies wird in der Konsole gemeldet und die integrierte Komponente wird stattdessen gerendert. Außerhalb von `collectionsDir` müssen Sie den Lazy-Import selbst schreiben: `Component: () => import("../../frontend/src/ProductCustomForm")`.
 
 Eine direkte Referenz (`Component: ProductCustomForm`) funktioniert ebenfalls, jedoch nur in einer Collection-Datei, die vom Server nicht geladen wird, da der Import der Komponente auch React und alle damit verbundenen Abhängigkeiten lädt.
+
+### Wenn beide Gültigkeitsbereiche eine Komponente überschreiben
+
+<span class="since-badge" data-since="0.25">Seit 0.25</span> Unter 0.24 erhält der Wrapper einer Collection immer die integrierte Komponente, und das Override auf App-Ebene wird innerhalb dieser Collection übersprungen.
+
+Die beiden Gültigkeitsbereiche werden komponiert. Das Override auf App-Ebene (`<Rebase components>`) wird zuerst auf die integrierte Komponente angewendet, und das der Collection (`admin.components`) auf das Ergebnis:
+
+| App-Ebene | Collection-Ebene | Was innerhalb dieser Collection gerendert wird |
+|---|---|---|
+| beliebig | keines | das, was überall sonst gerendert wird: das Override auf App-Ebene oder die integrierte Komponente |
+| keines | wrap | der Wrapper der Collection um die integrierte Komponente |
+| replace oder wrap | wrap | der Wrapper der Collection um das Override auf App-Ebene, übergeben als `OriginalComponent` |
+| beliebig | replace | allein die Komponente der Collection; sie ersetzt beide |
+
+So kann eine Collection etwas um eine Komponente herum hinzufügen, die Ihre App bereits anpasst, ohne diese Anpassung zu verlieren. Um die Version auf App-Ebene für eine Collection zu verwerfen, ersetzen Sie, statt zu wrappen.
 
 ---
 

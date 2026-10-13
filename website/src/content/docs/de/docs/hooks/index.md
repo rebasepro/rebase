@@ -443,7 +443,7 @@ function CustomAction() {
 
 ## `useUnsavedChangesDialog`
 
-Verhindert Navigation oder das Verlassen der Seite, solange ein Formular ungespeicherte Änderungen hat. Interne React-Router-Navigation wird automatisch über `useBlocker` abgefangen, Reloads auf Browserebene über `beforeunload`.
+Verhindert Navigation oder das Verlassen der Seite, solange ein Formular ungespeicherte Änderungen hat. Es fragt vor einem Reload oder einem geschlossenen Tab (`beforeunload`) und, innerhalb des Admin-Panels unter einem React-Router-Data-Router (`createBrowserRouter`), auch vor der In-App-Navigation, über `useBlocker`. Unter jedem anderen Router, etwa einem einfachen `<BrowserRouter>`, gilt nur die Abfrage auf Browserebene.
 
 ```typescript
 import { useUnsavedChangesDialog } from "@rebasepro/app";

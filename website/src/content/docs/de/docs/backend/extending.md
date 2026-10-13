@@ -21,13 +21,16 @@ erreichen Ihr Projekt nicht mehr. Klettern Sie also nur so weit, wie Sie wirklic
 
 ## Die Leiter
 
+<span class="since-badge" data-since="0.25">Seit 0.25</span> `createRebaseBackend` auf
+Stufe 5 ist neu; unter 0.24 besteht diese Stufe nur aus dem Treiber.
+
 | # | Stufe | Erreicht | Erreicht **nicht** | Kosten dieser Stufe |
 |---|---|---|---|---|
 | 1 | **Deklaration** — eine Eigenschaft, eine Relation, ein Index, ein `search`-Block, eine Sicherheitsregel | Das Schema, das generierte SDK, das Admin-Panel, den Migrationsplaner | Alles, was Code ausführen muss | Keine. Dies ist der empfohlene Weg |
 | 2 | **Collection-Callback** — `beforeQuery`, `afterRead`, `beforeSave`, `afterSave`, `beforeDelete`, `afterDelete` | Jeden Lese- und Schreibzugriff auf eine Collection, über jedes Transportprotokoll, innerhalb der anfrageeigenen Transaktion | Anfragen, die keine Collection berühren; den Response-Envelope; alles, was asynchron zum Schreibvorgang ist | Läuft auf dem Hot Path und hält die Transaktion offen |
 | 3 | **Benutzerdefinierte Funktion** — eine Hono-App in `functions/` | Eine eigene URL mit aufgelöster Authentifizierung, dem auf den Aufrufer beschränkten Treiber und `rebase` griffbereit | Die integrierten `/api/data`-Routen. Sie liegt *neben* ihnen, nicht davor | Eine zusätzliche Autorisierungsfläche; es wird keine SDK-Methode dafür generiert |
 | 4 | **Eigene Routen und Middleware** auf der Hono-App | Alles über HTTP, einschließlich Pfade, die *vor* den Routern von Rebase ausgeführt werden | Den Treiber und die Identität des Aufrufers, es sei denn, Sie sichern die Route selbst ab | Liegt außerhalb jedes Rebase-Routers: Es wurde keine Authentifizierungs-Middleware ausgeführt |
-| 5 | **Eigener Server** — Einbetten des Treibers in Express, Fastify oder einfaches `http` | Den Datenadapter und Realtime, in einem von Ihnen geschriebenen Prozess | Alles, was `initializeRebaseBackend` bereitstellt: Authentifizierungsrouten, Speicher, Jobs, Cron, Admin-API, den MCP-Server | Sie bauen das Backend selbst zusammen. Rebase ist hier eine Bibliothek, kein Koordinator |
+| 5 | **Eigener Server** — das Backend mit `createRebaseBackend` bauen und die gewünschten Routengruppen einbinden, oder den Treiber allein in Express, Fastify oder einfaches `http` einbetten | Jede Routengruppe, unter dem Pfad Ihrer Wahl, und welcher Prozess die Timer startet; ganz unten den Datenadapter und Realtime allein | Mit dem Treiber allein: alles andere, von Auth-Routen und Speicher bis zu Cron und der Admin-API | Sie rufen jeden Schritt selbst auf, den `initializeRebaseBackend` für Sie übernommen hat |
 | 6 | **`rebase eject`** | Den Einstiegspunkt und das `Dockerfile` in Ihrem Repository | — | **Plattform-Laufzeit-Upgrades erreichen dieses Projekt nicht mehr.** CORS, Auth-Verdrahtung, Speicher und Shutdown liegen in Ihrer Verantwortung |
 
 :::tip[Zwei Stufen werden häufig grundlos übersprungen]
@@ -145,7 +148,7 @@ einer Datenquelle, die nicht Postgres ist. Eine Datenmaskierung, die auf jeder E
 **Geltungsbereich:** Eine URL unter `/api/functions`.
 
 Eine Hono-App in `backend/functions/`, die wie Collections und Cron-Jobs anhand des Dateinamens
-erkannt wird. Die Authentifizierungs-Middleware wurde bereits ausgeführt, wenn Ihr Handler erreicht wird,
+erkannt oder als Wert übergeben wird (`functions: { promote }`). Die Authentifizierungs-Middleware wurde bereits ausgeführt, wenn Ihr Handler erreicht wird,
 der Treiber ist auf den Aufrufer beschränkt und `rebase` steht für Speicher, E-Mails, Jobs und
 `dataAsAdmin` zur Verfügung.
 
@@ -176,7 +179,8 @@ SDK-Methode bereitgestellt; Aufrufer erreichen sie über `client.functions.invok
 `initializeRebaseBackend` übernimmt die App, die Sie übergeben. Alles, was Sie *vor* dem Aufruf
 auf dieser App registrieren, läuft vor jedem Rebase-Router – siehe
 [Reihenfolge der Routenregistrierung](/docs/backend/custom-functions#route-registration-order)
-für den genauen Aufbau.
+für den genauen Aufbau. Eine Routengruppe, die Sie selbst aus `backend.routes` einbinden
+(Stufe 5), gehört nicht zu diesen Routen: Sie bringt ihre eigene Authentifizierungs-Middleware mit.
 
 :::caution[Dort wurde keine Authentifizierungs-Middleware ausgeführt]
 Eine auf diese Weise registrierte Route liegt **außerhalb** jedes Rebase-Routers, daher ist
@@ -201,21 +205,42 @@ von einem Rebase-Router ausgeführt.
 
 **Geltungsbereich:** Der Prozess.
 
-`@rebasepro/server-postgres` ist framework-agnostisch: Es hängt von Drizzle und Nodes
-`http.Server` ab und von sonst nichts. Sie können den Datenadapter und Realtime also in Express,
-Fastify oder reines Node einbetten und den Koordinator vollständig umgehen.
+<span class="since-badge" data-since="0.25">Seit 0.25</span>
+`initializeRebaseBackend` ist eine Abkürzung über vier öffentliche Aufrufe, und diese Stufe
+bedeutet, sie selbst aufzurufen. `createRebaseBackend` baut das Backend und bindet nichts ein,
+startet nichts und lauscht auf nichts. `backend.routes` enthält jede Routengruppe als
+Hono-Sub-App, die Sie allein einbinden können, unter jedem Pfad. `mount`, `attachRealtime` und
+`start` erledigen den Rest, falls Sie ihn möchten:
+
+```typescript
+const backend = await createRebaseBackend({ database: adapter, auth, collections, provision: true });
+
+app.route("/v2/data", backend.routes.data());   // only the parts you want,
+app.route("/v2/auth", backend.routes.auth());   // at the paths you want
+await backend.attachRealtime(server);
+backend.start();                                // cron, job workers, sweeps
+```
+
+Eine Gruppe bringt ihren eigenen Auth-Kontext, ihre Rate-Limits und ihr Admin-Gate mit, sodass
+`getDriver(c)` in einer Gruppe funktioniert, die irgendwo eingebunden ist. Was sie nicht mitbringt,
+ist die prozessweite Middleware, die `mount()` hinzufügt: Body-Limit, Komprimierung, CSRF und
+der Error-Envelope müssen Sie selbst hinzufügen, wenn Sie Gruppen einzeln einbinden.
+
+Einen Schritt weiter unten ist `@rebasepro/server-postgres` framework-agnostisch: Es hängt von
+Drizzle und Nodes `http.Server` ab und von sonst nichts, sodass Sie den Datentreiber und Realtime
+in Express, Fastify oder reines Node einbetten und den Rebase-Server vollständig weglassen können.
 
 → [Eigene Server-Integration](/docs/backend/custom-server)
 
-**Was er nicht erreichen kann:** Alles, was `initializeRebaseBackend` bereitstellt – und das
-ist der Großteil des Backends: Die Auth-Routen und Token-Aktualisierung, Speicher, die Job-Queue,
-Cron, die Admin-API, mit der das Studio kommuniziert, der MCP-Server, der Error-Envelope und der
-Middleware-Stack. Jede dieser Komponenten kann manuell eingebunden werden, aber keine richtet sich
-von selbst ein. Auf dieser Stufe ist Rebase eine Bibliothek, kein Koordinator.
+**Was er nicht erreichen kann:** Mit `createRebaseBackend` liegt nichts außer Reichweite; Sie
+übernehmen die Reihenfolge der Aufrufe. Mit dem Treiber allein müssen Sie alles, was der Server
+verdrahtet, selbst bauen: die Auth-Routen und Token-Aktualisierung, Speicher, die Job-Queue, Cron,
+die Admin-API, mit der das Studio kommuniziert, den MCP-Server, den Error-Envelope und den
+Middleware-Stack.
 
 Wählen Sie diese Option, wenn Sie bereits einen bestehenden Server haben, der der Haupteinstiegspunkt
-bleiben muss. Wenn Sie eigentlich nur eine eigene Route benötigen, entspricht das Stufe 3 oder 4 – bei
-einem Bruchteil des Aufwands und der Angriffsfläche.
+bleiben muss, oder wenn nur ein Teil des Backends in diesen Prozess gehört. Wenn Sie eigentlich nur eine
+eigene Route benötigen, entspricht das Stufe 3 oder 4 – bei einem Bruchteil des Aufwands und der Angriffsfläche.
 
 ## 6. `rebase eject`
 

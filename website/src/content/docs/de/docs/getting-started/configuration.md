@@ -206,8 +206,8 @@ mitliefert), `STORAGE_PUBLIC_READ` oder `STORAGE_ALLOW_ANY_AUTHENTICATED`.
 | `DB_POOL_MAX` | Maximale Anzahl an gepoolten Verbindungen | `20` |
 | `DB_POOL_IDLE_TIMEOUT` | Millisekunden, die eine inaktive Verbindung aufrechterhalten wird | `30000` |
 | `DB_POOL_CONNECT_TIMEOUT` | Millisekunden, die auf eine Verbindung gewartet wird | `10000` |
-| `DATABASE_DIRECT_URL` | Direkte (nicht gepoolte) Verbindung. [Realtime](/docs/backend/realtime) benötigt eine solche: `LISTEN`/`NOTIFY` funktioniert nicht über einen Transaktions-Pooler wie PgBouncer; ohne sie werden Änderungsbenachrichtigungen mit einer Warnung deaktiviert, statt lautlos verloren zu gehen. Auch der [Job-Worker](/docs/backend/jobs) hält seinen Wake-up-`LISTEN` darauf. | — |
-| `DATABASE_READ_URL` | Read-Replikat. Lesezugriffe gehen dorthin, wenn gesetzt und abweichend von `DATABASE_URL`; schlägt die Verbindung fehl, fällt alles mit einer Warnung auf die primäre Datenbank zurück. | — |
+| `DATABASE_DIRECT_URL` | Direkte (nicht gepoolte) Verbindung. [Realtime](/docs/backend/realtime) benötigt eine solche: `LISTEN`/`NOTIFY` funktioniert nicht über einen Transaktions-Pooler wie PgBouncer; ohne sie werden Änderungsbenachrichtigungen mit einer Warnung deaktiviert, statt lautlos verloren zu gehen. Auch der [Job-Worker](/docs/backend/jobs) hält seinen Wake-up-`LISTEN` darauf. <span class="since-badge" data-since="0.25">Seit 0.25</span> Füllt das `directConnectionString` des Postgres-Adapters, wenn dieses nicht gesetzt ist. | — |
+| `DATABASE_READ_URL` | Read-Replikat. Lesezugriffe gehen dorthin, wenn gesetzt und abweichend von `DATABASE_URL`; schlägt die Verbindung fehl, fällt alles mit einer Warnung auf die primäre Datenbank zurück. <span class="since-badge" data-since="0.25">Seit 0.25</span> Füllt das `readConnectionString` des Postgres-Adapters, wenn dieses nicht gesetzt ist; unter 0.24 wird diese Option ignoriert. | — |
 | `REBASE_DB_POOL_MAX` | Eine Obergrenze für jeden Pool im Prozess, unabhängig davon, was der jeweilige Pool angefordert hat. Nur reine Ziffern: Ein fehlerhafter Wert wird ignoriert, anstatt den Server lautlos zu serialisieren. | — |
 
 ### Laufzeitverhalten
@@ -229,7 +229,7 @@ Server-Image. Ein Projekt, für das `eject` ausgeführt wurde, steuert diese Ent
 | `REBASE_METRICS_TOKEN` | Bearer-Token zum Schutz von `/metrics`. Wenn nicht gesetzt, bleibt der Endpunkt für alles offen, was den Port erreichen kann – in einem privaten Netzwerk in Ordnung, in einem öffentlichen nicht, worauf die Boot-Logs hinweisen. | — |
 | `REBASE_MIGRATE_ON_BOOT` | Was die Runtime beim Start mit dem Schema tun darf. `ensure` (der Standard überall – einschließlich Produktion) führt den **additiven** Schritt aus: Fehlende Tabellen, Spalten und Enum-Typen anlegen, niemals löschen oder umschreiben. `none` rührt nichts an. Das veröffentlichte Image akzeptiert nur diese beiden und **verweigert den Start bei `push`**. In einem [getrennten Deployment](/docs/deployment/split-processes) darf genau ein Prozess die Bereitstellung übernehmen, daher müssen alle anderen Rollen `none` setzen oder den Start verweigern. | `ensure` |
 | `REBASE_REQUIRE_SCHEMA_MATCH` | Start verweigern, wenn die Datenbank zuletzt aus einem anderen Satz von Collections bereitgestellt wurde, als diesem Prozess zugrunde liegt. Nicht gesetzt (oder alles andere als `true`/`1`) gibt stattdessen eine Warnung aus. | warn |
-| `REALTIME_CDC` | Change-Capture auf Datenbankebene: `auto` (aktivieren, wo die Verbindung es unterstützt, sonst stiller Fallback), `trigger` (erzwingen, warnen falls unmöglich), `wal` (fällt aktuell auf `trigger` zurück), `off`. Siehe [Realtime](/docs/backend/realtime-cdc/). | `auto` |
+| `REALTIME_CDC` | Change-Capture auf Datenbankebene: `auto` (aktivieren, wo die Verbindung es unterstützt, sonst stiller Fallback), `trigger` (erzwingen, warnen falls unmöglich), `wal` (fällt aktuell auf `trigger` zurück), `off`. Siehe [Realtime](/docs/backend/realtime-cdc/). <span class="since-badge" data-since="0.25">Seit 0.25</span> Hat Vorrang vor `realtime.cdc`. | `auto` |
 | `REALTIME_CHANNEL_BUS` | Instanzübergreifender Transport für Broadcast-Kanäle und Anwesenheit (Presence): `memory` oder `postgres`. Wird ignoriert, wenn `realtime.bus` ein konstruierter Transport übergeben wurde. | `memory` |
 | `REALTIME_MAX_SUBSCRIPTIONS_PER_SOCKET` | Wie viele Abonnements ein Realtime-Socket halten darf; das nächste wird mit `TOO_MANY_SUBSCRIPTIONS` abgelehnt. Eine positive ganze Zahl — alles andere stoppt den Server beim Start. Hat Vorrang vor `realtime.maxSubscriptionsPerSocket`. Siehe [Realtime](/docs/backend/realtime#what-a-write-costs-and-the-limits). | `1000` |
 | `REALTIME_MAX_SOCKETS_PER_USER` | <span class="since-badge" data-since="0.25">Seit 0.25</span> Wie viele Realtime-Sockets ein Benutzer auf einer Server-Instanz offen halten darf. Die Anmeldung des nächsten wird mit `TOO_MANY_SOCKETS` abgelehnt und der Socket geschlossen (4002); das SDK versucht es weiter, sodass er hineinkommt, wenn ein anderer schließt. Eine positive ganze Zahl — alles andere stoppt den Server beim Start. Hat Vorrang vor `realtime.maxSocketsPerUser`. | Keine Obergrenze |
@@ -475,6 +475,11 @@ await initializeRebaseBackend({
     }
 });
 ```
+
+<span class="since-badge" data-since="0.25">Seit 0.25</span> Dieselben Optionen,
+ohne `app`, `server` und `basePath` und mit einem erforderlichen `provision`, bauen ein
+Backend, das nichts ausliefert, bis Sie es einbinden: `createRebaseBackend`. Siehe
+[Integration eines eigenen Servers](/docs/backend/custom-server/).
 
 ### Ändern von `basePath`
 

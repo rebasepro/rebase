@@ -290,7 +290,17 @@ const router = createBrowserRouter([
 ], { basename });
 ```
 
-Die Administration braucht einen **Data Router** — `createBrowserRouter`, nicht der einfache `BrowserRouter` — weil das Blockieren ungespeicherter Änderungen `useBlocker` verwendet, das nur der Data Router bereitstellt.
+Betreiben Sie die Administration auf einem **Data Router** — `createBrowserRouter` mit
+`<RouterProvider>`, wie es das Scaffold tut. Unter ihm stoppt ein Datensatz mit ungespeicherten
+Änderungen auch die In-App-Navigation (ein Link im Drawer, die Zurück-Schaltfläche des
+Browsers) und fragt zuerst nach, über `useBlocker`, den nur ein Data Router
+bereitstellt.
+
+<span class="since-badge" data-since="0.25">Seit 0.25</span> Die Administration läuft auch
+unter einem einfachen `<BrowserRouter>`. Dort fällt der Schutz vor ungespeicherten Änderungen
+auf die eigene Verlassen-Abfrage des Browsers zurück, die einen Reload, das Schließen des
+Tabs oder die Eingabe einer URL abdeckt; die Navigation innerhalb der App geht ohne Nachfrage
+weiter. Unter 0.24 wirft die Administration außerhalb eines Data Routers einen Fehler.
 
 **Backend** — wenn Sie auch die API verschieben, passen Sie deren Basispfad an:
 
@@ -337,7 +347,7 @@ const router = isAdmin
 root.render(<RouterProvider router={router}/>);
 ```
 
-Ein Router für beide Hälften: die Administration braucht den Data Router ohnehin, und es gibt keinen Grund, die Produkt-App auf einen anderen zu setzen.
+Ein Router für beide Hälften: Die Administration ist auf einem Data Router besser aufgehoben, der ungespeicherte Änderungen die In-App-Navigation stoppen lässt, und es gibt keinen Grund, die Produkt-App auf einen anderen zu setzen.
 
 Das Backend benötigt für dieses Muster keine Änderungen — die API bleibt unter `/api` und der SPA-
 Catch-all liefert `index.html` sowohl für `/` als auch für `/admin/*`.

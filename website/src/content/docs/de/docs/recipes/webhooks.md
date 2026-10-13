@@ -89,6 +89,13 @@ Ziel, das der Dispatcher ablehnt, oder ein Empfänger, der mit einer Weiterleitu
 einem Versuch mit dem Grund in die Dead-Letter-Ablage; alles andere wird wie jeder Job wiederholt. Siehe
 [Durable Webhooks](/docs/backend/jobs#durable-webhooks).
 
+`setCollectionCallbacks` **ersetzt** die Callbacks, die die Collection `orders`
+deklariert. Wenn sie welche deklariert, behalten Sie diese:
+<span class="since-badge" data-since="0.25">Seit 0.25</span> Übergeben Sie
+`composeCallbacks(declared, { afterSave })`, mit `composeCallbacks` aus
+`@rebasepro/server` und `declared` als den eigenen `callbacks` der Collection. Siehe
+[Callback-Sets kombinieren](/docs/collections/callbacks/#combining-callback-sets).
+
 ### Ohne Job-Queue
 
 Lassen Sie `jobQueue` weg — oder arbeiten Sie mit einem Treiber ohne SQL, bei dem das Backend keine hat —, und die

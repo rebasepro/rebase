@@ -21,6 +21,37 @@ ein leerer String in einem Pflichtfeld. Es folgen drei Entfernungen: zwei Client
 die nur Engines waren, ein Admin-Hook, den niemand braucht, und eine Storage-Option, die
 keinen Client erreichte.
 
+:::note[Geändertes Verhalten und veraltete Namen]
+0.25 ändert außerdem, was einige bestehende Aufrufe tun, ohne sie zu brechen. Prüfen Sie
+diese, wenn sich Ihre App auf das alte Verhalten verlässt:
+
+- **Plugin-Feld-Wrapper werden komponiert.** Das `fieldBuilder.wrap` jedes Plugins wird gerendert,
+  jeweils um das Feld, das die Plugins davor hinterlassen haben, statt nur das des letzten.
+- **Komponenten-Overrides werden komponiert.** Das `wrap: true`-Override einer Collection erhält
+  das Override der App für dieselbe Komponente als `OriginalComponent`, nicht die
+  integrierte.
+- **`rebase.auth`, `rebase.admin`, `rebase.functions` und `rebase.cron` auf dem
+  Server erreichen die Routen des Backends In-Process,** sodass Middleware, die Sie zu
+  Ihrer eigenen Hono-App hinzugefügt haben, auf ihnen nicht mehr läuft.
+- **Der Realtime-Socket beantwortet nur seinen eigenen Pfad** (`/` für eine API unter `/api`).
+  Ein Client, der auf demselben Server einen anderen Pfad angewählt hat, erhält ein 404 oder Ihren eigenen
+  `upgrade`-Listener.
+- **Der Socket bekommt sein Token so wie HTTP,** sodass `client.setAuthTokenGetter()`
+  ihn nun authentifiziert und er nach einer Abmeldung nicht mehr auf die Option
+  `token` zurückfällt.
+
+Diese Namen funktionieren weiterhin, warnen einmalig zur Laufzeit und haben einen Ersatz:
+
+| Veraltet | Stattdessen verwenden |
+|---|---|
+| `loadFunctionsFromDirectory`, `loadFunctionsWithDiagnostics` | `loadFunctions(dir, { onSkip })` |
+| `loadCronJobsFromDirectory`, `loadCronJobsWithDiagnostics` | `loadCrons(dir, { onSkip })`, dann `declareCrons(crons)`, wo das alte Paar sie deklariert hat |
+| `client.ws.setAuthTokenGetter()` | `client.setAuthTokenGetter()` |
+| Plugin-`hooks.modifyCollectionAsync` (nie aufgerufen) | `hooks.modifyCollection`, wobei die Daten abgerufen werden, bevor `<Rebase>` rendert |
+| Plugin-`lifecycle.onCollectionChange` (nie aufgerufen) | `context.data.collection(slug).listen(…)` aus `lifecycle.onMount` |
+| `DatabaseAdapter.mountRoutes`, `BackendBootstrapper.mountRoutes` (nie aufgerufen) | eine Route-Factory, die Ihre App einbindet |
+:::
+
 ---
 
 ## 68. Ein Filter auf eine Spalte namens `count` gehört in `?where=`
