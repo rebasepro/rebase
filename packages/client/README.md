@@ -131,7 +131,6 @@ of it resolves too: Node has supported `require(esm)` since 22.12.
 | `createCookieStorage(options?)` | Cookie-based auth storage adapter |
 | `createMemoryStorage()` | In-memory auth storage adapter |
 | `or`, `and`, `not`, `cond` | Logical-condition helpers for `.where(…)` |
-| `QueryBuilder`, `createBackups` | **Deprecated**, leaving in the next minor: use `client.data.<collection>.where(…)` and `client.backups` |
 | `FindResult`, `FindParams`, `User`, … | Re-exported from `@rebasepro/types` |
 
 ## Quick Start

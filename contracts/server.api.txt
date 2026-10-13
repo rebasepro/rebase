@@ -1084,7 +1084,6 @@ type WirePrimaryKeys
 
 ## @rebasepro/client
 class MemoryOfflineStore { clear, deleteCache, dequeue, enqueue, getCache, listCache, listCacheEntries, listQueue, setCache, setCacheMany }
-class QueryBuilder { find, include, limit, listen, offset, orderBy, search, vectorSearch, where }
 class RebaseApiError { code, details, requestId, retryAfterSeconds, status }
 class RebaseClientError { code, details, requestId, retryAfterSeconds, status }
 class RebasePaginationError { code }
@@ -1093,7 +1092,6 @@ class RebaseWebSocketClient { authenticate, checkUniqueField, count, createBranc
 const STORAGE_REFERENCE_SCHEME
 function and { conditions, type }
 function cond { column, operator, value }
-function createBackups { download, downloadUrl, list, stream }
 function createCookieStorage
 function createMemoryStorage
 function createRebaseClient
@@ -1127,7 +1125,6 @@ interface CreateAdminOptions { adminPath }
 interface CreateApiKeyRequest { expires_at, name, rate_limit, roles, scopes }
 interface CreateApiKeysOptions { apiKeysPath }
 interface CreateAuthOptions { authFlowMode, authPath, autoRefresh, persistSession, storage }
-interface CreateBackupsOptions { backupsPath }
 interface CreateCronOptions { cronPath }
 interface CreatePersonalKeyRequest { expires_at, name, scopes }
 interface CreatePersonalKeysOptions { personalKeysPath, scopesPath }

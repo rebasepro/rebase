@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals
 import { createCollectionClient } from "../src/collection";
 import { createRebaseClient as _createRebaseClient } from "../src/index";
 import { buildQueryString, Transport } from "../src/transport";
-import { QueryBuilder } from "../src/query_builder";
+import { QueryBuilder } from "@rebasepro/common";
 
 // Tokenless clients in a Node environment, on purpose — that is what the
 // anonymous-server-client guard warns about (covered by
