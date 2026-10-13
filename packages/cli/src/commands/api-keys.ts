@@ -31,6 +31,7 @@ import {
 import { parseCommandArgs, UsageError, wantsHelp } from "../utils/args";
 import { unknownCommand } from "../utils/unknown-command";
 import { cliUserAgent } from "../utils/version";
+import { serverUnreachableHint } from "../utils/dev-server";
 import fs from "fs";
 import path from "path";
 
@@ -122,10 +123,7 @@ export function describeFailure(action: string, error: unknown, baseUrl: string)
         return [`✗ ${action}: ${error instanceof Error ? error.message : String(error)}`];
     }
     if (error.status === 0 || error.code === "NETWORK_ERROR") {
-        return [
-            `✗ ${action}: ${error.message}`,
-            `  Is the Rebase server running at ${baseUrl}? Start it with \`rebase dev\`, or set REBASE_BASE_URL in .env.`
-        ];
+        return [`✗ ${action}: ${error.message}`, ...serverUnreachableHint(baseUrl)];
     }
 
     const label = [error.code, error.status ? `(${error.status})` : undefined].filter(Boolean).join(" ");

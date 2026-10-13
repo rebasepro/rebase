@@ -18,7 +18,8 @@ import net from "net";
 import os from "os";
 import path from "path";
 
-import { appBannerLines, DEV_FLAGS, DEV_PORT_FILENAME, databaseBannerValue, devCommand, devRestartTrigger, devStaticShape, devWatchArgs, devWatchIncludes, getProjectPort, needsStaleSchemaPreflight, pinnedPortRefusal, readEnvValue, resolveStartPort, portMovedNotice, SCAFFOLD_DEFAULT_PORT, schemaPushArgv, START_PORT_SOURCE_LABELS } from "./dev";
+import { getProjectPort } from "../utils/dev-server";
+import { appBannerLines, DEV_FLAGS, DEV_PORT_FILENAME, databaseBannerValue, devCommand, devRestartTrigger, devStaticShape, devWatchArgs, devWatchIncludes, needsStaleSchemaPreflight, pinnedPortRefusal, readEnvValue, resolveStartPort, portMovedNotice, SCAFFOLD_DEFAULT_PORT, schemaPushArgv, START_PORT_SOURCE_LABELS } from "./dev";
 import type { PreparedDatabase } from "../dev-db/prepare";
 import { validateManifest } from "../manifest";
 

@@ -63,6 +63,7 @@ import { detectPackageManager, getPMCommands } from "../utils/package-manager";
 import { parseCommandArgs, UsageError, wantsHelp } from "../utils/args";
 import { affectsSqlSchema } from "../utils/collection-drift";
 import { ensureDevDatabase, probeTcp } from "../utils/dev-preflight";
+import { getProjectPort } from "../utils/dev-server";
 import { runDriverDbCommand, runDriverSchemaCommand } from "./db";
 import dotenv from "dotenv";
 import { recordEvent } from "../telemetry";
@@ -414,19 +415,6 @@ export const DEV_PORT_FILENAME = ".rebase-dev-port";
  * template still says this number, so the two cannot drift apart in silence.
  */
 export const SCAFFOLD_DEFAULT_PORT = 3001;
-
-/**
- * Compute a deterministic port from the project root path.
- * Range: 3001–3999 (avoids privileged ports and common services).
- * Two different project directories will almost always get different ports.
- */
-export function getProjectPort(projectRoot: string): number {
-    let hash = 0;
-    for (let i = 0; i < projectRoot.length; i++) {
-        hash = ((hash << 5) - hash + projectRoot.charCodeAt(i)) | 0;
-    }
-    return 3001 + (Math.abs(hash) % 999);
-}
 
 /**
  * Which rung of the ladder below decided the port.

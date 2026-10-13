@@ -18,6 +18,9 @@
  * the caller holds (`--full-access`) less key management. The flags of the
  * permission model before it are refused by name with their replacement.
  */
+import fs from "fs";
+import os from "os";
+import path from "path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ApiKeyMasked, ScopeSummary } from "@rebasepro/types";
 import { RebaseApiError } from "@rebasepro/client";
@@ -255,6 +258,27 @@ describe("describeFailure", () => {
         });
         expect(plain(describeFailure("Failed to list API keys", error, "http://rebase.test")))
             .toContain("Is the Rebase server running at http://rebase.test?");
+    });
+
+    it("names the port `rebase dev` used, not only the PORT in .env", () => {
+        // The tester's case: dev had served the project on 3732 and stopped,
+        // and the hint sent them to 3001.
+        const project = fs.mkdtempSync(path.join(os.tmpdir(), "rebase-api-keys-hint-"));
+        const cwd = process.cwd();
+        try {
+            fs.writeFileSync(path.join(project, "rebase.json"), "{}");
+            fs.mkdirSync(path.join(project, ".rebase"));
+            fs.writeFileSync(path.join(project, ".rebase", "state.json"), JSON.stringify({ port: 3732 }));
+            process.chdir(project);
+            const error = new RebaseApiError("Could not reach the server: fetch failed", { status: 0, code: "NETWORK_ERROR" });
+
+            const text = plain(describeFailure("Failed to list API keys", error, "http://localhost:3001"));
+
+            expect(text).toContain("http://localhost:3732");
+        } finally {
+            process.chdir(cwd);
+            fs.rmSync(project, { recursive: true, force: true });
+        }
     });
 });
 
