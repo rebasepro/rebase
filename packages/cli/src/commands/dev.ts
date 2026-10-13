@@ -821,8 +821,25 @@ function projectHasCollections(projectRoot: string): boolean {
  */
 async function ensureGeneratedSchema(projectRoot: string): Promise<SchemaGeneration> {
     if (!projectHasCollections(projectRoot)) return "skipped";
+    // Where the driver writes it: `src/schema.generated.ts` under the backend.
+    const schemaFile = path.join(findBackendDir(projectRoot) ?? path.join(projectRoot, "backend"), "src", "schema.generated.ts");
+    const read = (): string | null => {
+        try {
+            return fs.readFileSync(schemaFile, "utf8");
+        } catch {
+            return null;
+        }
+    };
+    const before = read();
     try {
         await runDriverSchemaCommand(["node", "rebase", "schema", "generate"], { quiet: true });
+        // Said when it changed, because the file is committed: a stale one means
+        // the collections moved without it, and the diff is now the reader's.
+        const after = read();
+        if (before !== null && after !== null && before !== after) {
+            const shown = path.relative(projectRoot, schemaFile).split(path.sep).join("/");
+            console.log(`  ${chalk.gray(`↻ ${shown} was out of date with the collections, so it was regenerated.`)}`);
+        }
         return "generated";
     } catch (error) {
         const message = error instanceof Error ? error.message : String(error);

@@ -350,6 +350,29 @@ describe("rebase dev's start-up", () => {
         expect(preflightUrls).toEqual([expect.stringContaining("@127.0.0.1:5435/rebase")]);
     });
 
+    it("says when it regenerated a schema that was out of date, and only then", async () => {
+        // A stale schema was regenerated on start without a word, so the reader
+        // never learned their collections and the committed file had drifted.
+        const schemaFile = path.join(scratch, "backend", "src", "schema.generated.ts");
+        const startWith = async (before: string, after: string, port: string): Promise<string> => {
+            fs.writeFileSync(schemaFile, before);
+            runDriverSchemaCommand.mockImplementation(async () => { fs.writeFileSync(schemaFile, after); });
+            spawned.length = 0;
+            const logged = vi.mocked(console.log);
+            logged.mockClear();
+            const run = devCommand(["node", "rebase", "dev", "--backend-only", "--port", port]);
+            await vi.waitFor(() => expect(spawned.some(s => s.file === "/bin/true")).toBe(true));
+            for (const child of spawned) child.end();
+            await run;
+            return logged.mock.calls.map(call => call.map(String).join(" ")).join("\n");
+        };
+
+        expect(await startWith("export const tables = { old };\n", "export const tables = { posts };\n", "45129"))
+            .toContain("backend/src/schema.generated.ts was out of date with the collections");
+        expect(await startWith("export const tables = { posts };\n", "export const tables = { posts };\n", "45130"))
+            .not.toContain("was out of date");
+    });
+
     it("starts no database under --no-db, and still generates", async () => {
         const run = devCommand(["node", "rebase", "dev", "--backend-only", "--no-db", "--port", "45124"]);
         await vi.waitFor(() => expect(runDriverSchemaCommand).toHaveBeenCalled());
