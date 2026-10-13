@@ -890,6 +890,94 @@ describe("a write's statements (E2E)", () => {
         });
     });
 
+    /**
+     * `PATCH /posts/:id/tags/:tagId` with `{}` is how the admin's "Add existing"
+     * links a tag: writing a row at its address under a parent asserts that it
+     * is a member of that parent's set, and the persistence layer writes the
+     * junction row. The route's 404 was judged on the row *as a member*, which a
+     * tag not linked yet is not — so linking answered 404 every time.
+     */
+    describe("a link through a many-to-many path", () => {
+        const linked = async (postId: number) => (await admin.query<{ tag_id: number }>(
+            "SELECT tag_id FROM public.post_tags WHERE post_id = $1 ORDER BY tag_id", [postId]
+        )).rows.map(row => row.tag_id);
+
+        it("links a tag that exists and is not linked yet, takes it from no other post, and is idempotent", async () => {
+            const id = await newPost("linking");
+            const other = await newPost("other");
+            await admin.query("INSERT INTO public.post_tags (post_id, tag_id) VALUES ($1, 3)", [other]);
+
+            const { result, statements } = await statementsOf(() => http("PATCH", `/posts/${id}/tags/3`, { body: {} }));
+            expect(result.status).toBe(200);
+            expect(result.json).toMatchObject({ id: 3, name: "tag 3" });
+            expect(await linked(id)).toEqual([3]);
+            expect(await linked(other)).toEqual([3]);
+            expect(reads(statements, "comments")).toEqual([]);
+            expect(begins(statements)).toHaveLength(1);
+
+            const again = await http("PATCH", `/posts/${id}/tags/3`, { body: {} });
+            expect(again.status).toBe(200);
+            expect(await linked(id)).toEqual([3]);
+        });
+
+        it("links and edits the tag in one write", async () => {
+            const id = await newPost("link and edit");
+            const { rows } = await admin.query<{ id: number }>("INSERT INTO public.tags (name) VALUES ('draft') RETURNING id");
+            const tag = rows[0].id;
+
+            const answer = await http("PATCH", `/posts/${id}/tags/${tag}`, { body: { name: "final" } });
+            expect(answer.status).toBe(200);
+            expect(answer.json.name).toBe("final");
+            expect(await linked(id)).toEqual([tag]);
+        });
+
+        it("a tag that does not exist is the route's 404, and links nothing", async () => {
+            const id = await newPost("no such tag");
+            const answer = await http("PATCH", `/posts/${id}/tags/987654`, { body: {} });
+            expect(answer.status).toBe(404);
+            expect(answer.json.error.message).toBe(
+                `No row with id '987654' in 'posts/${id}/tags'. It may not exist, or it may be hidden from this caller by row-level security.`
+            );
+            expect(await linked(id)).toEqual([]);
+        });
+
+        it("a post that does not exist is a 404 too, and links nothing", async () => {
+            const answer = await http("PATCH", "/posts/987654/tags/3", { body: {} });
+            expect(answer.status).toBe(404);
+            expect(answer.json.error.code).toBe("NOT_FOUND");
+            expect(await linked(987654)).toEqual([]);
+        });
+
+        it("If-Match compares the tag as it is stored: its own tag links it, a stale one is a 412", async () => {
+            const id = await newPost("conditional link");
+            const etag = (await http("GET", "/tags/4")).headers.get("etag")!;
+            expect(etag).toBeTruthy();
+
+            const conditional = await http("PATCH", `/posts/${id}/tags/4`, { body: {}, headers: { "If-Match": etag } });
+            expect(conditional.status).toBe(200);
+            expect(await linked(id)).toEqual([4]);
+
+            expect((await http("PATCH", "/tags/4", { body: { name: "tag four" } })).status).toBe(200);
+            const later = await newPost("stale link");
+            const stale = await http("PATCH", `/posts/${later}/tags/4`, { body: {}, headers: { "If-Match": etag } });
+            expect(stale.status).toBe(412);
+            expect(await linked(later)).toEqual([]);
+
+            // A linked tag, read where it is linked, is the same row.
+            const memberTag = (await http("GET", `/posts/${id}/tags/4`)).headers.get("etag")!;
+            expect(memberTag).toBeTruthy();
+            expect((await http("PATCH", `/posts/${id}/tags/4`, { body: { name: "tag 4" }, headers: { "If-Match": memberTag } })).status).toBe(200);
+        });
+
+        it("unlinking a tag the post does not have is still a 404", async () => {
+            const id = await newPost("unlink");
+            const answer = await http("DELETE", `/posts/${id}/tags/5`);
+            expect(answer.status).toBe(404);
+            const { rows } = await admin.query("SELECT id FROM public.tags WHERE id = 5");
+            expect(rows).toHaveLength(1);
+        });
+    });
+
     describe("the answers stay the same", () => {
         it("a missing row is the route's 404, on PATCH and DELETE", async () => {
             for (const method of ["PATCH", "DELETE"]) {

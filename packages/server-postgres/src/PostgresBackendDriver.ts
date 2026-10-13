@@ -48,7 +48,7 @@ import { DatabaseError, Pool, type PoolClient } from "pg";
 import { sqlRows, applyDefaultValuesOnCreate, buildPropertyCallbacks, hasFieldAccessRules, buildSdkData, callbackRefusal, createAccessorSlugResolver, classifyTable, detectJunctionTables, getTenantConfig, requireCallbackClient, requireCallbackCollection, resolveCollectionRelations, resolveTenantWrite, restoresSoftDeletedRow, tenantBypassRoles, toCallbackError, updateDateAutoValues, updateUserAutoValues } from "@rebasepro/common";
 import { PostgresCollectionRegistry } from "./collections/PostgresCollectionRegistry";
 import { deriveRowAddress, getPrimaryKeys, parseIdValues } from "./services/collection-helpers";
-import { isJunctionBackedRelation, isNestedPath, resolveNestedPath } from "./services/nested-path";
+import { isJunctionBackedRelation, isNestedPath, resolveNestedPath, splitPathSegments } from "./services/nested-path";
 import { resolveSoftDelete, rowInTrashError } from "./services/soft-delete";
 import { currentWriteScope, runInWriteScope, WriteTransactionScope } from "./services/write-transaction-scope";
 import { inWriteFrame, type WriteFrame } from "./services/write-depth";
@@ -1156,6 +1156,37 @@ export class PostgresBackendDriver implements DataDriver {
     }
 
     /**
+     * The row an update addresses, as this caller reads it there: what a
+     * caller's precondition (the REST routes' 404 and `If-Match`) judges.
+     *
+     * `stored` is the row read from {@link storedRowPath}. Off a many-to-many
+     * path that is the address itself. Through one, the row is judged as a
+     * member of the parent's set when it is one. When it is not yet, this
+     * update is the link that makes it one (the persistence layer writes the
+     * junction row), so the row is judged as it is stored — provided the caller
+     * can read the parent it is being linked to. A parent that is not there, or
+     * that their policies hide, is no set to join, and the row reads as absent.
+     */
+    private async rowAnUpdateAddresses(
+        path: string,
+        storedPath: string,
+        id: string | number,
+        stored: Record<string, unknown> | null,
+        databaseId: string | undefined,
+        withDeleted: true | undefined
+    ): Promise<Record<string, unknown> | null> {
+        if (storedPath === path) return stored;
+        const fetchService = this.dataService.getFetchService();
+        const member = await fetchService.fetchOneForRest(path, id, undefined, databaseId, { withDeleted });
+        if (member || !stored) return member;
+        const segments = splitPathSegments(path);
+        const parent = await fetchService.fetchOneForRest(
+            segments.slice(0, -2).join("/"), segments[segments.length - 2]
+        );
+        return parent ? stored : null;
+    }
+
+    /**
      * The stored row an upsert's key names, if this caller can address it —
      * with its address and the values to update it with.
      *
@@ -1375,14 +1406,9 @@ export class PostgresBackendDriver implements DataDriver {
                         storedPath, id, undefined, resolvedCollection?.databaseId, { withDeleted }
                     );
                 if (precondition) {
-                    // Judged at the address written: through a many-to-many
-                    // path that is the row as a member of the parent's set, which
-                    // the stored-row read above does not establish.
-                    const addressed = storedPath === path
-                        ? existing
-                        : await this.dataService.getFetchService().fetchOneForRest(
-                            path, id, undefined, resolvedCollection?.databaseId, { withDeleted }
-                        );
+                    const addressed = await this.rowAnUpdateAddresses(
+                        path, storedPath, id, existing, resolvedCollection?.databaseId, withDeleted
+                    );
                     await precondition.check(await this.asRestServes(addressed, path));
                 }
                 if (!existing) {

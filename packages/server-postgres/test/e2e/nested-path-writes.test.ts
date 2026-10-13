@@ -373,6 +373,45 @@ describe("Nested path writes (E2E)", () => {
             .toHaveLength(1);
     });
 
+    // The REST routes hand their 404 and `If-Match` to the write as a
+    // precondition. Linking is what makes the row a member, so the row it
+    // judges is the one stored — a precondition judged on the membership
+    // refused every link.
+    it("judges a caller's precondition on the row it links, not on a membership it does not have yet", async () => {
+        const judged: Array<Record<string, unknown> | undefined> = [];
+        await driver.save({
+            path: "posts/p-1/tags", id: "t-2", values: {}, status: "existing",
+            precondition: { check: (stored: Record<string, unknown> | undefined) => { judged.push(stored); } }
+        } as never);
+
+        expect(judged).toEqual([expect.objectContaining({ id: "t-2", label: "maths" })]);
+        expect(await rows("SELECT * FROM public.posts_tags WHERE post_id = 'p-1' AND tag_id = 't-2'")).toHaveLength(1);
+    });
+
+    it("judges a linked row as the member it is", async () => {
+        const judged: Array<Record<string, unknown> | undefined> = [];
+        await driver.save({
+            path: "posts/p-1/tags", id: "t-1", values: { label: "physics 2" }, status: "existing",
+            precondition: { check: (stored: Record<string, unknown> | undefined) => { judged.push(stored); } }
+        } as never);
+
+        expect(judged).toEqual([expect.objectContaining({ id: "t-1", label: "physics" })]);
+    });
+
+    it("judges nothing for a target or a parent that is not there, and links nothing", async () => {
+        const refuse = (stored: Record<string, unknown> | undefined) => {
+            if (!stored) throw Object.assign(new Error("not found"), { statusCode: 404 });
+        };
+        await expect(driver.save({
+            path: "posts/p-1/tags", id: "t-9", values: {}, status: "existing", precondition: { check: refuse }
+        } as never)).rejects.toThrow("not found");
+        await expect(driver.save({
+            path: "posts/p-9/tags", id: "t-2", values: {}, status: "existing", precondition: { check: refuse }
+        } as never)).rejects.toThrow("not found");
+
+        expect(await rows("SELECT * FROM public.posts_tags WHERE tag_id IN ('t-2', 't-9') OR post_id = 'p-9'")).toEqual([]);
+    });
+
     it("still creates and links a new many-to-many target", async () => {
         await driver.save({
             path: "posts/p-1/tags",
