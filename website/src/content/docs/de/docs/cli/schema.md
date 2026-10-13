@@ -114,6 +114,18 @@ Dies ist nützlich, wenn Sie Rebase auf einer bestehenden Datenbank einführen �
 
 **Introspektion, gefolgt von Push, ändert nichts.** Die generierten Eigenschaften geben exakt an, was jede Spalte ist — `columnType`, `precision`/`scale`, `defaultValue`, `required`, das `isId` eines Schlüssels (`"increment"` für eine ganzzahlige Identity, `columnType: "serial"` für ein Serial, `"manual"` für einen Schlüssel ohne Default), das `onDelete` einer Relation — und ihr `index: false`, wo die Datenbank keinen Index auf der Schlüsselspalte hat, da eine `belongsTo` [standardmäßig indiziert](/docs/backend/indexes#foreign-keys-are-indexed-for-you) wird (löschen Sie die Zeile, damit einer gebaut wird) — sowie der `search`-Block einer Collection, zurückgelesen aus der Spalte, die er aufgebaut hat — daher plant `rebase db push --dry-run` direkt nach einer Introspektion keine Änderungen. Wo keine Eigenschaft eine Spalte vollständig abbilden kann — ein `timestamp` ohne Zeitzone, ein `interval`, ein `inet`, ein Enum-Typ, der nicht `<table>_<column>` heißt, ein Default wie `CURRENT_DATE` — weist die Introspektion pro Spalte darauf hin, im Terminal und am Anfang der Datei, mit dem, was ein Push damit tun würde, und, wenn vorhanden, dem Statement, das die beiden in Übereinstimmung bringt (`ALTER TYPE "mood" RENAME TO "customers_current_mood";`). Eine Tabelle, deren Schlüssel aus mehr als einer Spalte besteht, kommt als ein zusammengesetzter Schlüssel zurück, wobei jede Schlüsselspalte ihr `isId` trägt. Sie wird mit ihrem Grund ausgelassen, wenn eine Schlüsselspalte kein `isId` tragen kann (etwa ein Timestamp) oder der Fremdschlüssel einer anderen Tabelle auf sie verweist, was eine einspaltige Relation nicht kann; `db push` lässt eine Tabelle, die keine Collection ist, unangetastet. Auf 0.23 kann der Push direkt nach einer Introspektion weiterhin Typänderungen, entfernte Defaults und NOT NULLs sowie einen Phantom-`id`-Schlüssel planen.
 
+**Wie die generierten Dateien aussehen**
+
+Die Introspektion schreibt Collections gegen `defineCollection`, das die Property-Schlüssel *literal* hält — sodass `propertiesOrder`, `listProperties`, `sort` und `display.title` über Ihre eigenen Spaltennamen vervollständigen und ein Schlüssel, der von einer umbenannten Spalte übrig bleibt, ein Kompilierfehler ist statt einer Zeile, die stillschweigend nichts bewirkt. Welches davon sie importiert, hängt davon ab, wovon Ihr Projekt abhängt, und wird pro Lauf entschieden:
+
+| Ihr Projekt deklariert | Generierte Collections verwenden | `admin`-Block |
+|------|------|------|
+| `@rebasepro/cms-types` (ein Projekt mit dem Panel) | `defineCollection` aus `@rebasepro/cms-types` | ja |
+| `@rebasepro/common` (ein `--headless`-Projekt) | `defineCollection` aus `@rebasepro/common` | nein |
+| keines von beiden | eine `PostgresCollectionConfig`-Annotation, mit einer Warnung | nein |
+
+Ein Headless-Projekt hat kein Admin-Panel, und die Core-Typen deklarieren überhaupt kein `admin`-Feld — daher wird der Block dort nicht ausgegeben. Er ist Präsentation (`icon`, `propertiesOrder`, `multiline`); nichts am Schema, an der API oder an Ihren Daten hängt von ihm ab.
+
 ### `rebase db push`
 
 Übertragen Sie Schemaänderungen direkt in die Datenbank ohne Migrationsdateien:
@@ -256,6 +268,13 @@ rebase db branch info feature_auth
 rebase db branch delete feature_auth
 ```
 
+`rebase db branch switch` (und `switch --off`) und `rebase db branch prune` sind neu.
+`create`, `list`, `info` und `delete` wurden mit 0.17 ausgeliefert.
+
+Jeder Branch ist eine vollständige Kopie der Datenbank, erstellt mit
+`CREATE DATABASE ... TEMPLATE`, braucht also einen echten PostgreSQL-Server und kostet
+denselben Plattenplatz wie seine Quelle.
+
 ### `rebase doctor`
 
 Erkennen Sie Drei-Wege-Drift zwischen Ihren Collection-Definitionen, dem generierten Drizzle-Schema und der laufenden PostgreSQL-Datenbank:
@@ -270,6 +289,8 @@ rebase doctor
 - Collections ↔ Datenbank — gibt es unerwarteten Drift?
 
 Führen Sie `doctor` aus, wann immer sich etwas nicht synchron anfühlt. Es zeigt genau, wo die Diskrepanz liegt.
+
+Der Datenbankvergleich braucht `DATABASE_URL` (oder `ADMIN_CONNECTION_STRING`). Ohne eine wird diese Phase als **übersprungen** gemeldet statt als bestanden, und der Lauf schließt nie mit „All schemas are in sync“ ab — eine Prüfung, die nicht stattgefunden hat, ist kein Gesundheitszeugnis.
 
 <span class="since-badge" data-since="0.25">Seit 0.25</span> Es nennt außerdem jede Collection ohne [`search`-Block](/docs/backend/search), deren Tabelle mehr als etwa 10.000 Zeilen enthält. Eine Suche dort — das Suchfeld des Admins, `.search()`, `?searchString=` — ist `ILIKE '%term%'` über die Textspalten, was kein Index bedienen kann, sodass jede die ganze Tabelle liest und ihr Count sie erneut liest (etwa eine Drittelsekunde bei 100.000 Zeilen, mit der Tabelle wachsend). Die Zeilenzahl ist die eigene Schätzung von Postgres, die Prüfung scannt also nichts. Es ist ein Hinweis: Der Exit-Code ändert sich nicht, und nichts wird für Sie indiziert.
 
@@ -329,7 +350,7 @@ const client = createRebaseClient<Database>({
 const { data } = await client.data.products.find();
 ```
 
-Feldnamen in den generierten Typen sind unverändert die, die die API liefert — eine Spalte `createdAt` ist `row.createdAt`. Nur der Collection-*Accessor* wird in einen Property-Namen umgewandelt (`my-notes` → `client.data.myNotes`); genau diese Zuordnung stellt `collectionsDictionary` auf den Slug zurück.
+Feldnamen in den generierten Typen sind die, die die API liefert. Der Wire-Name eines Feldes ist sein Property-Schlüssel, und die API ist durchgehend camelCase: Die Introspektion generiert eine Spalte `created_at` als Property `createdAt` mit `columnName: "created_at"` und liefert sie als `row.createdAt`. Die Spalte selbst bleibt unberührt. Der Collection-*Accessor* wird auf dieselbe Weise in einen Property-Namen umgewandelt (`my-notes` → `client.data.myNotes`); genau diese Zuordnung stellt `collectionsDictionary` auf den Slug zurück.
 
 ## Entwicklungs-Workflow
 

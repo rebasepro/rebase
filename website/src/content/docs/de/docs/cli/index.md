@@ -402,8 +402,7 @@ rebase api-keys revoke abc123-def456
 gibt ihm jeden Scope, den der Service-Key hält, außer `keys:*`. `--roles` fügt RLS-Rollen neben
 `service` hinzu, `--expires-in` nimmt Tage und `--expires-at` ein ISO-Datum.
 `rebase api-keys scopes` listet jeden Scope, den das Backend kennt. Ein Schlüssel wird einmal angezeigt.
-
-Schlüssel sind doppelt abgesichert: Sowohl die Scopes des Schlüssels als auch die Row-Level Security
+Sowohl die Scopes des Schlüssels als auch die Row-Level Security
 der Identität, als die er agiert, greifen. Siehe [API-Schlüssel](/docs/backend/api-keys/).
 
 ### `rebase storage`

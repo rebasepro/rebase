@@ -48,7 +48,7 @@ Dies geschieht bei jedem `rebase init`, für jedes Preset einschließlich `--hea
 Es gibt kein Flag und keine Eingabeaufforderung.
 
 `rebase init` schreibt außerdem `.mcp.json`, das Claude Code, Cursor und jeden
-anderen MCP-Client auf den [Rebase-MCP-Server](/de/docs/ai/mcp) richtet — die
+anderen MCP-Client auf den [Rebase-MCP-Server](/docs/ai/mcp) richtet — die
 projekteigene Kopie, eine mit der CLI fixierte devDependency (`npx --no rebase-mcp`
 in einem npm-Projekt):
 
@@ -71,7 +71,7 @@ Server im Projektstamm, und ein absoluter Pfad ist die eine Zeile dieser Datei,
 die sich nicht committen lässt. Es steht dort, weil `~/.rebase/projects.json`
 rechnerweit gilt — ein Projekt, das kein eigenes Verzeichnis nennt, fällt auf das
 zurück, was zuletzt irgendein Projekt auf diesem Rechner gespeichert hat. Siehe
-[die Rangfolge](/de/docs/ai/mcp#auf-welches-verzeichnis-zugegriffen-wird).
+[die Rangfolge](/docs/ai/mcp#which-directory-it-acts-on).
 
 ## Warum ein Pointer statt einer Kopie
 
