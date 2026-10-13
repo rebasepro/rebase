@@ -94,6 +94,25 @@ describe("history is not lossy", () => {
             expect(db.execute).toHaveBeenCalledTimes(1);
         });
 
+        it("says what is missing in a sentence that reads, for the table and for its function", () => {
+            const missing = [
+                historyUnavailableReason({ tableExists: false, inTransaction: false, entryFormat: 1 }, { requireTransaction: true }),
+                historyUnavailableReason({ tableExists: true, inTransaction: false, entryFormat: 2 }, { requireTransaction: true })
+            ];
+            const messages = missing.map((unavailable) => {
+                const service = new HistoryService({ execute: jest.fn() } as unknown as NodePgDatabase, undefined, { unavailable });
+                try {
+                    service.assertRecordable("ledger");
+                } catch (error) {
+                    return error instanceof Error ? error.message : String(error);
+                }
+                return "";
+            });
+            expect(messages[0]).toMatch(/but this database is missing the rebase\.entity_history table —/);
+            expect(messages[1]).toMatch(/but this database is missing the rebase\.record_history function —/);
+            for (const message of messages) expect(message).not.toMatch(/has no the/);
+        });
+
         it("names what is missing: the table, then — when entries must ride the write — its function", () => {
             const table = { tableExists: false, inTransaction: false, entryFormat: 1 as const };
             const noFunction = { tableExists: true, inTransaction: false, entryFormat: 2 as const };

@@ -91,7 +91,7 @@ export class HistoryService {
     assertRecordable(collection: string): void {
         if (!this.unavailable) return;
         throw ApiError.serviceUnavailable(
-            `Collection "${collection}" keeps history (\`history: true\`), but this database has no ` +
+            `Collection "${collection}" keeps history (\`history: true\`), but this database is missing ` +
             `${this.unavailable} — no backend with history enabled has provisioned it. The write was refused ` +
             "rather than made without its audit entry; reads still work. Provision it by starting the backend " +
             "once with `history` enabled and `provision: true` (`rebase dev` does).",
