@@ -44,7 +44,7 @@ propósito: um pooler de conexões e rodar as funções e o worker de jobs como
 processos próprios.
 
 ```bash
-rebase build          # produz ./dist-bundle
+rebase build          # produces ./dist-bundle
 docker compose up -d
 ```
 
@@ -287,7 +287,9 @@ const router = createBrowserRouter([
 ], { basename });
 ```
 
-A administração precisa de um **data router** — `createBrowserRouter`, não o simples `BrowserRouter` — porque o bloqueio de alterações não guardadas usa `useBlocker`, que só o data router fornece.
+Mantenha a administração num **data router** — `createBrowserRouter` com `<RouterProvider>`, como faz o scaffold. Sob ele, um registro com alterações não salvas também interrompe a navegação dentro do app (um link no menu lateral, o botão de voltar do navegador) e pergunta primeiro, por meio do `useBlocker`, que só um data router fornece.
+
+<span class="since-badge" data-since="0.25">Desde 0.25</span> A administração também funciona sob um simples `<BrowserRouter>`. Nele, a proteção contra alterações não salvas recorre ao aviso de saída da página do próprio navegador, que cobre um reload, o fechamento da aba ou a digitação de uma URL; a navegação dentro do app segue adiante sem perguntar. Na 0.24 a administração lança um erro fora de um data router.
 
 **Backend** — se também mover a API, actualize o seu caminho base:
 
@@ -334,7 +336,7 @@ const router = isAdmin
 root.render(<RouterProvider router={router}/>);
 ```
 
-Um só router para as duas metades: a administração precisa do data router de qualquer forma, e não há razão para a app de produto estar noutro.
+Um só router para as duas metades: a administração fica melhor num data router, que permite que as alterações não salvas interrompam a navegação dentro do app, e não há razão para o app de produto estar noutro.
 
 O backend não precisa de alterações para esse padrão — a API permanece em `/api` e o catch-all da SPA
 serve `index.html` tanto para `/` quanto para `/admin/*`.

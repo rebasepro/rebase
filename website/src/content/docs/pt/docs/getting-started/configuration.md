@@ -207,8 +207,8 @@ inclui), `STORAGE_PUBLIC_READ` ou `STORAGE_ALLOW_ANY_AUTHENTICATED`.
 | `DB_POOL_MAX` | Máximo de conexões no pool | `20` |
 | `DB_POOL_IDLE_TIMEOUT` | Milissegundos em que uma conexão ociosa é mantida | `30000` |
 | `DB_POOL_CONNECT_TIMEOUT` | Milissegundos de espera por uma conexão | `10000` |
-| `DATABASE_DIRECT_URL` | Conexão direta (sem pool). O [Realtime](/docs/backend/realtime) precisa de uma: `LISTEN`/`NOTIFY` não sobrevive a um pooler de transações como o PgBouncer e, sem isso, as notificações de alterações são desativadas com um aviso em vez de serem silenciosamente perdidas. O [worker de jobs](/docs/backend/jobs) mantém nela também o seu `LISTEN` de despertar. | — |
-| `DATABASE_READ_URL` | Réplica de leitura. Leituras vão para lá quando definida e diferente de `DATABASE_URL`; se a conexão falhar, tudo volta para a primária com um aviso. | — |
+| `DATABASE_DIRECT_URL` | Conexão direta (sem pool). O [Realtime](/docs/backend/realtime) precisa de uma: `LISTEN`/`NOTIFY` não sobrevive a um pooler de transações como o PgBouncer e, sem isso, as notificações de alterações são desativadas com um aviso em vez de serem silenciosamente perdidas. O [worker de jobs](/docs/backend/jobs) mantém nela também o seu `LISTEN` de despertar. <span class="since-badge" data-since="0.25">Desde 0.25</span> Preenche o `directConnectionString` do adaptador Postgres quando ele não está definido. | — |
+| `DATABASE_READ_URL` | Réplica de leitura. Leituras vão para lá quando definida e diferente de `DATABASE_URL`; se a conexão falhar, tudo volta para a primária com um aviso. <span class="since-badge" data-since="0.25">Desde 0.25</span> Preenche o `readConnectionString` do adaptador Postgres quando ele não está definido; na 0.24 essa opção é ignorada. | — |
 | `REBASE_DB_POOL_MAX` | Um teto para cada pool no processo, aplicado independentemente do que cada um solicitou. Apenas dígitos puros: um valor malformado é ignorado em vez de serializar silenciosamente o servidor. | — |
 
 ### Comportamento em tempo de execução
@@ -230,7 +230,7 @@ publicada. Um projeto que foi ejetado é responsável por essas decisões em seu
 | `REBASE_METRICS_TOKEN` | Token Bearer que protege `/metrics`. Não definido deixa o endpoint aberto para qualquer um que possa alcançar a porta — aceitável em uma rede privada, mas não em uma pública, e os logs de inicialização alertam sobre isso. | — |
 | `REBASE_MIGRATE_ON_BOOT` | O que o runtime pode fazer com o schema na inicialização. `ensure` (o padrão em qualquer lugar — produção inclusa) executa a etapa **aditiva**: cria tabelas, colunas e tipos enum ausentes, nunca remove ou reescreve um. `none` não toca em nada. A imagem publicada aceita apenas esses dois e **se recusa a inicializar em `push`**. Em uma [implantação dividida](/docs/deployment/split-processes), exatamente um processo pode provisionar, portanto qualquer outra função deve definir `none` ou se recusará a inicializar. | `ensure` |
 | `REBASE_REQUIRE_SCHEMA_MATCH` | Recusa-se a inicializar quando o banco de dados foi provisionado pela última vez a partir de um conjunto de coleções diferente daquele a partir do qual este processo foi construído. Não definido (ou qualquer valor diferente de `true`/`1`) emite um aviso. | warn |
-| `REALTIME_CDC` | Captura de alterações em nível de banco de dados: `auto` (habilita onde a conexão suportar, reverte silenciosamente caso contrário), `trigger` (força o uso, avisa se impossível), `wal` (degrada para `trigger` atualmente), `off`. Veja [Realtime](/docs/backend/realtime-cdc/). | `auto` |
+| `REALTIME_CDC` | Captura de alterações em nível de banco de dados: `auto` (habilita onde a conexão suportar, reverte silenciosamente caso contrário), `trigger` (força o uso, avisa se impossível), `wal` (degrada para `trigger` atualmente), `off`. Veja [Realtime](/docs/backend/realtime-cdc/). <span class="since-badge" data-since="0.25">Desde 0.25</span> Prevalece sobre `realtime.cdc`. | `auto` |
 | `REALTIME_CHANNEL_BUS` | Transporte entre instâncias para canais de broadcast e presença: `memory` ou `postgres`. Ignorado quando `realtime.bus` receber um transporte construído. | `memory` |
 | `REALTIME_MAX_SUBSCRIPTIONS_PER_SOCKET` | Quantas assinaturas um socket de tempo real pode manter; a próxima é recusada com `TOO_MANY_SUBSCRIPTIONS`. Um número inteiro positivo — qualquer outro valor interrompe o servidor na inicialização. Prevalece sobre `realtime.maxSubscriptionsPerSocket`. Veja [Tempo real](/docs/backend/realtime#what-a-write-costs-and-the-limits). | `1000` |
 | `REALTIME_MAX_SOCKETS_PER_USER` | <span class="since-badge" data-since="0.25">Desde 0.25</span> Quantos sockets de tempo real um usuário pode manter abertos em uma instância do servidor. O login do próximo é recusado com `TOO_MANY_SOCKETS` e o socket é fechado (4002); o SDK continua tentando, então ele entra quando outro fecha. Um número inteiro positivo — qualquer outro valor interrompe o servidor na inicialização. Prevalece sobre `realtime.maxSocketsPerUser`. | Sem limite |
@@ -477,6 +477,11 @@ await initializeRebaseBackend({
     }
 });
 ```
+
+<span class="since-badge" data-since="0.25">Desde 0.25</span> As mesmas opções,
+sem `app`, `server` e `basePath` e com um `provision` obrigatório, constroem um
+backend que não serve nada até você montá-lo: `createRebaseBackend`. Veja
+[Integração com Servidor Customizado](/docs/backend/custom-server/).
 
 ### Alterando o `basePath`
 

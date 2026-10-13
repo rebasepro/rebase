@@ -87,6 +87,13 @@ destino que o dispatcher recusa, ou um receptor que responde com um redirecionam
 após uma tentativa, com o motivo; qualquer outra falha é repetida como em qualquer job. Veja
 [Webhooks duráveis](/docs/backend/jobs#durable-webhooks).
 
+`setCollectionCallbacks` **substitui** os callbacks que a coleção `orders`
+declara. Se ela declara algum, mantenha-os:
+<span class="since-badge" data-since="0.25">Desde 0.25</span> passe
+`composeCallbacks(declared, { afterSave })`, com `composeCallbacks` de
+`@rebasepro/server` e `declared` sendo os próprios `callbacks` da coleção. Veja
+[Combinando conjuntos de callbacks](/docs/collections/callbacks/#combining-callback-sets).
+
 ### Sem uma fila de jobs
 
 Deixe `jobQueue` de fora — ou execute em um driver sem SQL, onde o backend não tem uma — e as

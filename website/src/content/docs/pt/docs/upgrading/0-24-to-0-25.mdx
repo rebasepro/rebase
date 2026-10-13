@@ -21,6 +21,37 @@ uma string vazia em um campo obrigatório. Seguem três remoções: duas exporta
 eram apenas engines, um hook do admin de que nada precisa e uma opção de storage que
 não chegava a nenhum cliente.
 
+:::note[Comportamento alterado e nomes obsoletos]
+A 0.25 também muda o que algumas chamadas existentes fazem, sem quebrá-las.
+Confira estas se o seu app depende do comportamento antigo:
+
+- **Os wrappers de campo dos plugins se compõem.** O `fieldBuilder.wrap` de todo plugin é renderizado,
+  cada um em volta do campo que os plugins anteriores deixaram, em vez de apenas o último.
+- **As substituições de componentes se compõem.** A substituição `wrap: true` de uma coleção recebe
+  a substituição do app para o mesmo componente como `OriginalComponent`, e não o
+  componente integrado.
+- **`rebase.auth`, `rebase.admin`, `rebase.functions` e `rebase.cron` no
+  servidor alcançam as rotas do backend em processo,** então o middleware que você adicionou ao
+  seu próprio app Hono não roda mais nelas.
+- **O socket de tempo real atende apenas o seu próprio caminho** (`/` para uma API em `/api`).
+  Um cliente que discava outro caminho no mesmo servidor recebe um 404, ou o seu próprio
+  listener de `upgrade`.
+- **O socket recebe o token como o HTTP,** então `client.setAuthTokenGetter()`
+  agora o autentica, e depois de um logout ele não recorre mais à opção
+  `token`.
+
+Estes nomes ainda funcionam, avisam uma vez em tempo de execução e têm um substituto:
+
+| Obsoleto | Use |
+|---|---|
+| `loadFunctionsFromDirectory`, `loadFunctionsWithDiagnostics` | `loadFunctions(dir, { onSkip })` |
+| `loadCronJobsFromDirectory`, `loadCronJobsWithDiagnostics` | `loadCrons(dir, { onSkip })`, depois `declareCrons(crons)` onde o par antigo os declarava |
+| `client.ws.setAuthTokenGetter()` | `client.setAuthTokenGetter()` |
+| `hooks.modifyCollectionAsync` de plugin (nunca chamado) | `hooks.modifyCollection`, com os dados buscados antes de o `<Rebase>` renderizar |
+| `lifecycle.onCollectionChange` de plugin (nunca chamado) | `context.data.collection(slug).listen(…)` a partir de `lifecycle.onMount` |
+| `DatabaseAdapter.mountRoutes`, `BackendBootstrapper.mountRoutes` (nunca chamados) | uma factory de rotas que o seu app monta |
+:::
+
 ---
 
 ## 68. Um filtro em uma coluna chamada `count` vai dentro de `?where=`

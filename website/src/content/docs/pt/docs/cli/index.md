@@ -174,8 +174,8 @@ Aplica todas as migrações não aplicadas ao banco de dados.
 ### `rebase db backup` / `backups` / `restore`
 
 ```bash
-rebase db backup --out ./backups        # ou s3://bucket/prefix, gs://bucket/prefix
-rebase db backups list                  # lista o que está armazenado
+rebase db backup --out ./backups        # or s3://bucket/prefix, gs://bucket/prefix
+rebase db backups list                  # list what is stored
 rebase db restore ./backups/<file>.dump --yes
 ```
 
@@ -207,13 +207,31 @@ psql "$(rebase db url)"
 
 O banco de dados de desenvolvimento gerenciado é o caso de uso que necessita disso: o `.env` deixa o `DATABASE_URL` comentado propositalmente, e a porta é derivada do caminho do projeto, portanto nada no disco a especifica diretamente. Quando você define um `DATABASE_URL` próprio, é isso que este comando imprime — a ordem de resolução é a mesma que todos os outros comandos seguem. Ele inicia o banco de dados gerenciado caso ainda não esteja em execução.
 
+### `rebase console`
+
+<span class="since-badge" data-since="0.25">Desde 0.25</span>
+
+Um REPL do Node com os dados do projeto abertos, ou um único trecho de código executado com `-e`:
+
+```bash
+rebase console
+rebase console -e "rebase.dataAsAdmin.posts.find({ limit: 5 })"
+```
+
+`rebase` (`dataAsAdmin`, `sql`, `withAuth(user)`) e `collections` estão no escopo, e o
+`await` de nível superior funciona. O banco de dados é resolvido como o `rebase db push`
+o resolve, e abri-lo não altera nada nele. Com `-e`, o resultado aguardado (awaited)
+é impresso como JSON no stdout e uma exceção encerra com código `1`. Flags: `--eval`/`-e`,
+`--collections`/`-c`, `--database-url`, `--docker`. Veja
+[Scripts e o Console](/docs/backend/scripts/).
+
 ### `rebase db stop` / `rebase db reset`
 
 Apenas para o banco de dados de desenvolvimento gerenciado:
 
 ```bash
-rebase db stop     # para o banco; os dados são mantidos
-rebase db reset    # apaga o banco e recomeça do zero
+rebase db stop     # stop it; the data is kept
+rebase db reset    # delete it and start over
 ```
 
 ### `rebase db branch`
@@ -222,9 +240,9 @@ rebase db reset    # apaga o banco e recomeça do zero
 rebase db branch create <name>
 rebase db branch list
 rebase db branch info <name>
-rebase db branch switch <name>     # trabalha nele; todos os comandos subsequentes o seguem
-rebase db branch switch            # informa em qual branch você está
-rebase db branch switch --off      # volta para o banco de dados principal
+rebase db branch switch <name>     # work on it; every later command follows
+rebase db branch switch            # say which branch you are on
+rebase db branch switch --off      # back to the main database
 rebase db branch delete <name>
 rebase db branch prune [--older-than 14d] [--include-dev-diff]
 ```
@@ -244,9 +262,9 @@ Cada branch é uma cópia completa em disco, por isso elas precisam ser limpas. 
 ### `rebase apps init` / `rebase apps config`
 
 ```bash
-rebase apps list             # os apps que este projeto declara
-rebase apps init <name>      # registra um novo app no rebase.json
-rebase apps config <app>     # para o que um app específico se resolve
+rebase apps list             # the apps this project declares
+rebase apps init <name>      # register a new app in rebase.json
+rebase apps config <app>     # what one app resolves to
 ```
 
 ### `rebase status`
@@ -254,8 +272,8 @@ rebase apps config <app>     # para o que um app específico se resolve
 Tudo o que este projeto declara e se o ambiente realmente faz o binding de cada item:
 
 ```bash
-rebase status               # cada recurso e as variáveis que ele lê
-rebase status --json        # legível por máquina
+rebase status               # every resource, and the variables it reads
+rebase status --json        # machine-readable
 ```
 
 ```
@@ -283,10 +301,10 @@ Um `○` representa o estado importante de se conhecer antes de um deploy, em ve
 O que este projeto declara como necessário — os bancos de dados, buckets, tópicos e filas solicitados pelo seu código de configuração, e os crons e functions definidos pelos seus arquivos:
 
 ```bash
-rebase resources            # lista os recursos
-rebase resources --write    # regenera rebase.resources.json
-rebase resources --check    # falha se o grafo comitado estiver desatualizado
-rebase resources --json     # legível por máquina
+rebase resources            # list them
+rebase resources --write    # regenerate rebase.resources.json
+rebase resources --check    # fail if the committed graph is stale
+rebase resources --json     # machine-readable
 ```
 
 `rebase resources --check` é uma novidade — a flag usada em pipelines de CI para falhar quando um `rebase.resources.json` não corresponder mais ao código de configuração.

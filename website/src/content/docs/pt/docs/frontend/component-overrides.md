@@ -9,7 +9,7 @@ description: Substitua componentes de interface padrão por implementações per
 
 O Rebase permite que você substitua componentes de interface de usuário (UI) padrão por suas próprias implementações personalizadas. Isso implementa um modelo de swizzling de componentes no estilo Docusaurus que suporta dois padrões de personalização:
 - **Modo Eject** (padrão): Seu componente substitui totalmente o componente integrado.
-- **Modo Wrap** (`wrap: true`): Seu componente envolve o original. O componente integrado é passado como a prop `OriginalComponent` para que você possa renderizá-lo dentro do seu layout/lógica personalizada.
+- **Modo Wrap** (`wrap: true`): Seu componente envolve o original. O que ele envolve (normalmente o componente integrado) é passado como a prop `OriginalComponent` para que você possa renderizá-lo dentro do seu layout/lógica personalizada.
 
 As substituições de componentes podem ser aplicadas **globalmente** no nível da aplicação (no provedor `<Rebase>`) ou **localmente** no nível da coleção (dentro das definições individuais de coleção).
 
@@ -86,7 +86,7 @@ export const productsCollection = defineCollection({
 });
 ```
 
-O componente que envolve o original reside junto ao restante do seu código frontend e recebe o componente integrado como `OriginalComponent`:
+O componente que envolve o original reside junto ao restante do seu código frontend e recebe o que ele envolve como `OriginalComponent` — o componente integrado, a menos que seu app o substitua também (veja [Quando os dois escopos substituem um componente](#quando-os-dois-escopos-substituem-um-componente)):
 
 ```tsx
 // frontend/src/ProductsEmptyState.tsx
@@ -109,6 +109,21 @@ export default function ProductsEmptyState({ OriginalComponent, ...props }: {
 Cada módulo precisa de um **export padrão** (default export). O plugin Vite para coleções reescreve um caminho em um lazy import, de modo que o componente seja seu próprio chunk e carregue na primeira vez que a substituição for renderizada. Essa reescrita cobre os arquivos dentro do `collectionsDir` configurado. Um caminho em um arquivo fora dele chega ao admin como uma string simples: o console emitirá um aviso e o componente integrado será renderizado em seu lugar. Fora do `collectionsDir`, escreva você mesmo o lazy import: `Component: () => import("../../frontend/src/ProductCustomForm")`.
 
 Uma referência direta (`Component: ProductCustomForm`) também funciona, mas apenas em um arquivo de coleção que nada no servidor carregue, pois importar o componente também importa o React e tudo o que ele traz consigo.
+
+### Quando os dois escopos substituem um componente
+
+<span class="since-badge" data-since="0.25">Desde 0.25</span> Na 0.24 o wrapper de uma coleção sempre recebe o componente integrado, e a substituição no nível da aplicação é ignorada dentro dessa coleção.
+
+Os dois escopos se compõem. A substituição no nível da aplicação (`<Rebase components>`) é aplicada primeiro ao componente integrado, e a da coleção (`admin.components`) é aplicada ao resultado:
+
+| Nível da aplicação | Nível da coleção | O que é renderizado dentro dessa coleção |
+|---|---|---|
+| qualquer | nenhuma | o que é renderizado em todos os outros lugares: a substituição no nível da aplicação, ou o componente integrado |
+| nenhuma | wrap | o wrapper da coleção em volta do componente integrado |
+| replace ou wrap | wrap | o wrapper da coleção em volta da substituição no nível da aplicação, passada como `OriginalComponent` |
+| qualquer | replace | o componente da coleção sozinho; ele substitui ambos |
+
+Assim, uma coleção pode adicionar algo em volta de um componente que seu app já personaliza sem perder essa personalização. Para descartar a versão no nível da aplicação em uma coleção, substitua em vez de envolver.
 
 ---
 

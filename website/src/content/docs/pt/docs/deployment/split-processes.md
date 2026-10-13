@@ -36,6 +36,10 @@ REBASE_ROLE=all        # the default: everything, one process
 
 Health e métricas estão em todas as roles, sem exceção. Um processo que um orquestrador não consegue sondar é um processo que ele não consegue atualizar.
 
+<span class="since-badge" data-since="0.25">Desde 0.25</span> O `GET /api/auth/config`,
+o que a tela de login lê, segue o resto de `/api/auth`: apenas `api` e
+`all` o servem. Na 0.24 um processo `functions` ou `worker` também o respondia.
+
 O Realtime está na lista porque tem um custo, quer alguém o utilize ou não: um processo que consome eventos de alteração mantém uma conexão `LISTEN` fora do pool enquanto estiver em execução e instala os triggers de captura na inicialização. Apenas um processo que serve websockets tem alguém para quem entregar, portanto as duas roles que não servem nenhum não fazem nenhuma das duas coisas. **As gravações feitas por esses processos ainda são detectadas.** Com a captura de alterações ligada, a captura é feita por triggers de banco de dados, de modo que uma alteração é publicada pelo banco de dados em vez de qualquer processo que a tenha feito. Com a captura desligada (`REALTIME_CDC=off`, ou `auto` recorrendo a isso porque a role do banco de dados não pode criar triggers), um processo `worker` ou `functions` anuncia cada uma de suas próprias gravações no canal entre instâncias, sem manter uma conexão `LISTEN`. De qualquer modo, uma função que grava uma linha ainda acorda todos os assinantes na `api`.
 
 Dê a todos os processos o mesmo `REALTIME_CDC`. Um processo que é dono do schema com `REALTIME_CDC=off` remove os triggers de captura na inicialização, e uma `api` ainda configurada como `auto` passaria a escutar alterações que ninguém anuncia.
@@ -108,6 +112,15 @@ REBASE_MIGRATE_ON_BOOT=none
 ```
 
 Isso é **obrigatório**, não recomendação: um processo `functions` ou `worker` deixado no valor padrão se recusa a iniciar, e emite um aviso sobre isso. O comando `CREATE … IF NOT EXISTS` lê o catálogo e depois escreve nele como duas etapas separadas, portanto processos inicializando juntos colidem — e uma implantação em que vários processos disputam para provisionar o mesmo schema não é algo planejado por ninguém.
+
+<span class="since-badge" data-since="0.25">Desde 0.25</span> Em um
+[servidor customizado](/docs/backend/custom-server/), a mesma decisão é a opção
+`provision` do `createRebaseBackend`: `true` no processo que é dono do schema, e
+`{ collections: false, realtime: false }` em todos os outros, que ainda mantêm as
+tabelas do próprio framework. `REBASE_MIGRATE_ON_BOOT=none` desativa o schema das
+coleções lá também. O trabalho em segundo plano é decidido da mesma forma:
+um processo que nunca chama `start()` não executa agendador de cron nem workers de
+jobs, e um que chama executa aqueles que sua opção `ownership` lhe dá.
 
 ## Servindo uma função por processo
 

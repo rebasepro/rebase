@@ -515,6 +515,49 @@ const client = createRebaseClient({
 });
 ```
 
+## Usando seu próprio provedor de autenticação
+
+<span class="since-badge" data-since="0.25">Desde 0.25</span> Na 0.24 um getter
+de token autentica apenas as requisições HTTP, e o socket de tempo real continua
+anônimo.
+
+Quando os usuários fazem login com um provedor seu (Clerk, Firebase Auth ou uma
+sessão que seu app já tem), o `client.auth` não entra em jogo. Dê ao cliente, em vez disso, um
+getter para o token do provedor. Ele é consultado toda vez que um token é
+necessário: a cada requisição HTTP e toda vez que o socket de tempo real
+se autentica.
+
+```typescript
+import { createRebaseClient } from "@rebasepro/client";
+
+const client = createRebaseClient({ baseUrl: import.meta.env.VITE_API_URL });
+
+client.setAuthTokenGetter(() => clerk.session?.getToken() ?? Promise.resolve(null));
+
+// Optional: let Clerk recover a refused token, on HTTP and the socket alike.
+client.setOnUnauthorized(async () => {
+    await clerk.session?.reload();
+    return true;
+});
+
+// The socket authenticates as the Clerk user.
+client.data.posts.listen({}, (response) => render(response.data));
+```
+
+- O getter prevalece sobre a sessão do próprio cliente. Quando ele responde `null` ou
+  lança um erro, o cliente envia o token que tiver, se houver: o da sua sessão, um definido
+  com `client.setToken()`, ou a opção `token`.
+- A opção `token` é lida toda vez que um token é necessário, até que `setToken()` ou
+  um login a substitua, então ela pode ser declarada como um getter
+  (`get token() { return currentToken; }`).
+- `setOnUnauthorized` cobre um 401 via HTTP e um erro de autenticação no socket,
+  e substitui a renovação de sessão do próprio cliente.
+
+O backend precisa verificar o token do provedor: veja
+[Adaptadores de autenticação personalizados](/docs/backend/auth-adapters). No painel de administração, defina
+o getter no cliente que você passa para `<Rebase client>`
+([Seu próprio provedor de autenticação](/docs/frontend/authentication#your-own-auth-provider)).
+
 ## Estrutura do Objeto User
 
 ```typescript

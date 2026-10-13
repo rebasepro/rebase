@@ -54,6 +54,15 @@ const instance = await initializeRebaseBackend({
 });
 ```
 
+<span class="since-badge" data-since="0.25">Desde 0.25</span> `callbacks` recebe
+um único conjunto. Para manter várias preocupações separadas, escreva cada uma
+como seu próprio conjunto e passe `composeCallbacks(tenantScope, auditTrail)`:
+eles se combinam exatamente como os níveis acima. Veja
+[Combinando conjuntos de callbacks](/docs/collections/callbacks/#combining-callback-sets).
+O mesmo vale para `backend.setCollectionCallbacks(slug, callbacks)`, que
+substitui os callbacks que uma coleção declarou: passe
+`composeCallbacks(declared, yours)` para mantê-los.
+
 ---
 
 ## Tipo `CollectionCallbacks`

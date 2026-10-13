@@ -29,6 +29,14 @@ Para implantações multi-instância, o Rebase usa o `LISTEN/NOTIFY` do PostgreS
 
 O tempo real é habilitado por padrão. Não há nenhuma flag para ativar nem serviço para iniciar — se o seu servidor Rebase estiver em execução, o endpoint WebSocket estará disponível.
 
+### Qual caminho o socket atende
+
+<span class="since-badge" data-since="0.25">Desde 0.25</span> Na 0.24 o socket aceita todo upgrade de WebSocket no servidor, seja qual for o caminho.
+
+O socket atende upgrades em um único caminho: o caminho base da API com um `/api` final removido, ou seja, `/` para uma API em `/api`. É para lá que o SDK disca: ele se conecta ao seu `baseUrl`, enquanto suas requisições HTTP vão para `${baseUrl}/api`. Um upgrade para qualquer outro caminho é deixado para os outros listeners de `upgrade` do servidor, de modo que seu app pode rodar o próprio servidor WebSocket no mesmo `http.Server`. Sem nenhum outro listener, esse upgrade é respondido com `404`.
+
+Em um [servidor customizado](/docs/backend/custom-server/), `backend.attachRealtime(server, { path })` define o caminho, e o `realtime.path` do adaptador Postgres sobrescreve o que o servidor derivou.
+
 > Por padrão, o Rebase também emite eventos em tempo real para gravações feitas **fora** da API (via `psql`, outro serviço ou pelo editor SQL do Studio) sempre que a conexão com o banco de dados suportar — veja [captura de alterações a nível de banco de dados (CDC)](/docs/backend/realtime-cdc/).
 
 ## Assinaturas do SDK tipado

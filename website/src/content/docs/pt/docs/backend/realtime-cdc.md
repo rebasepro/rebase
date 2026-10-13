@@ -20,6 +20,8 @@ O CDC é controlado pela variável de ambiente `REALTIME_CDC`:
 | `wal` | Dá preferência à replicação lógica WAL. Ainda não empacotado nativamente — degrada para `trigger` e registra o modo ativo nos logs. |
 | `off` | Apenas tempo real a nível de aplicação. Use isso para evitar o overhead de triggers por gravação em cargas de trabalho com muitas gravações. Uma inicialização com `off` que é proprietária do schema também **remove** os triggers e funções de captura que uma inicialização anterior instalou, e registra em log quantos retirou; remova o `off` e a próxima inicialização os instala de novo. |
 
+<span class="since-badge" data-since="0.25">Desde 0.25</span> A mesma configuração é a opção `realtime.cdc` do adaptador Postgres, para um servidor que a configura em código. `REALTIME_CDC`, quando definida, prevalece.
+
 Na inicialização, você verá uma linha de log informando o modo ativo, por exemplo:
 
 ```
@@ -46,7 +48,9 @@ Se a conexão não puder dar suporte, `auto` registra uma linha informativa em v
 
 ## Requisitos & Observações
 
-- O CDC requer uma connection string direta (`DATABASE_DIRECT_URL` ou a conexão primária) para o cliente `LISTEN` — poolers de conexão em modo de transação não oferecem suporte a sessões de `LISTEN` de longa duração.
+<span class="since-badge" data-since="0.25">Desde 0.25</span> `directConnectionString` é a opção do adaptador; na 0.24 use `DATABASE_DIRECT_URL`.
+
+- O CDC requer uma connection string direta (`DATABASE_DIRECT_URL`, o `directConnectionString` do adaptador ou a conexão primária) para o cliente `LISTEN` — poolers de conexão em modo de transação não oferecem suporte a sessões de `LISTEN` de longa duração.
 - Os triggers são instalados apenas em tabelas associadas a uma coleção registrada. Gravações em tabelas não mapeadas são ignoradas.
 - Uma coleção cuja tabela ainda não foi migrada é ignorada com um aviso, em vez de bloquear o CDC para as demais.
 - O streaming de replicação lógica nativa do WAL (`wal2json`/`pgoutput`) está planejado; atualmente `REALTIME_CDC=wal` degrada para o caminho baseado em triggers, que oferece cobertura equivalente a nível de banco de dados.
