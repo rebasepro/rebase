@@ -241,8 +241,29 @@ export interface DatabaseAdapterInitConfig {
      * name none when this is the default.
      */
     dataSourceKey?: string;
-    /** The shared collection registry to register into. */
-    collectionRegistry: CollectionRegistryInterface;
+    /**
+     * The backend's shared collection registry. No bundled driver reads it —
+     * each builds and returns its own on `InitializedDriver.collectionRegistry`
+     * — so a caller opening a driver on its own (a script, a test) leaves it out.
+     */
+    collectionRegistry?: CollectionRegistryInterface;
+    /**
+     * Whether opening the driver may change the database (default `true`).
+     *
+     * The server's boot owns its schema, so the driver provisions what it needs
+     * while it opens: the restricted role requests run as under RLS, the
+     * branch-metadata table, channel-history tables, change-capture triggers.
+     *
+     * `false` opens it with no DDL of any kind — what a script, a REPL or a
+     * test that only reads and writes rows wants, and what a process that does
+     * not own the schema must ask for. A connection that would bypass
+     * row-level security still sends a user's requests through the restricted
+     * role; when an earlier boot never created that role, those requests fail
+     * rather than run unfiltered. Change capture is not installed
+     * (`realtime.provision` reads as `false`); whether change events are
+     * consumed is still `realtime.subscribe`.
+     */
+    provision?: boolean;
     /**
      * Whether this driver should describe its own schema.
      *

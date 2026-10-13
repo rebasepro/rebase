@@ -1089,6 +1089,18 @@ export interface RealtimeSocketOptions {
      * closed (4002). Unset for no ceiling. See `realtime.maxSocketsPerUser`.
      */
     maxSocketsPerUser?: number;
+    /**
+     * The URL path the socket accepts upgrades on (default `/`). The SDK dials
+     * its `baseUrl` with no extra segment, so for a server mounted at `/api`
+     * this is `/`, and for one at `/app/api` it is `/app`. A trailing `/` is
+     * ignored, and so is the query string.
+     *
+     * An upgrade to any other path is not this socket's: it is left untouched
+     * for another `upgrade` listener on the same `http.Server` — a host app's
+     * own WebSocket server — or, when the socket's listener is the only one,
+     * answered `404` and closed, so the client is not left hanging.
+     */
+    path?: string;
 }
 
 /**
