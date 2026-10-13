@@ -223,7 +223,14 @@ export interface BucketOptions extends DeclareOptions {
      * is a data leak that nothing errors on.
      */
     publicRead?: boolean;
-    /** Key prefix within the bucket, for sharing one bucket between sources. */
+    /**
+     * @deprecated Never applied: every object lands at the root of its bucket,
+     * whatever this says, so two sources declaring one bucket share one
+     * namespace. Give each source a bucket of its own (`S3_BUCKET__<KEY>`,
+     * `GCS_BUCKET__<KEY>`, or `STORAGE_PATH__<KEY>` for a local one), or put
+     * the folder in each storage property's `storagePath`. The backend warns
+     * once at boot when it is set. Will be removed in a future release.
+     */
     prefix?: string;
     /**
      * Serve unqualified uploads — a storage property with no `storageSource` —

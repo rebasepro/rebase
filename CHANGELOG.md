@@ -1347,6 +1347,14 @@
   pair declared them.** Both keep their old shape and behaviour, still declare
   what they load, and warn once per process.
 
+- **The `prefix` option of `bucket()` is deprecated; nothing ever applied
+  it.** A source declared with `prefix: "tenant-a/"` stored its objects at the
+  root of the bucket, so two sources sharing one bucket shared one namespace,
+  and nothing said so. Give each source a bucket of its own (`S3_BUCKET__<KEY>`,
+  `GCS_BUCKET__<KEY>`, or `STORAGE_PATH__<KEY>` for a local one), or put the
+  folder in each storage property's `storagePath`. A declaration that sets it
+  still compiles and deploys, and the backend warns once per bucket at boot.
+
 - **`DatabaseAdapter.mountRoutes` and `BackendBootstrapper.mountRoutes` are
   deprecated.** The server never called them, and its adapter wrappers no
   longer forward them. The types still accept them. A driver that needs HTTP

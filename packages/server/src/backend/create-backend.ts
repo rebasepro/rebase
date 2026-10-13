@@ -158,7 +158,8 @@ import {
     graphToDataSources,
     graphToStorageSources,
     graphTopics,
-    graphQueues
+    graphQueues,
+    warnOnDeprecatedBucketOptions
 } from "../boot/resource-adapters.js";
 import { assertEveryKindBindable } from "../boot/resource-resolvers.js";
 import { createTopicRuntime, topicJobHandlers } from "../topics/runtime.js";
@@ -536,6 +537,7 @@ export async function createRebaseBackend(options: RebaseBackendOptions): Promis
     // being initialised with them.
     const resourceGraph = buildResourceGraph();
     assertEveryKindBindable(resourceGraph);
+    warnOnDeprecatedBucketOptions(resourceGraph);
     const declaredDataSources = graphToDataSources(resourceGraph);
     const declaredStorageSources = graphToStorageSources(resourceGraph);
 
