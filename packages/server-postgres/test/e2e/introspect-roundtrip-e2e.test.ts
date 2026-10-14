@@ -77,6 +77,11 @@ export default {
 import people from "./people.js";
 export default {
     name: "Categories", slug: "categories", table: "categories",
+    // The scaffold's default rules: reads for everyone, writes for admins.
+    securityRules: [
+        { operation: "select", access: "public" },
+        { operations: ["insert", "update", "delete"], roles: ["admin"] }
+    ],
     properties: {
         id: { name: "ID", type: "number", isId: "increment" },
         title: { name: "Title", type: "string" },
@@ -257,6 +262,13 @@ describe("introspect, then push: adopting a database changes nothing", () => {
         expect(introspected.all).not.toMatch(/will not round-trip/);
         expect(planned.exitCode, planned.all).toBe(0);
         expect(planned.all).toMatch(/No changes: the database already matches these collections/);
+        // A role rule reads back deparsed — `( SELECT (string_to_array(
+        // rebase.roles(), ','::text) && ARRAY['admin'::text]))` — and the stamp
+        // over the statement it renders then differed from the push's, so each
+        // was planned as a replacement of itself.
+        expect(planned.all).not.toMatch(/Planned row-level security changes/);
+        expect(planned.all).not.toMatch(/replace policy/);
+        expect(planned.all).not.toMatch(/carry no stamp of Rebase's/);
     }, 300_000);
 
     it("a hand-written database of shapes a property can state plans no schema change", async () => {

@@ -22,6 +22,7 @@ import { parseCheckConstraints } from "./introspect-db-constraints";
 import { out, outWarn, outError } from "../cli-output";
 import { promptConfirm } from "../cli-prompt";
 import { diagnoseDbError } from "../cli-errors";
+import { pinSearchPath } from "../connection";
 
 async function main() {
     const args = arg(
@@ -73,7 +74,13 @@ async function main() {
         process.exit(1);
     }
 
-    const client = new pg.Client({ connectionString: databaseUrl });
+    // Pinned to `public`, as the server's connections are. Postgres spells an
+    // expression it read back — a policy's USING, a CHECK, a column default —
+    // with every name on the search path unqualified, and under the default
+    // `"$user", public` a role named `rebase` puts the `rebase` schema on it:
+    // `rebase.roles()` came back as `roles()`, which the push, pinned to
+    // `public`, could not find.
+    const client = new pg.Client({ connectionString: pinSearchPath(databaseUrl) });
 
     try {
         await client.connect();

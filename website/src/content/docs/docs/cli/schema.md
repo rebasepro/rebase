@@ -93,6 +93,12 @@ rebase schema introspect
   `db push` after it recreates every policy as it was. On 0.24 the policies
   stay out of the files, and a push can drop one whose name has the shape a
   generated policy has (`<table>_<op>_<hash>`)
+- <span class="since-badge" data-since="0.25">Since 0.25</span> Reads every
+  expression (a policy's `USING`, a CHECK, a column default) under the
+  `search_path` the server uses, `public`, so a function in the `rebase` schema
+  is written `rebase.roles()`. Connected as a role named `rebase`, the default
+  path put that schema first and the rule came back as `roles()`, which the
+  push could not find
 - <span class="since-badge" data-since="0.25">Since 0.25</span> Writes
   `disableDefaultPolicies: true` on a table that has row-level security on and
   does not hold the whole [admin baseline](/docs/collections/security-rules/#policies-a-collection-gets-without-writing-them),
