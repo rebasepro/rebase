@@ -256,8 +256,9 @@ ignored, and `--force` writes plain inference: the static app becomes `web`,
 built with `npm run build --workspace frontend`.
 
 <span class="since-badge" data-since="0.25">Since 0.25</span> For a
-checkout not linked to a Cloud project, `apps config` gives the backend's URL
-as `rebase dev` serves it. On 0.24 it prints `http://localhost:3001`.
+checkout not linked to a Cloud project, `apps config` says it is not linked,
+whether or not `rebase dev` is running, and gives the backend's URL as
+`rebase dev` serves it. On 0.24 it prints `http://localhost:3001`.
 
 ### `rebase status`
 
