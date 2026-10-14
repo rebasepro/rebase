@@ -242,6 +242,80 @@ describe("a project on the managed development database", () => {
         const db = find(managed(RUNNING), "database", "(default)");
         expect(db.bindings.find(b => b.name === "DATABASE_URL")!.set).toBe(false);
     });
+
+    it("judges a database bound by hand by its own connection string", () => {
+        // It was marked ✗ with `Data source "(default)" has no connection
+        // string`: the resolver judges a source alongside the default, and was
+        // handed `.env`, where the default deliberately is not — while the
+        // boot, which gets the managed URL for it, worked.
+        database("analytics");
+
+        const analytics = find(
+            managed(RUNNING, { DATABASE_URL__ANALYTICS: "postgres://warehouse/app" }),
+            "database",
+            "analytics"
+        );
+        expect(analytics.state).toBe("ready");
+        expect(analytics.detail).not.toContain("(default)");
+    });
+});
+
+/**
+ * `rebase dev --docker`, remembered: the compose `db` service serves the
+ * default database, and `.env` leaves `DATABASE_URL` commented out.
+ *
+ * Judged by `.env` alone that was `○ (default) postgres · DATABASE_URL not set`
+ * with the remedy "set DATABASE_URL" — printed while `rebase dev --docker`
+ * served the project from that very database. And a second database bound by
+ * its own `DATABASE_URL__ANALYTICS` was marked ✗ for the default's sake.
+ */
+describe("a project on Postgres in Docker", () => {
+    beforeEach(() => resetDeclaredResources());
+
+    const COMPOSE = "postgresql://rebase_app:s3cret@127.0.0.1:5433/rebase?sslmode=disable";
+    const docker = (env: Record<string, string | undefined> = {}) =>
+        computeStatus(buildResourceGraph(), env, {
+            ...resolvers(false),
+            dockerDatabase: { url: COMPOSE, detail: "Postgres in Docker (docker-compose.yml) · 127.0.0.1:5433/rebase" }
+        });
+
+    it("reports the default database as the container's, not as unconfigured", () => {
+        const db = find(docker(), "database", "(default)");
+
+        expect(db.state).toBe("ready");
+        expect(db.detail).toContain("Postgres in Docker");
+        expect(db.detail).not.toContain("set DATABASE_URL");
+        // The bindings are still `.env`'s, which does not set it.
+        expect(db.bindings.find(b => b.name === "DATABASE_URL")!.set).toBe(false);
+    });
+
+    it("runs the whole-set check against the container's URL", () => {
+        expect(docker().blocked).toBeUndefined();
+    });
+
+    it("judges a second database by its own connection string", () => {
+        database("analytics");
+
+        const result = docker({ DATABASE_URL__ANALYTICS: "postgresql://u:pw@127.0.0.1:5433/analytics" });
+
+        expect(find(result, "database", "analytics").state).toBe("ready");
+        expect(result.blocked).toBeUndefined();
+    });
+
+    it("stands in for the default only: a second database still needs its own", () => {
+        // `rebase dev --docker` hands the backend DATABASE_URL and nothing
+        // else, so an unbound `analytics` is what boot refuses.
+        database("analytics");
+
+        const analytics = find(docker(), "database", "analytics");
+        expect(analytics.state).toBe("unconfigured");
+        expect(analytics.detail).toContain("DATABASE_URL__ANALYTICS");
+    });
+
+    it("leaves a DATABASE_URL set in .env alone", () => {
+        const db = find(docker({ DATABASE_URL: "postgres://x/y" }), "database", "(default)");
+        expect(db.detail).not.toContain("Postgres in Docker");
+    });
 });
 
 /**

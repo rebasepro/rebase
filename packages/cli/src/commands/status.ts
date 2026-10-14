@@ -24,11 +24,11 @@ import { parseCommandArgs, wantsHelp } from "../utils/args";
 import { failAsJson, readEnvFile, requireProjectRoot } from "../utils/project";
 import { findBackendApp, loadManifest, ManifestError, resolveBackendPaths } from "../manifest";
 import { deriveOptionsFor, deriveResourceGraph, RESOURCE_GRAPH_FILENAME, readResourceGraphFile, serializeResourceGraph } from "../resources/derive";
-import { computeStatus, type ResourceStatus } from "../resources/status";
+import { computeStatus, type DockerDatabaseStatus, type ManagedDatabaseStatus, type ResourceStatus } from "../resources/status";
 import { findRunningDaemon, managedUrl } from "../dev-db/daemon";
-import { resolveActiveBranch, resolveComposeUrl } from "../dev-db/prepare";
-import { resolveDevDatabase } from "../dev-db/resolve";
-import { readLastDevDocker } from "../dev-db/last-dev-database";
+import { type ResolvedBranch, resolveProjectDatabaseAndBranch } from "../dev-db/prepare";
+import { describeTarget } from "../dev-db/pull";
+import { parseLoopbackDsn, probeTcp } from "../utils/dev-preflight";
 import type { RebaseBackendAppConfig } from "@rebasepro/types";
 
 function usage(): void {
@@ -98,6 +98,59 @@ function printResource(status: ResourceStatus): void {
         const colour = status.state === "broken" ? chalk.red : status.state === "unconfigured" ? chalk.yellow : chalk.gray;
         console.log(`      ${colour(`└ ${status.detail}`)}`);
     }
+}
+
+/** Which database `rebase status` reports the project on, and what it hands the status view about it. */
+export interface StatusDatabase {
+    managedDatabase?: ManagedDatabaseStatus;
+    dockerDatabase?: DockerDatabaseStatus;
+    /** The branch this checkout is on, when the database is one. */
+    branch: ResolvedBranch | null;
+    /** A switched-to branch the managed database cannot serve. */
+    ignoredBranch: string | null;
+}
+
+/**
+ * Which database this project is on, decided by the same ordered rule
+ * `rebase dev` and `rebase db url` use — and read from the project's `.env`,
+ * not from this shell: `rebase status` asks what *this project* is on.
+ *
+ * Nothing is started. `status` is a question, and a question that boots a
+ * 180 MB Postgres to answer itself is a different command. So a managed
+ * database that is not running is reported as exactly that, rather than as a
+ * project with no database; and a compose database likewise, after a probe of
+ * its port.
+ *
+ * `envFile` is the parsed `.env`; production stands nothing in, because there
+ * an unset `DATABASE_URL` is the failure it has always been.
+ *
+ * Exported for its tests.
+ */
+export async function statusDatabase(projectRoot: string, envFile: Record<string, string>): Promise<StatusDatabase> {
+    const { database, branch, ignoredBranch } = resolveProjectDatabaseAndBranch(projectRoot, { env: {} });
+    if (envFile.NODE_ENV === "production") return { branch, ignoredBranch };
+
+    if (database.kind === "managed") {
+        const daemon = await findRunningDaemon(projectRoot);
+        return { managedDatabase: { url: daemon ? managedUrl(daemon.port) : null }, branch, ignoredBranch };
+    }
+
+    if (database.kind === "docker" && database.url) {
+        const target = parseLoopbackDsn(database.url);
+        const listening = target ? await probeTcp(target.host, target.port) : true;
+        const which = branch ? `branch "${branch.name}" (${branch.database}) of Postgres in Docker` : "Postgres in Docker";
+        return {
+            dockerDatabase: {
+                url: database.url,
+                detail: `${which}, as the last \`rebase dev --docker\` · ${describeTarget(database.url)}`
+                    + (listening ? "" : " — not running; `rebase dev --docker` starts it")
+            },
+            branch,
+            ignoredBranch
+        };
+    }
+
+    return { branch, ignoredBranch };
 }
 
 export async function statusCommand(rawArgs: string[]): Promise<void> {
@@ -176,30 +229,8 @@ export async function statusCommand(rawArgs: string[]): Promise<void> {
     // developer happens to be standing in is not that.
     const env = readEnvFile(projectRoot);
 
-    // Which database this project is on, decided by the same ordered rule
-    // `rebase dev` and `rebase db url` use — and read from the same `.env`, not
-    // from this shell, for the reason above.
-    //
-    // Nothing is started. `status` is a question, and a question that boots a
-    // 180 MB Postgres to answer itself is a different command. So a managed
-    // database that is not running is reported as exactly that, rather than as
-    // a project with no database — which is what this view used to say while
-    // `rebase db url` printed a working connection string for it.
     const production = env.NODE_ENV === "production";
-    const database = resolveDevDatabase({
-        env: {},
-        envFile: env,
-        // The database the last `rebase dev` ran on, as every other command
-        // follows it: without it, a project on `dev --docker` read as a managed
-        // database that is not running.
-        lastDevDocker: readLastDevDocker(projectRoot),
-        branch: resolveActiveBranch(projectRoot, env),
-        composeUrl: resolveComposeUrl(projectRoot, env)
-    });
-    const daemon = database.kind === "managed" ? await findRunningDaemon(projectRoot) : null;
-    const managedDatabase = !production && database.kind === "managed"
-        ? { url: daemon ? managedUrl(daemon.port) : null }
-        : undefined;
+    const { managedDatabase, dockerDatabase, branch, ignoredBranch } = await statusDatabase(projectRoot, env);
 
     const server = await import("@rebasepro/server");
     const { resources, blocked } = computeStatus(graph, env, {
@@ -208,11 +239,18 @@ export async function statusCommand(rawArgs: string[]): Promise<void> {
         // Judged as production when the .env says so; a stand-in local
         // directory for an unbound bucket is only ever offered to development.
         production,
-        ...(managedDatabase ? { managedDatabase } : {})
+        ...(managedDatabase ? { managedDatabase } : {}),
+        ...(dockerDatabase ? { dockerDatabase } : {})
     });
 
     if (asJson) {
-        console.log(JSON.stringify({ backend: backendName, runtime: backendApp.runtime, resources, blocked }, null, 2));
+        console.log(JSON.stringify({
+            backend: backendName,
+            runtime: backendApp.runtime,
+            ...(branch ? { branch: { name: branch.name, database: branch.database } } : {}),
+            resources,
+            blocked
+        }, null, 2));
         return;
     }
 
@@ -231,6 +269,14 @@ export async function statusCommand(rawArgs: string[]): Promise<void> {
     console.log(`  ${chalk.gray("declared in")}  ${chalk.gray(resourcesFile)}${
         declaresAnything ? "" : chalk.gray("  (none — the defaults below are implicit)")}`);
     console.log(`  ${chalk.gray("configured by")}  ${chalk.gray(".env")}`);
+    // Every database command in this checkout uses the branch, so the view
+    // says so: a switch made yesterday is easy to forget.
+    if (branch) {
+        console.log(`  ${chalk.gray("on branch")}  ${chalk.bold(branch.name)} ${chalk.gray(`(${branch.database})`)}`
+            + chalk.gray(` — ${chalk.cyan("rebase db branch switch --off")} returns to ${branch.parent ?? "the main database"}`));
+    } else if (ignoredBranch) {
+        console.log(`  ${chalk.yellow("○")} ${chalk.gray(`switched to branch "${ignoredBranch}", which the managed database cannot serve — it uses the main one`)}`);
+    }
 
     const kinds = [...new Set(resources.map(r => r.kind))];
     for (const kind of kinds) {

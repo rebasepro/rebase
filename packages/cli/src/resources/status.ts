@@ -146,6 +146,24 @@ export interface ManagedDatabaseStatus {
 }
 
 /**
+ * The compose `db` service, when a project is on Postgres in Docker.
+ *
+ * `rebase dev --docker` is remembered, and every command follows it with the
+ * scaffold's `DATABASE_URL` still commented out — so, judged by `.env` alone,
+ * this view said the default database had no connection string while `rebase
+ * dev --docker` served the project from it. Unlike the managed database it
+ * stands in for the default only: `dev --docker` hands the backend
+ * `DATABASE_URL` and nothing else, so a second declared database still needs
+ * its own variable.
+ */
+export interface DockerDatabaseStatus {
+    /** The compose service's connection string, which the runtime is given as `DATABASE_URL`. */
+    url: string;
+    /** What the default database's row says it is. */
+    detail: string;
+}
+
+/**
  * The resolver-side of status, as `@rebasepro/server` registers it per kind.
  *
  * Passed in rather than imported so this module stays testable without a
@@ -174,6 +192,8 @@ export interface StatusResolvers {
      * been.
      */
     managedDatabase?: ManagedDatabaseStatus;
+    /** Set when this project runs on Postgres in Docker. Absent in production, like the managed one. */
+    dockerDatabase?: DockerDatabaseStatus;
 }
 
 /**
@@ -201,6 +221,22 @@ function withManagedUrls(env: EnvBag, graph: ResourceGraph, url: string): EnvBag
 }
 
 /**
+ * The environment with the default database's URL filled in, when `.env` leaves it out.
+ *
+ * What a database's resolver is judged against. The resolver checks a source
+ * alongside the default one, so a second database bound by its own
+ * `DATABASE_URL__ANALYTICS` was marked ✗ with `Data source "(default)" has no
+ * connection string` — on a project whose default the managed database or the
+ * compose service provides, and whose boot worked. Judged against the
+ * environment the runtime actually gets, it is judged on its own string.
+ */
+function withDefaultUrl(env: EnvBag, url: string | null | undefined): EnvBag {
+    if (!url || isSet(env, "DATABASE_URL")) return env;
+
+    return { ...env, DATABASE_URL: url };
+}
+
+/**
  * Resolve every declared resource against an environment.
  *
  * Each kind's verdict comes from the resolver `@rebasepro/server` registered
@@ -222,6 +258,9 @@ export function computeStatus(
     const resources: ResourceStatus[] = [];
     const production = resolvers.production ?? false;
     const managed = resolvers.managedDatabase;
+    const docker = resolvers.dockerDatabase;
+    /** The default database's URL as the runtime gets it, when `.env` does not name one. */
+    const devDefaultUrl = managed?.url ?? docker?.url ?? null;
     /** Database rows the managed database answered for, so `blocked` can skip them. */
     let managedCovered = 0;
 
@@ -270,7 +309,16 @@ export function computeStatus(
             continue;
         }
 
-        const verdict = resolver.resolve(declaration, env, { production, defaultBasePath: "uploads" });
+        // The default database on Docker: the compose service, unless `.env`
+        // names one itself.
+        if (docker && declaration.kind === "database" && declaration.key === DEFAULT_RESOURCE_KEY
+            && bindings.every(b => !b.set && !b.fallback?.set)) {
+            resources.push({ ...base, state: "ready", detail: docker.detail });
+            continue;
+        }
+
+        const judged = declaration.kind === "database" ? withDefaultUrl(env, devDefaultUrl) : env;
+        const verdict = resolver.resolve(declaration, judged, { production, defaultBasePath: "uploads" });
         switch (verdict.state) {
             case "ready":
                 resources.push({
@@ -314,7 +362,7 @@ export function computeStatus(
             resolvers.resolveDataSources(
                 // The managed URL for the rows it answered for, so the whole-set
                 // check judges the same environment the runtime would get.
-                managed?.url ? withManagedUrls(env, graph, managed.url) : env,
+                managed?.url ? withManagedUrls(env, graph, managed.url) : withDefaultUrl(env, docker?.url),
                 graph.resources.filter(r => r.kind === "database").map(resourceToDataSource)
             );
         } catch (err) {
