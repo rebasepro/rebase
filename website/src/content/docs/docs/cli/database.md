@@ -70,9 +70,21 @@ rebase db migrate --baseline <version>
 ```
 
 The version is the numeric prefix of the migration file; `db generate` prints the
-command with it filled in. Every `db migrate` after that is an ordinary one. See
+command with it filled in. See
 [`--baseline`](/docs/cli/schema/#rebase-db-migrate) for a database that already
 records migrations.
+
+After that, `db migrate` applies what boot has not, and on a database
+`rebase dev` serves that is less than it looks. Boot adds each new table,
+column and enum value as soon as a collection changes, so by the time
+`db generate` writes the migration that adds a column, the column is already
+there: that `db migrate` stops on `already exists` again and names the
+`--baseline <version>` that records it. Every new property means another
+baseline. Record a migration only when boot made every change in it. One that
+also drops, renames or narrows something holds statements boot never runs, and
+recording it skips them. In development, `rebase db push` is the command that
+changes the schema; keep `db generate` and `db migrate` for a database boot has
+not already changed.
 
 ### `rebase db backup` / `backups` / `restore`
 
