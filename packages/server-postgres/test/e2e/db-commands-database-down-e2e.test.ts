@@ -103,6 +103,35 @@ describe("db commands with the database down", () => {
         expect(fs.existsSync(output)).toBe(false);
     }, 60_000);
 
+    /**
+     * `db push` and `db migrate` printed `⚠️ Failed to bootstrap the RLS helper
+     * functions: connect ECONNREFUSED…` above the banner: the first step that
+     * reaches the database reported the failure as a warning of its own, then
+     * the next one said what was actually wrong.
+     */
+    it("rebase db migrate says it once: the banner, with no RLS-helper warning above it", async () => {
+        fs.mkdirSync(path.join(workDir, "drizzle", "migrations"), { recursive: true });
+        fs.writeFileSync(path.join(workDir, "drizzle", "migrations", "20260101000000_init.sql"), "CREATE TABLE t (id int);\n");
+        const { code, stderr: written } = await run(["db", "migrate"]);
+        expect(code).toBe(1);
+        expect(written).toContain(`Cannot connect to PostgreSQL at 127.0.0.1:${port}`);
+        expect(written).not.toMatch(/Failed to bootstrap the RLS helper functions/);
+        expect(written.match(/Cannot connect to PostgreSQL/g)).toHaveLength(1);
+    });
+
+    it("rebase db push says it once too", async () => {
+        const collections = path.join(workDir, "collections");
+        fs.mkdirSync(collections);
+        fs.writeFileSync(path.join(collections, "package.json"), JSON.stringify({ type: "module" }));
+        fs.writeFileSync(path.join(collections, "tasks.js"),
+            "export default { name: \"Tasks\", slug: \"tasks\", table: \"tasks\", properties: { id: { name: \"ID\", type: \"string\", isId: \"uuid\" } } };\n");
+        const { code, stderr: written } = await run(["db", "push", "--collections", collections, "--yes"]);
+        expect(code).toBe(1);
+        expect(written).toContain(`Cannot connect to PostgreSQL at 127.0.0.1:${port}`);
+        expect(written).not.toMatch(/Failed to bootstrap the RLS helper functions/);
+        expect(written.match(/Cannot connect to PostgreSQL/g)).toHaveLength(1);
+    }, 60_000);
+
     it("rebase db restore names it too", async () => {
         const dump = path.join(workDir, "x.dump");
         fs.writeFileSync(dump, "not a real dump");

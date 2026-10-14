@@ -45,6 +45,9 @@ import {
     diagnoseAtlasFailure,
     diagnoseDbError,
     formatForeignGeneratedColumnBanner,
+    isAuthFailure,
+    isEconnrefused,
+    isSslNotEnabled,
     reportCommandFailure
 } from "./cli-errors";
 import { forLibpq, redactConnectionPasswords } from "./utils/connection-string";
@@ -1084,6 +1087,14 @@ async function ensureAuthSchemaAndFunctions(databaseUrl: string): Promise<void> 
             await client.query(RLS_BOOTSTRAP_SQL);
         });
     } catch (err) {
+        // A database that cannot be reached is the whole answer, in the banner
+        // every db command prints for it. As a warning first, it said the same
+        // thing twice: `⚠️ Failed to bootstrap the RLS helper functions:
+        // connect ECONNREFUSED…`, then the banner from the next step.
+        if (isEconnrefused(err) || isAuthFailure(err) || isSslNotEnabled(err)) {
+            outError(diagnoseDbError(err, databaseUrl) ?? `  ✗ ${err instanceof Error ? err.message : String(err)}`);
+            process.exit(1);
+        }
         outWarn(chalk.yellow(`  ⚠️  Failed to bootstrap the RLS helper functions: ${err instanceof Error ? err.message : String(err)}`));
     }
 }
