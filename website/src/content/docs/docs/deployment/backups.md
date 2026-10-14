@@ -196,6 +196,8 @@ the binary is missing:
 Install them with `brew install libpq` or `apt-get install postgresql-client-18`
 (from the PostgreSQL apt repository, where Debian's own is older), or point at a
 specific binary with `PG_DUMP_PATH`, `PG_RESTORE_PATH` and `PG_DUMPALL_PATH`.
+`restore --clean` also runs `psql`, which ships with them; `PSQL_PATH` names
+another one.
 
 ## Row-level security, and the dump that is silently short
 
