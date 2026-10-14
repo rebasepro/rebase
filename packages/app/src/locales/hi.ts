@@ -1156,6 +1156,12 @@ export const hi: RebaseTranslations = {
     schema_change_commit: "commit करें",
     schema_change_commit_and_apply: "commit करें और लागू करें",
 
+    // ─── API explorer ────────────────────────────────────────
+    studio_api_explorer_spec_refused_title: "यह सत्र API विनिर्देश नहीं पढ़ सकता",
+    studio_api_explorer_spec_failed_title: "API विनिर्देश लोड नहीं हो सका",
+    studio_api_explorer_spec_refused_body: "इस प्रोजेक्ट के API तक कंसोल की पहुँच अस्वीकार कर दी गई। आमतौर पर इसका मतलब है कि सत्र समाप्त हो गया है — फिर से साइन इन करें — या इस प्रोजेक्ट के लिए सेटिंग्स में कंसोल पहुँच बंद कर दी गई है।",
+    studio_api_explorer_spec_failed_body: "प्रोजेक्ट ने जवाब दिया, लेकिन ऐसे विनिर्देश के साथ नहीं जिसे यह एक्सप्लोरर पढ़ सके। उसका API प्रभावित नहीं है; केवल यह पेज।",
+
     // ─── Property field labels ──────────────────────────────────
     db_column_type: "डेटाबेस कॉलम प्रकार",
     primary_key_unique_id: "प्राथमिक कुंजी / अद्वितीय ID",

@@ -1164,6 +1164,12 @@ export const en: RebaseTranslations = {
     schema_change_commit: "Commit",
     schema_change_commit_and_apply: "Commit and apply",
 
+    // ─── API explorer ────────────────────────────────────────
+    studio_api_explorer_spec_refused_title: "This session cannot read the API specification",
+    studio_api_explorer_spec_failed_title: "Could not load the API specification",
+    studio_api_explorer_spec_refused_body: "The console's access to this project's API was refused. It usually means the session expired — sign in again — or that console access has been turned off for this project in Settings.",
+    studio_api_explorer_spec_failed_body: "The project answered, but not with a specification this explorer could read. Its API is unaffected; only this page is.",
+
     // ─── Property field labels ──────────────────────────────────
     db_column_type: "Database Column Type",
     primary_key_unique_id: "Primary Key / Unique ID",

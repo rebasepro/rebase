@@ -1263,6 +1263,12 @@ export interface RebaseTranslations {
     schema_change_commit?: string;
     schema_change_commit_and_apply?: string;
 
+    // ─── API explorer ────────────────────────────────────────
+    studio_api_explorer_spec_refused_title?: string;
+    studio_api_explorer_spec_failed_title?: string;
+    studio_api_explorer_spec_refused_body?: string;
+    studio_api_explorer_spec_failed_body?: string;
+
     // ─── Property field labels ──────────────────────────────────
     db_column_type?: string;
     primary_key_unique_id?: string;

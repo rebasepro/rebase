@@ -1156,6 +1156,12 @@ export const de: RebaseTranslations = {
     schema_change_commit: "Committen",
     schema_change_commit_and_apply: "Committen und anwenden",
 
+    // ─── API explorer ────────────────────────────────────────
+    studio_api_explorer_spec_refused_title: "Diese Sitzung kann die API-Spezifikation nicht lesen",
+    studio_api_explorer_spec_failed_title: "Die API-Spezifikation konnte nicht geladen werden",
+    studio_api_explorer_spec_refused_body: "Der Zugriff der Konsole auf die API dieses Projekts wurde verweigert. Meist ist die Sitzung abgelaufen — melden Sie sich erneut an — oder der Konsolenzugriff wurde für dieses Projekt in den Einstellungen deaktiviert.",
+    studio_api_explorer_spec_failed_body: "Das Projekt hat geantwortet, aber nicht mit einer Spezifikation, die dieser Explorer lesen kann. Seine API ist nicht betroffen, nur diese Seite.",
+
     // ─── Property field labels ──────────────────────────────────
     db_column_type: "Datenbank-Spaltentyp",
     primary_key_unique_id: "Primärschlüssel / Eindeutige ID",

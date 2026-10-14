@@ -1161,6 +1161,12 @@ export const pt: RebaseTranslations = {
     schema_change_commit: "Fazer commit",
     schema_change_commit_and_apply: "Fazer commit e aplicar",
 
+    // ─── API explorer ────────────────────────────────────────
+    studio_api_explorer_spec_refused_title: "Esta sessão não consegue ler a especificação da API",
+    studio_api_explorer_spec_failed_title: "Não foi possível carregar a especificação da API",
+    studio_api_explorer_spec_refused_body: "O acesso da consola à API deste projeto foi recusado. Normalmente significa que a sessão expirou (inicie sessão novamente) ou que o acesso da consola foi desativado para este projeto nas Definições.",
+    studio_api_explorer_spec_failed_body: "O projeto respondeu, mas não com uma especificação que este explorador consiga ler. A sua API não é afetada; só esta página.",
+
     // ─── Property field labels ──────────────────────────────────
     db_column_type: "Tipo de coluna do banco de dados",
     primary_key_unique_id: "Chave primária / ID único",

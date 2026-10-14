@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { useApiBase, useApiConfig, useAuthController } from "@rebasepro/app";
+import { useApiBase, useApiConfig, useAuthController, useTranslation } from "@rebasepro/app";
 import {
     CircularProgress,
     Typography,
@@ -26,6 +26,7 @@ export function ApiExplorer() {
     const apiConfig = useApiConfig();
     const apiBase = useApiBase();
     const authController = useAuthController();
+    const { t } = useTranslation();
     const apiUrl = apiConfig?.apiUrl;
 
     const [spec, setSpec] = useState<OpenApiSpec | null>(null);
@@ -141,12 +142,12 @@ allEndpoints: [] };
             <div className="flex items-center justify-center h-full w-full p-8">
                 <div className="max-w-md text-center">
                     <Typography variant="subtitle2" className="block text-text-primary dark:text-text-primary-dark">
-                        {isAuth ? "This session cannot read the API specification" : "Could not load the API specification"}
+                        {isAuth ? t("studio_api_explorer_spec_refused_title") : t("studio_api_explorer_spec_failed_title")}
                     </Typography>
                     <Typography variant="body2" className="block mt-2 text-text-secondary dark:text-text-secondary-dark">
                         {isAuth
-                            ? "The console's access to this project's API was refused. It usually means the session expired — sign in again — or that console access has been turned off for this project in Settings."
-                            : "The project answered, but not with a specification this explorer could read. Its API is unaffected; only this page is."}
+                            ? t("studio_api_explorer_spec_refused_body")
+                            : t("studio_api_explorer_spec_failed_body")}
                     </Typography>
                     <Button
                         variant="outlined"
@@ -155,7 +156,7 @@ allEndpoints: [] };
                         className="mt-4"
                         onClick={() => window.location.reload()}
                     >
-                        Try again
+                        {t("retry")}
                     </Button>
                     {status && (
                         <Typography variant="caption" className="block mt-4 font-mono text-text-disabled dark:text-text-disabled-dark">

@@ -1156,6 +1156,12 @@ export const it: RebaseTranslations = {
     schema_change_commit: "Esegui il commit",
     schema_change_commit_and_apply: "Esegui il commit e applica",
 
+    // ─── API explorer ────────────────────────────────────────
+    studio_api_explorer_spec_refused_title: "Questa sessione non può leggere la specifica dell'API",
+    studio_api_explorer_spec_failed_title: "Impossibile caricare la specifica dell'API",
+    studio_api_explorer_spec_refused_body: "L'accesso della console all'API di questo progetto è stato rifiutato. Di solito significa che la sessione è scaduta (accedi di nuovo) o che l'accesso della console è stato disattivato per questo progetto nelle Impostazioni.",
+    studio_api_explorer_spec_failed_body: "Il progetto ha risposto, ma non con una specifica che questo explorer possa leggere. La sua API non è interessata; solo questa pagina.",
+
     // ─── Property field labels ──────────────────────────────────
     db_column_type: "Tipo di colonna del database",
     primary_key_unique_id: "Chiave primaria / ID univoco",
