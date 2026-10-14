@@ -5,7 +5,7 @@
 # is moved onto a new image. Removing one breaks tenants at boot.
 
 ## @rebasepro/server
-class ApiError { badRequest, code, conflict, details, expected, forbidden, internal, notFound, serviceUnavailable, statusCode, unauthenticated, unauthorized }
+class ApiError { badRequest, code, conflict, databaseUnavailable, details, expected, forbidden, internal, notFound, serviceUnavailable, statusCode, unauthenticated, unauthorized }
 class BlockedUrlError
 class BundleError { hint }
 class CollectionConfigError { hint }
@@ -27,6 +27,7 @@ const ACCOUNT_SCOPED_STORAGE_BASES
 const BATCH_REF_KEY
 const CONCURRENT_DDL_SQLSTATES
 const CORS_EXPOSED_HEADERS
+const DATABASE_UNAVAILABLE_MESSAGE
 const DEFAULT_DRIVER_ID
 const DEFAULT_MAX_FILE_SIZE
 const DEFAULT_STORAGE_ID
@@ -183,6 +184,7 @@ function isAuthenticated
 function isConcurrentDdlRace
 function isDataException
 function isDatabaseAdapter
+function isDatabaseUnreachable
 function isDuplicateObjectRace
 function isLocalhostOrigin
 function isNodeRuntime
@@ -248,6 +250,7 @@ function safeCompare
 function schemaDriftRemedy { lines, short }
 function serveSPA
 function setDefaultBackend
+function setLogOutput
 function splitFieldOps { fieldOps, values }
 function summarizeRlsScan { level, message }
 function transformImage
@@ -799,7 +802,7 @@ interface ImageResize { format, maxHeight, maxWidth, mode, quality }
 interface IncludeOptions { count, fields, include, limit, logical, orderBy, where }
 interface IncludeOptionsFor { count, fields, include, limit, logical, orderBy, where }
 interface IndexKey { direction, nulls, prop }
-interface InitializedDriver { collectionRegistry, collections, connection, driver, internals, realtimeProvider }
+interface InitializedDriver { collectionRegistry, collections, connection, driver, internals, realtimeProvider, unprotectedTables }
 interface JoinStep { on, table }
 interface LazyComponentRef { load }
 interface ListLimitBounds { defaultLimit, maxLimit, vectorDefaultLimit }
@@ -1581,7 +1584,7 @@ type ReadStoredJsonOptions { accept, fallback, storage }
 type RelativeTimeLabels { daysAgo, hoursAgo, inAMoment, inDays, inHours, inMinutes, justNow, minutesAgo }
 
 ## @rebasepro/server/functions
-class ApiError { badRequest, code, conflict, details, expected, forbidden, internal, notFound, serviceUnavailable, statusCode, unauthenticated, unauthorized }
+class ApiError { badRequest, code, conflict, databaseUnavailable, details, expected, forbidden, internal, notFound, serviceUnavailable, statusCode, unauthenticated, unauthorized }
 const rebase { admin, apiKeys, apiPath, auth, backups, baseUrl, bucket, call, createStorageSource, cron, dataAsAdmin, email, fetchStorageSources, functions, personalKeys, resolveToken, setAuthTokenGetter, setOnUnauthorized, setToken, sql, storage, storageRegistry, ws }
 const requireAdmin
 const requireAuth
