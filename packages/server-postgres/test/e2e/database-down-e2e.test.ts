@@ -17,6 +17,9 @@
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { createServer } from "node:http";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import type { AddressInfo } from "node:net";
 import { execa } from "execa";
 import { WebSocket as NodeWebSocket } from "ws";
@@ -62,6 +65,7 @@ describe("the database is down (E2E)", () => {
     const originalNodeEnv = process.env.NODE_ENV;
     let userToken = "";
     let adminToken = "";
+    const storageDir = mkdtempSync(path.join(tmpdir(), "rebase-database-down-storage-"));
 
     async function call(path: string, headers: Record<string, string>, init: { method?: string; body?: unknown } = {}): Promise<Answer> {
         const response = await app.request(path, {
@@ -130,7 +134,9 @@ describe("the database is down (E2E)", () => {
                 connection: connection.db,
                 connectionString: container.connectionString
             }),
-            auth: { jwtSecret: JWT_SECRET, serviceKey: SERVICE_KEY }
+            auth: { jwtSecret: JWT_SECRET, serviceKey: SERVICE_KEY },
+            storage: { type: "local", basePath: storageDir },
+            storageInsecureAllowAnyAuthenticated: true
         });
 
         const repo = backend.auth?.authRepository as AuthRepository | undefined;
@@ -145,6 +151,7 @@ describe("the database is down (E2E)", () => {
 
         // Up: the same requests succeed, so what changes below is the database.
         expect((await call("/api/data/notes", bearer(userToken))).status).toBe(200);
+        expect((await call("/api/storage/list?prefix=docs/", bearer(adminToken))).status).toBe(200);
         signedInSocket = await openSocket();
         expect((await signedInSocket.send("AUTHENTICATE", { token: userToken })).type).toBe("AUTH_SUCCESS");
         expect((await signedInSocket.send("FETCH_COLLECTION", { path: "notes" })).type).not.toBe("ERROR");
@@ -160,6 +167,7 @@ describe("the database is down (E2E)", () => {
         process.env.NODE_ENV = originalNodeEnv;
         await connection?.pool.end().catch(() => {});
         if (container) await stopPgContainer(container.containerName);
+        rmSync(storageDir, { recursive: true, force: true });
     }, 60_000);
 
     it("answers a signed-in data request 503 DATABASE_UNAVAILABLE, not ROLE_LOOKUP_FAILED", async () => {
@@ -179,6 +187,10 @@ describe("the database is down (E2E)", () => {
 
     it("answers an admin route the same", async () => {
         expectDatabaseUnavailable(await call("/api/admin/users", bearer(adminToken)));
+    });
+
+    it("answers storage the same, not 401 UNAUTHORIZED for a valid admin token", async () => {
+        expectDatabaseUnavailable(await call("/api/storage/list?prefix=docs/", bearer(adminToken)));
     });
 
     it("answers a signed-in socket's frame with the same code", async () => {
