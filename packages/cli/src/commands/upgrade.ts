@@ -308,7 +308,7 @@ export async function upgradeCommand(rawArgs: string[], io: UpgradeIo = defaultI
         return;
     }
 
-    printOutcome(plan, { dryRun, wrote, installed, installLine });
+    printOutcome(plan, { dryRun, wrote, installed, installLine, wouldRefuse: dryRun ? downgradeRefusal : null });
 }
 
 /** Changes grouped by file, then what was left alone and why, then overrides. */
@@ -369,7 +369,7 @@ function printSummary(plan: UpgradePlan, dryRun: boolean): void {
 
 function printOutcome(
     plan: UpgradePlan,
-    outcome: { dryRun: boolean; wrote: boolean; installed: boolean; installLine: string }
+    outcome: { dryRun: boolean; wrote: boolean; installed: boolean; installLine: string; wouldRefuse: UpgradeRefusal | null }
 ): void {
     const moved = plan.changed.length + plan.overrides.filter(o => o.action !== "kept-local").length;
     // What the project is not moved off by this command: every pin it left
@@ -397,9 +397,14 @@ function printOutcome(
     }
 
     if (outcome.dryRun) {
+        // "Run it without --dry-run" is the one thing not to say after the
+        // warning above that a real run refuses it: the last line is the one
+        // acted on, so it names what to type instead.
         console.log(chalk.gray(moved === 0
             ? `  Nothing to change: this project is already on ${plan.target}.`
-            : "  Dry run — nothing was written. Run it without --dry-run to apply."));
+            : outcome.wouldRefuse
+                ? `  Dry run — nothing was written, and a real run refuses it. ${outcome.wouldRefuse.hint}`
+                : "  Dry run — nothing was written. Run it without --dry-run to apply."));
         console.log("");
         return;
     }

@@ -403,6 +403,35 @@ describe("rebase upgrade on a prerelease", () => {
         expect(refused.hint).toBe(doc.wouldRefuse.hint);
     });
 
+    /**
+     * The human dry run said "A real run refuses it without --allow-downgrade."
+     * and then ended "Dry run — nothing was written. Run it without --dry-run to
+     * apply." — the line a reader acts on was the one that was not true.
+     */
+    it("ends a dry run the real run would refuse with what to type instead", async () => {
+        canaryProject();
+        const fake = io({ npmView: registry({ latest: "0.24.0", canary: "0.24.1-canary.g8c5a265" }) });
+
+        expect(await run(["--to", "latest", "--dry-run"], fake)).toBe(0);
+
+        // eslint-disable-next-line no-control-regex
+        const lines = stdout.join("\n").replace(/\x1b\[[0-9;]*m/g, "").trim().split("\n");
+        const last = lines[lines.length - 1].trim();
+        expect(last).not.toContain("Run it without --dry-run to apply");
+        expect(last).toContain("Dry run — nothing was written");
+        expect(last).toContain("rebase upgrade --to canary");
+        expect(last).toContain("--allow-downgrade");
+    });
+
+    it("still tells a dry run the real run would carry out to run it without --dry-run", async () => {
+        canaryProject();
+        const fake = io({ npmView: registry({ latest: "0.24.0", canary: "0.24.1-canary.g8c5a265" }) });
+
+        expect(await run(["--to", "latest", "--allow-downgrade", "--dry-run"], fake)).toBe(0);
+
+        expect(stdout.join("\n")).toContain("Run it without --dry-run to apply.");
+    });
+
     it("leaves wouldRefuse null on a dry run the real run would carry out", async () => {
         canaryProject();
         const fake = io({ npmView: registry({ latest: "0.24.0", canary: "0.24.1-canary.g8c5a265" }) });
