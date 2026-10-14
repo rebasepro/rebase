@@ -680,6 +680,23 @@ async function planSourceOnly(
 }
 
 /**
+ * The files an apply of `plan` commits: the collection source `writeSource`
+ * rewrites, then the planner's generated files — the order `/apply` commits
+ * them in.
+ *
+ * The review a person agrees to lists these, so it is the same list. It listed
+ * the planner's files alone, and the commit also carried the person's own
+ * collection file. Nothing for a change the apply refuses, which commits
+ * nothing; no source when there is no `writeSource`, which writes none.
+ */
+function filesCommittedBy(config: LiveSchemaRoutesConfig, change: ProposedChange, plan: SchemaChangePlan): string[] {
+    const generated = plan.files.map(file => file.path);
+    if (!plan.classified.applicable) return generated;
+    const source = config.writeSource ? config.sourcePathsFor?.(change) ?? [] : [];
+    return [...new Set([...source, ...generated])];
+}
+
+/**
  * What still has to happen after this change lands, if anything.
  *
  * Only one thing so far, and it is the one that would otherwise be silent: a
@@ -866,7 +883,7 @@ export function createLiveSchemaRoutes(config: LiveSchemaRoutesConfig): Hono<Hon
             verdict: plan.classified.verdict,
             changes: plan.classified.changes,
             statements: plan.statements,
-            files: plan.files.map(file => file.path),
+            files: filesCommittedBy(config, change, plan),
             message: messageFor(sourceChangeFor(before, change), plan),
             // A change can be applicable and still leave something the config
             // asks for unenforced. That is not a refusal, so it does not belong

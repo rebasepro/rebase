@@ -173,6 +173,42 @@ describe("POST /plan", () => {
         const { post } = harness({ getRepository: () => undefined });
         expect((await post("/plan", change)).status).toBe(200);
     });
+
+    /**
+     * Studio's review listed one file — the generated schema — and the commit
+     * also carried the person's own collection file, which the apply writes
+     * and commits first. The review is the consent to the commit, so it lists
+     * exactly what the commit will hold.
+     */
+    describe("the files it lists", () => {
+        const SOURCE = "config/collections/posts.ts";
+
+        it("are the files the apply commits, the collection source included", async () => {
+            const { post } = harness({ sourcePathsFor: () => [SOURCE] });
+
+            const planned = (await (await post("/plan", change)).json() as { files: string[] }).files;
+            const committed = (await (await post("/apply", change)).json() as { committed: { files: string[] } }).committed.files;
+
+            expect(planned).toEqual([SOURCE, "backend/src/schema.generated.ts"]);
+            expect(planned).toEqual(committed);
+        });
+
+        it("leave the source out when source editing is off, as the commit does", async () => {
+            const { post } = harness({ sourcePathsFor: () => [SOURCE], writeSource: undefined });
+
+            const planned = (await (await post("/plan", change)).json() as { files: string[] }).files;
+            const committed = (await (await post("/apply", change)).json() as { committed: { files: string[] } }).committed.files;
+
+            expect(planned).toEqual(["backend/src/schema.generated.ts"]);
+            expect(planned).toEqual(committed);
+        });
+
+        it("are none for a change the apply refuses", async () => {
+            const { post } = harness({ plan: { ...blockedPlan(), files: [] }, sourcePathsFor: () => [SOURCE] });
+
+            expect((await (await post("/plan", change)).json() as { files: string[] }).files).toEqual([]);
+        });
+    });
 });
 
 describe("POST /apply", () => {
