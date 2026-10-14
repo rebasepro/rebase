@@ -2736,6 +2736,14 @@
   This covers a `hasMany` whose child has the `belongsTo` back on
   `foreignKeyOnTarget`. A link keyed on `sourceKey` is not prefilled.
 
+- **"Create" in the side panel opens the saved record instead of asking about
+  unsaved changes.** The save reported the form clean and moved the panel to
+  the new record in the same tick, and the panel's guard still saw it as dirty.
+  It asked "There are unsaved changes" about a record already saved and left
+  the URL on `#new_side`. A dirty record still asks before the panel leaves it.
+  `useUnsavedChangesDialog` now also takes a function for `when`, read at the
+  moment of navigation.
+
 - **The markdown editor's link box takes a link, and pressing Enter in it no longer
   saves the record.** The box reset to empty on every keystroke, so no link could be
   typed or edited, and its submit went on through the popover to the record form

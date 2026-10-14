@@ -88,8 +88,21 @@ function SideDialogView({
 
     // was the closing of the dialog requested by the drawer
     const [drawerCloseRequested, setDrawerCloseRequested] = useState<boolean>(false);
-    const [blocked, setBlocked] = useState(false);
+    const [blocked, setBlockedState] = useState(false);
     const [blockedNavigationMessage, setBlockedNavigationMessage] = useState<React.ReactNode | undefined>();
+
+    // Mirrored in a ref for the same reason as `pendingCloseRef` below. A save
+    // reports the form clean and then moves the panel — onto the record it
+    // just created, or closed — in one tick, and the guard reads this flag
+    // inside that navigation. As state alone it was still set there, so
+    // "Create" asked "There are unsaved changes" about a record already saved,
+    // and left the URL on `#new_side`.
+    const blockedRef = React.useRef(false);
+    const setBlocked = useCallback((value: boolean) => {
+        blockedRef.current = value;
+        setBlockedState(value);
+    }, []);
+    const isBlocked = useCallback(() => blockedRef.current, []);
 
     // Held in a ref, read through a getter, because of *when* it is written and
     // read. "Save and close" raises it and submits the form in one click
@@ -116,7 +129,7 @@ function SideDialogView({
     }, []);
 
     const { dialogProps, triggerDialog } = useUnsavedChangesDialog(
-        blocked,
+        isBlocked,
         () => setBlocked(false)
     );
 
@@ -137,14 +150,14 @@ function SideDialogView({
     };
 
     const onCloseRequest = useCallback((force?: boolean) => {
-        if (blocked && !force) {
+        if (blockedRef.current && !force) {
             setDrawerCloseRequested(true);
             triggerDialog();
         } else {
             sideDialogsController.close();
             panel?.onClose?.();
         }
-    }, [blocked, triggerDialog, sideDialogsController, panel]);
+    }, [triggerDialog, sideDialogsController, panel]);
 
     const contextValue = useMemo(() => ({
         blocked,
@@ -156,7 +169,7 @@ function SideDialogView({
             return pendingCloseRef.current;
         },
         setPendingClose
-    }), [blocked, setBlockedNavigationMessage, width, onCloseRequest, setPendingClose]);
+    }), [blocked, setBlocked, setBlockedNavigationMessage, width, onCloseRequest, setPendingClose]);
 
     const additionalProps = panel?.additional as SidePanelBindingProps | undefined;
     const isDialogMode = additionalProps?.collection?.openEntityMode === "dialog";
