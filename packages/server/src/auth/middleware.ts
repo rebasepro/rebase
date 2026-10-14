@@ -4,6 +4,7 @@ import { ANONYMOUS_USER_ID, DataDriver, hasAdminRole, isPublicStorageKey } from 
 import { jwtOf, processJwtService, AccessTokenPayload, type DownloadTokenPayload, type JwtService } from "./jwt";
 import type { HonoEnv } from "../api/types";
 import { ApiError, errorHandler, isDatabaseUnreachable } from "../api/errors";
+import { warnIfDatabaseClosed } from "../api/closed-database";
 import { scopeDataDriver } from "./rls-scope";
 import { safeCompare } from "./crypto-utils";
 import { isApiKeyToken, validateApiKey } from "./api-keys/api-key-middleware";
@@ -231,9 +232,11 @@ roles: ["admin"] } as AccessTokenPayload);
                 // the lookup exists to close. A database that cannot be reached
                 // is said as that, the answer every other door gives then.
                 if (isDatabaseUnreachable(error)) {
-                    logger.warn("[Auth] Could not resolve roles for an admin-gated request: the database is unreachable", {
-                        uid: payload.uid
-                    });
+                    if (!warnIfDatabaseClosed(error)) {
+                        logger.warn("[Auth] Could not resolve roles for an admin-gated request: the database is unreachable", {
+                            uid: payload.uid
+                        });
+                    }
                     return refuse(c, ApiError.databaseUnavailable());
                 }
                 logger.warn("[Auth] Could not resolve roles for an admin-gated request", {

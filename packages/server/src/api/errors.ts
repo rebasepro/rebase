@@ -3,6 +3,7 @@ import type { ContentfulStatusCode } from "hono/utils/http-status";
 import type { HonoEnv } from "./types";
 import { logger } from "../utils/logger";
 import { hostEnv } from "../utils/host";
+import { closedDatabaseName, warnIfDatabaseClosed } from "./closed-database";
 
 /**
  * A stale caller's schema stamp, as the cause of the error it explains.
@@ -229,6 +230,10 @@ function isSocketFailure(error: object, depth = 0): boolean {
  */
 export function isDatabaseUnreachable(error: unknown): boolean {
     if (typeof error !== "object" || error === null) return false;
+
+    // Ahead of the SQLSTATE read below, which takes 55000 for the database
+    // answering: closed to new connections, it cannot serve the request at all.
+    if (closedDatabaseName(error) !== null) return true;
 
     const reported = databaseReport(error);
     if (reported !== undefined) return reported;
@@ -746,9 +751,12 @@ export const errorHandler: ErrorHandler<HonoEnv> = (err, c) => {
     } else if (unreachable) {
         code = "DATABASE_UNAVAILABLE";
         statusCode = 503;
+        const closedDatabase = closedDatabaseName(error);
         const reason = describeConnectionFailure(error);
-        logMessage = `The database could not be reached: ${reason}.`;
-        warnDatabaseUnreachable(reason);
+        logMessage = closedDatabase !== null
+            ? `Database "${closedDatabase}" is closed to new connections.`
+            : `The database could not be reached: ${reason}.`;
+        if (!warnIfDatabaseClosed(error)) warnDatabaseUnreachable(reason);
         c.header("Retry-After", String(DATABASE_RETRY_AFTER_SECONDS));
     } else if (upstream) {
         code = "SERVICE_UNAVAILABLE";

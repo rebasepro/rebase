@@ -46,6 +46,7 @@ import { safeCompare } from "./crypto-utils";
 import { extractBearerToken } from "./bearer-token";
 import { logger } from "../utils/logger";
 import { ApiError, isDataException, isDatabaseUnreachable } from "../api/errors";
+import { warnIfDatabaseClosed } from "../api/closed-database";
 
 /**
  * Configuration for the built-in Rebase auth adapter.
@@ -188,7 +189,9 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
      */
     function lookupRefusal(line: string, uid: string, error: unknown): ApiError {
         if (isDatabaseUnreachable(error)) {
-            logger.warn(`${line}: the database is unreachable`, { uid });
+            // A database closed to new connections is named, with what opens
+            // it, once a minute: every request fails the same way.
+            if (!warnIfDatabaseClosed(error)) logger.warn(`${line}: the database is unreachable`, { uid });
             return ApiError.databaseUnavailable();
         }
         logger.warn(line, { uid, error });
