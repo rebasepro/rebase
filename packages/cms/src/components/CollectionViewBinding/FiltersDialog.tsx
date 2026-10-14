@@ -76,6 +76,15 @@ export function FiltersDialog({
     // Track hidden state for reference fields (when reference dialog is open)
     const [hiddenFields, setHiddenFields] = useState<Record<string, boolean>>({});
 
+    /**
+     * Bumped by "Clear all", and part of each field's key, so every field
+     * starts again from no value. A field keeps what it shows in its own
+     * state — an operator picked before any value is not a filter yet — and
+     * seeds it from `value` once, so emptying the filters alone left every
+     * field showing the value it had.
+     */
+    const [fieldsGeneration, setFieldsGeneration] = useState(0);
+
     // Reset local state when dialog opens
     React.useEffect(() => {
         if (open) {
@@ -109,6 +118,7 @@ export function FiltersDialog({
 
     const handleClearAll = useCallback(() => {
         setLocalFilters({});
+        setFieldsGeneration(generation => generation + 1);
     }, []);
 
     const setHiddenForField = useCallback((propertyKey: string, hidden: boolean) => {
@@ -128,6 +138,7 @@ export function FiltersDialog({
 
         return (
             <FilterFieldBinding
+                key={`${propertyKey}:${fieldsGeneration}`}
                 propertyKey={propertyKey}
                 property={property}
                 engine={engine}
@@ -137,7 +148,7 @@ export function FiltersDialog({
                 setHidden={(hidden) => setHiddenForField(propertyKey, hidden)}
             />
         );
-    }, [localFilters, handleFilterChange, hiddenFields, setHiddenForField, engine]);
+    }, [localFilters, handleFilterChange, hiddenFields, setHiddenForField, engine, fieldsGeneration]);
 
     return (
         <Dialog
