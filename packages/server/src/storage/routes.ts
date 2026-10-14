@@ -33,7 +33,8 @@ import {
 } from "./property-limits";
 import { objectValidators, isNotModified, applyCacheHeaders, buildEntityTag } from "./cache-headers";
 import { parseRange, contentRange, unsatisfiableContentRange } from "./range";
-import { requireAuth as jwtRequireAuth, optionalAuth as jwtOptionalAuth, queryTokenAuth, fileTokenAuth, publicObjectAuth } from "../auth/middleware";
+import { requireAuth as jwtRequireAuth, optionalAuth as jwtOptionalAuth, queryTokenAuth, fileTokenAuth, publicObjectAuth, refuse } from "../auth/middleware";
+import { adapterRefusal } from "../auth/adapter-middleware";
 import { jwtOf, type JwtService } from "../auth/jwt";
 import { ApiError, declaredErrorAnswer, errorHandler } from "../api/errors";
 import { logger } from "../utils/logger";
@@ -403,8 +404,10 @@ function buildAdapterAuthMiddleware(
             let authenticatedUser = null;
             try {
                 authenticatedUser = await adapter.verifyRequest(c.req.raw);
-            } catch {
-                return c.json({ error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, 401);
+            } catch (error) {
+                // The answer the data API gives the same throw: a database
+                // that is down is a 503 here too, not "no user".
+                return refuse(c, adapterRefusal(error));
             }
 
             if (authenticatedUser) {

@@ -52,6 +52,19 @@ export interface AdapterAuthMiddlewareOptions {
 }
 
 /**
+ * What a request is refused with when `adapter.verifyRequest` throws: the
+ * adapter's own answer when it gave one, otherwise a 401 — fail closed either
+ * way. The built-in adapter throws the 401 that says why a session is refused
+ * (`SESSION_REVOKED`, `ACCOUNT_DISABLED`) and a 503 when it cannot read the
+ * caller's account (`DATABASE_UNAVAILABLE` when the database is down). Every
+ * door that asks an adapter answers with this, so none of them turns an outage
+ * into a bad session, which sends the client to refresh one that is fine.
+ */
+export function adapterRefusal(error: unknown): ApiError {
+    return error instanceof ApiError && error.statusCode >= 400 ? error : ApiError.unauthenticated("Unauthorized");
+}
+
+/**
  * Create a Hono middleware that uses an `AuthAdapter` for request verification.
  */
 export function createAdapterAuthMiddleware(options: AdapterAuthMiddlewareOptions): MiddlewareHandler<HonoEnv> {
@@ -83,13 +96,7 @@ driver });
             authenticatedUser = await adapter.verifyRequest(c.req.raw);
         } catch (error) {
             // adapter.verifyRequest() threw — reject the request (fail closed).
-            // With the adapter's own answer when it gave one: the built-in
-            // adapter throws a 503 when it cannot read the caller's roles,
-            // and a 401 there would send the client to refresh a session that
-            // is fine.
-            return refuse(c, error instanceof ApiError && error.statusCode >= 400
-                ? error
-                : ApiError.unauthenticated("Unauthorized"));
+            return refuse(c, adapterRefusal(error));
         }
 
         if (authenticatedUser) {
