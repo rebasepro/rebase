@@ -66,7 +66,8 @@ describe("every command init prints works in the scaffold it is printed for", ()
 
                 for (const command of printed) {
                     const [bin, verb, ...rest] = command;
-                    if (bin === "cd" || bin === "ALTER" || bin === "CREATE") continue;
+                    // SQL, comment included, is run in the database rather than a shell.
+                    if (bin === "cd" || bin === "ALTER" || bin === "CREATE" || bin === "--") continue;
                     expect(bin, command.join(" ")).toBe(pm === "pnpm" ? "pnpm" : bin === "npx" ? "npx" : "npm");
                     if (verb === "run") {
                         // `pnpm run db:push` in a project without `db:push` is
@@ -178,7 +179,8 @@ describe("the steps, per flavour", () => {
             "  #    A table is served once row-level security is enabled on it, and a",
             "  #    policy is what opens its rows:",
             "  ALTER TABLE your_table ENABLE ROW LEVEL SECURITY;",
-            "  CREATE POLICY your_table_owner ON your_table FOR ALL USING (user_id = rebase.uid());",
+            "  -- rebase.uid() is text: the cast makes this work for a uuid or integer column too.",
+            "  CREATE POLICY your_table_owner ON your_table FOR ALL USING (user_id::text = rebase.uid());",
             "  #    The API logs any table it skips, and why.",
             "",
             "  # Sign in: the first account you register becomes the admin.",
@@ -204,7 +206,8 @@ describe("the steps, per flavour", () => {
             "  #    A table is served once row-level security is enabled on it, and a",
             "  #    policy is what opens its rows:",
             "  ALTER TABLE your_table ENABLE ROW LEVEL SECURITY;",
-            "  CREATE POLICY your_table_owner ON your_table FOR ALL USING (user_id = rebase.uid());",
+            "  -- rebase.uid() is text: the cast makes this work for a uuid or integer column too.",
+            "  CREATE POLICY your_table_owner ON your_table FOR ALL USING (user_id::text = rebase.uid());",
             "  #    The API logs any table it skips, and why.",
             "",
             "  # Sign in: the first account you register becomes the admin.",

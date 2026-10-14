@@ -776,7 +776,11 @@ export function initNextSteps(input: InitNextStepsInput): string[] {
         lines.push(note("   A table is served once row-level security is enabled on it, and a"));
         lines.push(note("   policy is what opens its rows:"));
         lines.push(cmd(["ALTER TABLE your_table ENABLE ROW LEVEL SECURITY;"]));
-        lines.push(cmd(["CREATE POLICY your_table_owner ON your_table FOR ALL USING (user_id = rebase.uid());"]));
+        // The column side is cast, as the policies Rebase generates cast it:
+        // `rebase.uid()` is text, so `user_id = rebase.uid()` on a uuid column
+        // failed with "operator does not exist: uuid = text".
+        lines.push(cmd(["-- rebase.uid() is text: the cast makes this work for a uuid or integer column too."]));
+        lines.push(cmd(["CREATE POLICY your_table_owner ON your_table FOR ALL USING (user_id::text = rebase.uid());"]));
         lines.push(note("   The API logs any table it skips, and why."));
     } else if (ownDatabase) {
         lines.push(note("Your custom database is configured in .env."));
