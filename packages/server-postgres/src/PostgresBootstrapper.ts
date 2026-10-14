@@ -1756,7 +1756,7 @@ schemaHealthCheck: () => probeAuthSchema(db, resolveAuthSchema(authCollection)) 
             driverResult?: InitializedDriver,
             log?: (message: string) => void
         ): Promise<{ applied: number }> {
-            const { ensureCollectionPolicies } = await import("./schema/ensure-collection-policies");
+            const { ensureCollectionPolicies, describeRulesDropped } = await import("./schema/ensure-collection-policies");
             const queryable = provisioningQueryable(driverResult);
             // The order this depends on is set by the caller, and a caller that
             // gets it wrong fails silently-but-permanently: `CREATE POLICY`
@@ -1792,6 +1792,10 @@ schemaHealthCheck: () => probeAuthSchema(db, resolveAuthSchema(authCollection)) 
                     `🔐 [rls] Could not fully apply policies to "${failure.table}" — RLS is on, so it denies until this is resolved: ${failure.error}`
                 );
             }
+            // Applied — the declaration wins, and the table is left admin-only
+            // rather than open — but never in silence: it changes who reads
+            // the table on every server sharing this database.
+            for (const dropped of outcome.rulesDropped) logger.warn(describeRulesDropped(dropped));
             // Not a failure: the table's transaction rolled back, so it is
             // exactly as it was — RLS on, its existing policies in force. Only
             // worth more than a warning when those are not the declared ones.

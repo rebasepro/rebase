@@ -129,6 +129,21 @@ export interface PolicyEnsureResult {
      * case the new rules are not in force on this table until a later boot.
      */
     deferred: { table: string; error: string; rulesChanged: boolean }[];
+    /**
+     * Tables whose collection declares no rule of its own and which still held
+     * generated rule policies, all of them dropped: the generated policies, by
+     * name, the boot is to warn about.
+     *
+     * An edited rule supersedes its old policy, and that drop is the point of
+     * {@link PolicyEnsureResult.orphansDropped}. A collection with no rule at
+     * all is something else: what a collection looks like when the
+     * `defaultSecurityRules` its directory's index declares never reached it —
+     * an array handed to a backend without them. Dropping is still right (the
+     * declared state wins, and the table is left admin-only rather than open),
+     * but it changes who can read the table on every server sharing the
+     * database, so it is not done in silence.
+     */
+    rulesDropped: { table: string; policies: string[] }[];
 }
 
 const isCreatePolicy = (statement: string): boolean => /^\s*CREATE POLICY/i.test(statement);
@@ -437,6 +452,8 @@ interface TableWork {
     orphans: string[];
     /** Whether the policy names on the table differ from the plan's. */
     rulesChanged: boolean;
+    /** Whether the plan holds no generated rule of its own, so the orphans are every rule the table had. */
+    declaresNoRule: boolean;
 }
 
 type AtomicOutcome =
@@ -490,7 +507,7 @@ export async function ensureCollectionPolicies(
 ): Promise<PolicyEnsureResult> {
     const result: PolicyEnsureResult = {
         policiesApplied: 0, tablesSecured: 0, unchanged: 0, skipped: [], failures: [], unsecured: [],
-        orphansDropped: 0, deferred: []
+        orphansDropped: 0, deferred: [], rulesDropped: []
     };
 
     const plans = planCollectionPolicies(collections);
@@ -522,7 +539,8 @@ export async function ensureCollectionPolicies(
         }
         const presentSet = new Set(present);
         const rulesChanged = orphans.length > 0 || [...plannedPolicyNames(plan)].some(name => !presentSet.has(name));
-        work.push({ plan, rlsOn: table.rls, orphans, rulesChanged });
+        const declaresNoRule = ![...plannedPolicyNames(plan)].some(name => isGeneratedPolicyName(name, plan.table));
+        work.push({ plan, rlsOn: table.rls, orphans, rulesChanged, declaresNoRule });
     }
     if (result.unchanged > 0) {
         log?.(`${result.unchanged} table(s) already have exactly the declared policies; left as they are`);
@@ -612,11 +630,31 @@ async function applyAtomically(
     }
 }
 
+/**
+ * The warning a boot gives for one entry of {@link PolicyEnsureResult.rulesDropped}:
+ * each policy, what it means for the table, and the likely cause.
+ */
+export function describeRulesDropped(dropped: { table: string; policies: string[] }): string {
+    return `🔐 [rls] "${dropped.table}" declares no securityRules, so the policies its rules had made were dropped: ` +
+        `${dropped.policies.join(", ")}. Only administrators reach its rows now, on every server sharing this database. ` +
+        "If its collection came in an array handed to createRebaseBackend, that array lacked the defaultSecurityRules " +
+        "its config/collections/index.ts declares: pass collectionsDir, or the array that index exports, which carries " +
+        "them. If the rules were removed on purpose, this is that change.";
+}
+
+/** The orphans just dropped, when they were every rule the table had. See {@link PolicyEnsureResult.rulesDropped}. */
+function recordRulesDropped(result: PolicyEnsureResult, table: TableWork): void {
+    if (table.declaresNoRule && table.orphans.length > 0) {
+        result.rulesDropped.push({ table: table.plan.qualified, policies: [...table.orphans].sort() });
+    }
+}
+
 function record(result: PolicyEnsureResult, table: TableWork, log?: (message: string) => void): void {
     const created = table.plan.policyStatements.filter(isCreatePolicy).length;
     result.tablesSecured++;
     result.policiesApplied += created;
     result.orphansDropped += table.orphans.length;
+    recordRulesDropped(result, table);
     log?.(`${table.plan.qualified}: RLS enabled, ${created} policy(ies) applied` +
         (table.orphans.length > 0 ? `, ${table.orphans.length} orphan(s) dropped` : ""));
 }
@@ -663,6 +701,7 @@ async function applyEachStatement(
             await run(dropPolicySql(plan, name));
             result.orphansDropped++;
         }
+        recordRulesDropped(result, table);
         log?.(`${plan.qualified}: RLS enabled, ${created} policy(ies) applied` +
             (table.orphans.length > 0 ? `, ${table.orphans.length} orphan(s) dropped` : ""));
     } catch (err) {
