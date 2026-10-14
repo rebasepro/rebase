@@ -260,4 +260,35 @@ targetSlug: "tags" });
         expect(views[0].collection.slug).toBe("locales");
         expect(views[0].source).toEqual({ kind: "subcollection" });
     });
+
+    /**
+     * The declaring property's name labels the tab, and it is a plural — "Tags".
+     * It was made the tab's singular name too, so every sentence about one row
+     * of it read "Remove this Tags from this record?" and "Add Tags", where the
+     * same row from its own collection is "this Tag".
+     */
+    it("names the tab after the property, and one row of it after the target", () => {
+        const singularTags = { ...tags, slug: "singular_tags", singularName: "Tag" } as unknown as CollectionConfig;
+        const blogPosts: CollectionConfig = {
+            slug: "blog_posts", name: "Posts", table: "blog_posts",
+            properties: {
+                id: { type: "number" },
+                tags: {
+                    name: "Tags",
+                    type: "relation",
+                    relation: {
+                        kind: "manyToMany",
+                        target: () => singularTags,
+                        through: { table: "posts_tags", sourceColumn: "post_id", targetColumn: "tag_id" }
+                    }
+                }
+            }
+        } as unknown as CollectionConfig;
+
+        const registry = new CollectionRegistry([blogPosts, singularTags]);
+        const view = getEntityChildViews(registry.get("blog_posts")!)[0];
+
+        expect(view.collection.name).toBe("Tags");
+        expect(view.collection.singularName).toBe("Tag");
+    });
 });

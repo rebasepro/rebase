@@ -423,6 +423,8 @@ export function getEntityChildViews<M extends Record<string, unknown> = Record<s
         seen.add(identity);
 
         // A name given to the declaring property is the author naming the tab.
+        // Only the tab: it is a plural ("Tags"), and one row of it is still
+        // what the target calls one ("Tag").
         const declaringProperty = Object.entries((collection.properties ?? {}) as Record<string, Property>)
             .find(([propKey, p]) => p.type === "relation" && ((p as RelationProperty).relation?.relationName ?? propKey) === identity);
         const customName = declaringProperty?.[1]?.name;
@@ -430,8 +432,7 @@ export function getEntityChildViews<M extends Record<string, unknown> = Record<s
         const base: CollectionConfig<Record<string, unknown>> = {
             ...target,
             slug: relationKey,
-            ...(customName ? { name: customName,
-singularName: customName } : {})
+            ...(customName ? { name: customName } : {})
         } as CollectionConfig<Record<string, unknown>>;
 
         views.push({
