@@ -1,8 +1,9 @@
 /**
  * CLI command: rebase schema <action>
  */
+import arg from "arg";
 import chalk from "chalk";
-import { spawnDriverCli } from "./db";
+import { ensureDockerDatabase, spawnDriverCli } from "./db";
 import {
     requireProjectRoot,
     requireBackendDir,
@@ -17,7 +18,7 @@ import { wantsHelp } from "../utils/args";
 import { reportSpawnFailure } from "../utils/spawn-error";
 import { argsFromCommand } from "../utils/command-words";
 import { unknownCommand } from "../utils/unknown-command";
-import { DEV_DATABASE_KIND_ENV, devDatabaseKind } from "../dev-db/prepare";
+import { DEV_DATABASE_KIND_ENV, devDatabaseKind, managedNotices, prepareDatabaseEnv } from "../dev-db/prepare";
 import { absolutizeLocalPathArgs } from "./db";
 import { COLLECTIONS_FLAG_HELP, refuseMissingCollectionsPath } from "../utils/path-flags";
 
@@ -94,6 +95,29 @@ export async function schemaCommand(subcommand: string | undefined, rawArgs: str
 
     refuseMissingCollectionsPath(rawArgs, process.cwd(), backendDir);
 
+    // `introspect` is the one schema command that reads a database, and it
+    // reads the project's — resolved the way every `db` command resolves it,
+    // started if that is what it takes. It used to pass `.env` and nothing
+    // else, so on the managed database or after `rebase dev --docker` (with
+    // the scaffold's DATABASE_URL commented out, on purpose) it said
+    // "DATABASE_URL is not set", and `--docker` and `--database-url` passed the
+    // flag check only to be ignored.
+    if (subcommand === "introspect") {
+        const flags = arg(
+            { "--database-url": String, "--docker": Boolean },
+            { argv: rawArgs.slice(2), permissive: true }
+        );
+        await ensureDockerDatabase(projectRoot, rawArgs);
+        const prepared = await prepareDatabaseEnv(projectRoot, {
+            flagUrl: flags["--database-url"] ?? null,
+            flagDocker: flags["--docker"] === true,
+            onProgress: (message) => console.log(chalk.gray(`  ${message}`))
+        });
+        Object.assign(env, prepared.env);
+        env[DEV_DATABASE_KIND_ENV] = prepared.database.kind;
+        for (const line of managedNotices(prepared)) console.log(chalk.gray(`  ${line}`));
+    }
+
     try {
         // The one spawn, shared with `db`. This file used to carry its own copy
         // of the tsx-or-node decision; three copies of that rule existed and two
@@ -122,7 +146,11 @@ const SCHEMA_ACTION_HELP: Record<string, { usage: string; summary: string; notes
     introspect: {
         usage: "rebase schema introspect [--collections <dir>] [--output <dir>] [--schema <name>] [--force]",
         summary: "Read an existing database and write Rebase collection definitions from it.",
-        notes: ["--force overwrites collection files that are already there."]
+        notes: [
+            "--force overwrites collection files that are already there.",
+            "Reads this project's database, the one `rebase db url` prints: --database-url <url> names another; "
+                + "--docker uses the compose one, starting it if needed."
+        ]
     },
     stale: {
         usage: "rebase schema stale [--collections <dir>] [--output <file>] [--fix]",
@@ -171,6 +199,8 @@ ${chalk.green.bold("introspect Options")}
   ${chalk.blue("--output, -o")}       Output directory for generated collection files
   ${chalk.blue("--schema")}           Postgres schema to read (default: public)
   ${chalk.blue("--force, -f")}        Overwrite collection files that already exist
+  ${chalk.blue("--database-url")}     Read this database instead of the project's own
+  ${chalk.blue("--docker")}           Read the compose database, starting it if needed
 
 ${chalk.green.bold("stale Options")}
   ${chalk.blue("--fix")}              Regenerate the stale files instead of only reporting them
