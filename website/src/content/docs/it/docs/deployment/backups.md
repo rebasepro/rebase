@@ -106,7 +106,10 @@ contiene hanno policy che richiamano funzioni che non contiene.
 Per questo
 `rebase db backup` rifiuta un `--exclude-schema` che corrisponde a `rebase`, secondo le
 regole dei pattern di pg_dump stesso (`reb*` e `*` compresi), prima di eseguire qualsiasi
-cosa. Su 0.24 scriveva il dump e lo validava, e falliva solo il ripristino.
+cosa. Quelle regole lasciano passare la sintassi delle espressioni regolari fuori dalle
+virgolette doppie, quindi vengono rifiutati anche `[r]ebase` e `audit|rebase`, e ogni
+pattern viene verificato dal server prima che `pg_dump` venga eseguito, con lo stesso
+motore di espressioni regolari che usa la query di `pg_dump` stesso. Su 0.24 scriveva il dump e lo validava, e falliva solo il ripristino.
 
 Poiché contiene ogni password
 e hash di chiave, un dump locale e il suo `.globals.sql` vengono creati leggibili solo dal

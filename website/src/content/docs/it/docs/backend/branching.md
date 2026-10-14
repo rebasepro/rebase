@@ -69,7 +69,10 @@ server) e la riapre in seguito: in caso di errore, e a ogni segnale che può int
 (SIGKILL), lascia la sorgente chiusa fino al successivo comando `rebase db branch`,
 uno qualsiasi, che prima la riapre e lo dice;
 `ALTER DATABASE "<db>" ALLOW_CONNECTIONS true`, eseguito dal database `postgres`,
-fa lo stesso a mano. Un client che si
+fa lo stesso a mano. Finché un create forzato tiene chiusa la sua sorgente, detiene su di
+essa un advisory lock nel database `postgres`, così la riapertura lascia stare la
+sorgente di una copia in corso, e un secondo create forzato dalla stessa sorgente attende
+che il primo finisca. Un client che si
 riconnette appena viene disconnesso, come fa un `rebase dev` in esecuzione, non può
 quindi rientrare prima che la copia inizi. Per farlo serve il proprietario della sorgente;
 senza di esso, e su `delete`, `--force` disconnette le sessioni fino a tre volte prima di

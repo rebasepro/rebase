@@ -136,8 +136,15 @@ Copia un altro database in quello di sviluppo locale:
 rebase db pull --from postgres://…  [--anonymize]
 ```
 
+`--from` accetta un URL `postgres://` o `postgresql://`, oppure le coppie
+`host=… port=… dbname=…` di libpq racchiuse tra virgolette come un unico argomento.
+Qualsiasi altra cosa viene rifiutata prima che venga letto o avviato qualcosa, senza
+ripetere il valore.
+
 `--anonymize` sostituisce i campi personali durante l'importazione, consentendo di lavorare localmente su una copia della produzione senza trasferire dati reali dei clienti su un laptop. Associa le colonne per nome ed è
-best-effort.
+best-effort. Una colonna `name` semplice viene sostituita solo in una tabella di persone:
+una chiamata `users`, `authors`, `customers` o simili, oppure qualsiasi tabella che
+contiene anche una colonna di indirizzi email.
 Una colonna sotto un indice univoco riceve un valore distinto per ogni riga, e il passaggio
 è un'unica transazione: se fallisce, le tabelle che avrebbe riscritto vengono svuotate e
 nominate, e il comando termina con 1. Su 0.24 falliva su `token_hash` una volta che gli
@@ -149,6 +156,11 @@ quello che probabilmente si intendeva: `--anonymise` risponde "did you mean --an
 e termina con 1. Su 0.24 un flag scritto male veniva ignorato, quindi `--anonymise`,
 `--anon` o `--schem` eseguivano il pull senza di esso, e i dati personali arrivavano
 così com'erano.
+Su `pull` e su ogni altro comando, uno switch a cui viene dato un valore lo legge:
+`--anonymize=true` o `=1` lo attiva, `--anonymize=false` o `=0` lo lascia disattivato,
+e qualsiasi altro valore viene rifiutato. Su 0.25 ogni valore attivava lo switch, quindi
+`--anonymize=false` anonimizzava e `db push --allow-destructive=false` consentiva
+l'eliminazione.
 
 Dato che `pg_dump` rimuove i privilegi, la copia arriverebbe con i criteri RLS di origine ma senza le relative autorizzazioni sottostanti — causando il fallimento di ogni lettura come `rebase_user` con l'errore `permission denied`. L'operazione di pull ripristina successivamente il ruolo dell'applicazione, impiegando la medesima procedura usata all'avvio e da `rebase db push`, garantendo che le tabelle interne di Rebase rimangano protette come previsto.
 
