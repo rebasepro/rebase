@@ -137,8 +137,14 @@ Copia outro banco de dados para o banco de dados de desenvolvimento local:
 rebase db pull --from postgres://…  [--anonymize]
 ```
 
+O `--from` aceita uma URL `postgres://` ou `postgresql://`, ou os pares
+`host=… port=… dbname=…` do libpq entre aspas como um único argumento. Qualquer outra coisa é recusada
+antes de qualquer leitura ou início, sem repetir o valor.
+
 `--anonymize` substitui campos pessoais durante a importação, para que uma cópia de produção possa ser trabalhada localmente sem levar dados reais de clientes para um laptop. Ele associa as colunas pelo nome e
-funciona no melhor esforço (best-effort).
+funciona no melhor esforço (best-effort). Uma coluna `name` sozinha só é substituída em uma
+tabela de pessoas: uma chamada `users`, `authors`, `customers` ou algo parecido, ou qualquer
+tabela que também tenha uma coluna de endereço de e-mail.
 Uma coluna sob um índice único recebe um valor distinto por linha, e a passagem é uma
 única transação: se ela falha, as tabelas que ela teria reescrito são esvaziadas e
 nomeadas, e o comando termina com código 1. Na 0.24 ele falhava em `token_hash` depois
@@ -149,6 +155,11 @@ não aceita é recusada antes de qualquer coisa ser lida ou copiada, nomeando a 
 provavelmente se pretendia: `--anonymise` responde "did you mean --anonymize?" e
 termina com código 1. Na 0.24 uma flag escrita errado era ignorada, então `--anonymise`, `--anon` ou
 `--schem` executavam o pull sem ela, e os dados pessoais chegavam como estavam.
+No `pull` e em todos os outros comandos, um switch que recebe um valor o lê:
+`--anonymize=true` ou `=1` o ativa, `--anonymize=false` ou `=0` o deixa desativado,
+e qualquer outro valor é recusado. Na 0.25 qualquer valor ativava o switch, então
+`--anonymize=false` anonimizava e `db push --allow-destructive=false` permitia
+a remoção.
 
 O `pg_dump` remove privilégios, então a cópia chegaria com as políticas de RLS da origem e nenhuma das concessões (grants) por trás delas — fazendo com que cada leitura como `rebase_user` falhe com `permission denied`. O pull provisiona novamente a role do app em seguida, usando a mesma rotina que a inicialização e o `rebase db push` utilizam, garantindo que as tabelas internas do Rebase permaneçam revogadas como devem ser.
 

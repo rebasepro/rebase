@@ -107,6 +107,10 @@ tabelas que ele contém têm políticas que chamam funções que ele não tem.
 Por isso o
 `rebase db backup` recusa um `--exclude-schema` que corresponde a `rebase`, pelas
 próprias regras de padrão do pg_dump (`reb*` e `*` incluídos), antes de executar qualquer coisa.
+Essas regras repassam a sintaxe de expressão regular fora de aspas duplas, então
+`[r]ebase` e `audit|rebase` também são recusados, e o servidor é consultado sobre
+cada padrão antes de o `pg_dump` rodar, no mesmo mecanismo de expressões regulares que
+a própria consulta do `pg_dump` usa.
 Na 0.24 ele escrevia o dump e o validava, e só a restauração falhava.
 
 Como contém todas as
