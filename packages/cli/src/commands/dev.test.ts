@@ -19,7 +19,7 @@ import os from "os";
 import path from "path";
 
 import { getProjectPort } from "../utils/dev-server";
-import { appBannerLines, DEV_FLAGS, DEV_PORT_FILENAME, databaseBannerValue, devCommand, devRestartTrigger, devStaticShape, devWatchArgs, devWatchIncludes, needsStaleSchemaPreflight, pinnedPortRefusal, readEnvValue, resolveStartPort, portMovedNotice, SCAFFOLD_DEFAULT_PORT, schemaPushArgv, START_PORT_SOURCE_LABELS } from "./dev";
+import { appBannerLines, DEV_FLAGS, DEV_PORT_FILENAME, databaseBannerValue, devCommand, devRestartTrigger, devStaticShape, devWatchArgs, devWatchIncludes, envFileHiddenFromTsx, needsStaleSchemaPreflight, pinnedPortRefusal, readEnvValue, resolveStartPort, portMovedNotice, SCAFFOLD_DEFAULT_PORT, schemaPushArgv, START_PORT_SOURCE_LABELS } from "./dev";
 import type { PreparedDatabase } from "../dev-db/prepare";
 import { validateManifest } from "../manifest";
 
@@ -169,6 +169,57 @@ describe("devWatchArgs", () => {
             fs.rmSync(root, { recursive: true, force: true });
         }
     }, 30_000);
+
+    /**
+     * Under `rebase dev`, an `.env` edit restarted Vite and not the backend:
+     * the server reads the file at boot, tsx watches only what the entry
+     * imports, and `STORAGE_PATH__MEDIA` had no effect until a watched file
+     * changed.
+     */
+    it("watches the project's .env, and restarts on an edit to it, under the real tsx", async () => {
+        expect(devWatchArgs("/srv/app", paths, "entry.mjs", null, "/srv/app/.env"))
+            .toEqual(expect.arrayContaining(["--include", "/srv/app/.env"]));
+
+        const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "rebase-dev-watch-env-")));
+        const tsxCli = createRequire(import.meta.url).resolve("tsx/cli");
+        try {
+            fs.mkdirSync(path.join(root, "backend"));
+            const envFile = path.join(root, ".env");
+            fs.writeFileSync(envFile, "STORAGE_PATH__MEDIA=./uploads/media\n");
+            const boots = path.join(root, "boots.log");
+            fs.writeFileSync(path.join(root, "backend", "entry.mjs"), [
+                "import fs from 'node:fs';",
+                `fs.appendFileSync(${JSON.stringify(boots)}, 'boot\\n');`,
+                "setInterval(() => {}, 1000);"
+            ].join("\n"));
+
+            const count = () => (fs.existsSync(boots) ? fs.readFileSync(boots, "utf8").split("\n").filter(Boolean).length : 0);
+            const waitFor = async (n: number) => {
+                for (let i = 0; i < 100 && count() < n; i++) await new Promise(r => setTimeout(r, 100));
+                return count();
+            };
+
+            const { execa } = await import("execa");
+            const child = execa(process.execPath, [tsxCli, ...devWatchArgs(root, {}, "entry.mjs", null, envFile)], { cwd: path.join(root, "backend"), reject: false });
+            try {
+                expect(await waitFor(1), "tsx never ran the entry").toBe(1);
+                // The watcher is ready a moment after the first boot.
+                await new Promise(r => setTimeout(r, 1500));
+                fs.writeFileSync(envFile, "STORAGE_PATH__MEDIA=./elsewhere\n");
+                expect(await waitFor(2), "an .env edit did not restart the backend").toBe(2);
+            } finally {
+                child.kill("SIGTERM");
+                await child;
+            }
+        } finally {
+            fs.rmSync(root, { recursive: true, force: true });
+        }
+    }, 30_000);
+
+    it("knows which .env tsx cannot see: one inside backend/, under its dotfile ignore", () => {
+        expect(envFileHiddenFromTsx("/srv/app/backend/.env", "/srv/app/backend")).toBe(true);
+        expect(envFileHiddenFromTsx("/srv/app/.env", "/srv/app/backend")).toBe(false);
+    });
 
     it("puts the trigger where tsx is willing to watch it", () => {
         // tsx ignores every path with a dot-named segment, so a trigger under

@@ -359,7 +359,8 @@ export function devWatchArgs(
     projectRoot: string,
     paths: { REBASE_DEV_FUNCTIONS?: string; REBASE_DEV_CRONS?: string },
     entryTarget: string,
-    restartTrigger: string | null
+    restartTrigger: string | null,
+    envFile: string | null = null
 ): string[] {
     // tsx's own flags first: it stops reading flags at the first one it does
     // not know (`--conditions` is Node's) and hands the rest to Node, which
@@ -375,8 +376,24 @@ export function devWatchArgs(
         args.push("--include", restartTrigger);
         args.push("--exclude", `${glob(devCollectionsDir(projectRoot))}/**`);
     }
+    // The server reads `.env` at boot, and the entry never imports it, so an
+    // edit there changed nothing until some watched file did. tsx watches a
+    // named file outside its cwd; one inside `backend/` falls under its own
+    // dotfile ignore, and dev watches that one itself (see `envFileHiddenFromTsx`).
+    if (envFile) args.push("--include", envFile);
     args.push("--conditions", "development", entryTarget);
     return args;
+}
+
+/**
+ * Whether tsx, run in `backendDir`, ignores `envFile` whatever it is told.
+ *
+ * Its default ignores (`**\/.*` among them) are resolved against its cwd, so a
+ * `backend/.env` is beyond an `--include`, and a project-root `.env` is not.
+ */
+export function envFileHiddenFromTsx(envFile: string, backendDir: string): boolean {
+    const relative = path.relative(backendDir, envFile);
+    return !relative.startsWith("..") && !path.isAbsolute(relative);
 }
 
 /**
@@ -1739,7 +1756,8 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
             }
         }
         const usableTrigger = restartTrigger && fs.existsSync(restartTrigger) ? restartTrigger : null;
-        const watchArgs = devWatchArgs(projectRoot, runtimePaths, entryTarget, usableTrigger).map(quoteForShell);
+        const envFileForDev = envFile && envFileHiddenFromTsx(envFile, backendDir) ? envFile : null;
+        const watchArgs = devWatchArgs(projectRoot, runtimePaths, entryTarget, usableTrigger, envFileForDev ? null : envFile).map(quoteForShell);
         /** Restart the backend once, after dev has finished reacting to a collection save. */
         const restartBackend = (): void => {
             if (!usableTrigger) return; // tsx restarted on the save itself
@@ -1749,6 +1767,21 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
                 // Best effort: the next save tries again.
             }
         };
+        // A `backend/.env` is under tsx's own dotfile ignore, so dev watches it
+        // and restarts the backend through the trigger. The directory, not the
+        // file: an editor that saves by renaming replaces the file a watch on it
+        // would have followed.
+        if (envFileForDev && usableTrigger) {
+            let envDebounce: NodeJS.Timeout | null = null;
+            fs.watch(path.dirname(envFileForDev), (_event, filename) => {
+                if (filename !== path.basename(envFileForDev)) return;
+                if (envDebounce) clearTimeout(envDebounce);
+                envDebounce = setTimeout(() => {
+                    console.log(chalk.gray(`  ↻ ${path.relative(projectRoot, envFileForDev)} changed: restarting the backend.`));
+                    restartBackend();
+                }, 200);
+            });
+        }
         const generatedSchemaFile = path.resolve(projectRoot, runtimePaths.REBASE_DEV_SCHEMA);
         /** What tsx reacts to: a write, even of identical bytes, moves the mtime. */
         const generatedSchemaStamp = (): string | null => {
@@ -2192,5 +2225,9 @@ ${chalk.green.bold("Description")}
   On startup and on every save under config/collections, the Drizzle
   schema (backend/src/schema.generated.ts) and the SDK types
   (generated/sdk) are regenerated from the collections.
+
+  An edit to .env restarts the backend, which reads the file again. What
+  this command sets for it is kept until ${chalk.cyan("rebase dev")} restarts: ${chalk.gray("PORT")}, and
+  ${chalk.gray("DATABASE_URL")} on the managed or the Docker database.
 `);
 }

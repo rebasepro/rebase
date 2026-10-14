@@ -58,6 +58,12 @@ Starts both frontend and backend with hot reloading, and regenerates the Drizzle
 Both ports are derived from the project's path so several Rebase projects can run
 side by side. Use the URLs `rebase dev` prints. Pin one with `rebase dev --port 3001`.
 
+<span class="since-badge" data-since="0.25">Since 0.25</span> An edit to `.env`
+restarts the backend, which reads the file again, as the admin panel does. What
+`rebase dev` sets itself is kept until you restart it: `PORT`, and
+`DATABASE_URL` when it is on the managed database or on Docker. On 0.24 an `.env`
+edit reached the backend only when some other watched file changed.
+
 ### `rebase build`
 
 Build the project into a deployable bundle in `dist-bundle/`:
