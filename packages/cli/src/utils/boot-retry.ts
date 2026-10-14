@@ -22,9 +22,13 @@ const BOOT_FAILED = /Failed to start the Rebase runtime/;
  * the server ended the connection (57P01 `pg_terminate_backend`, 57P02, 57P03
  * a server starting or stopping), or the database is closed to new
  * connections (55000, what a forced branch create does while it copies).
+ * A connection the server ended while it sat idle is reported by `pg` on the
+ * next query, in its own words and with no code: "Client has encountered a
+ * connection error and is not queryable".
  */
 const PASSING_CAUSES: readonly RegExp[] = [
     /terminating connection due to administrator command/i,
+    /Client has encountered a connection error and is not queryable/i,
     /\(57P0[123]\)/,
     /is not currently accepting connections/i,
     /the database system is (?:starting up|shutting down|in recovery mode)/i

@@ -29,7 +29,9 @@ describe("BootRetry", () => {
         "  caused by: database \"rebase\" is not currently accepting connections (55000)",
         "  caused by: the database system is starting up (57P03)",
         "  caused by: the database system is shutting down",
-        "  caused by: terminating connection due to administrator command (57P01)"
+        "  caused by: terminating connection due to administrator command (57P01)",
+        // `pg`'s own words for a client whose idle connection the server ended.
+        "  caused by: Client has encountered a connection error and is not queryable"
     ])("reads the cause from a line after the headline: %s", (cause) => {
         const retry = new BootRetry();
 
