@@ -222,6 +222,55 @@ export interface ResolvedDataSourceConfig {
 }
 
 /**
+ * One server-transport data source resolved to its connection, from its own
+ * variables (`DATABASE_URL__<KEY>`, or the bare names for the default) and
+ * nobody else's. What {@link resolveDataSources} does for each source of a
+ * project, and what the database resolver judges one declared source by, so a
+ * source with its own string is not refused for the default's.
+ */
+export function resolveDataSourceConnection(env: EnvBag, definition: DataSourceDefinition): ResolvedDataSourceConfig {
+    const suffixes = envSuffixFormsForKey(definition.key, DEFAULT_DATA_SOURCE_KEY);
+    // Named in errors: the spelling the CLI and the control plane write.
+    const suffix = suffixes[0];
+    const connectionString = readVar(env, "DATABASE_URL", suffixes);
+
+    if (!connectionString) {
+        throw new BundleError(
+            `Data source "${definition.key}" has no connection string — ` +
+            `set ${`DATABASE_URL${suffix}`}.`,
+            "Every declared server-transport data source needs its own connection; " +
+            "collections routed to it would otherwise silently use the default database."
+        );
+    }
+
+    const engine = definition.engine || "postgres";
+    const driverPackage =
+        readVar(env, "REBASE_DRIVER", suffixes) ||
+        ENGINE_DRIVERS[engine.toLowerCase()];
+
+    if (!driverPackage) {
+        throw new BundleError(
+            `No driver package is known for engine "${engine}" (data source "${definition.key}") — ` +
+            `set ${`REBASE_DRIVER${suffix}`} to the npm package implementing it.`
+        );
+    }
+
+    const poolConfig = resolvePoolConfig(env, suffixes);
+
+    return {
+        key: definition.key,
+        engine,
+        driverPackage,
+        connectionString,
+        adminConnectionString: readVar(env, "ADMIN_CONNECTION_STRING", suffixes),
+        readConnectionString: readVar(env, "DATABASE_READ_URL", suffixes),
+        directConnectionString: readVar(env, "DATABASE_DIRECT_URL", suffixes),
+        isDefault: definition.key === DEFAULT_DATA_SOURCE_KEY,
+        poolConfig
+    };
+}
+
+/**
  * Resolve every server-transport data source to a connection.
  *
  * `direct` and `custom` transports are skipped: the client talks to those
@@ -247,49 +296,7 @@ export function resolveDataSources(
         : [{ key: DEFAULT_DATA_SOURCE_KEY,
 engine: "postgres" }, ...serverSide];
 
-    const resolved: ResolvedDataSourceConfig[] = [];
-
-    for (const definition of effective) {
-        const suffixes = envSuffixFormsForKey(definition.key, DEFAULT_DATA_SOURCE_KEY);
-        // Named in errors: the spelling the CLI and the control plane write.
-        const suffix = suffixes[0];
-        const connectionString = readVar(env, "DATABASE_URL", suffixes);
-
-        if (!connectionString) {
-            throw new BundleError(
-                `Data source "${definition.key}" has no connection string — ` +
-                `set ${`DATABASE_URL${suffix}`}.`,
-                "Every declared server-transport data source needs its own connection; " +
-                "collections routed to it would otherwise silently use the default database."
-            );
-        }
-
-        const engine = definition.engine || "postgres";
-        const driverPackage =
-            readVar(env, "REBASE_DRIVER", suffixes) ||
-            ENGINE_DRIVERS[engine.toLowerCase()];
-
-        if (!driverPackage) {
-            throw new BundleError(
-                `No driver package is known for engine "${engine}" (data source "${definition.key}") — ` +
-                `set ${`REBASE_DRIVER${suffix}`} to the npm package implementing it.`
-            );
-        }
-
-        const poolConfig = resolvePoolConfig(env, suffixes);
-
-        resolved.push({
-            key: definition.key,
-            engine,
-            driverPackage,
-            connectionString,
-            adminConnectionString: readVar(env, "ADMIN_CONNECTION_STRING", suffixes),
-            readConnectionString: readVar(env, "DATABASE_READ_URL", suffixes),
-            directConnectionString: readVar(env, "DATABASE_DIRECT_URL", suffixes),
-            isDefault: definition.key === DEFAULT_DATA_SOURCE_KEY,
-            poolConfig
-        });
-    }
+    const resolved = effective.map(definition => resolveDataSourceConnection(env, definition));
 
     if (!resolved.some(r => r.isDefault)) {
         // A default declared as `direct` still fails here, and must: the driver

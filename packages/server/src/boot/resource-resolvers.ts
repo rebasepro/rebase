@@ -37,7 +37,7 @@ import { BundleError } from "./bundle.js";
 import { storageBucketVariable } from "../storage/source-variables.js";
 import {
     ACCOUNT_SCOPED_STORAGE_BASES,
-    resolveDataSources,
+    resolveDataSourceConnection,
     resolveStorageBackend,
     type EnvBag
 } from "./sources.js";
@@ -147,7 +147,10 @@ const databaseResolver: ResourceResolver = {
             return { state: "code", detail: "reached by a provider SDK; the backend binds nothing for it" };
         }
         try {
-            resolveDataSources(env, [resourceToDataSource(declaration)]);
+            // This source alone, by its own variables: the whole-project
+            // resolver adds the implicit default to a set that declares none,
+            // and would refuse a bound source for the default's missing string.
+            resolveDataSourceConnection(env, resourceToDataSource(declaration));
             return { state: "ready" };
         } catch (err) {
             // The resolver's own message, which names the variable to set,
