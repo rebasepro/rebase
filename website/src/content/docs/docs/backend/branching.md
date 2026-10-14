@@ -203,6 +203,13 @@ rebase db branch delete dev_sandbox
 stay in `.env` alone — and every `rebase` command in that checkout then resolves
 the branch's database instead: `dev`, `db push`, `db migrate`, `db backup`.
 
+<span class="since-badge" data-since="0.25">Since 0.25</span> `rebase db branch
+list` marks the branch this checkout is on, and `prune` never removes it, as
+`delete` refuses to: the plan lists it as kept, and says to leave it with
+`rebase db branch switch --off` first. On 0.24 `prune --older-than … --yes`
+dropped it, and the checkout then pointed every command at a database that no
+longer existed.
+
 It sits between the shell and the project file in the resolution order:
 
 1. `--database-url` on the command line

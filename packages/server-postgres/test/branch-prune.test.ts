@@ -106,6 +106,46 @@ describe("planPrune", () => {
     });
 });
 
+/**
+ * `prune --older-than 0d --yes` dropped the branch the checkout was switched
+ * to — which `delete` refuses — and every later command then pointed at a
+ * database that no longer existed, with nothing saying `switch --off`.
+ */
+describe("the branch this checkout is switched to", () => {
+    it("is never expired, and is named as kept", () => {
+        const plan = planPrune({
+            rows: [row("mine", 30), row("old", 30)],
+            databases: ["rb_mine", "rb_old"],
+            branchPrefix: "rb_"
+        }, { olderThanDays: 0, now: NOW, activeDatabase: "rb_mine" });
+
+        expect(plan.expired.map(e => e.branch.name)).toEqual(["old"]);
+        expect(plan.active).toEqual({ name: "mine", database: "rb_mine" });
+    });
+
+    it("is never dropped as an orphan either", () => {
+        const plan = planPrune({ rows: [], databases: ["rb_mine"], branchPrefix: "rb_" },
+            { activeDatabase: "rb_mine", now: NOW });
+
+        expect(plan.orphanDatabases).toEqual([]);
+        expect(plan.active).toEqual({ name: "rb_mine", database: "rb_mine" });
+    });
+
+    it("is not mentioned when prune would not have touched it", () => {
+        const plan = planPrune({ rows: [row("mine", 1)], databases: ["rb_mine"], branchPrefix: "rb_" },
+            { olderThanDays: 7, now: NOW, activeDatabase: "rb_mine" });
+
+        expect(plan.active).toBeNull();
+    });
+
+    it("does not make a plan that keeps only it look like work", () => {
+        const plan = planPrune({ rows: [row("mine", 30)], databases: ["rb_mine"], branchPrefix: "rb_" },
+            { olderThanDays: 0, now: NOW, activeDatabase: "rb_mine" });
+
+        expect(planIsEmpty(plan, true)).toBe(true);
+    });
+});
+
 describe("planIsEmpty", () => {
     const empty = { staleRows: [], orphanDatabases: [], expired: [], devDiff: ["x_dev_diff"] };
 

@@ -773,6 +773,7 @@ export async function dbCommand(subcommand: string | undefined, rawArgs: string[
     if (subcommand === "branch") {
         const action = commandWords(rawArgs, "db")[2];
         if (action === "delete") await refuseDeletingActiveBranch(projectRoot, rawArgs);
+        if (action === "prune" || action === "list") await tellDriverTheActiveBranch(projectRoot);
         if (action && REGISTRY_ACTIONS.has(action)) driverArgs = await onParentDatabase(projectRoot, rawArgs, action);
     }
 
@@ -1332,6 +1333,31 @@ async function refuseDeletingActiveBranch(projectRoot: string, rawArgs: readonly
     console.error(`  ${chalk.cyan(del)}${" ".repeat(column - del.length)}then this works`);
     console.error("");
     process.exit(1);
+}
+
+/**
+ * The variable that tells the driver which database this checkout is switched
+ * to. Spelled the same in `packages/server-postgres/src/branch-prune.ts`.
+ */
+const ACTIVE_BRANCH_DATABASE_ENV = "REBASE_ACTIVE_BRANCH_DATABASE";
+
+/**
+ * Tell the driver which branch this checkout is on, for the two actions that
+ * answer differently for it.
+ *
+ * - `prune` keeps it, as `delete` refuses it. `prune --older-than 0d --yes`
+ *   dropped it, and the checkout then pointed every command at a database
+ *   that no longer existed, with no word of `switch --off`.
+ * - `list` marks it, where every branch had the same bullet.
+ *
+ * The pointer is the CLI's and the driver is a child process, so it is told
+ * the database in its environment.
+ */
+async function tellDriverTheActiveBranch(projectRoot: string): Promise<void> {
+    const { readActiveBranch } = await import("../dev-db/branch-pointer");
+    const active = readActiveBranch(projectRoot);
+    if (active) process.env[ACTIVE_BRANCH_DATABASE_ENV] = active.database;
+    else delete process.env[ACTIVE_BRANCH_DATABASE_ENV];
 }
 
 /** The `branch` actions that read or write the registry — every one but `switch`. */

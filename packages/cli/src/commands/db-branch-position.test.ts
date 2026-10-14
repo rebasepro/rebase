@@ -104,6 +104,14 @@ function driverLine(): string[] {
     return call ? (call[1] as string[]) : [];
 }
 
+/** The environment the driver was spawned with, or `{}` when it was not. */
+function driverEnv(): Record<string, unknown> {
+    const options: unknown = execaSpy.mock.calls.at(-1)?.[2];
+    const env = typeof options === "object" && options !== null && "env" in options ? options.env : undefined;
+
+    return typeof env === "object" && env !== null ? Object.fromEntries(Object.entries(env)) : {};
+}
+
 beforeEach(() => {
     vi.clearAllMocks();
     exits.length = 0;
@@ -231,6 +239,26 @@ describe("the other branch actions from a branch", () => {
 
         expect(driverLine().filter(a => a === "--from")).toHaveLength(1);
         expect(driverLine()).toContain("shop");
+    });
+
+    // `prune --older-than 0d --yes` dropped the branch the checkout was on,
+    // which `delete` refuses: the driver plans the prune, and is told which
+    // database to keep out of it.
+    it("`prune` tells the driver the database this checkout is on, so it keeps it", async () => {
+        await dbCommand("branch", argv("db", "branch", "prune", "--older-than", "0d", "--yes")).catch(() => undefined);
+
+        expect(driverEnv().REBASE_ACTIVE_BRANCH_DATABASE).toBe("rb_feature_x");
+
+        active = null;
+        await dbCommand("branch", argv("db", "branch", "prune", "--older-than", "0d", "--yes")).catch(() => undefined);
+        expect(driverEnv().REBASE_ACTIVE_BRANCH_DATABASE).toBeUndefined();
+    });
+
+    // Every branch had the same bullet in `list`, the current one included.
+    it("`list` tells the driver the database this checkout is on, so it marks it", async () => {
+        await dbCommand("branch", argv("db", "branch", "list")).catch(() => undefined);
+
+        expect(driverEnv().REBASE_ACTIVE_BRANCH_DATABASE).toBe("rb_feature_x");
     });
 
     it("adds nothing when the checkout is not on a branch", async () => {

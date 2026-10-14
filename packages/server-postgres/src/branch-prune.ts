@@ -46,7 +46,21 @@ export interface PrunePlan {
     expired: { branch: BranchRow; ageDays: number }[];
     /** Atlas scratch databases. Reported; removed only when asked. */
     devDiff: string[];
+    /**
+     * The branch the checkout is switched to, when prune would otherwise have
+     * removed it: kept, as `delete` refuses it, and named so the plan says
+     * why. `null` when prune would not have touched it.
+     */
+    active: { name: string; database: string } | null;
 }
+
+/**
+ * The variable the CLI hands the driver the database its checkout is switched
+ * to in. The pointer is the CLI's (`dev-db/branch-pointer.ts`); the driver is
+ * a child process that cannot read it. Spelled the same in
+ * `packages/cli/src/commands/db.ts`.
+ */
+export const ACTIVE_BRANCH_DATABASE_ENV = "REBASE_ACTIVE_BRANCH_DATABASE";
 
 /** True when nothing at all needs doing. */
 export function planIsEmpty(plan: PrunePlan, includeDevDiff: boolean): boolean {
@@ -91,16 +105,28 @@ export function planPrune(
         databases: readonly string[];
         branchPrefix: string;
     },
-    options: { olderThanDays?: number | null; now?: Date } = {}
+    options: {
+        olderThanDays?: number | null;
+        now?: Date;
+        /** The database the checkout is switched to, which prune never drops. */
+        activeDatabase?: string | null;
+    } = {}
 ): PrunePlan {
     const now = options.now ?? new Date();
     const present = new Set(input.databases);
     const registered = new Set(input.rows.map((row) => row.dbName));
+    const isActive = (database: string): boolean => options.activeDatabase != null && database === options.activeDatabase;
+    let active: PrunePlan["active"] = null;
 
     const staleRows = input.rows.filter((row) => !present.has(row.dbName));
 
     const orphanDatabases = input.databases
         .filter((name) => name.startsWith(input.branchPrefix) && !registered.has(name))
+        .filter((name) => {
+            if (!isActive(name)) return true;
+            active = { name, database: name };
+            return false;
+        })
         .sort();
 
     const expired = options.olderThanDays == null
@@ -112,9 +138,14 @@ export function planPrune(
             .filter((row) => present.has(row.dbName))
             .map((branch) => ({ branch, ageDays: ageInDays(branch.createdAt, now) }))
             .filter((entry) => entry.ageDays >= options.olderThanDays!)
+            .filter((entry) => {
+                if (!isActive(entry.branch.dbName)) return true;
+                active = { name: entry.branch.name, database: entry.branch.dbName };
+                return false;
+            })
             .sort((a, b) => b.ageDays - a.ageDays);
 
     const devDiff = input.databases.filter((name) => name.endsWith("_dev_diff")).sort();
 
-    return { staleRows, orphanDatabases, expired, devDiff };
+    return { staleRows, orphanDatabases, expired, devDiff, active };
 }

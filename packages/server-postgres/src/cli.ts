@@ -81,7 +81,7 @@ import { backupActionOf } from "./backup-argv";
 import type { TableLockResult } from "./schema/ensure-collection-policies";
 import type { DeferredIndexBuild } from "./schema/plan/diff-plan";
 
-import { planIsEmpty, planPrune, parseOlderThan } from "./branch-prune";
+import { ACTIVE_BRANCH_DATABASE_ENV, planIsEmpty, planPrune, parseOlderThan } from "./branch-prune";
 
 const __cliDirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -1559,12 +1559,15 @@ max: 3 });
                 } else {
                     out(chalk.bold(`  🌿 ${branches.length} branch(es):`));
                     out("");
+                    // The one this checkout is switched to, as the CLI says.
+                    const current = process.env[ACTIVE_BRANCH_DATABASE_ENV]?.trim();
                     for (const b of branches) {
                         const size = b.sizeBytes != null
                             ? chalk.gray(` (${formatBytes(b.sizeBytes)})`)
                             : "";
                         const age = chalk.gray(` — created ${timeAgo(b.createdAt)}`);
-                        out(`  ${chalk.green("●")} ${chalk.bold(b.name)}${size}${age}`);
+                        const here = current && b.database === current ? chalk.cyan(" (current — this checkout is on it)") : "";
+                        out(`  ${chalk.green("●")} ${chalk.bold(b.name)}${here}${size}${age}`);
                         out(chalk.gray(`    from ${b.parentDatabase}`));
                     }
                 }
@@ -1632,10 +1635,20 @@ max: 3 });
 
                 const includeDevDiff = parsed["--include-dev-diff"] === true;
                 const { rows, databases } = await branchService.pruneCandidates();
-                const plan = planPrune({ rows, databases, branchPrefix: "rb_" }, { olderThanDays });
+                const plan = planPrune({ rows, databases, branchPrefix: "rb_" }, {
+                    olderThanDays,
+                    activeDatabase: process.env[ACTIVE_BRANCH_DATABASE_ENV]?.trim() || null
+                });
+                // Kept as `delete` keeps it, and said, whichever way the plan goes.
+                const keptActive = (): void => {
+                    if (!plan.active) return;
+                    out(`  ${chalk.gray("○")} ${chalk.bold(plan.active.name)} ${chalk.gray("— this checkout is switched to it, so it is kept")}`);
+                    out(chalk.gray(`    To prune it, leave it first: ${chalk.cyan("rebase db branch switch --off")}`));
+                };
 
                 out("");
                 if (planIsEmpty(plan, includeDevDiff)) {
+                    keptActive();
                     out(chalk.gray("  Nothing to prune."));
                     if (!olderThanDays && rows.length > 0) {
                         out(chalk.gray(`  ${rows.length} branch(es) are healthy — --older-than 14 also removes old ones.`));
@@ -1659,6 +1672,7 @@ max: 3 });
                 for (const { branch, ageDays } of plan.expired) {
                     out(`  ${chalk.red("●")} ${chalk.bold(branch.name)} ${chalk.gray(`— ${ageDays} days old; branch and database will be dropped`)}`);
                 }
+                keptActive();
                 if (includeDevDiff) {
                     for (const dbName of plan.devDiff) {
                         out(`  ${chalk.red("●")} ${chalk.bold(dbName)} ${chalk.gray("— Atlas scratch database; will be dropped")}`);
