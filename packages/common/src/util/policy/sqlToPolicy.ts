@@ -126,6 +126,22 @@ function scalarSubqueryBody(s: string): string | null {
     return STARTS_WITH_SELECT.test(inner) ? inner.slice("select".length).trim() : null;
 }
 
+/**
+ * The names in a role array's body — `'admin', 'editor'`, each with or without
+ * Postgres's `::text` — or `null` when an element is anything else. A quote
+ * or a comma inside a name is not split into roles that were never there: the
+ * clause stays raw and round-trips verbatim.
+ */
+function roleArrayElements(list: string): string[] | null {
+    const roles: string[] = [];
+    for (const element of list.split(",")) {
+        const match = /^'([^',]*)'(?:::text)?$/.exec(element.trim());
+        if (!match) return null;
+        roles.push(match[1]);
+    }
+    return roles;
+}
+
 /** Whether any part of `expr` fell through to `raw`. */
 function containsRaw(expr: PolicyExpression): boolean {
     switch (expr.kind) {
@@ -171,20 +187,17 @@ export function sqlToPolicy(sql: string): PolicyExpression {
     if (trimmed.toLowerCase() === "true") return policy.true();
     if (trimmed.toLowerCase() === "false") return policy.false();
 
-    // Handle roles overlap (&&)
-    // Matches: string_to_array(rebase.roles(), ',') && ARRAY['admin', 'editor']
-    const overlapMatch = trimmed.match(/^string_to_array\s*\(\s*rebase\.roles\(\)\s*,\s*','\s*\)\s*&&\s*ARRAY\s*\[(.+)\]$/i);
-    if (overlapMatch) {
-        const roles = overlapMatch[1].split(",").map(s => s.trim().replace(/^'|'$/g, ""));
-        return policy.rolesOverlap(roles);
-    }
-
-    // Handle roles containment (@>)
-    // Matches: string_to_array(rebase.roles(), ',') @> ARRAY['admin']
-    const containMatch = trimmed.match(/^string_to_array\s*\(\s*rebase\.roles\(\)\s*,\s*','\s*\)\s*@>\s*ARRAY\s*\[(.+)\]$/i);
-    if (containMatch) {
-        const roles = containMatch[1].split(",").map(s => s.trim().replace(/^'|'$/g, ""));
-        return policy.rolesContain(roles);
+    // Handle roles overlap (&&) and containment (@>), as the compiler writes
+    // them and as Postgres stores them:
+    //   string_to_array(rebase.roles(), ',') && ARRAY['admin', 'editor']
+    //   string_to_array(rebase.roles(), ','::text) && ARRAY['admin'::text, 'editor'::text]
+    // The second is what `pg_policies` holds, so what `schema introspect`
+    // writes as a rule's `using`. Read as raw, a junction could not inherit
+    // the rule, and its derived edge-write policies were left with none.
+    const rolesMatch = trimmed.match(/^string_to_array\s*\(\s*rebase\.roles\(\)\s*,\s*','(?:::text)?\s*\)\s*(&&|@>)\s*ARRAY\s*\[(.+)\]$/i);
+    const roles = rolesMatch ? roleArrayElements(rolesMatch[2]) : null;
+    if (rolesMatch && roles) {
+        return rolesMatch[1] === "&&" ? policy.rolesOverlap(roles) : policy.rolesContain(roles);
     }
 
     // OR binds looser than AND, so it splits first.

@@ -99,6 +99,16 @@ rebase schema introspect
   is written `rebase.roles()`. Connected as a role named `rebase`, the default
   path put that schema first and the rule came back as `roles()`, which the
   push could not find
+- Keeps a many-to-many
+  junction's policies. A junction's `<junction>_default_edge_write_*` policies
+  are derived from the update rules of the collection that declares the
+  relation, and a junction can inherit only a rule it can read. A role rule
+  comes back as the SQL Postgres stores for it,
+  `string_to_array(rebase.roles(), ','::text) && ARRAY['admin'::text]`, and
+  that reads as the role rule again, so the push derives the same policies.
+  On 0.25.0 it read as raw SQL: the dry run
+  listed the three policies as ones no collection describes, the push left them
+  in force, and a later change to the rule no longer reached them
 - Writes
   `disableDefaultPolicies: true` on a table that has row-level security on and
   does not hold the whole [admin baseline](/docs/collections/security-rules/#policies-a-collection-gets-without-writing-them),

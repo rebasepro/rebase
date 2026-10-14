@@ -396,6 +396,36 @@ describe("sqlToPolicy — reading the initPlan spelling back", () => {
         expect(sqlToPolicy("(owner_id = ( SELECT rebase.uid() AS uid))")).toEqual(owner);
     });
 
+    // What `pg_policies` holds for a compiled role rule: Postgres writes the
+    // literals' casts back in. `schema introspect` writes it as the rule's
+    // `using`, and a junction can only inherit an update rule it understands —
+    // read as raw, every `<junction>_default_edge_write_*` policy was left in
+    // force with no rule behind it.
+    it("reads a role check as Postgres stores it, casts and all", () => {
+        expect(sqlToPolicy("( SELECT (string_to_array(rebase.roles(), ','::text) && ARRAY['admin'::text]))"))
+            .toEqual(policy.rolesOverlap(["admin"]));
+        expect(sqlToPolicy("( SELECT (string_to_array(rebase.roles(), ','::text) && ARRAY['admin'::text, 'editor'::text]))"))
+            .toEqual(policy.rolesOverlap(["admin", "editor"]));
+        expect(sqlToPolicy("(string_to_array(rebase.roles(), ','::text) @> ARRAY['admin'::text])"))
+            .toEqual(policy.rolesContain(["admin"]));
+        expect(sqlToPolicy("(owner_id = ( SELECT rebase.uid() AS uid)) AND (string_to_array(rebase.roles(), ','::text) && ARRAY['editor'::text])"))
+            .toEqual(policy.and(
+                policy.compare(policy.field("owner_id"), "eq", policy.authUid()),
+                policy.rolesOverlap(["editor"])
+            ));
+    });
+
+    it("keeps a role array it cannot read element by element as raw", () => {
+        // A quote or a comma inside a role name: splitting on "," would invent roles.
+        for (const sql of [
+            "string_to_array(rebase.roles(), ','::text) && ARRAY['a,b'::text]",
+            "string_to_array(rebase.roles(), ','::text) && ARRAY['o''brien'::text]",
+            "string_to_array(rebase.roles(), ','::text) && ARRAY[lower('x'::text)]"
+        ]) {
+            expect(sqlToPolicy(sql)).toEqual(policy.raw(sql));
+        }
+    });
+
     it("keeps a subquery it does not fully understand as raw, parens and all", () => {
         // Stripped of its parens this is `SELECT …`, which is not an
         // expression: `USING (SELECT …)` does not parse.

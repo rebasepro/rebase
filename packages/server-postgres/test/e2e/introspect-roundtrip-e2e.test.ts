@@ -245,7 +245,7 @@ describe("introspect, then push: adopting a database changes nothing", () => {
         expect(introspected.exitCode, introspected.all).toBe(0);
         const planned = await cli(adopted.backend, database,
             ["db", "push", "--dry-run", "--collections", adopted.collections]);
-        return { introspected, planned };
+        return { introspected, planned, adopted };
     }
 
     it("a database Rebase built plans no changes after a round trip", async () => {
@@ -258,7 +258,7 @@ describe("introspect, then push: adopting a database changes nothing", () => {
         const pushed = await cli(made.backend, "built", ["db", "push", "--collections", made.collections]);
         expect(pushed.exitCode, pushed.all).toBe(0);
 
-        const { introspected, planned } = await introspectAndPlan("built");
+        const { introspected, planned, adopted } = await introspectAndPlan("built");
         expect(introspected.all).not.toMatch(/will not round-trip/);
         expect(planned.exitCode, planned.all).toBe(0);
         expect(planned.all).toMatch(/No changes: the database already matches these collections/);
@@ -269,6 +269,15 @@ describe("introspect, then push: adopting a database changes nothing", () => {
         expect(planned.all).not.toMatch(/Planned row-level security changes/);
         expect(planned.all).not.toMatch(/replace policy/);
         expect(planned.all).not.toMatch(/carry no stamp of Rebase's/);
+        // The junction's `categories_people_default_edge_write_*` policies are
+        // derived from categories' update rule. Read back as SQL that did not
+        // parse as a role check, the rule could not be carried into the
+        // junction, so its three policies were left in force as ones no
+        // collection describes — and would never follow the rule again.
+        expect(planned.all).not.toMatch(/no collection describes/);
+        const doctor = await cli(adopted.backend, "built", ["doctor", "--policies", "--collections", adopted.collections]);
+        expect(doctor.all).not.toMatch(/Orphaned/);
+        expect(doctor.all).not.toMatch(/categories_people_default_edge_write/);
     }, 300_000);
 
     it("a hand-written database of shapes a property can state plans no schema change", async () => {
