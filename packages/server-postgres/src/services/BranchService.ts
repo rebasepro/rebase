@@ -39,6 +39,18 @@ const MAINTENANCE_DATABASE = "postgres";
  */
 const REOPEN_ON_SIGNALS: readonly NodeJS.Signals[] = ["SIGHUP", "SIGINT", "SIGTERM", "SIGQUIT"];
 
+/**
+ * The class of the advisory lock a forced create holds on its source from the
+ * moment it closes it until it opens it again: `(COPY_LOCK_CLASS,
+ * hashtext(<source>))`, taken in the server's `postgres` database, where the
+ * self-heal looks. Without it, the self-heal every `rebase db branch` command
+ * runs could not tell a database a killed create left closed from one a live
+ * create had just closed, and opened that one in the settle before the copy
+ * starts; and a second forced create on the same source copied beside the
+ * first and opened it under it.
+ */
+const COPY_LOCK_CLASS = 0x52424331;
+
 /** `ALTER DATABASE … ALLOW_CONNECTIONS true`, the statement that opens a closed database again. */
 function reopenStatement(dbName: string): string {
     return `ALTER DATABASE "${dbName.replace(/"/g, '""')}" ALLOW_CONNECTIONS true`;
@@ -66,8 +78,9 @@ export interface ReopenedDatabases {
  *
  * Runs from the server's `postgres` database, since a closed database cannot
  * be connected to. A template is never touched (`template0` is closed by
- * design), nor a database a `CREATE DATABASE … TEMPLATE` is copying right now:
- * that is another forced create, which opens it itself.
+ * design), nor a database a live forced create holds closed: one whose
+ * {@link COPY_LOCK_CLASS} lock is held, or that a `CREATE DATABASE … TEMPLATE`
+ * is copying right now. That create opens it itself.
  *
  * Best-effort: a server it cannot reach, or a catalogue it cannot read, is an
  * empty answer, and the command's own connection check speaks next.
@@ -114,6 +127,12 @@ export async function reopenClosedDatabases(
             [names]
         );
         for (const { datname } of closed.rows) {
+            // Held while it opens it, so a forced create starting now waits.
+            const free = await client.query<{ locked: boolean }>(
+                "SELECT pg_try_advisory_lock($1, hashtext($2)) AS locked",
+                [COPY_LOCK_CLASS, datname]
+            );
+            if (free.rows[0]?.locked !== true) continue;
             const statement = reopenStatement(datname);
             try {
                 await client.query(statement);
@@ -124,6 +143,9 @@ export async function reopenClosedDatabases(
                     reason: extractPgError(err)?.message ?? extractCauseMessage(err) ?? String(err),
                     statement
                 });
+            } finally {
+                await client.query("SELECT pg_advisory_unlock($1, hashtext($2))", [COPY_LOCK_CLASS, datname])
+                    .catch(() => undefined);
             }
         }
     } catch {
@@ -603,8 +625,53 @@ export class BranchService {
      * the database again before the process exits; a second signal waits for
      * that rather than cutting it short. One it could not open is named, with
      * the statement that does. No handler is left installed after the copy.
+     *
+     * From before it reads whether the database is open until after it opens
+     * it, it holds the {@link COPY_LOCK_CLASS} lock, so the self-heal leaves
+     * the database to it and a second forced create on the same source waits
+     * for it. A process that dies holding it ends its session, which releases
+     * it. A server the lock cannot be taken on is copied without one.
      */
     private async whileClosedToNewConnections(dbName: string, operation: () => Promise<void>): Promise<void> {
+        const lock = dbName === MAINTENANCE_DATABASE ? null : await this.holdCopyLock(dbName);
+        try {
+            await this.closedToNewConnections(dbName, operation);
+        } finally {
+            await lock?.end().catch(() => undefined);
+        }
+    }
+
+    /**
+     * The {@link COPY_LOCK_CLASS} lock on `dbName`, on a client of its own, or
+     * null where it cannot be taken.
+     *
+     * Its own client, never one checked out of the maintenance pool: opening
+     * the database again ends that pool, and `pool.end()` waits for its
+     * checked-out clients, so the create would wait on itself.
+     */
+    private async holdCopyLock(dbName: string): Promise<Client | null> {
+        let client: Client;
+        try {
+            const { connectionString } = this.poolManager.getPool(MAINTENANCE_DATABASE).options;
+            if (!connectionString) return null;
+            client = new Client({ connectionString, connectionTimeoutMillis: 5000 });
+        } catch {
+            return null;
+        }
+        // A connection dropped while it waits must not take the command down with it.
+        client.on("error", () => undefined);
+        try {
+            await client.connect();
+            await client.query("SELECT pg_advisory_lock($1, hashtext($2))", [COPY_LOCK_CLASS, dbName]);
+            return client;
+        } catch {
+            await client.end().catch(() => undefined);
+            return null;
+        }
+    }
+
+    /** {@link whileClosedToNewConnections} past its lock. */
+    private async closedToNewConnections(dbName: string, operation: () => Promise<void>): Promise<void> {
         const safe = dbName.replace(/"/g, '""');
         const maintenance = dbName === MAINTENANCE_DATABASE ? null : this.poolManager.getDrizzle(MAINTENANCE_DATABASE);
         let closed = false;

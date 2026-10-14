@@ -33,7 +33,7 @@ import { execa } from "execa";
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
 import { runPluginCommand } from "../../src/cli.js";
 import { checkDatabaseConnectivity, diagnoseDbError } from "../../src/cli-errors.js";
-import { BranchService } from "../../src/services/BranchService.js";
+import { BranchService, reopenClosedDatabases } from "../../src/services/BranchService.js";
 import { DatabasePoolManager } from "../../src/databasePoolManager.js";
 import { resolveTsxLoader } from "../../src/tsx-loader.js";
 
@@ -329,6 +329,70 @@ describe("db branch with other clients connected, and from a switched checkout",
             expect(await allowsConnections(SOURCE)).toBe(true);
             const after = Object.fromEntries((["SIGHUP", "SIGINT", "SIGTERM", "SIGQUIT"] as const).map((s) => [s, process.listenerCount(s)]));
             expect(after).toEqual(before);
+        }, 120_000);
+
+        /**
+         * The lock a forced create holds on its source from close to reopen:
+         * `BranchService`'s `COPY_LOCK_CLASS`, keyed by the source's name, in
+         * the `postgres` database.
+         */
+        const COPY_LOCK = "SELECT pg_advisory_lock(1380074289, hashtext($1))";
+
+        /** A client in `postgres` holding the copy lock on `SOURCE`, as a live forced create does. */
+        async function holdingTheCopyLock(): Promise<pg.Client> {
+            const holder = new pg.Client({ connectionString: urlFor("postgres") });
+            await holder.connect();
+            await holder.query(COPY_LOCK, [SOURCE]);
+            return holder;
+        }
+
+        // The self-heal every branch command runs opened a source a live
+        // forced create had just closed, in the settle before its copy starts,
+        // and the copy then failed on the clients that came back.
+        it("the self-heal leaves a source a live forced create holds closed, and opens it once released", async () => {
+            const holder = await holdingTheCopyLock();
+            await admin.query(`ALTER DATABASE "${SOURCE}" ALLOW_CONNECTIONS false`);
+            try {
+                expect(await reopenClosedDatabases(urlFor(SOURCE))).toEqual({ reopened: [], failed: [] });
+                expect(await allowsConnections(SOURCE)).toBe(false);
+            } finally {
+                await holder.end();
+            }
+
+            expect(await reopenClosedDatabases(urlFor(SOURCE))).toEqual({ reopened: [SOURCE], failed: [] });
+            expect(await allowsConnections(SOURCE)).toBe(true);
+        }, 60_000);
+
+        // A second forced create on the same source found it closed by the
+        // first, copied beside it, and opened it under it.
+        it("a forced create waits for another to finish with the source before it closes it", async () => {
+            const holder = await holdingTheCopyLock();
+            const pool = new pg.Pool({ connectionString: container.connectionString, max: 3 });
+            const poolManager = new DatabasePoolManager(container.connectionString);
+            let created: Promise<void> | undefined;
+            try {
+                const service = new BranchService(drizzle(pool), poolManager);
+                await service.ensureBranchMetadataTable();
+                created = service.createBranch("waited", { source: SOURCE, force: true });
+                created.catch(() => undefined);
+                await new Promise((resolve) => setTimeout(resolve, 750));
+
+                expect(await allowsConnections(SOURCE)).toBe(true);
+                expect(await databases()).not.toContain("rb_waited");
+
+                await holder.end();
+                await created;
+            } finally {
+                await holder.end().catch(() => undefined);
+                await created?.catch(() => undefined);
+                await poolManager.shutdown();
+                await pool.end();
+            }
+
+            expect(await databases()).toContain("rb_waited");
+            expect(await allowsConnections(SOURCE)).toBe(true);
+            const locks = await admin.query("SELECT 1 FROM pg_locks WHERE locktype = 'advisory' AND classid = 1380074289");
+            expect(locks.rows).toHaveLength(0);
         }, 120_000);
 
         it("the connection banner names the command and the statement that open a closed database", async () => {

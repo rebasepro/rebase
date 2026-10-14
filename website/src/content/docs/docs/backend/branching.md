@@ -68,7 +68,10 @@ catch (closing the terminal, Ctrl-C, SIGTERM, SIGQUIT). Killed outright
 (SIGKILL), it leaves the source closed until the next `rebase db branch`
 command, any of them, which reopens it first and says so;
 `ALTER DATABASE "<db>" ALLOW_CONNECTIONS true`, run from the `postgres`
-database, does the same by hand. A client
+database, does the same by hand. While a forced create holds its source closed,
+it holds an advisory lock on it in the `postgres` database, so that reopening
+leaves a live copy's source alone, and a second forced create from the same
+source waits for the first to finish. A client
 that reconnects as soon as it is disconnected, as a running `rebase dev` does,
 then cannot slip back in before the copy starts. That needs the source's owner;
 without it, and on `delete`, `--force` disconnects the sessions up to three
