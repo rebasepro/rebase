@@ -1,5 +1,5 @@
 ---
-sourceHash: 7f0806d9b7f638db
+sourceHash: 0066572f94396839
 title: Nur Backend (Headless)
 sidebar_label: Nur Backend
 description: Betreiben Sie Rebase als headless Backend-as-a-Service über Ihrer eigenen PostgreSQL-Datenbank – eine REST-API, Authentifizierung, Storage und Echtzeitfunktionen, ohne Admin-Panel und ohne Collection-Dateien.
@@ -71,8 +71,9 @@ davor; eine Policy öffnet sie:
 
 ```sql
 ALTER TABLE your_table ENABLE ROW LEVEL SECURITY;
+-- rebase.uid() is text: the cast makes this work for a uuid or integer column too.
 CREATE POLICY your_table_owner ON your_table
-    FOR ALL USING (user_id = rebase.uid());
+    FOR ALL USING (user_id::text = rebase.uid());
 ```
 
 `rebase.uid()`, `rebase.roles()` und `rebase.jwt()` werden von Rebase
