@@ -1,5 +1,5 @@
 ---
-sourceHash: adcc6573a73a4294
+sourceHash: c782dc72c3c2aff6
 title: Sauvegardes et restauration
 sidebar_label: Sauvegardes
 description: Prenez, planifiez, listez et restaurez des sauvegardes de base de données avec pg_dump — ce que contient une sauvegarde, le fichier de rôles qui l'accompagne, et la seule chose qu'elle ne couvre pas, vos fichiers téléversés.
@@ -45,7 +45,7 @@ dans le même ordre : `--database-url`, `DATABASE_URL` dans le shell, la
 dans `.env`, Postgres sous Docker (`--docker`, ou le dernier `rebase dev --docker`),
 puis la base de données de développement gérée, que `restore` refuse.
 
-<span class="since-badge" data-since="0.25">Depuis 0.25</span> Un `--out` relatif,
+Un `--out` relatif,
 la valeur par défaut `./backups` et un chemin de dump passé à `rebase db restore`
 se résolvent tous par rapport au répertoire depuis lequel vous lancez `rebase`, normalement la racine
 du projet : `rebase db backup` et `rebase db backups list` se retrouvent donc au même endroit. Un
@@ -105,12 +105,12 @@ dump sans lui ne comporte aucun utilisateur, et ne peut pas du tout être restau
 une base de données vide : les tables qu'il contient ont des politiques qui appellent
 des fonctions qu'il ne contient pas.
 
-<span class="since-badge" data-since="0.25">Depuis 0.25</span> C'est pourquoi
+C'est pourquoi
 `rebase db backup` refuse un `--exclude-schema` qui correspond à `rebase`, selon les propres
 règles de motif de pg_dump (`reb*` et `*` compris), avant d'exécuter quoi que ce soit.
 En 0.24, il écrivait le dump et le validait, et seule la restauration échouait.
 
-<span class="since-badge" data-since="0.25">Depuis 0.25</span> Comme il contient
+Comme il contient
 chaque mot de passe et chaque hash de clé, un dump local et son `.globals.sql` sont créés
 lisibles par leur seul propriétaire (0600), avant que `pg_dump` n'y écrive ; les fichiers
 locaux d'une sauvegarde planifiée le sont aussi. En 0.24, ils sont en 0644.
@@ -249,7 +249,7 @@ rebase db restore <backup> [--target-db <name>] [--create-db] [--clean] [--yes]
 interactif, elle s'arrête et dit de passer `--yes`. `<backup>` est un `.dump` local ou une clé `s3://…` /
 `gs://…`, téléchargée au préalable.
 
-<span class="since-badge" data-since="0.25">Depuis 0.25</span> Dans une base de données
+Dans une base de données
 qui contient déjà ce que la sauvegarde crée, elle exige `--clean` : sans cette option,
 elle refuse avant que quoi que ce soit ne s'exécute, en nommant les schémas et les tables qui
 gênent, et dit de passer `--clean` ou de restaurer dans une nouvelle base de données avec
@@ -258,7 +258,7 @@ gênent, et dit de passer `--clean` ou de restaurer dans une nouvelle base de do
 développement gérée, qui ne peut pas recevoir les données COPY d'un dump ; restaurez plutôt
 dans un Postgres sous Docker avec `--docker`.
 
-<span class="since-badge" data-since="0.25">Depuis 0.25</span> Avec `--clean`,
+Avec `--clean`,
 la restauration remplace ce que contient la sauvegarde en une seule transaction. Elle supprime en
 entier chaque schéma que la sauvegarde crée (`rebase`, par exemple), et chaque table que la
 sauvegarde crée dans un schéma qu'elle ne crée pas (`public`), avec `CASCADE`, puis restaure le
@@ -361,7 +361,7 @@ le panneau indique que les sauvegardes ne sont pas configurées.
 
 ### Télécharger une sauvegarde
 
-<span class="since-badge" data-since="0.25">Depuis 0.25</span> Un navigateur ne peut pas placer d'en-tête `Authorization` sur un téléchargement ; Studio et le SDK
+Un navigateur ne peut pas placer d'en-tête `Authorization` sur un téléchargement ; Studio et le SDK
 demandent donc d'abord un lien. `POST /api/admin/backups/download-url` avec `{ "key": "…" }` (même portée
 d'administration et mêmes vérifications de clé que le téléchargement) répond
 `{ url, token, expiresIn }` : une URL dont le jeton tient lieu d'en-tête, pour cette seule sauvegarde à la

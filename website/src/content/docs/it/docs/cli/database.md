@@ -1,5 +1,5 @@
 ---
-sourceHash: 20ed1243d65e4ebe
+sourceHash: 7508b9aae8deef79
 title: Comandi del database
 sidebar_label: Comandi del database
 description: I comandi rebase db — push, generate e migrate, backup e ripristini, la copia di un database, la stringa di connessione, il database di sviluppo gestito e i branch.
@@ -96,13 +96,13 @@ rebase db restore ./backups/<file>.dump --yes
 `backup` esegue `pg_dump`; `restore` esegue `pg_restore` e, essendo distruttivo,
 chiede di digitare `yes` su un terminale, oppure accetta `--yes`; senza un terminale e
 senza `--yes` si rifiuta e dice di passarlo.
-<span class="since-badge" data-since="0.25">Da 0.25</span> In un database
+In un database
 che contiene già ciò che il backup crea, `restore` richiede `--clean`. Senza di esso,
 si rifiuta prima di applicare qualsiasi cosa, ruoli del cluster compresi, e nomina gli
 oggetti d'intralcio e i due modi per aggirarli: `--clean`, oppure
 `--create-db --target-db <new name>`. Su 0.24 applicava i ruoli e poi falliva con
 l'errore di pg_restore `schema "rebase" already exists`.
-<span class="since-badge" data-since="0.25">Da 0.25</span> Con `--clean`
+Con `--clean`
 il ripristino è un'unica transazione: elimina gli schemi del backup con tutto ciò che
 contengono, ripristina, e fa il commit solo quando l'intero ripristino è riuscito, quindi
 un errore lascia il database com'era. Prima di chiedere conferma, nomina ciò che elimina
@@ -110,7 +110,7 @@ e che il backup non contiene. Esegue `psql`, che viene fornito con `pg_restore`.
 Su 0.24 un ripristino `--clean` in un database con una tabella che mancava al backup,
 come la tabella delle revisioni di Atlas dopo `db migrate`, eliminava tutto e non
 ripristinava nulla.
-<span class="since-badge" data-since="0.25">Da 0.25</span> `restore` rifiuta
+`restore` rifiuta
 il database di sviluppo gestito: un backup porta le sue righe come dati COPY, che quel
 database non può ricevere, e su 0.24 il ripristino lo lasciava bloccato finché non
 veniva arrestato. Ripristina in Postgres in Docker (`rebase db restore <dump> --docker --clean --yes`),
@@ -118,12 +118,12 @@ poi `rebase db pull --from "$(rebase db url --docker)" --yes` lo copia nel datab
 gestito. Un backup del database gestito lo lascia com'era; su
 0.24 le impostazioni applicate da `pg_dump` restavano su di esso, e ogni richiesta API
 falliva fino a `rebase db stop`.
-<span class="since-badge" data-since="0.25">Da 0.25</span> I percorsi relativi, e il
+I percorsi relativi, e il
 valore predefinito `./backups`, si risolvono rispetto alla directory da cui esegui
 `rebase`, così le tre righe qui sopra si incontrano in un'unica directory; un'opzione che
 un comando non accetta viene rifiutata prima che venga eseguito qualcosa. Su 0.24 il
 valore predefinito è `backend/backups`, quindi elencalo con `--out ./backups`.
-<span class="since-badge" data-since="0.25">Da 0.25</span> Il dump e il suo file dei ruoli
+Il dump e il suo file dei ruoli
 sono leggibili solo da te (0600), e contro un database non in esecuzione `backup` e `restore`
 stampano il banner che stampa `db push`. Su 0.24 i dump sono 0644.
 La pianificazione, il file dei ruoli che viaggia con ogni dump e la procedura di ripristino sono in [Backup e ripristino](/docs/deployment/backups/).
@@ -137,13 +137,13 @@ rebase db pull --from postgres://…  [--anonymize]
 ```
 
 `--anonymize` sostituisce i campi personali durante l'importazione, consentendo di lavorare localmente su una copia della produzione senza trasferire dati reali dei clienti su un laptop. Associa le colonne per nome ed è
-best-effort. <span class="since-badge" data-since="0.25">Da 0.25</span>
+best-effort.
 Una colonna sotto un indice univoco riceve un valore distinto per ogni riga, e il passaggio
 è un'unica transazione: se fallisce, le tabelle che avrebbe riscritto vengono svuotate e
 nominate, e il comando termina con 1. Su 0.24 falliva su `token_hash` una volta che gli
 utenti avevano effettuato l'accesso due volte, lasciando dati reali.
 
-<span class="since-badge" data-since="0.25">Da 0.25</span> Un flag che `pull`
+Un flag che `pull`
 non accetta viene rifiutato prima che venga letto o copiato qualsiasi cosa, nominando
 quello che probabilmente si intendeva: `--anonymise` risponde "did you mean --anonymize?"
 e termina con 1. Su 0.24 un flag scritto male veniva ignorato, quindi `--anonymise`,
@@ -154,7 +154,7 @@ Dato che `pg_dump` rimuove i privilegi, la copia arriverebbe con i criteri RLS d
 
 La destinazione è sempre il database di sviluppo locale di questo progetto e non può essere modificata: il passaggio di `--database-url` viene rifiutato, evitando qualsiasi possibilità di eseguire un "pull verso la produzione". `--from` è l'unica direzione consentita.
 
-<span class="since-badge" data-since="0.25">Da 0.25</span> Un pull sostituisce
+Un pull sostituisce
 il contenuto del database locale: svuota prima ogni schema che copia, quindi una tabella
 che esiste solo in locale non sopravvive. Nel database di sviluppo gestito le righe
 viaggiano come istruzioni `INSERT`, che quel database accetta laddove `COPY` lo
@@ -171,10 +171,10 @@ psql "$(rebase db url)"
 ```
 
 Il database di sviluppo gestito è il caso principale che necessita di questo comando: `.env` lascia intenzionalmente `DATABASE_URL` commentato, e la porta è calcolata dal percorso del progetto, per cui nessun elemento su disco la definisce in modo esplicito.
-<span class="since-badge" data-since="0.25">Da 0.25</span> Mantiene quella porta tra un arresto e un avvio, a meno che qualcos'altro non l'abbia
+Mantiene quella porta tra un arresto e un avvio, a meno che qualcos'altro non l'abbia
 occupata; su 0.24 ogni avvio ne sceglieva una nuova. Quando imposti un tuo `DATABASE_URL`, viene stampato quello — l'ordine di risoluzione è lo stesso seguito da qualsiasi altro comando. Il comando avvia il database gestito qualora non sia già in esecuzione.
 
-<span class="since-badge" data-since="0.25">Da 0.25</span> Dopo
+Dopo
 `rebase dev --docker`, `db url` e gli altri comandi usano quel database Docker
 (e lo dicono su stderr) finché non viene eseguito un `rebase dev` senza il flag. La scelta
 è conservata in `.rebase/dev-database.json` e ha la precedenza dove l'ha `--docker`,
@@ -186,7 +186,7 @@ quindi, una volta tolta la stringa di connessione, i comandi seguono di nuovo Do
 0.24 ogni comando richiede il proprio `--docker`, e uno superato avvia comunque il
 container.
 
-<span class="since-badge" data-since="0.25">Da 0.25</span> `rebase init`
+`rebase init`
 assegna a ogni progetto la propria porta compose, tra 5433 e 5632 in base al percorso del
 progetto, e `--docker` controlla che ciò che risponde su di essa sia il container `db` di
 questo progetto. Quando la porta è occupata da un altro container o da un Postgres esterno
@@ -208,10 +208,10 @@ rebase db reset    # delete it and start over
 Appartiene al progetto, non al comando che l'ha avviato, quindi arrestare `rebase dev`
 lo lascia in esecuzione per gli altri comandi. Dopo 30 minuti senza nulla di connesso si
 arresta da solo, e il comando successivo che ne ha bisogno lo avvia di nuovo.
-<span class="since-badge" data-since="0.25">Da 0.25</span> `rebase dev` lo dice mentre si arresta, indicando come arrestare subito il database;
+`rebase dev` lo dice mentre si arresta, indicando come arrestare subito il database;
 su 0.24 non diceva nulla.
 
-<span class="since-badge" data-since="0.25">Da 0.25</span> `db stop` con un
+`db stop` con un
 `rebase dev` in esecuzione dice che il suo backend non può raggiungere il database finché
 non torna disponibile. Il comando successivo che ne ha bisogno, per esempio
 `rebase db url`, lo avvia sulla stessa porta, e il backend si riconnette senza riavvio.
@@ -234,14 +234,14 @@ rebase db branch prune [--older-than 14d] [--include-dev-diff]
 PostgreSQL non consente di copiare o eliminare un database a cui è connesso qualsiasi altro processo, e il caso più tipico di "qualsiasi altro processo" è la tua istanza di `rebase dev`. `create` e `delete` indicano cosa sta occupando il database; `--force` disconnette preventivamente tali sessioni.
 
 Ogni branch è una copia completa su disco, pertanto richiede una pulizia periodica. `prune` rimuove tre elementi: una voce il cui database è stato rimosso all'esterno di Rebase, un database di branch la cui voce non è mai stata salvata e — solo specificando `--older-than` — i branch più vecchi dell'età specificata. Salvo l'uso di `--yes`, richiede conferma prima di eliminare qualsiasi cosa.
-<span class="since-badge" data-since="0.25">Da 0.25</span> Senza un terminale su cui chiedere, come in CI, non rimuove nulla, dice di passare `--yes` e termina con 1; su 0.24 dice "Nothing was changed." e termina con 0.
+Senza un terminale su cui chiedere, come in CI, non rimuove nulla, dice di passare `--yes` e termina con 1; su 0.24 dice "Nothing was changed." e termina con 0.
 `list` e `info` si limitano a leggere: un database su cui non è stato creato alcun branch non ne ha, e
 non vi creano lo schema `rebase`. Su 0.24 creano il registro.
 
 `switch` registra il branch in `.rebase/branch.json` e non modifica mai `.env`. Ha la precedenza su `DATABASE_URL` presente in `.env` ma cede il passo a `--database-url` o a una variabile `DATABASE_URL` definita nella shell; pertanto, un flag passato da riga di comando ha sempre priorità rispetto a uno switch effettuato precedentemente. `delete` rifiuta il branch su cui ti trovi, poiché ogni comando del checkout, `delete` compreso, punta a esso: prima `switch --off`, poi eliminalo. L'intero flusso di lavoro è in [Database Branching](/docs/backend/branching/).
 
 :::note[Sul database di sviluppo gestito]
-<span class="since-badge" data-since="0.25">Da 0.25</span> `push`, `generate` e `migrate` funzionano qui come su qualsiasi database.
+`push`, `generate` e `migrate` funzionano qui come su qualsiasi database.
 `push` e `generate` pianificano le loro operazioni tramite Atlas, che richiede un secondo database vuoto con cui effettuare il confronto — e il PGlite gestito ne fornisce esattamente uno. Quindi
 sul database gestito ognuno di essi avvia un secondo PGlite temporaneo in memoria
 per Atlas, e lo ferma al termine del comando. È così che una colonna viene eliminata,

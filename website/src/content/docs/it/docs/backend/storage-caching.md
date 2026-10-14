@@ -1,5 +1,5 @@
 ---
-sourceHash: 714b241cabcf5ac5
+sourceHash: add7e5205bcbe73a
 title: Caching dello storage e CDN
 sidebar_label: Caching dello storage e CDN
 description: Come Rebase serve i file memorizzati in modo che browser e CDN possano metterli in cache — ETag e 304, Cache-Control in base a chi può leggere un oggetto, byte range per il seeking in audio e video, e cosa configurare su una CDN davanti.
@@ -53,7 +53,7 @@ player funzionante e uno non funzionante.
 - La riconvalida ha la priorità su un range: una richiesta contenente sia
   `If-None-Match` sia `Range` riceve un `304`.
 
-<span class="since-badge" data-since="0.25">Da 0.25</span> Vengono letti solo i byte richiesti — da disco nello storage locale, e con una
+Vengono letti solo i byte richiesti — da disco nello storage locale, e con una
 lettura a intervalli da S3 e GCS — e ogni oggetto viene inviato al client in
 streaming man mano che viene letto, anziché essere prima tenuto in memoria,
 quindi servire un video di grandi dimensioni costa al server la stessa memoria

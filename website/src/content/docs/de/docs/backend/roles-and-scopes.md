@@ -1,5 +1,5 @@
 ---
-sourceHash: cc000bf4cb3fb671
+sourceHash: e6d2447955c86775
 title: Rollen und Scopes
 sidebar_label: Rollen und Scopes
 description: "Was ein Aufrufer darf: die Datenebene, die jede Person hält, die Admin-Ebene, die Rollen gewähren, die Scopes, die eine App für sich selbst deklariert, und wie jedes Credential sie trägt."
@@ -216,7 +216,7 @@ für jedes andere Projekt. Er braucht außerdem `functions:invoke` oder
 `hasScope(c, scope, target)` und `getScopes(c)` beantworten dieselbe Frage innerhalb eines
 Handlers.
 
-<span class="since-badge" data-since="0.25">Seit 0.25</span> `requireScope`
+`requireScope`
 verweigert einen Scope, den niemand halten könnte. Ein Name, der kein Scope ist, oder ein
 falsch geschriebener integrierter wie `data:raed` wirft, sobald die Funktion lädt. Ein
 App-Scope, den das Backend nicht unter `auth.scopes` deklariert, beantwortet jeden

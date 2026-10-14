@@ -56,7 +56,7 @@ process lives, which is not a default anyone chose. It needs a driver that can
 run SQL — on one that cannot (MongoDB), the queue is unavailable and you are
 told at boot rather than at the first enqueue.
 
-<span class="since-badge" data-since="0.25">Since 0.25</span> An idle worker does not poll every two seconds. Each enqueue sends a
+An idle worker does not poll every two seconds. Each enqueue sends a
 `NOTIFY` on the `rebase_jobs` channel when it commits, and a worker holding a
 `LISTEN` on it claims at once — a job enqueued by another process (the `api`
 role, another replica) starts within milliseconds, and a delayed one when it
@@ -148,7 +148,7 @@ jobs: {
 The flip side: a handler awaiting a `fetch` that never answers holds its worker
 slot, and its claim, for as long as the process lives — five of them and the
 worker runs nothing else, while `/health` stays green.
-<span class="since-badge" data-since="0.25">Since 0.25</span> `timeoutMs`
+`timeoutMs`
 bounds one attempt. At the deadline the attempt fails — retried while attempts
 remain, like any throw — its slot is freed, and the handler's `signal` is
 aborted. Pass the signal on, so the work stops too; a handler that ignores it

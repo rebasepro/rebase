@@ -129,7 +129,7 @@ For a real deployment, prefer baking both into an image, which also pins exactly
 what runs:
 
 ```dockerfile
-FROM rebasepro/server:0.24.0
+FROM rebasepro/server:0.25.0
 COPY dist-bundle /bundle
 ```
 
@@ -201,7 +201,7 @@ container's filesystem and loses its files when the container is recreated.
 move it inside another bucket's directory, such as `/storage/uploads/media`,
 because the default bucket would then list, serve and delete its files.
 
-<span class="since-badge" data-since="0.25">Since 0.25</span> The image creates
+The image creates
 `/storage` for the unprivileged `node` user it runs as, which is why the volume
 goes there. A volume mounted where the image has no directory belongs to root,
 and every upload fails with `EACCES`. The compose file `rebase init` writes
@@ -245,7 +245,7 @@ containers works. Two things to get right everywhere:
 
 ```toml
 [build]
-  image = "rebasepro/server:0.24.0"
+  image = "rebasepro/server:0.25.0"
 
 [http_service]
   internal_port = 8080
@@ -390,7 +390,6 @@ broken down by API surface (data, auth, storage, functions) and collection, plus
 process gauges. Without a token the endpoint is readable by anyone who can reach
 the port, so set one unless it is on a private network.
 
-<span class="since-badge" data-since="0.25">Since 0.25</span>
 `rebase_db_pool_wait_ms` is a histogram of how long each query waited for a
 connection from the database pool, opening one included, labelled by data
 source key (`source="(default)"` in a project that declares no data sources). A
@@ -436,7 +435,7 @@ processes. See [Split processes](/docs/deployment/split-processes/).
 ## Upgrading
 
 ```yaml
-image: rebasepro/server:0.24.0
+image: rebasepro/server:0.25.0
 ```
 
 Restart. Your bundle is unchanged. Within a runtime contract major, a bundle that

@@ -1,5 +1,5 @@
 ---
-sourceHash: 13c5a740a1cf4bc3
+sourceHash: 6cb1ed423c284379
 title: Apps und Repositories
 sidebar_label: Apps & Repositories
 description: Ein Projekt besteht aus einem Backend und den Apps, die damit kommunizieren, welche jeweils in ihrem eigenen Repository liegen können.
@@ -145,7 +145,7 @@ Zwei Dinge kann die Ableitung nicht wissen, die das `rebase.json` eines Scaffold
 festlegt. Sie nennt die statische App `web`, wo ein Scaffold sie `admin` nennt, und
 sie kann die `cms`-Route der App nicht kennen. Der Name ändert sich nicht: Rebase
 Cloud hat `web` für jedes Projekt registriert, das ohne `rebase.json` deployt wurde.
-<span class="since-badge" data-since="0.25">Seit 0.25</span> `rebase apps init --force`
+`rebase apps init --force`
 behält die Namen, den `path` und das `cms` der Apps, die die Datei deklariert, die
 es ersetzt, und benennt eine App, die es nicht mehr findet, als entfernt. Unter 0.24
 schreibt es die reine Ableitung darüber.

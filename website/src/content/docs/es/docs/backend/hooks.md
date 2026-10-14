@@ -1,5 +1,5 @@
 ---
-sourceHash: 51f1c0cce1e10e0e
+sourceHash: b0d41379c997dc49
 title: Hooks globales del backend
 sidebar_label: Hooks globales
 description: Aplica callbacks de ciclo de vida transversales a cada colección a nivel de servidor usando CollectionCallbacks.
@@ -54,7 +54,7 @@ const instance = await initializeRebaseBackend({
 });
 ```
 
-<span class="since-badge" data-since="0.25">Desde 0.25</span> `callbacks` recibe
+`callbacks` recibe
 un solo conjunto. Para mantener separadas varias responsabilidades, escriba cada una como su propio conjunto y pase
 `composeCallbacks(tenantScope, auditTrail)`: se combinan exactamente como los niveles
 anteriores. Consulte

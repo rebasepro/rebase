@@ -1,5 +1,5 @@
 ---
-sourceHash: 75953facb59d9645
+sourceHash: ead814d8414e0434
 title: "Ricetta: Integrazione Webhook"
 sidebar_label: Webhooks
 description: Utilizza i callback delle entità per inviare webhook a servizi esterni quando i dati cambiano, senza tenere aperta la transazione della scrittura.
@@ -91,7 +91,7 @@ dopo un solo tentativo con la motivazione; tutto il resto viene ritentato come q
 
 `setCollectionCallbacks` **sostituisce** i callback che la collezione `orders`
 dichiara. Se ne dichiara alcuni, mantienili:
-<span class="since-badge" data-since="0.25">Da 0.25</span> passa
+passa
 `composeCallbacks(declared, { afterSave })`, con `composeCallbacks` da
 `@rebasepro/server` e `declared` i `callbacks` della collezione stessa. Vedi
 [Combinare Insiemi di Callback](/docs/collections/callbacks/#combining-callback-sets).
@@ -142,7 +142,7 @@ e il suo import di `@rebasepro/server` arriverebbero a ogni visitatore, e farebb
 
 Un crash o un deploy tra il commit e la consegna perde l'evento. Ogni webhook ha la propria
 coda, quindi un destinatario non raggiungibile ritarda solo le proprie consegne, mai quelle di un altro webhook.
-<span class="since-badge" data-since="0.25">Da 0.25</span> La coda di ciascun webhook contiene al massimo
+La coda di ciascun webhook contiene al massimo
 10.000 consegne in attesa; finché è piena, una nuova consegna viene rifiutata e segnalata a `onDelivery`
 con `success: false`, `statusCode: 0`, `attemptNumber: 0` e `responseBody: "queue full"`, e
 il log del server lo dice una volta. Chiama `await dispatcher.flush(10_000)` allo spegnimento: attende ciò che
@@ -212,7 +212,7 @@ Non passare mai a un `fetch` nudo un URL che proviene dal tuo database. Il dispa
 destinazioni loopback, link-local, private e schemi diversi da `http(s)` prima di connettersi, e si
 rifiuta di seguire i redirect, proprio perché un URL memorizzato è input controllato da un
 attaccante.
-<span class="since-badge" data-since="0.25">Da 0.25</span> Su Node giudica l'indirizzo a cui ogni
+Su Node giudica l'indirizzo a cui ogni
 connessione viene effettivamente fatta, all'interno della ricerca DNS della connessione stessa, così un nome il cui record
 cambia tra un controllo e la connessione non può eluderlo; il nome di un destinatario viene risolto
 una volta per connessione, non una volta per consegna.

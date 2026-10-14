@@ -40,7 +40,7 @@ Sets up the project structure with frontend, backend, and shared packages.
 | `-i, --install` | Install dependencies after scaffolding. Without it, init asks (default yes); under `--yes`, nothing is installed |
 | `--no-install` | Install nothing, and do not ask |
 | `-g, --git` | Initialize a repository and make the first commit. Without it, init asks (default yes); under `--yes`, no repository |
-| `--database-url <url>` | Use an existing database instead of the managed one. <span class="since-badge" data-since="0.25">Since 0.25</span> It must be a `postgres://` or `postgresql://` URL: anything else is refused before a file is written, and the interactive prompt asks again |
+| `--database-url <url>` | Use an existing database instead of the managed one. It must be a `postgres://` or `postgresql://` URL: anything else is refused before a file is written, and the interactive prompt asks again |
 | `--introspect` | Generate collections from that database. Implies `--template blank` and needs `--install` |
 | `--project <slug>` | Link the scaffold to a Rebase Cloud project |
 | `--setup-key <key>` | The one-time key authenticating that link |
@@ -59,13 +59,13 @@ Starts both frontend and backend with hot reloading, and regenerates the Drizzle
 Both ports are derived from the project's path so several Rebase projects can run
 side by side. Use the URLs `rebase dev` prints. Pin one with `rebase dev --port 3001`.
 
-<span class="since-badge" data-since="0.25">Since 0.25</span> An edit to `.env`
+An edit to `.env`
 restarts the backend, which reads the file again, as the admin panel does. What
 `rebase dev` sets itself is kept until you restart it: `PORT`, and
 `DATABASE_URL` when it is on the managed database or on Docker. On 0.24 an `.env`
 edit reached the backend only when some other watched file changed.
 
-<span class="since-badge" data-since="0.25">Since 0.25</span> With
+With
 `--database-url`, `rebase dev` first checks that something answers at that host
 and port. If nothing does, it says so, naming the flag, and exits `1` with
 nothing started; it also leaves the database `.env` names alone, never starting
@@ -96,7 +96,7 @@ Dependencies are vendored by default so a pod restart does not pay a 35–55 sec
 install. A tree that grows past 200 MB on disk is dropped instead, because the
 upload limit is 100 MB compressed — see the changelog for the reasoning.
 
-<span class="since-badge" data-since="0.25">Since 0.25</span> Every static app the
+Every static app the
 bundle carries gets a brotli (`.br`) and a gzip (`.gz`) copy beside each
 content-hashed asset of 1 KB or more — the files a browser caches for a year.
 The runtime sends the one the browser accepts, so those files cost no
@@ -120,7 +120,7 @@ Overrides in `pnpm-workspace.yaml` and `package.json` move too, but a `link:` or
 `--drop-local-overrides` removes it. `--dry-run` writes nothing, `--no-install`
 skips the install, and `--json` prints one document.
 
-<span class="since-badge" data-since="0.25">Since 0.25</span> A project on a
+A project on a
 prerelease, such as a canary, stays on its channel unless `latest` is newer. A
 dist-tag that would move a pin backwards is refused (`downgrade_refused` under
 `--json`) unless you pass `--allow-downgrade`; an exact `--to` is applied, and
@@ -144,7 +144,7 @@ for a production server. `rebase start --bundle ./dist-bundle` runs a bundle els
 
 `rebase start` starts no database, and the scaffold's `.env` has no
 `DATABASE_URL`, so a local run on the database `rebase dev` uses is
-`DATABASE_URL="$(rebase db url)" rebase start`. <span class="since-badge" data-since="0.25">Since 0.25</span>
+`DATABASE_URL="$(rebase db url)" rebase start`.
 Without one, it prints that line before booting; on 0.24 the runtime stops on
 "DATABASE_URL: is required".
 
@@ -176,7 +176,7 @@ Preview it with `rebase eject --dry-run`, which lists what would change and
 changes nothing. `--force` replaces an existing `backend/src/index.ts` or
 `env.ts`, keeping the current file as `<name>.bak`.
 
-<span class="since-badge" data-since="0.25">Since 0.25</span> The ejected server
+The ejected server
 keeps local uploads in the project's `uploads/`, run from source or compiled, as
 `rebase dev` does. It runs in `backend/`, so a relative `STORAGE_PATH` there is
 read from `backend/`. On 0.24 the compiled server uses `backend/dist/uploads`,
@@ -222,8 +222,6 @@ depth on [Schema Generation](/docs/cli/schema/).
 
 ### `rebase console`
 
-<span class="since-badge" data-since="0.25">Since 0.25</span>
-
 A Node REPL with the project's data open, or one snippet run with `-e`:
 
 ```bash
@@ -250,7 +248,7 @@ rebase apps config <app>     # the client configuration for one app
 whole `rebase.json`, and refuses to replace one that exists unless you pass
 `--force`.
 
-<span class="since-badge" data-since="0.25">Since 0.25</span> A name argument is
+A name argument is
 refused. `--force` keeps what inference cannot know from the file it replaces:
 each app's name, its `path` and its `cms` route. Everything else is inferred
 again, and a declared app it no longer finds is named as removed, so on a
@@ -259,7 +257,7 @@ app's build command uses the project's package manager. On 0.24 the name is
 ignored, and `--force` writes plain inference: the static app becomes `web`,
 built with `npm run build --workspace frontend`.
 
-<span class="since-badge" data-since="0.25">Since 0.25</span> For a
+For a
 checkout not linked to a Cloud project, `apps config` says it is not linked,
 whether or not `rebase dev` is running, and gives the backend's URL as
 `rebase dev` serves it. On 0.24 it prints `http://localhost:3001`.
@@ -298,7 +296,7 @@ A `○` is the state worth knowing about before a deploy rather than after:
 declared, not configured. A `✗` means the environment sets something *wrongly*,
 which refuses the boot rather than degrading.
 
-<span class="since-badge" data-since="0.25">Since 0.25</span> A
+A
 `rebase.resources.json` that no longer matches the declarations gets a `○` line.
 One that has not been written yet does not: `rebase build` writes it on every
 build, so a project that has never been built, such as a fresh scaffold, has
@@ -318,7 +316,7 @@ rebase resources --json     # machine-readable
 
 `rebase resources --check` is the flag a CI job uses to fail on a
 `rebase.resources.json` that no longer matches the config code.
-<span class="since-badge" data-since="0.25">Since 0.25</span> `--json` combines
+`--json` combines
 with it: on drift, `rebase resources --check --json` exits 1 with an error
 envelope (`resource_graph_missing` or `resource_graph_stale`), and on success
 the graph carries `check.status`. `--write --json` writes the file and reports
@@ -335,7 +333,7 @@ A backend also has a default database and a default storage source that nobody
 declares. Both are listed here, marked `implicit`, and neither is written to
 `rebase.resources.json` — the host supplies them, so recording them would ask
 for something to be provisioned that nobody asked for.
-<span class="since-badge" data-since="0.25">Since 0.25</span> Declaring a named
+Declaring a named
 one, such as `bucket("media")`, leaves the default where it is, so both are
 listed. Only declaring the default itself, or marking one bucket
 `default: true`, replaces it. On 0.24 the default storage source dropped out of
@@ -439,7 +437,7 @@ See [API keys](/docs/backend/api-keys/).
 
 ### `rebase storage`
 
-<span class="since-badge" data-since="0.25">Since 0.25</span> Whole-store
+Whole-store
 maintenance of stored files, through the running backend with
 `REBASE_SERVICE_KEY` from `.env`:
 
@@ -485,7 +483,7 @@ asks at the end, and the prompt defaults to no, so nothing is shared unless you
 answer yes. The answer is per machine (`~/.rebase/telemetry.json`): after a yes
 `init` never asks again, and after a no the next `init` asks again. Each
 checkout gets a random project id, kept in its gitignored
-`.rebase/telemetry-project.json`. <span class="since-badge" data-since="0.25">Since 0.25</span>
+`.rebase/telemetry-project.json`.
 On 0.24 the prompt defaults to yes, and the project id changes on every
 `rebase dev` restart.
 

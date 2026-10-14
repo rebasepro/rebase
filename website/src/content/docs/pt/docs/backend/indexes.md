@@ -1,5 +1,5 @@
 ---
-sourceHash: 3d8676ac5f8d58c7
+sourceHash: d74cc2ea4835551d
 title: Índices
 sidebar_label: Índices
 description: Declare índices comuns do Postgres em uma coleção — btree, GIN e BRIN, parciais, compostos, de cobertura e únicos — e por que um índice manual costumava desaparecer.
@@ -266,7 +266,7 @@ Ambos os produtores os emitem, o que é importante porque nem todo deployment ex
 
 ## Chaves estrangeiras são indexadas para você
 
-<span class="since-badge" data-since="0.25">Desde 0.25</span> O Postgres cria o
+O Postgres cria o
 índice para o qual uma chave estrangeira *aponta* — a chave primária do alvo — e nunca um
 na coluna que a *contém*. Toda leitura feita do outro lado de um vínculo filtra por essa
 coluna: um include `hasMany` ou `hasOne`, uma listagem aninhada como

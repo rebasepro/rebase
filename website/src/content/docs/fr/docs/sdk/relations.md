@@ -1,5 +1,5 @@
 ---
-sourceHash: 8aef72b75f28c106
+sourceHash: 2e602d0ed1bed6e5
 title: Interroger les relations
 sidebar_label: Relations
 description: "Incluez des entités liées dans une requête et lisez une collection enfant via son parent grâce aux accesseurs de relations du SDK."
@@ -81,14 +81,14 @@ const { data } = await client.data.posts.include({
 | `orderBy` | La même syntaxe de tri, y compris le [positionnement des valeurs NULL](/docs/sdk/querying#where-nulls-sort). En cas d'égalité, ou pour une `limit` sans `orderBy`, l'ordre suit la clé de la ligne liée, croissante. |
 | `fields` | Colonnes de la ligne *liée*. Sa clé est toujours conservée, afin que la ligne reste adressable. |
 | `include` | Relations de la ligne liée, à leur tour — c'est ainsi que l'arborescence s'imbrique. |
-| `count` | <span class="since-badge" data-since="0.25">Depuis 0.25</span> Renvoie aussi le nombre total de lignes liées, par parent, sous le `_count` de la ligne. Voir [Compter ce qu'une limite laisse de côté](#compter-ce-quune-limite-laisse-de-côté). |
+| `count` | Renvoie aussi le nombre total de lignes liées, par parent, sous le `_count` de la ligne. Voir [Compter ce qu'une limite laisse de côté](#compter-ce-quune-limite-laisse-de-côté). |
 
 `true` est le raccourci pour "charger dans son intégralité" : `{ author: true }` et
 `["author"]` correspondent à la même requête.
 
 ### Compter ce qu'une limite laisse de côté
 
-<span class="since-badge" data-since="0.25">Depuis 0.25</span> Un `limit` plafonne ce qui est envoyé, et `count: true` dit combien a été laissé de côté. C'est ce dont une
+Un `limit` plafonne ce qui est envoyé, et `count: true` dit combien a été laissé de côté. C'est ce dont une
 liste a besoin pour afficher quatre tags et un « +33 » :
 
 ```typescript

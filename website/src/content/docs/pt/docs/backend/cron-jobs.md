@@ -1,5 +1,5 @@
 ---
-sourceHash: e5474c2a6107ff70
+sourceHash: 008801863c78b3e5
 title: Cron Jobs
 sidebar_label: Cron Jobs
 description: Agende tarefas em segundo plano recorrentes com o sistema integrado de cron jobs do Rebase. Defina jobs como arquivos TypeScript, monitore-os no Studio e gerencie-os via REST API.
@@ -86,7 +86,7 @@ Isso é tudo. O Rebase irá:
 
 ### Cron jobs como valores
 
-<span class="since-badge" data-since="0.25">Desde 0.25</span> Na 0.24 os cron jobs vêm apenas de um diretório.
+Na 0.24 os cron jobs vêm apenas de um diretório.
 
 `crons` recebe os jobs como um record do ID do job para a definição, ao lado de `collections`. Um diretório é uma das formas de montá-lo: `loadCrons(dir)` lê um diretório exatamente nesse formato.
 
@@ -202,7 +202,7 @@ interface CronJobContext {
 
 Use `ctx.log()` para gerar saídas estruturadas. Essas linhas são capturadas no log de execução e ficam visíveis no Studio e por meio da REST API. Cada linha também é gravada no log do servidor no nível `info`, com um campo `cron` contendo o ID do job, então ela aparece em qualquer lugar que colete a saída do seu contêiner, inclusive nos logs de depuração do Rebase Cloud. Essa cópia é mascarada como as próprias linhas de log do servidor: os valores de chaves como `password` ou `apiKey`, e o SQL e os parâmetros de uma consulta que falhou, são substituídos. O log de execução armazena a linha sem esse mascaramento.
 
-<span class="since-badge" data-since="0.25">Desde 0.25</span> O log de execução guarda as primeiras 500 linhas de uma execução ou 64 KB delas, o que vier primeiro, e depois uma linha dizendo quantas houve além disso: `… 9500 more lines not kept — see the server log`. O log do servidor recebe todas as linhas. Um job que registra uma linha por item processado deve esperar que seu histórico mostre o início da execução.
+O log de execução guarda as primeiras 500 linhas de uma execução ou 64 KB delas, o que vier primeiro, e depois uma linha dizendo quantas houve além disso: `… 9500 more lines not kept — see the server log`. O log do servidor recebe todas as linhas. Um job que registra uma linha por item processado deve esperar que seu histórico mostre o início da execução.
 
 ### `ctx.signal` — interrompa o trabalho quando a execução parar
 
@@ -315,7 +315,7 @@ réplicas que agendam, nenhuma vê os slots que a outra reivindicou. Só quando
 o banco de dados não pode ser lido o card recorre aos contadores do próprio processo, com um
 aviso no log do servidor.
 
-<span class="since-badge" data-since="0.25">Desde 0.25</span> As contagens são de toda a vida; o histórico são os últimos 30 dias. A linha de cada execução em `rebase.cron_logs` é excluída 30 dias depois de iniciada, por uma varredura a cada hora, enquanto as contagens de execuções e de falhas continuam a contá-la. Uma execução ignorada conta como execução, como sempre contou: é uma linha do histórico.
+As contagens são de toda a vida; o histórico são os últimos 30 dias. A linha de cada execução em `rebase.cron_logs` é excluída 30 dias depois de iniciada, por uma varredura a cada hora, enquanto as contagens de execuções e de falhas continuam a contá-la. Uma execução ignorada conta como execução, como sempre contou: é uma linha do histórico.
 
 ## Validação de Agendamento e Análise AST
 
@@ -405,7 +405,7 @@ de usuário final `rebase_user` não tem nenhum privilégio sobre elas: um
 `cron_job_state` gravável permitiria que um usuário autenticado pausasse um job
 para todos, ou segurasse seu lease para que nada o execute.
 
-<span class="since-badge" data-since="0.25">Desde 0.25</span> A linha de uma execução e sua contagem são gravadas em uma única instrução: o insert em `cron_logs` e um upsert dos contadores do job em `cron_job_state`. Uma listagem lê uma linha de `cron_job_state` por job, por mais longo que seja o histórico, e o agendador também, ao preencher `totalRuns` e `totalFailures` na inicialização. As gravações de log não seguram a execução; se uma falhar, o agendador registra o erro e segue em frente, com a execução ainda no ring buffer em memória.
+A linha de uma execução e sua contagem são gravadas em uma única instrução: o insert em `cron_logs` e um upsert dos contadores do job em `cron_job_state`. Uma listagem lê uma linha de `cron_job_state` por job, por mais longo que seja o histórico, e o agendador também, ao preencher `totalRuns` e `totalFailures` na inicialização. As gravações de log não seguram a execução; se uma falhar, o agendador registra o erro e segue em frente, com a execução ainda no ring buffer em memória.
 
 A cada hora, e quando inicia, o agendador exclui as linhas do histórico com mais de 30 dias e conta as execuções ainda não contadas, ambos em lotes de 5.000 linhas. Um histórico gravado antes da 0.24 é contado pela primeira dessas varreduras, fora do caminho de inicialização. Até ela terminar, uma listagem soma aos contadores as execuções que ainda não contou, de modo que os números não mudam na atualização. O mesmo vale para uma execução que um servidor mais antigo registra durante um deploy gradual.
 
@@ -458,7 +458,7 @@ async handler({ log }) {
 
 O handler é executado na instância de implantação, onde essas variáveis de fato existem. Um import no nível raiz do mesmo módulo tornaria o grafo derivável apenas em uma máquina que por acaso possuísse um `.env` — além de carregar todas as dependências a cada inicialização que simplesmente registre o job.
 
-<span class="since-badge" data-since="0.25">Desde 0.25</span> Carregar um cron
+Carregar um cron
 não declara nada. Uma etapa de build sua que queira os crons no grafo diz isso
 com `declareCrons`:
 

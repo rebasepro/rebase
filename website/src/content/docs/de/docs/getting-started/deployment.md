@@ -1,5 +1,5 @@
 ---
-sourceHash: 72190d7e15d46c15
+sourceHash: 5584cf0dc01c6497
 title: Bereitstellung
 sidebar_label: Bereitstellung
 description: Stellen Sie Ihr Rebase-Projekt mit Docker, Cloud-Plattformen oder manuellen Setups in der Produktion bereit.
@@ -296,7 +296,7 @@ Betreiben Sie die Administration auf einem **Data Router** — `createBrowserRou
 Browsers) und fragt zuerst nach, über `useBlocker`, den nur ein Data Router
 bereitstellt.
 
-<span class="since-badge" data-since="0.25">Seit 0.25</span> Die Administration läuft auch
+Die Administration läuft auch
 unter einem einfachen `<BrowserRouter>`. Dort fällt der Schutz vor ungespeicherten Änderungen
 auf die eigene Verlassen-Abfrage des Browsers zurück, die einen Reload, das Schließen des
 Tabs oder die Eingabe einer URL abdeckt; die Navigation innerhalb der App geht ohne Nachfrage

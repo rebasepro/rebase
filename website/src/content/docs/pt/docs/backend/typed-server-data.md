@@ -1,5 +1,5 @@
 ---
-sourceHash: c098315f51933896
+sourceHash: b40368f94c74dfb6
 title: Dados tipados no servidor
 sidebar_label: Dados tipados no servidor
 description: "Registre o seu tipo Database gerado uma vez, e context.data, rebase.dataAsAdmin e o rebase que uma função ou um cron recebe passam a ser tipados a partir dele: linhas, filtros, ordenações, includes e entradas de escrita."
@@ -19,8 +19,6 @@ Até que você faça isso, elas permanecem sem tipos: qualquer coleção com qua
 `Record<string, unknown>`. Nada muda para um projeto que não registra nada.
 
 ## Registrar o `Database`
-
-<span class="since-badge" data-since="0.25">Desde 0.25</span>
 
 ```bash
 rebase generate-sdk --register

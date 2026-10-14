@@ -1,5 +1,5 @@
 ---
-sourceHash: b9b698ec32e400fc
+sourceHash: 7f736b930b419003
 title: Escritura a través de REST
 sidebar_label: Escritura a través de REST
 description: Claves de idempotencia, escrituras condicionales con ETag e If-Match, operaciones de campo, upserts sobre clave natural, return=minimal y lotes entre colecciones.
@@ -44,7 +44,7 @@ Se admite en `POST`, `PATCH`, `DELETE`, las tres rutas `/bulk` y `/_batch`. Las 
 
 `GET /api/data/:slug/:id` devuelve un `ETag`, y también lo hace el `GET` anidado de una sola fila. Envíelo de vuelta como `If-Match` en un `PATCH` o `DELETE` posterior y la escritura se rechazará con `412` si la fila ha cambiado en el ínterin.
 
-<span class="since-badge" data-since="0.25">Desde 0.25</span> Un `PATCH` correcto responde con el `ETag` de la versión que escribió,
+Un `PATCH` correcto responde con el `ETag` de la versión que escribió,
 de modo que la siguiente escritura condicional no necesita leer antes. La etiqueta
 viaja también en un `204` respondido por `Prefer: return=minimal`, y una respuesta
 reenviada para una `Idempotency-Key` lleva la misma etiqueta que la primera. Una
@@ -67,7 +67,7 @@ Sin esto, lectura-modificación-escritura funciona como «gana el último» sobr
 
 La etiqueta se deriva de una propiedad `date` con `autoValue: "on_update"` cuando la colección declara una — esa columna ya *es* una versión — y de un hash estable de la fila en caso contrario. `If-Match: *` solo afirma que la fila existe. No se escribe nada si la precondición falla.
 
-<span class="since-badge" data-since="0.25">Desde 0.25</span> El formulario de registro del panel de administración guarda con `If-Match`: un guardado hecho sobre una versión
+El formulario de registro del panel de administración guarda con `If-Match`: un guardado hecho sobre una versión
 que alguien ha reemplazado entretanto se rechaza, el formulario lo indica y la edición se queda
 en el formulario, reajustada sobre la nueva versión con los campos en conflicto marcados.
 
@@ -129,7 +129,7 @@ Una fila que ya existía conserva su marca de tiempo `on_create` y su creador `u
 
 #### No en la colección de usuarios
 
-<span class="since-badge" data-since="0.25">Since 0.25</span> La colección de usuarios (la que tiene `auth` activado) rechaza un upsert por cualquier vía — `?on_conflict=`, `/bulk` con `upsert: true`, una operación `upsert` de `_batch`, el `upsert()` del SDK y el socket en tiempo real — con un `400` (`INVALID_CONFLICT_TARGET`). Sus filas son los usuarios, y crear uno y modificarlo siguen reglas distintas: una creación cifra la contraseña con hash, normaliza el email, ejecuta `onCreateUser` y envía la invitación, y una actualización no puede degradar al último administrador. Un upsert solo sabe cuál de las dos es dentro de la escritura, demasiado tarde para aplicar ninguna. Cree los usuarios con un `POST` normal y modifíquelos con `PATCH`.
+La colección de usuarios (la que tiene `auth` activado) rechaza un upsert por cualquier vía — `?on_conflict=`, `/bulk` con `upsert: true`, una operación `upsert` de `_batch`, el `upsert()` del SDK y el socket en tiempo real — con un `400` (`INVALID_CONFLICT_TARGET`). Sus filas son los usuarios, y crear uno y modificarlo siguen reglas distintas: una creación cifra la contraseña con hash, normaliza el email, ejecuta `onCreateUser` y envía la invitación, y una actualización no puede degradar al último administrador. Un upsert solo sabe cuál de las dos es dentro de la escritura, demasiado tarde para aplicar ninguna. Cree los usuarios con un `POST` normal y modifíquelos con `PATCH`.
 
 ### `Prefer: return=minimal`
 

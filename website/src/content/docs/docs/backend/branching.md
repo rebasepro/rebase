@@ -60,7 +60,7 @@ Cannot create branch: the source database "leadgen" has active connections.
 `--force` terminates those sessions before templating, on `create` and `delete`
 alike. It never terminates the session running the command itself.
 
-<span class="since-badge" data-since="0.25">Since 0.25</span> `create --force`
+`create --force`
 also closes the source to new connections for the copy
 (`ALTER DATABASE … ALLOW_CONNECTIONS false`, run from the server's `postgres`
 database) and opens it again afterwards: on failure, and on any signal it can
@@ -222,7 +222,7 @@ the branch's database instead: `dev`, `db push`, `db migrate`, `db backup`.
 A `rebase dev` that is already running keeps the database it started on until
 you restart it, and `switch` says so.
 
-<span class="since-badge" data-since="0.25">Since 0.25</span> `rebase db branch
+`rebase db branch
 list` marks the branch this checkout is on, and `prune` never removes it, as
 `delete` refuses to: the plan lists it as kept, and says to leave it with
 `rebase db branch switch --off` first. On 0.24 `prune --older-than … --yes`
@@ -238,7 +238,7 @@ It sits between the shell and the project file in the resolution order:
 5. `--docker`, or the last `rebase dev` having run with it
 6. the managed development database
 
-<span class="since-badge" data-since="0.25">Since 0.25</span> Rung 5 follows the
+Rung 5 follows the
 last `rebase dev --docker`, so a branch command after it needs no `--docker` of
 its own, and a `--docker` that a rung above it outranks starts no container and
 says it was ignored. On 0.24 only the flag counts, and an outranked one still
@@ -251,7 +251,7 @@ command line is a more immediate instruction than a switch made yesterday.
 `.rebase/` is gitignored, so the branch you are on is a fact about your machine
 and never about the project.
 
-<span class="since-badge" data-since="0.25">Since 0.25</span> On a switched
+On a switched
 checkout, `rebase db branch create`, `list`, `info`, `delete` and `prune` work
 on the main database, where the registry is, and say so. `create` still copies
 the branch you are on unless you pass `--from`; it is recorded in the main

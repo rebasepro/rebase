@@ -1,5 +1,5 @@
 ---
-sourceHash: 3d8676ac5f8d58c7
+sourceHash: d74cc2ea4835551d
 title: Indici
 sidebar_label: Indici
 description: Dichiara normali indici Postgres su una collection — btree, GIN e BRIN, parziali, compositi, covering e univoci — e perché quelli scritti a mano tendevano a scomparire.
@@ -268,7 +268,7 @@ eseguono `db push`:
 
 ## Le chiavi esterne sono indicizzate per te
 
-<span class="since-badge" data-since="0.25">Da 0.25</span> Postgres crea
+Postgres crea
 l'indice a cui una chiave esterna *punta* — la chiave primaria della destinazione — e
 mai uno sulla colonna che la *contiene*. Ogni lettura dall'altro lato di un collegamento
 filtra su quella colonna: un include `hasMany` o `hasOne`, un elenco annidato come

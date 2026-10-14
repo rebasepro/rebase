@@ -1,5 +1,5 @@
 ---
-sourceHash: 85e444fd4d0f85a8
+sourceHash: b2aa1062d257415a
 title: Rebase no hace X
 sidebar_label: Extender el servidor
 description: La escalera de extensiones del lado del servidor — declaración, callback de colección, función personalizada, tus propias rutas, tu propio servidor, eject — con lo que cada uno puede y no puede alcanzar.
@@ -22,7 +22,7 @@ donde sea necesario.
 
 ## La escalera
 
-<span class="since-badge" data-since="0.25">Desde 0.25</span> El `createRebaseBackend`
+El `createRebaseBackend`
 del peldaño 5 es nuevo; en 0.24 ese peldaño es solo el driver.
 
 | # | Peldaño | Alcanza | **No** alcanza | Costo de estar aquí |
@@ -220,7 +220,6 @@ Rebase le proporciona a un controlador es algo que hizo un enrutador de Rebase.
 
 **Alcance:** el proceso.
 
-<span class="since-badge" data-since="0.25">Desde 0.25</span>
 `initializeRebaseBackend` es un atajo sobre unas pocas llamadas públicas, y este peldaño
 consiste en hacerlas tú mismo. `createRebaseBackend` construye el backend y no monta,
 no pone en marcha ni escucha nada. `backend.routes` contiene cada grupo de rutas como
@@ -310,7 +309,7 @@ async function topSellers(driver: DataDriver, since: string) {
 que no puede ejecutar SQL lo indique formalmente o que lance
 `admin.executeSql is not a function` en el punto de llamada.
 
-<span class="since-badge" data-since="0.25">Desde 0.25</span> `executeSql` devuelve
+`executeSql` devuelve
 todas las filas que lee. Para un SQL cuyo tamaño no controlas, pasa `maxResultBytes`:
 un resultado cuyas filas ocupen más bytes que eso se rechaza con un error cuyo
 `code` es `RESULT_TOO_LARGE`, nunca se devuelve en parte. El `EXECUTE_SQL` del socket

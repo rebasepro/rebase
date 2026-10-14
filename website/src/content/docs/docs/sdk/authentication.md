@@ -503,7 +503,7 @@ const client = createRebaseClient({
 
 ## Using your own auth provider
 
-<span class="since-badge" data-since="0.25">Since 0.25</span> On 0.24 a token
+On 0.24 a token
 getter authenticates HTTP requests only, and the realtime socket stays
 anonymous.
 

@@ -86,7 +86,7 @@ the trash, and reverting it to a version from before the delete restores it.
 
 ### What `previous_values` holds
 
-<span class="since-badge" data-since="0.25">Since 0.25</span> An update entry
+An update entry
 keeps, in `previous_values`, only the fields listed in `changed_fields`. Every
 other field held the same value before and after the change, so it is in
 `values` already; storing the whole row twice cost a one-field change to a
@@ -119,7 +119,7 @@ Retention is enforced in two places:
 - **After each write**, for the entity written: right after it is saved or
   deleted, the server prunes that entity's entries beyond the newest 200, or
   older than the retention period. It does not hold up the write.
-- <span class="since-badge" data-since="0.25">Since 0.25</span> **Once an hour**,
+- **Once an hour**,
   for every entity: entries older than the retention period are deleted
   whatever they belong to — including entities that are never written again,
   such as deleted ones. See [Pruning lifecycle](#pruning-lifecycle-mechanics).
@@ -188,7 +188,7 @@ records its history entry but prunes nothing, because a script cannot know the
 retention your server is configured with. The server prunes that entity on its
 next write to it, and in the hourly sweep below.
 
-<span class="since-badge" data-since="0.25">Since 0.25</span> Once an hour, the
+Once an hour, the
 backend also deletes every entry older than the retention period, of every
 entity. Before this, the history of an entity that was never written again —
 every deleted one — was not pruned at all. The sweep:

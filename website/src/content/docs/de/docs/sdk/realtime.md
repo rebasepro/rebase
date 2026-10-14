@@ -1,5 +1,5 @@
 ---
-sourceHash: 479be58faac5dc73
+sourceHash: 172ed813d51ccec3
 title: Realtime-Abonnements
 sidebar_label: Realtime
 description: Abonnieren Sie Live-Datenänderungen mit dem typisierten SDK von Rebase über WebSocket-basierte Realtime-Listener.
@@ -147,7 +147,7 @@ den verknüpften Zeilen zu folgen, beobachten Sie zusätzlich deren Collection.
 
 ## Eine Anzahl beobachten
 
-<span class="since-badge" data-since="0.25">Seit 0.25</span> `listenCount()` hält eine Anzahl aktuell: die Gesamtzahl dessen, was der Filter einer Liste trifft, für
+`listenCount()` hält eine Anzahl aktuell: die Gesamtzahl dessen, was der Filter einer Liste trifft, für
 eine Toolbar oder ein „Alle N auswählen“-Angebot, das nicht veralten soll, während andere Zeilen hinzufügen und entfernen.
 Der Callback läuft mit der Gesamtzahl, sobald sie bekannt ist, und erneut, wann immer ein Schreibvorgang sie ändert.
 
@@ -249,7 +249,7 @@ const unsubscribe = client.data.orders.listen(
 
 ### Welches Token der Socket sendet
 
-<span class="since-badge" data-since="0.25">Seit 0.25</span> Unter 0.24 verwendet der Socket
+Unter 0.24 verwendet der Socket
 nur die eigene Session des Clients und die Option `token`: Ein mit
 `client.setAuthTokenGetter()` installierter Getter erreicht ihn nie, sodass ein Host, der
 einen eigenen Auth-Provider verwendet, einen anonymen Socket bekommt.

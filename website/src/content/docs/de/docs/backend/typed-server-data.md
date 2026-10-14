@@ -1,5 +1,5 @@
 ---
-sourceHash: c098315f51933896
+sourceHash: b40368f94c74dfb6
 title: Typisierte serverseitige Daten
 sidebar_label: Typisierte serverseitige Daten
 description: "Registrieren Sie Ihren generierten Database-Typ einmal, und context.data, rebase.dataAsAdmin und das rebase, das eine Funktion oder ein Cron erhält, sind daraus typisiert: Zeilen, Filter, Sortierungen, Includes und Schreib-Eingaben."
@@ -19,8 +19,6 @@ Bis dahin bleiben sie untypisiert: jede Collection unter jedem Namen, Zeilen als
 `Record<string, unknown>`. Für ein Projekt, das nichts registriert, ändert sich nichts.
 
 ## Die `Database` registrieren
-
-<span class="since-badge" data-since="0.25">Seit 0.25</span>
 
 ```bash
 rebase generate-sdk --register

@@ -1,5 +1,5 @@
 ---
-sourceHash: e5474c2a6107ff70
+sourceHash: 008801863c78b3e5
 title: Tâches Cron
 sidebar_label: Tâches Cron
 description: Planifiez des tâches d'arrière-plan récurrentes grâce au système intégré de tâches cron de Rebase. Définissez des tâches sous forme de fichiers TypeScript, surveillez-les dans Studio et gérez-les via l'API REST.
@@ -88,7 +88,7 @@ C'est tout. Rebase va :
 
 ### Les tâches cron comme valeurs
 
-<span class="since-badge" data-since="0.25">Depuis 0.25</span> En 0.24, les tâches cron ne proviennent que d'un répertoire.
+En 0.24, les tâches cron ne proviennent que d'un répertoire.
 
 `crons` prend les tâches sous la forme d'un enregistrement (record) qui associe l'identifiant de chaque tâche à sa définition, à côté de `collections`. Un répertoire n'est qu'une façon de le construire : `loadCrons(dir)` en lit un et produit exactement cette forme.
 
@@ -205,7 +205,7 @@ interface CronJobContext {
 
 Utilisez `ctx.log()` pour émettre une sortie structurée. Ces lignes sont capturées dans le journal d'exécution et visibles dans Studio ainsi que via l'API REST. Chaque ligne est aussi écrite dans le journal du serveur au niveau `info`, avec un champ `cron` contenant l'ID du job : elle apparaît donc partout où la sortie de votre conteneur est collectée, y compris dans les journaux de débogage de Rebase Cloud. Cette copie est masquée comme les lignes de journal du serveur lui-même : les valeurs de clés comme `password` ou `apiKey`, ainsi que le SQL et les paramètres d'une requête en échec, sont remplacés. Le journal d'exécution conserve la ligne sans ce masquage.
 
-<span class="since-badge" data-since="0.25">Depuis 0.25</span> Le journal d'exécution conserve les 500 premières lignes d'une exécution ou 64 Ko d'entre elles, selon ce qui survient en premier, puis une ligne indiquant combien d'autres il y en avait : `… 9500 more lines not kept — see the server log`. Le journal du serveur reçoit toutes les lignes. Une tâche qui journalise une ligne par élément traité doit s'attendre à ce que son historique montre le début de l'exécution.
+Le journal d'exécution conserve les 500 premières lignes d'une exécution ou 64 Ko d'entre elles, selon ce qui survient en premier, puis une ligne indiquant combien d'autres il y en avait : `… 9500 more lines not kept — see the server log`. Le journal du serveur reçoit toutes les lignes. Une tâche qui journalise une ligne par élément traité doit s'attendre à ce que son historique montre le début de l'exécution.
 
 ### `ctx.signal` — interrompre le travail lorsque l'exécution s'arrête
 
@@ -330,7 +330,7 @@ Le panneau affiche la même chose quel que soit le processus qui le sert. Une
 tâche qu'un autre processus exécute apparaît comme en cours.
 Sur chaque processus qui dispose d'un magasin, le nombre d'exécutions, le nombre d'échecs et la dernière exécution sont lus dans la base de données, où sont comptées les exécutions de tous les processus. Les compteurs propres d'un processus ne contiennent que les exécutions qu'il a faites : le rôle `api` à côté d'un worker n'exécute rien, et de deux répliques qui planifient toutes deux, aucune ne voit les créneaux que l'autre a réservés. Ce n'est que lorsque la base de données ne peut pas être lue que la carte se rabat sur les compteurs propres de ce processus, avec un avertissement dans le journal du serveur.
 
-<span class="since-badge" data-since="0.25">Depuis 0.25</span> Les compteurs couvrent toute la durée de vie ; l'historique couvre les 30 derniers jours. La ligne de chaque exécution dans `rebase.cron_logs` est supprimée 30 jours après son début, par un balayage horaire, tandis que les compteurs d'exécutions et d'échecs continuent de la compter. Une exécution ignorée compte comme une exécution, comme toujours : c'est une ligne de l'historique.
+Les compteurs couvrent toute la durée de vie ; l'historique couvre les 30 derniers jours. La ligne de chaque exécution dans `rebase.cron_logs` est supprimée 30 jours après son début, par un balayage horaire, tandis que les compteurs d'exécutions et d'échecs continuent de la compter. Une exécution ignorée compte comme une exécution, comme toujours : c'est une ligne de l'historique.
 
 ## Validation des planifications et parsing AST
 
@@ -422,7 +422,7 @@ le rôle d'utilisateur final `rebase_user` n'a aucun privilège sur elles : un
 mettre une tâche en pause pour tout le monde, ou de retenir son bail pour que
 rien ne l'exécute.
 
-<span class="since-badge" data-since="0.25">Depuis 0.25</span> La ligne d'une exécution et son décompte sont écrits en une seule instruction : l'insertion dans `cron_logs` et un upsert des compteurs de la tâche dans `cron_job_state`. Une liste lit une ligne de `cron_job_state` par tâche, quelle que soit la longueur de l'historique, et le planificateur fait de même lorsqu'il initialise `totalRuns` et `totalFailures` au démarrage. Les écritures de journal ne retardent pas l'exécution ; si l'une échoue, le planificateur enregistre l'erreur et poursuit, l'exécution restant dans la mémoire tampon circulaire en mémoire.
+La ligne d'une exécution et son décompte sont écrits en une seule instruction : l'insertion dans `cron_logs` et un upsert des compteurs de la tâche dans `cron_job_state`. Une liste lit une ligne de `cron_job_state` par tâche, quelle que soit la longueur de l'historique, et le planificateur fait de même lorsqu'il initialise `totalRuns` et `totalFailures` au démarrage. Les écritures de journal ne retardent pas l'exécution ; si l'une échoue, le planificateur enregistre l'erreur et poursuit, l'exécution restant dans la mémoire tampon circulaire en mémoire.
 
 Une fois par heure, et au démarrage, le planificateur supprime les lignes d'historique de plus de 30 jours et compte toute exécution pas encore comptée, le tout par lots de 5 000 lignes. Un historique écrit avant la 0.24 est compté par le premier de ces balayages, hors du chemin de démarrage. Tant qu'il n'est pas terminé, une liste ajoute aux compteurs les exécutions pas encore comptées, de sorte que les chiffres ne changent pas à la mise à niveau. Il en va de même pour une exécution qu'un ancien serveur journalise pendant un déploiement progressif.
 
@@ -486,7 +486,7 @@ niveau de ce même module rend le graphe calculable uniquement sur une machine d
 par hasard d'un fichier `.env` — et cela charge l'intégralité de la dépendance à chaque démarrage qui
 se contente d'enregistrer la tâche.
 
-<span class="since-badge" data-since="0.25">Depuis 0.25</span> Charger un cron ne
+Charger un cron ne
 déclare rien. Une étape de build qui vous appartient et qui veut des crons dans le graphe
 le dit explicitement, avec `declareCrons` :
 

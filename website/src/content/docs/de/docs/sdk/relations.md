@@ -1,5 +1,5 @@
 ---
-sourceHash: 8aef72b75f28c106
+sourceHash: 2e602d0ed1bed6e5
 title: Relationen abfragen
 sidebar_label: Relationen
 description: "Binden Sie verknüpfte Entitäten in eine Abfrage ein und lesen Sie eine Child-Collection über ihr Parent mit den Relations-Accessors des SDKs."
@@ -75,13 +75,13 @@ const { data } = await client.data.posts.include({
 | `orderBy` | Dieselbe Sortiersyntax, einschließlich der [NULL-Platzierung](/docs/sdk/querying#where-nulls-sort). Gleichstände sowie ein `limit` ohne `orderBy` richten sich nach dem Schlüssel der verknüpften Zeile, aufsteigend. |
 | `fields` | Spalten der *verknüpften* Zeile. Ihr Schlüssel bleibt immer erhalten, sodass die Zeile adressierbar bleibt. |
 | `include` | Relationen der verknüpften Zeile wiederum – so wird der Baum verschachtelt. |
-| `count` | <span class="since-badge" data-since="0.25">Seit 0.25</span> Liefert zusätzlich, wie viele verknüpfte Zeilen es insgesamt gibt, pro Parent, unter dem `_count` der Zeile. Siehe [Zählen, was ein Limit auslässt](#zählen-was-ein-limit-auslässt). |
+| `count` | Liefert zusätzlich, wie viele verknüpfte Zeilen es insgesamt gibt, pro Parent, unter dem `_count` der Zeile. Siehe [Zählen, was ein Limit auslässt](#zählen-was-ein-limit-auslässt). |
 
 `true` ist die Kurzform für „vollständig laden“: `{ author: true }` und `["author"]` sind dieselbe Anfrage.
 
 ### Zählen, was ein Limit auslässt
 
-<span class="since-badge" data-since="0.25">Seit 0.25</span> Ein `limit` begrenzt,
+Ein `limit` begrenzt,
 was gesendet wird, und `count: true` sagt, wie viel ausgelassen wurde. Das braucht eine Liste,
 um vier Tags und ein „+33“ zu zeigen:
 

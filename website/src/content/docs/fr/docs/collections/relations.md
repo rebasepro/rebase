@@ -1,5 +1,5 @@
 ---
-sourceHash: a3e5fa2b319b73d8
+sourceHash: e3130fcc43e901ed
 title: Relations
 sidebar_label: Relations
 description: Définir les relations SQL un-à-un, un-à-plusieurs et plusieurs-à-plusieurs entre les collections avec des clés étrangères, des tables de jonction et des jointures multi-sauts.
@@ -92,7 +92,7 @@ author: {
 // → posts.author_id
 ```
 
-<span class="since-badge" data-since="0.25">Depuis 0.25</span> La colonne est indexée pour vous : Postgres indexe la clé vers laquelle pointe une clé étrangère, jamais la
+La colonne est indexée pour vous : Postgres indexe la clé vers laquelle pointe une clé étrangère, jamais la
 colonne qui la porte ; sans index, chaque include `hasMany` et chaque liste imbriquée depuis l'autre côté
 parcourt cette table. `index: false` conserve la contrainte et supprime l'index — voir
 [Les clés étrangères sont indexées pour vous](/docs/backend/indexes#foreign-keys-are-indexed-for-you)

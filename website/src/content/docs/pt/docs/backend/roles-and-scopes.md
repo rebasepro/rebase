@@ -1,5 +1,5 @@
 ---
-sourceHash: cc000bf4cb3fb671
+sourceHash: e6d2447955c86775
 title: Papéis e escopos
 sidebar_label: Papéis e escopos
 description: "O que um chamador pode fazer: o plano de dados que toda pessoa tem, o plano administrativo que os papéis concedem, os escopos que um app declara para si mesmo e como cada credencial os carrega."
@@ -215,7 +215,7 @@ para qualquer outro projeto. Ela também precisa de `functions:invoke`, ou de
 `hasScope(c, scope, target)` e `getScopes(c)` respondem à mesma pergunta dentro de um
 handler.
 
-<span class="since-badge" data-since="0.25">Desde 0.25</span> O `requireScope`
+O `requireScope`
 recusa um escopo que ninguém poderia ter. Um nome que não é um escopo, ou um
 escopo embutido com erro de digitação como `data:raed`, lança um erro quando a
 função é carregada. Um escopo de app que o backend não declara em `auth.scopes`

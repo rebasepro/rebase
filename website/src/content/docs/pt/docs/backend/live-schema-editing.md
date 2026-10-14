@@ -1,5 +1,5 @@
 ---
-sourceHash: 8bd32575d082fb6c
+sourceHash: 6cfa40d6d7fc1902
 title: Edição de schema ao vivo
 description: Crie e altere coleções em um backend em execução — comitadas primeiro no seu repositório, depois aplicadas.
 ---
@@ -197,7 +197,7 @@ Na 0.23 o commit também carrega `drizzle/schema.sql`, `drizzle/policies.sql` e
 A mensagem de commit descreve a alteração em vez de simplesmente anunciar uma, e
 é atribuída à pessoa que a realizou, pelo nome de exibição e pelo e-mail da conta
 (um usuário sem nenhum dos dois é registrado como `<uid>@users.noreply.rebase.pro`).
-<span class="since-badge" data-since="0.25">Desde 0.25</span> Na 0.24, os commits
+Na 0.24, os commits
 da autenticação integrada levam o uid como nome.
 
 Uma alteração de schema com autor e diff no histórico do seu projeto é algo que

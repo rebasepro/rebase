@@ -1,5 +1,5 @@
 ---
-sourceHash: 9fe6bb92d083cb36
+sourceHash: 83ba3db403bb8334
 title: Chaves de API
 sidebar_label: Chaves de API
 description: "Chaves de longa duração para scripts, CI, agentes e integrações: chaves de serviço e chaves pessoais, os escopos que elas têm, como se combinam com a segurança em nível de linha (RLS) e as rotas que as gerenciam."
@@ -302,7 +302,7 @@ Cada chave é verificada contra quem a cria, da mesma forma nas duas rotas:
 
 | Recusa | Quando |
 |---|---|
-| `400 INVALID_SCOPES` | Um escopo está malformado, é desconhecido ou carrega um alvo que não aceita. `details.validScopes` lista os escopos que uma chave pode ter. <span class="since-badge" data-since="0.25">Desde 0.25</span> Ela deixa de fora `keys:*`, que nenhuma chave pode ter; na 0.24 ela os lista |
+| `400 INVALID_SCOPES` | Um escopo está malformado, é desconhecido ou carrega um alvo que não aceita. `details.validScopes` lista os escopos que uma chave pode ter. Ela deixa de fora `keys:*`, que nenhuma chave pode ter; na 0.24 ela os lista |
 | `400 UNKNOWN_SCOPE_TARGET` | Um alvo nomeia uma coleção, fonte de storage ou função que este backend não serve |
 | `400 KEY_MANAGEMENT_SCOPE` | Foi pedido `keys:read` ou `keys:write` |
 | `403 SCOPE_EXCEEDS_CREATOR` | Um escopo que o criador não tem. Uma chave nunca tem mais do que a conta que a criou |

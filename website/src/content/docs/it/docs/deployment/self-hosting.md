@@ -1,5 +1,5 @@
 ---
-sourceHash: d33249c4f6560ffc
+sourceHash: e66387578eabf2dd
 title: Self-Hosting
 sidebar_label: Self-Hosting
 description: Esegui Rebase ovunque con l'immagine di runtime ufficiale e il bundle del tuo progetto — Docker Compose, Fly, Railway o un semplice VPS.
@@ -82,7 +82,7 @@ Poiché sono già presenti, puoi montare il bundle in sola lettura — una prati
 Per un ambiente di produzione reale, è preferibile incorporare entrambi in un'immagine, bloccando con precisione ciò che viene eseguito:
 
 ```dockerfile
-FROM rebasepro/server:0.24.0
+FROM rebasepro/server:0.25.0
 COPY dist-bundle /bundle
 ```
 
@@ -125,7 +125,7 @@ Per il disco locale, appropriato solo quando il percorso corrisponde a un volume
 
 Monta il volume **sopra** `STORAGE_PATH`, non direttamente su di esso. `STORAGE_PATH` è la directory del bucket predefinito, e ogni bucket dichiarato in `config/resources.ts` ne riceve una propria affiancata, `<STORAGE_PATH>__<key>`. Un volume montato esattamente su `STORAGE_PATH` conterrà solo il bucket predefinito. Tutti gli altri bucket scriveranno sul filesystem del container e perderanno i propri file alla ricreazione dello stesso. `STORAGE_PATH__MEDIA` può spostare un singolo bucket altrove nel volume. Non può tuttavia spostarlo all'interno della directory di un altro bucket (come `/storage/uploads/media`), poiché il bucket predefinito ne elencherebbe, servirebbe ed eliminerebbe i file.
 
-<span class="since-badge" data-since="0.25">Dalla 0.25</span> L'immagine crea `/storage` per l'utente non privilegiato `node` con cui viene eseguita, motivo per cui il volume va posizionato lì. Un volume montato dove l'immagine non possiede alcuna directory appartiene a root, e ogni caricamento fallirà con `EACCES`. Il file compose generato da `rebase init` lo monta in questo modo.
+L'immagine crea `/storage` per l'utente non privilegiato `node` con cui viene eseguita, motivo per cui il volume va posizionato lì. Un volume montato dove l'immagine non possiede alcuna directory appartiene a root, e ogni caricamento fallirà con `EACCES`. Il file compose generato da `rebase init` lo monta in questo modo.
 
 ### Lo storage necessita di un modello di controllo degli accessi
 
@@ -150,7 +150,7 @@ Il runtime è un normale container in ascolto su `$PORT`, quindi qualsiasi servi
 
 ```toml
 [build]
-  image = "rebasepro/server:0.24.0"
+  image = "rebasepro/server:0.25.0"
 
 [http_service]
   internal_port = 8080
@@ -249,7 +249,6 @@ REBASE_METRICS_TOKEN=<random string>
 
 Espone metriche Prometheus su `/metrics`: conteggio delle richieste e istogrammi di latenza suddivisi per superficie API (data, auth, storage, functions) e collection, oltre a misurazioni del processo. Senza un token l'endpoint è accessibile a chiunque possa raggiungere la porta, pertanto impostane uno a meno che l'istanza non si trovi su una rete privata.
 
-<span class="since-badge" data-since="0.25">Dalla 0.25</span>
 `rebase_db_pool_wait_ms` è un istogramma del tempo di attesa di ciascuna query per ottenere una connessione dal pool del database (inclusa la sua apertura), etichettato per chiave della sorgente dati (`source="(default)"` nei progetti che non dichiarano sorgenti dati). Un pool in salute mantiene questo valore vicino allo zero. Una coda che cresce con il traffico indica richieste in attesa di connessioni — nella maggior parte dei casi trattenute da callback di scrittura in attesa di operazioni lente; vedi [A callback holds a connection](/docs/collections/context-data-api/#a-callback-holds-a-connection).
 
 ## Header di sicurezza
@@ -270,7 +269,7 @@ Tutto quanto descritto sopra prevede un unico container a servizio dell'intero p
 ## Aggiornamento
 
 ```yaml
-image: rebasepro/server:0.24.0
+image: rebasepro/server:0.25.0
 ```
 
 Riavvia. Il tuo bundle rimane invariato. All'interno della stessa major version del contratto di runtime, un bundle validato continuerà a funzionare — consulta [Compatibility](/docs/architecture/runtime-and-bundles/#compatibility).

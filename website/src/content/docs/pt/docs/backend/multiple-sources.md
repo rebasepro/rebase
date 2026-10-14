@@ -1,5 +1,5 @@
 ---
-sourceHash: cc03d759eb4057c2
+sourceHash: 7f10dbaa07451bc9
 title: Múltiplos Bancos de Dados e Buckets
 sidebar_label: Múltiplas Fontes
 description: Direcione coleções para diferentes bancos de dados e propriedades para diferentes buckets de armazenamento, e configure cada um a partir do ambiente.
@@ -227,8 +227,6 @@ O engine provém da declaração, portanto não há `STORAGE_TYPE` a ser configu
 
 #### Qual bucket recebe um upload não qualificado
 
-<span class="since-badge" data-since="0.25">Desde 0.25</span>
-
 Uma propriedade de armazenamento que não especifica nenhum `storageSource` grava no bucket **padrão**.
 Declarar buckets nomeados nunca o move. O padrão mantém a sua própria
 configuração, seja qual for o conteúdo de `config/resources.ts`: `STORAGE_TYPE`,
@@ -402,7 +400,7 @@ grava em `/storage/uploads__media`. Monte o volume no diretório pai,
 `STORAGE_PATH`. `STORAGE_PATH__MEDIA` define o diretório de um bucket
 específico explicitamente. Consulte [Auto-hospedagem](/docs/deployment/self-hosting/#file-storage).
 
-<span class="since-badge" data-since="0.25">Desde 0.25</span> Declarar buckets
+Declarar buckets
 não altera o bucket padrão. Com apenas `bucket("media")` declarado, o padrão
 ainda lê as suas próprias variáveis. Em desenvolvimento é `./uploads`. Em produção,
 sem vinculação, ele fica desativado como qualquer bucket sem vinculação: os uploads

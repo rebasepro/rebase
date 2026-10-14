@@ -327,7 +327,7 @@ changes also stops in-app navigation (a link in the drawer, the browser's back
 button) and asks first, through `useBlocker`, which only a data router
 provides.
 
-<span class="since-badge" data-since="0.25">Since 0.25</span> The admin also
+The admin also
 runs under a plain `<BrowserRouter>`. There the unsaved-changes guard falls
 back to the browser's own leave-page prompt, which covers a reload, closing the
 tab or typing a URL; navigating inside the app goes ahead without asking. On

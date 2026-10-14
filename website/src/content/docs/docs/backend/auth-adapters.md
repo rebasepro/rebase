@@ -198,7 +198,7 @@ const backend = await initializeRebaseBackend({
 
 #### The client half
 
-<span class="since-badge" data-since="0.25">Since 0.25</span> On 0.24 the getter
+On 0.24 the getter
 authenticates HTTP requests only, and the realtime socket stays anonymous.
 
 The adapter verifies the provider's token; the client has to send it. Give the

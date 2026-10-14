@@ -1,5 +1,5 @@
 ---
-sourceHash: cc03d759eb4057c2
+sourceHash: 7f10dbaa07451bc9
 title: Mehrere Datenbanken und Buckets
 sidebar_label: Mehrere Quellen
 description: Leiten Sie Collections an verschiedene Datenbanken und Properties an verschiedene Storage-Buckets weiter und konfigurieren Sie jedes einzelne über die Umgebung.
@@ -229,8 +229,6 @@ Die Engine stammt aus der Deklaration, daher muss kein `STORAGE_TYPE` festgelegt
 
 #### Welcher Bucket empfängt einen nicht näher spezifizierten Upload
 
-<span class="since-badge" data-since="0.25">Seit 0.25</span>
-
 Eine Storage-Property, die keine `storageSource` angibt, schreibt in den **Standard**-Bucket.
 Benannte Buckets zu deklarieren, verschiebt ihn nie. Der Standard behält seine eigene
 Konfiguration, was auch immer `config/resources.ts` deklariert: `STORAGE_TYPE`,
@@ -410,7 +408,7 @@ nach `/storage/uploads__media`. Mounten Sie das Volume auf deren übergeordnetem
 `STORAGE_PATH` selbst. `STORAGE_PATH__MEDIA` legt das Verzeichnis eines Buckets explizit fest.
 Siehe [Self-Hosting](/docs/deployment/self-hosting/#file-storage).
 
-<span class="since-badge" data-since="0.25">Seit 0.25</span> Buckets zu deklarieren ändert
+Buckets zu deklarieren ändert
 den Standard-Bucket nicht. Wenn nur `bucket("media")` deklariert ist, liest der Standard
 weiterhin seine eigenen Variablen. In der Entwicklung ist er `./uploads`. In der Produktion
 ist er ungebunden aus, wie jeder ungebundene Bucket: Uploads, die keine `storageSource`

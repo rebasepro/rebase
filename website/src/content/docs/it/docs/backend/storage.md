@@ -1,5 +1,5 @@
 ---
-sourceHash: 912fb4a5c0d6c740
+sourceHash: cc1736a186791d89
 title: Configurazione dello storage
 sidebar_label: Configurazione dello storage
 description: Configura backend di storage per filesystem locale, compatibili con S3 o GCS/Firebase Storage per il caricamento di file, immagini e contenuti multimediali.
@@ -104,7 +104,7 @@ image: {
 | `GET` | `/api/storage/file/*` | Recupera un file — tutto ciò che segue `/file/` è la chiave dell'oggetto |
 | `GET` | `/api/storage/file/*?storageId=<key>` | Recupera un file da uno specifico backend |
 | `GET` | `/api/storage/metadata/*` | Dimensioni, tipo di contenuto e metadati personalizzati di un oggetto, senza i relativi byte, più un token di download di breve durata quando è privato |
-| `POST` | `/api/storage/metadata` | <span class="since-badge" data-since="0.25">Da 0.25</span> Lo stesso per un massimo di 100 oggetti di una sorgente: body `{ keys, storageId? }` |
+| `POST` | `/api/storage/metadata` | Lo stesso per un massimo di 100 oggetti di una sorgente: body `{ keys, storageId? }` |
 | `DELETE` | `/api/storage/file/*` | Elimina un file |
 | `GET` | `/api/storage/list` | Elenca gli oggetti sotto un prefisso (`prefix`, `bucket`, `maxResults`, `pageToken`, `storageId`). Un `maxResults` inferiore a 1, o un `pageToken` mai emesso dalla sorgente, restituisce `400 INVALID_LIST_OPTIONS` |
 | `POST` | `/api/storage/folder` | Crea un marcatore di cartella vuota |
@@ -123,13 +123,13 @@ image: {
   "size": 48213, "updated": "2026-10-01T12:00:00.000Z", "contentType": "image/jpeg" } ], "prefixes": [] } }
 ```
 
-<span class="since-badge" data-since="0.25">Da 0.25</span> Un elenco descrive ciascun file restituito: la sua dimensione `size` in byte e `updated`, data dell'ultima scrittura, su storage locale, S3 e GCS, e il suo `contentType` su storage locale e GCS. Un elenco S3 non include il tipo, quindi su S3 questo campo è assente e `/api/storage/metadata/*` continua a fornirlo. Una cartella in `prefixes` non include nessuno di questi valori, così come un `StorageController` personalizzato che non li imposta.
+Un elenco descrive ciascun file restituito: la sua dimensione `size` in byte e `updated`, data dell'ultima scrittura, su storage locale, S3 e GCS, e il suo `contentType` su storage locale e GCS. Un elenco S3 non include il tipo, quindi su S3 questo campo è assente e `/api/storage/metadata/*` continua a fornirlo. Una cartella in `prefixes` non include nessuno di questi valori, così come un `StorageController` personalizzato che non li imposta.
 
 `POST /api/storage/upload` restituisce `201` con l'oggetto `{ key, bucket, storageUrl }` memorizzato sotto `data`; `GET /api/storage/metadata/*` restituisce i metadati dell'oggetto e, per un oggetto privato, il `token` di breve durata; `POST /api/storage/metadata` restituisce un oggetto indicizzato per i percorsi inviati, ciascuno contenente ciò che avrebbe restituito la `GET` per esso (vedi sotto). Una cartella non è un oggetto: chiamare `/metadata` su una chiave che termina con `/` restituisce `404` su ogni storage, anche laddove S3 o GCS mantengono un marcatore `folder/`, quindi non viene generato alcun token di download per un prefisso; `GET /api/storage/sources` restituisce l'array delle sorgenti configurate, con `configured: true`. Su un deployment senza alcuno storage configurato, restituisce `200 {"data": [], "configured": false}`, mentre ogni altra route restituisce `501 STORAGE_NOT_CONFIGURED`. `GET /api/auth/config` riporta lo stesso fatto con `storage: false`, in modo che un client possa evitare di richiederlo. `GET /api/storage/sources` è pubblico: risponde senza token anche quando `requireAuth` è attivo. Riporta le sorgenti (chiave, motore, trasporto ed etichetta) e mai un file, e l'SDK client lo legge per collegare le proprie sorgenti, il che può avvenire prima che chiunque abbia effettuato l'accesso. Anche un'app che legge una sorgente `direct` in modo anonimo ne ha bisogno. Ogni route che elenca, legge o scrive un file mantiene la propria autenticazione. `DELETE /api/storage/file/*` e `POST /api/storage/folder` contengono solo un `message`, poiché non c'è nulla da restituire.
 
 Su S3 e GCS, un `bucket` deve essere tra quelli serviti dalla sorgente, sia in scrittura che in lettura: un caricamento, un `POST /api/storage/folder` o un caricamento TUS che specifichi qualsiasi altro bucket restituisce `404 UNKNOWN_STORAGE_SOURCE`, così come l'elenco. Lo storage locale continua a creare un bucket alla prima scrittura.
 
-**Molti oggetti contemporaneamente.** <span class="since-badge" data-since="0.25">Da 0.25</span> `POST /api/storage/metadata` accetta `{ "keys": ["photos/a.png", "photos/b.png"], "storageId": "media" }` — fino a 100 percorsi di oggetti di una sorgente, ciascuno formattato come farebbe `GET /api/storage/metadata/<key>` — e restituisce una voce per chiave:
+**Molti oggetti contemporaneamente.** `POST /api/storage/metadata` accetta `{ "keys": ["photos/a.png", "photos/b.png"], "storageId": "media" }` — fino a 100 percorsi di oggetti di una sorgente, ciascuno formattato come farebbe `GET /api/storage/metadata/<key>` — e restituisce una voce per chiave:
 
 ```json
 { "data": {
@@ -161,7 +161,7 @@ GET /api/storage/file/products/laptop.jpg?width=300&format=webp
 Un parametro al di fuori di questi limiti restituisce un **400**, non un valore limitato silenziosamente (clamp) — in precedenza `?width=99999` restituiva un'immagine da 4096px e `?format=tiff` un'immagine in formato webp, senza alcun avviso.
 
 Le miniature delle immagini archiviate nel pannello di amministrazione utilizzano questo endpoint: l'anteprima di una tabella o di una scheda richiede una versione in formato webp di dimensioni pari a circa il doppio della dimensione renderizzata (96–800px) invece dell'originale. I file SVG e GIF vengono sempre mostrati così come sono.
-`sharp` è opzionale: <span class="since-badge" data-since="0.25">Da 0.25</span>
+`sharp` è opzionale:
 in sua assenza una richiesta di trasformazione riceve l'originale, e il backend avvisa una volta di eseguire
 `pnpm add sharp` in `backend/` (su 0.24 risponde 500, e il pannello mostra gli originali).
 
@@ -210,7 +210,7 @@ STORAGE_MAX_FILE_SIZE=209715200          # (default): 200 MB
 STORAGE_MAX_FILE_SIZE__MEDIA=1073741824  # media: 1 GB
 ```
 
-La quantità di file che il server gestisce contemporaneamente in memoria dipende dal punto di accesso. `POST /api/storage/upload` è un corpo multipart singolo, che il server analizza per intero: da tre a cinque volte la dimensione del file nella sua memoria. Un caricamento ripristinabile (TUS) gestisce un chunk alla volta. <span class="since-badge" data-since="0.25">Da 0.25</span> `client.storage.putObject()` e il pannello di amministrazione inviano i file superiori a 8 MiB in modalità ripristinabile. Consulta [Caricamenti ripristinabili (TUS)](/docs/backend/storage-resumable-uploads/) per i dettagli sul protocollo, sulle risposte e sul comportamento tra le diverse istanze.
+La quantità di file che il server gestisce contemporaneamente in memoria dipende dal punto di accesso. `POST /api/storage/upload` è un corpo multipart singolo, che il server analizza per intero: da tre a cinque volte la dimensione del file nella sua memoria. Un caricamento ripristinabile (TUS) gestisce un chunk alla volta. `client.storage.putObject()` e il pannello di amministrazione inviano i file superiori a 8 MiB in modalità ripristinabile. Consulta [Caricamenti ripristinabili (TUS)](/docs/backend/storage-resumable-uploads/) per i dettagli sul protocollo, sulle risposte e sul comportamento tra le diverse istanze.
 
 ## Variabili d'ambiente
 
@@ -247,7 +247,7 @@ export const media = bucket("media", { engine: "s3", label: "Media" });
 
 Quindi esegui `rebase resources --write`, che rigenera `rebase.resources.json` in modo che un host possa leggere la topologia senza dover eseguire una build. Consulta [Sorgenti multiple](/docs/backend/multiple-sources) per approfondire database, bucket e topic insieme.
 
-Ogni sorgente viene configurata tramite gli **stessi nomi di variabili a cui viene aggiunto il proprio suffisso**. La sorgente predefinita non accetta alcun suffisso, quindi un progetto con un singolo bucket continua a usare i nomi semplici sopra indicati e non deve dichiarare nulla, e dichiarare bucket con nome accanto ad essa non li cambia (<span class="since-badge" data-since="0.25">Da 0.25</span>, [dettagli](/docs/backend/multiple-sources/#which-bucket-receives-an-unqualified-upload)):
+Ogni sorgente viene configurata tramite gli **stessi nomi di variabili a cui viene aggiunto il proprio suffisso**. La sorgente predefinita non accetta alcun suffisso, quindi un progetto con un singolo bucket continua a usare i nomi semplici sopra indicati e non deve dichiarare nulla, e dichiarare bucket con nome accanto ad essa non li cambia ([dettagli](/docs/backend/multiple-sources/#which-bucket-receives-an-unqualified-upload)):
 
 ```bash
 S3_BUCKET=app-uploads             # (default)

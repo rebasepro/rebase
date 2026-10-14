@@ -1,5 +1,5 @@
 ---
-sourceHash: 00c369539f8269ad
+sourceHash: fa5ea5eeb92e1460
 title: L'API context.data
 sidebar_label: API context.data
 description: Leggi e scrivi altre collection dall'interno di un callback con context.data — i suoi metodi, i privilegi con cui viene eseguito, la semantica transazionale e la connessione che un callback occupa.
@@ -184,7 +184,7 @@ Quindi:
 - Invia le righe i cui hook sono lenti in bulk più piccoli.
 - Se molti hook lenti sono eseguiti insieme per progetto, alza `DB_POOL_MAX`, entro quanto
   il `max_connections` del database consente per ogni istanza.
-- <span class="since-badge" data-since="0.25">Da 0.25</span> Con
+- Con
   `REBASE_METRICS=true`, `/metrics` riporta `rebase_db_pool_wait_ms`: quanto
   ha atteso ogni query per una connessione. Un pool sano lo tiene vicino a zero; una
   coda che cresce con il traffico sono richieste in attesa di connessioni che i callback

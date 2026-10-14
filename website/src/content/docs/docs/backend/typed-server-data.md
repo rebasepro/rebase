@@ -19,8 +19,6 @@ Until you do, they stay untyped: any collection by any name, rows as
 
 ## Register the `Database`
 
-<span class="since-badge" data-since="0.25">Since 0.25</span>
-
 ```bash
 rebase generate-sdk --register
 ```

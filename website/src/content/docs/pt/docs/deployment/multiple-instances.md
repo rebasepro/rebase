@@ -1,5 +1,5 @@
 ---
-sourceHash: 3116577a359d845f
+sourceHash: de9051fe769a602b
 title: Executando mais de uma instância
 sidebar_label: Mais de uma instância
 description: Cada fragmento de estado que um processo do Rebase mantém para si e a configuração que o compartilha — o que definir antes que uma segunda réplica, um rolling deploy ou um split deployment receba tráfego.
@@ -91,7 +91,7 @@ contenha o diretório `<STORAGE_PATH>__<key>` de cada bucket local nomeado. Cons
 [Auto-hospedagem: armazenamento de arquivos](/docs/deployment/self-hosting/#file-storage).
 
 **Uploads retomáveis** (o endpoint TUS) mantêm o arquivo parcial de cada upload e,
-<span class="since-badge" data-since="0.25">A partir da 0.25</span> um registro do upload ao lado dele, no disco da instância
+um registro do upload ao lado dele, no disco da instância
 que o criou, sob `STORAGE_PATH/.tus-uploads` — mesmo quando os arquivos finalizados vão para
 o S3 ou GCS. Monte um volume em `STORAGE_PATH` em todas as instâncias e qualquer instância
 poderá atender a qualquer upload; uma reinicialização ou um rolling deploy retomará o upload de onde

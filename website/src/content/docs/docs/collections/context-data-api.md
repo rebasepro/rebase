@@ -198,7 +198,7 @@ So:
 - Send rows whose hooks are slow in smaller bulks.
 - If many slow hooks run at once by design, raise `DB_POOL_MAX`, within what
   the database's `max_connections` allows for every instance.
-- <span class="since-badge" data-since="0.25">Since 0.25</span> With
+- With
   `REBASE_METRICS=true`, `/metrics` reports `rebase_db_pool_wait_ms`: how long
   each query waited for a connection. A healthy pool keeps it near zero; a tail
   that grows with traffic is requests queueing for connections that callbacks

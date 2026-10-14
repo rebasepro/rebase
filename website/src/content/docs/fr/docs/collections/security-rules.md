@@ -1,5 +1,5 @@
 ---
-sourceHash: 963ab532acd3da90
+sourceHash: bf198f4f8752c00d
 title: Règles de sécurité (RLS)
 sidebar_label: Règles de sécurité
 description: Définissez des stratégies de sécurité au niveau des lignes (RLS) pour vos collections à l'aide de raccourcis pratiques ou d'expressions SQL brutes.
@@ -44,7 +44,7 @@ Ces valeurs sont définies automatiquement par transaction par le backend Rebase
 
 Les politiques d'une table sont plus que les `securityRules` propres à la collection :
 
-- **`defaultSecurityRules`**, exporté depuis `config/collections/index.ts`. Une collection dont `securityRules` est absent ou vide les reçoit toutes à sa place, comme si elle les avait écrites. Une collection qui déclare ne serait-ce qu'une règle à elle n'en reçoit aucune : les deux listes ne sont jamais fusionnées. Elles sont appliquées partout où le répertoire est lu : `rebase dev`, `rebase db push`, le panneau d'administration et un backend auquel on passe `collectionsDir`. <span class="since-badge" data-since="0.25">Depuis 0.25</span> L'index du scaffold les applique aussi au tableau `collections` qu'il exporte, de sorte qu'un backend auquel on remet ce tableau les reçoit également. Un tableau assemblé de toute autre façon ne porte que les règles que déclarent ses collections.
+- **`defaultSecurityRules`**, exporté depuis `config/collections/index.ts`. Une collection dont `securityRules` est absent ou vide les reçoit toutes à sa place, comme si elle les avait écrites. Une collection qui déclare ne serait-ce qu'une règle à elle n'en reçoit aucune : les deux listes ne sont jamais fusionnées. Elles sont appliquées partout où le répertoire est lu : `rebase dev`, `rebase db push`, le panneau d'administration et un backend auquel on passe `collectionsDir`. L'index du scaffold les applique aussi au tableau `collections` qu'il exporte, de sorte qu'un backend auquel on remet ce tableau les reçoit également. Un tableau assemblé de toute autre façon ne porte que les règles que déclarent ses collections.
 - **La base administrateur.** Chaque collection reçoit aussi `<table>_default_admin_read` et `<table>_default_admin_write_insert`, `_update` et `_delete` : des politiques permissives qui laissent le contexte serveur et le rôle `admin` lire et écrire chaque ligne. Elles s'ajoutent aux règles que la collection finit par avoir, les siennes ou les valeurs par défaut héritées, et les politiques permissives sont combinées par OR : elles élargissent donc les deux. La collection des utilisateurs reçoit aussi une lecture de soi-même et un verrou d'écriture restrictif qui réserve `roles` aux administrateurs.
 - **Multi-tenance.** Une collection limitée à un tenant reçoit une règle restrictive qui confine chaque opération au tenant de l'appelant ; le contexte serveur la franchit.
 

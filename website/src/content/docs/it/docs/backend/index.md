@@ -1,5 +1,5 @@
 ---
-sourceHash: 52c124b4df13db42
+sourceHash: bf72686388b55887
 title: Panoramica del backend
 sidebar_label: Backend
 description: Il backend di Rebase fornisce un server completo con API REST, autenticazione, storage, WebSocket in tempo reale e cronologia delle entità — tutto inizializzato con una singola chiamata di funzione.
@@ -45,7 +45,7 @@ const instance = await initializeRebaseBackend({
 });
 ```
 
-<span class="since-badge" data-since="0.25">Da 0.25</span> Quella singola chiamata è
+Quella singola chiamata è
 una scorciatoia su passaggi pubblici: `installUnhandledRejectionHandler` impedisce che
 una rejection vagante termini il processo, `createRebaseBackend` costruisce il backend,
 `setDefaultBackend` lo rende quello a cui risponde l'API a livello di modulo, e
@@ -252,13 +252,13 @@ instance.setCollectionCallbacks(slug, callbacks) // Replace a collection's callb
 instance.shutdown()          // Drain and stop; also closes the server it was given
 ```
 
-<span class="since-badge" data-since="0.25">Da 0.25</span> Porta con sé anche
+Porta con sé anche
 `rebase`, il client in-process, `fetch(request)`, `routes`, i gruppi di rotte come
 sotto-app Hono, `services`, le sue chiavi JWT, il modello di accesso, l'archivio delle
 chiavi API e i rate limiter, e `verifyCredential(token)`; vedi
 [Integrazione Server Personalizzato](/docs/backend/custom-server/).
 
-> **Nota:** Sebbene l'`instance` esponga questi servizi interni, il codice applicativo (come funzioni personalizzate e cron job) dovrebbe utilizzare il singleton `rebase` di `@rebasepro/server` per interagire con l'API del backend. <span class="since-badge" data-since="0.25">Da 0.25</span> All'interno di una richiesta, di un'esecuzione cron o di un job, `rebase` è il backend che la serve; altrove è il default del processo, che `initializeRebaseBackend` imposta sul proprio backend.
+> **Nota:** Sebbene l'`instance` esponga questi servizi interni, il codice applicativo (come funzioni personalizzate e cron job) dovrebbe utilizzare il singleton `rebase` di `@rebasepro/server` per interagire con l'API del backend. All'interno di una richiesta, di un'esecuzione cron o di un job, `rebase` è il backend che la serve; altrove è il default del processo, che `initializeRebaseBackend` imposta sul proprio backend.
 
 ## API REST
 
@@ -285,7 +285,7 @@ Un parametro non riservato dal server viene interpretato come un filtro sulla co
 
 ## WebSocket
 
-Il server WebSocket si aggancia al medesimo server HTTP e fornisce sottoscrizioni in tempo reale. <span class="since-badge" data-since="0.25">Da 0.25</span> Risponde agli upgrade su un solo percorso, `/` per un'API su `/api`, dove si connette l'SDK, e lascia ogni altro percorso ai tuoi listener `upgrade`; su 0.24 prende ogni upgrade del server:
+Il server WebSocket si aggancia al medesimo server HTTP e fornisce sottoscrizioni in tempo reale. Risponde agli upgrade su un solo percorso, `/` per un'API su `/api`, dove si connette l'SDK, e lascia ogni altro percorso ai tuoi listener `upgrade`; su 0.24 prende ogni upgrade del server:
 
 - Sottoscrizione alle **modifiche delle collection** — ricevi notifiche quando un'entità in una collection viene creata, aggiornata o eliminata
 - Sottoscrizione alle **modifiche delle entità** — ricevi notifiche quando una specifica entità viene modificata
@@ -317,7 +317,7 @@ Ogni errore — proveniente da qualsiasi route o sottosistema — viene restitui
 Lo stato HTTP è presente nella risposta, non nel corpo. Gestisci la logica basandoti su `code` e non su `message` — i messaggi sono scritti per gli utenti e possono variare.
 
 L'SDK tipizzato converte ciascuno di questi errori in un `RebaseApiError` contenente `status`, `code` e `details` — inclusi i fallimenti che non hanno mai raggiunto il server. Una connessione rifiutata, un errore DNS, problemi di CORS o un'interruzione (abort) vengono restituiti come `status: 0`, `code: "NETWORK_ERROR"`, con l'errore del runtime associato a `cause`, anziché con l'eccezione generica restituita da `fetch`. Una risposta senza envelope — un 413 di un proxy, un 502 di un load balancer — riceve comunque un `code` dal suo status (`PAYLOAD_TOO_LARGE`, `SERVICE_UNAVAILABLE`, `INTERNAL_ERROR`, …), e un client costruito fuori da un browser senza `baseUrl` fallisce con `BASE_URL_REQUIRED` anziché con un errore di rete.
-<span class="since-badge" data-since="0.25">Da 0.25</span> Una lettura che riceve un successo privo della forma che legge — un `204`, un corpo vuoto, una pagina senza l'elenco `data` — fallisce con `UNEXPECTED_RESPONSE` invece di risolversi come "nessuna riga", e `createMany`, `updateMany`, `deleteMany` o `batch` che ricevono qualcosa di diverso da un array falliscono con `INVALID_BULK_BODY`, il codice che il server usa per lo stesso errore. In questo modo il codice applicativo gestisce un'unica classe di errore:
+Una lettura che riceve un successo privo della forma che legge — un `204`, un corpo vuoto, una pagina senza l'elenco `data` — fallisce con `UNEXPECTED_RESPONSE` invece di risolversi come "nessuna riga", e `createMany`, `updateMany`, `deleteMany` o `batch` che ricevono qualcosa di diverso da un array falliscono con `INVALID_BULK_BODY`, il codice che il server usa per lo stesso errore. In questo modo il codice applicativo gestisce un'unica classe di errore:
 
 ```typescript
 async function setPrice(id: string, price: number) {

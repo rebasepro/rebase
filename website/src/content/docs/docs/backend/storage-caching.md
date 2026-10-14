@@ -47,7 +47,7 @@ the difference between a working player and a broken one.
 - Revalidation wins over a range: a request carrying both `If-None-Match` and
   `Range` gets the `304`.
 
-<span class="since-badge" data-since="0.25">Since 0.25</span> Only the requested bytes are read — from disk on local storage, and with a
+Only the requested bytes are read — from disk on local storage, and with a
 ranged read from S3 and GCS — and every object is streamed to the client as it
 is read rather than held in memory first, so serving a large video costs the
 server the same memory as serving a thumbnail. A revalidation that ends in a

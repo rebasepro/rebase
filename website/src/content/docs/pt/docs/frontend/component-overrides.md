@@ -1,5 +1,5 @@
 ---
-sourceHash: 1d7b256891673c72
+sourceHash: 0a17c13d60408e81
 title: Substituições de Componentes (Swizzling)
 sidebar_label: Substituições de Componentes
 description: Substitua componentes de interface padrão por implementações personalizadas no nível da aplicação ou da coleção.
@@ -112,7 +112,7 @@ Uma referência direta (`Component: ProductCustomForm`) também funciona, mas ap
 
 ### Quando os dois escopos substituem um componente
 
-<span class="since-badge" data-since="0.25">Desde 0.25</span> Na 0.24 o wrapper de uma coleção sempre recebe o componente integrado, e a substituição no nível da aplicação é ignorada dentro dessa coleção.
+Na 0.24 o wrapper de uma coleção sempre recebe o componente integrado, e a substituição no nível da aplicação é ignorada dentro dessa coleção.
 
 Os dois escopos se compõem. A substituição no nível da aplicação (`<Rebase components>`) é aplicada primeiro ao componente integrado, e a da coleção (`admin.components`) é aplicada ao resultado:
 

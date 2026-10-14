@@ -1,5 +1,5 @@
 ---
-sourceHash: d33249c4f6560ffc
+sourceHash: e66387578eabf2dd
 title: Auto-hospedagem
 sidebar_label: Auto-hospedagem
 description: Execute o Rebase em qualquer lugar com a imagem oficial de runtime e o bundle do seu projeto — Docker Compose, Fly, Railway ou uma VPS simples.
@@ -130,7 +130,7 @@ Para uma implantação real, prefira empacotar ambos em uma imagem, o que també
 o que é executado:
 
 ```dockerfile
-FROM rebasepro/server:0.24.0
+FROM rebasepro/server:0.25.0
 COPY dist-bundle /bundle
 ```
 
@@ -201,7 +201,7 @@ sistema de arquivos do contêiner e perderão seus arquivos quando o contêiner 
 movê-lo para dentro do diretório de outro bucket, como `/storage/uploads/media`,
 pois o bucket padrão passaria a listar, servir e excluir seus arquivos.
 
-<span class="since-badge" data-since="0.25">Desde 0.25</span> A imagem cria
+A imagem cria
 `/storage` para o usuário sem privilégios `node` sob o qual ela roda, razão pela qual o volume
 deve apontar para lá. Um volume montado onde a imagem não possui diretório pertencerá ao root,
 fazendo com que todo upload falhe com `EACCES`. O arquivo compose gerado por `rebase init`
@@ -245,7 +245,7 @@ contêineres funcionará. Dois pontos que devem ser configurados corretamente em
 
 ```toml
 [build]
-  image = "rebasepro/server:0.24.0"
+  image = "rebasepro/server:0.25.0"
 
 [http_service]
   internal_port = 8080
@@ -390,7 +390,6 @@ detalhados por superfície de API (data, auth, storage, functions) e coleção, 
 indicadores de processo (gauges). Sem um token, o endpoint fica acessível para qualquer pessoa com acesso à
 porta, portanto defina um a menos que esteja em uma rede privada.
 
-<span class="since-badge" data-since="0.25">Desde 0.25</span>
 `rebase_db_pool_wait_ms` é um histograma do tempo que cada consulta esperou por uma
 conexão do pool do banco de dados, incluindo a abertura de uma nova conexão, rotulado pela chave da fonte
 de dados (`source="(default)"` em projetos que não declaram fontes de dados adicionais). Um
@@ -436,7 +435,7 @@ cooperando entre si. Consulte [Processos divididos](/docs/deployment/split-proce
 ## Atualização
 
 ```yaml
-image: rebasepro/server:0.24.0
+image: rebasepro/server:0.25.0
 ```
 
 Reinicie. O seu bundle permanece inalterado. Dentro da mesma versão principal (major) do contrato de runtime, um bundle devidamente

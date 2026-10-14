@@ -1,5 +1,5 @@
 ---
-sourceHash: e5474c2a6107ff70
+sourceHash: 008801863c78b3e5
 title: Cron Jobs
 sidebar_label: Cron Jobs
 description: Pianifica attività ricorrenti in background con il sistema di cron job integrato di Rebase. Definisci i job come file TypeScript, monitorali in Studio e gestiscili tramite l'API REST.
@@ -86,7 +86,7 @@ Tutto qui. Rebase si occuperà di:
 
 ### Cron job come valori
 
-<span class="since-badge" data-since="0.25">Da 0.25</span> Su 0.24 i cron job provengono solo da una directory.
+Su 0.24 i cron job provengono solo da una directory.
 
 `crons` accetta i job come record da id del job a definizione, accanto a `collections`. Una directory è un modo per costruirlo: `loadCrons(dir)` ne legge una e la porta esattamente in quella forma.
 
@@ -202,7 +202,7 @@ interface CronJobContext {
 
 Usa `ctx.log()` per emettere output strutturato. Queste righe vengono acquisite nel log di esecuzione e sono visibili in Studio e tramite l'API REST. Ogni riga viene scritta anche nel log del server a livello `info`, con un campo `cron` che contiene l'ID del job, quindi compare ovunque venga raccolto l'output del tuo container, compresi i log di debug di Rebase Cloud. Questa copia viene oscurata come le righe di log del server stesso: i valori di chiavi come `password` o `apiKey`, e l'SQL e i parametri di una query fallita, vengono sostituiti. Il log di esecuzione conserva la riga senza questo oscuramento.
 
-<span class="since-badge" data-since="0.25">Da 0.25</span> Il log di esecuzione conserva le prime 500 righe di un'esecuzione o 64 KB di esse, a seconda di quale limite viene raggiunto per primo, e poi una riga che dice quante altre ce n'erano: `… 9500 more lines not kept — see the server log`. Il log del server riceve ogni riga. Un job che registra una riga per ogni elemento che elabora deve aspettarsi che la sua cronologia mostri l'inizio dell'esecuzione.
+Il log di esecuzione conserva le prime 500 righe di un'esecuzione o 64 KB di esse, a seconda di quale limite viene raggiunto per primo, e poi una riga che dice quante altre ce n'erano: `… 9500 more lines not kept — see the server log`. Il log del server riceve ogni riga. Un job che registra una riga per ogni elemento che elabora deve aspettarsi che la sua cronologia mostri l'inizio dell'esecuzione.
 
 ### `ctx.signal` — interrompere il lavoro quando l'esecuzione si ferma
 
@@ -310,7 +310,7 @@ Il pannello mostra la stessa cosa qualunque processo lo serva. Un job che un
 altro processo sta eseguendo appare in esecuzione.
 Su ogni processo che dispone di uno store, il numero di esecuzioni, il numero di errori e l'ultima esecuzione vengono letti dal database, dove sono contate le esecuzioni di ogni processo. I contatori propri di un processo contengono solo le esecuzioni che ha fatto lui: il ruolo `api` accanto a un worker non esegue nulla, e di due repliche che pianificano entrambe, nessuna vede gli slot rivendicati dall'altra. Solo quando il database non può essere letto la scheda ripiega sui contatori di questo processo, con un avviso nel log del server.
 
-<span class="since-badge" data-since="0.25">Da 0.25</span> I conteggi sono complessivi; la cronologia è quella degli ultimi 30 giorni. La riga di ogni esecuzione in `rebase.cron_logs` viene eliminata 30 giorni dopo il suo avvio, da una pulizia oraria, mentre i conteggi di esecuzioni e fallimenti continuano a includerla. Un'esecuzione saltata conta come esecuzione, come è sempre stato: è una riga della cronologia.
+I conteggi sono complessivi; la cronologia è quella degli ultimi 30 giorni. La riga di ogni esecuzione in `rebase.cron_logs` viene eliminata 30 giorni dopo il suo avvio, da una pulizia oraria, mentre i conteggi di esecuzioni e fallimenti continuano a includerla. Un'esecuzione saltata conta come esecuzione, come è sempre stato: è una riga della cronologia.
 
 ## Validazione della pianificazione e parsing dell'AST
 
@@ -400,7 +400,7 @@ ottiene al deploy successivo. Nessuna è una collection, e il ruolo utente final
 permetterebbe a un utente autenticato di mettere in pausa un job per tutti, o di
 trattenerne il lease così che nulla lo esegua.
 
-<span class="since-badge" data-since="0.25">Da 0.25</span> La riga di un'esecuzione e il suo conteggio vengono scritti in un'unica istruzione: l'inserimento in `cron_logs` e un upsert dei contatori del job su `cron_job_state`. Un elenco legge una riga di `cron_job_state` per job, per quanto lunga sia la cronologia, e lo stesso fa lo scheduler quando inizializza `totalRuns` e `totalFailures` all'avvio. Le scritture dei log non fanno attendere l'esecuzione; se una fallisce, lo scheduler registra l'errore e prosegue, con l'esecuzione ancora nel ring buffer in memoria.
+La riga di un'esecuzione e il suo conteggio vengono scritti in un'unica istruzione: l'inserimento in `cron_logs` e un upsert dei contatori del job su `cron_job_state`. Un elenco legge una riga di `cron_job_state` per job, per quanto lunga sia la cronologia, e lo stesso fa lo scheduler quando inizializza `totalRuns` e `totalFailures` all'avvio. Le scritture dei log non fanno attendere l'esecuzione; se una fallisce, lo scheduler registra l'errore e prosegue, con l'esecuzione ancora nel ring buffer in memoria.
 
 Una volta all'ora, e all'avvio, lo scheduler elimina le righe di cronologia più vecchie di 30 giorni e conta le esecuzioni non ancora contate, entrambe a lotti di 5.000 righe. Una cronologia scritta prima della 0.24 viene contata dalla prima di queste pulizie, fuori dal percorso di avvio. Finché non ha finito, un elenco somma ai contatori le esecuzioni non ancora contate, così i numeri non cambiano all'aggiornamento. Lo stesso vale per un'esecuzione che un server più vecchio registra durante un deploy progressivo.
 
@@ -453,7 +453,7 @@ async handler({ log }) {
 
 L'handler viene eseguito nel deployment, dove tali variabili sono presenti. Un'importazione di livello superiore dello stesso modulo rende il grafo derivabile solo su una macchina che possiede casualmente un file `.env` — e carica l'intera dipendenza a ogni avvio anche solo per registrare il job.
 
-<span class="since-badge" data-since="0.25">Da 0.25</span> Caricare un cron non dichiara
+Caricare un cron non dichiara
 nulla. Un passaggio di build tuo che vuole i cron nel grafo lo dice
 esplicitamente, con `declareCrons`:
 

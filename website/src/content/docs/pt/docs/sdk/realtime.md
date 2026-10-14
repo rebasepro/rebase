@@ -1,5 +1,5 @@
 ---
-sourceHash: 479be58faac5dc73
+sourceHash: 172ed813d51ccec3
 title: Subscrições em Tempo Real
 sidebar_label: Realtime
 description: Inscreva-se em alterações de dados em tempo real com o SDK tipado do Rebase usando listeners em tempo real baseados em WebSocket.
@@ -147,7 +147,7 @@ as linhas relacionadas, escute também a coleção delas.
 
 ## Observando uma Contagem
 
-<span class="since-badge" data-since="0.25">Desde 0.25</span> `listenCount()` mantém uma contagem atualizada: o total do que o filtro de uma lista corresponde, para uma
+`listenCount()` mantém uma contagem atualizada: o total do que o filtro de uma lista corresponde, para uma
 barra de ferramentas ou uma oferta de "selecionar todos os N" que não deve ficar desatualizada enquanto outras pessoas adicionam e removem linhas.
 O callback é executado com o total assim que ele é conhecido, e de novo sempre que uma escrita o altera.
 
@@ -249,7 +249,7 @@ const unsubscribe = client.data.orders.listen(
 
 ### Qual token o socket envia
 
-<span class="since-badge" data-since="0.25">Desde 0.25</span> Na 0.24 o
+Na 0.24 o
 socket usa apenas a sessão do próprio cliente e a opção `token`: um getter
 instalado com `client.setAuthTokenGetter()` nunca chega a ele, então um host que usa
 um provedor de autenticação próprio obtém um socket anônimo.

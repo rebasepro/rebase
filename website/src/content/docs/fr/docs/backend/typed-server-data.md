@@ -1,5 +1,5 @@
 ---
-sourceHash: c098315f51933896
+sourceHash: b40368f94c74dfb6
 title: Données côté serveur typées
 sidebar_label: Données côté serveur typées
 description: "Enregistrez une fois votre type Database généré, et context.data, rebase.dataAsAdmin et le rebase que reçoit une fonction ou un cron sont typés à partir de lui : lignes, filtres, tris, includes et entrées d'écriture."
@@ -19,8 +19,6 @@ Tant que vous ne le faites pas, elles restent non typées : n'importe quelle col
 `Record<string, unknown>`. Rien ne change pour un projet qui n'enregistre rien.
 
 ## Enregistrer la `Database`
-
-<span class="since-badge" data-since="0.25">Depuis 0.25</span>
 
 ```bash
 rebase generate-sdk --register

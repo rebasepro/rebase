@@ -1,5 +1,5 @@
 ---
-sourceHash: 63a33a92e55310ba
+sourceHash: 6d6edea2e91b0bbc
 title: API REST
 sidebar_label: API REST
 description: Endpoints de API REST gerados automaticamente para cada coleção, com filtragem, ordenação, paginação e inclusão de relações.
@@ -22,7 +22,7 @@ Para cada coleção, os seguintes endpoints são gerados. Todas as outras rotas 
 | Método | Caminho | Descrição |
 |--------|------|-------------|
 | `GET` | `/api/data/:slug` | Listar entidades |
-| `POST` | `/api/data/:slug/query` | <span class="since-badge" data-since="0.25">Desde 0.25</span> A mesma listagem, com seus parâmetros de consulta em um corpo JSON — para uma consulta longa demais para uma URL. Veja [Consultas longas demais para uma URL](/docs/backend/vector-search/#queries-too-long-for-a-url) |
+| `POST` | `/api/data/:slug/query` | A mesma listagem, com seus parâmetros de consulta em um corpo JSON — para uma consulta longa demais para uma URL. Veja [Consultas longas demais para uma URL](/docs/backend/vector-search/#queries-too-long-for-a-url) |
 | `GET` | `/api/data/:slug/count` | Contar entidades |
 | `GET` | `/api/data/:slug/aggregate` | `count()`, `sum()`, `avg()`, `min()`, `max()`, opcionalmente agrupados. Aceita os mesmos filtros que o endpoint de listagem, e o RLS se aplica às linhas que estão sendo agregadas — veja [Consultas](/docs/sdk/querying/) |
 | `GET` | `/api/data/:slug/:id` | Obter uma única entidade |
@@ -148,12 +148,12 @@ identifica a si próprio: `INVALID_LIMIT`, `INVALID_OFFSET` (um número inteiro 
 diferente da solicitada não pode ser diferenciada de ter chegado ao final da coleção,
 razão pela qual nenhum deles é ajustado ou ignorado.
 
-<span class="since-badge" data-since="0.25">Desde 0.25</span> Pelo mesmo motivo, `page` e `offset` juntos resultam em um 400
+Pelo mesmo motivo, `page` e `offset` juntos resultam em um 400
 `PAGE_WITH_OFFSET`, em vez de um deles prevalecer silenciosamente.
 
 ### Ignorando a contagem
 
-<span class="since-badge" data-since="0.25">Desde 0.25</span> `meta.total` é um `COUNT(*)` sobre todas as linhas correspondentes — numa tabela
+`meta.total` é um `COUNT(*)` sobre todas as linhas correspondentes — numa tabela
 grande, a maior parte do custo de uma requisição de listagem. `?count=none`
 (`GET /api/data/orders?count=none`) a dispensa: sem `meta.total`, enquanto
 `meta.hasMore` continua exato (a leitura pede uma linha além da página).
@@ -323,7 +323,7 @@ o índice estão em [Busca Vetorial](/docs/backend/vector-search/).
 
 ## Consultas longas demais para uma URL
 
-<span class="since-badge" data-since="0.25">Desde 0.25</span> `POST /api/data/:slug/query` (esta listagem) e `POST /api/data/:slug/count`
+`POST /api/data/:slug/query` (esta listagem) e `POST /api/data/:slug/count`
 recebem os parâmetros de consulta em um corpo JSON, para uma consulta cuja URL não caberia — um embedding, uma lista `in` longa.
 Veja [Consultas longas demais para uma URL](/docs/backend/vector-search/#queries-too-long-for-a-url).
 
@@ -365,7 +365,7 @@ GET /api/data/posts?include={"comments":{"limit":5,"where":{"published":["==",tr
 | `orderBy` | A mesma grafia de ordenação, incluindo o posicionamento de NULL. Os empates, e um `limit` sem `orderBy`, seguem a chave da linha relacionada, em ordem ascendente |
 | `fields` | Colunas da linha *relacionada*; sua chave primária sempre permanece |
 | `include` | Relações da linha relacionada, por sua vez |
-| `count` | <span class="since-badge" data-since="0.25">Desde 0.25</span> `true` também devolve o total de cada pai em `_count` (`"_count":{"comments":37}`), contado pela mesma instrução. Apenas relações para-muitos. Veja [Contando o que um limit deixa de fora](/docs/sdk/relations#counting-what-a-limit-leaves-out) |
+| `count` | `true` também devolve o total de cada pai em `_count` (`"_count":{"comments":37}`), contado pela mesma instrução. Apenas relações para-muitos. Veja [Contando o que um limit deixa de fora](/docs/sdk/relations#counting-what-a-limit-leaves-out) |
 
 `true` significa "carregar por completo", portanto `{"author":true}` e `author` são a
 mesma requisição. Ambas as grafias funcionam na rota de listagem, na rota de busca por ID

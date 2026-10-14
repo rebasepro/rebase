@@ -111,7 +111,7 @@ A direct reference (`Component: ProductCustomForm`) also works, but only in a co
 
 ### When both scopes override a component
 
-<span class="since-badge" data-since="0.25">Since 0.25</span> On 0.24 a collection's wrapper always receives the built-in component, and the app-level override is skipped inside that collection.
+On 0.24 a collection's wrapper always receives the built-in component, and the app-level override is skipped inside that collection.
 
 The two scopes compose. The app-level override (`<Rebase components>`) is applied to the built-in component first, and the collection's (`admin.components`) is applied to the result:
 

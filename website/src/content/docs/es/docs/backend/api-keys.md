@@ -1,5 +1,5 @@
 ---
-sourceHash: 9fe6bb92d083cb36
+sourceHash: 83ba3db403bb8334
 title: Claves de API
 sidebar_label: Claves de API
 description: "Claves de larga duración para scripts, CI, agentes e integraciones: claves de servicio y claves personales, los alcances que tienen, cómo se combinan con la seguridad a nivel de fila y las rutas que las gestionan."
@@ -313,7 +313,7 @@ Cada clave se comprueba contra quien la crea, igual en ambas rutas:
 
 | Rechazo | Cuándo |
 |---|---|
-| `400 INVALID_SCOPES` | Un alcance está mal formado, es desconocido o lleva un destino que no admite. `details.validScopes` enumera los alcances que una clave puede tener. <span class="since-badge" data-since="0.25">Desde 0.25</span> Deja fuera `keys:*`, que ninguna clave puede tener; en la 0.24 los enumera |
+| `400 INVALID_SCOPES` | Un alcance está mal formado, es desconocido o lleva un destino que no admite. `details.validScopes` enumera los alcances que una clave puede tener. Deja fuera `keys:*`, que ninguna clave puede tener; en la 0.24 los enumera |
 | `400 UNKNOWN_SCOPE_TARGET` | Un destino nombra una colección, un origen de almacenamiento o una función que este backend no sirve |
 | `400 KEY_MANAGEMENT_SCOPE` | Se pidió `keys:read` o `keys:write` |
 | `403 SCOPE_EXCEEDS_CREATOR` | Un alcance que el creador no tiene. Una clave nunca tiene más que la cuenta que la creó |

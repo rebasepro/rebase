@@ -80,14 +80,14 @@ const { data } = await client.data.posts.include({
 | `orderBy` | The same sort spelling, including the [NULL placement](/docs/sdk/querying#where-nulls-sort). Ties, and a `limit` with no `orderBy`, go by the related row's key, ascending. |
 | `fields` | Columns of the *related* row. Its key always survives, so the row stays addressable. |
 | `include` | Relations of the related row, in turn — this is how the tree nests. |
-| `count` | <span class="since-badge" data-since="0.25">Since 0.25</span> Also return how many related rows there are in all, per parent, under the row's `_count`. See [Counting what a limit leaves out](#counting-what-a-limit-leaves-out). |
+| `count` | Also return how many related rows there are in all, per parent, under the row's `_count`. See [Counting what a limit leaves out](#counting-what-a-limit-leaves-out). |
 
 `true` is the shorthand for "load it whole": `{ author: true }` and
 `["author"]` are the same request.
 
 ### Counting what a limit leaves out
 
-<span class="since-badge" data-since="0.25">Since 0.25</span> A `limit` caps
+A `limit` caps
 what is sent, and `count: true` says how much was left out. This is what a list
 needs to show four tags and a "+33":
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: 479be58faac5dc73
+sourceHash: 172ed813d51ccec3
 title: Abonnements en temps réel
 sidebar_label: Temps réel
 description: Abonnez-vous aux modifications de données en direct avec le SDK typé de Rebase à l'aide d'écouteurs en temps réel basés sur WebSocket.
@@ -169,7 +169,7 @@ les lignes liées, écoutez aussi leur collection.
 
 ## Suivre un décompte
 
-<span class="since-badge" data-since="0.25">Depuis 0.25</span> `listenCount()` maintient un décompte à jour : le total de ce que correspond le filtre d'une liste, pour une barre d'outils ou une offre « tout sélectionner (N) » qui ne doit pas se périmer pendant que d'autres ajoutent et retirent des lignes. Le callback s'exécute avec le total dès qu'il est connu, puis chaque fois qu'une écriture le modifie.
+`listenCount()` maintient un décompte à jour : le total de ce que correspond le filtre d'une liste, pour une barre d'outils ou une offre « tout sélectionner (N) » qui ne doit pas se périmer pendant que d'autres ajoutent et retirent des lignes. Le callback s'exécute avec le total dès qu'il est connu, puis chaque fois qu'une écriture le modifie.
 
 ```typescript
 const stop = client.data.orders.listenCount(
@@ -271,7 +271,7 @@ const unsubscribe = client.data.orders.listen(
 
 ### Quel jeton le socket envoie
 
-<span class="since-badge" data-since="0.25">Depuis 0.25</span> En 0.24, le
+En 0.24, le
 socket n'utilise que la session propre au client et l'option `token` : un getter
 installé avec `client.setAuthTokenGetter()` ne l'atteint jamais, si bien qu'un hôte qui utilise
 son propre fournisseur d'authentification obtient un socket anonyme.

@@ -1,5 +1,5 @@
 ---
-sourceHash: 5a4b74223c30f992
+sourceHash: 26723d5fe58a36e5
 slug: de/docs/rls-check
 title: rls-check
 description: Überprüfen Sie Row-Level Security auf jeder PostgreSQL-Datenbank – Supabase, Neon, RDS oder Ihr eigener Server. Schreibgeschützt, keine Registrierung, kein Rebase erforderlich.
@@ -364,12 +364,12 @@ ist das Eingrenzen von Zeilen: Was übrig bleibt, ist *jedes registrierte Konto 
 Tabelle lesen*, was eine andere Aussage ist als die, die normalerweise beabsichtigt war. Auf einem
 Rebase-Projekt ist das eine Regel, deren `condition` `policy.authenticated()` ist und sonst nichts,
 die die Datenbank als `rebase.uid() <> ALL (ARRAY['anonymous', 'anon'])` speichert.
-<span class="since-badge" data-since="0.25">Seit 0.25</span> Eine Regel, deren Bedingung nur
+Eine Regel, deren Bedingung nur
 `policy.registered()` ist, wird ebenfalls gemeldet: Ihr zusätzliches `NOT rebase.is_anonymous()` hält
 Gäste fern und grenzt ebenfalls keine Zeilen ein, sodass jedes Konto, das kein Gast ist, jede
 Zeile liest. Mit dem Standard `--fail-on high` schlägt ein CI-Lauf, der eine solche Policy scannt, jetzt fehl.
 
-<span class="since-badge" data-since="0.25">Seit 0.25</span> Eine Policy, deren Ausdruck nur
+Eine Policy, deren Ausdruck nur
 die Rolle des Aufrufers prüft – `auth.role() = 'authenticated'`, `(auth.jwt() ->> 'role') =
 'authenticated'`, in beliebiger Reihenfolge – wird ebenfalls unter dieser ID gemeldet. Sie ist
 `TO authenticated USING (true)`, als Ausdruck geschrieben, und erhält daher den Schweregrad, den

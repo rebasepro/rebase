@@ -1,5 +1,5 @@
 ---
-sourceHash: 32c7b310f4621e8a
+sourceHash: bc24a5e7b69762ad
 title: Archivos de instrucciones de IA
 sidebar_label: Archivos de instrucciones de IA
 description: Cada proyecto Rebase generado incluye ai-instructions.md junto con archivos de puntero de tres líneas para Claude, Cursor, Windsurf, Copilot y AGENTS.md — una sola fuente de verdad, muchos nombres de archivo.
@@ -110,7 +110,7 @@ suficiente como para que valga la pena repetirlas al inicio de cada sesión:
    campo eliminado — tanto en la base de datos de desarrollo gestionada como en
    tu propio PostgreSQL. En producción es `pnpm db:generate` y después
    `pnpm db:migrate`.
-   <span class="since-badge" data-since="0.25">Desde 0.25</span> En la 0.24,
+   En la 0.24,
    `pnpm db:push` necesita tu propio PostgreSQL, y el archivo lo dice.
 3. **Usa el SDK.** Accede a través de `rebase.dataAsAdmin.<slug>` para el trabajo
    realizado con la identidad del servicio, o `getDriver(c)` dentro de una función

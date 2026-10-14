@@ -42,7 +42,7 @@ REBASE_ROLE=all        # the default: everything, one process
 Health and metrics are on every role without exception. A process an
 orchestrator cannot probe is a process it cannot roll.
 
-<span class="since-badge" data-since="0.25">Since 0.25</span> `GET /api/auth/config`,
+`GET /api/auth/config`,
 what the sign-in screen reads, follows the rest of `/api/auth`: only `api` and
 `all` serve it. On 0.24 a `functions` or `worker` process answered it too.
 
@@ -153,7 +153,7 @@ and then writes to it as two separate steps, so processes booting together do
 collide — and a deployment where several of them race to provision the same
 schema is not one anybody designed.
 
-<span class="since-badge" data-since="0.25">Since 0.25</span> In a
+In a
 [custom server](/docs/backend/custom-server/), the same decision is the
 `provision` option of `createRebaseBackend`: `true` in the process that owns the
 schema, and `{ collections: false, realtime: false }` in every other one, which
@@ -245,7 +245,7 @@ split: true
 functions:
   enabled: true
   image:
-    tag: "0.24.0"     # this unit only; the rest stay on the release-wide tag
+    tag: "0.25.0"     # this unit only; the rest stay on the release-wide tag
 ```
 
 Only the tag is usually worth pinning: the repository is inherited, so this is

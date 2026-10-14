@@ -1,5 +1,5 @@
 ---
-sourceHash: a3e5fa2b319b73d8
+sourceHash: e3130fcc43e901ed
 title: Beziehungen
 sidebar_label: Beziehungen
 description: Definieren Sie Eins-zu-Eins-, Eins-zu-Viele- und Viele-zu-Viele-SQL-Beziehungen zwischen Sammlungen mit Fremdschlüsseln, Verbindungstabellen und Multi-Hop-Joins.
@@ -95,7 +95,7 @@ author: {
 // → posts.author_id
 ```
 
-<span class="since-badge" data-since="0.25">Seit 0.25</span> Die Spalte wird für Sie
+Die Spalte wird für Sie
 indiziert: Postgres indiziert den Schlüssel, auf den ein Fremdschlüssel zeigt, nie die
 Spalte, die ihn hält, sodass ohne Index jedes `hasMany`-Include und jede verschachtelte Auflistung
 von der anderen Seite diese Tabelle scannt. `index: false` behält die Constraint und

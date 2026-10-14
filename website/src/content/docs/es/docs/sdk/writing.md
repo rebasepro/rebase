@@ -1,5 +1,5 @@
 ---
-sourceHash: dcdd32536d7ea87a
+sourceHash: 19b3f8d0d52e648a
 title: Escritura de datos
 sidebar_label: Escritura de datos
 description: create, upsert, update y delete con el SDK — operaciones de campo, escrituras condicionales, claves de idempotencia, escrituras por lotes y escritura entre colecciones en una sola transacción.
@@ -70,7 +70,7 @@ modifican: un conflicto significa que su creación es un hecho del pasado.
 
 #### No en la colección de usuarios
 
-<span class="since-badge" data-since="0.25">Since 0.25</span> `upsert()` en la colección de usuarios (la que tiene `auth` activado) se rechaza con un 400 (`INVALID_CONFLICT_TARGET`), igual que `createMany` con `upsert` en ella. Crear un usuario y modificarlo siguen reglas distintas — una creación cifra la contraseña con hash y envía la invitación, una actualización no puede degradar al último administrador — y un upsert solo sabe cuál de las dos es dentro de la escritura. Llame a `create` o a `update` en su lugar.
+`upsert()` en la colección de usuarios (la que tiene `auth` activado) se rechaza con un 400 (`INVALID_CONFLICT_TARGET`), igual que `createMany` con `upsert` en ella. Crear un usuario y modificarlo siguen reglas distintas — una creación cifra la contraseña con hash y envía la invitación, una actualización no puede degradar al último administrador — y un upsert solo sabe cuál de las dos es dentro de la escritura. Llame a `create` o a `update` en su lugar.
 
 ### Update
 
@@ -152,7 +152,7 @@ una fila proveniente de `find()`, de la caché offline o de un servidor que no e
 `ETag`; y pasar `undefined` no envía ninguna precondición, por lo que la llamada anterior
 se degrada a una actualización ordinaria en lugar de lanzar un error.
 
-<span class="since-badge" data-since="0.25">Desde 0.25</span> Una fila devuelta por `update()` lleva la versión que produjo esa escritura, de modo que
+Una fila devuelta por `update()` lleva la versión que produjo esa escritura, de modo que
 las ediciones condicionales se encadenan sin una lectura intermedia. Una fila que recibe un callback de `listenById()`
 lleva la versión que muestra ese frame:
 

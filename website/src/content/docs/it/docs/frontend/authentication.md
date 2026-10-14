@@ -1,5 +1,5 @@
 ---
-sourceHash: 7452474353756b93
+sourceHash: c35ed2ce1194af56
 title: Autenticazione e Login
 sidebar_label: Autenticazione e Login
 description: Configura il controller di autenticazione, la vista di login e la simulazione dei ruoli nel tuo frontend React Rebase.
@@ -39,7 +39,7 @@ Passa l'`authController` al navigation controller di Rebase per proteggere l'int
 
 ## Il tuo provider di autenticazione
 
-<span class="since-badge" data-since="0.25">Da 0.25</span> Su 0.24 il getter
+Su 0.24 il getter
 autentica solo le richieste HTTP, e il socket realtime del pannello resta
 anonimo.
 

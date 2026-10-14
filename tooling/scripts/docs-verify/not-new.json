@@ -1,7 +1,1 @@
-{
-    "rebase dev": "the command has shipped since 0.1; the entries make it start the backend sooner and fix a ready line it missed, and change nothing a page teaches about running it",
-    "rebase db push": "the command has shipped since 0.1; the entries make it run Atlas once on a database that already matches and stop reporting a policy tautology as drift",
-    "INVALID_CONFLICT_TARGET": "the error code shipped in 0.24.0 (conflict-target.ts, nested on_conflict); the entry refuses one more case with it, the users collection, and that paragraph carries its own badge",
-    "list_collections": "the MCP tool shipped in 0.24.0 (mcp-tools.ts); the Breaking entry changes the shape of its reply, and field-access.md names it only as a surface that leaves excludeFromApi fields out, which 0.24 already did",
-    "prefix": "bucket()'s prefix option shipped in 0.24.0 (declared, validated and carried into the resource graph); the entry deprecates it, it adds nothing, and the pages that say 'prefix' elsewhere describe other things"
-}
+{}

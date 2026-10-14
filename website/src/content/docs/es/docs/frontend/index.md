@@ -1,5 +1,5 @@
 ---
-sourceHash: 62bb342dd6196f27
+sourceHash: 867178ccdf409a3f
 title: Visión general del frontend
 sidebar_label: Frontend
 description: "Construye y personaliza el panel — Rebase CMS y Rebase Studio — con React: controladores, scaffold, enrutamiento y vistas."
@@ -81,7 +81,7 @@ Los veintitrés en su totalidad — la tabla solía listar diez, y dos de ellos 
 | `collectionViews` | Modos de vista de colección personalizados, disponibles para cualquier colección mediante `key` |
 | `entityActions` | Acciones globales de entidad |
 | `effectiveRoleController` | Simula un rol diferente mientras el modo de desarrollo está activo |
-| `modeController` | <span class="since-badge" data-since="0.25">Desde 0.25</span> Entrega a Rebase el modo claro/oscuro de la aplicación anfitriona; Rebase entonces nunca toca `<html>`, `prefers-color-scheme` ni localStorage — consulta [Estilos](#estilos) |
+| `modeController` | Entrega a Rebase el modo claro/oscuro de la aplicación anfitriona; Rebase entonces nunca toca `<html>`, `prefers-color-scheme` ni localStorage — consulta [Estilos](#estilos) |
 | `translations` | Anula o extiende cualquier cadena de texto de la interfaz de usuario, indexada por locale — consulta [Traducciones](/docs/frontend/i18n) |
 | `components` | Reemplaza componentes integrados — consulta [Sustitución de componentes](/docs/frontend/component-overrides) |
 <!-- rebase-props:end -->
@@ -117,7 +117,7 @@ entities[0].values.title;
 
 ## Una colección o un registro en una página propia
 
-<span class="since-badge" data-since="0.25">Desde 0.25</span> En 0.24
+En 0.24
 `CollectionPanel` solo acepta un `path` registrado y renderiza "Collection not
 found" fuera del árbol completo del panel de administración, y `EntityFormPanel` y
 `CollectionsProvider` no existen.
@@ -215,7 +215,7 @@ Todo lo siguiente reemplaza a `<RebaseShell>`. Solo lo necesitas cuando el layou
 ```
 
 El orden es fijo: `RebaseAuthGate → RebaseNavigation → RebaseRouteDefs → RebaseLayout`. `RebaseAuthGate` muestra la vista de inicio de sesión hasta que haya un usuario, por lo que nada debajo de él se renderiza para un visitante sin sesión iniciada; `RebaseNavigation` construye los controladores de navegación, URL y registro de colecciones que leen `RebaseRouteDefs` y cada vista de colección, por lo que usar `RebaseRouteDefs` fuera de él lanzará un error.
-<span class="since-badge" data-since="0.25">Desde 0.25</span> Para incrustar una
+Para incrustar una
 vista de colección o un formulario de registro en una página propia, sin las rutas del
 panel de administración, el `CollectionsProvider`, más ligero, construye esos controladores
 en su lugar — consulta
@@ -302,7 +302,7 @@ modeController.setMode("dark");  // "light" | "dark" | "system" — "system" fol
 
 `<Rebase>` construye uno por sí mismo.
 
-<span class="since-badge" data-since="0.25">Desde 0.25</span> Cuando el
+Cuando el
 componente que lo usa se desmonta, elimina la clase `dark` que añadió; una clase `dark`
 que la página ya tenía se mantiene. Construye el tuyo
 por encima de `<Rebase>` solo cuando los componentes fuera de él también necesiten el modo, y entrégaselo
@@ -406,11 +406,11 @@ Por defecto `<Rebase>` es dueño del tema de la página: pone la clase `dark` en
 `<html>`, sigue `prefers-color-scheme` hasta que el usuario elige un modo en el
 panel de administración, y recuerda esa elección en localStorage.
 
-<span class="since-badge" data-since="0.25">Desde 0.25</span> Cuando `<Rebase>`
+Cuando `<Rebase>`
 se desmonta, elimina la clase `dark` que añadió; una clase que la página ya tenía
 se mantiene. En 0.24 la clase se queda.
 
-<span class="since-badge" data-since="0.25">Desde 0.25</span> Cuando tu aplicación
+Cuando tu aplicación
 ya tiene un tema, pásalo como `modeController`. Rebase lee `mode` de él,
 llama a su `setMode` desde su propio conmutador de tema, y nunca toca `<html>`,
 `prefers-color-scheme` ni localStorage:

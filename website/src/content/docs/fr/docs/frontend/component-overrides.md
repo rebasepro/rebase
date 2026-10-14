@@ -1,5 +1,5 @@
 ---
-sourceHash: 1d7b256891673c72
+sourceHash: 0a17c13d60408e81
 title: Surcharges de composants (Swizzling)
 sidebar_label: Surcharges de composants
 description: Remplacez les composants d'interface utilisateur par défaut par des implémentations personnalisées au niveau de l'application ou de la collection.
@@ -112,7 +112,7 @@ Une référence directe (`Component: ProductCustomForm`) fonctionne également, 
 
 ### Quand les deux portées surchargent un composant
 
-<span class="since-badge" data-since="0.25">Depuis 0.25</span> En 0.24, le wrapper d'une collection reçoit toujours le composant intégré, et la surcharge au niveau de l'application est ignorée dans cette collection.
+En 0.24, le wrapper d'une collection reçoit toujours le composant intégré, et la surcharge au niveau de l'application est ignorée dans cette collection.
 
 Les deux portées se composent. La surcharge au niveau de l'application (`<Rebase components>`) est appliquée d'abord au composant intégré, puis celle de la collection (`admin.components`) est appliquée au résultat :
 

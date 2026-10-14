@@ -1,5 +1,5 @@
 ---
-sourceHash: 6a0a2927f191087f
+sourceHash: 6304a2aeeb6a8bcf
 title: Aggregazioni e ricerca
 sidebar_label: Aggregazioni e ricerca
 description: "Conta, somma e raggruppa con l'SDK, filtra all'interno delle colonne JSON ed esegui ricerche full-text e vettoriali dal client."
@@ -179,7 +179,7 @@ su un pgvector più vecchio un filtro che poche delle righe più vicine superano
 pagina corta. Generare `queryVector` è compito tuo: Rebase memorizza e
 cerca gli embedding, non li calcola.
 
-<span class="since-badge" data-since="0.25">Da 0.25</span> L'SDK invia una
+L'SDK invia una
 ricerca vettoriale come `POST /api/data/<collection>/query`, con l'embedding nel
 body: nell'URL, 768 dimensioni sono circa 17 KB, oltre ciò che accettano Node (16 KB) e la maggior parte dei
 proxy (nginx: 8 KB). `count()` con una ricerca vettoriale segue la stessa strada,
@@ -187,7 +187,7 @@ come `POST /api/data/<collection>/count`. Contro un server precedente alla 0.24,
 non ha una route del genere, entrambi ripiegano sulla `GET` — e un embedding lungo lì
 può comunque essere rifiutato con un 431 o un 414.
 
-<span class="since-badge" data-since="0.25">Da 0.25</span> Con un `threshold`,
+Con un `threshold`,
 il risultato non ha `meta.total` — contare le righe entro una distanza lo calcola
 per ogni riga della tabella. Pagina con `meta.hasMore`, che resta esatto.
 

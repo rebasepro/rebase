@@ -1,5 +1,5 @@
 ---
-sourceHash: 8aef72b75f28c106
+sourceHash: 2e602d0ed1bed6e5
 title: Interrogare le relazioni
 sidebar_label: Relazioni
 description: "Includi entità correlate in una query e leggi una collezione figlia tramite il genitore con gli accessor di relazione dell'SDK."
@@ -75,7 +75,7 @@ const { data } = await client.data.posts.include({
 | `orderBy` | La stessa sintassi di ordinamento, incluso il [posizionamento di NULL](/docs/sdk/querying#where-nulls-sort). Gli ex aequo, e un `limit` senza `orderBy`, seguono la chiave della riga correlata, in ordine crescente. |
 | `fields` | Colonne della riga *correlata*. La sua chiave viene sempre preservata, in modo che la riga rimanga indirizzabile. |
 | `include` | Relazioni della riga correlata, a loro volta — è così che l'albero si annida. |
-| `count` | <span class="since-badge" data-since="0.25">Da 0.25</span> Restituisce anche quante righe correlate ci sono in tutto, per genitore, sotto il `_count` della riga. Vedi [Contare ciò che un limite lascia fuori](#contare-ciò-che-un-limite-lascia-fuori). |
+| `count` | Restituisce anche quante righe correlate ci sono in tutto, per genitore, sotto il `_count` della riga. Vedi [Contare ciò che un limite lascia fuori](#contare-ciò-che-un-limite-lascia-fuori). |
 
 `true` è la forma abbreviata per "carica tutto": `{ author: true }` e `["author"]` rappresentano la stessa richiesta.
 
@@ -178,7 +178,7 @@ const typo: IncludeFor<"posts"> = { comments: { include: { authr: true } } };
 
 ### Contare ciò che un limite lascia fuori
 
-<span class="since-badge" data-since="0.25">Da 0.25</span> Un `limit` limita
+Un `limit` limita
 ciò che viene inviato, e `count: true` dice quanto è stato lasciato fuori. È ciò di cui una lista
 ha bisogno per mostrare quattro tag e un «+33»:
 

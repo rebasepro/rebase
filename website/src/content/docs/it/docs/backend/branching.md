@@ -1,5 +1,5 @@
 ---
-sourceHash: b964127a9f6eafc2
+sourceHash: 9f9448404128f745
 title: Database Branching
 sidebar_label: Branching
 description: Crea branch di database isolati per sviluppo, staging e testing utilizzando CREATE DATABASE ... TEMPLATE di PostgreSQL — copie istantanee a fedeltà totale senza tempi di inattività.
@@ -61,7 +61,7 @@ Cannot create branch: the source database "leadgen" has active connections.
 `--force` termina queste sessioni prima del templating, sia su `create` che su
 `delete`. Non termina mai la sessione che sta eseguendo il comando stesso.
 
-<span class="since-badge" data-since="0.25">Da 0.25</span> `create --force`
+`create --force`
 chiude anche la sorgente alle nuove connessioni per la durata della copia
 (`ALTER DATABASE … ALLOW_CONNECTIONS false`, eseguito dal database `postgres` del
 server) e la riapre in seguito: in caso di errore, e a ogni segnale che può intercettare
@@ -222,7 +222,7 @@ quindi al database del branch: `dev`, `db push`, `db migrate`, `db backup`.
 Un `rebase dev` già in esecuzione mantiene il database su cui è partito finché non lo
 riavvii, e `switch` lo dice.
 
-<span class="since-badge" data-since="0.25">Da 0.25</span> `rebase db branch
+`rebase db branch
 list` segna il branch su cui si trova questo checkout, e `prune` non lo rimuove mai, così
 come `delete` si rifiuta di farlo: il piano lo elenca come mantenuto, e dice di lasciarlo
 prima con `rebase db branch switch --off`. Su 0.24 `prune --older-than … --yes` lo
@@ -237,7 +237,7 @@ Si posiziona tra la shell e il file di progetto nell'ordine di risoluzione:
 5. `--docker`, o l'ultimo `rebase dev` eseguito con esso
 6. il database di sviluppo gestito
 
-<span class="since-badge" data-since="0.25">Da 0.25</span> Il livello 5 segue
+Il livello 5 segue
 l'ultimo `rebase dev --docker`, quindi un comando branch eseguito dopo di esso
 non ha bisogno di un proprio `--docker`, e un `--docker` che un livello superiore
 supera non avvia alcun container e dichiara di essere stato ignorato. Su 0.24
@@ -250,7 +250,7 @@ riga di comando è un'istruzione più immediata rispetto a uno switch effettuato
 `.rebase/` è incluso nel file .gitignore, pertanto il branch su cui ti trovi è un dato relativo alla tua macchina
 e mai relativo al progetto.
 
-<span class="since-badge" data-since="0.25">Da 0.25</span> In un checkout su cui hai cambiato
+In un checkout su cui hai cambiato
 branch, `rebase db branch create`, `list`, `info`, `delete` e `prune` operano sul
 database principale, dove si trova il registro, e lo dichiarano. `create` copia
 comunque il branch su cui ti trovi, a meno che tu non passi `--from`; viene

@@ -1,5 +1,5 @@
 ---
-sourceHash: 72190d7e15d46c15
+sourceHash: 5584cf0dc01c6497
 title: Implantação
 sidebar_label: Implantação
 description: Implante seu projeto Rebase em produção usando Docker, plataformas de nuvem ou configurações manuais.
@@ -289,7 +289,7 @@ const router = createBrowserRouter([
 
 Mantenha a administração num **data router** — `createBrowserRouter` com `<RouterProvider>`, como faz o scaffold. Sob ele, um registro com alterações não salvas também interrompe a navegação dentro do app (um link no menu lateral, o botão de voltar do navegador) e pergunta primeiro, por meio do `useBlocker`, que só um data router fornece.
 
-<span class="since-badge" data-since="0.25">Desde 0.25</span> A administração também funciona sob um simples `<BrowserRouter>`. Nele, a proteção contra alterações não salvas recorre ao aviso de saída da página do próprio navegador, que cobre um reload, o fechamento da aba ou a digitação de uma URL; a navegação dentro do app segue adiante sem perguntar. Na 0.24 a administração lança um erro fora de um data router.
+A administração também funciona sob um simples `<BrowserRouter>`. Nele, a proteção contra alterações não salvas recorre ao aviso de saída da página do próprio navegador, que cobre um reload, o fechamento da aba ou a digitação de uma URL; a navegação dentro do app segue adiante sem perguntar. Na 0.24 a administração lança um erro fora de um data router.
 
 **Backend** — se também mover a API, actualize o seu caminho base:
 

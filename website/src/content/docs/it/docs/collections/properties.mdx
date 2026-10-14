@@ -1,5 +1,5 @@
 ---
-sourceHash: f26c07b9fa5cc279
+sourceHash: 0c7da5b3273415e5
 title: Proprietà
 sidebar_label: Proprietà
 description: I tipi di proprietà definiscono il tipo di dati, la validazione e il rendering dell'interfaccia utente per ogni campo in una collection. Rebase supporta i tipi string, number, boolean, date, array, map, reference, relation e geopoint.
@@ -42,7 +42,7 @@ Tutti i tipi di proprietà condividono le seguenti opzioni:
 | `name` | `string` | Etichetta visualizzata. Di default è la chiave della proprietà, formattata graficamente — `publishDate` → "Publish Date". Impostala quando tale derivazione è errata: `"URL"` anziché "Url". |
 | `description` | `string` | Testo di aiuto mostrato sotto il campo |
 | `defaultValue` | `any` | Valore predefinito per le nuove entità. Un valore letterale — una stringa, un numero, un booleano, una data, un ID di enum o un documento `map`/`array` — diventa anche il `DEFAULT` della colonna, quindi qualsiasi riga inserita da elementi esterni al pannello di amministrazione (l'API REST, un seed, `psql`) lo riceve a sua volta |
-| `databaseDefault` | `boolean \| SqlExpression` | <span class="since-badge" data-since="0.25">Da 0.25</span> Il database riempie la colonna quando una creazione la lascia vuota: una colonna `NOT NULL DEFAULT <expression>` come `gen_random_uuid()` o `nextval(…)`. Un campo `required` che lo ha può essere omesso da una creazione, sia dal form di amministrazione sia dall'API, e un `null` inviato in creazione viene lasciato al database; resta obbligatorio in modifica, e il tipo `Insert` generato lo rende facoltativo. Indica l'espressione nella forma template che accetta `isId`, ``databaseDefault: "sql`gen_random_uuid()`"``, e il planner dello schema la scrive come `DEFAULT` della colonna, così `rebase db push` la mantiene. `true` dichiara un `DEFAULT` scritto altrove e non ne scrive nessuno, quindi un push pianifica di eliminarlo. «Import from table» e `rebase schema introspect` impostano l'espressione che leggono |
+| `databaseDefault` | `boolean \| SqlExpression` | Il database riempie la colonna quando una creazione la lascia vuota: una colonna `NOT NULL DEFAULT <expression>` come `gen_random_uuid()` o `nextval(…)`. Un campo `required` che lo ha può essere omesso da una creazione, sia dal form di amministrazione sia dall'API, e un `null` inviato in creazione viene lasciato al database; resta obbligatorio in modifica, e il tipo `Insert` generato lo rende facoltativo. Indica l'espressione nella forma template che accetta `isId`, ``databaseDefault: "sql`gen_random_uuid()`"``, e il planner dello schema la scrive come `DEFAULT` della colonna, così `rebase db push` la mantiene. `true` dichiara un `DEFAULT` scritto altrove e non ne scrive nessuno, quindi un push pianifica di eliminarlo. «Import from table» e `rebase schema introspect` impostano l'espressione che leggono |
 | `validation` | `object` | Regole di validazione |
 | `propertyConfig` | `string` | Chiave di configurazione della proprietà registrata |
 | `columnName` | `string` | Nome esplicito della colonna del database (ignora la conversione in snake_case) |

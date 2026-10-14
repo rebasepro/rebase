@@ -1,5 +1,5 @@
 ---
-sourceHash: d33249c4f6560ffc
+sourceHash: e66387578eabf2dd
 title: Self-Hosting
 sidebar_label: Self-Hosting
 description: Führen Sie Rebase überall mit dem offiziellen Runtime-Image und Ihrem Projekt-Bundle aus – Docker Compose, Fly, Railway oder auf einem einfachen VPS.
@@ -81,7 +81,7 @@ Da sie bereits vorhanden sind, können Sie das Bundle schreibgeschützt (read-on
 Für ein echtes Deployment empfiehlt es sich, beides in ein Image einzubetten, was auch exakt festlegt, was ausgeführt wird:
 
 ```dockerfile
-FROM rebasepro/server:0.24.0
+FROM rebasepro/server:0.25.0
 COPY dist-bundle /bundle
 ```
 
@@ -123,7 +123,7 @@ Für lokalen Festplattenspeicher, der nur dann geeignet ist, wenn der Pfad ein e
 
 Mounten Sie das Volume **über** `STORAGE_PATH`, nicht direkt darauf. `STORAGE_PATH` ist das Verzeichnis des Standard-Buckets, und jeder in `config/resources.ts` deklarierte Bucket erhält daneben sein eigenes Verzeichnis, `<STORAGE_PATH>__<key>`. Ein Volume direkt auf `STORAGE_PATH` enthält nur den Standard-Bucket. Jeder andere Bucket schreibt in das Dateisystem des Containers und verliert seine Dateien, wenn der Container neu erstellt wird. `STORAGE_PATH__MEDIA` kann einen Bucket an eine andere Stelle auf dem Volume verschieben. Er kann ihn jedoch nicht in das Verzeichnis eines anderen Buckets verschieben, wie etwa `/storage/uploads/media`, da der Standard-Bucket dessen Dateien sonst auflisten, ausliefern und löschen würde.
 
-<span class="since-badge" data-since="0.25">Since 0.25</span> Das Image erstellt `/storage` für den unprivilegierten `node`-Benutzer, unter dem es ausgeführt wird; deshalb gehört das Volume dorthin. Ein Volume, das an einer Stelle gemountet wird, an der das Image kein Verzeichnis hat, gehört root, und jeder Upload schlägt mit `EACCES` fehl. Die von `rebase init` erstellte Compose-Datei mountet es auf diese Weise.
+Das Image erstellt `/storage` für den unprivilegierten `node`-Benutzer, unter dem es ausgeführt wird; deshalb gehört das Volume dorthin. Ein Volume, das an einer Stelle gemountet wird, an der das Image kein Verzeichnis hat, gehört root, und jeder Upload schlägt mit `EACCES` fehl. Die von `rebase init` erstellte Compose-Datei mountet es auf diese Weise.
 
 ### Speicher benötigt ein Zugriffssteuerungsmodell
 
@@ -148,7 +148,7 @@ Die Runtime ist ein gewöhnlicher Container, der auf `$PORT` lauscht, sodass all
 
 ```toml
 [build]
-  image = "rebasepro/server:0.24.0"
+  image = "rebasepro/server:0.25.0"
 
 [http_service]
   internal_port = 8080
@@ -247,7 +247,6 @@ REBASE_METRICS_TOKEN=<random string>
 
 Stellt Prometheus-Metriken unter `/metrics` bereit: Anzahl der Anfragen und Latenz-Histogramme aufgeschlüsselt nach API-Bereich (data, auth, storage, functions) und Collection, plus Prozess-Gauges. Ohne Token ist der Endpunkt für jeden lesbar, der den Port erreichen kann; setzen Sie also ein Token, es sei denn, er befindet sich in einem privaten Netzwerk.
 
-<span class="since-badge" data-since="0.25">Since 0.25</span>
 `rebase_db_pool_wait_ms` ist ein Histogramm darüber, wie lange jede Abfrage auf eine Verbindung aus dem Datenbank-Pool gewartet hat (das Öffnen einer Verbindung inbegriffen), gelabelt nach Datenquellen-Schlüssel (`source="(default)"` in einem Projekt, das keine Datenquellen deklariert). Ein gesunder Pool hält diesen Wert nahe null. Ein Tail, der mit dem Datenverkehr wächst, bedeutet, dass sich Anfragen in einer Warteschlange für Verbindungen stauen – meist gehalten von Schreib-Callbacks, die auf etwas Langsames warten; siehe [A callback holds a connection](/docs/collections/context-data-api/#a-callback-holds-a-connection).
 
 ## Sicherheits-Header
@@ -268,7 +267,7 @@ Alles oben Beschriebene ist ein einzelner Container, der das gesamte Projekt ber
 ## Upgrade
 
 ```yaml
-image: rebasepro/server:0.24.0
+image: rebasepro/server:0.25.0
 ```
 
 Neu starten. Ihr Bundle bleibt unverändert. Innerhalb einer Major-Version des Runtime-Contracts funktioniert ein zuvor validiertes Bundle weiterhin – siehe [Kompatibilität](/docs/architecture/runtime-and-bundles/#compatibility).

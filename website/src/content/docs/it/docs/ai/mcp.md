@@ -1,5 +1,5 @@
 ---
-sourceHash: a7fdf34234049b93
+sourceHash: ee28e46d5e82c6f9
 title: Server MCP
 sidebar_label: Server MCP
 description: Connetti Claude Code, Cursor, Gemini CLI o qualsiasi client MCP a un progetto Rebase — i 42 tool esposti, le credenziali con cui si autentica e il loopback gate che si interpone tra un agent e la produzione.
@@ -338,7 +338,7 @@ database at boot, additively. After changing a collection, restart it with
 rebase_dev_stop and rebase_dev_start. …
 ```
 
-<span class="since-badge" data-since="0.25">Da 0.25</span> Da un terminale,
+Da un terminale,
 `rebase db push` e `rebase db migrate` girano su quel database; solo i tool MCP
 vengono rifiutati. Su 0.24 la CLI li rifiuta lì anche lei.
 
@@ -374,7 +374,7 @@ all'esterno.
 
 L'[endpoint remoto](#lendpoint-remoto) racchiude allo stesso modo i risultati dei
 suoi tool e lo comunica al client; il suo `structuredContent` trasporta il risultato puro.
-<span class="since-badge" data-since="0.25">Da 0.25</span> `list_collections` e
+`list_collections` e
 `describe_collection` fanno eccezione: li legge solo un modello, quindi vengono
 inviati una sola volta, nel testo. Prima della 0.24 l'elenco portava anche una
 copia in `structuredContent`.
@@ -494,7 +494,7 @@ a un singolo utente, l'endpoint si rifiuta di essere montato e ne spiega il moti
   1000, un argomento non dichiarato e una modifica o eliminazione di una riga
   nel cestino (404) vengono rifiutati; impostare il campo di soft-delete a
   `null` la ripristina.
-- <span class="since-badge" data-since="0.25">Da 0.25</span> **L'elenco nomina le collection; `describe_collection` dà lo schema di una.**
+- **L'elenco nomina le collection; `describe_collection` dà lo schema di una.**
   `list_collections` risponde con `name`, `title` e `description` di ciascuna
   collection, e `describe_collection { collection }` con gli schemi OpenAPI
   `row` e `create` di quella collection, più `softDeleteField` dove le righe

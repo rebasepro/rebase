@@ -1,5 +1,5 @@
 ---
-sourceHash: 5ea5126e8624cda2
+sourceHash: f2c1bc257cbc2dca
 title: Paginierung
 sidebar_label: Paginierung
 description: Paginieren Sie eine Collection mit Limit/Offset, Seitenzahlen oder einem Keyset-Cursor – und wann die jeweilige Methode nicht mehr korrekt funktioniert.
@@ -24,7 +24,7 @@ if (page1.meta.hasMore) {
 const page = await client.data.products.find({ page: 2, limit: 20 });
 ```
 
-Verwenden Sie das eine oder das andere. <span class="since-badge" data-since="0.25">Seit 0.25</span> `page` und `offset` zusammen beschreiben dasselbe Fenster
+Verwenden Sie das eine oder das andere. `page` und `offset` zusammen beschreiben dasselbe Fenster
 doppelt, und der Read wird mit `PAGE_WITH_OFFSET` abgelehnt, anstatt stillschweigend
 `page` anzuwenden. Das SDK lehnt es vor jeder Anfrage ab, über HTTP, In-Process und
 offline; der Server antwortet auf eine Roh-Anfrage, die beides sendet, mit einem 400.
@@ -99,7 +99,7 @@ GET /api/data/orders?orderBy=createdAt:desc&limit=100&after=eyJrIjpbWyJ…
 
 #### Die Zählung überspringen
 
-<span class="since-badge" data-since="0.25">Seit 0.25</span> `meta.total` ist ein `COUNT(*)` über jede Zeile, die die Abfrage trifft, neben der Seite
+`meta.total` ist ein `COUNT(*)` über jede Zeile, die die Abfrage trifft, neben der Seite
 ausgeführt — und bei einer großen Tabelle kostet es mehr als die Seite selbst. Ein Read, der nur
 vorwärts paginiert, braucht es nie, denn `meta.hasMore` hängt nicht davon ab: Übergeben Sie
 `count: "none"`, und der Read fragt stattdessen eine Zeile über die Seite hinaus ab.

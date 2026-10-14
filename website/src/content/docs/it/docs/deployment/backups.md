@@ -1,5 +1,5 @@
 ---
-sourceHash: adcc6573a73a4294
+sourceHash: c782dc72c3c2aff6
 title: Backup e ripristino
 sidebar_label: Backup
 description: Crea, pianifica, elenca e ripristina backup del database con pg_dump — cosa contiene un backup, il file dei ruoli che lo accompagna, e l'unica cosa che non copre, i tuoi file caricati.
@@ -44,7 +44,7 @@ nello stesso ordine: `--database-url`, `DATABASE_URL` nella shell, il
 in `.env`, Postgres in Docker (`--docker`, o l'ultimo `rebase dev --docker`),
 poi il database di sviluppo gestito, che `restore` rifiuta.
 
-<span class="since-badge" data-since="0.25">Da 0.25</span> Un `--out` relativo, il
+Un `--out` relativo, il
 valore predefinito `./backups` e un percorso di dump passato a `rebase db restore` si
 risolvono tutti rispetto alla directory da cui esegui `rebase`, normalmente la radice del
 progetto, così `rebase db backup` e `rebase db backups list` si incontrano nello stesso
@@ -103,12 +103,12 @@ tue policy RLS e dai trigger di change-capture. Un dump senza di esso non ha
 utenti, e non può essere ripristinato in un database vuoto: le tabelle che
 contiene hanno policy che richiamano funzioni che non contiene.
 
-<span class="since-badge" data-since="0.25">Da 0.25</span> Per questo
+Per questo
 `rebase db backup` rifiuta un `--exclude-schema` che corrisponde a `rebase`, secondo le
 regole dei pattern di pg_dump stesso (`reb*` e `*` compresi), prima di eseguire qualsiasi
 cosa. Su 0.24 scriveva il dump e lo validava, e falliva solo il ripristino.
 
-<span class="since-badge" data-since="0.25">Da 0.25</span> Poiché contiene ogni password
+Poiché contiene ogni password
 e hash di chiave, un dump locale e il suo `.globals.sql` vengono creati leggibili solo dal
 proprietario (0600), prima che `pg_dump` vi scriva; lo sono anche i file locali di un
 backup pianificato. Su 0.24 sono 0644.
@@ -248,7 +248,7 @@ mai automatica: senza `--yes` richiede una conferma interattiva `yes`, e in
 una shell non interattiva si interrompe e dice di passare `--yes`. `<backup>` è un
 `.dump` locale o una chiave `s3://…` / `gs://…`, scaricata per prima.
 
-<span class="since-badge" data-since="0.25">Da 0.25</span> In un database
+In un database
 che contiene già ciò che il backup crea, richiede `--clean`: senza di esso, si rifiuta
 prima di eseguire qualsiasi cosa, nominando gli schemi e le tabelle d'intralcio, e dice di
 passare `--clean` oppure di ripristinare in un nuovo database con
@@ -257,7 +257,7 @@ pg_restore `schema "rebase" already exists`. Rifiuta il database di sviluppo ges
 che non può accettare i dati COPY di un dump; ripristina invece in Postgres in Docker con
 `--docker`.
 
-<span class="since-badge" data-since="0.25">Da 0.25</span> Con `--clean`,
+Con `--clean`,
 il ripristino sostituisce ciò che il backup contiene in un'unica transazione. Elimina per
 intero ogni schema che il backup crea (`rebase`, per esempio), e ogni tabella che il
 backup crea in uno schema che non crea (`public`), con `CASCADE`, poi ripristina il dump
@@ -356,7 +356,7 @@ pannello indica che i backup non sono configurati.
 
 ### Scaricare un backup
 
-<span class="since-badge" data-since="0.25">Da 0.25</span> Un browser non può
+Un browser non può
 mettere un header `Authorization` su un download, quindi Studio e l'SDK chiedono prima
 un link. `POST /api/admin/backups/download-url` con `{ "key": "…" }` (stesso scope admin e
 stessi controlli sulla chiave del download) risponde

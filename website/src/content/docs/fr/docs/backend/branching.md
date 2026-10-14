@@ -1,5 +1,5 @@
 ---
-sourceHash: b964127a9f6eafc2
+sourceHash: 9f9448404128f745
 title: Branches de base de données
 sidebar_label: Branches
 description: Créez des branches de base de données isolées pour le développement, le staging et les tests à l'aide de CREATE DATABASE ... TEMPLATE de PostgreSQL — des copies instantanées et parfaitement fidèles, sans temps d'arrêt.
@@ -60,7 +60,7 @@ Cannot create branch: the source database "leadgen" has active connections.
 
 `--force` met fin à ces sessions avant l'opération de template, aussi bien lors de `create` que de `delete`. Il ne met jamais fin à la session qui exécute la commande elle-même.
 
-<span class="since-badge" data-since="0.25">Depuis 0.25</span> `create --force`
+`create --force`
 ferme aussi la source aux nouvelles connexions pendant la copie
 (`ALTER DATABASE … ALLOW_CONNECTIONS false`, exécuté depuis la base de données `postgres`
 du serveur) et la rouvre ensuite : en cas d'échec, et sur tout signal qu'elle peut
@@ -207,7 +207,7 @@ rebase db branch delete dev_sandbox
 Un `rebase dev` déjà en cours d'exécution garde la base de données sur laquelle il a démarré jusqu'à ce
 que vous le redémarriez, et `switch` le signale.
 
-<span class="since-badge" data-since="0.25">Depuis 0.25</span> `rebase db branch list`
+`rebase db branch list`
 marque la branche sur laquelle se trouve cet espace de travail, et `prune` ne la supprime jamais,
 pas plus que `delete` n'accepte de le faire : le plan la liste comme conservée, et dit de la quitter
 d'abord avec `rebase db branch switch --off`. En 0.24, `prune --older-than … --yes` la supprimait,
@@ -223,7 +223,7 @@ Il s'intercale entre le shell et le fichier de projet dans l'ordre de résolutio
 5. `--docker`, ou le dernier `rebase dev` lancé avec cette option
 6. la base de données de développement gérée
 
-<span class="since-badge" data-since="0.25">Depuis 0.25</span> Le cinquième rang suit
+Le cinquième rang suit
 le dernier `rebase dev --docker` : une commande de branche lancée après lui n'a donc
 pas besoin de son propre `--docker`, et un `--docker` qu'un rang supérieur écarte ne
 démarre aucun conteneur et signale qu'il a été ignoré. En 0.24, seule l'option
@@ -233,7 +233,7 @@ Une branche doit avoir la priorité sur `.env`, sinon le basculement n'aurait au
 
 `.rebase/` est ignoré par Git, donc la branche sur laquelle vous vous trouvez est propre à votre machine et ne concerne jamais le projet lui-même.
 
-<span class="since-badge" data-since="0.25">Depuis 0.25</span> Sur un espace de travail basculé,
+Sur un espace de travail basculé,
 `rebase db branch create`, `list`, `info`, `delete` et `prune` opèrent sur la base de données principale,
 là où se trouve le registre, et l'indiquent. `create` copie toujours la branche sur laquelle vous êtes, sauf
 si vous passez `--from` ; elle est enregistrée dans la base de données principale, donc `list` la montre

@@ -1,5 +1,5 @@
 ---
-sourceHash: 1d7b256891673c72
+sourceHash: 0a17c13d60408e81
 title: Komponenten-Overrides (Swizzling)
 sidebar_label: Komponenten-Overrides
 description: Überschreiben Sie Standard-UI-Komponenten mit benutzerdefinierten Implementierungen auf Anwendungs- oder Collection-Ebene.
@@ -112,7 +112,7 @@ Eine direkte Referenz (`Component: ProductCustomForm`) funktioniert ebenfalls, j
 
 ### Wenn beide Gültigkeitsbereiche eine Komponente überschreiben
 
-<span class="since-badge" data-since="0.25">Seit 0.25</span> Unter 0.24 erhält der Wrapper einer Collection immer die integrierte Komponente, und das Override auf App-Ebene wird innerhalb dieser Collection übersprungen.
+Unter 0.24 erhält der Wrapper einer Collection immer die integrierte Komponente, und das Override auf App-Ebene wird innerhalb dieser Collection übersprungen.
 
 Die beiden Gültigkeitsbereiche werden komponiert. Das Override auf App-Ebene (`<Rebase components>`) wird zuerst auf die integrierte Komponente angewendet, und das der Collection (`admin.components`) auf das Ergebnis:
 

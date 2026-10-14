@@ -1,5 +1,5 @@
 ---
-sourceHash: dcdd32536d7ea87a
+sourceHash: 19b3f8d0d52e648a
 title: Daten schreiben
 sidebar_label: Daten schreiben
 description: Erstellen, Upserten, Aktualisieren und Löschen mit dem SDK – Feldoperationen, bedingte Schreibvorgänge, Idempotenzschlüssel, Batch-Schreibvorgänge und kollektionsübergreifendes Schreiben in einer einzigen Transaktion.
@@ -68,7 +68,7 @@ bleiben unberührt: Ein Konflikt bedeutet, dass ihre Erstellung eine Tatsache au
 
 #### Nicht auf der Users-Collection
 
-<span class="since-badge" data-since="0.25">Since 0.25</span> `upsert()` auf der Users-Collection (der mit aktiviertem `auth`) wird mit einem 400 (`INVALID_CONFLICT_TARGET`) abgelehnt, ebenso `createMany` mit `upsert` dort. Das Anlegen und das Ändern eines Benutzers folgen unterschiedlichen Regeln — ein Create hasht das Passwort und verschickt die Einladung, ein Update darf den letzten Administrator nicht herabstufen — und ein Upsert erfährt erst innerhalb des Schreibvorgangs, was es ist. Rufen Sie stattdessen `create` oder `update` auf.
+`upsert()` auf der Users-Collection (der mit aktiviertem `auth`) wird mit einem 400 (`INVALID_CONFLICT_TARGET`) abgelehnt, ebenso `createMany` mit `upsert` dort. Das Anlegen und das Ändern eines Benutzers folgen unterschiedlichen Regeln — ein Create hasht das Passwort und verschickt die Einladung, ein Update darf den letzten Administrator nicht herabstufen — und ein Upsert erfährt erst innerhalb des Schreibvorgangs, was es ist. Rufen Sie stattdessen `create` oder `update` auf.
 
 ### Update
 
@@ -151,7 +151,7 @@ Zeile aus `find()`, aus dem Offline-Cache oder von einem Server, der kein `ETag`
 Übergabe von `undefined` sendet keine Vorbedingung, sodass der obige Aufruf zu einem gewöhnlichen
 Update herabgestuft wird, anstatt einen Fehler zu werfen.
 
-<span class="since-badge" data-since="0.25">Seit 0.25</span> Eine Zeile aus `update()` trägt die Version, die dieser Schreibvorgang erzeugt hat, sodass
+Eine Zeile aus `update()` trägt die Version, die dieser Schreibvorgang erzeugt hat, sodass
 bedingte Bearbeitungen ohne dazwischenliegendes Lesen aneinandergereiht werden können. Eine Zeile, die ein `listenById()`-Callback
 erhält, trägt die Version, die dieser Frame zeigt:
 

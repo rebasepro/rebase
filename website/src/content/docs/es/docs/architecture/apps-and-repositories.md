@@ -1,5 +1,5 @@
 ---
-sourceHash: 13c5a740a1cf4bc3
+sourceHash: 6cb1ed423c284379
 title: Apps y repositorios
 sidebar_label: Apps y repositorios
 description: Un proyecto es un backend más las apps que se comunican con él, cada una de las cuales puede residir en su propio repositorio.
@@ -144,7 +144,6 @@ La inferencia no puede saber dos cosas que sí declara el `rebase.json` de un
 scaffold. Llama `web` a la app estática, donde un scaffold la llama `admin`, y no
 puede conocer la ruta `cms` de la app. El nombre no cambia: Rebase Cloud registró
 `web` para todos los proyectos que se desplegaron sin un `rebase.json`.
-<span class="since-badge" data-since="0.25">Desde 0.25</span>
 `rebase apps init --force` conserva los nombres, el `path` y el `cms` de las apps
 que declara el archivo que reemplaza, y nombra como eliminada una app que ya no
 encuentra. En la 0.24 escribe la inferencia pura encima.

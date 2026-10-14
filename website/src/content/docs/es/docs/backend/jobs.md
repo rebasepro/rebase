@@ -1,5 +1,5 @@
 ---
-sourceHash: 03c3a22014b05f70
+sourceHash: cf996dc5a52fc912
 title: Trabajos en segundo plano
 sidebar_label: Trabajos en segundo plano
 description: Una cola de trabajos duradera respaldada por Postgres — trabajo que sobrevive a un reinicio, reintentado con retroceso, donde los fallos se conservan en lugar de descartarse.
@@ -36,7 +36,7 @@ await initializeRebaseBackend({
 
 Desactivado a menos que lo solicite: un worker sigue buscando trabajo mientras el proceso viva, lo cual no es un valor predeterminado que cualquiera elegiría. Necesita un controlador capaz de ejecutar SQL; en uno que no puede (MongoDB), la cola no está disponible y se le informa al arrancar en lugar de al realizar el primer encolado.
 
-<span class="since-badge" data-since="0.25">Desde 0.25</span> Un worker inactivo no sondea cada dos segundos. Cada encolado envía un
+Un worker inactivo no sondea cada dos segundos. Cada encolado envía un
 `NOTIFY` en el canal `rebase_jobs` cuando se confirma, y un worker que mantiene un
 `LISTEN` sobre él reclama de inmediato: un trabajo encolado por otro proceso (el rol
 `api`, otra réplica) empieza en milisegundos, y uno diferido cuando
@@ -111,7 +111,7 @@ jobs: {
 La otra cara: un handler que espera un `fetch` que nunca responde retiene su ranura de
 worker, y su reclamo, mientras el proceso viva — cinco de ellos y el worker no ejecuta
 nada más, mientras `/health` sigue en verde.
-<span class="since-badge" data-since="0.25">Desde 0.25</span> `timeoutMs`
+`timeoutMs`
 acota un intento. Al llegar al límite, el intento falla — se reintenta mientras queden
 intentos, como cualquier excepción —, su ranura se libera y el `signal` del handler se
 aborta. Pásalo a lo que corresponda, para que el trabajo también se detenga; un handler que lo ignora

@@ -1,5 +1,5 @@
 ---
-sourceHash: e5474c2a6107ff70
+sourceHash: 008801863c78b3e5
 title: Cron-Jobs
 sidebar_label: Cron-Jobs
 description: Planen Sie wiederkehrende Hintergrundaufgaben mit dem integrierten Cron-Job-System von Rebase. Definieren Sie Jobs als TypeScript-Dateien, überwachen Sie sie in Studio und verwalten Sie sie über die REST-API.
@@ -86,7 +86,7 @@ Das ist alles. Rebase wird:
 
 ### Cron-Jobs als Werte
 
-<span class="since-badge" data-since="0.25">Seit 0.25</span> Unter 0.24 stammen Cron-Jobs nur aus einem Verzeichnis.
+Unter 0.24 stammen Cron-Jobs nur aus einem Verzeichnis.
 
 `crons` nimmt die Jobs als Record von der Job-ID zur Definition entgegen, neben `collections`. Ein Verzeichnis ist eine Möglichkeit, ihn zu bauen: `loadCrons(dir)` liest eines in genau diese Form ein.
 
@@ -202,7 +202,7 @@ interface CronJobContext {
 
 Verwenden Sie `ctx.log()`, um strukturierte Ausgaben zu erzeugen. Diese Zeilen werden im Ausführungslog erfasst und sind in Studio sowie über die REST-API sichtbar. Jede Zeile wird außerdem auf Level `info` in das Server-Log geschrieben, mit einem Feld `cron`, das die Job-ID enthält. So erscheint sie überall dort, wo die Ausgabe Ihres Containers gesammelt wird, auch in den Debug-Logs von Rebase Cloud. Diese Kopie wird so geschwärzt wie die eigenen Log-Zeilen des Servers: Die Werte von Schlüsseln wie `password` oder `apiKey` sowie SQL und Parameter einer fehlgeschlagenen Abfrage werden ersetzt. Das Ausführungslog speichert die Zeile ohne diese Schwärzung.
 
-<span class="since-badge" data-since="0.25">Seit 0.25</span> Das Ausführungslog behält die ersten 500 Zeilen eines Durchlaufs oder 64 KB davon, je nachdem, was zuerst erreicht wird, und danach eine Zeile, die nennt, wie viele weitere es gab: `… 9500 more lines not kept — see the server log`. Das Server-Log erhält jede Zeile. Ein Job, der eine Zeile pro verarbeitetem Element loggt, sollte damit rechnen, dass sein Verlauf den Anfang des Durchlaufs zeigt.
+Das Ausführungslog behält die ersten 500 Zeilen eines Durchlaufs oder 64 KB davon, je nachdem, was zuerst erreicht wird, und danach eine Zeile, die nennt, wie viele weitere es gab: `… 9500 more lines not kept — see the server log`. Das Server-Log erhält jede Zeile. Ein Job, der eine Zeile pro verarbeitetem Element loggt, sollte damit rechnen, dass sein Verlauf den Anfang des Durchlaufs zeigt.
 
 ### `ctx.signal` — die Arbeit stoppen, wenn der Durchlauf endet
 
@@ -311,7 +311,7 @@ Das Panel zeigt dasselbe, egal welcher Prozess es ausliefert. Ein Job, den ein
 anderer Prozess gerade ausführt, wird als laufend angezeigt.
 Auf jedem Prozess, der einen Store hat, werden die Anzahl der Ausführungen, die Anzahl der Fehlschläge und die letzte Ausführung aus der Datenbank gelesen, in der die Ausführungen jedes Prozesses gezählt werden. Die eigenen Zähler eines Prozesses enthalten nur die Ausführungen, die er selbst gemacht hat: Die `api`-Rolle neben einem Worker führt nichts aus, und von zwei Repliken, die beide planen, sieht keine die Slots, die die andere beansprucht hat. Nur wenn die Datenbank nicht gelesen werden kann, greift die Karte auf die eigenen Zähler dieses Prozesses zurück, mit einer Warnung im Server-Log.
 
-<span class="since-badge" data-since="0.25">Seit 0.25</span> Die Zähler gelten für alle Zeiten; der Verlauf umfasst die letzten 30 Tage. Die Zeile jeder Ausführung in `rebase.cron_logs` wird 30 Tage nach ihrem Start von einem stündlichen Durchlauf gelöscht, während die Zähler für Ausführungen und Fehlschläge sie weiter mitzählen. Eine übersprungene Ausführung zählt wie eh und je als Ausführung: Sie ist eine Zeile des Verlaufs.
+Die Zähler gelten für alle Zeiten; der Verlauf umfasst die letzten 30 Tage. Die Zeile jeder Ausführung in `rebase.cron_logs` wird 30 Tage nach ihrem Start von einem stündlichen Durchlauf gelöscht, während die Zähler für Ausführungen und Fehlschläge sie weiter mitzählen. Eine übersprungene Ausführung zählt wie eh und je als Ausführung: Sie ist eine Zeile des Verlaufs.
 
 ## Zeitplan-Validierung & AST-Parsing
 
@@ -402,7 +402,7 @@ beschreibbares `cron_job_state` würde es einem angemeldeten Benutzer erlauben,
 einen Job für alle zu pausieren oder seine Lease zu halten, sodass nichts ihn
 ausführt.
 
-<span class="since-badge" data-since="0.25">Seit 0.25</span> Die Zeile einer Ausführung und ihre Zählung werden in einer Anweisung geschrieben: das Einfügen in `cron_logs` und ein Upsert der Zähler des Jobs in `cron_job_state`. Eine Auflistung liest eine `cron_job_state`-Zeile pro Job, egal wie lang der Verlauf ist, und der Scheduler tut dasselbe, wenn er beim Start `totalRuns` und `totalFailures` befüllt. Log-Schreibvorgänge halten die Ausführung nicht auf; schlägt einer fehl, protokolliert der Scheduler den Fehler und macht weiter, wobei die Ausführung weiterhin im In-Memory-Ringpuffer liegt.
+Die Zeile einer Ausführung und ihre Zählung werden in einer Anweisung geschrieben: das Einfügen in `cron_logs` und ein Upsert der Zähler des Jobs in `cron_job_state`. Eine Auflistung liest eine `cron_job_state`-Zeile pro Job, egal wie lang der Verlauf ist, und der Scheduler tut dasselbe, wenn er beim Start `totalRuns` und `totalFailures` befüllt. Log-Schreibvorgänge halten die Ausführung nicht auf; schlägt einer fehl, protokolliert der Scheduler den Fehler und macht weiter, wobei die Ausführung weiterhin im In-Memory-Ringpuffer liegt.
 
 Einmal pro Stunde und beim Start löscht der Scheduler die Verlaufszeilen, die älter als 30 Tage sind, und zählt jede Ausführung, die noch nicht gezählt ist, beides in Batches von 5.000 Zeilen. Ein vor 0.24 geschriebener Verlauf wird vom ersten dieser Durchläufe gezählt, abseits des Boot-Pfads. Bis dieser beendet ist, addiert eine Auflistung die noch nicht gezählten Ausführungen zu den Zählern, sodass sich die Zahlen beim Upgrade nicht ändern. Dasselbe gilt für eine Ausführung, die ein älterer Server während eines Rolling Deploys protokolliert.
 
@@ -455,7 +455,7 @@ async handler({ log }) {
 
 Der Handler läuft im Deployment, wo diese Variablen existieren. Ein Top-Level-Import desselben Moduls sorgt dafür, dass der Graph nur auf einer Maschine abgeleitet werden kann, die zufällig eine `.env`-Datei hat – und er lädt die gesamte Abhängigkeit bei jedem Bootvorgang, der den Job lediglich registrieren will.
 
-<span class="since-badge" data-since="0.25">Seit 0.25</span> Das Laden eines Crons
+Das Laden eines Crons
 deklariert nichts. Ein eigener Build-Schritt, der Crons im Graphen haben möchte, sagt
 das mit `declareCrons`:
 

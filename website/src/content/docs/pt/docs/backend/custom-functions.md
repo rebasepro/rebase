@@ -1,5 +1,5 @@
 ---
-sourceHash: f92df350bca97cf1
+sourceHash: c964225df6522161
 title: Funções Personalizadas
 sidebar_label: Funções Personalizadas
 description: Adicione endpoints de API Hono personalizados junto com suas rotas CRUD do Rebase. Descoberta automática a partir de um diretório, com acesso total à instância do backend.
@@ -121,7 +121,7 @@ O Rebase irá:
 
 ### Funções como valores
 
-<span class="since-badge" data-since="0.25">Desde 0.25</span> Na 0.24 as funções vêm apenas de um diretório.
+Na 0.24 as funções vêm apenas de um diretório.
 
 Um diretório é uma das formas de produzir o que o servidor atende: um record do segmento de URL para um app Hono. Passe esse record você mesmo como `functions`, ou leia um diretório para dentro dele com `loadFunctions`:
 
@@ -583,7 +583,7 @@ O roteador é montado para o **diretório**, não para as funções nele contida
 
 Dois limites se aplicam a `/api/functions/*`:
 
-- **Timeout da requisição** — 30 segundos por padrão, respondendo `504` com o código `FUNCTION_TIMEOUT`. Configure com `functionsTimeoutMs` (ou `REBASE_FUNCTIONS_TIMEOUT_MS`); `0` desativa o timeout. O manipulador não pode ser interrompido externamente, mas é avisado: <span class="since-badge" data-since="0.25">Desde 0.25</span> `getSignal(c)`, de `@rebasepro/server/functions`, é abortado no momento do 504, então passe-o ao `fetch` e a qualquer outra coisa que aceite um signal (`fetch(url, { signal: getSignal(c) })`). O trabalho que não recebe o signal continua — o timeout libera o cliente e o socket, não o trabalho. O fato de o manipulador *continuar em execução* após o 504 é uma propriedade de um processo Node de longa duração, não uma garantia contratual; qualquer coisa que precise ser concluída pertence ao [`waitUntil`](#trabalho-em-segundo-plano).
+- **Timeout da requisição** — 30 segundos por padrão, respondendo `504` com o código `FUNCTION_TIMEOUT`. Configure com `functionsTimeoutMs` (ou `REBASE_FUNCTIONS_TIMEOUT_MS`); `0` desativa o timeout. O manipulador não pode ser interrompido externamente, mas é avisado: `getSignal(c)`, de `@rebasepro/server/functions`, é abortado no momento do 504, então passe-o ao `fetch` e a qualquer outra coisa que aceite um signal (`fetch(url, { signal: getSignal(c) })`). O trabalho que não recebe o signal continua — o timeout libera o cliente e o socket, não o trabalho. O fato de o manipulador *continuar em execução* após o 504 é uma propriedade de um processo Node de longa duração, não uma garantia contratual; qualquer coisa que precise ser concluída pertence ao [`waitUntil`](#trabalho-em-segundo-plano).
 - **Limite de taxa (Rate limit)** — Chamadores autenticados e com chave de API compartilham os buckets da API de dados. Chamadores anônimos recebem uma cota própria e bem mais generosa (3000 por janela), pois este roteador é público por padrão para receptores de webhooks. Sobrescreva com `rateLimit.anonymousFunctions`; `null` desativa o limite.
 
 Rejeições de promises não tratadas são registradas em log em vez de serem fatais: de outro modo, uma chamada fire-and-forget em uma função encerraria todo o processo. Defina `REBASE_EXIT_ON_UNHANDLED_REJECTION=1` para o comportamento padrão do Node.

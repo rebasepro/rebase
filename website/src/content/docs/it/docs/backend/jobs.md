@@ -1,5 +1,5 @@
 ---
-sourceHash: 03c3a22014b05f70
+sourceHash: cf996dc5a52fc912
 title: Job in background
 sidebar_label: Job in background
 description: Una coda di job persistente basata su Postgres — lavoro che sopravvive a un riavvio, ritentato con backoff, con i fallimenti conservati anziché eliminati.
@@ -36,7 +36,7 @@ await initializeRebaseBackend({
 
 Disabilitato se non richiesto esplicitamente: un worker continua a cercare lavoro finché il processo è in vita, un comportamento che non è una scelta predefinita desiderabile per tutti. Richiede un driver in grado di eseguire SQL — su uno che non può farlo (MongoDB), la coda non è disponibile e ti viene segnalato all'avvio anziché al primo inserimento in coda.
 
-<span class="since-badge" data-since="0.25">Da 0.25</span> Un worker inattivo non esegue il polling ogni due secondi. Ogni inserimento in coda invia un
+Un worker inattivo non esegue il polling ogni due secondi. Ogni inserimento in coda invia un
 `NOTIFY` sul canale `rebase_jobs` al momento del commit, e un worker che tiene un
 `LISTEN` su di esso acquisisce subito il job — un job accodato da un altro processo (il ruolo
 `api`, un'altra replica) parte in pochi millisecondi, e uno differito quando
@@ -110,7 +110,7 @@ jobs: {
 Il rovescio della medaglia: un handler in attesa di una `fetch` che non risponde mai tiene
 occupato il suo slot di worker, e la sua presa in carico, finché il processo è in vita — con cinque
 di questi il worker non esegue nient'altro, mentre `/health` resta verde.
-<span class="since-badge" data-since="0.25">Da 0.25</span> `timeoutMs`
+`timeoutMs`
 limita un tentativo. Alla scadenza il tentativo fallisce — ritentato finché restano
 tentativi, come qualsiasi throw — il suo slot viene liberato, e il `signal` dell'handler
 viene interrotto. Passa il signal a chi di dovere, così anche il lavoro si ferma; un handler che lo ignora

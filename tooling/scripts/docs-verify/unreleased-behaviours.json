@@ -1,6 +1,1 @@
-{
-    "`db push`, `db generate` and `db migrate` on the managed database": {
-        "entry": "**rebase db push, db generate and db migrate work on the managed development database (PGlite).**",
-        "pattern": "throwaway(?: in-memory)? (?:second )?PGlite|db:?(?: |-)?push\\b(?:[^.]|\\.(?! )){0,80}?\\bmanaged (?:development )?database as on your own"
-    }
-}
+{}

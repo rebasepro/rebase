@@ -1,5 +1,5 @@
 ---
-sourceHash: 3d8676ac5f8d58c7
+sourceHash: d74cc2ea4835551d
 title: Índices
 sidebar_label: Índices
 description: Declara índices ordinarios de Postgres en una colección — btree, GIN y BRIN, parciales, compuestos, cubrientes y únicos — y por qué uno escrito a mano solía desaparecer.
@@ -267,7 +267,7 @@ Ambos productores los emiten, lo cual es importante porque no todos los desplieg
 
 ## Las claves foráneas se indexan por ti
 
-<span class="since-badge" data-since="0.25">Desde 0.25</span> Postgres crea el
+Postgres crea el
 índice al que una clave foránea *apunta* —la clave primaria del destino— y nunca uno en
 la columna que la *contiene*. Toda lectura desde el otro lado de un enlace filtra por
 esa columna: una inclusión `hasMany` o `hasOne`, un listado anidado como

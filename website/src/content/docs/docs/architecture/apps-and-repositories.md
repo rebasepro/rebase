@@ -140,7 +140,7 @@ rebase apps init      # write an inferred rebase.json
 Inference cannot know two things a scaffold's `rebase.json` declares. It names
 the static app `web`, where a scaffold names it `admin`, and it cannot know the
 app's `cms` route. The name does not change: Rebase Cloud registered `web` for
-every project that deployed without a `rebase.json`. <span class="since-badge" data-since="0.25">Since 0.25</span>
+every project that deployed without a `rebase.json`.
 `rebase apps init --force` keeps the names, `path` and `cms` of the apps the file
 it replaces declares, and names an app it no longer finds as removed. On 0.24 it
 writes plain inference over them.

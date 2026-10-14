@@ -1,5 +1,5 @@
 ---
-sourceHash: ebb10bc84ac28936
+sourceHash: b0bd1a2197737033
 title: Tempo Real & WebSocket
 sidebar_label: Tempo Real
 description: Sincronização de dados em tempo real, canais de broadcast e rastreamento de presença via WebSocket.
@@ -31,7 +31,7 @@ O tempo real é habilitado por padrão. Não há nenhuma flag para ativar nem se
 
 ### Qual caminho o socket atende
 
-<span class="since-badge" data-since="0.25">Desde 0.25</span> Na 0.24 o socket aceita todo upgrade de WebSocket no servidor, seja qual for o caminho.
+Na 0.24 o socket aceita todo upgrade de WebSocket no servidor, seja qual for o caminho.
 
 O socket atende upgrades em um único caminho: o caminho base da API com um `/api` final removido, ou seja, `/` para uma API em `/api`. É para lá que o SDK disca: ele se conecta ao seu `baseUrl`, enquanto suas requisições HTTP vão para `${baseUrl}/api`. Um upgrade para qualquer outro caminho é deixado para os outros listeners de `upgrade` do servidor, de modo que seu app pode rodar o próprio servidor WebSocket no mesmo `http.Server`. Sem nenhum outro listener, esse upgrade é respondido com `404`.
 
@@ -110,7 +110,7 @@ const unsubscribe = client.data.products.listenById(
 
 O callback recebe a linha, plana, como `findById()` a retorna (`row.name`, não `row.values.name`), ou `undefined` quando a linha é excluída.
 
-<span class="since-badge" data-since="0.25">Desde 0.25</span> **Cada frame traz a versão da linha.** `etagOf(row)` é a `ETag` que um `GET` da linha responde, de modo que uma edição feita contra o que um frame mostrava pode ser salva com `ifMatch: etagOf(row)` e é recusada com `412` se a linha já mudou (veja [Escritas condicionais](/docs/backend/writes/)). No fio, o `subscribe_one` do SDK pergunta com `etag: true`, e cada frame `single_update` de uma linha que existe traz `"etag"` ao lado de `"row"`. Um servidor anterior a isto ignora o pedido e não envia tag, e um cliente que não pergunta recebe frames sem ela.
+**Cada frame traz a versão da linha.** `etagOf(row)` é a `ETag` que um `GET` da linha responde, de modo que uma edição feita contra o que um frame mostrava pode ser salva com `ifMatch: etagOf(row)` e é recusada com `412` se a linha já mudou (veja [Escritas condicionais](/docs/backend/writes/)). No fio, o `subscribe_one` do SDK pergunta com `etag: true`, e cada frame `single_update` de uma linha que existe traz `"etag"` ao lado de `"row"`. Um servidor anterior a isto ignora o pedido e não envia tag, e um cliente que não pergunta recebe frames sem ela.
 
 ### Cancelando a Assinatura
 
@@ -161,9 +161,9 @@ Uma alteração nunca viaja para um assinante como dados. Ela viaja como o fato 
 2. **Refetch debounced com RLS.** Após **300ms** (`REFETCH_DEBOUNCE_MS`), o servidor busca novamente a coleção com seus filtros e ordenação originais. A consulta é executada dentro de uma transação que define os valores locais de transação `app.user_id` e `app.user_roles` a partir do `SubscriptionAuthContext` do assinante, para que o Postgres avalie a Segurança em Nível de Linha (RLS) sob a identidade daquele cliente e apenas as linhas que ele tem autorização para ver sejam enviadas no `collection_update`. O debounce também agrupa uma sequência rápida de gravações em uma única consulta. Ele espera 300 ms sem
 uma nova alteração, mas nunca mais de **1 s** (`REFETCH_MAX_WAIT_MS`) depois da
 primeira, de modo que uma coleção gravada várias vezes por segundo ainda envia
-aos seus assinantes um frame pelo menos uma vez por segundo. <span class="since-badge" data-since="0.25">Desde 0.25</span> Defina esse limite com `REALTIME_REFETCH_MAX_WAIT_MS` (ou `realtime.refetchMaxWaitMs`): um valor maior refaz a leitura de uma tabela movimentada com menos frequência, um menor envia frames mais recentes.
+aos seus assinantes um frame pelo menos uma vez por segundo. Defina esse limite com `REALTIME_REFETCH_MAX_WAIT_MS` (ou `realtime.refetchMaxWaitMs`): um valor maior refaz a leitura de uma tabela movimentada com menos frequência, um menor envia frames mais recentes.
 
-   <span class="since-badge" data-since="0.25">Desde 0.25</span> Um refetch que lê exatamente o que um assinante recebeu por último não envia nada
+   Um refetch que lê exatamente o que um assinante recebeu por último não envia nada
    a esse assinante: uma gravação na linha 9.000 de uma lista que mostra as primeiras 50 custa
    a leitura, não um frame para cada espectador. Depois de um frame de erro, as próximas linhas
    são enviadas de novo, mesmo que sejam as mesmas.
@@ -194,7 +194,7 @@ O frame é `{ rows, pks, meta }`:
 
 `meta` é contabilizado dentro da mesma transação com restrição de RLS que leu as linhas, portanto descreve exatamente as linhas ao lado dele. Sem isso, um cliente que precisasse de um total teria que emitir um `GET /count` **por push** — uma viagem de ida e volta (round trip) extra por gravação, por assinante, e uma janela na qual a contagem e as linhas descreviam estados diferentes da coleção.
 
-Quando a contagem em si falha, o frame traz `partial: true` e nenhum `total`; isso não é um erro de assinatura, e o cliente deve manter o último total real em vez de substituí-lo pelo tamanho da página. <span class="since-badge" data-since="0.25">Desde 0.25</span> Em uma tabela grande, a contagem é a maior parte do que um frame custa. Com `REALTIME_RECOUNT_INTERVAL_MS` definido, uma lista cujo último total foi de pelo menos `REALTIME_RECOUNT_MIN_ROWS` (100.000 por padrão) reaproveita esse total durante o intervalo em vez de contar a cada gravação, e esse frame traz `meta.totalAsOf`, quando o total foi obtido. Sem definir, como por padrão, todo frame conta.
+Quando a contagem em si falha, o frame traz `partial: true` e nenhum `total`; isso não é um erro de assinatura, e o cliente deve manter o último total real em vez de substituí-lo pelo tamanho da página. Em uma tabela grande, a contagem é a maior parte do que um frame custa. Com `REALTIME_RECOUNT_INTERVAL_MS` definido, uma lista cujo último total foi de pelo menos `REALTIME_RECOUNT_MIN_ROWS` (100.000 por padrão) reaproveita esse total durante o intervalo em vez de contar a cada gravação, e esse frame traz `meta.totalAsOf`, quando o total foi obtido. Sem definir, como por padrão, todo frame conta.
 
 ### O que uma gravação custa, e os limites
 
@@ -241,13 +241,13 @@ registros distintos que uma página mantém abertos. Altere isso com
 `REALTIME_MAX_SUBSCRIPTIONS_PER_SOCKET` ou `realtime.maxSubscriptionsPerSocket`
 no adaptador Postgres (a variável de ambiente prevalece); um valor que não é um
 número inteiro positivo interrompe o servidor na inicialização. Na 0.23 as assinaturas de um socket
-não têm limite. <span class="since-badge" data-since="0.25">Desde 0.25</span> **Os sockets que um usuário mantém também podem ser limitados**, por instância de servidor: defina `REALTIME_MAX_SOCKETS_PER_USER` (ou `realtime.maxSocketsPerUser`), e um login além dele é recusado com `TOO_MANY_SOCKETS` e o socket é fechado com 4002. Sem definir, como por padrão, não há limite.
+não têm limite. **Os sockets que um usuário mantém também podem ser limitados**, por instância de servidor: defina `REALTIME_MAX_SOCKETS_PER_USER` (ou `realtime.maxSocketsPerUser`), e um login além dele é recusado com `TOO_MANY_SOCKETS` e o socket é fechado com 4002. Sem definir, como por padrão, não há limite.
 
 Um id de assinatura é próprio do socket: dois clientes que ambos nomeiam uma
 assinatura `"sub-1"` mantêm cada um a sua, e um `unsubscribe` encerra apenas a
 do remetente.
 
-<span class="since-badge" data-since="0.25">Desde 0.25</span> **Assinar conta para o limite de taxa de dados.** O primeiro frame de uma assinatura é uma leitura, executada como o assinante, e o mesmo vale para a requisição de histórico de um canal. Por isso `subscribe_collection`, `subscribe_one` e `channel_history` contam como requisições de dados no bucket de limite de taxa do chamador (o mesmo que suas requisições HTTP e seus outros sockets compartilham) depois que a cota do próprio socket se esgota. Cada socket pode enviar 1.000 delas sem que sejam contadas, ou tantas quanto o seu teto de assinaturas, quando este for maior, e a cota volta ao longo de 15 minutos. Isso é tudo o que um socket pode manter, de modo que a reassinatura após uma reconexão nunca é recusada e nunca gasta o orçamento da pessoa. Passada a cota, um frame acima do limite é recusado com um frame de erro codificado `RATE_LIMITED`, que o SDK entrega ao `onError` dessa assinatura, ou ao do canal. Na 0.23 esses frames contam apenas para o orçamento próprio do socket, de 2.000 frames por minuto.
+**Assinar conta para o limite de taxa de dados.** O primeiro frame de uma assinatura é uma leitura, executada como o assinante, e o mesmo vale para a requisição de histórico de um canal. Por isso `subscribe_collection`, `subscribe_one` e `channel_history` contam como requisições de dados no bucket de limite de taxa do chamador (o mesmo que suas requisições HTTP e seus outros sockets compartilham) depois que a cota do próprio socket se esgota. Cada socket pode enviar 1.000 delas sem que sejam contadas, ou tantas quanto o seu teto de assinaturas, quando este for maior, e a cota volta ao longo de 15 minutos. Isso é tudo o que um socket pode manter, de modo que a reassinatura após uma reconexão nunca é recusada e nunca gasta o orçamento da pessoa. Passada a cota, um frame acima do limite é recusado com um frame de erro codificado `RATE_LIMITED`, que o SDK entrega ao `onError` dessa assinatura, ou ao do canal. Na 0.23 esses frames contam apenas para o orçamento próprio do socket, de 2.000 frames por minuto.
 
 ### Sockets que param de responder
 
@@ -260,7 +260,7 @@ Navegadores e o SDK respondem aos pings sozinhos; um cliente que fala o
 protocolo diretamente também precisa respondê-los, como faz a maioria das
 bibliotecas de WebSocket.
 
-<span class="since-badge" data-since="0.25">Desde 0.25</span> **O lado do navegador.** Um navegador não consegue enviar nem ver um ping, então um socket meio aberto parece conectado para ele para sempre. O SDK abre o socket com `?rebase_caps=heartbeat,channel_seq,cancel_sql`; um servidor que as conhece responde com `{"type":"hello","capabilities":[…],"heartbeatMs":30000}`, listando as que honra (`cancel_sql`: aceita o frame `CANCEL_SQL` do console SQL), e envia `{"type":"heartbeat"}` a cada 30 segundos, e o SDK derruba o socket e [se reconecta](#reconexão-automática) depois de duas perdidas. Um cliente que não nomeia nada não recebe nenhuma das duas, e um servidor mais antigo ignora o parâmetro, então um SDK falando com um se comporta como antes.
+**O lado do navegador.** Um navegador não consegue enviar nem ver um ping, então um socket meio aberto parece conectado para ele para sempre. O SDK abre o socket com `?rebase_caps=heartbeat,channel_seq,cancel_sql`; um servidor que as conhece responde com `{"type":"hello","capabilities":[…],"heartbeatMs":30000}`, listando as que honra (`cancel_sql`: aceita o frame `CANCEL_SQL` do console SQL), e envia `{"type":"heartbeat"}` a cada 30 segundos, e o SDK derruba o socket e [se reconecta](#reconexão-automática) depois de duas perdidas. Um cliente que não nomeia nada não recebe nenhuma das duas, e um servidor mais antigo ignora o parâmetro, então um SDK falando com um se comporta como antes.
 
 Um socket também é encerrado quando mais de 16&nbsp;MiB de frames enviados a ele
 continuam sem ser lidos. É um cliente que não lê o que recebe, ou um tão
@@ -376,7 +376,7 @@ A limpeza (pruning) ocorre à medida que as mensagens chegam, com limitação de
 - **Ordenada.** Os números de sequência são alocados por canal, e a ordem de entrega corresponde à ordem da sequência — em uma instância, e entre instâncias no bus `postgres`, onde a mesma instrução que numera uma mensagem também a anuncia, então toda instância (incluindo a do remetente) recebe os anúncios em ordem de sequência. Um bus que você mesmo fornece carrega frames na ordem em que os entrega.
 - **Durável antes de entregue.** Uma mensagem que não pode ser armazenada não é entregue a ninguém, e o remetente é informado. Entregá-la a colocaria diante dos assinantes conectados, enquanto a deixaria de fora de qualquer repetição (replay) futura, e nenhuma mensagem posterior poderia reparar essa lacuna.
 - **Pelo menos uma vez (At-least-once) na recuperação.** Um intervalo de repetição pode se sobrepor a mensagens que o cliente já recebeu; o SDK descarta aquelas que já foram entregues.
-- <span class="since-badge" data-since="0.25">Desde 0.25</span> **Sem buracos.** Uma mensagem retida chega a todos os membros: o remetente, que nunca recebe a própria mensagem, recebe `{"type":"broadcast_ack","channel","seq"}` no lugar quando aderiu a `channel_seq`. Assim, uma mensagem além de `lastSeq + 1` significa que uma foi perdida, e o SDK a segura, pede o histórico no meio e entrega todas em ordem. Contra um servidor sem `channel_seq`, um salto é entregue como chega.
+- **Sem buracos.** Uma mensagem retida chega a todos os membros: o remetente, que nunca recebe a própria mensagem, recebe `{"type":"broadcast_ack","channel","seq"}` no lugar quando aderiu a `channel_seq`. Assim, uma mensagem além de `lastSeq + 1` significa que uma foi perdida, e o SDK a segura, pede o histórico no meio e entrega todas em ordem. Contra um servidor sem `channel_seq`, um salto é entregue como chega.
 
 :::caution[O histórico tem o mesmo modelo de acesso que o canal]
 Um cliente que entrou em um canal pode reproduzir suas mensagens retidas, incluindo aquelas transmitidas antes de sua entrada — o pertencimento ao canal é a única verificação, e a entrada é aberta a qualquer cliente que saiba o nome do canal. A retenção é opcional por padrão de canal, portanto, ativá-la torna o passado desse canal legível para qualquer visitante que adivinhe o nome. Os canais retidos são o caso em que isso se torna durável em vez de momentâneo, portanto trate o conteúdo de um canal retido como público para os seus usuários.

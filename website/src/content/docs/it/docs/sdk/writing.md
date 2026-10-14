@@ -1,5 +1,5 @@
 ---
-sourceHash: dcdd32536d7ea87a
+sourceHash: 19b3f8d0d52e648a
 title: Scrittura dei dati
 sidebar_label: Scrittura dei dati
 description: create, upsert, update e delete con l'SDK — operazioni sui campi, scritture condizionali, chiavi di idempotenza, scritture batch e scrittura tra collezioni in una singola transazione.
@@ -68,7 +68,7 @@ toccati: un conflitto indica che la sua creazione appartiene al passato.
 
 #### Non sulla collection degli utenti
 
-<span class="since-badge" data-since="0.25">Since 0.25</span> `upsert()` sulla collection degli utenti (quella con `auth` attivo) viene rifiutato con un 400 (`INVALID_CONFLICT_TARGET`), come anche `createMany` con `upsert` su di essa. Creare un utente e modificarlo seguono regole diverse — una creazione esegue l'hash della password e invia l'invito, un aggiornamento non può declassare l'ultimo amministratore — e un upsert scopre quale dei due è solo dentro la scrittura. Chiama invece `create` o `update`.
+`upsert()` sulla collection degli utenti (quella con `auth` attivo) viene rifiutato con un 400 (`INVALID_CONFLICT_TARGET`), come anche `createMany` con `upsert` su di essa. Creare un utente e modificarlo seguono regole diverse — una creazione esegue l'hash della password e invia l'invito, un aggiornamento non può declassare l'ultimo amministratore — e un upsert scopre quale dei due è solo dentro la scrittura. Chiama invece `create` o `update`.
 
 ### Update
 
@@ -150,7 +150,7 @@ riga proveniente da `find()`, dalla cache offline o da un server che non invia a
 `ETag` — e passare `undefined` non invia alcuna precondizione, degradando la chiamata precedente
 a un normale update invece di generare un errore.
 
-<span class="since-badge" data-since="0.25">Da 0.25</span> Una riga restituita da `update()` porta la versione che quella scrittura ha prodotto,
+Una riga restituita da `update()` porta la versione che quella scrittura ha prodotto,
 così le modifiche condizionali si concatenano senza una lettura nel mezzo. Una riga che riceve una callback di `listenById()`
 porta la versione che quel frame mostra:
 

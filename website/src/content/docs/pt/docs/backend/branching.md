@@ -1,5 +1,5 @@
 ---
-sourceHash: b964127a9f6eafc2
+sourceHash: 9f9448404128f745
 title: Branching de Banco de Dados
 sidebar_label: Branching
 description: Crie branches de banco de dados isoladas para desenvolvimento, staging e testes usando o CREATE DATABASE ... TEMPLATE do PostgreSQL — cópias instantâneas e de alta fidelidade com zero tempo de inatividade.
@@ -60,7 +60,7 @@ Cannot create branch: the source database "leadgen" has active connections.
 
 O `--force` encerra essas sessões antes da criação do template, tanto no `create` quanto no `delete`. Ele nunca encerra a sessão que está executando o comando em si.
 
-<span class="since-badge" data-since="0.25">Desde 0.25</span> O `create --force`
+O `create --force`
 também fecha a origem para novas conexões durante a cópia
 (`ALTER DATABASE … ALLOW_CONNECTIONS false`, executado a partir do banco de dados
 `postgres` do servidor) e a abre de novo depois: em caso de falha, e em qualquer sinal que ele consiga
@@ -218,7 +218,7 @@ O comando `switch` é o que torna uma branch utilizável. Ele registra a branch 
 Um `rebase dev` que já está em execução mantém o banco de dados com que iniciou até
 você reiniciá-lo, e o `switch` avisa isso.
 
-<span class="since-badge" data-since="0.25">Desde 0.25</span> O `rebase db branch
+O `rebase db branch
 list` marca a branch em que este checkout está, e o `prune` nunca a remove, assim como
 o `delete` se recusa a fazê-lo: o plano a lista como mantida e diz para sair dela com
 `rebase db branch switch --off` primeiro. Na 0.24 o `prune --older-than … --yes`
@@ -234,7 +234,7 @@ Ele fica posicionado entre a shell e o arquivo do projeto na ordem de resoluçã
 5. `--docker`, ou o último `rebase dev` ter rodado com ele
 6. o banco de dados de desenvolvimento gerenciado
 
-<span class="since-badge" data-since="0.25">Desde 0.25</span> O item 5 segue o
+O item 5 segue o
 último `rebase dev --docker`, de modo que um comando de branch depois dele não
 precisa de um `--docker` próprio, e um `--docker` que um item acima dele supera
 não inicia nenhum container e informa que foi ignorado. Na 0.24 só a flag conta,
@@ -244,7 +244,7 @@ Uma branch precisa ter precedência sobre o `.env`, caso contrário, alternar n�
 
 O diretório `.rebase/` está no gitignore, portanto a branch em que você está é uma informação sobre a sua máquina e nunca sobre o projeto.
 
-<span class="since-badge" data-since="0.25">Desde 0.25</span> Em um checkout
+Em um checkout
 trocado, `rebase db branch create`, `list`, `info`, `delete` e `prune` atuam sobre o
 banco de dados principal, onde fica o registro, e dizem isso. `create` continua copiando
 a branch em que você está, a menos que você passe `--from`; ela é registrada no banco

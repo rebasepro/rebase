@@ -1,5 +1,5 @@
 ---
-sourceHash: 62bb342dd6196f27
+sourceHash: 867178ccdf409a3f
 title: Vue d'ensemble du Frontend
 sidebar_label: Frontend
 description: "Créez et personnalisez le panneau d'administration — Rebase CMS et Rebase Studio — avec React : contrôleurs, structure (scaffold), routage et vues."
@@ -88,7 +88,7 @@ n'étaient même jamais lues par le composant :
 | `collectionViews` | Modes de vue de collection personnalisés, accessibles à toute collection par `key` |
 | `entityActions` | Actions globales d'entité |
 | `effectiveRoleController` | Simuler un rôle différent lorsque le mode dev est activé |
-| `modeController` | <span class="since-badge" data-since="0.25">Depuis 0.25</span> Confier à Rebase le mode clair/sombre de l'application hôte ; Rebase ne touche alors jamais à `<html>`, à `prefers-color-scheme` ni à localStorage — voir [Styles](#styles) |
+| `modeController` | Confier à Rebase le mode clair/sombre de l'application hôte ; Rebase ne touche alors jamais à `<html>`, à `prefers-color-scheme` ni à localStorage — voir [Styles](#styles) |
 | `translations` | Remplacer ou étendre n'importe quelle chaîne de l'interface, indexée par locale — voir [Traductions](/docs/frontend/i18n) |
 | `components` | Remplacer les composants intégrés — voir [Remplacements de composants](/docs/frontend/component-overrides) |
 <!-- rebase-props:end -->
@@ -138,7 +138,7 @@ entities[0].values.title;
 
 ## Une collection ou un enregistrement dans une page qui vous appartient
 
-<span class="since-badge" data-since="0.25">Depuis 0.25</span> En 0.24,
+En 0.24,
 `CollectionPanel` ne prend qu'un `path` enregistré et affiche « Collection not
 found » en dehors de l'arbre d'administration complet, et `EntityFormPanel` et
 `CollectionsProvider` n'existent pas.
@@ -243,7 +243,7 @@ L'ordre est fixe : `RebaseAuthGate → RebaseNavigation → RebaseRouteDefs → 
 rien en dessous ne s'affiche pour un visiteur non authentifié ; `RebaseNavigation` construit
 les contrôleurs de navigation, d'URL et de registre de collections lus par `RebaseRouteDefs`
 et chaque vue de collection, de sorte qu'utiliser `RebaseRouteDefs` en dehors lèvera une exception.
-<span class="since-badge" data-since="0.25">Depuis 0.25</span> Pour intégrer une
+Pour intégrer une
 vue de collection ou un formulaire d'enregistrement dans une page qui vous appartient, sans les routes de
 l'administration, le `CollectionsProvider`, plus léger, construit ces contrôleurs
 à la place — voir
@@ -341,7 +341,7 @@ modeController.setMode("dark");  // "light" | "dark" | "system" — "system" fol
 
 `<Rebase>` en construit un lui-même.
 
-<span class="since-badge" data-since="0.25">Depuis 0.25</span> Lorsque le
+Lorsque le
 composant qui l'utilise se démonte, il retire la classe `dark` qu'il a ajoutée ; une classe `dark`
 déjà présente sur la page reste. Construisez le vôtre
 au-dessus de `<Rebase>` uniquement lorsque des composants extérieurs à celui-ci ont aussi besoin du mode, et confiez-le
@@ -449,11 +449,11 @@ Par défaut, `<Rebase>` possède le thème de la page : il place la classe `dark
 `<html>`, suit `prefers-color-scheme` jusqu'à ce que l'utilisateur choisisse un mode dans
 l'administration, et mémorise ce choix dans localStorage.
 
-<span class="since-badge" data-since="0.25">Depuis 0.25</span> Lorsque `<Rebase>`
+Lorsque `<Rebase>`
 se démonte, il retire la classe `dark` qu'il a ajoutée ; une classe déjà présente sur la page
 reste. En 0.24, la classe reste en place.
 
-<span class="since-badge" data-since="0.25">Depuis 0.25</span> Lorsque votre application
+Lorsque votre application
 a déjà un thème, passez-le comme `modeController`. Rebase y lit `mode`,
 appelle son `setMode` depuis son propre sélecteur de thème, et ne touche jamais à `<html>`,
 à `prefers-color-scheme` ni à localStorage :

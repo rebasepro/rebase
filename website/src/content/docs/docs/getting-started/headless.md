@@ -110,7 +110,7 @@ pnpm rebase schema introspect
 Files land in `config/collections/`. From that point the project has collections
 in code and the boot-time introspection stops being what defines the API.
 
-<span class="since-badge" data-since="0.25">Since 0.25</span> The headless
+The headless
 scaffold installs Atlas in `backend/`, so `rebase db push`, `rebase db generate`
 and `pnpm run db:migrate` work on those collections as in any project. On 0.24
 each of them stops on "The atlas binary is missing"; add it to the backend with
@@ -171,7 +171,7 @@ Three things resolve it, in the order worth checking:
    collection file plus `rebase db push` — and restart.
 2. **The tables do not have row-level security enabled**, so boot skipped
    them. The boot log names each one, with the SQL. Enable it and add a policy,
-   as above. <span class="since-badge" data-since="0.25">Since 0.25</span> The
+   as above. The
    response says so too: its message names the tables and gives the
    `ALTER TABLE … ENABLE ROW LEVEL SECURITY` for them, and
    `details.unprotectedTables` lists them. On 0.24 it says the database has no

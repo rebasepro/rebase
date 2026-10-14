@@ -1,5 +1,5 @@
 ---
-sourceHash: 3702fa186011ca6b
+sourceHash: 2ab6f8f502363939
 title: Champs de téléversement de fichiers
 sidebar_label: Téléversements de fichiers
 description:"\"Déclarer un champ de fichier ou d'image sur une collection : le bloc storage, les téléversements uniques et multiples, et quelles options sont résolues par le panneau plutôt que par le serveur.\""
@@ -110,7 +110,7 @@ règles d'autorisation de stockage — voir [Storage](/docs/backend/storage).
 
 ### Les fichiers ne sont jamais supprimés pour vous
 
-Vider un champ de fichier, remplacer son fichier, ou supprimer la ligne à laquelle il appartient laisse l'objet stocké où il est. Chaque téléversement reçoit sa propre clé, si bien qu'un remplacement écrit un nouvel objet plutôt que d'écraser l'ancien, et rien ne supprime le précédent : deux lignes peuvent partager la même clé, donc le panneau ne peut pas savoir qu'un fichier est inutilisé. Les objets qu'aucune ligne ne référence restent dans le bucket, et sont facturés, jusqu'à ce que vous les supprimiez — depuis le navigateur de stockage de Studio, avec `client.storage.deleteObject(key)`, ou avec une règle de cycle de vie sur le bucket. <span class="since-badge" data-since="0.25">Depuis 0.25</span> `rebase storage orphans` liste les fichiers qu'aucune ligne ne nomme, et les supprime avec `--delete` — voir [la CLI](/docs/cli/#rebase-storage).
+Vider un champ de fichier, remplacer son fichier, ou supprimer la ligne à laquelle il appartient laisse l'objet stocké où il est. Chaque téléversement reçoit sa propre clé, si bien qu'un remplacement écrit un nouvel objet plutôt que d'écraser l'ancien, et rien ne supprime le précédent : deux lignes peuvent partager la même clé, donc le panneau ne peut pas savoir qu'un fichier est inutilisé. Les objets qu'aucune ligne ne référence restent dans le bucket, et sont facturés, jusqu'à ce que vous les supprimiez — depuis le navigateur de stockage de Studio, avec `client.storage.deleteObject(key)`, ou avec une règle de cycle de vie sur le bucket. `rebase storage orphans` liste les fichiers qu'aucune ligne ne nomme, et les supprime avec `--delete` — voir [la CLI](/docs/cli/#rebase-storage).
 
 ### Déplacer une propriété vers une autre source de stockage
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: cc03d759eb4057c2
+sourceHash: 7f10dbaa07451bc9
 title: Multiples bases de données et buckets
 sidebar_label: Multiples sources
 description: Acheminez les collections vers différentes bases de données et les propriétés vers différents buckets de stockage, et configurez chacun depuis l'environnement.
@@ -227,8 +227,6 @@ Le moteur provient de la déclaration, il n'y a donc aucun `STORAGE_TYPE` à dé
 
 #### Quel bucket reçoit un téléversement non qualifié
 
-<span class="since-badge" data-since="0.25">Depuis 0.25</span>
-
 Une propriété de stockage qui ne spécifie aucun `storageSource` écrit dans le bucket par **défaut**.
 Déclarer des buckets nommés ne le déplace jamais. Le bucket par défaut garde sa propre
 configuration, quoi que déclare `config/resources.ts` : `STORAGE_TYPE`,
@@ -401,7 +399,7 @@ Avec `STORAGE_PATH=/storage/uploads`, `bucket("media", { engine: "local" })`
 `/storage`, comme le fait le fichier compose généré par `rebase init`, et non sur
 `STORAGE_PATH` directement. `STORAGE_PATH__MEDIA` définit explicitement le répertoire d'un bucket spécifique. Consultez [Auto-hébergement](/docs/deployment/self-hosting/#file-storage).
 
-<span class="since-badge" data-since="0.25">Depuis 0.25</span> Déclarer des
+Déclarer des
 buckets ne change pas le bucket par défaut. Avec seulement `bucket("media")`
 déclaré, le bucket par défaut lit toujours ses propres variables. En développement, c'est
 `./uploads`. En production, sans liaison, il est désactivé comme tout bucket non lié :

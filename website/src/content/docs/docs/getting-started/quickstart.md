@@ -69,7 +69,7 @@ Pin a port with `rebase dev --port 3001`.
 | `--headless` | `init` | A backend with no collection files and no UI — see [Backend only](/docs/getting-started/headless/) |
 | `--template <name>` | `init` | Start from a template other than the default |
 | `--install` / `--no-install` | `init` | Run the package manager for you, or leave it |
-| `--docker` | `dev` | Use PostgreSQL in a container instead of the managed one. <span class="since-badge" data-since="0.25">Since 0.25</span> The other commands follow it until `rebase dev` runs without it. A `DATABASE_URL` outranks it: then it starts nothing, and says so |
+| `--docker` | `dev` | Use PostgreSQL in a container instead of the managed one. The other commands follow it until `rebase dev` runs without it. A `DATABASE_URL` outranks it: then it starts nothing, and says so |
 | `--no-db` | `dev` | Start no database at all — not the container and not the managed one. Set `DATABASE_URL` yourself |
 
 ## Variant: use your own PostgreSQL
@@ -89,7 +89,7 @@ The migration commands plan changes with [Atlas](https://atlasgo.io/), the
 schema-migration engine Rebase plans with, which needs a second empty database to
 compare against. On your own database Rebase makes one beside it; on the managed
 one, which serves exactly one database, it starts a throwaway PGlite for the
-length of the command. <span class="since-badge" data-since="0.25">Since 0.25</span>
+length of the command.
 On 0.24 the migration commands refuse the managed database, and need your own.
 Either way:
 
@@ -203,7 +203,7 @@ column, a narrowed type, a removed field:
 pnpm run db:push
 ```
 
-<span class="since-badge" data-since="0.25">Since 0.25</span> It runs on the
+It runs on the
 managed database as on your own. On 0.24 it needs your own PostgreSQL.
 
 ## Database Commands Reference
@@ -216,7 +216,7 @@ managed database as on your own. On 0.24 it needs your own PostgreSQL.
 | `rebase db generate` | Generate SQL migration files |
 | `rebase db migrate` | Run pending migrations |
 
-<span class="since-badge" data-since="0.25">Since 0.25</span> The three `db`
+The three `db`
 commands work on the managed database. On 0.24 they need your own PostgreSQL.
 
 ## What's Next

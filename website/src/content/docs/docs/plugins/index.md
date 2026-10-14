@@ -61,7 +61,6 @@ the **[Slots](/docs/frontend/slots)** page.
   a sign-in, `null` on sign-out. The plugin stays mounted across both.
 - `onUnmount()` runs when `<Rebase>` unmounts.
 
-<span class="since-badge" data-since="0.25">Since 0.25</span>
 `lifecycle.onCollectionChange` is deprecated. Nothing ever called it, on 0.24
 or before. A plugin that sets it still compiles, and `<Rebase>` warns once per
 plugin. To follow a collection's rows, subscribe from `onMount` and
@@ -172,7 +171,7 @@ function useMyPlugin(): RebasePlugin {
 
 ### Field wrappers from several plugins
 
-<span class="since-badge" data-since="0.25">Since 0.25</span> On 0.24 each
+On 0.24 each
 plugin's `wrap` received the built-in field, and only the last wrapper
 returned was rendered.
 
@@ -224,7 +223,7 @@ to every markdown field, which continues the text from the cursor. Both appear
 only where the plugin is enabled: the service reports itself available and
 `getConfigForPath` (when you pass one) allows the collection. A field whose
 `customProps.editorProps.aiController` names a controller of its own uses that
-one. <span class="since-badge" data-since="0.25">Since 0.25</span> Another plugin can give markdown fields a controller the same way, with
+one. Another plugin can give markdown fields a controller the same way, with
 `EditorAIControllerProvider` from `@rebasepro/cms` in a form-scoped provider.
 
 ![Data enhancement](/img/data_enhancement.png)
@@ -329,7 +328,6 @@ export function App() {
 }
 ```
 
-<span class="since-badge" data-since="0.25">Since 0.25</span>
 `hooks.modifyCollectionAsync` is deprecated. Nothing ever called it, on 0.24
 or before. A plugin that sets it still compiles, and `<Rebase>` warns once per
 plugin. Use `modifyCollection` as above.

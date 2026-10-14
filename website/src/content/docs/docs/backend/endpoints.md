@@ -134,18 +134,18 @@ a collection reaches none of this. See [Roles and scopes](/docs/backend/roles-an
 | `GET` | `/api/admin/cron/:id` | `cron:read` | [Cron Jobs](/docs/backend/cron-jobs/) |
 | `PUT` | `/api/admin/cron/:id` | `cron:write` | Enable or disable a job |
 | `GET` | `/api/admin/cron/:id/logs` | `cron:read` | [Cron Jobs](/docs/backend/cron-jobs/) |
-| `POST` | `/api/admin/cron/:id/trigger` | `cron:write` | Run a job now. <span class="since-badge" data-since="0.25">Since 0.25</span> `?async=1` answers `202` once it has started — [Cron Jobs API](/docs/backend/cron-jobs-api/#example-trigger-a-job-manually) |
+| `POST` | `/api/admin/cron/:id/trigger` | `cron:write` | Run a job now. `?async=1` answers `202` once it has started — [Cron Jobs API](/docs/backend/cron-jobs-api/#example-trigger-a-job-manually) |
 | `GET` | `/api/admin/backups` | `backups:read` | Backup inventory |
 | `GET` | `/api/admin/backups/download` | `backups:read` | Streams one backup. With `?token=` from a download link, no header is needed, for that backup only |
-| `POST` | `/api/admin/backups/download-url` | `backups:read` | <span class="since-badge" data-since="0.25">Since 0.25</span> A link to one backup, `{ key }` → `{ url, token, expiresIn }`, good for 60 seconds — [Backups](/docs/deployment/backups/#download-a-backup) |
-| `GET` | `/api/admin/storage/orphans` | `database:read` | <span class="since-badge" data-since="0.25">Since 0.25</span> Stored files no row names, `?storageId=&olderThanHours=` — what `rebase storage orphans` prints |
-| `DELETE` | `/api/admin/storage/orphans` | `database:write` | <span class="since-badge" data-since="0.25">Since 0.25</span> Finds them again and deletes them; `409 STORAGE_SCAN_INCOMPLETE` when a collection could not be read |
-| `POST` | `/api/admin/storage/move` | `database:write` | <span class="since-badge" data-since="0.25">Since 0.25</span> Copies a folder to another source under the same keys, a page per call — what `rebase storage move` sends |
+| `POST` | `/api/admin/backups/download-url` | `backups:read` | A link to one backup, `{ key }` → `{ url, token, expiresIn }`, good for 60 seconds — [Backups](/docs/deployment/backups/#download-a-backup) |
+| `GET` | `/api/admin/storage/orphans` | `database:read` | Stored files no row names, `?storageId=&olderThanHours=` — what `rebase storage orphans` prints |
+| `DELETE` | `/api/admin/storage/orphans` | `database:write` | Finds them again and deletes them; `409 STORAGE_SCAN_INCOMPLETE` when a collection could not be read |
+| `POST` | `/api/admin/storage/move` | `database:write` | Copies a folder to another source under the same keys, a page per call — what `rebase storage move` sends |
 | `GET` | `/api/admin/logs` | `logs:read` | The recent log buffer |
 | `GET` | `/api/admin/logs/latest` | `logs:read` | The most recent entries |
 | `GET` | `/api/admin/logs/stream` | `logs:read` | Server-sent events |
 | `GET` | `/api/admin/rls-audit` | `schema:read` | The scheduled audit's latest result |
-| `POST` | `/api/admin/sql/csv` | `database:write` | <span class="since-badge" data-since="0.25">Since 0.25</span> Streams one read-only query's whole result as CSV — [Studio](/docs/studio/)'s "Download full result as CSV" |
+| `POST` | `/api/admin/sql/csv` | `database:write` | Streams one read-only query's whole result as CSV — [Studio](/docs/studio/)'s "Download full result as CSV" |
 | `GET` | `/api/admin/schema/status` | `schema:read` | [Live schema editing](/docs/backend/live-schema-editing/) |
 | `POST` | `/api/admin/schema/plan` | `schema:read` | Plans a change; never applies one |
 | `POST` | `/api/admin/schema/apply` | `schema:write` | A person only, unless `REBASE_LIVE_SCHEMA_ALLOW_MACHINE_APPLY` |
@@ -169,7 +169,7 @@ for projects that have not moved; write new code against the canonical path.
 | `GET` | `/api/storage/file/*` | session + `storageAuthorize` | [Storage](/docs/backend/storage/) |
 | `DELETE` | `/api/storage/file/*` | session + `storageAuthorize` | [Storage](/docs/backend/storage/) |
 | `GET` | `/api/storage/metadata/*` | session + `storageAuthorize` | [Storage](/docs/backend/storage/) |
-| `POST` | `/api/storage/metadata` | session + `storageAuthorize`, per key | <span class="since-badge" data-since="0.25">Since 0.25</span> [Storage](/docs/backend/storage/#storage-endpoints): metadata for up to 100 objects |
+| `POST` | `/api/storage/metadata` | session + `storageAuthorize`, per key | [Storage](/docs/backend/storage/#storage-endpoints): metadata for up to 100 objects |
 | `GET` | `/api/storage/list` | session + `storageAuthorize` | [Storage](/docs/backend/storage/) |
 | `POST` | `/api/storage/folder` | session + `storageAuthorize` | [Storage](/docs/backend/storage/) |
 | `GET` | `/api/storage/sources` | session | The named storage sources this backend serves |

@@ -1,5 +1,5 @@
 ---
-sourceHash: 10cf48a2f2326c5a
+sourceHash: d0d64eef975c9c59
 title: Skripte und die Konsole
 sidebar_label: Skripte und Konsole
 description: Öffnen Sie die Daten eines Projekts aus einem Skript, einem Test oder einer REPL mit openRebase oder über das Terminal mit rebase console. Kein Server, keine Schemaänderungen.
@@ -7,7 +7,7 @@ description: Öffnen Sie die Daten eines Projekts aus einem Skript, einem Test o
 
 ## Übersicht
 
-<span class="since-badge" data-since="0.25">Seit 0.25</span> Unter 0.24 gibt es
+Unter 0.24 gibt es
 weder `openRebase` noch `rebase console`: Ein Skript muss ein Backend bauen oder
 die REST-API eines laufenden Servers aufrufen.
 
@@ -28,8 +28,6 @@ und `sql`, sodass ein Snippet unverändert zwischen einer Funktion, einem Skript
 wandern kann.
 
 ## `rebase console`
-
-<span class="since-badge" data-since="0.25">Seit 0.25</span>
 
 Führen Sie es in Ihrem Projekt aus:
 
@@ -67,8 +65,6 @@ nach stderr.
 
 ### Ein Snippet: `--eval`
 
-<span class="since-badge" data-since="0.25">Seit 0.25</span>
-
 `rebase console -e "<code>"` führt ein Stück Code anstelle der REPL aus. Der Wert eines
 Ausdrucks oder das `return` eines Funktionskörpers wird abgewartet (`await`) und als
 JSON auf stdout ausgegeben, sodass sich die Ausgabe weiterleiten (pipen) lässt:
@@ -83,7 +79,7 @@ Alles, was die Konsole protokolliert, geht, was auch immer `LOG_LEVEL` sagt, nac
 sodass stdout das Ergebnis und sonst nichts enthält. Ein Snippet, das einen Fehler wirft, gibt
 den Fehler auf stderr aus und beendet sich mit `1`.
 
-<span class="since-badge" data-since="0.25">Seit 0.25</span> Eine Datenbank,
+Eine Datenbank,
 die die Konsole nicht öffnen kann, wird einmal gemeldet, und sie beendet sich mit `1`: das
 Banner "Cannot connect to PostgreSQL", das die `db`-Befehle ausgeben, oder, bei der
 verwalteten Entwicklungsdatenbank, dass sie keine freie Verbindung hat. Diese Datenbank nimmt
@@ -102,8 +98,6 @@ verwaltete Datenbank gab `read ECONNRESET` mit ihrem Stack als eine Zeile JSON a
 | `--docker` | Die Datenbank aus Docker Compose verwenden und sie bei Bedarf starten |
 
 ## `openRebase`
-
-<span class="since-badge" data-since="0.25">Seit 0.25</span>
 
 `openRebase` aus `@rebasepro/server-postgres` ist das, was die Konsole aufruft. Verwenden Sie
 es in einem Skript, einem Seed, einer Datenkorrektur oder einem Test. Legen Sie das Skript in
@@ -155,7 +149,7 @@ Seine Optionen:
 `openRebase` liest keine Umgebungsvariable. Die `DATABASE_URL` oben wird von Ihrem Skript gelesen,
 und Einstellungen wie `REBASE_DB_POOL_MAX` oder `REALTIME_CDC` ändern hier nichts.
 
-<span class="since-badge" data-since="0.25">Seit 0.25</span> Das Öffnen
+Das Öffnen
 protokolliert auf `info` nichts, sodass die stdout eines Skripts enthält, was das Skript
 ausgibt, und `tsx scripts/report.ts > report.json` nur dessen JSON schreibt. Warnungen und
 Fehler gehen in der Entwicklung nach stderr. Der Hinweis, wie Anfragen isoliert werden
@@ -175,8 +169,6 @@ falsch geschriebenes Feld oder ein falscher Enum-Wert in einem Skript ein Typfeh
 beiden sind Zeilen untypisiert, weshalb das erste Beispiel `draft.id` mit `String()` umwandelt.
 
 ### Prüfen, was ein Benutzer sehen kann
-
-<span class="since-badge" data-since="0.25">Seit 0.25</span>
 
 `withAuth` ist der schnellste Weg, eine Sicherheitsregel gegen echte Daten zu testen. Das
 Blog-Scaffold, die Vorgabe von `rebase init`, gibt jeder Collection die
@@ -224,8 +216,6 @@ Führen Sie vorher `rebase db push` aus oder booten Sie den Server einmal.
 
 ### In einem Test
 
-<span class="since-badge" data-since="0.25">Seit 0.25</span>
-
 ```typescript
 import { after, before, test } from "node:test";
 import assert from "node:assert/strict";
@@ -259,8 +249,6 @@ Dasselbe funktioniert unter Vitest oder Jest.
 
 ### Collections mit History
 
-<span class="since-badge" data-since="0.25">Seit 0.25</span>
-
 Ein Schreibvorgang auf eine Collection mit [`history: true`](/docs/backend/history/)
 zeichnet seinen Eintrag so auf, wie es ein Schreibvorgang des Servers tut. Der Eintrag
 wird in der eigenen Transaktion der Zeile geschrieben, sodass ein Schreibvorgang, der
@@ -282,8 +270,6 @@ die ein Skript nicht sehen kann, daher bereinigt der Server sie wie gewohnt: wen
 Entität das nächste Mal schreibt und in seinem stündlichen Durchlauf.
 
 ### Was es auslässt
-
-<span class="since-badge" data-since="0.25">Seit 0.25</span>
 
 `openRebase` öffnet die Datenschicht und sonst nichts. Es startet kein Realtime, daher werden
 seine Schreibvorgänge Live-Abfragen nicht mitgeteilt. Storage, E-Mail, Auth-Verwaltung und

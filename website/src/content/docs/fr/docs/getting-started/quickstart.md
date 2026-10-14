@@ -1,5 +1,5 @@
 ---
-sourceHash: dc4cb3811023b966
+sourceHash: 44951a600db63629
 title: Démarrage rapide
 sidebar_label: Démarrage rapide
 description: Créez un nouveau projet Rebase et lancez-le localement en moins de 2 minutes.
@@ -70,7 +70,7 @@ Fixez un port avec `rebase dev --port 3001`.
 | `--headless` | `init` | Un backend sans fichiers de collections et sans interface utilisateur — voir [Backend seul](/docs/getting-started/headless/) |
 | `--template <name>` | `init` | Démarrer à partir d'un autre template que celui par défaut |
 | `--install` / `--no-install` | `init` | Exécuter le gestionnaire de paquets pour vous, ou l'ignorer |
-| `--docker` | `dev` | Utiliser PostgreSQL dans un conteneur au lieu de l'instance gérée. <span class="since-badge" data-since="0.25">Depuis 0.25</span> Les autres commandes la suivent jusqu'à ce que `rebase dev` soit lancé sans elle. Un `DATABASE_URL` l'emporte sur elle : elle ne démarre alors rien, et le dit |
+| `--docker` | `dev` | Utiliser PostgreSQL dans un conteneur au lieu de l'instance gérée. Les autres commandes la suivent jusqu'à ce que `rebase dev` soit lancé sans elle. Un `DATABASE_URL` l'emporte sur elle : elle ne démarre alors rien, et le dit |
 | `--no-db` | `dev` | Ne démarrer aucune base de données — ni le conteneur ni l'instance gérée. Définissez `DATABASE_URL` vous-même |
 
 ## Variante : utiliser votre propre PostgreSQL
@@ -89,7 +89,7 @@ laissée intacte.
 Les commandes de migration planifient les modifications avec [Atlas](https://atlasgo.io/), le moteur de migration de schéma
 avec lequel Rebase fonctionne, qui nécessite une seconde base de données vide pour comparaison. Sur votre propre base de données,
 Rebase en crée une à côté ; sur la base gérée, qui n'en dessert qu'une seule, il démarre un PGlite jetable pendant la durée de la
-commande. <span class="since-badge" data-since="0.25">Depuis 0.25</span>
+commande.
 En 0.24, les commandes de migration refusent la base gérée et exigent la vôtre.
 Dans les deux cas :
 
@@ -202,7 +202,7 @@ renommée, un type restreint, un champ supprimé :
 pnpm run db:push
 ```
 
-<span class="since-badge" data-since="0.25">Depuis 0.25</span> Elle s'exécute sur la
+Elle s'exécute sur la
 base gérée comme sur la vôtre. En 0.24, elle exige votre propre PostgreSQL.
 
 ## Référence des commandes de base de données
@@ -215,7 +215,7 @@ base gérée comme sur la vôtre. En 0.24, elle exige votre propre PostgreSQL.
 | `rebase db generate` | Génère les fichiers de migration SQL |
 | `rebase db migrate` | Exécute les migrations en attente |
 
-<span class="since-badge" data-since="0.25">Depuis 0.25</span> Les trois commandes `db`
+Les trois commandes `db`
 fonctionnent sur la base gérée. En 0.24, elles exigent votre propre PostgreSQL.
 
 ## Étapes suivantes

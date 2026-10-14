@@ -1,5 +1,5 @@
 ---
-sourceHash: a7fdf34234049b93
+sourceHash: ee28e46d5e82c6f9
 title: MCP Server
 sidebar_label: MCP Server
 description: Verbinden Sie Claude Code, Cursor, Gemini CLI oder beliebige MCP-Clients mit einem Rebase-Projekt – die 42 bereitgestellten Tools, die Anmeldedaten zur Authentifizierung und das Loopback-Gate, das zwischen einem Agenten und der Produktion steht.
@@ -355,7 +355,7 @@ database at boot, additively. After changing a collection, restart it with
 rebase_dev_stop and rebase_dev_start. …
 ```
 
-<span class="since-badge" data-since="0.25">Seit 0.25</span> Aus einem Terminal laufen
+Aus einem Terminal laufen
 `rebase db push` und `rebase db migrate` auf dieser Datenbank; nur die MCP-Tools
 werden verweigert. Unter 0.24 verweigert die CLI sie dort ebenfalls.
 
@@ -395,7 +395,7 @@ vorzeitig beenden und den nachfolgenden Text nach außen verlagern kann.
 Der [Remote-Endpunkt](#der-remote-endpunkt) umschließt seine Tool-Ergebnisse auf
 dieselbe Weise und teilt dies dem Client mit; dessen `structuredContent` enthält
 das reine Ergebnis.
-<span class="since-badge" data-since="0.25">Seit 0.25</span> `list_collections` und
+`list_collections` und
 `describe_collection` sind die Ausnahmen: Nur ein Modell liest sie, daher werden sie
 einmal gesendet, im Text. Vor 0.24 trug die Auflistung zusätzlich eine Kopie in
 `structuredContent`.
@@ -520,7 +520,7 @@ und gibt den Grund im Start-Log an. Keine `REBASE_ROLE` schaltet ihn ein.
   deklariertes Argument sowie das Bearbeiten oder Löschen einer in den Papierkorb
   verschobenen Zeile (404) abgelehnt; das Setzen des Soft-Delete-Felds auf `null`
   stellt die Zeile wieder her.
-- <span class="since-badge" data-since="0.25">Seit 0.25</span> **Die Auflistung nennt die Collections; `describe_collection` liefert das Schema einer einzelnen.**
+- **Die Auflistung nennt die Collections; `describe_collection` liefert das Schema einer einzelnen.**
   `list_collections` antwortet mit `name`, `title` und `description` jeder Collection,
   und `describe_collection { collection }` mit dem OpenAPI-`row`- und `create`-Schema
   dieser Collection sowie `softDeleteField`, falls Zeilen in einen Papierkorb wandern.

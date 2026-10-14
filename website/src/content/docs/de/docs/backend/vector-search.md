@@ -1,5 +1,5 @@
 ---
-sourceHash: 333a5c7a8ba6fe64
+sourceHash: 8376384a90695757
 title: Vektorsuche
 sidebar_label: Vektorsuche
 description: Nächste-Nachbarn-Suche über eine Vektor-Property per REST-API — die Query-Parameter, Schwellenwerte, für eine URL zu lange Embeddings und wie sich Filter auf einem HNSW-Index verhalten.
@@ -20,7 +20,7 @@ GET /api/data/products?vector_search=embedding&vector=[0.15,0.22,-0.05]&vector_d
 | `vector_distance` | `string` | Die auszuwertende Distanzmetrik. Unterstützte Werte: `cosine` (Standard, `<=>`), `l2` (`<->`), `inner_product` (`<#>`). |
 | `vector_threshold` | `number` | Maximaler Distanz-Schwellenwert. Nur Datensätze mit einer Distanz unter diesem Schwellenwert werden zurückgegeben. |
 
-<span class="since-badge" data-since="0.25">Seit 0.25</span> Eine Vektorsuche mit einem
+Eine Vektorsuche mit einem
 `vector_threshold` hat kein `meta.total`: Die Zeilen innerhalb einer Distanz zu zählen
 bedeutet, diese Distanz für jede Zeile der Tabelle zu berechnen, was kein Index bedient — ein
 Mehrfaches der Kosten der Seite selbst, wachsend mit Zeilen × Dimensionen. `meta.hasMore` ist
@@ -29,14 +29,14 @@ gewöhnliche.
 
 Ein Embedding ist in einer URL lang: 768 Dimensionen sind etwa 17 KB Query-String und
 1.536 etwa 33 KB. Der Server akzeptiert bis zu 64 KB an Request-Zeile und Headern
-(<span class="since-badge" data-since="0.25">Seit 0.25</span>; zuvor 16 KB, ein 431
+(; zuvor 16 KB, ein 431
 ab 768 Dimensionen), und ein Proxy davor akzeptiert meist weniger — beim Standard von nginx
 sind es 8 KB. Senden Sie eine Vektorsuche stattdessen als [`POST …/query`](#abfragen-die-für-eine-url-zu-lang-sind);
 das SDK tut das immer.
 
 ## Filter auf einem approximativen Index
 
-<span class="since-badge" data-since="0.25">Seit 0.25</span> Eine Vektorsuche, die
+Eine Vektorsuche, die
 zusätzlich filtert — ein `where`, eine Suche, Row-Level Security —, gibt die nächsten Zeilen zurück,
 die passen. Ein HNSW-Index antwortet mit einer festen Anzahl nächster Kandidaten
 (`hnsw.ef_search`, standardmäßig 40), und die anderen Bedingungen werden auf diese angewendet;
@@ -51,7 +51,7 @@ Scan (`index: false`) hatte es nie.
 
 ## Abfragen, die für eine URL zu lang sind
 
-<span class="since-badge" data-since="0.25">Seit 0.25</span> `POST /api/data/:slug/query`
+`POST /api/data/:slug/query`
 ist die Auflistung, die `GET /api/data/:slug` beantwortet, mit den Query-Parametern in einem JSON-Body
 statt in der URL. Verwenden Sie es, wenn die URL nicht passen würde — das Embedding einer Vektorsuche,
 ein Filter auf einer langen `in`-Liste. Das SDK sendet jede Vektorsuche auf diese Weise
@@ -84,7 +84,7 @@ zählt gegen dasselbe Rate-Limit wie das `GET`. Verschachtelte Auflistungen habe
 `POST /api/data/authors/42/posts/query`. Ein Server älter als 0.24 antwortet darauf mit 404;
 das SDK sendet dann das `GET`.
 
-<span class="since-badge" data-since="0.25">Seit 0.25</span> Die Zählung hat
+Die Zählung hat
 denselben Zwilling: `POST /api/data/:slug/count` (und `POST /api/data/authors/42/posts/count`)
 ist `GET /api/data/:slug/count` mit seinen Parametern im Body, genauso gelesen
 und genauso abgelehnt. Eine Zählung trägt die Filter des `find()`, das sie beschreibt,

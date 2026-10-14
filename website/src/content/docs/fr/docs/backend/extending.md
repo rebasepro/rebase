@@ -1,5 +1,5 @@
 ---
-sourceHash: 85e444fd4d0f85a8
+sourceHash: b2aa1062d257415a
 title: Rebase ne fait pas X
 sidebar_label: Étendre le serveur
 description: L'échelle d'extension côté serveur — déclaration, callback de collection, fonction personnalisée, vos propres routes, votre propre serveur, eject — avec ce que chacun peut et ne peut pas atteindre.
@@ -16,7 +16,7 @@ La règle incarnée par cette échelle : **chaque échelon vous coûte quelque c
 
 ## L'échelle
 
-<span class="since-badge" data-since="0.25">Depuis 0.25</span> `createRebaseBackend`, à l'échelon 5,
+`createRebaseBackend`, à l'échelon 5,
 est nouveau ; en 0.24, cet échelon se limite au driver seul.
 
 | # | Échelon | Ce qu'il atteint | Ce qu'il n'atteint **pas** | Le coût à ce niveau |
@@ -143,7 +143,6 @@ Un piège de Hono bon à connaître, car il est silencieux : `app.use("/*", guar
 
 **Portée :** le processus.
 
-<span class="since-badge" data-since="0.25">Depuis 0.25</span>
 `initializeRebaseBackend` est un raccourci au-dessus de quelques appels publics, et cet échelon consiste à
 les appeler vous-même. `createRebaseBackend` construit le backend et ne monte, ne démarre et n'écoute
 rien. `backend.routes` contient chaque groupe de routes sous la forme d'une sous-application Hono que
@@ -217,7 +216,7 @@ async function topSellers(driver: DataDriver, since: string) {
 
 `driver` est ce que vous transmet le contexte d'une fonction personnalisée (`c.get("driver")`), ou `context.driver` dans un callback. Restreignez son type avec `isSQLAdmin` plutôt que de forcer le transtypage (casting) : ce garde fait la différence entre un driver incapable d'exécuter du SQL qui le signale clairement, et un driver qui lève une exception `admin.executeSql is not a function` au point d'appel.
 
-<span class="since-badge" data-since="0.25">Depuis 0.25</span> `executeSql` renvoie toutes les lignes qu'il lit. Pour du SQL dont vous ne
+`executeSql` renvoie toutes les lignes qu'il lit. Pour du SQL dont vous ne
 maîtrisez pas la taille, passez `maxResultBytes` : un résultat dont les lignes pèsent plus d'octets
 que cette valeur est refusé avec une erreur dont le `code` est `RESULT_TOO_LARGE`, jamais renvoyé en
 partie. Le `EXECUTE_SQL` du socket temps réel, par lequel passe le `executeSql` d'un client admin,

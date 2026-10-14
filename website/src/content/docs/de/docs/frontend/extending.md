@@ -1,5 +1,5 @@
 ---
-sourceHash: 2bd46c60d468fb45
+sourceHash: 1c45110c48185387
 title: Rebase erweitern
 sidebar_label: Rebase erweitern
 description: Ein Entscheidungsleitfaden zur Auswahl des richtigen Erweiterungsmechanismus – Plugins, Slots, Komponenten-Overrides, Entity-Views, Aktionen und mehr.
@@ -216,7 +216,7 @@ Wenn Sie das Verhalten des Servers ändern möchten und nicht die Darstellung de
 
 ## Zusammenfassung der Rangfolge
 
-- **`collection.components` wird innerhalb dieser Collection über die globalen `components` gelegt.** Ein Collection-Ersatz ersetzt beide; <span class="since-badge" data-since="0.25">Seit 0.25</span> ein `wrap: true`-Override der Collection umhüllt den globalen Override, falls es einen gibt (unter 0.24 umhüllt er das Eingebaute, und der globale Override wird übersprungen). Siehe [Komponenten-Overrides](/docs/frontend/component-overrides#when-both-scopes-override-a-component).
+- **`collection.components` wird innerhalb dieser Collection über die globalen `components` gelegt.** Ein Collection-Ersatz ersetzt beide; ein `wrap: true`-Override der Collection umhüllt den globalen Override, falls es einen gibt (unter 0.24 umhüllt er das Eingebaute, und der globale Override wird übersprungen). Siehe [Komponenten-Overrides](/docs/frontend/component-overrides#when-both-scopes-override-a-component).
 - **Collection-`Actions` und der `collection.actions`-Slot ergänzen sich** – `Actions` werden zuerst gerendert, danach die Slot-Beiträge.
 - **`entityActions` und `entityViews` auf Collection-Ebene erweitern die globalen (anstatt sie zu ersetzen).**
-- **Plugins werden in der Reihenfolge des `plugins`-Arrays angewendet**, nicht nach `key`. Slot-Beiträge werden nach ihrem `order` gerendert (niedrigere zuerst, standardmäßig 50), und bei Gleichstand bleibt diese Reihenfolge erhalten. <span class="since-badge" data-since="0.25">Seit 0.25</span> Feld-Wrapper mehrerer Plugins werden in dieser Reihenfolge komponiert, wobei der des ersten Plugins am innersten liegt; unter 0.24 wurde nur der letzte Wrapper gerendert. Siehe [Plugins](/docs/plugins#field-wrappers-from-several-plugins).
+- **Plugins werden in der Reihenfolge des `plugins`-Arrays angewendet**, nicht nach `key`. Slot-Beiträge werden nach ihrem `order` gerendert (niedrigere zuerst, standardmäßig 50), und bei Gleichstand bleibt diese Reihenfolge erhalten. Feld-Wrapper mehrerer Plugins werden in dieser Reihenfolge komponiert, wobei der des ersten Plugins am innersten liegt; unter 0.24 wurde nur der letzte Wrapper gerendert. Siehe [Plugins](/docs/plugins#field-wrappers-from-several-plugins).

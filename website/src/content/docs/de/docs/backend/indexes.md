@@ -1,5 +1,5 @@
 ---
-sourceHash: 3d8676ac5f8d58c7
+sourceHash: d74cc2ea4835551d
 title: Indizes
 sidebar_label: Indizes
 description: Deklarieren Sie gewöhnliche Postgres-Indizes für eine Collection – btree, GIN und BRIN, partiell, zusammengesetzt, abdeckend und eindeutig – und warum ein handgeschriebener früher verschwand.
@@ -179,7 +179,7 @@ Beide Producer geben sie aus, was wichtig ist, da nicht jedes Deployment `db pus
 
 ## Fremdschlüssel werden für Sie indiziert
 
-<span class="since-badge" data-since="0.25">Seit 0.25</span> Postgres erstellt den Index, auf den ein Fremdschlüssel *zeigt* — den Primärschlüssel des Ziels —, und nie einen auf der Spalte, die ihn *hält*. Jeder Lesezugriff von der anderen Seite einer Verknüpfung filtert auf dieser Spalte: ein `hasMany`- oder `hasOne`-Include, eine verschachtelte Auflistung wie `/authors/5/posts` (ihre Seite und ihre Zählung), die Rückseite einer `manyToMany` und die `ON DELETE`-Prüfung, wenn eine übergeordnete Zeile gelöscht wird. Ohne Index liest jeder davon jede Zeile der Kind-Tabelle.
+Postgres erstellt den Index, auf den ein Fremdschlüssel *zeigt* — den Primärschlüssel des Ziels —, und nie einen auf der Spalte, die ihn *hält*. Jeder Lesezugriff von der anderen Seite einer Verknüpfung filtert auf dieser Spalte: ein `hasMany`- oder `hasOne`-Include, eine verschachtelte Auflistung wie `/authors/5/posts` (ihre Seite und ihre Zählung), die Rückseite einer `manyToMany` und die `ON DELETE`-Prüfung, wenn eine übergeordnete Zeile gelöscht wird. Ohne Index liest jeder davon jede Zeile der Kind-Tabelle.
 
 Rebase leitet daher einen einfachen B-Tree ab für:
 

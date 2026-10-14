@@ -1,5 +1,5 @@
 ---
-sourceHash: dcdd32536d7ea87a
+sourceHash: 19b3f8d0d52e648a
 title: Escrita de dados
 sidebar_label: Escrita de dados
 description: crie, faça upsert, atualize e exclua com o SDK — operações de campo, escritas condicionais, chaves de idempotência, escritas em lote e escrita entre coleções em uma única transação.
@@ -69,7 +69,7 @@ são mantidos intactos: um conflito significa que sua criação é um fato do pa
 
 #### Não na coleção de usuários
 
-<span class="since-badge" data-since="0.25">Since 0.25</span> `upsert()` na coleção de usuários (a que tem `auth` ativado) é recusado com um 400 (`INVALID_CONFLICT_TARGET`), assim como `createMany` com `upsert` nela. Criar um usuário e alterá-lo seguem regras diferentes — uma criação faz o hash da senha e envia o convite, uma atualização não pode rebaixar o último administrador — e um upsert só descobre qual dos dois é dentro da escrita. Chame `create` ou `update` em vez disso.
+`upsert()` na coleção de usuários (a que tem `auth` ativado) é recusado com um 400 (`INVALID_CONFLICT_TARGET`), assim como `createMany` com `upsert` nela. Criar um usuário e alterá-lo seguem regras diferentes — uma criação faz o hash da senha e envia o convite, uma atualização não pode rebaixar o último administrador — e um upsert só descobre qual dos dois é dentro da escrita. Chame `create` ou `update` em vez disso.
 
 ### Update
 
@@ -151,7 +151,7 @@ uma linha vinda de `find()`, do cache offline ou de um servidor que não envia
 `ETag` — e passar `undefined` não envia nenhuma pré-condição, fazendo com que a chamada acima
 se degrade para uma atualização comum em vez de lançar um erro.
 
-<span class="since-badge" data-since="0.25">Desde 0.25</span> Uma linha vinda de `update()` carrega a versão que essa escrita produziu, de modo que
+Uma linha vinda de `update()` carrega a versão que essa escrita produziu, de modo que
 edições condicionais se encadeiam sem uma leitura entre elas. Uma linha que um callback de `listenById()`
 recebe carrega a versão que esse frame mostra:
 

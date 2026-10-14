@@ -1,5 +1,5 @@
 ---
-sourceHash: a3e5fa2b319b73d8
+sourceHash: e3130fcc43e901ed
 title: Relações
 sidebar_label: Relações
 description: Defina relações SQL um-para-um, um-para-muitos e muitos-para-muitos entre coleções com chaves estrangeiras, tabelas de junção e junções multi-salto.
@@ -92,7 +92,7 @@ author: {
 // → posts.author_id
 ```
 
-<span class="since-badge" data-since="0.25">Desde 0.25</span> A coluna é
+A coluna é
 indexada para você: o Postgres indexa a chave para a qual uma chave estrangeira aponta, nunca a
 coluna que a contém, de modo que, sem um índice, todo include `hasMany` e toda listagem aninhada
 a partir do outro lado varre esta tabela. `index: false` mantém a constraint e

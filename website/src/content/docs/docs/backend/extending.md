@@ -22,7 +22,7 @@ longer reach your project. So climb only as far as you have to.
 
 ## The ladder
 
-<span class="since-badge" data-since="0.25">Since 0.25</span> Rung 5's
+Rung 5's
 `createRebaseBackend` is new; on 0.24 that rung is the driver alone.
 
 | # | Rung | Reaches | Does **not** reach | Cost of being here |
@@ -210,7 +210,6 @@ a thing a Rebase router did.
 
 **Scope:** the process.
 
-<span class="since-badge" data-since="0.25">Since 0.25</span>
 `initializeRebaseBackend` is a shortcut over a few public calls, and this rung
 is calling them yourself. `createRebaseBackend` builds the backend and mounts,
 starts and listens to nothing. `backend.routes` holds each route group as a
@@ -296,7 +295,7 @@ async function topSellers(driver: DataDriver, since: string) {
 casting: the guard is the difference between a driver that cannot run SQL saying
 so and one throwing `admin.executeSql is not a function` at the call site.
 
-<span class="since-badge" data-since="0.25">Since 0.25</span> `executeSql` returns
+`executeSql` returns
 every row it reads. For SQL whose size you do not control, pass `maxResultBytes`:
 a result whose rows take more bytes than that is refused with an error whose
 `code` is `RESULT_TOO_LARGE`, never returned in part. The realtime socket's

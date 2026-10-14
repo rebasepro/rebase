@@ -38,7 +38,7 @@ Pass the `authController` to the Rebase navigation controller to gate the entire
 
 ## Your Own Auth Provider
 
-<span class="since-badge" data-since="0.25">Since 0.25</span> On 0.24 the
+On 0.24 the
 getter authenticates HTTP requests only, and the panel's realtime socket stays
 anonymous.
 

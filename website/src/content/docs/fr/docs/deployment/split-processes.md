@@ -1,5 +1,5 @@
 ---
-sourceHash: e20c62e3ffffe67b
+sourceHash: dd99ad3524029bf5
 title: Séparation en plusieurs processus
 sidebar_label: Processus séparés
 description: Exécutez un seul bundle sous forme de plusieurs processus coopérants — une API, un niveau de fonctions, un worker — à partir de la même image d'exécution publiée, afin qu'une fonction personnalisée lourde ne vienne plus concurrencer l'API de données.
@@ -43,7 +43,7 @@ REBASE_ROLE=all        # the default: everything, one process
 Les endpoints de santé (health) et de métriques sont présents sur chaque rôle sans exception. Un processus qu'un
 orchestrateur ne peut pas sonder est un processus qu'il ne peut pas mettre à jour de manière progressive (rolling update).
 
-<span class="since-badge" data-since="0.25">Depuis 0.25</span> `GET /api/auth/config`,
+`GET /api/auth/config`,
 ce que lit l'écran de connexion, suit le reste de `/api/auth` : seuls `api` et
 `all` le servent. En 0.24, un processus `functions` ou `worker` y répondait aussi.
 
@@ -153,7 +153,7 @@ puis y écrit en deux étapes distinctes, de sorte que des processus démarrant 
 entrent en collision — et un déploiement où plusieurs d'entre eux entrent en concurrence pour provisionner le même
 schéma n'est souhaitable pour personne.
 
-<span class="since-badge" data-since="0.25">Depuis 0.25</span> Dans un
+Dans un
 [serveur personnalisé](/docs/backend/custom-server/), la même décision est l'option
 `provision` de `createRebaseBackend` : `true` dans le processus qui possède le
 schéma, et `{ collections: false, realtime: false }` dans tous les autres, qui
@@ -245,7 +245,7 @@ split: true
 functions:
   enabled: true
   image:
-    tag: "0.24.0"     # this unit only; the rest stay on the release-wide tag
+    tag: "0.25.0"     # this unit only; the rest stay on the release-wide tag
 ```
 
 Seul le tag vaut généralement la peine d'être fixé : le dépôt est hérité, il s'agit donc

@@ -1,5 +1,5 @@
 ---
-sourceHash: 7452474353756b93
+sourceHash: c35ed2ce1194af56
 title: Autenticação e Login
 sidebar_label: Autenticação e Login
 description: Configure o controlador de autenticação, a tela de login e a simulação de papéis no seu frontend React do Rebase.
@@ -39,7 +39,7 @@ Passe o `authController` para o controlador de navegação do Rebase para proteg
 
 ## Seu próprio provedor de autenticação
 
-<span class="since-badge" data-since="0.25">Desde 0.25</span> Na 0.24 o
+Na 0.24 o
 getter autentica apenas as requisições HTTP, e o socket de tempo real do painel
 continua anônimo.
 

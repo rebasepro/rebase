@@ -1,5 +1,5 @@
 ---
-sourceHash: 6a0a2927f191087f
+sourceHash: 6304a2aeeb6a8bcf
 title: Agrégats et recherche
 sidebar_label: Agrégats & recherche
 description: "Comptez, additionnez et regroupez avec le SDK, filtrez dans les colonnes JSON, et exécutez des recherches textuelles et vectorielles depuis le client."
@@ -186,13 +186,13 @@ sur un pgvector plus ancien, un filtre que peu des lignes les plus proches satis
 trop courte. La production de `queryVector` vous incombe : Rebase stocke et recherche les embeddings,
 il ne les calcule pas.
 
-<span class="since-badge" data-since="0.25">Depuis 0.25</span> Le SDK envoie une recherche vectorielle sous la forme `POST /api/data/<collection>/query`, avec l'embedding
+Le SDK envoie une recherche vectorielle sous la forme `POST /api/data/<collection>/query`, avec l'embedding
 dans le corps : dans l'URL, 768 dimensions représentent environ 17 Ko, au-delà de ce qu'acceptent Node (16 Ko) et la
 plupart des proxys (nginx : 8 Ko). `count()` avec une recherche vectorielle emprunte le même chemin, sous la forme
 `POST /api/data/<collection>/count`. Face à un serveur antérieur à la 0.24, qui n'a pas cette route, l'un comme
 l'autre se rabat sur le `GET` — et un long embedding peut alors encore être refusé par un 431 ou un 414.
 
-<span class="since-badge" data-since="0.25">Depuis 0.25</span> Avec un `threshold`, le résultat n'a pas de `meta.total` — compter les lignes situées dans une
+Avec un `threshold`, le résultat n'a pas de `meta.total` — compter les lignes situées dans une
 distance le calcule pour chaque ligne de la table. Paginez avec `meta.hasMore`, qui reste exact.
 
 ### Ce que vous devez fournir

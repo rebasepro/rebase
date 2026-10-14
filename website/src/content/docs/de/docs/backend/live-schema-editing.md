@@ -1,5 +1,5 @@
 ---
-sourceHash: 8bd32575d082fb6c
+sourceHash: 6cfa40d6d7fc1902
 title: Live-Schema-Bearbeitung
 description: Erstellen und Ändern von Collections auf einem laufenden Backend – zuerst in Ihr Repository committet, dann angewendet.
 ---
@@ -197,7 +197,7 @@ Unter 0.23 trägt der Commit außerdem `drizzle/schema.sql`, `drizzle/policies.s
 Die Commit-Nachricht beschreibt die Änderung, anstatt nur eine anzukündigen, und wird
 der Person zugeschrieben, die sie vorgenommen hat, mit dem Anzeigenamen und der E-Mail
 des Kontos (ein Benutzer mit keinem von beiden wird als `<uid>@users.noreply.rebase.pro`
-committet). <span class="since-badge" data-since="0.25">Seit 0.25</span> Unter 0.24
+committet). Unter 0.24
 tragen die Commits der integrierten Auth die uid als Namen.
 
 Eine Schemaänderung mit einem Autor und einem Diff in der Historie Ihres Projekts ist

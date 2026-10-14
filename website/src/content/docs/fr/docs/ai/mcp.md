@@ -1,5 +1,5 @@
 ---
-sourceHash: a7fdf34234049b93
+sourceHash: ee28e46d5e82c6f9
 title: Serveur MCP
 sidebar_label: Serveur MCP
 description: Connectez Claude Code, Cursor, Gemini CLI ou n'importe quel client MCP à un projet Rebase — les 42 outils exposés, l'identifiant avec lequel il s'authentifie et le verrou loopback qui s'interpose entre un agent et la production.
@@ -335,7 +335,7 @@ database at boot, additively. After changing a collection, restart it with
 rebase_dev_stop and rebase_dev_start. …
 ```
 
-<span class="since-badge" data-since="0.25">Depuis 0.25</span> Depuis un terminal,
+Depuis un terminal,
 `rebase db push` et `rebase db migrate` s'exécutent bel et bien sur cette base de
 données ; seuls les outils MCP sont refusés. En 0.24, la CLI les y refuse aussi.
 
@@ -370,7 +370,7 @@ scindé par une espace sans chasse (zero-width space), de sorte qu'une ligne qui
 
 Le [point de terminaison distant](#le-point-de-terminaison-distant) clôture ses résultats d'outils
 de la même façon et le signale au client ; son `structuredContent` porte le résultat brut.
-<span class="since-badge" data-since="0.25">Depuis 0.25</span> `list_collections` et
+`list_collections` et
 `describe_collection` font exception : seul un modèle les lit, elles ne sont donc envoyées qu'une fois,
 dans le texte. Avant la 0.24, la liste portait aussi une copie dans `structuredContent`.
 
@@ -485,7 +485,7 @@ Aucun `REBASE_ROLE` ne permet de l'activer.
   répond `{ count }`. Comme sur REST, un `limit` au-delà de 1000, un argument non déclaré et une
   modification ou suppression d'une ligne dans la corbeille (404) sont refusés ; remettre le champ
   de soft delete à `null` la restaure.
-- <span class="since-badge" data-since="0.25">Depuis 0.25</span> **La liste nomme les collections ; `describe_collection` donne le schéma de l'une d'elles.**
+- **La liste nomme les collections ; `describe_collection` donne le schéma de l'une d'elles.**
   `list_collections` répond `name`, `title` et `description` de chaque collection, et
   `describe_collection { collection }` les schémas OpenAPI `row` et `create` de cette collection,
   plus `softDeleteField` quand les lignes vont dans une corbeille. Les descriptions des outils

@@ -1,5 +1,5 @@
 ---
-sourceHash: 3529ea341017acda
+sourceHash: 68b71012725d6c0d
 title: Speicher & Dateien
 sidebar_label: Speicher
 description: Dateien mit dem Speichermodul des typisierten SDK von Rebase hochladen, herunterladen, auflisten und löschen.
@@ -30,7 +30,7 @@ const result = await client.storage.putObject({
 // result: { key: string; bucket: string; storageUrl: string }
 ```
 
-<span class="since-badge" data-since="0.25">Seit 0.25</span> Eine Datei über 8 MiB wird über den fortsetzbaren (TUS-)
+Eine Datei über 8 MiB wird über den fortsetzbaren (TUS-)
 Endpunkt des Servers hochgeladen, 8 MiB pro Anfrage, statt als eine Multipart-Anfrage, die der Server
 vollständig parst — ein großer Upload kostet den Server so einen Chunk an Arbeitsspeicher, nicht das Drei-
 bis Fünffache der Datei. Ein Chunk, der unterwegs scheitert, wird ab dem Punkt erneut gesendet, bis zu dem
@@ -86,7 +86,7 @@ const { url } = await client.storage.getSignedUrl(
 ```
 
 Das SDK speichert signierte URLs im Cache, um redundante Serveraufrufe zu vermeiden, bis das
-Download-Token der jeweiligen URL abläuft. <span class="since-badge" data-since="0.25">Seit 0.25</span> Gemeinsam gestellte
+Download-Token der jeweiligen URL abläuft. Gemeinsam gestellte
 Abfragen — eine Seite mit Vorschauen, die `getSignedUrl()` im selben Tick aufruft — gehen als ein
 `POST /api/storage/metadata` pro 100 Dateien an den Server, den der Rate Limiter als ein Zehntel der
 ersetzten Anfragen zählt; eine Datei, die ein Aufrufer nicht lesen darf, lässt nur diesen einen Aufruf
@@ -121,7 +121,7 @@ Bild funktionsfähig bleibt, egal wie lange es schon hochgeladen ist. Eine Refer
 nicht mehr existierendes Objekt benennt, bleibt unverändert. `storageReference(key,
 storageId?)` erstellt eine solche Referenz, für Text, den Sie selbst schreiben.
 
-<span class="since-badge" data-since="0.25">Seit 0.25</span> Text, der gespeichert wurde, bevor es Referenzen gab, enthält die Download-URL einer privaten Datei
+Text, der gespeichert wurde, bevor es Referenzen gab, enthält die Download-URL einer privaten Datei
 selbst, `…/storage/file/posts/cover.png?token=…`, deren Token wenige Minuten
 nach dem Schreiben ablief. `resolveStorageReferences` erneuert auch diese:
 Das Token nennt weiterhin das Objekt, sodass die URL durch eine frische ersetzt wird. Um
@@ -189,7 +189,7 @@ if (result.nextPageToken) {
 }
 ```
 
-<span class="since-badge" data-since="0.25">Seit 0.25</span> Jeder Eintrag trägt seine `size` in Bytes und `updated` (einen ISO-8601-
+Jeder Eintrag trägt seine `size` in Bytes und `updated` (einen ISO-8601-
 Zeitstempel) bei lokalem Speicher, S3 und GCS und seinen `contentType` bei lokalem Speicher
 und GCS — genug, um einen Ordner ohne ein `getSignedUrl()` pro Datei anzuzeigen. Eine S3-
 Auflistung hat keinen Content-Type; Ordner (`result.prefixes`) tragen keines der

@@ -1,5 +1,5 @@
 ---
-sourceHash: 3116577a359d845f
+sourceHash: de9051fe769a602b
 title: Exécuter plusieurs instances
 sidebar_label: Plusieurs instances
 description: Chaque élément d'état qu'un processus Rebase conserve pour lui-même, et le paramètre pour le partager — ce qu'il faut configurer avant qu'un second réplica, un déploiement progressif ou un déploiement scindé ne reçoive du trafic.
@@ -92,7 +92,7 @@ contienne également le répertoire `<STORAGE_PATH>__<key>` de chaque bucket loc
 [Auto-hébergement : stockage de fichiers](/docs/deployment/self-hosting/#file-storage).
 
 Les **téléversements avec reprise** (le point de terminaison TUS) conservent le fichier partiel de chaque téléversement, et
-<span class="since-badge" data-since="0.25">Depuis 0.25</span> un enregistrement du téléversement à ses côtés, sur le disque de l'instance qui
+un enregistrement du téléversement à ses côtés, sur le disque de l'instance qui
 l'a créé, sous `STORAGE_PATH/.tus-uploads` — même lorsque les fichiers finalisés vont vers
 S3 ou GCS. Montez un volume partagé sur `STORAGE_PATH` sur chaque instance et n'importe quelle instance
 pourra servir n'importe quel téléversement ; un redémarrage ou un déploiement progressif reprendra alors le téléversement là où il

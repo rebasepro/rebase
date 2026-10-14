@@ -1,5 +1,5 @@
 ---
-sourceHash: e9385ebca9727baf
+sourceHash: 648de86871ab3d3d
 slug: de/docs/troubleshooting
 title: Fehlerbehebung
 description: Die Fehler, die verhindern, dass ein Rebase-Backend startet oder Anfragen bedient – eine nicht erreichbare Datenbank, falsche Anmeldedaten, eine fehlende Extension, eine RLS-Verweigerung, Schema-Drift, ein belegter Port, eine Funktion, die nicht lädt – und wie jeder davon aussieht.
@@ -130,7 +130,7 @@ und eine wurde darunter geschlossen. Es wurde nichts angewendet, der Befehl kann
 gefahrlos erneut ausgeführt werden; der Dev-Server schließt untätige Verbindungen nach
 30 Sekunden. Scheitert er weiter, stoppen Sie `rebase dev`, während Sie pushen.
 
-<span class="since-badge" data-since="0.25">Seit 0.25</span> Der Push schließt seine eigenen
+Der Push schließt seine eigenen
 Verbindungen, bevor Atlas startet, was Atlas im üblichen Fall Platz lässt, und der Fehler
 sagt, was passiert ist. Unter 0.24 scheitert der erste Push nach dem Start von `rebase dev`
 oft auf diese Weise, nur mit den beiden Zeilen oben.

@@ -1,5 +1,5 @@
 ---
-sourceHash: cc03d759eb4057c2
+sourceHash: 7f10dbaa07451bc9
 title: Database e Bucket Multipli
 sidebar_label: Sorgenti Multiple
 description: Indirizza le collection a database diversi e le proprietà a bucket di archiviazione diversi, configurando ciascuno dall'ambiente.
@@ -182,8 +182,6 @@ L'engine viene ricavato dalla dichiarazione, quindi non c'è alcun `STORAGE_TYPE
 
 #### Quale bucket riceve un upload non qualificato
 
-<span class="since-badge" data-since="0.25">Da 0.25</span>
-
 Una proprietà di storage che non specifica alcuna `storageSource` scrive nel bucket di **default**.
 Dichiarare bucket con nome non lo sposta mai. Il default mantiene la propria configurazione
 qualunque cosa dichiari `config/resources.ts`: `STORAGE_TYPE`, `STORAGE_PATH` (`./uploads`
@@ -303,7 +301,7 @@ Senza alcun bucket configurato, lo storage è **disattivato** in produzione e gl
 
 Tale volume deve contenere tutti i bucket locali, non solo quello di default. La directory di un bucket locale con nome si trova accanto a quella predefinita, `<STORAGE_PATH>__<key>`. Con `STORAGE_PATH=/storage/uploads`, `bucket("media", { engine: "local" })` scrive su `/storage/uploads__media`. Monta il volume sulla directory genitore, `/storage`, come fa il file compose generato da `rebase init`, e non su `STORAGE_PATH` stesso. `STORAGE_PATH__MEDIA` imposta esplicitamente la directory di un bucket. Consulta [Self-hosting](/docs/deployment/self-hosting/#file-storage).
 
-<span class="since-badge" data-since="0.25">Da 0.25</span> Dichiarare bucket non cambia il bucket di default. Con solo `bucket("media")` dichiarato, il default legge ancora le proprie variabili. In sviluppo è `./uploads`. In produzione, non associato, è disattivato come qualsiasi bucket non associato: gli upload che non specificano alcuna `storageSource` rispondono `501 STORAGE_NOT_CONFIGURED`. Il boot lo segnala una volta, con entrambe le soluzioni: associarlo (`STORAGE_TYPE=s3` e `S3_BUCKET`, oppure `STORAGE_TYPE=gcs` e `GCS_BUCKET`), oppure contrassegnare un bucket con nome `default: true`.
+Dichiarare bucket non cambia il bucket di default. Con solo `bucket("media")` dichiarato, il default legge ancora le proprie variabili. In sviluppo è `./uploads`. In produzione, non associato, è disattivato come qualsiasi bucket non associato: gli upload che non specificano alcuna `storageSource` rispondono `501 STORAGE_NOT_CONFIGURED`. Il boot lo segnala una volta, con entrambe le soluzioni: associarlo (`STORAGE_TYPE=s3` e `S3_BUCKET`, oppure `STORAGE_TYPE=gcs` e `GCS_BUCKET`), oppure contrassegnare un bucket con nome `default: true`.
 
 In sviluppo, un bucket dichiarato a cui non è associato nulla è una directory locale — `uploads__media` accanto al valore predefinito `uploads` — qualunque sia l'engine dichiarato, quindi `bucket("media", { engine: "s3" })` insieme a `rebase dev` è sufficiente per caricare un file. L'avvio (boot) indica quale engine la directory sta sostituendo e `rebase status` lo mostra in giallo accanto al segno di spunta. Questo non accade mai in produzione o sul runtime gestito: un bucket inventato lì scriverebbe i caricamenti sul filesystem di un container che svanisce al rollout successivo, quindi un bucket non associato rimane tale e risponde 501.
 

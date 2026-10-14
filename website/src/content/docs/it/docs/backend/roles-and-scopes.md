@@ -1,5 +1,5 @@
 ---
-sourceHash: cc000bf4cb3fb671
+sourceHash: e6d2447955c86775
 title: Ruoli e scope
 sidebar_label: Ruoli e scope
 description: "Cosa può fare un chiamante: il piano dati che ogni persona possiede, il piano di amministrazione che i ruoli concedono, gli scope che un'app dichiara per sé e come ogni credenziale li porta con sé."
@@ -216,7 +216,7 @@ per qualsiasi altro progetto. Ha anche bisogno di `functions:invoke`, oppure di
 `hasScope(c, scope, target)` e `getScopes(c)` rispondono alla stessa domanda dentro un
 handler.
 
-<span class="since-badge" data-since="0.25">Da 0.25</span> `requireScope`
+`requireScope`
 rifiuta uno scope che nessuno potrebbe possedere. Un nome che non è uno scope, o uno
 scope integrato scritto male come `data:raed`, lancia un errore al caricamento della
 funzione. Per uno scope dell'app che il backend non dichiara sotto `auth.scopes`, ogni

@@ -1,5 +1,5 @@
 ---
-sourceHash: 75953facb59d9645
+sourceHash: ead814d8414e0434
 title: "Receita: Integração de Webhook"
 sidebar_label: Webhooks
 description: Utilize callbacks de entidade para enviar webhooks a serviços externos quando os dados mudam, sem manter aberta a transação da escrita.
@@ -89,7 +89,7 @@ após uma tentativa, com o motivo; qualquer outra falha é repetida como em qual
 
 `setCollectionCallbacks` **substitui** os callbacks que a coleção `orders`
 declara. Se ela declara algum, mantenha-os:
-<span class="since-badge" data-since="0.25">Desde 0.25</span> passe
+passe
 `composeCallbacks(declared, { afterSave })`, com `composeCallbacks` de
 `@rebasepro/server` e `declared` sendo os próprios `callbacks` da coleção. Veja
 [Combinando conjuntos de callbacks](/docs/collections/callbacks/#combining-callback-sets).
@@ -140,7 +140,7 @@ e o seu import de `@rebasepro/server` iriam para todos os visitantes, e fariam o
 
 Uma falha ou um deploy entre a confirmação e a entrega perde o evento. Cada webhook tem a sua própria
 fila, então um receptor fora do ar atrasa apenas as suas próprias entregas, nunca as de outro webhook.
-<span class="since-badge" data-since="0.25">Desde 0.25</span> A fila de cada webhook comporta no máximo
+A fila de cada webhook comporta no máximo
 10.000 entregas em espera; enquanto estiver cheia, uma nova entrega é recusada e reportada ao `onDelivery`
 com `success: false`, `statusCode: 0`, `attemptNumber: 0` e `responseBody: "queue full"`, e
 o log do servidor avisa uma vez. Chame `await dispatcher.flush(10_000)` no encerramento: ele espera o que
@@ -210,7 +210,7 @@ Nunca passe para um `fetch` nu uma URL vinda do seu banco de dados. O dispatcher
 loopback, link-local, privados e esquemas que não sejam `http(s)` antes de conectar, e recusa-se a
 seguir redirecionamentos, justamente porque uma URL armazenada é entrada controlada por um
 atacante.
-<span class="since-badge" data-since="0.25">Desde 0.25</span> No Node, ele julga o endereço para o qual cada
+No Node, ele julga o endereço para o qual cada
 conexão é de fato feita, dentro da própria resolução de DNS da conexão, de modo que um nome cujo registro
 muda entre uma verificação e a conexão não consegue passar; o nome de um receptor é resolvido
 uma vez por conexão, não uma vez por entrega.

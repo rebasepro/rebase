@@ -1,5 +1,5 @@
 ---
-sourceHash: c770e1b2f77d1d8d
+sourceHash: a0bd19745c59b12b
 title: Plugin-System
 sidebar_label: Plugins
 description: Erweitern Sie Rebase mit Plugins – injizieren Sie UI-Komponenten, modifizieren Sie Collections, fügen Sie Toolbar-Aktionen hinzu und erstellen Sie benutzerdefinierte Field Builder.
@@ -64,7 +64,6 @@ der Seite **[Slots](/docs/frontend/slots)**.
   Das Plugin bleibt dabei in beiden Fällen gemountet.
 - `onUnmount()` wird ausgeführt, wenn `<Rebase>` unmountet wird.
 
-<span class="since-badge" data-since="0.25">Seit 0.25</span>
 `lifecycle.onCollectionChange` ist veraltet (deprecated). Es wurde nie aufgerufen, weder
 unter 0.24 noch davor. Ein Plugin, das es setzt, kompiliert weiterhin, und `<Rebase>` warnt
 einmal pro Plugin. Um die Zeilen einer Collection zu verfolgen, abonnieren Sie in `onMount`
@@ -175,7 +174,7 @@ function useMyPlugin(): RebasePlugin {
 
 ### Feld-Wrapper aus mehreren Plugins
 
-<span class="since-badge" data-since="0.25">Seit 0.25</span> Unter 0.24 erhielt das `wrap`
+Unter 0.24 erhielt das `wrap`
 jedes Plugins das integrierte Feld, und nur der zuletzt zurückgegebene Wrapper wurde
 gerendert.
 
@@ -227,7 +226,7 @@ Es fügt jedem Formular eine Autofill-Aktion hinzu und jedem Markdown-Feld einen
 nur dort, wo das Plugin aktiviert ist: Der Dienst meldet sich als verfügbar und
 `getConfigForPath` (sofern Sie eines übergeben) erlaubt die Collection. Ein Feld, dessen
 `customProps.editorProps.aiController` einen eigenen Controller nennt, verwendet
-diesen. <span class="since-badge" data-since="0.25">Seit 0.25</span> Ein anderes Plugin kann Markdown-Feldern auf dieselbe Weise einen Controller geben, mit
+diesen. Ein anderes Plugin kann Markdown-Feldern auf dieselbe Weise einen Controller geben, mit
 `EditorAIControllerProvider` aus `@rebasepro/cms` in einem formularbezogenen Provider.
 
 ![Data enhancement](/img/data_enhancement.png)
@@ -332,7 +331,6 @@ export function App() {
 }
 ```
 
-<span class="since-badge" data-since="0.25">Seit 0.25</span>
 `hooks.modifyCollectionAsync` ist veraltet (deprecated). Es wurde nie aufgerufen, weder
 unter 0.24 noch davor. Ein Plugin, das es setzt, kompiliert weiterhin, und `<Rebase>` warnt
 einmal pro Plugin. Verwenden Sie `modifyCollection` wie oben.

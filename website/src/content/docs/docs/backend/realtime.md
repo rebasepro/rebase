@@ -30,7 +30,7 @@ Realtime is enabled out of the box. There is no flag to flip or service to start
 
 ### Which path the socket answers
 
-<span class="since-badge" data-since="0.25">Since 0.25</span> On 0.24 the socket takes every WebSocket upgrade on the server, whatever its path.
+On 0.24 the socket takes every WebSocket upgrade on the server, whatever its path.
 
 The socket answers upgrades on one path: the API's base path with a trailing `/api` removed, so `/` for an API at `/api`. That is where the SDK dials: it connects to its `baseUrl`, while its HTTP requests go to `${baseUrl}/api`. An upgrade to any other path is left to the server's other `upgrade` listeners, so your app can run its own WebSocket server on the same `http.Server`. With no other listener, such an upgrade is answered `404`.
 
@@ -109,7 +109,7 @@ const unsubscribe = client.data.products.listenById(
 
 The callback receives the row, flat, as `findById()` returns it (`row.name`, not `row.values.name`), or `undefined` once the row is deleted.
 
-<span class="since-badge" data-since="0.25">Since 0.25</span> **Each frame carries the row's version.** `etagOf(row)` is the `ETag` a `GET` of the row answers, so an edit made against what a frame showed can be saved with `ifMatch: etagOf(row)` and is refused with `412` if the row has moved on (see [Conditional writes](/docs/backend/writes/)). On the wire, the SDK's `subscribe_one` asks with `etag: true`, and each `single_update` frame for a row that exists carries `"etag"` beside `"row"`. A server that predates this ignores the ask and sends no tag, and a client that does not ask gets frames without one.
+**Each frame carries the row's version.** `etagOf(row)` is the `ETag` a `GET` of the row answers, so an edit made against what a frame showed can be saved with `ifMatch: etagOf(row)` and is refused with `412` if the row has moved on (see [Conditional writes](/docs/backend/writes/)). On the wire, the SDK's `subscribe_one` asks with `etag: true`, and each `single_update` frame for a row that exists carries `"etag"` beside `"row"`. A server that predates this ignores the ask and sends no tag, and a client that does not ask gets frames without one.
 
 ### Unsubscribing
 
@@ -171,9 +171,9 @@ query run as them:
    also coalesces a burst of writes into one query. It waits for 300 ms without
    a further change, but never more than **1 s** (`REFETCH_MAX_WAIT_MS`) after
    the first one, so a collection written several times a second still sends
-   its subscribers a frame at least once a second. <span class="since-badge" data-since="0.25">Since 0.25</span> Set that bound with `REALTIME_REFETCH_MAX_WAIT_MS` (or `realtime.refetchMaxWaitMs`): higher refetches a busy table less often, lower sends fresher frames.
+   its subscribers a frame at least once a second. Set that bound with `REALTIME_REFETCH_MAX_WAIT_MS` (or `realtime.refetchMaxWaitMs`): higher refetches a busy table less often, lower sends fresher frames.
 
-   <span class="since-badge" data-since="0.25">Since 0.25</span> A refetch that reads exactly what a subscriber was last sent sends that
+   A refetch that reads exactly what a subscriber was last sent sends that
    subscriber nothing: a write to row 9,000 of a list showing the first 50 costs
    the read, not a frame to every viewer. After an error frame, the next rows
    are sent again even if they are the same.
@@ -225,7 +225,7 @@ states of the collection.
 
 When the count itself fails, the frame carries `partial: true` and no `total`;
 that is not a subscription error, and a client should keep the last real total
-rather than substituting the page length. <span class="since-badge" data-since="0.25">Since 0.25</span> On a big table the count is most of what a frame costs. With `REALTIME_RECOUNT_INTERVAL_MS` set, a list whose last total was at least `REALTIME_RECOUNT_MIN_ROWS` (100,000 by default) reuses that total for the interval instead of counting on every write, and such a frame carries `meta.totalAsOf`, when the total was taken. Unset, as by default, every frame counts.
+rather than substituting the page length. On a big table the count is most of what a frame costs. With `REALTIME_RECOUNT_INTERVAL_MS` set, a list whose last total was at least `REALTIME_RECOUNT_MIN_ROWS` (100,000 by default) reuses that total for the interval instead of counting on every write, and such a frame carries `meta.totalAsOf`, when the total was taken. Unset, as by default, every frame counts.
 
 ### What a write costs, and the limits
 
@@ -264,11 +264,11 @@ start to lag. Beyond that, prefer narrower subscriptions (a page, a filter on
 the user's own rows) or a [broadcast channel](#broadcast-channels) carrying the
 change for clients to re-fetch on their own schedule.
 
-**One socket may hold at most 1,000 subscriptions.** The next is refused with an error frame coded `TOO_MANY_SUBSCRIPTIONS`; re-subscribing under an id the socket already holds replaces that subscription and does not count again. The SDK shares identical subscriptions on a socket, so this counts the distinct lists and records a page has open. Change it with `REALTIME_MAX_SUBSCRIPTIONS_PER_SOCKET` or `realtime.maxSubscriptionsPerSocket` on the Postgres adapter (the environment variable wins); a value that is not a positive whole number stops the server at boot. On 0.23 a socket's subscriptions are not limited. <span class="since-badge" data-since="0.25">Since 0.25</span> **The sockets one user holds can be limited too**, per server instance: set `REALTIME_MAX_SOCKETS_PER_USER` (or `realtime.maxSocketsPerUser`), and a sign-in past it is refused with `TOO_MANY_SOCKETS` and the socket closed with 4002. Unset, as by default, there is no ceiling.
+**One socket may hold at most 1,000 subscriptions.** The next is refused with an error frame coded `TOO_MANY_SUBSCRIPTIONS`; re-subscribing under an id the socket already holds replaces that subscription and does not count again. The SDK shares identical subscriptions on a socket, so this counts the distinct lists and records a page has open. Change it with `REALTIME_MAX_SUBSCRIPTIONS_PER_SOCKET` or `realtime.maxSubscriptionsPerSocket` on the Postgres adapter (the environment variable wins); a value that is not a positive whole number stops the server at boot. On 0.23 a socket's subscriptions are not limited. **The sockets one user holds can be limited too**, per server instance: set `REALTIME_MAX_SOCKETS_PER_USER` (or `realtime.maxSocketsPerUser`), and a sign-in past it is refused with `TOO_MANY_SOCKETS` and the socket closed with 4002. Unset, as by default, there is no ceiling.
 
 A subscription id is the socket's own: two clients that both name a subscription `"sub-1"` each keep theirs, and an `unsubscribe` ends only the sender's.
 
-<span class="since-badge" data-since="0.25">Since 0.25</span> **Subscribing counts against the data rate limit.** A subscription's first frame is a read, run as the subscriber, and so is a channel's history request. So `subscribe_collection`, `subscribe_one` and `channel_history` count as data requests in the caller's rate-limit bucket (the one their HTTP requests and their other sockets share) once the socket's own allowance is spent. Each socket may send 1,000 of them without counting them, or as many as its subscription ceiling when that is higher, and the allowance comes back over 15 minutes. That is everything a socket can hold, so the re-subscribe after a reconnect is never refused and never spends the person's budget. Past the allowance, a frame over the limit is refused with an error frame coded `RATE_LIMITED`, which the SDK delivers to that subscription's `onError`, or to the channel's. On 0.23 these frames count only against the socket's own budget of 2,000 frames a minute.
+**Subscribing counts against the data rate limit.** A subscription's first frame is a read, run as the subscriber, and so is a channel's history request. So `subscribe_collection`, `subscribe_one` and `channel_history` count as data requests in the caller's rate-limit bucket (the one their HTTP requests and their other sockets share) once the socket's own allowance is spent. Each socket may send 1,000 of them without counting them, or as many as its subscription ceiling when that is higher, and the allowance comes back over 15 minutes. That is everything a socket can hold, so the re-subscribe after a reconnect is never refused and never spends the person's budget. Past the allowance, a frame over the limit is refused with an error frame coded `RATE_LIMITED`, which the SDK delivers to that subscription's `onError`, or to the channel's. On 0.23 these frames count only against the socket's own budget of 2,000 frames a minute.
 
 ### Sockets that stop answering
 
@@ -280,7 +280,7 @@ a vanished client is let go of within a minute. Browsers and the SDK answer
 pings on their own; a client that speaks the protocol directly has to answer
 them too, as most WebSocket libraries do.
 
-<span class="since-badge" data-since="0.25">Since 0.25</span> **The browser side.** A browser cannot send a ping or see one, so a half-open socket looks connected to it forever. The SDK opens the socket with `?rebase_caps=heartbeat,channel_seq,cancel_sql`; a server that knows them answers with `{"type":"hello","capabilities":[…],"heartbeatMs":30000}`, listing the ones it honours (`cancel_sql`: it takes the SQL console's `CANCEL_SQL` frame), and sends `{"type":"heartbeat"}` every 30 seconds, and the SDK drops the socket and [reconnects](#auto-reconnect) after two missed. A client that names nothing is sent neither, and an older server ignores the parameter, so an SDK talking to one behaves as before.
+**The browser side.** A browser cannot send a ping or see one, so a half-open socket looks connected to it forever. The SDK opens the socket with `?rebase_caps=heartbeat,channel_seq,cancel_sql`; a server that knows them answers with `{"type":"hello","capabilities":[…],"heartbeatMs":30000}`, listing the ones it honours (`cancel_sql`: it takes the SQL console's `CANCEL_SQL` frame), and sends `{"type":"heartbeat"}` every 30 seconds, and the SDK drops the socket and [reconnects](#auto-reconnect) after two missed. A client that names nothing is sent neither, and an older server ignores the parameter, so an SDK talking to one behaves as before.
 
 A socket is also terminated when more than 16&nbsp;MiB of frames sent to it are
 still unread. That is a client that does not read what it is sent, or one so far
@@ -398,7 +398,7 @@ Pruning happens as messages arrive, throttled per channel so cost tracks elapsed
 - **Ordered.** Sequence numbers are allocated per channel, and delivery order matches sequence order — on one instance, and across instances on the `postgres` bus, where the statement that numbers a message also announces it, so every instance (the sender's included) receives the announcements in sequence order. A bus you supply yourself carries frames in whatever order it delivers them.
 - **Durable before delivered.** A message that cannot be stored is not delivered to anyone, and the sender is told. Delivering it would put it in front of live subscribers while leaving it out of every future replay, and no later message could repair that gap.
 - **At-least-once on catch-up.** A replay range may overlap messages a client already received; the SDK discards ones it has already delivered.
-- <span class="since-badge" data-since="0.25">Since 0.25</span> **No holes.** A retained message reaches every member: the sender, who is never sent its own message, is sent `{"type":"broadcast_ack","channel","seq"}` instead when it opted into `channel_seq`. So a message past `lastSeq + 1` means one was missed, and the SDK holds it back, asks for the history in between, and delivers all of them in order. Against a server without `channel_seq`, a jump is delivered as it arrives.
+- **No holes.** A retained message reaches every member: the sender, who is never sent its own message, is sent `{"type":"broadcast_ack","channel","seq"}` instead when it opted into `channel_seq`. So a message past `lastSeq + 1` means one was missed, and the SDK holds it back, asks for the history in between, and delivers all of them in order. Against a server without `channel_seq`, a jump is delivered as it arrives.
 
 :::caution[History has the same access model as the channel]
 A client that has joined a channel may replay its retained messages, including those broadcast before it arrived — membership is the only check, and joining is open to any client that can name the channel. Retention is opt-in per channel pattern, so enabling it makes that channel's past readable to any visitor who guesses the name. Retained channels are the case where this becomes durable rather than momentary, so treat a retained channel's contents as public to your users.

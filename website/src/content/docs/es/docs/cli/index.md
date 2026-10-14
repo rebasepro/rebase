@@ -1,5 +1,5 @@
 ---
-sourceHash: 53e679722797e137
+sourceHash: c5d1f52c0af5c703
 title: Referencia de la CLI
 sidebar_label: CLI
 description: Comandos de Rebase CLI para inicialización de proyectos, generación de esquemas, migraciones de bases de datos y generación de SDK.
@@ -41,7 +41,7 @@ Configura la estructura del proyecto con frontend, backend y paquetes compartido
 | `-i, --install` | Instala dependencias tras el scaffolding. Sin él, init pregunta (por defecto sí); con `--yes`, no se instala nada |
 | `--no-install` | No instala nada, y no pregunta |
 | `-g, --git` | Inicializa un repositorio y realiza el primer commit. Sin él, init pregunta (por defecto sí); con `--yes`, no hay repositorio |
-| `--database-url <url>` | Usa una base de datos existente en lugar de la gestionada. <span class="since-badge" data-since="0.25">Desde 0.25</span> Debe ser una URL `postgres://` o `postgresql://`: cualquier otra cosa se rechaza antes de escribir un archivo, y el prompt interactivo vuelve a preguntar |
+| `--database-url <url>` | Usa una base de datos existente en lugar de la gestionada. Debe ser una URL `postgres://` o `postgresql://`: cualquier otra cosa se rechaza antes de escribir un archivo, y el prompt interactivo vuelve a preguntar |
 | `--introspect` | Genera colecciones a partir de esa base de datos. Implica `--template blank` y requiere `--install` |
 | `--project <slug>` | Vincula el scaffold a un proyecto de Rebase Cloud |
 | `--setup-key <key>` | La clave de un solo uso que autentica ese enlace |
@@ -59,9 +59,9 @@ Inicia tanto el frontend como el backend con recarga en caliente (hot reloading)
 
 Ambos puertos se derivan de la ruta del proyecto para que varios proyectos de Rebase puedan ejecutarse en paralelo. Utiliza las URLs que imprime `rebase dev`. Fija uno con `rebase dev --port 3001`.
 
-<span class="since-badge" data-since="0.25">Desde 0.25</span> Una edición de `.env` reinicia el backend, que vuelve a leer el archivo, como hace el panel de administración. Lo que `rebase dev` define por sí mismo se conserva hasta que lo reinicias: `PORT`, y `DATABASE_URL` cuando está en la base de datos gestionada o en Docker. En la 0.24 una edición de `.env` solo llegaba al backend cuando cambiaba algún otro archivo vigilado.
+Una edición de `.env` reinicia el backend, que vuelve a leer el archivo, como hace el panel de administración. Lo que `rebase dev` define por sí mismo se conserva hasta que lo reinicias: `PORT`, y `DATABASE_URL` cuando está en la base de datos gestionada o en Docker. En la 0.24 una edición de `.env` solo llegaba al backend cuando cambiaba algún otro archivo vigilado.
 
-<span class="since-badge" data-since="0.25">Desde 0.25</span> Con `--database-url`, `rebase dev` comprueba primero que algo responde en ese host y puerto. Si nada responde, lo dice, nombrando el flag, y termina con código `1` sin haber iniciado nada; tampoco toca la base de datos que nombra `.env`, y nunca inicia su contenedor de compose. En la 0.24 el aviso del backend decía que verificaras `DATABASE_URL` en `.env`, y dev seguía en marcha con el backend caído.
+Con `--database-url`, `rebase dev` comprueba primero que algo responde en ese host y puerto. Si nada responde, lo dice, nombrando el flag, y termina con código `1` sin haber iniciado nada; tampoco toca la base de datos que nombra `.env`, y nunca inicia su contenedor de compose. En la 0.24 el aviso del backend decía que verificaras `DATABASE_URL` en `.env`, y dev seguía en marcha con el backend caído.
 
 ### `rebase build`
 
@@ -84,7 +84,7 @@ El bundle es el artefacto que despliegas — la imagen del runtime lo carga, por
 
 Las dependencias se empaquetan por defecto (vendored) para que el reinicio de un pod no conlleve una instalación de 35–55 segundos. Un árbol que supere los 200 MB en disco se descarta en su lugar, ya que el límite de subida es de 100 MB comprimido — consulta el registro de cambios (changelog) para conocer el motivo.
 
-<span class="since-badge" data-since="0.25">Desde 0.25</span> Cada aplicación estática que
+Cada aplicación estática que
 lleva el bundle recibe una copia brotli (`.br`) y otra gzip (`.gz`) junto a cada
 recurso con hash de contenido de 1 KB o más — los archivos que un navegador guarda en
 caché durante un año. El runtime envía la que el navegador acepta, así que esos archivos no
@@ -98,7 +98,7 @@ ejemplo esto añade menos de un segundo a la compilación y unos 2,4 MB al bundl
 
 Actualiza cada paquete `@rebasepro/*` que fija el proyecto a una única versión y, a continuación, instala con el gestor de paquetes indicado por su archivo lockfile. `rebase upgrade` toma la última versión; `--to 0.21.0` una versión exacta, sin búsqueda en el registro; `--to canary` un dist-tag. Cada versión fijada en `dependencies`, `devDependencies` y `optionalDependencies`, en cada `package.json` del proyecto, conserva su `^` o `~`, y nada más en el archivo cambia. `peerDependencies` y las especificaciones `workspace:`, `link:`, `file:`, git y etiquetas se enumeran y se dejan intactas. Los overrides en `pnpm-workspace.yaml` y `package.json` también se actualizan, pero un override `link:` o `file:` prevalece sobre cualquier versión fijada: se informa al respecto y `--drop-local-overrides` lo elimina. `--dry-run` no escribe nada, `--no-install` omite la instalación y `--json` imprime un único documento.
 
-<span class="since-badge" data-since="0.25">Desde 0.25</span> Un proyecto en una prerelease, como un canary, se queda en su canal salvo que `latest` sea más reciente. Un dist-tag que movería una versión fijada hacia atrás se rechaza (`downgrade_refused` con `--json`) salvo que pases `--allow-downgrade`; un `--to` exacto se aplica, y se marca como una degradación. Un `--dry-run` de una actualización que la ejecución real rechazaría muestra lo que se movería y termina con código 0, y con `--json` su documento lleva el rechazo como `wouldRefuse` (`{ code, message, hint }`). En la 0.24, `rebase upgrade` toma `latest` sin más.
+Un proyecto en una prerelease, como un canary, se queda en su canal salvo que `latest` sea más reciente. Un dist-tag que movería una versión fijada hacia atrás se rechaza (`downgrade_refused` con `--json`) salvo que pases `--allow-downgrade`; un `--to` exacto se aplica, y se marca como una degradación. Un `--dry-run` de una actualización que la ejecución real rechazaría muestra lo que se movería y termina con código 0, y con `--json` su documento lleva el rechazo como `wouldRefuse` (`{ code, message, hint }`). En la 0.24, `rebase upgrade` toma `latest` sin más.
 
 ### `rebase start`
 
@@ -110,7 +110,7 @@ rebase start
 
 Lee `PORT` y el resto de `.env`, a diferencia de `rebase dev`, en el `NODE_ENV` que definan. Un `.env` recién generado por el scaffold indica `development`, por lo que la primera cuenta que se registre sigue convirtiéndose en administradora, y `rebase start` lo indica al principio; define `NODE_ENV=production` para un servidor de producción. `rebase start --bundle ./dist-bundle` ejecuta un bundle en otra ubicación.
 
-`rebase start` no inicia ninguna base de datos, y el `.env` del scaffold no tiene `DATABASE_URL`, así que una ejecución local sobre la base de datos que usa `rebase dev` es `DATABASE_URL="$(rebase db url)" rebase start`. <span class="since-badge" data-since="0.25">Desde 0.25</span> Sin una, imprime esa línea antes de arrancar; en la 0.24 el runtime se detiene con "DATABASE_URL: is required".
+`rebase start` no inicia ninguna base de datos, y el `.env` del scaffold no tiene `DATABASE_URL`, así que una ejecución local sobre la base de datos que usa `rebase dev` es `DATABASE_URL="$(rebase db url)" rebase start`. Sin una, imprime esa línea antes de arrancar; en la 0.24 el runtime se detiene con "DATABASE_URL: is required".
 
 ### `rebase apps list`
 
@@ -134,7 +134,7 @@ Escribe el punto de entrada del backend y un `Dockerfile` en el proyecto y cambi
 
 Obtén una vista previa con `rebase eject --dry-run`, que muestra lo que cambiaría sin modificar nada. `--force` reemplaza un `backend/src/index.ts` o `env.ts` existente, conservando el archivo actual como `<name>.bak`.
 
-<span class="since-badge" data-since="0.25">Desde 0.25</span> El servidor ejectado guarda las subidas locales en el `uploads/` del proyecto, ejecutado desde el código fuente o compilado, como hace `rebase dev`. Se ejecuta en `backend/`, así que un `STORAGE_PATH` relativo allí se lee desde `backend/`. En la 0.24 el servidor compilado usa `backend/dist/uploads`, que borra la siguiente compilación.
+El servidor ejectado guarda las subidas locales en el `uploads/` del proyecto, ejecutado desde el código fuente o compilado, como hace `rebase dev`. Se ejecuta en `backend/`, así que un `STORAGE_PATH` relativo allí se lee desde `backend/`. En la 0.24 el servidor compilado usa `backend/dist/uploads`, que borra la siguiente compilación.
 
 ### `rebase schema generate`
 
@@ -173,8 +173,6 @@ Cada uno está en [Comandos de base de datos](/docs/cli/database/), con el orden
 
 ### `rebase console`
 
-<span class="since-badge" data-since="0.25">Desde 0.25</span>
-
 Un REPL de Node con los datos del proyecto abiertos, o un solo fragmento ejecutado con `-e`:
 
 ```bash
@@ -199,9 +197,9 @@ rebase apps config <app>     # the client configuration for one app
 
 `apps init` no recibe nombre: infiere todas las apps del proyecto y escribe el `rebase.json` completo, y se niega a reemplazar uno que exista salvo que pases `--force`.
 
-<span class="since-badge" data-since="0.25">Desde 0.25</span> Un argumento de nombre se rechaza. `--force` conserva, del archivo que reemplaza, lo que la inferencia no puede saber: el nombre de cada app, su `path` y su ruta `cms`. Todo lo demás se infiere de nuevo, y una app declarada que ya no encuentra se nombra como eliminada, de modo que en un scaffold vuelve a escribir el `rebase.json` que entregó el scaffold. El comando de compilación de la app estática usa el gestor de paquetes del proyecto. En la 0.24 el nombre se ignora, y `--force` escribe la inferencia pura: la app estática pasa a ser `web`, compilada con `npm run build --workspace frontend`.
+Un argumento de nombre se rechaza. `--force` conserva, del archivo que reemplaza, lo que la inferencia no puede saber: el nombre de cada app, su `path` y su ruta `cms`. Todo lo demás se infiere de nuevo, y una app declarada que ya no encuentra se nombra como eliminada, de modo que en un scaffold vuelve a escribir el `rebase.json` que entregó el scaffold. El comando de compilación de la app estática usa el gestor de paquetes del proyecto. En la 0.24 el nombre se ignora, y `--force` escribe la inferencia pura: la app estática pasa a ser `web`, compilada con `npm run build --workspace frontend`.
 
-<span class="since-badge" data-since="0.25">Desde 0.25</span> Para un checkout no vinculado a un proyecto de Cloud, `apps config` dice que no está vinculado, esté o no en marcha `rebase dev`, y da la URL del backend tal como la sirve `rebase dev`. En la 0.24 imprime `http://localhost:3001`.
+Para un checkout no vinculado a un proyecto de Cloud, `apps config` dice que no está vinculado, esté o no en marcha `rebase dev`, y da la URL del backend tal como la sirve `rebase dev`. En la 0.24 imprime `http://localhost:3001`.
 
 ### `rebase status`
 
@@ -230,7 +228,7 @@ Tres archivos determinan a qué puede acceder un backend, y este comando muestra
 
 Un `○` es el estado que conviene conocer antes de un despliegue y no después: declarado, no configurado. Una `✗` significa que el entorno define algo de forma *incorrecta*, lo que impide el arranque en lugar de degradar el servicio.
 
-<span class="since-badge" data-since="0.25">Desde 0.25</span> Un `rebase.resources.json` que ya no coincide con las declaraciones recibe una línea `○`. Uno que aún no se ha escrito no: `rebase build` lo escribe en cada compilación, así que un proyecto que nunca se ha compilado, como un scaffold recién creado, no tiene nada que arreglar. En la 0.24 el `status` de todo proyecto nuevo terminaba con "is missing".
+Un `rebase.resources.json` que ya no coincide con las declaraciones recibe una línea `○`. Uno que aún no se ha escrito no: `rebase build` lo escribe en cada compilación, así que un proyecto que nunca se ha compilado, como un scaffold recién creado, no tiene nada que arreglar. En la 0.24 el `status` de todo proyecto nuevo terminaba con "is missing".
 
 ### `rebase resources`
 
@@ -243,12 +241,12 @@ rebase resources --check    # fail if the committed graph is stale
 rebase resources --json     # machine-readable
 ```
 
-`rebase resources --check` es el flag que usa un trabajo de CI para fallar en caso de que `rebase.resources.json` ya no coincida con el código de configuración. <span class="since-badge" data-since="0.25">Desde 0.25</span> `--json` se combina con él: ante una desviación, `rebase resources --check --json` termina con código 1 con un contenedor de error (`resource_graph_missing` o `resource_graph_stale`), y si todo va bien el grafo lleva `check.status`. `--write --json` escribe el archivo e informa `written.changed`. En la 0.24 `--json` imprimía el grafo e ignoraba ambos flags.
+`rebase resources --check` es el flag que usa un trabajo de CI para fallar en caso de que `rebase.resources.json` ya no coincida con el código de configuración. `--json` se combina con él: ante una desviación, `rebase resources --check --json` termina con código 1 con un contenedor de error (`resource_graph_missing` o `resource_graph_stale`), y si todo va bien el grafo lleva `check.status`. `--write --json` escribe el archivo e informa `written.changed`. En la 0.24 `--json` imprimía el grafo e ignoraba ambos flags.
 
 Un recurso se declara en el código de configuración — `database("analytics")`, `bucket("media")`, `topic("signups")`, `queue("thumbnails")` — o es un archivo bajo `backend/crons` o `backend/functions`, y nunca se escribe a mano en `rebase.resources.json`, el cual se genera a partir de esas declaraciones para que un host pueda leer lo que necesita un proyecto sin compilarlo. Cada entrada registra quién lo utiliza (`collection:events`, `property:posts.cover`, `function:report`).
 
 Un backend también cuenta con una base de datos predeterminada y un origen de almacenamiento predeterminado que nadie declara. Ambos se enumeran aquí, marcados como `implicit`, y ninguno se escribe en `rebase.resources.json` — el host los proporciona, por lo que registrarlos solicitaría el aprovisionamiento de algo que nadie pidió.
-<span class="since-badge" data-since="0.25">Desde 0.25</span> Declarar uno con nombre, como `bucket("media")`, deja el predeterminado donde está, así que se enumeran ambos. Solo declarar el propio predeterminado, o marcar un bucket con `default: true`, lo reemplaza. En la 0.24 el origen de almacenamiento predeterminado desaparecía de `rebase status` y `rebase resources` en cuanto se declaraba cualquier bucket, aunque el servidor lo seguía sirviendo.
+Declarar uno con nombre, como `bucket("media")`, deja el predeterminado donde está, así que se enumeran ambos. Solo declarar el propio predeterminado, o marcar un bucket con `default: true`, lo reemplaza. En la 0.24 el origen de almacenamiento predeterminado desaparecía de `rebase status` y `rebase resources` en cuanto se declaraba cualquier bucket, aunque el servidor lo seguía sirviendo.
 
 Para ver lo que la plataforma mantiene para un proyecto en comparación con lo que declara su código, y para eliminar una base de datos aprovisionada que el código ya no menciona, consulta [`rebase cloud resources`](/docs/cli/cloud#resources).
 
@@ -333,7 +331,7 @@ Las claves cuentan con doble validación: se aplican tanto los alcances de la cl
 
 ### `rebase storage`
 
-<span class="since-badge" data-since="0.25">Desde 0.25</span> Mantenimiento de todo el almacén
+Mantenimiento de todo el almacén
 de archivos guardados, a través del backend en ejecución con
 `REBASE_SERVICE_KEY` de `.env`:
 
@@ -374,7 +372,7 @@ Consulta [Skills del agente](/docs/ai/skills) para ver la lista completa y dónd
 
 ### `rebase telemetry`
 
-Envío anónimo de datos de uso, desactivado hasta que digas que sí. Un `rebase init` interactivo pregunta al final, y la opción predeterminada es negativa, así que no se comparte nada salvo que respondas que sí. La respuesta es por máquina (`~/.rebase/telemetry.json`): tras un sí, `init` no vuelve a preguntar, y tras un no, el siguiente `init` vuelve a preguntar. Cada checkout recibe un id de proyecto aleatorio, guardado en su `.rebase/telemetry-project.json`, ignorado por git. <span class="since-badge" data-since="0.25">Desde 0.25</span> En la 0.24 la opción predeterminada es sí, y el id de proyecto cambia en cada reinicio de `rebase dev`.
+Envío anónimo de datos de uso, desactivado hasta que digas que sí. Un `rebase init` interactivo pregunta al final, y la opción predeterminada es negativa, así que no se comparte nada salvo que respondas que sí. La respuesta es por máquina (`~/.rebase/telemetry.json`): tras un sí, `init` no vuelve a preguntar, y tras un no, el siguiente `init` vuelve a preguntar. Cada checkout recibe un id de proyecto aleatorio, guardado en su `.rebase/telemetry-project.json`, ignorado por git. En la 0.24 la opción predeterminada es sí, y el id de proyecto cambia en cada reinicio de `rebase dev`.
 
 ```bash
 rebase telemetry status

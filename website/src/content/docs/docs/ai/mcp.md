@@ -337,7 +337,7 @@ database at boot, additively. After changing a collection, restart it with
 rebase_dev_stop and rebase_dev_start. …
 ```
 
-<span class="since-badge" data-since="0.25">Since 0.25</span> From a terminal,
+From a terminal,
 `rebase db push` and `rebase db migrate` do run on that database; only the MCP
 tools are refused. On 0.24 the CLI refuses them there too.
 
@@ -373,7 +373,7 @@ outside.
 
 The [remote endpoint](#the-remote-endpoint) fences its tool results the same
 way and says so to the client; its `structuredContent` carries the plain result.
-<span class="since-badge" data-since="0.25">Since 0.25</span> `list_collections` and
+`list_collections` and
 `describe_collection` are the exceptions: only a model reads them, so they are
 sent once, in the text. Before 0.24 the listing carried a `structuredContent`
 copy too.
@@ -491,7 +491,7 @@ to one user, the endpoint declines to mount and says why in the boot log. No
   `{ count }`. As on REST, a `limit` above 1000, an undeclared argument and an
   edit or delete of a trashed row (404) are refused; setting the soft-delete
   field to `null` restores it.
-- <span class="since-badge" data-since="0.25">Since 0.25</span> **The listing names the collections; `describe_collection` gives one's schema.**
+- **The listing names the collections; `describe_collection` gives one's schema.**
   `list_collections` answers each collection's `name`, `title` and `description`,
   and `describe_collection { collection }` that collection's OpenAPI `row` and
   `create` schemas, plus `softDeleteField` where rows go to a trash. The tool

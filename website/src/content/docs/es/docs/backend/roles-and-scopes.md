@@ -1,5 +1,5 @@
 ---
-sourceHash: cc000bf4cb3fb671
+sourceHash: e6d2447955c86775
 title: Roles y alcances
 sidebar_label: Roles y alcances
 description: "Lo que puede hacer quien llama: el plano de datos que tiene toda persona, el plano de administración que conceden los roles, los alcances que una aplicación declara para sí misma y cómo los lleva cada credencial."
@@ -226,7 +226,7 @@ para cualquier otro proyecto. También necesita `functions:invoke`, o
 `hasScope(c, scope, target)` y `getScopes(c)` responden a la misma pregunta dentro de
 un manejador.
 
-<span class="since-badge" data-since="0.25">Desde 0.25</span> `requireScope`
+`requireScope`
 rechaza un alcance que nadie podría tener. Un nombre que no es un alcance, o uno
 integrado mal escrito como `data:raed`, lanza un error al cargarse la función. Un
 alcance de la aplicación que el backend no declara bajo `auth.scopes` responde a

@@ -104,7 +104,7 @@ session:
    only for what boot deliberately leaves alone — a renamed column, a narrowed
    type, a removed field — on the managed development database as on your own
    PostgreSQL. Production is `pnpm db:generate` then `pnpm db:migrate`.
-   <span class="since-badge" data-since="0.25">Since 0.25</span> On 0.24,
+   On 0.24,
    `pnpm db:push` needs your own PostgreSQL, and the file says so.
 3. **Use the SDK.** Go through `rebase.dataAsAdmin.<slug>` for work done as the
    service identity, or `getDriver(c)` inside a function when the read should run

@@ -1,5 +1,5 @@
 ---
-sourceHash: b9b698ec32e400fc
+sourceHash: 7f736b930b419003
 title: Scrittura tramite REST
 sidebar_label: Scrittura tramite REST
 description: Chiavi di idempotenza, scritture condizionali con ETag e If-Match, operazioni sui campi, upsert su chiave naturale, return=minimal e batch tra collezioni.
@@ -80,7 +80,7 @@ una singola riga. Inviandolo nuovamente come `If-Match` in una successiva richie
 `PATCH` o `DELETE`, la scrittura viene rifiutata con `412` se la riga è stata
 modificata nel frattempo.
 
-<span class="since-badge" data-since="0.25">Da 0.25</span> Un `PATCH` riuscito risponde con l'`ETag` della versione che ha scritto,
+Un `PATCH` riuscito risponde con l'`ETag` della versione che ha scritto,
 così la successiva scrittura condizionale non richiede una lettura preventiva. Il tag
 viaggia anche su un `204` risposto per `Prefer: return=minimal`, e una risposta riproposta per
 un `Idempotency-Key` porta lo stesso tag della prima. Una sottoscrizione live a una riga
@@ -108,7 +108,7 @@ collezione ne dichiara una — quella colonna già *è* una versione — e da un
 stabile della riga in caso contrario. `If-Match: *` verifica solo che la riga
 esista. Se la precondizione fallisce, non viene scritto nulla.
 
-<span class="since-badge" data-since="0.25">Da 0.25</span> Il form dei record dell'admin salva con `If-Match`: un salvataggio fatto su una versione
+Il form dei record dell'admin salva con `If-Match`: un salvataggio fatto su una versione
 che qualcuno ha nel frattempo sostituito viene rifiutato, il form lo dice, e la modifica resta
 nel form, riapplicata sulla nuova versione con i campi in conflitto evidenziati.
 
@@ -226,7 +226,7 @@ qualsiasi query basata su "nuovi di questa settimana".
 
 #### Non sulla collection degli utenti
 
-<span class="since-badge" data-since="0.25">Since 0.25</span> La collection degli utenti (quella con `auth` attivo) rifiuta un upsert da ogni porta — `?on_conflict=`, `/bulk` con `upsert: true`, un'operazione `upsert` di `_batch`, l'`upsert()` dell'SDK e il socket realtime — con un `400` (`INVALID_CONFLICT_TARGET`). Le sue righe sono gli utenti, e creare un utente e modificarlo seguono regole diverse: una creazione esegue l'hash della password, normalizza l'email, esegue `onCreateUser` e invia l'invito, e un aggiornamento non può declassare l'ultimo amministratore. Un upsert scopre quale dei due è solo dentro la scrittura, troppo tardi per applicare l'una o l'altra. Crea gli utenti con un semplice `POST` e modificali con `PATCH`.
+La collection degli utenti (quella con `auth` attivo) rifiuta un upsert da ogni porta — `?on_conflict=`, `/bulk` con `upsert: true`, un'operazione `upsert` di `_batch`, l'`upsert()` dell'SDK e il socket realtime — con un `400` (`INVALID_CONFLICT_TARGET`). Le sue righe sono gli utenti, e creare un utente e modificarlo seguono regole diverse: una creazione esegue l'hash della password, normalizza l'email, esegue `onCreateUser` e invia l'invito, e un aggiornamento non può declassare l'ultimo amministratore. Un upsert scopre quale dei due è solo dentro la scrittura, troppo tardi per applicare l'una o l'altra. Crea gli utenti con un semplice `POST` e modificali con `PATCH`.
 
 ### `Prefer: return=minimal`
 

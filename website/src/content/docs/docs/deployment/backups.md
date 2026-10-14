@@ -42,7 +42,7 @@ resolves, in the same order: `--database-url`, `DATABASE_URL` in the shell, the
 in `.env`, Postgres in Docker (`--docker`, or the last `rebase dev --docker`),
 then the managed development database, which `restore` refuses.
 
-<span class="since-badge" data-since="0.25">Since 0.25</span> A relative
+A relative
 `--out`, the default `./backups` and a dump path given to `rebase db restore`
 all resolve against the directory you run `rebase` from, normally the project
 root, so `rebase db backup` and `rebase db backups list` meet in one place. A
@@ -100,12 +100,12 @@ call. A dump without it has no users, and cannot be restored into an empty
 database at all: the tables it does contain have policies that call functions
 it does not.
 
-<span class="since-badge" data-since="0.25">Since 0.25</span> So
+So
 `rebase db backup` refuses an `--exclude-schema` that matches `rebase`, by
 pg_dump's own pattern rules (`reb*` and `*` included), before it runs anything.
 On 0.24 it wrote the dump and validated it, and only the restore failed.
 
-<span class="since-badge" data-since="0.25">Since 0.25</span> Because it holds
+Because it holds
 every password and key hash, a local dump and its `.globals.sql` are created
 readable by their owner only (0600), before `pg_dump` writes to them; a
 scheduled backup's local files are too. On 0.24 they are 0644.
@@ -237,7 +237,7 @@ without `--yes` it asks for an interactive `yes`, and in a non-interactive
 shell it stops and says to pass `--yes`. `<backup>` is a local `.dump` or an `s3://…` / `gs://…` key,
 downloaded first.
 
-<span class="since-badge" data-since="0.25">Since 0.25</span> Into a database
+Into a database
 that already holds what the backup creates, it needs `--clean`: without it,
 it refuses before anything runs, naming the schemas and tables in the way, and
 says to pass `--clean` or restore into a new database with
@@ -246,7 +246,7 @@ stopped on pg_restore's `schema "rebase" already exists`. It refuses the
 managed development database, which cannot take a dump's COPY data; restore
 into Postgres in Docker with `--docker` instead.
 
-<span class="since-badge" data-since="0.25">Since 0.25</span> With `--clean`,
+With `--clean`,
 the restore replaces what the backup holds as one transaction. It drops each
 schema the backup creates whole (`rebase`, say), and each table the backup
 creates in a schema it does not (`public`), with `CASCADE`, then restores the
@@ -339,7 +339,7 @@ configured.
 
 ### Download a backup
 
-<span class="since-badge" data-since="0.25">Since 0.25</span> A browser cannot
+A browser cannot
 put an `Authorization` header on a download, so Studio and the SDK ask for a
 link first. `POST /api/admin/backups/download-url` with `{ "key": "…" }` (same
 admin scope and key checks as the download) answers

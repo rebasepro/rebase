@@ -1,5 +1,5 @@
 ---
-sourceHash: f64124003b7de5a4
+sourceHash: 20e5f3d510186de4
 title: Generazione dello Schema
 sidebar_label: Generazione dello Schema
 description: Genera schemi Drizzle ORM dalle definizioni delle collezioni, crea migrazioni SQL e mantieni il tuo database sincronizzato con la CLI di Rebase.
@@ -86,20 +86,20 @@ rebase schema introspect
 - Si connette al tuo database (usando la stringa di connessione dal tuo `.env`)
 - Ispeziona tutte le tabelle, colonne, tipi e chiavi esterne
 - Genera i file di definizione delle collezioni
-- <span class="since-badge" data-since="0.25">Da 0.25</span> Legge le policy di
+- Legge le policy di
   row-level security di ogni tabella nelle `securityRules` della sua collezione:
   nome, comando, modalità, elenco `TO`, `USING` e `WITH CHECK`. Le policy
   `<table>_default_*` che Rebase aggiunge da sé restano fuori. Così il
   `db push` che segue ricrea ogni policy com'era. Su 0.24 le policy
   restano fuori dai file, e un push può eliminarne una il cui nome ha la forma
   di una policy generata (`<table>_<op>_<hash>`)
-- <span class="since-badge" data-since="0.25">Da 0.25</span> Legge ogni
+- Legge ogni
   espressione (il `USING` di una policy, un CHECK, il default di una colonna) con il
   `search_path` che usa il server, `public`, così una funzione nello schema `rebase`
   viene scritta `rebase.roles()`. Con una connessione come ruolo chiamato `rebase`, il
   percorso predefinito metteva quello schema per primo e la regola tornava come `roles()`, che il
   push non riusciva a trovare
-- <span class="since-badge" data-since="0.25">Da 0.25</span> Scrive
+- Scrive
   `disableDefaultPolicies: true` su una tabella che ha la row-level security attiva e
   non possiede l'intera [baseline admin](/docs/collections/security-rules/#policies-a-collection-gets-without-writing-them),
   così il push non aggiunge alcuna policy `<table>_default_admin_*` e l'accesso alla
@@ -108,15 +108,15 @@ rebase schema introspect
   disattivata mantiene la baseline, e l'introspezione dice, una sola volta, quali sono:
   il push attiva la RLS qualunque cosa dica una collezione. Su 0.24 il push dopo
   un'introspezione aggiungeva la baseline a ogni tabella
-- <span class="since-badge" data-since="0.25">Da 0.25</span> Genera come entità nella
+- Genera come entità nella
   navigazione una tabella le cui policy danno a ogni utente le proprie righe (leggono
   `rebase.uid()`, `app.uid` o il JWT), per quanto poche righe abbia. Su 0.24 una tabella
   piccola è un elenco di codici, e una tabella posseduta tramite un'altra è nascosta
   come suo figlio
-- <span class="since-badge" data-since="0.25">Da 0.25</span> Contro un database non in
+- Contro un database non in
   esecuzione, stampa una sola volta lo stesso banner di `db push` e non crea nulla.
   Stampa la directory di output come percorso assoluto
-- <span class="since-badge" data-since="0.25">Da 0.25</span> Lascia nel database i vincoli CHECK ed EXCLUDE di
+- Lascia nel database i vincoli CHECK ed EXCLUDE di
   una tabella, e il `db push` successivo li mantiene. Una collezione non può dichiarare né gli
   uni né gli altri; un CHECK che l'introspezione sa leggere (`total >= 0`) diventa anche la
   `validation` della proprietà. Su 0.24 quel push li eliminava
@@ -131,7 +131,7 @@ rebase schema introspect
 
 Questo è utile quando si adotta Rebase su un database esistente — prima esegui l'introspezione, poi personalizza le collezioni generate.
 
-**Introspezione, poi push, non cambia nulla.** Le proprietà generate dicono esattamente cos'è ogni colonna — `columnType`, `precision`/`scale`, `defaultValue`, `required`, l'`isId` di una chiave (`"increment"` per un'identity intera, `columnType: "serial"` per una serial, `"manual"` per una chiave senza default), l'`onDelete` di una relazione — e il suo `index: false` dove al database manca l'indice che Rebase deriverebbe sulla colonna della chiave, dato che un `belongsTo` è [indicizzato per impostazione predefinita](/docs/backend/indexes#foreign-keys-are-indexed-for-you). Dove nessun indice serve la colonna, la riga lo dice (eliminala per farne costruire uno); <span class="since-badge" data-since="0.25">Da 0.25</span> dove un altro indice inizia già con essa (`orders_customer_id_idx`, uno composito, uno univoco), la riga nomina quell'indice, e senza quella riga il push ne costruirebbe un secondo. Su 0.24 diceva di eliminare la riga in ogni caso — e il blocco `search` di una collezione letto a ritroso dalla colonna che ha costruito — quindi `rebase db push --dry-run` eseguito subito dopo un'introspezione non pianifica alcuna modifica. L'eccezione è una tabella con la row-level security disattivata: il push la attiva, e il dry run lo elenca insieme alla baseline admin che aggiunge. Dove nessuna proprietà può rappresentare una colonna — un `timestamp` senza time zone, un `interval`, un `inet`, un tipo enum che non si chiama `<table>_<column>`, un default come `CURRENT_DATE` — l'introspezione lo segnala, colonna per colonna, sul terminale e in testa al file, con ciò che un push le farebbe e, quando esiste, l'istruzione che fa coincidere le due cose (`ALTER TYPE "mood" RENAME TO "customers_current_mood";`). Una tabella con chiave su più di una colonna torna come una chiave composita, con il suo `isId` su ogni colonna della chiave. Viene esclusa, con il relativo motivo, quando una colonna della chiave non può portare `isId` (un timestamp, per esempio) o la chiave esterna di un'altra tabella punta a essa, cosa che una relazione su una sola colonna non può fare; `db push` lascia stare una tabella che non è una collezione. Sulla 0.23 il push eseguito subito dopo un'introspezione può ancora pianificare cambi di tipo, default rimossi e NOT NULL, e una chiave `id` fantasma.
+**Introspezione, poi push, non cambia nulla.** Le proprietà generate dicono esattamente cos'è ogni colonna — `columnType`, `precision`/`scale`, `defaultValue`, `required`, l'`isId` di una chiave (`"increment"` per un'identity intera, `columnType: "serial"` per una serial, `"manual"` per una chiave senza default), l'`onDelete` di una relazione — e il suo `index: false` dove al database manca l'indice che Rebase deriverebbe sulla colonna della chiave, dato che un `belongsTo` è [indicizzato per impostazione predefinita](/docs/backend/indexes#foreign-keys-are-indexed-for-you). Dove nessun indice serve la colonna, la riga lo dice (eliminala per farne costruire uno); dove un altro indice inizia già con essa (`orders_customer_id_idx`, uno composito, uno univoco), la riga nomina quell'indice, e senza quella riga il push ne costruirebbe un secondo. Su 0.24 diceva di eliminare la riga in ogni caso — e il blocco `search` di una collezione letto a ritroso dalla colonna che ha costruito — quindi `rebase db push --dry-run` eseguito subito dopo un'introspezione non pianifica alcuna modifica. L'eccezione è una tabella con la row-level security disattivata: il push la attiva, e il dry run lo elenca insieme alla baseline admin che aggiunge. Dove nessuna proprietà può rappresentare una colonna — un `timestamp` senza time zone, un `interval`, un `inet`, un tipo enum che non si chiama `<table>_<column>`, un default come `CURRENT_DATE` — l'introspezione lo segnala, colonna per colonna, sul terminale e in testa al file, con ciò che un push le farebbe e, quando esiste, l'istruzione che fa coincidere le due cose (`ALTER TYPE "mood" RENAME TO "customers_current_mood";`). Una tabella con chiave su più di una colonna torna come una chiave composita, con il suo `isId` su ogni colonna della chiave. Viene esclusa, con il relativo motivo, quando una colonna della chiave non può portare `isId` (un timestamp, per esempio) o la chiave esterna di un'altra tabella punta a essa, cosa che una relazione su una sola colonna non può fare; `db push` lascia stare una tabella che non è una collezione. Sulla 0.23 il push eseguito subito dopo un'introspezione può ancora pianificare cambi di tipo, default rimossi e NOT NULL, e una chiave `id` fantasma.
 
 **Come sono fatti i file generati**
 
@@ -156,28 +156,28 @@ rebase db push
 **Cosa fa:**
 - Legge lo schema Drizzle generato
 - Applica le modifiche direttamente al database (CREATE, ALTER, DROP)
-- Esegue prima il piano in modalità dry run e si ferma prima di tutto ciò che distrugge dati: una tabella, colonna, schema, vista o tipo eliminati, un `TRUNCATE`, un cambio di tipo di colonna che può perdere valori (`timestamptz` → `date`, `numeric` → `integer`), o un cambio di chiave primaria: `(id)` → `(id, locale)` dà a ogni riga un nuovo id, così link, chiavi esterne e id salvati altrove non trovano più la loro riga. <span class="since-badge" data-since="0.25">Da 0.25</span> Si ferma anche prima dell'eliminazione di un vincolo CHECK o EXCLUDE che il database contiene: nessuna riga va persa, ma da quel momento il database accetta righe che rifiutava. In un terminale chiede conferma, dove Ctrl-C o Ctrl-D rispondono no, altrimenti rifiuta; `--allow-destructive` (o `--yes`) applica comunque la modifica. Un push che si ferma lì elimina all'uscita il proprio database di appoggio `<db>_dev_diff`
+- Esegue prima il piano in modalità dry run e si ferma prima di tutto ciò che distrugge dati: una tabella, colonna, schema, vista o tipo eliminati, un `TRUNCATE`, un cambio di tipo di colonna che può perdere valori (`timestamptz` → `date`, `numeric` → `integer`), o un cambio di chiave primaria: `(id)` → `(id, locale)` dà a ogni riga un nuovo id, così link, chiavi esterne e id salvati altrove non trovano più la loro riga. Si ferma anche prima dell'eliminazione di un vincolo CHECK o EXCLUDE che il database contiene: nessuna riga va persa, ma da quel momento il database accetta righe che rifiutava. In un terminale chiede conferma, dove Ctrl-C o Ctrl-D rispondono no, altrimenti rifiuta; `--allow-destructive` (o `--yes`) applica comunque la modifica. Un push che si ferma lì elimina all'uscita il proprio database di appoggio `<db>_dev_diff`
 - Attiva la sicurezza a livello di riga su ogni tabella di collezione, tabelle di giunzione comprese, subito dopo la modifica dello schema e prima di qualsiasi passaggio che possa fallire: un push che si interrompe a metà lascia una nuova tabella che nega ogni richiesta invece che aperta a tutte
 - Applica le policy RLS delle tue collezioni e **rimuove le policy sostituite da un push precedente**
-- <span class="since-badge" data-since="0.25">Da 0.25</span> Lascia com'è ogni vincolo CHECK ed EXCLUDE sulla
+- Lascia com'è ogni vincolo CHECK ed EXCLUDE sulla
   tabella di una collezione. Una collezione non può dichiarare né gli uni né gli altri, quindi sono
   regole proprie del database, scritte a mano o portate da un database che `schema introspect` ha
   adottato; per rimuoverne uno, eliminalo a mano (`ALTER TABLE … DROP CONSTRAINT …`). Anche i
   trigger e le funzioni che hai scritto non vengono toccati. Su 0.24 il primo push dopo
   un'introspezione eliminava ogni vincolo CHECK ed EXCLUDE senza chiedere conferma
-- <span class="since-badge" data-since="0.25">Da 0.25</span> Riconosce per nome esatto tutto ciò che lascia
+- Riconosce per nome esatto tutto ciò che lascia
   stare, compreso un `.`, `[`, `]` o `*` al suo interno. Su 0.24 un indice scritto a mano con un
   nome come `orders_idx[v1]` veniva eliminato senza conferma, e un `.` nel nome di una tabella o
   di un indice faceva fallire ogni push con `too many parts in pattern`
-- <span class="since-badge" data-since="0.25">Da 0.25</span> Costruisce ogni
+- Costruisce ogni
   [indice di chiave esterna che Rebase deriva](/docs/backend/indexes#foreign-keys-are-indexed-for-you)
   e che a una tabella esistente manca **prima** di pianificare, con
   `CREATE INDEX CONCURRENTLY`, così le scritture sulla tabella proseguono durante la build;
   Atlas lo trova poi già al suo posto. `--dry-run` li nomina e non costruisce nulla
-- <span class="since-badge" data-since="0.25">Da 0.25</span> Marca le policy che
+- Marca le policy che
   applica nello stesso modo dell'avvio del server, così il primo avvio dopo un
   push le lascia stare invece di ricreare ognuna
-- <span class="since-badge" data-since="0.25">Da 0.25</span> `--dry-run`
+- `--dry-run`
   elenca la row-level security che il push cambierebbe, sotto "Planned row-level security
   changes": le tabelle su cui attiva la RLS, e ogni policy che crea, sostituisce o
   elimina, calcolate nello stesso modo in cui le decidono i passaggi del push stesso. Dice
@@ -190,13 +190,13 @@ rebase db push
   una che non ha potuto confrontare (per esempio, il lock della sua tabella non concesso
   entro due secondi) è elencata a parte. Il push stesso stampa una riga che conta le
   modifiche. Su 0.24 il dry run mostrava solo il piano di Atlas, che non contiene policy
-- <span class="since-badge" data-since="0.25">Da 0.25</span> Mostra una sola volta
+- Mostra una sola volta
   ogni istruzione che Atlas applica. Atlas si connette senza SSL a un database su questa
   macchina (`localhost`, `127.x`, `::1`) il cui URL non indica alcun `sslmode`, come fa
   l'app, invece di fallire con `SSL is not enabled on the server`; un URL che indica
   `sslmode`, o un altro host, viene passato così com'è scritto. Un'esecuzione di Atlas che
   fallisce prima di pianificare non lascia dietro di sé alcun database `<db>_dev_diff`
-- <span class="since-badge" data-since="0.25">Da 0.25</span> `--dry-run`
+- `--dry-run`
   non scrive nulla del progetto: `src/schema.generated.ts` resta com'è,
   e le copie `drizzle/*.sql` che una release precedente aveva committato vengono nominate, non
   eliminate. Solo l'input del piano va in `.rebase/sql/`, che non viene committato
@@ -236,7 +236,7 @@ Ora `db push` riconcilia questa situazione: elimina le policy generate che non c
 
 Per verificare un database su cui è stato fatto il push prima di questa modifica, esegui `rebase doctor --policies`. Funziona come controllo di CI: esce con un codice diverso da zero in caso di drift, e anche quando non è riuscito a eseguire il controllo — nessuna `DATABASE_URL`, un percorso `--collections` che non si risolve, una lettura di `pg_policies` non concessa al ruolo di CI. Un controllo che non ha potuto guardare non è stato superato.
 
-<span class="since-badge" data-since="0.25">Da 0.25</span> `doctor` e `db push` distinguono i due tipi di orfana. Una policy con un nome generato è stata sostituita, e il prossimo push la elimina. Qualsiasi altro nome è stato scritto a mano o da un altro strumento ed è ancora in vigore: descrivila nelle `securityRules` della sua collezione per mantenerla (la vista RLS di Studio la importa), oppure eliminala a mano se è obsoleta. Su 0.24 entrambe sono "lasciate da un push precedente".
+`doctor` e `db push` distinguono i due tipi di orfana. Una policy con un nome generato è stata sostituita, e il prossimo push la elimina. Qualsiasi altro nome è stato scritto a mano o da un altro strumento ed è ancora in vigore: descrivila nelle `securityRules` della sua collezione per mantenerla (la vista RLS di Studio la importa), oppure eliminala a mano se è obsoleta. Su 0.24 entrambe sono "lasciate da un push precedente".
 :::
 
 :::caution
@@ -255,13 +255,13 @@ rebase db generate
 - Confronta lo schema Drizzle con lo stato che costruiscono le migrazioni in `drizzle/migrations/`, non con il tuo database
 - Produce file di migrazione SQL con timestamp in `drizzle/migrations/`
 - I file possono essere revisionati, modificati e committati nel controllo di versione
-- <span class="since-badge" data-since="0.25">Da 0.25</span> Nomina ogni istruzione della nuova
+- Nomina ogni istruzione della nuova
   migrazione che distrugge dati, usando il controllo che `db push` esegue prima di applicare: una
   tabella, colonna, schema, vista o tipo eliminati, un `TRUNCATE`, un cambio di tipo di colonna che può
   perdere valori, una modifica della chiave primaria, o l'eliminazione di un vincolo CHECK o EXCLUDE
   che il database contiene. Scrive comunque il file ed esce con 0, quindi
   avvisa e non rifiuta.
-- <span class="since-badge" data-since="0.25">Da 0.25</span> Termina con che cosa
+- Termina con che cosa
   fare dopo: `rebase db migrate` e, per la prima migrazione di un progetto, il
   `--baseline <version>` di cui ha bisogno invece un database che l'avvio ha già
   preparato. Una migrazione successiva non riceve alcuna riga di baseline, poiché una
@@ -293,7 +293,7 @@ rebase db migrate
 - Le applica in ordine al database
 - Tiene traccia di quali migrazioni sono state applicate
 
-<span class="since-badge" data-since="0.25">Da 0.25</span> `--refuse-destructive`
+`--refuse-destructive`
 la fa invece rifiutare. Prima esegue una prova a secco (dry run) delle migrazioni in sospeso. Se
 un'istruzione distrugge dati, con lo stesso controllo usato da `db push` e `db generate`, elenca
 quelle istruzioni ed esce con 1. Non applica nulla, nemmeno i file
@@ -321,7 +321,7 @@ rebase db migrate
 
 La versione è il prefisso numerico del file di migrazione che descrive ciò che c'è nel database *adesso*. Quella migrazione e tutte le precedenti risultano applicate; tutto ciò che viene dopo viene eseguito. Su un database che non è mai stato avviato non serve alcuna baseline: migrate direttamente.
 
-Lo stesso accade più avanti nel ciclo ordinario: modifica una collezione mentre `rebase dev` è in esecuzione, e l'avvio aggiunge la colonna prima che `rebase db generate` scriva la migrazione che la aggiunge, così `rebase db migrate` si ferma su `column … already exists (42701)`. Imposta la baseline di quella migrazione allo stesso modo. <span class="since-badge" data-since="0.25">Da 0.25</span> `--baseline` funziona su un database che registra già delle migrazioni: segna come applicato tutto fino alla versione con `atlas migrate set`, e lo dice, oppure dice che non c'è nulla da registrare quando la cronologia la raggiunge già. Su 0.24 Atlas ignora `--baseline` una volta registrata una qualsiasi migrazione, quindi lo stesso errore ritorna. <span class="since-badge" data-since="0.25">Da 0.25</span> Una versione che non corrisponde ad alcun file in `drizzle/migrations` viene rifiutata prima di eseguire qualsiasi cosa, e il messaggio nomina le versioni presenti.
+Lo stesso accade più avanti nel ciclo ordinario: modifica una collezione mentre `rebase dev` è in esecuzione, e l'avvio aggiunge la colonna prima che `rebase db generate` scriva la migrazione che la aggiunge, così `rebase db migrate` si ferma su `column … already exists (42701)`. Imposta la baseline di quella migrazione allo stesso modo. `--baseline` funziona su un database che registra già delle migrazioni: segna come applicato tutto fino alla versione con `atlas migrate set`, e lo dice, oppure dice che non c'è nulla da registrare quando la cronologia la raggiunge già. Su 0.24 Atlas ignora `--baseline` una volta registrata una qualsiasi migrazione, quindi lo stesso errore ritorna. Una versione che non corrisponde ad alcun file in `drizzle/migrations` viene rifiutata prima di eseguire qualsiasi cosa, e il messaggio nomina le versioni presenti.
 
 ### `rebase db branch`
 
@@ -360,9 +360,9 @@ Esegui `doctor` ogni volta che qualcosa sembra non sincronizzato. Individua esat
 
 Il confronto con il database richiede `DATABASE_URL` (o `ADMIN_CONNECTION_STRING`). Senza una delle due, quella fase viene riportata come **saltata** anziché superata, e l'esecuzione non si chiude mai con "All schemas are in sync": un controllo che non è avvenuto non è un certificato di buona salute.
 
-<span class="since-badge" data-since="0.25">Da 0.25</span> Nomina anche ogni collezione priva di un [blocco `search`](/docs/backend/search) la cui tabella contiene più di circa 10.000 righe. Una ricerca lì — la casella di ricerca dell'admin, `.search()`, `?searchString=` — è un `ILIKE '%term%'` sulle colonne di testo, che nessun indice può servire, quindi ognuna legge l'intera tabella, e il suo conteggio la legge di nuovo (circa un terzo di secondo a 100.000 righe, in crescita con la tabella). Il numero di righe è la stima di Postgres stesso, quindi il controllo non scansiona nulla. È un suggerimento: non cambia il codice di uscita, e nulla viene indicizzato per te.
+Nomina anche ogni collezione priva di un [blocco `search`](/docs/backend/search) la cui tabella contiene più di circa 10.000 righe. Una ricerca lì — la casella di ricerca dell'admin, `.search()`, `?searchString=` — è un `ILIKE '%term%'` sulle colonne di testo, che nessun indice può servire, quindi ognuna legge l'intera tabella, e il suo conteggio la legge di nuovo (circa un terzo di secondo a 100.000 righe, in crescita con la tabella). Il numero di righe è la stima di Postgres stesso, quindi il controllo non scansiona nulla. È un suggerimento: non cambia il codice di uscita, e nulla viene indicizzato per te.
 
-<span class="since-badge" data-since="0.25">Da 0.25</span> Nomina una **giunzione orfana**: una tabella `public` con la forma di una giunzione many-to-many che nessuna collezione dichiara. La forma è due colonne che insieme formano la chiave primaria, ciascuna una chiave esterna verso la tabella di una collezione. Rinominare o rimuovere una `manyToMany` lascia indietro la vecchia giunzione, perché push e avvio creano soltanto tabelle, e ogni riga di collegamento è ancora al suo interno. La nota è solo informativa, quindi non cambia il codice di uscita. La correzione è l'istruzione `DROP TABLE`, che `doctor` mostra e non esegue mai.
+Nomina una **giunzione orfana**: una tabella `public` con la forma di una giunzione many-to-many che nessuna collezione dichiara. La forma è due colonne che insieme formano la chiave primaria, ciascuna una chiave esterna verso la tabella di una collezione. Rinominare o rimuovere una `manyToMany` lascia indietro la vecchia giunzione, perché push e avvio creano soltanto tabelle, e ogni riga di collegamento è ancora al suo interno. La nota è solo informativa, quindi non cambia il codice di uscita. La correzione è l'istruzione `DROP TABLE`, che `doctor` mostra e non esegue mai.
 
 ### `rebase generate-sdk`
 
@@ -394,7 +394,7 @@ avviso quello che non si carica, e accetta la directory come `--collections-dir`
 
 `--from` è ciò che permette a un repository privo di collezioni — un frontend separato, una seconda web app, un'app mobile — di generare un client tipizzato dal progetto con cui parla. `REBASE_SERVICE_KEY` viene inviato solo al progetto collegato a questo checkout; per qualsiasi altro host, passa `--token` esplicitamente. La chiave in
 `.env` appartiene al tuo backend locale e non viene mai inviata.
-<span class="since-badge" data-since="0.25">Da 0.25</span> Un rifiuto dice quale di queste
+Un rifiuto dice quale di queste
 cose è successa: un `--token` rifiutato, una chiave della shell rifiutata, una chiave
 trattenuta per un host non collegato, una chiave presente solo in `.env`, oppure nessuna
 chiave. Su 0.24 dice sempre di passare `--token` o di impostare `REBASE_SERVICE_KEY`.
@@ -464,7 +464,7 @@ rebase db migrate
 | Il file di schema non si aggiorna | Controlla che il percorso `--collections` punti alla directory corretta |
 | La migrazione mostra modifiche impreviste | Esegui `rebase doctor` per identificare la deriva |
 | `db push` fallisce in produzione | Usa `db generate` + `db migrate` invece |
-| Una migrazione non deve eliminare dati in CI o in produzione | <span class="since-badge" data-since="0.25">Da 0.25</span> `rebase db migrate --refuse-destructive` esce con 1 e non applica nulla quando un'istruzione in sospeso distrugge dati |
+| Una migrazione non deve eliminare dati in CI o in produzione | `rebase db migrate --refuse-destructive` esce con 1 e non applica nulla quando un'istruzione in sospeso distrugge dati |
 | `db migrate` fallisce con `already exists (42710)` | L'avvio o `db push` hanno già predisposto lo schema — registratelo con `rebase db migrate --baseline <version>` |
 | `db migrate` fallisce con `column … already exists (42701)` | `rebase dev` ha aggiunto la colonna all'avvio — imposta la baseline di quella migrazione allo stesso modo |
 | `db push` sul database gestito fallisce con `Error: EOF` | Atlas ha perso una connessione che tiene il `rebase dev` in esecuzione. Riesegui; se continua a fallire, ferma prima `rebase dev` |

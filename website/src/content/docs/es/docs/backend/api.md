@@ -1,5 +1,5 @@
 ---
-sourceHash: 63a33a92e55310ba
+sourceHash: 6d6edea2e91b0bbc
 title: API REST
 sidebar_label: API REST
 description: Endpoints de la API REST autogenerados para cada colección, con filtrado, ordenación, paginación e inclusión de relaciones.
@@ -22,7 +22,7 @@ Para cada colección, se generan los siguientes endpoints. Cualquier otra ruta q
 | Método | Ruta | Descripción |
 |--------|------|-------------|
 | `GET` | `/api/data/:slug` | Listar entidades |
-| `POST` | `/api/data/:slug/query` | <span class="since-badge" data-since="0.25">Desde 0.25</span> El mismo listado, con sus parámetros de consulta en un cuerpo JSON, para una consulta demasiado larga para una URL. Consulta [Consultas demasiado largas para una URL](/docs/backend/vector-search/#queries-too-long-for-a-url) |
+| `POST` | `/api/data/:slug/query` | El mismo listado, con sus parámetros de consulta en un cuerpo JSON, para una consulta demasiado larga para una URL. Consulta [Consultas demasiado largas para una URL](/docs/backend/vector-search/#queries-too-long-for-a-url) |
 | `GET` | `/api/data/:slug/count` | Contar entidades |
 | `GET` | `/api/data/:slug/aggregate` | `count()`, `sum()`, `avg()`, `min()`, `max()`, opcionalmente agrupados. Acepta los mismos filtros que el endpoint de listado, y RLS se aplica a las filas que se agregan; consulta [Consultas](/docs/sdk/querying/) |
 | `GET` | `/api/data/:slug/:id` | Obtener una sola entidad |
@@ -134,11 +134,11 @@ El límite predeterminado es **50**, y el máximo es **1000**. Ambos provienen d
 
 Los tres parámetros de ventana se rechazan en lugar de corregirse, y cada uno indica su error: `INVALID_LIMIT`, `INVALID_OFFSET` (un número entero de 0 o más) e `INVALID_PAGE` (un número entero de 1 o más). Una ventana sutilmente diferente a la solicitada no se puede distinguir de haber llegado al final de la colección, razón por la cual ninguno de ellos se trunca ni se ignora.
 
-<span class="since-badge" data-since="0.25">Desde 0.25</span> Por la misma razón, `page` y `offset` juntos son un 400 `PAGE_WITH_OFFSET`, en lugar de que uno de los dos gane en silencio.
+Por la misma razón, `page` y `offset` juntos son un 400 `PAGE_WITH_OFFSET`, en lugar de que uno de los dos gane en silencio.
 
 ### Omitir el conteo
 
-<span class="since-badge" data-since="0.25">Desde 0.25</span> `meta.total` es un `COUNT(*)` sobre todas las filas que coinciden — en una tabla grande, la mayor parte de lo que cuesta una solicitud de listado. `?count=none` (`GET /api/data/orders?count=none`) lo omite: no hay `meta.total`, mientras que `meta.hasMore` sigue siendo exacto (la lectura pide una fila más allá de la página). `?count=exact` es el valor por defecto; cualquier otro valor es un 400 `INVALID_COUNT`. Una lectura con `?distinct=true` nunca se cuenta, ni tampoco una búsqueda vectorial con un `vector_threshold` (consulta [Búsqueda vectorial](/docs/backend/vector-search/)).
+`meta.total` es un `COUNT(*)` sobre todas las filas que coinciden — en una tabla grande, la mayor parte de lo que cuesta una solicitud de listado. `?count=none` (`GET /api/data/orders?count=none`) lo omite: no hay `meta.total`, mientras que `meta.hasMore` sigue siendo exacto (la lectura pide una fila más allá de la página). `?count=exact` es el valor por defecto; cualquier otro valor es un 400 `INVALID_COUNT`. Una lectura con `?distinct=true` nunca se cuenta, ni tampoco una búsqueda vectorial con un `vector_threshold` (consulta [Búsqueda vectorial](/docs/backend/vector-search/)).
 
 ### Paginación por cursor
 
@@ -273,7 +273,7 @@ filtros sobre el índice están en [Búsqueda vectorial](/docs/backend/vector-se
 
 ## Consultas demasiado largas para una URL
 
-<span class="since-badge" data-since="0.25">Desde 0.25</span> `POST /api/data/:slug/query` (este listado) y `POST /api/data/:slug/count`
+`POST /api/data/:slug/query` (este listado) y `POST /api/data/:slug/count`
 toman los parámetros de consulta en un cuerpo JSON, para una consulta cuya URL no cabría — un embedding, una lista `in` larga.
 Consulta [Consultas demasiado largas para una URL](/docs/backend/vector-search/#queries-too-long-for-a-url).
 
@@ -310,7 +310,7 @@ GET /api/data/posts?include={"comments":{"limit":5,"where":{"published":["==",tr
 | `orderBy` | La misma sintaxis de ordenación, incluida la posición de NULL. Los empates, y un `limit` sin `orderBy`, se resuelven por la clave de la fila relacionada, en orden ascendente |
 | `fields` | Columnas de la fila *relacionada*; su clave primaria siempre se conserva |
 | `include` | Relaciones de la fila relacionada, a su vez |
-| `count` | <span class="since-badge" data-since="0.25">Desde 0.25</span> `true` devuelve además el total de cada fila principal bajo `_count` (`"_count":{"comments":37}`), contado por la misma sentencia. Solo relaciones a muchos. Consulta [Contar lo que deja fuera un límite](/docs/sdk/relations#counting-what-a-limit-leaves-out) |
+| `count` | `true` devuelve además el total de cada fila principal bajo `_count` (`"_count":{"comments":37}`), contado por la misma sentencia. Solo relaciones a muchos. Consulta [Contar lo que deja fuera un límite](/docs/sdk/relations#counting-what-a-limit-leaves-out) |
 
 `true` significa "cargarla por completo", por lo que `{"author":true}` y `author` representan la misma solicitud. Ambas sintaxis funcionan en la ruta de listado, en la de obtención por ID y en las rutas de subcolecciones anidadas.
 

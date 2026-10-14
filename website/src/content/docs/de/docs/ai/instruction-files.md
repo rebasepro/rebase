@@ -1,5 +1,5 @@
 ---
-sourceHash: 32c7b310f4621e8a
+sourceHash: bc24a5e7b69762ad
 title: KI-Instruktionsdateien
 sidebar_label: KI-Instruktionsdateien
 description: Jedes erstellte Rebase-Projekt enthält ai-instructions.md sowie dreizeilige Pointer-Dateien für Claude, Cursor, Windsurf, Copilot und AGENTS.md – eine Single Source of Truth, viele Dateinamen.
@@ -110,7 +110,7 @@ Sitzung zu wiederholen:
    umbenannte Spalte, ein verengter Typ, ein entferntes Feld — auf der verwalteten
    Entwicklungsdatenbank wie auf Ihrem eigenen PostgreSQL. Produktion ist
    `pnpm db:generate`, danach `pnpm db:migrate`.
-   <span class="since-badge" data-since="0.25">Seit 0.25</span> Unter 0.24 braucht
+   Unter 0.24 braucht
    `pnpm db:push` Ihr eigenes PostgreSQL, und die Datei sagt das.
 3. **Nutzen Sie das SDK.** Gehen Sie über `rebase.dataAsAdmin.<slug>` für Arbeit
    unter der Dienstidentität oder über `getDriver(c)` innerhalb einer Function,

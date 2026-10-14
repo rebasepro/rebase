@@ -1,5 +1,5 @@
 ---
-sourceHash: dc4cb3811023b966
+sourceHash: 44951a600db63629
 title: Início Rápido
 sidebar_label: Início Rápido
 description: Crie um novo projeto Rebase e coloque-o para rodar localmente em menos de 2 minutos.
@@ -70,7 +70,7 @@ Fixe uma porta com `rebase dev --port 3001`.
 | `--headless` | `init` | Um backend sem arquivos de collection e sem UI — veja [Backend only](/docs/getting-started/headless/) |
 | `--template <name>` | `init` | Começar a partir de um template diferente do padrão |
 | `--install` / `--no-install` | `init` | Executar o gerenciador de pacotes para você, ou ignorar |
-| `--docker` | `dev` | Usar o PostgreSQL em um contêiner em vez do gerenciado. <span class="since-badge" data-since="0.25">Desde 0.25</span> Os outros comandos o seguem até que o `rebase dev` rode sem ele. Uma `DATABASE_URL` tem precedência sobre ele: então ele não inicia nada, e diz isso |
+| `--docker` | `dev` | Usar o PostgreSQL em um contêiner em vez do gerenciado. Os outros comandos o seguem até que o `rebase dev` rode sem ele. Uma `DATABASE_URL` tem precedência sobre ele: então ele não inicia nada, e diz isso |
 | `--no-db` | `dev` | Não iniciar nenhum banco de dados — nem o contêiner nem o gerenciado. Defina `DATABASE_URL` manualmente |
 
 ## Variante: use seu próprio PostgreSQL
@@ -90,7 +90,7 @@ Os comandos de migração planejam alterações com o [Atlas](https://atlasgo.io
 utilizado pelo Rebase, que precisa de um segundo banco de dados vazio para
 comparação. No seu próprio banco de dados, o Rebase cria um ao lado dele; no gerenciado,
 que atende exatamente a um banco de dados, ele inicia um PGlite descartável pela
-duração do comando. <span class="since-badge" data-since="0.25">Desde 0.25</span>
+duração do comando.
 Na 0.24 os comandos de migração recusam o banco de dados gerenciado e exigem o seu próprio.
 Em ambos os casos:
 
@@ -205,7 +205,7 @@ renomeada, um tipo restringido, um campo removido:
 pnpm run db:push
 ```
 
-<span class="since-badge" data-since="0.25">Desde 0.25</span> Ele roda no banco de dados
+Ele roda no banco de dados
 gerenciado como no seu próprio. Na 0.24 ele requer o seu próprio PostgreSQL.
 
 ## Referência de Comandos de Banco de Dados
@@ -218,7 +218,7 @@ gerenciado como no seu próprio. Na 0.24 ele requer o seu próprio PostgreSQL.
 | `rebase db generate` | Gera arquivos de migração SQL |
 | `rebase db migrate` | Executa migrações pendentes |
 
-<span class="since-badge" data-since="0.25">Desde 0.25</span> Os três comandos `db`
+Os três comandos `db`
 funcionam no banco de dados gerenciado. Na 0.24 eles requerem o seu próprio PostgreSQL.
 
 ## Próximos Passos

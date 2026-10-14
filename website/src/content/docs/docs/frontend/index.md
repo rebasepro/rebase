@@ -87,7 +87,7 @@ were props the component never read:
 | `collectionViews` | Custom collection view modes, available to any collection by `key` |
 | `entityActions` | Global entity actions |
 | `effectiveRoleController` | Simulate a different role while dev mode is on |
-| `modeController` | <span class="since-badge" data-since="0.25">Since 0.25</span> Hand Rebase the host app's light/dark mode; Rebase then never touches `<html>`, `prefers-color-scheme` or localStorage — see [Styling](#styling) |
+| `modeController` | Hand Rebase the host app's light/dark mode; Rebase then never touches `<html>`, `prefers-color-scheme` or localStorage — see [Styling](#styling) |
 | `translations` | Override or extend any UI string, keyed by locale — see [Translations](/docs/frontend/i18n) |
 | `components` | Replace built-in components — see [Component Overrides](/docs/frontend/component-overrides) |
 <!-- rebase-props:end -->
@@ -137,7 +137,7 @@ entities[0].values.title;
 
 ## One collection or one record in a page of your own
 
-<span class="since-badge" data-since="0.25">Since 0.25</span> On 0.24
+On 0.24
 `CollectionPanel` takes only a registered `path` and renders "Collection not
 found" outside the full admin tree, and `EntityFormPanel` and
 `CollectionsProvider` do not exist.
@@ -242,7 +242,7 @@ RebaseLayout`. `RebaseAuthGate` shows the login view until there is a user, so
 nothing below it renders for a signed-out visitor; `RebaseNavigation` builds
 the navigation, URL and collection-registry controllers that `RebaseRouteDefs`
 and every collection view read, so `RebaseRouteDefs` outside it throws.
-<span class="since-badge" data-since="0.25">Since 0.25</span> To embed a
+To embed a
 collection view or a record form in a page of your own, without the
 admin's routes, the lighter `CollectionsProvider` builds those controllers
 instead — see
@@ -341,7 +341,7 @@ modeController.setMode("dark");  // "light" | "dark" | "system" — "system" fol
 
 `<Rebase>` builds one of these itself.
 
-<span class="since-badge" data-since="0.25">Since 0.25</span> When the
+When the
 component using it unmounts, it removes the `dark` class it added; a `dark`
 class the page already had stays. Build your own
 above `<Rebase>` only when components outside it need the mode too, and hand
@@ -449,11 +449,11 @@ By default `<Rebase>` owns the page's theme: it puts the `dark` class on
 `<html>`, follows `prefers-color-scheme` until the user picks a mode in the
 admin, and remembers that pick in localStorage.
 
-<span class="since-badge" data-since="0.25">Since 0.25</span> When `<Rebase>`
+When `<Rebase>`
 unmounts, it removes the `dark` class it added; a class the page already had
 stays. On 0.24 the class stays behind.
 
-<span class="since-badge" data-since="0.25">Since 0.25</span> When your app
+When your app
 already has a theme, pass it as `modeController`. Rebase reads `mode` from it,
 calls its `setMode` from its own theme toggle, and never touches `<html>`,
 `prefers-color-scheme` or localStorage:

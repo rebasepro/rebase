@@ -1,5 +1,5 @@
 ---
-sourceHash: f9db2c304fc55386
+sourceHash: 7256a7d26ab9e154
 title: "Acquisizione delle modifiche a livello di database (CDC)"
 sidebar_label: "Acquisizione delle modifiche a livello di database (CDC)"
 description: "Eventi realtime per ogni scrittura sottoposta a commit, comunque sia stata eseguita: i trigger di acquisizione, l'impostazione REALTIME_CDC e ciò di cui hanno bisogno."
@@ -20,7 +20,7 @@ CDC è controllato dalla variabile d'ambiente `REALTIME_CDC`:
 | `wal` | Predilige la replica logica WAL. Non ancora integrata — degrada a `trigger` e registra nei log la modalità attiva. |
 | `off` | Solo realtime a livello applicativo. Usalo per evitare l'overhead dei trigger per ogni scrittura su carichi di lavoro ad alta intensità di scrittura. Un boot con `off` che possiede lo schema **rimuove** anche i trigger e le funzioni di cattura che un boot precedente aveva installato, e registra quanti ne ha tolti; rimuovi l'impostazione e il boot successivo li installa di nuovo. |
 
-<span class="since-badge" data-since="0.25">Da 0.25</span> La stessa impostazione è
+La stessa impostazione è
 l'opzione `realtime.cdc` dell'adattatore Postgres, per un server che la configura nel
 codice. `REALTIME_CDC`, se impostata, prevale.
 
@@ -42,7 +42,7 @@ Se la connessione non lo supporta, `auto` registra invece una riga informativa e
 
 1. **Auto-provisioning** — All'avvio (nel contesto server/owner), Rebase installa trigger idempotenti `AFTER INSERT/UPDATE/DELETE/TRUNCATE` su ciascuna tabella gestita. Scattano una volta per istruzione ed emettono notifiche di modifica sul canale `rebase_cdc` che identificano le righe modificate tramite la loro chiave — la chiave primaria, più le due colonne id per una tabella di giunzione many-to-many — e non trasportano **nessun'altra colonna**. Un'istruzione che ha modificato molte righe le nomina in lotti di circa mille chiavi, quindi un `UPDATE` su 1M di righe invia circa 1.000 notifiche anziché un milione; un'istruzione che ha modificato una riga invia una notifica, e una che non ne ha modificate nessuna non invia nulla. Un `TRUNCATE` viene annunciato come una modifica a ogni riga della collection. Una tabella partizionata mantiene un trigger per riga, perché PostgreSQL copia un trigger di riga su ogni partizione e una scrittura fatta direttamente su una partizione viene comunque vista. PostgreSQL non impone alcun privilegio su `LISTEN`, quindi qualsiasi ruolo in grado di connettersi al database può leggere questo canale; apprende quali chiavi sono cambiate, mai cosa contengono. Una chiave troppo grande per il limite di 8&nbsp;KB del comando `NOTIFY` di PostgreSQL viene inviata come nessuna chiave (una modifica all'intera collection, che ogni sottoscrizione a elenco e a singola riga su di essa rilegge), impedendo così a CDC di interrompere la scrittura che ha generato l'evento. Le funzioni vengono sostituite a ogni avvio che esegue il provisioning, quindi un database strumentato da una versione precedente — il cui trigger inviava righe intere — viene aggiornato al boot successivo; un boot con `REALTIME_CDC=off` le rimuove invece.
 
-   <span class="since-badge" data-since="0.25">Da 0.25</span> **Aggiornamento.** Un database strumentato da una versione precedente al batching ha un trigger per riga; il primo avvio di una versione più recente lo sostituisce con i trigger per istruzione. Per le 24 ore successive, i nuovi trigger inviano ancora una notifica per riga, come facevano i vecchi, così le istanze della versione precedente ancora in esecuzione durante un deploy progressivo (o dopo un rollback) sentono ogni riga. Dopo la finestra, fanno il batching. Ogni versione che fa il batching legge entrambe le forme.
+   **Aggiornamento.** Un database strumentato da una versione precedente al batching ha un trigger per riga; il primo avvio di una versione più recente lo sostituisce con i trigger per istruzione. Per le 24 ore successive, i nuovi trigger inviano ancora una notifica per riga, come facevano i vecchi, così le istanze della versione precedente ancora in esecuzione durante un deploy progressivo (o dopo un rollback) sentono ogni riga. Dopo la finestra, fanno il batching. Ogni versione che fa il batching legge entrambe le forme.
 2. **Acquisizione** — Un client `LISTEN` dedicato e non condiviso (unpooled) per istanza consuma `rebase_cdc`, mappa la tabella modificata sulla rispettiva collezione e inserisce la modifica nella stessa pipeline di `RealtimeService` utilizzata dalle mutazioni API. Come il listener tra istanze, predilige `DATABASE_DIRECT_URL` e si riconnette automaticamente.
 3. **Recapito sicuro con RLS** — La riga grezza proveniente dal flusso di modifiche non viene **mai** inoltrata ai sottoscrittori. La modifica viene contrassegnata come invalidata e ciascuna sottoscrizione rilegge la riga con il **proprio** contesto di autenticazione. Il filtraggio avviene quindi per sottoscrittore, mai per publisher: un client riceve unicamente le righe consentite dalle proprie policy RLS.
 4. **Tra istanze (Cross-instance)** — Poiché ogni istanza osserva ogni commit attraverso il flusso di modifiche, CDC funge anche da canale cross-instance; il broadcast legacy `rebase_entity_changes` per mutazione non viene utilizzato quando CDC è attivo.
@@ -50,7 +50,7 @@ Se la connessione non lo supporta, `auto` registra invece una riga informativa e
 
 ## Requisiti e note
 
-<span class="since-badge" data-since="0.25">Da 0.25</span> `directConnectionString` è l'opzione dell'adattatore; su 0.24 usa `DATABASE_DIRECT_URL`.
+`directConnectionString` è l'opzione dell'adattatore; su 0.24 usa `DATABASE_DIRECT_URL`.
 
 - CDC richiede una stringa di connessione diretta (`DATABASE_DIRECT_URL`, la `directConnectionString` dell'adattatore o la connessione primaria) per il client `LISTEN` — i connection pooler in modalità transazione non supportano sessioni `LISTEN` persistenti.
 - I trigger vengono installati solo su tabelle collegate a una collezione registrata. Le scritture su tabelle non mappate vengono ignorate.

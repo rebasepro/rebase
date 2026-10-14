@@ -1,5 +1,5 @@
 ---
-sourceHash: 5a4b74223c30f992
+sourceHash: 26723d5fe58a36e5
 slug: fr/docs/rls-check
 title: rls-check
 description: Auditez la sécurité au niveau des lignes (RLS) sur n'importe quelle base de données PostgreSQL — Supabase, Neon, RDS ou votre propre serveur. En lecture seule, sans inscription, sans Rebase requis.
@@ -351,12 +351,12 @@ La forme corrigée de la vérification précédente — `rebase.uid() IS NOT NUL
 et l'endroit où l'on s'arrête souvent par erreur. Elle exclut effectivement les appelants déconnectés. Ce qu'elle
 ne fait pas, en revanche, c'est restreindre les lignes : ce qui reste revient à dire que *chaque compte enregistré
 peut lire chaque ligne de cette table*, ce qui est une affirmation bien différente de celle généralement visée. Sur un projet Rebase, c'est une règle dont la `condition` est `policy.authenticated()` et rien d'autre, que la base de données stocke sous la forme `rebase.uid() <> ALL (ARRAY['anonymous', 'anon'])`.
-<span class="since-badge" data-since="0.25">Depuis 0.25</span> Une règle dont la condition est seulement `policy.registered()` est signalée aussi : son
+Une règle dont la condition est seulement `policy.registered()` est signalée aussi : son
 `NOT rebase.is_anonymous()` supplémentaire écarte les invités et ne restreint aucune ligne non plus, si bien
 que chaque compte qui n'est pas un invité lit chaque ligne. Avec `--fail-on high` par défaut, une exécution
 CI qui analyse une telle stratégie échoue désormais.
 
-<span class="since-badge" data-since="0.25">Depuis 0.25</span> Une stratégie dont l'expression ne fait que
+Une stratégie dont l'expression ne fait que
 tester le rôle de l'appelant — `auth.role() = 'authenticated'`, `(auth.jwt() ->> 'role') =
 'authenticated'`, dans un sens comme dans l'autre — est signalée sous cet identifiant aussi. C'est un `TO authenticated
 USING (true)` écrit sous forme d'expression ; elle reçoit donc la sévérité que lui donne

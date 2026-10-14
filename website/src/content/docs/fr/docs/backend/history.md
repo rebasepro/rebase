@@ -1,5 +1,5 @@
 ---
-sourceHash: f0cc4de3a8c82b82
+sourceHash: 1efb8010154baea9
 title: Historique des entités
 sidebar_label: Historique des entités
 description: Suivez chaque modification apportée à vos entités avec une piste d'audit complète — qui a modifié quoi, quand, et l'entité complète avant/après.
@@ -89,7 +89,7 @@ version antérieure à la suppression la restaure.
 
 ### Ce que contient `previous_values`
 
-<span class="since-badge" data-since="0.25">Depuis 0.25</span> Une entrée de mise à jour ne conserve, dans `previous_values`, que les champs listés
+Une entrée de mise à jour ne conserve, dans `previous_values`, que les champs listés
 dans `changed_fields`. Tous les autres champs avaient la même valeur avant et après la modification, ils
 figurent donc déjà dans `values` ; stocker deux fois la ligne entière coûtait 1 269 octets pour une
 modification d'un seul champ sur une ligne de 20 champs, contre 794 désormais.
@@ -120,7 +120,7 @@ La rétention est appliquée à deux endroits :
 - **Après chaque écriture**, pour l'entité écrite : juste après son enregistrement ou sa suppression,
   le serveur purge les entrées de cette entité au-delà des 200 plus récentes, ou antérieures à la
   période de rétention. Cela ne retarde pas l'écriture.
-- <span class="since-badge" data-since="0.25">Depuis 0.25</span> **Une fois par heure**, pour chaque entité : les entrées antérieures à la période de
+- **Une fois par heure**, pour chaque entité : les entrées antérieures à la période de
   rétention sont supprimées, quelle que soit l'entité à laquelle elles appartiennent — y compris les
   entités qui ne sont jamais réécrites, comme les entités supprimées. Voir
   [Mécanismes du cycle de vie de la purge](#mécanismes-du-cycle-de-vie-de-la-purge).
@@ -187,7 +187,7 @@ d'historique mais ne purge rien, car un script ne peut pas connaître la rétent
 serveur. Le serveur purge cette entité à sa prochaine écriture sur elle, et lors du balayage horaire
 ci-dessous.
 
-<span class="since-badge" data-since="0.25">Depuis 0.25</span> Une fois par heure, le backend supprime aussi toute entrée plus ancienne que la période de
+Une fois par heure, le backend supprime aussi toute entrée plus ancienne que la période de
 rétention, pour toutes les entités. Auparavant, l'historique d'une entité qui n'était plus jamais
 réécrite — toute entité supprimée — n'était pas purgé du tout. Ce balayage :
 

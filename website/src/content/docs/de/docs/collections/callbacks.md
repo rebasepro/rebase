@@ -1,5 +1,5 @@
 ---
-sourceHash: e806583db3fff138
+sourceHash: c3af858aa8d11859
 title: Entitäts-Callbacks
 sidebar_label: Callbacks
 description: Nutzen Sie Lifecycle-Callbacks, um benutzerdefinierte Logik auszuführen, wenn Entitäten erstellt, aktualisiert, gelesen oder gelöscht werden. Beinhaltet die context.data-API für kollektionsübergreifende Operationen.
@@ -121,7 +121,7 @@ const articlesCollection = defineCollection({
 
 ## Callback-Sets kombinieren
 
-<span class="since-badge" data-since="0.25">Seit 0.25</span> Unter 0.24 kombinieren Sie
+Unter 0.24 kombinieren Sie
 Sets von Hand.
 
 Eine Collection hat ein einziges `callbacks`-Objekt. Wenn mehrere Belange je einen Hook
@@ -417,8 +417,6 @@ Weitere kollektionsübergreifende Muster:
 - **Zähler (Counters)**: Verwenden Sie `afterSave` / `afterDelete`, um Zählerfelder bei zugehörigen Entitäten zu aktualisieren
 
 ## Einen Callback testen
-
-<span class="since-badge" data-since="0.25">Seit 0.25</span>
 
 Ein Callback ist eine einfache Funktion eines einzigen Props-Objekts, sodass ein Unit-Test sie
 aufruft. `createCallContext` baut die `context`-Prop: Die Felder, die Sie übergeben, werden so

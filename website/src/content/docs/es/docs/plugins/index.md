@@ -1,5 +1,5 @@
 ---
-sourceHash: c770e1b2f77d1d8d
+sourceHash: a0bd19745c59b12b
 title: Sistema de plugins
 sidebar_label: Plugins
 description: Extiende Rebase con plugins — inyecta componentes de UI, modifica colecciones, añade acciones a la barra de herramientas y crea constructores de campos personalizados.
@@ -65,7 +65,6 @@ se encuentra en la página de **[Slots](/docs/frontend/slots)**.
   montado en ambos casos.
 - `onUnmount()` se ejecuta cuando `<Rebase>` se desmonta.
 
-<span class="since-badge" data-since="0.25">Desde 0.25</span>
 `lifecycle.onCollectionChange` está deprecado. Nada lo llamó nunca, ni en 0.24
 ni antes. Un plugin que lo define sigue compilando, y `<Rebase>` avisa una vez por
 plugin. Para seguir las filas de una colección, suscríbete desde `onMount` y
@@ -178,7 +177,7 @@ function useMyPlugin(): RebasePlugin {
 
 ### Envoltorios de campo de varios plugins
 
-<span class="since-badge" data-since="0.25">Desde 0.25</span> En 0.24 el `wrap` de cada
+En 0.24 el `wrap` de cada
 plugin recibía el campo integrado, y solo se renderizaba el último envoltorio
 devuelto.
 
@@ -230,7 +229,7 @@ a cada campo markdown, que continúa el texto desde el cursor. Ambos aparecen so
 donde el plugin está habilitado: el servicio se declara disponible y
 `getConfigForPath` (cuando le pasas uno) permite la colección. Un campo cuyo
 `customProps.editorProps.aiController` nombra un controlador propio usa ese.
-<span class="since-badge" data-since="0.25">Desde 0.25</span> Otro plugin puede dar a los campos markdown un controlador de la misma forma, con
+Otro plugin puede dar a los campos markdown un controlador de la misma forma, con
 `EditorAIControllerProvider` de `@rebasepro/cms` en un proveedor con alcance de formulario.
 
 ![Mejora de datos](/img/data_enhancement.png)
@@ -340,7 +339,6 @@ export function App() {
 }
 ```
 
-<span class="since-badge" data-since="0.25">Desde 0.25</span>
 `hooks.modifyCollectionAsync` está deprecado. Nada lo llamó nunca, ni en 0.24
 ni antes. Un plugin que lo define sigue compilando, y `<Rebase>` avisa una vez por
 plugin. Usa `modifyCollection` como se muestra arriba.

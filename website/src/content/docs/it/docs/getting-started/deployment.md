@@ -1,5 +1,5 @@
 ---
-sourceHash: 72190d7e15d46c15
+sourceHash: 5584cf0dc01c6497
 title: Distribuzione
 sidebar_label: Distribuzione
 description: Distribuisci il tuo progetto Rebase in produzione utilizzando Docker, piattaforme cloud o configurazioni manuali.
@@ -295,7 +295,7 @@ ferma anche la navigazione interna all'app (un link nel drawer, il pulsante indi
 browser) e chiede prima conferma, tramite `useBlocker`, che solo un data router
 fornisce.
 
-<span class="since-badge" data-since="0.25">Da 0.25</span> L'amministrazione funziona
+L'amministrazione funziona
 anche sotto un semplice `<BrowserRouter>`. In quel caso la guardia delle modifiche non
 salvate ricade sul prompt di uscita dalla pagina del browser, che copre un ricaricamento,
 la chiusura della scheda o la digitazione di un URL; la navigazione all'interno dell'app

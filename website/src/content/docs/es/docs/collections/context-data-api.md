@@ -1,5 +1,5 @@
 ---
-sourceHash: 00c369539f8269ad
+sourceHash: fa5ea5eeb92e1460
 title: La API context.data
 sidebar_label: API context.data
 description: Lee y escribe otras colecciones desde un callback con context.data — sus métodos, los privilegios con los que se ejecuta, la semántica transaccional y la conexión que ocupa un callback.
@@ -188,7 +188,7 @@ Por tanto:
 - Envía las filas cuyos hooks son lentos en masas más pequeñas.
 - Si muchos hooks lentos se ejecutan a la vez por diseño, sube `DB_POOL_MAX`, dentro de lo que
   permita el `max_connections` de la base de datos para todas las instancias.
-- <span class="since-badge" data-since="0.25">Desde 0.25</span> Con
+- Con
   `REBASE_METRICS=true`, `/metrics` informa `rebase_db_pool_wait_ms`: cuánto
   esperó cada consulta una conexión. Un pool sano lo mantiene cerca de cero; una cola
   que crece con el tráfico son solicitudes haciendo cola por conexiones que los callbacks

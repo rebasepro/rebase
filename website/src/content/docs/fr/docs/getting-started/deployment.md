@@ -1,5 +1,5 @@
 ---
-sourceHash: 72190d7e15d46c15
+sourceHash: 5584cf0dc01c6497
 title: Déploiement
 sidebar_label: Déploiement
 description: Déployez votre projet Rebase en production à l'aide de Docker, de plateformes cloud ou de configurations manuelles.
@@ -296,7 +296,7 @@ non enregistrées arrête aussi la navigation dans l'application (un lien du tir
 retour du navigateur) et demande d'abord confirmation, via `useBlocker`, que seul un data router
 fournit.
 
-<span class="since-badge" data-since="0.25">Depuis 0.25</span> L'administration fonctionne aussi
+L'administration fonctionne aussi
 sous un simple `<BrowserRouter>`. Dans ce cas, la garde des modifications non enregistrées
 se rabat sur l'invite de sortie de page propre au navigateur, qui couvre un rechargement, la fermeture de
 l'onglet ou la saisie d'une URL ; la navigation à l'intérieur de l'application se poursuit sans demander. En

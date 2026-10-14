@@ -1,5 +1,5 @@
 ---
-sourceHash: 1d7b256891673c72
+sourceHash: 0a17c13d60408e81
 title: Override dei componenti (Swizzling)
 sidebar_label: Override dei componenti
 description: Esegui l'override dei componenti UI predefiniti con implementazioni personalizzate a livello di applicazione o di collection.
@@ -112,7 +112,7 @@ Anche un riferimento diretto (`Component: ProductCustomForm`) funziona, ma solo 
 
 ### Quando entrambi gli ambiti sovrascrivono un componente
 
-<span class="since-badge" data-since="0.25">Da 0.25</span> Su 0.24 il wrapper di una collection riceve sempre il componente integrato, e l'override a livello di app viene saltato all'interno di quella collection.
+Su 0.24 il wrapper di una collection riceve sempre il componente integrato, e l'override a livello di app viene saltato all'interno di quella collection.
 
 I due ambiti si compongono. L'override a livello di app (`<Rebase components>`) viene applicato per primo al componente integrato, e quello della collection (`admin.components`) viene applicato al risultato:
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: f0cc4de3a8c82b82
+sourceHash: 1efb8010154baea9
 title: Historial de entidades
 sidebar_label: Historial de entidades
 description: Realiza un seguimiento de cada cambio en tus entidades con un registro de auditoría completo — quién cambió qué, cuándo y la entidad completa antes y después.
@@ -89,7 +89,7 @@ versión anterior al borrado la restaura.
 
 ### Qué contiene `previous_values`
 
-<span class="since-badge" data-since="0.25">Desde 0.25</span> Una entrada de
+Una entrada de
 actualización guarda, en `previous_values`, solo los campos listados en
 `changed_fields`. Todos los demás campos tenían el mismo valor antes y después del
 cambio, así que ya están en `values`; guardar la fila entera dos veces costaba a un
@@ -123,7 +123,7 @@ La retención se aplica en dos lugares:
   eliminarla, el servidor purga las entradas de esa entidad que superen las 200 más
   recientes, o que sean más antiguas que el período de retención. No retiene la
   escritura.
-- <span class="since-badge" data-since="0.25">Desde 0.25</span> **Una vez por hora**,
+- **Una vez por hora**,
   para todas las entidades: se eliminan las entradas más antiguas que el período de
   retención, sea cual sea la entidad a la que pertenezcan — incluidas las entidades
   en las que nunca se vuelve a escribir, como las eliminadas. Consulta
@@ -192,7 +192,7 @@ registra su entrada de historial pero no purga nada, porque un script no puede c
 retención con la que está configurado tu servidor. El servidor purga esa entidad en su
 siguiente escritura sobre ella, y en el barrido horario que sigue.
 
-<span class="since-badge" data-since="0.25">Desde 0.25</span> Una vez por hora, el
+Una vez por hora, el
 backend elimina además todas las entradas más antiguas que el período de retención, de
 todas las entidades. Antes, el historial de una entidad en la que nunca se volvía a
 escribir — todas las eliminadas — no se purgaba en absoluto. El barrido:

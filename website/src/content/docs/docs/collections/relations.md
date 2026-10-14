@@ -91,7 +91,7 @@ author: {
 // → posts.author_id
 ```
 
-<span class="since-badge" data-since="0.25">Since 0.25</span> The column is
+The column is
 indexed for you: Postgres indexes the key a foreign key points at, never the
 column holding it, so without one every `hasMany` include and nested listing
 from the other side scans this table. `index: false` keeps the constraint and

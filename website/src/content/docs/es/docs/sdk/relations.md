@@ -1,5 +1,5 @@
 ---
-sourceHash: 8aef72b75f28c106
+sourceHash: 2e602d0ed1bed6e5
 title: Consultar relaciones
 sidebar_label: Relaciones
 description: "Incluye entidades relacionadas en una consulta y lee una colección secundaria a través de su elemento principal con los accesores de relaciones del SDK."
@@ -81,14 +81,14 @@ const { data } = await client.data.posts.include({
 | `orderBy` | La misma sintaxis de ordenación, incluyendo la [ubicación de NULL](/docs/sdk/querying#where-nulls-sort). Los empates, y un `limit` sin `orderBy`, se resuelven por la clave de la fila relacionada, en orden ascendente. |
 | `fields` | Columnas de la fila *relacionada*. Su clave siempre se conserva, por lo que la fila sigue siendo direccionable. |
 | `include` | Relaciones de la fila relacionada, a su vez; así es como se anida el árbol. |
-| `count` | <span class="since-badge" data-since="0.25">Desde 0.25</span> Devuelve además cuántas filas relacionadas hay en total, por elemento principal, bajo el `_count` de la fila. Consulta [Contar lo que deja fuera un límite](#contar-lo-que-deja-fuera-un-límite). |
+| `count` | Devuelve además cuántas filas relacionadas hay en total, por elemento principal, bajo el `_count` de la fila. Consulta [Contar lo que deja fuera un límite](#contar-lo-que-deja-fuera-un-límite). |
 
 `true` es la forma abreviada de "cargar por completo": `{ author: true }` y
 `["author"]` son la misma petición.
 
 ### Contar lo que deja fuera un límite
 
-<span class="since-badge" data-since="0.25">Desde 0.25</span> Un `limit` limita
+Un `limit` limita
 lo que se envía, y `count: true` dice cuánto se dejó fuera. Esto es lo que necesita una lista
 para mostrar cuatro etiquetas y un «+33»:
 

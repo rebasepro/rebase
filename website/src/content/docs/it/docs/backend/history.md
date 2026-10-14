@@ -1,5 +1,5 @@
 ---
-sourceHash: f0cc4de3a8c82b82
+sourceHash: 1efb8010154baea9
 title: Cronologia entità
 sidebar_label: Cronologia entità
 description: Traccia ogni modifica apportata alle tue entità con un audit trail completo — chi ha modificato cosa, quando e l'entità completa prima/dopo.
@@ -91,7 +91,7 @@ versione precedente all'eliminazione la fa tornare attiva.
 
 ### Cosa contiene `previous_values`
 
-<span class="since-badge" data-since="0.25">Da 0.25</span> Una voce di aggiornamento
+Una voce di aggiornamento
 conserva, in `previous_values`, solo i campi elencati in `changed_fields`. Ogni
 altro campo conteneva lo stesso valore prima e dopo la modifica, quindi è già in
 `values`; memorizzare due volte l'intera riga costava 1.269 byte per la modifica
@@ -124,7 +124,7 @@ La retention viene applicata in due punti:
 - **Dopo ogni scrittura**, per l'entità scritta: subito dopo che è stata salvata
   o eliminata, il server esegue il pruning delle voci di quell'entità oltre le 200
   più recenti, o più vecchie del periodo di retention. Non fa attendere la scrittura.
-- <span class="since-badge" data-since="0.25">Da 0.25</span> **Una volta all'ora**,
+- **Una volta all'ora**,
   per ogni entità: le voci più vecchie del periodo di retention vengono eliminate
   qualunque entità le possieda — comprese quelle che non vengono mai più scritte,
   come le entità eliminate. Vedi [Meccanica del ciclo di vita del pruning](#meccanica-del-ciclo-di-vita-del-pruning).
@@ -190,7 +190,7 @@ registra la propria voce di cronologia ma non elimina nulla, perché uno script 
 conoscere la retention con cui è configurato il tuo server. Il server esegue il pruning di
 quell'entità alla sua prossima scrittura su di essa, e nella pulizia oraria qui sotto.
 
-<span class="since-badge" data-since="0.25">Da 0.25</span> Una volta all'ora, il
+Una volta all'ora, il
 backend elimina inoltre ogni voce più vecchia del periodo di retention, di ogni
 entità. Prima di questo, la cronologia di un'entità che non veniva mai più
 riscritta — ogni entità eliminata — non veniva sottoposta a pruning affatto. La

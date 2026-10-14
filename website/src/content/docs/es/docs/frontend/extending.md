@@ -1,5 +1,5 @@
 ---
-sourceHash: 2bd46c60d468fb45
+sourceHash: 1c45110c48185387
 title: Extender Rebase
 sidebar_label: Extender Rebase
 description: "Una guía de decisión para elegir el mecanismo de extensión adecuado: plugins, slots, reemplazos de componentes, vistas de entidad, acciones y más."
@@ -235,7 +235,7 @@ muestra el panel, esta no es la página indicada. El servidor tiene su propia es
 
 ## Resumen de precedencia
 
-- **`collection.components` se aplica sobre `components` globales** dentro de esa colección. Un reemplazo de colección reemplaza a ambos; <span class="since-badge" data-since="0.25">Desde 0.25</span> una sobrescritura de colección con `wrap: true` envuelve la sobrescritura global cuando la hay (en 0.24 envuelve el componente integrado, y la sobrescritura global se omite). Consulta [Sobrescritura de componentes](/docs/frontend/component-overrides#when-both-scopes-override-a-component).
+- **`collection.components` se aplica sobre `components` globales** dentro de esa colección. Un reemplazo de colección reemplaza a ambos; una sobrescritura de colección con `wrap: true` envuelve la sobrescritura global cuando la hay (en 0.24 envuelve el componente integrado, y la sobrescritura global se omite). Consulta [Sobrescritura de componentes](/docs/frontend/component-overrides#when-both-scopes-override-a-component).
 - **`Actions` de colección y el slot `collection.actions` son acumulativos**: `Actions` se renderizan primero, luego las contribuciones de los slots.
 - **`entityActions` y `entityViews` a nivel de colección amplían (no reemplazan) a los globales.**
-- **Los plugins se aplican en el orden del array `plugins`**, no por `key`. Las contribuciones a los slots se renderizan según su `order` (menor primero, 50 por defecto), y los empates mantienen ese orden. <span class="since-badge" data-since="0.25">Desde 0.25</span> Los envoltorios de campo (field wrappers) de varios plugins se componen en ese orden, con el del primer plugin como el más interno; en 0.24 solo se renderizaba el último envoltorio. Consulta [Sistema de plugins](/docs/plugins#field-wrappers-from-several-plugins).
+- **Los plugins se aplican en el orden del array `plugins`**, no por `key`. Las contribuciones a los slots se renderizan según su `order` (menor primero, 50 por defecto), y los empates mantienen ese orden. Los envoltorios de campo (field wrappers) de varios plugins se componen en ese orden, con el del primer plugin como el más interno; en 0.24 solo se renderizaba el último envoltorio. Consulta [Sistema de plugins](/docs/plugins#field-wrappers-from-several-plugins).

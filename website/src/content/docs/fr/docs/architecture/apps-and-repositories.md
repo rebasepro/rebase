@@ -1,5 +1,5 @@
 ---
-sourceHash: 13c5a740a1cf4bc3
+sourceHash: 6cb1ed423c284379
 title: Applications et dépôts
 sidebar_label: Apps & dépôts
 description: Un projet est un backend accompagné des applications qui communiquent avec lui, chacune pouvant résider dans son propre dépôt.
@@ -109,7 +109,7 @@ L'inférence ne peut pas connaître deux choses que le `rebase.json` d'un scaffo
 déclare. Elle nomme l'application statique `web`, là où un scaffold la nomme
 `admin`, et elle ne peut pas connaître la route `cms` de l'application. Le nom ne
 change pas : Rebase Cloud a enregistré `web` pour chaque projet déployé sans
-`rebase.json`. <span class="since-badge" data-since="0.25">Depuis 0.25</span>
+`rebase.json`.
 `rebase apps init --force` conserve les noms, le `path` et le `cms` des
 applications que déclare le fichier qu'il remplace, et signale comme retirée une
 application qu'il ne retrouve plus. En 0.24, il écrit la simple inférence par-dessus.

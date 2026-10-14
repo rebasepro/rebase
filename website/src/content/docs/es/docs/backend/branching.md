@@ -1,5 +1,5 @@
 ---
-sourceHash: b964127a9f6eafc2
+sourceHash: 9f9448404128f745
 title: Ramificación de bases de datos
 sidebar_label: Ramificación
 description: Crea ramas aisladas de bases de datos para desarrollo, staging y pruebas usando CREATE DATABASE ... TEMPLATE de PostgreSQL — copias instantáneas y de fidelidad total sin tiempo de inactividad.
@@ -60,7 +60,7 @@ Cannot create branch: the source database "leadgen" has active connections.
 
 `--force` finaliza esas sesiones antes de aplicar la plantilla, tanto en `create` como en `delete`. Nunca finaliza la sesión que ejecuta el propio comando.
 
-<span class="since-badge" data-since="0.25">Desde 0.25</span> `create --force`
+`create --force`
 también cierra el origen a nuevas conexiones durante la copia
 (`ALTER DATABASE … ALLOW_CONNECTIONS false`, ejecutado desde la base de datos
 `postgres` del servidor) y lo vuelve a abrir después: si falla, y ante cualquier señal
@@ -222,7 +222,7 @@ rebase db branch delete dev_sandbox
 Un `rebase dev` que ya está en marcha conserva la base de datos con la que arrancó
 hasta que lo reinicias, y `switch` lo dice.
 
-<span class="since-badge" data-since="0.25">Desde 0.25</span> `rebase db branch
+`rebase db branch
 list` marca la rama en la que está este checkout, y `prune` nunca la elimina, igual
 que `delete` se niega a hacerlo: el plan la enumera como conservada, e indica que
 primero hay que salir de ella con `rebase db branch switch --off`. En la 0.24
@@ -238,7 +238,7 @@ Se sitúa entre el shell y el archivo del proyecto en el orden de resolución:
 5. `--docker`, o el último `rebase dev` que se ejecutó con él
 6. la base de datos de desarrollo gestionada
 
-<span class="since-badge" data-since="0.25">Desde 0.25</span> El peldaño 5 sigue al
+El peldaño 5 sigue al
 último `rebase dev --docker`, así que un comando de rama posterior no necesita su propio
 `--docker`, y un `--docker` que un peldaño superior anula no inicia ningún contenedor y
 avisa de que se ignoró. En la 0.24 solo cuenta la opción, y una anulada igualmente inicia
@@ -248,7 +248,7 @@ Una rama debe tener mayor precedencia que `.env`; de lo contrario, cambiar de ra
 
 `.rebase/` se encuentra en el archivo gitignore, por lo que la rama en la que te encuentras es un dato propio de tu máquina y nunca del proyecto.
 
-<span class="since-badge" data-since="0.25">Desde 0.25</span> En un checkout cambiado de
+En un checkout cambiado de
 rama, `rebase db branch create`, `list`, `info`, `delete` y `prune` trabajan sobre la base
 de datos principal, donde está el registro, y lo indican. `create` sigue copiando la rama en
 la que estás, salvo que pases `--from`; queda registrada en la base de datos principal, así

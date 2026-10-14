@@ -1,5 +1,5 @@
 ---
-sourceHash: e20c62e3ffffe67b
+sourceHash: dd99ad3524029bf5
 title: Aufteilen in mehrere Prozesse
 sidebar_label: Prozesse aufteilen
 description: Führen Sie ein Bundle als mehrere zusammenarbeitende Prozesse aus – eine API, eine Functions-Ebene, ein Worker – aus demselben veröffentlichten Runtime-Image, damit eine rechenintensive benutzerdefinierte Funktion nicht mehr mit der Daten-API konkurriert.
@@ -42,7 +42,7 @@ REBASE_ROLE=all        # the default: everything, one process
 Health und Metriken sind ausnahmslos in jeder Rolle enthalten. Ein Prozess, den ein
 Orchestrator nicht abfragen kann, ist ein Prozess, den er nicht rollierend aktualisieren kann.
 
-<span class="since-badge" data-since="0.25">Seit 0.25</span> `GET /api/auth/config`,
+`GET /api/auth/config`,
 das, was der Anmeldebildschirm liest, folgt dem Rest von `/api/auth`: Nur `api` und
 `all` liefern es aus. Unter 0.24 hat es auch ein `functions`- oder `worker`-Prozess beantwortet.
 
@@ -151,7 +151,7 @@ Katalog und schreibt in zwei separaten Schritten darauf, sodass gleichzeitig sta
 und ein Deployment, bei dem mehrere Prozesse um die Bereitstellung desselben Schemas konkurrieren, ist von
 niemandem so vorgesehen.
 
-<span class="since-badge" data-since="0.25">Seit 0.25</span> In einem
+In einem
 [eigenen Server](/docs/backend/custom-server/) ist dieselbe Entscheidung die
 Option `provision` von `createRebaseBackend`: `true` in dem Prozess, dem das
 Schema gehört, und `{ collections: false, realtime: false }` in jedem anderen, der
@@ -242,7 +242,7 @@ split: true
 functions:
   enabled: true
   image:
-    tag: "0.24.0"     # this unit only; the rest stay on the release-wide tag
+    tag: "0.25.0"     # this unit only; the rest stay on the release-wide tag
 ```
 
 Meist lohnt es sich nur, das Tag festzupinnen: Das Repository wird übernommen, es handelt sich also um

@@ -1,5 +1,5 @@
 ---
-sourceHash: a7fdf34234049b93
+sourceHash: ee28e46d5e82c6f9
 title: Servidor MCP
 sidebar_label: Servidor MCP
 description: Conecte o Claude Code, Cursor, Gemini CLI ou qualquer cliente MCP a um projeto Rebase — as 42 ferramentas que ele expõe, a credencial com a qual se autentica e o gate de loopback que fica entre um agente e a produção.
@@ -337,7 +337,7 @@ database at boot, additively. After changing a collection, restart it with
 rebase_dev_stop and rebase_dev_start. …
 ```
 
-<span class="since-badge" data-since="0.25">Desde 0.25</span> A partir de um
+A partir de um
 terminal, `rebase db push` e `rebase db migrate` rodam nesse banco de dados;
 apenas as ferramentas do MCP são recusadas. Na 0.24 o CLI também as recusa ali.
 
@@ -373,7 +373,7 @@ do lado de fora.
 
 O [endpoint remoto](#o-endpoint-remoto) cerca os resultados das suas ferramentas da mesma
 forma e avisa o cliente disso; seu `structuredContent` carrega o resultado puro.
-<span class="since-badge" data-since="0.25">Desde 0.25</span> `list_collections` e
+`list_collections` e
 `describe_collection` são as exceções: só um modelo as lê, por isso são
 enviadas uma única vez, no texto. Antes da 0.24 a listagem também carregava uma
 cópia em `structuredContent`.
@@ -491,7 +491,7 @@ a um usuário, o endpoint se recusa a inicializar e informa o motivo no log de b
   `{ count }`. Como no REST, um `limit` acima de 1000, um argumento não declarado e uma
   edição ou exclusão de uma linha na lixeira (404) são recusados; definir o campo de
   soft-delete como `null` a restaura.
-- <span class="since-badge" data-since="0.25">Desde 0.25</span> **A listagem nomeia as coleções; `describe_collection` dá o esquema de uma.**
+- **A listagem nomeia as coleções; `describe_collection` dá o esquema de uma.**
   `list_collections` responde `name`, `title` e `description` de cada coleção, e
   `describe_collection { collection }` os esquemas OpenAPI `row` e `create` dessa coleção,
   além de `softDeleteField` onde linhas vão para a lixeira. As descrições das ferramentas

@@ -1,5 +1,5 @@
 ---
-sourceHash: 7452474353756b93
+sourceHash: c35ed2ce1194af56
 title: Authentifizierung & Anmeldung
 sidebar_label: Authentifizierung & Anmeldung
 description: Richten Sie den Auth-Controller, die Login-Ansicht und die Rollensimulation in Ihrem Rebase-React-Frontend ein.
@@ -39,7 +39,7 @@ authController.getAuthToken() // Get current JWT for API calls
 
 ## Ihr eigener Auth-Provider
 
-<span class="since-badge" data-since="0.25">Seit 0.25</span> Unter 0.24 authentifiziert der
+Unter 0.24 authentifiziert der
 Getter nur HTTP-Anfragen, und der Realtime-Socket des Panels bleibt anonym.
 
 Wenn Ihre App Benutzer mit einem eigenen Provider anmeldet (Clerk, Firebase Auth, eine

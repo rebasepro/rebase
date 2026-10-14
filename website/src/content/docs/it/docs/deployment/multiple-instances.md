@@ -1,5 +1,5 @@
 ---
-sourceHash: 3116577a359d845f
+sourceHash: de9051fe769a602b
 title: Esecuzione di più istanze
 sidebar_label: Più istanze
 description: "Ogni elemento di stato che un processo Rebase mantiene per sé e l'impostazione per condividerlo: cosa configurare prima che una seconda replica, un rolling deploy o un deployment suddiviso ricevano traffico."
@@ -92,7 +92,7 @@ contenga anche la directory `<STORAGE_PATH>__<key>` di ciascun bucket locale con
 [Self-hosting: archiviazione dei file](/docs/deployment/self-hosting/#file-storage).
 
 I **caricamenti ripristinabili** (l'endpoint TUS) conservano il file parziale di ogni upload e,
-<span class="since-badge" data-since="0.25">Dalla 0.25</span> una registrazione del caricamento accanto ad esso, sul disco dell'istanza che
+una registrazione del caricamento accanto ad esso, sul disco dell'istanza che
 lo ha creato, in `STORAGE_PATH/.tus-uploads` — anche quando i file completati vengono inviati a
 S3 o GCS. Monta un unico volume su `STORAGE_PATH` in ogni istanza e qualunque istanza
 potrà gestire qualsiasi caricamento; un riavvio o un rolling deploy riprenderà un caricamento da dove

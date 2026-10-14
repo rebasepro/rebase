@@ -1,5 +1,5 @@
 ---
-sourceHash: b964127a9f6eafc2
+sourceHash: 9f9448404128f745
 title: Datenbank-Branching
 sidebar_label: Branching
 description: Erstellen Sie isolierte Datenbank-Branches für Entwicklung, Staging und Tests mit PostgreSQLs CREATE DATABASE ... TEMPLATE – sofortige, originalgetreue Kopien ohne Ausfallzeiten.
@@ -60,7 +60,7 @@ Cannot create branch: the source database "leadgen" has active connections.
 
 `--force` beendet diese Sitzungen vor dem Templating, sowohl bei `create` als auch bei `delete`. Die Sitzung, die den Befehl selbst ausführt, wird dabei niemals beendet.
 
-<span class="since-badge" data-since="0.25">Seit 0.25</span> `create --force`
+`create --force`
 schließt die Quelle außerdem für die Dauer der Kopie für neue Verbindungen
 (`ALTER DATABASE … ALLOW_CONNECTIONS false`, ausgeführt aus der `postgres`-Datenbank des Servers)
 und öffnet sie danach wieder: bei einem Fehler und bei jedem Signal, das es abfangen kann (Schließen
@@ -218,7 +218,7 @@ rebase db branch delete dev_sandbox
 Ein bereits laufendes `rebase dev` behält die Datenbank, mit der es gestartet wurde, bis Sie es neu
 starten, und `switch` sagt das.
 
-<span class="since-badge" data-since="0.25">Seit 0.25</span> `rebase db branch
+`rebase db branch
 list` markiert den Branch, auf dem dieser Checkout steht, und `prune` entfernt ihn nie, so wie
 `delete` ihn verweigert: Der Plan führt ihn als behalten auf und sagt, ihn zuerst mit
 `rebase db branch switch --off` zu verlassen. Unter 0.24 löschte `prune --older-than … --yes` ihn,
@@ -233,7 +233,7 @@ In der Auflösungsreihenfolge steht es zwischen der Shell und der Projektdatei:
 5. `--docker` oder der Umstand, dass das letzte `rebase dev` damit lief
 6. die verwaltete Entwicklungsdatenbank
 
-<span class="since-badge" data-since="0.25">Seit 0.25</span> Stufe 5 folgt dem letzten
+Stufe 5 folgt dem letzten
 `rebase dev --docker`, sodass ein Branch-Befehl danach kein eigenes `--docker` braucht,
 und ein `--docker`, das eine Stufe darüber übertrumpft, startet keinen Container und
 sagt, dass es ignoriert wurde. Unter 0.24 zählt nur das Flag, und ein übertrumpftes
@@ -243,7 +243,7 @@ Ein Branch muss Vorrang vor `.env` haben, da das Umschalten sonst bei keinem Pro
 
 `.rebase/` wird von Git ignoriert (gitignored), sodass der Branch, auf dem Sie sich befinden, nur für Ihren Rechner gilt und niemals für das gesamte Projekt.
 
-<span class="since-badge" data-since="0.25">Seit 0.25</span> In einem umgeschalteten
+In einem umgeschalteten
 Checkout arbeiten `rebase db branch create`, `list`, `info`, `delete` und `prune` auf der
 Hauptdatenbank, in der das Register liegt, und sagen das auch. `create` kopiert weiterhin
 den Branch, auf dem du bist, außer du übergibst `--from`; er wird in der Hauptdatenbank

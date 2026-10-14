@@ -1,5 +1,5 @@
 ---
-sourceHash: 8bd32575d082fb6c
+sourceHash: 6cfa40d6d7fc1902
 title: Edición de esquemas en vivo
 description: "Crea y modifica colecciones en un backend en ejecución: primero se confirman en tu repositorio y luego se aplican."
 ---
@@ -166,7 +166,7 @@ En 0.23 el commit también incluía `drizzle/schema.sql`, `drizzle/policies.sql`
 `drizzle/search.sql`, escritos en la raíz del proyecto.
 
 El mensaje del commit describe el cambio en lugar de limitarse a anunciarlo, y se atribuye a la persona que lo realizó, con el nombre visible y el correo de la cuenta (un usuario sin ninguno de los dos se confirma como `<uid>@users.noreply.rebase.pro`).
-<span class="since-badge" data-since="0.25">Desde 0.25</span> En la 0.24, los commits de la autenticación integrada llevan el uid como nombre.
+En la 0.24, los commits de la autenticación integrada llevan el uid como nombre.
 
 Un cambio de esquema con autor y un diff en el historial de tu proyecto es algo que ni Firebase ni Supabase ofrecen: sus ediciones de tablas son invisibles para tu repositorio.
 

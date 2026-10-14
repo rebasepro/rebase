@@ -1,5 +1,5 @@
 ---
-sourceHash: 7452474353756b93
+sourceHash: c35ed2ce1194af56
 title: Authentification et connexion
 sidebar_label: Authentification et connexion
 description: Configurez le contrôleur d'authentification, la vue de connexion et la simulation de rôles dans votre frontend React Rebase.
@@ -39,7 +39,7 @@ Passez l'`authController` au contrôleur de navigation Rebase pour restreindre l
 
 ## Votre propre fournisseur d'authentification
 
-<span class="since-badge" data-since="0.25">Depuis 0.25</span> En 0.24, le
+En 0.24, le
 getter n'authentifie que les requêtes HTTP, et le socket temps réel du panneau reste
 anonyme.
 

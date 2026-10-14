@@ -1,5 +1,5 @@
 ---
-sourceHash: 5a4b74223c30f992
+sourceHash: 26723d5fe58a36e5
 slug: pt/docs/rls-check
 title: rls-check
 description: Audite a segurança em nível de linha (RLS) em qualquer banco de dados PostgreSQL — Supabase, Neon, RDS ou seu próprio servidor. Somente leitura, sem cadastro, sem necessidade de Rebase.
@@ -355,12 +355,12 @@ faz é delimitar o escopo das linhas: o que resta é que *qualquer conta registr
 desta tabela*, o que é uma afirmação bem diferente daquela pretendida originalmente. Em um
 projeto Rebase, isto é uma regra cuja `condition` é `policy.authenticated()` e nada mais,
 que o banco de dados armazena como `rebase.uid() <> ALL (ARRAY['anonymous', 'anon'])`.
-<span class="since-badge" data-since="0.25">Desde 0.25</span> Uma regra cuja condição é
+Uma regra cuja condição é
 apenas `policy.registered()` também é relatada: o seu `NOT rebase.is_anonymous()` extra mantém
 os convidados de fora e também não delimita o escopo de nenhuma linha, de modo que toda conta que não
 seja de convidado lê todas as linhas. Com o `--fail-on high` padrão, uma execução de CI que varre tal policy agora falha.
 
-<span class="since-badge" data-since="0.25">Desde 0.25</span> Uma policy cuja expressão apenas
+Uma policy cuja expressão apenas
 testa a role do chamador — `auth.role() = 'authenticated'`, `(auth.jwt() ->> 'role') =
 'authenticated'`, em qualquer ordem — também é relatada sob este id. É um
 `TO authenticated USING (true)` escrito como expressão, então recebe a severidade que

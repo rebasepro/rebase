@@ -1,5 +1,5 @@
 ---
-sourceHash: dc4cb3811023b966
+sourceHash: 44951a600db63629
 title: Inicio rápido
 sidebar_label: Inicio rápido
 description: Crea un nuevo proyecto de Rebase y ponlo en marcha localmente en menos de 2 minutos.
@@ -61,7 +61,7 @@ Ambos puertos se **derivan de la ruta de este proyecto** en lugar de ser fijos, 
 | `--headless` | `init` | Un backend sin archivos de colección y sin interfaz de usuario — consulta [Backend only](/docs/getting-started/headless/) |
 | `--template <name>` | `init` | Iniciar desde una plantilla distinta a la predeterminada |
 | `--install` / `--no-install` | `init` | Ejecutar el gestor de paquetes por ti, o no hacerlo |
-| `--docker` | `dev` | Usar PostgreSQL en un contenedor en lugar del administrado. <span class="since-badge" data-since="0.25">Desde 0.25</span> Los demás comandos lo siguen hasta que `rebase dev` se ejecuta sin él. Una `DATABASE_URL` tiene prioridad sobre él: entonces no inicia nada, y lo dice |
+| `--docker` | `dev` | Usar PostgreSQL en un contenedor en lugar del administrado. Los demás comandos lo siguen hasta que `rebase dev` se ejecuta sin él. Una `DATABASE_URL` tiene prioridad sobre él: entonces no inicia nada, y lo dice |
 | `--no-db` | `dev` | No iniciar ninguna base de datos: ni el contenedor ni la administrada. Configura `DATABASE_URL` tú mismo |
 
 ## Variante: usa tu propio PostgreSQL
@@ -74,7 +74,7 @@ DATABASE_URL=postgresql://username:password@localhost:5432/your_database
 
 Luego, inicia los servidores de desarrollo como se indicó anteriormente. Si se define una variable `DATABASE_URL`, esta nunca se modifica, y si apunta a cualquier lugar fuera de esta máquina, se deja completamente intacta.
 
-Los comandos de migración planifican los cambios con [Atlas](https://atlasgo.io/), el motor de migración de esquemas con el que Rebase planifica, el cual necesita una segunda base de datos vacía con la cual comparar. Con tu propia base de datos, Rebase crea una a su lado; en la administrada, que sirve exactamente una base de datos, inicia un PGlite desechable mientras dura el comando. <span class="since-badge" data-since="0.25">Desde 0.25</span>
+Los comandos de migración planifican los cambios con [Atlas](https://atlasgo.io/), el motor de migración de esquemas con el que Rebase planifica, el cual necesita una segunda base de datos vacía con la cual comparar. Con tu propia base de datos, Rebase crea una a su lado; en la administrada, que sirve exactamente una base de datos, inicia un PGlite desechable mientras dura el comando.
 En la 0.24 los comandos de migración rechazan la base de datos administrada, y necesitan la tuya.
 En ambos casos:
 
@@ -179,7 +179,7 @@ Lo mismo ocurre con una propiedad añadida a una colección que ya tienes: guard
 pnpm run db:push
 ```
 
-<span class="since-badge" data-since="0.25">Desde 0.25</span> Se ejecuta en la base de datos
+Se ejecuta en la base de datos
 administrada igual que en la tuya. En la 0.24 necesita tu propio PostgreSQL.
 
 ## Referencia de comandos de base de datos
@@ -192,7 +192,7 @@ administrada igual que en la tuya. En la 0.24 necesita tu propio PostgreSQL.
 | `rebase db generate` | Genera archivos de migración SQL |
 | `rebase db migrate` | Ejecuta las migraciones pendientes |
 
-<span class="since-badge" data-since="0.25">Desde 0.25</span> Los tres comandos `db`
+Los tres comandos `db`
 funcionan en la base de datos administrada. En la 0.24 necesitan tu propio PostgreSQL.
 
 ## Próximos pasos

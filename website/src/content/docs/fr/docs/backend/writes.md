@@ -1,5 +1,5 @@
 ---
-sourceHash: b9b698ec32e400fc
+sourceHash: 7f736b930b419003
 title: Écriture via REST
 sidebar_label: Écriture via REST
 description: Clés d'idempotence, écritures conditionnelles avec ETag et If-Match, opérations sur les champs, upserts sur clé naturelle, return=minimal et lots multi-collections.
@@ -44,7 +44,7 @@ Le cas de `DELETE` mérite une attention particulière. Rejouée sans clé, la s
 
 `GET /api/data/:slug/:id` renvoie un `ETag`, tout comme le `GET` imbriqué d'une seule ligne. Renvoyez-le dans l'en-tête `If-Match` lors d'un `PATCH` ou d'un `DELETE` ultérieur et l'écriture sera refusée avec un code `412` si la ligne a été modifiée entre-temps.
 
-<span class="since-badge" data-since="0.25">Depuis 0.25</span> Un `PATCH` réussi répond avec l'`ETag` de la version qu'il a écrite, de sorte que l'écriture conditionnelle suivante n'a pas besoin de lecture préalable. Le jeton accompagne aussi un `204` répondu pour `Prefer: return=minimal`, et une réponse rejouée pour une `Idempotency-Key` porte le même jeton que la première. Un abonnement en direct à une ligne porte le même jeton sur chaque trame (voir [Temps réel](/docs/backend/realtime/)).
+Un `PATCH` réussi répond avec l'`ETag` de la version qu'il a écrite, de sorte que l'écriture conditionnelle suivante n'a pas besoin de lecture préalable. Le jeton accompagne aussi un `204` répondu pour `Prefer: return=minimal`, et une réponse rejouée pour une `Idempotency-Key` porte le même jeton que la première. Un abonnement en direct à une ligne porte le même jeton sur chaque trame (voir [Temps réel](/docs/backend/realtime/)).
 
 ```bash
 # read
@@ -62,7 +62,7 @@ Sans cela, le mécanisme de lecture-modification-écriture applique la règle du
 
 Le jeton provient d'une propriété `date` avec `autoValue: "on_update"` lorsque la collection en déclare une — cette colonne constitue déjà une version — et d'un hachage stable de la ligne dans le cas contraire. `If-Match: *` affirme uniquement que la ligne existe. Rien n'est écrit lorsque la précondition échoue.
 
-<span class="since-badge" data-since="0.25">Depuis 0.25</span> Le formulaire d'enregistrement de l'admin enregistre avec `If-Match` : un enregistrement fait sur une version que quelqu'un a remplacée depuis est refusé, le formulaire le signale, et la modification reste dans le formulaire, rebasée sur la nouvelle version avec les champs en conflit marqués.
+Le formulaire d'enregistrement de l'admin enregistre avec `If-Match` : un enregistrement fait sur une version que quelqu'un a remplacée depuis est refusé, le formulaire le signale, et la modification reste dans le formulaire, rebasée sur la nouvelle version avec les champs en conflit marqués.
 
 Le jeton est comparé au sein de la propre transaction de l'écriture, une fois la ligne verrouillée. Deux écritures portant le même jeton ne peuvent pas passer toutes les deux : la seconde attend le commit de la première, lit ce qu'elle a écrit et est refusée avec un code `412`.
 
@@ -122,7 +122,7 @@ Une ligne qui existait déjà conserve son horodatage `on_create` et son créate
 
 #### Pas sur la collection des utilisateurs
 
-<span class="since-badge" data-since="0.25">Since 0.25</span> La collection des utilisateurs (celle où `auth` est activé) refuse un upsert par toutes les voies — `?on_conflict=`, `/bulk` avec `upsert: true`, une opération `upsert` de `_batch`, le `upsert()` du SDK et le socket temps réel — avec un `400` (`INVALID_CONFLICT_TARGET`). Ses lignes sont les utilisateurs, et créer un utilisateur et le modifier suivent des règles différentes : une création hache le mot de passe, normalise l'email, exécute `onCreateUser` et envoie l'invitation, et une mise à jour ne peut pas rétrograder le dernier administrateur. Un upsert n'apprend lequel des deux il est qu'à l'intérieur de l'écriture, trop tard pour appliquer l'une ou l'autre. Créez les utilisateurs avec un simple `POST` et modifiez-les avec `PATCH`.
+La collection des utilisateurs (celle où `auth` est activé) refuse un upsert par toutes les voies — `?on_conflict=`, `/bulk` avec `upsert: true`, une opération `upsert` de `_batch`, le `upsert()` du SDK et le socket temps réel — avec un `400` (`INVALID_CONFLICT_TARGET`). Ses lignes sont les utilisateurs, et créer un utilisateur et le modifier suivent des règles différentes : une création hache le mot de passe, normalise l'email, exécute `onCreateUser` et envoie l'invitation, et une mise à jour ne peut pas rétrograder le dernier administrateur. Un upsert n'apprend lequel des deux il est qu'à l'intérieur de l'écriture, trop tard pour appliquer l'une ou l'autre. Créez les utilisateurs avec un simple `POST` et modifiez-les avec `PATCH`.
 
 ### `Prefer: return=minimal`
 

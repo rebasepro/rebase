@@ -301,7 +301,7 @@ Every key is checked against whoever creates it, the same way on both routes:
 
 | Refusal | When |
 |---|---|
-| `400 INVALID_SCOPES` | A scope is malformed, unknown, or carries a target it does not take. `details.validScopes` lists the scopes a key may hold. <span class="since-badge" data-since="0.25">Since 0.25</span> It leaves out `keys:*`, which no key can hold; on 0.24 it lists them |
+| `400 INVALID_SCOPES` | A scope is malformed, unknown, or carries a target it does not take. `details.validScopes` lists the scopes a key may hold. It leaves out `keys:*`, which no key can hold; on 0.24 it lists them |
 | `400 UNKNOWN_SCOPE_TARGET` | A target names a collection, storage source or function this backend does not serve |
 | `400 KEY_MANAGEMENT_SCOPE` | `keys:read` or `keys:write` was asked for |
 | `403 SCOPE_EXCEEDS_CREATOR` | A scope the creator does not hold. A key never holds more than the account that made it |

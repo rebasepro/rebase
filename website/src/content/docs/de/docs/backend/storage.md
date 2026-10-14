@@ -1,5 +1,5 @@
 ---
-sourceHash: 912fb4a5c0d6c740
+sourceHash: cc1736a186791d89
 title: Speicher-Konfiguration
 sidebar_label: Speicher-Konfiguration
 description: Konfigurieren Sie lokales Dateisystem, S3-kompatible Backends oder GCS/Firebase Storage für Datei-Uploads, Bilder und Medien.
@@ -104,7 +104,7 @@ image: {
 | `GET` | `/api/storage/file/*` | Eine Datei abrufen — alles nach `/file/` ist der Objektschlüssel |
 | `GET` | `/api/storage/file/*?storageId=<key>` | Eine Datei von einem bestimmten Backend abrufen |
 | `GET` | `/api/storage/metadata/*` | Größe, Content-Type und benutzerdefinierte Metadaten eines Objekts ohne dessen Bytes, plus ein kurzlebiges Download-Token, falls es privat ist |
-| `POST` | `/api/storage/metadata` | <span class="since-badge" data-since="0.25">Seit 0.25</span> Dasselbe für bis zu 100 Objekte einer Quelle: Body `{ keys, storageId? }` |
+| `POST` | `/api/storage/metadata` | Dasselbe für bis zu 100 Objekte einer Quelle: Body `{ keys, storageId? }` |
 | `DELETE` | `/api/storage/file/*` | Eine Datei löschen |
 | `GET` | `/api/storage/list` | Objekte unter einem Präfix auflisten (`prefix`, `bucket`, `maxResults`, `pageToken`, `storageId`). Ein `maxResults` kleiner als 1 oder ein `pageToken`, den die Quelle nie ausgestellt hat, ergibt `400 INVALID_LIST_OPTIONS` |
 | `POST` | `/api/storage/folder` | Eine leere Ordnermarkierung erstellen |
@@ -127,7 +127,7 @@ ist die Ausnahme, da dessen Nutzlast die Datei selbst ist — es antwortet mit d
   "size": 48213, "updated": "2026-10-01T12:00:00.000Z", "contentType": "image/jpeg" } ], "prefixes": [] } }
 ```
 
-<span class="since-badge" data-since="0.25">Seit 0.25</span> Eine Auflistung beschreibt jede Datei, die sie zurückgibt: ihre `size` in Bytes und
+Eine Auflistung beschreibt jede Datei, die sie zurückgibt: ihre `size` in Bytes und
 `updated`, wann sie zuletzt geschrieben wurde (im lokalen Speicher, auf S3 und GCS), sowie ihren
 `contentType` im lokalen Speicher und auf GCS. Ein S3-Listing enthält den Typ nicht,
 daher fehlt er bei S3 und `/api/storage/metadata/*` liefert ihn stattdessen. Ein Ordner in
@@ -152,7 +152,7 @@ Leseoperationen: Ein Upload, ein `POST /api/storage/folder` oder ein TUS-Upload 
 Buckets antwortet mit `404 UNKNOWN_STORAGE_SOURCE`, genau wie das Listing. Der lokale Speicher
 erstellt ein Bucket weiterhin beim ersten Schreibvorgang automatisch.
 
-**Viele Objekte auf einmal.** <span class="since-badge" data-since="0.25">Seit 0.25</span> `POST /api/storage/metadata` akzeptiert
+**Viele Objekte auf einmal.** `POST /api/storage/metadata` akzeptiert
 `{ "keys": ["photos/a.png", "photos/b.png"], "storageId": "media" }` — bis zu 100
 Objektpfade einer einzelnen Quelle, jeweils so formatiert, wie `GET /api/storage/metadata/<key>`
 sie erwartet — und liefert einen Eintrag pro Schlüssel zurück:
@@ -207,7 +207,7 @@ ohne Rückmeldung darüber zu geben.
 Die Thumbnails gespeicherter Bilder im Admin-Panel nutzen diesen Endpunkt: Eine Tabellen- oder Karten-Vorschau
 fordert eine WebP-Version an, die etwa doppelt so groß wie ihre dargestellte Größe ist (96–800px),
 anstatt des Originals. SVG- und GIF-Dateien werden immer unverändert angezeigt.
-`sharp` ist optional: <span class="since-badge" data-since="0.25">Seit 0.25</span>
+`sharp` ist optional:
 ohne es erhält eine Transformationsanfrage das Original, und das Backend warnt einmal,
 `pnpm add sharp` in `backend/` auszuführen (unter 0.24 antwortet es mit 500, und das Panel zeigt die Originale).
 
@@ -296,7 +296,7 @@ STORAGE_MAX_FILE_SIZE__MEDIA=1073741824  # media: 1 GB
 Wie viel einer Datei der Server gleichzeitig im Arbeitsspeicher hält, hängt vom Eingangsweg ab.
 `POST /api/storage/upload` ist ein einzelner Multipart-Body, den der Server vollständig parst:
 das Drei- bis Fünffache der Dateigröße im Arbeitsspeicher. Ein fortsetzbarer Upload (TUS) verarbeitet
-jeweils nur einen Chunk. <span class="since-badge" data-since="0.25">Seit 0.25</span> `client.storage.putObject()` und das Admin-Panel senden Dateien
+jeweils nur einen Chunk. `client.storage.putObject()` und das Admin-Panel senden Dateien
 über 8 MiB über das fortsetzbare Verfahren. Unter
 [Fortsetzbare Uploads (TUS)](/docs/backend/storage-resumable-uploads/) finden Sie Informationen zum
 Protokoll, zu den Antworten und zum Verhalten über mehrere Instanzen hinweg.
@@ -343,7 +343,7 @@ Topics im Zusammenspiel.
 Jede Quelle wird über **dieselben Variablennamen mit ihrem eigenen Suffix** konfiguriert.
 Die Standardquelle verwendet kein Suffix, sodass ein Projekt mit nur einem Bucket weiterhin die
 einfachen Namen von oben nutzen kann und gar nichts deklarieren muss, und benannte Buckets daneben zu
-deklarieren ändert sie nicht (<span class="since-badge" data-since="0.25">Seit 0.25</span>, [Details](/docs/backend/multiple-sources/#which-bucket-receives-an-unqualified-upload)):
+deklarieren ändert sie nicht ([Details](/docs/backend/multiple-sources/#which-bucket-receives-an-unqualified-upload)):
 
 ```bash
 S3_BUCKET=app-uploads             # (default)

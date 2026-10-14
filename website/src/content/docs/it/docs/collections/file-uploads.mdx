@@ -1,5 +1,5 @@
 ---
-sourceHash: 3702fa186011ca6b
+sourceHash: 2ab6f8f502363939
 title: Campi di caricamento file
 sidebar_label: Caricamenti file
 description:"\"Dichiarare un campo file o immagine su una collezione: il blocco storage, i caricamenti di file singoli e multipli e quali delle sue opzioni vengono risolte dal pannello anziché dal server.\""
@@ -150,7 +150,7 @@ condividere la stessa chiave, quindi il pannello non può sapere che un file
 non è più usato. Gli oggetti a cui nessuna riga punta restano nel bucket, e
 vengono fatturati, finché non li elimini — dal browser di storage di Studio,
 con `client.storage.deleteObject(key)`, o con una regola di lifecycle sul
-bucket. <span class="since-badge" data-since="0.25">Da 0.25</span> `rebase storage orphans` elenca i file che nessuna riga nomina, e li elimina
+bucket. `rebase storage orphans` elenca i file che nessuna riga nomina, e li elimina
 con `--delete` — vedi [la CLI](/docs/cli/#rebase-storage).
 
 ### Spostare una proprietà su un'altra sorgente di storage

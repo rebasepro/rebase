@@ -1,5 +1,5 @@
 ---
-sourceHash: 63a33a92e55310ba
+sourceHash: 6d6edea2e91b0bbc
 title: REST API
 sidebar_label: REST API
 description: Automatisch generierte REST-API-Endpunkte für jede Collection, mit Filterung, Sortierung, Paginierung und Einbindung von Relationen.
@@ -22,7 +22,7 @@ Für jede Collection werden die folgenden Endpunkte generiert. Alle anderen vom 
 | Methode | Pfad | Beschreibung |
 |---------|------|--------------|
 | `GET` | `/api/data/:slug` | Entitäten auflisten |
-| `POST` | `/api/data/:slug/query` | <span class="since-badge" data-since="0.25">Seit 0.25</span> Dieselbe Auflistung, ihre Query-Parameter in einem JSON-Body — für eine Abfrage, die für eine URL zu lang ist. Siehe [Abfragen, die für eine URL zu lang sind](/docs/backend/vector-search/#queries-too-long-for-a-url) |
+| `POST` | `/api/data/:slug/query` | Dieselbe Auflistung, ihre Query-Parameter in einem JSON-Body — für eine Abfrage, die für eine URL zu lang ist. Siehe [Abfragen, die für eine URL zu lang sind](/docs/backend/vector-search/#queries-too-long-for-a-url) |
 | `GET` | `/api/data/:slug/count` | Entitäten zählen |
 | `GET` | `/api/data/:slug/aggregate` | `count()`, `sum()`, `avg()`, `min()`, `max()`, optional gruppiert. Akzeptiert dieselben Filter wie der Listen-Endpunkt, und RLS gilt für die aggregierten Zeilen — siehe [Abfragen](/docs/sdk/querying/) |
 | `GET` | `/api/data/:slug/:id` | Eine einzelne Entität abrufen |
@@ -153,12 +153,12 @@ selbst: `INVALID_LIMIT`, `INVALID_OFFSET` (eine ganze Zahl von 0 oder mehr) und
 von dem angeforderten unterscheidet, lässt sich nicht vom Erreichen des Endes der Collection
 unterscheiden, weshalb keines davon gekappt oder ignoriert wird.
 
-<span class="since-badge" data-since="0.25">Seit 0.25</span> Aus demselben Grund sind `page` und `offset` zusammen ein 400 `PAGE_WITH_OFFSET`,
+Aus demselben Grund sind `page` und `offset` zusammen ein 400 `PAGE_WITH_OFFSET`,
 statt dass eines von beiden stillschweigend gewinnt.
 
 ### Die Zählung überspringen
 
-<span class="since-badge" data-since="0.25">Seit 0.25</span> `meta.total` ist ein `COUNT(*)` über alle passenden Zeilen — bei einer großen Tabelle
+`meta.total` ist ein `COUNT(*)` über alle passenden Zeilen — bei einer großen Tabelle
 der größte Teil dessen, was eine Listenanfrage kostet. `?count=none`
 (`GET /api/data/orders?count=none`) überspringt sie: kein `meta.total`, während
 `meta.hasMore` exakt bleibt (der Read fragt eine Zeile über die Seite hinaus ab).
@@ -338,7 +338,7 @@ und das Verhalten von Filtern auf dem Index stehen unter [Vektorsuche](/docs/bac
 
 ## Abfragen, die für eine URL zu lang sind
 
-<span class="since-badge" data-since="0.25">Seit 0.25</span> `POST /api/data/:slug/query` (diese Auflistung) und `POST /api/data/:slug/count`
+`POST /api/data/:slug/query` (diese Auflistung) und `POST /api/data/:slug/count`
 nehmen die Query-Parameter in einem JSON-Body entgegen, für eine Abfrage, deren URL nicht passen würde — ein Embedding, eine lange `in`-Liste.
 Siehe [Abfragen, die für eine URL zu lang sind](/docs/backend/vector-search/#queries-too-long-for-a-url).
 
@@ -381,7 +381,7 @@ GET /api/data/posts?include={"comments":{"limit":5,"where":{"published":["==",tr
 | `orderBy` | Dieselbe Sortierschreibweise, einschließlich der NULL-Platzierung. Gleichstände sowie ein `limit` ohne `orderBy` richten sich nach dem Schlüssel der verknüpften Zeile, aufsteigend |
 | `fields` | Spalten der *verknüpften* Zeile; ihr Primärschlüssel bleibt immer erhalten |
 | `include` | Relationen der verknüpften Zeile wiederum |
-| `count` | <span class="since-badge" data-since="0.25">Seit 0.25</span> `true` liefert zusätzlich die Gesamtzahl jedes Elternelements unter `_count` (`"_count":{"comments":37}`), gezählt von derselben Anweisung. Nur To-many-Relationen. Siehe [Zählen, was ein Limit auslässt](/docs/sdk/relations#counting-what-a-limit-leaves-out) |
+| `count` | `true` liefert zusätzlich die Gesamtzahl jedes Elternelements unter `_count` (`"_count":{"comments":37}`), gezählt von derselben Anweisung. Nur To-many-Relationen. Siehe [Zählen, was ein Limit auslässt](/docs/sdk/relations#counting-what-a-limit-leaves-out) |
 
 `true` bedeutet „vollständig laden“, sodass `{"author":true}` und `author` dieselbe
 Anfrage sind. Beide Schreibweisen funktionieren auf der Listen-Route, der Get-by-ID-Route

@@ -1,5 +1,5 @@
 ---
-sourceHash: f9db2c304fc55386
+sourceHash: 7256a7d26ab9e154
 title: "Change Capture auf Datenbankebene (CDC)"
 sidebar_label: "Change Capture auf Datenbankebene (CDC)"
 description: "Realtime-Events für jeden bestätigten Schreibvorgang, gleich wie er getätigt wurde: die Capture-Trigger, die Einstellung REALTIME_CDC und was sie brauchen."
@@ -20,7 +20,7 @@ CDC wird über die Umgebungsvariable `REALTIME_CDC` gesteuert:
 | `wal` | Bevorzugt logische WAL-Replikation. Noch nicht integriert – fällt auf `trigger` zurück und protokolliert den aktiven Modus. |
 | `off` | Nur Realtime auf Anwendungsebene. Verwenden Sie dies, um den Trigger-Overhead pro Schreibvorgang bei schreibintensiven Workloads zu vermeiden. Ein Start mit `off`, der das Schema besitzt, **entfernt** außerdem die Capture-Trigger und -Funktionen, die ein früherer Start installiert hat, und loggt, wie viele er entfernt hat; setzen Sie den Wert zurück, installiert der nächste Start sie wieder. |
 
-<span class="since-badge" data-since="0.25">Seit 0.25</span> Dieselbe Einstellung ist die
+Dieselbe Einstellung ist die
 Option `realtime.cdc` des Postgres-Adapters, für einen Server, der sie im Code konfiguriert.
 `REALTIME_CDC` hat, sofern gesetzt, Vorrang.
 
@@ -42,7 +42,7 @@ Wenn die Verbindung dies nicht unterstützt, gibt `auto` stattdessen eine Inform
 
 1. **Automatische Bereitstellung (Self-Provisioning)** – Beim Start (im Server-/Owner-Kontext) installiert Rebase idempotente `AFTER INSERT/UPDATE/DELETE/TRUNCATE`-Trigger auf jeder verwalteten Tabelle. Sie feuern einmal pro Statement und geben Änderungsbenachrichtigungen auf dem Kanal `rebase_cdc` aus, die die geänderten Zeilen anhand ihres Schlüssels benennen – den Primärschlüssel, plus die beiden ID-Spalten bei der Verbindungstabelle einer manyToMany-Relation – und **keine andere Spalte** tragen. Ein Statement, das viele Zeilen geändert hat, benennt sie in Batches von etwa tausend Schlüsseln, sodass ein `UPDATE` über 1 Mio. Zeilen etwa 1.000 Benachrichtigungen sendet statt einer Million; ein Statement, das eine Zeile geändert hat, sendet eine Benachrichtigung, und eines, das keine geändert hat, nichts. Ein `TRUNCATE` wird als Änderung an jeder Zeile der Collection angekündigt. Eine partitionierte Tabelle behält einen Trigger pro Zeile, weil PostgreSQL einen Zeilen-Trigger auf jede Partition kopiert und ein direkt auf eine Partition ausgeführter Schreibvorgang trotzdem gesehen wird. PostgreSQL vergibt für `LISTEN` kein Privileg, sodass jede Rolle, die sich mit der Datenbank verbinden kann, diesen Kanal lesen kann; sie erfährt, welche Schlüssel sich geändert haben, niemals, was diese enthalten. Ein Schlüssel, der zu groß für das 8&nbsp;KB-`NOTIFY`-Limit von PostgreSQL ist, wird ohne Schlüssel gesendet (eine Änderung an der gesamten Collection, die jedes Listen- und Einzelzeilen-Abonnement darauf neu abruft), sodass CDC den auslösenden Schreibvorgang niemals abbrechen kann. Die Funktionen werden bei jedem bereitstellenden Start ersetzt, sodass eine Datenbank, die von einer älteren Version instrumentiert wurde – deren Trigger ganze Zeilen sendete – beim nächsten Start aktualisiert wird; ein Start mit `REALTIME_CDC=off` entfernt sie stattdessen.
 
-   <span class="since-badge" data-since="0.25">Seit 0.25</span> **Upgrade.** Eine Datenbank, die von einer Version vor dem Batching instrumentiert wurde, hat einen Trigger pro Zeile; der erste Start einer neueren Version ersetzt ihn durch die Trigger pro Statement. 24 Stunden danach senden die neuen Trigger weiterhin eine Benachrichtigung pro Zeile, wie es die alten taten, sodass Instanzen der älteren Version, die während eines Rolling Deploys (oder nach einem Rollback) noch laufen, jede Zeile hören. Nach dem Fenster batchen sie. Jede Version, die batcht, liest beide Formen.
+   **Upgrade.** Eine Datenbank, die von einer Version vor dem Batching instrumentiert wurde, hat einen Trigger pro Zeile; der erste Start einer neueren Version ersetzt ihn durch die Trigger pro Statement. 24 Stunden danach senden die neuen Trigger weiterhin eine Benachrichtigung pro Zeile, wie es die alten taten, sodass Instanzen der älteren Version, die während eines Rolling Deploys (oder nach einem Rollback) noch laufen, jede Zeile hören. Nach dem Fenster batchen sie. Jede Version, die batcht, liest beide Formen.
 2. **Erfassung** – Ein dedizierter, ungepoolter `LISTEN`-Client pro Instanz verarbeitet `rebase_cdc`, ordnet die geänderte Tabelle wieder ihrer Collection zu und speist die Änderung in dieselbe `RealtimeService`-Pipeline ein, die von API-Mutationen verwendet wird. Wie der instanzübergreifende Listener bevorzugt er `DATABASE_DIRECT_URL` und verbindet sich automatisch wieder.
 3. **RLS-sichere Zustellung** – Die rohe Zeile aus dem Änderungs-Stream wird **niemals** an Abonnenten weitergeleitet. Die Änderung wird als ungültig markiert und jedes Abonnement liest die Zeile unter seinem **eigenen** Authentifizierungskontext erneut aus. Die Filterung erfolgt daher pro Abonnent, niemals pro Publisher: Ein Client empfängt immer nur Zeilen, die seine RLS-Richtlinien zulassen.
 4. **Instanzübergreifend** – Da jede Instanz jeden Commit über den Change-Stream beobachtet, *ist* CDC gleichzeitig der instanzübergreifende Kanal; der frühere mutationsbasierte `rebase_entity_changes`-Broadcast wird nicht verwendet, solange CDC aktiv ist.
@@ -50,7 +50,7 @@ Wenn die Verbindung dies nicht unterstützt, gibt `auto` stattdessen eine Inform
 
 ## Anforderungen & Hinweise
 
-<span class="since-badge" data-since="0.25">Seit 0.25</span> `directConnectionString` ist die Adapter-Option; unter 0.24 verwenden Sie `DATABASE_DIRECT_URL`.
+`directConnectionString` ist die Adapter-Option; unter 0.24 verwenden Sie `DATABASE_DIRECT_URL`.
 
 - CDC erfordert einen direkten Connection-String (`DATABASE_DIRECT_URL`, das `directConnectionString` des Adapters oder die primäre Verbindung) für den `LISTEN`-Client – Connection-Pooler im Transaktionsmodus unterstützen keine langlebigen `LISTEN`-Sitzungen.
 - Trigger werden nur auf Tabellen installiert, die einer registrierten Collection zugeordnet sind. Schreibvorgänge in nicht zugeordnete Tabellen werden ignoriert.

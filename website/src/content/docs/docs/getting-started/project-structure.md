@@ -58,7 +58,7 @@ my-app/
 ```
 
 `tsc --noEmit` at the root checks `scripts/`; in `config/`, `backend/` or
-`frontend/` it checks that workspace. <span class="since-badge" data-since="0.25">Since 0.25</span>
+`frontend/` it checks that workspace.
 On 0.24 the root has no `tsconfig.json`, and `tsc` there prints its help and
 checks nothing.
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: 9fe6bb92d083cb36
+sourceHash: 83ba3db403bb8334
 title: API-Schlüssel
 sidebar_label: API-Schlüssel
 description: "Langlebige Schlüssel für Skripte, CI, Agents und Integrationen: Service-Schlüssel und persönliche Schlüssel, die Scopes, die sie halten, wie sie mit Row-Level Security zusammenwirken, und die Routen, die sie verwalten."
@@ -302,7 +302,7 @@ Jeder Schlüssel wird gegen den geprüft, der ihn erstellt, auf beiden Routen gl
 
 | Ablehnung | Wann |
 |---|---|
-| `400 INVALID_SCOPES` | Ein Scope ist fehlerhaft, unbekannt oder trägt ein Ziel, das er nicht annimmt. `details.validScopes` listet die Scopes, die ein Key halten darf. <span class="since-badge" data-since="0.25">Seit 0.25</span> Er lässt `keys:*` aus, das kein Key halten kann; unter 0.24 listet er sie auf |
+| `400 INVALID_SCOPES` | Ein Scope ist fehlerhaft, unbekannt oder trägt ein Ziel, das er nicht annimmt. `details.validScopes` listet die Scopes, die ein Key halten darf. Er lässt `keys:*` aus, das kein Key halten kann; unter 0.24 listet er sie auf |
 | `400 UNKNOWN_SCOPE_TARGET` | Ein Ziel nennt eine Collection, Storage-Quelle oder Funktion, die dieses Backend nicht bereitstellt |
 | `400 KEY_MANAGEMENT_SCOPE` | `keys:read` oder `keys:write` wurde angefordert |
 | `403 SCOPE_EXCEEDS_CREATOR` | Ein Scope, den der Ersteller nicht hält. Ein Schlüssel hält nie mehr als das Konto, das ihn erstellt hat |

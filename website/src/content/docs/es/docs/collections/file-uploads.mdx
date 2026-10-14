@@ -1,5 +1,5 @@
 ---
-sourceHash: 3702fa186011ca6b
+sourceHash: 2ab6f8f502363939
 title: Campos de subida de archivos
 sidebar_label: Subidas de archivos
 description:"\"Declarar un campo de archivo o imagen en una colección: el bloque storage, subidas de archivos individuales o múltiples, y cuáles de sus opciones son resueltas por el panel en lugar del servidor.\""
@@ -149,7 +149,7 @@ contener la misma clave, así que el panel no puede saber si un archivo está
 sin usar. Los objetos a los que ninguna fila apunta permanecen en el bucket,
 y se facturan, hasta que los elimines — desde el explorador de almacenamiento
 de Studio, con `client.storage.deleteObject(key)`, o con una regla de ciclo
-de vida (lifecycle) en el bucket. <span class="since-badge" data-since="0.25">Desde 0.25</span> `rebase storage orphans` lista los archivos que ninguna fila nombra, y los elimina
+de vida (lifecycle) en el bucket. `rebase storage orphans` lista los archivos que ninguna fila nombra, y los elimina
 con `--delete` — consulta [la CLI](/docs/cli/#rebase-storage).
 
 ### Mover una propiedad a otro origen de almacenamiento

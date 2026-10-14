@@ -142,7 +142,7 @@ const articlesCollection = defineCollection({
 
 ## Combining callback sets
 
-<span class="since-badge" data-since="0.25">Since 0.25</span> On 0.24, combine
+On 0.24, combine
 sets by hand.
 
 A collection has one `callbacks` object. When several concerns each want a hook,
@@ -481,8 +481,6 @@ Other cross-collection patterns:
 - **Counters**: Use `afterSave` / `afterDelete` to update count fields on related entities
 
 ## Testing a callback
-
-<span class="since-badge" data-since="0.25">Since 0.25</span>
 
 A callback is a plain function of one props object, so a unit test calls it.
 `createCallContext` builds the `context` prop: the fields you pass are used as

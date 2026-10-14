@@ -19,7 +19,7 @@ GET /api/data/products?vector_search=embedding&vector=[0.15,0.22,-0.05]&vector_d
 | `vector_distance` | `string` | The distance metric to evaluate. Supported values: `cosine` (default, `<=>`), `l2` (`<->`), `inner_product` (`<#>`). |
 | `vector_threshold` | `number` | Maximum distance threshold. Only records with distance less than this threshold are returned. |
 
-<span class="since-badge" data-since="0.25">Since 0.25</span> A vector search with a
+A vector search with a
 `vector_threshold` has no `meta.total`: counting the rows within a distance means
 computing that distance for every row of the table, which no index serves — several
 times the cost of the page itself, growing with rows × dimensions. `meta.hasMore` is
@@ -28,14 +28,14 @@ ordinary one.
 
 An embedding is long in a URL: 768 dimensions are about 17 KB of query string and
 1,536 about 33 KB. The server accepts up to 64 KB of request line and headers
-(<span class="since-badge" data-since="0.25">Since 0.25</span>; 16 KB before, a 431
+(; 16 KB before, a 431
 from 768 dimensions up), and a proxy in front of it usually accepts less — nginx's
 default is 8 KB. Send a vector search as [`POST …/query`](#queries-too-long-for-a-url)
 instead; the SDK always does.
 
 ## Filters on an approximate index
 
-<span class="since-badge" data-since="0.25">Since 0.25</span> A vector search that
+A vector search that
 also filters — a `where`, a search, row-level security — returns the nearest rows
 that match. An HNSW index answers with a fixed number of nearest candidates
 (`hnsw.ef_search`, 40 by default), and the other conditions are applied to those;
@@ -50,7 +50,7 @@ scan (`index: false`) never had it.
 
 ## Queries too long for a URL
 
-<span class="since-badge" data-since="0.25">Since 0.25</span> `POST /api/data/:slug/query`
+`POST /api/data/:slug/query`
 is the listing `GET /api/data/:slug` answers, with the query parameters in a JSON
 body instead of the URL. Use it when the URL would not fit — a vector search's
 embedding, a filter on a long `in` list. The SDK sends every vector search this way,
@@ -83,7 +83,7 @@ counts against the same rate limit as the `GET`. Nested listings have it too:
 `POST /api/data/authors/42/posts/query`. A server older than 0.24 answers it 404;
 the SDK then sends the `GET`.
 
-<span class="since-badge" data-since="0.25">Since 0.25</span> The count has the
+The count has the
 same twin: `POST /api/data/:slug/count` (and `POST /api/data/authors/42/posts/count`)
 is `GET /api/data/:slug/count` with its parameters in the body, read the same way
 and refused the same way. A count carries the filters of the `find()` it describes,

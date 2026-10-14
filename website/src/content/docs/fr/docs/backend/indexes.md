@@ -1,5 +1,5 @@
 ---
-sourceHash: 3d8676ac5f8d58c7
+sourceHash: d74cc2ea4835551d
 title: Index
 sidebar_label: Index
 description: Déclarez des index Postgres ordinaires sur une collection — btree, GIN et BRIN, partiels, composites, couvrants et uniques — et comprenez pourquoi un index écrit à la main disparaissait auparavant.
@@ -179,7 +179,7 @@ Les deux producteurs les émettent, ce qui est important car tous les déploieme
 
 ## Les clés étrangères sont indexées pour vous
 
-<span class="since-badge" data-since="0.25">Depuis 0.25</span> Postgres crée l'index vers lequel une clé étrangère *pointe* — la clé primaire de la cible — et jamais
+Postgres crée l'index vers lequel une clé étrangère *pointe* — la clé primaire de la cible — et jamais
 un index sur la colonne qui la *porte*. Chaque lecture depuis l'autre côté d'un lien filtre sur cette
 colonne : un include `hasMany` ou `hasOne`, une liste imbriquée comme `/authors/5/posts` (sa page et son
 comptage), le côté inverse d'un `manyToMany`, et la vérification `ON DELETE` lorsqu'une ligne parente est

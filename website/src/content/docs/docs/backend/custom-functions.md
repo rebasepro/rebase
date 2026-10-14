@@ -120,7 +120,7 @@ Rebase will:
 
 ### Functions as values
 
-<span class="since-badge" data-since="0.25">Since 0.25</span> On 0.24 functions come from a directory only.
+On 0.24 functions come from a directory only.
 
 A directory is one way to produce what the server serves: a record from URL segment to Hono app. Pass that record yourself as `functions`, or read a directory into it with `loadFunctions`:
 
@@ -582,7 +582,7 @@ The router is mounted for the **directory**, not for the functions in it. If eve
 
 Two ceilings apply to `/api/functions/*`:
 
-- **Request timeout** — 30 seconds by default, answering `504` with code `FUNCTION_TIMEOUT`. Configure with `functionsTimeoutMs` (or `REBASE_FUNCTIONS_TIMEOUT_MS`); `0` disables it. The handler cannot be stopped from the outside, but it is told: <span class="since-badge" data-since="0.25">Since 0.25</span> `getSignal(c)` from `@rebasepro/server/functions` is aborted at the moment of the 504, so pass it to `fetch` and anything else that takes a signal (`fetch(url, { signal: getSignal(c) })`). Work not handed the signal carries on — the timeout frees the client and the socket, not the work. That the handler *keeps running* after the 504 is a property of a long-lived Node process, not a guarantee of the contract; anything that must complete belongs in [`waitUntil`](#background-work).
+- **Request timeout** — 30 seconds by default, answering `504` with code `FUNCTION_TIMEOUT`. Configure with `functionsTimeoutMs` (or `REBASE_FUNCTIONS_TIMEOUT_MS`); `0` disables it. The handler cannot be stopped from the outside, but it is told: `getSignal(c)` from `@rebasepro/server/functions` is aborted at the moment of the 504, so pass it to `fetch` and anything else that takes a signal (`fetch(url, { signal: getSignal(c) })`). Work not handed the signal carries on — the timeout frees the client and the socket, not the work. That the handler *keeps running* after the 504 is a property of a long-lived Node process, not a guarantee of the contract; anything that must complete belongs in [`waitUntil`](#background-work).
 - **Rate limit** — API-key and signed-in callers share the data API's buckets. Anonymous callers get their own, much looser allowance (3000 per window) because this router is public by default for webhook receivers. Override with `rateLimit.anonymousFunctions`; `null` switches it off.
 
 Unhandled promise rejections are logged rather than fatal: a fire-and-forget call in one function would otherwise end the whole process. Set `REBASE_EXIT_ON_UNHANDLED_REJECTION=1` for Node's default behaviour.

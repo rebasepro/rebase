@@ -1,5 +1,5 @@
 ---
-sourceHash: 8d6ce023558e141f
+sourceHash: 65085708df65a92e
 title: Authentifizierung
 sidebar_label: Authentifizierung
 description: Clientseitige Authentifizierung mit dem Rebase SDK — E-Mail/Passwort-Anmeldung, OAuth-Anbieter, Sitzungsverwaltung und Auth-Status-Listener.
@@ -487,7 +487,7 @@ const client = createRebaseClient({
 
 ## Einen eigenen Auth-Provider verwenden
 
-<span class="since-badge" data-since="0.25">Seit 0.25</span> Unter 0.24 authentifiziert ein
+Unter 0.24 authentifiziert ein
 Token-Getter nur HTTP-Anfragen, und der Realtime-Socket bleibt anonym.
 
 Wenn sich Benutzer mit einem eigenen Provider anmelden (Clerk, Firebase Auth oder eine

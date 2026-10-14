@@ -91,7 +91,7 @@ holds each named local bucket's `<STORAGE_PATH>__<key>` directory. See
 [Self-hosting: file storage](/docs/deployment/self-hosting/#file-storage).
 
 **Resumable uploads** (the TUS endpoint) keep each upload's partial file, and
-<span class="since-badge" data-since="0.25">Since 0.25</span> a record of the upload beside it, on the disk of the instance that
+a record of the upload beside it, on the disk of the instance that
 created it, under `STORAGE_PATH/.tus-uploads` — even when finished files go to
 S3 or GCS. Mount one volume at `STORAGE_PATH` on every instance and any instance
 serves any upload; a restart or a rolling deploy resumes an upload where it

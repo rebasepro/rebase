@@ -87,7 +87,7 @@ That's it. Rebase will:
 
 ### Cron jobs as values
 
-<span class="since-badge" data-since="0.25">Since 0.25</span> On 0.24 cron jobs come from a directory only.
+On 0.24 cron jobs come from a directory only.
 
 `crons` takes the jobs as a record from job id to definition, beside `collections`. A directory is one way to build it: `loadCrons(dir)` reads one into exactly that shape.
 
@@ -208,7 +208,7 @@ interface CronJobContext {
 
 Use `ctx.log()` to emit structured output. These lines are captured in the execution log and visible in Studio and via the REST API. Each line is also written to the server log at `info` level with a `cron` field holding the job ID, so it shows up wherever your container's output is collected, including Rebase Cloud's debug logs. That copy is redacted the way the server's own log lines are: the values of keys such as `password` or `apiKey`, and the SQL and parameters of a failed query, are replaced. The execution log stores the line without that redaction.
 
-<span class="since-badge" data-since="0.25">Since 0.25</span> The execution log keeps a run's first 500 lines or 64 KB of them, whichever comes first, and then one line saying how many more there were: `… 9500 more lines not kept — see the server log`. The server log gets every line. A job that logs one line per item it processes should expect its history to show the start of the run.
+The execution log keeps a run's first 500 lines or 64 KB of them, whichever comes first, and then one line saying how many more there were: `… 9500 more lines not kept — see the server log`. The server log gets every line. A job that logs one line per item it processes should expect its history to show the start of the run.
 
 ### `ctx.signal` — stop the work when the run stops
 
@@ -333,7 +333,7 @@ The panel shows the same thing whichever process serves it. A job another
 process is running shows as running.
 On every process that has a store, the run count, the failure count and the last run are read from the database, where every process's runs are counted. A process's own counters hold only the runs it made: the `api` role beside a worker runs nothing, and of two replicas that both schedule, neither sees the slots the other one claimed. Only when the database cannot be read does the card fall back to this process's own counters, with a warning in the server log.
 
-<span class="since-badge" data-since="0.25">Since 0.25</span> The counts are all-time; the history is the last 30 days. Each run's row in `rebase.cron_logs` is deleted 30 days after it started, by an hourly sweep, while the run and failure counts keep counting it. A skipped run counts as a run, as it always has: it is a row of the history.
+The counts are all-time; the history is the last 30 days. Each run's row in `rebase.cron_logs` is deleted 30 days after it started, by an hourly sweep, while the run and failure counts keep counting it. A skipped run counts as a run, as it always has: it is a row of the history.
 
 ## Schedule Validation & AST Parsing
 
@@ -422,7 +422,7 @@ it on its next deploy. None of them is a collection, and the end-user role
 let a signed-in user pause a job for everyone, or hold its lease so that nothing
 runs it.
 
-<span class="since-badge" data-since="0.25">Since 0.25</span> A run's row and its count are written in one statement: the insert into `cron_logs` and an upsert of the job's counters on `cron_job_state`. A listing reads one `cron_job_state` row per job, however long the history, and so does the scheduler when it seeds `totalRuns` and `totalFailures` on startup. Log writes do not hold up the run; if one fails, the scheduler logs the error and carries on, with the run still in the in-memory ring buffer.
+A run's row and its count are written in one statement: the insert into `cron_logs` and an upsert of the job's counters on `cron_job_state`. A listing reads one `cron_job_state` row per job, however long the history, and so does the scheduler when it seeds `totalRuns` and `totalFailures` on startup. Log writes do not hold up the run; if one fails, the scheduler logs the error and carries on, with the run still in the in-memory ring buffer.
 
 Once an hour, and when it starts, the scheduler deletes the history rows older than 30 days and counts any run that is not counted yet, both in batches of 5,000 rows. A history written before 0.24 is counted by the first of these sweeps, off the boot path. Until it has finished, a listing adds the runs it has not counted yet to the counters, so the numbers do not change on upgrade. The same goes for a run an older server logs during a rolling deploy.
 
@@ -486,7 +486,7 @@ import of the same module makes the graph derivable only on a machine that
 happens to have a `.env` — and it loads the whole dependency into every boot
 that merely registers the job.
 
-<span class="since-badge" data-since="0.25">Since 0.25</span> Loading a cron
+Loading a cron
 declares nothing. A build step of your own that wants crons in the graph says
 so, with `declareCrons`:
 

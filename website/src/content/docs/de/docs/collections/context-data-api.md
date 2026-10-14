@@ -1,5 +1,5 @@
 ---
-sourceHash: 00c369539f8269ad
+sourceHash: fa5ea5eeb92e1460
 title: Die context.data-API
 sidebar_label: context.data-API
 description: Andere Collections aus einem Callback heraus mit context.data lesen und schreiben – Methoden, die Rechte, mit denen es läuft, Transaktionssemantik und die Verbindung, die ein Callback belegt.
@@ -184,7 +184,7 @@ Daher:
 - Senden Sie Zeilen, deren Hooks langsam sind, in kleineren Bulks.
 - Laufen viele langsame Hooks absichtlich gleichzeitig, erhöhen Sie `DB_POOL_MAX`, im Rahmen dessen,
   was `max_connections` der Datenbank für jede Instanz erlaubt.
-- <span class="since-badge" data-since="0.25">Seit 0.25</span> Mit
+- Mit
   `REBASE_METRICS=true` meldet `/metrics` `rebase_db_pool_wait_ms`: wie lange
   jede Abfrage auf eine Verbindung wartete. Ein gesunder Pool hält ihn nahe null; ein Tail,
   der mit dem Traffic wächst, sind Anfragen, die auf Verbindungen warten, die Callbacks

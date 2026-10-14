@@ -1,5 +1,5 @@
 ---
-sourceHash: 5a4b74223c30f992
+sourceHash: 26723d5fe58a36e5
 slug: es/docs/rls-check
 title: rls-check
 description: Audita la seguridad a nivel de fila (RLS) en cualquier base de datos PostgreSQL — Supabase, Neon, RDS o tu propio servidor. De solo lectura, sin registro y sin requerir Rebase.
@@ -353,12 +353,12 @@ lo que no hace es delimitar las filas: lo que queda es que *toda cuenta registra
 esta tabla*, lo cual difiere bastante de lo que suele pretenderse. En un proyecto de Rebase esto es una regla cuyo
 `condition` es `policy.authenticated()` y nada más, que la base de datos almacena como
 `rebase.uid() <> ALL (ARRAY['anonymous', 'anon'])`.
-<span class="since-badge" data-since="0.25">Desde 0.25</span> También se reporta una regla cuya condición es
+También se reporta una regla cuya condición es
 solo `policy.registered()`: su `NOT rebase.is_anonymous()` adicional deja fuera a los
 invitados y tampoco delimita ninguna fila, por lo que toda cuenta que no sea de invitado lee todas las
 filas. Con el `--fail-on high` por defecto, una ejecución de CI que escanee una política así ahora falla.
 
-<span class="since-badge" data-since="0.25">Desde 0.25</span> Una política cuya expresión solo
+Una política cuya expresión solo
 comprueba el rol del llamante — `auth.role() = 'authenticated'`, `(auth.jwt() ->> 'role') =
 'authenticated'`, en cualquier orden — también se reporta bajo este id. Es `TO authenticated
 USING (true)` escrito como expresión, así que recibe la severidad que le da

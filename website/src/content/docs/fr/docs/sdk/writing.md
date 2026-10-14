@@ -1,5 +1,5 @@
 ---
-sourceHash: dcdd32536d7ea87a
+sourceHash: 19b3f8d0d52e648a
 title: Écriture de données
 sidebar_label: Écriture de données
 description: create, upsert, update et delete avec le SDK — opérations sur les champs, écritures conditionnelles, clés d'idempotence, écritures par lots et écriture entre collections dans une seule transaction.
@@ -68,7 +68,7 @@ pas modifiés : un conflit signifie que sa création est un fait appartenant au 
 
 #### Pas sur la collection des utilisateurs
 
-<span class="since-badge" data-since="0.25">Since 0.25</span> `upsert()` sur la collection des utilisateurs (celle où `auth` est activé) est refusé avec un 400 (`INVALID_CONFLICT_TARGET`), tout comme `createMany` avec `upsert` sur celle-ci. Créer un utilisateur et le modifier suivent des règles différentes — une création hache le mot de passe et envoie l'invitation, une mise à jour ne peut pas rétrograder le dernier administrateur — et un upsert n'apprend lequel des deux il est qu'à l'intérieur de l'écriture. Appelez `create` ou `update` à la place.
+`upsert()` sur la collection des utilisateurs (celle où `auth` est activé) est refusé avec un 400 (`INVALID_CONFLICT_TARGET`), tout comme `createMany` avec `upsert` sur celle-ci. Créer un utilisateur et le modifier suivent des règles différentes — une création hache le mot de passe et envoie l'invitation, une mise à jour ne peut pas rétrograder le dernier administrateur — et un upsert n'apprend lequel des deux il est qu'à l'intérieur de l'écriture. Appelez `create` ou `update` à la place.
 
 ### Update
 
@@ -148,7 +148,7 @@ ligne issue de `find()`, du cache hors ligne ou d'un serveur qui n'envoie pas
 d'`ETag` — et passer `undefined` n'envoie aucune précondition, l'appel ci-dessus
 se dégrade donc en une mise à jour ordinaire plutôt que de lever une exception.
 
-<span class="since-badge" data-since="0.25">Depuis 0.25</span> Une ligne issue de `update()` porte la version que cette écriture a produite, de sorte que les modifications conditionnelles s'enchaînent sans lecture intermédiaire. Une ligne que reçoit un callback `listenById()` porte la version que cette trame montre :
+Une ligne issue de `update()` porte la version que cette écriture a produite, de sorte que les modifications conditionnelles s'enchaînent sans lecture intermédiaire. Une ligne que reçoit un callback `listenById()` porte la version que cette trame montre :
 
 ```typescript
 import { etagOf } from "@rebasepro/client";

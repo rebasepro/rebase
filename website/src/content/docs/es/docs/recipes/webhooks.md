@@ -1,5 +1,5 @@
 ---
-sourceHash: 75953facb59d9645
+sourceHash: ead814d8414e0434
 title: "Receta: Integración de Webhooks"
 sidebar_label: Webhooks
 description: Utiliza las devoluciones de llamada de la entidad para enviar webhooks a servicios externos cuando los datos cambien, sin mantener abierta la transacción de la escritura.
@@ -91,7 +91,7 @@ tras un intento, con el motivo; todo lo demás se reintenta como cualquier job. 
 
 `setCollectionCallbacks` **reemplaza** los callbacks que declara la colección `orders`.
 Si declara alguno, consérvalos:
-<span class="since-badge" data-since="0.25">Desde 0.25</span> pasa
+pasa
 `composeCallbacks(declared, { afterSave })`, con `composeCallbacks` de
 `@rebasepro/server` y `declared` los `callbacks` propios de la colección. Consulta
 [Combinar conjuntos de callbacks](/docs/collections/callbacks/#combining-callback-sets).
@@ -142,7 +142,7 @@ y su importación de `@rebasepro/server` llegarían a todos los visitantes, y ha
 
 Un fallo del proceso o un despliegue entre la confirmación y la entrega pierde el evento. Cada webhook tiene su propia
 cola, así que un receptor caído retrasa solo sus propias entregas, nunca las de otro webhook.
-<span class="since-badge" data-since="0.25">Desde 0.25</span> La cola de cada webhook admite como máximo
+La cola de cada webhook admite como máximo
 10.000 entregas en espera; mientras está llena, una nueva entrega se rechaza y se informa a `onDelivery`
 con `success: false`, `statusCode: 0`, `attemptNumber: 0` y `responseBody: "queue full"`, y
 el registro del servidor lo dice una vez. Llama a `await dispatcher.flush(10_000)` al apagar: espera a lo que
@@ -211,7 +211,7 @@ Nunca pases a un `fetch` desnudo una URL que venga de tu base de datos. El dispa
 destinos loopback, link-local, privados y esquemas que no sean `http(s)` antes de conectarse, y se
 niega a seguir redirecciones, precisamente porque una URL almacenada es entrada controlada por un
 atacante.
-<span class="since-badge" data-since="0.25">Desde 0.25</span> En Node juzga la dirección a la que
+En Node juzga la dirección a la que
 realmente se hace cada conexión, dentro de la propia búsqueda DNS de la conexión, de modo que un nombre cuyo registro
 cambia entre una comprobación y la conexión no puede colarse; el nombre de un receptor se resuelve
 una vez por conexión, no una vez por entrega.

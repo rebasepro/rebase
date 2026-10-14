@@ -1,5 +1,5 @@
 ---
-sourceHash: 03c3a22014b05f70
+sourceHash: cf996dc5a52fc912
 title: Hintergrund-Jobs
 sidebar_label: Hintergrund-Jobs
 description: Eine dauerhafte, Postgres-gestützte Job-Warteschlange – Aufgaben, die einen Neustart überstehen, mit Backoff wiederholt werden und bei denen Fehler aufbewahrt statt verworfen werden.
@@ -36,7 +36,7 @@ await initializeRebaseBackend({
 
 Standardmäßig deaktiviert: Ein Worker sucht so lange nach Arbeit, wie der Prozess lebt, was kein Standardverhalten ist, das jeder möchte. Er benötigt einen Treiber, der SQL ausführen kann – bei einem Treiber, der dies nicht kann (MongoDB), ist die Warteschlange nicht verfügbar, und Sie werden bereits beim Start darauf hingewiesen und nicht erst beim ersten Einreihen.
 
-<span class="since-badge" data-since="0.25">Seit 0.25</span> Ein untätiger Worker pollt nicht alle zwei Sekunden. Jedes Einreihen sendet beim Commit ein `NOTIFY` auf dem Kanal `rebase_jobs`, und ein Worker, der ein `LISTEN` darauf hält, beansprucht sofort – ein Job, der von einem anderen Prozess eingereiht wird (die `api`-Rolle, eine andere Replik), startet innerhalb von Millisekunden, ein verzögerter, wenn er fällig wird. Dahinter schaut er trotzdem alle 30 Sekunden nach. Ein Job, den dieser Prozess einreiht, ein Retry, den er geplant hat, und ein Job, den er zurückgefordert hat, wecken ihn ohne Benachrichtigung.
+Ein untätiger Worker pollt nicht alle zwei Sekunden. Jedes Einreihen sendet beim Commit ein `NOTIFY` auf dem Kanal `rebase_jobs`, und ein Worker, der ein `LISTEN` darauf hält, beansprucht sofort – ein Job, der von einem anderen Prozess eingereiht wird (die `api`-Rolle, eine andere Replik), startet innerhalb von Millisekunden, ein verzögerter, wenn er fällig wird. Dahinter schaut er trotzdem alle 30 Sekunden nach. Ein Job, den dieser Prozess einreiht, ein Retry, den er geplant hat, und ein Job, den er zurückgefordert hat, wecken ihn ohne Benachrichtigung.
 
 Das `LISTEN` braucht eine eigene Verbindung, die so gefunden wird wie bei Realtime: `DATABASE_DIRECT_URL`, wenn gesetzt, sonst `DATABASE_URL`. Setzen Sie hinter einem Pooler im Transaction-Modus wie PgBouncer `DATABASE_DIRECT_URL`: Ein Pooler hält kein `LISTEN`, und Jobs aus anderen Prozessen würden dann auf den 30-Sekunden-Blick warten. Wo es überhaupt keine solche Verbindung gibt (die In-Process-Entwicklungsdatenbank), fährt ein untätiger Worker stattdessen zurück: Er schaut nach `pollIntervalMs` (2 Sekunden) nach, danach nach jeweils doppelt so langer Zeit, wenn der Blick nichts fand, bis zu 30 Sekunden, und beginnt von vorn, sobald er Arbeit findet. Ein untätiger Worker macht etwa 2.900 Claims pro Tag statt 43.200.
 
@@ -95,7 +95,7 @@ jobs: {
 ### Ein Handler, der nie fertig wird
 
 Die Kehrseite: Ein Handler, der auf ein `fetch` wartet, das nie antwortet, hält seinen Worker-Slot und seinen Claim, solange der Prozess lebt – bei fünf davon führt der Worker nichts anderes mehr aus, während `/health` grün bleibt.
-<span class="since-badge" data-since="0.25">Seit 0.25</span> `timeoutMs` begrenzt einen Versuch. Mit Ablauf der Frist schlägt der Versuch fehl — er wird wiederholt, solange Versuche übrig sind, wie bei jedem Throw —, sein Slot wird frei, und das `signal` des Handlers wird abgebrochen. Reichen Sie das Signal weiter, damit auch die Arbeit stoppt; ein Handler, der es ignoriert, läuft im Hintergrund weiter, ohne dass etwas sein Ergebnis aufzeichnet.
+`timeoutMs` begrenzt einen Versuch. Mit Ablauf der Frist schlägt der Versuch fehl — er wird wiederholt, solange Versuche übrig sind, wie bei jedem Throw —, sein Slot wird frei, und das `signal` des Handlers wird abgebrochen. Reichen Sie das Signal weiter, damit auch die Arbeit stoppt; ein Handler, der es ignoriert, läuft im Hintergrund weiter, ohne dass etwas sein Ergebnis aufzeichnet.
 
 Ohne Angabe sind es 15 Minuten (`900_000`), und der Worker meldet das beim Start in einer Logzeile. Ein Job, der legitim länger läuft, setzt seinen eigenen Wert, und `timeoutMs: 0` hebt das Limit auf.
 

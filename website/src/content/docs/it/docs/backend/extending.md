@@ -1,5 +1,5 @@
 ---
-sourceHash: 85e444fd4d0f85a8
+sourceHash: b2aa1062d257415a
 title: Rebase non fa X
 sidebar_label: Estendere il server
 description: La scala di estensione lato server — dichiarazione, callback di collezione, funzione personalizzata, rotte personalizzate, server personalizzato, eject — con ciò che ciascuno può e non può raggiungere.
@@ -17,7 +17,7 @@ La regola che la scala riflette: **ogni gradino comporta un costo rispetto a ci�
 
 ## La scala
 
-<span class="since-badge" data-since="0.25">Da 0.25</span> `createRebaseBackend`, al gradino 5,
+`createRebaseBackend`, al gradino 5,
 è nuovo; su 0.24 quel gradino è il solo driver.
 
 | # | Gradino | Raggiunge | **Non** raggiunge | Costo di questa scelta |
@@ -203,7 +203,6 @@ frutto dell'elaborazione svolta dal router Rebase stesso.
 
 **Ambito:** il processo.
 
-<span class="since-badge" data-since="0.25">Da 0.25</span>
 `initializeRebaseBackend` è una scorciatoia su alcune chiamate pubbliche, e questo gradino
 consiste nel chiamarle tu stesso. `createRebaseBackend` costruisce il backend e non monta,
 non avvia e non ascolta nulla. `backend.routes` contiene ogni gruppo di rotte come
@@ -288,7 +287,7 @@ da `context.driver` all'interno di un callback. Restringine il tipo con `isSQLAd
 la guardia fa la differenza tra un driver che dichiara l'impossibilità di eseguire SQL e uno
 che genera un errore `admin.executeSql is not a function` nel punto di chiamata.
 
-<span class="since-badge" data-since="0.25">Da 0.25</span> `executeSql` restituisce
+`executeSql` restituisce
 tutte le righe che legge. Per l'SQL di cui non controlli la dimensione, passa `maxResultBytes`:
 un risultato le cui righe occupano più byte di così viene rifiutato con un errore il cui
 `code` è `RESULT_TOO_LARGE`, mai restituito in parte. L'`EXECUTE_SQL` del socket

@@ -1,5 +1,5 @@
 ---
-sourceHash: f0cc4de3a8c82b82
+sourceHash: 1efb8010154baea9
 title: Entitätshistorie
 sidebar_label: Entitätshistorie
 description: Verfolgen Sie jede Änderung an Ihren Entitäten mit einem vollständigen Audit-Trail – wer hat was wann geändert, inklusive vollständigem Vorher-/Nachher-Zustand.
@@ -83,7 +83,7 @@ Bei einer Collection mit [Soft Delete](/docs/collections/soft-delete/) wird ein 
 
 ### Was `previous_values` enthält
 
-<span class="since-badge" data-since="0.25">Seit 0.25</span> Ein Update-Eintrag
+Ein Update-Eintrag
 behält in `previous_values` nur die Felder, die in `changed_fields` aufgeführt sind. Jedes
 andere Feld hatte vor und nach der Änderung denselben Wert und steht deshalb bereits in
 `values`; die ganze Zeile doppelt zu speichern kostete bei einer Ein-Feld-Änderung an einer
@@ -117,7 +117,7 @@ Die Aufbewahrung wird an zwei Stellen durchgesetzt:
   oder gelöscht wurde, entfernt der Server die Einträge dieser Entität, die über die neuesten
   200 hinausgehen oder älter als der Aufbewahrungszeitraum sind. Der Schreibvorgang wird dadurch
   nicht aufgehalten.
-- <span class="since-badge" data-since="0.25">Seit 0.25</span> **Einmal pro Stunde**,
+- **Einmal pro Stunde**,
   für jede Entität: Einträge, die älter als der Aufbewahrungszeitraum sind, werden gelöscht,
   unabhängig davon, wozu sie gehören — auch bei Entitäten, in die nie wieder geschrieben
   wird, etwa gelöschten. Siehe [Pruning-Lebenszyklusmechanik](#pruning-lebenszyklusmechanik).
@@ -180,7 +180,7 @@ Nach jeder Änderung, die der Server aufzeichnet, wird die geänderte Entität b
 
 Ein Schreibvorgang über [`openRebase` oder `rebase console`](/docs/backend/scripts/) zeichnet seinen History-Eintrag auf, bereinigt aber nichts, denn ein Skript kann nicht wissen, mit welcher Aufbewahrung Ihr Server konfiguriert ist. Der Server bereinigt diese Entität bei seinem nächsten Schreibvorgang darauf und im stündlichen Durchlauf weiter unten.
 
-<span class="since-badge" data-since="0.25">Seit 0.25</span> Einmal pro Stunde löscht das Backend zusätzlich jeden Eintrag, der älter als der Aufbewahrungszeitraum ist, von jeder Entität. Zuvor wurde die Historie einer Entität, in die nie wieder geschrieben wurde — jeder gelöschten —, überhaupt nicht bereinigt. Der Durchlauf:
+Einmal pro Stunde löscht das Backend zusätzlich jeden Eintrag, der älter als der Aufbewahrungszeitraum ist, von jeder Entität. Zuvor wurde die Historie einer Entität, in die nie wieder geschrieben wurde — jeder gelöschten —, überhaupt nicht bereinigt. Der Durchlauf:
 
 - läuft pro Stunde auf einer Instanz der Flotte, auf den Prozessen, die die geplanten Jobs ausführen (er beansprucht seine Stunde in `rebase.cron_claims`, wie es eine Cron-Ausführung tut), zum ersten Mal beim Start des Backends;
 - löscht in Batches von 5.000 Einträgen, je eine Anweisung, bis ein Batch kürzer ausfällt, und überspringt Einträge, die ein anderer Durchlauf hält — ein erster Durchlauf über einen großen Rückstand besteht also aus vielen kurzen Löschvorgängen, nicht aus einem langen;

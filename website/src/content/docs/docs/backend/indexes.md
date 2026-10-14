@@ -266,7 +266,7 @@ Both producers emit them, which matters because not every deployment runs
 
 ## Foreign keys are indexed for you
 
-<span class="since-badge" data-since="0.25">Since 0.25</span> Postgres creates the
+Postgres creates the
 index a foreign key *points at* — the target's primary key — and never one on
 the column *holding* it. Every read from the other side of a link filters on
 that column: a `hasMany` or `hasOne` include, a nested listing such as

@@ -103,7 +103,7 @@ image: {
 | `GET` | `/api/storage/file/*` | Retrieve a file — everything after `/file/` is the object key |
 | `GET` | `/api/storage/file/*?storageId=<key>` | Retrieve a file from a specific backend |
 | `GET` | `/api/storage/metadata/*` | Size, content type and custom metadata of one object, without its bytes, plus a short-lived download token when it is private |
-| `POST` | `/api/storage/metadata` | <span class="since-badge" data-since="0.25">Since 0.25</span> The same for up to 100 objects of one source: body `{ keys, storageId? }` |
+| `POST` | `/api/storage/metadata` | The same for up to 100 objects of one source: body `{ keys, storageId? }` |
 | `DELETE` | `/api/storage/file/*` | Delete a file |
 | `GET` | `/api/storage/list` | List objects under a prefix (`prefix`, `bucket`, `maxResults`, `pageToken`, `storageId`). A `maxResults` below 1, or a `pageToken` the source never issued, is `400 INVALID_LIST_OPTIONS` |
 | `POST` | `/api/storage/folder` | Create an empty folder marker |
@@ -126,7 +126,7 @@ is the exception, because its payload is the file — it answers the bytes, with
   "size": 48213, "updated": "2026-10-01T12:00:00.000Z", "contentType": "image/jpeg" } ], "prefixes": [] } }
 ```
 
-<span class="since-badge" data-since="0.25">Since 0.25</span> A listing describes each file it returns: its `size` in bytes and
+A listing describes each file it returns: its `size` in bytes and
 `updated`, when it was last written, on local storage, S3 and GCS, and its
 `contentType` on local storage and GCS. An S3 listing does not carry the type,
 so on S3 it is absent and `/api/storage/metadata/*` still says. A folder in
@@ -151,7 +151,7 @@ reads: an upload, a `POST /api/storage/folder` or a TUS upload naming any other
 bucket answers `404 UNKNOWN_STORAGE_SOURCE`, as the listing does. Local storage
 still creates a bucket on its first write.
 
-**Many objects at once.** <span class="since-badge" data-since="0.25">Since 0.25</span> `POST /api/storage/metadata` takes
+**Many objects at once.** `POST /api/storage/metadata` takes
 `{ "keys": ["photos/a.png", "photos/b.png"], "storageId": "media" }` — up to 100
 object paths of one source, each spelled as `GET /api/storage/metadata/<key>`
 takes it — and answers one entry per key:
@@ -206,7 +206,7 @@ neither said so.
 The admin panel's thumbnails of stored images use this endpoint: a table or card
 preview asks for a webp rendition about twice its rendered size (96–800px)
 rather than the original. SVG and GIF files are always shown as they are.
-`sharp` is optional: <span class="since-badge" data-since="0.25">Since 0.25</span>
+`sharp` is optional:
 without it a transform request gets the original, and the backend warns once to
 `pnpm add sharp` in `backend/` (on 0.24 it answers 500, and the panel shows originals).
 
@@ -297,7 +297,7 @@ STORAGE_MAX_FILE_SIZE__MEDIA=1073741824  # media: 1 GB
 How much of a file the server holds at once depends on the door.
 `POST /api/storage/upload` is one multipart body, which the server parses whole:
 three to five times the file in its memory. A resumable (TUS) upload holds one
-chunk at a time. <span class="since-badge" data-since="0.25">Since 0.25</span> `client.storage.putObject()` and the admin panel send a file
+chunk at a time. `client.storage.putObject()` and the admin panel send a file
 over 8 MiB the resumable way. See
 [Resumable uploads (TUS)](/docs/backend/storage-resumable-uploads/) for the
 protocol, what it answers and how it behaves across instances.
@@ -344,7 +344,7 @@ topics together.
 Each source is configured from the **same variable names carrying its own
 suffix**. The default source takes no suffix, so a single-bucket project keeps
 using the plain names above and needs to declare nothing at all, and declaring
-named buckets beside it does not change them (<span class="since-badge" data-since="0.25">Since 0.25</span>, [details](/docs/backend/multiple-sources/#which-bucket-receives-an-unqualified-upload)):
+named buckets beside it does not change them ([details](/docs/backend/multiple-sources/#which-bucket-receives-an-unqualified-upload)):
 
 ```bash
 S3_BUCKET=app-uploads             # (default)

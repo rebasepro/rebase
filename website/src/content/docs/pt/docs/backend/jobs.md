@@ -1,5 +1,5 @@
 ---
-sourceHash: 03c3a22014b05f70
+sourceHash: cf996dc5a52fc912
 title: Tarefas em Segundo Plano
 sidebar_label: Tarefas em Segundo Plano
 description: Uma fila de jobs durável, baseada em Postgres — trabalho que sobrevive a reinicializações, com novas tentativas usando backoff e falhas mantidas em vez de descartadas.
@@ -36,7 +36,7 @@ await initializeRebaseBackend({
 
 Desativado a menos que você solicite: um worker continua procurando trabalho enquanto o processo viver, o que não é um padrão que qualquer um escolheria. Ele precisa de um driver capaz de executar SQL — em um que não suporte (MongoDB), a fila fica indisponível e você é avisado na inicialização em vez de no primeiro enfileiramento.
 
-<span class="since-badge" data-since="0.25">Desde 0.25</span> Um worker ocioso não faz polling a cada dois segundos. Cada enfileiramento envia um
+Um worker ocioso não faz polling a cada dois segundos. Cada enfileiramento envia um
 `NOTIFY` no canal `rebase_jobs` quando é confirmado, e um worker que mantém um
 `LISTEN` nele reivindica na hora — um job enfileirado por outro processo (o papel
 `api`, outra réplica) começa em milissegundos, e um job com atraso começa quando
@@ -111,7 +111,7 @@ jobs: {
 O outro lado da moeda: um handler que aguarda um `fetch` que nunca responde segura seu
 slot de worker, e sua reivindicação, enquanto o processo viver — cinco deles e o
 worker não executa mais nada, enquanto o `/health` continua verde.
-<span class="since-badge" data-since="0.25">Desde 0.25</span> `timeoutMs`
+`timeoutMs`
 limita uma tentativa. No prazo final a tentativa falha — repetida enquanto restarem
 tentativas, como qualquer exceção —, seu slot é liberado e o `signal` do handler é
 abortado. Repasse o signal, para que o trabalho também pare; um handler que o ignora

@@ -1,5 +1,5 @@
 ---
-sourceHash: 85e444fd4d0f85a8
+sourceHash: b2aa1062d257415a
 title: Rebase unterstützt X nicht
 sidebar_label: Server erweitern
 description: Die serverseitige Erweiterungsleiter – Deklaration, Collection-Callback, benutzerdefinierte Funktion, eigene Routen, eigener Server, Eject – und was die einzelnen Stufen erreichen können und was nicht.
@@ -21,7 +21,7 @@ erreichen Ihr Projekt nicht mehr. Klettern Sie also nur so weit, wie Sie wirklic
 
 ## Die Leiter
 
-<span class="since-badge" data-since="0.25">Seit 0.25</span> `createRebaseBackend` auf
+`createRebaseBackend` auf
 Stufe 5 ist neu; unter 0.24 besteht diese Stufe nur aus dem Treiber.
 
 | # | Stufe | Erreicht | Erreicht **nicht** | Kosten dieser Stufe |
@@ -205,7 +205,6 @@ von einem Rebase-Router ausgeführt.
 
 **Geltungsbereich:** Der Prozess.
 
-<span class="since-badge" data-since="0.25">Seit 0.25</span>
 `initializeRebaseBackend` ist eine Abkürzung über einige öffentliche Aufrufe, und diese Stufe
 bedeutet, sie selbst aufzurufen. `createRebaseBackend` baut das Backend und bindet nichts ein,
 startet nichts und lauscht auf nichts. `backend.routes` enthält jede Routengruppe als
@@ -291,7 +290,7 @@ einen Type-Cast zu verwenden: Dieser Type-Guard macht den Unterschied aus zwisch
 explizit meldet, dass er kein SQL ausführen kann, und einem Fehler `admin.executeSql is not a function`
 am Aufrufort.
 
-<span class="since-badge" data-since="0.25">Seit 0.25</span> `executeSql` liefert
+`executeSql` liefert
 jede Zeile, die es liest. Übergeben Sie bei SQL, dessen Größe Sie nicht kontrollieren,
 `maxResultBytes`: Ein Ergebnis, dessen Zeilen mehr Bytes belegen, wird mit einem Fehler
 abgelehnt, dessen `code` `RESULT_TOO_LARGE` ist, und nie teilweise zurückgegeben. Das

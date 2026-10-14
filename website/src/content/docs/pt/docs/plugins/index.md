@@ -1,5 +1,5 @@
 ---
-sourceHash: c770e1b2f77d1d8d
+sourceHash: a0bd19745c59b12b
 title: Sistema de Plugins
 sidebar_label: Plugins
 description: Estenda o Rebase com plugins — injete componentes de UI, modifique coleções, adicione ações na barra de ferramentas e crie construtores de campos personalizados.
@@ -63,7 +63,6 @@ está na página de **[Slots](/docs/frontend/slots)**.
   nos dois casos.
 - `onUnmount()` é executado quando `<Rebase>` é desmontado.
 
-<span class="since-badge" data-since="0.25">Desde 0.25</span>
 `lifecycle.onCollectionChange` está obsoleto. Nada nunca o chamou, na 0.24
 ou antes. Um plugin que o define continua compilando, e o `<Rebase>` avisa uma vez por
 plugin. Para acompanhar as linhas de uma coleção, assine a partir de `onMount` e
@@ -176,7 +175,7 @@ function useMyPlugin(): RebasePlugin {
 
 ### Wrappers de campo de vários plugins
 
-<span class="since-badge" data-since="0.25">Desde 0.25</span> Na 0.24 o `wrap` de cada
+Na 0.24 o `wrap` de cada
 plugin recebia o campo integrado, e apenas o último wrapper
 retornado era renderizado.
 
@@ -226,7 +225,7 @@ a todo campo markdown, que continua o texto a partir do cursor. Ambos aparecem
 apenas onde o plugin está habilitado: o serviço se declara disponível e
 `getConfigForPath` (quando você passa um) permite a coleção. Um campo cujo
 `customProps.editorProps.aiController` nomeia um controlador próprio usa
-esse. <span class="since-badge" data-since="0.25">Desde 0.25</span> Outro plugin pode dar aos campos markdown um controlador da mesma forma, com
+esse. Outro plugin pode dar aos campos markdown um controlador da mesma forma, com
 `EditorAIControllerProvider` de `@rebasepro/cms` em um provider no escopo do formulário.
 
 ![Data enhancement](/img/data_enhancement.png)
@@ -332,7 +331,6 @@ export function App() {
 }
 ```
 
-<span class="since-badge" data-since="0.25">Desde 0.25</span>
 `hooks.modifyCollectionAsync` está obsoleto. Nada nunca o chamou, na 0.24
 ou antes. Um plugin que o define continua compilando, e o `<Rebase>` avisa uma vez por
 plugin. Use `modifyCollection`, como acima.

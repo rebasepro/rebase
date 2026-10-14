@@ -1,5 +1,5 @@
 ---
-sourceHash: 75953facb59d9645
+sourceHash: ead814d8414e0434
 title: "Rezept: Webhook-Integration"
 sidebar_label: Webhooks
 description: Verwenden Sie Entity-Callbacks, um Webhooks an externe Dienste zu senden, wenn sich Daten ändern, ohne die Transaktion des Schreibvorgangs offen zu halten.
@@ -91,7 +91,7 @@ einem Versuch mit dem Grund in die Dead-Letter-Ablage; alles andere wird wie jed
 
 `setCollectionCallbacks` **ersetzt** die Callbacks, die die Collection `orders`
 deklariert. Wenn sie welche deklariert, behalten Sie diese:
-<span class="since-badge" data-since="0.25">Seit 0.25</span> Übergeben Sie
+Übergeben Sie
 `composeCallbacks(declared, { afterSave })`, mit `composeCallbacks` aus
 `@rebasepro/server` und `declared` als den eigenen `callbacks` der Collection. Siehe
 [Callback-Sets kombinieren](/docs/collections/callbacks/#combining-callback-sets).
@@ -142,7 +142,7 @@ und sein `@rebasepro/server`-Import würden an jeden Besucher ausgeliefert und d
 
 Ein Absturz oder ein Deploy zwischen dem Commit und der Zustellung verliert das Ereignis. Jeder Webhook hat seine eigene
 Warteschlange, sodass ein ausgefallener Empfänger nur seine eigenen Zustellungen verzögert, nie die eines anderen Webhooks.
-<span class="since-badge" data-since="0.25">Seit 0.25</span> Die Warteschlange jedes Webhooks hält höchstens
+Die Warteschlange jedes Webhooks hält höchstens
 10.000 wartende Zustellungen; solange sie voll ist, wird eine neue Zustellung abgelehnt und an `onDelivery` gemeldet,
 mit `success: false`, `statusCode: 0`, `attemptNumber: 0` und `responseBody: "queue full"`, und
 das Server-Log sagt es einmal. Rufen Sie beim Herunterfahren `await dispatcher.flush(10_000)` auf: Es wartet auf das, was
@@ -212,7 +212,7 @@ Geben Sie niemals eine URL aus Ihrer Datenbank an ein nacktes `fetch`. Der Dispa
 Loopback-, Link-Local- und private Ziele sowie andere Schemata als `http(s)` ab, bevor er sich
 verbindet, und folgt keinen Weiterleitungen — genau deshalb, weil eine gespeicherte URL eine von
 Angreifern kontrollierte Eingabe ist.
-<span class="since-badge" data-since="0.25">Seit 0.25</span> Unter Node beurteilt er die Adresse, zu der jede
+Unter Node beurteilt er die Adresse, zu der jede
 Verbindung tatsächlich aufgebaut wird, innerhalb des eigenen DNS-Lookups der Verbindung, sodass ein Name, dessen Eintrag
 sich zwischen einer Prüfung und der Verbindung ändert, nicht daran vorbeischlüpfen kann; der Name eines Empfängers wird
 einmal pro Verbindung aufgelöst, nicht einmal pro Zustellung.

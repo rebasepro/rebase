@@ -1,5 +1,5 @@
 ---
-sourceHash: 5ea5126e8624cda2
+sourceHash: f2c1bc257cbc2dca
 title: Paginação
 sidebar_label: Paginação
 description: Pagine uma coleção com limit/offset, números de página ou um cursor keyset — e quando cada um deixa de ser correto.
@@ -24,7 +24,7 @@ if (page1.meta.hasMore) {
 const page = await client.data.products.find({ page: 2, limit: 20 });
 ```
 
-Use um ou outro. <span class="since-badge" data-since="0.25">Desde 0.25</span> `page` e `offset` juntos descrevem a mesma janela
+Use um ou outro. `page` e `offset` juntos descrevem a mesma janela
 duas vezes, e a leitura é recusada com `PAGE_WITH_OFFSET` em vez de aplicar
 silenciosamente `page`. O SDK a recusa antes de qualquer requisição, por HTTP, em processo e
 offline; o servidor responde com um 400 a uma requisição crua que envie os dois.
@@ -101,7 +101,7 @@ GET /api/data/orders?orderBy=createdAt:desc&limit=100&after=eyJrIjpbWyJ…
 
 #### Ignorando a contagem
 
-<span class="since-badge" data-since="0.25">Desde 0.25</span> `meta.total` é um `COUNT(*)` sobre todas as linhas que a consulta encontra, executado ao lado da
+`meta.total` é um `COUNT(*)` sobre todas as linhas que a consulta encontra, executado ao lado da
 página — e numa tabela grande custa mais do que a própria página. Uma leitura que só pagina para a frente nunca precisa dele, porque
 `meta.hasMore` não depende dele: passe `count: "none"` e a leitura pede uma linha além da página.
 

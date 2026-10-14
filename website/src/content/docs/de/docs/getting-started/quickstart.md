@@ -1,5 +1,5 @@
 ---
-sourceHash: dc4cb3811023b966
+sourceHash: 44951a600db63629
 title: Schnellstart
 sidebar_label: Schnellstart
 description: Erstellen Sie ein neues Rebase-Projekt und führen Sie es in weniger als 2 Minuten lokal aus.
@@ -70,7 +70,7 @@ Einen Port können Sie mit `rebase dev --port 3001` festlegen.
 | `--headless` | `init` | Ein Backend ohne Collection-Dateien und ohne UI — siehe [Nur Backend](/docs/getting-started/headless/) |
 | `--template <name>` | `init` | Von einer anderen Vorlage als der Standardvorlage starten |
 | `--install` / `--no-install` | `init` | Paketmanager automatisch ausführen oder überspringen |
-| `--docker` | `dev` | PostgreSQL in einem Container anstelle der verwalteten Version verwenden. <span class="since-badge" data-since="0.25">Seit 0.25</span> Die anderen Befehle folgen ihm, bis `rebase dev` ohne es läuft. Ein `DATABASE_URL` hat Vorrang: Dann startet es nichts und sagt das |
+| `--docker` | `dev` | PostgreSQL in einem Container anstelle der verwalteten Version verwenden. Die anderen Befehle folgen ihm, bis `rebase dev` ohne es läuft. Ein `DATABASE_URL` hat Vorrang: Dann startet es nichts und sagt das |
 | `--no-db` | `dev` | Gar keine Datenbank starten — weder den Container noch die verwaltete Version. Setzen Sie `DATABASE_URL` selbst |
 
 ## Variante: Eigene PostgreSQL-Instanz verwenden
@@ -89,7 +89,7 @@ Die Migrationsbefehle planen Änderungen mit [Atlas](https://atlasgo.io/), der S
 die Rebase zur Planung nutzt. Atlas benötigt eine zweite leere Datenbank für den Vergleich. Bei einer
 eigenen Datenbank legt Rebase eine daneben an; bei der verwalteten, die exakt eine Datenbank bereitstellt,
 startet es für die Dauer des Befehls eine wegwerfbare PGlite-Instanz.
-<span class="since-badge" data-since="0.25">Seit 0.25</span> Unter 0.24 verweigern die
+Unter 0.24 verweigern die
 Migrationsbefehle die verwaltete Datenbank und brauchen Ihre eigene. In beiden Fällen:
 
 ```bash
@@ -203,7 +203,7 @@ Spalte, ein eingeschränkter Typ, ein entferntes Feld:
 pnpm run db:push
 ```
 
-<span class="since-badge" data-since="0.25">Seit 0.25</span> Es läuft auf der verwalteten
+Es läuft auf der verwalteten
 Datenbank wie auf Ihrer eigenen. Unter 0.24 braucht es Ihr eigenes PostgreSQL.
 
 ## Referenz der Datenbankbefehle
@@ -216,7 +216,7 @@ Datenbank wie auf Ihrer eigenen. Unter 0.24 braucht es Ihr eigenes PostgreSQL.
 | `rebase db generate` | SQL-Migrationsdateien generieren |
 | `rebase db migrate` | Ausstehende Migrationen ausführen |
 
-<span class="since-badge" data-since="0.25">Seit 0.25</span> Die drei `db`-Befehle
+Die drei `db`-Befehle
 funktionieren auf der verwalteten Datenbank. Unter 0.24 brauchen sie Ihr eigenes PostgreSQL.
 
 ## Nächste Schritte

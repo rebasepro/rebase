@@ -1,5 +1,5 @@
 ---
-sourceHash: 3529ea341017acda
+sourceHash: 68b71012725d6c0d
 title: Archiviazione e file
 sidebar_label: Archiviazione
 description: Carica, scarica, elenca ed elimina file usando il modulo di archiviazione dell'SDK tipizzato di Rebase.
@@ -30,7 +30,7 @@ const result = await client.storage.putObject({
 // result: { key: string; bucket: string; storageUrl: string }
 ```
 
-<span class="since-badge" data-since="0.25">Da 0.25</span> Un file oltre 8 MiB sale attraverso l'endpoint
+Un file oltre 8 MiB sale attraverso l'endpoint
 riprendibile (TUS) del server, 8 MiB per richiesta, invece che come un'unica richiesta multipart che il server
 analizza per intero — così un caricamento grande costa al server un chunk di memoria, non da tre
 a cinque volte il file. Un chunk che fallisce lungo la strada viene inviato di nuovo da dove
@@ -86,7 +86,7 @@ const { url } = await client.storage.getSignedUrl(
 ```
 
 L'SDK memorizza nella cache gli URL firmati per evitare chiamate ridondanti al server, fino alla scadenza
-del token di download di ciascuno. <span class="since-badge" data-since="0.25">Da 0.25</span> Le ricerche fatte insieme — una pagina di anteprime
+del token di download di ciascuno. Le ricerche fatte insieme — una pagina di anteprime
 che chiama `getSignedUrl()` nello stesso tick — vanno al server come un solo
 `POST /api/storage/metadata` ogni 100 file, che il rate limiter conta come un
 decimo delle richieste che sostituisce; un file che un chiamante non può leggere fa fallire
@@ -122,7 +122,7 @@ un'immagine privata continua a funzionare indipendentemente da quanto tempo fa
 lasciato com'è. `storageReference(key, storageId?)` ne costruisce uno, per un
 testo che scrivi tu stesso.
 
-<span class="since-badge" data-since="0.25">Da 0.25</span> Un testo salvato prima che i riferimenti esistessero contiene l'URL di download
+Un testo salvato prima che i riferimenti esistessero contiene l'URL di download
 di un file privato, `…/storage/file/posts/cover.png?token=…`, il cui token è scaduto pochi minuti
 dopo la scrittura. `resolveStorageReferences` rinnova anche questi: il token
 nomina ancora l'oggetto, quindi l'URL viene sostituito da uno nuovo. Per memorizzare
@@ -190,7 +190,7 @@ if (result.nextPageToken) {
 }
 ```
 
-<span class="since-badge" data-since="0.25">Da 0.25</span> Ogni elemento porta la sua `size` in byte e `updated` (un
+Ogni elemento porta la sua `size` in byte e `updated` (un
 timestamp ISO 8601) su storage locale, S3 e GCS, e il suo `contentType` su storage locale
 e GCS — abbastanza per mostrare una cartella senza un `getSignedUrl()` per file. Un elenco
 S3 non ha il content type; le cartelle (`result.prefixes`) non portano nessuno dei

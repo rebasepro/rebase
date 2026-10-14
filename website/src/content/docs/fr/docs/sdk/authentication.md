@@ -1,5 +1,5 @@
 ---
-sourceHash: 8d6ce023558e141f
+sourceHash: 65085708df65a92e
 title: Authentification
 sidebar_label: Authentification
 description: Authentification côté client avec le SDK Rebase — connexion par e-mail/mot de passe, fournisseurs OAuth, gestion des sessions et écouteurs d'état d'authentification.
@@ -487,7 +487,7 @@ const client = createRebaseClient({
 
 ## Utiliser votre propre fournisseur d'authentification
 
-<span class="since-badge" data-since="0.25">Depuis 0.25</span> En 0.24, un getter de
+En 0.24, un getter de
 jeton n'authentifie que les requêtes HTTP, et le socket temps réel reste
 anonyme.
 

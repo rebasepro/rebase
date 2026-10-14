@@ -1,5 +1,5 @@
 ---
-sourceHash: 2bd46c60d468fb45
+sourceHash: 1c45110c48185387
 title: Estendere Rebase
 sidebar_label: Estendere Rebase
 description: Una guida alle decisioni per scegliere il giusto meccanismo di estensione — plugin, slot, override di componenti, viste entità, azioni e altro ancora.
@@ -216,7 +216,7 @@ Se ciò che desideri modificare riguarda il comportamento del server anziché ci
 
 ## Riepilogo delle precedenze
 
-- **`collection.components` si applica sopra i `components` globali** all'interno di quella collezione. Una sostituzione di collezione sostituisce entrambi; <span class="since-badge" data-since="0.25">Da 0.25</span> un override di collezione con `wrap: true` avvolge l'override globale quando esiste (su 0.24 avvolge il componente integrato, e l'override globale viene saltato). Vedi [Override dei componenti](/docs/frontend/component-overrides#when-both-scopes-override-a-component).
+- **`collection.components` si applica sopra i `components` globali** all'interno di quella collezione. Una sostituzione di collezione sostituisce entrambi; un override di collezione con `wrap: true` avvolge l'override globale quando esiste (su 0.24 avvolge il componente integrato, e l'override globale viene saltato). Vedi [Override dei componenti](/docs/frontend/component-overrides#when-both-scopes-override-a-component).
 - **Le `Actions` della collezione e lo slot `collection.actions` sono additivi** — le `Actions` vengono renderizzate per prime, seguite dai contributi dello slot.
 - **`entityActions` ed `entityViews` a livello di collezione estendono (non sostituiscono) quelli globali.**
-- **I plugin si applicano nell'ordine dell'array `plugins`**, non per `key`. I contributi agli slot vengono renderizzati in base al loro `order` (prima i valori più bassi, 50 per impostazione predefinita), e a parità di valore si mantiene quell'ordine. <span class="since-badge" data-since="0.25">Da 0.25</span> I wrapper di campo di più plugin si compongono in quell'ordine, con il primo plugin più all'interno; su 0.24 veniva renderizzato solo l'ultimo wrapper. Vedi [Plugin](/docs/plugins#field-wrappers-from-several-plugins).
+- **I plugin si applicano nell'ordine dell'array `plugins`**, non per `key`. I contributi agli slot vengono renderizzati in base al loro `order` (prima i valori più bassi, 50 per impostazione predefinita), e a parità di valore si mantiene quell'ordine. I wrapper di campo di più plugin si compongono in quell'ordine, con il primo plugin più all'interno; su 0.24 veniva renderizzato solo l'ultimo wrapper. Vedi [Plugin](/docs/plugins#field-wrappers-from-several-plugins).

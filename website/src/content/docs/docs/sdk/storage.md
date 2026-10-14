@@ -29,7 +29,7 @@ const result = await client.storage.putObject({
 // result: { key: string; bucket: string; storageUrl: string }
 ```
 
-<span class="since-badge" data-since="0.25">Since 0.25</span> A file over 8 MiB goes up through the server's resumable (TUS)
+A file over 8 MiB goes up through the server's resumable (TUS)
 endpoint, 8 MiB per request, instead of as one multipart request the server
 parses whole — so a large upload costs the server one chunk of memory, not three
 to five times the file. A chunk that fails on the way is sent again from where
@@ -85,7 +85,7 @@ const { url } = await client.storage.getSignedUrl(
 ```
 
 The SDK caches signed URLs to avoid redundant server calls, until each one's
-download token expires. <span class="since-badge" data-since="0.25">Since 0.25</span> Lookups made together — a page of previews
+download token expires. Lookups made together — a page of previews
 calling `getSignedUrl()` in the same tick — go to the server as one
 `POST /api/storage/metadata` per 100 files, which the rate limiter counts as a
 tenth of the requests it replaces; a file that one caller may not read fails
@@ -119,7 +119,7 @@ keeps working however long ago it was uploaded. A reference that names an
 object that no longer exists is left as it is. `storageReference(key,
 storageId?)` builds one, for text you write yourself.
 
-<span class="since-badge" data-since="0.25">Since 0.25</span> Text saved before references existed holds a private file's download URL
+Text saved before references existed holds a private file's download URL
 itself, `…/storage/file/posts/cover.png?token=…`, whose token expired minutes
 after it was written. `resolveStorageReferences` renews those too: the token
 still names the object, so the URL is replaced by a fresh one. To store
@@ -187,7 +187,7 @@ if (result.nextPageToken) {
 }
 ```
 
-<span class="since-badge" data-since="0.25">Since 0.25</span> Each item carries its `size` in bytes and `updated` (an ISO 8601
+Each item carries its `size` in bytes and `updated` (an ISO 8601
 timestamp) on local storage, S3 and GCS, and its `contentType` on local storage
 and GCS — enough to show a folder without a `getSignedUrl()` per file. An S3
 listing has no content type; folders (`result.prefixes`) carry none of the

@@ -1,5 +1,5 @@
 ---
-sourceHash: 3529ea341017acda
+sourceHash: 68b71012725d6c0d
 title: Stockage et fichiers
 sidebar_label: Stockage
 description: Téléverser, télécharger, lister et supprimer des fichiers à l'aide du module de stockage du SDK typé de Rebase.
@@ -30,7 +30,7 @@ const result = await client.storage.putObject({
 // result: { key: string; bucket: string; storageUrl: string }
 ```
 
-<span class="since-badge" data-since="0.25">Depuis 0.25</span> Un fichier de plus de 8 Mio est envoyé par le point de terminaison reprenable (TUS) du serveur, à raison de
+Un fichier de plus de 8 Mio est envoyé par le point de terminaison reprenable (TUS) du serveur, à raison de
 8 Mio par requête, au lieu d'une seule requête multipart que le serveur analyse en entier — un gros
 téléversement coûte donc au serveur un fragment de mémoire, et non trois à cinq fois le fichier. Un fragment
 qui échoue en route est renvoyé à partir de l'endroit où le serveur s'était arrêté. Le résultat, l'objet
@@ -85,7 +85,7 @@ const { url } = await client.storage.getSignedUrl(
 ```
 
 Le SDK met en cache les URL signées pour éviter les appels serveur redondants, jusqu'à l'expiration du
-jeton de téléchargement de chacune. <span class="since-badge" data-since="0.25">Depuis 0.25</span> Les recherches faites ensemble — une page d'aperçus qui appelle `getSignedUrl()` au même tick — partent vers le serveur sous la forme d'un seul `POST /api/storage/metadata` par tranche de 100 fichiers, que le limiteur de débit compte pour un dixième des requêtes qu'il remplace ; un fichier qu'un appelant n'a pas le droit de lire fait échouer cet appel seul. Le cache appartient à l'identifiant qui l'a demandé : lorsque le jeton
+jeton de téléchargement de chacune. Les recherches faites ensemble — une page d'aperçus qui appelle `getSignedUrl()` au même tick — partent vers le serveur sous la forme d'un seul `POST /api/storage/metadata` par tranche de 100 fichiers, que le limiteur de débit compte pour un dixième des requêtes qu'il remplace ; un fichier qu'un appelant n'a pas le droit de lire fait échouer cet appel seul. Le cache appartient à l'identifiant qui l'a demandé : lorsque le jeton
 d'accès change — une déconnexion, un autre utilisateur qui se connecte, une actualisation — il repart de zéro,
 de sorte qu'un utilisateur ne reçoit jamais une URL émise pour un autre.
 
@@ -108,7 +108,7 @@ const body = await resolveStorageReferences(String(post?.body ?? ""), client);
 
 Chaque objet est signé une fois par appel, depuis sa propre source, de sorte qu'une image privée continue de fonctionner quelle que soit l'ancienneté du téléversement. Une référence qui nomme un objet qui n'existe plus est laissée telle quelle. `storageReference(key, storageId?)` en construit une, pour un texte que vous écrivez vous-même.
 
-<span class="since-badge" data-since="0.25">Depuis 0.25</span> Un texte enregistré avant l'existence des références contient lui-même l'URL de téléchargement d'un fichier privé, `…/storage/file/posts/cover.png?token=…`, dont le token a expiré quelques minutes après son écriture. `resolveStorageReferences` renouvelle aussi celles-ci : le token nomme toujours l'objet, l'URL est donc remplacée par une URL fraîche. Pour stocker des références à la place, réécrivez le texte une fois avec `storageReferencesForDownloadUrls(text)`, qui laisse toutes les autres URL telles quelles.
+Un texte enregistré avant l'existence des références contient lui-même l'URL de téléchargement d'un fichier privé, `…/storage/file/posts/cover.png?token=…`, dont le token a expiré quelques minutes après son écriture. `resolveStorageReferences` renouvelle aussi celles-ci : le token nomme toujours l'objet, l'URL est donc remplacée par une URL fraîche. Pour stocker des références à la place, réécrivez le texte une fois avec `storageReferencesForDownloadUrls(text)`, qui laisse toutes les autres URL telles quelles.
 
 ## Télécharger un fichier
 
@@ -170,7 +170,7 @@ if (result.nextPageToken) {
 }
 ```
 
-<span class="since-badge" data-since="0.25">Depuis 0.25</span> Chaque élément porte sa `size` en octets et `updated` (un horodatage ISO 8601) sur le stockage local, S3 et
+Chaque élément porte sa `size` en octets et `updated` (un horodatage ISO 8601) sur le stockage local, S3 et
 GCS, et son `contentType` sur le stockage local et GCS — de quoi afficher un dossier sans un `getSignedUrl()`
 par fichier. Une liste S3 n'a pas de type de contenu ; les dossiers (`result.prefixes`) ne portent aucun des
 trois.

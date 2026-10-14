@@ -1,5 +1,5 @@
 ---
-sourceHash: 3702fa186011ca6b
+sourceHash: 2ab6f8f502363939
 title: Datei-Upload-Felder
 sidebar_label: Datei-Uploads
 description:"\"Deklarieren eines Datei- oder Bildfelds in einer Collection: der storage-Block, Einzel- und Mehrfach-Datei-Uploads und welche Optionen vom Panel statt vom Server aufgelöst werden.\""
@@ -139,7 +139,7 @@ ein neues Objekt schreibt, statt das alte zu überschreiben, und nichts entfernt
 Zeilen können denselben Schlüssel halten, daher kann das Panel nicht wissen, dass eine Datei ungenutzt
 ist. Objekte, auf die keine Zeile mehr verweist, bleiben im Bucket – und werden weiterhin abgerechnet
 –, bis Sie sie löschen: über Studios Storage-Browser, mit `client.storage.deleteObject(key)` oder mit
-einer Lifecycle-Regel auf dem Bucket. <span class="since-badge" data-since="0.25">Seit 0.25</span> `rebase storage orphans` listet die Dateien auf, die keine Zeile nennt, und löscht sie
+einer Lifecycle-Regel auf dem Bucket. `rebase storage orphans` listet die Dateien auf, die keine Zeile nennt, und löscht sie
 mit `--delete` — siehe [die CLI](/docs/cli/#rebase-storage).
 
 ### Eine Eigenschaft zu einer anderen Storage-Quelle verschieben

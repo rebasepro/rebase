@@ -162,7 +162,7 @@ more, and one was closed under it. Nothing was applied, so the command is safe
 to run again; the dev server closes idle connections after 30 seconds. If it
 keeps failing, stop `rebase dev` while you push.
 
-<span class="since-badge" data-since="0.25">Since 0.25</span> The push closes its
+The push closes its
 own connections before Atlas starts, which leaves Atlas room in the usual case,
 and the error says what happened. On 0.24 the first push after `rebase dev`
 starts often fails this way, with only the two lines above.

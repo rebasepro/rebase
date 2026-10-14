@@ -1,5 +1,5 @@
 ---
-sourceHash: 72190d7e15d46c15
+sourceHash: 5584cf0dc01c6497
 title: Despliegue
 sidebar_label: Despliegue
 description: Despliega tu proyecto Rebase a producción usando Docker, plataformas en la nube o configuraciones manuales.
@@ -295,7 +295,7 @@ también detiene la navegación dentro de la aplicación (un enlace del drawer, 
 de retroceso del navegador) y pregunta primero, mediante `useBlocker`, que solo un data router
 proporciona.
 
-<span class="since-badge" data-since="0.25">Desde 0.25</span> El panel también
+El panel también
 funciona bajo un simple `<BrowserRouter>`. Allí la protección contra cambios sin guardar
 recurre al aviso propio del navegador al abandonar la página, que cubre una recarga, cerrar la
 pestaña o escribir una URL; navegar dentro de la aplicación continúa sin preguntar. En

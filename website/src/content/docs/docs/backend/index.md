@@ -53,7 +53,7 @@ const instance = await initializeRebaseBackend({
 });
 ```
 
-<span class="since-badge" data-since="0.25">Since 0.25</span> That one call is
+That one call is
 a shortcut over public steps: `installUnhandledRejectionHandler` keeps a stray
 rejection from ending the process, `createRebaseBackend` builds the backend,
 `setDefaultBackend` makes it the one the module-level API answers for, and
@@ -287,13 +287,13 @@ instance.setCollectionCallbacks(slug, callbacks) // Replace a collection's callb
 instance.shutdown()          // Drain and stop; also closes the server it was given
 ```
 
-<span class="since-badge" data-since="0.25">Since 0.25</span> It also carries
+It also carries
 `rebase`, the in-process client, `fetch(request)`, `routes`, the route groups
 as Hono sub-apps, `services`, its own JWT keys, access model, API-key store and
 rate limiters, and `verifyCredential(token)`; see
 [Custom Server Integration](/docs/backend/custom-server/).
 
-> **Note:** While the `instance` exposes these internal services, application code (such as custom functions and cron jobs) should use the `rebase` singleton from `@rebasepro/server` to interact with the backend API. <span class="since-badge" data-since="0.25">Since 0.25</span> Inside a request, cron run or job, `rebase` is the backend serving it; elsewhere it is the process default, which `initializeRebaseBackend` sets to its backend.
+> **Note:** While the `instance` exposes these internal services, application code (such as custom functions and cron jobs) should use the `rebase` singleton from `@rebasepro/server` to interact with the backend API. Inside a request, cron run or job, `rebase` is the backend serving it; elsewhere it is the process default, which `initializeRebaseBackend` sets to its backend.
 
 ## REST API
 
@@ -326,7 +326,7 @@ that name, so an invented one does not fail: it silently matches nothing.
 
 ## WebSocket
 
-The WebSocket server attaches to the same HTTP server and provides real-time subscriptions. <span class="since-badge" data-since="0.25">Since 0.25</span> It answers upgrades on one path, `/` for an API at `/api`, where the SDK dials, and leaves every other path to your own `upgrade` listeners; on 0.24 it takes every upgrade on the server:
+The WebSocket server attaches to the same HTTP server and provides real-time subscriptions. It answers upgrades on one path, `/` for an API at `/api`, where the SDK dials, and leaves every other path to your own `upgrade` listeners; on 0.24 it takes every upgrade on the server:
 
 - Subscribe to **collection changes** — get notified when any entity in a collection is created, updated, or deleted
 - Subscribe to **entity changes** — get notified when a specific entity changes
@@ -367,7 +367,7 @@ envelope — a proxy's 413, a load balancer's 502 — still gets a `code` from i
 status (`PAYLOAD_TOO_LARGE`, `SERVICE_UNAVAILABLE`, `INTERNAL_ERROR`, …), and a
 client built outside a browser with no `baseUrl` fails with
 `BASE_URL_REQUIRED` rather than a network error.
-<span class="since-badge" data-since="0.25">Since 0.25</span> A read that gets a success
+A read that gets a success
 without the shape it reads — a `204`, an empty body, a page with no `data`
 list — fails with `UNEXPECTED_RESPONSE` instead of resolving as "no rows", and
 `createMany`, `updateMany`, `deleteMany` or `batch` given something other than

@@ -1,5 +1,5 @@
 ---
-sourceHash: c770e1b2f77d1d8d
+sourceHash: a0bd19745c59b12b
 title: Système de plugins
 sidebar_label: Plugins
 description: Étendez Rebase avec des plugins — injectez des composants d'interface, modifiez des collections, ajoutez des actions de barre d'outils et créez des constructeurs de champs personnalisés.
@@ -55,7 +55,6 @@ Chacun de ces éléments est optionnel à l'exception de `key`. La liste complè
 - `onAuthStateChange(user)` s'exécute à chaque changement d'utilisateur ultérieur : avec le nouvel utilisateur lors d'une connexion, avec `null` lors d'une déconnexion. Le plugin reste monté dans les deux cas.
 - `onUnmount()` s'exécute lorsque `<Rebase>` est démonté.
 
-<span class="since-badge" data-since="0.25">Depuis 0.25</span>
 `lifecycle.onCollectionChange` est déprécié. Rien ne l'a jamais appelé, en 0.24
 comme avant. Un plugin qui le définit compile toujours, et `<Rebase>` avertit une seule fois par
 plugin. Pour suivre les lignes d'une collection, abonnez-vous depuis `onMount` et
@@ -158,7 +157,7 @@ function useMyPlugin(): RebasePlugin {
 
 ### Wrappers de champ de plusieurs plugins
 
-<span class="since-badge" data-since="0.25">Depuis 0.25</span> En 0.24, le `wrap` de chaque
+En 0.24, le `wrap` de chaque
 plugin recevait le champ intégré, et seul le dernier wrapper renvoyé
 était affiché.
 
@@ -205,7 +204,7 @@ import { useDataEnhancementPlugin } from "@rebasepro/plugin-ai";
 const enhancementPlugin = useDataEnhancementPlugin();
 ```
 
-Il ajoute une action Autofill à chaque formulaire, et une commande slash **Autocomplete** à chaque champ markdown, qui poursuit le texte à partir du curseur. Les deux n'apparaissent que là où le plugin est activé : le service se déclare disponible et `getConfigForPath` (si vous en passez un) autorise la collection. Un champ dont `customProps.editorProps.aiController` nomme un contrôleur qui lui est propre utilise celui-là. <span class="since-badge" data-since="0.25">Depuis 0.25</span> Un autre plugin peut donner un contrôleur aux champs markdown de la même façon, avec `EditorAIControllerProvider` de `@rebasepro/cms` dans un fournisseur limité au formulaire.
+Il ajoute une action Autofill à chaque formulaire, et une commande slash **Autocomplete** à chaque champ markdown, qui poursuit le texte à partir du curseur. Les deux n'apparaissent que là où le plugin est activé : le service se déclare disponible et `getConfigForPath` (si vous en passez un) autorise la collection. Un champ dont `customProps.editorProps.aiController` nomme un contrôleur qui lui est propre utilise celui-là. Un autre plugin peut donner un contrôleur aux champs markdown de la même façon, avec `EditorAIControllerProvider` de `@rebasepro/cms` dans un fournisseur limité au formulaire.
 
 ![Data enhancement](/img/data_enhancement.png)
 
@@ -300,7 +299,6 @@ export function App() {
 }
 ```
 
-<span class="since-badge" data-since="0.25">Depuis 0.25</span>
 `hooks.modifyCollectionAsync` est déprécié. Rien ne l'a jamais appelé, en 0.24
 comme avant. Un plugin qui le définit compile toujours, et `<Rebase>` avertit une seule fois par
 plugin. Utilisez `modifyCollection` comme ci-dessus.

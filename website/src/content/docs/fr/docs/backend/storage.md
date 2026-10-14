@@ -1,5 +1,5 @@
 ---
-sourceHash: 912fb4a5c0d6c740
+sourceHash: cc1736a186791d89
 title: Configuration du stockage
 sidebar_label: Configuration du stockage
 description: Configurez les backends de stockage sur système de fichiers local, compatible S3 ou GCS/Firebase Storage pour les téléversements de fichiers, les images et les médias.
@@ -104,7 +104,7 @@ image: {
 | `GET` | `/api/storage/file/*` | Récupérer un fichier — tout ce qui suit `/file/` est la clé de l'objet |
 | `GET` | `/api/storage/file/*?storageId=<key>` | Récupérer un fichier depuis un backend spécifique |
 | `GET` | `/api/storage/metadata/*` | Taille, type de contenu et métadonnées personnalisées d'un objet, sans ses octets, plus un jeton de téléchargement à courte durée de vie lorsqu'il est privé |
-| `POST` | `/api/storage/metadata` | <span class="since-badge" data-since="0.25">Depuis la version 0.25</span> La même chose pour un maximum de 100 objets d'une même source : corps `{ keys, storageId? }` |
+| `POST` | `/api/storage/metadata` | La même chose pour un maximum de 100 objets d'une même source : corps `{ keys, storageId? }` |
 | `DELETE` | `/api/storage/file/*` | Supprimer un fichier |
 | `GET` | `/api/storage/list` | Lister les objets sous un préfixe (`prefix`, `bucket`, `maxResults`, `pageToken`, `storageId`). Un `maxResults` inférieur à 1, ou un `pageToken` jamais émis par la source, renvoie `400 INVALID_LIST_OPTIONS` |
 | `POST` | `/api/storage/folder` | Créer un marqueur de dossier vide |
@@ -127,7 +127,7 @@ est l'exception, car sa charge utile est le fichier lui-même — il renvoie les
   "size": 48213, "updated": "2026-10-01T12:00:00.000Z", "contentType": "image/jpeg" } ], "prefixes": [] } }
 ```
 
-<span class="since-badge" data-since="0.25">Depuis la version 0.25</span> Un listing décrit chaque fichier retourné : sa taille `size` en octets et
+Un listing décrit chaque fichier retourné : sa taille `size` en octets et
 `updated`, date de sa dernière écriture, sur le stockage local, S3 et GCS, ainsi que son
 `contentType` sur le stockage local et GCS. Un listing S3 ne transporte pas le type,
 il est donc absent sur S3 et `/api/storage/metadata/*` continue de le fournir. Un dossier dans
@@ -152,7 +152,7 @@ qu'en lecture : un téléversement, un `POST /api/storage/folder` ou un téléve
 bucket répond `404 UNKNOWN_STORAGE_SOURCE`, tout comme le listing. Le stockage local
 crée quant à lui toujours un bucket lors de sa première écriture.
 
-**Plusieurs objets à la fois.** <span class="since-badge" data-since="0.25">Depuis la version 0.25</span> `POST /api/storage/metadata` accepte
+**Plusieurs objets à la fois.** `POST /api/storage/metadata` accepte
 `{ "keys": ["photos/a.png", "photos/b.png"], "storageId": "media" }` — jusqu'à 100
 chemins d'objets d'une même source, chacun formaté comme `GET /api/storage/metadata/<key>`
 le requiert — et renvoie une entrée par clé :
@@ -207,7 +207,7 @@ qu'aucun message ne le signale.
 Les miniatures d'images stockées dans le panneau d'administration utilisent ce point de terminaison : un aperçu
 sous forme de tableau ou de carte demande un rendu webp environ deux fois supérieur à sa taille affichée (96–800px)
 plutôt que l'original. Les fichiers SVG et GIF sont toujours affichés tels quels.
-`sharp` est facultatif : <span class="since-badge" data-since="0.25">Depuis 0.25</span>
+`sharp` est facultatif :
 sans lui, une demande de transformation reçoit l'original, et le backend avertit une fois de
 lancer `pnpm add sharp` dans `backend/` (en 0.24, elle répond 500, et le panneau affiche les originaux).
 
@@ -298,7 +298,7 @@ STORAGE_MAX_FILE_SIZE__MEDIA=1073741824  # media: 1 GB
 La quantité de données qu'un serveur garde en mémoire à la fois dépend du point d'entrée.
 `POST /api/storage/upload` constitue un corps multipart complet que le serveur traite en entier :
 trois à cinq fois la taille du fichier dans sa mémoire. Un téléversement avec reprise (TUS) ne conserve qu'un
-fragment à la fois. <span class="since-badge" data-since="0.25">Depuis la version 0.25</span> `client.storage.putObject()` et le panneau d'administration envoient les fichiers
+fragment à la fois. `client.storage.putObject()` et le panneau d'administration envoient les fichiers
 de plus de 8 Mio via le protocole avec reprise. Consultez
 [Téléversements avec reprise (TUS)](/docs/backend/storage-resumable-uploads/) pour découvrir le
 protocole, ce qu'il renvoie et son comportement à travers plusieurs instances.
@@ -345,7 +345,7 @@ topics.
 Chaque source est configurée à partir des **mêmes noms de variables portant leur propre
 suffixe**. La source par défaut ne prend aucun suffixe, ainsi un projet à bucket unique continue
 d'utiliser les noms simples ci-dessus sans rien devoir déclarer, et déclarer des buckets nommés à côté
-ne les change pas (<span class="since-badge" data-since="0.25">Depuis 0.25</span>, [détails](/docs/backend/multiple-sources/#which-bucket-receives-an-unqualified-upload)) :
+ne les change pas ([détails](/docs/backend/multiple-sources/#which-bucket-receives-an-unqualified-upload)) :
 
 ```bash
 S3_BUCKET=app-uploads             # (default)

@@ -71,13 +71,13 @@ rather than accepting it and validating half of it.
 - Blocks auto-generated secrets in production — you must set them explicitly.
 - Validates that `CORS_ORIGINS` or `FRONTEND_URL` is set in production.
 - Refuses an `extend` schema built by a different copy of zod.
-- Throws an `Error` naming each variable that is missing or wrong, such as `DATABASE_URL: is required`, with zod's issues on its `issues` property. <span class="since-badge" data-since="0.25">Since 0.25</span> On 0.24 it throws zod's own `ZodError`, which names no variable when nothing catches it.
+- Throws an `Error` naming each variable that is missing or wrong, such as `DATABASE_URL: is required`, with zod's issues on its `issues` property. On 0.24 it throws zod's own `ZodError`, which names no variable when nothing catches it.
 
 See `.env.example` in the scaffolded app for the full list of supported variables.
 
 ## One step under `initializeRebaseBackend`
 
-<span class="since-badge" data-since="0.25">Since 0.25</span> On 0.24,
+On 0.24,
 `initializeRebaseBackend` is the only way in, and none of the pieces below is
 exported.
 
@@ -237,8 +237,6 @@ SDK dials, because it connects to its `baseUrl` while its HTTP requests go to
 
 ### What creating a backend may change: `provision`
 
-<span class="since-badge" data-since="0.25">Since 0.25</span>
-
 Creating a backend can run DDL, so `createRebaseBackend` asks you to decide:
 
 | `provision` | Creates | For |
@@ -254,8 +252,6 @@ decided what exists. `REBASE_MIGRATE_ON_BOOT=none` still turns the collection
 schema off for any backend in the process.
 
 ## Mounting only the groups you want
-
-<span class="since-badge" data-since="0.25">Since 0.25</span>
 
 `backend.routes` holds the route groups. Each one is a Hono sub-app you can
 mount on its own, at any path:
@@ -273,7 +269,7 @@ app.route("/hooks", backend.routes.functions());   // getUser(c) and getDriver(c
 
 `collections` is the array a scaffold's `config/collections/index.ts` exports. It carries that index's `defaultSecurityRules`, as `collectionsDir` does, so the backend provisions the policies `rebase db push` would. An array of your own carries only the rules its collections declare, and `provision: true` makes one that declares none admin-only, dropping the policies Rebase generated for it earlier, on every server that shares the database.
 
-<span class="since-badge" data-since="0.25">Since 0.25</span> The scaffold's index applies the defaults to its array. In a project scaffolded on 0.24, copy that loop from a new scaffold's `config/collections/index.ts`, or pass `collectionsDir`.
+The scaffold's index applies the defaults to its array. In a project scaffolded on 0.24, copy that loop from a new scaffold's `config/collections/index.ts`, or pass `collectionsDir`.
 
 | Group | Normally at | Serves |
 |---|---|---|
@@ -307,8 +303,6 @@ Every call returns a fresh router over the same handlers, so you can mount a gro
 
 ## The backend without a server
 
-<span class="since-badge" data-since="0.25">Since 0.25</span>
-
 A backend you have built can be used without mounting anything.
 `backend.rebase` is its in-process client, and `backend.fetch(request)`
 answers a `Request` as `mount()` would at `/api`:
@@ -332,7 +326,7 @@ opens the database without building a backend at all.
 
 ## Several backends in one process
 
-<span class="since-badge" data-since="0.25">Since 0.25</span> On 0.24 the JWT
+On 0.24 the JWT
 configuration, the access model, the API-key store, the rate-limit store and
 `rebase` are process globals, and the last backend built wins all of them.
 
@@ -395,15 +389,15 @@ const payload = await jwt.verifyAccessToken(token);
 
 A minted session is checked like any other on every request, so its uid has to be a user that exists: for a uid with no user the request is refused.
 
-<span class="since-badge" data-since="0.25">Since 0.25</span> `verifyCredential` reaches the verdict the routes reach: a session its owner signed out of, a uid with no user and a disabled account come back null, and the roles are the ones the account holds now. It throws when the database cannot be reached. On 0.24 it checks the signature only, and reads the roles off the token.
+`verifyCredential` reaches the verdict the routes reach: a session its owner signed out of, a uid with no user and a disabled account come back null, and the roles are the ones the account holds now. It throws when the database cannot be reached. On 0.24 it checks the signature only, and reads the roles off the token.
 
 Every route group sets `c.var.services` itself. A route outside the groups that uses `requireAuth`, `requireScope` or another guard from `@rebasepro/server` reads it there, and falls back to the process default when it is unset. `requireScope` judges the caller `requireAuth` identified, so it goes after `requireAuth`: on its own it refuses every request with a 401. It takes a built-in scope, or an app scope the backend declares under `auth.scopes` on its users collection, as in the comment above.
 
-<span class="since-badge" data-since="0.25">Since 0.25</span> A name that is not a scope, or a misspelt built-in one such as `data:raed`, throws where the route is registered. An app scope the backend answering does not declare answers every caller, an administrator too, `500 SCOPE_NOT_DECLARED`. On 0.24 both answer every caller `403 SCOPE_MISSING`.
+A name that is not a scope, or a misspelt built-in one such as `data:raed`, throws where the route is registered. An app scope the backend answering does not declare answers every caller, an administrator too, `500 SCOPE_NOT_DECLARED`. On 0.24 both answer every caller `403 SCOPE_MISSING`.
 
 ## Shutting down
 
-<span class="since-badge" data-since="0.25">Since 0.25</span> A backend from
+A backend from
 `createRebaseBackend` is new; the rest of this section holds for 0.24 too.
 
 From `initializeRebaseBackend`, hand the backend to the built-in helper rather
@@ -436,7 +430,7 @@ npm install @rebasepro/server-postgres @rebasepro/types express pg drizzle-orm
 
 ### 2. Opening the driver and the socket
 
-<span class="since-badge" data-since="0.25">Since 0.25</span> `openPostgresDriver`
+`openPostgresDriver`
 and `postgresDriverConfigFromEnv` are exported. On 0.24, open the driver with
 `createPostgresBootstrapper(pgConfig).initializeDriver(…)`, whose `internals` is
 untyped.
@@ -549,7 +543,7 @@ It creates no collection table, so against a database without one `POST /api/pro
 ### Read Replica Connections
 Set `readConnectionString` on the driver config, or the `DATABASE_READ_URL` environment variable, which the server's boot and `postgresDriverConfigFromEnv` read into it, and the driver opens a second connection pool against your read replica, under `internals.readDb`. Reads go to the replica; writes stay on the primary.
 
-<span class="since-badge" data-since="0.25">Since 0.25</span> The `readConnectionString` option is honoured. On 0.24 it was declared and ignored, and only `DATABASE_READ_URL` worked.
+The `readConnectionString` option is honoured. On 0.24 it was declared and ignored, and only `DATABASE_READ_URL` worked.
 
 ### Drizzle Integration
 You do not have to choose between Rebase and Drizzle. The driver compiles your schemas dynamically, and `internals.db` is the Drizzle `NodePgDatabase` client, typed, for raw SQL or type-safe Drizzle builders alongside Rebase's REST services.
@@ -576,7 +570,7 @@ app.use(cors({
 }));
 ```
 
-<span class="since-badge" data-since="0.25">Since 0.25</span> `CORS_EXPOSED_HEADERS` is the list the runtime itself exposes, so a
+`CORS_EXPOSED_HEADERS` is the list the runtime itself exposes, so a
 header the SDK starts reading in a later version reaches your frontend without
 a change here. It is `ETag`, `Retry-After`, `X-Request-ID`, the three
 `X-RateLimit-*` headers and `Preference-Applied`, plus `Location`,

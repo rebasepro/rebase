@@ -1,5 +1,5 @@
 ---
-sourceHash: e20c62e3ffffe67b
+sourceHash: dd99ad3524029bf5
 title: Divisão em vários processos
 sidebar_label: Processos Divididos
 description: Execute um bundle como vários processos cooperantes — uma API, uma camada de funções, um worker — a partir da mesma imagem de runtime publicada, para que uma função customizada pesada deixe de concorrer com a API de dados.
@@ -36,7 +36,7 @@ REBASE_ROLE=all        # the default: everything, one process
 
 Health e métricas estão em todas as roles, sem exceção. Um processo que um orquestrador não consegue sondar é um processo que ele não consegue atualizar.
 
-<span class="since-badge" data-since="0.25">Desde 0.25</span> O `GET /api/auth/config`,
+O `GET /api/auth/config`,
 o que a tela de login lê, segue o resto de `/api/auth`: apenas `api` e
 `all` o servem. Na 0.24 um processo `functions` ou `worker` também o respondia.
 
@@ -113,7 +113,7 @@ REBASE_MIGRATE_ON_BOOT=none
 
 Isso é **obrigatório**, não recomendação: um processo `functions` ou `worker` deixado no valor padrão se recusa a iniciar, e emite um aviso sobre isso. O comando `CREATE … IF NOT EXISTS` lê o catálogo e depois escreve nele como duas etapas separadas, portanto processos inicializando juntos colidem — e uma implantação em que vários processos disputam para provisionar o mesmo schema não é algo planejado por ninguém.
 
-<span class="since-badge" data-since="0.25">Desde 0.25</span> Em um
+Em um
 [servidor customizado](/docs/backend/custom-server/), a mesma decisão é a opção
 `provision` do `createRebaseBackend`: `true` no processo que é dono do schema, e
 `{ collections: false, realtime: false }` em todos os outros, que ainda mantêm as
@@ -178,7 +178,7 @@ split: true
 functions:
   enabled: true
   image:
-    tag: "0.24.0"     # this unit only; the rest stay on the release-wide tag
+    tag: "0.25.0"     # this unit only; the rest stay on the release-wide tag
 ```
 
 Geralmente, vale a pena fixar apenas a tag: o repositório é herdado, então trata-se de um projeto e uma imagem com uma unidade modificada. O `bundleUrl` cumpre a mesma função quando `bundle.mode: url`.

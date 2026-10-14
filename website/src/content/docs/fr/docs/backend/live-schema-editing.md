@@ -1,5 +1,5 @@
 ---
-sourceHash: 8bd32575d082fb6c
+sourceHash: 6cfa40d6d7fc1902
 title: Édition de schéma en direct
 description: Créez et modifiez des collections sur un backend en cours d'exécution — d'abord validé dans votre dépôt, puis appliqué.
 ---
@@ -158,7 +158,7 @@ Sur la 0.23 le commit porte aussi `drizzle/schema.sql`, `drizzle/policies.sql` e
 
 Le message de commit décrit la modification plutôt que d'en annoncer une, et est attribué à la personne qui l'a effectuée, par le nom d'affichage et l'e-mail de son compte
 (un utilisateur qui n'a ni l'un ni l'autre est commité sous `<uid>@users.noreply.rebase.pro`).
-<span class="since-badge" data-since="0.25">Depuis 0.25</span> En 0.24, les commits de l'authentification intégrée portent l'uid comme nom.
+En 0.24, les commits de l'authentification intégrée portent l'uid comme nom.
 
 Une modification de schéma avec un auteur et un diff dans l'historique de votre projet est une chose que ni Firebase ni Supabase ne vous offrent — leurs modifications de tables sont invisibles pour votre dépôt.
 

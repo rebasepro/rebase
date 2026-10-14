@@ -1,5 +1,5 @@
 ---
-sourceHash: 0066572f94396839
+sourceHash: 51ddecad0855d078
 title: Apenas backend (headless)
 sidebar_label: Apenas backend
 description: Execute o Rebase como um Backend-as-a-Service headless sobre o seu próprio PostgreSQL — uma API REST, autenticação, storage e realtime, sem painel administrativo e sem arquivos de coleções.
@@ -112,7 +112,7 @@ Os arquivos são gerados em `config/collections/`. A partir desse ponto, o proje
 a ter coleções no código e a introspecção no momento da inicialização deixa de ser o
 que define a API.
 
-<span class="since-badge" data-since="0.25">Desde 0.25</span> O scaffold headless
+O scaffold headless
 instala o Atlas em `backend/`, então `rebase db push`, `rebase db generate` e
 `pnpm run db:migrate` funcionam com essas coleções como em qualquer projeto. Na 0.24
 cada um deles para em "The atlas binary is missing"; adicione-o ao backend com
@@ -172,7 +172,7 @@ Três coisas resolvem isso, na ordem em que vale a pena verificar:
    ou um arquivo de coleção acompanhado de `rebase db push` — e reinicie.
 2. **As tabelas não têm a row-level security habilitada**, então a inicialização as
    ignorou. O log de boot informa o nome de cada uma, com o SQL. Habilite-a e adicione
-   uma policy, como mostrado acima. <span class="since-badge" data-since="0.25">Desde 0.25</span>
+   uma policy, como mostrado acima.
    A resposta também diz isso: a mensagem nomeia as tabelas e traz o
    `ALTER TABLE … ENABLE ROW LEVEL SECURITY` para elas, e
    `details.unprotectedTables` as lista. Na 0.24 ela diz que o banco de dados não tem

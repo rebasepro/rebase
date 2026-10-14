@@ -1,5 +1,5 @@
 ---
-sourceHash: 10cf48a2f2326c5a
+sourceHash: d0d64eef975c9c59
 title: Scripts y la consola
 sidebar_label: Scripts y la consola
 description: Abre los datos de un proyecto desde un script, una prueba o un REPL con openRebase, o desde la terminal con rebase console. Sin servidor, sin cambios de esquema.
@@ -7,7 +7,7 @@ description: Abre los datos de un proyecto desde un script, una prueba o un REPL
 
 ## Visión general
 
-<span class="since-badge" data-since="0.25">Desde 0.25</span> En 0.24 no existe
+En 0.24 no existe
 `openRebase` ni `rebase console`: un script tiene que construir un backend, o
 llamar a la API REST de un servidor en ejecución.
 
@@ -28,8 +28,6 @@ servidor, `dataAsAdmin` y `sql`, de modo que un fragmento de código pasa sin ca
 y la consola.
 
 ## `rebase console`
-
-<span class="since-badge" data-since="0.25">Desde 0.25</span>
 
 Ejecútala en tu proyecto:
 
@@ -66,8 +64,6 @@ valores solo se colorean en una terminal. Todo lo que la consola registra va a s
 
 ### Un solo fragmento: `--eval`
 
-<span class="since-badge" data-since="0.25">Desde 0.25</span>
-
 `rebase console -e "<code>"` ejecuta un fragmento de código en lugar del REPL. El valor
 de una expresión, o el `return` del cuerpo de una función, se espera con `await` y se imprime como
 JSON en stdout, de modo que la salida se puede canalizar (pipe):
@@ -82,7 +78,7 @@ Todo lo que la consola registra, diga lo que diga `LOG_LEVEL`, va a stderr, de m
 stdout contiene el resultado y nada más. Un fragmento que lanza un error imprime el error
 en stderr y termina con código `1`.
 
-<span class="since-badge" data-since="0.25">Desde 0.25</span> Una base de datos que la
+Una base de datos que la
 consola no puede abrir se notifica una sola vez, y termina con código `1`: el aviso
 "Cannot connect to PostgreSQL" que imprimen los comandos `db`, o, en la base de
 datos de desarrollo gestionada, que no le queda ninguna conexión libre. Esa base de
@@ -102,8 +98,6 @@ de JSON.
 | `--docker` | Usa la base de datos de docker compose, iniciándola si hace falta |
 
 ## `openRebase`
-
-<span class="since-badge" data-since="0.25">Desde 0.25</span>
 
 `openRebase` de `@rebasepro/server-postgres` es lo que llama la consola. Úsalo
 en un script, un seed, una corrección de datos o una prueba. En un proyecto scaffold,
@@ -156,7 +150,7 @@ Sus opciones:
 tu script, y ajustes como `REBASE_DB_POOL_MAX` o `REALTIME_CDC` no cambian
 nada aquí.
 
-<span class="since-badge" data-since="0.25">Desde 0.25</span> Al abrirse no registra
+Al abrirse no registra
 nada en `info`, así que el stdout de un script contiene lo que imprime el script, y
 `tsx scripts/report.ts > report.json` escribe solo su JSON. Los avisos y errores
 van a stderr en desarrollo. La nota sobre cómo se aíslan las solicitudes (`RLS
@@ -176,8 +170,6 @@ un helper que recibe uno. Sin ninguno de los dos, las filas no tienen tipo, por 
 primer ejemplo convierte `draft.id` con `String()`.
 
 ### Comprobar qué puede ver un usuario
-
-<span class="since-badge" data-since="0.25">Desde 0.25</span>
 
 `withAuth` es la forma más rápida de probar una regla de seguridad con datos reales. El
 scaffold del blog, el predeterminado de `rebase init`, da a todas las colecciones las
@@ -226,8 +218,6 @@ sin filtrar. Ejecuta antes `rebase db push`, o arranca el servidor una vez.
 
 ### En una prueba
 
-<span class="since-badge" data-since="0.25">Desde 0.25</span>
-
 ```typescript
 import { after, before, test } from "node:test";
 import assert from "node:assert/strict";
@@ -261,8 +251,6 @@ Lo mismo funciona con Vitest o Jest.
 
 ### Colecciones con historial
 
-<span class="since-badge" data-since="0.25">Desde 0.25</span>
-
 Una escritura en una colección con [`history: true`](/docs/backend/history/) registra
 su entrada igual que lo hace una escritura del servidor. La entrada se escribe en la
 transacción de la propia fila, así que una escritura que se revierte no deja ninguna
@@ -283,8 +271,6 @@ un script no puede ver, así que el servidor las purga como de costumbre: cuando
 a escribir la entidad, y en su barrido horario.
 
 ### Lo que deja fuera
-
-<span class="since-badge" data-since="0.25">Desde 0.25</span>
 
 `openRebase` abre la capa de datos y nada más. No inicia realtime, así que
 sus escrituras no se anuncian a las consultas en vivo.

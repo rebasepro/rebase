@@ -88,7 +88,7 @@ after one attempt with the reason; anything else is retried like any job. See
 
 `setCollectionCallbacks` **replaces** the callbacks the `orders` collection
 declares. If it declares some, keep them:
-<span class="since-badge" data-since="0.25">Since 0.25</span> pass
+pass
 `composeCallbacks(declared, { afterSave })`, with `composeCallbacks` from
 `@rebasepro/server` and `declared` the collection's own `callbacks`. See
 [Combining callback sets](/docs/collections/callbacks/#combining-callback-sets).
@@ -139,7 +139,7 @@ and its `@rebasepro/server` import would ship to every visitor, and fail the adm
 
 A crash or a deploy between the commit and the delivery drops the event. Each webhook has its own
 queue, so a receiver that is down delays only its own deliveries, never another webhook's.
-<span class="since-badge" data-since="0.25">Since 0.25</span> Each webhook's queue holds at most
+Each webhook's queue holds at most
 10,000 deliveries waiting; while it is full, a new delivery is refused and reported to `onDelivery`
 with `success: false`, `statusCode: 0`, `attemptNumber: 0` and `responseBody: "queue full"`, and
 the server log says so once. Call `await dispatcher.flush(10_000)` on shutdown: it waits for what
@@ -207,7 +207,7 @@ const callbacks: CollectionCallbacks<Order> = {
 Never put a URL that came from your database into a bare `fetch`. The dispatcher rejects loopback,
 link-local, private and non-`http(s)` destinations before it connects, and refuses to follow
 redirects, precisely because a stored URL is attacker-controlled input.
-<span class="since-badge" data-since="0.25">Since 0.25</span> On Node it judges the address each
+On Node it judges the address each
 connection is actually made to, inside the connection's own DNS lookup, so a name whose record
 changes between a check and the connection cannot slip past it; a receiver's name is resolved
 once per connection, not once per delivery.

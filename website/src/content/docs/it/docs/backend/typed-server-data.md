@@ -1,5 +1,5 @@
 ---
-sourceHash: c098315f51933896
+sourceHash: b40368f94c74dfb6
 title: Dati lato server tipizzati
 sidebar_label: Dati lato server tipizzati
 description: "Registra una volta il tuo tipo Database generato, e context.data, rebase.dataAsAdmin e il rebase che una function o un cron riceve sono tipizzati a partire da esso: righe, filtri, ordinamenti, include e input di scrittura."
@@ -19,8 +19,6 @@ Finché non lo fai, restano non tipizzate: qualsiasi collection con qualsiasi no
 `Record<string, unknown>`. Nulla cambia per un progetto che non registra nulla.
 
 ## Registrare il `Database`
-
-<span class="since-badge" data-since="0.25">Da 0.25</span>
 
 ```bash
 rebase generate-sdk --register

@@ -1,5 +1,5 @@
 ---
-sourceHash: 8d6ce023558e141f
+sourceHash: 65085708df65a92e
 title: Autenticación
 sidebar_label: Autenticación
 description: Autenticación del lado del cliente con el SDK de Rebase — inicio de sesión con correo electrónico/contraseña, proveedores OAuth, gestión de sesiones y escuchadores de estado de autenticación.
@@ -500,7 +500,7 @@ const client = createRebaseClient({
 
 ## Usar tu propio proveedor de autenticación
 
-<span class="since-badge" data-since="0.25">Desde 0.25</span> En 0.24 un getter de
+En 0.24 un getter de
 token autentica solo las solicitudes HTTP, y el socket de tiempo real sigue siendo
 anónimo.
 

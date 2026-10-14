@@ -71,7 +71,7 @@ the `204`.
 `GET`. Send it back as `If-Match` on a later `PATCH` or `DELETE` and the write is
 refused with `412` if the row has changed in between.
 
-<span class="since-badge" data-since="0.25">Since 0.25</span> A successful `PATCH` answers with the `ETag` of the version it wrote,
+A successful `PATCH` answers with the `ETag` of the version it wrote,
 so the next conditional write needs no read first. The tag rides on a
 `204` answered for `Prefer: return=minimal` too, and an answer replayed for an
 `Idempotency-Key` carries the same tag as the first one. A live row subscription
@@ -98,7 +98,7 @@ collection declares one — that column already *is* a version — and from a st
 hash of the row otherwise. `If-Match: *` asserts only that the row exists.
 Nothing is written when the precondition fails.
 
-<span class="since-badge" data-since="0.25">Since 0.25</span> The admin's record form saves with `If-Match`: a save made against a version
+The admin's record form saves with `If-Match`: a save made against a version
 someone has since replaced is refused, the form says so, and the edit stays in
 the form, rebased onto the new version with the conflicting fields marked.
 
@@ -219,7 +219,7 @@ would take every "new this week" query with it.
 
 #### Not on the users collection
 
-<span class="since-badge" data-since="0.25">Since 0.25</span> The users collection (the one with `auth` enabled) refuses an upsert on every
+The users collection (the one with `auth` enabled) refuses an upsert on every
 door — `?on_conflict=`, `/bulk` with `upsert: true`, a `_batch` `upsert`
 operation, the SDK's `upsert()` and the realtime socket — with a `400`
 (`INVALID_CONFLICT_TARGET`). Its rows are the users, and creating one and

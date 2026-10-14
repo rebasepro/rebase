@@ -1,5 +1,5 @@
 ---
-sourceHash: cc03d759eb4057c2
+sourceHash: 7f10dbaa07451bc9
 title: Múltiples bases de datos y buckets
 sidebar_label: Múltiples orígenes
 description: Enrute colecciones a diferentes bases de datos y propiedades a diferentes buckets de almacenamiento, y configure cada uno desde el entorno.
@@ -227,8 +227,6 @@ El motor proviene de la declaración, por lo que no hay ningún `STORAGE_TYPE` q
 
 #### Qué bucket recibe una subida no calificada
 
-<span class="since-badge" data-since="0.25">Desde 0.25</span>
-
 Una propiedad de almacenamiento que no especifica ningún `storageSource` escribe en el bucket
 **predeterminado**. Declarar buckets con nombre nunca lo mueve. El bucket predeterminado
 conserva su propia configuración, sea lo que sea lo que declare `config/resources.ts`:
@@ -402,7 +400,7 @@ escribe en `/storage/uploads__media`. Monte el volumen en su directorio padre,
 `STORAGE_PATH`. `STORAGE_PATH__MEDIA` define el directorio de un bucket
 de forma explícita. Consulte [Autoalojamiento](/docs/deployment/self-hosting/#file-storage).
 
-<span class="since-badge" data-since="0.25">Desde 0.25</span> Declarar buckets no cambia
+Declarar buckets no cambia
 el bucket predeterminado. Con solo `bucket("media")` declarado, el predeterminado sigue
 leyendo sus propias variables. En desarrollo es `./uploads`. En producción, sin vincular,
 está desactivado como cualquier bucket sin vincular: las subidas que no especifican ningún

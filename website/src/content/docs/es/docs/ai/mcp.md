@@ -1,5 +1,5 @@
 ---
-sourceHash: a7fdf34234049b93
+sourceHash: ee28e46d5e82c6f9
 title: Servidor MCP
 sidebar_label: Servidor MCP
 description: "Conecta Claude Code, Cursor, Gemini CLI o cualquier cliente MCP a un proyecto de Rebase: las 42 herramientas que expone, la credencial con la que se autentica y la barrera de loopback que se interpone entre un agente y producción."
@@ -340,7 +340,7 @@ database at boot, additively. After changing a collection, restart it with
 rebase_dev_stop and rebase_dev_start. …
 ```
 
-<span class="since-badge" data-since="0.25">Desde 0.25</span> Desde una terminal,
+Desde una terminal,
 `rebase db push` y `rebase db migrate` sí se ejecutan en esa base de datos; solo se
 rechazan las herramientas de MCP. En la 0.24 la CLI también las rechaza allí.
 
@@ -375,7 +375,7 @@ tenga forma de marcador se divide con un espacio de ancho cero, por lo que una f
 
 El [endpoint remoto](#el-endpoint-remoto) marca los resultados de sus herramientas de la misma
 forma y se lo indica al cliente; su `structuredContent` transporta el resultado sin marcar.
-<span class="since-badge" data-since="0.25">Desde 0.25</span> `list_collections` y
+`list_collections` y
 `describe_collection` son las excepciones: solo un modelo las lee, así que se envían
 una sola vez, en el texto. Antes de la 0.24 el listado llevaba además una copia en
 `structuredContent`.
@@ -489,7 +489,7 @@ de inicio. Ningún `REBASE_ROLE` lo activa.
   `{ count }`. Igual que en REST, se rechazan un `limit` superior a 1000, un argumento
   no declarado y una edición o eliminación de una fila en la papelera (404); poner el
   campo de borrado suave a `null` la restaura.
-- <span class="since-badge" data-since="0.25">Desde 0.25</span> **El listado nombra las colecciones; `describe_collection` da el esquema de una.**
+- **El listado nombra las colecciones; `describe_collection` da el esquema de una.**
   `list_collections` responde el `name`, el `title` y la `description` de cada colección,
   y `describe_collection { collection }` el esquema OpenAPI `row` y `create` de esa
   colección, además de `softDeleteField` cuando las filas van a una papelera. Las

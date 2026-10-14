@@ -1,5 +1,5 @@
 ---
-sourceHash: f0cc4de3a8c82b82
+sourceHash: 1efb8010154baea9
 title: Histórico de Entidades
 sidebar_label: Histórico de Entidades
 description: Rastreie todas as alterações em suas entidades com uma trilha de auditoria completa — quem alterou o quê, quando e a entidade completa antes/depois.
@@ -90,7 +90,7 @@ anterior à exclusão a restaura.
 
 ### O que `previous_values` contém
 
-<span class="since-badge" data-since="0.25">Desde 0.25</span> Uma entrada de
+Uma entrada de
 atualização guarda, em `previous_values`, apenas os campos listados em
 `changed_fields`. Todos os outros campos tinham o mesmo valor antes e depois da
 alteração, portanto já estão em `values`; guardar a linha inteira duas vezes custava,
@@ -123,7 +123,7 @@ A retenção é aplicada em dois lugares:
 - **Após cada escrita**, para a entidade escrita: logo depois de ela ser salva ou
   excluída, o servidor remove as entradas dessa entidade além das 200 mais recentes,
   ou mais antigas que o período de retenção. Isso não segura a escrita.
-- <span class="since-badge" data-since="0.25">Desde 0.25</span> **Uma vez por hora**,
+- **Uma vez por hora**,
   para todas as entidades: as entradas mais antigas que o período de retenção são
   excluídas, não importa a quem pertençam — inclusive entidades que nunca mais são
   escritas, como as excluídas. Veja [Mecânica do ciclo de vida da limpeza](#mecânica-do-ciclo-de-vida-da-limpeza).
@@ -189,7 +189,7 @@ registra a sua entrada de histórico, mas não poda nada, porque um script não 
 saber a retenção com que o seu servidor está configurado. O servidor poda essa
 entidade na próxima escrita nela, e na varredura de hora em hora abaixo.
 
-<span class="since-badge" data-since="0.25">Desde 0.25</span> Uma vez por hora, o backend também exclui todas as entradas mais antigas que o período de retenção, de todas as entidades. Antes disso, o histórico de uma entidade que nunca mais era escrita — toda entidade excluída — não era limpo de forma alguma. A varredura:
+Uma vez por hora, o backend também exclui todas as entradas mais antigas que o período de retenção, de todas as entidades. Antes disso, o histórico de uma entidade que nunca mais era escrita — toda entidade excluída — não era limpo de forma alguma. A varredura:
 
 - roda em uma instância da frota por hora, nos processos que executam os jobs agendados
   (ela reivindica sua hora em `rebase.cron_claims`, como uma execução de cron faz), a

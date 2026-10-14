@@ -1,5 +1,5 @@
 ---
-sourceHash: 6a0a2927f191087f
+sourceHash: 6304a2aeeb6a8bcf
 title: Aggregate und Suche
 sidebar_label: Aggregate & Suche
 description: "Zählen, summieren und gruppieren mit dem SDK, Filtern in JSON-Spalten und Ausführen von Volltext- und Vektorsuche über den Client."
@@ -186,7 +186,7 @@ bei einem älteren pgvector liefert ein Filter, den nur wenige der nächstgelege
 Seite. Die Erstellung des `queryVector` liegt in Ihrer Verantwortung: Rebase speichert und durchsucht
 Embeddings, berechnet sie jedoch nicht.
 
-<span class="since-badge" data-since="0.25">Seit 0.25</span> Das SDK sendet eine
+Das SDK sendet eine
 Vektorsuche als `POST /api/data/<collection>/query`, mit dem Embedding im
 Body: In der URL sind 768 Dimensionen etwa 17 KB, mehr, als Node (16 KB) und die meisten
 Proxys (nginx: 8 KB) akzeptieren. `count()` mit einer Vektorsuche geht denselben Weg,
@@ -194,7 +194,7 @@ als `POST /api/data/<collection>/count`. Gegen einen Server älter als 0.24, der
 keine solche Route hat, fällt beides auf das `GET` zurück — und ein langes Embedding kann dort
 weiterhin mit einem 431 oder einem 414 abgelehnt werden.
 
-<span class="since-badge" data-since="0.25">Seit 0.25</span> Mit einem `threshold`
+Mit einem `threshold`
 hat das Ergebnis kein `meta.total` — das Zählen der Zeilen innerhalb einer Distanz berechnet sie
 für jede Zeile der Tabelle. Paginieren Sie mit `meta.hasMore`, das exakt bleibt.
 

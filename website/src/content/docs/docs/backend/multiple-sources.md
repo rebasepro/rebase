@@ -226,8 +226,6 @@ The engine comes from the declaration, so there is no `STORAGE_TYPE` to set.
 
 #### Which bucket receives an unqualified upload
 
-<span class="since-badge" data-since="0.25">Since 0.25</span>
-
 A storage property that names no `storageSource` writes to the **default**
 bucket. Declaring named buckets never moves it. The default keeps its own
 configuration whatever `config/resources.ts` declares: `STORAGE_TYPE`,
@@ -401,7 +399,7 @@ writes to `/storage/uploads__media`. Mount the volume on their parent,
 `STORAGE_PATH` itself. `STORAGE_PATH__MEDIA` sets one bucket's directory
 explicitly. See [Self-hosting](/docs/deployment/self-hosting/#file-storage).
 
-<span class="since-badge" data-since="0.25">Since 0.25</span> Declaring
+Declaring
 buckets does not change the default bucket. With only `bucket("media")`
 declared, the default still reads its own variables. In development it is
 `./uploads`. In production, unbound, it is off like any unbound bucket: uploads

@@ -1,5 +1,5 @@
 ---
-sourceHash: 63a33a92e55310ba
+sourceHash: 6d6edea2e91b0bbc
 title: API REST
 sidebar_label: API REST
 description: Endpoint API REST generati automaticamente per ogni collection, con filtraggio, ordinamento, paginazione e inclusione delle relazioni.
@@ -22,7 +22,7 @@ Per ogni collection vengono generati i seguenti endpoint. Tutte le altre route m
 | Metodo | Percorso | Descrizione |
 |--------|----------|-------------|
 | `GET` | `/api/data/:slug` | Elenca le entità |
-| `POST` | `/api/data/:slug/query` | <span class="since-badge" data-since="0.25">Da 0.25</span> Lo stesso elenco, con i parametri di query in un body JSON — per una query troppo lunga per un URL. Vedi [Query troppo lunghe per un URL](/docs/backend/vector-search/#queries-too-long-for-a-url) |
+| `POST` | `/api/data/:slug/query` | Lo stesso elenco, con i parametri di query in un body JSON — per una query troppo lunga per un URL. Vedi [Query troppo lunghe per un URL](/docs/backend/vector-search/#queries-too-long-for-a-url) |
 | `GET` | `/api/data/:slug/count` | Conta le entità |
 | `GET` | `/api/data/:slug/aggregate` | `count()`, `sum()`, `avg()`, `min()`, `max()`, opzionalmente raggruppati. Accetta gli stessi filtri dell'endpoint di elenco e la RLS si applica alle righe aggregate — vedi [Querying](/docs/sdk/querying/) |
 | `GET` | `/api/data/:slug/:id` | Recupera una singola entità |
@@ -134,12 +134,12 @@ Il limite predefinito è **50**, il massimo è **1000**. Entrambi provengono da 
 
 Tutti e tre i parametri della finestra vengono rifiutati anziché corretti automaticamente, e ciascuno specifica il proprio codice: `INVALID_LIMIT`, `INVALID_OFFSET` (un numero intero maggiore o uguale a 0) e `INVALID_PAGE` (un numero intero maggiore o uguale a 1). Una finestra silenziosamente diversa da quella richiesta non potrebbe essere distinta dal raggiungimento della fine della collection, motivo per cui nessuno di essi viene limitato o ignorato.
 
-<span class="since-badge" data-since="0.25">Da 0.25</span> Per lo stesso motivo `page` e `offset` insieme sono un 400
+Per lo stesso motivo `page` e `offset` insieme sono un 400
 `PAGE_WITH_OFFSET`, anziché lasciare che uno dei due prevalga in silenzio.
 
 ### Saltare il conteggio
 
-<span class="since-badge" data-since="0.25">Da 0.25</span> `meta.total` è un `COUNT(*)` su ogni riga corrispondente — su una tabella grande, la maggior parte di
+`meta.total` è un `COUNT(*)` su ogni riga corrispondente — su una tabella grande, la maggior parte di
 ciò che costa una richiesta di elenco. `?count=none` (`GET /api/data/orders?count=none`) lo salta:
 niente `meta.total`, mentre `meta.hasMore` resta esatto (la lettura chiede una riga oltre la pagina).
 `?count=exact` è il valore predefinito; qualsiasi altro valore è un 400 `INVALID_COUNT`. Una lettura
@@ -277,7 +277,7 @@ sull'indice sono in [Ricerca vettoriale](/docs/backend/vector-search/).
 
 ## Query troppo lunghe per un URL
 
-<span class="since-badge" data-since="0.25">Da 0.25</span> `POST /api/data/:slug/query` (questo elenco) e `POST /api/data/:slug/count`
+`POST /api/data/:slug/query` (questo elenco) e `POST /api/data/:slug/count`
 accettano i parametri di query in un body JSON, per una query il cui URL non ci starebbe — un embedding, una lunga lista `in`.
 Vedi [Query troppo lunghe per un URL](/docs/backend/vector-search/#queries-too-long-for-a-url).
 
@@ -314,7 +314,7 @@ GET /api/data/posts?include={"comments":{"limit":5,"where":{"published":["==",tr
 | `orderBy` | La stessa sintassi di ordinamento, inclusa la posizione dei valori NULL. Gli ex aequo, e un `limit` senza `orderBy`, seguono la chiave della riga correlata, in ordine crescente |
 | `fields` | Colonne della riga *correlata*; la sua chiave viene sempre preservata |
 | `include` | A sua volta, relazioni della riga correlata |
-| `count` | <span class="since-badge" data-since="0.25">Da 0.25</span> `true` restituisce anche il totale di ciascun genitore sotto `_count` (`"_count":{"comments":37}`), contato dalla stessa istruzione. Solo relazioni to-many. Vedi [Contare ciò che un limite lascia fuori](/docs/sdk/relations#counting-what-a-limit-leaves-out) |
+| `count` | `true` restituisce anche il totale di ciascun genitore sotto `_count` (`"_count":{"comments":37}`), contato dalla stessa istruzione. Solo relazioni to-many. Vedi [Contare ciò che un limite lascia fuori](/docs/sdk/relations#counting-what-a-limit-leaves-out) |
 
 `true` significa "carica l'entità per intero", quindi `{"author":true}` e `author` rappresentano la medesima richiesta. Entrambe le formulazioni funzionano sulla route di elenco, sulla route get-by-id e sulle route di subcollection annidate.
 

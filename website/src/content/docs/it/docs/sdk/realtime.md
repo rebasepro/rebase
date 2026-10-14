@@ -1,5 +1,5 @@
 ---
-sourceHash: 479be58faac5dc73
+sourceHash: 172ed813d51ccec3
 title: Sottoscrizioni Realtime
 sidebar_label: Realtime
 description: Sottoscrivi le modifiche ai dati in tempo reale con l'SDK tipizzato di Rebase utilizzando listener realtime basati su WebSocket.
@@ -147,7 +147,7 @@ le righe correlate, ascolta anche la loro collection.
 
 ## Osservare un conteggio
 
-<span class="since-badge" data-since="0.25">Da 0.25</span> `listenCount()` mantiene aggiornato un conteggio: il totale di ciò che il filtro di un elenco seleziona, per una
+`listenCount()` mantiene aggiornato un conteggio: il totale di ciò che il filtro di un elenco seleziona, per una
 toolbar o un'offerta «seleziona tutti gli N» che non deve diventare obsoleta mentre altre persone aggiungono e rimuovono righe.
 La callback viene eseguita con il totale non appena è noto, e di nuovo ogni volta che una scrittura lo cambia.
 
@@ -249,7 +249,7 @@ const unsubscribe = client.data.orders.listen(
 
 ### Quale token invia il socket
 
-<span class="since-badge" data-since="0.25">Da 0.25</span> Su 0.24 il
+Su 0.24 il
 socket usa solo la sessione propria del client e l'opzione `token`: un getter
 installato con `client.setAuthTokenGetter()` non lo raggiunge mai, quindi un host che usa
 un proprio provider di autenticazione ottiene un socket anonimo.

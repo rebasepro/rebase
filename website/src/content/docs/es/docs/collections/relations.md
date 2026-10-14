@@ -1,5 +1,5 @@
 ---
-sourceHash: a3e5fa2b319b73d8
+sourceHash: e3130fcc43e901ed
 title: Relaciones
 sidebar_label: Relaciones
 description: Define relaciones SQL uno a uno, uno a muchos y muchos a muchos entre colecciones con claves foráneas, tablas de unión y uniones multi-salto.
@@ -92,7 +92,7 @@ author: {
 // → posts.author_id
 ```
 
-<span class="since-badge" data-since="0.25">Desde 0.25</span> La columna se
+La columna se
 indexa por ti: Postgres indexa la clave a la que apunta una clave foránea, nunca la
 columna que la contiene, así que sin un índice cada inclusión `hasMany` y cada listado anidado
 desde el otro lado recorre esta tabla. `index: false` conserva la restricción y

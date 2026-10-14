@@ -1,5 +1,5 @@
 ---
-sourceHash: 8aef72b75f28c106
+sourceHash: 2e602d0ed1bed6e5
 title: Consultando relações
 sidebar_label: Relações
 description: "Inclua entidades relacionadas em uma consulta e leia uma coleção filha por meio de seu pai com os acessadores de relação do SDK."
@@ -75,13 +75,13 @@ const { data } = await client.data.posts.include({
 | `orderBy` | A mesma sintaxe de ordenação, incluindo o [posicionamento de NULL](/docs/sdk/querying#where-nulls-sort). Os empates, e um `limit` sem `orderBy`, seguem a chave da linha relacionada, em ordem ascendente. |
 | `fields` | Colunas da linha *relacionada*. Sua chave sempre é mantida, garantindo que a linha permaneça endereçável. |
 | `include` | Relações da linha relacionada, por sua vez — é assim que a árvore se aninha. |
-| `count` | <span class="since-badge" data-since="0.25">Desde 0.25</span> Devolve também quantas linhas relacionadas existem no total, por pai, sob o `_count` da linha. Veja [Contando o que um limit deixa de fora](#contando-o-que-um-limit-deixa-de-fora). |
+| `count` | Devolve também quantas linhas relacionadas existem no total, por pai, sob o `_count` da linha. Veja [Contando o que um limit deixa de fora](#contando-o-que-um-limit-deixa-de-fora). |
 
 `true` é a forma abreviada para "carregar por completo": `{ author: true }` e `["author"]` são a mesma requisição.
 
 ### Contando o que um limit deixa de fora
 
-<span class="since-badge" data-since="0.25">Desde 0.25</span> Um `limit` limita
+Um `limit` limita
 o que é enviado, e `count: true` diz quanto ficou de fora. É disso que uma lista
 precisa para mostrar quatro tags e um "+33":
 

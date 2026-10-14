@@ -1,5 +1,5 @@
 ---
-sourceHash: 912fb4a5c0d6c740
+sourceHash: cc1736a186791d89
 title: Configuración de Storage
 sidebar_label: Configuración de Storage
 description: Configura backends de sistema de archivos local, compatibles con S3 o GCS/Firebase Storage para subidas de archivos, imágenes y medios.
@@ -104,7 +104,7 @@ image: {
 | `GET` | `/api/storage/file/*` | Recuperar un archivo — todo lo que sigue a `/file/` es la clave del objeto |
 | `GET` | `/api/storage/file/*?storageId=<key>` | Recuperar un archivo desde un backend específico |
 | `GET` | `/api/storage/metadata/*` | Tamaño, tipo de contenido y metadatos personalizados de un objeto, sin sus bytes, más un token de descarga de corta duración cuando es privado |
-| `POST` | `/api/storage/metadata` | <span class="since-badge" data-since="0.25">Desde 0.25</span> Lo mismo para hasta 100 objetos de un mismo origen: cuerpo `{ keys, storageId? }` |
+| `POST` | `/api/storage/metadata` | Lo mismo para hasta 100 objetos de un mismo origen: cuerpo `{ keys, storageId? }` |
 | `DELETE` | `/api/storage/file/*` | Eliminar un archivo |
 | `GET` | `/api/storage/list` | Listar objetos bajo un prefijo (`prefix`, `bucket`, `maxResults`, `pageToken`, `storageId`). Un `maxResults` menor a 1, o un `pageToken` que el origen nunca emitió, devuelve `400 INVALID_LIST_OPTIONS` |
 | `POST` | `/api/storage/folder` | Crear un marcador de carpeta vacía |
@@ -127,7 +127,7 @@ es la excepción, porque su carga útil es el archivo en sí: responde con los b
   "size": 48213, "updated": "2026-10-01T12:00:00.000Z", "contentType": "image/jpeg" } ], "prefixes": [] } }
 ```
 
-<span class="since-badge" data-since="0.25">Desde 0.25</span> Un listado describe cada archivo que retorna: su `size` en bytes y
+Un listado describe cada archivo que retorna: su `size` en bytes y
 `updated`, cuándo se escribió por última vez, en almacenamiento local, S3 y GCS, y su
 `contentType` en almacenamiento local y GCS. Un listado de S3 no incluye el tipo,
 por lo que en S3 está ausente y `/api/storage/metadata/*` sigue indicándolo. Una carpeta en
@@ -152,7 +152,7 @@ como en lecturas: una subida, un `POST /api/storage/folder` o una subida TUS que
 bucket responde `404 UNKNOWN_STORAGE_SOURCE`, tal como lo hace el listado. El almacenamiento local
 sigue creando un bucket en su primera escritura.
 
-**Muchos objetos a la vez.** <span class="since-badge" data-since="0.25">Desde 0.25</span> `POST /api/storage/metadata` recibe
+**Muchos objetos a la vez.** `POST /api/storage/metadata` recibe
 `{ "keys": ["photos/a.png", "photos/b.png"], "storageId": "media" }` — hasta 100
 rutas de objetos de un origen, cada una especificada como la recibe `GET /api/storage/metadata/<key>` —
 y responde con una entrada por clave:
@@ -206,7 +206,7 @@ ninguno lo advertía.
 Las miniaturas de imágenes almacenadas en el panel de administración utilizan este endpoint: la vista previa
 en tabla o tarjeta solicita una reproducción webp de aproximadamente el doble de su tamaño renderizado (96–800px)
 en lugar del original. Los archivos SVG y GIF siempre se muestran tal como son.
-`sharp` es opcional: <span class="since-badge" data-since="0.25">Desde 0.25</span>
+`sharp` es opcional:
 sin él, una solicitud de transformación recibe el original, y el backend avisa una vez
 de que hay que ejecutar `pnpm add sharp` en `backend/` (en la 0.24 responde 500, y el panel muestra los originales).
 
@@ -296,7 +296,7 @@ STORAGE_MAX_FILE_SIZE__MEDIA=1073741824  # media: 1 GB
 La cantidad de archivo que el servidor retiene en memoria a la vez depende de la vía de entrada.
 `POST /api/storage/upload` es un único cuerpo multipart que el servidor procesa por completo:
 de tres a cinco veces el tamaño del archivo en su memoria. Una subida reanudable (TUS) retiene un
-fragmento a la vez. <span class="since-badge" data-since="0.25">Desde 0.25</span> `client.storage.putObject()` y el panel de administración envían archivos
+fragmento a la vez. `client.storage.putObject()` y el panel de administración envían archivos
 mayores a 8 MiB mediante el método reanudable. Consulta
 [Subidas reanudables (TUS)](/docs/backend/storage-resumable-uploads/) para conocer el
 protocolo, qué responde y cómo se comporta entre instancias.
@@ -343,7 +343,7 @@ tópicos en conjunto.
 Cada origen se configura a partir de los **mismos nombres de variable acompañados de su propio
 sufijo**. El origen predeterminado no lleva sufijo, por lo que un proyecto con un solo bucket continúa
 usando los nombres simples mostrados anteriormente y no necesita declarar absolutamente nada, y declarar
-buckets con nombre a su lado no los cambia (<span class="since-badge" data-since="0.25">Desde 0.25</span>, [detalles](/docs/backend/multiple-sources/#which-bucket-receives-an-unqualified-upload)):
+buckets con nombre a su lado no los cambia ([detalles](/docs/backend/multiple-sources/#which-bucket-receives-an-unqualified-upload)):
 
 ```bash
 S3_BUCKET=app-uploads             # (default)

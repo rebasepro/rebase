@@ -1,5 +1,5 @@
 ---
-sourceHash: a6a820da39681f4a
+sourceHash: fba11bae884a016c
 title: Index des points de terminaison
 sidebar_label: Index des points de terminaison
 description: Chaque route HTTP montée par un backend Rebase — données, auth, stockage, admin, méta — avec son contrôle d'accès et la page qui l'explique.
@@ -135,18 +135,18 @@ une collection ne peut accéder à rien de tout cela. Voir [Rôles et portées](
 | `GET` | `/api/admin/cron/:id` | `cron:read` | [Tâches Cron](/docs/backend/cron-jobs/) |
 | `PUT` | `/api/admin/cron/:id` | `cron:write` | Activer ou désactiver une tâche |
 | `GET` | `/api/admin/cron/:id/logs` | `cron:read` | [Tâches Cron](/docs/backend/cron-jobs/) |
-| `POST` | `/api/admin/cron/:id/trigger` | `cron:write` | Exécuter une tâche maintenant. <span class="since-badge" data-since="0.25">Depuis 0.25</span> `?async=1` répond `202` dès qu'elle a démarré — [API des tâches Cron](/docs/backend/cron-jobs-api/#example-trigger-a-job-manually) |
+| `POST` | `/api/admin/cron/:id/trigger` | `cron:write` | Exécuter une tâche maintenant. `?async=1` répond `202` dès qu'elle a démarré — [API des tâches Cron](/docs/backend/cron-jobs-api/#example-trigger-a-job-manually) |
 | `GET` | `/api/admin/backups` | `backups:read` | Inventaire des sauvegardes |
 | `GET` | `/api/admin/backups/download` | `backups:read` | Télécharge une sauvegarde en streaming. Avec `?token=` issu d'un lien de téléchargement, aucun en-tête n'est nécessaire, pour cette sauvegarde uniquement |
-| `POST` | `/api/admin/backups/download-url` | `backups:read` | <span class="since-badge" data-since="0.25">Depuis 0.25</span> Un lien vers une sauvegarde, `{ key }` → `{ url, token, expiresIn }`, valable 60 secondes — [Sauvegardes](/docs/deployment/backups/#download-a-backup) |
-| `GET` | `/api/admin/storage/orphans` | `database:read` | <span class="since-badge" data-since="0.25">Depuis 0.25</span> Fichiers stockés qu'aucune ligne ne nomme, `?storageId=&olderThanHours=` — ce qu'affiche `rebase storage orphans` |
-| `DELETE` | `/api/admin/storage/orphans` | `database:write` | <span class="since-badge" data-since="0.25">Depuis 0.25</span> Les retrouve et les supprime ; `409 STORAGE_SCAN_INCOMPLETE` lorsqu'une collection n'a pas pu être lue |
-| `POST` | `/api/admin/storage/move` | `database:write` | <span class="since-badge" data-since="0.25">Depuis 0.25</span> Copie un dossier vers une autre source sous les mêmes clés, une page par appel — ce qu'envoie `rebase storage move` |
+| `POST` | `/api/admin/backups/download-url` | `backups:read` | Un lien vers une sauvegarde, `{ key }` → `{ url, token, expiresIn }`, valable 60 secondes — [Sauvegardes](/docs/deployment/backups/#download-a-backup) |
+| `GET` | `/api/admin/storage/orphans` | `database:read` | Fichiers stockés qu'aucune ligne ne nomme, `?storageId=&olderThanHours=` — ce qu'affiche `rebase storage orphans` |
+| `DELETE` | `/api/admin/storage/orphans` | `database:write` | Les retrouve et les supprime ; `409 STORAGE_SCAN_INCOMPLETE` lorsqu'une collection n'a pas pu être lue |
+| `POST` | `/api/admin/storage/move` | `database:write` | Copie un dossier vers une autre source sous les mêmes clés, une page par appel — ce qu'envoie `rebase storage move` |
 | `GET` | `/api/admin/logs` | `logs:read` | Le tampon des logs récents |
 | `GET` | `/api/admin/logs/latest` | `logs:read` | Les entrées les plus récentes |
 | `GET` | `/api/admin/logs/stream` | `logs:read` | Événements envoyés par le serveur (SSE) |
 | `GET` | `/api/admin/rls-audit` | `schema:read` | Le dernier résultat de l'audit planifié |
-| `POST` | `/api/admin/sql/csv` | `database:write` | <span class="since-badge" data-since="0.25">Depuis 0.25</span> Diffuse en streaming le résultat complet d'une requête en lecture seule au format CSV — « Télécharger le résultat complet en CSV » de [Studio](/docs/studio/) |
+| `POST` | `/api/admin/sql/csv` | `database:write` | Diffuse en streaming le résultat complet d'une requête en lecture seule au format CSV — « Télécharger le résultat complet en CSV » de [Studio](/docs/studio/) |
 | `GET` | `/api/admin/schema/status` | `schema:read` | [Édition de schéma en direct](/docs/backend/live-schema-editing/) |
 | `POST` | `/api/admin/schema/plan` | `schema:read` | Planifie une modification ; ne l'applique jamais |
 | `POST` | `/api/admin/schema/apply` | `schema:write` | Une personne uniquement, sauf si `REBASE_LIVE_SCHEMA_ALLOW_MACHINE_APPLY` |
@@ -170,7 +170,7 @@ destinés aux projets qui n'ont pas encore migré ; écrivez le nouveau code en 
 | `GET` | `/api/storage/file/*` | session + `storageAuthorize` | [Stockage](/docs/backend/storage/) |
 | `DELETE` | `/api/storage/file/*` | session + `storageAuthorize` | [Stockage](/docs/backend/storage/) |
 | `GET` | `/api/storage/metadata/*` | session + `storageAuthorize` | [Stockage](/docs/backend/storage/) |
-| `POST` | `/api/storage/metadata` | session + `storageAuthorize`, par clé | <span class="since-badge" data-since="0.25">Depuis 0.25</span> [Stockage](/docs/backend/storage/#storage-endpoints) : métadonnées pour 100 objets au plus |
+| `POST` | `/api/storage/metadata` | session + `storageAuthorize`, par clé | [Stockage](/docs/backend/storage/#storage-endpoints) : métadonnées pour 100 objets au plus |
 | `GET` | `/api/storage/list` | session + `storageAuthorize` | [Stockage](/docs/backend/storage/) |
 | `POST` | `/api/storage/folder` | session + `storageAuthorize` | [Stockage](/docs/backend/storage/) |
 | `GET` | `/api/storage/sources` | session | Les sources de stockage nommées desservies par ce backend |

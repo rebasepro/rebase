@@ -1,5 +1,5 @@
 ---
-sourceHash: c770e1b2f77d1d8d
+sourceHash: a0bd19745c59b12b
 title: Sistema dei plugin
 sidebar_label: Plugin
 description: Estendi Rebase con i plugin — inserisci componenti UI, modifica collection, aggiungi azioni alla barra degli strumenti e crea field builder personalizzati.
@@ -55,7 +55,6 @@ Ognuna di queste proprietà è facoltativa tranne `key`. L'elenco completo dei n
 - `onAuthStateChange(user)` viene eseguito a ogni successivo cambio di utente: con il nuovo utente all'accesso, con `null` alla disconnessione. Il plugin resta montato in entrambi i casi.
 - `onUnmount()` viene eseguito quando `<Rebase>` viene smontato.
 
-<span class="since-badge" data-since="0.25">Da 0.25</span>
 `lifecycle.onCollectionChange` è deprecato. Nessuno lo ha mai chiamato, su 0.24
 o prima. Un plugin che lo imposta continua a compilare, e `<Rebase>` avvisa una
 volta per plugin. Per seguire le righe di una collection, sottoscrivi da `onMount` e
@@ -158,7 +157,7 @@ function useMyPlugin(): RebasePlugin {
 
 ### Wrapper di campo da più plugin
 
-<span class="since-badge" data-since="0.25">Da 0.25</span> Su 0.24 il `wrap` di ogni
+Su 0.24 il `wrap` di ogni
 plugin riceveva il campo integrato, e veniva renderizzato solo l'ultimo wrapper
 restituito.
 
@@ -210,7 +209,7 @@ a ogni campo markdown, che continua il testo dal cursore. Entrambi compaiono
 solo dove il plugin è abilitato: il servizio si dichiara disponibile e
 `getConfigForPath` (quando ne passi uno) consente la collection. Un campo il cui
 `customProps.editorProps.aiController` nomina un controller proprio usa
-quello. <span class="since-badge" data-since="0.25">Da 0.25</span> Un altro plugin può dare ai campi markdown un controller allo stesso modo, con
+quello. Un altro plugin può dare ai campi markdown un controller allo stesso modo, con
 `EditorAIControllerProvider` da `@rebasepro/cms` in un provider con ambito form.
 
 ![Data enhancement](/img/data_enhancement.png)
@@ -306,7 +305,6 @@ export function App() {
 }
 ```
 
-<span class="since-badge" data-since="0.25">Da 0.25</span>
 `hooks.modifyCollectionAsync` è deprecato. Nessuno lo ha mai chiamato, su 0.24
 o prima. Un plugin che lo imposta continua a compilare, e `<Rebase>` avvisa una
 volta per plugin. Usa `modifyCollection` come sopra.

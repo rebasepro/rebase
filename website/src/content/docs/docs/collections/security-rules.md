@@ -48,7 +48,7 @@ The policies on a table are more than the collection's own `securityRules`:
   place, as if it had written them. A collection that declares even one rule of
   its own takes none: the two lists are never merged. They are applied wherever
   the directory is read: `rebase dev`, `rebase db push`, the admin panel and a
-  backend given `collectionsDir`. <span class="since-badge" data-since="0.25">Since 0.25</span>
+  backend given `collectionsDir`.
   The scaffold's index also applies them to the `collections` array it exports,
   so a backend handed that array gets them too. An array put together any other
   way carries only the rules its collections declare.

@@ -1,5 +1,5 @@
 ---
-sourceHash: 714b241cabcf5ac5
+sourceHash: add7e5205bcbe73a
 title: Mise en cache du stockage et CDN
 sidebar_label: Mise en cache du stockage et CDN
 description: Comment Rebase distribue les fichiers stockés pour que les navigateurs et les CDN puissent les mettre en cache — ETags et 304, Cache-Control selon qui peut lire un objet, plages d'octets pour le déplacement dans l'audio et la vidéo, et ce qu'il faut configurer sur un CDN en amont.
@@ -48,7 +48,7 @@ la différence entre un lecteur fonctionnel et un lecteur en panne.
 - La revalidation prévaut sur un intervalle : une requête transmettant à la fois `If-None-Match` et
   `Range` reçoit le code `304`.
 
-<span class="since-badge" data-since="0.25">Depuis 0.25</span> Seuls les octets demandés sont lus — depuis le disque pour le stockage local, et par une lecture
+Seuls les octets demandés sont lus — depuis le disque pour le stockage local, et par une lecture
 partielle sur S3 et GCS — et chaque objet est transmis au client au fil de sa lecture (streaming) au
 lieu d'être d'abord conservé en mémoire : servir une grande vidéo coûte donc au serveur la même
 mémoire que servir une miniature. Une revalidation qui se termine par un `304`, un `HEAD`, un `416`

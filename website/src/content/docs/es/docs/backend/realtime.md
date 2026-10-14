@@ -1,5 +1,5 @@
 ---
-sourceHash: ebb10bc84ac28936
+sourceHash: b0bd1a2197737033
 title: Tiempo real y WebSocket
 sidebar_label: Tiempo real
 description: Sincronización de datos en tiempo real, canales de difusión y seguimiento de presencia mediante WebSocket.
@@ -31,7 +31,7 @@ El tiempo real está habilitado de forma predeterminada. No hay ningún indicado
 
 ### Qué ruta responde el socket
 
-<span class="since-badge" data-since="0.25">Desde 0.25</span> En 0.24 el socket acepta cada actualización (upgrade) de WebSocket del servidor, sea cual sea su ruta.
+En 0.24 el socket acepta cada actualización (upgrade) de WebSocket del servidor, sea cual sea su ruta.
 
 El socket responde a las actualizaciones de una sola ruta: la ruta base de la API sin un `/api` final, es decir, `/` para una API en `/api`. Es donde marca el SDK: se conecta a su `baseUrl`, mientras que sus solicitudes HTTP van a `${baseUrl}/api`. Una actualización a cualquier otra ruta se deja a los demás oyentes `upgrade` del servidor, de modo que tu aplicación puede ejecutar su propio servidor WebSocket en el mismo `http.Server`. Sin otro oyente, esa actualización recibe un `404`.
 
@@ -110,7 +110,7 @@ const unsubscribe = client.data.products.listenById(
 
 El callback recibe la fila, plana, tal como la devuelve `findById()` (`row.name`, no `row.values.name`), o `undefined` una vez que la fila se elimina.
 
-<span class="since-badge" data-since="0.25">Desde 0.25</span> **Cada trama lleva la versión de la fila.** `etagOf(row)` es el `ETag` que responde un `GET` de la fila, así que una edición hecha sobre lo que mostraba una trama puede guardarse con `ifMatch: etagOf(row)` y se rechaza con `412` si la fila ha cambiado entretanto (consulta [Escrituras condicionales](/docs/backend/writes/)). En el protocolo, el `subscribe_one` del SDK pide con `etag: true`, y cada trama `single_update` de una fila que existe lleva `"etag"` junto a `"row"`. Un servidor anterior a esto ignora la petición y no envía etiqueta, y un cliente que no la pide recibe tramas sin ella.
+**Cada trama lleva la versión de la fila.** `etagOf(row)` es el `ETag` que responde un `GET` de la fila, así que una edición hecha sobre lo que mostraba una trama puede guardarse con `ifMatch: etagOf(row)` y se rechaza con `412` si la fila ha cambiado entretanto (consulta [Escrituras condicionales](/docs/backend/writes/)). En el protocolo, el `subscribe_one` del SDK pide con `etag: true`, y cada trama `single_update` de una fila que existe lleva `"etag"` junto a `"row"`. Un servidor anterior a esto ignora la petición y no envía etiqueta, y un cliente que no la pide recibe tramas sin ella.
 
 ### Cancelar la suscripción
 
@@ -158,9 +158,9 @@ Un cambio nunca viaja a un suscriptor como datos directos. Viaja como el hecho d
 
 1. **Invalidación.** Cuando una entidad cambia (creada, actualizada, eliminada), el servidor marca las rutas afectadas. La fila que se escribió no se reenvía: se leyó bajo la autorización de quien escribió, lo cual no garantiza lo que un suscriptor tiene permitido ver.
 
-2. **Refetch con RLS y debounce.** Tras **300ms** (`REFETCH_DEBOUNCE_MS`), el servidor vuelve a consultar la colección con tus filtros y orden originales. La consulta se ejecuta dentro de una transacción que establece `app.user_id` y `app.user_roles` locales a la transacción a partir del `SubscriptionAuthContext` del suscriptor, de modo que Postgres evalúa la Row-Level Security (RLS) bajo la identidad de ese cliente y solo las filas que tiene autorización para ver se envían en el `collection_update`. El debounce también agrupa ráfagas de escrituras en una sola consulta. Espera 300 ms sin un cambio más, pero nunca más de **1 s** (`REFETCH_MAX_WAIT_MS`) tras el primero, de modo que una colección escrita varias veces por segundo envía de todos modos una trama a sus suscriptores al menos una vez por segundo. <span class="since-badge" data-since="0.25">Desde 0.25</span> Fija ese límite con `REALTIME_REFETCH_MAX_WAIT_MS` (o `realtime.refetchMaxWaitMs`): un valor mayor vuelve a consultar una tabla ocupada con menos frecuencia, uno menor envía tramas más recientes.
+2. **Refetch con RLS y debounce.** Tras **300ms** (`REFETCH_DEBOUNCE_MS`), el servidor vuelve a consultar la colección con tus filtros y orden originales. La consulta se ejecuta dentro de una transacción que establece `app.user_id` y `app.user_roles` locales a la transacción a partir del `SubscriptionAuthContext` del suscriptor, de modo que Postgres evalúa la Row-Level Security (RLS) bajo la identidad de ese cliente y solo las filas que tiene autorización para ver se envían en el `collection_update`. El debounce también agrupa ráfagas de escrituras en una sola consulta. Espera 300 ms sin un cambio más, pero nunca más de **1 s** (`REFETCH_MAX_WAIT_MS`) tras el primero, de modo que una colección escrita varias veces por segundo envía de todos modos una trama a sus suscriptores al menos una vez por segundo. Fija ese límite con `REALTIME_REFETCH_MAX_WAIT_MS` (o `realtime.refetchMaxWaitMs`): un valor mayor vuelve a consultar una tabla ocupada con menos frecuencia, uno menor envía tramas más recientes.
 
-   <span class="since-badge" data-since="0.25">Desde 0.25</span> Un refetch que lee exactamente lo que se le envió por última vez a un suscriptor no le envía
+   Un refetch que lee exactamente lo que se le envió por última vez a un suscriptor no le envía
    nada: una escritura en la fila 9.000 de una lista que muestra las primeras 50 cuesta
    la lectura, no una trama a cada espectador. Tras una trama de error, las siguientes filas
    se vuelven a enviar aunque sean las mismas.
@@ -191,7 +191,7 @@ La trama es `{ rows, pks, meta }`:
 
 `meta` se calcula dentro de la misma transacción sujeta a RLS que leyó las filas, por lo que describe con exactitud las filas que la acompañan. Sin esto, un cliente que necesitara el total tenía que emitir un `GET /count` **por cada push**: un viaje de ida y vuelta adicional por escritura y por suscriptor, además de una ventana en la que el conteo y las filas describían estados distintos de la colección.
 
-Cuando el propio conteo falla, la trama incluye `partial: true` y ningún `total`; esto no constituye un error de suscripción, y el cliente debe conservar el último total real en lugar de sustituirlo por la longitud de la página. <span class="since-badge" data-since="0.25">Desde 0.25</span> En una tabla grande, el conteo es la mayor parte de lo que cuesta una trama. Con `REALTIME_RECOUNT_INTERVAL_MS` definida, una lista cuyo último total fue de al menos `REALTIME_RECOUNT_MIN_ROWS` (100.000 por defecto) reutiliza ese total durante el intervalo en lugar de contar en cada escritura, y esa trama lleva `meta.totalAsOf`, el momento en que se tomó el total. Sin definir, como por defecto, cada trama cuenta.
+Cuando el propio conteo falla, la trama incluye `partial: true` y ningún `total`; esto no constituye un error de suscripción, y el cliente debe conservar el último total real en lugar de sustituirlo por la longitud de la página. En una tabla grande, el conteo es la mayor parte de lo que cuesta una trama. Con `REALTIME_RECOUNT_INTERVAL_MS` definida, una lista cuyo último total fue de al menos `REALTIME_RECOUNT_MIN_ROWS` (100.000 por defecto) reutiliza ese total durante el intervalo en lugar de contar en cada escritura, y esa trama lleva `meta.totalAsOf`, el momento en que se tomó el total. Sin definir, como por defecto, cada trama cuenta.
 
 ### Lo que cuesta una escritura, y los límites
 
@@ -244,13 +244,13 @@ registros distintos que una página tiene abiertos. Cámbialo con
 `REALTIME_MAX_SUBSCRIPTIONS_PER_SOCKET` o `realtime.maxSubscriptionsPerSocket`
 en el adaptador de Postgres (la variable de entorno prevalece); un valor que
 no sea un entero positivo detiene el servidor en el arranque. En 0.23 las
-suscripciones de un socket no tienen límite. <span class="since-badge" data-since="0.25">Desde 0.25</span> **También se pueden limitar los sockets que mantiene un usuario**, por instancia del servidor: define `REALTIME_MAX_SOCKETS_PER_USER` (o `realtime.maxSocketsPerUser`), y un inicio de sesión por encima del límite se rechaza con `TOO_MANY_SOCKETS` y el socket se cierra con 4002. Sin definir, como por defecto, no hay techo.
+suscripciones de un socket no tienen límite. **También se pueden limitar los sockets que mantiene un usuario**, por instancia del servidor: define `REALTIME_MAX_SOCKETS_PER_USER` (o `realtime.maxSocketsPerUser`), y un inicio de sesión por encima del límite se rechaza con `TOO_MANY_SOCKETS` y el socket se cierra con 4002. Sin definir, como por defecto, no hay techo.
 
 Un id de suscripción es propio del socket: dos clientes que nombran ambos una
 suscripción `"sub-1"` conservan cada uno la suya, y un `unsubscribe` termina
 solo la del emisor.
 
-<span class="since-badge" data-since="0.25">Desde 0.25</span> **Suscribirse cuenta contra el límite de tasa de datos.** La primera trama de una suscripción es una lectura, ejecutada como el suscriptor, y lo mismo es la solicitud de historial de un canal. Por eso `subscribe_collection`, `subscribe_one` y `channel_history` cuentan como solicitudes de datos en el contador de límite de tasa de quien llama (el que comparten sus solicitudes HTTP y sus otros sockets) una vez agotada la asignación propia del socket. Cada socket puede enviar 1.000 de ellas sin contarlas, o tantas como su techo de suscripciones cuando este es mayor, y la asignación se recupera a lo largo de 15 minutos. Eso es todo lo que un socket puede tener, así que la nueva suscripción tras una reconexión nunca se rechaza y nunca gasta el presupuesto de la persona. Superada la asignación, una trama por encima del límite se rechaza con una trama de error con el código `RATE_LIMITED`, que el SDK entrega al `onError` de esa suscripción, o al del canal. En 0.23 estas tramas solo cuentan contra el presupuesto propio del socket de 2.000 tramas por minuto.
+**Suscribirse cuenta contra el límite de tasa de datos.** La primera trama de una suscripción es una lectura, ejecutada como el suscriptor, y lo mismo es la solicitud de historial de un canal. Por eso `subscribe_collection`, `subscribe_one` y `channel_history` cuentan como solicitudes de datos en el contador de límite de tasa de quien llama (el que comparten sus solicitudes HTTP y sus otros sockets) una vez agotada la asignación propia del socket. Cada socket puede enviar 1.000 de ellas sin contarlas, o tantas como su techo de suscripciones cuando este es mayor, y la asignación se recupera a lo largo de 15 minutos. Eso es todo lo que un socket puede tener, así que la nueva suscripción tras una reconexión nunca se rechaza y nunca gasta el presupuesto de la persona. Superada la asignación, una trama por encima del límite se rechaza con una trama de error con el código `RATE_LIMITED`, que el SDK entrega al `onError` de esa suscripción, o al del canal. En 0.23 estas tramas solo cuentan contra el presupuesto propio del socket de 2.000 tramas por minuto.
 
 ### Sockets que dejan de responder
 
@@ -263,7 +263,7 @@ libera en menos de un minuto. Los navegadores y el SDK responden a los pings por
 sí solos; un cliente que habla el protocolo directamente también tiene que
 responderlos, como hacen la mayoría de las bibliotecas de WebSocket.
 
-<span class="since-badge" data-since="0.25">Desde 0.25</span> **El lado del navegador.** Un navegador no puede enviar un ping ni verlo, así que un socket medio abierto le parece conectado para siempre. El SDK abre el socket con `?rebase_caps=heartbeat,channel_seq,cancel_sql`; un servidor que las conoce responde con `{"type":"hello","capabilities":[…],"heartbeatMs":30000}`, listando las que respeta (`cancel_sql`: acepta la trama `CANCEL_SQL` de la consola SQL), y envía `{"type":"heartbeat"}` cada 30 segundos, y el SDK descarta el socket y [se reconecta](#reconexión-automática) tras perder dos. A un cliente que no nombra nada no se le envía ninguna, y un servidor anterior ignora el parámetro, así que un SDK que hable con uno se comporta como antes.
+**El lado del navegador.** Un navegador no puede enviar un ping ni verlo, así que un socket medio abierto le parece conectado para siempre. El SDK abre el socket con `?rebase_caps=heartbeat,channel_seq,cancel_sql`; un servidor que las conoce responde con `{"type":"hello","capabilities":[…],"heartbeatMs":30000}`, listando las que respeta (`cancel_sql`: acepta la trama `CANCEL_SQL` de la consola SQL), y envía `{"type":"heartbeat"}` cada 30 segundos, y el SDK descarta el socket y [se reconecta](#reconexión-automática) tras perder dos. A un cliente que no nombra nada no se le envía ninguna, y un servidor anterior ignora el parámetro, así que un SDK que hable con uno se comporta como antes.
 
 Un socket también se termina cuando más de 16&nbsp;MiB de frames enviados a él
 siguen sin leerse. Es un cliente que no lee lo que se le envía, o uno tan
@@ -379,7 +379,7 @@ La purga se realiza a medida que llegan los mensajes, regulada por canal para qu
 - **Ordenado.** Los números de secuencia se asignan por canal y el orden de entrega coincide con el orden de la secuencia — en una sola instancia, y entre instancias en el bus `postgres`, donde la misma sentencia que numera un mensaje también lo anuncia, de modo que cada instancia (incluida la del emisor) recibe los anuncios en el orden de la secuencia. Un bus que proporciones tú mismo entrega las tramas en el orden en que las entregue.
 - **Durable antes de ser entregado.** Un mensaje que no se puede almacenar no se entrega a nadie y se notifica al remitente. Entregarlo lo expondría ante los suscriptores en vivo pero lo omitiría en cualquier reproducción futura, y ningún mensaje posterior podría subsanar ese vacío.
 - **Al menos una vez al ponerse al día (At-least-once).** Un rango de reproducción puede solaparse con mensajes que el cliente ya haya recibido; el SDK descarta aquellos que ya ha entregado.
-- <span class="since-badge" data-since="0.25">Desde 0.25</span> **Sin huecos.** Un mensaje retenido llega a todos los miembros: al emisor, a quien nunca se envía su propio mensaje, se le envía en su lugar `{"type":"broadcast_ack","channel","seq"}` si optó por `channel_seq`. Así, un mensaje posterior a `lastSeq + 1` significa que se perdió uno, y el SDK lo retiene, pide el historial intermedio y entrega todos en orden. Frente a un servidor sin `channel_seq`, un salto se entrega tal como llega.
+- **Sin huecos.** Un mensaje retenido llega a todos los miembros: al emisor, a quien nunca se envía su propio mensaje, se le envía en su lugar `{"type":"broadcast_ack","channel","seq"}` si optó por `channel_seq`. Así, un mensaje posterior a `lastSeq + 1` significa que se perdió uno, y el SDK lo retiene, pide el historial intermedio y entrega todos en orden. Frente a un servidor sin `channel_seq`, un salto se entrega tal como llega.
 
 :::caution[El historial comparte el mismo modelo de acceso que el canal]
 Un cliente que se haya unido a un canal puede reproducir sus mensajes retenidos, incluidos los transmitidos antes de su llegada; la membresía es la única verificación, y unirse está abierto a cualquier cliente que conozca el nombre del canal. La retención se habilita de forma opcional por patrón de canal, por lo que activarla hace que el historial de ese canal sea legible para cualquier visitante que adivine el nombre. En los canales retenidos esto se vuelve duradero en lugar de momentáneo, por lo que debes tratar el contenido de un canal retenido como público para tus usuarios.

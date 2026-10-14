@@ -1,5 +1,5 @@
 ---
-sourceHash: e20c62e3ffffe67b
+sourceHash: dd99ad3524029bf5
 title: División en varios procesos
 sidebar_label: Procesos divididos
 description: Ejecute un bundle como varios procesos cooperativos —una API, una capa de funciones, un worker— desde la misma imagen de runtime publicada, para que una función personalizada pesada deje de competir con la API de datos.
@@ -43,7 +43,7 @@ REBASE_ROLE=all        # the default: everything, one process
 El estado de salud (health) y las métricas están en cada rol sin excepción. Un proceso que un
 orquestador no puede sondear es un proceso que no puede actualizar progresivamente (roll).
 
-<span class="since-badge" data-since="0.25">Desde 0.25</span> `GET /api/auth/config`,
+`GET /api/auth/config`,
 lo que lee la pantalla de inicio de sesión, sigue al resto de `/api/auth`: solo lo sirven `api` y
 `all`. En 0.24 un proceso `functions` o `worker` también lo respondía.
 
@@ -154,7 +154,7 @@ y luego escribe en él en dos pasos separados, por lo que los procesos que arran
 colisionan; y un despliegue donde varios compiten por aprovisionar el mismo
 esquema no es algo que nadie haya diseñado intencionadamente.
 
-<span class="since-badge" data-since="0.25">Desde 0.25</span> En un
+En un
 [servidor personalizado](/docs/backend/custom-server/), la misma decisión es la opción
 `provision` de `createRebaseBackend`: `true` en el proceso que es dueño del
 esquema, y `{ collections: false, realtime: false }` en todos los demás, que
@@ -246,7 +246,7 @@ split: true
 functions:
   enabled: true
   image:
-    tag: "0.24.0"     # this unit only; the rest stay on the release-wide tag
+    tag: "0.25.0"     # this unit only; the rest stay on the release-wide tag
 ```
 
 Normalmente solo vale la pena fijar la etiqueta (tag): el repositorio se hereda, por lo que se trata de

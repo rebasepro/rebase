@@ -1,5 +1,5 @@
 ---
-sourceHash: 53e679722797e137
+sourceHash: c5d1f52c0af5c703
 title: Riferimento CLI
 sidebar_label: CLI
 description: Comandi della CLI di Rebase per l'inizializzazione del progetto, la generazione dello schema, le migrazioni del database e la generazione dell'SDK.
@@ -41,7 +41,7 @@ Configura la struttura del progetto con frontend, backend e pacchetti condivisi.
 | `-i, --install` | Installa le dipendenze dopo lo scaffolding. Senza di esso, init lo chiede (predefinito sì); con `--yes`, non viene installato nulla |
 | `--no-install` | Non installa nulla, e non lo chiede |
 | `-g, --git` | Inizializza un repository ed esegue il primo commit. Senza di esso, init lo chiede (predefinito sì); con `--yes`, nessun repository |
-| `--database-url <url>` | Usa un database esistente invece di quello gestito. <span class="since-badge" data-since="0.25">Da 0.25</span> Deve essere un URL `postgres://` o `postgresql://`: qualsiasi altra cosa viene rifiutata prima che venga scritto un file, e il prompt interattivo lo richiede di nuovo |
+| `--database-url <url>` | Usa un database esistente invece di quello gestito. Deve essere un URL `postgres://` o `postgresql://`: qualsiasi altra cosa viene rifiutata prima che venga scritto un file, e il prompt interattivo lo richiede di nuovo |
 | `--introspect` | Genera le collection da tale database. Implica `--template blank` e richiede `--install` |
 | `--project <slug>` | Collega lo scaffold a un progetto Rebase Cloud |
 | `--setup-key <key>` | La chiave monouso per autenticare tale collegamento |
@@ -59,13 +59,13 @@ Avvia sia il frontend che il backend con hot reloading, e rigenera lo schema Dri
 
 Entrambe le porte sono derivate dal percorso del progetto, consentendo l'esecuzione affiancata di più progetti Rebase. Usa gli URL stampati da `rebase dev`. Puoi fissarne una con `rebase dev --port 3001`.
 
-<span class="since-badge" data-since="0.25">Da 0.25</span> Una modifica a `.env`
+Una modifica a `.env`
 riavvia il backend, che rilegge il file, come fa il pannello di amministrazione. Ciò che
 `rebase dev` imposta da sé resta com'è finché non lo riavvii: `PORT`, e `DATABASE_URL`
 quando è sul database gestito o su Docker. Su 0.24 una modifica a `.env` raggiungeva il
 backend solo quando cambiava qualche altro file osservato.
 
-<span class="since-badge" data-since="0.25">Da 0.25</span> Con
+Con
 `--database-url`, `rebase dev` controlla prima che qualcosa risponda a quell'host e a
 quella porta. Se non risponde nulla, lo dice, nominando il flag, e termina con `1` senza
 avviare nulla; lascia inoltre stare il database indicato da `.env`, senza mai avviarne il
@@ -93,7 +93,7 @@ Il bundle è l'artefatto di cui esegui il deploy — l'immagine di runtime lo ca
 
 Le dipendenze vengono incluse (vendored) per impostazione predefinita, evitando che il riavvio di un pod richieda un'installazione di 35–55 secondi. Un albero che supera i 200 MB su disco viene invece scartato, poiché il limite di caricamento è di 100 MB compressi — consulta il changelog per le motivazioni.
 
-<span class="since-badge" data-since="0.25">Da 0.25</span> Ogni app statica che il
+Ogni app statica che il
 bundle contiene riceve una copia brotli (`.br`) e una gzip (`.gz`) accanto a ogni
 asset con hash di contenuto di 1 KB o più — i file che un browser mette in cache per un anno.
 Il runtime invia quella che il browser accetta, così quei file non costano alcun
@@ -107,7 +107,7 @@ build e circa 2,4 MB al bundle.
 
 Aggiorna ogni pacchetto `@rebasepro/*` bloccato dal progetto a una singola release, quindi installa con il gestore di pacchetti i nomi indicati nel relativo lockfile. `rebase upgrade` seleziona l'ultima versione; `--to 0.21.0` una versione esatta, senza consultare il registro; `--to canary` un dist-tag. Ogni versione bloccata in `dependencies`, `devDependencies` e `optionalDependencies`, in ogni `package.json` del progetto, mantiene il proprio `^` o `~`, e null'altro nel file viene modificato. Le specifiche per `peerDependencies` e `workspace:`, `link:`, `file:`, git e tag vengono elencate e lasciate invariate. Anche gli override in `pnpm-workspace.yaml` e `package.json` vengono aggiornati, ma un override `link:` o `file:` ha la precedenza su qualsiasi blocco: viene segnalato e `--drop-local-overrides` lo rimuove. `--dry-run` non scrive nulla, `--no-install` salta l'installazione e `--json` stampa un unico documento.
 
-<span class="since-badge" data-since="0.25">Da 0.25</span> Un progetto su una prerelease,
+Un progetto su una prerelease,
 come un canary, resta sul suo canale a meno che `latest` sia più recente. Un dist-tag che
 sposterebbe un pin all'indietro viene rifiutato (`downgrade_refused` con `--json`) a meno
 che tu non passi `--allow-downgrade`; un `--to` esatto viene applicato, e segnalato come
@@ -132,7 +132,7 @@ in testa; imposta `NODE_ENV=production` per un server di produzione.
 
 `rebase start` non avvia alcun database, e il `.env` dello scaffold non ha
 `DATABASE_URL`, quindi un'esecuzione locale sul database che usa `rebase dev` è
-`DATABASE_URL="$(rebase db url)" rebase start`. <span class="since-badge" data-since="0.25">Da 0.25</span>
+`DATABASE_URL="$(rebase db url)" rebase start`.
 Senza uno, stampa quella riga prima dell'avvio; su 0.24 il runtime si ferma su
 "DATABASE_URL: is required".
 
@@ -158,7 +158,7 @@ Scrive l'entrypoint del backend e un `Dockerfile` nel progetto e converte il bac
 
 Visualizzane un'anteprima con `rebase eject --dry-run`, che elenca le modifiche senza applicarle. `--force` sostituisce un file `backend/src/index.ts` o `env.ts` esistente, conservando il file corrente come `<name>.bak`.
 
-<span class="since-badge" data-since="0.25">Da 0.25</span> Il server espulso tiene gli
+Il server espulso tiene gli
 upload locali nella cartella `uploads/` del progetto, eseguito dai sorgenti o compilato,
 come fa `rebase dev`. Gira in `backend/`, quindi lì uno `STORAGE_PATH` relativo viene
 letto da `backend/`. Su 0.24 il server compilato usa `backend/dist/uploads`, che la
@@ -204,8 +204,6 @@ sceglie il proprio database; `push`, `generate` e `migrate` sono trattati in det
 
 ### `rebase console`
 
-<span class="since-badge" data-since="0.25">Da 0.25</span>
-
 Un REPL Node con i dati del progetto aperti, oppure un singolo snippet eseguito con `-e`:
 
 ```bash
@@ -232,7 +230,7 @@ rebase apps config <app>     # the client configuration for one app
 `rebase.json`, e rifiuta di sostituirne uno esistente a meno che tu non passi
 `--force`.
 
-<span class="since-badge" data-since="0.25">Da 0.25</span> Un argomento nome viene
+Un argomento nome viene
 rifiutato. `--force` mantiene ciò che l'inferenza non può sapere dal file che sostituisce:
 il nome di ogni app, il suo `path` e la sua route `cms`. Tutto il resto viene dedotto di
 nuovo, e un'app dichiarata che non trova più viene nominata come rimossa, quindi su uno
@@ -241,7 +239,7 @@ statica usa il gestore di pacchetti del progetto. Su 0.24 il nome viene ignorato
 `--force` scrive la semplice inferenza: l'app statica diventa `web`, compilata con
 `npm run build --workspace frontend`.
 
-<span class="since-badge" data-since="0.25">Da 0.25</span> Per un checkout non collegato
+Per un checkout non collegato
 a un progetto Cloud, `apps config` dice che non è collegato, che `rebase dev` sia in
 esecuzione o meno, e fornisce l'URL del backend così come lo serve `rebase dev`. Su 0.24
 stampa `http://localhost:3001`.
@@ -273,7 +271,7 @@ Tre file determinano le risorse accessibili da un backend, e questo comando li i
 
 Il simbolo `○` denota lo stato che è utile rilevare prima del deployment anziché dopo: risorsa dichiarata ma non configurata. Il simbolo `✗` indica una configurazione *errata* nell'ambiente, condizione che impedisce l'avvio invece di consentire un funzionamento degradato.
 
-<span class="since-badge" data-since="0.25">Da 0.25</span> Un
+Un
 `rebase.resources.json` che non corrisponde più alle dichiarazioni riceve una riga `○`.
 Uno non ancora scritto no: `rebase build` lo scrive a ogni build, quindi un progetto mai
 compilato, come uno scaffold appena creato, non ha nulla da correggere. Su 0.24 lo
@@ -291,7 +289,7 @@ rebase resources --json     # machine-readable
 ```
 
 `rebase resources --check` è il flag utilizzato nei job di CI per segnalare un errore qualora `rebase.resources.json` non corrisponda più al codice di configurazione.
-<span class="since-badge" data-since="0.25">Da 0.25</span> `--json` si combina con esso:
+`--json` si combina con esso:
 in caso di drift, `rebase resources --check --json` termina con 1 e una busta di errore
 (`resource_graph_missing` o `resource_graph_stale`), e in caso di successo il grafo porta
 `check.status`. `--write --json` scrive il file e riporta `written.changed`. Su 0.24
@@ -300,7 +298,7 @@ in caso di drift, `rebase resources --check --json` termina con 1 e una busta di
 Una risorsa viene dichiarata nel codice di configurazione — `database("analytics")`, `bucket("media")`, `topic("signups")`, `queue("thumbnails")` — oppure consiste in un file collocato in `backend/crons` o `backend/functions`. Essa non va mai scritta manualmente in `rebase.resources.json`, file generato automaticamente da tali dichiarazioni per consentire all'host di determinare le dipendenze del progetto senza compilarlo. Ogni voce tiene traccia dei relativi utilizzatori (`collection:events`, `property:posts.cover`, `function:report`).
 
 Un backend include inoltre un database predefinito e una sorgente di archiviazione predefinita che non richiedono alcuna dichiarazione. Entrambi compaiono in questo elenco con il contrassegno `implicit` e non vengono registrati in `rebase.resources.json`: essendo forniti direttamente dall'host, la loro annotazione comporterebbe la richiesta di provisioning per risorse non esplicitamente sollecitate.
-<span class="since-badge" data-since="0.25">Da 0.25</span> Dichiararne uno con
+Dichiararne uno con
 nome, come `bucket("media")`, lascia il predefinito dov'è, quindi compaiono entrambi.
 Solo dichiarare il predefinito stesso, o segnare un bucket con `default: true`, lo
 sostituisce. Su 0.24 la sorgente di archiviazione predefinita spariva da
@@ -393,7 +391,7 @@ Le chiavi prevedono un duplice livello di autorizzazione: a esse si applicano si
 
 ### `rebase storage`
 
-<span class="since-badge" data-since="0.25">Da 0.25</span> Manutenzione dell'intero
+Manutenzione dell'intero
 store dei file archiviati, tramite il backend in esecuzione con
 `REBASE_SERVICE_KEY` da `.env`:
 
@@ -439,7 +437,7 @@ Condivisione anonima dei dati di utilizzo, disattivata finché non dici di sì. 
 nulla viene condiviso a meno che tu risponda sì. La risposta vale per macchina
 (`~/.rebase/telemetry.json`): dopo un sì `init` non lo chiede più, e dopo un no il
 successivo `init` lo chiede di nuovo. Ogni checkout riceve un id di progetto casuale,
-conservato nel suo `.rebase/telemetry-project.json` escluso da git. <span class="since-badge" data-since="0.25">Da 0.25</span>
+conservato nel suo `.rebase/telemetry-project.json` escluso da git.
 Su 0.24 il prompt ha come predefinito sì, e l'id di progetto cambia a ogni riavvio di
 `rebase dev`.
 

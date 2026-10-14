@@ -1,5 +1,5 @@
 ---
-sourceHash: 2bd46c60d468fb45
+sourceHash: 1c45110c48185387
 title: Estendendo o Rebase
 sidebar_label: Estendendo o Rebase
 description: Um guia de decisão para escolher o mecanismo de extensão correto — plugins, slots, substituições de componentes, visualizações de entidade, ações e muito mais.
@@ -235,7 +235,7 @@ painel exibe, esta não é a página correta. O servidor tem sua própria estrut
 
 ## Resumo de Precedência
 
-- **`collection.components` se aplica sobre os `components` globais** dentro dessa coleção. Uma substituição (replace) da coleção substitui ambos; <span class="since-badge" data-since="0.25">Desde 0.25</span> uma substituição da coleção com `wrap: true` envolve a substituição global quando há uma (na 0.24 ela envolve o componente integrado, e a substituição global é ignorada). Veja [Substituições de Componentes](/docs/frontend/component-overrides#when-both-scopes-override-a-component).
+- **`collection.components` se aplica sobre os `components` globais** dentro dessa coleção. Uma substituição (replace) da coleção substitui ambos; uma substituição da coleção com `wrap: true` envolve a substituição global quando há uma (na 0.24 ela envolve o componente integrado, e a substituição global é ignorada). Veja [Substituições de Componentes](/docs/frontend/component-overrides#when-both-scopes-override-a-component).
 - **`Actions` de coleção e o slot `collection.actions` são cumulativos** — `Actions` são renderizados primeiro, seguidos pelas contribuições de slots.
 - **`entityActions` e `entityViews` em nível de coleção estendem (não substituem) os globais.**
-- **Os plugins se aplicam na ordem do array `plugins`**, não pela `key`. As contribuições de slots são renderizadas pelo seu `order` (o menor primeiro, 50 por padrão), e os empates mantêm essa ordem. <span class="since-badge" data-since="0.25">Desde 0.25</span> Os wrappers de campo de vários plugins se compõem nessa ordem, com o do primeiro plugin por dentro; na 0.24 apenas o último wrapper era renderizado. Veja [Plugins](/docs/plugins#field-wrappers-from-several-plugins).
+- **Os plugins se aplicam na ordem do array `plugins`**, não pela `key`. As contribuições de slots são renderizadas pelo seu `order` (o menor primeiro, 50 por padrão), e os empates mantêm essa ordem. Os wrappers de campo de vários plugins se compõem nessa ordem, com o do primeiro plugin por dentro; na 0.24 apenas o último wrapper era renderizado. Veja [Plugins](/docs/plugins#field-wrappers-from-several-plugins).

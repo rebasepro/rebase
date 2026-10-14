@@ -151,7 +151,7 @@ function ProductDetail({ productId }) {
 
 Rebase maintains a global memory cache to prevent UI flashing. You can manipulate this cache directly:
 
-- `populateFetchCache(path, entities)`: Pre-populates the cache with a list of entities (e.g. after a bulk action or custom API call). <span class="since-badge" data-since="0.25">Since 0.25</span> The cache keeps the 2,000 records written or read most recently. A collection view no longer writes every row it shows into it: clicking a row, or its **Edit** or **Copy** action, puts that one row there, so the record still opens with its values on screen.
+- `populateFetchCache(path, entities)`: Pre-populates the cache with a list of entities (e.g. after a bulk action or custom API call). The cache keeps the 2,000 records written or read most recently. A collection view no longer writes every row it shows into it: clicking a row, or its **Edit** or **Copy** action, puts that one row there, so the record still opens with its values on screen.
 - `clearFetchCache()`: Clears the cache. Recommended to call this upon user logout to prevent data leakage.
 
 ## `usePermissions`

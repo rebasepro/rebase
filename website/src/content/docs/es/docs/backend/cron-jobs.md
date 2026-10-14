@@ -1,5 +1,5 @@
 ---
-sourceHash: e5474c2a6107ff70
+sourceHash: 008801863c78b3e5
 title: Cron Jobs
 sidebar_label: Cron Jobs
 description: Programa tareas recurrentes en segundo plano con el sistema integrado de cron jobs de Rebase. Define tareas como archivos TypeScript, monitorízalas en Studio y gestiónalas a través de la API REST.
@@ -86,7 +86,7 @@ Eso es todo. Rebase hará lo siguiente:
 
 ### Cron jobs como valores
 
-<span class="since-badge" data-since="0.25">Desde 0.25</span> En 0.24 los cron jobs provienen solo de un directorio.
+En 0.24 los cron jobs provienen solo de un directorio.
 
 `crons` recibe las tareas como un objeto que va del id de la tarea a su definición, junto a `collections`. Un directorio es una forma de construirlo: `loadCrons(dir)` lee uno y lo devuelve exactamente con esa forma.
 
@@ -202,7 +202,7 @@ interface CronJobContext {
 
 Usa `ctx.log()` para emitir salida estructurada. Estas líneas se capturan en el registro de ejecución y son visibles en Studio y a través de la API REST. Cada línea también se escribe en el registro del servidor con nivel `info` y un campo `cron` que contiene el ID del job, así que aparece en cualquier sistema que recoja la salida de tu contenedor, incluidos los registros de depuración de Rebase Cloud. En esa copia se ocultan los mismos datos que en las líneas de registro del propio servidor: se sustituyen los valores de claves como `password` o `apiKey`, y el SQL y los parámetros de una consulta fallida. El registro de ejecución guarda la línea sin ocultar nada.
 
-<span class="since-badge" data-since="0.25">Desde 0.25</span> El registro de ejecución conserva las primeras 500 líneas de una ejecución o 64 KB de ellas, lo que ocurra primero, y después una línea que dice cuántas más hubo: `… 9500 more lines not kept — see the server log`. El registro del servidor recibe todas las líneas. Un job que registra una línea por cada elemento que procesa debe esperar que su historial muestre el comienzo de la ejecución.
+El registro de ejecución conserva las primeras 500 líneas de una ejecución o 64 KB de ellas, lo que ocurra primero, y después una línea que dice cuántas más hubo: `… 9500 more lines not kept — see the server log`. El registro del servidor recibe todas las líneas. Un job que registra una línea por cada elemento que procesa debe esperar que su historial muestre el comienzo de la ejecución.
 
 ### `ctx.signal` — detén el trabajo cuando la ejecución se detenga
 
@@ -310,7 +310,7 @@ El panel muestra lo mismo sea cual sea el proceso que lo sirve. Una tarea que
 otro proceso está ejecutando aparece como en ejecución.
 En todo proceso que tiene un almacén, el número de ejecuciones, el número de fallos y la última ejecución se leen de la base de datos, donde se cuentan las ejecuciones de todos los procesos. Los contadores propios de un proceso solo recogen las ejecuciones que hizo él: el rol `api` junto a un worker no ejecuta nada, y de dos réplicas que programan ambas, ninguna ve los turnos que reclamó la otra. Solo cuando no se puede leer la base de datos recurre la tarjeta a los contadores propios de este proceso, con una advertencia en el registro del servidor.
 
-<span class="since-badge" data-since="0.25">Desde 0.25</span> Los recuentos son de toda la vida; el historial son los últimos 30 días. La fila de cada ejecución en `rebase.cron_logs` se elimina 30 días después de que empezó, mediante un barrido cada hora, mientras que los recuentos de ejecuciones y fallos siguen contándola. Una ejecución omitida cuenta como ejecución, como siempre: es una fila del historial.
+Los recuentos son de toda la vida; el historial son los últimos 30 días. La fila de cada ejecución en `rebase.cron_logs` se elimina 30 días después de que empezó, mediante un barrido cada hora, mientras que los recuentos de ejecuciones y fallos siguen contándola. Una ejecución omitida cuenta como ejecución, como siempre: es una fila del historial.
 
 ## Validación de programación y análisis AST
 
@@ -400,7 +400,7 @@ usuario final `rebase_user` no tiene ningún privilegio sobre ellas: un
 `cron_job_state` escribible permitiría a un usuario autenticado pausar una tarea
 para todos, o retener su lease para que nada la ejecute.
 
-<span class="since-badge" data-since="0.25">Desde 0.25</span> La fila de una ejecución y su recuento se escriben en una sola sentencia: la inserción en `cron_logs` y un upsert de los contadores de la tarea en `cron_job_state`. Un listado lee una fila de `cron_job_state` por tarea, por largo que sea el historial, y lo mismo hace el programador cuando inicializa `totalRuns` y `totalFailures` al arrancar. Las escrituras del registro no retienen la ejecución; si una falla, el programador registra el error y continúa, con la ejecución todavía en el búfer circular en memoria.
+La fila de una ejecución y su recuento se escriben en una sola sentencia: la inserción en `cron_logs` y un upsert de los contadores de la tarea en `cron_job_state`. Un listado lee una fila de `cron_job_state` por tarea, por largo que sea el historial, y lo mismo hace el programador cuando inicializa `totalRuns` y `totalFailures` al arrancar. Las escrituras del registro no retienen la ejecución; si una falla, el programador registra el error y continúa, con la ejecución todavía en el búfer circular en memoria.
 
 Una vez por hora, y al arrancar, el programador elimina las filas del historial de más de 30 días y cuenta las ejecuciones que aún no están contadas, ambas cosas en lotes de 5.000 filas. Un historial escrito antes de la 0.24 lo cuenta el primero de estos barridos, fuera de la ruta de arranque. Hasta que termina, un listado suma a los contadores las ejecuciones que todavía no ha contado, de modo que las cifras no cambian al actualizar. Lo mismo vale para una ejecución que un servidor más antiguo registra durante un despliegue progresivo.
 
@@ -453,7 +453,7 @@ async handler({ log }) {
 
 El handler se ejecuta en el despliegue, donde esas variables existen. Una importación en el nivel superior (top-level) del mismo módulo hace que el grafo solo pueda derivarse en una máquina que tenga un `.env`, y carga toda la dependencia en cada arranque que simplemente registre la tarea.
 
-<span class="since-badge" data-since="0.25">Desde 0.25</span> Cargar un cron no
+Cargar un cron no
 declara nada. Un paso de compilación propio que quiera los crons en el grafo
 lo dice con `declareCrons`:
 

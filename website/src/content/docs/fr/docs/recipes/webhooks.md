@@ -1,5 +1,5 @@
 ---
-sourceHash: 75953facb59d9645
+sourceHash: ead814d8414e0434
 title: "Recette : Intégration de Webhooks"
 sidebar_label: Webhooks
 description: Utilisez les callbacks d'entité pour envoyer des webhooks à des services externes lorsque les données changent, sans maintenir ouverte la transaction de l'écriture.
@@ -91,7 +91,7 @@ comme n'importe quel job. Voir [Webhooks durables](/docs/backend/jobs#durable-we
 
 `setCollectionCallbacks` **remplace** les callbacks que la collection `orders`
 déclare. Si elle en déclare, conservez-les :
-<span class="since-badge" data-since="0.25">Depuis 0.25</span> passez
+passez
 `composeCallbacks(declared, { afterSave })`, avec `composeCallbacks` issu de
 `@rebasepro/server` et `declared` les `callbacks` propres à la collection. Voir
 [Combiner des ensembles de callbacks](/docs/collections/callbacks/#combining-callback-sets).
@@ -143,7 +143,7 @@ build de l'admin.
 
 Un crash ou un déploiement entre la validation et la livraison perd l'événement. Chaque webhook possède sa
 propre file : un destinataire hors service ne retarde que ses propres livraisons, jamais celles d'un autre
-webhook. <span class="since-badge" data-since="0.25">Depuis 0.25</span> La file de chaque webhook contient au plus 10 000 livraisons en attente ; tant qu'elle est
+webhook. La file de chaque webhook contient au plus 10 000 livraisons en attente ; tant qu'elle est
 pleine, une nouvelle livraison est refusée et signalée à `onDelivery` avec `success: false`,
 `statusCode: 0`, `attemptNumber: 0` et `responseBody: "queue full"`, et le journal du serveur l'indique une
 fois. Appelez `await dispatcher.flush(10_000)` à l'arrêt : l'appel attend ce qui est en file et se résout à
@@ -214,7 +214,7 @@ Ne passez jamais à un `fetch` nu une URL venue de votre base de données. Le di
 destinations loopback, link-local, privées et les schémas autres que `http(s)` avant de se
 connecter, et refuse de suivre les redirections, précisément parce qu'une URL stockée est une
 entrée contrôlée par un attaquant.
-<span class="since-badge" data-since="0.25">Depuis 0.25</span> Sur Node, il juge l'adresse à laquelle chaque connexion est réellement établie, à l'intérieur de la
+Sur Node, il juge l'adresse à laquelle chaque connexion est réellement établie, à l'intérieur de la
 résolution DNS propre à la connexion, de sorte qu'un nom dont l'enregistrement change entre une vérification
 et la connexion ne peut pas passer à travers ; le nom d'un destinataire est résolu une fois par connexion,
 et non une fois par livraison.

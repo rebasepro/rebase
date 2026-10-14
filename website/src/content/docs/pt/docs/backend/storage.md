@@ -1,5 +1,5 @@
 ---
-sourceHash: 912fb4a5c0d6c740
+sourceHash: cc1736a186791d89
 title: Configuração de Storage
 sidebar_label: Configuração de Storage
 description: Configure backends de sistema de arquivos local, compatíveis com S3 ou GCS/Firebase Storage para uploads de arquivos, imagens e mídia.
@@ -104,7 +104,7 @@ image: {
 | `GET` | `/api/storage/file/*` | Recuperar um arquivo — tudo após `/file/` é a chave do objeto |
 | `GET` | `/api/storage/file/*?storageId=<key>` | Recuperar um arquivo de um backend específico |
 | `GET` | `/api/storage/metadata/*` | Tamanho, tipo de conteúdo e metadados personalizados de um objeto, sem seus bytes, além de um token de download de curta duração quando for privado |
-| `POST` | `/api/storage/metadata` | <span class="since-badge" data-since="0.25">Desde 0.25</span> O mesmo para até 100 objetos de uma única fonte: corpo `{ keys, storageId? }` |
+| `POST` | `/api/storage/metadata` | O mesmo para até 100 objetos de uma única fonte: corpo `{ keys, storageId? }` |
 | `DELETE` | `/api/storage/file/*` | Excluir um arquivo |
 | `GET` | `/api/storage/list` | Listar objetos sob um prefixo (`prefix`, `bucket`, `maxResults`, `pageToken`, `storageId`). Um `maxResults` menor que 1, ou um `pageToken` que a fonte nunca emitiu, resulta em `400 INVALID_LIST_OPTIONS` |
 | `POST` | `/api/storage/folder` | Criar um marcador de pasta vazia |
@@ -127,7 +127,7 @@ com os códigos na [referência de erros](/docs/backend/errors/). `/api/storage/
   "size": 48213, "updated": "2026-10-01T12:00:00.000Z", "contentType": "image/jpeg" } ], "prefixes": [] } }
 ```
 
-<span class="since-badge" data-since="0.25">Desde 0.25</span> Uma listagem descreve cada arquivo retornado: seu `size` em bytes e
+Uma listagem descreve cada arquivo retornado: seu `size` em bytes e
 `updated`, quando foi gravado pela última vez, no armazenamento local, S3 e GCS, e seu
 `contentType` no armazenamento local e GCS. Uma listagem do S3 não carrega o tipo,
 portanto, no S3 ele fica ausente e `/api/storage/metadata/*` ainda o informa. Uma pasta em
@@ -152,7 +152,7 @@ leituras: um upload, um `POST /api/storage/folder` ou um upload TUS informando q
 bucket responde `404 UNKNOWN_STORAGE_SOURCE`, assim como a listagem. O armazenamento local
 ainda cria um bucket em sua primeira gravação.
 
-**Múltiplos objetos de uma só vez.** <span class="since-badge" data-since="0.25">Desde 0.25</span> `POST /api/storage/metadata` aceita
+**Múltiplos objetos de uma só vez.** `POST /api/storage/metadata` aceita
 `{ "keys": ["photos/a.png", "photos/b.png"], "storageId": "media" }` — até 100
 caminhos de objeto de uma única fonte, cada um formatado como `GET /api/storage/metadata/<key>`
 recebe — e responde com uma entrada por chave:
@@ -207,7 +207,7 @@ nenhum dos dois avisava sobre isso.
 As miniaturas de imagens armazenadas no painel administrativo utilizam este endpoint: uma tabela ou prévia
 em card solicita uma versão em webp com cerca do dobro do tamanho renderizado (96–800px)
 em vez do original. Arquivos SVG e GIF são sempre exibidos como estão.
-O `sharp` é opcional: <span class="since-badge" data-since="0.25">Desde 0.25</span>
+O `sharp` é opcional:
 sem ele, uma requisição de transformação recebe o original, e o backend avisa uma vez
 para executar `pnpm add sharp` em `backend/` (na 0.24 ele responde 500, e o painel exibe os originais).
 
@@ -298,7 +298,7 @@ STORAGE_MAX_FILE_SIZE__MEDIA=1073741824  # media: 1 GB
 A quantidade de um arquivo que o servidor mantém de uma só vez depende da porta de entrada.
 `POST /api/storage/upload` é um único corpo multipart, que o servidor analisa por inteiro:
 de três a cinco vezes o tamanho do arquivo em sua memória. Um upload retomável (TUS) mantém um
-bloco por vez. <span class="since-badge" data-since="0.25">Desde 0.25</span> `client.storage.putObject()` e o painel administrativo enviam arquivos
+bloco por vez. `client.storage.putObject()` e o painel administrativo enviam arquivos
 acima de 8 MiB pelo método retomável. Consulte
 [Uploads retomáveis (TUS)](/docs/backend/storage-resumable-uploads/) para saber mais sobre o
 protocolo, o que ele responde e como se comporta entre instâncias.
@@ -345,7 +345,7 @@ tópicos juntos.
 Cada fonte é configurada a partir dos **mesmos nomes de variáveis carregando seu próprio
 sufixo**. A fonte padrão não leva sufixo, portanto, um projeto de bucket único continua
 usando os nomes comuns acima e não precisa declarar nada, e declarar buckets
-nomeados ao lado dele não os altera (<span class="since-badge" data-since="0.25">Desde 0.25</span>, [detalhes](/docs/backend/multiple-sources/#which-bucket-receives-an-unqualified-upload)):
+nomeados ao lado dele não os altera ([detalhes](/docs/backend/multiple-sources/#which-bucket-receives-an-unqualified-upload)):
 
 ```bash
 S3_BUCKET=app-uploads             # (default)

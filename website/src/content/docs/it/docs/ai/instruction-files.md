@@ -1,5 +1,5 @@
 ---
-sourceHash: 32c7b310f4621e8a
+sourceHash: bc24a5e7b69762ad
 title: File di Istruzioni AI
 sidebar_label: File di Istruzioni AI
 description: Ogni progetto Rebase scaffoldato include ai-instructions.md più file puntatore di tre righe per Claude, Cursor, Windsurf, Copilot e AGENTS.md — un'unica fonte di verità, molti nomi di file.
@@ -104,7 +104,7 @@ sessione:
    `pnpm db:push` serve solo per ciò che il boot lascia deliberatamente stare —
    una colonna rinominata, un tipo ristretto, un campo rimosso — sul database di
    sviluppo gestito come sul tuo PostgreSQL. In produzione la coppia è `pnpm db:generate` e poi `pnpm db:migrate`.
-   <span class="since-badge" data-since="0.25">Da 0.25</span> Su 0.24
+   Su 0.24
    `pnpm db:push` richiede il tuo PostgreSQL, e il file lo dice.
 3. **Usa l'SDK.** Passa attraverso `rebase.dataAsAdmin.<slug>` per il lavoro svolto
    con l'identità del servizio, oppure `getDriver(c)` dentro una function quando la

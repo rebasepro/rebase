@@ -1,5 +1,5 @@
 ---
-sourceHash: 1d7b256891673c72
+sourceHash: 0a17c13d60408e81
 title: Sobrescritura de componentes (Swizzling)
 sidebar_label: Sobrescritura de componentes
 description: Sobrescribe componentes de interfaz de usuario predeterminados con implementaciones personalizadas a nivel de aplicación o colección.
@@ -112,7 +112,7 @@ Una referencia directa (`Component: ProductCustomForm`) también funciona, pero 
 
 ### Cuando ambos alcances sobrescriben un componente
 
-<span class="since-badge" data-since="0.25">Desde 0.25</span> En 0.24 el contenedor (wrapper) de una colección siempre recibe el componente integrado, y la sobrescritura a nivel de aplicación se omite dentro de esa colección.
+En 0.24 el contenedor (wrapper) de una colección siempre recibe el componente integrado, y la sobrescritura a nivel de aplicación se omite dentro de esa colección.
 
 Los dos alcances se componen. La sobrescritura a nivel de aplicación (`<Rebase components>`) se aplica primero al componente integrado, y la de la colección (`admin.components`) se aplica al resultado:
 

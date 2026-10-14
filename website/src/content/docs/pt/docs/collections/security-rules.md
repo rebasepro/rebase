@@ -1,5 +1,5 @@
 ---
-sourceHash: 963ab532acd3da90
+sourceHash: bf198f4f8752c00d
 title: Regras de Segurança (RLS)
 sidebar_label: Regras de Segurança
 description: Defina políticas de Row Level Security para suas coleções usando atalhos de conveniência ou expressões SQL puras.
@@ -49,7 +49,7 @@ As policies de uma tabela são mais do que as `securityRules` da própria coleç
   lugar, como se as tivesse escrito. Uma coleção que declara ao menos uma regra
   própria não recebe nenhuma: as duas listas nunca são mescladas. Elas são aplicadas
   onde quer que o diretório seja lido: `rebase dev`, `rebase db push`, o painel de
-  administração e um backend que recebe `collectionsDir`. <span class="since-badge" data-since="0.25">Desde 0.25</span>
+  administração e um backend que recebe `collectionsDir`.
   O índice do scaffold também as aplica ao array `collections` que ele exporta,
   então um backend que recebe esse array também as recebe. Um array montado de
   qualquer outra forma carrega apenas as regras que suas coleções declaram.

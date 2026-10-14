@@ -1,5 +1,5 @@
 ---
-sourceHash: e20c62e3ffffe67b
+sourceHash: dd99ad3524029bf5
 title: Suddivisione in più processi
 sidebar_label: Processi separati
 description: Esegui un unico bundle suddiviso in vari processi cooperanti — un'API, un livello per le funzioni, un worker — a partire dalla stessa immagine di runtime pubblicata, evitando che una funzione custom pesante competa con l'API dati.
@@ -43,7 +43,7 @@ REBASE_ROLE=all        # the default: everything, one process
 Health e metriche sono presenti su ciascun ruolo senza eccezioni. Un processo che un
 orchestratore non può sottoporre a probe è un processo di cui non può effettuare il rollout.
 
-<span class="since-badge" data-since="0.25">Da 0.25</span> `GET /api/auth/config`,
+`GET /api/auth/config`,
 ciò che legge la schermata di accesso, segue il resto di `/api/auth`: lo servono solo `api` e
 `all`. Su 0.24 lo rendeva disponibile anche un processo `functions` o `worker`.
 
@@ -154,7 +154,7 @@ e successivamente vi scrive in due passaggi separati, quindi processi avviati co
 conflitto — e un deployment in cui più istanze competono per effettuare il provisioning dello stesso
 schema non è uno scenario previsto.
 
-<span class="since-badge" data-since="0.25">Da 0.25</span> In un
+In un
 [server personalizzato](/docs/backend/custom-server/), la stessa decisione è l'opzione
 `provision` di `createRebaseBackend`: `true` nel processo che possiede lo schema, e
 `{ collections: false, realtime: false }` in tutti gli altri, che mantiene comunque le
@@ -245,7 +245,7 @@ split: true
 functions:
   enabled: true
   image:
-    tag: "0.24.0"     # this unit only; the rest stay on the release-wide tag
+    tag: "0.25.0"     # this unit only; the rest stay on the release-wide tag
 ```
 
 Solitamente ha senso bloccare solo il tag: il repository viene ereditato, quindi si tratta di

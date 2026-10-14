@@ -6,7 +6,7 @@ description: Open a project's data from a script, a test or a REPL with openReba
 
 ## Overview
 
-<span class="since-badge" data-since="0.25">Since 0.25</span> On 0.24 there is
+On 0.24 there is
 no `openRebase` and no `rebase console`: a script has to build a backend, or
 call the REST API of a running server.
 
@@ -27,8 +27,6 @@ server, `dataAsAdmin` and `sql`, so a snippet moves between a function, a script
 and the console unchanged.
 
 ## `rebase console`
-
-<span class="since-badge" data-since="0.25">Since 0.25</span>
 
 Run it in your project:
 
@@ -66,8 +64,6 @@ stderr.
 
 ### One snippet: `--eval`
 
-<span class="since-badge" data-since="0.25">Since 0.25</span>
-
 `rebase console -e "<code>"` runs one piece of code instead of the REPL. An
 expression's value, or a function body's `return`, is awaited and printed as
 JSON on stdout, so the output can be piped:
@@ -82,7 +78,7 @@ Everything the console logs, whatever `LOG_LEVEL` says, goes to stderr, so
 stdout holds the result and nothing else. A snippet that throws prints the error
 on stderr and exits `1`.
 
-<span class="since-badge" data-since="0.25">Since 0.25</span> A database the
+A database the
 console cannot open is reported once, and it exits `1`: the "Cannot connect to
 PostgreSQL" banner the `db` commands print, or, on the managed development
 database, that it has no free connection. That database accepts only a few
@@ -101,8 +97,6 @@ under an empty `❌ [ERROR]` line, and a full managed database printed
 | `--docker` | Use the database from docker compose, starting it if needed |
 
 ## `openRebase`
-
-<span class="since-badge" data-since="0.25">Since 0.25</span>
 
 `openRebase` from `@rebasepro/server-postgres` is what the console calls. Use
 it in a script, a seed, a data fix or a test. In a scaffolded project, put the
@@ -155,7 +149,7 @@ Its options:
 your script, and settings such as `REBASE_DB_POOL_MAX` or `REALTIME_CDC` change
 nothing here.
 
-<span class="since-badge" data-since="0.25">Since 0.25</span> Opening logs
+Opening logs
 nothing at `info`, so a script's stdout holds what the script prints, and
 `tsx scripts/report.ts > report.json` writes only its JSON. Warnings and errors
 go to stderr in development. The note on how requests are isolated (`RLS
@@ -174,8 +168,6 @@ a helper that takes one. With neither, rows are untyped, which is why the first
 example converts `draft.id` with `String()`.
 
 ### Checking what a user can see
-
-<span class="since-badge" data-since="0.25">Since 0.25</span>
 
 `withAuth` is the quickest way to test a security rule against real data. The
 blog scaffold, `rebase init`'s default, gives every collection the
@@ -223,8 +215,6 @@ unfiltered. Run `rebase db push`, or boot the server once, first.
 
 ### In a test
 
-<span class="since-badge" data-since="0.25">Since 0.25</span>
-
 ```typescript
 import { after, before, test } from "node:test";
 import assert from "node:assert/strict";
@@ -258,8 +248,6 @@ The same works under Vitest or Jest.
 
 ### Collections with history
 
-<span class="since-badge" data-since="0.25">Since 0.25</span>
-
 A write to a collection with [`history: true`](/docs/backend/history/) records
 its entry the way a server write does. The entry is written in the row's own
 transaction, so a write that rolls back leaves no entry. It is recorded as the
@@ -279,8 +267,6 @@ cannot see, so the server prunes them as usual: when it next writes the entity,
 and in its hourly sweep.
 
 ### What it leaves out
-
-<span class="since-badge" data-since="0.25">Since 0.25</span>
 
 `openRebase` opens the data layer and nothing else. It starts no realtime, so
 its writes are not announced to live queries. Storage, email, auth

@@ -1,5 +1,5 @@
 ---
-sourceHash: 3702fa186011ca6b
+sourceHash: 2ab6f8f502363939
 title: Campos de upload de arquivos
 sidebar_label: Uploads de arquivos
 description:"\"Declarando um campo de arquivo ou imagem em uma coleção: o bloco de storage, uploads de arquivo único e múltiplos arquivos, e quais de suas opções o painel resolve em vez do servidor.\""
@@ -149,7 +149,7 @@ mesma chave, então o painel não tem como saber que um arquivo está sem uso.
 Objetos aos quais nenhuma linha aponta permanecem no bucket, e são cobrados,
 até que você os exclua — pelo navegador de storage do Studio, com
 `client.storage.deleteObject(key)`, ou com uma regra de ciclo de vida no
-bucket. <span class="since-badge" data-since="0.25">Desde 0.25</span> `rebase storage orphans` lista os arquivos que nenhuma linha nomeia e os exclui
+bucket. `rebase storage orphans` lista os arquivos que nenhuma linha nomeia e os exclui
 com `--delete` — veja [a CLI](/docs/cli/#rebase-storage).
 
 ### Movendo uma propriedade para outra fonte de storage

@@ -1,5 +1,5 @@
 ---
-sourceHash: 333a5c7a8ba6fe64
+sourceHash: 8376384a90695757
 title: Ricerca vettoriale
 sidebar_label: Ricerca vettoriale
 description: Ricerca del vicino più prossimo su una proprietà vector tramite l'API REST — i parametri di query, le soglie, gli embedding troppo lunghi per un URL e come si comportano i filtri su un indice HNSW.
@@ -20,7 +20,7 @@ GET /api/data/products?vector_search=embedding&vector=[0.15,0.22,-0.05]&vector_d
 | `vector_distance` | `string` | La metrica di distanza da valutare. Valori supportati: `cosine` (predefinito, `<=>`), `l2` (`<->`), `inner_product` (`<#>`). |
 | `vector_threshold` | `number` | Soglia massima di distanza. Vengono restituiti solo i record con distanza inferiore a questa soglia. |
 
-<span class="since-badge" data-since="0.25">Da 0.25</span> Una ricerca vettoriale con una
+Una ricerca vettoriale con una
 `vector_threshold` non ha `meta.total`: contare le righe entro una distanza significa
 calcolare quella distanza per ogni riga della tabella, cosa che nessun indice serve — diverse
 volte il costo della pagina stessa, in crescita con righe × dimensioni. `meta.hasMore` è
@@ -29,14 +29,14 @@ quello ordinario.
 
 Un embedding è lungo in un URL: 768 dimensioni sono circa 17 KB di query string e
 1.536 circa 33 KB. Il server accetta fino a 64 KB di request line e header
-(<span class="since-badge" data-since="0.25">Da 0.25</span>; prima 16 KB, un 431
+(; prima 16 KB, un 431
 da 768 dimensioni in su), e un proxy davanti ad esso di solito ne accetta meno — il valore
 predefinito di nginx è 8 KB. Invia invece una ricerca vettoriale come [`POST …/query`](#query-troppo-lunghe-per-un-url);
 l'SDK lo fa sempre.
 
 ## Filtri su un indice approssimato
 
-<span class="since-badge" data-since="0.25">Da 0.25</span> Una ricerca vettoriale che
+Una ricerca vettoriale che
 filtra anche — un `where`, una ricerca, la row-level security — restituisce le righe più vicine
 che corrispondono. Un indice HNSW risponde con un numero fisso di candidati più vicini
 (`hnsw.ef_search`, 40 per impostazione predefinita), e le altre condizioni vengono applicate a quelli;
@@ -51,7 +51,7 @@ esatta (`index: false`) non l'ha mai avuto.
 
 ## Query troppo lunghe per un URL
 
-<span class="since-badge" data-since="0.25">Da 0.25</span> `POST /api/data/:slug/query`
+`POST /api/data/:slug/query`
 è l'elenco che `GET /api/data/:slug` restituisce, con i parametri di query in un body JSON
 invece che nell'URL. Usalo quando l'URL non ci starebbe — l'embedding di una ricerca vettoriale,
 un filtro su una lunga lista `in`. L'SDK invia ogni ricerca vettoriale in questo modo,
@@ -84,7 +84,7 @@ conta contro lo stesso rate limit del `GET`. Anche gli elenchi annidati lo hanno
 `POST /api/data/authors/42/posts/query`. Un server precedente alla 0.24 risponde 404;
 l'SDK invia allora il `GET`.
 
-<span class="since-badge" data-since="0.25">Da 0.25</span> Il conteggio ha lo
+Il conteggio ha lo
 stesso gemello: `POST /api/data/:slug/count` (e `POST /api/data/authors/42/posts/count`)
 è `GET /api/data/:slug/count` con i suoi parametri nel body, letti allo stesso modo
 e rifiutati allo stesso modo. Un conteggio porta i filtri del `find()` che descrive,

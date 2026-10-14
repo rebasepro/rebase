@@ -1,5 +1,5 @@
 ---
-sourceHash: a703c4791f9384f2
+sourceHash: e3a81a3528add4c5
 title: Integration eines eigenen Servers
 sidebar_label: Eigener Server
 description: Bauen Sie das Rebase-Backend aus öffentlichen Bausteinen in Ihrem eigenen Server – createRebaseBackend, seine Routengruppen, mount, attachRealtime und start – oder betten Sie den Postgres-Treiber in Express ein.
@@ -64,13 +64,13 @@ Die Runtime stellt `zod` bereit. Die `backend/package.json` des Scaffolds führt
 - Blockiert automatisch generierte Secrets in der Produktionsumgebung – Sie müssen diese explizit setzen.
 - Prüft, ob in der Produktionsumgebung `CORS_ORIGINS` oder `FRONTEND_URL` gesetzt ist.
 - Verweigert ein `extend`-Schema, das von einer anderen Kopie von Zod erstellt wurde.
-- Wirft einen `Error`, der jede fehlende oder falsche Variable nennt, etwa `DATABASE_URL: is required`, mit den Issues von Zod in seiner Eigenschaft `issues`. <span class="since-badge" data-since="0.25">Seit 0.25</span> Unter 0.24 wirft es Zods eigenen `ZodError`, der keine Variable nennt, wenn niemand ihn abfängt.
+- Wirft einen `Error`, der jede fehlende oder falsche Variable nennt, etwa `DATABASE_URL: is required`, mit den Issues von Zod in seiner Eigenschaft `issues`. Unter 0.24 wirft es Zods eigenen `ZodError`, der keine Variable nennt, wenn niemand ihn abfängt.
 
 Die vollständige Liste der unterstützten Variablen finden Sie in der `.env.example`-Datei der bereitgestellten Scaffold-App.
 
 ## Ein Schritt unter `initializeRebaseBackend`
 
-<span class="since-badge" data-since="0.25">Seit 0.25</span> Unter 0.24 ist
+Unter 0.24 ist
 `initializeRebaseBackend` der einzige Zugang, und keiner der folgenden Bausteine
 ist exportiert.
 
@@ -230,8 +230,6 @@ HTTP-Requests an `${baseUrl}/api` gehen. Ein Upgrade auf jeden anderen Pfad blei
 
 ### Was das Erstellen eines Backends verändern darf: `provision`
 
-<span class="since-badge" data-since="0.25">Seit 0.25</span>
-
 Das Erstellen eines Backends kann DDL ausführen, daher verlangt `createRebaseBackend`
 von Ihnen eine Entscheidung:
 
@@ -249,8 +247,6 @@ Collection-Schema weiterhin für jedes Backend im Prozess ab.
 
 ## Nur die gewünschten Gruppen einbinden
 
-<span class="since-badge" data-since="0.25">Seit 0.25</span>
-
 `backend.routes` enthält die Routengruppen. Jede ist eine Hono-Sub-App, die Sie für
 sich allein unter jedem Pfad einbinden können:
 
@@ -267,7 +263,7 @@ app.route("/hooks", backend.routes.functions());   // getUser(c) and getDriver(c
 
 `collections` ist das Array, das die `config/collections/index.ts` eines Scaffolds exportiert. Es trägt die `defaultSecurityRules` dieses Index, wie `collectionsDir` es tut, sodass das Backend die Policies anlegt, die `rebase db push` anlegen würde. Ein eigenes Array trägt nur die Regeln, die seine Collections deklarieren, und `provision: true` macht eine Collection, die keine deklariert, nur für Admins zugänglich und verwirft die Policies, die Rebase zuvor für sie generiert hat, auf jedem Server, der die Datenbank teilt.
 
-<span class="since-badge" data-since="0.25">Seit 0.25</span> Der Index des Scaffolds wendet die Standards auf sein Array an. Kopieren Sie in einem unter 0.24 erstellten Projekt diese Schleife aus der `config/collections/index.ts` eines neuen Scaffolds, oder übergeben Sie `collectionsDir`.
+Der Index des Scaffolds wendet die Standards auf sein Array an. Kopieren Sie in einem unter 0.24 erstellten Projekt diese Schleife aus der `config/collections/index.ts` eines neuen Scaffolds, oder übergeben Sie `collectionsDir`.
 
 | Gruppe | Normalerweise unter | Liefert |
 |---|---|---|
@@ -307,8 +303,6 @@ haben keine Gruppe: Sie beschreiben die URLs des `mount()`-Layouts, daher liefer
 
 ## Das Backend ohne Server
 
-<span class="since-badge" data-since="0.25">Seit 0.25</span>
-
 Ein gebautes Backend lässt sich nutzen, ohne etwas einzubinden. `backend.rebase` ist
 sein In-Process-Client, und `backend.fetch(request)` beantwortet einen `Request`, wie es
 `mount()` unter `/api` täte:
@@ -332,7 +326,7 @@ die Datenbank, ohne überhaupt ein Backend zu bauen.
 
 ## Mehrere Backends in einem Prozess
 
-<span class="since-badge" data-since="0.25">Seit 0.25</span> Unter 0.24 sind die
+Unter 0.24 sind die
 JWT-Konfiguration, das Zugriffsmodell, der API-Schlüssel-Speicher, der
 Rate-Limit-Speicher und `rebase` Prozess-Globals, und das zuletzt gebaute Backend
 gewinnt sie alle.
@@ -398,7 +392,7 @@ const payload = await jwt.verifyAccessToken(token);
 Eine erzeugte Sitzung wird bei jeder Anfrage wie jede andere geprüft, daher muss ihre
 uid ein vorhandener Benutzer sein: Bei einer uid ohne Benutzer wird die Anfrage verweigert.
 
-<span class="since-badge" data-since="0.25">Seit 0.25</span> `verifyCredential` kommt zum selben Urteil wie die Routen: Eine Sitzung, von der sich ihr Eigentümer abgemeldet hat, eine uid ohne Benutzer und ein deaktiviertes Konto ergeben null, und die Rollen sind die, die das Konto jetzt hält. Es wirft, wenn die Datenbank nicht erreichbar ist. Unter 0.24 prüft es nur die Signatur und liest die Rollen aus dem Token.
+`verifyCredential` kommt zum selben Urteil wie die Routen: Eine Sitzung, von der sich ihr Eigentümer abgemeldet hat, eine uid ohne Benutzer und ein deaktiviertes Konto ergeben null, und die Rollen sind die, die das Konto jetzt hält. Es wirft, wenn die Datenbank nicht erreichbar ist. Unter 0.24 prüft es nur die Signatur und liest die Rollen aus dem Token.
 
 Jede Routengruppe setzt `c.var.services` selbst. Eine Route außerhalb der Gruppen, die
 `requireAuth`, `requireScope` oder einen anderen Guard aus `@rebasepro/server` verwendet,
@@ -408,11 +402,11 @@ deshalb hinter `requireAuth`: Allein verweigert es jede Anfrage mit einem 401. E
 einen integrierten Scope oder einen App-Scope, den das Backend unter `auth.scopes` in seiner
 Users-Collection deklariert, wie im Kommentar oben.
 
-<span class="since-badge" data-since="0.25">Seit 0.25</span> Ein Name, der kein Scope ist, oder ein falsch geschriebener integrierter wie `data:raed` wirft dort, wo die Route registriert wird. Ein App-Scope, den das antwortende Backend nicht deklariert, beantwortet jeden Aufrufer, auch einen Administrator, mit `500 SCOPE_NOT_DECLARED`. Unter 0.24 antworten beide jedem Aufrufer mit `403 SCOPE_MISSING`.
+Ein Name, der kein Scope ist, oder ein falsch geschriebener integrierter wie `data:raed` wirft dort, wo die Route registriert wird. Ein App-Scope, den das antwortende Backend nicht deklariert, beantwortet jeden Aufrufer, auch einen Administrator, mit `500 SCOPE_NOT_DECLARED`. Unter 0.24 antworten beide jedem Aufrufer mit `403 SCOPE_MISSING`.
 
 ## Herunterfahren
 
-<span class="since-badge" data-since="0.25">Seit 0.25</span> Ein Backend aus
+Ein Backend aus
 `createRebaseBackend` ist neu; der Rest dieses Abschnitts gilt auch für 0.24.
 
 Übergeben Sie bei `initializeRebaseBackend` das Backend an den integrierten Helper,
@@ -450,7 +444,7 @@ npm install @rebasepro/server-postgres @rebasepro/types express pg drizzle-orm
 
 ### 2. Den Treiber und den Socket öffnen
 
-<span class="since-badge" data-since="0.25">Seit 0.25</span> `openPostgresDriver`
+`openPostgresDriver`
 und `postgresDriverConfigFromEnv` sind exportiert. Unter 0.24 öffnen Sie den Treiber
 mit `createPostgresBootstrapper(pgConfig).initializeDriver(…)`, dessen `internals`
 untypisiert ist.
@@ -568,7 +562,7 @@ Es legt keine Collection-Tabelle an, daher antwortet `POST /api/products` gegen 
 ### Read-Replica-Verbindungen
 Setzen Sie `readConnectionString` in der Treiberkonfiguration oder die Umgebungsvariable `DATABASE_READ_URL`, die der Boot des Servers und `postgresDriverConfigFromEnv` in sie einlesen, und der Treiber öffnet einen zweiten Verbindungspool gegen Ihr Read Replica, unter `internals.readDb`. Lesezugriffe gehen an das Replica; Schreibzugriffe bleiben auf dem primären Pool.
 
-<span class="since-badge" data-since="0.25">Seit 0.25</span> Die Option `readConnectionString` wird berücksichtigt. Unter 0.24 wurde sie deklariert und ignoriert, und nur `DATABASE_READ_URL` funktionierte.
+Die Option `readConnectionString` wird berücksichtigt. Unter 0.24 wurde sie deklariert und ignoriert, und nur `DATABASE_READ_URL` funktionierte.
 
 ### Drizzle-Integration
 Sie müssen sich nicht zwischen Rebase und Drizzle entscheiden. Der Treiber kompiliert Ihre Schemas dynamisch, und `internals.db` ist der Drizzle-`NodePgDatabase`-Client, typisiert, für rohes SQL oder typsichere Drizzle-Builder parallel zu den REST-Diensten von Rebase.
@@ -592,7 +586,7 @@ app.use(cors({
 }));
 ```
 
-<span class="since-badge" data-since="0.25">Seit 0.25</span> `CORS_EXPOSED_HEADERS` ist die Liste, die die Runtime selbst freigibt. Ein
+`CORS_EXPOSED_HEADERS` ist die Liste, die die Runtime selbst freigibt. Ein
 Header, den das SDK in einer späteren Version zu lesen beginnt, erreicht Ihr Frontend also ohne
 Änderung an dieser Stelle. Sie besteht aus `ETag`, `Retry-After`, `X-Request-ID`, den drei
 `X-RateLimit-*`-Headern und `Preference-Applied`, dazu `Location`,

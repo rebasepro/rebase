@@ -1,5 +1,5 @@
 ---
-sourceHash: 333a5c7a8ba6fe64
+sourceHash: 8376384a90695757
 title: Recherche vectorielle
 sidebar_label: Recherche vectorielle
 description: Recherche des plus proches voisins sur une propriété vectorielle via l'API REST — les paramètres de requête, les seuils, les embeddings trop longs pour une URL, et le comportement des filtres sur un index HNSW.
@@ -20,7 +20,7 @@ GET /api/data/products?vector_search=embedding&vector=[0.15,0.22,-0.05]&vector_d
 | `vector_distance` | `string` | La métrique de distance à évaluer. Valeurs prises en charge : `cosine` (par défaut, `<=>`), `l2` (`<->`), `inner_product` (`<#>`). |
 | `vector_threshold` | `number` | Seuil de distance maximal. Seuls les enregistrements dont la distance est inférieure à ce seuil sont renvoyés. |
 
-<span class="since-badge" data-since="0.25">Depuis 0.25</span> Une recherche vectorielle avec un
+Une recherche vectorielle avec un
 `vector_threshold` n'a pas de `meta.total` : compter les lignes dans une distance donnée revient à
 calculer cette distance pour chaque ligne de la table, ce qu'aucun index ne sert — plusieurs
 fois le coût de la page elle-même, croissant avec lignes × dimensions. `meta.hasMore` est
@@ -29,14 +29,14 @@ ordinaire.
 
 Un embedding est long dans une URL : 768 dimensions représentent environ 17 Ko de chaîne de requête et
 1 536 environ 33 Ko. Le serveur accepte jusqu'à 64 Ko de ligne de requête et d'en-têtes
-(<span class="since-badge" data-since="0.25">Depuis 0.25</span> ; 16 Ko auparavant, un 431
+(; 16 Ko auparavant, un 431
 à partir de 768 dimensions), et un proxy placé devant en accepte généralement moins — la valeur par défaut de nginx
 est de 8 Ko. Envoyez plutôt une recherche vectorielle par [`POST …/query`](#requêtes-trop-longues-pour-une-url) ;
 le SDK le fait toujours.
 
 ## Filtres sur un index approximatif
 
-<span class="since-badge" data-since="0.25">Depuis 0.25</span> Une recherche vectorielle qui
+Une recherche vectorielle qui
 filtre aussi — un `where`, une recherche, la sécurité au niveau des lignes — renvoie les lignes les plus proches
 qui correspondent. Un index HNSW répond avec un nombre fixe de candidats les plus proches
 (`hnsw.ef_search`, 40 par défaut), et les autres conditions leur sont appliquées ;
@@ -51,7 +51,7 @@ exact (`index: false`) ne l'a jamais eu.
 
 ## Requêtes trop longues pour une URL
 
-<span class="since-badge" data-since="0.25">Depuis 0.25</span> `POST /api/data/:slug/query`
+`POST /api/data/:slug/query`
 est le listing que répond `GET /api/data/:slug`, avec les paramètres de requête dans un corps
 JSON au lieu de l'URL. Utilisez-le lorsque l'URL ne tiendrait pas — l'embedding d'une
 recherche vectorielle, un filtre sur une longue liste `in`. Le SDK envoie ainsi chaque recherche vectorielle,
@@ -84,7 +84,7 @@ compte dans la même limite de débit que le `GET`. Les listings imbriqués l'on
 `POST /api/data/authors/42/posts/query`. Un serveur antérieur à la 0.24 répond 404 ;
 le SDK envoie alors le `GET`.
 
-<span class="since-badge" data-since="0.25">Depuis 0.25</span> Le décompte a le
+Le décompte a le
 même jumeau : `POST /api/data/:slug/count` (et `POST /api/data/authors/42/posts/count`)
 est `GET /api/data/:slug/count` avec ses paramètres dans le corps, lus de la même façon
 et refusés de la même façon. Un décompte porte les filtres du `find()` qu'il décrit,

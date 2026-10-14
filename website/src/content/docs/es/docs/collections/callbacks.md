@@ -1,5 +1,5 @@
 ---
-sourceHash: e806583db3fff138
+sourceHash: c3af858aa8d11859
 title: Callbacks de entidades
 sidebar_label: Callbacks
 description: Usa callbacks de ciclo de vida para ejecutar lógica personalizada cuando las entidades se crean, actualizan, leen o eliminan. Incluye la API context.data para operaciones entre colecciones.
@@ -132,7 +132,7 @@ const articlesCollection = defineCollection({
 
 ## Combinar conjuntos de callbacks
 
-<span class="since-badge" data-since="0.25">Desde 0.25</span> En 0.24, combina los
+En 0.24, combina los
 conjuntos a mano.
 
 Una colección tiene un solo objeto `callbacks`. Cuando varias responsabilidades quieren
@@ -436,8 +436,6 @@ Otros patrones entre colecciones:
 - **Contadores**: Usa `afterSave` / `afterDelete` para actualizar campos de recuento en entidades relacionadas
 
 ## Probar un callback
-
-<span class="since-badge" data-since="0.25">Desde 0.25</span>
 
 Un callback es una función simple de un objeto de props, así que una prueba unitaria la
 llama. `createCallContext` construye la prop `context`: los campos que pasas se usan

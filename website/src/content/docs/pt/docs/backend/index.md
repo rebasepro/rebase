@@ -1,5 +1,5 @@
 ---
-sourceHash: 52c124b4df13db42
+sourceHash: bf72686388b55887
 title: Visão Geral do Backend
 sidebar_label: Backend
 description: O backend do Rebase fornece um servidor completo com API REST, autenticação, armazenamento, tempo real com WebSocket e histórico de entidades — tudo inicializado com uma única chamada de função.
@@ -54,7 +54,7 @@ const instance = await initializeRebaseBackend({
 });
 ```
 
-<span class="since-badge" data-since="0.25">Desde 0.25</span> Essa única chamada é
+Essa única chamada é
 um atalho sobre passos públicos: o `installUnhandledRejectionHandler` impede que uma
 rejeição perdida encerre o processo, o `createRebaseBackend` constrói o backend,
 o `setDefaultBackend` o torna aquele a que a API em nível de módulo responde, e
@@ -288,14 +288,14 @@ instance.setCollectionCallbacks(slug, callbacks) // Replace a collection's callb
 instance.shutdown()          // Drain and stop; also closes the server it was given
 ```
 
-<span class="since-badge" data-since="0.25">Desde 0.25</span> Ele também carrega
+Ele também carrega
 o `rebase`, o cliente em processo, o `fetch(request)`, as `routes`, os grupos de
 rotas como sub-apps Hono, os `services`, suas próprias chaves JWT, modelo de
 acesso, armazenamento de chaves de API e limitadores de taxa, e o
 `verifyCredential(token)`; veja
 [Integração com Servidor Customizado](/docs/backend/custom-server/).
 
-> **Nota:** Embora a `instance` exponha esses serviços internos, o código da aplicação (como funções personalizadas e tarefas cron) deve usar o singleton `rebase` de `@rebasepro/server` para interagir com a API do backend. <span class="since-badge" data-since="0.25">Desde 0.25</span> Dentro de uma requisição, de uma execução de cron ou de um job, o `rebase` é o backend que a atende; fora disso, é o padrão do processo, que o `initializeRebaseBackend` define como o seu backend.
+> **Nota:** Embora a `instance` exponha esses serviços internos, o código da aplicação (como funções personalizadas e tarefas cron) deve usar o singleton `rebase` de `@rebasepro/server` para interagir com a API do backend. Dentro de uma requisição, de uma execução de cron ou de um job, o `rebase` é o backend que a atende; fora disso, é o padrão do processo, que o `initializeRebaseBackend` define como o seu backend.
 
 ## API REST
 
@@ -329,7 +329,7 @@ não corresponderá a nada de forma silenciosa.
 
 ## WebSocket
 
-O servidor WebSocket é acoplado ao mesmo servidor HTTP e fornece inscrições em tempo real. <span class="since-badge" data-since="0.25">Desde 0.25</span> Ele responde a upgrades em um único caminho, `/` para uma API em `/api`, onde o SDK se conecta, e deixa todos os outros caminhos para os seus próprios listeners de `upgrade`; na 0.24 ele assume todos os upgrades do servidor:
+O servidor WebSocket é acoplado ao mesmo servidor HTTP e fornece inscrições em tempo real. Ele responde a upgrades em um único caminho, `/` para uma API em `/api`, onde o SDK se conecta, e deixa todos os outros caminhos para os seus próprios listeners de `upgrade`; na 0.24 ele assume todos os upgrades do servidor:
 
 - Inscrever-se em **alterações na coleção** — receba notificações quando qualquer entidade em uma coleção for criada, atualizada ou excluída
 - Inscrever-se em **alterações na entidade** — receba notificações quando uma entidade específica for alterada
@@ -370,7 +370,7 @@ envelope — um 413 de um proxy, um 502 de um balanceador de carga — ainda rec
 a partir do seu status (`PAYLOAD_TOO_LARGE`, `SERVICE_UNAVAILABLE`, `INTERNAL_ERROR`, …), e
 um cliente criado fora de um navegador sem `baseUrl` falha com
 `BASE_URL_REQUIRED` em vez de um erro de rede.
-<span class="since-badge" data-since="0.25">Desde 0.25</span> Uma leitura que recebe um sucesso
+Uma leitura que recebe um sucesso
 sem a forma que ela lê — um `204`, um corpo vazio, uma página sem a lista
 `data` — falha com `UNEXPECTED_RESPONSE` em vez de resolver como "nenhuma linha", e
 `createMany`, `updateMany`, `deleteMany` ou `batch` que recebem algo diferente de

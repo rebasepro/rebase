@@ -1,5 +1,5 @@
 ---
-sourceHash: 7452474353756b93
+sourceHash: c35ed2ce1194af56
 title: Autenticación e inicio de sesión
 sidebar_label: Autenticación e inicio de sesión
 description: Configura el controlador de autenticación, la vista de inicio de sesión y la simulación de roles en tu frontend React de Rebase.
@@ -39,7 +39,7 @@ Pasa el `authController` al controlador de navegación de Rebase para proteger t
 
 ## Tu propio proveedor de autenticación
 
-<span class="since-badge" data-since="0.25">Desde 0.25</span> En 0.24 el
+En 0.24 el
 getter autentica solo las solicitudes HTTP, y el socket de tiempo real del panel sigue
 siendo anónimo.
 

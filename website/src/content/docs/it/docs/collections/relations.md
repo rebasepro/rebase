@@ -1,5 +1,5 @@
 ---
-sourceHash: a3e5fa2b319b73d8
+sourceHash: e3130fcc43e901ed
 title: Relazioni
 sidebar_label: Relazioni
 description: Definisci relazioni SQL uno-a-uno, uno-a-molti e molti-a-molti tra collezioni con chiavi esterne, tabelle di giunzione e join multi-hop.
@@ -93,7 +93,7 @@ author: {
 // → posts.author_id
 ```
 
-<span class="since-badge" data-since="0.25">Da 0.25</span> La colonna viene
+La colonna viene
 indicizzata per te: Postgres indicizza la chiave a cui punta una chiave esterna, mai la
 colonna che la contiene, quindi senza un indice ogni include `hasMany` e ogni elenco annidato
 dall'altro lato scorre questa tabella. `index: false` mantiene il vincolo e

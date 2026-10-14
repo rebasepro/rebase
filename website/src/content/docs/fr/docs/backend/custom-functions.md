@@ -1,5 +1,5 @@
 ---
-sourceHash: f92df350bca97cf1
+sourceHash: c964225df6522161
 title: Fonctions personnalisées
 sidebar_label: Fonctions personnalisées
 description: Ajoutez des points de terminaison d'API Hono personnalisés aux côtés de vos routes CRUD Rebase. Découverte automatique à partir d'un répertoire, avec un accès complet à l'instance backend.
@@ -121,7 +121,7 @@ Rebase va :
 
 ### Les fonctions comme valeurs
 
-<span class="since-badge" data-since="0.25">Depuis 0.25</span> En 0.24, les fonctions ne proviennent que d'un répertoire.
+En 0.24, les fonctions ne proviennent que d'un répertoire.
 
 Un répertoire n'est qu'une façon de produire ce que le serveur dessert : un enregistrement (record) qui associe un segment d'URL à une application Hono. Passez vous-même cet enregistrement sous le nom `functions`, ou faites-le lire depuis un répertoire par `loadFunctions` :
 
@@ -583,7 +583,7 @@ Le routeur est monté pour le **répertoire**, et non pour les fonctions qu'il c
 
 Deux plafonds s'appliquent à `/api/functions/*` :
 
-- **Délai d'expiration de la requête (timeout)** — 30 secondes par défaut, renvoyant un code `504` avec le code `FUNCTION_TIMEOUT`. Se configure via `functionsTimeoutMs` (ou `REBASE_FUNCTIONS_TIMEOUT_MS`) ; `0` le désactive. Le gestionnaire ne peut pas être arrêté depuis l'extérieur, mais il en est informé : <span class="since-badge" data-since="0.25">Depuis 0.25</span> `getSignal(c)`, exporté par `@rebasepro/server/functions`, est interrompu au moment du 504 ; passez-le à `fetch` et à tout ce qui accepte un signal (`fetch(url, { signal: getSignal(c) })`). Le travail auquel le signal n'est pas transmis se poursuit — le timeout libère le client et le socket, pas le travail en cours. Le fait que le gestionnaire *continue de s'exécuter* après l'erreur 504 est une propriété inhérente à un processus Node de longue durée, et non une garantie contractuelle ; tout ce qui doit impérativement aller à son terme doit être placé dans [`waitUntil`](#tâches-en-arrière-plan).
+- **Délai d'expiration de la requête (timeout)** — 30 secondes par défaut, renvoyant un code `504` avec le code `FUNCTION_TIMEOUT`. Se configure via `functionsTimeoutMs` (ou `REBASE_FUNCTIONS_TIMEOUT_MS`) ; `0` le désactive. Le gestionnaire ne peut pas être arrêté depuis l'extérieur, mais il en est informé : `getSignal(c)`, exporté par `@rebasepro/server/functions`, est interrompu au moment du 504 ; passez-le à `fetch` et à tout ce qui accepte un signal (`fetch(url, { signal: getSignal(c) })`). Le travail auquel le signal n'est pas transmis se poursuit — le timeout libère le client et le socket, pas le travail en cours. Le fait que le gestionnaire *continue de s'exécuter* après l'erreur 504 est une propriété inhérente à un processus Node de longue durée, et non une garantie contractuelle ; tout ce qui doit impérativement aller à son terme doit être placé dans [`waitUntil`](#tâches-en-arrière-plan).
 - **Limite de débit (rate limit)** — Les appelants avec clé d'API et les appelants connectés partagent les quotas de l'API de données. Les appelants anonymes disposent de leur propre quota, bien plus large (3000 par fenêtre), car ce routeur est public par défaut pour les récepteurs de webhooks. Modifiez cela avec `rateLimit.anonymousFunctions` ; `null` le désactive.
 
 Les rejets de promesses non gérés sont consignés dans les logs plutôt que fatals : un appel non attendu (fire-and-forget) dans une fonction interromprait sinon l'intégralité du processus. Définissez `REBASE_EXIT_ON_UNHANDLED_REJECTION=1` pour rétablir le comportement par défaut de Node.

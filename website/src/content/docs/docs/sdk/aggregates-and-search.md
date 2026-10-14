@@ -177,7 +177,7 @@ on an older pgvector a filter that few of the nearest rows pass returns a short
 page. Producing `queryVector` is your job: Rebase stores and searches
 embeddings, it does not compute them.
 
-<span class="since-badge" data-since="0.25">Since 0.25</span> The SDK sends a
+The SDK sends a
 vector search as `POST /api/data/<collection>/query`, with the embedding in the
 body: in the URL, 768 dimensions are about 17 KB, past what Node (16 KB) and most
 proxies (nginx: 8 KB) accept. `count()` with a vector search goes the same way,
@@ -185,7 +185,7 @@ as `POST /api/data/<collection>/count`. Against a server older than 0.24, which
 has no such route, either falls back to the `GET` — and a long embedding there
 can still be refused with a 431 or a 414.
 
-<span class="since-badge" data-since="0.25">Since 0.25</span> With a `threshold`,
+With a `threshold`,
 the result has no `meta.total` — counting the rows within a distance computes it
 for every row of the table. Page with `meta.hasMore`, which stays exact.
 

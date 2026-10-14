@@ -170,7 +170,7 @@ the related rows, listen to their collection as well.
 
 ## Watching a Count
 
-<span class="since-badge" data-since="0.25">Since 0.25</span> `listenCount()` keeps a count current: the total of what a list's filter matches, for a
+`listenCount()` keeps a count current: the total of what a list's filter matches, for a
 toolbar or a "select all N" offer that should not go stale while other people add and remove rows.
 The callback runs with the total once it is known, and again whenever a write changes it.
 
@@ -279,7 +279,7 @@ const unsubscribe = client.data.orders.listen(
 
 ### Which token the socket sends
 
-<span class="since-badge" data-since="0.25">Since 0.25</span> On 0.24 the
+On 0.24 the
 socket uses only the client's own session and the `token` option: a getter
 installed with `client.setAuthTokenGetter()` never reaches it, so a host using
 its own auth provider gets an anonymous socket.

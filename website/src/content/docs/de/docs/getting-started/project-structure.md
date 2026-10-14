@@ -1,5 +1,5 @@
 ---
-sourceHash: 7db21cd525636ef0
+sourceHash: d12be9bfca55558a
 title: Projektstruktur
 sidebar_label: Projektstruktur
 description: Verstehen Sie die Struktur eines Rebase-Projekts – Frontend, Backend und Collections-Konfiguration.
@@ -58,7 +58,7 @@ my-app/
 ```
 
 `tsc --noEmit` im Root prüft `scripts/`; in `config/`, `backend/` oder `frontend/` prüft es
-jeweils diesen Workspace. <span class="since-badge" data-since="0.25">Seit 0.25</span>
+jeweils diesen Workspace.
 Unter 0.24 hat das Root keine `tsconfig.json`, und `tsc` gibt dort seine Hilfe aus und prüft
 nichts.
 

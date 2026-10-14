@@ -1,5 +1,5 @@
 ---
-sourceHash: 03c3a22014b05f70
+sourceHash: cf996dc5a52fc912
 title: Tâches en arrière-plan
 sidebar_label: Tâches en arrière-plan
 description: Une file d'attente de tâches durable, basée sur Postgres — des traitements qui survivent à un redémarrage, réessayés avec un backoff, avec conservation des échecs plutôt que leur abandon.
@@ -36,7 +36,7 @@ await initializeRebaseBackend({
 
 Désactivé par défaut : un worker continue de chercher du travail tant que le processus vit, ce qui n'est pas un comportement par défaut souhaité. Il nécessite un pilote capable d'exécuter du SQL — sur un pilote qui ne le peut pas (MongoDB), la file d'attente est indisponible et vous en êtes informé au démarrage plutôt qu'à la première mise en file d'attente.
 
-<span class="since-badge" data-since="0.25">Depuis 0.25</span> Un worker inactif n'interroge pas la base toutes les deux secondes. Chaque mise en file d'attente envoie un
+Un worker inactif n'interroge pas la base toutes les deux secondes. Chaque mise en file d'attente envoie un
 `NOTIFY` sur le canal `rebase_jobs` lorsqu'elle est validée, et un worker qui détient un `LISTEN` dessus
 réserve aussitôt — un job mis en file d'attente par un autre processus (le rôle `api`, une autre
 réplique) démarre en quelques millisecondes, et un job différé démarre à son échéance. En arrière-plan, il
@@ -108,7 +108,7 @@ jobs: {
 L'envers du décor : un gestionnaire qui attend un `fetch` qui ne répond jamais conserve son emplacement de
 worker, et sa réservation, tant que le processus vit — avec cinq d'entre eux, le worker n'exécute plus rien
 d'autre, alors que `/health` reste vert.
-<span class="since-badge" data-since="0.25">Depuis 0.25</span> `timeoutMs` borne une tentative. À l'échéance, la tentative échoue — retentée tant
+`timeoutMs` borne une tentative. À l'échéance, la tentative échoue — retentée tant
 qu'il reste des tentatives, comme n'importe quelle exception — son emplacement est libéré, et le `signal`
 du gestionnaire est interrompu. Transmettez le signal, pour que le travail s'arrête lui aussi ; un
 gestionnaire qui l'ignore continue de s'exécuter en arrière-plan sans que rien n'enregistre son résultat.
