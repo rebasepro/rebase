@@ -1,5 +1,5 @@
 ---
-sourceHash: abd2a2de4a0ff4be
+sourceHash: 963ab532acd3da90
 title: Regras de Segurança (RLS)
 sidebar_label: Regras de Segurança
 description: Defina políticas de Row Level Security para suas coleções usando atalhos de conveniência ou expressões SQL puras.

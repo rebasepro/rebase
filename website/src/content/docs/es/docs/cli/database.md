@@ -1,5 +1,5 @@
 ---
-sourceHash: 866dbef37f99114d
+sourceHash: 8fe0cd9ee8de9137
 title: Comandos de base de datos
 sidebar_label: Comandos de base de datos
 description: Los comandos rebase db — push, generate y migrate, copias de seguridad y restauraciones, traer una copia, la cadena de conexión, la base de datos de desarrollo gestionada y las ramas.

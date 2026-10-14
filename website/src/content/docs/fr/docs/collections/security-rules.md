@@ -1,5 +1,5 @@
 ---
-sourceHash: abd2a2de4a0ff4be
+sourceHash: 963ab532acd3da90
 title: Règles de sécurité (RLS)
 sidebar_label: Règles de sécurité
 description: Définissez des stratégies de sécurité au niveau des lignes (RLS) pour vos collections à l'aide de raccourcis pratiques ou d'expressions SQL brutes.
