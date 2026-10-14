@@ -20,6 +20,7 @@ import os from "node:os";
 import path from "node:path";
 import { PassThrough } from "node:stream";
 import { spawn } from "node:child_process";
+import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import pg from "pg";
 import type { CollectionConfig } from "@rebasepro/types";
@@ -536,9 +537,13 @@ describe("openRebase (E2E)", () => {
                         TSX_TSCONFIG_PATH: path.resolve(packageRoot, "../../tsconfig.typecheck.json")
                     }, options.env);
                     return new Promise((resolve, reject) => {
+                        // Node itself running tsx's CLI, resolved the way Node resolves
+                        // it: this package does not declare tsx (the root does), so a
+                        // `node_modules/.bin/tsx` here exists only as a stale shim, and
+                        // not at all in a clean install.
                         const child = spawn(
-                            path.join(packageRoot, "node_modules/.bin/tsx"),
-                            [path.join(packageRoot, "src/cli.ts"), "console", "--collections", collectionsDir, ...args],
+                            process.execPath,
+                            [createRequire(import.meta.url).resolve("tsx/cli"), path.join(packageRoot, "src/cli.ts"), "console", "--collections", collectionsDir, ...args],
                             { cwd: projectDir, env, stdio: ["pipe", "pipe", "pipe"] }
                         );
                         let stdout = "";
