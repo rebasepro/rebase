@@ -148,6 +148,8 @@ describe("db push against the managed database while a dev server holds connecti
         expect(generated.exitCode).toBe(0);
         const version = newestVersion();
         expect(version).not.toBe("");
+        // What it ends on says so before `db migrate` has to.
+        expect(generated.all).toContain(`rebase db migrate --baseline ${version}`);
 
         const failed = await driver("db", "migrate");
         expect(failed.all).not.toContain("EOF");

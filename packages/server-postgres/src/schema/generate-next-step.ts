@@ -1,5 +1,5 @@
 /**
- * The line `rebase schema generate` ends on.
+ * The lines `rebase schema generate` and `rebase db generate` end on.
  *
  * Its own module because `generate-drizzle-schema.ts` uses `import.meta` to
  * decide whether it was executed directly, which the driver's jest suite cannot
@@ -43,4 +43,23 @@ export const nextStepAfterGenerate = (): string => {
     }
 
     return `You can now run ${command("rebase db generate")} to generate the SQL migration files.`;
+};
+
+/**
+ * What to do with the migration `rebase db generate` just wrote.
+ *
+ * `db migrate`, and on a database that has already booted, `--baseline` first.
+ * Boot creates every collection's tables, so the first migration of a project —
+ * which creates them too — stops on `already exists` there, on the managed
+ * database and on a server of your own alike. `--baseline <version>` records
+ * the migration as applied instead. The newest version is named: boot made the
+ * tables the collections declare now, which is what that migration describes.
+ */
+export const nextStepAfterDbGenerate = (newestVersion: string | null): string[] => {
+    const version = newestVersion ?? "<version>";
+    return [
+        `  You can now run ${chalk.bold.green("rebase db migrate")} to apply the migrations to your database.`,
+        "  On a database that has already booted and has never been migrated, boot made these tables:",
+        `  the first time, record them instead with ${chalk.bold.green(`rebase db migrate --baseline ${version}`)}.`
+    ];
 };

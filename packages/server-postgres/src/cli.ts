@@ -63,6 +63,7 @@ import type { ExistingConstraint } from "./schema/undeclarable-constraints";
 import { finishNewMigration } from "./schema/migration-post-process";
 import { acceptsExcludeFlag, buildAtlasArgs, migrateApplyArgs, readsRevisions, takesDevUrl } from "./schema/atlas-argv";
 import { ensureAtlasRevisionsTable } from "./schema/atlas-revisions";
+import { nextStepAfterDbGenerate } from "./schema/generate-next-step";
 import { CommandStopped, ScratchDatabase } from "./cli-scratch-database";
 import { describeBaselinePlan, latestRecordedMigration, planBaseline } from "./schema/migrate-baseline";
 import { promptConfirm } from "./cli-prompt";
@@ -648,7 +649,7 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
         }
 
         out("");
-        out(`  You can now run ${chalk.bold.green("rebase db migrate")} to apply the migrations to your database.`);
+        for (const line of nextStepAfterDbGenerate(latestMigrationVersion())) out(line);
         out("");
     } else {
         out("");
