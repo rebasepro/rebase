@@ -1,7 +1,7 @@
 import type { Property, MapProperty, Properties, RelationProperty } from "@rebasepro/types";
 import { useMemo } from "react";
 ;
-import { getChildViewDeclaringProperties, getChildViewRelationPropertyKeys, getSubcollections } from "@rebasepro/common";
+import { getChildViewDeclaringProperties, getChildViewRelationPropertyKeys, getDeclaredPrimaryKeys, getSubcollections } from "@rebasepro/common";
 import type { AdminCollection } from "@rebasepro/cms-types";
 import { getPropertyInPath } from "../../collections/property-path";
 import { isDisabled } from "../../collections/property_presentation";
@@ -53,11 +53,34 @@ export function getRedundantChildViewColumnIds<M extends Record<string, any>>(co
 
 export function useColumnIds<M extends Record<string, any>>(collection: AdminCollection<M>, includeSubcollections: boolean): PropertyColumnConfig[] {
     return useMemo(() => {
-        if (collection.propertiesOrder) {
-            return hideAndExpandKeys(collection, collection.propertiesOrder);
-        }
-        return getDefaultColumnKeys(collection, includeSubcollections);
+        const columns = collection.propertiesOrder
+            ? hideAndExpandKeys(collection, collection.propertiesOrder)
+            : getDefaultColumnKeys(collection, includeSubcollections);
+        const keyInIdColumn = getKeyShownInIdColumn(collection);
+        return keyInIdColumn ? columns.filter(column => column.key !== keyInIdColumn) : columns;
     }, [collection, includeSubcollections]);
+}
+
+/**
+ * The property whose value a collection table's own ID column already shows.
+ *
+ * Every table opens with an ID column: the row's id, beside its checkbox and
+ * menu. A single declared key *is* that id, so its property's column repeated
+ * it — two columns headed "ID" with the same value, in the collection view and
+ * in the relation picker alike. The record form treats that key the same way
+ * (routed out of the fields and into the record block), and so does the CSV
+ * export (its own `id` column, never the property's).
+ *
+ * A composite key is not the row's id — `entity.id` is a token built on top of
+ * its columns, which are data — so its columns stay. Nor is an `id` property
+ * no `isId` declares (see `getDeclaredPrimaryKeys`). With
+ * `hideIdFromCollection` the ID column shows no id, and the property's column
+ * is where it is read.
+ */
+function getKeyShownInIdColumn<M extends Record<string, any>>(collection: AdminCollection<M>): string | undefined {
+    if (collection.hideIdFromCollection) return undefined;
+    const keys = getDeclaredPrimaryKeys(collection);
+    return keys.length === 1 ? keys[0].fieldName : undefined;
 }
 
 function hideAndExpandKeys<M extends Record<string, any>>(collection: AdminCollection<M>, keys: string[]): PropertyColumnConfig[] {
