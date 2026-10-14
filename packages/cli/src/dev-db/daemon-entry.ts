@@ -24,14 +24,13 @@ import net from "net";
 import { DEFAULT_RESOURCE_KEY } from "@rebasepro/types";
 
 import {
+    MANAGED_IDLE_TIMEOUT_MS,
     MANAGED_SERVER_MAX_CONNECTIONS,
     PGLITE_EXTENSIONS
 } from "./constraints";
 import { NotificationProxy } from "./notification-proxy";
 import { additionalDataDir, chooseManagedPort, clearState, dataDir, findFreePort, recordManagedPorts, writeState } from "./state";
 
-/** Shut down after this long with nothing connected. */
-const DEFAULT_IDLE_TIMEOUT_MS = 30 * 60_000;
 
 /** How often to check for idleness. */
 const IDLE_CHECK_INTERVAL_MS = 60_000;
@@ -68,7 +67,7 @@ export function parseDaemonArgs(argv: readonly string[]): DaemonArgs {
     }
     if (!token) throw new Error("__dev-db-daemon: --token is required");
 
-    const idleTimeoutMs = idleRaw === null ? DEFAULT_IDLE_TIMEOUT_MS : Number(idleRaw);
+    const idleTimeoutMs = idleRaw === null ? MANAGED_IDLE_TIMEOUT_MS : Number(idleRaw);
     if (!Number.isFinite(idleTimeoutMs) || idleTimeoutMs < 0) {
         throw new Error("__dev-db-daemon: --idle-timeout must be a non-negative number of milliseconds");
     }

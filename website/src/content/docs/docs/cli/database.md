@@ -159,6 +159,12 @@ rebase db stop     # stop it; the data is kept
 rebase db reset    # delete it and start over
 ```
 
+It belongs to the project, not to the command that started it, so stopping
+`rebase dev` leaves it running for the other commands. After 30 minutes with
+nothing connected it stops itself, and the next command that needs it starts it
+again. <span class="since-badge" data-since="0.25">Since 0.25</span> `rebase dev`
+says so as it stops, with how to stop the database now; on 0.24 it said nothing.
+
 <span class="since-badge" data-since="0.25">Since 0.25</span> `db stop` under a
 running `rebase dev` says that its backend cannot reach the database until it
 is back. The next command that needs it, `rebase db url` for one, starts it on

@@ -104,6 +104,17 @@ export const MANAGED_POOL_MAX = 1;
  */
 export const MANAGED_SERVER_MAX_CONNECTIONS = 4;
 
+/**
+ * How long the managed database's daemon stays up with nothing connected.
+ *
+ * It belongs to the project, not to the command that started it, so stopping
+ * `rebase dev` does not stop it: `rebase db url`, `db push` and `console` in
+ * another terminal keep reaching the same database. With nobody left to serve
+ * it stops itself after this long, and the next command that needs it starts
+ * it again.
+ */
+export const MANAGED_IDLE_TIMEOUT_MS = 30 * 60_000;
+
 /** What a managed PGlite database cannot do, in the words the user needs. */
 export interface ManagedLimitation {
     /** Stable id, so a warning can be suppressed or tested for. */

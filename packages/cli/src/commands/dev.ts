@@ -31,6 +31,7 @@ import {
     resolveProjectDatabase,
     type PreparedDatabase
 } from "../dev-db/prepare";
+import { MANAGED_IDLE_TIMEOUT_MS } from "../dev-db/constraints";
 import { resolveCliEntry, resolveSpawn } from "../dev-db/daemon";
 import { lastDevDatabaseNotice, recordLastDevDatabase } from "../dev-db/last-dev-database";
 import path from "path";
@@ -760,6 +761,29 @@ export function getProjectFrontendPort(projectRoot: string): number {
 }
 
 /**
+ * What `rebase dev` says as it stops, about the database it leaves behind.
+ *
+ * Ctrl+C used to print nothing, and the managed database's daemon stayed up
+ * unannounced. Staying up is the design: the database belongs to the project,
+ * so the other commands keep reaching it after dev stops. What was missing is
+ * saying so, and how to stop it. A database dev did not start is not its to
+ * mention.
+ */
+export function devExitLines(kind: PreparedDatabase["database"]["kind"] | null): string[] {
+    if (kind === "managed") {
+        const minutes = Math.round(MANAGED_IDLE_TIMEOUT_MS / 60_000);
+        return [
+            `The development database keeps running for the other commands, and stops itself after ${minutes} minutes with nothing connected.`,
+            "Stop it now with `rebase db stop`; the data is kept."
+        ];
+    }
+    if (kind === "docker") {
+        return ["The Postgres container keeps running. Stop it with `docker compose stop db`; the data is kept."];
+    }
+    return [];
+}
+
+/**
  * The flags `rebase dev` takes.
  *
  * Exported so `dev.test.ts` can assert that every short alias the help
@@ -1479,6 +1503,11 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
         } catch { /* ignore */ }
 
         children.forEach(killChildTree);
+        const exitLines = devExitLines(prepared?.database.kind ?? null);
+        if (exitLines.length > 0) {
+            console.log("");
+            for (const line of exitLines) console.log(chalk.gray(`  ${line}`));
+        }
         // Not a hard-coded 0. Ctrl+C is how `rebase dev` normally ends, so
         // exiting 0 unconditionally threw away the one thing `--backend-only`
         // has to report: whether the backend it was asked to run is up. A
