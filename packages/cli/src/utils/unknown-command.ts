@@ -86,19 +86,38 @@ export function suggestCommand(typed: string, known: readonly string[]): string 
 }
 
 /**
+ * The family command a word names exactly, as `<family> <command>`, or nothing.
+ *
+ * `rebase deploy` is `rebase cloud deploy`: the word is a whole command one
+ * level down. Exact only — a near miss there is a guess about both the family
+ * and the command.
+ */
+function familyCommand(typed: string, families: Readonly<Record<string, readonly string[]>>): string | undefined {
+    const word = typed.toLowerCase();
+    for (const [family, commands] of Object.entries(families)) {
+        const match = commands.find(name => name.toLowerCase() === word);
+        if (match) return `${family} ${match}`;
+    }
+    return undefined;
+}
+
+/**
  * The line itself, without printing it — so callers that must answer in JSON
  * (the cloud family, whose `fail()` writes a machine-readable envelope) use the
  * same words as the ones that print.
  *
  * `family` is empty for the top level: `rebase --help`, not `rebase  --help`.
+ * `families` are the command families below this level, by name, whose
+ * commands a word may be one of.
  */
 export function unknownCommandMessage(
     typed: string | undefined,
     known: readonly string[],
-    family = ""
+    family = "",
+    families: Readonly<Record<string, readonly string[]>> = {}
 ): string {
     const what = family ? `${family} command` : "command";
-    const suggestion = typed ? suggestCommand(typed, known) : undefined;
+    const suggestion = typed ? suggestCommand(typed, known) ?? familyCommand(typed, families) : undefined;
     const help = family ? `rebase ${family} --help` : "rebase --help";
 
     return suggestion
@@ -115,8 +134,9 @@ export function unknownCommandMessage(
 export function unknownCommand(
     typed: string | undefined,
     known: readonly string[],
-    family = ""
+    family = "",
+    families: Readonly<Record<string, readonly string[]>> = {}
 ): never {
-    console.error(chalk.red(`✗ ${unknownCommandMessage(typed, known, family)}`));
+    console.error(chalk.red(`✗ ${unknownCommandMessage(typed, known, family, families)}`));
     process.exit(1);
 }

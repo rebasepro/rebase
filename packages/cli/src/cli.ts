@@ -454,7 +454,10 @@ async function dispatch(
             // suggestion can never name a command that is not there.
             //
             // A mistyped command must not look like success to a shell or CI.
-            unknownCommand(command, namespacedCommands);
+            //
+            // And a word that is a whole cloud command — `rebase deploy` — is
+            // named as one: `cloud deploy`.
+            unknownCommand(command, namespacedCommands, "", { cloud: (await import("./commands/cloud")).CLOUD_GROUP_NAMES });
     }
 }
 

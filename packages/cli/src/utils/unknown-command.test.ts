@@ -82,3 +82,29 @@ describe("unknownCommandMessage", () => {
         }
     });
 });
+
+/**
+ * `rebase deploy` said `Unknown command "deploy". Run rebase --help` — and the
+ * command is one level down, as `rebase cloud deploy`. A word that is a whole
+ * command of a family is the family's command, said as such.
+ */
+describe("a command that lives in a family", () => {
+    const families = { cloud: ["login", "link", "deploy", "logs", "status"] };
+
+    it("is suggested as the family's command", () => {
+        expect(unknownCommandMessage("deploy", TOP_LEVEL, "", families)).toBe(
+            'Unknown command "deploy" — did you mean `cloud deploy`? Run `rebase --help` for the rest.'
+        );
+        expect(unknownCommandMessage("login", TOP_LEVEL, "", families)).toContain("`cloud login`");
+    });
+
+    it("loses to a near miss at the level it was typed: `statsu` is `status`, not `cloud status`", () => {
+        expect(unknownCommandMessage("statsu", TOP_LEVEL, "", families)).toContain("`status`?");
+    });
+
+    it("is only ever a whole word, never a guess one level down", () => {
+        expect(unknownCommandMessage("deplyo", TOP_LEVEL, "", families)).toBe(
+            'Unknown command "deplyo". Run `rebase --help` for the ones there are.'
+        );
+    });
+});
