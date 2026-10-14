@@ -22,7 +22,7 @@ Your collection definitions in `config/collections/` describe tables, columns, t
 
 ### 2. Drizzle Schema → Migrations
 
-From the generated Drizzle schema, `db generate` diffs against the current database state and produces timestamped SQL migration files.
+From the generated Drizzle schema, `db generate` diffs against the migrations already in `drizzle/migrations/`, replayed on a scratch database, and produces timestamped SQL migration files. It never reads your database: a column boot or `db push` already added still comes out as `ADD COLUMN`.
 
 ### 3. Migrations → PostgreSQL
 
@@ -267,7 +267,7 @@ rebase db generate
 ```
 
 **What it does:**
-- Compares the Drizzle schema against the current database state
+- Compares the Drizzle schema against the state the migrations in `drizzle/migrations/` build, not against your database
 - Produces timestamped SQL migration files in `drizzle/migrations/`
 - Files can be reviewed, edited, and committed to version control
 - <span class="since-badge" data-since="0.25">Since 0.25</span> Names every
