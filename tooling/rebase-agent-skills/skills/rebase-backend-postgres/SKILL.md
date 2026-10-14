@@ -74,7 +74,7 @@ rebase db migrate
 | `rebase db restore` | Restore the database from a backup | Recovery |
 | `rebase db pull` | Copy another database into local dev (`--from <url>`, `--anonymize`, all-or-nothing); never writes to the source | Working against real data locally |
 | `rebase db url` | Print the connection string this project uses | Piping into `psql` |
-| `rebase db stop` | Stop the managed local database | Freeing the port |
+| `rebase db stop` | Stop the managed local database. It comes back on the same port, and a running `rebase dev` reconnects once any command starts it again | Freeing the port |
 | `rebase db reset` | Delete and recreate the managed local database | A clean slate in dev |
 
 <!-- docs-verify: ignore -->

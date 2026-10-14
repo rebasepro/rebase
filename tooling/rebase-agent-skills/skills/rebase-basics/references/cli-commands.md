@@ -168,7 +168,7 @@ booting and prints that line.
 | `rebase db restore` | Restore the database from a backup |
 | `rebase db pull` | Copy another database into local development: `--from <url>`, optionally `--anonymize` (name-based and best-effort, in one transaction: if it fails, the affected tables are emptied and named and it exits 1). One-directional — it can never write to a remote database. (Turning a database into collection files is `rebase schema introspect`) |
 | `rebase db url` | Print the connection string this project uses — nothing else goes to stdout, so it pipes. After `rebase dev --docker` it, like every command, uses the Docker database until a `rebase dev` without the flag |
-| `rebase db stop` | Stop the managed local database |
+| `rebase db stop` | Stop the managed local database. It comes back on the same port, and a running `rebase dev` reconnects once any command starts it again |
 | `rebase db reset` | Delete and recreate the managed local database |
 | `rebase db --help` | Show database command help |
 
