@@ -363,6 +363,46 @@ export function refuseBranchOnManagedDatabase(rawArgs: string[], kind: string): 
 }
 
 /**
+ * Refuse `rebase db restore` into the managed development database.
+ *
+ * A backup carries its rows as COPY data, and the managed database's socket
+ * server cannot take `COPY … FROM stdin`: `rebase db restore --clean` into it
+ * hung the daemon, and every command after it, until the daemon was killed.
+ * `pg_restore` has no way to write the rows as INSERTs. `rebase db pull`
+ * dumps them that way itself (see `dev-db/pull.ts`), so the route is to
+ * restore into a real Postgres and pull the copy across.
+ */
+export function refuseRestoreOnManagedDatabase(rawArgs: string[], kind: string): void {
+    if (kind !== "managed") return;
+    const words = argsFromCommand(rawArgs, "db");
+    if (words[0] !== "db" || words[1] !== "restore") return;
+
+    let dump = "<dump>";
+    for (let i = 2; i < words.length; i++) {
+        if (words[i] === "--target-db") i++;
+        else if (!words[i].startsWith("-")) {
+            dump = words[i];
+            break;
+        }
+    }
+    const summary = "rebase db restore does not work on the managed development database.";
+
+    throw new ManagedDatabaseRefusal(summary, [
+        "",
+        chalk.red(`  ✗ ${summary} Nothing was restored.`),
+        "",
+        chalk.gray("  A backup carries its rows as COPY data, which the managed database (PGlite)"),
+        chalk.gray("  cannot receive: the restore would leave it hung until it is stopped."),
+        "",
+        chalk.gray("  Restore into Postgres in Docker instead:"),
+        chalk.gray(`    ${chalk.cyan(`rebase db restore ${dump} --docker --clean --yes`)}`),
+        chalk.gray("  and, to have the copy in the managed database too, pull it across:"),
+        chalk.gray(`    ${chalk.cyan("rebase db pull --from \"$(rebase db url --docker)\" --yes")}`),
+        ""
+    ]);
+}
+
+/**
  * Resolve the active driver's CLI and the environment it should run in.
  *
  * Shared by the two runners below. Deliberately does NOT resolve a database:
@@ -505,10 +545,12 @@ export async function runDriverDbCommand(
     // the managed database would have failed to start, where the developer
     // would otherwise be told about a daemon rather than about branching.
     const { resolveProjectDatabase } = await import("../dev-db/prepare");
-    refuseBranchOnManagedDatabase(rawArgs, resolveProjectDatabase(projectRoot, {
+    const resolvedKind = resolveProjectDatabase(projectRoot, {
         flagUrl: readFlagValue(rawArgs, "--database-url"),
         flagDocker: rawArgs.includes("--docker")
-    }).kind);
+    }).kind;
+    refuseBranchOnManagedDatabase(rawArgs, resolvedKind);
+    refuseRestoreOnManagedDatabase(rawArgs, resolvedKind);
 
     const { prepareDatabaseEnv, managedNotices } = await import("../dev-db/prepare");
     const prepared = await prepareDatabaseEnv(projectRoot, {

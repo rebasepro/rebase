@@ -14,7 +14,8 @@ import {
     dbExamples,
     ManagedDatabaseRefusal,
     atlasDevDatabaseFor,
-    refuseBranchOnManagedDatabase
+    refuseBranchOnManagedDatabase,
+    refuseRestoreOnManagedDatabase
 } from "./db.js";
 
 const ROOT = path.resolve("/projects/my-app");
@@ -244,8 +245,52 @@ describe("refuseBranchOnManagedDatabase", () => {
 
     it("leaves the other db subcommands alone", () => {
         // push/generate/migrate get a throwaway Atlas database instead (see
-        // atlasDevDatabaseFor); backup and restore are not refused at all.
+        // atlasDevDatabaseFor); backup is not refused at all, and restore has
+        // its own refusal (refuseRestoreOnManagedDatabase).
         for (const sub of ["push", "backup", "restore", "pull"]) {
+            expect(call(["node", "rebase", "db", sub], "managed").refused).toBe(false);
+        }
+    });
+});
+
+describe("refuseRestoreOnManagedDatabase", () => {
+    /**
+     * A backup carries its rows as COPY data, and the managed database's
+     * socket server cannot take `COPY … FROM stdin`: `rebase db restore
+     * --clean` into it hung the daemon, and every command after it, until
+     * the daemon was killed.
+     */
+    const call = (args: string[], kind: string) => {
+        try {
+            refuseRestoreOnManagedDatabase(args, kind);
+        } catch (error) {
+            expect(error).toBeInstanceOf(ManagedDatabaseRefusal);
+            return { refused: true, output: (error as ManagedDatabaseRefusal).lines.join("\n") };
+        }
+        return { refused: false, output: "" };
+    };
+    const line = (...words: string[]) => ["node", "rebase", "db", "restore", "./backups/app.dump", ...words];
+
+    it.each([[["--clean", "--yes"]], [["--yes"]], [[]]])("refuses a restore into the managed database (%j)", (words) => {
+        const { refused, output } = call(line(...words), "managed");
+        expect(refused).toBe(true);
+        expect(output).toContain("rebase db restore does not work on the managed development database.");
+        expect(output).toContain("COPY");
+        expect(output).toContain("Nothing was restored.");
+    });
+
+    it("names the restore that works, and how the copy then reaches the managed database", () => {
+        const { output } = call(line("--clean", "--yes"), "managed");
+        expect(output).toContain("rebase db restore ./backups/app.dump --docker --clean --yes");
+        expect(output).toContain("rebase db pull --from");
+    });
+
+    it.each(["external", "docker"])("restores into a real Postgres (%s)", (kind) => {
+        expect(call(line("--clean", "--yes"), kind).refused).toBe(false);
+    });
+
+    it("leaves the other db subcommands alone", () => {
+        for (const sub of ["push", "backup", "pull", "backups"]) {
             expect(call(["node", "rebase", "db", sub], "managed").refused).toBe(false);
         }
     });
