@@ -1287,7 +1287,12 @@ export async function ensureDockerDatabase(projectRoot: string, rawArgs: readonl
         // Never a push. `rebase db push --docker` is one, and it runs next.
         hasCollections: false,
         pushSchema: async () => undefined,
-        log: message => console.log(message)
+        // stderr, like every notice about which database a command resolved:
+        // stdout belongs to the command. On stdout these lines were the first
+        // thing `psql "$(rebase db url)"`, `DATABASE_URL="$(rebase db url)"`
+        // and `rebase console -e … | jq` read, whenever the container had to
+        // be started first.
+        log: message => console.error(message)
     });
 }
 
