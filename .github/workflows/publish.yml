@@ -553,6 +553,11 @@ jobs:
             echo "found=true" >> "$GITHUB_OUTPUT"
             echo "$NOTES" > /tmp/release-notes.md
             echo "📝 Found release notes for v$VERSION in CHANGELOG.md"
+            # GitHub refuses a release body over 125,000 characters, and this
+            # release is created last: 0.25.0's 174,000 published everywhere,
+            # then failed here. Over the limit, whole sections are kept, the
+            # ones to act on first, with a link to the CHANGELOG at the tag.
+            node tooling/scripts/fit-release-notes.mjs /tmp/release-notes.md "$VERSION"
           else
             echo "❌ No release notes found for v$VERSION in CHANGELOG.md. Release notes are required to continue."
             exit 1
