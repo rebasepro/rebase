@@ -68,7 +68,10 @@ que pueda capturar (cerrar el terminal, Ctrl-C, SIGTERM, SIGQUIT). Si se le mata
 más (SIGKILL), deja el origen cerrado hasta el siguiente comando `rebase db branch`,
 cualquiera de ellos, que primero lo vuelve a abrir y lo dice;
 `ALTER DATABASE "<db>" ALLOW_CONNECTIONS true`, ejecutado desde la base de datos
-`postgres`, hace lo mismo a mano.
+`postgres`, hace lo mismo a mano. Mientras un create forzado mantiene cerrado su
+origen, mantiene sobre él un advisory lock en la base de datos `postgres`, de modo que
+la reapertura deja en paz el origen de una copia en curso, y un segundo create forzado
+desde el mismo origen espera a que termine el primero.
 Así, un cliente que se reconecta en cuanto se le desconecta, como hace un
 `rebase dev` en marcha, no puede volver a colarse antes de que empiece la copia. Eso
 requiere ser el propietario del origen; sin serlo, y en `delete`, `--force`

@@ -138,7 +138,13 @@ Copia otra base de datos en la base de datos de desarrollo local:
 rebase db pull --from postgres://…  [--anonymize]
 ```
 
-`--anonymize` reemplaza los campos personales durante la importación, para que se pueda trabajar con una copia de producción localmente sin llevar datos reales de clientes a un portátil. Compara las columnas por nombre y es de mejor esfuerzo.
+`--from` acepta una URL `postgres://` o `postgresql://`, o los pares
+`host=… port=… dbname=…` de libpq entrecomillados como un solo argumento. Cualquier
+otra cosa se rechaza antes de leer o iniciar nada, sin repetir el valor.
+
+`--anonymize` reemplaza los campos personales durante la importación, para que se pueda trabajar con una copia de producción localmente sin llevar datos reales de clientes a un portátil. Compara las columnas por nombre y es de mejor esfuerzo. Una columna `name` a secas solo se reemplaza en una
+tabla de personas: una llamada `users`, `authors`, `customers` o similar, o cualquier
+tabla que además tenga una columna de dirección de correo electrónico.
 Una columna bajo un índice único recibe un valor distinto por fila, y la pasada es una sola
 transacción: si falla, las tablas que habría reescrito se vacían y se nombran,
 y el comando termina con código 1. En la 0.24 fallaba en `token_hash` una vez que los usuarios
@@ -149,6 +155,11 @@ no acepta se rechaza antes de leer o copiar nada, nombrando el que probablemente
 quería escribir: `--anonymise` responde "did you mean --anonymize?" y termina con
 código 1. En la 0.24 un flag mal escrito se ignoraba, así que `--anonymise`, `--anon` o
 `--schem` ejecutaban el pull sin él, y los datos personales llegaban tal cual.
+En `pull` y en todos los demás comandos, un switch al que se le da un valor lo lee:
+`--anonymize=true` o `=1` lo activa, `--anonymize=false` o `=0` lo deja desactivado,
+y cualquier otro valor se rechaza. En la 0.25 cualquier valor activaba el switch, así que
+`--anonymize=false` anonimizaba y `db push --allow-destructive=false` permitía
+la eliminación.
 
 `pg_dump` elimina los privilegios, por lo que la copia llegaría con las políticas RLS del origen y ninguna de las concesiones (grants) asociadas — fallando cada lectura como `rebase_user` con `permission denied`. La operación pull reaprovisiona el rol de la aplicación después, utilizando la misma rutina que el arranque y `rebase db push`, de modo que las tablas internas de Rebase permanezcan revocadas como corresponde.
 

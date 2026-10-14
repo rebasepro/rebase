@@ -98,6 +98,16 @@ rebase schema introspect
   del esquema `rebase` se escribe `rebase.roles()`. Conectado como un rol llamado
   `rebase`, la ruta por defecto ponía ese esquema primero y la regla volvía como
   `roles()`, que el push no podía encontrar
+- Conserva las políticas de una
+  tabla de unión many-to-many. Las políticas `<junction>_default_edge_write_*` de una
+  tabla de unión se derivan de las reglas de actualización de la colección que declara
+  la relación, y una tabla de unión solo puede heredar una regla que pueda leer. Una
+  regla de rol vuelve como el SQL que Postgres guarda para ella,
+  `string_to_array(rebase.roles(), ','::text) && ARRAY['admin'::text]`, y eso se lee
+  de nuevo como la regla de rol, así que el push deriva las mismas políticas.
+  En la 0.25.0 se leía como SQL en bruto: el dry run
+  enumeraba las tres políticas como políticas que ninguna colección describe, el push
+  las dejaba en vigor, y un cambio posterior en la regla ya no les llegaba
 - Escribe
   `disableDefaultPolicies: true` en una tabla que tiene la seguridad a nivel de fila
   activada y no tiene toda la [base del administrador](/docs/collections/security-rules/#policies-a-collection-gets-without-writing-them),
@@ -294,6 +304,15 @@ rebase db migrate
 - Lee `drizzle/migrations/` en busca de migraciones no aplicadas
 - Las aplica en orden a la base de datos
 - Rastrea qué migraciones se han aplicado
+- Sella las
+  políticas de seguridad a nivel de fila como lo hacen `db push` y el arranque del
+  servidor, de modo que el primer arranque tras un migrate las deja en paz en lugar de
+  volver a crear cada una. Una migración se escribió a partir de las colecciones de su
+  momento, así que una política solo se sella cuando es exactamente lo que su regla
+  produce ahora: migrate la vuelve a crear a partir de su regla con otro nombre, en una
+  transacción que revierte, y compara lo que guardó Postgres, como hace
+  `db push --dry-run`. Una política que difiere no recibe sello, y el siguiente arranque
+  vuelve a aplicar su tabla
 
 `--refuse-destructive`
 hace que rechace en su lugar. Primero ejecuta en seco las migraciones pendientes. Si alguna
@@ -358,6 +377,8 @@ rebase doctor
 - Colecciones ↔ Base de datos — ¿hay alguna desviación inesperada?
 
 Ejecute `doctor` cada vez que algo parezca desincronizado. Señala exactamente dónde está la discrepancia.
+
+La comparación con la base de datos incluye la que hace el arranque antes de advertir que `schema.generated.ts` y la base de datos no coinciden, ejecutada con el mismo código. Así, cada diferencia de la que advierte el arranque está también en el informe, con las mismas palabras: una columna que es NOT NULL en un lado y admite nulos en el otro, y una columna que la base de datos aún tiene y el archivo no (el arranque nunca elimina ninguna, así que una propiedad renombrada deja atrás su columna antigua). Cada una es una advertencia, y la solución nombra `rebase db push`.
 
 La comparación con la base de datos necesita `DATABASE_URL` (o `ADMIN_CONNECTION_STRING`). Sin una, esa fase se informa como **omitida** en lugar de superada, y la ejecución nunca termina con "All schemas are in sync" — una comprobación que no ocurrió no es un certificado de buena salud.
 

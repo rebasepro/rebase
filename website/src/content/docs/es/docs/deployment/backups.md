@@ -108,6 +108,10 @@ funciones que no están.
 Por eso
 `rebase db backup` rechaza un `--exclude-schema` que coincide con `rebase`, según las
 reglas de patrones del propio pg_dump (`reb*` y `*` incluidos), antes de ejecutar nada.
+Esas reglas dejan pasar la sintaxis de expresiones regulares fuera de las comillas
+dobles, así que `[r]ebase` y `audit|rebase` también se rechazan, y se pregunta al
+servidor por cada patrón antes de que se ejecute `pg_dump`, con el mismo motor de
+expresiones regulares que usa la propia consulta de `pg_dump`.
 En la 0.24 escribía el dump y lo validaba, y solo fallaba la restauración.
 
 Como contiene cada
