@@ -1051,6 +1051,7 @@ export const hi: RebaseTranslations = {
     studio_policy_help_step4_title: "4. WITH CHECK एक्सप्रेशन",
     studio_policy_help_step4_desc: "एक SQL शर्त जो सत्य होने पर ही नई या संशोधित पंक्तियाँ सहेजी जाती हैं (INSERT, UPDATE)।",
     studio_policy_help_step4_example: "आम तौर पर USING एक्सप्रेशन जैसा ही, जब उपयोगकर्ता केवल अपना ही डेटा जोड़ या संपादित कर सकते हों।",
+    studio_policy_help_example: "उदाहरण:",
     studio_policy_help_auth_vars_title: "Rebase प्रमाणीकरण वेरिएबल",
     studio_policy_help_auth_vars_desc: "Rebase ऐसे नेटिव हेल्पर फ़ंक्शन देता है जिन्हें आप अपने एक्सप्रेशन में उपयोग कर सकते हैं:",
     studio_policy_help_auth_uid: "वर्तमान उपयोगकर्ता की ID को टेक्स्ट के रूप में लौटाता है। उदाहरण:",

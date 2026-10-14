@@ -307,7 +307,7 @@ export const PolicyEditor = ({
             </DialogActions>
 
             <Dialog open={helpOpen} onOpenChange={setHelpOpen} maxWidth="3xl">
-                <DialogTitle hidden>Row-Level Security Help</DialogTitle>
+                <DialogTitle hidden>{t("studio_policy_help_title")}</DialogTitle>
                 <DialogContent className="p-4 sm:p-6 lg:p-8 flex flex-col gap-6">
                     <div>
                         <Typography variant="h5" className="mb-2">{t("studio_policy_help_title")}</Typography>
@@ -348,7 +348,7 @@ export const PolicyEditor = ({
                                 {t("studio_policy_help_step3_desc")}
                             </Typography>
                             <div className={cls("bg-surface-well px-3 py-2 rounded-md font-mono text-sm my-2", defaultBorderMixin)}>
-                                Example: {RLS_UID_SQL} = uid
+                                {t("studio_policy_help_example")} {RLS_UID_SQL} = uid
                             </div>
                             <Typography variant="caption" className="text-text-secondary dark:text-text-secondary-dark">
                                 {t("studio_policy_help_step3_example")}
@@ -361,7 +361,7 @@ export const PolicyEditor = ({
                                 {t("studio_policy_help_step4_desc")}
                             </Typography>
                             <div className={cls("bg-surface-well px-3 py-2 rounded-md font-mono text-sm my-2", defaultBorderMixin)}>
-                                Example: {RLS_UID_SQL} = uid
+                                {t("studio_policy_help_example")} {RLS_UID_SQL} = uid
                             </div>
                             <Typography variant="caption" className="text-text-secondary dark:text-text-secondary-dark">
                                 {t("studio_policy_help_step4_example")}
@@ -376,15 +376,15 @@ export const PolicyEditor = ({
                             <ul className="list-disc pl-5 space-y-2 text-sm text-text-secondary dark:text-text-secondary-dark font-normal">
                                 <li>
                                     <code className="bg-surface-well px-1.5 py-0.5 rounded mr-1 whitespace-nowrap">{RLS_UID_SQL}</code>
-                                    <span className="block mt-0.5">Returns the current user&apos;s ID as text. Example: <code className="bg-surface-well px-1 py-0.5 rounded text-[11px]">{RLS_UID_SQL} = uid</code></span>
+                                    <span className="block mt-0.5">{t("studio_policy_help_auth_uid")} <code className="bg-surface-well px-1 py-0.5 rounded text-[11px]">{RLS_UID_SQL} = uid</code></span>
                                 </li>
                                 <li>
                                     <code className="bg-surface-well px-1.5 py-0.5 rounded mr-1 whitespace-nowrap">{RLS_JWT_SQL}</code>
-                                    <span className="block mt-0.5">Returns the full JWT payload as JSONB so you can check custom claims. Example: <code className="bg-surface-well px-1 py-0.5 rounded text-[11px]">{RLS_JWT_SQL} -&gt;&gt; &apos;email&apos; = &apos;admin@example.com&apos;</code></span>
+                                    <span className="block mt-0.5">{t("studio_policy_help_auth_jwt")} <code className="bg-surface-well px-1 py-0.5 rounded text-[11px]">{RLS_JWT_SQL} -&gt;&gt; &apos;email&apos; = &apos;admin@example.com&apos;</code></span>
                                 </li>
                                 <li>
                                     <code className="bg-surface-well px-1.5 py-0.5 rounded mr-1 whitespace-nowrap">{RLS_ROLES_SQL}</code>
-                                    <span className="block mt-0.5">Returns the user&apos;s role IDs as a comma-separated string. Best used with: <code className="bg-surface-well px-1 py-0.5 rounded text-[11px]">string_to_array({RLS_ROLES_SQL}, &apos;,&apos;) @&gt; ARRAY[&apos;admin&apos;]</code></span>
+                                    <span className="block mt-0.5">{t("studio_policy_help_auth_roles")} <code className="bg-surface-well px-1 py-0.5 rounded text-[11px]">string_to_array({RLS_ROLES_SQL}, &apos;,&apos;) @&gt; ARRAY[&apos;admin&apos;]</code></span>
                                 </li>
                             </ul>
                         </Paper>

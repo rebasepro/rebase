@@ -1051,6 +1051,7 @@ export const de: RebaseTranslations = {
     studio_policy_help_step4_title: "4. WITH CHECK-Ausdruck",
     studio_policy_help_step4_desc: "Eine SQL-Bedingung, die wahr sein muss, damit neue oder geänderte Zeilen gespeichert werden (INSERT, UPDATE).",
     studio_policy_help_step4_example: "Meist identisch mit dem USING-Ausdruck, wenn Benutzer nur ihre eigenen Daten anlegen oder bearbeiten dürfen.",
+    studio_policy_help_example: "Beispiel:",
     studio_policy_help_auth_vars_title: "Rebase-Auth-Variablen",
     studio_policy_help_auth_vars_desc: "Rebase stellt native Hilfsfunktionen bereit, die Sie in Ihren Ausdrücken verwenden können:",
     studio_policy_help_auth_uid: "Gibt die ID des aktuellen Benutzers als Text zurück. Beispiel:",

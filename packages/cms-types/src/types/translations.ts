@@ -1158,6 +1158,7 @@ export interface RebaseTranslations {
     studio_policy_help_step4_title: string;
     studio_policy_help_step4_desc: string;
     studio_policy_help_step4_example: string;
+    studio_policy_help_example?: string;
     studio_policy_help_auth_vars_title?: string;
     studio_policy_help_auth_vars_desc?: string;
     studio_policy_help_auth_uid?: string;

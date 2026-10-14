@@ -1051,6 +1051,7 @@ export const fr: RebaseTranslations = {
     studio_policy_help_step4_title: "4. Expression WITH CHECK",
     studio_policy_help_step4_desc: "Une condition SQL qui doit être vraie pour que les lignes nouvelles ou modifiées soient enregistrées (INSERT, UPDATE).",
     studio_policy_help_step4_example: "Généralement identique à l'expression USING lorsque les utilisateurs ne peuvent insérer ou modifier que leurs propres données.",
+    studio_policy_help_example: "Exemple :",
     studio_policy_help_auth_vars_title: "Variables d'authentification Rebase",
     studio_policy_help_auth_vars_desc: "Rebase fournit des fonctions natives que vous pouvez utiliser dans vos expressions :",
     studio_policy_help_auth_uid: "Renvoie l'identifiant de l'utilisateur courant sous forme de texte. Exemple :",
