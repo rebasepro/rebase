@@ -146,17 +146,49 @@ export function useCreateFormex<T = any>({
     const initialTouchedRef = useRef(initialTouched);
     initialTouchedRef.current = initialTouched;
     const debounceTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+    /** The values the timer above will report, while it is pending. */
+    const pendingValuesRef = useRef<{ values: T } | undefined>(undefined);
 
     const callDebouncedOnValuesChange = useCallback((values: T) => {
         if (onValuesChangeRef.current) {
             if (debounceTimeoutRef.current) {
                 clearTimeout(debounceTimeoutRef.current);
             }
+            pendingValuesRef.current = { values };
             debounceTimeoutRef.current = setTimeout(() => {
+                debounceTimeoutRef.current = undefined;
+                pendingValuesRef.current = undefined;
                 onValuesChangeRef.current?.(values, controllerRef.current);
             }, 300);
         }
     }, []);
+
+    /** Drop the pending `onValuesChangeDeferred` call, if there is one. */
+    const cancelDeferredValuesChange = useCallback(() => {
+        if (debounceTimeoutRef.current) {
+            clearTimeout(debounceTimeoutRef.current);
+            debounceTimeoutRef.current = undefined;
+        }
+        pendingValuesRef.current = undefined;
+    }, []);
+
+    /**
+     * Make the pending `onValuesChangeDeferred` call now, if there is one.
+     *
+     * A submit does this before it saves, so whatever the report writes (the
+     * record form's draft backup) is written before the save and cleared by
+     * it — never written back 300 ms after it. A form unmounting does it too,
+     * rather than reporting from a timer that outlives it.
+     */
+    const flushDeferredValuesChange = useCallback(() => {
+        const pending = pendingValuesRef.current;
+        cancelDeferredValuesChange();
+        if (pending) {
+            onValuesChangeRef.current?.(pending.values, controllerRef.current);
+        }
+    }, [cancelDeferredValuesChange]);
+
+    useEffect(() => flushDeferredValuesChange, [flushDeferredValuesChange]);
 
     // Replace state for history with refs
     const historyRef = useRef<FormexHistoryEntry<T>[]>([{ values: startValues }]);
@@ -269,6 +301,7 @@ export function useCreateFormex<T = any>({
         async (e?: React.FormEvent<HTMLFormElement>) => {
             e?.preventDefault();
             e?.stopPropagation();
+            flushDeferredValuesChange();
             setIsSubmitting(true);
             setSubmitCount((prev: number) => prev + 1);
             await beforeSubmitRef.current?.();
@@ -282,7 +315,7 @@ export function useCreateFormex<T = any>({
             setIsSubmitting(false);
             setVersion((prev: number) => prev + 1);
         },
-        []
+        [flushDeferredValuesChange]
     );
 
     const resetForm = useCallback((props?: FormexResetProps<T>) => {
@@ -293,6 +326,8 @@ export function useCreateFormex<T = any>({
             touched: touchedProp,
             undoable
         } = props ?? {};
+        // What the reset throws away is not reported later as the values.
+        cancelDeferredValuesChange();
         const priorValues = valuesRef.current;
         const priorTouched = touchedRef.current;
         const nextValues = valuesProp ?? initialValuesRef.current;
@@ -323,7 +358,7 @@ export function useCreateFormex<T = any>({
             historyRef.current = [{ values: nextValues }];
             historyIndexRef.current = 0;
         }
-    }, []);
+    }, [cancelDeferredValuesChange]);
 
     /**
      * The `initialValues` prop moved: the record this form edits finished

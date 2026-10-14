@@ -44,7 +44,7 @@ Formex is a minimal, Formik-inspired form library used throughout the Rebase adm
 | `validateOnInitialRender` | `boolean` | `false` | Run validation on mount |
 | `onSubmit` | `(values: T, controller) => void \| Promise<void>` | — | Submit handler |
 | `onReset` | `(controller) => void \| Promise<void>` | — | Reset callback |
-| `onValuesChangeDeferred` | `(values: T, controller) => void` | — | Debounced (300ms) callback on value changes |
+| `onValuesChangeDeferred` | `(values: T, controller) => void` | — | Debounced (300ms) callback on value changes. A pending call is made at once when the form submits or unmounts, and dropped when it resets |
 | `debugId` | `string` | — | Optional identifier for debugging |
 
 ### `FormexController<T>` Properties
