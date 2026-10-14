@@ -263,7 +263,8 @@ intero ogni schema che il backup crea (`rebase`, per esempio), e ogni tabella ch
 backup crea in uno schema che non crea (`public`), con `CASCADE`, poi ripristina il dump
 nella stessa transazione. Prima di chiedere conferma, nomina ciò che questo elimina e che
 il backup non contiene, come `rebase.atlas_schema_revisions` da `rebase db migrate`,
-o una vista o una chiave esterna altrove che fa riferimento a una delle tabelle del
+una funzione, un tipo o una sequenza in uno schema sostituito, o una vista o una chiave
+esterna altrove che fa riferimento a una delle tabelle del
 backup. Un ripristino che si ferma in un punto qualsiasi viene annullato, e dice che il
 database contiene ciò che conteneva prima. Esegue il dump tramite `psql`, che viene
 fornito con `pg_restore` (`PSQL_PATH` ne indica un altro), e attende al massimo
