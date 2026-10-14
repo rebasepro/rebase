@@ -363,21 +363,28 @@ const CONFLICTS_NAMED = 5;
  * What `db restore` says when the target already holds what the backup
  * creates, and the two ways round it: `--clean` replaces them with the
  * backup's copy, a new database restores beside them.
-
+ *
+ * `line` is the rest of what the user typed — the database it names, `--yes`,
+ * `--no-owner` — which both commands keep, so the one copied runs against the
+ * same database and does not stop again to ask. `--target-db` goes on the
+ * `--clean` one only: the other names a new database.
  */
 export function describeRestoreConflict(
     target: string,
     backupArg: string,
-    conflicts: readonly string[]
+    conflicts: readonly string[],
+    line: { targetDb?: string; carried?: readonly string[] } = {}
 ): { message: string; hint: string } {
     const named = conflicts.slice(0, CONFLICTS_NAMED).join(", ");
     const more = conflicts.length > CONFLICTS_NAMED ? `, and ${conflicts.length - CONFLICTS_NAMED} more` : "";
+    const carried = line.carried?.length ? ` ${line.carried.join(" ")}` : "";
+    const sameTarget = line.targetDb ? ` --target-db ${line.targetDb}` : "";
     return {
         message: `"${target}" already holds ${named}${more}, which this backup creates. ` +
             "Without --clean, pg_restore stops at the first of them. Nothing was restored or changed.",
         hint: [
-            `To replace them with the backup's copy:  rebase db restore ${backupArg} --clean`,
-            `To restore beside them, in a new database:  rebase db restore ${backupArg} --create-db --target-db <new name>`
+            `To replace them with the backup's copy:  rebase db restore ${backupArg}${sameTarget} --clean${carried}`,
+            `To restore beside them, in a new database:  rebase db restore ${backupArg} --create-db --target-db <new name>${carried}`
         ].join("\n    ")
     };
 }
@@ -528,7 +535,15 @@ export async function restoreCommand(rawArgs: string[]): Promise<void> {
         if (!args["--clean"]) {
             const conflicts = await findRestoreConflicts(targetConnection, objects);
             if (conflicts.length > 0) {
-                const { message, hint } = describeRestoreConflict(targetDb ?? "the target database", backupArg, conflicts);
+                const { message, hint } = describeRestoreConflict(targetDb ?? "the target database", backupArg, conflicts, {
+                    targetDb: args["--target-db"],
+                    carried: [
+                        ...(args["--database-url"] ? ["--database-url", `"${args["--database-url"]}"`] : []),
+                        ...(args["--docker"] ? ["--docker"] : []),
+                        ...(args["--no-owner"] ? ["--no-owner"] : []),
+                        ...(args["--yes"] ? ["--yes"] : [])
+                    ]
+                });
                 throw new BackupToolError(message, hint);
             }
         }

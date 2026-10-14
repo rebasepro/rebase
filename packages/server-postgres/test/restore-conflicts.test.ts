@@ -85,6 +85,15 @@ describe("the refusal", () => {
         expect(hint).toContain("rebase db restore ./backups/x.dump --create-db --target-db <new name>");
     });
 
+    it("keeps the database the user named, and the --yes they typed, in both commands", () => {
+        const { hint } = describeRestoreConflict("shop", "x.dump", ["schema rebase"], {
+            targetDb: "shop",
+            carried: ["--docker", "--yes"]
+        });
+        expect(hint).toContain("rebase db restore x.dump --target-db shop --clean --docker --yes");
+        expect(hint).toContain("rebase db restore x.dump --create-db --target-db <new name> --docker --yes");
+    });
+
     it("counts what it does not list", () => {
         const many = Array.from({ length: 8 }, (_, i) => `table public.t${i}`);
         expect(describeRestoreConflict("shop", "x.dump", many).message).toMatch(/table public\.t4, and 3 more, which/);
