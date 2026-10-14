@@ -147,7 +147,7 @@ describe("the branch this checkout is switched to", () => {
 });
 
 describe("planIsEmpty", () => {
-    const empty = { staleRows: [], orphanDatabases: [], expired: [], devDiff: ["x_dev_diff"] };
+    const empty = { staleRows: [], orphanDatabases: [], expired: [], devDiff: ["x_dev_diff"], active: null };
 
     it("ignores Atlas leftovers unless they were asked for", () => {
         expect(planIsEmpty(empty, false)).toBe(true);
