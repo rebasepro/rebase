@@ -1454,7 +1454,10 @@ async function onParentDatabase(projectRoot: string, rawArgs: string[], action: 
     const url = (parent.kind === "managed" ? null : parent.url)?.trim();
     if (!url) return rawArgs;
 
-    console.log(chalk.gray(`  ● On branch ${active.name} — using the main database, where the branch registry lives.`));
+    // stderr, like every notice about which database a command resolved:
+    // stdout belongs to the command. `branch list --json` printed this on
+    // stdout, ahead of whatever followed.
+    console.error(chalk.gray(`  ● On branch ${active.name} — using the main database, where the branch registry lives.`));
 
     const from = action === "create" && readFlagValue(rawArgs, "--from") === null
         ? ["--from", active.database]

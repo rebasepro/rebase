@@ -187,6 +187,27 @@ describe("listing branches from a branch", () => {
         expect(printed()).toContain("main database");
     });
 
+    // A notice about which database was read, not the command's output: on
+    // stdout it came ahead of whatever `list` printed, and `list --json`
+    // printed it and then refused the flag.
+    it("says it on stderr, leaving stdout to the command", async () => {
+        await dbCommand("branch", argv("db", "branch", "list")).catch(() => undefined);
+
+        const onStdout = vi.mocked(console.log).mock.calls.map(c => c.join(" ")).join("\n");
+        const onStderr = vi.mocked(console.error).mock.calls.map(c => c.join(" ")).join("\n");
+        expect(onStdout).not.toContain("On branch");
+        expect(onStderr).toContain("On branch feature_x");
+    });
+
+    it("refuses list --json before saying anything on stdout", async () => {
+        const refused = await dbCommand("branch", argv("db", "branch", "list", "--json")).catch((error: unknown) => error);
+
+        expect(refused).toMatchObject({ isUsageError: true });
+        expect(String(refused)).toContain("`rebase db branch list` has no option --json");
+        expect(vi.mocked(console.log).mock.calls).toEqual([]);
+        expect(driverLine()).toEqual([]);
+    });
+
     it("adds nothing when the checkout is not on a branch", async () => {
         active = null;
         await dbCommand("branch", argv("db", "branch", "list")).catch(() => undefined);
