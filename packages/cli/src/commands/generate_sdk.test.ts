@@ -113,6 +113,25 @@ force: true });
         expect(options).toMatchObject({ baseUrl: "http://localhost:3755" });
     });
 
+    it("gives the README the address rebase dev says its backend is starting on", async () => {
+        // `rebase dev` regenerates the SDK at boot, before the backend binds —
+        // so before `state.json` holds this run's port, and while it may still
+        // hold another run's.
+        const collectionsDir = collectionsDirWith({ "posts.ts": collectionFile("posts") });
+        fs.writeFileSync(path.join(tmpDir, "rebase.json"), "{}");
+        fs.mkdirSync(path.join(tmpDir, ".rebase"));
+        fs.writeFileSync(path.join(tmpDir, ".rebase", "state.json"), JSON.stringify({ port: 3755 }));
+        vi.stubEnv("REBASE_DEV_BACKEND_URL", "http://localhost:3918");
+        try {
+            await generateSdkCommand({ collectionsDir, output: path.join(tmpDir, "out"), cwd: tmpDir });
+        } finally {
+            vi.unstubAllEnvs();
+        }
+
+        const [, options] = vi.mocked(sdkGen.generateSDK).mock.calls[0];
+        expect(options).toMatchObject({ baseUrl: "http://localhost:3918" });
+    });
+
     it("passes every collection through, sorted by slug for a stable SDK", async () => {
         const collectionsDir = collectionsDirWith({
             "posts.ts": collectionFile("posts"),

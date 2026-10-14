@@ -545,3 +545,59 @@ describe("the admin panel and the backend", () => {
         await finish(run);
     });
 });
+
+/**
+ * `generated/sdk/README.md` names the backend's address, and `rebase dev`
+ * regenerates the SDK at boot — before the backend has bound, so before it
+ * writes `.rebase/state.json`, which is all `generate-sdk` read. Every start
+ * left the README saying `localhost:3001`, a port this project's dev server is
+ * almost never on.
+ */
+describe("the SDK's example address", () => {
+    const isSdk = (s: Spawned) => s.args.includes("generate-sdk");
+    const isBackend = (s: Spawned) => s.file === "/bin/true";
+    const sdkUrls = () => spawned.filter(isSdk).map(s => s.options.env?.REBASE_DEV_BACKEND_URL);
+
+    /** Boxed: an async function returning the run itself would wait for it to end. */
+    async function start(argv: string[]): Promise<{ run: Promise<void> }> {
+        const run = devCommand(["node", "rebase", "dev", "--backend-only", ...argv]);
+        await vi.waitFor(() => expect(runDriverSchemaCommand).toHaveBeenCalled());
+        generation.resolve();
+        await vi.waitFor(() => expect(spawned.some(isBackend)).toBe(true));
+        return { run };
+    }
+
+    function announce(port: number): void {
+        spawned.find(isBackend)?.stdout.write(`ℹ️ [INFO] Server running at http://localhost:${port}\n`);
+    }
+
+    it("is the port dev starts the backend on, from the first generation", async () => {
+        const { run } = await start(["--port", "45160"]);
+
+        expect(sdkUrls()).toEqual(["http://localhost:45160"]);
+
+        announce(45160);
+        await settle();
+        // The backend landed where the SDK said: nothing to regenerate.
+        expect(sdkUrls()).toEqual(["http://localhost:45160"]);
+
+        for (const child of spawned) child.end();
+        await run;
+    });
+
+    it("follows the backend when it binds another port", async () => {
+        const { run } = await start([]);
+        const told = Number(new URL(sdkUrls()[0] ?? "").port);
+
+        announce(told + 1);
+        await vi.waitFor(() => expect(sdkUrls()).toEqual([`http://localhost:${told}`, `http://localhost:${told + 1}`]));
+
+        // A restart on the same port changes nothing.
+        announce(told + 1);
+        await settle();
+        expect(sdkUrls()).toHaveLength(2);
+
+        for (const child of spawned) child.end();
+        await run;
+    });
+});

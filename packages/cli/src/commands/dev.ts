@@ -63,7 +63,7 @@ import { detectPackageManager, getPMCommands } from "../utils/package-manager";
 import { parseCommandArgs, UsageError, wantsHelp } from "../utils/args";
 import { affectsSqlSchema } from "../utils/collection-drift";
 import { ensureDevDatabase, probeTcp } from "../utils/dev-preflight";
-import { getProjectPort } from "../utils/dev-server";
+import { DEV_BACKEND_URL_ENV, getProjectPort } from "../utils/dev-server";
 import { runDriverDbCommand, runDriverSchemaCommand } from "./db";
 import dotenv from "dotenv";
 import { recordEvent } from "../telemetry";
@@ -973,15 +973,21 @@ export function needsStaleSchemaPreflight(generation: SchemaGeneration): boolean
  * hand, so it is captured, and on failure only the lines that say what went
  * wrong are shown — not the stack under them. Like the schema, a failure never
  * stops `dev`.
+ *
+ * `backendPort` is where the backend is, or is about to be: the README's
+ * example names it. The first run is before the backend binds, so it is told
+ * rather than left to read `.rebase/state.json`.
  */
-async function regenerateSdk(projectRoot: string): Promise<void> {
+async function regenerateSdk(projectRoot: string, backendPort: number | null): Promise<void> {
     if (!projectHasCollections(projectRoot)) return;
     const entry = resolveCliEntry();
     const { execPath, prefixArgs } = resolveSpawn(entry);
     try {
         await execa(execPath, [...prefixArgs, entry, "generate-sdk"], {
             cwd: projectRoot,
-            all: true
+            all: true,
+            // The README's example address — see `DEV_BACKEND_URL_ENV`.
+            ...(backendPort !== null ? { env: { [DEV_BACKEND_URL_ENV]: `http://localhost:${backendPort}` } } : {})
         });
     } catch (error) {
         const output = typeof error === "object" && error !== null && "all" in error && typeof error.all === "string"
@@ -1353,6 +1359,15 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
      * which is the failure the flag exists to produce.
      */
     let prepared: PreparedDatabase | null = null;
+    /**
+     * The backend port the SDK README was last generated for: the one the
+     * backend is told at boot, then each one it announces it bound.
+     */
+    let sdkBackendPort: number | null = startsBackend ? startPort : null;
+    const regenerateSdkFor = (port: number | null): Promise<void> => {
+        sdkBackendPort = port;
+        return regenerateSdk(projectRoot, port);
+    };
     if (!frontendOnly) {
         // `--docker` names a container, not a connection string, and the
         // preflight is what starts it — but only when the order picks Docker. A
@@ -1367,7 +1382,7 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
         ({ schemaGeneration, database: prepared } = await overlapDevStartup({
             // Side by side: they read the same collections and write different
             // files, so the SDK costs nothing on top of the schema.
-            generate: async () => (await Promise.all([ensureGeneratedSchema(projectRoot), regenerateSdk(projectRoot)]))[0],
+            generate: async () => (await Promise.all([ensureGeneratedSchema(projectRoot), regenerateSdkFor(sdkBackendPort)]))[0],
             // Not under --database-url: the preflight decides from `.env`, and
             // may start the compose container it names, which is not the
             // database the flag points this run at.
@@ -1906,7 +1921,7 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
                     sqlSchemaAffected = false;
                     void (async () => {
                         if (!regenerateSchema) {
-                            await regenerateSdk(projectRoot);
+                            await regenerateSdkFor(resolvedBackendPort ?? startPort);
                             restartBackend();
                             return;
                         }
@@ -1922,7 +1937,7 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
                         ].join("\n"));
 
                         const schemaBefore = generatedSchemaStamp();
-                        await Promise.all([ensureGeneratedSchema(projectRoot), regenerateSdk(projectRoot)]);
+                        await Promise.all([ensureGeneratedSchema(projectRoot), regenerateSdkFor(resolvedBackendPort ?? startPort)]);
                         // The stock runtime imports the generated schema, so tsx
                         // already restarts when it is written; a second restart
                         // from the trigger is exactly what this avoids.
@@ -2152,6 +2167,12 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
                 // Save the port to .rebase-dev-port for port affinity
                 const portFile = path.join(projectRoot, DEV_PORT_FILENAME);
                 fs.writeFileSync(portFile, devPortFileContents(resolvedBackendPort, startPort), "utf-8");
+
+                // The SDK README names the port the backend was told; one that
+                // moved past a collision gets the port it actually bound.
+                if (sdkBackendPort !== null && sdkBackendPort !== resolvedBackendPort) {
+                    void regenerateSdkFor(resolvedBackendPort);
+                }
             }
         });
 

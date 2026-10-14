@@ -13,6 +13,18 @@ import path from "path";
 import { findProjectRoot } from "./project";
 
 /**
+ * The address `rebase dev` is starting its backend on, handed to the
+ * `generate-sdk` child it runs.
+ *
+ * Dev regenerates the SDK at boot, beside the database start and before the
+ * backend binds — so before the backend writes `.rebase/state.json`, which is
+ * where `generate-sdk` otherwise reads the address for the README's example.
+ * Dev knows the port it hands the backend, and the child's environment is the
+ * only channel between them.
+ */
+export const DEV_BACKEND_URL_ENV = "REBASE_DEV_BACKEND_URL";
+
+/**
  * The port `rebase dev` derives from the project root path.
  * Range: 3001–3999 (avoids privileged ports and common services).
  * Two different project directories will almost always get different ports.

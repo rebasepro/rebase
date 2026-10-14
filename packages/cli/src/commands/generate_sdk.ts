@@ -15,6 +15,7 @@ import { CollectionConfig, computeSchemaVersion, deserializeCollections } from "
 import { CodegenError, generateSDK, GeneratedFile, toCollectionAccessor } from "@rebasepro/codegen";
 import { detectPackageManager, getPMCommands } from "../utils/package-manager";
 import { findProjectRoot, readEnvFile } from "../utils/project";
+import { DEV_BACKEND_URL_ENV } from "../utils/dev-server";
 import { findBackendApp, loadManifest, manifestExists, writeManifest } from "../manifest";
 import { readLink } from "./cloud/context";
 import { COLLECTIONS_FLAG_HELP, COLLECTIONS_PATH_RULE } from "../utils/path-flags";
@@ -428,10 +429,14 @@ function mayUseAmbientKey(target: string, cwd: string): boolean {
  * the one it actually got to `.rebase/state.json`. Printing a hardcoded
  * `localhost:3001` sent people to a port nothing was listening on — or, with
  * several projects on one machine, to a different project's backend. Prefer the
- * port this project last ran on; fall back to the literal only when the project
- * has never been started.
+ * port `rebase dev` says it is starting the backend on (`DEV_BACKEND_URL_ENV`:
+ * it regenerates the SDK before the backend binds), then the port this project
+ * last ran on; fall back to the literal only when the project has never been
+ * started.
  */
 export function resolveExampleBaseUrl(cwd: string): string {
+    const fromDev = process.env[DEV_BACKEND_URL_ENV]?.trim();
+    if (fromDev) return fromDev;
     const projectRoot = findProjectRoot(cwd) ?? cwd;
     try {
         const state = JSON.parse(fs.readFileSync(path.join(projectRoot, ".rebase", "state.json"), "utf-8"));
