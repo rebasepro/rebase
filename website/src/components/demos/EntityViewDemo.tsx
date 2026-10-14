@@ -177,7 +177,7 @@ const KANBAN_COLUMNS: KanbanColumn[] = [
     title: "Backlog",
     // The dot is `CHIP_COLORS[key].darkColor` — the hue's own solid stop
     // (BoardColumnTitle.tsx), not a Tailwind grey that belongs to no palette.
-    color: "#666666",
+    color: "#62676e",
     cards: [
       { id: "871492", title: "Dark mode", image: "/img/kanban/dark_mode.png" },
       { id: "871388", title: "Search indexing", image: "/img/kanban/search_indexing.png" },

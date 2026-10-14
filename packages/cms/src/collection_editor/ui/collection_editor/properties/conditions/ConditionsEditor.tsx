@@ -367,12 +367,12 @@ function ConditionRow({
         const contextField = CONTEXT_FIELDS.find(f => f.id === fieldPath);
         if (contextField) return contextField.color;
 
-        if (!collectionProperties) return "#888";
+        if (!collectionProperties) return "#838991";
 
         const prop = getPropertyAtPath(fieldPath, collectionProperties);
-        if (!prop) return "#888";
+        if (!prop) return "#838991";
         const config = getFieldConfig(prop, DEFAULT_FIELD_CONFIGS);
-        return config?.color ?? "#888";
+        return config?.color ?? "#838991";
     };
 
     return (

@@ -12,7 +12,7 @@
  *
  *     node website/scripts/generate_icons.mjs
  *
- * The apple-touch-icon sits on the page ground (#0A0A0A) with padding: iOS
+ * The apple-touch-icon sits on the page ground (#090A0C) with padding: iOS
  * fills transparency with black and rounds the corners itself, and the mark
  * drawn edge to edge loses its own rounded silhouette under that mask.
  */
@@ -27,7 +27,7 @@ const PUBLIC = path.join(SITE, "public");
 const require = createRequire(path.join(SITE, "package.json"));
 const { chromium } = require("@playwright/test");
 
-const GROUND = "#0A0A0A";
+const GROUND = "#090A0C";
 const svg = await readFile(path.join(PUBLIC, "favicon.svg"), "utf8");
 const dataUri = `data:image/svg+xml;base64,${Buffer.from(svg).toString("base64")}`;
 

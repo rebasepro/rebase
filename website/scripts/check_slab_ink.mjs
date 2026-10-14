@@ -119,7 +119,7 @@ const MEASURE = () => {
             // alpha, is wrong and reports three false failures on /product: the
             // form figure's `.field` is `--surface-field`, white at 0.04, and
             // taking that as "translucent, therefore on the slab" composites a
-            // field that sits on an opaque #181818 card over deep blue.
+            // field that sits on an opaque #16181c card over deep blue.
             const layers = [];
             let ownSurface = false;
             for (let q = el; q && q !== slab; q = q.parentElement) {

@@ -9,12 +9,12 @@ function Tip({ children, text }: { children: ReactNode; text: string }) {
             {children}
             {show && (
                 <span
-                    className="absolute z-50 bottom-full left-1/2 mb-1.5 px-2.5 py-1.5 rounded-lg bg-[#09090b] border border-hairline text-[11px] text-surface-300 leading-snug shadow-2xl shadow-black/60 max-w-[240px] w-max pointer-events-none"
+                    className="absolute z-50 bottom-full left-1/2 mb-1.5 px-2.5 py-1.5 rounded-lg bg-[#08090b] border border-hairline text-[11px] text-surface-300 leading-snug shadow-2xl shadow-black/60 max-w-[240px] w-max pointer-events-none"
                     style={{ animation: "archTip 120ms ease-out", transform: "translateX(-50%)" }}
                 >
                     {text}
                     <span className="absolute top-full left-1/2 -translate-x-1/2 -mt-px">
-                        <span className="block w-1.5 h-1.5 rotate-45 bg-[#09090b] border-r border-b border-hairline" />
+                        <span className="block w-1.5 h-1.5 rotate-45 bg-[#08090b] border-r border-b border-hairline" />
                     </span>
                 </span>
             )}

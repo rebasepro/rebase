@@ -25,7 +25,7 @@ import { FONT, INK } from "../theme";
 type Line = { text: string; color?: string; at: number; indent?: number };
 
 const C = {
-    white: "#F7F8F8",
+    white: "#F6F7F8",
     dim: "#6B7078",
     rule: "#3A3E45",
     critical: "#FB7185",
@@ -33,7 +33,7 @@ const C = {
     medium: "#FDE047",
     cyan: "#67E8F9",
     green: "#34D399",
-    body: "#B4B8BD",
+    body: "#AEB3BA",
 };
 
 const RULE = "─".repeat(58);

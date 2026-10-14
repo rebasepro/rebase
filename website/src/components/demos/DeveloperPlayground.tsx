@@ -185,7 +185,7 @@ export function DeveloperPlayground() {
                                 </div>
                             </div>
                             {/* Vis sync side */}
-                            <div className="lg:col-span-6 bg-[#09090b] p-5 flex flex-col justify-between">
+                            <div className="lg:col-span-6 bg-[#08090b] p-5 flex flex-col justify-between">
                                 <div className="space-y-4">
                                     <div className="flex items-center justify-between border-b border-hairline pb-2.5">
                                         <span className="text-[10px] font-semibold text-surface-500 uppercase tracking-wider">Visual Studio Schema Editor</span>
@@ -224,7 +224,7 @@ export function DeveloperPlayground() {
                                 </div>
                             </div>
                             {/* API inspector side */}
-                            <div className="lg:col-span-5 bg-[#09090b] flex flex-col">
+                            <div className="lg:col-span-5 bg-[#08090b] flex flex-col">
                                 <div className="p-4 border-b border-hairline flex items-center justify-between">
                                     <span className="text-[10px] font-semibold text-surface-500 uppercase tracking-wider">Generated REST Endpoint</span>
                                     <span className="text-[8px] text-green-400 font-semibold bg-green-500/10 px-1.5 py-0.5 rounded border border-green-500/20">Instant API</span>
@@ -262,7 +262,7 @@ export function DeveloperPlayground() {
                                 </div>
                             </div>
                             {/* Live custom widgets render side */}
-                            <div className="lg:col-span-6 bg-[#09090b] flex flex-col justify-between">
+                            <div className="lg:col-span-6 bg-[#08090b] flex flex-col justify-between">
                                 <div className="flex-1">
                                     <CustomFieldsDemo />
                                 </div>
@@ -272,7 +272,7 @@ export function DeveloperPlayground() {
 
                     {/* ── TAB 4: VISUAL SECURITY (RLS) ── */}
                     {activeTab === "security" && (
-                        <div className="lg:col-span-12 bg-[#09090b] flex flex-col">
+                        <div className="lg:col-span-12 bg-[#08090b] flex flex-col">
                             <div className="p-4 border-b border-hairline flex items-center justify-between">
                                 <span className="text-[10px] font-semibold text-surface-500 uppercase tracking-wider">Visual row-level security policy builder</span>
                                 <span className="text-[8px] text-emerald-400 font-semibold bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">DB Level Security</span>

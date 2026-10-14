@@ -115,68 +115,94 @@
     --color-primary-bg: oklch(from var(--color-primary) l c h / 0.1);
     --color-secondary-bg: oklch(from var(--color-secondary) l c h / 0.1);
 
+    /* GRAPHITE — every neutral in this file, text and surface, sits on ONE hue:
+       258°, the brand blue's own, at a chroma low enough (0.002-0.014) that
+       nothing reads as blue. Adopted 2026-10-14.
+
+       Before, the neutrals sat on five hues: the surface ladder had none (pure
+       grey), the text greys were Tailwind's zinc at 286° (violet), the site and
+       film grounds 246°, the slate scale 264°. A hue-less grey beside a cool
+       black reads warm and muddy, so a card looked like a grey box set on
+       black rather than a lifted piece of the same surface.
+
+       Each value is `oklch(L c 258)` with the lightness it had before, so
+       contrast and the ladder's steps did not move; the exceptions are the
+       text tiers noted below, moved on purpose. The values are written as hex
+       because tokens are read by more than CSS (canvas, email, charts), and a
+       guard (test/neutral-hue.test.ts) fails on any neutral off the hue. */
+
     /* Field Colors */
-    --color-field-disabled: rgb(224 224 226);
-    --color-field-disabled-dark: rgb(35 35 37);
+    --color-field-disabled: #e1e4e7;
+    --color-field-disabled-dark: #212429;
 
     /* Text Colors — using opaque values so icon strokes render solidly */
-    --color-text-primary: #212121;
-    /* #737373, not #757575. Two units, and they are the two that matter.
-       The app's light page ground is #fafafa, not #ffffff, and #757575 lands at
-       4.41:1 there — under AA for the 14px type this token carries. It clears
-       4.5 only against pure white, which is not a surface the product actually
-       uses. Every field label in light mode was failing by a whisker.
-       #737373 measures 4.54:1 on #fafafa and 4.74:1 on #ffffff, so it passes on
-       both grounds instead of the theoretical one. Same fix, and the same
-       reasoning, as the `--color-surface-500` move recorded below. */
-    --color-text-secondary: #737373;
-    /* #8b8b8b, not #9e9e9e. Measured against the field fill a disabled label
-       actually sits on (`surface-accent-200/50` over #fafafa ≈ #eef1f5),
-       #9e9e9e reached 2.36:1 — present, but not readable.
-       Full AA is not achievable here and should not be chased: 4.5:1 on that
-       fill needs #6e6e6e, which is DARKER than the #737373 an ENABLED label
-       uses, so the disabled state would read as the emphasised one. WCAG 1.4.3
-       exempts inactive controls for exactly this reason.
-       #8b8b8b lands at ~3:1 — legible at a glance, still unmistakably muted
-       against its enabled neighbour. */
-    --color-text-disabled: #8b8b8b;
-    --color-text-primary-dark: #ffffff;
-    --color-text-secondary-dark: #a0a0a9;
-    --color-text-disabled-dark: #757580;
+    --color-text-primary: #1e2126;
+    /* Secondary text: field labels, descriptions. Light is moved DOWN to
+       L 0.52 — the old #737373 measured 4.54:1 on #fafafa but only 4.17:1 on
+       the frame (#f0f0f2) it actually sits on most, below AA. Now 4.85:1 on
+       the frame, 5.29:1 on surface-50, 5.52:1 on white. Dark is moved UP to
+       L 0.765, one value for the panel and the site, which had two (#a0a0a9
+       and #b4b8bd): 9.4:1 on the frame, 8.4:1 on a card. */
+    --color-text-secondary: #646971;
+    /* Disabled: deliberately not AA. 4.5:1 on the disabled field fill would
+       need a value DARKER than the enabled label, so the disabled state would
+       read as the emphasised one; WCAG 1.4.3 exempts inactive controls for
+       exactly this reason. It lands at ~3.4:1 on white — legible at a glance,
+       still unmistakably muted against its enabled neighbour. Dark disabled
+       is moved up to L 0.605, which clears 4.6:1 on a card (was 3.9:1). */
+    --color-text-disabled: #868c94;
+    --color-text-primary-dark: #f6f7f8;
+    --color-text-secondary-dark: #aeb3ba;
+    --color-text-disabled-dark: #7d828a;
 
     /* Surface Colors */
-    --color-surface-50: #fafafa;
-    --color-surface-100: #f5f5f5;
-    --color-surface-200: #e5e5e5;
-    --color-surface-300: #d4d4d4;
-    --color-surface-400: #a3a3a3;
-    /* Muted text: captions, nav descriptions, table headers, eyebrows.
-       #737373 was tuned for light and measured 4.74:1 on white but only
-       4.43:1 on #000 and 4.18:1 on #0a0a0a, so every dark surface — the
-       marketing site, the console, the admin panel in dark mode — carried a
-       muted tier below AA. #797979 is the balance point: it is the single
-       value where the white and #111111 curves cross, at 4.35:1 on each,
-       and it clears 4.5:1 outright on the two backgrounds that carry most of
-       this token (4.82:1 on #000, 4.55:1 on #0a0a0a). */
-    --color-surface-500: #797979;
-    --color-surface-600: #404040;
-    --color-surface-700: #262626;
-    --color-surface-800: #111111;
-    --color-surface-900: #0a0a0a;
+    --color-surface-50: #f9fafb;
+    --color-surface-100: #f4f5f7;
+    --color-surface-200: #e3e5e9;
+    --color-surface-300: #d1d4d9;
+    --color-surface-400: #9ea4ab;
+    /* Muted text: captions, nav descriptions, table headers, eyebrows. One
+       value has to serve both themes, so it sits at the lightness where the
+       white and surface-800 contrast curves cross (L 0.576): 4.34:1 on white,
+       4.36:1 on surface-800, and it clears 4.5:1 on the two backgrounds that
+       carry most of this token (4.84:1 on #000, 4.57:1 on surface-900). */
+    --color-surface-500: #747a81;
+    --color-surface-600: #3c4046;
+    --color-surface-700: #23262b;
+    --color-surface-800: #0f1114;
+    --color-surface-900: #090a0c;
     --color-surface-950: #000000;
 
     /* Surface Accent Colors */
     --color-surface-accent-50: #f8fafc;
-    --color-surface-accent-100: #f1f5f9;
+    --color-surface-accent-100: #f2f5f9;
     --color-surface-accent-200: #e2e8f0;
-    --color-surface-accent-300: #cbd5e1;
+    --color-surface-accent-300: #ccd5e1;
     --color-surface-accent-400: #94a3b8;
     --color-surface-accent-500: #64748b;
     --color-surface-accent-600: #475569;
     --color-surface-accent-700: #334155;
-    --color-surface-accent-800: #1e293b;
-    --color-surface-accent-900: #172033;
-    --color-surface-accent-950: #0f172a;
+    --color-surface-accent-800: #1d293b;
+    --color-surface-accent-900: #152133;
+    --color-surface-accent-950: #0c182a;
+
+    /* The Graphite ramp at Tailwind's own lightness steps. Tailwind's zinc,
+       neutral, gray and stone palettes are re-pointed at it (see the inline
+       block below), so a `bg-zinc-900` written anywhere — a website demo, an
+       editor toolbar, a customer's own component — lands on the system's one
+       neutral hue instead of zinc's 286°. Slate is left alone: it already sits
+       on 258°. */
+    --color-graphite-50: #f9fafb;
+    --color-graphite-100: #f4f5f7;
+    --color-graphite-200: #e3e5e9;
+    --color-graphite-300: #d1d4d9;
+    --color-graphite-400: #9ca1a9;
+    --color-graphite-500: #6e747b;
+    --color-graphite-600: #4e5359;
+    --color-graphite-700: #3c4046;
+    --color-graphite-800: #23262b;
+    --color-graphite-900: #15171b;
+    --color-graphite-950: #090a0c;
 }
 
 /* The semantic surfaces as Tailwind colors. `inline` is load-bearing: it makes
@@ -185,6 +211,52 @@
    `@theme` the alias would be computed once on `:root` and stay light. The
    variables themselves are defined at the bottom of this file. */
 @theme inline {
+    /* Tailwind's grey palettes, re-pointed at Graphite (defined above). */
+    --color-zinc-50: var(--color-graphite-50);
+    --color-zinc-100: var(--color-graphite-100);
+    --color-zinc-200: var(--color-graphite-200);
+    --color-zinc-300: var(--color-graphite-300);
+    --color-zinc-400: var(--color-graphite-400);
+    --color-zinc-500: var(--color-graphite-500);
+    --color-zinc-600: var(--color-graphite-600);
+    --color-zinc-700: var(--color-graphite-700);
+    --color-zinc-800: var(--color-graphite-800);
+    --color-zinc-900: var(--color-graphite-900);
+    --color-zinc-950: var(--color-graphite-950);
+    --color-neutral-50: var(--color-graphite-50);
+    --color-neutral-100: var(--color-graphite-100);
+    --color-neutral-200: var(--color-graphite-200);
+    --color-neutral-300: var(--color-graphite-300);
+    --color-neutral-400: var(--color-graphite-400);
+    --color-neutral-500: var(--color-graphite-500);
+    --color-neutral-600: var(--color-graphite-600);
+    --color-neutral-700: var(--color-graphite-700);
+    --color-neutral-800: var(--color-graphite-800);
+    --color-neutral-900: var(--color-graphite-900);
+    --color-neutral-950: var(--color-graphite-950);
+    --color-gray-50: var(--color-graphite-50);
+    --color-gray-100: var(--color-graphite-100);
+    --color-gray-200: var(--color-graphite-200);
+    --color-gray-300: var(--color-graphite-300);
+    --color-gray-400: var(--color-graphite-400);
+    --color-gray-500: var(--color-graphite-500);
+    --color-gray-600: var(--color-graphite-600);
+    --color-gray-700: var(--color-graphite-700);
+    --color-gray-800: var(--color-graphite-800);
+    --color-gray-900: var(--color-graphite-900);
+    --color-gray-950: var(--color-graphite-950);
+    --color-stone-50: var(--color-graphite-50);
+    --color-stone-100: var(--color-graphite-100);
+    --color-stone-200: var(--color-graphite-200);
+    --color-stone-300: var(--color-graphite-300);
+    --color-stone-400: var(--color-graphite-400);
+    --color-stone-500: var(--color-graphite-500);
+    --color-stone-600: var(--color-graphite-600);
+    --color-stone-700: var(--color-graphite-700);
+    --color-stone-800: var(--color-graphite-800);
+    --color-stone-900: var(--color-graphite-900);
+    --color-stone-950: var(--color-graphite-950);
+
     --color-surface-frame: var(--surface-frame);
     --color-surface-sheet: var(--surface-sheet);
     --color-surface-card: var(--surface-card);
@@ -244,12 +316,12 @@
    `.dark` are the only switches. */
 :root,
 [data-theme="light"] {
-    --surface-frame: #f0f0f2;
-    --surface-sheet: #f9f9fa;
+    --surface-frame: #eff0f3;
+    --surface-sheet: #f8f9fa;
     --surface-card: #ffffff;
-    --surface-card-hover: #f7f7f8;
-    --surface-raised: #ececee;
-    --surface-raised-hover: #e3e3e6;
+    --surface-card-hover: #f6f7f9;
+    --surface-raised: #eaecef;
+    --surface-raised-hover: #e1e4e7;
     --surface-lifted: #ffffff;
     --surface-field: rgb(0 0 0 / 0.035);
     --surface-field-hover: rgb(0 0 0 / 0.055);
@@ -258,26 +330,26 @@
     --surface-scrim: rgb(0 0 0 / 0.4);
     /* The one surface that goes DOWN the ladder on purpose: a code well, a
        query, a log tail, a connection string, recessed into its card. */
-    --surface-well: #f5f5f5;
+    --surface-well: #f4f5f7;
     --hairline: rgb(0 0 0 / 0.08);
     --hairline-strong: rgb(0 0 0 / 0.13);
 }
 
 .dark,
 [data-theme="dark"] {
-    --surface-frame: #0a0a0a;
-    --surface-sheet: #131313;
-    --surface-card: #181818;
-    --surface-card-hover: #1d1d1d;
-    --surface-raised: #242424;
-    --surface-raised-hover: #2c2c2c;
-    --surface-lifted: #2c2c2c;
+    --surface-frame: #090a0c;
+    --surface-sheet: #111316;
+    --surface-card: #16181c;
+    --surface-card-hover: #1b1d21;
+    --surface-raised: #212429;
+    --surface-raised-hover: #292c32;
+    --surface-lifted: #292c32;
     --surface-field: rgb(255 255 255 / 0.04);
     --surface-field-hover: rgb(255 255 255 / 0.07);
     --surface-hover: rgb(255 255 255 / 0.06);
     --surface-active: rgb(255 255 255 / 0.09);
     --surface-scrim: rgb(0 0 0 / 0.6);
-    --surface-well: #0a0a0a;
+    --surface-well: #090a0c;
     --hairline: rgb(255 255 255 / 0.08);
     --hairline-strong: rgb(255 255 255 / 0.14);
 }

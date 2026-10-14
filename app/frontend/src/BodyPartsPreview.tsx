@@ -70,7 +70,7 @@ export default function BodyPartsPreview({
             <div className={cls("flex flex-wrap gap-1", "gap-0.5")}>
                 {value.map((partId: string) => {
                     const label = labelMap.get(partId) ?? partId;
-                    const color = BODY_PART_COLORS[partId] ?? "#9e9e9e";
+                    const color = BODY_PART_COLORS[partId] ?? "#999fa6";
 
                     return (
                         <Tooltip title={label} key={partId}>
@@ -127,7 +127,7 @@ export default function BodyPartsPreview({
                 const isSelected = value.includes(partId);
                 if (!isSelected) return null;
 
-                const color = BODY_PART_COLORS[partId] ?? "#9e9e9e";
+                const color = BODY_PART_COLORS[partId] ?? "#999fa6";
 
                 return zones
                     .filter((z) => z.view === view)

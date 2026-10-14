@@ -19,7 +19,7 @@
  *  of thing you are being told. See global.css for the full argument. */
 export const GROUND = {
     /** EVIDENCE — you are being shown something real. */
-    base: "#08090A",
+    base: "#090A0C",
     /** MECHANISM — a machine being opened.
      *
      *  NOT USED AS A FILM GROUND, and the reason is in global.css: RAISED and
@@ -35,7 +35,7 @@ export const GROUND = {
      *
      *  Kept as a token because it is part of the system and the panel surfaces
      *  inside a scene are entitled to it. The FIELD is not. */
-    raised: "#14161B",
+    raised: "#14161A",
     /** THE CLAIM the product rests on: security lives in the database. */
     claim: "#0021C1",
     /** THE ASK. The site spends this on its closing CTA; the film does not —
@@ -59,7 +59,7 @@ export type Ground = keyof typeof GROUND;
 /**
  * Ink, per ground. Not one palette — one per surface.
  *
- * `INK.muted` (#797979) is a grey chosen against near-black, where it is a
+ * `INK.muted` (#747a81) is a grey chosen against near-black, where it is a
  * comfortable 4.6:1. On the two chroma fields it is a disaster: **2.4:1 on
  * #0021C1 and 2.3:1 on #2E0EC7**, which is what made the eyebrow on the claim
  * scene and the whole summary line on the agent scene nearly unreadable. Grey
@@ -71,7 +71,7 @@ export type Ground = keyof typeof GROUND;
  * field-only with white type — the film just was not applying it.
  *
  * Card borders and fills move for the same reason: a 9%-white hairline is
- * visible on #08090A and gone on #2E0EC7, so the agent scene's three cards had
+ * visible on #090A0C and gone on #2E0EC7, so the agent scene's three cards had
  * effectively no edges at all.
  */
 export interface Tone {
@@ -84,9 +84,9 @@ export interface Tone {
 }
 
 const DARK_TONE: Tone = {
-    high: "#F7F8F8",
-    copy: "#B4B8BD",
-    muted: "#797979",
+    high: "#F6F7F8",
+    copy: "#AEB3BA",
+    muted: "#747a81",
     rule: "rgba(255,255,255,0.10)",
     cardBorder: "rgba(255,255,255,0.09)",
     cardFill: "rgba(255,255,255,0.022)",
@@ -112,11 +112,11 @@ export const TONE: Record<Ground, Tone> = {
 
 export const INK = {
     /** Full-strength type on a dark ground. */
-    high: "#F7F8F8",
+    high: "#F6F7F8",
     /** Body copy. 8.9:1 on base — the reading colour. */
-    copy: "#B4B8BD",
+    copy: "#AEB3BA",
     /** Eyebrows and captions. */
-    muted: "#797979",
+    muted: "#747a81",
     /** Hairlines. */
     rule: "rgba(255,255,255,0.10)",
     ruleSoft: "rgba(255,255,255,0.06)",
@@ -163,11 +163,11 @@ export const TRACKING = {
  *  each a step lighter than what it sits on; `well` is the one surface that
  *  goes down the ladder — an inset code well, a query, a log tail. */
 export const SURFACE = {
-    frame: "#0a0a0a",
-    sheet: "#131313",
-    card: "#181818",
-    raised: "#242424",
-    well: "#0a0a0a",
+    frame: "#090a0c",
+    sheet: "#111316",
+    card: "#16181c",
+    raised: "#212429",
+    well: "#090a0c",
     /** A hairline marks an object, not a region: cards on the sheet, fields,
      *  a table header's rule. Rows, tiles inside a card and buttons get none. */
     hairline: "rgba(255,255,255,0.08)",

@@ -83,7 +83,7 @@ const TOKEN_COLOR: Record<TokenKind, string> = {
     type: "#36CCD6",
     property: "#E7E9EB",
     punctuation: "#6B7078",
-    plain: "#B4B8BD",
+    plain: "#AEB3BA",
 };
 
 export const Code: React.FC<{
@@ -152,7 +152,7 @@ export const CodeCaption: React.FC<{ children: React.ReactNode; delay?: number }
     delay = 0,
 }) => {
     const frame = useCurrentFrame();
-    /* The ground's own muted ink, not INK.muted: #797979 is 2.4:1 on the
+    /* The ground's own muted ink, not INK.muted: #747a81 is 2.4:1 on the
        claim's blue, and a file name nobody can read is a frame with no
        name. See the note over TONE in theme.ts. */
     const tone = useTone();

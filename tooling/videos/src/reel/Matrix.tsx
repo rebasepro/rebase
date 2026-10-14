@@ -36,7 +36,7 @@ const VERDICT: Record<V, { label: string; hue: string; fill: number }> = {
     self: { label: "self", hue: CHROMA.yellow, fill: 0.14 },
     read: { label: "read", hue: CHROMA.violet, fill: 0.14 },
     pub: { label: "published", hue: CHROMA.violet, fill: 0.14 },
-    none: { label: "—", hue: "#6A6A6A", fill: 0.03 },
+    none: { label: "—", hue: "#666B72", fill: 0.03 },
 };
 
 const ROWS: { table: string; cells: V[] }[] = [

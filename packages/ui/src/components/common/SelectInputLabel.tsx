@@ -11,8 +11,8 @@ import { cls } from "../../util";
  * Measured side by side on /debug/ui, which is where it is most obvious, because
  * the reference puts them in adjacent columns.
  *
- * The text tokens are also the tuned ones: `--color-surface-500` was moved to
- * #797979 precisely so muted type clears AA on both grounds. The slate scale
+ * The text tokens are also the tuned ones: `--color-surface-500` sits at the
+ * lightness where muted type clears AA on both grounds. The accent scale
  * carries no such guarantee — it is for surfaces.
  */
 export function SelectInputLabel({ children, error }: { children: React.ReactNode, error?: boolean }) {

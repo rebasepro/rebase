@@ -16,9 +16,9 @@ import { CHIP_COLORS, CHIP_SEED_KEYS, contrastRatio, getColorSchemeForSeed, tint
 /** WCAG AA for normal-sized text. Chip labels are 11–13px. */
 const AA = 4.5;
 
-/** The surfaces a chip sits on: a light card and the dark `surface-card` (#181818). */
+/** The surfaces a chip sits on: a light card and the dark `surface-card` (#16181c). */
 const PAGE_LIGHT = "#ffffff";
-const PAGE_DARK = "#181818";
+const PAGE_DARK = "#16181c";
 
 describe("chip contrast", () => {
     it("covers every scheme, so a new hue cannot slip past this file", () => {

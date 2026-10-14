@@ -220,8 +220,8 @@ footer{margin-top:56px;padding-top:20px;border-top:1px solid var(--line-strong);
 footer p{margin:0 0 6px}
 
 @media print{
-  :root{--ground:#FFF;--surface:#FFF;--surface-2:#F4F4F4;--ink:#000;--ink-2:#222;--ink-3:#555;
-    --line:#CCC;--line-strong:#999}
+  :root{--ground:#FFF;--surface:#FFF;--surface-2:#F3F4F6;--ink:#000;--ink-2:#1f2227;--ink-3:#51555c;
+    --line:#C9CCD2;--line-strong:#949aa1}
   body{font-size:11pt}
   .wrap{max-width:none;padding:0}
   .finding{break-inside:avoid;page-break-inside:avoid}

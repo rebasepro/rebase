@@ -51,7 +51,7 @@ export default defineConfig({
                 { tag: "link", attrs: { rel: "icon", href: "/favicon.ico", sizes: "32x32" } },
                 { tag: "link", attrs: { rel: "apple-touch-icon", href: "/apple-touch-icon.png" } },
                 { tag: "link", attrs: { rel: "manifest", href: "/site.webmanifest" } },
-                { tag: "meta", attrs: { name: "theme-color", content: "#0A0A0A" } }
+                { tag: "meta", attrs: { name: "theme-color", content: "#090A0C" } }
             ],
             locales: { root: { label: "English", lang: "en" }, es: { label: "Español", lang: "es" }, de: { label: "Deutsch", lang: "de" }, fr: { label: "Français", lang: "fr" }, it: { label: "Italiano", lang: "it" }, pt: { label: "Português", lang: "pt" } },
             customCss: [
