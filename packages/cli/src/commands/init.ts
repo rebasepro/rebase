@@ -10,6 +10,7 @@ import { fileURLToPath } from "url";
 import crypto from "crypto";
 import { detectPackageManager, getPMCommands } from "../utils/package-manager";
 import { cliVersion } from "../utils/version";
+import { invokedRebaseCommand } from "../utils/invoked-command";
 import type arg from "arg";
 import { parseCommandArgs, wantsHelp } from "../utils/args";
 import { resolveCloudUrl, writeLink } from "./cloud/context";
@@ -478,9 +479,13 @@ async function promptForOptions(rawArgs: string[], pm: PackageManager): Promise<
     // inquirer either blocks forever waiting for input or aborts with a raw
     // ExitPromptError stack trace. Fail fast with actionable guidance instead.
     if (!process.stdin.isTTY) {
+        const rerun = initRerunCommand(rawArgs, invokedRebaseCommand());
         console.error(chalk.red("Cannot prompt: this is a non-interactive terminal (no TTY)."));
-        console.error(chalk.yellow("  Re-run with --yes to accept defaults, passing any choices as flags, e.g.:"));
-        console.error(chalk.yellow(`    rebase init ${nameArg || "my-app"} --yes --template blog`));
+        console.error(chalk.yellow("  Re-run it with --yes, which takes the default for anything not passed as a flag:"));
+        console.error(chalk.yellow(`    ${rerun.command}`));
+        if (rerun.redacted.length > 0) {
+            console.error(chalk.gray(`  ${capitalize(joinWords(rerun.redacted))} ${rerun.redacted.length === 1 ? "is" : "are"} left out above; put yours back in.`));
+        }
         console.error(chalk.gray("  Options: --template <blog|ecommerce|blank>  --headless  --database-url <url>  --install  --git  --agent <name>"));
         process.exit(1);
     }
@@ -524,6 +529,77 @@ async function promptForOptions(rawArgs: string[], pm: PackageManager): Promise<
         agents,
         interactive: true
     };
+}
+
+/**
+ * The command a reader with no terminal is told to run instead: the one they
+ * typed, as they typed it, with `--yes`.
+ *
+ * It used to be one fixed example, `rebase init <name> --yes --template blog`,
+ * whatever had been passed — so `init intro-app --headless --database-url …
+ * --introspect --install` was told to scaffold a blog. Every word after `init`
+ * is repeated in its place, and `invocation` is `rebase` as the reader started
+ * it (see `invokedRebaseCommand`).
+ *
+ * Two values are never repeated, because a hint is printed to logs: the
+ * password in `--database-url` (`databaseUrlProblem` keeps the same rule) and
+ * the `--setup-key`. Each is replaced with a placeholder and named in
+ * `redacted`, so the caller can say the copy is not runnable as printed.
+ *
+ * Exported for its test.
+ */
+export function initRerunCommand(
+    rawArgs: readonly string[],
+    invocation: readonly string[]
+): { command: string; redacted: string[] } {
+    const rest = rawArgs.slice(2);
+    const commandWord = rest.indexOf("init");
+    const redacted = new Set<string>();
+
+    const hide = (flag: string, value: string): string => {
+        if (flag === "--setup-key") {
+            redacted.add("the setup key");
+            return "<setup-key>";
+        }
+        if (flag === "--database-url") {
+            return value.replace(/^([a-z][a-z0-9+.-]*:\/\/[^:@/?#]*):([^@/?#]+)@/i, (_all, before: string) => {
+                redacted.add("the password in --database-url");
+                return `${before}:<password>@`;
+            });
+        }
+        return value;
+    };
+
+    const words: string[] = [];
+    for (let i = 0; i < rest.length; i++) {
+        if (i === commandWord) continue;
+        const word = rest[i];
+        const inline = /^(--[a-z-]+)=([\s\S]*)$/.exec(word);
+        if (inline) {
+            words.push(`${inline[1]}=${shellWord(hide(inline[1], inline[2]))}`);
+            continue;
+        }
+        const previous = i > 0 && i - 1 !== commandWord ? rest[i - 1] : "";
+        words.push(shellWord(previous.startsWith("--") ? hide(previous, word) : word));
+    }
+
+    return {
+        command: [...invocation, "init", ...words, "--yes"].join(" "),
+        redacted: [...redacted]
+    };
+}
+
+/** One word for a POSIX shell: bare when nothing in it is special, else single-quoted. */
+function shellWord(word: string): string {
+    return /^[\w@%+=:,./-]+$/.test(word) ? word : `'${word.replace(/'/g, "'\\''")}'`;
+}
+
+function joinWords(items: readonly string[]): string {
+    return items.length <= 1 ? items.join("") : `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`;
+}
+
+function capitalize(text: string): string {
+    return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
 /**
@@ -821,12 +897,22 @@ export function scaffoldDirectoryConflicts(dir: string): string[] {
         .sort();
 }
 
-/** The refusal for a directory that already holds files, with the two ways forward. */
-export function scaffoldConflictMessage(projectName: string, displayPath: string, conflicts: string[]): string[] {
+/**
+ * The refusal for a directory that already holds files, with the two ways forward.
+ *
+ * `invocation` is `rebase` as the reader started it, so the command offered is
+ * one they can run.
+ */
+export function scaffoldConflictMessage(
+    projectName: string,
+    displayPath: string,
+    conflicts: string[],
+    invocation: readonly string[] = invokedRebaseCommand()
+): string[] {
     const shown = conflicts.slice(0, 8).join(", ") + (conflicts.length > 8 ? `, and ${conflicts.length - 8} more` : "");
     return [
         `${chalk.red.bold("ERROR")} Directory "${projectName}" already holds files a new project would overwrite or mix with: ${shown}`,
-        chalk.yellow(`  Scaffold somewhere new — ${chalk.cyan("rebase init <new-directory>")} — or move those out of ${displayPath || "this directory"} and run this again.`),
+        chalk.yellow(`  Scaffold somewhere new — ${chalk.cyan([...invocation, "init", "<new-directory>"].join(" "))} — or move those out of ${displayPath || "this directory"} and run this again.`),
         chalk.gray(`  A repository's own metadata (.git) and a LICENSE are fine to leave in place.`)
     ];
 }
