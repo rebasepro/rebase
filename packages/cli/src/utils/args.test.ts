@@ -12,6 +12,7 @@
  * `bin/rebase.js` prints after every failure, `-p` was advertised in this
  * command's own help — so neither is a hypothetical.
  */
+import type arg from "arg";
 import { describe, expect, it } from "vitest";
 import { parseCommandArgs, wantsHelp } from "./args";
 
@@ -166,7 +167,7 @@ describe("an argument holding a flag and its value", () => {
  * parser.
  */
 describe("a switch given a value", () => {
-    const SWITCHES = { "--anonymize": Boolean, "--yes": Boolean, "-y": "--yes", "--schema": [String], "--tag": [Boolean] } as const;
+    const SWITCHES = { "--anonymize": Boolean, "--yes": Boolean, "-y": "--yes", "--schema": [String], "--tag": [Boolean] } satisfies arg.Spec;
     const pull = (...line: string[]) =>
         parseCommandArgs({ spec: SWITCHES, rawArgs: argv("db", "pull", ...line), commandWords: 2, command: "db pull", maxPositionals: 0 });
 
