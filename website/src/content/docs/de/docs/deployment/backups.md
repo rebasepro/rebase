@@ -263,8 +263,9 @@ Wiederherstellung, was das Backup enthält, als eine einzige Transaktion. Sie l�
 das das Backup anlegt, vollständig (`rebase` etwa), und jede Tabelle, die das Backup in einem
 Schema anlegt, das es nicht anlegt (`public`), mit `CASCADE`, und stellt dann den Dump in derselben
 Transaktion wieder her. Bevor sie nachfragt, nennt sie, was dabei gelöscht wird, das das Backup
-nicht enthält, etwa `rebase.atlas_schema_revisions` aus `rebase db migrate` oder eine View oder
-einen Fremdschlüssel an anderer Stelle, die auf eine der Tabellen des Backups verweisen. Eine
+nicht enthält, etwa `rebase.atlas_schema_revisions` aus `rebase db migrate`, eine Funktion, einen
+Typ oder eine Sequenz in einem ersetzten Schema oder eine View oder einen Fremdschlüssel an
+anderer Stelle, die auf eine der Tabellen des Backups verweisen. Eine
 Wiederherstellung, die irgendwo anhält, wird zurückgerollt, und sie sagt, dass die Datenbank
 enthält, was sie vorher enthielt. Sie spielt den Dump über `psql` ein, das mit `pg_restore`
 ausgeliefert wird (`PSQL_PATH` nennt ein anderes), und wartet höchstens 15 Sekunden auf eine
