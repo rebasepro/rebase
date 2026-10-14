@@ -152,36 +152,6 @@ importers:
         specifier: ^6.0.3
         version: 6.0.3
 
-  app/dist-bundle:
-    dependencies:
-      '@aws-sdk/client-s3':
-        specifier: ^3.1096.0
-        version: 3.1096.0
-      dotenv:
-        specifier: ^17.4.2
-        version: 17.4.2
-      drizzle-orm:
-        specifier: ^0.45.2
-        version: 0.45.2(@electric-sql/pglite@0.5.6)(@types/pg@8.20.0)(pg@8.22.0)
-      zod:
-        specifier: ^4.4.3
-        version: 4.4.3
-
-  app/dist-bundle-acceptance:
-    dependencies:
-      '@aws-sdk/client-s3':
-        specifier: ^3.1096.0
-        version: 3.1096.0
-      dotenv:
-        specifier: ^17.4.2
-        version: 17.4.2
-      drizzle-orm:
-        specifier: ^0.45.2
-        version: 0.45.2(@electric-sql/pglite@0.5.6)(@types/pg@8.20.0)(pg@8.22.0)
-      zod:
-        specifier: ^4.4.3
-        version: 4.4.3
-
   app/frontend:
     dependencies:
       '@fontsource-variable/instrument-sans':

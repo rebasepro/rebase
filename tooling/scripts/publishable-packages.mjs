@@ -83,14 +83,21 @@ export function workspaceGlobs(root = ROOT) {
     return globs;
 }
 
-/** Every workspace member, private ones included. */
+/**
+ * Every workspace member, private ones included.
+ *
+ * A glob that starts with `!` takes its matches out, as pnpm reads it — that
+ * is how `app/*` leaves `rebase build`'s output (`app/dist-bundle`) alone.
+ */
 export function workspacePackages(root = ROOT) {
     const seen = new Map();
+    const globs = workspaceGlobs(root);
+    const exclude = globs.filter(glob => glob.startsWith("!")).map(glob => `${glob.slice(1)}/package.json`);
 
-    for (const glob of workspaceGlobs(root)) {
+    for (const glob of globs.filter(glob => !glob.startsWith("!"))) {
         // `globSync` matches directories for a bare pattern; append the manifest
         // so a glob can only ever select a real package.
-        for (const match of fs.globSync(`${glob}/package.json`, { cwd: root })) {
+        for (const match of fs.globSync(`${glob}/package.json`, { cwd: root, exclude })) {
             const dir = path.dirname(match);
             if (seen.has(dir)) continue;
             let pkg;

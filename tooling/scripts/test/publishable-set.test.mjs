@@ -114,6 +114,54 @@ test("private packages are workspace members but never publishable", () => {
     assert.deepEqual(publishablePackages(root).map(p => p.name), ["@rebasepro/cli"]);
 });
 
+test("a `!` glob takes matches out of the workspace, as pnpm reads it", () => {
+    // `app/*` matched `rebase build`'s output — `app/dist-bundle` has a
+    // package.json of its own, and pnpm counted it as a member.
+    const root = workspace({
+        "app/backend": ok("backend"),
+        "app/dist-bundle": { name: "rebase-bundle", private: true },
+        "app/dist-bundle-acceptance": { name: "rebase-bundle", private: true }
+    }, ["app/*", "'!app/dist-bundle*'"]);
+    assert.deepEqual(workspaceGlobs(root), ["app/*", "!app/dist-bundle*"]);
+    assert.deepEqual(workspacePackages(root).map(p => p.dir), ["app/backend"]);
+});
+
+/**
+ * The repository's own globs, against the lockfile's own importers.
+ *
+ * A build in `app/` writes `app/dist-bundle/package.json` (and the acceptance
+ * suite `app/dist-bundle-acceptance/`), and `app/*` made each a workspace
+ * member: the lockfile recorded them, and the next build's package.json no
+ * longer matched what it recorded, so `pnpm install --frozen-lockfile` failed
+ * after any local build. Rebuilt on disk rather than read from this checkout,
+ * so the answer does not depend on what happens to be built or checked out
+ * here (`saas/` is a private repository).
+ */
+test("the repository's globs match every lockfile importer, and no build output", () => {
+    const repo = path.resolve(import.meta.dirname, "..", "..", "..");
+    const lockfile = fs.readFileSync(path.join(repo, "pnpm-lock.yaml"), "utf8");
+    const block = lockfile.slice(lockfile.indexOf("\nimporters:\n") + 1);
+    const end = block.search(/\n[a-z]/);
+    const importers = [...(end === -1 ? block : block.slice(0, end)).matchAll(/^ {2}([^ \n][^:\n]*):/gm)]
+        .map(match => match[1])
+        .filter(dir => dir !== ".");
+    assert.ok(importers.includes("app/backend") && importers.includes("packages/cli"), "read the importers");
+    assert.ok(!importers.some(dir => dir.startsWith("app/dist")), "the lockfile records no build output");
+
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "rebase-globs-"));
+    fs.copyFileSync(path.join(repo, "pnpm-workspace.yaml"), path.join(root, "pnpm-workspace.yaml"));
+    const manifests = Object.fromEntries(importers.map(dir => [dir, { name: dir }]));
+    for (const output of ["app/dist-bundle", "app/dist-bundle-acceptance", "app/dist-bundle-staging"]) {
+        manifests[output] = { name: "rebase-bundle", private: true };
+    }
+    for (const [dir, manifest] of Object.entries(manifests)) {
+        fs.mkdirSync(path.join(root, dir), { recursive: true });
+        fs.writeFileSync(path.join(root, dir, "package.json"), JSON.stringify(manifest));
+    }
+
+    assert.deepEqual(workspacePackages(root).map(p => p.dir).sort(), [...importers].sort());
+});
+
 test("setVersion moves every publishable package and leaves private ones alone", () => {
     const root = workspace({
         "packages/cli": ok("@rebasepro/cli", "0.17.2"),

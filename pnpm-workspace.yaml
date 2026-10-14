@@ -58,6 +58,12 @@ packages:
   - tooling/rebase-agent-skills
   - app
   - app/*
+  # Not `rebase build`'s output, which carries a package.json of its own:
+  # counted as a member, the lockfile recorded it, and the next build's
+  # manifest disagreed with what it recorded, so `pnpm install
+  # --frozen-lockfile` failed after any local build. Quoted: a bare `!` starts
+  # a YAML tag.
+  - '!app/dist-bundle*'
   - website
   - tooling/videos
   - examples/*
