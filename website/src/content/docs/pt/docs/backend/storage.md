@@ -1,5 +1,5 @@
 ---
-sourceHash: 552bf6fc4d37691a
+sourceHash: 912fb4a5c0d6c740
 title: Configuração de Storage
 sidebar_label: Configuração de Storage
 description: Configure backends de sistema de arquivos local, compatíveis com S3 ou GCS/Firebase Storage para uploads de arquivos, imagens e mídia.
@@ -99,7 +99,7 @@ image: {
 
 | Método | Caminho | Descrição |
 |--------|---------|-----------|
-| `POST` | `/api/storage/upload` | Upload direto de arquivo |
+| `POST` | `/api/storage/upload` | Upload direto de arquivo, um único corpo `multipart/form-data`: `file` (obrigatório); `key`, a chave do objeto, pastas incluídas (`author_pictures/ada.jpg`), senão o nome do arquivo na raiz; `bucket`, senão o bucket padrão; `storageId`; e `metadata_<name>` para metadados personalizados. Qualquer outro campo é ignorado: não existe um campo `path` |
 | `POST` | `/api/storage/upload?storageId=<key>` | Upload para um backend nomeado específico |
 | `GET` | `/api/storage/file/*` | Recuperar um arquivo — tudo após `/file/` é a chave do objeto |
 | `GET` | `/api/storage/file/*?storageId=<key>` | Recuperar um arquivo de um backend específico |

@@ -98,7 +98,7 @@ image: {
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `POST` | `/api/storage/upload` | Direct file upload |
+| `POST` | `/api/storage/upload` | Direct file upload, one `multipart/form-data` body: `file` (required); `key`, the object key, folders included (`author_pictures/ada.jpg`), else the file's name at the root; `bucket`, else the default one; `storageId`; and `metadata_<name>` for custom metadata. Any other field is ignored: there is no `path` field |
 | `POST` | `/api/storage/upload?storageId=<key>` | Upload to a specific named backend |
 | `GET` | `/api/storage/file/*` | Retrieve a file — everything after `/file/` is the object key |
 | `GET` | `/api/storage/file/*?storageId=<key>` | Retrieve a file from a specific backend |

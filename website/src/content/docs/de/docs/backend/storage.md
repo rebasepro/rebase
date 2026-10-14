@@ -1,5 +1,5 @@
 ---
-sourceHash: 552bf6fc4d37691a
+sourceHash: 912fb4a5c0d6c740
 title: Speicher-Konfiguration
 sidebar_label: Speicher-Konfiguration
 description: Konfigurieren Sie lokales Dateisystem, S3-kompatible Backends oder GCS/Firebase Storage für Datei-Uploads, Bilder und Medien.
@@ -99,7 +99,7 @@ image: {
 
 | Methode | Pfad | Beschreibung |
 |--------|------|-------------|
-| `POST` | `/api/storage/upload` | Direkter Datei-Upload |
+| `POST` | `/api/storage/upload` | Direkter Datei-Upload, ein einziger `multipart/form-data`-Body: `file` (Pflichtfeld); `key`, der Objektschlüssel samt Ordnern (`author_pictures/ada.jpg`), sonst der Dateiname im Wurzelverzeichnis; `bucket`, sonst der Standard-Bucket; `storageId`; und `metadata_<name>` für eigene Metadaten. Jedes andere Feld wird ignoriert: Ein Feld `path` gibt es nicht |
 | `POST` | `/api/storage/upload?storageId=<key>` | Upload in ein bestimmtes benanntes Backend |
 | `GET` | `/api/storage/file/*` | Eine Datei abrufen — alles nach `/file/` ist der Objektschlüssel |
 | `GET` | `/api/storage/file/*?storageId=<key>` | Eine Datei von einem bestimmten Backend abrufen |

@@ -1,5 +1,5 @@
 ---
-sourceHash: 552bf6fc4d37691a
+sourceHash: 912fb4a5c0d6c740
 title: Configuration du stockage
 sidebar_label: Configuration du stockage
 description: Configurez les backends de stockage sur système de fichiers local, compatible S3 ou GCS/Firebase Storage pour les téléversements de fichiers, les images et les médias.
@@ -99,7 +99,7 @@ image: {
 
 | Méthode | Chemin | Description |
 |--------|------|-------------|
-| `POST` | `/api/storage/upload` | Téléversement direct de fichier |
+| `POST` | `/api/storage/upload` | Téléversement direct de fichier, un seul corps `multipart/form-data` : `file` (obligatoire) ; `key`, la clé d'objet, dossiers compris (`author_pictures/ada.jpg`), sinon le nom du fichier à la racine ; `bucket`, sinon le bucket par défaut ; `storageId` ; et `metadata_<name>` pour des métadonnées personnalisées. Tout autre champ est ignoré : il n'existe pas de champ `path` |
 | `POST` | `/api/storage/upload?storageId=<key>` | Téléversement vers un backend nommé spécifique |
 | `GET` | `/api/storage/file/*` | Récupérer un fichier — tout ce qui suit `/file/` est la clé de l'objet |
 | `GET` | `/api/storage/file/*?storageId=<key>` | Récupérer un fichier depuis un backend spécifique |
