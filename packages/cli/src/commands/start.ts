@@ -18,6 +18,8 @@ import { detectPackageManager, getPMCommands } from "../utils/package-manager";
 import { DEFAULT_BUNDLE_DIR } from "../bundle";
 import type { RebaseBundleStatic } from "@rebasepro/types";
 import type { DevDatabase } from "../dev-db/resolve";
+import type { DaemonState } from "../dev-db/state";
+import { MANAGED_POOL_MAX } from "../dev-db/constraints";
 
 function printHelp(): void {
     console.log(`
@@ -142,6 +144,38 @@ export function missingDatabaseUrl(
     ];
 }
 
+/**
+ * What the runtime needs when DATABASE_URL is this project's managed
+ * development database, or nothing.
+ *
+ * The connection ceiling `rebase dev` sets for it (`MANAGED_POOL_MAX`). PGlite
+ * is one session behind a socket server that accepts only a few connections,
+ * and a running `rebase dev` holds some. With an ordinary pool, the boot's
+ * concurrent probes opened more than were left, the ones over were refused,
+ * and a probe that could not connect read as a table that was not there:
+ * `❌ rebase.cron_claims is unavailable`, beside tables that existed.
+ *
+ * Recognised by the running daemon's ports, which is what `rebase db url`
+ * prints from. A ceiling set by hand is kept.
+ */
+export function managedDatabaseRuntimeEnv(
+    databaseUrl: string | undefined,
+    daemon: DaemonState | null,
+    env: Record<string, string | undefined>
+): Record<string, string> {
+    if (!databaseUrl || !daemon || env.REBASE_DB_POOL_MAX !== undefined) return {};
+    let url: URL;
+    try {
+        url = new URL(databaseUrl);
+    } catch {
+        return {};
+    }
+    if (!["127.0.0.1", "localhost", "[::1]"].includes(url.hostname)) return {};
+    const ports = [daemon.port, ...Object.values(daemon.databases ?? {}).map(database => database.port)];
+    if (!ports.includes(Number(url.port))) return {};
+    return { REBASE_DB_POOL_MAX: String(MANAGED_POOL_MAX) };
+}
+
 function readBundleStatic(bundleDir: string): RebaseBundleStatic[] {
     try {
         const manifest = JSON.parse(fs.readFileSync(path.join(bundleDir, "manifest.json"), "utf8")) as { entry?: { static?: RebaseBundleStatic[] } };
@@ -220,6 +254,17 @@ export async function startCommand(rawArgs: string[] = []): Promise<void> {
             for (const line of missing) console.error(line);
             process.exit(1);
         }
+    }
+
+    // See `managedDatabaseRuntimeEnv`.
+    const { findRunningDaemon } = await import("../dev-db/daemon");
+    const managedEnv = managedDatabaseRuntimeEnv(process.env.DATABASE_URL, await findRunningDaemon(projectRoot), process.env);
+    if (managedEnv.REBASE_DB_POOL_MAX) {
+        Object.assign(process.env, managedEnv);
+        console.log(chalk.dim(
+            "DATABASE_URL is this project's managed development database: the runtime uses one connection,\n" +
+            "as `rebase dev` does, so requests are served one at a time.\n"
+        ));
     }
 
     process.env.REBASE_BUNDLE = bundleDir;
