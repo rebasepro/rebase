@@ -570,6 +570,11 @@ export async function runDriverDbCommand(
     // What named the database, for the driver's "Cannot connect" banner to
     // send the reader to it rather than to a `.env` that played no part.
     env[DATABASE_SOURCE_ENV] = prepared.database.source;
+    // And which kind it is, for the managed database's Atlas handling
+    // (`--skip-lock`, the revisions table made first): the project default set
+    // above is wrong for a command whose --database-url or --docker named
+    // another database.
+    env[DEV_DATABASE_KIND_ENV] = prepared.database.kind;
     // Suppressed for an internal caller. `rebase dev` runs a schema push during
     // start-up and has already said all of this in its own banner; repeating it
     // mid-boot reads as something having gone wrong.

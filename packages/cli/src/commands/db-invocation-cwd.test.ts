@@ -35,7 +35,8 @@ vi.mock("../dev-db/prepare", () => ({
     })),
     managedNotices: () => [],
     DEV_DATABASE_KIND_ENV: "REBASE_DEV_DATABASE_KIND",
-    devDatabaseKind: () => "external" as const,
+    // The scaffold default; a flag can name another database for one command.
+    devDatabaseKind: () => "managed" as const,
     resolveProjectDatabase: () => ({ kind: "external" as const, url: "postgres://u:p@127.0.0.1:5432/shop", source: "env-file" as const }),
     resolveActiveBranch: () => null,
     resolveComposeUrl: () => null
@@ -81,5 +82,15 @@ describe("what named the database", () => {
         await dbCommand("push", argv("db", "push"));
 
         expect(driverSpawn().env?.REBASE_DATABASE_SOURCE).toBe("env-file");
+    });
+
+    // The driver gives the managed database its own Atlas handling
+    // (`--skip-lock`, the revisions table made first). A project whose default
+    // is the managed database, migrating a real Postgres named by a flag, must
+    // not get it: the kind is the database this command resolved.
+    it("reaches the driver as the kind this command resolved, not the project's default", async () => {
+        await dbCommand("migrate", argv("db", "migrate", "--database-url", "postgres://u:p@127.0.0.1:5432/shop"));
+
+        expect(driverSpawn().env?.REBASE_DEV_DATABASE_KIND).toBe("external");
     });
 });
