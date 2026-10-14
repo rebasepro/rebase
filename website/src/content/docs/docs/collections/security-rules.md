@@ -46,7 +46,12 @@ The policies on a table are more than the collection's own `securityRules`:
 - **`defaultSecurityRules`**, exported from `config/collections/index.ts`. A
   collection whose `securityRules` is absent or empty takes all of them in its
   place, as if it had written them. A collection that declares even one rule of
-  its own takes none: the two lists are never merged.
+  its own takes none: the two lists are never merged. They are applied wherever
+  the directory is read: `rebase dev`, `rebase db push`, the admin panel and a
+  backend given `collectionsDir`. <span class="since-badge" data-since="0.25">Since 0.25</span>
+  The scaffold's index also applies them to the `collections` array it exports,
+  so a backend handed that array gets them too. An array put together any other
+  way carries only the rules its collections declare.
 - **The admin baseline.** Every collection also gets
   `<table>_default_admin_read` and `<table>_default_admin_write_insert`,
   `_update` and `_delete`: permissive policies that let the server context and

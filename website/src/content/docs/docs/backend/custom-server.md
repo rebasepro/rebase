@@ -71,6 +71,7 @@ rather than accepting it and validating half of it.
 - Blocks auto-generated secrets in production — you must set them explicitly.
 - Validates that `CORS_ORIGINS` or `FRONTEND_URL` is set in production.
 - Refuses an `extend` schema built by a different copy of zod.
+- Throws an `Error` naming each variable that is missing or wrong, such as `DATABASE_URL: is required`, with zod's issues on its `issues` property. <span class="since-badge" data-since="0.25">Since 0.25</span> On 0.24 it throws zod's own `ZodError`, which names no variable when nothing catches it.
 
 See `.env.example` in the scaffolded app for the full list of supported variables.
 
@@ -270,6 +271,10 @@ app.route("/v2/data", backend.routes.data());      // the data API, at a path of
 app.route("/hooks", backend.routes.functions());   // getUser(c) and getDriver(c) work inside
 ```
 
+`collections` is the array a scaffold's `config/collections/index.ts` exports. It carries that index's `defaultSecurityRules`, as `collectionsDir` does, so the backend provisions the policies `rebase db push` would. An array of your own carries only the rules its collections declare, and `provision: true` makes one that declares none admin-only, dropping the policies Rebase generated for it earlier, on every server that shares the database.
+
+<span class="since-badge" data-since="0.25">Since 0.25</span> The scaffold's index applies the defaults to its array. In a project scaffolded on 0.24, copy that loop from a new scaffold's `config/collections/index.ts`, or pass `collectionsDir`.
+
 | Group | Normally at | Serves |
 |---|---|---|
 | `routes.auth()` | `/api/auth` | sign-in, sessions, OAuth, password reset, `GET /config`, the caller's own API keys and the scope catalogue |
@@ -298,11 +303,7 @@ import { errorHandler } from "@rebasepro/server";
 app.onError(errorHandler);
 ```
 
-Every call returns a fresh router over the same handlers, so you can mount a
-group in two places. Asking for a group whose surface this backend was created
-without (`surfaces: { data: false }`) throws, because the backend never built
-it. The OpenAPI docs and the MCP server have no group: they describe the URLs
-of the `mount()` layout, so only `mount()` serves them.
+Every call returns a fresh router over the same handlers, so you can mount a group in two places. Asking for a group whose surface this backend was created without (`surfaces: { data: false }`) throws, because the backend never built it. The OpenAPI docs and the MCP server have no group: they describe the URLs of the `mount()` layout, so only `mount()` serves them.
 
 ## The backend without a server
 
@@ -392,8 +393,7 @@ const jwt = createJwtService({ secret: process.env.JWT_SECRET!, accessExpiresIn:
 const payload = await jwt.verifyAccessToken(token);
 ```
 
-A minted session is checked like any other on every request, so its uid has to
-be a user that exists: for a uid with no user the request is refused.
+A minted session is checked like any other on every request, so its uid has to be a user that exists: for a uid with no user the request is refused.
 
 <span class="since-badge" data-since="0.25">Since 0.25</span> `verifyCredential` reaches the verdict the routes reach: a session its owner signed out of, a uid with no user and a disabled account come back null, and the roles are the ones the account holds now. It throws when the database cannot be reached. On 0.24 it checks the signature only, and reads the roles off the token.
 
@@ -426,16 +426,12 @@ top of this page.
 
 ## Embedding the Postgres driver in Express
 
-One step further down, `@rebasepro/server-postgres` works without the Rebase
-server at all. It depends on Drizzle and Node's `http.Server`, so you can open
-the data driver and the realtime socket inside Express, Fastify or plain Node.
-At this level you assemble the backend yourself: there are no auth routes, no
-storage and no admin API unless you build them.
+One step further down, `@rebasepro/server-postgres` works without the Rebase server at all. It depends on Drizzle and Node's `http.Server`, so you can open the data driver and the realtime socket inside Express, Fastify or plain Node. At this level you assemble the backend yourself: there are no auth routes, no storage and no admin API unless you build them.
 
 ### 1. Installation
 
 ```bash
-npm install @rebasepro/server-postgres @rebasepro/types express pg
+npm install @rebasepro/server-postgres @rebasepro/types express pg drizzle-orm
 ```
 
 ### 2. Opening the driver and the socket
@@ -472,7 +468,9 @@ async function startServer() {
     // Leave this call out and the driver reads no environment variable at all.
     const pgConfig = postgresDriverConfigFromEnv({ connection: db, connectionString });
 
-    // `provision: false` if the schema is applied elsewhere (`rebase db push`).
+    // The collections' tables must already exist: the driver serves them and never creates them.
+    // `provision` (default true) is the rest of its DDL: the role requests run as, branch metadata,
+    // channel history and change capture. `provision: false` when none of that may run here.
     const { driver, internals } = await openPostgresDriver(pgConfig, { collections });
 
     // The realtime socket. It answers upgrades on `path` only, so a WebSocket
@@ -540,11 +538,9 @@ async function startServer() {
 startServer();
 ```
 
-`openPostgresDriver` is what `createPostgresAdapter` runs when the Rebase server
-boots, after `postgresDriverConfigFromEnv` has read the environment into the
-config. Its second argument says what to open: the `collections`, whether
-opening may change the database (`provision`, default `true`), and what part
-this process takes in realtime (`realtime: false` for none).
+`openPostgresDriver` is what `createPostgresAdapter` runs when the Rebase server boots, after `postgresDriverConfigFromEnv` has read the environment into the config. Its second argument says what to open: the `collections`, whether opening may run its own DDL (`provision`, default `true`), and what part this process takes in realtime (`realtime: false` for none).
+
+It creates no collection table, so against a database without one `POST /api/products` answers `500` "Table not found for collection 'products'". Create the tables first. `rebase db push` does it from a Rebase project whose `config/collections` declares them. In this server, `await createPostgresAdapter(pgConfig).ensureCollectionSchema?.(collections)` before `openPostgresDriver` adds the tables and columns the database lacks, as the Rebase server's boot does, and changes nothing that exists.
 
 ---
 
