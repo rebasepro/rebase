@@ -40,10 +40,10 @@ rebase console
 ```text
 > const { data } = await rebase.dataAsAdmin.posts.find({ limit: 3 })
 > data.map(p => p.title)
-[ 'Hello', 'Second post', 'Draft' ]
+[ 'Draft', 'Second post', 'Hello' ]
 > const ada = await rebase.withAuth({ uid: "ada", roles: ["user"] })
-> (await ada.data.posts.find()).data.length
-1
+> (await ada.data.posts.find({ limit: 3 })).data.length
+3
 ```
 
 Dois nomes estão no escopo, e o `await` de nível superior funciona:
@@ -83,6 +83,15 @@ rebase console -e "const u = await rebase.withAuth({ uid: 'u1', roles: ['user'] 
 Tudo o que o console registra em log, seja qual for o `LOG_LEVEL`, vai para o stderr,
 de modo que o stdout contém o resultado e nada mais. Um trecho que lança uma exceção
 imprime o erro no stderr e termina com código `1`.
+
+<span class="since-badge" data-since="0.25">Desde 0.25</span> Um banco de dados que
+o console não consegue abrir é relatado uma única vez, e ele termina com código `1`:
+o banner "Cannot connect to PostgreSQL" que os comandos `db` imprimem, ou, no banco
+de desenvolvimento gerenciado, o aviso de que ele não tem nenhuma conexão livre. Esse
+banco aceita apenas algumas conexões por vez e um `rebase dev` em execução ocupa
+algumas, então feche outro cliente ou pare o `rebase dev` e execute o console novamente. Na
+0.24 o banner aparecia duas vezes, sob uma linha `❌ [ERROR]` vazia, e um banco
+gerenciado cheio imprimia `read ECONNRESET` com o seu stack trace como uma linha de JSON.
 
 ### Opções
 
@@ -149,9 +158,21 @@ O `openRebase` não lê nenhuma variável de ambiente. O `DATABASE_URL` acima é
 pelo seu script, e configurações como `REBASE_DB_POOL_MAX` ou `REALTIME_CDC` não
 mudam nada aqui.
 
+<span class="since-badge" data-since="0.25">Desde 0.25</span> A abertura não registra
+nada em log no nível `info`, de modo que o stdout de um script contém o que o script
+imprime, e `tsx scripts/report.ts > report.json` escreve apenas o seu JSON. Avisos e
+erros vão para o stderr em desenvolvimento. A nota sobre como as requisições são
+isoladas (`RLS enforcement active`) é registrada no nível `debug`; a inicialização de
+um servidor ainda a imprime em `info`. Um banco de dados que ele não consegue alcançar
+rejeita a abertura com um único erro,
+`Cannot connect to PostgreSQL at <host>:<port>: <reason>.`, e não registra nada em
+log: o que imprimir fica a cargo do script. Na 0.24 essa nota era a primeira linha do stdout de
+um script, e um banco de dados inalcançável registrava um banner antes do erro.
+
 Seus acessores são tipados pelo `Database` que o `rebase generate-sdk --register`
 registra, como o `rebase` de uma função, de modo que uma coleção, um campo ou um valor
-de enum escrito errado em um script é um erro de tipo. Sem um registro, nomeie-o a cada
+de enum escrito errado em um script é um erro de tipo. O `backend/tsconfig.json` do
+scaffold inclui `scripts/`, então o `tsc --noEmit` em `backend/` o relata. Sem um registro, nomeie-o a cada
 chamada com `openRebase<Database>({ … })`; `OpenedRebase<Database>` é o tipo a dar a um
 helper que recebe um. Sem nenhum dos dois, as linhas não são tipadas, e é por isso que o
 primeiro exemplo converte `draft.id` com `String()`.
@@ -160,7 +181,11 @@ primeiro exemplo converte `draft.id` com `String()`.
 
 <span class="since-badge" data-since="0.25">Desde 0.25</span>
 
-O `withAuth` é a forma mais rápida de testar uma regra de segurança contra dados reais:
+O `withAuth` é a forma mais rápida de testar uma regra de segurança contra dados reais. O
+scaffold de blog, o padrão do `rebase init`, dá a toda coleção os
+`defaultSecurityRules` de `config/collections/index.ts`: todo usuário autenticado
+lê todos os posts, e só um admin escreve um. Isto confere as duas metades, como
+`backend/scripts/ada-check.ts`:
 
 ```typescript
 import { openRebase } from "@rebasepro/server-postgres";
@@ -168,9 +193,29 @@ import { collections } from "../../config/collections";
 
 const rebase = await openRebase({ databaseUrl: process.env.DATABASE_URL!, collections });
 const ada = await rebase.withAuth({ uid: "ada", roles: ["user"] });
-const { data } = await ada.data.posts.find();
-console.log(data.every(post => post.author_id === "ada"));
+
+// A signed-in user reads every post…
+const { data: seen } = await ada.data.posts.find();
+const { data: all } = await rebase.dataAsAdmin.posts.find();
+console.log(seen.length === all.length);
+
+// …and writing one is refused: only an admin may.
+const refused = await ada.data.posts.create({ title: "Not an admin" }).then(() => false, () => true);
+console.log(refused);
+
+await rebase.close();
 ```
+
+Execute-o da mesma forma que o primeiro script, e ele imprime `true` duas vezes:
+
+```bash
+cd backend
+DATABASE_URL="$(pnpm exec rebase db url)" pnpm exec tsx scripts/ada-check.ts
+```
+
+Uma regra que filtra linhas pelo dono é conferida da mesma forma: compare o campo de
+dono de cada linha com o `uid` que você passou. No scaffold de blog nenhuma regra faz
+isso, e o `authorId` de um post é o id de uma linha de autor, não de um usuário.
 
 Um usuário é `{ uid, roles?, isAnonymous?, claims? }`; `claims` é o que o
 `rebase.jwt()` lê em uma política.
@@ -197,16 +242,19 @@ before(async () => {
 });
 after(() => rebase.close());
 
-test("a user only sees their own posts", async () => {
+test("a signed-in user reads every post and writes none", async () => {
     const ada = await rebase.withAuth({ uid: "ada", roles: ["user"] });
-    const { data } = await ada.data.posts.find();
-    assert.ok(data.every(post => post.author_id === "ada"));
+    const { data: seen } = await ada.data.posts.find();
+    const { data: all } = await rebase.dataAsAdmin.posts.find();
+    assert.equal(seen.length, all.length);
+    await assert.rejects(ada.data.posts.create({ title: "Not an admin" }));
 });
 ```
 
 
-Execute-o a partir de `backend/` com o test runner do Node, apontando `TEST_DATABASE_URL`
-para um banco de dados em que um servidor Rebase já tenha sido iniciado:
+Salve-o como `backend/scripts/posts.test.ts` e execute-o a partir de `backend/` com o
+test runner do Node, apontando `TEST_DATABASE_URL` para um banco de dados em que um
+servidor Rebase já tenha sido iniciado:
 
 ```bash
 TEST_DATABASE_URL="$(pnpm exec rebase db url)" pnpm exec tsx --test scripts/posts.test.ts

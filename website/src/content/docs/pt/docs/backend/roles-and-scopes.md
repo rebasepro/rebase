@@ -215,6 +215,13 @@ para qualquer outro projeto. Ela também precisa de `functions:invoke`, ou de
 `hasScope(c, scope, target)` e `getScopes(c)` respondem à mesma pergunta dentro de um
 handler.
 
+<span class="since-badge" data-since="0.25">Desde 0.25</span> O `requireScope`
+recusa um escopo que ninguém poderia ter. Um nome que não é um escopo, ou um
+escopo embutido com erro de digitação como `data:raed`, lança um erro quando a
+função é carregada. Um escopo de app que o backend não declara em `auth.scopes`
+responde a todo chamador, inclusive a um administrador, `500 SCOPE_NOT_DECLARED`.
+Na 0.24 ambos respondem `403 SCOPE_MISSING`.
+
 ## O que admin significa
 
 `admin` é o único papel embutido, e é mais do que uma lista de escopos:

@@ -38,8 +38,9 @@ Configura a estrutura do projeto com frontend, backend e pacotes compartilhados.
 | `-t, --template <preset>` | `blog`, `ecommerce` ou `blank`. Padrão: `blog` |
 | `--headless` | Apenas backend — sem painel de administração e sem arquivos de collection. `--template` não tem efeito, pois não há collections para popular |
 | `-y, --yes` | Nunca solicita confirmações interativas. **Obrigatório onde não houver terminal para responder**, como no CI. Ele ignora o git init e a instalação de dependências — os padrões interativos dizem sim para ambos, portanto passe `--git` / `--install` se desejar executá-los |
-| `-i, --install` | Instala dependências após o scaffolding |
-| `-g, --git` | Inicializa um repositório e faz o primeiro commit |
+| `-i, --install` | Instala dependências após o scaffolding. Sem ele, o init pergunta (padrão: sim); com `--yes`, nada é instalado |
+| `--no-install` | Não instala nada e não pergunta |
+| `-g, --git` | Inicializa um repositório e faz o primeiro commit. Sem ele, o init pergunta (padrão: sim); com `--yes`, nenhum repositório |
 | `--database-url <url>` | Usa um banco de dados existente em vez do gerenciado. <span class="since-badge" data-since="0.25">Desde 0.25</span> Precisa ser uma URL `postgres://` ou `postgresql://`: qualquer outra coisa é recusada antes de um arquivo ser escrito, e o prompt interativo pergunta de novo |
 | `--introspect` | Gera collections a partir desse banco de dados. Implica `--template blank` e requer `--install` |
 | `--project <slug>` | Vincula o scaffold a um projeto do Rebase Cloud |
@@ -57,6 +58,19 @@ rebase dev
 Inicia tanto o frontend quanto o backend com hot reloading e regenera o schema do Drizzle e os tipos do SDK (`generated/sdk/`) na inicialização e a cada salvamento de collection. Na 0.23 ele regenera apenas o schema, e cabe a você executar o `rebase generate-sdk`.
 
 Ambas as portas são derivadas do caminho do projeto, permitindo que vários projetos Rebase sejam executados lado a lado. Use as URLs exibidas pelo `rebase dev`. Fixe uma com `rebase dev --port 3001`.
+
+<span class="since-badge" data-since="0.25">Desde 0.25</span> Uma edição no `.env`
+reinicia o backend, que lê o arquivo de novo, como faz o painel de administração. O que
+o próprio `rebase dev` define é mantido até você reiniciá-lo: `PORT`, e
+`DATABASE_URL` quando ele está no banco de dados gerenciado ou no Docker. Na 0.24 uma
+edição no `.env` só chegava ao backend quando algum outro arquivo observado mudava.
+
+<span class="since-badge" data-since="0.25">Desde 0.25</span> Com
+`--database-url`, o `rebase dev` primeiro verifica se algo responde naquele host
+e porta. Se nada responde, ele diz isso, nomeando a flag, e termina com código `1`
+sem iniciar nada; ele também deixa intacto o banco de dados que o `.env` nomeia, sem
+nunca iniciar o seu contêiner do compose. Na 0.24 o banner do backend dizia para
+verificar o `DATABASE_URL` no `.env`, e o dev continuava rodando com o backend fora do ar.
 
 ### `rebase build`
 
@@ -97,8 +111,10 @@ Atualiza todos os pacotes `@rebasepro/*` fixados pelo projeto para uma única ve
 prerelease, como um canary, permanece no seu canal, a menos que `latest` seja mais
 novo. Uma dist-tag que moveria uma fixação para trás é recusada (`downgrade_refused`
 sob `--json`), a menos que você passe `--allow-downgrade`; um `--to` exato é aplicado
-e sinalizado como um downgrade. Na 0.24, o `rebase upgrade` usa `latest`
-independentemente.
+e sinalizado como um downgrade. Um `--dry-run` de um upgrade que a execução real
+recusaria mostra o que mudaria e termina com código 0, e com `--json` o seu documento
+traz a recusa como `wouldRefuse` (`{ code, message, hint }`). Na 0.24, o
+`rebase upgrade` usa `latest` independentemente.
 
 ### `rebase start`
 
@@ -230,7 +246,8 @@ trazia. O comando de build do app estático usa o gerenciador de pacotes do proj
 `web`, compilado com `npm run build --workspace frontend`.
 
 <span class="since-badge" data-since="0.25">Desde 0.25</span> Para um checkout não
-vinculado a um projeto do Cloud, o `apps config` fornece a URL do backend como o
+vinculado a um projeto do Cloud, o `apps config` diz que ele não está vinculado,
+esteja o `rebase dev` rodando ou não, e fornece a URL do backend como o
 `rebase dev` a serve. Na 0.24 ele imprime `http://localhost:3001`.
 
 ### `rebase status`

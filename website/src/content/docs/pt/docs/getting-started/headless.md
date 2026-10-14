@@ -111,6 +111,12 @@ Os arquivos são gerados em `config/collections/`. A partir desse ponto, o proje
 a ter coleções no código e a introspecção no momento da inicialização deixa de ser o
 que define a API.
 
+<span class="since-badge" data-since="0.25">Desde 0.25</span> O scaffold headless
+instala o Atlas em `backend/`, então `rebase db push`, `rebase db generate` e
+`pnpm run db:migrate` funcionam com essas coleções como em qualquer projeto. Na 0.24
+cada um deles para em "The atlas binary is missing"; adicione-o ao backend com
+`pnpm --dir backend add @ariga/atlas`.
+
 ## Como usar
 
 Via HTTP:
