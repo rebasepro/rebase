@@ -312,6 +312,17 @@ describe("a subcommand nobody implemented is refused before a database starts", 
         expect(said()).toContain("rebase db --help");
     });
 
+    // `db backups lst` reached the driver, which answered with a bare,
+    // unformatted `Unknown backups action: "lst". Valid: list`.
+    it("answers a `db backups` typo the same way, before a database starts", async () => {
+        await expect(dbCommand("backups", argv("db", "backups", "lst"))).rejects.toThrow("process.exit(1)");
+
+        expect(prepareSpy).not.toHaveBeenCalled();
+        expect(execaSpy).not.toHaveBeenCalled();
+        expect(said()).toContain("Unknown db backups command \"lst\" — did you mean `list`?");
+        expect(said()).toContain("rebase db backups --help");
+    });
+
     it.each([["url"], ["pull"], ["stop"], ["reset"]])("still accepts `db %s`", async (action) => {
         // The four the driver's list omitted. Getting past the guard is the
         // assertion; what each then does with this fixture is its own business.

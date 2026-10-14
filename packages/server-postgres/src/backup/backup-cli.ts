@@ -13,7 +13,7 @@ import chalk from "chalk";
 // Aliased: `out` is already a local in two of the commands below (the `--out`
 // backup destination).
 import { out as print, outWarn, outError } from "../cli-output";
-import { parseCommandFlags } from "../cli-flags";
+import { closestWord, parseCommandFlags } from "../cli-flags";
 import { redactConnectionPasswords } from "../utils/connection-string";
 import { promptConfirm } from "../cli-prompt";
 import { checkDatabaseConnectivity } from "../cli-errors";
@@ -477,6 +477,16 @@ export async function restoreCommand(rawArgs: string[]): Promise<void> {
 // ─────────────────────────────────────────────────────────────────────────
 // rebase db backups list
 // ─────────────────────────────────────────────────────────────────────────
+const BACKUPS_ACTIONS = ["list"] as const;
+
+/** What `db backups <action>` says of an action it does not have: the sentence every `db` command says. */
+export function unknownBackupsAction(action: string): string {
+    const near = closestWord(action, BACKUPS_ACTIONS);
+    return near
+        ? `Unknown db backups command "${action}" — did you mean \`${near}\`? Run \`rebase db backups --help\` for the rest.`
+        : `Unknown db backups command "${action}". Run \`rebase db backups --help\` for the ones there are.`;
+}
+
 export async function backupsCommand(rawArgs: string[]): Promise<void> {
     const action = rawArgs[2];
     if (!action || action === "--help") {
@@ -484,7 +494,7 @@ export async function backupsCommand(rawArgs: string[]): Promise<void> {
         return;
     }
     if (action !== "list") {
-        outError(chalk.red(`Unknown backups action: "${action}". Valid: list`));
+        outError(chalk.red(`✗ ${unknownBackupsAction(action)}`));
         process.exit(1);
     }
 

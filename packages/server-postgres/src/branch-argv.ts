@@ -7,9 +7,8 @@
  * of any of that.
  */
 import arg from "arg";
-import { suggestNearMiss } from "@rebasepro/utils";
 
-import { RELAYED_FLAGS } from "./cli-flags";
+import { closestWord, RELAYED_FLAGS } from "./cli-flags";
 
 /**
  * The flags each driver-side `db branch` action takes, besides the ones the CLI
@@ -28,19 +27,6 @@ export const BRANCH_ACTION_FLAGS: Record<string, arg.Spec> = {
     delete: { "--force": Boolean, "--yes": Boolean, "-y": "--yes" },
     prune: { "--older-than": String, "--include-dev-diff": Boolean, "--yes": Boolean, "-y": "--yes" }
 };
-
-/**
- * `--froce` for `--force`: two neighbouring letters swapped, which
- * `suggestNearMiss` counts as two edits and so never offers.
- */
-function transposedFrom(known: readonly string[], typed: string): string | undefined {
-    return known.find((candidate) => {
-        if (candidate.length !== typed.length || candidate === typed) return false;
-        const differ = [...candidate].flatMap((letter, index) => (letter === typed[index] ? [] : [index]));
-        return differ.length === 2 && differ[1] === differ[0] + 1
-            && candidate[differ[0]] === typed[differ[1]] && candidate[differ[1]] === typed[differ[0]];
-    });
-}
 
 /**
  * Refuse a flag `action` does not take, naming the one it was probably meant
@@ -62,7 +48,7 @@ function assertKnownBranchFlags(action: string, rest: readonly string[]): void {
         const unknown = /option: (\S+)$/.exec(error.message)?.[1] ?? error.message;
         const typed = unknown.split("=")[0];
         const known = Object.keys(full).filter((flag) => flag.startsWith("--"));
-        const suggestion = suggestNearMiss(known, typed) ?? transposedFrom(known, typed);
+        const suggestion = closestWord(typed, known);
         const own = Object.keys(spec).filter((flag) => flag.startsWith("--"));
         const takes = own.length > 0 ? `it takes ${own.join(", ")}` : "it takes no options of its own";
         throw new Error(

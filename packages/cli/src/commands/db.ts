@@ -583,6 +583,11 @@ export async function dbCommand(subcommand: string | undefined, rawArgs: string[
     // The set comes from the help table, so the list a typo is measured against
     // and the list `--help` prints cannot drift apart.
     if (!DB_ACTION_HELP[subcommand]) unknownCommand(subcommand, Object.keys(DB_ACTION_HELP), "db");
+    // `db backups` has one action, and its typo is answered here for the same reason.
+    if (subcommand === "backups") {
+        const action = argsFromCommand(rawArgs, "backups")[1];
+        if (action !== undefined && action !== "list") unknownCommand(action, ["list"], "db backups");
+    }
 
     const projectRoot = requireProjectRoot();
 

@@ -8,7 +8,7 @@
  * it, and with `--clean` on the line nothing would have. `db backup --ot ../x`
  * wrote to the default directory. Every other `db` subcommand already refused.
  */
-import { parseBackupLine, parseRestoreLine } from "../src/backup/backup-cli";
+import { parseBackupLine, parseRestoreLine, unknownBackupsAction } from "../src/backup/backup-cli";
 import { parseCommandFlags } from "../src/cli-flags";
 
 // The backup module runs pg_dump through execa, which is ESM-only and which
@@ -19,6 +19,13 @@ describe("db restore", () => {
     it("refuses a misspelled --target-db and names the real one", () => {
         expect(() => parseRestoreLine(["db", "restore", "backups/x.dump", "--targt-db", "u3_typo", "--create-db", "--yes"]))
             .toThrow(/has no option --targt-db — did you mean --target-db\?/);
+    });
+
+    // Two neighbouring letters swapped is the commonest typo there is, and
+    // one edit away it is not: `--clena` was refused with the whole flag list.
+    it("names the flag a swapped pair of letters was meant to be", () => {
+        expect(() => parseRestoreLine(["db", "restore", "x.dump", "--clena", "--yes"]))
+            .toThrow(/has no option --clena — did you mean --clean\?/);
     });
 
     it("says nothing was run", () => {
@@ -78,3 +85,13 @@ describe("parseCommandFlags", () => {
             .toThrow(/option requires argument: --out/);
     });
 });
+
+describe("db backups with an action it does not have", () => {
+    it("names the one it has, the way every db command does", () => {
+        expect(unknownBackupsAction("lst"))
+            .toBe("Unknown db backups command \"lst\" — did you mean `list`? Run `rebase db backups --help` for the rest.");
+        expect(unknownBackupsAction("show"))
+            .toBe("Unknown db backups command \"show\". Run `rebase db backups --help` for the ones there are.");
+    });
+});
+

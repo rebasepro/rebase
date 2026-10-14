@@ -275,10 +275,28 @@ function unknownFlagIn(err: unknown): string | null {
     return /option: (\S+)$/.exec(err.message)?.[1] ?? null;
 }
 
-/** The declared long flag `typed` is one edit away from, if there is one. */
+/** The declared long flag `typed` is one edit or one swap away from, if there is one. */
 function closestFlag(typed: string, spec: arg.Spec): string | undefined {
     const name = typed.split("=")[0];
-    return suggestNearMiss(Object.keys(spec).filter(flag => flag.startsWith("--")), name);
+    return closestWord(name, Object.keys(spec).filter(flag => flag.startsWith("--")));
+}
+
+/**
+ * The word in `known` that `typed` was probably meant to be: one edit away
+ * (`--targt-db`), or two neighbouring letters swapped (`--clena`, `--froce`),
+ * which `suggestNearMiss` counts as two edits and so never offers.
+ */
+export function closestWord(typed: string, known: readonly string[]): string | undefined {
+    return suggestNearMiss(known, typed) ?? transposedFrom(known, typed);
+}
+
+function transposedFrom(known: readonly string[], typed: string): string | undefined {
+    return known.find((candidate) => {
+        if (candidate.length !== typed.length || candidate === typed) return false;
+        const differ = [...candidate].flatMap((letter, index) => (letter === typed[index] ? [] : [index]));
+        return differ.length === 2 && differ[1] === differ[0] + 1
+            && candidate[differ[0]] === typed[differ[1]] && candidate[differ[1]] === typed[differ[0]];
+    });
 }
 
 /**
