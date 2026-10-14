@@ -252,8 +252,8 @@ schema the backup creates whole (`rebase`, say), and each table the backup
 creates in a schema it does not (`public`), with `CASCADE`, then restores the
 dump in the same transaction. Before it asks, it names what that drops that the
 backup does not hold, such as `rebase.atlas_schema_revisions` from
-`rebase db migrate`, or a view or foreign key elsewhere that references one of
-the backup's tables. A restore that stops anywhere is rolled back, and it says
+`rebase db migrate`, a function, type or sequence in a replaced schema, or a
+view or foreign key elsewhere that references one of the backup's tables. A restore that stops anywhere is rolled back, and it says
 the database holds what it held before. It runs the dump through `psql`, which
 ships with `pg_restore` (`PSQL_PATH` names another one), and waits at most
 15 seconds for a lock, which a running `rebase dev` can hold. On 0.24, `--clean`

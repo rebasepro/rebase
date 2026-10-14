@@ -63,7 +63,12 @@ alike. It never terminates the session running the command itself.
 <span class="since-badge" data-since="0.25">Since 0.25</span> `create --force`
 also closes the source to new connections for the copy
 (`ALTER DATABASE … ALLOW_CONNECTIONS false`, run from the server's `postgres`
-database) and opens it again afterwards, on failure and on Ctrl-C too. A client
+database) and opens it again afterwards: on failure, and on any signal it can
+catch (closing the terminal, Ctrl-C, SIGTERM, SIGQUIT). Killed outright
+(SIGKILL), it leaves the source closed until the next `rebase db branch`
+command, any of them, which reopens it first and says so;
+`ALTER DATABASE "<db>" ALLOW_CONNECTIONS true`, run from the `postgres`
+database, does the same by hand. A client
 that reconnects as soon as it is disconnected, as a running `rebase dev` does,
 then cannot slip back in before the copy starts. That needs the source's owner;
 without it, and on `delete`, `--force` disconnects the sessions up to three
