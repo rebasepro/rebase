@@ -99,6 +99,16 @@ rebase schema introspect
   `rebase.roles()` geschrieben wird. Verbunden als eine Rolle namens `rebase` setzte der
   Standardpfad dieses Schema an die erste Stelle, und die Regel kam als `roles()` zurück, was der
   Push nicht finden konnte
+- Behält die Policies einer Many-to-many-
+  Junction. Die `<junction>_default_edge_write_*`-Policies einer Junction werden aus den
+  Update-Regeln der Collection abgeleitet, die die Relation deklariert, und eine Junction kann nur
+  eine Regel erben, die sie lesen kann. Eine Rollenregel kommt als das SQL zurück, das Postgres für
+  sie speichert,
+  `string_to_array(rebase.roles(), ','::text) && ARRAY['admin'::text]`, und
+  das wird wieder als die Rollenregel gelesen, sodass der Push dieselben Policies ableitet.
+  Unter 0.25.0 wurde es als rohes SQL gelesen: Der Dry Run
+  führte die drei Policies als solche auf, die keine Collection beschreibt, der Push ließ sie in
+  Kraft, und eine spätere Änderung der Regel erreichte sie nicht mehr
 - Schreibt
   `disableDefaultPolicies: true` an eine Tabelle, die Row-Level-Security aktiviert hat und
   nicht die ganze [Admin-Basis](/docs/collections/security-rules/#policies-a-collection-gets-without-writing-them) hält,
@@ -288,6 +298,14 @@ rebase db migrate
 - Liest `drizzle/migrations/` nach nicht angewendeten Migrationen
 - Wendet sie der Reihe nach auf die Datenbank an
 - Verfolgt, welche Migrationen angewendet wurden
+- Stempelt die
+  Row-Level-Security-Policies so, wie es `db push` und der Boot des Servers tun, sodass der erste
+  Boot nach einem Migrate sie in Ruhe lässt, statt jede neu anzulegen. Eine Migration wurde aus den
+  Collections ihrer Zeit geschrieben, daher wird eine Policy nur gestempelt, wenn sie genau das ist,
+  was ihre Regel jetzt ergibt: Migrate legt sie aus ihrer Regel unter einem anderen Namen neu an, in
+  einer Transaktion, die es zurückrollt, und vergleicht, was Postgres gespeichert hat, wie es
+  `db push --dry-run` tut. Eine Policy, die abweicht, erhält keinen Stempel, und der nächste Boot
+  wendet ihre Tabelle erneut an
 
 `--refuse-destructive`
 lässt ihn stattdessen verweigern. Er führt zuerst einen Probelauf der ausstehenden Migrationen aus. Zerstört
@@ -354,6 +372,8 @@ rebase doctor
 - Collections ↔ Datenbank — gibt es unerwarteten Drift?
 
 Führen Sie `doctor` aus, wann immer sich etwas nicht synchron anfühlt. Es zeigt genau, wo die Diskrepanz liegt.
+
+Der Datenbankvergleich schließt den ein, den der Boot vornimmt, bevor er warnt, dass `schema.generated.ts` und die Datenbank nicht übereinstimmen, ausgeführt durch denselben Code. So steht jeder Unterschied, vor dem der Boot warnt, auch im Bericht, mit denselben Worten: eine Spalte, die auf einer Seite NOT NULL und auf der anderen nullable ist, und eine Spalte, die die Datenbank noch hat und die Datei nicht (der Boot löscht nie eine, daher lässt eine umbenannte Property ihre alte Spalte zurück). Jeder ist eine Warnung, und die Abhilfe nennt `rebase db push`.
 
 Der Datenbankvergleich braucht `DATABASE_URL` (oder `ADMIN_CONNECTION_STRING`). Ohne eine wird diese Phase als **übersprungen** gemeldet statt als bestanden, und der Lauf schließt nie mit „All schemas are in sync“ ab — eine Prüfung, die nicht stattgefunden hat, ist kein Gesundheitszeugnis.
 

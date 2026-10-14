@@ -108,7 +108,12 @@ Funktionen aufrufen, die er nicht enthält.
 
 Deshalb verweigert
 `rebase db backup` ein `--exclude-schema`, das nach den eigenen Musterregeln von pg_dump (`reb*`
-und `*` eingeschlossen) auf `rebase` passt, bevor es irgendetwas ausführt. Unter 0.24 schrieb es
+und `*` eingeschlossen) auf `rebase` passt, bevor es irgendetwas ausführt.
+Diese Regeln reichen Syntax regulärer Ausdrücke außerhalb doppelter Anführungszeichen durch, daher
+werden auch `[r]ebase` und `audit|rebase` verweigert, und der Server wird zu jedem Muster befragt,
+bevor `pg_dump` läuft, mit derselben Engine für reguläre Ausdrücke, die die eigene Abfrage von
+`pg_dump` verwendet.
+Unter 0.24 schrieb es
 den Dump und validierte ihn, und erst die Wiederherstellung scheiterte.
 
 Weil er jedes Passwort und

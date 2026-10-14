@@ -67,7 +67,10 @@ und öffnet sie danach wieder: bei einem Fehler und bei jedem Signal, das es abf
 des Terminals, Ctrl-C, SIGTERM, SIGQUIT). Wird es hart beendet (SIGKILL), bleibt die Quelle
 geschlossen bis zum nächsten `rebase db branch`-Befehl, gleich welchem, der sie zuerst wieder öffnet
 und das sagt; `ALTER DATABASE "<db>" ALLOW_CONNECTIONS true`, ausgeführt aus der
-`postgres`-Datenbank, tut dasselbe von Hand. Ein Client, der sich sofort
+`postgres`-Datenbank, tut dasselbe von Hand. Solange ein erzwungenes Create seine Quelle
+geschlossen hält, hält es in der `postgres`-Datenbank einen Advisory Lock auf sie, sodass das
+Wiederöffnen die Quelle einer laufenden Kopie in Ruhe lässt und ein zweites erzwungenes Create
+von derselben Quelle wartet, bis das erste fertig ist. Ein Client, der sich sofort
 nach dem Trennen wieder verbindet, wie es ein laufendes `rebase dev` tut, kann dann nicht
 zurückschlüpfen, bevor die Kopie beginnt. Dafür braucht es den Eigentümer der Quelle; ohne ihn,
 und bei `delete`, trennt `--force` die Sitzungen bis zu dreimal, bevor es aufgibt. Ist danach noch

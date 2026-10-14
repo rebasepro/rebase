@@ -133,9 +133,15 @@ Kopiert eine andere Datenbank in die lokale Entwicklungsdatenbank:
 rebase db pull --from postgres://…  [--anonymize]
 ```
 
+`--from` nimmt eine `postgres://`- oder `postgresql://`-URL entgegen, oder die
+`host=… port=… dbname=…`-Paare von libpq, als ein einziges Argument in Anführungszeichen. Alles
+andere wird verweigert, bevor irgendetwas gelesen oder gestartet wird, ohne den Wert zu wiederholen.
+
 `--anonymize` ersetzt personenbezogene Felder beim Importieren, sodass eine Produktionskopie
 lokal bearbeitet werden kann, ohne echte Kundendaten auf einen Laptop zu übertragen. Es gleicht
-Spalten nach Namen ab und arbeitet nach bestem Bemühen.
+Spalten nach Namen ab und arbeitet nach bestem Bemühen. Eine bloße `name`-Spalte wird nur in einer
+Tabelle von Personen ersetzt: einer namens `users`, `authors`, `customers` oder ähnlich, oder
+jeder Tabelle, die außerdem eine Spalte für E-Mail-Adressen enthält.
 Eine Spalte unter einem Unique-Index erhält pro Zeile einen eigenen Wert, und der Durchlauf ist
 eine Transaktion: Schlägt er fehl, werden die Tabellen, die er umgeschrieben hätte, geleert und
 namentlich genannt, und der Befehl beendet sich mit 1. Unter 0.24 scheiterte er an `token_hash`,
@@ -146,6 +152,10 @@ irgendetwas gelesen oder kopiert wird, und das vermutlich gemeinte wird genannt:
 antwortet mit "did you mean --anonymize?" und beendet sich mit 1. Unter 0.24 wurde ein falsch
 geschriebenes Flag ignoriert, sodass `--anonymise`, `--anon` oder `--schem` den Pull ohne es
 ausführten und personenbezogene Daten unverändert ankamen.
+Bei `pull` und bei jedem anderen Befehl liest ein Schalter, dem ein Wert gegeben wird, diesen Wert:
+`--anonymize=true` oder `=1` schaltet ihn ein, `--anonymize=false` oder `=0` lässt ihn aus, und
+jeder andere Wert wird verweigert. Unter 0.25 schaltete jeder Wert den Schalter ein, sodass
+`--anonymize=false` anonymisierte und `db push --allow-destructive=false` das Löschen erlaubte.
 
 `pg_dump` entfernt Berechtigungen, sodass die Kopie mit den RLS-Policies der Quelle ankommen
 würde, aber ohne die dahinterliegenden Grants — jeder Lesevorgang als `rebase_user` würde
