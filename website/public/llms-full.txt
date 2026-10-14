@@ -428,8 +428,6 @@ file that builds them. See [Custom Server Integration](/docs/backend/custom-serv
 The frontend is a standard **Vite + React + TypeScript** application. The key file is `App.tsx`, which wires together all Rebase controllers:
 
 ```typescript title="frontend/src/App.tsx"
-import React from "react";
-
 import "@fontsource/jetbrains-mono";
 import "@fontsource-variable/inter";
 import "@fontsource-variable/instrument-sans";
@@ -449,14 +447,17 @@ import { collections } from "virtual:rebase-collections";
 const API_URL = import.meta.env.VITE_API_URL;
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
-export function App() {
-    const rebaseClient = React.useMemo(() => createRebaseClient({
-        baseUrl: API_URL,
-        // Store the refresh token in an httpOnly cookie (XSS-safe) rather than
-        // localStorage. The backend issues it via `auth.cookieAuth`.
-        auth: { authFlowMode: "cookie" }
-    }), []);
+// One client for the page, created when this module loads. Inside a component,
+// even in a `useMemo`, `<React.StrictMode>` builds a second one in development,
+// and both restore the session and open their own connections.
+const rebaseClient = createRebaseClient({
+    baseUrl: API_URL,
+    // Store the refresh token in an httpOnly cookie (XSS-safe) rather than
+    // localStorage. The backend issues it via `auth.cookieAuth`.
+    auth: { authFlowMode: "cookie" }
+});
 
+export function App() {
     const authController = useRebaseAuthController({
         client: rebaseClient,
         googleClientId: GOOGLE_CLIENT_ID
@@ -489,7 +490,7 @@ one value without it being written down three times.
 
 #### Key Concepts
 
-- **`createRebaseClient`** — Creates the SDK client that handles HTTP requests, WebSocket connections, and auth token management
+- **`createRebaseClient`** — Creates the SDK client that handles HTTP requests, WebSocket connections, and auth token management. Call it once, at module scope: inside a component, even in a `useMemo`, `<React.StrictMode>` builds a second client in development
 - **`virtual:rebase-collections`** — A Vite plugin that auto-imports your shared collections at build time
 - **`useRebaseAuthController`** — Holds the signed-in user and the token lifecycle, and is what `<Rebase>` distributes to everything below it
 
@@ -3724,7 +3725,7 @@ The three ratings mean:
 | MCP server + agent skills | Beta | `@rebasepro/mcp` runs over stdio: forty-two tools, bearer auth per project, destructive tools refuse non-local targets unless opted in. Since 0.21 the server can also mount a remote `/mcp` endpoint — OAuth 2.1, six data tools, every call under the signed-in person's own RLS — off unless `REBASE_MCP_ENABLED=true`, and Postgres only |
 | Studio (SQL, schema, RLS, API explorer) | Beta | Used daily against real projects. Branching is present in the OSS package and deliberately not exposed in Rebase Cloud, because moving a running deployment onto a branch has no story yet |
 | CMS + admin panel | Beta | Complete for CRUD, relations, storage fields and roles. **The data table has no grid semantics** — no `role`, no `aria-rowindex`, `tabIndex` stripped — so keyboard and screen-reader users cannot operate the main view. No drafts, no per-locale content, no block rich-text |
-| PGlite managed dev database | Beta | Zero-setup `rebase dev` with no Docker. One session at a time, so requests serialize and concurrency cannot be reproduced against it; Atlas-backed commands (`db push`, `generate`, `migrate`) plan against a throwaway second PGlite started for the command (; on 0.24 they refuse the managed database); `db branch` does not work there and says so |
+| PGlite managed dev database | Beta | Zero-setup `rebase dev` with no Docker. One session at a time, so requests serialize and concurrency cannot be reproduced against it; Atlas-backed commands (`db push`, `generate`, `migrate`) plan against a throwaway second PGlite started for the command (on 0.24 they refuse the managed database); `db branch` does not work there and says so |
 | Helm chart | Beta | Renders the split-process topology and is published to the OCI registry at each release. The default remains a single container |
 | `@rebasepro/server-mongo` | **Experimental** | A working driver with change-stream realtime and snapshot history. **No row-level security** — the whole isolation model above does not apply to it — and no relations. Change streams need a replica set: on a standalone `mongod` nothing replaces them, so a subscription sees writes made through that Rebase process and misses every other. No MFA: enrolment answers 501, and the checks answer "no factor", so sign-in never asks for one. The admin aggregate cannot target a collection — it reads the name from a `$from` stage MongoDB does not have — so it returns nothing |
 | `@rebasepro/firebase` | Experimental | Runs the admin panel and SDK against Firestore. No RLS, no SQL surface; the Postgres feature set does not carry over. The Firestore driver ignores `or(...)`/`and(...)` filter groups, so a query that uses one reads every row its plain filters allow |
@@ -4062,6 +4063,261 @@ yet, listed so that nobody reads a promise into them:
 ## Changelog
 
 ### [Unreleased]
+
+#### Changed
+
+##### CLI
+
+- **A pull anonymizes the names on any table of people.** `rebase db pull
+  --anonymize` kept a bare `name` everywhere but tables named like users or
+  customers, so the blog scaffold's `authors` arrived with real names. `authors`
+  now counts, and so does any table with an email address column; a table of
+  organisations with a contact address gets its name redacted in the local copy.
+
+##### Realtime
+
+- **The realtime socket ends a revoked session with the HTTP routes' code.**
+  With the built-in auth, a socket whose session is revoked, or whose account is
+  deleted or disabled, now receives `AUTH_ERROR` with `SESSION_REVOKED` or
+  `ACCOUNT_DISABLED` before it is closed (4001), where it received
+  `SESSION_ENDED`, and a refused `AUTHENTICATE` gets those codes instead of
+  `INVALID_TOKEN`. Another auth adapter's socket still receives `SESSION_ENDED`.
+  A client that matches on the old codes should match these too.
+  `isDatabaseUnreachable` from `@rebasepro/server` also answers `true` now for a
+  database closed to new connections.
+
+##### Studio
+
+- **The schema change dialog's and the API explorer's retry buttons say
+  "Retry"**, the same translated word as the rest of the admin, where they said
+  "Try again".
+
+#### Fixed
+
+##### CLI
+
+- **A start beside a running dev no longer takes over dev's state, or deletes it
+  when it stops.** Both wrote `.rebase/state.json` and `.rebase-dev-port` on
+  every bind and deleted them on every stop, so while `rebase start` ran,
+  `rebase api-keys`, `generate-sdk` and MCP discovery reached it, and when it
+  stopped, `rebase api-keys list` said the server was not running while dev was
+  serving. A server now leaves the files to the live server that wrote them,
+  `rebase dev`'s backend takes them over in either order, and each process
+  removes only what it wrote.
+
+- **A managed database started by an older CLI is restarted after an upgrade.**
+  The database proxy runs inside the daemon, which outlives every command, so
+  after `rebase upgrade` the old daemon and its bugs kept serving until `rebase
+  db stop` or 30 idle minutes. The daemon now records which CLI started it. A
+  newer CLI restarts an older one when nothing is connected to it (data and port
+  kept), or says once to stop what uses it and run `rebase db stop`, and `rebase
+  upgrade` says so when such a daemon is running.
+
+- **Dev recovers from a database that went away during boot.** A `rebase db
+  branch create --force`, or a database restarting, that landed while the
+  backend booted left it down with "Fix the error above; the watcher restarts it
+  on the next change", though nothing needed fixing. Dev now retries such a boot
+  up to three times, after 1, 2 and 4 seconds, and says so. It also no longer
+  polls for a minute on a database closed to new connections: it opens it again,
+  as every `rebase db branch` command does, or stops at once and names the
+  database, `rebase db branch list`, and the `ALTER DATABASE … ALLOW_CONNECTIONS
+  true` to run.
+
+- **A misspelt flag on a driver command is refused before a database starts.**
+  `rebase db push --dry-rn` started the remembered Docker container, or the
+  managed database, before the driver refused the flag. `db push`, `generate`,
+  `migrate`, `branch`, `backup`, `restore` and `backups list` are now checked by
+  the driver's own parser first, and so are `branch switch`'s flags and a
+  missing `--collections` path.
+
+- **Two forced branch creates on one source no longer step on each other.** A
+  forced create holds an advisory lock on its source while it keeps it closed:
+  the reopening every `rebase db branch` command does leaves that source alone,
+  and a second forced create from it waits for the first. Forced creates under a
+  running dev no longer flood its log: the database ending the server's idle
+  connections is one warning per 10-second burst, not one error per connection.
+
+- **The doctor reports the drift that boot warns about.** `rebase doctor` said
+  "Collections → Database: In sync" while boot warned that `schema.generated.ts`
+  and the database disagree, as after renaming a property: a NOT NULL against a
+  nullable column, and the old column left behind. It now runs boot's own
+  comparison, so every difference boot warns about is in its report, in the same
+  words, naming `rebase db push`. Its "Cannot connect" banner names what chose
+  the database, so a stopped remembered Docker database gets the Docker fix
+  instead of ".env".
+
+- **The first boot after a migrate leaves the policies alone.** `rebase db
+  migrate` applied the migration's row-level security policies without the stamp
+  that `db push` and the boot write, so the first boot after every migrate
+  dropped and re-created every policy once, an ACCESS EXCLUSIVE lock per table.
+  Migrate now stamps each policy whose stored definition is exactly what its
+  rule makes, which it checks with Postgres in a rolled-back transaction. A
+  policy that differs gets no stamp, and the boot re-applies it as before.
+
+- **Introspection keeps a many-to-many junction's write policies.** After
+  `rebase schema introspect`, the junction's `<junction>_default_edge_write_*`
+  policies had no rule behind them: introspection wrote a role rule as the SQL
+  Postgres stores (`string_to_array(rebase.roles(), ','::text) &&
+  ARRAY['admin'::text]`), which a junction could not inherit, so the dry run
+  listed the three policies as ones no collection describes and a later change
+  to the rule never reached them. A role rule written that way now reads as the
+  role rule, so the push derives the same policies, and the admin UI's policy
+  check reads it as a role check.
+
+- **A headless dev picks up the collections an introspection writes while it
+  runs.** Dev watched `config/collections` only when it existed at start, so new
+  collections, and edits to them, changed nothing until a restart. Dev now
+  regenerates the schema and the SDK and restarts the backend when the directory
+  appears.
+
+- **A fresh project passes its own resource check.** Every scaffold declares a
+  database and a function, and nothing wrote `rebase.resources.json` until the
+  first build, so `rebase resources --check` in CI failed on a project nobody
+  had touched. `rebase init` now writes the file, and it is in a `--git`
+  project's first commit.
+
+- **Database command details.** A restore from a truncated dump says the file is
+  truncated (or is not a backup, or came from a newer pg_dump), quotes
+  pg_restore, and says nothing was restored or changed, instead of `Command
+  failed … pg_restore --list`. The NOT NULL box's backfill line survives the
+  value typed into it: the SQL is double-quoted for the shell with a `'…'`
+  placeholder, where typing `'tbd'` closed the quote. A pull refuses a source
+  that is not a connection string up front, without repeating the value; libpq's
+  `host=… dbname=…` form still works. The switched-branch note goes to stderr
+  instead of ahead of the command's output.
+
+- **CLI details.** The SDK README names the port `rebase dev` is on, where it
+  said `localhost:3001` after every start. The start command's help prints a run
+  line that works in a project (`pnpm exec rebase`, or the project's package
+  manager), and the scaffold's `.env` comment says `rebase start` keeps local
+  uploads in `<project>/uploads` too. Ctrl-C at an init question exits 130
+  quietly, and the "Re-run with --debug" hint no longer follows init's and dev's
+  own refusals or `generate-sdk`'s collection-loading errors. A local build no
+  longer breaks `pnpm install --frozen-lockfile` in this repository: `app/*`
+  matched `rebase build`'s output.
+
+##### Server & REST
+
+- **A script that builds a backend prints only its own output.** A script that
+  called `createRebaseBackend` and never mounted it, as the scripts page
+  suggests, opened its stdout with the boot's info lines: the schema owner,
+  change capture, the RLS posture, the per-boot key, `backend.fetch`'s request
+  log and the shutdown, and its stderr warned about nine admin routes it had not
+  mounted. The build's info lines now wait until the backend serves (`mount()`,
+  a route group, `attachRealtime()` or `start()`), so a server's boot prints
+  what it always printed and a script prints nothing of it. Warnings and errors
+  are written at once, `LOG_LEVEL=debug` still shows everything, and the "routes
+  are mounted but DISABLED" warnings are said when those routes are mounted.
+
+- **A database closed to new connections answers 503 DATABASE_UNAVAILABLE.** A
+  running app whose database refused new connections (`ALLOW_CONNECTIONS false`,
+  which an interrupted `rebase db branch create --force` leaves on its source)
+  answered signed-in requests `503 ROLE_LOOKUP_FAILED` "Could not verify your
+  permissions", and a query a 500. It now answers `503 DATABASE_UNAVAILABLE`
+  with `Retry-After`, as for a database that is down, and the log names the
+  database once a minute, says nothing is lost, and gives `rebase db branch
+  list` and the `ALTER DATABASE … ALLOW_CONNECTIONS true` that open it.
+
+- **Quieter logs.** A cross-instance or change-capture LISTEN connection that
+  could not be opened logged `❌ [ERROR] … Failed to connect LISTEN client`, with
+  the stack, on every retry, while realtime carried on; it is now one warning
+  per outage, naming the reason and the retry interval. The schema editor's
+  ts-morph hint names the package the backend runs in, in your package manager
+  (`pnpm --dir backend add -D ts-morph@28.0.0` in a scaffold), where `pnpm add
+  -D` at a scaffold's root is refused, and it is logged the first time the admin
+  panel asks for the editor instead of on every boot.
+
+##### Realtime
+
+- **A revoked session on the realtime socket is refused promptly, and the error
+  says why.** With a signed-out or revoked session, or a disabled account, the
+  socket answered `INVALID_TOKEN`, and the SDK logged "WebSocket connected
+  without auth" and retried for over three seconds before `listen()`'s `onError`
+  heard anything. The SDK now warns once that the session was refused, does not
+  ask again with the same token, and passes the error, with its `code`, to
+  `onError` at once.
+
+##### Client SDK
+
+- **The client SDK no longer writes connection messages to a Node script's
+  stdout.** "Connected to PostgreSQL backend" and "WebSocket auto-authenticated"
+  went to stdout, because `console.debug` is `console.log` in Node. In a browser
+  they stay at the console's Verbose level; in Node they print only with
+  `globalThis.__REBASE_DEBUG_REALTIME__ = true`.
+
+##### Studio
+
+- **Studio's schema change dialog and column selects are translated.** The
+  dialog's review, verdicts, chips, disclosures, receipt and buttons, and the
+  column type and primary key selects on string, number and date properties
+  (their options, the value they show and the caption under them), now follow
+  the admin language in all seven locales; they were English in every language.
+  The server's own explanations of each change, and SQL type names, are shown as
+  written. The policy editor's expression boxes use the theme's card surface
+  instead of a fixed white and near-black pair.
+
+- **The API explorer's load-failure screen and the policy editor's help are
+  translated.** Both titles and explanations of the explorer's failure screen,
+  and the policy help's auth-helper bullets, example label and screen-reader
+  title, follow the admin language. The demo app creates its client once per
+  page, as the scaffold now does.
+
+##### Admin (CMS & app)
+
+- **Admin details.** The relation picker's title and its Clear and Done buttons
+  follow the admin language, where they were English beside a translated "Add"
+  button. A select's chevron in the record form is drawn at full size, the same
+  icon as the relation field's, where it was about half size with a hairline
+  stroke.
+
+- **A new project's admin creates one API client per page.** The scaffold built
+  its client inside a component, which `<React.StrictMode>` runs twice in
+  development, so every dev page load made two clients, each restoring the
+  session, with two `POST /api/auth/refresh` 401s for a visitor who was not
+  signed in, and one client never closed. Existing projects can move the
+  `createRebaseClient(...)` call in `frontend/src/App.tsx` out of the component
+  to module scope.
+
+- **The date property's selects are translated, and an empty automatic value
+  shows.** Its mode, automatic-value and timezone selects and their captions
+  follow the admin language. With no automatic value the closed select showed
+  nothing in every language, because it was given a value no item has; it now
+  shows "None", and choosing it still stores `null`. The relation field's
+  open-record button has a translated tooltip and accessible name.
+
+##### CI & tooling
+
+- **A release no longer leaves a half-empty parenthesis where it removed a
+  badge.** 0.25.0's cut turned "(Since 0.25; on 0.24 …)" into "(; on 0.24 …)" on
+  six pages in every locale. The badge remover now takes a following semicolon
+  or colon along, as it took a comma, and a new verify:docs stage refuses a
+  parenthesis that opens or closes on a separator outside code, so the release
+  job stops before npm if a cut leaves one.
+
+#### Security
+
+##### CLI
+
+- **A switch given false is now off.** On the driver, `db push
+  --allow-destructive=false` allowed the destructive statements it was written
+  to forbid, `--dry-run=false` ran a dry run, and `rebase db pull
+  --anonymize=false` anonymized. A switch's value is now read on every CLI
+  command and every `rebase db` command: `=true` or `=1` turns it on, as `=true`
+  always did, `=false` or `=0` leaves it off, and any other value is refused
+  before anything runs.
+
+- **A refusal no longer repeats a password quoted into one argument.** `rebase
+  db pull "--fro postgres://user:pw@host/db"`, a flag and its value in one shell
+  word, printed the URL, password included, and `rebase db
+  "postgres://user:pw@host/db"` printed it in its "Unknown db command" line.
+  Both are masked as `user:***@` now, and the stray-argument refusals of `db
+  backup`, `db restore` and `db branch` mask what they quote too.
+
+- **The guard on backups without the rebase schema reads patterns as pg_dump
+  does.** `rebase db backup --exclude-schema '[r]ebase'` (or `audit|rebase`)
+  wrote a dump that cannot be restored. Regular-expression syntax in a pattern
+  is now read the way pg_dump reads it, and the server is asked about each
+  pattern before `pg_dump` runs.
 
 ### [0.25.0] - 2026-10-14
 
@@ -25210,13 +25466,13 @@ the ID you got. Read the response header.
 | `ROLE_EXCEEDS_CALLER` | 403 | The roles being granted hold a scope, or `admin`, that the caller does not. `details.beyond` names them. | Have someone who holds them grant the role. |
 | `ROLE_EXCEEDS_CREATOR` | 403 | A service key was given an RLS role its creator does not hold. Only an admin may give any role. `details.roles` names them. | Drop the role, or have an admin create the key. |
 | `ROLE_EXISTS` | 409 | That role name is taken. | Pick another name. |
-| `ROLE_LOOKUP_FAILED` | 503 | The caller's roles could not be read — on an admin route, or on a data request on a backend with `config.auth`. Fails closed rather than trusting the roles in the token. A token whose uid names no account, including a uid the users table cannot hold, is a 401, not this (; on 0.24 a uid the table cannot hold is this 503). A database that cannot be reached is `DATABASE_UNAVAILABLE`, not this (; on 0.24 it is this 503). | Retry; check the database. |
+| `ROLE_LOOKUP_FAILED` | 503 | The caller's roles could not be read — on an admin route, or on a data request on a backend with `config.auth`. Fails closed rather than trusting the roles in the token. A token whose uid names no account, including a uid the users table cannot hold, is a 401, not this (on 0.24 a uid the table cannot hold is this 503). A database that cannot be reached is `DATABASE_UNAVAILABLE`, not this (on 0.24 it is this 503). | Retry; check the database. |
 | `SCOPE_EXCEEDS_CREATOR` | 403 | A key was asked for a scope its creator does not hold. A key never holds more than the account that makes it. `details.scopes` names them. | Drop them, or have someone who holds them create the key. |
 | `SCOPE_MISSING` | 403 | The credential does not hold the scope this route, collection, storage source or function needs. `details.requiredScope` names it, target included. | For a person, a role that declares the scope. For a key, a key that holds it. See [Roles and scopes](/docs/backend/roles-and-scopes/). |
 | `SCOPE_NOT_DECLARED` | 500 | A route guarded with `requireScope` names an app scope this backend does not declare, so nobody holds it, an administrator neither. A name that is not a scope at all, or a misspelt built-in one such as `data:raed`, never gets this far: `requireScope` throws where the route is registered. On 0.24 both answer every caller `403 SCOPE_MISSING`. | Declare the scope under `auth.scopes` on the users collection, or correct the name. See [Roles and scopes](/docs/backend/roles-and-scopes/). |
 | `SELF_DELETE` | 400 | An admin tried to delete their own account. | Have another admin do it. |
-| `SESSION_REVOKED` | 401 | The session was signed out elsewhere, or every session was revoked, or the account was deleted. Every door that takes a session answers it to such an access token: the data API, storage, custom functions and the admin routes (; on 0.24 the first three answer `UNAUTHORIZED` "Invalid or expired token"). The SDK refreshes, the refresh is refused, and it signs out. | Sign in again. |
-| `ACCOUNT_DISABLED` | 401/403 | An administrator switched the account off: sign-in (403), refresh and every token it holds (401) are refused, at every door that takes a session (; on 0.24 the data API, storage and custom functions answer `UNAUTHORIZED`). | Ask an administrator. |
+| `SESSION_REVOKED` | 401 | The session was signed out elsewhere, or every session was revoked, or the account was deleted. Every door that takes a session answers it to such an access token: the data API, storage, custom functions and the admin routes (on 0.24 the first three answer `UNAUTHORIZED` "Invalid or expired token"). The realtime socket refuses its `AUTHENTICATE` with an `AUTH_ERROR` frame carrying the same code. The SDK refreshes, the refresh is refused, and it signs out. | Sign in again. |
+| `ACCOUNT_DISABLED` | 401/403 | An administrator switched the account off: sign-in (403), refresh and every token it holds (401) are refused, at every door that takes a session (on 0.24 the data API, storage and custom functions answer `UNAUTHORIZED`). The realtime socket refuses its `AUTHENTICATE` with an `AUTH_ERROR` frame carrying the same code. | Ask an administrator. |
 | `EMAIL_NOT_CONFIRMED` | 403 | `requireEmailVerification` is on and the address is not verified yet. Answered only for a correct password; a new link is mailed. | Follow the link in the mail. |
 | `PROOF_REQUIRED` | 409 | `POST /auth/verify-email`: the account holds a password or identity nobody proved, and the request proves neither. The token is not spent. | Send `password` to keep it, or `removeUnproven: true` to verify without it. |
 | `UNDELIVERABLE_ADDRESS` | 400 / 409 | A verification mail was asked for an address mail cannot reach — a guest's, or X's placeholder (400) — or an account asked to move onto such an address (409, `POST /auth/change-email`). | Set a real address first. |
@@ -25250,7 +25506,7 @@ the ID you got. Read the response header.
 | `CURSOR_WITH_OFFSET` | 400 | `?after=` was combined with `?offset=` or `?page=`. A cursor already says where the page starts, so an offset on top of it silently skips that many rows past the cursor — a gap the caller cannot see in the response. | Use one or the other. |
 | `DISTINCT_NOT_APPLICABLE` | 400 | `?distinct=true` was combined with a search or vector query. Both attach a per-row score, so no two rows are ever equal and `DISTINCT` would collapse nothing — it would look like it worked and change nothing. | Drop one of the two. |
 | `DISTINCT_ORDER_BY_NOT_SELECTED` | 400 | A `distinct` read is ordered by a column it does not return. A `SELECT DISTINCT` can only be ordered by columns in its select list, or the rows it collapses have no defined order. `details.fields` names them. | Add those fields to `?fields=`, or drop them from `?orderBy=`. |
-| `DATABASE_UNAVAILABLE` | 503 | The database could not be reached: the connection was refused or dropped, the host did not resolve, or the server is shutting down or starting. Every door answers it, sign-in, the admin routes and the realtime socket (an `ERROR` frame) included. Sent with `Retry-After: 5`. On 0.24 the same outage answers `ROLE_LOOKUP_FAILED`, `INTERNAL_ERROR` or a 500 with the code `ECONNREFUSED`. | Retry; the SDK does. Check that the database is running and reachable from the server. |
+| `DATABASE_UNAVAILABLE` | 503 | The database could not be reached: the connection was refused or dropped, the host did not resolve, the server is shutting down or starting, or the database is closed to new connections (`ALLOW_CONNECTIONS false`, which a `rebase db branch create --force` stopped part-way leaves on its source; the server log names the database, and `rebase db branch list` opens it again). Every door answers it, sign-in, the admin routes and the realtime socket (an `ERROR` frame) included. Sent with `Retry-After: 5`. On 0.24 the same outage answers `ROLE_LOOKUP_FAILED`, `INTERNAL_ERROR` or a 500 with the code `ECONNREFUSED`. | Retry; the SDK does. Check that the database is running and reachable from the server. |
 | `DB_CONNECT_TIMEOUT` | 503 | Opening a new database connection took longer than `DB_POOL_CONNECT_TIMEOUT`: the database is slow to accept connections, or far away. Sent with `Retry-After`. | Retry; the SDK does. Check the database's load and the network to it. |
 | `DB_PERMISSION_DENIED` | 500 | Postgres refused the statement (`42501`): either a row-level-security policy denying this role, or a missing `GRANT`. | See [Troubleshooting](/docs/troubleshooting/). |
 | `DB_POOL_EXHAUSTED` | 503 | Every pooled database connection stayed busy for `DB_POOL_CONNECT_TIMEOUT`, so this request never reached the database. Load, not a fault; sent with `Retry-After`. The server logs the remedy once a minute. | Retry; the SDK does. Raise `DB_POOL_MAX`, or find the slow queries or long transactions holding connections. |
@@ -25411,7 +25667,7 @@ so a panel can grey the feature out instead of showing an error.
 | `SCHEMA_EDITING_UNSUPPORTED` | 503 | This driver cannot plan schema changes. | Live editing is available on Postgres. |
 | `SCHEMA_EDITOR_BAAS_MODE` | 501 | Collections are introspected from the database here, so there are no source files to edit. | Change the schema with a migration. |
 | `SCHEMA_EDITOR_DISABLED` | 501 | The schema editor is turned off for this server. A built bundle always answers this. | Turn it on with `schemaEditor`. On a bundle, set `REBASE_LIVE_SCHEMA_REPOSITORY` to edit collections through a repository — see [Live schema editing](/docs/backend/live-schema-editing#from-a-built-bundle). |
-| `SCHEMA_EDITOR_MISSING_DEPENDENCY` | 501 | The schema editor needs `ts-morph`, which is not installed. | `pnpm add -D ts-morph@28.0.0`. |
+| `SCHEMA_EDITOR_MISSING_DEPENDENCY` | 501 | The schema editor needs `ts-morph`, which is not installed. | Install it in the package that runs the backend, then restart it: `pnpm --dir backend add -D ts-morph@28.0.0` from the root of a scaffolded project, or `pnpm add -D ts-morph@28.0.0` where the backend is the project. The message names the command for your project. |
 | `SCHEMA_EDITOR_NO_COLLECTIONS_DIR` | 501 | The server has no `collectionsDir`, so the editor has nothing to write to. | Set `collectionsDir`. |
 | `SCHEMA_EDITOR_PRODUCTION` | 501 | The editor is off under `NODE_ENV=production`: a deployed server's files are rebuilt from your repository on every deploy, so an edit here would be discarded. | Edit collections in development and deploy, or configure `liveSchema.repository` to commit them there. |
 | `SQL_EXPORT_UNSUPPORTED` | 501 | `POST /api/admin/sql/csv` cannot stream a result here: the in-process development database (PGlite) has one connection, and a cursor held across a download would hold every other query behind it; or the data source has no SQL cursor. | Point `DATABASE_URL` at a Postgres of your own (`rebase dev --docker` starts one), or add a `LIMIT` and export the rows on screen. |
@@ -25824,7 +26080,7 @@ refused too. Each refusal names the change and what to do instead.
 The verdict is read from the schema each side produces — the same plan
 `schema.generated.ts` and `db push` are rendered from — so an edit that changes
 the database cannot be reported as no change. Two edits that look like changes
-and are not refused (; 0.23 reports both as needing a migration):
+and are not refused (0.23 reports both as needing a migration):
 
 - **Renaming a property's key while keeping its column** (`columnName` set to
   the old column) moves no data. It is `safe`; API clients read the new name.
@@ -29493,7 +29749,7 @@ WebSocket subscriptions automatically respect Row-Level Security (RLS) policies.
 
 1. The WebSocket connection authenticates using the same JWT token as the REST API.
 2. Every subscription refetch runs inside a PostgreSQL transaction with `set_config('app.user_id', ...)` and `set_config('app.user_roles', ...)` — ensuring RLS policies are enforced.
-3. The identity is checked again for as long as the socket is open, not only when it authenticates. Before each frame the server asks what an HTTP request would ask: is the token still valid, was its session signed out or revoked, does the account still exist, and which roles does it hold now. Channel frames are asked at most once a second. Frames that arrive on one socket while its check is still under way — a client re-sending its subscriptions after a reconnect — share that check rather than each asking again; the next frame after it settles asks afresh. A socket that only listens is asked at least every 30 seconds, and a token stops being honoured at the instant it expires. A role taken away applies from the next frame (or, for a frame that shared a check already under way, from the one after), to reads, writes and open subscriptions alike. A socket whose identity has ended receives an `AUTH_ERROR` frame with the code `SESSION_ENDED` or `TOKEN_EXPIRED` and is closed with code `4001`. The SDK authenticates its socket again each time it refreshes its token; a new token for the same identity (the same user id, roles, guest flag and claims) leaves the open subscriptions as they are, and one for a different identity refetches each of them as it. After a `4001` it reconnects with the session it holds then, or with none. A client speaking the protocol directly has to send a fresh token in `AUTHENTICATE` before the old one expires.
+3. The identity is checked again for as long as the socket is open, not only when it authenticates. Before each frame the server asks what an HTTP request would ask: is the token still valid, was its session signed out or revoked, does the account still exist, and which roles does it hold now. Channel frames are asked at most once a second. Frames that arrive on one socket while its check is still under way — a client re-sending its subscriptions after a reconnect — share that check rather than each asking again; the next frame after it settles asks afresh. A socket that only listens is asked at least every 30 seconds, and a token stops being honoured at the instant it expires. A role taken away applies from the next frame (or, for a frame that shared a check already under way, from the one after), to reads, writes and open subscriptions alike. A socket whose identity has ended receives an `AUTH_ERROR` frame and is closed with code `4001`. With the built-in auth the frame's code says why, as the HTTP routes say it: `SESSION_REVOKED` (signed out, revoked, or the account deleted), `ACCOUNT_DISABLED` or `TOKEN_EXPIRED`; another auth adapter's is `SESSION_ENDED`. An `AUTHENTICATE` for a revoked session or a disabled account is refused with `SESSION_REVOKED` or `ACCOUNT_DISABLED` (a token that does not verify, or has expired, with `INVALID_TOKEN`). The SDK does not ask again with the same token, and hands the refusal, code included, to the `onError` of whatever needed the account. The SDK authenticates its socket again each time it refreshes its token; a new token for the same identity (the same user id, roles, guest flag and claims) leaves the open subscriptions as they are, and one for a different identity refetches each of them as it. After a `4001` it reconnects with the session it holds then, or with none. A client speaking the protocol directly has to send a fresh token in `AUTHENTICATE` before the old one expires.
 
 This means each socket only receives updates for records its authenticated identity may see.
 
@@ -30182,7 +30438,7 @@ ordinary one.
 
 An embedding is long in a URL: 768 dimensions are about 17 KB of query string and
 1,536 about 33 KB. The server accepts up to 64 KB of request line and headers
-(; 16 KB before, a 431
+(16 KB before, a 431
 from 768 dimensions up), and a proxy in front of it usually accepts less — nginx's
 default is 8 KB. Send a vector search as [`POST …/query`](#queries-too-long-for-a-url)
 instead; the SDK always does.
@@ -32979,7 +33235,10 @@ catch (closing the terminal, Ctrl-C, SIGTERM, SIGQUIT). Killed outright
 (SIGKILL), it leaves the source closed until the next `rebase db branch`
 command, any of them, which reopens it first and says so;
 `ALTER DATABASE "<db>" ALLOW_CONNECTIONS true`, run from the `postgres`
-database, does the same by hand. A client
+database, does the same by hand. While a forced create holds its source closed,
+it holds an advisory lock on it in the `postgres` database, so that reopening
+leaves a live copy's source alone, and a second forced create from the same
+source waits for the first to finish. A client
 that reconnects as soon as it is disconnected, as a running `rebase dev` does,
 then cannot slip back in before the copy starts. That needs the source's owner;
 without it, and on `delete`, `--force` disconnects the sessions up to three
@@ -48550,9 +48809,15 @@ Copy another database into the local development one:
 rebase db pull --from postgres://…  [--anonymize]
 ```
 
+`--from` takes a `postgres://` or `postgresql://` URL, or libpq's
+`host=… port=… dbname=…` pairs quoted as one argument. Anything else is refused
+before anything is read or started, without repeating the value.
+
 `--anonymize` replaces personal fields on the way in, so a production copy can be
 worked on locally without carrying real customer data onto a laptop. It matches
-columns by name and is best-effort.
+columns by name and is best-effort. A bare `name` column is replaced only on a
+table of people: one called `users`, `authors`, `customers` or the like, or any
+table that also holds an email address column.
 A column under a unique index gets a distinct value per row, and the pass is one
 transaction: if it fails, the tables it would have rewritten are emptied and
 named, and the command exits 1. On 0.24 it failed on `token_hash` once users had
@@ -48563,6 +48828,11 @@ does not take is refused before anything is read or copied, naming the one it
 was probably meant to be: `--anonymise` answers "did you mean --anonymize?" and
 exits 1. On 0.24 a misspelt flag was ignored, so `--anonymise`, `--anon` or
 `--schem` ran the pull without it, and personal data arrived as it was.
+On `pull` and on every other command, a switch given a value reads it:
+`--anonymize=true` or `=1` turns it on, `--anonymize=false` or `=0` leaves it off,
+and any other value is refused. On 0.25 every value turned the switch on, so
+`--anonymize=false` anonymized and `db push --allow-destructive=false` allowed
+the drop.
 
 `pg_dump` strips privileges, so the copy would arrive with the source's RLS
 policies and none of the grants behind them — every read as `rebase_user` failing
@@ -48927,6 +49197,16 @@ rebase schema introspect
   is written `rebase.roles()`. Connected as a role named `rebase`, the default
   path put that schema first and the rule came back as `roles()`, which the
   push could not find
+- Keeps a many-to-many
+  junction's policies. A junction's `<junction>_default_edge_write_*` policies
+  are derived from the update rules of the collection that declares the
+  relation, and a junction can inherit only a rule it can read. A role rule
+  comes back as the SQL Postgres stores for it,
+  `string_to_array(rebase.roles(), ','::text) && ARRAY['admin'::text]`, and
+  that reads as the role rule again, so the push derives the same policies.
+  On 0.25.0 it read as raw SQL: the dry run
+  listed the three policies as ones no collection describes, the push left them
+  in force, and a later change to the rule no longer reached them
 - Writes
   `disableDefaultPolicies: true` on a table that has row-level security on and
   does not hold the whole [admin baseline](/docs/collections/security-rules/#policies-a-collection-gets-without-writing-them),
@@ -49145,6 +49425,14 @@ rebase db migrate
 - Reads `drizzle/migrations/` for unapplied migrations
 - Applies them in order to the database
 - Tracks which migrations have been applied
+- Stamps the
+  row-level security policies the way `db push` and the server's boot do, so
+  the first boot after a migrate leaves them alone instead of re-creating every
+  one. A migration was written from the collections of its day, so a policy is
+  stamped only when it is exactly what its rule makes now: migrate makes it
+  again from its rule under another name, in a transaction it rolls back, and
+  compares what Postgres stored, as `db push --dry-run` does. A policy that
+  differs gets no stamp, and the next boot re-applies its table
 
 `--refuse-destructive`
 makes it refuse instead. It dry-runs the pending migrations first. If any
@@ -49210,6 +49498,8 @@ rebase doctor
 - Collections ↔ Database — is there any unexpected drift?
 
 Run `doctor` whenever something feels out of sync. It pinpoints exactly where the mismatch is.
+
+The database comparison includes the one boot makes before it warns that `schema.generated.ts` and the database disagree, run through the same code. So every difference boot warns about is in the report too, in the same words: a column that is NOT NULL on one side and nullable on the other, and a column the database still has that the file does not (boot never drops one, so a renamed property leaves its old column behind). Each is a warning, and the fix names `rebase db push`.
 
 The database comparison needs `DATABASE_URL` (or `ADMIN_CONNECTION_STRING`). Without one, that phase is reported as **skipped** rather than passing, and the run never closes with "All schemas are in sync" — a check that did not happen is not a clean bill of health.
 
@@ -52489,6 +52779,10 @@ it does not.
 So
 `rebase db backup` refuses an `--exclude-schema` that matches `rebase`, by
 pg_dump's own pattern rules (`reb*` and `*` included), before it runs anything.
+Those rules pass regular-expression syntax through outside double quotes, so
+`[r]ebase` and `audit|rebase` are refused too, and the server is asked about
+each pattern before `pg_dump` runs, in the same regular-expression engine
+`pg_dump`'s own query uses.
 On 0.24 it wrote the dump and validated it, and only the restore failed.
 
 Because it holds
