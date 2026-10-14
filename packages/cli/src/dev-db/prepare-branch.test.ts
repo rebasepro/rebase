@@ -13,8 +13,17 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { BRANCH_PARENT_DATABASE_ENV, prepareDatabaseEnv, resolveActiveBranch } from "./prepare";
+import {
+    BRANCH_PARENT_DATABASE_ENV,
+    devDatabaseKind,
+    prepareDatabaseEnv,
+    resolveActiveBranch,
+    resolveProjectDatabase,
+    resolveProjectDatabaseAndBranch
+} from "./prepare";
 import { writeActiveBranch } from "./branch-pointer";
+import { recordLastDevDatabase } from "./last-dev-database";
+import type { DevDatabase } from "./resolve";
 
 describe("prepareDatabaseEnv with a branch active", () => {
     let root: string;
@@ -96,3 +105,121 @@ describe("prepareDatabaseEnv with a branch active", () => {
         expect(prepared.database).toMatchObject({ source: "flag" });
     });
 });
+
+/**
+ * A switch on Postgres in Docker, the setup the docs send you to for branching.
+ *
+ * `rebase dev --docker` is remembered, so the scaffold's `.env` keeps
+ * `DATABASE_URL` commented out and every command reaches the compose database.
+ * The branch was derived from `.env` alone, so on exactly this project `switch`
+ * said "every rebase command in this checkout now uses it" and then `db url`,
+ * `console`, `db backup` and `dev --docker` all kept using the main database —
+ * every write meant for the branch landed on main.
+ */
+describe("a branch on Postgres in Docker", () => {
+    let root: string;
+
+    beforeEach(() => {
+        root = fs.mkdtempSync(path.join(os.tmpdir(), "rebase-prepare-docker-"));
+        fs.writeFileSync(path.join(root, "docker-compose.yml"), [
+            "services:",
+            "  db:",
+            "    image: pgvector/pgvector:pg18",
+            "    environment:",
+            "      POSTGRES_USER: rebase_app",
+            "      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:-changeme}",
+            "      POSTGRES_DB: rebase",
+            "    ports:",
+            "      - \"5433:5432\"",
+            ""
+        ].join("\n"));
+        // The scaffold's `.env`: the password the compose file reads, and
+        // DATABASE_URL commented out.
+        fs.writeFileSync(path.join(root, ".env"), "DATABASE_PASSWORD=s3cret\n# DATABASE_URL=postgresql://…\n");
+        writeActiveBranch(root, { name: "feat_one", database: "rb_feat_one" });
+        delete process.env.DATABASE_URL;
+    });
+    afterEach(() => fs.rmSync(root, { recursive: true, force: true }));
+
+    const onBranch = (url: string | null | undefined) => {
+        expect(url).toBeTruthy();
+        const parsed = new URL(url ?? "");
+        expect(parsed.pathname).toBe("/rb_feat_one");
+        expect(parsed.port).toBe("5433");
+        // The query string is carried across: `sslmode=disable` is what a
+        // local container needs.
+        expect(parsed.searchParams.get("sslmode")).toBe("disable");
+    };
+
+    it("is what every command resolves after `rebase dev --docker`", () => {
+        recordLastDevDatabase(root, "docker");
+
+        const database = resolveProjectDatabase(root);
+
+        // Still Docker: `rebase dev --docker` starts the container for it, and
+        // records Docker as what the other commands follow.
+        expect(database).toMatchObject({ kind: "docker", source: "last-dev" });
+        onBranch(database.kind === "docker" ? database.url : null);
+        expect(devDatabaseKind(root)).toBe("docker");
+    });
+
+    it("hands the child the branch, and the main database the branch registry lives in", async () => {
+        recordLastDevDatabase(root, "docker");
+        const progress: string[] = [];
+
+        const prepared = await prepareDatabaseEnv(root, { onProgress: (line) => progress.push(line) });
+
+        onBranch(prepared.env.DATABASE_URL);
+        expect(prepared.env[BRANCH_PARENT_DATABASE_ENV]).toBe("rebase");
+        expect(prepared.description).toContain("feat_one");
+        expect(prepared.description).toContain("Docker");
+        expect(progress.join("\n")).toContain("feat_one");
+    });
+
+    it("follows --docker typed on the command line", () => {
+        onBranch(databaseUrl(resolveProjectDatabase(root, { flagDocker: true })));
+    });
+
+    it("is what `rebase dev --docker` starts and serves", async () => {
+        // `dev` resolves with its own flags and without the record.
+        const options = { flagDocker: true, followLastDev: false };
+
+        onBranch(databaseUrl(resolveProjectDatabase(root, options)));
+        onBranch((await prepareDatabaseEnv(root, options)).env.DATABASE_URL);
+    });
+
+    it("is what `rebase status` reads, from .env and not this shell", () => {
+        recordLastDevDatabase(root, "docker");
+        process.env.DATABASE_URL = "postgresql://u:pw@staging:5432/app";
+
+        const resolved = resolveProjectDatabaseAndBranch(root, { env: {} });
+
+        onBranch(databaseUrl(resolved.database));
+        expect(resolved.branch).toEqual({ name: "feat_one", database: "rb_feat_one", parent: "rebase" });
+    });
+
+    it("still loses to a DATABASE_URL in the shell, which outranks any switch", () => {
+        recordLastDevDatabase(root, "docker");
+        process.env.DATABASE_URL = "postgresql://u:pw@staging:5432/app";
+
+        expect(resolveProjectDatabaseAndBranch(root)).toMatchObject({
+            database: { kind: "external", source: "environment" },
+            branch: null
+        });
+    });
+
+    it("says so, rather than nothing, when the database it resolves to cannot have one", () => {
+        // No `--docker`, nothing remembered: the managed database, which serves
+        // exactly one database. Asserted on the seam, because
+        // `prepareDatabaseEnv` would start a real PGlite to prove it.
+        expect(resolveProjectDatabaseAndBranch(root)).toMatchObject({
+            database: { kind: "managed" },
+            branch: null,
+            ignoredBranch: "feat_one"
+        });
+    });
+});
+
+function databaseUrl(database: DevDatabase): string | null {
+    return database.kind === "managed" ? null : database.url;
+}

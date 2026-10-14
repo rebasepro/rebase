@@ -78,17 +78,19 @@ export interface PreparedDatabase {
 }
 
 /**
- * The branch this checkout is switched to, as a connection string.
+ * The branch this checkout is switched to, over the `DATABASE_URL` in `.env`.
  *
  * Derived rather than stored: the pointer holds a name, and the credentials
- * stay in the one place the developer wrote them. The base is the project's
- * `.env` — a switch is a statement about *this project's* database, so a
- * `DATABASE_URL` that happens to be in the shell is not the thing being
+ * stay in the one place the developer wrote them. The base here is the
+ * project's `.env` — a switch is a statement about *this project's* database,
+ * so a `DATABASE_URL` that happens to be in the shell is not the thing being
  * branched, and it outranks the branch anyway.
  *
- * Returns null when there is no branch, and also when there is no base to swap
- * the database name on: a project with no `DATABASE_URL` is on the managed
- * database, where branching does not work at all.
+ * Returns null when there is no branch, and also when `.env` names no base to
+ * swap the database name on. That is not the end of it: a project on Postgres
+ * in Docker has no `DATABASE_URL` either, and its branch is applied over the
+ * compose URL once the order has picked Docker — see
+ * {@link resolveProjectDatabaseAndBranch}.
  *
  * Exported for its tests. Asserting this through {@link prepareDatabaseEnv}
  * would start a real PGlite daemon to check a decision made before any daemon
@@ -164,17 +166,92 @@ export function resolveProjectDatabase(
     projectRoot: string,
     options: Pick<PrepareOptions, "flagUrl" | "flagDocker" | "followLastDev"> = {}
 ): DevDatabase {
-    const envFile = readEnvFile(projectRoot);
+    return resolveProjectDatabaseAndBranch(projectRoot, options).database;
+}
 
-    return resolveDevDatabase({
+/** The branch a resolution landed on. */
+export interface ResolvedBranch {
+    /** The name the developer switched to. */
+    name: string;
+    /** The PostgreSQL database that name refers to. */
+    database: string;
+    /**
+     * The database the branch was taken from, where the branch registry lives:
+     * the one the switch swapped the name on.
+     */
+    parent: string | null;
+}
+
+export interface ProjectDatabase {
+    database: DevDatabase;
+    /** Set when the resolved database is this checkout's branch rather than the main one. */
+    branch: ResolvedBranch | null;
+    /**
+     * The branch this checkout is switched to, when the database resolved to
+     * is the managed one — which serves exactly one database, so the switch
+     * cannot be honoured and the main database is used instead. Null otherwise.
+     */
+    ignoredBranch: string | null;
+}
+
+/**
+ * {@link resolveProjectDatabase}, and which branch the answer is.
+ *
+ * The switch applies to whichever base the order picks, not to `.env` alone. A
+ * project on Postgres in Docker — `rebase dev --docker`, remembered, with the
+ * scaffold's `DATABASE_URL` left commented out, which is the setup the docs
+ * point to for branching — resolved its branch to nothing, and every command
+ * went on using the main database while `switch` said they had moved. So the
+ * branch is applied over the compose URL whenever the order picks Docker, by a
+ * typed `--docker` or the remembered one, and the answer stays Docker: that is
+ * what has the container started and what `rebase dev` records.
+ *
+ * What outranks a switch still does. `--database-url` and a `DATABASE_URL` in
+ * the shell name a database outright, and the managed database cannot hold a
+ * branch at all — that last one is reported as `ignoredBranch`, so the caller
+ * can say so instead of quietly using main.
+ *
+ * `env` is the shell environment to judge against, `process.env` by default;
+ * `rebase status` passes `{}`, because it asks what *this project* is on.
+ */
+export function resolveProjectDatabaseAndBranch(
+    projectRoot: string,
+    options: Pick<PrepareOptions, "flagUrl" | "flagDocker" | "followLastDev"> & {
+        env?: Record<string, string | undefined>;
+    } = {}
+): ProjectDatabase {
+    const envFile = readEnvFile(projectRoot);
+    const active = readActiveBranch(projectRoot);
+
+    const database = resolveDevDatabase({
         flagUrl: options.flagUrl,
         flagDocker: options.flagDocker,
         lastDevDocker: options.followLastDev !== false && readLastDevDocker(projectRoot),
-        env: process.env,
+        env: options.env ?? process.env,
         envFile,
         branch: resolveActiveBranch(projectRoot, envFile),
         composeUrl: resolveComposeUrl(projectRoot, envFile)
     });
+
+    if (!active) return { database, branch: null, ignoredBranch: null };
+
+    if (database.kind === "external" && database.source === "branch") {
+        const parent = databaseNameOf(envFile.DATABASE_URL?.trim() ?? "");
+        return { database, branch: { ...active, parent }, ignoredBranch: null };
+    }
+
+    if (database.kind === "docker" && database.url) {
+        const url = branchUrl(database.url, active.database);
+        if (url) {
+            return {
+                database: { ...database, url },
+                branch: { ...active, parent: databaseNameOf(database.url) },
+                ignoredBranch: null
+            };
+        }
+    }
+
+    return { database, branch: null, ignoredBranch: database.kind === "managed" ? active.name : null };
 }
 
 /**
@@ -207,14 +284,29 @@ export async function prepareDatabaseEnv(
     options: PrepareOptions = {}
 ): Promise<PreparedDatabase> {
     const envFile = readEnvFile(projectRoot);
-    const database = resolveProjectDatabase(projectRoot, options);
+    const { database, branch, ignoredBranch } = resolveProjectDatabaseAndBranch(projectRoot, options);
 
-    const description = describeDevDatabase(database);
+    // A branch on Docker is still Docker to the resolver, so its own line does
+    // not name the branch; this does, because that is the database in use.
+    const description = database.kind === "docker" && branch
+        ? `branch "${branch.name}" (rebase db branch switch) on ${describeDevDatabase(database)}`
+        : describeDevDatabase(database);
+    // Where a branch lives, for the server: the registry is kept in the
+    // database the branch was taken from, and a branch URL does not say which.
+    const parentEnv: Record<string, string> = branch?.parent ? { [BRANCH_PARENT_DATABASE_ENV]: branch.parent } : {};
 
     // Said even on a quiet command: `rebase db url --docker` is quiet, and its
     // progress goes to stderr, which is where a flag it did not follow belongs.
     const outranked = outrankedDockerFlagNotice(database, options.flagDocker);
     if (outranked) options.onProgress?.(outranked);
+
+    if (ignoredBranch) {
+        options.onProgress?.(
+            `Branch "${ignoredBranch}" is switched to, but this uses the managed database, which has no branches, `
+            + "so the main database is used. `--docker` (or DATABASE_URL in .env) reaches the branch; "
+            + "`rebase db branch switch --off` clears the switch."
+        );
+    }
 
     if (database.kind === "external" && (database.source === "branch" || database.source === "flag")) {
         // The two external cases that MUST be exported. `environment` and
@@ -228,14 +320,8 @@ export async function prepareDatabaseEnv(
         //
         // Safe to set: `dotenv` does not overwrite a variable that is already
         // in the environment, so the child's own `.env` load cannot undo it.
-        // On a branch, the database it was branched from too: the one
-        // `resolveActiveBranch` swapped the name on.
-        const parent = database.source === "branch" ? databaseNameOf(envFile.DATABASE_URL?.trim() ?? "") : null;
-        return {
-            database,
-            env: { DATABASE_URL: database.url, ...(parent ? { [BRANCH_PARENT_DATABASE_ENV]: parent } : {}) },
-            description
-        };
+        // On a branch, the database it was branched from too.
+        return { database, env: { DATABASE_URL: database.url, ...parentEnv }, description };
     }
 
     if (database.kind === "docker") {
@@ -256,11 +342,11 @@ export async function prepareDatabaseEnv(
         // earlier `rebase dev` did.
         if (database.source === "last-dev") {
             options.onProgress?.(
-                "Using Postgres in Docker, as the last `rebase dev --docker` did. "
-                + "`rebase dev` without --docker goes back to the managed database."
+                `Using ${branch ? `branch "${branch.name}" (${branch.database}) of ` : ""}Postgres in Docker, `
+                + "as the last `rebase dev --docker` did. `rebase dev` without --docker goes back to the managed database."
             );
         }
-        return { database, env: { DATABASE_URL: database.url }, description };
+        return { database, env: { DATABASE_URL: database.url, ...parentEnv }, description };
     }
 
     if (database.kind !== "managed") {
