@@ -236,8 +236,17 @@ rebase db restore <backup> [--target-db <name>] [--create-db] [--clean] [--yes]
 
 `restore` esegue `pg_restore`, ed è un'operazione distruttiva, quindi non è
 mai automatica: senza `--yes` richiede una conferma interattiva `yes`, e in
-una shell non interattiva si interrompe. `<backup>` è un `.dump` locale o una
-chiave `s3://…` / `gs://…`, scaricata per prima.
+una shell non interattiva si interrompe e dice di passare `--yes`. `<backup>` è un
+`.dump` locale o una chiave `s3://…` / `gs://…`, scaricata per prima.
+
+<span class="since-badge" data-since="0.25">Da 0.25</span> In un database
+che contiene già ciò che il backup crea, richiede `--clean`: senza di esso, si rifiuta
+prima di eseguire qualsiasi cosa, nominando gli schemi e le tabelle d'intralcio, e dice di
+passare `--clean` oppure di ripristinare in un nuovo database con
+`--create-db --target-db <name>`. Su 0.24 ricreava i ruoli e poi si fermava sull'errore di
+pg_restore `schema "rebase" already exists`. Rifiuta il database di sviluppo gestito,
+che non può accettare i dati COPY di un dump; ripristina invece in Postgres in Docker con
+`--docker`.
 
 Prima di ripristinare, ricrea i ruoli del cluster a partire dal
 `.globals.sql` del backup — un ruolo già esistente viene saltato, non è un

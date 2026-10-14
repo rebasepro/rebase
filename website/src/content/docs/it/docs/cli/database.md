@@ -60,6 +60,19 @@ rebase db migrate
 
 Applica tutte le migrazioni non ancora applicate al database.
 
+Su un database su cui un server si è già avviato, la prima migrazione crea tabelle che
+l'avvio ha già creato, quindi lì il primo `db migrate` si ferma su `already exists`.
+Registra invece quella migrazione come applicata, una sola volta:
+
+```bash
+rebase db migrate --baseline <version>
+```
+
+La versione è il prefisso numerico del file di migrazione; `db generate` stampa il
+comando con la versione già inserita. Ogni `db migrate` successivo è un comando
+ordinario. Vedi [`--baseline`](/docs/cli/schema/#rebase-db-migrate) per un database che
+registra già le migrazioni.
+
 ### `rebase db backup` / `backups` / `restore`
 
 ```bash
@@ -68,7 +81,21 @@ rebase db backups list                  # list what is stored
 rebase db restore ./backups/<file>.dump --yes
 ```
 
-`backup` esegue `pg_dump`; `restore` esegue `pg_restore` e, essendo distruttivo, richiede `--yes`.
+`backup` esegue `pg_dump`; `restore` esegue `pg_restore` e, essendo distruttivo,
+chiede di digitare `yes` su un terminale, oppure accetta `--yes`; senza un terminale e
+senza `--yes` si rifiuta e dice di passarlo.
+<span class="since-badge" data-since="0.25">Da 0.25</span> In un database
+che contiene già ciò che il backup crea, `restore` richiede `--clean`. Senza di esso,
+si rifiuta prima di applicare qualsiasi cosa, ruoli del cluster compresi, e nomina gli
+oggetti d'intralcio e i due modi per aggirarli: `--clean`, oppure
+`--create-db --target-db <new name>`. Su 0.24 applicava i ruoli e poi falliva con
+l'errore di pg_restore `schema "rebase" already exists`.
+<span class="since-badge" data-since="0.25">Da 0.25</span> `restore` rifiuta
+il database di sviluppo gestito: un backup porta le sue righe come dati COPY, che quel
+database non può ricevere, e su 0.24 il ripristino lo lasciava bloccato finché non
+veniva arrestato. Ripristina in Postgres in Docker (`rebase db restore <dump> --docker --clean --yes`),
+poi `rebase db pull --from "$(rebase db url --docker)" --yes` lo copia nel database
+gestito.
 <span class="since-badge" data-since="0.25">Da 0.25</span> I percorsi relativi, e il
 valore predefinito `./backups`, si risolvono rispetto alla directory da cui esegui
 `rebase`, così le tre righe qui sopra si incontrano in un'unica directory; un'opzione che
@@ -98,6 +125,13 @@ Dato che `pg_dump` rimuove i privilegi, la copia arriverebbe con i criteri RLS d
 
 La destinazione è sempre il database di sviluppo locale di questo progetto e non può essere modificata: il passaggio di `--database-url` viene rifiutato, evitando qualsiasi possibilità di eseguire un "pull verso la produzione". `--from` è l'unica direzione consentita.
 
+<span class="since-badge" data-since="0.25">Da 0.25</span> Un pull sostituisce
+il contenuto del database locale: svuota prima ogni schema che copia, quindi una tabella
+che esiste solo in locale non sopravvive. Nel database di sviluppo gestito le righe
+viaggiano come istruzioni `INSERT`, che quel database accetta laddove `COPY` lo
+bloccherebbe. Su 0.24 un pull nel database gestito falliva alla prima tabella e lo
+lasciava senza rispondere finché non veniva terminato.
+
 ### `rebase db url`
 
 Stampa la stringa di connessione utilizzata dal progetto, e nient'altro, facilitando l'uso in pipe:
@@ -107,7 +141,9 @@ rebase db url
 psql "$(rebase db url)"
 ```
 
-Il database di sviluppo gestito è il caso principale che necessita di questo comando: `.env` lascia intenzionalmente `DATABASE_URL` commentato, e la porta è calcolata dal percorso del progetto, per cui nessun elemento su disco la definisce in modo esplicito. Quando imposti un tuo `DATABASE_URL`, viene stampato quello — l'ordine di risoluzione è lo stesso seguito da qualsiasi altro comando. Il comando avvia il database gestito qualora non sia già in esecuzione.
+Il database di sviluppo gestito è il caso principale che necessita di questo comando: `.env` lascia intenzionalmente `DATABASE_URL` commentato, e la porta è calcolata dal percorso del progetto, per cui nessun elemento su disco la definisce in modo esplicito.
+<span class="since-badge" data-since="0.25">Da 0.25</span> Mantiene quella porta tra un arresto e un avvio, a meno che qualcos'altro non l'abbia
+occupata; su 0.24 ogni avvio ne sceglieva una nuova. Quando imposti un tuo `DATABASE_URL`, viene stampato quello — l'ordine di risoluzione è lo stesso seguito da qualsiasi altro comando. Il comando avvia il database gestito qualora non sia già in esecuzione.
 
 <span class="since-badge" data-since="0.25">Da 0.25</span> Dopo
 `rebase dev --docker`, `db url` e gli altri comandi usano quel database Docker
@@ -115,8 +151,21 @@ Il database di sviluppo gestito è il caso principale che necessita di questo co
 è conservata in `.rebase/dev-database.json` e ha la precedenza dove l'ha `--docker`,
 sotto ogni stringa di connessione. Un `--docker` che digiti e che una stringa di
 connessione supera non avvia alcun container: una riga su stderr dice che è stato
-ignorato, nomina ciò che ha vinto e dice come raggiungere invece Docker. Su 0.24 ogni
-comando richiede il proprio `--docker`, e uno superato avvia comunque il container.
+ignorato, nomina ciò che ha vinto e dice come raggiungere invece Docker. Un
+`rebase dev --docker` superato in questo modo mantiene la scelta memorizzata così com'era,
+quindi, una volta tolta la stringa di connessione, i comandi seguono di nuovo Docker. Su
+0.24 ogni comando richiede il proprio `--docker`, e uno superato avvia comunque il
+container.
+
+<span class="since-badge" data-since="0.25">Da 0.25</span> `rebase init`
+assegna a ogni progetto la propria porta compose, tra 5433 e 5632 in base al percorso del
+progetto, e `--docker` controlla che ciò che risponde su di essa sia il container `db` di
+questo progetto. Quando la porta è occupata da un altro container o da un Postgres esterno
+a Docker, si ferma e lo nomina invece di accedere al database di qualcun altro. Per
+spostare il progetto, cambia la porta host del servizio `db` in `docker-compose.yml`, e
+`DATABASE_URL` se `.env` ne imposta uno. Su 0.24 ogni scaffold prendeva la prima porta
+libera a partire da 5432, quindi progetti creati uno accanto all'altro potevano
+condividerne una.
 
 ### `rebase db stop` / `rebase db reset`
 
@@ -126,6 +175,19 @@ Valido solo per il database di sviluppo gestito:
 rebase db stop     # stop it; the data is kept
 rebase db reset    # delete it and start over
 ```
+
+Appartiene al progetto, non al comando che l'ha avviato, quindi arrestare `rebase dev`
+lo lascia in esecuzione per gli altri comandi. Dopo 30 minuti senza nulla di connesso si
+arresta da solo, e il comando successivo che ne ha bisogno lo avvia di nuovo.
+<span class="since-badge" data-since="0.25">Da 0.25</span> `rebase dev` lo dice mentre si arresta, indicando come arrestare subito il database;
+su 0.24 non diceva nulla.
+
+<span class="since-badge" data-since="0.25">Da 0.25</span> `db stop` con un
+`rebase dev` in esecuzione dice che il suo backend non può raggiungere il database finché
+non torna disponibile. Il comando successivo che ne ha bisogno, per esempio
+`rebase db url`, lo avvia sulla stessa porta, e il backend si riconnette senza riavvio.
+Su 0.24 tornava su un'altra porta, e il backend rispondeva 503 finché `rebase dev` non
+veniva riavviato.
 
 ### `rebase db branch`
 
@@ -150,7 +212,8 @@ non vi creano lo schema `rebase`. Su 0.24 creano il registro.
 `switch` registra il branch in `.rebase/branch.json` e non modifica mai `.env`. Ha la precedenza su `DATABASE_URL` presente in `.env` ma cede il passo a `--database-url` o a una variabile `DATABASE_URL` definita nella shell; pertanto, un flag passato da riga di comando ha sempre priorità rispetto a uno switch effettuato precedentemente. `delete` rifiuta il branch su cui ti trovi, poiché ogni comando del checkout, `delete` compreso, punta a esso: prima `switch --off`, poi eliminalo. L'intero flusso di lavoro è in [Database Branching](/docs/backend/branching/).
 
 :::note[Sul database di sviluppo gestito]
-<span class="since-badge" data-since="0.25">Da 0.25</span> `push`, `generate` e `migrate` pianificano le loro operazioni tramite Atlas, che richiede un secondo database vuoto con cui effettuare il confronto — e il PGlite gestito ne fornisce esattamente uno. Quindi
+<span class="since-badge" data-since="0.25">Da 0.25</span> `push`, `generate` e `migrate` funzionano qui come su qualsiasi database.
+`push` e `generate` pianificano le loro operazioni tramite Atlas, che richiede un secondo database vuoto con cui effettuare il confronto — e il PGlite gestito ne fornisce esattamente uno. Quindi
 sul database gestito ognuno di essi avvia un secondo PGlite temporaneo in memoria
 per Atlas, e lo ferma al termine del comando. È così che una colonna viene eliminata,
 rinominata o ristretta lì: `rebase dev` si limita ad aggiungere. Il blocco sulle operazioni distruttive è lo

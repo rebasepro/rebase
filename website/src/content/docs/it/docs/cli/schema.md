@@ -93,6 +93,15 @@ rebase schema introspect
   `db push` che segue ricrea ogni policy com'era. Su 0.24 le policy
   restano fuori dai file, e un push può eliminarne una il cui nome ha la forma
   di una policy generata (`<table>_<op>_<hash>`)
+- <span class="since-badge" data-since="0.25">Da 0.25</span> Scrive
+  `disableDefaultPolicies: true` su una tabella che ha la row-level security attiva e
+  non possiede l'intera [baseline admin](/docs/collections/security-rules/#policies-a-collection-gets-without-writing-them),
+  così il push non aggiunge alcuna policy `<table>_default_admin_*` e l'accesso alla
+  tabella resta com'era; qualsiasi parte della baseline che la tabella ha viene scritta come
+  regola. Elimina la riga per dare al server e agli admin ogni riga. Una tabella con la RLS
+  disattivata mantiene la baseline, e l'introspezione dice, una sola volta, quali sono:
+  il push attiva la RLS qualunque cosa dica una collezione. Su 0.24 il push dopo
+  un'introspezione aggiungeva la baseline a ogni tabella
 - <span class="since-badge" data-since="0.25">Da 0.25</span> Genera come entità nella
   navigazione una tabella le cui policy danno a ogni utente le proprie righe (leggono
   `rebase.uid()`, `app.uid` o il JWT), per quanto poche righe abbia. Su 0.24 una tabella
@@ -116,7 +125,7 @@ rebase schema introspect
 
 Questo è utile quando si adotta Rebase su un database esistente — prima esegui l'introspezione, poi personalizza le collezioni generate.
 
-**Introspezione, poi push, non cambia nulla.** Le proprietà generate dicono esattamente cos'è ogni colonna — `columnType`, `precision`/`scale`, `defaultValue`, `required`, l'`isId` di una chiave (`"increment"` per un'identity intera, `columnType: "serial"` per una serial, `"manual"` per una chiave senza default), l'`onDelete` di una relazione — e il suo `index: false` dove il database non ha alcun indice sulla colonna della chiave, dato che un `belongsTo` è [indicizzato per impostazione predefinita](/docs/backend/indexes#foreign-keys-are-indexed-for-you) (elimina la riga per farne costruire uno) — e il blocco `search` di una collezione letto a ritroso dalla colonna che ha costruito — quindi `rebase db push --dry-run` eseguito subito dopo un'introspezione non pianifica alcuna modifica. Dove nessuna proprietà può rappresentare una colonna — un `timestamp` senza time zone, un `interval`, un `inet`, un tipo enum che non si chiama `<table>_<column>`, un default come `CURRENT_DATE` — l'introspezione lo segnala, colonna per colonna, sul terminale e in testa al file, con ciò che un push le farebbe e, quando esiste, l'istruzione che fa coincidere le due cose (`ALTER TYPE "mood" RENAME TO "customers_current_mood";`). Una tabella con chiave su più di una colonna torna come una chiave composita, con il suo `isId` su ogni colonna della chiave. Viene esclusa, con il relativo motivo, quando una colonna della chiave non può portare `isId` (un timestamp, per esempio) o la chiave esterna di un'altra tabella punta a essa, cosa che una relazione su una sola colonna non può fare; `db push` lascia stare una tabella che non è una collezione. Sulla 0.23 il push eseguito subito dopo un'introspezione può ancora pianificare cambi di tipo, default rimossi e NOT NULL, e una chiave `id` fantasma.
+**Introspezione, poi push, non cambia nulla.** Le proprietà generate dicono esattamente cos'è ogni colonna — `columnType`, `precision`/`scale`, `defaultValue`, `required`, l'`isId` di una chiave (`"increment"` per un'identity intera, `columnType: "serial"` per una serial, `"manual"` per una chiave senza default), l'`onDelete` di una relazione — e il suo `index: false` dove al database manca l'indice che Rebase deriverebbe sulla colonna della chiave, dato che un `belongsTo` è [indicizzato per impostazione predefinita](/docs/backend/indexes#foreign-keys-are-indexed-for-you). Dove nessun indice serve la colonna, la riga lo dice (eliminala per farne costruire uno); <span class="since-badge" data-since="0.25">Da 0.25</span> dove un altro indice inizia già con essa (`orders_customer_id_idx`, uno composito, uno univoco), la riga nomina quell'indice, e senza quella riga il push ne costruirebbe un secondo. Su 0.24 diceva di eliminare la riga in ogni caso — e il blocco `search` di una collezione letto a ritroso dalla colonna che ha costruito — quindi `rebase db push --dry-run` eseguito subito dopo un'introspezione non pianifica alcuna modifica. L'eccezione è una tabella con la row-level security disattivata: il push la attiva, e il dry run lo elenca insieme alla baseline admin che aggiunge. Dove nessuna proprietà può rappresentare una colonna — un `timestamp` senza time zone, un `interval`, un `inet`, un tipo enum che non si chiama `<table>_<column>`, un default come `CURRENT_DATE` — l'introspezione lo segnala, colonna per colonna, sul terminale e in testa al file, con ciò che un push le farebbe e, quando esiste, l'istruzione che fa coincidere le due cose (`ALTER TYPE "mood" RENAME TO "customers_current_mood";`). Una tabella con chiave su più di una colonna torna come una chiave composita, con il suo `isId` su ogni colonna della chiave. Viene esclusa, con il relativo motivo, quando una colonna della chiave non può portare `isId` (un timestamp, per esempio) o la chiave esterna di un'altra tabella punta a essa, cosa che una relazione su una sola colonna non può fare; `db push` lascia stare una tabella che non è una collezione. Sulla 0.23 il push eseguito subito dopo un'introspezione può ancora pianificare cambi di tipo, default rimossi e NOT NULL, e una chiave `id` fantasma.
 
 **Come sono fatti i file generati**
 
@@ -162,6 +171,21 @@ rebase db push
 - <span class="since-badge" data-since="0.25">Da 0.25</span> Marca le policy che
   applica nello stesso modo dell'avvio del server, così il primo avvio dopo un
   push le lascia stare invece di ricreare ognuna
+- <span class="since-badge" data-since="0.25">Da 0.25</span> `--dry-run`
+  elenca la row-level security che il push cambierebbe, sotto "Planned row-level security
+  changes": le tabelle su cui attiva la RLS, e ogni policy che crea, sostituisce o
+  elimina, calcolate nello stesso modo in cui le decidono i passaggi del push stesso. Dice
+  "No changes" solo quando non cambierebbero né lo schema né la row-level security. Una
+  policy priva della marcatura di Rebase (una scritta a mano, o letta da
+  `schema introspect`) viene ricreata dalla sua regola senza nulla con cui confrontarla
+  prima, ed è elencata a parte. Il push stesso stampa una riga che le conta. Su 0.24 il dry
+  run mostrava solo il piano di Atlas, che non contiene policy
+- <span class="since-badge" data-since="0.25">Da 0.25</span> Mostra una sola volta
+  ogni istruzione che Atlas applica. Atlas si connette senza SSL a un database su questa
+  macchina (`localhost`, `127.x`, `::1`) il cui URL non indica alcun `sslmode`, come fa
+  l'app, invece di fallire con `SSL is not enabled on the server`; un URL che indica
+  `sslmode`, o un altro host, viene passato così com'è scritto. Un'esecuzione di Atlas che
+  fallisce prima di pianificare non lascia dietro di sé alcun database `<db>_dev_diff`
 - <span class="since-badge" data-since="0.25">Da 0.25</span> `--dry-run`
   non scrive nulla del progetto: `src/schema.generated.ts` resta com'è,
   e le copie `drizzle/*.sql` che una release precedente aveva committato vengono nominate, non
@@ -281,7 +305,7 @@ rebase db migrate
 
 La versione è il prefisso numerico del file di migrazione che descrive ciò che c'è nel database *adesso*. Quella migrazione e tutte le precedenti risultano applicate; tutto ciò che viene dopo viene eseguito. Su un database che non è mai stato avviato non serve alcuna baseline: migrate direttamente.
 
-Lo stesso accade più avanti nel ciclo ordinario: modifica una collezione mentre `rebase dev` è in esecuzione, e l'avvio aggiunge la colonna prima che `rebase db generate` scriva la migrazione che la aggiunge, così `rebase db migrate` si ferma su `column … already exists (42701)`. Imposta la baseline di quella migrazione allo stesso modo. <span class="since-badge" data-since="0.25">Da 0.25</span> `--baseline` funziona su un database che registra già delle migrazioni: segna come applicato tutto fino alla versione con `atlas migrate set`, e lo dice, oppure dice che non c'è nulla da registrare quando la cronologia la raggiunge già. Su 0.24 Atlas ignora `--baseline` una volta registrata una qualsiasi migrazione, quindi lo stesso errore ritorna.
+Lo stesso accade più avanti nel ciclo ordinario: modifica una collezione mentre `rebase dev` è in esecuzione, e l'avvio aggiunge la colonna prima che `rebase db generate` scriva la migrazione che la aggiunge, così `rebase db migrate` si ferma su `column … already exists (42701)`. Imposta la baseline di quella migrazione allo stesso modo. <span class="since-badge" data-since="0.25">Da 0.25</span> `--baseline` funziona su un database che registra già delle migrazioni: segna come applicato tutto fino alla versione con `atlas migrate set`, e lo dice, oppure dice che non c'è nulla da registrare quando la cronologia la raggiunge già. Su 0.24 Atlas ignora `--baseline` una volta registrata una qualsiasi migrazione, quindi lo stesso errore ritorna. <span class="since-badge" data-since="0.25">Da 0.25</span> Una versione che non corrisponde ad alcun file in `drizzle/migrations` viene rifiutata prima di eseguire qualsiasi cosa, e il messaggio nomina le versioni presenti.
 
 ### `rebase db branch`
 
