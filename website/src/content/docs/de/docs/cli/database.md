@@ -1,5 +1,5 @@
 ---
-sourceHash: 8fe0cd9ee8de9137
+sourceHash: 20ed1243d65e4ebe
 title: Datenbank-Befehle
 sidebar_label: Datenbank-Befehle
 description: Die rebase-db-Befehle — push, generate und migrate, Backups und Wiederherstellungen, eine Kopie ziehen, der Verbindungsstring, die verwaltete Entwicklungsdatenbank und Branches.

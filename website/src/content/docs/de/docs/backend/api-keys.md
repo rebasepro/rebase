@@ -1,5 +1,5 @@
 ---
-sourceHash: 56f735f039d14350
+sourceHash: 9fe6bb92d083cb36
 title: API-Schlüssel
 sidebar_label: API-Schlüssel
 description: "Langlebige Schlüssel für Skripte, CI, Agents und Integrationen: Service-Schlüssel und persönliche Schlüssel, die Scopes, die sie halten, wie sie mit Row-Level Security zusammenwirken, und die Routen, die sie verwalten."

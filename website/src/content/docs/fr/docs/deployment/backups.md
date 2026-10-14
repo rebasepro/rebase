@@ -1,5 +1,5 @@
 ---
-sourceHash: 015cdf6d6bef4dbd
+sourceHash: 55359aa7639d9c2e
 title: Sauvegardes et restauration
 sidebar_label: Sauvegardes
 description: Prenez, planifiez, listez et restaurez des sauvegardes de base de données avec pg_dump — ce que contient une sauvegarde, le fichier de rôles qui l'accompagne, et la seule chose qu'elle ne couvre pas, vos fichiers téléversés.

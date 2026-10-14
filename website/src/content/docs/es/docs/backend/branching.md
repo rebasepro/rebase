@@ -1,5 +1,5 @@
 ---
-sourceHash: 6259c846d02dac1a
+sourceHash: 263274ffe3bc3f21
 title: Ramificación de bases de datos
 sidebar_label: Ramificación
 description: Crea ramas aisladas de bases de datos para desarrollo, staging y pruebas usando CREATE DATABASE ... TEMPLATE de PostgreSQL — copias instantáneas y de fidelidad total sin tiempo de inactividad.

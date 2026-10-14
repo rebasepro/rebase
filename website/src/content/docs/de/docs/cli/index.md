@@ -1,5 +1,5 @@
 ---
-sourceHash: 6c235887a7412913
+sourceHash: 53e679722797e137
 title: CLI-Referenz
 sidebar_label: CLI
 description: Rebase-CLI-Befehle für Projektinitialisierung, Schemagenerierung, Datenbankmigrationen und SDK-Generierung.
