@@ -574,6 +574,7 @@ function isBranchAdmin
 function isBuiltInScope
 function isChannelBusInstance
 function isCollectionPatch
+function isContentHashedFileName
 function isDataPlaneScope
 function isDocumentAdmin
 function isFieldOperation
