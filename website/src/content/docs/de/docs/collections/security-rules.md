@@ -47,7 +47,12 @@ Die Policies einer Tabelle sind mehr als die `securityRules` der Collection selb
 - **`defaultSecurityRules`**, exportiert aus `config/collections/index.ts`. Eine Collection,
   deren `securityRules` fehlt oder leer ist, übernimmt sie alle an deren Stelle, als hätte sie
   sie selbst geschrieben. Eine Collection, die auch nur eine eigene Regel deklariert, übernimmt
-  keine: Die beiden Listen werden nie zusammengeführt.
+  keine: Die beiden Listen werden nie zusammengeführt. Sie werden überall angewendet, wo das
+  Verzeichnis gelesen wird: `rebase dev`, `rebase db push`, das Admin-Panel und ein Backend, dem
+  `collectionsDir` übergeben wird. <span class="since-badge" data-since="0.25">Seit 0.25</span>
+  Der Index des Scaffolds wendet sie außerdem auf das `collections`-Array an, das er exportiert,
+  sodass auch ein Backend, dem dieses Array übergeben wird, sie erhält. Ein auf andere Weise
+  zusammengestelltes Array trägt nur die Regeln, die seine Collections deklarieren.
 - **Die Admin-Basis.** Jede Collection erhält außerdem
   `<table>_default_admin_read` und `<table>_default_admin_write_insert`,
   `_update` und `_delete`: permissive Policies, die den Server-Kontext und

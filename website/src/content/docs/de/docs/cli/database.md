@@ -60,6 +60,19 @@ rebase db migrate
 
 Wendet alle noch nicht angewendeten Migrationen auf die Datenbank an.
 
+Auf einer Datenbank, die bereits gebootet hat, legt die erste Migration Tabellen an, die der Boot
+schon angelegt hat, daher hält das erste `db migrate` dort bei `already exists` an. Verzeichnen Sie
+diese Migration stattdessen einmal als angewendet:
+
+```bash
+rebase db migrate --baseline <version>
+```
+
+Die Version ist das Zahlenpräfix der Migrationsdatei; `db generate` gibt den Befehl mit
+eingesetzter Version aus. Jedes `db migrate` danach ist ein gewöhnliches. Siehe
+[`--baseline`](/docs/cli/schema/#rebase-db-migrate) für eine Datenbank, die bereits Migrationen
+verzeichnet.
+
 ### `rebase db backup` / `backups` / `restore`
 
 ```bash
@@ -68,7 +81,19 @@ rebase db backups list                  # list what is stored
 rebase db restore ./backups/<file>.dump --yes
 ```
 
-`backup` führt `pg_dump` aus; `restore` führt `pg_restore` aus und benötigt, da destruktiv, `--yes`.
+`backup` führt `pg_dump` aus; `restore` führt `pg_restore` aus und verlangt, da destruktiv,
+in einem Terminal ein getipptes `yes` oder nimmt `--yes` entgegen; ohne Terminal und ohne
+`--yes` verweigert es und sagt, dass es zu übergeben ist.
+<span class="since-badge" data-since="0.25">Seit 0.25</span> In eine Datenbank, die bereits enthält, was das Backup anlegt,
+braucht `restore` `--clean`. Ohne das Flag verweigert es, bevor irgendetwas angewendet wird, die
+Cluster-Rollen eingeschlossen, und nennt die Objekte, die im Weg sind, sowie beide Wege daran
+vorbei: `--clean` oder `--create-db --target-db <new name>`. Unter 0.24 wendete es die Rollen an
+und scheiterte dann an `schema "rebase" already exists` von pg_restore.
+<span class="since-badge" data-since="0.25">Seit 0.25</span> `restore` verweigert die verwaltete Entwicklungsdatenbank: Ein
+Backup trägt seine Zeilen als COPY-Daten, die sie nicht empfangen kann, und unter 0.24 ließ die
+Wiederherstellung sie hängen, bis sie gestoppt wurde. Stellen Sie in Postgres in Docker wieder
+her (`rebase db restore <dump> --docker --clean --yes`), dann kopiert
+`rebase db pull --from "$(rebase db url --docker)" --yes` sie in die verwaltete Datenbank.
 <span class="since-badge" data-since="0.25">Seit 0.25</span> Relative Pfade und der Standard
 `./backups` werden gegen das Verzeichnis aufgelöst, aus dem Sie `rebase` ausführen, sodass sich
 die drei Zeilen oben in einem Verzeichnis treffen; eine Option, die ein Befehl nicht kennt, wird
@@ -106,6 +131,12 @@ Das Ziel ist immer die lokale Entwicklungsdatenbank dieses Projekts und kann nic
 ausgewählt werden: `--database-url` wird verweigert statt akzeptiert, sodass es keine Möglichkeit
 gibt, "in die Produktion pullen" zu formulieren. `--from` ist die einzige Richtung.
 
+<span class="since-badge" data-since="0.25">Seit 0.25</span> Ein Pull ersetzt den Inhalt der lokalen Datenbank: Er leert
+zuerst jedes Schema, das er kopiert, sodass eine Tabelle, die nur lokal existiert, ihn nicht
+überlebt. In die verwaltete Entwicklungsdatenbank reisen die Zeilen als `INSERT`-Anweisungen, die
+sie annimmt, wo `COPY` sie anhalten würde. Unter 0.24 schlug ein Pull in die verwaltete Datenbank
+bei der ersten Tabelle fehl und ließ sie nichts mehr beantworten, bis sie beendet wurde.
+
 ### `rebase db url`
 
 Gibt den Verbindungsstring aus, den dieses Projekt verwendet, und sonst nichts, sodass er
@@ -118,7 +149,10 @@ psql "$(rebase db url)"
 
 Die verwaltete Entwicklungsdatenbank ist der Fall, der dies erfordert: `.env` lässt
 `DATABASE_URL` mit Absicht auskommentiert, und der Port wird aus dem Projektpfad
-abgeleitet, sodass nichts auf der Festplatte ihn benennt. Wenn Sie eine eigene
+abgeleitet, sodass nichts auf der Festplatte ihn benennt.
+<span class="since-badge" data-since="0.25">Seit 0.25</span> Die Datenbank behält diesen Port über ein Stoppen und Starten
+hinweg, es sei denn, etwas anderes hat ihn belegt; unter 0.24 wählte jeder Start einen neuen.
+Wenn Sie eine eigene
 `DATABASE_URL` festgelegt haben, wird genau diese ausgegeben — die Auflösungsreihenfolge ist
 dieselbe, der auch jeder andere Befehl folgt. Startet die verwaltete Datenbank, falls sie
 noch nicht läuft.
@@ -129,8 +163,18 @@ bis ein `rebase dev` ohne das Flag läuft. Die Wahl wird in `.rebase/dev-databas
 gespeichert und steht dort im Rang, wo `--docker` steht, unter jedem Verbindungsstring. Ein von
 Ihnen getipptes `--docker`, das ein Verbindungsstring übertrumpft, startet keinen Container: Eine
 Zeile auf stderr sagt, dass es ignoriert wurde, nennt, was gewonnen hat, und sagt, wie Sie
-stattdessen Docker erreichen. Unter 0.24 braucht jeder Befehl sein eigenes `--docker`, und ein
+stattdessen Docker erreichen. Ein so übertrumpftes `rebase dev --docker` lässt die gespeicherte
+Wahl unverändert, sodass die Befehle wieder Docker folgen, sobald der Verbindungsstring weg ist.
+Unter 0.24 braucht jeder Befehl sein eigenes `--docker`, und ein
 übertrumpftes startet den Container trotzdem.
+
+<span class="since-badge" data-since="0.25">Seit 0.25</span> `rebase init` gibt jedem Projekt seinen eigenen Compose-Port,
+aus 5433–5632 nach dem Pfad des Projekts, und `--docker` prüft, dass das, was darauf antwortet,
+der `db`-Container dieses Projekts ist. Wenn ein anderer Container oder ein Postgres außerhalb von
+Docker den Port hält, hält es an und nennt, wer ihn hält, statt sich bei der Datenbank eines
+anderen anzumelden. Um das Projekt zu verlegen, ändern Sie den Host-Port des `db`-Service in
+`docker-compose.yml` und `DATABASE_URL`, falls `.env` eine setzt. Unter 0.24 nahm jedes Scaffold
+den ersten freien Port ab 5432, sodass nebeneinander angelegte Projekte sich einen teilen konnten.
 
 ### `rebase db stop` / `rebase db reset`
 
@@ -140,6 +184,18 @@ Nur für die verwaltete Entwicklungsdatenbank:
 rebase db stop     # stop it; the data is kept
 rebase db reset    # delete it and start over
 ```
+
+Die Datenbank gehört dem Projekt, nicht dem Befehl, der sie gestartet hat, sodass das Beenden von
+`rebase dev` sie für die anderen Befehle weiterlaufen lässt. Nach 30 Minuten ohne Verbindung
+stoppt sie sich selbst, und der nächste Befehl, der sie braucht, startet sie wieder.
+<span class="since-badge" data-since="0.25">Seit 0.25</span> `rebase dev` sagt das beim Beenden, zusammen damit, wie Sie die
+Datenbank sofort stoppen; unter 0.24 sagte es nichts.
+
+<span class="since-badge" data-since="0.25">Seit 0.25</span> `db stop` unter einem laufenden `rebase dev` sagt, dass dessen
+Backend die Datenbank nicht erreichen kann, bis sie wieder da ist. Der nächste Befehl, der sie
+braucht, etwa `rebase db url`, startet sie auf demselben Port, und das Backend verbindet sich ohne
+Neustart wieder. Unter 0.24 kam sie auf einem anderen Port zurück, und das Backend antwortete mit
+503, bis `rebase dev` neu gestartet wurde.
 
 ### `rebase db branch`
 
@@ -176,7 +232,8 @@ Befehl im Checkout, das Löschen eingeschlossen, auf ihn zeigt: erst `switch --o
 Den gesamten Workflow finden Sie unter [Datenbank-Branching](/docs/backend/branching/).
 
 :::note[Auf der verwalteten Entwicklungsdatenbank]
-<span class="since-badge" data-since="0.25">Seit 0.25</span> `push`, `generate` und `migrate` planen ihre Arbeit mit Atlas, welches eine zweite
+<span class="since-badge" data-since="0.25">Seit 0.25</span> `push`, `generate` und `migrate` funktionieren hier wie auf jeder Datenbank.
+`push` und `generate` planen ihre Arbeit mit Atlas, welches eine zweite
 leere Datenbank zum Vergleichen benötigt — und das verwaltete PGlite stellt genau eine bereit. Auf
 der verwalteten Datenbank startet daher jeder dieser Befehle ein zweites, wegwerfbares PGlite im Speicher
 für Atlas und stoppt es, wenn der Befehl endet. So wird dort eine Spalte gelöscht,

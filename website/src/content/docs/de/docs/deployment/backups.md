@@ -238,8 +238,16 @@ rebase db restore <backup> [--target-db <name>] [--create-db] [--clean] [--yes]
 
 `restore` führt `pg_restore` aus, und das ist destruktiv, daher läuft es nie
 automatisch: Ohne `--yes` fragt es interaktiv nach einem `yes`, und in einer
-nicht interaktiven Shell stoppt es. `<backup>` ist ein lokales `.dump` oder ein
+nicht interaktiven Shell stoppt es und sagt, dass `--yes` zu übergeben ist. `<backup>` ist ein lokales `.dump` oder ein
 `s3://…`- / `gs://…`-Key, der zuerst herunterladen wird.
+
+<span class="since-badge" data-since="0.25">Seit 0.25</span> In eine Datenbank, die bereits enthält, was das Backup anlegt,
+braucht es `--clean`: Ohne das Flag verweigert es, bevor irgendetwas läuft, nennt die Schemas und
+Tabellen, die im Weg sind, und sagt, dass `--clean` zu übergeben oder mit
+`--create-db --target-db <name>` in eine neue Datenbank wiederherzustellen ist. Unter 0.24 legte
+es die Rollen neu an und hielt dann an `schema "rebase" already exists` von pg_restore an. Es
+verweigert die verwaltete Entwicklungsdatenbank, die die COPY-Daten eines Dumps nicht annehmen
+kann; stellen Sie stattdessen mit `--docker` in Postgres in Docker wieder her.
 
 Vor der Wiederherstellung legt es die Cluster-Rollen aus der `.globals.sql`
 des Backups neu an — eine bereits vorhandene Rolle wird übersprungen, nicht
