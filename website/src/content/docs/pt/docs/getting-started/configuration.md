@@ -321,6 +321,7 @@ sem credenciais válidas causa a recusa da inicialização. Veja
 | `BACKUP_KEEP_MINIMUM` | Sempre mantém no mínimo os N backups mais recentes, independentemente da retenção configurada. | — |
 | `PG_DUMP_PATH` | Sobrescreve o binário do `pg_dump` — deve corresponder à versão principal do servidor ou ser mais recente. | — |
 | `PG_RESTORE_PATH` | Sobrescreve o binário do `pg_restore`. | — |
+| `PSQL_PATH` | Sobrescreve o binário do `psql` que o `rebase db restore --clean` executa para fazer da restauração uma única transação. | — |
 | `PG_DUMPALL_PATH` | Caminho para o executável `pg_dumpall`, caso não esteja presente no `PATH`. Sem ele — e sem as ferramentas de cliente do PostgreSQL instaladas —, o backup de variáveis globais falha com um erro indicando esta variável. | — |
 
 A imagem de runtime oficial (`rebasepro/server`) inclui as ferramentas de
@@ -363,9 +364,9 @@ Lido pelo `rebase`, não pelo servidor. Nenhuma dessas opções afeta uma implan
 
 | Variável | Descrição | Padrão |
 |----------|-------------|---------|
-| `REBASE_BASE_URL` | O backend com o qual `rebase auth` e `rebase api-keys` se comunicam, em vez de inferir o endereço a partir do projeto. | — |
-| `REBASE_PORT` | Porta assumida por esses comandos ao resolver essa URL. | — |
-| `SERVICE_KEY` | Chave de serviço usada para autenticação automática, evitando a solicitação interativa no terminal. | — |
+| `REBASE_BASE_URL` | Para onde `rebase api-keys`, `rebase storage` e `rebase auth reset-password` enviam a chave de serviço, no shell ou no `.env`. Defina-a quando o servidor roda de outra forma que não o `rebase dev` neste projeto: `rebase start`, um container, outro host. Sem ela, eles usam o servidor que o `rebase dev` registrou enquanto esse servidor está em execução, e não enviam nada quando ele não está. | — |
+| `REBASE_SERVICE_KEY` | A chave de serviço com que esses comandos se autenticam, lida do `.env`: a mesma variável que o servidor lê (veja acima). | — |
+| `SERVICE_KEY` | Um nome mais antigo para essa chave. Quando o `.env` a define, `rebase api-keys` e `rebase storage` a leem no lugar de `REBASE_SERVICE_KEY`. | — |
 | `REBASE_ENV_FILE_PATH` | Especifica qual arquivo `.env` a CLI deve ler e gravar, caso seja diferente do padrão do projeto. | — |
 | `REBASE_CLOUD_URL` | O plano de controle com o qual `rebase cloud` se comunica. | — |
 | `REBASE_CLOUD_EMAIL` | Conta utilizada para autenticação em `rebase cloud login`, evitando a solicitação interativa no terminal. | — |

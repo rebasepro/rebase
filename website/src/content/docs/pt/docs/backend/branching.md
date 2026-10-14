@@ -60,6 +60,18 @@ Cannot create branch: the source database "leadgen" has active connections.
 
 O `--force` encerra essas sessões antes da criação do template, tanto no `create` quanto no `delete`. Ele nunca encerra a sessão que está executando o comando em si.
 
+<span class="since-badge" data-since="0.25">Desde 0.25</span> O `create --force`
+também fecha a origem para novas conexões durante a cópia
+(`ALTER DATABASE … ALLOW_CONNECTIONS false`, executado a partir do banco de dados
+`postgres` do servidor) e a abre de novo depois, inclusive em caso de falha e de Ctrl-C. Um cliente
+que se reconecta assim que é desconectado, como faz um `rebase dev` em execução,
+então não consegue voltar a entrar antes de a cópia começar. Isso exige o owner da origem;
+sem ele, e no `delete`, o `--force` desconecta as sessões até três
+vezes antes de desistir. Quando uma sessão continua lá depois disso, o erro
+diz que elas se reconectaram e que é preciso pará-las, e não que se passe `--force` de novo. Na 0.24 ele
+as desconectava uma vez, e cerca de um em cada sete `create --force` com um
+`rebase dev` em execução falhava com o conselho de executar de novo com `--force`.
+
 O `DatabasePoolManager` desconecta seus próprios pools inativos antes de clonar ou remover — mas apenas os pools **dentro do processo que está executando o trabalho**. O comando `rebase db branch` é executado como seu próprio processo, portanto isso não alcança nada mais na sua máquina:
 
 - **Um `rebase dev` em execução bloqueia o branching.** Este é o caso comum, não um caso isolado: querer uma branch e executar a aplicação costumam acontecer no mesmo momento. Pare o servidor de desenvolvimento, crie a branch e inicie-o novamente.
@@ -198,6 +210,15 @@ rebase db branch delete dev_sandbox
 ```
 
 O comando `switch` é o que torna uma branch utilizável. Ele registra a branch em `.rebase/branch.json` — apenas um nome, nunca uma string de conexão, mantendo suas credenciais somente no `.env` — e todos os comandos `rebase` subsequentes nesse checkout passam a resolver o banco de dados da branch: `dev`, `db push`, `db migrate`, `db backup`.
+Um `rebase dev` que já está em execução mantém o banco de dados com que iniciou até
+você reiniciá-lo, e o `switch` avisa isso.
+
+<span class="since-badge" data-since="0.25">Desde 0.25</span> O `rebase db branch
+list` marca a branch em que este checkout está, e o `prune` nunca a remove, assim como
+o `delete` se recusa a fazê-lo: o plano a lista como mantida e diz para sair dela com
+`rebase db branch switch --off` primeiro. Na 0.24 o `prune --older-than … --yes`
+a removia, e o checkout então apontava todo comando para um banco de dados que não
+existia mais.
 
 Ele fica posicionado entre a shell e o arquivo do projeto na ordem de resolução:
 
@@ -228,11 +249,10 @@ snapshot da própria branch.
 
 As branches são bancos de dados PostgreSQL comuns nomeados a partir da branch com o prefixo `rb_`, de modo que `dev_sandbox` acima é o banco de dados `rb_dev_sandbox` no mesmo servidor.
 
-Criar uma branch **não** altera com qual banco de dados o seu projeto se comunica. O comando `rebase db branch create` faz a cópia e para por aí; nada é gravado no `.env`, e o próximo `rebase dev` ainda usará o banco de dados que usava antes. Para trabalhar em uma branch, aponte você mesmo o `DATABASE_URL` para ela — a string de conexão é a mesma que você já possui, apenas trocando o nome do banco de dados:
+Criar uma branch **não** altera com qual banco de dados o seu projeto se comunica. O comando `rebase db branch create` faz a cópia e para por aí; nada é gravado no `.env`, e o próximo `rebase dev` ainda usará o banco de dados que usava antes. Para trabalhar em uma branch, troque para ela com `rebase db branch switch <name>`, como acima. Para alcançá-la a partir de qualquer coisa que não seja um comando `rebase`, a string de conexão dela é a mesma que você já possui, apenas trocando o nome do banco de dados:
 
 ```bash
-# .env
-DATABASE_URL=postgresql://user:pass@localhost:5432/rb_dev_sandbox
+postgresql://user:pass@localhost:5432/rb_dev_sandbox
 ```
 
 ---

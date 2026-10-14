@@ -279,6 +279,12 @@ Três arquivos decidem o que um backend pode alcançar, e este comando imprime t
 
 Um `○` representa o estado importante de se conhecer antes de um deploy, em vez de depois: declarado, não configurado. Um `✗` significa que o ambiente define algo de forma *incorreta*, o que impede a inicialização em vez de degradar graciosamente.
 
+<span class="since-badge" data-since="0.25">Desde 0.25</span> Um
+`rebase.resources.json` que não corresponde mais às declarações recebe uma linha `○`.
+Um que ainda não foi escrito não recebe: o `rebase build` o escreve a cada
+build, então um projeto que nunca foi compilado, como um scaffold novo, não tem
+nada a corrigir. Na 0.24 o `status` de todo projeto novo terminava com "is missing".
+
 ### `rebase resources`
 
 O que este projeto declara como necessário — os bancos de dados, buckets, tópicos e filas solicitados pelo seu código de configuração, e os crons e functions definidos pelos seus arquivos:
@@ -300,6 +306,12 @@ ignorava ambas as flags.
 Um recurso é declarado no código de configuração — `database("analytics")`, `bucket("media")`, `topic("signups")`, `queue("thumbnails")` — ou é um arquivo em `backend/crons` ou `backend/functions`, nunca sendo escrito manualmente em `rebase.resources.json`, que é gerado a partir dessas declarações para que um host possa ler o que um projeto precisa sem compilá-lo. Cada entrada registra quem o utiliza (`collection:events`, `property:posts.cover`, `function:report`).
 
 Um backend também possui um banco de dados padrão e uma fonte de armazenamento padrão que ninguém declara. Ambos são listados aqui, marcados como `implicit`, e nenhum dos dois é gravado no `rebase.resources.json` — o host os fornece; portanto, registrá-los solicitaria o provisionamento de algo que ninguém pediu.
+<span class="since-badge" data-since="0.25">Desde 0.25</span> Declarar uma
+fonte nomeada, como `bucket("media")`, deixa a padrão onde está, então ambas são
+listadas. Somente declarar a própria padrão, ou marcar um bucket com
+`default: true`, a substitui. Na 0.24 a fonte de armazenamento padrão sumia do
+`rebase status` e do `rebase resources` assim que qualquer bucket era declarado,
+embora o servidor continuasse a servi-la.
 
 Para verificar o que a plataforma mantém para um projeto em relação ao que seu código declara e para remover um banco de dados provisionado que o código não referencia mais, consulte [`rebase cloud resources`](/docs/cli/cloud#resources).
 
