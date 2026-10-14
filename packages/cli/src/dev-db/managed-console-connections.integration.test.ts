@@ -133,6 +133,8 @@ describe("rebase console against the managed database beside other clients", () 
         expect(result.stdout).toBe("");
         expect(result.stderr).toContain("no free connection");
         expect(result.stderr).toContain("rebase dev");
+        // The console's own remedy, now that the proxy refuses with SQLSTATE 53300.
+        expect(result.stderr).toContain("Close another `rebase console`, psql or database GUI");
         // Not a serialised error: no stack, no JSON.
         expect(result.stderr).not.toMatch(/"stack"|\n\s+at /);
     });

@@ -161,7 +161,7 @@ export interface PostgresDriverInternals {
 
 // Re-export from shared CLI error utilities
 import { deepestErrorMessage, diagnoseDbError, isEconnrefused, parseHostInfo } from "./cli-errors";
-import { classifyConnectFailure } from "./utils/pg-error-utils";
+import { classifyConnectFailure, extractPgError } from "./utils/pg-error-utils";
 import type { OpenIndexBuildSession, ScheduledIndexBuild } from "./schema/deferred-index-build";
 
 /**
@@ -421,6 +421,30 @@ function diagnoseConnectFailure(err: unknown, connectionString: string | undefin
 
     const { fatal, reason, code } = classifyConnectFailure(err);
     const detail = code ? ` [${code}]` : "";
+
+    // Every connection the server accepts is taken: SQLSTATE 53300, what
+    // Postgres answers over its `max_connections` and what the managed
+    // development database's proxy answers over its few. Not a database that
+    // is down, so it says which, with the managed database's own remedy (its
+    // refusal's hint) where it sent one. Not settled either: a connection may
+    // free up, so a caller that can carry on still does.
+    if (code === "53300") {
+        const remedy = extractPgError(err)?.hint
+            ?? "Close another client, cap this process's pool with REBASE_DB_POOL_MAX, or raise the server's max_connections.";
+        logger.error(
+            `\n` +
+            `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+            `  ❌  PostgreSQL at ${hostInfo} has no free connection\n` +
+            `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+            `\n` +
+            `  ${reason}${detail}\n` +
+            `\n` +
+            `  ${remedy}\n` +
+            `\n` +
+            `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`
+        );
+        return undefined;
+    }
 
     if (fatal) {
         logger.error(
@@ -1662,9 +1686,13 @@ schemaHealthCheck: () => probeAuthSchema(db, resolveAuthSchema(authCollection)) 
             try {
                 await db.execute(sql`SELECT 1`);
             } catch (err: unknown) {
+                const hostInfo = parseHostInfo(pgConfig.connectionString ?? "");
+                const { reason, code } = classifyConnectFailure(err);
                 throw diagnoseConnectFailure(err, pgConfig.connectionString)
                     ?? new Error(
-                        `Cannot reach PostgreSQL at ${parseHostInfo(pgConfig.connectionString ?? "")} to provision the collection schema.`,
+                        code === "53300"
+                            ? `PostgreSQL at ${hostInfo} has no free connection: ${reason} [53300]`
+                            : `Cannot reach PostgreSQL at ${hostInfo} to provision the collection schema.`,
                         { cause: err }
                     );
             }

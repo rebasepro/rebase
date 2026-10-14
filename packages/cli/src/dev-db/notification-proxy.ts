@@ -52,6 +52,8 @@
 
 import net from "net";
 
+import { MANAGED_SERVER_MAX_CONNECTIONS } from "./constraints";
+
 /** `NotificationResponse`. The one message type this proxy treats specially. */
 const NOTIFICATION_RESPONSE = 0x41; // 'A'
 
@@ -257,6 +259,35 @@ export class ReadyForQueryLedger {
     }
 }
 
+/** What a client over the managed database's limit is told, and what to do. */
+export const NO_FREE_CONNECTION = {
+    message: "The managed development database has no free connection: it accepts only a few at a time, " +
+        "and other clients hold them — a running `rebase dev` holds some.",
+    hint: "Stop another process that uses it (a second backend, `rebase console`, psql or a database GUI) " +
+        "and connect again. For several backends at once, run Postgres in Docker: `rebase dev --docker`."
+};
+
+/**
+ * The refusal as Postgres sends one to a client over `max_connections`: a
+ * FATAL ErrorResponse with SQLSTATE 53300 (too_many_connections).
+ */
+export function noFreeConnectionResponse(): Buffer {
+    const field = (code: string, value: string) => Buffer.concat([Buffer.from(code, "ascii"), Buffer.from(`${value}\0`, "utf8")]);
+    const body = Buffer.concat([
+        field("S", "FATAL"),
+        field("V", "FATAL"),
+        field("C", "53300"),
+        field("M", NO_FREE_CONNECTION.message),
+        field("H", NO_FREE_CONNECTION.hint),
+        Buffer.from([0])
+    ]);
+    const message = Buffer.alloc(5 + body.length);
+    message.write("E", 0, "ascii");
+    message.writeInt32BE(4 + body.length, 1);
+    body.copy(message, 5);
+    return message;
+}
+
 export function isNotificationFrame(message: Buffer): boolean {
     return message.length > 0 && message[0] === NOTIFICATION_RESPONSE;
 }
@@ -283,6 +314,12 @@ export interface NotificationProxyOptions {
     host?: string;
     /** Called for every notification broadcast. For diagnostics and tests. */
     onNotification?: (channel: string, payload: string, copies: number) => void;
+    /**
+     * Connections the socket server behind accepts. One more is refused here,
+     * with a message, rather than dropped there without one. Default
+     * {@link MANAGED_SERVER_MAX_CONNECTIONS}, what the daemon gives it.
+     */
+    maxConnections?: number;
 }
 
 interface Connection {
@@ -323,6 +360,10 @@ export class NotificationProxy {
     }
 
     private accept(client: net.Socket, host: string): void {
+        if (this.connections.size >= (this.options.maxConnections ?? MANAGED_SERVER_MAX_CONNECTIONS)) {
+            this.refuse(client);
+            return;
+        }
         const upstream = net.connect(this.options.upstreamPort, host);
         const connection: Connection = {
             client,
@@ -376,6 +417,29 @@ export class NotificationProxy {
         client.on("error", close);
         upstream.on("close", close);
         upstream.on("error", close);
+    }
+
+    /**
+     * Turn a client away, in words, when every connection the socket server
+     * accepts is taken.
+     *
+     * The socket server sets its limit on the listening socket, so Node closes
+     * a connection over it the moment it is accepted, before a byte is read:
+     * every client read that as "Connection terminated unexpectedly", which
+     * says the database is down. Each client has its own connection upstream,
+     * so the proxy's count is the server's, and it answers as Postgres answers
+     * a client over `max_connections`, once the client has said hello: "no TLS"
+     * to an SSLRequest, and the refusal to the startup packet.
+     */
+    private refuse(client: net.Socket): void {
+        client.on("error", () => client.destroy());
+        client.on("data", (chunk: Buffer) => {
+            if (isSslRequest(chunk)) {
+                client.write("N");
+                return;
+            }
+            client.end(noFreeConnectionResponse());
+        });
     }
 
     /**

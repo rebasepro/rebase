@@ -23,6 +23,7 @@ import {
 import { buildSdkData, createAccessorSlugResolver } from "@rebasepro/common";
 import { logger } from "@rebasepro/server";
 import { deepestErrorMessage, parseHostInfo } from "./cli-errors";
+import { extractPgError } from "./utils/pg-error-utils";
 import { createPostgresDatabaseConnection, type PostgresPoolConfig } from "./connection";
 import { openPostgresDriver } from "./PostgresBootstrapper";
 import { HistoryService } from "./history/HistoryService";
@@ -152,9 +153,12 @@ export async function openRebase<DB = RegisteredDatabase>(options: OpenRebaseOpt
         await pool?.query("SELECT 1");
     } catch (error) {
         await owned?.pool.end().catch(() => undefined);
+        // With Postgres' hint, where it gave one: the managed development
+        // database's refusal for want of a free connection says what to do in it.
+        const hint = extractPgError(error)?.hint;
         throw new Error(
             `Cannot connect to PostgreSQL at ${parseHostInfo(connectionString ?? "")}: ` +
-            `${deepestErrorMessage(error) ?? "the connection failed"}.`,
+            `${deepestErrorMessage(error) ?? "the connection failed"}.${hint ? ` ${hint}` : ""}`,
             { cause: error }
         );
     }

@@ -138,17 +138,25 @@ function connectionCutOff(error: unknown, depth = 0): boolean {
     return "cause" in error && connectionCutOff(error.cause, depth + 1);
 }
 
+/** Whether Postgres refused the connection for want of one: SQLSTATE 53300, anywhere in the error's chain. */
+function noFreeConnection(error: unknown, depth = 0): boolean {
+    if (!error || typeof error !== "object" || depth > 4) return false;
+    if ("code" in error && error.code === "53300") return true;
+    return "cause" in error && noFreeConnection(error.cause, depth + 1);
+}
+
 /**
  * What the console says when the project's database will not open: the banner
  * every db command prints for a database it cannot reach, or one sentence —
  * never the driver's error serialised onto one line, stack and all.
  *
- * The managed development database refuses a connection over its limit by
- * resetting it, and `read ECONNRESET` says nothing about why. It accepts only a
- * few at a time, and a running `rebase dev` holds some of them.
+ * The managed development database accepts only a few connections at a time,
+ * and a running `rebase dev` holds some of them. Its proxy refuses one over the
+ * limit with SQLSTATE 53300; a database an earlier CLI started resets it
+ * instead, and `read ECONNRESET` says nothing about why.
  */
 export function describeOpenFailure(error: unknown, databaseUrl: string, managed: boolean): string {
-    if (managed && connectionCutOff(error)) {
+    if (managed && (connectionCutOff(error) || noFreeConnection(error))) {
         return "✗ The managed development database has no free connection: it accepts only a few at a time, " +
             "and other clients hold them — a running `rebase dev` holds some.\n" +
             "  Close another `rebase console`, psql or database GUI and run this again, " +
