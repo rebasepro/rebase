@@ -227,9 +227,12 @@ const renderedHashes = (plan: CollectionPolicyPlan): Map<string, string> => {
  * literal. One line, and it names only this table.
  *
  * `undefined` for a table the plan gives no policies.
+ *
+ * @param only the names to stamp, when not every policy on the table is known
+ *        to be what its statement makes — see `stampPoliciesStoredAsRendered`.
  */
-export function policyStampSql(plan: CollectionPolicyPlan): string | undefined {
-    const hashes = renderedHashes(plan);
+export function policyStampSql(plan: CollectionPolicyPlan, only?: ReadonlySet<string>): string | undefined {
+    const hashes = new Map([...renderedHashes(plan)].filter(([name]) => !only || only.has(name)));
     if (hashes.size === 0) return undefined;
     const target = `"${plan.schema}"."${plan.table}"`;
     const values = [...hashes].map(([name, hash]) => `(${quoteSqlLiteral(name)}, '${hash}')`).join(", ");

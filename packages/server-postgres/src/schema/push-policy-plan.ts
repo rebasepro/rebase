@@ -155,7 +155,7 @@ export function summarizePolicyPushPlan(plan: PolicyPushPlan): string | null {
  * Run `read` under `searchPath`, set for one transaction and gone after it, or
  * as the connection is when there is none to set.
  */
-async function underSearchPath<T>(client: Queryable, searchPath: string | undefined, read: () => Promise<T>): Promise<T> {
+export async function underSearchPath<T>(client: Queryable, searchPath: string | undefined, read: () => Promise<T>): Promise<T> {
     if (!searchPath) return read();
     await client.query("BEGIN");
     try {

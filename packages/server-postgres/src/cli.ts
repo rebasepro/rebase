@@ -1005,6 +1005,10 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
             if (databaseUrl) {
                 await ensureRlsUserRole(databaseUrl);
                 await retireLegacyAuthSchema(databaseUrl);
+                // As push stamps what it applies, so the first boot after a
+                // migrate does not re-apply every policy once.
+                const { stampMigratedPolicies } = await import("./schema/migrate-policy-stamps");
+                await stampMigratedPolicies(databaseUrl, collectionsPath);
             }
         }
 

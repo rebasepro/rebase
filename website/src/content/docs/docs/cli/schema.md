@@ -317,6 +317,14 @@ rebase db migrate
 - Reads `drizzle/migrations/` for unapplied migrations
 - Applies them in order to the database
 - Tracks which migrations have been applied
+- Stamps the
+  row-level security policies the way `db push` and the server's boot do, so
+  the first boot after a migrate leaves them alone instead of re-creating every
+  one. A migration was written from the collections of its day, so a policy is
+  stamped only when it is exactly what its rule makes now: migrate makes it
+  again from its rule under another name, in a transaction it rolls back, and
+  compares what Postgres stored, as `db push --dry-run` does. A policy that
+  differs gets no stamp, and the next boot re-applies its table
 
 `--refuse-destructive`
 makes it refuse instead. It dry-runs the pending migrations first. If any
