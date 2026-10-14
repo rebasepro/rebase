@@ -18,6 +18,9 @@ import {
     exitDependenciesNotInstalled
 } from "../utils/project";
 import { unknownCommand } from "../utils/unknown-command";
+import { redactConnectionPasswords } from "../utils/redact";
+import type { PreparedDatabase } from "../dev-db/prepare";
+import type { DevDatabaseSource } from "../dev-db/resolve";
 
 /** The backend was reached and refused: not a reason to fall back to the database. */
 class ApiAnswered extends Error {}
@@ -316,6 +319,40 @@ async function resetPassword(rawArgs: string[]): Promise<void> {
         exitDependenciesNotInstalled(projectRoot);
     }
 
+    // The database the `db` family would use, resolved — and, for a remembered
+    // compose container that is stopped, started — the same way. A stock
+    // scaffold leaves DATABASE_URL commented out and runs on the managed
+    // database, which only exists in a child's environment when something puts
+    // it there — without this the script connected with libpq's defaults,
+    // localhost:5432 as the OS user. An external DATABASE_URL adds nothing
+    // here: the child already reads it.
+    let prepared: PreparedDatabase;
+    try {
+        const { ensureDockerDatabase } = await import("./db");
+        await ensureDockerDatabase(projectRoot, rawArgs);
+        const { prepareDatabaseEnv } = await import("../dev-db/prepare");
+        prepared = await prepareDatabaseEnv(projectRoot, {
+            onProgress: (message) => console.log(chalk.gray(`  ${message}`))
+        });
+    } catch (err) {
+        console.error(chalk.red("✗ Direct database update failed."));
+        console.error(err instanceof Error ? err.message : String(err));
+        process.exit(1);
+    }
+
+    // Opened here first, so a database that does not answer gets the banner
+    // every other command prints — not the script's raw error and stack — and
+    // no script is written for it.
+    const { databaseUrlOf } = await import("./db");
+    const url = databaseUrlOf(prepared, readEnvFile(projectRoot));
+    if (url) {
+        const failure = await databaseOpenFailure(url, prepared.database.source);
+        if (failure) {
+            for (const line of failure) console.error(line);
+            process.exit(1);
+        }
+    }
+
     try {
         const env: Record<string, string> = { ...process.env as Record<string, string> };
         if (envFile) {
@@ -324,17 +361,6 @@ async function resetPassword(rawArgs: string[]): Promise<void> {
         env.REBASE_RESET_EMAIL = email;
         env.REBASE_RESET_PASSWORD = newPassword;
         env.REBASE_ENV_FILE_PATH = envFile || path.join(projectRoot, ".env");
-
-        // The database the `db` family would use, resolved the same way. A
-        // stock scaffold leaves DATABASE_URL commented out and runs on the
-        // managed database, which only exists in a child's environment when
-        // something puts it there — without this the script connected with
-        // libpq's defaults, localhost:5432 as the OS user. An external
-        // DATABASE_URL adds nothing here: the child already reads it.
-        const { prepareDatabaseEnv } = await import("../dev-db/prepare");
-        const prepared = await prepareDatabaseEnv(projectRoot, {
-            onProgress: (message) => console.log(chalk.gray(`  ${message}`))
-        });
         Object.assign(env, prepared.env);
 
         const scriptContent = resetPasswordScript(wasGenerated);
@@ -385,6 +411,35 @@ async function resetPassword(rawArgs: string[]): Promise<void> {
         console.error(chalk.red("✗ Direct database update failed."));
         console.error(err instanceof Error ? err.message : String(err));
         process.exit(1);
+    }
+}
+
+/**
+ * Why the database the fallback would reset in cannot be opened, as the lines
+ * to print — or null when it opens.
+ *
+ * A stopped database, refused credentials and a database name the server does
+ * not have get the boxed banner the other commands print; anything else is one
+ * sentence. Either way the password was not reset and no script was written.
+ */
+async function databaseOpenFailure(url: string, source: DevDatabaseSource): Promise<string[] | null> {
+    const { Client } = await import("pg");
+    const client = new Client({ connectionString: url, connectionTimeoutMillis: 10_000 });
+    client.on("error", () => undefined);
+    try {
+        await client.connect();
+        await client.query("SELECT 1");
+        return null;
+    } catch (error) {
+        const { connectionErrorText, connectionFailureBanner, connectionRefusedFixes } =
+            await import("../dev-db/connection-banner");
+        const consequence = "The password was not reset.";
+        return connectionFailureBanner(url, error, { consequence, fixes: connectionRefusedFixes(source) }) ?? [
+            chalk.red(`✗ Could not open the database: ${redactConnectionPasswords(connectionErrorText(error))}`),
+            chalk.gray(`  ${consequence}`)
+        ];
+    } finally {
+        await client.end().catch(() => undefined);
     }
 }
 
@@ -456,6 +511,16 @@ async function resetPassword() {
 
     const client = await pool.connect();
     try {
+        // A database nothing has booted against — or a managed one \`db reset\`
+        // emptied — has no users table, and so no account to reset. Said as
+        // that, not as pg's \`relation … does not exist\`.
+        const usersTable = await client.query("SELECT to_regclass($1) IS NOT NULL AS present", [users]);
+        if (!usersTable.rows[0]?.present) {
+            console.error("✗ " + users + " does not exist in this database, so it holds no account to reset.");
+            console.error("  Nothing was changed. \`rebase dev\` creates it the first time it boots against this database.");
+            process.exit(1);
+        }
+
         await client.query("BEGIN");
         const updated = await client.query(
             "UPDATE " + users + " SET " + passwordColumn + " = $1 WHERE " + emailColumn + " = $2 " +
@@ -502,9 +567,17 @@ async function resetPassword() {
 }
 
 // A thrown error is a failed reset, and exits like one — a refused connection
-// that exits 0 reads as a reset to anything checking the exit code.
+// that exits 0 reads as a reset to anything checking the exit code. Said as a
+// sentence: the stack is the script's own, and only REBASE_DEBUG asks for it.
+const describe = (error: unknown): string => {
+    if (error instanceof AggregateError && !error.message && error.errors.length > 0) return describe(error.errors[0]);
+    const message = error instanceof Error ? error.message : String(error);
+    const code = error && typeof error === "object" && "code" in error && typeof error.code === "string" ? error.code : "";
+    return code && !message.includes(code) ? message + " (" + code + ")" : message;
+};
 resetPassword().catch((error) => {
-    console.error(error);
+    if (process.env.REBASE_DEBUG) console.error(error);
+    else console.error("✗ The password was not reset: " + describe(error));
     process.exit(1);
 });
 `;

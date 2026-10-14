@@ -38,6 +38,7 @@ import { execa } from "execa";
 import fs from "fs";
 import type { Client } from "pg";
 
+import { banner, connectionErrorText, hostOf } from "./connection-banner";
 import { PGLITE_EXTENSIONS } from "./constraints";
 
 /**
@@ -504,40 +505,6 @@ export async function findPgTool(tool: "pg_dump" | "pg_restore"): Promise<string
 /** PGlite names itself in `version()`: `PostgreSQL 18.3 (PGlite 0.5.6) on wasm32-…`. */
 function engineOf(version: string): PullTargetEngine {
     return /\bPGlite\b/i.test(version) ? "pglite" : "postgres";
-}
-
-/** `host:port` of a connection string, for a message: never the string, which carries the password. */
-function hostOf(connectionString: string): string {
-    try {
-        const url = new URL(connectionString);
-
-        return `${url.hostname || "localhost"}:${url.port || "5432"}`;
-    } catch {
-        return "(unparseable connection string)";
-    }
-}
-
-/**
- * A connection error's own sentence. A refused connection on a dual-stack
- * host is an `AggregateError` with an empty message, and its sentence —
- * `connect ECONNREFUSED 127.0.0.1:5432` — is in the attempts it holds.
- */
-function connectionErrorText(error: unknown): string {
-    if (error instanceof AggregateError && error.errors.length > 0 && !error.message) {
-        return connectionErrorText(error.errors[0]);
-    }
-
-    return errorText(error);
-}
-
-const RULE = "━".repeat(60);
-
-/**
- * The boxed banner the database commands print when a connection fails —
- * `Cannot connect to PostgreSQL at …` — as plain lines for the caller to print.
- */
-function banner(title: string, said: string | null, body: readonly string[]): string[] {
-    return ["", RULE, `  ❌  ${title}`, RULE, "", ...(said ? [`  ${said}`, ""] : []), ...body.map(line => `  ${line}`), "", RULE];
 }
 
 const NOTHING_CHANGED = "Nothing was changed: the local database is as it was.";

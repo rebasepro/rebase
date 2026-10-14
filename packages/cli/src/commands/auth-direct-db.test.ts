@@ -23,16 +23,40 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const state = vi.hoisted(() => ({
     root: "",
-    spawned: [] as { command: string; args: readonly string[]; env: NodeJS.ProcessEnv; script: string }[]
+    spawned: [] as { command: string; args: readonly string[]; env: NodeJS.ProcessEnv; script: string }[],
+    /** What opening the database does: nothing, or throw this. */
+    connectError: null as Error | null,
+    database: { kind: "managed", source: "managed" } as { kind: string; source: string },
+    ensured: [] as string[]
 }));
 
 vi.mock("../dev-db/prepare", () => ({
     prepareDatabaseEnv: vi.fn(async () => ({
-        database: { kind: "managed" },
+        database: state.database,
         description: "the managed development database (PGlite)",
         env: { DATABASE_URL: "postgresql://postgres@127.0.0.1:54329/managed", REBASE_DB_POOL_MAX: "1" }
     }))
 }));
+
+// The remembered compose database is started the way every `db` command starts it.
+vi.mock("./db", async importOriginal => ({
+    ...await importOriginal<typeof import("./db")>(),
+    ensureDockerDatabase: async (root: string) => {
+        state.ensured.push(root);
+    }
+}));
+
+vi.mock("pg", () => {
+    class Client {
+        on(): this { return this; }
+        async connect(): Promise<void> {
+            if (state.connectError) throw state.connectError;
+        }
+        async query(): Promise<{ rows: unknown[] }> { return { rows: [{ "?column?": 1 }] }; }
+        async end(): Promise<void> { /* nothing to close */ }
+    }
+    return { Client, default: { Client } };
+});
 
 vi.mock("../utils/project", async importOriginal => ({
     ...await importOriginal<typeof import("../utils/project")>(),
@@ -66,6 +90,9 @@ describe("the direct-database reset", () => {
         state.root = fs.mkdtempSync(path.join(os.tmpdir(), "rebase-auth-direct-"));
         fs.mkdirSync(path.join(state.root, "backend"));
         state.spawned.length = 0;
+        state.connectError = null;
+        state.database = { kind: "managed", source: "managed" };
+        state.ensured.length = 0;
         savedBaseUrl = process.env.REBASE_BASE_URL;
         savedServiceKey = process.env.REBASE_SERVICE_KEY;
         delete process.env.REBASE_BASE_URL;
@@ -86,6 +113,39 @@ describe("the direct-database reset", () => {
         expect(prepareDatabaseEnv).toHaveBeenCalledWith(state.root, expect.anything());
         expect(state.spawned).toHaveLength(1);
         expect(state.spawned[0].env.DATABASE_URL).toBe("postgresql://postgres@127.0.0.1:54329/managed");
+    });
+
+    it("starts the remembered Docker database first, as every db command does", async () => {
+        await authCommand("reset-password", ["node", "rebase", "auth", "reset-password", "admin@example.com", "N3w-Passw0rd!"]);
+
+        expect(state.ensured).toEqual([state.root]);
+    });
+
+    /**
+     * Every other command that opens the database answers a stopped one with
+     * the boxed "Cannot connect" banner. This one printed the script's raw
+     * `Error: connect ECONNREFUSED 127.0.0.1:5508` and the stack under it.
+     */
+    it("says Cannot connect in the banner, and writes no script, when the database does not answer", async () => {
+        state.database = { kind: "docker", source: "last-dev" };
+        state.connectError = Object.assign(new Error("connect ECONNREFUSED 127.0.0.1:54329"), { code: "ECONNREFUSED" });
+        const errors: string[] = [];
+        vi.spyOn(console, "error").mockImplementation((...parts: unknown[]) => { errors.push(parts.map(String).join(" ")); });
+        vi.spyOn(process, "exit").mockImplementation((code?: string | number | null) => {
+            throw new Error(`process.exit(${String(code)})`);
+        });
+
+        await expect(authCommand("reset-password", ["node", "rebase", "auth", "reset-password", "admin@example.com", "N3w-Passw0rd!"]))
+            .rejects.toThrow("process.exit(1)");
+
+        const said = errors.join("\n");
+        expect(said).toContain("Cannot connect to PostgreSQL at 127.0.0.1:54329");
+        expect(said).toContain("The driver said: connect ECONNREFUSED 127.0.0.1:54329");
+        expect(said).toContain("The password was not reset.");
+        expect(said).toContain("docker compose up -d db");
+        expect(said).not.toMatch(/\n\s+at /);
+        expect(state.spawned).toHaveLength(0);
+        expect(fs.existsSync(path.join(state.root, "backend", ".tmp-reset-password.ts"))).toBe(false);
     });
 
     it("does not go round a backend that refused the reset — a weak password stays refused", async () => {
@@ -242,7 +302,35 @@ describe("the direct-database reset", () => {
         `);
 
         expect(run.stderr).toContain("ECONNREFUSED");
+        expect(run.stderr).toContain("The password was not reset");
+        // A sentence, not `console.error(error)`'s stack.
+        expect(run.stderr).not.toMatch(/\n\s+at /);
         expect(run.status).toBe(1);
+    });
+
+    /**
+     * A database with no users table — a managed one `db reset` emptied, or one
+     * nothing has booted against — answered with pg's raw
+     * `error: relation "rebase.users" does not exist` and a stack.
+     */
+    it("says there is no account to reset when the users table is not there", () => {
+        const run = runResetScript(`
+            const client = (record) => ({
+                async query(text, values) {
+                    record(text, values);
+                    if (/to_regclass/.test(text)) return { rowCount: 1, rows: [{ present: false }] };
+                    throw Object.assign(new Error('relation "rebase.users" does not exist'), { code: "42P01" });
+                },
+                release() {}
+            });
+        `);
+
+        expect(run.status).toBe(1);
+        expect(run.stderr).toContain("\"rebase\".\"users\" does not exist in this database");
+        expect(run.stderr).toContain("Nothing was changed");
+        expect(run.stderr).toContain("rebase dev");
+        expect(run.stderr).not.toMatch(/\n\s+at /);
+        expect(run.statements.some(s => /^UPDATE/.test(s.text))).toBe(false);
     });
 
     it("ends the account's sessions in the same transaction that sets the password", () => {
