@@ -329,6 +329,12 @@ A backend also has a default database and a default storage source that nobody
 declares. Both are listed here, marked `implicit`, and neither is written to
 `rebase.resources.json` — the host supplies them, so recording them would ask
 for something to be provisioned that nobody asked for.
+<span class="since-badge" data-since="0.25">Since 0.25</span> Declaring a named
+one, such as `bucket("media")`, leaves the default where it is, so both are
+listed. Only declaring the default itself, or marking one bucket
+`default: true`, replaces it. On 0.24 the default storage source dropped out of
+`rebase status` and `rebase resources` as soon as any bucket was declared,
+though the server went on serving it.
 
 To see what the platform holds for a project against what its code declares,
 and to remove a provisioned database the code no longer names, see

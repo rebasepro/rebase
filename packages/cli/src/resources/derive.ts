@@ -658,15 +658,26 @@ export function parseResourceGraph(contents: string): ResourceGraph {
  * in the graph, so a status view built only from declarations would show an
  * empty screen to the majority of projects — the ones that most need to be told
  * which variable their one database reads.
+ *
+ * Declaring a *named* one leaves the default where it is, as the server does
+ * (`resolveDataSources` and `resolveStorageSources` in `@rebasepro/server`):
+ * `bucket("media")` adds a source and never moves the files the default holds,
+ * so both are listed. The default is displaced only by declaring it — or, for a
+ * bucket, by marking exactly one server-side bucket `default: true`, which then
+ * serves the uploads that name no `storageSource`. This used to drop the
+ * default as soon as any bucket was declared, and `rebase status` and `rebase
+ * resources` stopped listing a source the server was still serving.
  */
 export function withImplicitDefaults(graph: ResourceGraph): {
     declaration: ResourceDeclaration;
     implicit: boolean;
 }[] {
     const entries = graph.resources.map(declaration => ({ declaration, implicit: false }));
-    const has = (kind: string) => graph.resources.some(r => r.kind === kind);
+    const declaresDefault = (kind: string) => graph.resources.some(r => r.kind === kind && r.key === DEFAULT_RESOURCE_KEY);
+    const markedDefault = graph.resources.filter(r =>
+        r.kind === "bucket" && (r.transport ?? "server") === "server" && r.options.default === true);
 
-    if (!has("database")) {
+    if (!declaresDefault("database")) {
         entries.unshift({
             declaration: {
                 kind: "database",
@@ -678,8 +689,8 @@ export function withImplicitDefaults(graph: ResourceGraph): {
             implicit: true
         });
     }
-    if (!has("bucket")) {
-        entries.push({
+    if (!declaresDefault("bucket") && markedDefault.length !== 1) {
+        const implicitBucket = {
             declaration: {
                 kind: "bucket",
                 key: DEFAULT_RESOURCE_KEY,
@@ -688,11 +699,16 @@ export function withImplicitDefaults(graph: ResourceGraph): {
                 // with no S3 variables actually gets: a directory that a
                 // container erases on restart, which production then drops.
                 engine: "local",
-                transport: "server",
+                transport: "server" as const,
                 options: {}
             },
             implicit: true
-        });
+        };
+        // First among the buckets, as the database default is first among the
+        // databases; last when there are none.
+        const firstBucket = entries.findIndex(entry => entry.declaration.kind === "bucket");
+        if (firstBucket === -1) entries.push(implicitBucket);
+        else entries.splice(firstBucket, 0, implicitBucket);
     }
     return entries;
 }

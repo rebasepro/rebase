@@ -360,12 +360,40 @@ describe("status and resources project the same set", () => {
         expect(keysOfStatus()).toEqual(keysOfResources());
     });
 
-    it("agrees when a declaration displaces an implicit default", () => {
-        // Declaring one bucket means there is no implicit one; both projections
-        // have to reach that conclusion, and only one of them used to.
+    /**
+     * Declaring `bucket("media")` adds a source; the default one stays, on its
+     * own variables, and the server goes on serving it — `/api/storage/sources`
+     * answers `(default)` and `media`. Both commands listed only `media`, so the
+     * place every upload without a `storageSource` goes vanished from the view.
+     */
+    it("keeps the default bucket beside a named one", () => {
         bucket("media", { engine: "s3" });
 
-        expect(keysOfResources()).not.toContain("bucket:(default)");
+        expect(keysOfResources()).toEqual(["bucket:(default)", "bucket:media", "database:(default)"]);
+        expect(keysOfStatus()).toEqual(keysOfResources());
+        expect(projectResourceGraph(buildResourceGraph()).find(r => r.kind === "bucket" && r.key === "(default)")?.implicit).toBe(true);
+    });
+
+    it("and the default database beside a named one", () => {
+        database("analytics");
+
+        expect(keysOfResources()).toEqual(["bucket:(default)", "database:(default)", "database:analytics"]);
+        expect(keysOfStatus()).toEqual(keysOfResources());
+    });
+
+    it("lists no implicit default when one is declared", () => {
+        bucket({ engine: "s3" });
+
+        expect(keysOfResources().filter(key => key === "bucket:(default)")).toHaveLength(1);
+        expect(projectResourceGraph(buildResourceGraph()).find(r => r.kind === "bucket")?.implicit).toBeUndefined();
+    });
+
+    it("lists no implicit default when a named bucket is marked the default", () => {
+        // `default: true` makes that bucket the one an unqualified upload goes
+        // to, as the server binds it: there is no second default beside it.
+        bucket("media", { engine: "s3", default: true });
+
+        expect(keysOfResources()).toEqual(["bucket:media", "database:(default)"]);
         expect(keysOfStatus()).toEqual(keysOfResources());
     });
 
