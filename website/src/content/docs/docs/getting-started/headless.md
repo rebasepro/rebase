@@ -109,6 +109,12 @@ pnpm rebase schema introspect
 Files land in `config/collections/`. From that point the project has collections
 in code and the boot-time introspection stops being what defines the API.
 
+<span class="since-badge" data-since="0.25">Since 0.25</span> The headless
+scaffold installs Atlas in `backend/`, so `rebase db push`, `rebase db generate`
+and `pnpm run db:migrate` work on those collections as in any project. On 0.24
+each of them stops on "The atlas binary is missing"; add it to the backend with
+`pnpm --dir backend add @ariga/atlas`.
+
 ## Use it
 
 Over HTTP:
