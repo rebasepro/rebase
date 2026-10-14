@@ -144,10 +144,14 @@ const SCHEMA_ACTION_HELP: Record<string, { usage: string; summary: string; notes
         notes: ["--watch regenerates on every change to a collection file."]
     },
     introspect: {
-        usage: "rebase schema introspect [--collections <dir>] [--output <dir>] [--schema <name>] [--force]",
+        usage: "rebase schema introspect [--collections <dir>] [--output <dir>] [--schema <name>] [--force] "
+            + "[--data-inference | --no-data-inference]",
         summary: "Read an existing database and write Rebase collection definitions from it.",
         notes: [
             "--force overwrites collection files that are already there.",
+            "--data-inference samples up to 100 rows per table to detect formats, constraints and UI settings; "
+                + "--no-data-inference reads the structure only. Without either it asks, and without a terminal "
+                + "it reads the structure only.",
             "Reads this project's database, the one `rebase db url` prints: --database-url <url> names another; "
                 + "--docker uses the compose one, starting it if needed."
         ]
@@ -201,6 +205,8 @@ ${chalk.green.bold("introspect Options")}
   ${chalk.blue("--force, -f")}        Overwrite collection files that already exist
   ${chalk.blue("--database-url")}     Read this database instead of the project's own
   ${chalk.blue("--docker")}           Read the compose database, starting it if needed
+  ${chalk.blue("--data-inference")}   Sample rows to detect formats and constraints ${chalk.gray("(asked when omitted)")}
+  ${chalk.blue("--no-data-inference")} Read the structure only, without asking
 
 ${chalk.green.bold("stale Options")}
   ${chalk.blue("--fix")}              Regenerate the stale files instead of only reporting them

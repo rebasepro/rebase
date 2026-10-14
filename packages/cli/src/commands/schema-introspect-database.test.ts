@@ -117,3 +117,45 @@ describe("schema introspect", () => {
         expect(ensureDocker.calls).toBe(0);
     });
 });
+
+/**
+ * Every flag the driver's `introspect` reads, on both help pages.
+ *
+ * `--data-inference` and `--no-data-inference` decide whether rows are read at
+ * all — the one choice a script has to make, since without a terminal the
+ * prompt is skipped — and neither `rebase schema --help` nor `rebase schema
+ * introspect --help` named them. The flags come from the driver's own spec, so
+ * the next one added there fails here until a help page says it.
+ */
+describe("schema introspect --help", () => {
+    const driverFlags = (): string[] => {
+        const source = fs.readFileSync(
+            path.join(__dirname, "..", "..", "..", "server-postgres", "src", "schema", "introspect-db.ts"),
+            "utf8"
+        );
+        const spec = /const args = arg\(\s*\{([\s\S]*?)\}/.exec(source);
+        expect(spec, "introspect-db.ts's arg spec moved; this guard needs its new shape").not.toBeNull();
+        // Long flags only: a short alias is named beside the flag it stands for.
+        return [...spec![1].matchAll(/"(--[a-z-]+)":\s*(?!")/g)].map(match => match[1]);
+    };
+    const helpOf = async (...line: string[]): Promise<string> => {
+        const printed: string[] = [];
+        vi.spyOn(console, "log").mockImplementation((...parts: unknown[]) => { printed.push(parts.map(String).join(" ")); });
+        await schemaCommand(line[1], argv(...line));
+        // eslint-disable-next-line no-control-regex
+        return printed.join("\n").replace(/\x1b\[[0-9;]*m/g, "");
+    };
+
+    it("names every flag the driver's introspect reads", async () => {
+        const flags = driverFlags();
+        expect(flags).toContain("--data-inference");
+
+        const page = await helpOf("schema", "introspect", "--help");
+        const index = await helpOf("schema", "--help");
+        for (const flag of flags) {
+            expect(page, `rebase schema introspect --help does not mention ${flag}`).toContain(flag);
+            expect(index, `rebase schema --help does not mention ${flag}`).toContain(flag);
+        }
+    });
+});
+
