@@ -407,6 +407,21 @@ async function declaredAdditionalDatabases(projectRoot: string): Promise<string[
 export const DEV_PORT_FILENAME = ".rebase-dev-port";
 
 /**
+ * What `.rebase-dev-port` holds: the port the backend bound, then the one it
+ * was asked for — the server's own format (`listenWithPortRetry`).
+ *
+ * The requested half is what tells a later server whether the saved port is
+ * meant for it, and `rebase dev` used to overwrite the server's file with the
+ * bound port alone. Every server in the project then tried dev's port first:
+ * `rebase start` beside dev logged `Port 3755 is in use — trying 3001`, and
+ * after a dev that crashed, leaving the file behind, it bound 3755 rather than
+ * the `PORT=3001` its environment named.
+ */
+export function devPortFileContents(bound: number, requested: number): string {
+    return `${bound} ${requested}`;
+}
+
+/**
  * The `PORT` the scaffold's own `.env.example` ships.
  *
  * `rebase init` copies that file into `.env` verbatim, so every new project has
@@ -483,7 +498,8 @@ export function resolveStartPort(
     try {
         const portFile = path.join(projectRoot, DEV_PORT_FILENAME);
         if (fs.existsSync(portFile)) {
-            const saved = parsePort(fs.readFileSync(portFile, "utf-8"));
+            // The bound port, first of `<bound> <requested>` — see `devPortFileContents`.
+            const saved = parsePort(fs.readFileSync(portFile, "utf-8").trim().split(/\s+/)[0]);
             if (saved !== undefined) return { port: saved, source: "affinity" };
         }
     } catch { /* ignore */ }
@@ -2027,7 +2043,7 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
 
                 // Save the port to .rebase-dev-port for port affinity
                 const portFile = path.join(projectRoot, DEV_PORT_FILENAME);
-                fs.writeFileSync(portFile, String(resolvedBackendPort), "utf-8");
+                fs.writeFileSync(portFile, devPortFileContents(resolvedBackendPort, startPort), "utf-8");
             }
         });
 
