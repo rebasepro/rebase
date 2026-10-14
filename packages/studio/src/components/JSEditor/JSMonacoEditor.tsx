@@ -1,10 +1,11 @@
 
-import React, { useRef, useEffect } from "react";
+import React, { useRef, useEffect, useImperativeHandle } from "react";
 import Editor, { Monaco, OnMount } from "@monaco-editor/react";
 import type { editor } from "monaco-editor";
 import { cls, defaultBorderMixin, FileIcon } from "@rebasepro/ui";
 import { useModeController } from "@rebasepro/app";
 import { ALL_WHERE_FILTER_OPS } from "@rebasepro/types";
+import type { MonacoEditorHandle } from "../SQLEditor/MonacoEditor";
 
 /**
  * Shape of `monaco.languages.typescript` at runtime.
@@ -286,6 +287,8 @@ export type CollectionInfo = {
 };
 
 export type JSMonacoEditorProps = {
+    /** The script and its selection, read when Run acts on them. */
+    ref?: React.Ref<MonacoEditorHandle>;
     value: string;
     onChange: (value: string | undefined) => void;
     onRun?: (selectedText?: string) => void;
@@ -299,6 +302,7 @@ export type JSMonacoEditorProps = {
 };
 
 export const JSMonacoEditor = ({
+    ref,
     value,
     onChange,
     onRun,
@@ -314,6 +318,16 @@ export const JSMonacoEditor = ({
     const onRunRef = useRef(onRun);
     onRunRef.current = onRun;
     const typesRegisteredRef = useRef(false);
+
+    useImperativeHandle(ref, () => ({
+        getSelectedText: () => {
+            const instance = editorRef.current;
+            const selection = instance?.getSelection();
+            if (!instance || !selection || selection.isEmpty()) return undefined;
+            return instance.getModel()?.getValueInRange(selection)?.trim() || undefined;
+        },
+        getValue: () => editorRef.current?.getValue()
+    }), []);
 
     const handleEditorOnMount: OnMount = (editorInstance, monaco) => {
         editorRef.current = editorInstance;

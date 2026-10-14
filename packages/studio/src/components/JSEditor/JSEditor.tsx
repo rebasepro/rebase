@@ -40,6 +40,7 @@ import { useRebaseContext, useRebaseClient, useSnackbarController, useApiConfig,
 
 import { createMemoryStorage, createRebaseClient, type CreateAuthOptions } from "@rebasepro/client";
 import { JSMonacoEditor } from "./JSMonacoEditor";
+import type { MonacoEditorHandle } from "../SQLEditor/MonacoEditor";
 import { JSEditorSidebar, JSSnippet } from "./JSEditorSidebar";
 import { AuthSimulationSelector } from "../AuthSimulationSelector";
 import { useRunAsUsers } from "../useRunAsUsers";
@@ -251,9 +252,12 @@ export function JSEditor() {
 name: "Script 1",
 code: DEFAULT_CODE }])
     );
-    const [activeTabId, setActiveTabId] = useState<string>(() =>
-        loadFromStorage("activeTab", "1")
-    );
+    const [activeTabId, setActiveTabId] = useState<string>(() => {
+        // A stored id that names none of the tabs would leave the editor on
+        // the first tab while every edit went to a tab that is not there.
+        const stored = loadFromStorage<unknown>("activeTab", null);
+        return typeof stored === "string" && tabs.some(t => t.id === stored) ? stored : tabs[0].id;
+    });
     const [result, setResult] = useState<ExecutionResult | null>(null);
     const [isRunning, setIsRunning] = useState(false);
     const [snippets, setSnippets] = useState<JSSnippet[]>(() =>
@@ -424,8 +428,17 @@ release: () => client.close() };
 
     // ─── Execution engine ────────────────────────────────────────
 
-    const executeCode = useCallback(async (codeOverride?: string) => {
-        const code = codeOverride ?? activeTab?.code ?? "";
+    /** The editor, for the script Run executes. */
+    const editorHandle = useRef<MonacoEditorHandle>(null);
+
+    /**
+     * Run `selectedText`, or else the script the editor holds now — read from
+     * the editor, never from the tab's `code`: an edit reaches the tab only
+     * when the console re-renders, so a Run right after a paste ran the script
+     * from before it.
+     */
+    const executeCode = useCallback(async (selectedText?: string) => {
+        const code = selectedText ?? editorHandle.current?.getValue() ?? activeTab?.code ?? "";
         if (!code.trim()) return;
 
         setIsRunning(true);
@@ -874,6 +887,7 @@ message: t("studio_sql_markdown_copy_failed") });
                                             </div>
                                             <div className="flex-1 min-h-0">
                                                 <JSMonacoEditor
+                                                    ref={editorHandle}
                                                     value={activeTab?.code ?? ""}
                                                     onChange={updateActiveCode}
                                                     onRun={(selectedText) => executeCode(selectedText)}

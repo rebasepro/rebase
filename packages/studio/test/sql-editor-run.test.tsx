@@ -3,7 +3,7 @@
  */
 import React from "react";
 import { describe, expect, it, jest, beforeEach, afterEach } from "@jest/globals";
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { en } from "../../app/src/locales/en";
 
 /**
@@ -61,14 +61,39 @@ jest.mock("@rebasepro/app", () => ({
 /** What the stand-in editor reports as selected; nothing unless a test says. */
 let editorSelection: string | undefined;
 
+/**
+ * The stand-in editor's own text and the props it was last rendered with.
+ * Monaco's model changes the moment the person types or pastes, and the
+ * console only learns of it when it re-renders from `onChange`; `text` is that
+ * model. `onRun` is what Cmd+Enter inside the editor calls — the handler of the
+ * last render, as Monaco's action reads it from a ref.
+ */
+const editorModel: {
+    text: string;
+    onChange?: (value: string) => void;
+    onRun?: (selectedText?: string) => void;
+} = { text: "" };
+
 jest.mock("../src/components/SQLEditor/MonacoEditor", () => ({
-    MonacoEditor: ({ ref, value, onChange }: {
-        ref?: React.Ref<{ getSelectedText: () => string | undefined }>;
+    MonacoEditor: ({ ref, value, onChange, onRun }: {
+        ref?: React.Ref<{ getSelectedText: () => string | undefined; getValue: () => string }>;
         value: string;
         onChange: (value: string) => void;
+        onRun?: (selectedText?: string) => void;
     }) => {
-        React.useImperativeHandle(ref, () => ({ getSelectedText: () => editorSelection }));
-        return <textarea aria-label="SQL" value={value} onChange={(e) => onChange(e.target.value)}/>;
+        editorModel.onChange = onChange;
+        editorModel.onRun = onRun;
+        // A new `value` from the console (Format, a tab switch) is written
+        // into the model, as @monaco-editor/react does.
+        React.useLayoutEffect(() => { editorModel.text = value; }, [value]);
+        React.useImperativeHandle(ref, () => ({
+            getSelectedText: () => editorSelection,
+            getValue: () => editorModel.text
+        }));
+        return <textarea aria-label="SQL" value={value} onChange={(e) => {
+            editorModel.text = e.target.value;
+            onChange(e.target.value);
+        }}/>;
     }
 }));
 
@@ -96,7 +121,29 @@ beforeEach(() => {
     executeSql.mockClear();
     localStorage.clear();
     editorSelection = undefined;
+    editorModel.text = "";
 });
+
+/**
+ * The editor's text changes, and the console hears of it through `onChange`
+ * — but it has not re-rendered yet when `then` runs, as when Run or Cmd+Enter
+ * comes right after a paste. Both happen inside one `act`, so React renders
+ * once, after both.
+ */
+function editThen(text: string, then: () => void): void {
+    act(() => {
+        editorModel.text = text;
+        editorModel.onChange?.(text);
+        then();
+    });
+}
+
+/** The Run button, once the run before has finished. */
+async function idleRunButton(): Promise<HTMLButtonElement> {
+    const button = screen.getByRole("button", { name: label("studio_sql_run") }) as HTMLButtonElement;
+    await waitFor(() => expect(button.disabled).toBe(false));
+    return button;
+}
 
 /**
  * "Explain" ran `EXPLAIN (FORMAT JSON, ANALYZE) <the whole tab>`. ANALYZE
@@ -330,5 +377,118 @@ describe("a run already in flight", () => {
         } finally {
             executeSql.mockImplementation(async () => []);
         }
+    });
+});
+
+/**
+ * Run read the statement from the console's state, which learns of an edit
+ * only when it re-renders. Run or Cmd+Enter right after a paste executed the
+ * statement the buffer held before it — the editor showed one query and the
+ * grid the rows of another — and a DELETE run a moment earlier ran again.
+ */
+describe("running right after an edit", () => {
+    it("runs the text the editor holds from the Run button", async () => {
+        render(<SQLEditor/>);
+        await typeSql("select count(*) as n_posts from posts");
+        fireEvent.click(await idleRunButton());
+        await waitFor(() => expect(sent()).toHaveLength(1));
+
+        const run = await idleRunButton();
+        editThen("select count(*) as n_authors from authors", () => run.click());
+
+        await waitFor(() => expect(sent()).toHaveLength(2));
+        expect(sent()[1]).toBe("select count(*) as n_authors from authors LIMIT 1000;");
+    });
+
+    it("runs the text the editor holds from Cmd+Enter in the editor", async () => {
+        render(<SQLEditor/>);
+        await typeSql("select 'stale'");
+        fireEvent.click(await idleRunButton());
+        await waitFor(() => expect(sent()).toHaveLength(1));
+        await idleRunButton();
+
+        editThen("select 'fresh'", () => editorModel.onRun?.(undefined));
+
+        await waitFor(() => expect(sent()).toHaveLength(2));
+        expect(sent()[1]).toBe("select 'fresh' LIMIT 1000;");
+    });
+
+    it("does not run the DELETE that ran before the edit again", async () => {
+        render(<SQLEditor/>);
+        await typeSql("DELETE FROM posts WHERE id = 1");
+        fireEvent.click(await idleRunButton());
+        await waitFor(() => expect(sent()).toEqual(["DELETE FROM posts WHERE id = 1"]));
+
+        const run = await idleRunButton();
+        editThen("SELECT 1", () => run.click());
+
+        await waitFor(() => expect(sent()).toHaveLength(2));
+        expect(sent()).toEqual(["DELETE FROM posts WHERE id = 1", "SELECT 1 LIMIT 1000;"]);
+    });
+
+    it("asks about the statement on screen, and runs that one once accepted", async () => {
+        // The confirmation was decided on the same stale text: a DELETE pasted
+        // over a SELECT ran without a question, as the SELECT it replaced.
+        render(<SQLEditor/>);
+        await typeSql("SELECT * FROM posts");
+        const run = await idleRunButton();
+
+        editThen("DELETE FROM posts", () => run.click());
+
+        const dialog = await screen.findByRole("dialog", { name: label("studio_sql_dangerous_operation") });
+        expect(sent()).toEqual([]);
+        fireEvent.click(within(dialog).getByRole("button", { name: "accept" }));
+        await waitFor(() => expect(sent()).toEqual(["DELETE FROM posts"]));
+    });
+
+    it("records the statement that ran in the history", async () => {
+        render(<SQLEditor/>);
+        await typeSql("select 'stale'");
+        const run = await idleRunButton();
+
+        editThen("select 'fresh'", () => run.click());
+
+        await waitFor(() => expect(sent()).toHaveLength(1));
+        await waitFor(() => expect(JSON.parse(localStorage.getItem("rebase_sql_history_default") ?? "[]")).toEqual(["select 'fresh'"]));
+    });
+
+    it("explains the text the editor holds", async () => {
+        render(<SQLEditor/>);
+        await typeSql("SELECT 'stale'");
+        const explainButton = screen.getByRole("button", { name: label("studio_sql_explain") });
+
+        editThen("SELECT 'fresh'", () => explainButton.click());
+
+        await waitFor(() => expect(sent()).toHaveLength(1));
+        expect(sent()[0]).toBe("EXPLAIN (FORMAT JSON) SELECT 'fresh'");
+    });
+
+    it("formats the text the editor holds, not the text it held before", async () => {
+        // Format wrote the formatted old text back over the paste.
+        render(<SQLEditor/>);
+        await typeSql("select 'stale'");
+        const formatButton = screen.getByRole("button", { name: label("studio_sql_format_sql") });
+
+        editThen("select 1,2", () => formatButton.click());
+
+        expect((screen.getByLabelText("SQL") as HTMLTextAreaElement).value).toBe("select 1, 2");
+    });
+});
+
+/**
+ * A stored active tab that names none of the stored tabs — a tab whose write
+ * did not reach storage — left every edit landing nowhere: the editor showed
+ * the first tab, and its state never changed from what was stored.
+ */
+describe("a stored active tab that names no tab", () => {
+    it("opens the first tab and keeps what is typed in it", async () => {
+        localStorage.setItem("rebase_sql_tabs_default", JSON.stringify([{ id: "1", name: "Query 1", sql: "SELECT 'stored'" }]));
+        localStorage.setItem("rebase_sql_active_tab_default", "gone");
+        render(<SQLEditor/>);
+
+        await typeSql("SELECT 'typed'");
+
+        expect((screen.getByLabelText("SQL") as HTMLTextAreaElement).value).toBe("SELECT 'typed'");
+        await waitFor(() => expect(JSON.parse(localStorage.getItem("rebase_sql_tabs_default") ?? "[]")[0].sql).toBe("SELECT 'typed'"));
     });
 });

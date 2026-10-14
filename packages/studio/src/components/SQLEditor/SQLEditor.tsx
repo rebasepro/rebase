@@ -371,8 +371,11 @@ export const SQLEditor = () => {
         }];
     });
     const [activeTabId, setActiveTabId] = useState<string>(() => {
-        const projectPrefixSync = client?.baseUrl ? client.baseUrl.replace(/^https?:\/\//, "").replace(/[^a-zA-Z0-9]/g, "_") : "default";
-        return readStoredString(`rebase_sql_active_tab_${projectPrefixSync}`) || "1";
+        const stored = readStoredString(`rebase_sql_active_tab_${getStoragePrefix(client?.baseUrl)}`);
+        // A stored id that names none of the tabs — the tabs' own write did
+        // not land — would leave the editor on the first tab while every edit
+        // went to a tab that is not there.
+        return stored && tabs.some(t => t.id === stored) ? stored : tabs[0].id;
     });
 
     const activeTab = tabs.find(t => t.id === activeTabId) || tabs[0];
@@ -864,12 +867,23 @@ role: connection.role });
         });
     }, [resultSql, projectPrefix]);
 
-    const handlePrettify = () => {
-        setSql(formatSql(activeTab.sql));
-    };
-
-    /** The editor, for the selection the toolbar's buttons act on. */
+    /** The editor, for the text and the selection the toolbar's buttons act on. */
     const editorHandle = useRef<MonacoEditorHandle>(null);
+
+    /**
+     * The text in the editor now. Read from the editor, never from the tab's
+     * `sql`: an edit reaches the tab only when the console re-renders, so a
+     * Run, an Explain or a Format right after a paste acted on the text from
+     * before it. The tab's text stands in only until the editor has mounted.
+     */
+    const currentEditorText = useCallback(
+        () => editorHandle.current?.getValue() ?? activeTab.sql,
+        [activeTab.sql]
+    );
+
+    const handlePrettify = () => {
+        setSql(formatSql(currentEditorText()));
+    };
 
     /**
      * The tabs with a run or an explain in flight. A ref, not the tab's
@@ -907,7 +921,7 @@ role: connection.role });
     const handleExplain = async () => {
         // The selected statement when there is one, as Cmd+Enter runs it; and
         // planned, never executed — see `buildExplainSql`.
-        const explainSql = buildExplainSql(editorHandle.current?.getSelectedText() ?? activeTab.sql);
+        const explainSql = buildExplainSql(editorHandle.current?.getSelectedText() ?? currentEditorText());
         if (!explainSql) {
             updateActiveTab({ results: null,
 error: t("studio_sql_explain_single_statement") });
@@ -944,9 +958,12 @@ execTime: Math.round(performance.now() - start) });
         }
     };
 
-    const executeRun = useCallback((sqlOverride?: string) => runOnce(activeTab.id, async () => {
-        const written = sqlOverride || activeTab.sql;
-        const sqlToRun = (autoLimit ? withAutoLimit(written, 1000) : null) ?? written;
+    /**
+     * Run `statement` — exactly the text the person ran, the selection or the
+     * whole of `buffer` — and keep `buffer` in the history.
+     */
+    const executeRun = useCallback((statement: string, buffer: string) => runOnce(activeTab.id, async () => {
+        const sqlToRun = (autoLimit ? withAutoLimit(statement, 1000) : null) ?? statement;
 
         updateActiveTab({ loading: true,
 error: null,
@@ -989,8 +1006,8 @@ truncatedFrom: null });
                     setConnectionOwner(run.effectiveRole !== connection.role ? run.effectiveRole : null);
                 }
 
-                if (history[history.length - 1] !== activeTab.sql) {
-                    saveHistory([...history, activeTab.sql]);
+                if (history[history.length - 1] !== buffer) {
+                    saveHistory([...history, buffer]);
                 }
             } else {
                 updateActiveTab({ error: t("studio_sql_execution_not_supported") });
@@ -1007,20 +1024,27 @@ truncatedFrom: null });
         }
         // `runOnce` reads only a ref.
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }), [activeTab.id, activeTab.sql, autoLimit, databaseAdmin, history, updateActiveTab, selectedDatabase, selectedRole]);
+    }), [activeTab.id, autoLimit, databaseAdmin, history, updateActiveTab, selectedDatabase, selectedRole]);
 
+    /**
+     * Run what the editor holds at the moment of the click or the keypress:
+     * the selection, or else all of it. The confirmation is asked about that
+     * text, and accepting it runs that text — not whatever the buffer holds
+     * by then.
+     */
     const handleRun = useCallback(async (selectedText?: string) => {
-        const sqlTarget = selectedText || activeTab.sql;
-        if (!sqlTarget.trim()) return;
+        const buffer = currentEditorText();
+        const statement = selectedText || buffer;
+        if (!statement.trim()) return;
 
-        if (needsDestructiveConfirmation(sqlTarget)) {
-            setPendingAction(() => () => executeRun(selectedText));
+        if (needsDestructiveConfirmation(statement)) {
+            setPendingAction(() => () => executeRun(statement, buffer));
             setIsConfirmDialogOpen(true);
             return;
         }
 
-        executeRun(selectedText);
-    }, [activeTab.sql, executeRun]);
+        executeRun(statement, buffer);
+    }, [currentEditorText, executeRun]);
 
     // Global keybindings
     useEffect(() => {

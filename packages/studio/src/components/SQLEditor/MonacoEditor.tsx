@@ -14,6 +14,14 @@ import { useModeController } from "@rebasepro/app";
 export interface MonacoEditorHandle {
     /** The selected text, trimmed — `undefined` when nothing is selected. */
     getSelectedText: () => string | undefined;
+    /**
+     * The text the editor holds now — `undefined` before it has mounted.
+     *
+     * A host that acts on the text (Run, Format) reads it here, not from the
+     * `value` it last rendered: `onChange` reaches the host's state only when
+     * it re-renders, so a Run right after a paste read the text from before it.
+     */
+    getValue: () => string | undefined;
 }
 
 /** The editor's selection, trimmed — `undefined` when there is none. */
@@ -54,7 +62,8 @@ export const MonacoEditor = ({
     schemasRef.current = schemas;
 
     useImperativeHandle(ref, () => ({
-        getSelectedText: () => (editorRef.current ? selectedTextOf(editorRef.current) : undefined)
+        getSelectedText: () => (editorRef.current ? selectedTextOf(editorRef.current) : undefined),
+        getValue: () => editorRef.current?.getValue()
     }), []);
 
     const handleEditorOnMount: OnMount = (editor, monaco) => {

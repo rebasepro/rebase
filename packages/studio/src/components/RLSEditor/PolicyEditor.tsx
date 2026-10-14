@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
     Button,
     cls,
@@ -27,7 +27,7 @@ import {
     roleOptionsFor,
     type PolicyCommand
 } from "./policy-presets";
-import { MonacoEditor } from "../SQLEditor/MonacoEditor";
+import { MonacoEditor, type MonacoEditorHandle } from "../SQLEditor/MonacoEditor";
 import type { PostgresPolicy } from "./RLSEditor";
 
 export interface PolicyEditorProps {
@@ -110,14 +110,22 @@ export const PolicyEditor = ({
 
     const showCheck = command === "ALL" || command === "INSERT" || command === "UPDATE";
 
+    /**
+     * The two expression editors. Save reads what they hold now: an edit
+     * reaches `usingExpr` and `checkExpr` only when this re-renders, so a Save
+     * right after a paste wrote the expression from before it.
+     */
+    const usingEditor = useRef<MonacoEditorHandle>(null);
+    const checkEditor = useRef<MonacoEditorHandle>(null);
+
     const handleSave = () => {
         onSave({
             policyname: name,
             permissive: behavior,
             cmd: command,
             roles: roles,
-            qual: usingExpr,
-            with_check: showCheck ? checkExpr : null
+            qual: usingEditor.current?.getValue() ?? usingExpr,
+            with_check: showCheck ? checkEditor.current?.getValue() ?? checkExpr : null
         });
     };
 
@@ -256,6 +264,7 @@ export const PolicyEditor = ({
                             </div>
                             <div className={cls("h-32 border rounded-md overflow-hidden bg-white dark:bg-[#1e1e1e]", defaultBorderMixin)}>
                                 <MonacoEditor
+                                    ref={usingEditor}
                                     value={usingExpr}
                                     onChange={(v) => setUsingExpr(v || "")}
                                     readOnly={false}
@@ -274,6 +283,7 @@ export const PolicyEditor = ({
                             </div>
                             <div className={cls("h-32 border rounded-md overflow-hidden bg-white dark:bg-[#1e1e1e]", defaultBorderMixin)}>
                                 <MonacoEditor
+                                    ref={checkEditor}
                                     value={checkExpr}
                                     onChange={(v) => setCheckExpr(v || "")}
                                     readOnly={false}
