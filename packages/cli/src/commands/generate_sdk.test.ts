@@ -192,4 +192,15 @@ force: true });
         })).rejects.toThrow(/broken\.ts/);
         expect(sdkGen.generateSDK).not.toHaveBeenCalled();
     });
+
+    it("marks that refusal, so no --debug hint follows the files it names", async () => {
+        // The message names each file and why; the stack under it is the loader's.
+        const collectionsDir = collectionsDirWith({ "broken.ts": "export default { slug: ;\n" });
+
+        await expect(generateSdkCommand({
+            collectionsDir,
+            output: path.join(tmpDir, "out"),
+            cwd: tmpDir
+        })).rejects.toMatchObject({ isRefusal: true });
+    });
 });

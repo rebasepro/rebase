@@ -61,6 +61,7 @@ import {
 } from "../utils/project";
 import { detectPackageManager, getPMCommands } from "../utils/package-manager";
 import { parseCommandArgs, UsageError, wantsHelp } from "../utils/args";
+import { Refusal } from "../utils/refusal";
 import { affectsSqlSchema } from "../utils/collection-drift";
 import { ensureDevDatabase, probeTcp } from "../utils/dev-preflight";
 import { DEV_BACKEND_URL_ENV, getProjectPort } from "../utils/dev-server";
@@ -1342,7 +1343,7 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
     const portIsPinned = args["--port"] !== undefined;
     const pinnedFrontendPort = process.env.REBASE_FRONTEND_PORT;
     if (pinnedFrontendPort && !/^\d+$/.test(pinnedFrontendPort)) {
-        throw new Error(`REBASE_FRONTEND_PORT must be a number, got ${JSON.stringify(pinnedFrontendPort)}.`);
+        throw new Refusal(`REBASE_FRONTEND_PORT must be a number, got ${JSON.stringify(pinnedFrontendPort)}.`);
     }
     const frontendPort = pinnedFrontendPort
         ? Number(pinnedFrontendPort)

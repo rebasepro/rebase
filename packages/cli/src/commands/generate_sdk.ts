@@ -16,6 +16,7 @@ import { CodegenError, generateSDK, GeneratedFile, toCollectionAccessor } from "
 import { detectPackageManager, getPMCommands } from "../utils/package-manager";
 import { findProjectRoot, readEnvFile } from "../utils/project";
 import { DEV_BACKEND_URL_ENV } from "../utils/dev-server";
+import { Refusal } from "../utils/refusal";
 import { findBackendApp, loadManifest, manifestExists, writeManifest } from "../manifest";
 import { readLink } from "./cloud/context";
 import { COLLECTIONS_FLAG_HELP, COLLECTIONS_PATH_RULE } from "../utils/path-flags";
@@ -186,12 +187,15 @@ function rememberRegistration(projectRoot: string | undefined): { written: strin
  *
  * A path to a single module is read as the runtime reads one: its
  * `backendCollections`, or its `collections`.
+ *
+ * Every failure is a `Refusal`: the message names the files and why, and the
+ * stack under it is the loader's, so `bin/rebase.js` adds no --debug hint.
  */
 async function loadCollections(collectionsDir: string): Promise<CollectionConfig[]> {
     const absDir = path.resolve(collectionsDir);
 
     if (!fs.existsSync(absDir)) {
-        throw new Error(`Collections directory not found: ${absDir} (${COLLECTIONS_PATH_RULE})`);
+        throw new Refusal(`Collections directory not found: ${absDir} (${COLLECTIONS_PATH_RULE})`);
     }
 
     let jiti: (id: string, userOptions?: Record<string, unknown>) => (modulePath: string) => Record<string, unknown>;
@@ -200,7 +204,7 @@ async function loadCollections(collectionsDir: string): Promise<CollectionConfig
         jiti = (jitiModule.default || jitiModule) as typeof jiti;
     } catch {
         const installCmd = [...getPMCommands(detectPackageManager()).install, "-D", "jiti"].join(" ");
-        throw new Error(
+        throw new Refusal(
             `Could not load 'jiti'. Install it with: ${installCmd}\n` +
             "jiti is required to dynamically import TypeScript collection definitions."
         );
@@ -210,7 +214,7 @@ async function loadCollections(collectionsDir: string): Promise<CollectionConfig
         const mod = jiti(path.dirname(absDir), { interopDefault: true, esmResolve: true })(absDir);
         const listed = mod.backendCollections ?? mod.collections ?? mod.default;
         if (Array.isArray(listed)) return listed as CollectionConfig[];
-        throw new Error(
+        throw new Refusal(
             `Could not extract collections from ${absDir}.\n` +
             "A single collections module exports `backendCollections` or `collections`: an array of collections."
         );
@@ -240,7 +244,7 @@ async function loadCollections(collectionsDir: string): Promise<CollectionConfig
     }
 
     if (failures.length > 0) {
-        throw new Error(
+        throw new Refusal(
             `Could not load ${failures.length} collection file(s) from ${absDir}:\n` +
             failures.map(failure => `  • ${failure}`).join("\n") +
             "\n\nEvery collection file must import cleanly and default-export a collection — " +

@@ -12,6 +12,7 @@ import { detectPackageManager, getPMCommands } from "../utils/package-manager";
 import { cliVersion } from "../utils/version";
 import { invokedRebaseCommand } from "../utils/invoked-command";
 import { dockerClaimedPorts } from "../utils/dev-preflight";
+import { Refusal } from "../utils/refusal";
 import type arg from "arg";
 import { parseCommandArgs, wantsHelp } from "../utils/args";
 import { resolveCloudUrl, writeLink } from "./cloud/context";
@@ -352,8 +353,22 @@ ${chalk.bold("Rebase")} — Create a new project 🚀
 `);
 
     const pm = detectPackageManager();
-    const options = await promptForOptions(rawArgs, pm);
+    const options = await promptForOptions(rawArgs, pm).catch((error: unknown) => {
+        // Ctrl-C at a question. Nothing went wrong and nothing was written, so
+        // it is not reported as a failure: no `✗ User force closed the prompt`,
+        // no --debug hint — the exit a shell gives Ctrl-C, 130.
+        if (isPromptCancel(error)) {
+            console.log("");
+            process.exit(130);
+        }
+        throw error;
+    });
     await createProject(options);
+}
+
+/** Whether `error` is inquirer's answer to Ctrl-C at a prompt (`ExitPromptError`). */
+function isPromptCancel(error: unknown): boolean {
+    return error instanceof Error && error.name === "ExitPromptError";
 }
 
 /** The flags `rebase init` takes. */
@@ -1444,7 +1459,7 @@ async function replacePlaceholders(options: InitOptions) {
     const probe: ReleaseProbe = skipProbe ? { kind: "published" } : await probeRelease(version);
 
     if (probe.kind === "gap") {
-        throw new Error(
+        throw new Refusal(
             `Rebase ${version} is not fully published to npm.\n\n` +
             `${RELEASE_PROBE_PACKAGE} has no ${version} release — the registry has ${probe.found}.\n` +
             `Every @rebasepro package ships at one version, so scaffolding would pin ${allPackages.size}\n` +
@@ -1842,7 +1857,7 @@ export async function configureEnvFile(targetDirectory: string, databaseUrl?: st
 
         if (databaseUrl) {
             if (/[\r\n]/.test(databaseUrl)) {
-                throw new Error("Invalid DATABASE_URL: multiline values are not allowed.");
+                throw new Refusal("Invalid DATABASE_URL: multiline values are not allowed.");
             }
             // A supplied URL used to be written through verbatim, which quietly
             // dropped the `search_path=public` pin the generated URL below has

@@ -654,3 +654,14 @@ describe("collections that appear while dev runs", () => {
     });
 });
 
+describe("a refusal dev raises itself", () => {
+    it("is marked, so no --debug hint follows it", async () => {
+        vi.stubEnv("REBASE_FRONTEND_PORT", "five");
+        try {
+            await expect(devCommand(["node", "rebase", "dev", "--port", "45180"]))
+                .rejects.toMatchObject({ isRefusal: true, message: expect.stringContaining("REBASE_FRONTEND_PORT") });
+        } finally {
+            vi.unstubAllEnvs();
+        }
+    });
+});
