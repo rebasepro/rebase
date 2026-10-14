@@ -40,6 +40,7 @@ vi.mock("../dev-db/daemon", async importOriginal => ({
 }));
 
 const { managedDatabaseRuntimeEnv, missingDatabaseUrl, startCommand } = await import("./start");
+const { getPMCommands } = await import("../utils/package-manager");
 
 class Exit extends Error {
     constructor(readonly code: number | undefined) {
@@ -93,13 +94,31 @@ describe("rebase start without a DATABASE_URL", () => {
     });
 
     it("says how to run it against the development database, and does not boot", async () => {
+        fs.writeFileSync(path.join(state.root, "pnpm-lock.yaml"), "lockfileVersion: '9.0'\n");
         await expect(startCommand(["node", "rebase", "start"])).rejects.toEqual(new Exit(1));
 
         const output = printed.join("\n");
         expect(output).toContain("DATABASE_URL is not set");
-        expect(output).toContain('DATABASE_URL="$(rebase db url)" rebase start');
         expect(output).toContain("managed development database");
         expect(state.booted).toBe(0);
+    });
+
+    /**
+     * A scaffold has `rebase` in `node_modules/.bin`, not on PATH: the README
+     * runs it through scripts (`pnpm dev`), and the CLI's other hints spell a
+     * bare command the package manager's way. The bare `rebase db url` printed
+     * here answered `command not found`.
+     */
+    it("spells the command the way this project's package manager runs a local bin", async () => {
+        fs.writeFileSync(path.join(state.root, "pnpm-lock.yaml"), "lockfileVersion: '9.0'\n");
+        await expect(startCommand(["node", "rebase", "start"])).rejects.toEqual(new Exit(1));
+        expect(printed.join("\n")).toContain('DATABASE_URL="$(pnpm exec rebase db url)" pnpm exec rebase start');
+    });
+
+    it("spells it with npx in an npm project", async () => {
+        fs.writeFileSync(path.join(state.root, "package-lock.json"), "{}\n");
+        await expect(startCommand(["node", "rebase", "start"])).rejects.toEqual(new Exit(1));
+        expect(printed.join("\n")).toContain('DATABASE_URL="$(npx rebase db url)" npx rebase start');
     });
 
     it("boots when .env names one", async () => {
@@ -124,16 +143,18 @@ describe("rebase start without a DATABASE_URL", () => {
 });
 
 describe("missingDatabaseUrl", () => {
+    const pnpm = getPMCommands("pnpm");
+
     it("is nothing when DATABASE_URL is set", () => {
-        expect(missingDatabaseUrl({ DATABASE_URL: "postgresql://x" }, "managed")).toBeNull();
+        expect(missingDatabaseUrl({ DATABASE_URL: "postgresql://x" }, "managed", pnpm)).toBeNull();
     });
 
     it("treats a blank value as unset, as the runtime does", () => {
-        expect(missingDatabaseUrl({ DATABASE_URL: "  " }, "managed")).not.toBeNull();
+        expect(missingDatabaseUrl({ DATABASE_URL: "  " }, "managed", pnpm)).not.toBeNull();
     });
 
     it("names the Docker database when that is what `rebase dev` runs on", () => {
-        const text = (missingDatabaseUrl({}, "docker") ?? []).join("\n");
+        const text = (missingDatabaseUrl({}, "docker", pnpm) ?? []).join("\n");
         expect(text).toContain("Docker");
         expect(text).toContain("rebase db url");
     });

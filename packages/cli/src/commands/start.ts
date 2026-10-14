@@ -14,7 +14,7 @@ import chalk from "chalk";
 import { execa } from "execa";
 import { requireProjectRoot, findEnvFile, readEnvFile } from "../utils/project";
 import { parseCommandArgs, wantsHelp } from "../utils/args";
-import { detectPackageManager, getPMCommands } from "../utils/package-manager";
+import { detectPackageManager, getPMCommands, type PMCommands } from "../utils/package-manager";
 import { DEFAULT_BUNDLE_DIR } from "../bundle";
 import type { RebaseBundleStatic } from "@rebasepro/types";
 import type { DevDatabase } from "../dev-db/resolve";
@@ -118,13 +118,18 @@ export function hostRoutedNotice(staticApps: readonly RebaseBundleStatic[], port
  *
  * `kind` is what `rebase dev` runs this project on, so the line can say which
  * database `rebase db url` will print. A blank value is unset, as the runtime
- * reads it.
+ * reads it. `pm` spells the command: a scaffold has `rebase` in
+ * `node_modules/.bin`, not on PATH, so it is `pnpm exec rebase …` or
+ * `npx rebase …`, as in the CLI's other hints.
  */
 export function missingDatabaseUrl(
     env: Record<string, string | undefined>,
-    kind: DevDatabase["kind"] | null
+    kind: DevDatabase["kind"] | null,
+    pm: PMCommands
 ): string[] | null {
     if (env.DATABASE_URL?.trim()) return null;
+
+    const rebase = (args: string[]): string => pm.exec("rebase", args).join(" ");
 
     const which = kind === "docker"
         ? "the Docker database `rebase dev --docker` uses"
@@ -137,7 +142,7 @@ export function missingDatabaseUrl(
         chalk.gray("  `rebase dev` is the command that brings one of its own."),
         "",
         `  To run it on ${which}:`,
-        `    ${chalk.cyan('DATABASE_URL="$(rebase db url)" rebase start')}`,
+        `    ${chalk.cyan(`DATABASE_URL="$(${rebase(["db", "url"])})" ${rebase(["start"])}`)}`,
         "",
         chalk.gray("  For a deployment, set DATABASE_URL in the environment or in .env."),
         chalk.gray("  See https://rebase.pro/docs/deployment/self-hosting/ for the variables a deployment needs.")
@@ -249,7 +254,7 @@ export async function startCommand(rawArgs: string[] = []): Promise<void> {
     // deployment. See `missingDatabaseUrl`.
     if (!process.env.DATABASE_URL?.trim()) {
         const { devDatabaseKind } = await import("../dev-db/prepare");
-        const missing = missingDatabaseUrl(process.env, devDatabaseKind(projectRoot));
+        const missing = missingDatabaseUrl(process.env, devDatabaseKind(projectRoot), getPMCommands(detectPackageManager(projectRoot)));
         if (missing) {
             for (const line of missing) console.error(line);
             process.exit(1);
