@@ -104,6 +104,21 @@ describe("rebase storage orphans", () => {
         expect(printed.join("\n").replace(ANSI, "")).toContain("Deleted 1 file(s)");
     });
 
+    it("says in a sentence how many unused files it left out for being recent", () => {
+        // It read "1 more no row names are newer than 24h, or of unknown age".
+        const one = describeOrphanReport(report, 24).join("\n");
+        expect(one).toContain("1 more unused file is left out: it is newer than 24h, or its age is unknown,");
+        expect(one).not.toContain("no row names are newer");
+
+        const three = describeOrphanReport({ ...report, recent: 3 }, 48).join("\n");
+        expect(three).toContain("3 more unused files are left out: they are newer than 48h, or their age is unknown,");
+
+        // With none listed above it, they are not "more".
+        const only = describeOrphanReport({ ...report, orphans: [], recent: 2 }, 24).join("\n");
+        expect(only).toContain("No file older than 24h is unused.");
+        expect(only).toContain("2 unused files are left out: they are newer than 24h");
+    });
+
     it("says which collections were not read", () => {
         const lines = describeOrphanReport({ ...report, unscanned: [{ collection: "events", reason: "no data driver serves it here" }] }, 24);
         expect(lines.join("\n")).toContain("events could not be read");

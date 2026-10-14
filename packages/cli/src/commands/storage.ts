@@ -153,8 +153,11 @@ export function describeOrphanReport(report: OrphanReport, olderThanHours: numbe
         }
     }
     if (report.recent > 0) {
-        lines.push(`  ${report.recent} more no row names are newer than ${olderThanHours}h, or of unknown age, and are left out: ` +
-            "an upload can be saved before the row that names it.");
+        const one = report.recent === 1;
+        const more = report.orphans.length > 0 ? "more " : "";
+        lines.push(`  ${report.recent} ${more}unused ${one ? "file is" : "files are"} left out: ` +
+            `${one ? "it is" : "they are"} newer than ${olderThanHours}h, or ${one ? "its" : "their"} age is unknown, ` +
+            "and an upload can be saved before the row that names it.");
     }
     for (const entry of report.unscanned) {
         lines.push(`  ⚠ ${entry.collection} could not be read (${entry.reason}): a file only it names is listed above.`);
