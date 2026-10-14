@@ -4,7 +4,7 @@ import path from "node:path";
 import { Hono } from "hono";
 import type { AuthAdapter, AuthCollectionConfig } from "@rebasepro/types";
 import type { HonoEnv } from "../src/api/types";
-import { errorHandler } from "../src/api/errors";
+import { ApiError, errorHandler } from "../src/api/errors";
 import { createBuiltinAuthAdapter, type BuiltinAuthAdapterConfig } from "../src/auth/builtin-auth-adapter";
 import { hashToken } from "../src/auth/admin-user-ops";
 import type { AuthHooks } from "../src/auth/auth-hooks";
@@ -265,12 +265,20 @@ async function refreshStatus(world: World, refreshToken: string): Promise<number
     return res.status;
 }
 
-/** Whether the data plane would take this access token — the adapter's own check. */
+/**
+ * Whether the data plane would take this access token — the adapter's own
+ * check, which throws the 401 it is refused with (`SESSION_REVOKED`).
+ */
 async function accessTokenAccepted(world: World, accessToken: string): Promise<boolean> {
-    const user = await world.adapter.verifyRequest!(new Request("https://example.test/api/data/posts", {
-        headers: { authorization: `Bearer ${accessToken}` }
-    }));
-    return user !== null;
+    try {
+        const user = await world.adapter.verifyRequest!(new Request("https://example.test/api/data/posts", {
+            headers: { authorization: `Bearer ${accessToken}` }
+        }));
+        return user !== null;
+    } catch (error: unknown) {
+        if (error instanceof ApiError && error.statusCode === 401) return false;
+        throw error;
+    }
 }
 
 const workingMail = () => ({ isConfigured: () => true, send: jest.fn(async () => ({})) });

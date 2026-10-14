@@ -277,9 +277,13 @@ export interface RebaseBackend {
     services: BackendServices;
 
     /**
-     * The identity and scopes behind a bearer credential — a session token or
-     * an `rk_` API key — as this backend verifies it, or null. For an app's
-     * own socket or tunnel.
+     * The identity and scopes behind a bearer credential — a session token,
+     * an `rk_` API key or the service key — as this backend's routes judge
+     * it, for an app's own socket or tunnel. Null exactly when the routes
+     * would refuse it: it does not verify or has expired, its session was
+     * revoked, its account is gone or disabled. A session's roles are the
+     * account's now, not the ones the token claims. Throws when the backend
+     * cannot answer (`503 DATABASE_UNAVAILABLE`).
      */
     verifyCredential(token: string): Promise<VerifiedCredential | null>;
     driverRegistry: DriverRegistry;
@@ -1506,6 +1510,10 @@ export async function createRebaseBackend(options: RebaseBackendOptions): Promis
         // See ./auth/seed-admin.
         if (provision.database) await seedInitialAdmin(authAdapter?.userManagement);
     }
+    // Settled now — the app's own adapter, or the built-in one just made — so
+    // a session is judged the same way at every door, `verifyCredential`
+    // included.
+    services.authAdapter = authAdapter;
 
     // ── MCP ──────────────────────────────────────────────────────────────
     //
@@ -3700,6 +3708,7 @@ export async function createRebaseBackend(options: RebaseBackendOptions): Promis
     return {
         rebase: serverSingleton,
         services,
+        // The verdict the routes reach: the same adapter, the same key store.
         verifyCredential: (token: string) => verifyCredentialAgainst(services, token),
         driverRegistry,
         driver: defaultDriver,

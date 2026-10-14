@@ -614,15 +614,15 @@ describe("verifyCredential", () => {
     });
 
     it("answers an API key with what the key holds", async () => {
-        const { verifyCredential, configureCredentialStore } = await import("../src/auth/verify-credential");
-        configureCredentialStore(makeStore([makeKey(SCOPED_KEY_TOKEN, { scopes: ["data:read:events"] })]));
+        const { verifyCredential, configureCredentials } = await import("../src/auth/verify-credential");
+        configureCredentials({ apiKeyStore: makeStore([makeKey(SCOPED_KEY_TOKEN, { scopes: ["data:read:events"] })]) });
         try {
             expect(await verifyCredential(SCOPED_KEY_TOKEN)).toEqual(expect.objectContaining({
                 uid: "api-key:id-bbbb", roles: ["service"], scopes: ["data:read:events"], kind: "api-key"
             }));
             expect(await verifyCredential("rk_unknown_key")).toBeNull();
         } finally {
-            configureCredentialStore(undefined);
+            configureCredentials({});
         }
     });
 

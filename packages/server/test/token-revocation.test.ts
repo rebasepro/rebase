@@ -111,22 +111,31 @@ describe("every entry point that turns a token into a user reads the watermark",
 
     /**
      * Both ways a token becomes a user, each called the way its callers call
-     * it. `verifyRequest` is the HTTP path and takes a `Request`; `verifyToken`
-     * is what the WebSocket AUTHENTICATE handler calls and takes the token.
+     * it, and each refusing the way its callers read a refusal.
+     * `verifyRequest` is the HTTP path and takes a `Request`: it throws the
+     * 401 the adapter middleware answers with, which says why. `verifyToken`
+     * is what the WebSocket AUTHENTICATE handler calls and takes the token: it
+     * answers null, because a throw there means the store could not answer.
      */
     type Adapter = ReturnType<typeof createBuiltinAuthAdapter>;
-    const ENTRY_POINTS: { name: string; call: (a: Adapter, token: string) => Promise<unknown> }[] = [
+    const ENTRY_POINTS: {
+        name: string;
+        call: (a: Adapter, token: string) => Promise<unknown>;
+        expectRevoked: (outcome: Promise<unknown>) => Promise<void>;
+    }[] = [
         {
             name: "verifyRequest",
             call: (adapter, token) => adapter.verifyRequest!(
                 new Request("https://example.test/api/data/posts", {
                     headers: { authorization: `Bearer ${token}` }
                 })
-            )
+            ),
+            expectRevoked: outcome => expect(outcome).rejects.toMatchObject({ statusCode: 401, code: "SESSION_REVOKED" })
         },
         {
             name: "verifyToken",
-            call: (adapter, token) => adapter.verifyToken!(token)
+            call: (adapter, token) => adapter.verifyToken!(token),
+            expectRevoked: outcome => expect(outcome).resolves.toBeNull()
         }
     ];
 
@@ -136,7 +145,7 @@ describe("every entry point that turns a token into a user reads the watermark",
             const token = await generateAccessToken("u1", []);
             const iat = (await verifyAccessToken(token))!.iat!;
             const adapter = createBuiltinAuthAdapter({ authRepository: revokedRepo(iat) } as never);
-            await expect(entry.call(adapter, token)).resolves.toBeNull();
+            await entry.expectRevoked(entry.call(adapter, token));
         }
     );
 

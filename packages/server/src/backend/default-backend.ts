@@ -19,7 +19,7 @@
 import type { RebaseServerClient } from "@rebasepro/types";
 import { processJwtService, setDefaultJwtService } from "../auth/jwt";
 import { setDefaultAccessControl } from "../auth/access";
-import { configureCredentialStore } from "../auth/verify-credential";
+import { configureCredentials } from "../auth/verify-credential";
 import { configureUserPicking } from "../auth/user-picking";
 import { setSharedRateLimitStore } from "../auth/rate-limiter";
 import { _initRebase } from "../singleton";
@@ -43,7 +43,7 @@ export function setDefaultBackend(backend: { rebase: RebaseServerClient; service
     // installing that as the default would point it at itself.
     if (services.jwt !== processJwtService) setDefaultJwtService(services.jwt);
     setDefaultAccessControl(services.access);
-    configureCredentialStore(services.apiKeyStore);
+    configureCredentials({ apiKeyStore: services.apiKeyStore, authAdapter: services.authAdapter });
     configureUserPicking(services.collections);
     setSharedRateLimitStore(services.rateLimitStore);
     _initRebase(backend.rebase);

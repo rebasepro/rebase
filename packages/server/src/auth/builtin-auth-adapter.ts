@@ -24,7 +24,7 @@ import type {
 
 import { Hono } from "hono";
 import { hasAdminRole } from "@rebasepro/types";
-import { judgeAccessToken, replaceUserPassword, type AccessTokenVerdict } from "./token-revocation";
+import { accessTokenRefusalError, judgeAccessToken, replaceUserPassword, type AccessTokenRefusal, type AccessTokenVerdict } from "./token-revocation";
 import { customClaimsOf, processJwtService, type JwtService } from "./jwt";
 import type { AccessTokenPayload } from "./jwt";
 import type { AuthLimiters } from "./rate-limiter";
@@ -196,12 +196,12 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
     }
 
     /**
-     * The roles a verified access token runs with now, or `null` when it must
-     * not be honoured at all: revoked, or its account deleted. See
-     * `judgeAccessToken`, which both verify paths ask. A repository that
-     * cannot answer refuses the request (503), as `resolveLiveRoles` does.
+     * The roles a verified access token runs with now, or why it must not be
+     * honoured at all: revoked, or its account deleted or disabled. See
+     * `judgeAccessToken`. A repository that cannot answer refuses the
+     * request (503), as `resolveLiveRoles` does.
      */
-    async function liveRoles(payload: AccessTokenPayload): Promise<string[] | null> {
+    async function liveRoles(payload: AccessTokenPayload): Promise<string[] | AccessTokenRefusal> {
         let verdict: AccessTokenVerdict;
         try {
             verdict = await judgeAccessToken(authRepository, payload);
@@ -214,9 +214,62 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
                 refusal: verdict.refusal,
                 uid: payload.uid
             });
-            return null;
+            return verdict.refusal;
         }
         return verdict.roles ?? await resolveLiveRoles(payload.uid);
+    }
+
+    /**
+     * Who a bearer token names, now — the one judgement both verify paths
+     * make, so the data plane, the realtime socket and
+     * `backend.verifyCredential` cannot disagree about a token.
+     *
+     * `null` when it does not verify: not one of this backend's, malformed or
+     * expired. The refusal when it verifies and must not be honoured. Otherwise
+     * the account, with the roles the database holds for it now — never the
+     * ones the token claims, which can be a whole token lifetime stale.
+     */
+    async function judgeBearer(token: string): Promise<AuthenticatedUser | AccessTokenRefusal | null> {
+        // The service key first, compared in constant time.
+        if (serviceKey && safeCompare(token, serviceKey)) {
+            return {
+                uid: "service",
+                email: "service@rebase.internal",
+                roles: ["admin"],
+                isAdmin: true,
+                rawToken: token
+            };
+        }
+
+        const payload = await jwt.verifyAccessToken(token);
+        if (!payload) return null;
+
+        // A token issued before the user's revocation watermark is void,
+        // however well it verifies, and so is one whose account is gone.
+        // This is the read that makes `logout`, `change-password`,
+        // `reset-password`, `DELETE /auth/sessions` and deleting the account
+        // reach the access token instead of only the refresh row.
+        const roles = await liveRoles(payload);
+        if (!Array.isArray(roles)) return roles;
+
+        return {
+            uid: payload.uid,
+            email: payload.email ?? "",
+            displayName: payload.displayName ?? null,
+            roles,
+            isAdmin: hasAdminRole(roles),
+            // From the token, where the server wrote it at sign-in and a
+            // custom-claims hook cannot reach it. Reaches the database as
+            // `rebase.is_anonymous()` — see the claim's own note.
+            isAnonymous: payload.isAnonymous === true,
+            // What `customizeAccessToken` put on the token. Rebuilt without
+            // it, a claim-tenanted collection had no tenant to read —
+            // `rebase.jwt() ->> 'org_id'` was NULL on every backend with a
+            // `config.auth` object, which is every one that runs this. The
+            // socket's tenancy reads a claim too.
+            ...(payload.claims ? { claims: payload.claims } : {}),
+            rawToken: token
+        };
     }
 
     const adapter: AuthAdapter = {
@@ -233,99 +286,26 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
             // (storage file serving for `<img src>`) use scoped download
             // tokens via `fileTokenAuth`, which never reach this adapter.
             const token = extractBearerToken(request.headers.get("authorization"));
+            if (token === undefined) return null;
 
-            if (token === undefined) {
-                return null;
-            }
-
-            // Check service key first (constant-time)
-            if (serviceKey && safeCompare(token, serviceKey)) {
-                return {
-                    uid: "service",
-                    email: "service@rebase.internal",
-                    roles: ["admin"],
-                    isAdmin: true,
-                    rawToken: token
-                };
-            }
-
-            // JWT verification
-            const payload = await jwt.verifyAccessToken(token);
-            if (!payload) {
-                return null;
-            }
-
-            // A token issued before the user's revocation watermark is void,
-            // however well it verifies, and so is one whose account is gone.
-            // This is the read that makes `logout`, `change-password`,
-            // `reset-password`, `DELETE /auth/sessions` and deleting the
-            // account reach the access token instead of only the refresh row.
-            // Roles come from the same read — never from the token.
-            const roles = await liveRoles(payload);
-            if (!roles) return null;
-
-            const isAdmin = hasAdminRole(roles);
-
-            return {
-                uid: payload.uid,
-                email: payload.email ?? "",
-                displayName: payload.displayName ?? null,
-                roles,
-                isAdmin,
-                // From the token, where the server wrote it at sign-in and a
-                // custom-claims hook cannot reach it. Reaches the database as
-                // `rebase.is_anonymous()` — see the claim's own note.
-                isAnonymous: payload.isAnonymous === true,
-                // What `customizeAccessToken` put on the token. Rebuilt
-                // without it, a claim-tenanted collection had no tenant to read
-                // — `rebase.jwt() ->> 'org_id'` was NULL on every backend with
-                // a `config.auth` object, which is every one that runs this.
-                ...(payload.claims ? { claims: payload.claims } : {}),
-                rawToken: token
-            };
+            // A refused token is thrown as the 401 that says why —
+            // `SESSION_REVOKED`, `ACCOUNT_DISABLED` — which the adapter
+            // middleware answers with, rather than read as one that does not
+            // verify ("Invalid or expired token"), which it is not.
+            const verdict = await judgeBearer(token);
+            if (typeof verdict === "string") throw accessTokenRefusalError(verdict);
+            return verdict;
         },
 
         async verifyToken(token: string): Promise<AuthenticatedUser | null> {
-            // Service key check (constant-time)
-            if (serviceKey && safeCompare(token, serviceKey)) {
-                return {
-                    uid: "service",
-                    email: "service@rebase.internal",
-                    roles: ["admin"],
-                    isAdmin: true,
-                    rawToken: token
-                };
-            }
-
-            // JWT verification
-            const payload = await jwt.verifyAccessToken(token);
-            if (!payload) {
-                return null;
-            }
-
-            // The same judgement the request path makes above, for the same
-            // reason. This function is what the WebSocket handler calls — at
-            // AUTHENTICATE, and again on the frames that follow — so a token
-            // voided for HTTP is voided over the socket too.
-            const roles = await liveRoles(payload);
-            if (!roles) return null;
-
-            const isAdmin = hasAdminRole(roles);
-
-            return {
-                uid: payload.uid,
-                email: payload.email ?? "",
-                displayName: payload.displayName ?? null,
-                roles,
-                isAdmin,
-                // From the token, where the server wrote it at sign-in and a
-                // custom-claims hook cannot reach it. Reaches the database as
-                // `rebase.is_anonymous()` — see the claim's own note.
-                isAnonymous: payload.isAnonymous === true,
-                // The socket's tenancy reads a claim too — see verifyRequest.
-                ...(payload.claims ? { claims: payload.claims } : {}),
-                rawToken: token
-            };
+            // The same judgement the request path makes above. This is what
+            // the WebSocket handler calls — at AUTHENTICATE, and again on the
+            // frames that follow — and what `backend.verifyCredential` asks,
+            // so a token voided for HTTP is voided there too. A refusal is
+            // `null` here: the socket's contract, where a throw means the
+            // store could not answer.
+            const verdict = await judgeBearer(token);
+            return typeof verdict === "string" ? null : verdict;
         },
 
         async resolveUser(uid: string): Promise<AuthenticatedUser | null> {

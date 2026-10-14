@@ -1,7 +1,7 @@
 import type { AuthRepository } from "./interfaces";
 import type { AccessTokenPayload } from "./jwt";
 import { logger } from "../utils/logger";
-import { isDataException } from "../api/errors";
+import { ApiError, isDataException } from "../api/errors";
 
 /**
  * Has this access token been revoked?
@@ -170,6 +170,28 @@ async function readAccessVerdict(
 
     if (issuedBefore(payload, validAfter)) return { live: false, refusal: "revoked" };
     return { live: true, roles };
+}
+
+/**
+ * The 401 a door answers an access token with when {@link judgeAccessToken}
+ * refuses it — one wording and one code for each reason, wherever the token
+ * was presented.
+ *
+ * `SESSION_REVOKED` for a token whose session or account is gone: the client
+ * SDK answers it with a refresh, which the refresh route refuses for the same
+ * reason, and the client signs out. `ACCOUNT_DISABLED` for an account an
+ * administrator switched off, which no refresh can mend.
+ */
+export function accessTokenRefusalError(refusal: AccessTokenRefusal): ApiError {
+    switch (refusal) {
+        case "account-disabled":
+            return ApiError.unauthorized("This account has been disabled", "ACCOUNT_DISABLED");
+        case "account-deleted":
+            return ApiError.unauthorized("This account no longer exists", "SESSION_REVOKED");
+        case "revoked":
+        case "session-revoked":
+            return ApiError.unauthorized("Session has been revoked", "SESSION_REVOKED");
+    }
 }
 
 /** The watermark comparison {@link isAccessTokenRevoked} and the judge share. */

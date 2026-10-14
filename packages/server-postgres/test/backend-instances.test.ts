@@ -336,6 +336,10 @@ describe("an API key created in one backend does not authenticate on the other",
 
         expect((await A.app.request("/api/data/alpha_items", bearer(key))).status).toBe(200);
         expect((await B.app.request("/api/data/beta_items", bearer(key))).status).toBe(401);
+        // The backend that holds it verifies it for a socket of the app's own,
+        // as what the key holds; the other does not.
+        expect(await A.backend.verifyCredential(key)).toEqual(expect.objectContaining({ kind: "api-key", scopes: ["data:read"] }));
+        expect(await B.backend.verifyCredential(key)).toBeNull();
         // Nor does the process default know it.
         expect(await verifyCredential(key)).toBeNull();
     });

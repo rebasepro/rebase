@@ -1,5 +1,5 @@
 import { MiddlewareHandler, Context } from "hono";
-import { judgeAccessToken, type AccessJudgeRepository } from "./token-revocation";
+import { accessTokenRefusalError, judgeAccessToken, type AccessJudgeRepository } from "./token-revocation";
 import { ANONYMOUS_USER_ID, DataDriver, hasAdminRole, isPublicStorageKey } from "@rebasepro/types";
 import { jwtOf, processJwtService, AccessTokenPayload, type DownloadTokenPayload, type JwtService } from "./jwt";
 import type { HonoEnv } from "../api/types";
@@ -218,14 +218,7 @@ roles: ["admin"] } as AccessTokenPayload);
                 let judgedRoles: string[] | undefined;
                 if (revocationRepo) {
                     const verdict = await judgeAccessToken(revocationRepo, payload);
-                    if (!verdict.live) {
-                        return refuse(c, verdict.refusal === "account-disabled"
-                            ? ApiError.unauthorized("This account has been disabled", "ACCOUNT_DISABLED")
-                            : ApiError.unauthorized(
-                                verdict.refusal === "account-deleted" ? "This account no longer exists" : "Session has been revoked",
-                                "SESSION_REVOKED"
-                            ));
-                    }
+                    if (!verdict.live) return refuse(c, accessTokenRefusalError(verdict.refusal));
                     judgedRoles = verdict.roles;
                 }
                 c.set("user", resolveRoles

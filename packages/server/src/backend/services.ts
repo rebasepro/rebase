@@ -18,7 +18,7 @@
  *
  * @module
  */
-import type { CollectionConfig, QueueRuntime, TopicRuntime } from "@rebasepro/types";
+import type { AuthAdapter, CollectionConfig, QueueRuntime, TopicRuntime } from "@rebasepro/types";
 import type { JwtService } from "../auth/jwt";
 import type { AccessControl } from "../auth/access";
 import type { AuthLimiters } from "../auth/rate-limiter";
@@ -43,6 +43,14 @@ export interface BackendServices {
     rateLimitStore?: RateLimitStore;
     /** Where this backend keeps its API keys (`rk_`), when it keeps any. */
     apiKeyStore?: ApiKeyStore;
+    /**
+     * How this backend judges a session — whether it was revoked, whether its
+     * account still exists, and the roles the account holds now: its auth
+     * adapter, the built-in auth when `auth` is a config object, the app's own
+     * when it is an adapter. Every door the backend serves asks it, and so does
+     * `backend.verifyCredential`. Absent on a backend with no `auth`.
+     */
+    authAdapter?: AuthAdapter;
     /** The collections this backend serves, as they are now — a live schema edit included. */
     collections(): readonly CollectionConfig[];
     /**
