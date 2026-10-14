@@ -1874,6 +1874,10 @@ export async function configureEnvFile(targetDirectory: string, databaseUrl?: st
                     `DATABASE_PASSWORD=${dbPassword}`
                 ].join("\n")
             );
+            // The SSL note further down illustrates `sslmode=disable` with a
+            // full URL, and this file was copied from `.env.example` before the
+            // rewrite below gives that one this project's port.
+            envContent = envContent.replaceAll("@localhost:5432/rebase", `@127.0.0.1:${dbPort}/rebase`);
 
             // `.env.example` is copied to `.env` and then kept, as the reference
             // that gets committed — so it is the one file in the project that

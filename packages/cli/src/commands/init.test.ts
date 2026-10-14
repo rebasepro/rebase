@@ -1102,6 +1102,23 @@ describe(".env.example", () => {
         expect(ports.size).toBe(3);
     });
 
+    it("names one port for the compose database everywhere in .env", async () => {
+        // The SSL note in .env illustrates `sslmode=disable` with a full URL.
+        // `.env.example` got this project's port; `.env`, copied before that
+        // rewrite, kept `localhost:5432`: one file, two ports for one database.
+        const targetDir = await simulateInit("env-one-port-app");
+        await configureEnvFile(targetDir);
+
+        const compose = fs.readFileSync(path.join(targetDir, "docker-compose.yml"), "utf-8");
+        const composePort = /- "(\d+):5432"/.exec(compose)![1];
+        for (const file of [".env", ".env.example"]) {
+            const content = fs.readFileSync(path.join(targetDir, file), "utf-8");
+            const ports = [...content.matchAll(/@(?:127\.0\.0\.1|localhost):(\d+)\/rebase/g)].map(m => m[1]);
+            expect(ports.length, file).toBeGreaterThan(0);
+            expect(new Set(ports), file).toEqual(new Set([composePort]));
+        }
+    });
+
     it("leaves the compose file's other required variables satisfied too", async () => {
         // Every `${VAR:?…}` in docker-compose.yml has to be answerable from the
         // generated .env, or the file cannot be parsed at all.
