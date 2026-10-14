@@ -39,7 +39,7 @@ import {
     VENDOR_SIZE_WARN_BYTES
 } from "../bundle";
 import { assertBuiltForPath, foldFrontendIntoBundle, staticBuildEnv } from "../fold-static";
-import { deriveOptionsFor, deriveResourceGraph, writeResourceGraphFile } from "../resources/derive";
+import { deriveOptionsFor, deriveResourceGraph, RESOURCE_GRAPH_FILENAME, writeResourceGraphFile } from "../resources/derive";
 
 function printHelp(): void {
     console.log(`
@@ -264,7 +264,11 @@ export async function buildCommand(rawArgs: string[] = []): Promise<void> {
             }
             // Written alongside the bundle so the repository records what this
             // project needs. `rebase resources --check` is what keeps it honest.
-            writeResourceGraphFile(projectRoot, resourceGraph);
+            // Committed, so a change to it is said: the first build of a
+            // scaffold otherwise left it untracked with no word on what it is.
+            if (writeResourceGraphFile(projectRoot, resourceGraph).changed) {
+                console.log(chalk.dim(`  ${RESOURCE_GRAPH_FILENAME} updated — commit it: it records what this project needs from a host`));
+            }
 
             /* The framework pins, read before the build and reported after it.
                Ranges no single version satisfies are refused by `buildBundle`

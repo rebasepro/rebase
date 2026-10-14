@@ -199,6 +199,28 @@ describe("the build summary line", () => {
 });
 
 /**
+ * `rebase build` writes `rebase.resources.json`, which is committed — a host
+ * reads it to provision what the project declares, and `rebase resources
+ * --check` holds it to the config — and said nothing, so the first build of a
+ * scaffold left `?? rebase.resources.json` in `git status` with no word on what
+ * to do with it.
+ */
+describe("the resource graph a build writes", () => {
+    const printed = (): string => vi.mocked(console.log).mock.calls.map(c => String(c[0])).join("\n");
+
+    it("says to commit it when the build changed it, and only then", async () => {
+        manifest("managed");
+        await buildCommand(["node", "rebase", "build"]);
+        expect(fs.existsSync(path.join(projectRoot, "rebase.resources.json"))).toBe(true);
+        expect(printed()).toMatch(/rebase\.resources\.json updated — commit it/);
+
+        vi.mocked(console.log).mockClear();
+        await buildCommand(["node", "rebase", "build"]);
+        expect(printed()).not.toContain("rebase.resources.json");
+    });
+});
+
+/**
  * The command a custom runtime is told to run has to be one that works.
  *
  * It was `docker build -f <dockerfile> .` for every project, with the `.` a
