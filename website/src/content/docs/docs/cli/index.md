@@ -64,6 +64,13 @@ restarts the backend, which reads the file again, as the admin panel does. What
 `DATABASE_URL` when it is on the managed database or on Docker. On 0.24 an `.env`
 edit reached the backend only when some other watched file changed.
 
+<span class="since-badge" data-since="0.25">Since 0.25</span> With
+`--database-url`, `rebase dev` first checks that something answers at that host
+and port. If nothing does, it says so, naming the flag, and exits `1` with
+nothing started; it also leaves the database `.env` names alone, never starting
+its compose container. On 0.24 the backend's banner said to verify
+`DATABASE_URL` in `.env`, and dev kept running with the backend down.
+
 ### `rebase build`
 
 Build the project into a deployable bundle in `dist-bundle/`:

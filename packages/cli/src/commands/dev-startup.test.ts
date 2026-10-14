@@ -41,6 +41,8 @@ const prepareDatabaseEnv = vi.fn<(root: string, options: PrepareCall) => Promise
 const runDriverSchemaCommand = vi.fn<(argv: string[], options?: { quiet?: boolean }) => Promise<void>>();
 /** The DSN each `--docker` preflight decided from. */
 const preflightUrls: Array<string | undefined> = [];
+/** Whether each preflight was told to start nothing. */
+const preflightDisabled: boolean[] = [];
 
 vi.mock("../utils/project", async importOriginal => {
     const actual = await importOriginal<typeof import("../utils/project")>();
@@ -76,8 +78,9 @@ vi.mock("../utils/dev-preflight", async importOriginal => {
         // Only what a test says is busy: the pinned port is free, and the
         // liveness poll never runs long enough to matter.
         probeTcp: async (_host: string, port: number) => busyPorts.has(port),
-        ensureDevDatabase: async (options: { databaseUrl?: string }) => {
+        ensureDevDatabase: async (options: { databaseUrl?: string; disabled?: boolean }) => {
             preflightUrls.push(options.databaseUrl);
+            preflightDisabled.push(options.disabled === true);
             return { action: "no-dsn" as const };
         }
     };
@@ -320,6 +323,43 @@ describe("rebase dev's start-up", () => {
 
         expect(preflightUrls).toHaveLength(1);
         expect(preflightUrls[0] ?? "").not.toContain(":5435/");
+    });
+
+    /**
+     * `rebase dev --database-url <dead>` printed the backend's banner, "Verify
+     * DATABASE_URL in your .env file" — the reader had typed a flag — and kept
+     * running with the backend dead.
+     */
+    it("exits naming --database-url when nothing answers where it points, having started nothing", async () => {
+        const exit = vi.spyOn(process, "exit").mockImplementation((code?: string | number | null) => {
+            throw new Error(`process.exit(${code})`);
+        });
+        preflightUrls.length = 0;
+        await expect(devCommand(["node", "rebase", "dev", "--backend-only", "--port", "45131",
+            "--database-url", "postgres://u@127.0.0.1:5999/app"])).rejects.toThrow("process.exit(1)");
+
+        const errors = vi.mocked(console.error).mock.calls.map(call => call.map(String).join(" ")).join("\n");
+        expect(errors).toContain("--database-url");
+        expect(errors).toContain("127.0.0.1:5999");
+        expect(errors).not.toContain(".env");
+        expect(spawned.some(s => s.file === "/bin/true")).toBe(false);
+        expect(prepareDatabaseEnv).not.toHaveBeenCalled();
+        expect(preflightUrls).toEqual([]);
+        exit.mockRestore();
+    });
+
+    it("runs on a --database-url that answers, and leaves .env's database to the preflight not at all", async () => {
+        // The preflight decides from `.env` and may start its compose
+        // container; a flag that outranks `.env` is not that database.
+        busyPorts.add(5998);
+        preflightDisabled.length = 0;
+        const run = devCommand(["node", "rebase", "dev", "--backend-only", "--port", "45132",
+            "--database-url", "postgres://u@127.0.0.1:5998/app"]);
+        generation.resolve();
+        await vi.waitFor(() => expect(spawned.some(s => s.file === "/bin/true")).toBe(true));
+        for (const child of spawned) child.end();
+        await run;
+        expect(preflightDisabled).toEqual([true]);
     });
 
     it("hands the --docker preflight the compose URL when Docker is what it runs on", async () => {

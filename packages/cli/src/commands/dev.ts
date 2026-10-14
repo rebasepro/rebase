@@ -734,6 +734,34 @@ export async function pinnedPortRefusal(port: number, pinned: boolean): Promise<
 }
 
 /**
+ * Why `rebase dev` will not start on the database `--database-url` names, or
+ * null when something answers there.
+ *
+ * A TCP connect, not a login: whether the credentials are right is the
+ * backend's to say, and it says so in terms of the URL it was given. A URL
+ * that does not parse is the backend's to refuse too.
+ *
+ * Exported for its test.
+ */
+export async function unreachableDatabaseFlag(
+    url: string,
+    probe: (host: string, port: number, timeoutMs?: number) => Promise<boolean> = probeTcp
+): Promise<string | null> {
+    let host: string;
+    let port: number;
+    try {
+        const parsed = new URL(url);
+        host = parsed.hostname.replace(/^\[(.*)\]$/, "$1") || "localhost";
+        port = parsed.port ? Number(parsed.port) : 5432;
+    } catch {
+        return null;
+    }
+    if (await probe(host, port, 3_000)) return null;
+    return `Nothing answers at ${host}:${port}, the database --database-url names. ` +
+        "Start it, or pass a --database-url that reaches one. Nothing was started.";
+}
+
+/**
  * The frontend port for this project, derived the same way the backend's is.
  *
  * `rebase dev` used to leave this entirely to Vite, which takes 5173 and, when
@@ -1282,6 +1310,19 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
         }
     }
 
+    const flagUrl = typeof args["--database-url"] === "string" ? args["--database-url"] : null;
+    // A database named on this command line that nothing answers at is the
+    // same kind of refusal, said in the flag's terms. The backend's own banner
+    // said "Verify DATABASE_URL in your .env file", and dev ran on with the
+    // backend dead.
+    if (!frontendOnly && !noDb && flagUrl) {
+        const refusal = await unreachableDatabaseFlag(flagUrl);
+        if (refusal) {
+            console.error(chalk.red(`  ✗ ${refusal}`));
+            process.exit(1);
+        }
+    }
+
     const startsBackend = !frontendOnly && Boolean(backendDir);
 
     // Before anything is started, because the database now starts at once: a
@@ -1312,7 +1353,6 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
      * which is the failure the flag exists to produce.
      */
     let prepared: PreparedDatabase | null = null;
-    const flagUrl = typeof args["--database-url"] === "string" ? args["--database-url"] : null;
     if (!frontendOnly) {
         // `--docker` names a container, not a connection string, and the
         // preflight is what starts it — but only when the order picks Docker. A
@@ -1328,9 +1368,12 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
             // Side by side: they read the same collections and write different
             // files, so the SDK costs nothing on top of the schema.
             generate: async () => (await Promise.all([ensureGeneratedSchema(projectRoot), regenerateSdk(projectRoot)]))[0],
+            // Not under --database-url: the preflight decides from `.env`, and
+            // may start the compose container it names, which is not the
+            // database the flag points this run at.
             preflight: () => runDatabasePreflight({
                 projectRoot,
-                disabled: noDb,
+                disabled: noDb || flagUrl !== null,
                 databaseUrl: dockerUrl
             }),
             database: startsBackend && !noDb
