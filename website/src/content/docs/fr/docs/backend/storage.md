@@ -308,7 +308,7 @@ protocole, ce qu'il renvoie et son comportement à travers plusieurs instances.
 | Variable | Description |
 |----------|-------------|
 | `STORAGE_TYPE` | `"local"`, `"s3"` ou `"gcs"` |
-| `STORAGE_PATH` | Répertoire de stockage local (par défaut : `./uploads`). Un bucket local nommé conserve ses fichiers à côté, dans `<STORAGE_PATH>__<key>`, sauf si `STORAGE_PATH__<KEY>` en définit un propre |
+| `STORAGE_PATH` | Répertoire de stockage local (par défaut : `<project>/uploads`, sous `rebase dev` comme dans un serveur écrit par `rebase eject`). Un chemin relatif est lu depuis le répertoire où tourne le serveur, qui après `rebase eject` est `backend/`. Un bucket local nommé conserve ses fichiers à côté, dans `<STORAGE_PATH>__<key>`, sauf si `STORAGE_PATH__<KEY>` en définit un propre |
 | `S3_BUCKET` | Nom du bucket S3 |
 | `S3_REGION` | Région AWS (par défaut : `"auto"`) |
 | `S3_ACCESS_KEY_ID` | Clé d'accès AWS |

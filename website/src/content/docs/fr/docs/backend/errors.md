@@ -311,7 +311,7 @@ Une route renvoie l'un de ces codes lorsqu'aucun motif plus précis ne s'appliqu
 | `CONFLICT` | 409 | Conflit avec l'état existant. | Voir le message. |
 | `INTERNAL_ERROR` | 500 | Une erreur est survenue sur le serveur. Le message est délibérément générique. | Citez le `requestId` ; le détail figure dans les logs. |
 | `NOT_CONFIGURED` | 503 | Une dépendance requise par cette route n'est pas configurée sur ce serveur. | Voir le message. |
-| `SERVICE_UNAVAILABLE` | 503 | Une dépendance était inaccessible. | Réessayez ; consultez les logs. |
+| `SERVICE_UNAVAILABLE` | 503 | Un service dont dépend la requête était injoignable : un bucket S3 ou MinIO, ou un hôte qu'une fonction appelle avec `fetch()` et qui refuse la connexion ou ne se résout pas. Le log du serveur nomme l'hôte ; la réponse non. Une base de données injoignable est `DATABASE_UNAVAILABLE`. <span class="since-badge" data-since="0.25">Depuis 0.25</span> Une connexion qui échoue vers un tel service répond ce code ; en 0.24, elle répond une `500` dont le code est l'erreur de socket (`ECONNREFUSED`), ou `INTERNAL_ERROR`. | Réessayez ; consultez les logs. |
 
 ## Maintenir l'exactitude de cette page
 

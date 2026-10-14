@@ -30,6 +30,11 @@ rebase db push
 `--database-url <url>` désigne la base de données, et `--docker` celle de docker compose, démarrée
 si nécessaire. `generate`, `migrate`, `branch`, `backup` et `restore` acceptent aussi les deux.
 
+Il laisse en paix ce que vos collections ne décrivent pas : les autres tables et vues, les index
+que vous avez écrits, et les contraintes CHECK et EXCLUDE de la table d'une collection, qu'une
+collection ne peut pas déclarer. Voir [`rebase db push`](/docs/cli/schema/#rebase-db-push) pour
+ce qu'il applique et ce avant quoi il s'arrête.
+
 :::caution
 `db push` modifie directement la base de données sans fichiers de migration. Utilisez `db generate` + `db migrate` pour la production.
 :::

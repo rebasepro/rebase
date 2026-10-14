@@ -84,8 +84,8 @@ substitué. Ainsi, la variable fonctionne de la même manière dans les deux env
 cas nécessitant son utilisation en développement sont classiques :
 
 ```bash
-# Un téléphone sur le réseau local, la machine d'un collègue, un tunnel ngrok,
-# un port Codespaces redirigé — toutes des origines différentes de localhost.
+# A phone on the LAN, a colleague's machine, an ngrok tunnel,
+# a forwarded Codespaces port — all non-localhost origins.
 CORS_ORIGINS=http://192.168.1.5:5173
 ```
 
@@ -169,7 +169,7 @@ un hook `storageAuthorize` exporté depuis `config/index.ts` (ce que fournit le 
 | Variable | Description | Par défaut |
 |----------|-------------|------------|
 | `STORAGE_TYPE` | Backend de stockage : `local`, `s3` ou `gcs`. En production, `local` désactive le stockage à moins que `FORCE_LOCAL_STORAGE=true` | `local` |
-| `STORAGE_PATH` | Chemin de base pour le stockage local | `./uploads` |
+| `STORAGE_PATH` | Chemin de base pour le stockage local. Un chemin relatif est lu depuis le répertoire où tourne le serveur : la racine du projet sous `rebase dev`, `backend/` dans un serveur écrit par `rebase eject` | `<project>/uploads` |
 | `FORCE_LOCAL_STORAGE` | Autorise le stockage local en production — uniquement avec un volume persistant contenant `STORAGE_PATH` et les répertoires `<STORAGE_PATH>__<key>` des buckets locaux nommés à côté | `false` |
 | `STORAGE_DOWNLOAD_TOKEN_TTL` | Durée de validité en secondes de l'URL de téléchargement d'un fichier privé — le jeton que `getSignedUrl()` y insère. Au maximum `604800` (une semaine) | `300` |
 | `STORAGE_MAX_FILE_SIZE` | Taille maximale de fichier acceptée par la source, en octets, sur chaque chemin d'upload — `__<KEY>` pour une source nommée. Une valeur qui n'est pas un nombre entier d'octets refuse le démarrage | `52428800` (50 Mo) |

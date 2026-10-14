@@ -100,6 +100,10 @@ rebase schema introspect
 - <span class="since-badge" data-since="0.25">Depuis 0.25</span> Face à une
   base de données qui ne tourne pas, affiche une fois la même bannière que `db push`,
   et ne crée rien. Elle affiche le répertoire de sortie sous forme de chemin absolu
+- <span class="since-badge" data-since="0.25">Depuis 0.25</span> Laisse les contraintes CHECK et EXCLUDE d'une
+  table dans la base de données, là où le `db push` qui suit les conserve. Une collection ne peut
+  déclarer ni l'une ni l'autre ; un CHECK que l'introspection sait lire (`total >= 0`) devient
+  aussi la `validation` de la propriété. En 0.24, ce push les supprimait
 
 **Options :**
 
@@ -136,9 +140,11 @@ rebase db push
 **Ce qu'elle fait :**
 - Lit le schéma Drizzle généré
 - Applique les changements directement à la base de données (CREATE, ALTER, DROP)
-- Exécute d'abord le plan à blanc (dry run) et s'arrête avant tout ce qui détruit des données : une table, une colonne, un schéma, une vue ou un type supprimés, un `TRUNCATE`, un changement de type de colonne qui peut perdre des valeurs (`timestamptz` → `date`, `numeric` → `integer`), ou un changement de clé primaire : `(id)` → `(id, locale)` donne un nouvel id à chaque ligne, si bien que les liens, les clés étrangères et les ids conservés ailleurs ne retrouvent plus leur ligne. Il demande confirmation dans un terminal, où Ctrl-C ou Ctrl-D répond non, et refuse sinon ; `--allow-destructive` (ou `--yes`) l'applique quand même. Un push qui s'arrête là supprime en sortant sa base temporaire `<db>_dev_diff`
+- Exécute d'abord le plan à blanc (dry run) et s'arrête avant tout ce qui détruit des données : une table, une colonne, un schéma, une vue ou un type supprimés, un `TRUNCATE`, un changement de type de colonne qui peut perdre des valeurs (`timestamptz` → `date`, `numeric` → `integer`), ou un changement de clé primaire : `(id)` → `(id, locale)` donne un nouvel id à chaque ligne, si bien que les liens, les clés étrangères et les ids conservés ailleurs ne retrouvent plus leur ligne. <span class="since-badge" data-since="0.25">Depuis 0.25</span> Il s'arrête aussi avant la suppression d'une contrainte CHECK ou EXCLUDE que la base de données détient : aucune ligne n'est perdue, mais dès lors la base accepte des lignes qu'elle refusait. Il demande confirmation dans un terminal, où Ctrl-C ou Ctrl-D répond non, et refuse sinon ; `--allow-destructive` (ou `--yes`) l'applique quand même. Un push qui s'arrête là supprime en sortant sa base temporaire `<db>_dev_diff`
 - Active la sécurité au niveau des lignes sur chaque table de collection, tables de jointure comprises, juste après le changement de schéma et avant toute étape qui peut échouer : un push qui s'arrête en cours de route laisse une nouvelle table refuser toutes les requêtes plutôt que de leur être ouverte
 - Applique les politiques RLS de vos collections et **supprime celles qu'un push précédent a remplacées**
+- <span class="since-badge" data-since="0.25">Depuis 0.25</span> Laisse telles quelles toutes les contraintes CHECK et EXCLUDE de la table d'une collection. Une collection ne peut déclarer ni l'une ni l'autre : ce sont donc les règles propres de la base de données, écrites à la main ou apportées par une base que `schema introspect` a adoptée ; pour en retirer une, supprimez-la à la main (`ALTER TABLE … DROP CONSTRAINT …`). Les triggers et les fonctions que vous avez écrits ne sont pas touchés non plus. En 0.24, le premier push après une introspection supprimait toutes les contraintes CHECK et EXCLUDE sans confirmation
+- <span class="since-badge" data-since="0.25">Depuis 0.25</span> Reconnaît par son nom exact tout ce qu'il laisse tranquille, même si ce nom contient un `.`, `[`, `]` ou `*`. En 0.24, un index écrit à la main et nommé comme `orders_idx[v1]` était supprimé sans confirmation, et un `.` dans le nom d'une table ou d'un index faisait échouer chaque push avec `too many parts in pattern`
 - <span class="since-badge" data-since="0.25">Depuis 0.25</span> Construit, **avant** de planifier, tout [index de clé étrangère que Rebase dérive](/docs/backend/indexes#foreign-keys-are-indexed-for-you)
   et qui manque à une table existante, avec `CREATE INDEX CONCURRENTLY`, de sorte que les écritures sur la
   table continuent pendant la construction ; Atlas le trouve ensuite en place. `--dry-run` les nomme et ne
@@ -206,8 +212,19 @@ rebase db generate
   instruction de la nouvelle migration qui détruit des données, avec la vérification
   que `db push` exécute avant d'appliquer : une table, colonne, schéma, vue ou type
   supprimé, un `TRUNCATE`, un changement de type de colonne pouvant perdre des valeurs,
-  ou un changement de clé primaire. Elle écrit quand même le fichier et se termine
+  un changement de clé primaire, ou la suppression d'une contrainte CHECK ou EXCLUDE que la
+  base de données détient. Elle écrit quand même le fichier et se termine
   avec le code 0 : elle avertit, elle ne refuse pas.
+
+**Un CHECK qu'une de vos migrations a ajouté est supprimé par la suivante.** `db generate`
+compare vos fichiers de migration, pas la base de données, et Atlas n'a aucun moyen d'exclure
+un objet de cette comparaison. Une contrainte CHECK ou EXCLUDE que vous avez écrite à la main
+dans une migration, et qu'aucune collection ne peut déclarer, revient donc sous la forme
+`ALTER TABLE … DROP CONSTRAINT …` dans la prochaine migration qu'elle écrit, fondue dans la
+même instruction que le vrai changement. Le rapport ci-dessus nomme cette suppression lorsque la
+base de données détient déjà la contrainte ; il ne la retire pas du fichier. Supprimez la clause
+avant `rebase db migrate`, ou laissez `rebase db migrate --refuse-destructive` s'arrêter dessus.
+`db push` lit la base de données et conserve la contrainte.
 
 Les migrations générées sont de simples fichiers SQL — vous pouvez les inspecter et les modifier avant de les appliquer.
 
