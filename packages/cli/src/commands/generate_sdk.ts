@@ -188,8 +188,10 @@ function rememberRegistration(projectRoot: string | undefined): { written: strin
  * A path to a single module is read as the runtime reads one: its
  * `backendCollections`, or its `collections`.
  *
- * Every failure is a `Refusal`: the message names the files and why, and the
- * stack under it is the loader's, so `bin/rebase.js` adds no --debug hint.
+ * A missing directory, a missing jiti and a module that exports no collections
+ * are `Refusal`s: the message says all there is. A collection file that throws
+ * on import is not: that is the project's own code failing, and the stack
+ * `--debug` prints points at the line, so `bin/rebase.js` keeps its hint.
  */
 async function loadCollections(collectionsDir: string): Promise<CollectionConfig[]> {
     const absDir = path.resolve(collectionsDir);
@@ -244,7 +246,7 @@ async function loadCollections(collectionsDir: string): Promise<CollectionConfig
     }
 
     if (failures.length > 0) {
-        throw new Refusal(
+        throw new Error(
             `Could not load ${failures.length} collection file(s) from ${absDir}:\n` +
             failures.map(failure => `  • ${failure}`).join("\n") +
             "\n\nEvery collection file must import cleanly and default-export a collection — " +

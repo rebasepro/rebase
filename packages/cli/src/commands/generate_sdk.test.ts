@@ -193,14 +193,16 @@ force: true });
         expect(sdkGen.generateSDK).not.toHaveBeenCalled();
     });
 
-    it("marks that refusal, so no --debug hint follows the files it names", async () => {
-        // The message names each file and why; the stack under it is the loader's.
+    it("keeps the --debug hint for a collection file that throws, whose stack is the project's own", async () => {
+        // A file that fails on import is the project's code failing; `--debug`
+        // prints the stack that points at the line, so this is not a Refusal.
         const collectionsDir = collectionsDirWith({ "broken.ts": "export default { slug: ;\n" });
 
         await expect(generateSdkCommand({
             collectionsDir,
             output: path.join(tmpDir, "out"),
             cwd: tmpDir
-        })).rejects.toMatchObject({ isRefusal: true });
+        })).rejects.not.toMatchObject({ isRefusal: true });
     });
+
 });
