@@ -552,7 +552,7 @@
   checks something instead of printing its help and exiting 0. Each workspace
   still typechecks on its own.
 
-- **`rebase status --json` reports the branch.** It includes `branch: { name,
+- **`rebase status` reports the branch.** It includes `branch: { name,
   database }` when the checkout is switched to one, and the human output says
   so.
 
@@ -859,8 +859,8 @@
   through `verifyCredential` as `kind: "service-key"`, as it does on the HTTP
   routes, where it used to be `null`.
 
-- **`requireScope` refuses a scope nobody could hold where the route is
-  registered.** A name that is not a scope, a target written into the scope, or
+- **A route's scope guard refuses a scope nobody could hold where the route is
+  registered.** In `requireScope`, a name that is not a scope, a target written into the scope, or
   a misspelt built-in such as `data:raed` throws at registration. An app scope
   the backend does not declare under `auth.scopes` answers `500
   SCOPE_NOT_DECLARED`, instead of `403 SCOPE_MISSING` to everyone, admin
@@ -1173,8 +1173,9 @@
   form submits** (before `onSubmit`) or unmounts, and is dropped when the form
   resets. It is otherwise still debounced by 300 ms.
 
-- **`getEntityChildViews` gives a relation tab its target's `singularName`.**
-  The declaring property's `name` still names the tab, so dialogs say "Remove
+- **A relation tab takes its target's singular name.** `getEntityChildViews`
+  sets the child view's `singularName` from the target collection; the
+  declaring property's `name` still names the tab, so dialogs say "Remove
   this Tag from this record?" and "Add Tag", not "this Tags".
 
 #### UI kit & plugins
@@ -1338,22 +1339,22 @@
   from their defaults, and builds the static app with pnpm in a pnpm project.
   The inferred static app is still named `web`.
 
-- **`rebase db pull` replaces the local database's contents.** It empties every
-  schema it copies, in one transaction, before restoring. For a whole-database
+- **A pull replaces the local database's contents.** `rebase db pull` empties
+  every schema it copies, in one transaction, before restoring. For a whole-database
   pull that is every local schema, so tables that exist only locally, migration
   history included, no longer survive a pull.
 
-- **`rebase api-keys` and `rebase storage` need an address for a server `rebase
-  dev` did not start.** For `rebase start` in production mode, or a server in a
+- **The service-key commands need an address for a server dev did not start.**
+  For `rebase api-keys` and `rebase storage` against `rebase start` in production mode, or a server in a
   container, set `REBASE_BASE_URL`; see the Security entry.
 
-- **`rebase db branch` subcommands refuse a flag they do not take**, `switch`
-  included, and name the closest one ("did you mean --older-than?"), as `db
-  backup` and `db restore` do. They used to ignore it, so `--froce` ran without
-  `--force`.
+- **The branch subcommands refuse a flag they do not take.** Every
+  `rebase db branch` action, `switch` included, names the closest real flag
+  ("did you mean --older-than?"), as `db backup` and `db restore` do. They used
+  to ignore it, so `--froce` ran without `--force`.
 
-- **`rebase init` gives each project its own compose port.** The host port comes
-  from a per-project range (5433–5632, derived from the project path), never
+- **Each new project gets its own compose port.** `rebase init` takes the host
+  port from a per-project range (5433–5632, derived from the project path), never
   5432, and skips ports any Docker container is bound to, running or stopped.
 
 - **After `schema introspect` on tables with row-level security off, `rebase db
@@ -2893,10 +2894,10 @@
   history nor the process list, and connection strings in the driver CLI's
   errors are shown as `user:***@`.
 
-- **`rebase api-keys`, `rebase storage` and `rebase auth reset-password` send
-  the service key only to this project's backend.** With `rebase dev` stopped,
-  they fell back to `.env`'s `PORT` (3001 in every scaffold) or to a stopped
-  backend's leftover address, and sent the admin service key to whatever
+- **The CLI sends the service key only to this project's backend.** With `rebase
+  dev` stopped, `rebase api-keys`, `rebase storage` and `rebase auth
+  reset-password` fell back to `.env`'s `PORT` (3001 in every scaffold) or to a
+  stopped backend's leftover address, and sent the admin service key to whatever
   listened there. They now use `REBASE_BASE_URL` when you set it, or the address
   the running backend recorded while its process is alive. Otherwise `api-keys`
   and `storage` refuse before sending anything, and `reset-password` resets
