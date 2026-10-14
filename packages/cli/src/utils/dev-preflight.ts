@@ -233,7 +233,15 @@ function expandComposeValue(
     return trimmed.length > 0 ? trimmed : null;
 }
 
-/** Is something accepting connections there right now? */
+/**
+ * Is something accepting connections there right now?
+ *
+ * A reset counts as yes: a refused connection means nothing listens, a reset
+ * means something accepted it and dropped it — Docker's port proxy, while the
+ * Postgres behind it is still starting. On macOS that reset arrives after
+ * `connect`; on Linux it can arrive instead of it, and read as "not listening"
+ * the port wait spun for its whole minute before readiness was ever asked.
+ */
 export function probeTcp(host: string, port: number, timeoutMs = 700): Promise<boolean> {
     return new Promise(resolve => {
         const socket = new net.Socket();
@@ -249,7 +257,7 @@ export function probeTcp(host: string, port: number, timeoutMs = 700): Promise<b
         socket.setTimeout(timeoutMs);
         socket.once("connect", () => done(true));
         socket.once("timeout", () => done(false));
-        socket.once("error", () => done(false));
+        socket.once("error", (error: Error) => done("code" in error && error.code === "ECONNRESET"));
         socket.connect(port, host);
     });
 }

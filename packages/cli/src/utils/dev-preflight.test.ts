@@ -283,6 +283,20 @@ describe("probeTcp", () => {
         expect(await probeTcp("127.0.0.1", port)).toBe(false);
     });
 
+    it("is true for a port that accepts and resets every connection, as Docker's proxy does", async () => {
+        // Something is listening; a refusal would be the "nothing there" answer.
+        // On Linux the reset can reach the client instead of `connect`, which
+        // read as closed and kept the port wait spinning for its whole minute.
+        const server = net.createServer(socket => { socket.resetAndDestroy(); });
+        await new Promise<void>(resolve => server.listen(0, "127.0.0.1", resolve));
+        const port = (server.address() as net.AddressInfo).port;
+        try {
+            expect(await probeTcp("127.0.0.1", port)).toBe(true);
+        } finally {
+            await new Promise<void>(resolve => server.close(() => resolve()));
+        }
+    });
+
     it("gives up rather than hanging on an unroutable address", async () => {
         // 203.0.113.0/24 is TEST-NET-3 and is guaranteed not to be routed.
         expect(await probeTcp("203.0.113.1", 5432, 300)).toBe(false);
