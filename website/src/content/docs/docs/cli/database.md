@@ -123,6 +123,12 @@ transaction: if it fails, the tables it would have rewritten are emptied and
 named, and the command exits 1. On 0.24 it failed on `token_hash` once users had
 signed in twice, leaving real data behind.
 
+<span class="since-badge" data-since="0.25">Since 0.25</span> A flag `pull`
+does not take is refused before anything is read or copied, naming the one it
+was probably meant to be: `--anonymise` answers "did you mean --anonymize?" and
+exits 1. On 0.24 a misspelt flag was ignored, so `--anonymise`, `--anon` or
+`--schem` ran the pull without it, and personal data arrived as it was.
+
 `pg_dump` strips privileges, so the copy would arrive with the source's RLS
 policies and none of the grants behind them — every read as `rebase_user` failing
 with `permission denied`. The pull re-provisions the app role afterwards, using

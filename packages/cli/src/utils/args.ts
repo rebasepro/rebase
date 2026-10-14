@@ -31,6 +31,7 @@
  */
 import arg from "arg";
 
+import { redactConnectionPasswords } from "./redact";
 import { suggestCommand } from "./unknown-command";
 
 /**
@@ -183,9 +184,11 @@ export function parseCommandArgs<S extends arg.Spec>({
     }
 
     if (maxPositionals !== undefined && positionals.length > maxPositionals) {
+        // Redacted: a connection string passed where a flag's value belongs
+        // (`rebase db pull "$PROD"`) is still a password.
         throw new UsageError(
             `rebase ${command} takes ${maxPositionals} argument${maxPositionals === 1 ? "" : "s"}, ` +
-            `got ${positionals.length}: ${positionals.join(" ")}`
+            `got ${positionals.length}: ${redactConnectionPasswords(positionals.join(" "))}`
         );
     }
 

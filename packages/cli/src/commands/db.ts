@@ -1,6 +1,7 @@
 /**
  * CLI command: rebase db <action>
  */
+import type arg from "arg";
 import chalk from "chalk";
 import fs from "fs";
 import inquirer from "inquirer";
@@ -178,6 +179,65 @@ function readFlagValue(rawArgs: readonly string[], flag: string): string | null 
 
     return null;
 }
+
+/** `rebase db pull`'s flags. */
+const PULL_FLAGS = {
+    "--from": String,
+    "--schema": [String],
+    "--anonymize": Boolean,
+    "--yes": Boolean,
+    "-y": "--yes",
+    "--docker": Boolean,
+    // Declared so it is refused with its own reason rather than as a typo:
+    // the target of a pull is never selectable. See `pullIntoLocal`.
+    "--database-url": String
+} satisfies arg.Spec;
+
+/** `rebase db url`'s flags. */
+const URL_FLAGS = { "--database-url": String, "--docker": Boolean } satisfies arg.Spec;
+
+/** `rebase db reset`'s flags. */
+const RESET_FLAGS = { "--yes": Boolean, "-y": "--yes" } satisfies arg.Spec;
+
+/** `rebase db stop` takes none. */
+const STOP_FLAGS = {} satisfies arg.Spec;
+
+/** `rebase db pull`'s line, parsed strictly. */
+function parsePullFlags(rawArgs: readonly string[]): arg.Result<typeof PULL_FLAGS> {
+    return parseCommandArgs({ spec: PULL_FLAGS, rawArgs: [...rawArgs], commandWords: 2, command: "db pull", maxPositionals: 0 }).flags;
+}
+
+/** `rebase db url`'s line, parsed strictly. */
+function parseUrlFlags(rawArgs: readonly string[]): arg.Result<typeof URL_FLAGS> {
+    return parseCommandArgs({ spec: URL_FLAGS, rawArgs: [...rawArgs], commandWords: 2, command: "db url", maxPositionals: 0 }).flags;
+}
+
+/** `rebase db reset`'s line, parsed strictly. */
+function parseResetFlags(rawArgs: readonly string[]): arg.Result<typeof RESET_FLAGS> {
+    return parseCommandArgs({ spec: RESET_FLAGS, rawArgs: [...rawArgs], commandWords: 2, command: "db reset", maxPositionals: 0 }).flags;
+}
+
+/** `rebase db stop`'s line, parsed strictly. */
+function parseStopFlags(rawArgs: readonly string[]): arg.Result<typeof STOP_FLAGS> {
+    return parseCommandArgs({ spec: STOP_FLAGS, rawArgs: [...rawArgs], commandWords: 2, command: "db stop", maxPositionals: 0 }).flags;
+}
+
+/**
+ * The `db` subcommands this CLI answers itself, each with its strict parse.
+ *
+ * The driver's `db` commands refuse a flag they do not take; these four never
+ * reach the driver, and read their flags out of argv by hand, so they accepted
+ * anything. On `pull` that cost personal data: `--anonymise` (or `--anonymiz`,
+ * or `--anon`) was dropped and the copy arrived as it was. An undeclared flag,
+ * or a word where none is taken, is now a `UsageError` naming the flag it was
+ * probably meant to be, raised before anything has run.
+ */
+const OWN_SUBCOMMAND_PARSERS: Readonly<Record<string, ((rawArgs: readonly string[]) => unknown) | undefined>> = {
+    pull: parsePullFlags,
+    url: parseUrlFlags,
+    reset: parseResetFlags,
+    stop: parseStopFlags
+};
 
 /**
  * Run a database subcommand through the active driver's CLI, throwing on
@@ -647,6 +707,11 @@ export async function dbCommand(subcommand: string | undefined, rawArgs: string[
         if (action !== undefined && action !== "list") unknownCommand(action, ["list"], "db backups");
     }
 
+    // The subcommands answered here rather than by the driver are strict about
+    // their flags the way the driver's are, and refuse before anything is read,
+    // started or copied. See `OWN_SUBCOMMAND_PARSERS`.
+    OWN_SUBCOMMAND_PARSERS[subcommand]?.(rawArgs);
+
     const projectRoot = requireProjectRoot();
 
     // Fire-and-forget, and a no-op unless the developer opted in. Never awaited:
@@ -664,16 +729,9 @@ export async function dbCommand(subcommand: string | undefined, rawArgs: string[
         return;
     }
 
-    // `--docker` on a `db` subcommand meant "resolve the compose URL", and
-    // nothing started it: `rebase db branch list --docker` on a stock scaffold
-    // answered `✗ Failed query: CREATE SCHEMA IF NOT EXISTS rebase` and
-    // `connect ECONNREFUSED 127.0.0.1:5436` — two lines, no diagnosis — while
-    // the managed-database refusal that sends the reader here says "`rebase dev
-    // --docker` starts one, and branches work against it".
-    //
-    // The same ensure step `rebase dev --docker` runs, not a second one.
-    await ensureDockerDatabase(projectRoot, rawArgs);
-
+    // Each starts the remembered compose database itself, once what it was
+    // asked for has been checked: a pull refused for a missing --from has no
+    // reason to start a container first.
     if (subcommand === "pull") {
         await pullIntoLocal(projectRoot, rawArgs);
 
@@ -685,6 +743,16 @@ export async function dbCommand(subcommand: string | undefined, rawArgs: string[
 
         return;
     }
+
+    // `--docker` on a `db` subcommand meant "resolve the compose URL", and
+    // nothing started it: `rebase db branch list --docker` on a stock scaffold
+    // answered `✗ Failed query: CREATE SCHEMA IF NOT EXISTS rebase` and
+    // `connect ECONNREFUSED 127.0.0.1:5436` — two lines, no diagnosis — while
+    // the managed-database refusal that sends the reader here says "`rebase dev
+    // --docker` starts one, and branches work against it".
+    //
+    // The same ensure step `rebase dev --docker` runs, not a second one.
+    await ensureDockerDatabase(projectRoot, rawArgs);
 
     // Handled here rather than by the driver, for the same reason `stop` and
     // `reset` are: it writes per-checkout CLI state. The driver creates and
@@ -758,20 +826,18 @@ async function printDatabaseUrl(projectRoot: string, rawArgs: readonly string[])
     // `rebase db url --json`, which is worse: a flag that looks like it asks
     // for a different output format, silently ignored, hands a script a bare
     // string it will try to parse as JSON.
-    parseCommandArgs({
-        spec: { "--database-url": String, "--docker": Boolean },
-        rawArgs: [...rawArgs],
-        commandWords: 2,
-        command: "db url",
-        maxPositionals: 0
-    });
+    const flags = parseUrlFlags(rawArgs);
+
+    // After the flags, and before the URL is resolved: a remembered container
+    // that is stopped is started, with what that says on stderr.
+    await ensureDockerDatabase(projectRoot, rawArgs);
 
     const { prepareDatabaseEnv } = await import("../dev-db/prepare");
     const { readEnvFile } = await import("../utils/project");
 
     const prepared = await prepareDatabaseEnv(projectRoot, {
-        flagUrl: readFlagValue(rawArgs, "--database-url"),
-        flagDocker: rawArgs.includes("--docker"),
+        flagUrl: flags["--database-url"] ?? null,
+        flagDocker: flags["--docker"] === true,
         quiet: true,
         // Progress goes to stderr: stdout is the URL and nothing else.
         onProgress: message => console.error(chalk.gray(`  ${message}`))
@@ -855,7 +921,7 @@ async function manageLocalDatabase(
     // on this machine. So it asks, unless the caller has said not to — and
     // without a TTY there is nobody to ask, which is a refusal rather than an
     // assumption.
-    if (!rawArgs.includes("--yes") && !rawArgs.includes("-y")) {
+    if (parseResetFlags(rawArgs)["--yes"] !== true) {
         if (!process.stdin.isTTY) {
             console.error(chalk.red("✗ `rebase db reset` deletes the local database and cannot prompt here."));
             console.error(chalk.yellow("  Re-run with --yes if that is what you intend."));
@@ -893,26 +959,13 @@ async function pullIntoLocal(projectRoot: string, rawArgs: readonly string[]): P
     const { prepareDatabaseEnv } = await import("../dev-db/prepare");
     const { readEnvFile } = await import("../utils/project");
 
-    const source = readFlagValue(rawArgs, "--from");
-    if (!source) {
-        console.error(chalk.red("✗ `rebase db pull` needs a source: --from <connection-string>"));
-        console.error(chalk.gray("  Example: rebase db pull --from \"$PRODUCTION_DATABASE_URL\""));
-        process.exit(1);
-    }
-
-    const schemas = rawArgs.flatMap((arg, index) =>
-        arg === "--schema" && rawArgs[index + 1] ? [rawArgs[index + 1]] : []);
-    const anonymize = rawArgs.includes("--anonymize");
-
-    // Both checked before anything destructive: discovering either is missing
-    // after dropping the local database would be the worst possible ordering.
-    for (const tool of ["pg_dump", "pg_restore"] as const) {
-        if (!await findPgTool(tool)) {
-            console.error(chalk.red(`✗ \`${tool}\` is not on PATH, and this command cannot run without it.`));
-            console.error(chalk.gray("  Install the PostgreSQL client tools, e.g. `brew install libpq`."));
-            process.exit(1);
-        }
-    }
+    // Parsed strictly, not read by hand. `rawArgs.includes("--anonymize")` made
+    // the privacy flag the one a typo turned off: `--anonymise`, `--anonymiz`
+    // and `--anon` were dropped on the floor and the copy went ahead with real
+    // personal data, and `--schem public` pulled every schema.
+    const flags = parsePullFlags(rawArgs);
+    const schemas = flags["--schema"] ?? [];
+    const anonymize = flags["--anonymize"] === true;
 
     // `--database-url` is refused rather than honoured, and refused rather than
     // ignored — which is what it was.
@@ -932,8 +985,8 @@ async function pullIntoLocal(projectRoot: string, rawArgs: readonly string[]): P
     //
     // `--docker` is a different question and is passed through: it says how to
     // get a local database, not which database to overwrite.
-    const targetFlag = readFlagValue(rawArgs, "--database-url");
-    if (targetFlag !== null) {
+    const targetFlag = flags["--database-url"];
+    if (targetFlag !== undefined) {
         console.error(chalk.red("✗ `rebase db pull` does not take --database-url."));
         console.error("");
         console.error(chalk.gray("  The target is always this project's local development database. There is"));
@@ -945,8 +998,29 @@ async function pullIntoLocal(projectRoot: string, rawArgs: readonly string[]): P
         process.exit(1);
     }
 
+    const source = flags["--from"];
+    if (!source) {
+        console.error(chalk.red("✗ `rebase db pull` needs a source: --from <connection-string>"));
+        console.error(chalk.gray("  Example: rebase db pull --from \"$PRODUCTION_DATABASE_URL\""));
+        process.exit(1);
+    }
+
+    // Both checked before anything destructive: discovering either is missing
+    // after dropping the local database would be the worst possible ordering.
+    for (const tool of ["pg_dump", "pg_restore"] as const) {
+        if (!await findPgTool(tool)) {
+            console.error(chalk.red(`✗ \`${tool}\` is not on PATH, and this command cannot run without it.`));
+            console.error(chalk.gray("  Install the PostgreSQL client tools, e.g. `brew install libpq`."));
+            process.exit(1);
+        }
+    }
+
+    // The local database the copy goes into, started if it is the remembered
+    // compose one and stopped — once nothing above has refused.
+    await ensureDockerDatabase(projectRoot, rawArgs);
+
     const prepared = await prepareDatabaseEnv(projectRoot, {
-        flagDocker: rawArgs.includes("--docker"),
+        flagDocker: flags["--docker"] === true,
         onProgress: (message) => console.log(chalk.gray(`  ${message}`))
     });
     // The database `rebase db url` prints, resolved the one way — see
@@ -973,7 +1047,7 @@ async function pullIntoLocal(projectRoot: string, rawArgs: readonly string[]): P
     if (schemas.length > 0) console.log(`    ${chalk.gray("Schemas")}  ${schemas.join(", ")}`);
     console.log("");
 
-    if (!rawArgs.includes("--yes") && !rawArgs.includes("-y")) {
+    if (flags["--yes"] !== true) {
         if (!process.stdin.isTTY) {
             console.error(chalk.red("✗ This replaces the local database and cannot prompt here."));
             console.error(chalk.yellow("  Re-run with --yes if that is what you intend."));
@@ -1592,7 +1666,12 @@ const DB_ACTION_HELP: Record<string, { usage: string; summary: string; notes?: s
     pull: {
         usage: "rebase db pull --from <url> [--schema <name>] [--anonymize] [--yes]",
         summary: "Copy another database into local development. One-directional by design — it can never push.",
-        notes: ["The target is not selectable: --database-url is refused, so this can never write to a remote database."]
+        notes: [
+            "--anonymize overwrites personal-looking columns after the copy. A misspelt flag is refused, never ignored.",
+            "--schema <name> copies only that schema; repeat it for more.",
+            "--docker pulls into Postgres in Docker rather than the database `rebase dev` would pick.",
+            "The target is not selectable: --database-url is refused, so this can never write to a remote database."
+        ]
     },
     stop: { usage: "rebase db stop", summary: "Stop the managed development database. Data is kept." },
     reset: {
