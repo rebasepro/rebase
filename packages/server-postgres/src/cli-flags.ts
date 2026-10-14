@@ -262,10 +262,13 @@ export function assertKnownFlags(domain: string, subcommand: string | undefined,
     } catch (err) {
         const unknown = unknownFlagIn(err);
         if (unknown !== null && err instanceof Error) {
+            // In the words `parseCommandFlags` and the CLI's own parser use.
             const suggestion = closestFlag(unknown, { ...RELAYED_FLAGS, ...spec });
+            const own = Object.keys(spec).filter(flag => flag.startsWith("--"));
             throw new Error(
-                `${err.message}${suggestion ? ` (did you mean ${suggestion}?)` : ""} — run ` +
-                `\`rebase ${domain} --help\` for the options \`${domain} ${subcommand}\` takes.`
+                `\`rebase ${domain} ${subcommand}\` has no option ${unknown.split("=")[0]}` +
+                (suggestion ? ` — did you mean ${suggestion}?` : ` — it takes ${own.join(", ")}.`) +
+                ` Nothing was run. See \`rebase ${domain} --help\`.`
             );
         }
         throw err;

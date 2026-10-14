@@ -65,7 +65,15 @@ function usageStrings(): Record<string, string> {
 describe("assertKnownFlags", () => {
     it("rejects a misspelled --allow-destructive", () => {
         expect(() => assertKnownFlags("db", "push", line("db", "push", "--alow-destructive")))
-            .toThrow(/unknown or unexpected option: --alow-destructive/);
+            .toThrow(/`rebase db push` has no option --alow-destructive — did you mean --allow-destructive\? Nothing was run\./);
+    });
+
+    // The sentence `db backup`, `restore`, `branch` and the CLI's own parser
+    // say, where this family said `unknown or unexpected option: --x (did you
+    // mean --y?) — run …`.
+    it("says it in the words every other command does, and lists the options when nothing is near", () => {
+        expect(() => assertKnownFlags("db", "migrate", line("db", "migrate", "--zzz")))
+            .toThrow("`rebase db migrate` has no option --zzz — it takes --baseline, --refuse-destructive. Nothing was run. See `rebase db --help`.");
     });
 
     it("points at the help for the command that was named", () => {
@@ -75,7 +83,7 @@ describe("assertKnownFlags", () => {
 
     it("rejects a misspelled --output on schema generate", () => {
         expect(() => assertKnownFlags("schema", "generate", line("schema", "generate", "--ouput", "x")))
-            .toThrow(/unknown or unexpected option: --ouput/);
+            .toThrow(/has no option --ouput/);
     });
 
     it("accepts the flags db push documents", () => {
@@ -103,7 +111,7 @@ describe("assertKnownFlags", () => {
     it("does not judge db flags by the schema generator's spec", () => {
         expect(() => assertKnownFlags("db", "push", line("db", "push", "--allow-destructive"))).not.toThrow();
         expect(() => assertKnownFlags("schema", "generate", line("schema", "generate", "--allow-destructive")))
-            .toThrow(/unknown or unexpected option/);
+            .toThrow(/has no option --allow-destructive/);
     });
 
     it("accepts what the CLI relays without being asked", () => {
@@ -120,7 +128,7 @@ describe("assertKnownFlags", () => {
     it("lets `db migrate` keep its positional amount and nothing else", () => {
         expect(() => assertKnownFlags("db", "migrate", line("db", "migrate", "2"))).not.toThrow();
         expect(() => assertKnownFlags("db", "migrate", line("db", "migrate", "--baselin", "1")))
-            .toThrow(/unknown or unexpected option/);
+            .toThrow(/has no option --baselin — did you mean --baseline\?/);
     });
 
     it("leaves commands that own their argument handling alone", () => {

@@ -14,7 +14,8 @@ const line = (...words: string[]) => ["/usr/bin/node", "/usr/local/bin/rebase", 
 
 describe("assertSwitchFlags", () => {
     it("names the flag a typo was one edit from", () => {
-        expect(() => assertSwitchFlags(line("--of"))).toThrow("has no option --of — did you mean --off?");
+        expect(() => assertSwitchFlags(line("--of")))
+            .toThrow("`rebase db branch switch` has no option --of — did you mean --off? Nothing was run. See `rebase db branch --help`.");
     });
 
     it("says what it takes when nothing is close", () => {

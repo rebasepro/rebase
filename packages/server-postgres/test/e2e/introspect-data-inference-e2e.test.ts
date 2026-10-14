@@ -79,7 +79,7 @@ describe("schema introspect with data inference", () => {
 
         const run = await introspect("--data-inference", "--output", output);
 
-        expect(run.all).not.toContain("unknown or unexpected option");
+        expect(run.all).not.toContain("has no option");
         expect(run.all).not.toContain("DeprecationWarning");
         expect(run.all).toContain("Sampling database rows for data inference");
         expect(run.exitCode, run.all).toBe(0);

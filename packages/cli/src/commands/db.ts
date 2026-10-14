@@ -1447,7 +1447,7 @@ export function assertSwitchFlags(rawArgs: readonly string[]): void {
         throw new UsageError(
             `\`rebase db branch switch\` has no option ${flag}` +
             (near ? ` — did you mean --${near}?` : " — it takes --off (or --main) and a branch name.") +
-            " Nothing was changed."
+            " Nothing was run. See `rebase db branch --help`."
         );
     }
 }
