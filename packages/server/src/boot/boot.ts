@@ -1,3 +1,4 @@
+import fs from "fs";
 import path from "path";
 import { type Server } from "http";
 import { Hono } from "hono";
@@ -47,10 +48,11 @@ import {
     loadUsersCollection,
     type LoadedBundle
 } from "./bundle";
-import { resolveDataSources, resolveStorageSources } from "./sources";
+import { resolveDataSources, resolveStorageSources, type EnvBag } from "./sources";
 import { planStaticAppMounts, staticAppsShadowedByApi } from "./static-routing";
 import { bundleResolutionRoots, initializeDataSources, probeDataSource, type InitializedDataSource } from "./driver";
 import { resolveRlsAuditOptions } from "./rls-audit-option";
+import { findProjectRoot } from "../schema-edit/project-root";
 import { resolveAuthOptions, resolveLiveSchemaOptions } from "./options";
 import { createMetricsRoutes, createMetricsMiddleware } from "../metrics";
 import { recordPoolWaits } from "../metrics/pool-wait";
@@ -320,14 +322,7 @@ export async function bootFromBundle(options: BootOptions = {}): Promise<BootedR
 
     // ── Backend ──────────────────────────────────────────────────────────────
     const usersCollection = await loadUsersCollection(bundle);
-    const storage = resolveStorageSources(
-        process.env,
-        storageSourceDefs,
-        path.join(bundle.dir, "uploads"),
-        // Said explicitly: an unbound object store may stand in as a local
-        // directory only in a process that has declared itself development.
-        { production: isProduction }
-    );
+    const storage = resolveBootStorage(bundle, process.env, storageSourceDefs, isProduction);
 
     // ── Schema ───────────────────────────────────────────────────────────────
     //
@@ -1029,6 +1024,85 @@ export function warnOnDriverSkew(
         }
     }
 }
+
+/**
+ * The storage step of {@link bootFromBundle}: every storage source this process
+ * serves, from the declarations and the environment.
+ *
+ * Local storage that `STORAGE_PATH` does not place keeps its files in
+ * {@link defaultStorageDirectory}.
+ */
+export function resolveBootStorage(
+    bundle: LoadedBundle,
+    env: EnvBag,
+    definitions: StorageSourceDefinition[] | undefined,
+    production: boolean
+): ReturnType<typeof resolveStorageSources> {
+    const directory = defaultStorageDirectory(bundle);
+    const storage = resolveStorageSources(
+        env,
+        definitions,
+        directory,
+        // Said explicitly: an unbound object store may stand in as a local
+        // directory only in a process that has declared itself development.
+        { production }
+    );
+    if (!env.STORAGE_PATH?.trim()) warnOnUploadsLeftInBundle(bundle, directory);
+    return storage;
+}
+
+/**
+ * Where local storage keeps its files when `STORAGE_PATH` names no directory:
+ * `<project>/uploads`, where `rebase dev` and the server `rebase eject` writes
+ * keep them too.
+ *
+ * A built bundle that sits inside a project — `rebase start` boots
+ * `<project>/dist-bundle` — stores there too, found by the project's
+ * `rebase.json`, so `rebase start` serves what `rebase dev` stored. Not inside
+ * the bundle: the next `rebase build` deletes that directory and writes it
+ * again, and every file in it would go while the rows naming them stay.
+ *
+ * A bundle with no project around it stores inside the bundle: the runtime
+ * image's `/bundle`, a bundle the runtime fetched. A container names its volume
+ * with `STORAGE_PATH`, which wins over this either way.
+ */
+function defaultStorageDirectory(bundle: LoadedBundle): string {
+    const root = bundle.isSource ? bundle.dir : findProjectRoot(path.dirname(bundle.dir)) ?? bundle.dir;
+    return path.join(root, "uploads");
+}
+
+/**
+ * Name the uploads inside a bundle whose local storage is in the project:
+ * nothing serves them, and the next `rebase build` deletes them. Silent for a
+ * bundle that stores inside itself, and for one that holds none.
+ */
+function warnOnUploadsLeftInBundle(bundle: LoadedBundle, directory: string): void {
+    if (path.dirname(directory) === bundle.dir) return;
+    let entries: fs.Dirent[];
+    try {
+        entries = fs.readdirSync(bundle.dir, { withFileTypes: true });
+    } catch {
+        return;
+    }
+    const left = entries
+        .filter(entry => entry.isDirectory() && /^uploads(__.+)?$/.test(entry.name))
+        .map(entry => path.join(bundle.dir, entry.name))
+        .filter(dir => {
+            try {
+                return fs.readdirSync(dir).length > 0;
+            } catch {
+                return false;
+            }
+        });
+    if (left.length === 0) return;
+    logger.warn(
+        `Uploads an earlier version stored inside the bundle are no longer served: ${left.join(", ")}. ` +
+        `Local storage keeps its files in ${directory} now, where \`rebase dev\` keeps them, and the next ` +
+        "`rebase build` deletes the bundle's copy. Move them there (a named bucket's `uploads__<key>` goes " +
+        `beside it), or set STORAGE_PATH=${path.join(bundle.dir, "uploads")} to keep serving them where they are.`
+    );
+}
+
 /**
  * Warn about a bundle whose shape makes provisioning impossible.
  *
