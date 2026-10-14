@@ -281,8 +281,22 @@ export function readAtlasBinaryState(projectRoot: string): AtlasBinaryState | nu
         onPath,
         packageInstalled: manifest !== null,
         binaryOnDisk,
-        manager: readPackageManagerName(projectRoot)
+        manager: readPackageManagerName(projectRoot),
+        workspaceDir: fs.existsSync(path.join(projectRoot, "backend", "package.json")) && isWorkspaceRoot(projectRoot)
+            ? "backend"
+            : null
     };
+}
+
+/** Whether `dir` is a workspace root, where `pnpm add` refuses without `-w`. */
+function isWorkspaceRoot(dir: string): boolean {
+    if (fs.existsSync(path.join(dir, "pnpm-workspace.yaml"))) return true;
+    try {
+        const manifest: unknown = JSON.parse(fs.readFileSync(path.join(dir, "package.json"), "utf8"));
+        return typeof manifest === "object" && manifest !== null && "workspaces" in manifest;
+    } catch {
+        return false;
+    }
 }
 
 /** The reader's own package manager, from the lockfile beside their project. */

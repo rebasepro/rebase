@@ -36,6 +36,24 @@ export interface AtlasBinaryState {
     binaryOnDisk: boolean;
     /** For the remedy: the reader's own package manager. */
     manager: string;
+    /**
+     * The workspace member the install goes into (`backend` in a scaffold),
+     * or absent at a project that is no workspace. A scaffold's root refuses
+     * `pnpm add` without `-w`, and atlas belongs to the backend anyway.
+     */
+    workspaceDir?: string | null;
+}
+
+/** `@ariga/atlas` added as a dev dependency where the project keeps it. */
+function atlasAddCommand(manager: string, workspaceDir: string | null | undefined): string {
+    const pkg = "@ariga/atlas";
+    if (!workspaceDir) return `${manager} add -D ${pkg}`;
+    switch (manager) {
+        case "npm": return `npm install -D ${pkg} -w ${workspaceDir}`;
+        case "yarn": return `yarn --cwd ${workspaceDir} add -D ${pkg}`;
+        case "bun": return `bun add -d ${pkg} --cwd ${workspaceDir}`;
+        default: return `${manager} --dir ${workspaceDir} add -D ${pkg}`;
+    }
 }
 
 /**
@@ -64,7 +82,7 @@ export function checkAtlasBinary(state: AtlasBinaryState | null): EnvironmentFin
             severity: "warning",
             message: "The atlas binary is not on PATH and @ariga/atlas is not installed — "
                 + "`db push`, `db generate` and `db migrate` will fail.",
-            fix: `Install it: ${state.manager} add -D @ariga/atlas, and allow its install script.`
+            fix: `Install it: ${atlasAddCommand(state.manager, state.workspaceDir)}, and allow its install script.`
         }];
     }
 

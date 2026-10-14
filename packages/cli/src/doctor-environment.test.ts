@@ -199,6 +199,19 @@ manager: "pnpm" };
         expect(finding.fix).toContain("npm add -D @ariga/atlas");
     });
 
+    it("installs into the workspace member that runs it, where the root would refuse", () => {
+        // A scaffold is a workspace and `@ariga/atlas` belongs to `backend/`:
+        // `pnpm add -D` at its root fails with ERR_PNPM_ADDING_TO_ROOT.
+        const fixes = (["pnpm", "npm", "yarn", "bun"] as const).map(manager =>
+            checkAtlasBinary({ ...base, packageInstalled: false, manager, workspaceDir: "backend" })[0].fix);
+        expect(fixes).toEqual([
+            expect.stringContaining("pnpm --dir backend add -D @ariga/atlas"),
+            expect.stringContaining("npm install -D @ariga/atlas -w backend"),
+            expect.stringContaining("yarn --cwd backend add -D @ariga/atlas"),
+            expect.stringContaining("bun add -d @ariga/atlas --cwd backend")
+        ]);
+    });
+
     it("names the allowlist when the package is there and the binary is not", () => {
         const [finding] = checkAtlasBinary({ ...base, binaryOnDisk: false });
         expect(finding.message).toContain("preinstall");
@@ -248,5 +261,20 @@ describe("atlas binary state on disk", () => {
         expect(state!.binaryOnDisk).toBe(true);
         expect(state!.onPath).toBe(true);
         fs.rmSync(root, { recursive: true, force: true });
+    });
+
+    it("names backend/ as where the install goes in a workspace, and nothing at a plain project", () => {
+        const scaffold = fs.mkdtempSync(path.join(os.tmpdir(), "doctor-atlas-ws-"));
+        fs.writeFileSync(path.join(scaffold, "package.json"), JSON.stringify({ name: "app" }));
+        fs.writeFileSync(path.join(scaffold, "pnpm-workspace.yaml"), "packages:\n  - backend\n");
+        fs.mkdirSync(path.join(scaffold, "backend"));
+        fs.writeFileSync(path.join(scaffold, "backend", "package.json"), JSON.stringify({ name: "backend" }));
+        const plain = fs.mkdtempSync(path.join(os.tmpdir(), "doctor-atlas-plain-"));
+        fs.writeFileSync(path.join(plain, "package.json"), JSON.stringify({ name: "app" }));
+
+        expect(readAtlasBinaryState(scaffold)?.workspaceDir).toBe("backend");
+        expect(readAtlasBinaryState(plain)?.workspaceDir).toBeNull();
+        fs.rmSync(scaffold, { recursive: true, force: true });
+        fs.rmSync(plain, { recursive: true, force: true });
     });
 });
