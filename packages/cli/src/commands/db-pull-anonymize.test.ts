@@ -15,7 +15,7 @@ import os from "os";
 import path from "path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { AnonymizeOutcome } from "../dev-db/pull";
+import type { AnonymizeOutcome, PullPlan } from "../dev-db/pull";
 
 const state = vi.hoisted(() => ({
     root: "",
@@ -43,8 +43,10 @@ vi.mock("../dev-db/prepare", async importOriginal => ({
 
 vi.mock("../dev-db/pull", async importOriginal => ({
     ...await importOriginal<typeof import("../dev-db/pull")>(),
-    // A restore that completed; what emptying and restoring do is
-    // `dev-db/pull-restore.integration.test.ts`'s, on a real Postgres.
+    // A dump and a restore that completed; what they do is
+    // `dev-db/pull-restore.integration.test.ts`'s and
+    // `dev-db/pull-managed.integration.test.ts`'s, on a real Postgres.
+    dumpSource: async (plan: PullPlan) => ({ ok: true, plan }),
     restoreCopy: async () => ({ cleared: true, started: true, failure: null, advice: null }),
     anonymizeCopy: async () => {
         if (!state.outcome) throw new Error("no outcome set");

@@ -830,7 +830,7 @@ async function manageLocalDatabase(
  * and the wrong one here means overwriting production with a laptop.
  */
 async function pullIntoLocal(projectRoot: string, rawArgs: readonly string[]): Promise<void> {
-    const { describeRestoreFailure, describeTarget, dumpArgs, dumpEnv, findPgTool, restoreCopy } =
+    const { describeRestoreFailure, describeTarget, dumpSource, findPgTool, restoreCopy } =
         await import("../dev-db/pull");
     const { prepareDatabaseEnv } = await import("../dev-db/prepare");
     const { readEnvFile } = await import("../utils/project");
@@ -932,19 +932,26 @@ async function pullIntoLocal(projectRoot: string, rawArgs: readonly string[]): P
     }
 
     const dumpFile = path.join(os.tmpdir(), `rebase-pull-${process.pid}.dump`);
+    console.log(chalk.gray("  Dumping…"));
+    // In the form the local database can restore: the managed one takes the
+    // rows as INSERTs, because PGlite cannot receive COPY data. A source it
+    // cannot reach is said here, in the banner, before anything is emptied.
+    const dumped = await dumpSource(plan, dumpFile);
+    if (!dumped.ok) {
+        for (const line of dumped.lines) console.error(line.startsWith("✗") ? chalk.red(line) : line);
+        process.exit(1);
+    }
+
     /** What failed, the state the local database is left in, and what to do — see `describeRestoreFailure`. */
     let failure: string[] | null = null;
     let anonymizeFailure: string[] | null = null;
     try {
-        console.log(chalk.gray("  Dumping…"));
-        await execa("pg_dump", [...dumpArgs(plan), "--file", dumpFile], { stdio: ["ignore", "inherit", "inherit"], env: dumpEnv(plan) });
-
         console.log(chalk.gray("  Restoring…"));
         // Empties the local schemas the copy replaces, then restores into
         // them; `pg_restore --clean` alone left anything local the source
         // lacks in the way. A failure is reported only after whatever did
         // arrive has been anonymized.
-        const restored = await restoreCopy(plan, dumpFile);
+        const restored = await restoreCopy(dumped.plan, dumpFile);
         failure = restored.failure ? describeRestoreFailure(restored, describeTarget(source)) : null;
 
         // Before the verdict: a partial copy of personal data on a laptop is

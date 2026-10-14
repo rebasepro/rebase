@@ -19,6 +19,8 @@ const state = vi.hoisted(() => ({
     root: "",
     installed: new Set<string>(),
     restore: { exitCode: 0 as number | undefined, stderr: "" },
+    dump: { exitCode: 0, stderr: "" },
+    restores: 0,
     calls: [] as { file: string; args: readonly string[] }[]
 }));
 
@@ -43,7 +45,14 @@ vi.mock("../dev-db/pull", async importOriginal => {
     const actual = await importOriginal<typeof import("../dev-db/pull")>();
     return {
         ...actual,
-        restoreCopy: async () => ({ cleared: true, ...actual.restoreOutcome(state.restore) })
+        // The real dump step, through the `execa` below, for a target that
+        // runs Postgres: asking a real one is `pull-managed.integration.test.ts`'s.
+        dumpSource: (plan: Parameters<typeof actual.dumpSource>[0], dumpFile: string) =>
+            actual.dumpSource({ ...plan, targetEngine: "postgres" }, dumpFile),
+        restoreCopy: async () => {
+            state.restores++;
+            return { cleared: true, ...actual.restoreOutcome(state.restore) };
+        }
     };
 });
 
@@ -57,6 +66,7 @@ vi.mock("execa", () => ({
         if (file === "pg_restore") {
             return { exitCode: state.restore.exitCode, stdout: "", stderr: state.restore.stderr, failed: state.restore.exitCode !== 0 };
         }
+        if (file === "pg_dump") return { exitCode: state.dump.exitCode, stdout: "", stderr: state.dump.stderr, failed: state.dump.exitCode !== 0 };
         return { exitCode: 0, stdout: "", stderr: "" };
     }
 }));
@@ -76,6 +86,8 @@ describe("rebase db pull, when the restore fails", () => {
         state.root = fs.mkdtempSync(path.join(os.tmpdir(), "rebase-db-pull-"));
         state.installed = new Set(["pg_dump", "pg_restore"]);
         state.restore = { exitCode: 0, stderr: "" };
+        state.dump = { exitCode: 0, stderr: "" };
+        state.restores = 0;
         state.calls.length = 0;
         printed = [];
         const capture = (...parts: unknown[]) => { printed.push(parts.map(String).join(" ")); };
@@ -126,6 +138,26 @@ describe("rebase db pull, when the restore fails", () => {
         const output = printed.join("\n");
         expect(output).toContain("could not re-grant");
         expect(output).toContain("incomplete copy");
+    });
+
+    it("says a source it cannot reach in the banner, not as a failed command, and touches nothing local", async () => {
+        // pg_dump's own error, then `✗ Command failed with exit code 1:
+        // pg_dump …` from the top-level handler — where every other database
+        // command prints the "Cannot connect" banner.
+        state.dump = {
+            exitCode: 1,
+            stderr: "pg_dump: error: connection to server at \"prod.example.com\" (203.0.113.5), port 5432 failed: Connection refused\n"
+                + "\tIs the server running on that host and accepting TCP/IP connections?\n"
+        };
+
+        await expect(pull()).rejects.toEqual(new Exit(1));
+
+        const output = printed.join("\n");
+        expect(output).toContain("Cannot connect to PostgreSQL at prod.example.com:5432");
+        expect(output).toContain("Nothing was changed");
+        expect(output).not.toContain("Command failed");
+        expect(output).not.toContain("Restoring…");
+        expect(state.restores).toBe(0);
     });
 
     it("refuses before dumping anything when pg_restore is not installed", async () => {
