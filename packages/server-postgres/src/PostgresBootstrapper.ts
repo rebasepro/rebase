@@ -1146,7 +1146,12 @@ export async function openPostgresDriver(
             );
         } catch (err) {
             if (explicitCdc) {
-                logger.warn("⚠️ [CDC] Could not enable database-level change capture — falling back to app-level realtime.", { error: err });
+                // Handled — realtime carries on, app-level — so one line with
+                // the reason, not a stack.
+                logger.warn(
+                    "⚠️ [CDC] Could not enable database-level change capture — falling back to app-level realtime.",
+                    { detail: err instanceof Error ? err.message : String(err) }
+                );
             } else {
                 logger.info(
                     "ℹ️ [CDC] Database-level change capture unavailable (likely insufficient privileges to create triggers, " +
@@ -1195,7 +1200,7 @@ export async function openPostgresDriver(
         try {
             await realtimeService.startListening(directUrl);
         } catch (err) {
-            logger.warn("⚠️ Cross-instance realtime could not be started", { error: err });
+            logger.warn("⚠️ Cross-instance realtime could not be started", { detail: err instanceof Error ? err.message : String(err) });
         }
     } else if (!cdcEnabled && !realtimeSubscribes && !realtimeOff) {
         // A worker or a functions process, with no capture to publish

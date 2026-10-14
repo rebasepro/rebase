@@ -88,6 +88,16 @@ export const DEFAULT_HEARTBEAT_TIMEOUT_MS = 10_000;
 const SAFE_CHANNEL = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
 /**
+ * Why a connect failed, in one line: the message, and the SQLSTATE or socket
+ * code when the message does not already carry it.
+ */
+function connectFailureReason(err: unknown): string {
+    const message = err instanceof Error ? err.message : String(err);
+    const code = err instanceof Error && "code" in err && typeof err.code === "string" ? err.code : undefined;
+    return code && !message.includes(code) ? `${message} [${code}]` : message;
+}
+
+/**
  * A half-open connection — one whose packets stop arriving, with no FIN and no
  * RST, which is what an idle-flow timeout on a load balancer, a NAT, a dead
  * middlebox or a failed-over network looks like — fires no `error` and no
@@ -110,6 +120,8 @@ export class PgNotifyListener {
     private heartbeatInFlight = false;
     private downSince?: number;
     private lastHeartbeatAt?: number;
+    /** Whether this outage's "could not be opened" has been said. Cleared once it listens again. */
+    private outageWarned = false;
 
     constructor(private readonly options: PgNotifyListenerOptions) {
         if (!SAFE_CHANNEL.test(options.channel)) {
@@ -229,6 +241,7 @@ export class PgNotifyListener {
             // Adopted: `stop()` and `scheduleReconnect` will close it now.
             pending = undefined;
             this.downSince = undefined;
+            this.outageWarned = false;
             this.lastHeartbeatAt = Date.now();
             this.startHeartbeat(client);
             logger.debug(`📡 ${logLabel} Listening on channel "${channel}".`);
@@ -240,7 +253,18 @@ export class PgNotifyListener {
             // Surface the initial failure so callers can choose to fall back;
             // for reconnects, keep retrying quietly in the background.
             if (first && !this.options.retryInitialConnect) throw err;
-            logger.error(`❌ ${logLabel} Failed to connect LISTEN client`, { error: err });
+            // Handled: it is retried, and `/health` reports it down meanwhile.
+            // One line per outage, with the reason — the stack of a refused
+            // connection is not news, and an ERROR every few seconds for a
+            // fallback that is working reads as a crash.
+            const retry = `${logLabel} LISTEN connection could not be opened (${connectFailureReason(err)}); ` +
+                `retrying every ${Math.round((this.options.reconnectDelayMs ?? DEFAULT_RECONNECT_DELAY_MS) / 1000)} s.`;
+            if (this.outageWarned) {
+                logger.debug(retry);
+            } else {
+                this.outageWarned = true;
+                logger.warn(`⚠️ ${retry}`);
+            }
             this.scheduleReconnect();
             return;
         }
