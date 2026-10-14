@@ -31,6 +31,8 @@
  */
 import arg from "arg";
 
+import { suggestCommand } from "./unknown-command";
+
 /**
  * Flags accepted on top of whatever a command declares.
  *
@@ -44,6 +46,18 @@ export const GLOBAL_COMMAND_FLAGS = {
     "--help": Boolean,
     "-h": "--help"
 } as const;
+
+/**
+ * The declared long flag an undeclared one was probably meant to be, from
+ * `arg`'s `unknown or unexpected option: --form`: one edit or one swap away
+ * (`--from`), the way the driver's flag check and `db backup` answer a typo.
+ */
+function closestDeclaredFlag(argMessage: string, declared: readonly string[]): string | undefined {
+    const typed = /option: (--[^\s=]+)/.exec(argMessage)?.[1];
+    if (!typed) return undefined;
+    const near = suggestCommand(typed.slice(2), declared.filter(flag => flag.startsWith("--")).map(flag => flag.slice(2)));
+    return near ? `--${near}` : undefined;
+}
 
 export interface ParsedCommand<S extends arg.Spec> {
     /** The declared flags, as `arg` resolved them. */
@@ -118,8 +132,9 @@ export function parseCommandArgs<S extends arg.Spec>({
         parsed = arg(merged, { argv: rawArgs.slice(2) }) as arg.Result<S> & { "--help"?: boolean };
     } catch (err) {
         if (err instanceof Error && (err as arg.ArgError).code === "ARG_UNKNOWN_OPTION") {
+            const near = closestDeclaredFlag(err.message, Object.keys({ ...GLOBAL_COMMAND_FLAGS, ...spec }));
             throw new UsageError(
-                `${err.message} — run \`rebase ${command} --help\` for the options it takes.`
+                `${err.message}${near ? ` (did you mean ${near}?)` : ""} — run \`rebase ${command} --help\` for the options it takes.`
             );
         }
         throw err;

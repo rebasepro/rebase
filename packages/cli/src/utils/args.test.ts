@@ -50,6 +50,17 @@ describe("parseCommandArgs", () => {
             .toThrow(/unknown or unexpected option/);
     });
 
+    it("names the declared flag a typo is closest to", () => {
+        expect(() => parse("auth", "reset-password", "--emial", "bob@example.com"))
+            .toThrow("unknown or unexpected option: --emial (did you mean --email?) — run `rebase auth reset-password --help` for the options it takes.");
+        // `--debug` and `--help` are declared on every command, so they are
+        // offered too.
+        expect(() => parse("auth", "reset-password", "--hepl")).toThrow(/did you mean --help\?/);
+        // Nothing close: no guess, only the help.
+        expect(() => parse("auth", "reset-password", "--frobnicate"))
+            .toThrow("unknown or unexpected option: --frobnicate — run `rebase auth reset-password --help` for the options it takes.");
+    });
+
     it("names the command's help in the error, so the flag can be looked up", () => {
         expect(() => parse("auth", "reset-password", "--wat"))
             .toThrow(/rebase auth reset-password --help/);

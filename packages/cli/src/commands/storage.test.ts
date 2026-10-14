@@ -143,6 +143,14 @@ describe("rebase storage move", () => {
         expect(process.exitCode).toBe(1);
     });
 
+    it("names the flag a typo was one swap away from, and sends nothing", async () => {
+        await expect(storageCommand("move", argv("storage", "move", "--form", "(default)", "--to", "media")))
+            .rejects.toThrow(/unknown or unexpected option: --form \(did you mean --from\?\)/);
+        await expect(storageCommand("orphans", argv("storage", "orphans", "--older-then", "48")))
+            .rejects.toThrow(/did you mean --older-than\?/);
+        expect(calls).toEqual([]);
+    });
+
     it("needs at least one source named", async () => {
         await expect(storageCommand("move", argv("storage", "move"))).rejects.toThrow(/--from/);
         expect(calls).toEqual([]);

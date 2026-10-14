@@ -143,6 +143,13 @@ describe("resolveCreateKeyArgs", () => {
         expect(() => create("--foo", "--full-access")).toThrow(/unknown or unexpected option/);
     });
 
+    it("names the flag a typo was one swap away from", () => {
+        // It said "unknown or unexpected option: --rolse" and no more, where
+        // `db backup` and `db restore` answer "did you mean --out?".
+        expect(() => create("CI", "--scopes", "data:read", "--rolse", "admin")).toThrow(/did you mean --roles\?/);
+        expect(() => create("CI", "--scopse", "data:read")).toThrow(/did you mean --scopes\?/);
+    });
+
     it("is not shifted by a flag placed before the command", () => {
         expect(resolveCreateKeyArgs(argv("--debug", "api-keys", "create", "Analytics", "--scopes", "data:read"), NOW).name)
             .toBe("Analytics");
