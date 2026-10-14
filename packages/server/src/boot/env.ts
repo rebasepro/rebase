@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { loadEnv, numericEnvVar, optionalNumericEnvVar, type RebaseEnv } from "../env";
+import { EnvValidationError, loadEnv, numericEnvVar, optionalNumericEnvVar, type RebaseEnv } from "../env";
 import { BundleError } from "./bundle";
 
 /**
@@ -370,33 +370,6 @@ export const bootEnvExtension = z.object({
 
 export type RebaseBootEnv = RebaseEnv & z.infer<typeof bootEnvExtension>;
 
-/** One entry of a ZodError, narrowed to the parts this file reads. */
-interface BootEnvIssue {
-    path?: (string | number)[];
-    message?: string;
-    code?: string;
-}
-
-/**
- * Whether an issue means "this variable is not set", as opposed to "it is set
- * to something wrong".
- *
- * The difference is the whole point of the rewrite below: `DATABASE_URL: is
- * required` tells an operator what to do, and `DATABASE_URL: Invalid input:
- * expected string, received undefined` makes them work out that a validator's
- * idea of a missing key is an undefined string.
- *
- * The old test was `message === "Invalid input"`, which is the zod 3 wording
- * and has never matched: zod 4 puts the expected and received types in the
- * message, and drops the `received` field the zod 3 issue carried — so the
- * message is the only thing left to read. Matching the code as well keeps this
- * off `invalid_format` and the other issue kinds, whose own messages are
- * already specific.
- */
-function isMissingVariable(issue: BootEnvIssue): boolean {
-    return issue.code === "invalid_type" && /received undefined$/.test(issue.message ?? "");
-}
-
 /**
  * Load and validate the environment for a bundle boot.
  *
@@ -408,20 +381,11 @@ export function loadBootEnv(): RebaseBootEnv {
     try {
         return loadEnv({ extend: bootEnvExtension }) as RebaseBootEnv;
     } catch (err) {
-        // A raw ZodError prints a JSON dump and a stack trace through the
-        // validator — several screens of noise whose actual content is "you did
-        // not set DATABASE_URL". Restate it as the list of variables to fix.
-        const issues = (err as { issues?: BootEnvIssue[] }).issues;
-        if (!Array.isArray(issues)) throw err;
-
-        const lines = issues.map(issue => {
-            const name = Array.isArray(issue.path) ? issue.path.join(".") : "";
-            const detail = isMissingVariable(issue) ? "is required" : issue.message;
-            return name ? `  ${name}: ${detail}` : `  ${detail}`;
-        });
-
+        // The list of variables to fix, as `loadEnv` words it, with where a
+        // deployment's variables are described.
+        if (!(err instanceof EnvValidationError)) throw err;
         throw new BundleError(
-            `The environment is not valid:\n${lines.join("\n")}`,
+            err.message,
             "See https://rebase.pro/docs/deployment/self-hosting/ for the variables a deployment needs."
         );
     }

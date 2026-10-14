@@ -251,6 +251,75 @@ export function areSecretsEphemeral(input: {
 }
 
 /**
+ * What a schema makes of the environment, as far as it can: the parsed data
+ * when it parsed, otherwise every variable it did not refuse, parsed with
+ * each one optional. Used only to run the cross-variable checks alongside a
+ * failed parse; the failure itself is still thrown.
+ */
+function bestEffortData(
+    schema: z.ZodObject<z.ZodRawShape>,
+    result: { success: boolean; data?: unknown; error?: z.ZodError }
+): Record<string, unknown> {
+    if (result.success) return result.data as Record<string, unknown>;
+    const refused = new Set((result.error?.issues ?? []).map(issue => String(issue.path[0])));
+    const rest: Record<string, string | undefined> = {};
+    for (const [key, value] of Object.entries(process.env)) {
+        if (!refused.has(key)) rest[key] = value;
+    }
+    const partial = schema.partial().safeParse(rest);
+    return partial.success ? partial.data as Record<string, unknown> : {};
+}
+
+/** One problem {@link loadEnv} found, as zod reports it. */
+type EnvIssue = z.ZodError["issues"][number];
+
+/**
+ * Whether an issue means "this variable is not set", as opposed to "it is set
+ * to something wrong".
+ *
+ * The difference is the whole point of {@link describeEnvIssues}:
+ * `DATABASE_URL: is required` tells an operator what to do, and
+ * `DATABASE_URL: Invalid input: expected string, received undefined` makes
+ * them work out that a validator's idea of a missing key is an undefined
+ * string. zod 4 puts the expected and received types in the message and
+ * carries no `received` field, so the message is the only thing to read; the
+ * code keeps this off `invalid_format` and the other issue kinds, whose own
+ * messages are already specific.
+ */
+function isMissingVariable(issue: EnvIssue): boolean {
+    return issue.code === "invalid_type" && /received undefined$/.test(issue.message ?? "");
+}
+
+/**
+ * The environment's problems, one line each, as the runtime prints them:
+ * `  DATABASE_URL: is required` for a variable that is not set, and the rule
+ * it broke for one that is set and wrong.
+ */
+function describeEnvIssues(issues: readonly EnvIssue[]): string[] {
+    return issues.map(issue => {
+        const name = issue.path.map(String).join(".");
+        const detail = isMissingVariable(issue) ? "is required" : issue.message;
+        return name ? `  ${name}: ${detail}` : `  ${detail}`;
+    });
+}
+
+/**
+ * What {@link loadEnv} throws when the environment does not validate: an
+ * `Error` whose message lists each variable and what is wrong with it —
+ * `DATABASE_URL: is required` — so an uncaught one says it in the terminal.
+ * zod's own issues are on `issues` for a caller that reads them.
+ */
+export class EnvValidationError extends Error {
+    readonly issues: EnvIssue[];
+
+    constructor(issues: EnvIssue[]) {
+        super(`The environment is not valid:\n${describeEnvIssues(issues).join("\n")}`);
+        this.name = "EnvValidationError";
+        this.issues = issues;
+    }
+}
+
+/**
  * Load and validate the Rebase environment configuration from `process.env`.
  *
  * Call this **after** your `.env` file has been loaded (via `dotenv`, `--env-file`,
@@ -262,6 +331,8 @@ export function areSecretsEphemeral(input: {
  *   non-production mode so developers can start without manual setup.
  * - Blocks auto-generated secrets in production.
  * - Returns a fully typed, validated env object.
+ * - Throws an `Error` naming every variable that is missing or wrong —
+ *   `DATABASE_URL: is required` — with zod's issues on its `issues` property.
  *
  * Use `extend` to add your own typed env variables on top of the base Rebase schema:
  *
@@ -287,26 +358,6 @@ export function areSecretsEphemeral(input: {
  * // env.STRIPE_SECRET_KEY → string        (validated, required)
  * ```
  */
-/**
- * What a schema makes of the environment, as far as it can: the parsed data
- * when it parsed, otherwise every variable it did not refuse, parsed with
- * each one optional. Used only to run the cross-variable checks alongside a
- * failed parse; the failure itself is still thrown.
- */
-function bestEffortData(
-    schema: z.ZodObject<z.ZodRawShape>,
-    result: { success: boolean; data?: unknown; error?: z.ZodError }
-): Record<string, unknown> {
-    if (result.success) return result.data as Record<string, unknown>;
-    const refused = new Set((result.error?.issues ?? []).map(issue => String(issue.path[0])));
-    const rest: Record<string, string | undefined> = {};
-    for (const [key, value] of Object.entries(process.env)) {
-        if (!refused.has(key)) rest[key] = value;
-    }
-    const partial = schema.partial().safeParse(rest);
-    return partial.success ? partial.data as Record<string, unknown> : {};
-}
-
 export function loadEnv(): RebaseEnv;
 export function loadEnv<E extends z.ZodObject<z.ZodRawShape>>(options: { extend: E }): RebaseEnv & z.infer<E>;
 export function loadEnv(options?: { extend?: z.ZodObject<z.ZodRawShape> }): Record<string, unknown> {
@@ -448,7 +499,7 @@ export function loadEnv(options?: { extend?: z.ZodObject<z.ZodRawShape> }): Reco
         ? []
         : refined.error.issues.filter(issue => !refusedByParse.has(String(issue.path[0])));
     if (parseIssues.length + refinementIssues.length > 0) {
-        throw new z.ZodError([...parseIssues, ...refinementIssues]);
+        throw new EnvValidationError([...parseIssues, ...refinementIssues]);
     }
 
     // Warn after successful parse so the server still starts in dev — and only
