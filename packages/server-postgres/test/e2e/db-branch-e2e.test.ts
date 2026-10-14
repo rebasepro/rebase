@@ -369,12 +369,13 @@ describe("db branch with other clients connected, and from a switched checkout",
             const holder = await holdingTheCopyLock();
             const pool = new pg.Pool({ connectionString: container.connectionString, max: 3 });
             const poolManager = new DatabasePoolManager(container.connectionString);
-            let created: Promise<void> | undefined;
+            let created: Promise<unknown> | undefined;
             try {
                 const service = new BranchService(drizzle(pool), poolManager);
                 await service.ensureBranchMetadataTable();
-                created = service.createBranch("waited", { source: SOURCE, force: true });
-                created.catch(() => undefined);
+                const creating = service.createBranch("waited", { source: SOURCE, force: true });
+                created = creating;
+                creating.catch(() => undefined);
                 await new Promise((resolve) => setTimeout(resolve, 750));
 
                 expect(await allowsConnections(SOURCE)).toBe(true);
