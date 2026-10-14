@@ -158,4 +158,3 @@ describe("schema introspect --help", () => {
         }
     });
 });
-
