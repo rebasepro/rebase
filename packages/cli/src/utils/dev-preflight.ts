@@ -577,8 +577,7 @@ async function refuseForeignListener(options: {
     log(`  ${chalk.yellow("⚠")} ${chalk.bold(`Port ${port} is not this project's database.`)}`);
     for (const line of [
         `docker-compose.yml publishes this project's db service on ${port}, and ${who}.`,
-        "Nothing was started, and nothing connects to it: a login there would fail on this",
-        "project's password, and the fix that failure suggests would be for that database.",
+        "Nothing was started and nothing connected: a login there fails on this project's password, and the fix that failure suggests is for that database.",
         `Give this project its own port: change "${port}:5432" under db: in docker-compose.yml`
             + ` to ${suggestion ? `a free one, such as "${suggestion}:5432"` : "one nothing else uses"}`
             + (envSetsUrl ? ", and the port in DATABASE_URL in .env." : "."),
