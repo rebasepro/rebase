@@ -370,16 +370,17 @@ export async function probeRenderedPolicies(
         if (!statement) continue;
         const probe = statement.replace(/^(\s*CREATE POLICY\s+)"[^"]+"/i, `$1"${PROBE_POLICY}"`);
         const target = `"${policy.schema.replace(/"/g, '""')}"."${policy.table.replace(/"/g, '""')}"`;
+        // Literals rather than parameters: a boot's `Queryable` takes none.
         const definition = (name: string): string =>
-            `(SELECT ${liveDefinitionSql("p")} FROM pg_policy p WHERE p.polrelid = $1::regclass AND p.polname = ${name})`;
+            `(SELECT ${liveDefinitionSql("p")} FROM pg_policy p ` +
+            `WHERE p.polrelid = ${quoteSqlLiteral(target)}::regclass AND p.polname = ${quoteSqlLiteral(name)})`;
         try {
             await client.query("BEGIN");
             await client.query("SET LOCAL lock_timeout = '2s'");
             if (options.searchPath) await client.query(`SET LOCAL search_path TO ${options.searchPath}`);
             await client.query(probe);
             const { rows } = await client.query<{ same: boolean | null }>(
-                `SELECT ${definition("$2")} IS NOT DISTINCT FROM ${definition("$3")} AS same`,
-                [target, PROBE_POLICY, policy.name]
+                `SELECT ${definition(PROBE_POLICY)} IS NOT DISTINCT FROM ${definition(policy.name)} AS same`
             );
             if (typeof rows[0]?.same === "boolean") answers.set(key, rows[0].same);
         } catch {
