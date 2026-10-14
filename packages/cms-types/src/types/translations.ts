@@ -1271,6 +1271,23 @@ export interface RebaseTranslations {
     timezone?: string;
     target_collection?: string;
 
+    // ─── Column type and primary key selects ─────────────────
+    column_type_default?: string;
+    column_type_uuid_forced?: string;
+    column_type_varchar?: string;
+    column_type_text?: string;
+    column_type_char?: string;
+    column_type_timestamp?: string;
+    column_type_caption_string?: string;
+    column_type_caption_number?: string;
+    column_type_caption_date?: string;
+    primary_key_manual?: string;
+    primary_key_generated_string?: string;
+    primary_key_identity?: string;
+    primary_key_increment?: string;
+    primary_key_strategy?: string;
+    primary_key_caption?: string;
+
     // ─── Storage property ───────────────────────────────────────
     storage_file_name?: string;
     storage_path?: string;

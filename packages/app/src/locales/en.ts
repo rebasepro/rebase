@@ -1172,6 +1172,23 @@ export const en: RebaseTranslations = {
     timezone: "Timezone",
     target_collection: "Target collection",
 
+    // ─── Column type and primary key selects ─────────────────
+    column_type_default: "Default ({{type}})",
+    column_type_uuid_forced: "uuid (forced by Primary Key)",
+    column_type_varchar: "varchar (variable length)",
+    column_type_text: "text (unlimited)",
+    column_type_char: "char (fixed length)",
+    column_type_timestamp: "timestamp (with timezone)",
+    column_type_caption_string: "Optional database override for this string field.",
+    column_type_caption_number: "Optional database override for this number field.",
+    column_type_caption_date: "Optional database override for this date field.",
+    primary_key_manual: "Yes (Manual input)",
+    primary_key_generated_string: "Yes (Auto-generated UUID/String)",
+    primary_key_identity: "Yes (Auto-increment/identity)",
+    primary_key_increment: "Yes (Increment)",
+    primary_key_strategy: "Yes ({{strategy}})",
+    primary_key_caption: "Set as Primary Key and configure ID generation strategy.",
+
     // ─── Storage property ───────────────────────────────────────
     storage_file_name: "File name",
     storage_path: "Storage path",

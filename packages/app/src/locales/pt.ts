@@ -1169,6 +1169,23 @@ export const pt: RebaseTranslations = {
     timezone: "Fuso horário",
     target_collection: "Coleção de destino",
 
+    // ─── Column type and primary key selects ─────────────────
+    column_type_default: "Predefinido ({{type}})",
+    column_type_uuid_forced: "uuid (imposto pela chave primária)",
+    column_type_varchar: "varchar (comprimento variável)",
+    column_type_text: "text (ilimitado)",
+    column_type_char: "char (comprimento fixo)",
+    column_type_timestamp: "timestamp (com fuso horário)",
+    column_type_caption_string: "Opcional: outro tipo de coluna na base de dados para este campo de texto.",
+    column_type_caption_number: "Opcional: outro tipo de coluna na base de dados para este campo numérico.",
+    column_type_caption_date: "Opcional: outro tipo de coluna na base de dados para este campo de data.",
+    primary_key_manual: "Sim (introdução manual)",
+    primary_key_generated_string: "Sim (UUID/cadeia gerada automaticamente)",
+    primary_key_identity: "Sim (autoincremento/identity)",
+    primary_key_increment: "Sim (incremento)",
+    primary_key_strategy: "Sim ({{strategy}})",
+    primary_key_caption: "Definir como chave primária e configurar a estratégia de geração de ID.",
+
     // ─── Storage property ───────────────────────────────────────
     storage_file_name: "Nome do arquivo",
     storage_path: "Caminho de armazenamento",

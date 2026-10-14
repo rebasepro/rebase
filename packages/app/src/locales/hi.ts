@@ -1164,6 +1164,23 @@ export const hi: RebaseTranslations = {
     timezone: "समय क्षेत्र",
     target_collection: "लक्ष्य संग्रह",
 
+    // ─── Column type and primary key selects ─────────────────
+    column_type_default: "डिफ़ॉल्ट ({{type}})",
+    column_type_uuid_forced: "uuid (प्राथमिक कुंजी द्वारा तय)",
+    column_type_varchar: "varchar (परिवर्तनशील लंबाई)",
+    column_type_text: "text (असीमित)",
+    column_type_char: "char (निश्चित लंबाई)",
+    column_type_timestamp: "timestamp (समय क्षेत्र सहित)",
+    column_type_caption_string: "वैकल्पिक: इस टेक्स्ट फ़ील्ड के लिए अलग डेटाबेस कॉलम प्रकार।",
+    column_type_caption_number: "वैकल्पिक: इस संख्या फ़ील्ड के लिए अलग डेटाबेस कॉलम प्रकार।",
+    column_type_caption_date: "वैकल्पिक: इस तारीख फ़ील्ड के लिए अलग डेटाबेस कॉलम प्रकार।",
+    primary_key_manual: "हाँ (मैन्युअल इनपुट)",
+    primary_key_generated_string: "हाँ (स्वतः बनी UUID/स्ट्रिंग)",
+    primary_key_identity: "हाँ (ऑटो-इंक्रीमेंट/identity)",
+    primary_key_increment: "हाँ (इंक्रीमेंट)",
+    primary_key_strategy: "हाँ ({{strategy}})",
+    primary_key_caption: "प्राथमिक कुंजी के रूप में सेट करें और ID बनाने का तरीका चुनें।",
+
     // ─── Storage property ───────────────────────────────────────
     storage_file_name: "फ़ाइल का नाम",
     storage_path: "संग्रहण पथ",

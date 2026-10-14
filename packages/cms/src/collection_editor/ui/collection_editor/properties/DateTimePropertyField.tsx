@@ -221,22 +221,22 @@ export function DateTimePropertyField({ disabled }: {
                     onValueChange={(v) => setFieldValue(columnTypePath, v === "_default_" ? undefined : v)}
                     renderValue={(v) => {
                         switch (v) {
-                            case "timestamp": return "timestamp (with timezone)";
+                            case "timestamp": return t("column_type_timestamp");
                             case "date": return "date";
                             case "time": return "time";
-                            case "_default_": return "Default (timestamp)";
-                            default: return "Default (timestamp)";
+                            case "_default_": return t("column_type_default", { type: "timestamp" });
+                            default: return t("column_type_default", { type: "timestamp" });
                         }
                     }}
                     error={Boolean(columnTypeError)}
                     label={t("db_column_type")}>
-                    <SelectItem value={"_default_"}> Default (timestamp) </SelectItem>
-                    <SelectItem value={"timestamp"}> timestamp (with timezone) </SelectItem>
+                    <SelectItem value={"_default_"}>{t("column_type_default", { type: "timestamp" })}</SelectItem>
+                    <SelectItem value={"timestamp"}>{t("column_type_timestamp")}</SelectItem>
                     <SelectItem value={"date"}> date </SelectItem>
                     <SelectItem value={"time"}> time </SelectItem>
                 </Select>
                 <FieldCaption error={Boolean(columnTypeError)}>
-                    {columnTypeError ?? "Optional database override for this date field."}
+                    {columnTypeError ?? t("column_type_caption_date")}
                 </FieldCaption>
             </div>
 

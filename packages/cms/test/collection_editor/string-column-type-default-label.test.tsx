@@ -5,6 +5,7 @@ import React from "react";
 import { describe, expect, it, jest } from "@jest/globals";
 import { render, screen } from "@testing-library/react";
 import { Formex, useCreateFormex } from "@rebasepro/forms";
+import { RebaseI18nProvider } from "@rebasepro/app";
 
 /**
  * The column type a string property gets when it names none.
@@ -15,10 +16,6 @@ import { Formex, useCreateFormex } from "@rebasepro/forms";
  * "Default (varchar)", so the label promised a bounded column the DDL never
  * created.
  */
-
-jest.mock("@rebasepro/app", () => ({
-    useTranslation: () => ({ t: (key: string) => key })
-}));
 
 jest.mock("../../src/collection_editor/_cms_internals", () => ({
     FieldCaption: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>
@@ -35,7 +32,7 @@ function renderField(initialValues: Record<string, unknown>) {
             </Formex>
         );
     }
-    render(<Harness/>);
+    render(<RebaseI18nProvider locale="en"><Harness/></RebaseI18nProvider>);
 }
 
 describe("the string column type select", () => {

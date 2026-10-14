@@ -48,13 +48,13 @@ export function NumberPropertyField({ disabled }: {
                             case "bigint": return "bigint";
                             case "serial": return "serial";
                             case "bigserial": return "bigserial";
-                            case "_default_": return "Default (integer/numeric)";
-                            default: return "Default (integer/numeric)";
+                            case "_default_": return t("column_type_default", { type: "integer/numeric" });
+                            default: return t("column_type_default", { type: "integer/numeric" });
                         }
                     }}
                     error={Boolean(columnTypeError)}
                     label={t("db_column_type")}>
-                    <SelectItem value={"_default_"}> Default (integer/numeric) </SelectItem>
+                    <SelectItem value={"_default_"}>{t("column_type_default", { type: "integer/numeric" })}</SelectItem>
                     <SelectItem value={"integer"}> integer </SelectItem>
                     <SelectItem value={"real"}> real (float4) </SelectItem>
                     <SelectItem value={"double precision"}> double precision (float8) </SelectItem>
@@ -64,7 +64,7 @@ export function NumberPropertyField({ disabled }: {
                     <SelectItem value={"bigserial"}> bigserial </SelectItem>
                 </Select>
                 <FieldCaption error={Boolean(columnTypeError)}>
-                    {columnTypeError ?? "Optional database override for this number field."}
+                    {columnTypeError ?? t("column_type_caption_number")}
                 </FieldCaption>
             </div>
 
@@ -80,23 +80,23 @@ export function NumberPropertyField({ disabled }: {
                     }}
                     renderValue={(v) => {
                         switch (v) {
-                            case "true": return "Yes (Auto-increment/identity)";
-                            case "increment": return "Yes (Increment)";
-                            case "manual": return "Yes (Manual input)";
+                            case "true": return t("primary_key_identity");
+                            case "increment": return t("primary_key_increment");
+                            case "manual": return t("primary_key_manual");
                             case "false":
-                            case "_default_": return "No";
-                            default: return `Yes (${v})`;
+                            case "_default_": return t("no");
+                            default: return t("primary_key_strategy", { strategy: v });
                         }
                     }}
                     error={Boolean(isIdError)}
                     label={t("primary_key_unique_id")}>
-                    <SelectItem value={"_default_"}> No </SelectItem>
-                    <SelectItem value={"manual"}> Yes (Manual input) </SelectItem>
-                    <SelectItem value={"true"}> Yes (Auto-increment/identity) </SelectItem>
-                    <SelectItem value={"increment"}> Yes (Increment) </SelectItem>
+                    <SelectItem value={"_default_"}>{t("no")}</SelectItem>
+                    <SelectItem value={"manual"}>{t("primary_key_manual")}</SelectItem>
+                    <SelectItem value={"true"}>{t("primary_key_identity")}</SelectItem>
+                    <SelectItem value={"increment"}>{t("primary_key_increment")}</SelectItem>
                 </Select>
                 <FieldCaption error={Boolean(isIdError)}>
-                    {isIdError ?? "Set as Primary Key and configure ID generation strategy."}
+                    {isIdError ?? t("primary_key_caption")}
                 </FieldCaption>
             </div>
 
