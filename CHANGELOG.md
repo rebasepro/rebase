@@ -719,6 +719,11 @@
   service also exports `restoreDumpReplacing` and `findCleanExtras` for a
   one-transaction clean restore.
 
+- **The driver can reopen databases left closed.** `reopenClosedDatabases(url,
+  others?)` and `reopenedDatabasesNotice(result)` from
+  `@rebasepro/server-postgres` reopen any of the named databases that refuse new
+  connections, from the server's `postgres` database, and say which.
+
 ### Changed
 
 #### Server & REST
@@ -1427,7 +1432,10 @@
 - **A forced branch creation closes the source to new connections for the
   copy.** `rebase db branch create --force` runs `ALTER DATABASE …
   ALLOW_CONNECTIONS false` from the server's `postgres` database for the length
-  of the copy, then opens the source again.
+  of the copy, then opens the source again: on failure, and on every signal it
+  can catch, closing the terminal and Ctrl-C included. A source a SIGKILL leaves
+  closed is reopened by the next `rebase db branch` command, any of them, which
+  says so first, and a forced create also reopens a source it found closed.
 
 - **The driver's commands refuse an unknown option in the shared sentence.**
   `rebase db migrate`, `schema introspect`, `schema stale` and the other
@@ -2438,6 +2446,14 @@
   migration, a destructive one and a run that wrote none included. The DROP TYPE
   box reads the database from `rebase db url` instead of the unset
   `$DATABASE_URL`.
+
+- **A database closed to new connections is named, with the way to open it.**
+  The "Cannot connect" banners, `rebase console`, `db push` and the `rebase dev`
+  boot met `database "x" is not currently accepting connections` (55000) with a
+  bare error, or carried on past it. They now say the database is closed, that
+  an interrupted forced branch copy is what closes one, and that nothing is
+  lost, and they name `rebase db branch list`, which reopens it, and `ALTER
+  DATABASE "x" ALLOW_CONNECTIONS true;`, to run from the `postgres` database.
 
 #### Admin (CMS & app)
 
