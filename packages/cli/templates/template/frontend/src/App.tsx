@@ -1,5 +1,3 @@
-import React from "react";
-
 import "@fontsource/jetbrains-mono";
 import "@fontsource-variable/inter";
 import "@fontsource-variable/instrument-sans";
@@ -19,14 +17,17 @@ import { collections } from "virtual:rebase-collections";
 const API_URL = import.meta.env.VITE_API_URL;
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
-export function App() {
-    const rebaseClient = React.useMemo(() => createRebaseClient({
-        baseUrl: API_URL,
-        // Store the refresh token in an httpOnly cookie (XSS-safe) rather than
-        // localStorage. The backend issues it via `auth.cookieAuth`.
-        auth: { authFlowMode: "cookie" }
-    }), []);
+// One client for the page, created when this module loads. Inside a component,
+// even in a `useMemo`, `<React.StrictMode>` builds a second one in development,
+// and both restore the session and open their own connections.
+const rebaseClient = createRebaseClient({
+    baseUrl: API_URL,
+    // Store the refresh token in an httpOnly cookie (XSS-safe) rather than
+    // localStorage. The backend issues it via `auth.cookieAuth`.
+    auth: { authFlowMode: "cookie" }
+});
 
+export function App() {
     const authController = useRebaseAuthController({
         client: rebaseClient,
         googleClientId: GOOGLE_CLIENT_ID

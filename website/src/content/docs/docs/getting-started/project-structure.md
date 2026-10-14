@@ -79,8 +79,6 @@ file that builds them. See [Custom Server Integration](/docs/backend/custom-serv
 The frontend is a standard **Vite + React + TypeScript** application. The key file is `App.tsx`, which wires together all Rebase controllers:
 
 ```typescript title="frontend/src/App.tsx"
-import React from "react";
-
 import "@fontsource/jetbrains-mono";
 import "@fontsource-variable/inter";
 import "@fontsource-variable/instrument-sans";
@@ -100,14 +98,17 @@ import { collections } from "virtual:rebase-collections";
 const API_URL = import.meta.env.VITE_API_URL;
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
-export function App() {
-    const rebaseClient = React.useMemo(() => createRebaseClient({
-        baseUrl: API_URL,
-        // Store the refresh token in an httpOnly cookie (XSS-safe) rather than
-        // localStorage. The backend issues it via `auth.cookieAuth`.
-        auth: { authFlowMode: "cookie" }
-    }), []);
+// One client for the page, created when this module loads. Inside a component,
+// even in a `useMemo`, `<React.StrictMode>` builds a second one in development,
+// and both restore the session and open their own connections.
+const rebaseClient = createRebaseClient({
+    baseUrl: API_URL,
+    // Store the refresh token in an httpOnly cookie (XSS-safe) rather than
+    // localStorage. The backend issues it via `auth.cookieAuth`.
+    auth: { authFlowMode: "cookie" }
+});
 
+export function App() {
     const authController = useRebaseAuthController({
         client: rebaseClient,
         googleClientId: GOOGLE_CLIENT_ID
@@ -140,7 +141,7 @@ one value without it being written down three times.
 
 ### Key Concepts
 
-- **`createRebaseClient`** — Creates the SDK client that handles HTTP requests, WebSocket connections, and auth token management
+- **`createRebaseClient`** — Creates the SDK client that handles HTTP requests, WebSocket connections, and auth token management. Call it once, at module scope: inside a component, even in a `useMemo`, `<React.StrictMode>` builds a second client in development
 - **`virtual:rebase-collections`** — A Vite plugin that auto-imports your shared collections at build time
 - **`useRebaseAuthController`** — Holds the signed-in user and the token lifecycle, and is what `<Rebase>` distributes to everything below it
 
