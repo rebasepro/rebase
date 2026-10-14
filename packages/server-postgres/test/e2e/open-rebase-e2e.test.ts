@@ -15,6 +15,7 @@
  * Requires Docker.
  */
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
+import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -24,6 +25,7 @@ import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import pg from "pg";
 import type { CollectionConfig } from "@rebasepro/types";
+import { logger } from "@rebasepro/server";
 
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
 import { createPostgresBootstrapper, createPostgresDatabaseConnection, openRebase, type OpenedRebase } from "../../src/index.js";
@@ -369,6 +371,32 @@ describe("openRebase (E2E)", () => {
             }
         });
 
+        it("leaves the connection's posture for the server boot to announce at info; openRebase logs it at debug", async () => {
+            const info = vi.spyOn(logger, "info");
+            const debug = vi.spyOn(logger, "debug");
+            const posture = (spy: typeof info) => spy.mock.calls.filter(([message]) => /RLS enforcement/.test(String(message)));
+            const url = urlFor(container, "app");
+            try {
+                const rebase = await openRebase({ databaseUrl: url, collections: [notesCollection] });
+                await rebase.close();
+                expect(posture(info)).toEqual([]);
+                expect(posture(debug)).toHaveLength(1);
+
+                info.mockClear();
+                const conn = createPostgresDatabaseConnection(url);
+                try {
+                    const bootstrapper = createPostgresBootstrapper({ connectionString: url, connection: conn.db });
+                    await bootstrapper.initializeDriver({ collections: [notesCollection], provision: false, realtime: false });
+                } finally {
+                    await conn.pool.end();
+                }
+                expect(posture(info)).toHaveLength(1);
+            } finally {
+                info.mockRestore();
+                debug.mockRestore();
+            }
+        });
+
         it("has created nothing in the database by opening it", async () => {
             expect(await catalogue(observer)).toEqual(before);
         });
@@ -556,18 +584,69 @@ describe("openRebase (E2E)", () => {
                     });
                 }
 
-                it("--eval prints the result and nothing else on stdout, under LOG_LEVEL=info, and the log goes to stderr", async () => {
+                /**
+                 * `node <script>` from source, in the project directory, with
+                 * the same environment `runConsole` builds.
+                 */
+                function runScript(source: string, env: Record<string, string> = {}): Promise<{ code: number | null; stdout: string; stderr: string }> {
+                    const script = path.join(projectDir, `script-${crypto.randomUUID().slice(0, 8)}.mts`);
+                    fs.writeFileSync(script, source);
+                    const childEnv: Record<string, string> = {};
+                    for (const [key, value] of Object.entries(process.env)) {
+                        if (value !== undefined && !["LOG_LEVEL", "NODE_ENV", "DATABASE_URL", "VITEST", "VITEST_WORKER_ID"].includes(key)) childEnv[key] = value;
+                    }
+                    Object.assign(childEnv, {
+                        DATABASE_URL: urlFor(container, "app"),
+                        TSX_TSCONFIG_PATH: path.resolve(packageRoot, "../../tsconfig.typecheck.json")
+                    }, env);
+                    return new Promise((resolve, reject) => {
+                        const child = spawn(process.execPath, [createRequire(import.meta.url).resolve("tsx/cli"), script], {
+                            cwd: projectDir, env: childEnv, stdio: ["ignore", "pipe", "pipe"]
+                        });
+                        let stdout = "";
+                        let stderr = "";
+                        child.stdout.on("data", (chunk: Buffer) => { stdout += String(chunk); });
+                        child.stderr.on("data", (chunk: Buffer) => { stderr += String(chunk); });
+                        child.on("error", reject);
+                        child.on("close", (code) => resolve({ code, stdout, stderr }));
+                    });
+                }
+
+                /**
+                 * `tsx script.ts > out.json` held `ℹ️ [INFO] 🔐 RLS enforcement
+                 * active…` before the script's own output: opening announced
+                 * the connection's posture at info, which goes to stdout. That
+                 * line is the server boot's to print; a script's open logs it
+                 * at debug.
+                 */
+                it("a script that opens the project prints only its own output on stdout, under LOG_LEVEL=info", async () => {
+                    const result = await runScript(
+                        `import { openRebase } from ${JSON.stringify(path.join(packageRoot, "src/index.ts"))};\n` +
+                        `const rebase = await openRebase({ databaseUrl: process.env.DATABASE_URL ?? "", collections: ${JSON.stringify([notesCollection])} });\n` +
+                        "const [{ n }] = await rebase.sql(\"SELECT count(*)::int AS n FROM public.notes\");\n" +
+                        "console.log(JSON.stringify({ n }));\n" +
+                        "await rebase.close();\n",
+                        { LOG_LEVEL: "info" }
+                    );
+                    expect(result.code).toBe(0);
+                    expect(result.stdout).toMatch(/^\{"n":\d+\}\n$/);
+                    expect(result.stdout + result.stderr).not.toMatch(/RLS enforcement/);
+                }, 60_000);
+
+                it("--eval prints the result and nothing else on stdout, under LOG_LEVEL=info, and no boot note at all", async () => {
                     const result = await runConsole(["--eval", "rebase.sql('SELECT count(*)::int AS n FROM public.notes')"]);
                     expect(result.code).toBe(0);
                     const parsed = JSON.parse(result.stdout) as Array<{ n: number }>;
                     expect(typeof parsed[0].n).toBe("number");
-                    expect(result.stderr).toMatch(/RLS enforcement active/);
+                    // The connection's posture is the server boot's to announce.
+                    expect(result.stderr).not.toMatch(/RLS enforcement/);
                 }, 60_000);
 
                 it("--eval keeps stdout to the result under NODE_ENV=production too, where every level is a JSON line", async () => {
                     const result = await runConsole(["--eval", "6 * 7"], { env: { NODE_ENV: "production", LOG_LEVEL: "debug" } });
                     expect(result.code).toBe(0);
                     expect(JSON.parse(result.stdout)).toBe(42);
+                    // At debug the posture is still there to read, on stderr.
                     expect(result.stderr).toMatch(/RLS enforcement active/);
                 }, 60_000);
 

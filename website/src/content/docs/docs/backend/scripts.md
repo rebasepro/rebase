@@ -146,6 +146,13 @@ Its options:
 your script, and settings such as `REBASE_DB_POOL_MAX` or `REALTIME_CDC` change
 nothing here.
 
+<span class="since-badge" data-since="0.25">Since 0.25</span> Opening logs
+nothing at `info`, so a script's stdout holds what the script prints, and
+`tsx scripts/report.ts > report.json` writes only its JSON. Warnings and errors
+go to stderr in development. The note on how requests are isolated (`RLS
+enforcement active`) is logged at `debug`; a server's boot still prints it at
+`info`. On 0.24 that note opened a script's stdout.
+
 Its accessors are typed by the `Database` that `rebase generate-sdk --register`
 registers, as a function's `rebase` is, so a misspelled collection, field or
 enum value in a script is a type error. The scaffold's `backend/tsconfig.json`

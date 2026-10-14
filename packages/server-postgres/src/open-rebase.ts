@@ -21,6 +21,7 @@ import {
     type User
 } from "@rebasepro/types";
 import { buildSdkData, createAccessorSlugResolver } from "@rebasepro/common";
+import { logger } from "@rebasepro/server";
 import { createPostgresDatabaseConnection, type PostgresPoolConfig } from "./connection";
 import { openPostgresDriver } from "./PostgresBootstrapper";
 import { HistoryService } from "./history/HistoryService";
@@ -161,6 +162,10 @@ export async function openRebase<DB = RegisteredDatabase>(options: OpenRebaseOpt
 
     const driver = opened.internals.driver;
     const registry = opened.internals.registry;
+    // The server boot announces this at info. A script's stdout is its own
+    // output — `tsx script.ts > out.json` — so here it is there only for a
+    // reader who asked for debug.
+    if (opened.internals.rlsEnforcement) logger.debug(opened.internals.rlsEnforcement);
 
     // A `history: true` collection is audited from a script exactly as from
     // the server: the same service, the entry on the write's transaction,

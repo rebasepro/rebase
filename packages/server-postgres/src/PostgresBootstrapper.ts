@@ -139,6 +139,16 @@ export interface PostgresDriverInternals {
      */
     provisioned: boolean;
     /**
+     * How authenticated requests are isolated on this connection, in one
+     * line: run as the restricted role, or filtered natively.
+     *
+     * Returned rather than logged by {@link openPostgresDriver}. Announcing it
+     * is the server boot's business — `initializeDriver` logs it at info — and
+     * a script's `openRebase` logs it at debug, so a script's stdout holds what
+     * the script prints.
+     */
+    rlsEnforcement?: string;
+    /**
      * Attach CDC triggers to tables that did not exist when the driver
      * bootstrapped. Only set when database-level capture is actually active.
      *
@@ -818,6 +828,7 @@ export async function openPostgresDriver(
     // runs as `rebase_user` and its policies are evaluated.
     // Default-on: a privileged connection that cannot be
     // isolated fails the boot rather than serving unenforced requests.
+    let rlsEnforcement: string | undefined;
     {
         const runSql: RawSqlRunner = async (text) => {
             const res = await schemaAwareDb.execute(sql.raw(text));
@@ -897,7 +908,7 @@ export async function openPostgresDriver(
                         : posture.ownsTables
                             ? "table owner"
                             : "may create (and would then own) tables in the schemas it serves";
-                logger.info(`🔐 RLS enforcement active: authenticated requests run as "${REBASE_USER_ROLE}" (connection "${posture.role}" bypasses RLS: ${why})`);
+                rlsEnforcement = `🔐 RLS enforcement active: authenticated requests run as "${REBASE_USER_ROLE}" (connection "${posture.role}" bypasses RLS: ${why})`;
             }
 
             if (posture.superuser || posture.bypassRLS) {
@@ -912,7 +923,7 @@ export async function openPostgresDriver(
                 }
             }
         } else {
-            logger.info(`🔐 RLS enforcement: connection role "${posture.role}" is subject to RLS natively; no role switch needed.`);
+            rlsEnforcement = `🔐 RLS enforcement: connection role "${posture.role}" is subject to RLS natively; no role switch needed.`;
         }
 
         // Independent of posture: a policy targeting a role the request
@@ -1280,6 +1291,7 @@ foundIn: (tablesByName.get(checkName) ?? []).filter(s => s !== schemaName) });
         driver,
         poolManager,
         provisioned: provision,
+        rlsEnforcement,
         provisionCdcForTables
     };
 
@@ -1462,7 +1474,10 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
 
         async initializeDriver(config: unknown): Promise<InitializedDriver> {
             const init = config as DatabaseAdapterInitConfig;
-            return openPostgresDriver(effectiveConfig(init.dataSourceKey), init);
+            const opened = await openPostgresDriver(effectiveConfig(init.dataSourceKey), init);
+            // The boot announces the connection's posture; `openRebase` does not.
+            if (opened.internals.rlsEnforcement) logger.info(opened.internals.rlsEnforcement);
+            return opened;
         },
 
         async initializeAuth(config: unknown, driverResult: InitializedDriver): Promise<BootstrappedAuth | undefined> {
