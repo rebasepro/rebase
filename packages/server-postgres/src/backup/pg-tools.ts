@@ -338,6 +338,10 @@ export interface DumpObjects {
      * tell apart from what the target holds besides.
      */
     relations: { schema: string; name: string }[];
+    /** Every function, procedure and aggregate it creates, by schema and name: an overloaded name once for each. */
+    routines: { schema: string; name: string }[];
+    /** Every type it creates — enum, composite, range — and every domain, by schema and name. */
+    types: { schema: string; name: string }[];
 }
 
 /** `<id>; <catalog oid> <oid> <description> <namespace> <tag…> <owner>`, the shape of a TOC entry. */
@@ -346,6 +350,12 @@ const TOC_ENTRY = /^\d+;\s+\d+\s+\d+\s+(SCHEMA|TABLE)\s+(?!DATA\s)(\S+)\s+(.+)\s
 /** A TOC entry for a relation of any kind. `TABLE DATA`, `SEQUENCE SET` and `SEQUENCE OWNED BY` are not relations. */
 const TOC_RELATION = /^\d+;\s+\d+\s+\d+\s+(?:FOREIGN TABLE|MATERIALIZED VIEW|TABLE|VIEW|SEQUENCE)\s+(?!DATA\s|SET\s|OWNED BY\s)(\S+)\s+(.+)\s+(\S+)$/;
 
+/** A function's TOC entry: its tag is the name and the argument types, `two(integer, text)`. */
+const TOC_ROUTINE = /^\d+;\s+\d+\s+\d+\s+(?:FUNCTION|PROCEDURE|AGGREGATE)\s+(\S+)\s+(.+?)\(.*\)\s+\S+$/;
+
+/** A type's or a domain's TOC entry. */
+const TOC_TYPE = /^\d+;\s+\d+\s+\d+\s+(?:TYPE|DOMAIN)\s+(\S+)\s+(.+)\s+(\S+)$/;
+
 /**
  * The schemas and tables in `pg_restore --list` output: the objects a
  * restore without `--clean` fails on when the target already has them.
@@ -353,14 +363,20 @@ const TOC_RELATION = /^\d+;\s+\d+\s+\d+\s+(?:FOREIGN TABLE|MATERIALIZED VIEW|TAB
  * A TOC line ends in the object's owner, after its namespace and its name;
  * a schema's namespace is `-`. The name is what lies between the two, so a
  * name with a space in it (`Odd Name`) reads whole. `TABLE DATA` and every
- * other kind of entry are not objects of their own here.
+ * other kind of entry are not objects of their own here. Its relations,
+ * functions and types are read too, for what `restore --clean` would drop
+ * that the dump does not hold (`findCleanExtras`).
  */
 export function parseDumpObjects(list: string): DumpObjects {
-    const objects: DumpObjects = { schemas: [], tables: [], relations: [] };
+    const objects: DumpObjects = { schemas: [], tables: [], relations: [], routines: [], types: [] };
     for (const line of list.split("\n")) {
         const trimmed = line.trim();
         const relation = TOC_RELATION.exec(trimmed);
         if (relation) objects.relations.push({ schema: relation[1], name: relation[2] });
+        const routine = TOC_ROUTINE.exec(trimmed);
+        if (routine) objects.routines.push({ schema: routine[1], name: routine[2] });
+        const type = TOC_TYPE.exec(trimmed);
+        if (type) objects.types.push({ schema: type[1], name: type[2] });
         const entry = TOC_ENTRY.exec(trimmed);
         if (!entry) continue;
         const [, kind, namespace, name] = entry;

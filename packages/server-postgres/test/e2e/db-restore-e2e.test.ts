@@ -39,6 +39,8 @@ const SEED_SQL = `
 CREATE SCHEMA rebase;
 CREATE TABLE rebase.users (id serial PRIMARY KEY, email text NOT NULL);
 CREATE TABLE public.posts (id serial PRIMARY KEY, title text NOT NULL);
+CREATE FUNCTION rebase.uid() RETURNS integer LANGUAGE sql AS 'SELECT 1';
+CREATE TYPE rebase.role AS ENUM ('admin', 'editor');
 INSERT INTO rebase.users (email) VALUES ('ada@shop.test');
 INSERT INTO public.posts (title) VALUES ('one'), ('two');
 `;
@@ -164,6 +166,12 @@ describe("rebase db restore", () => {
         // And a table a newer runtime adds, which references one of the backup's.
         await sqlIn("migrated", "CREATE TABLE rebase.sessions (id serial PRIMARY KEY, user_id integer REFERENCES rebase.users(id))");
         await sqlIn("migrated", "INSERT INTO public.posts (title) VALUES ('three')");
+        // And what is not a relation: a helper function, a type, a free sequence.
+        await sqlIn("migrated", `
+            CREATE FUNCTION rebase.local_helper() RETURNS integer LANGUAGE sql AS 'SELECT 2';
+            CREATE TYPE rebase.local_kind AS ENUM ('x');
+            CREATE SEQUENCE rebase.local_counter;
+        `);
 
         const clean = await cli(["db", "restore", dumpFile, "--target-db", "migrated", "--clean", "--yes"]);
         const said = clean.all ?? "";
@@ -172,11 +180,21 @@ describe("rebase db restore", () => {
         expect(said).toMatch(/--clean replaces schema rebase whole, so it also drops what this backup does not hold:/);
         expect(said).toContain("table rebase.atlas_schema_revisions");
         expect(said).toContain("table rebase.sessions");
+        expect(said).toContain("function rebase.local_helper");
+        expect(said).toContain("type rebase.local_kind");
+        expect(said).toContain("sequence rebase.local_counter");
+        // What the backup holds is not named: its function and type, and the
+        // sequences its serial columns own.
+        expect(said).not.toContain("function rebase.uid");
+        expect(said).not.toContain("type rebase.role");
+        expect(said).not.toContain("sessions_id_seq");
         expect(said).toMatch(/Restore completed into "migrated"/);
         expect(await postsIn("migrated")).toBe(2);
         expect(await exists("migrated", "rebase.users")).toBe(true);
         expect(await exists("migrated", "rebase.atlas_schema_revisions")).toBe(false);
         expect(await exists("migrated", "rebase.sessions")).toBe(false);
+        const [{ helper }] = await sqlIn<{ helper: boolean }>("migrated", "SELECT to_regproc('rebase.local_helper') IS NOT NULL AS helper");
+        expect(helper).toBe(false);
     }, 180_000);
 
     it("a --clean restore that stops is rolled back whole, and says the database is as it was", async () => {

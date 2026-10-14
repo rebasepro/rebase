@@ -549,15 +549,21 @@ export async function restoreDumpReplacing(opts: {
 
 /**
  * What `restore --clean` drops that the backup does not hold, so it can say
- * so before it runs: the tables and views in a schema the backup replaces
- * whole that it has no copy of, and the views and foreign keys elsewhere that
- * reference one of the relations it replaces. As `<kind> <name>`.
+ * so before it runs: what a schema the backup replaces whole holds that it has
+ * no copy of — tables, views, sequences, functions, procedures, aggregates,
+ * types and domains — and the views and foreign keys elsewhere that reference
+ * one of the relations it replaces. As `<kind> <name>`.
+ *
+ * A function is matched by its name, so an overload the backup lacks beside
+ * one it holds is not named. Sequences a column owns go with their table,
+ * and what an extension owns with the extension, so neither is named.
  *
  * None for a database that does not exist yet.
  */
 export async function findCleanExtras(connectionString: string, objects: DumpObjects): Promise<string[]> {
     const schemas = objects.schemas.filter((schema) => schema !== "public");
     if (schemas.length === 0 && objects.relations.length === 0) return [];
+    const { routines, types } = objects;
     const { Client } = await import("pg");
     const client = new Client({ connectionString });
     try {
@@ -578,13 +584,42 @@ export async function findCleanExtras(connectionString: string, objects: DumpObj
              )
              SELECT kind, name FROM (
                  SELECT CASE c.relkind WHEN 'v' THEN 'view' WHEN 'm' THEN 'materialized view'
-                                       WHEN 'f' THEN 'foreign table' ELSE 'table' END AS kind,
+                                       WHEN 'f' THEN 'foreign table' WHEN 'S' THEN 'sequence' ELSE 'table' END AS kind,
                         n.nspname || '.' || c.relname AS name
                    FROM pg_class c
                    JOIN pg_namespace n ON n.oid = c.relnamespace
                   WHERE n.nspname = ANY($1::text[])
-                    AND c.relkind IN ('r', 'p', 'v', 'm', 'f')
+                    AND c.relkind IN ('r', 'p', 'v', 'm', 'f', 'S')
                     AND c.oid NOT IN (SELECT oid FROM dumped)
+                    AND NOT (c.relkind = 'S' AND EXISTS (
+                        SELECT 1 FROM pg_depend owner
+                         WHERE owner.classid = 'pg_class'::regclass AND owner.objid = c.oid
+                           AND owner.deptype IN ('a', 'i')))
+                 UNION
+                 SELECT CASE p.prokind WHEN 'p' THEN 'procedure' WHEN 'a' THEN 'aggregate' ELSE 'function' END,
+                        n.nspname || '.' || p.proname
+                   FROM pg_proc p
+                   JOIN pg_namespace n ON n.oid = p.pronamespace
+                  WHERE n.nspname = ANY($1::text[])
+                    AND (n.nspname, p.proname) NOT IN (SELECT * FROM unnest($4::text[], $5::text[]))
+                    AND NOT EXISTS (
+                        SELECT 1 FROM pg_depend owner
+                         WHERE owner.classid = 'pg_proc'::regclass AND owner.objid = p.oid
+                           AND owner.deptype IN ('e', 'i'))
+                 UNION
+                 SELECT CASE t.typtype WHEN 'd' THEN 'domain' ELSE 'type' END,
+                        n.nspname || '.' || t.typname
+                   FROM pg_type t
+                   JOIN pg_namespace n ON n.oid = t.typnamespace
+                  WHERE n.nspname = ANY($1::text[])
+                    AND (t.typtype IN ('e', 'd', 'r')
+                         OR (t.typtype = 'c' AND EXISTS (
+                             SELECT 1 FROM pg_class tc WHERE tc.oid = t.typrelid AND tc.relkind = 'c')))
+                    AND (n.nspname, t.typname) NOT IN (SELECT * FROM unnest($6::text[], $7::text[]))
+                    AND NOT EXISTS (
+                        SELECT 1 FROM pg_depend owner
+                         WHERE owner.classid = 'pg_type'::regclass AND owner.objid = t.oid
+                           AND owner.deptype = 'e')
                  UNION
                  SELECT 'view', vn.nspname || '.' || v.relname
                    FROM pg_depend dep
@@ -605,7 +640,12 @@ export async function findCleanExtras(connectionString: string, objects: DumpObj
                     AND NOT cn.nspname = ANY($1::text[])
              ) extra
              ORDER BY name`,
-            [schemas, objects.relations.map((r) => r.schema), objects.relations.map((r) => r.name)]
+            [
+                schemas,
+                objects.relations.map((r) => r.schema), objects.relations.map((r) => r.name),
+                routines.map((r) => r.schema), routines.map((r) => r.name),
+                types.map((t) => t.schema), types.map((t) => t.name)
+            ]
         );
         return rows.map((row) => `${row.kind} ${row.name}`);
     } finally {

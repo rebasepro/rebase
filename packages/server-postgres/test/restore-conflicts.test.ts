@@ -49,8 +49,38 @@ describe("the objects a dump creates", () => {
                 { schema: "public", name: "tags" },
                 { schema: "public", name: "tags_id_seq" },
                 { schema: "rebase", name: "users" }
-            ]
+            ],
+            routines: [],
+            types: []
         });
+    });
+
+    it("reads its functions, procedures and aggregates by name, and its types and domains", () => {
+        // pg_restore 18.4, captured verbatim, with the entries about them.
+        const list = [
+            "903; 1247 16406 DOMAIN rebase email rebase",
+            "906; 1247 16409 TYPE rebase pair rebase",
+            "900; 1247 16402 TYPE rebase role rebase",
+            "227; 1255 16399 PROCEDURE rebase proc() rebase",
+            "226; 1255 16398 FUNCTION rebase two(integer, text) rebase",
+            "225; 1255 16397 FUNCTION rebase uid() rebase",
+            "917; 1255 16400 AGGREGATE rebase agg(integer) rebase",
+            "3550; 0 0 ACL rebase FUNCTION uid() rebase",
+            "3551; 0 0 COMMENT rebase TYPE role rebase"
+        ].join("\n");
+        const objects = parseDumpObjects(list);
+        expect(objects.routines).toEqual([
+            { schema: "rebase", name: "proc" },
+            { schema: "rebase", name: "two" },
+            { schema: "rebase", name: "uid" },
+            { schema: "rebase", name: "agg" }
+        ]);
+        expect(objects.types).toEqual([
+            { schema: "rebase", name: "email" },
+            { schema: "rebase", name: "pair" },
+            { schema: "rebase", name: "role" }
+        ]);
+        expect(objects.relations).toEqual([]);
     });
 
     it("reads views, materialized views and foreign tables as relations, and no entry about one", () => {
@@ -69,7 +99,7 @@ describe("the objects a dump creates", () => {
     });
 
     it("reads nothing from an empty table of contents", () => {
-        expect(parseDumpObjects(";\n; Selected TOC Entries:\n;\n")).toEqual({ schemas: [], tables: [], relations: [] });
+        expect(parseDumpObjects(";\n; Selected TOC Entries:\n;\n")).toEqual({ schemas: [], tables: [], relations: [], routines: [], types: [] });
     });
 });
 
