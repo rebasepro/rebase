@@ -32,7 +32,7 @@ import {
  *
  * `resets: Infinity` is a container that never gets there.
  */
-async function fakePostgres(options: { resets: number; port?: number }): Promise<{
+async function fakePostgres(options: { resets: number; port?: number; closed?: { open: boolean } }): Promise<{
     port: number;
     connections: () => number;
     close: () => Promise<void>;
@@ -73,6 +73,19 @@ async function fakePostgres(options: { resets: number; port?: number }): Promise
                     if (code === 80877103) {
                         socket.write("N");
                         continue;
+                    }
+                    // What Postgres answers for a database set to
+                    // ALLOW_CONNECTIONS false: FATAL 55000, before any auth.
+                    if (options.closed && !options.closed.open) {
+                        const field = (code: string, value: string) => Buffer.from(`${code}${value}\0`);
+                        socket.end(message("E", Buffer.concat([
+                            field("S", "FATAL"),
+                            field("V", "FATAL"),
+                            field("C", "55000"),
+                            field("M", 'database "db" is not currently accepting connections'),
+                            Buffer.from("\0")
+                        ])));
+                        return;
                     }
                     started = true;
                     socket.write(Buffer.concat([message("R", int32(0)), readyForQuery]));
@@ -342,6 +355,60 @@ describe("waitForQueryable", () => {
             // Bounded, and it retried within the bound rather than trying once.
             expect(Date.now() - started).toBeLessThan(5_000);
             expect(db.connections()).toBeGreaterThan(1);
+        } finally {
+            await db.close();
+        }
+    });
+});
+
+/**
+ * A database closed to new connections (`ALLOW_CONNECTIONS false`), which is
+ * what a `rebase db branch create --force` killed mid-copy leaves its source
+ * as. Postgres refuses every connection with SQLSTATE 55000, the wait retried
+ * it like a database still starting, and `rebase dev` sat a full minute before
+ * saying "did not answer a query".
+ */
+describe("waitForQueryable on a database closed to new connections", () => {
+    const url = (port: number) => `postgres://u@127.0.0.1:${port}/db`;
+
+    it("opens it again with the driver's reopenClosedDatabases, then answers, without waiting out its bound", async () => {
+        const closed = { open: false };
+        const db = await fakePostgres({ resets: 0, closed });
+        const notices: string[] = [];
+        const reopenClosed = vi.fn(async () => {
+            closed.open = true;
+            return { reopened: true, notice: ['⚠ "db" was refusing every connection — it is open again.'] };
+        });
+        try {
+            const started = Date.now();
+            const ready = await waitForQueryable(url(db.port), {
+                timeoutMs: 60_000,
+                intervalMs: 10_000,
+                reopenClosed,
+                onNotice: line => notices.push(line)
+            });
+
+            expect(ready).toEqual({ ready: true });
+            expect(reopenClosed).toHaveBeenCalledWith(url(db.port));
+            expect(notices.join("\n")).toContain("open again");
+            expect(Date.now() - started).toBeLessThan(5_000);
+        } finally {
+            await db.close();
+        }
+    });
+
+    it("stops waiting at once when it cannot be opened, and names the database", async () => {
+        const db = await fakePostgres({ resets: 0, closed: { open: false } });
+        const reopenClosed = vi.fn(async () => ({ reopened: false, notice: [] }));
+        try {
+            const started = Date.now();
+            const ready = await waitForQueryable(url(db.port), { timeoutMs: 60_000, intervalMs: 50, reopenClosed });
+
+            expect(ready).toMatchObject({ ready: false, closedDatabase: "db" });
+            expect(Date.now() - started).toBeLessThan(5_000);
+            // Asked once, healed once, and no more: a closed database does not open by waiting.
+            expect(db.connections()).toBe(1);
+            expect(reopenClosed).toHaveBeenCalledTimes(1);
         } finally {
             await db.close();
         }
@@ -620,6 +687,36 @@ describe("ensureDevDatabase", () => {
             expect(outcome.hint).toMatch(/ECONNRESET|Connection terminated/);
             expect(outcome.hint).toContain("docker compose logs db");
             expect(logged.join("\n")).not.toContain("Database ready");
+        } finally {
+            await pg.db?.close();
+        }
+    });
+
+    it("names a database closed to new connections, and how to open it, rather than waiting a minute", async () => {
+        const port = await freePort();
+        composeOn(port);
+        const pg: { db?: Awaited<ReturnType<typeof fakePostgres>> } = {};
+        const pushSchema = vi.fn();
+
+        try {
+            const started = Date.now();
+            const outcome = await ensureDevDatabase({
+                ...base,
+                projectRoot,
+                databaseUrl: `postgres://u@127.0.0.1:${port}/db`,
+                startDatabase: async () => { pg.db = await fakePostgres({ resets: 0, port, closed: { open: false } }); },
+                reopenClosed: async () => ({ reopened: false, notice: [] }),
+                pushSchema
+            });
+
+            expect(Date.now() - started).toBeLessThan(5_000);
+            expect(pushSchema).not.toHaveBeenCalled();
+            expect(outcome.action).toBe("start-failed");
+            if (outcome.action !== "start-failed") throw new Error("narrowing");
+            expect(outcome.hint).toContain('"db"');
+            expect(outcome.hint).toContain("closed to new connections");
+            expect(outcome.hint).toContain("rebase db branch list");
+            expect(outcome.hint).toContain('ALTER DATABASE "db" ALLOW_CONNECTIONS true;');
         } finally {
             await pg.db?.close();
         }

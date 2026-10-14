@@ -293,8 +293,43 @@ export async function waitForPort(
     return false;
 }
 
-/** Whether a database answered a query, and if not, the last reason it gave. */
-export type QueryReadiness = { ready: true } | { ready: false; error: string };
+/**
+ * Whether a database answered a query, and if not, the last reason it gave —
+ * and, for a database closed to new connections, its name.
+ */
+export type QueryReadiness = { ready: true } | { ready: false; error: string; closedDatabase?: string };
+
+/** What opening a closed database again did, and what to say about it. */
+export interface ClosedDatabaseHeal {
+    /** It accepts connections again. */
+    reopened: boolean;
+    /** The driver's own lines about it (`reopenedDatabasesNotice`). */
+    notice: string[];
+}
+
+/**
+ * The database a connection was refused by because it is closed to new
+ * connections (`ALLOW_CONNECTIONS false`), or null.
+ *
+ * The driver's `closedDatabaseName`, for the error a bare `pg` connect gives:
+ * the sentence is matched, not SQLSTATE 55000, which also covers failures that
+ * have nothing to do with connecting.
+ */
+export function closedDatabaseName(error: unknown): string | null {
+    if (!error || typeof error !== "object") return null;
+    if ("message" in error && typeof error.message === "string") {
+        const named = /database "(.+)" is not currently accepting connections/.exec(error.message);
+        if (named) return named[1];
+    }
+    return "cause" in error ? closedDatabaseName(error.cause) : null;
+}
+
+/** Open `databaseUrl`'s database again with the driver, as every `rebase db branch` command does first. */
+async function reopenWithDriver(databaseUrl: string): Promise<ClosedDatabaseHeal> {
+    const { reopenClosedDatabases, reopenedDatabasesNotice } = await import("@rebasepro/server-postgres");
+    const result = await reopenClosedDatabases(databaseUrl);
+    return { reopened: result.reopened.length > 0, notice: reopenedDatabasesNotice(result) };
+}
 
 /**
  * Poll until `SELECT 1` succeeds on this connection string, or the bound runs out.
@@ -306,15 +341,30 @@ export type QueryReadiness = { ready: true } | { ready: false; error: string };
  * three. Every error is retried: a reset, "the database system is starting up"
  * and a refused connection all mean "not yet", and the bound is what turns
  * "not yet" into an answer.
+ *
+ * Except one, which is not "not yet": a database closed to new connections
+ * (`closedDatabaseName`), which is what a `rebase db branch create --force`
+ * killed mid-copy leaves its source as. Waiting cannot open it, and it was
+ * waited on for the whole minute. It is opened again with the driver's
+ * `reopenClosedDatabases`, once, and then either answers or the wait ends at
+ * once, naming it.
  */
 export async function waitForQueryable(
     databaseUrl: string,
-    options: { timeoutMs?: number; intervalMs?: number } = {}
+    options: {
+        timeoutMs?: number;
+        intervalMs?: number;
+        /** Opens a closed database again. The driver's `reopenClosedDatabases` by default; injected for tests. */
+        reopenClosed?: (databaseUrl: string) => Promise<ClosedDatabaseHeal>;
+        /** Where the driver's lines about a database it opened go. */
+        onNotice?: (line: string) => void;
+    } = {}
 ): Promise<QueryReadiness> {
     const { timeoutMs = 60_000, intervalMs = 500 } = options;
     const { Client } = await import("pg");
     const deadline = Date.now() + timeoutMs;
     let lastError = "no attempt was made";
+    let healed = false;
 
     do {
         const client = new Client({
@@ -324,14 +374,25 @@ export async function waitForQueryable(
         // A reset can arrive after `connect` settles; unhandled, it would take
         // the process down rather than count as one more "not yet".
         client.on("error", () => undefined);
+        let closed: string | null = null;
         try {
             await client.connect();
             await client.query("SELECT 1");
             return { ready: true };
         } catch (error) {
             lastError = error instanceof Error && error.message ? error.message : String(error);
+            closed = closedDatabaseName(error);
         } finally {
             await client.end().catch(() => undefined);
+        }
+        if (closed !== null) {
+            if (healed) return { ready: false, error: lastError, closedDatabase: closed };
+            healed = true;
+            const heal = await (options.reopenClosed ?? reopenWithDriver)(databaseUrl).catch(() => ({ reopened: false, notice: [] }));
+            for (const line of heal.notice) options.onNotice?.(line);
+            if (!heal.reopened) return { ready: false, error: lastError, closedDatabase: closed };
+            // Open again: ask straight away rather than after the interval.
+            continue;
         }
         if (Date.now() + intervalMs >= deadline) break;
         await new Promise(resolve => setTimeout(resolve, intervalMs));
@@ -616,6 +677,8 @@ export interface EnsureDevDatabaseOptions {
     startDatabase?: (projectRoot: string) => Promise<void>;
     /** How long a started database has to answer `SELECT 1`. Defaults to 60s. */
     readyTimeoutMs?: number;
+    /** Opens a database closed to new connections again; see `waitForQueryable`. Injected for tests. */
+    reopenClosed?: (databaseUrl: string) => Promise<ClosedDatabaseHeal>;
     /**
      * Who answers on the compose port. Asks Docker by default; injected for the
      * same reason `startDatabase` is.
@@ -722,7 +785,21 @@ export async function ensureDevDatabase(options: EnsureDevDatabaseOptions): Prom
 
     // Listening is not ready. Nothing is pushed into a database that has not
     // yet answered a query; see `waitForQueryable`.
-    const readiness = await waitForQueryable(databaseUrl, { timeoutMs: options.readyTimeoutMs });
+    const readiness = await waitForQueryable(databaseUrl, {
+        timeoutMs: options.readyTimeoutMs,
+        reopenClosed: options.reopenClosed,
+        onNotice: line => log(`  ${chalk.yellow(line)}`)
+    });
+    if (!readiness.ready && readiness.closedDatabase !== undefined) {
+        const name = readiness.closedDatabase;
+        const hint = `Database "${name}" on port ${target.port} is closed to new connections (ALLOW_CONNECTIONS false), `
+            + "and could not be opened again. `rebase db branch create --force` closes its source for the copy, and one "
+            + "stopped before it finished leaves it closed; nothing in it is lost. Open it with "
+            + `${chalk.cyan("rebase db branch list")} (every rebase db branch command opens it first), or run, connected `
+            + `to the server's postgres database: ALTER DATABASE "${name.replace(/"/g, '""')}" ALLOW_CONNECTIONS true;`;
+        log(`  ${chalk.yellow("⚠")} ${chalk.gray(hint)}`);
+        return { action: "start-failed", hint };
+    }
     if (!readiness.ready) {
         const seconds = Math.round((options.readyTimeoutMs ?? 60_000) / 1000);
         const hint = `The database container is listening on port ${target.port} but did not answer a query `
