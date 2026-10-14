@@ -40,6 +40,44 @@ export function compareMigrationVersions(a: string, b: string): number {
     return a.localeCompare(b);
 }
 
+/**
+ * The version Atlas records for a migration file: its numeric prefix
+ * (`20260906101530_init.sql` → `20260906101530`), or the name without `.sql`.
+ */
+export function migrationVersionOf(file: string): string {
+    return /^(\d+)/.exec(file)?.[1] ?? file.replace(/\.sql$/, "");
+}
+
+/** How many versions a refused baseline names, newest last. */
+const VERSIONS_NAMED = 5;
+
+/**
+ * Why `--baseline <version>` cannot run, or `null` when it names a migration
+ * file in `drizzle/migrations`.
+ *
+ * Asked before anything else, the database included. A version no file has
+ * was refused only by Atlas, after the command had said "Marking every
+ * migration up to abc as applied…"; and one older than every file read
+ * "Nothing to record" and migrated on, though it named nothing to baseline.
+ *
+ * @param files the migration files, sorted oldest first.
+ * @returns the refusal, its first line the error and the rest the detail.
+ */
+export function baselineVersionProblem(version: string, files: readonly string[]): string | null {
+    const versions = files.map(migrationVersionOf);
+    if (versions.length === 0) {
+        return `--baseline ${version}: There are no migrations in drizzle/migrations to baseline. Nothing was run.\n` +
+            "Run `rebase db generate` to write the first one.";
+    }
+    if (versions.includes(version)) return null;
+    const named = versions.slice(-VERSIONS_NAMED).join(", ");
+    const which = versions.length > VERSIONS_NAMED
+        ? `The newest ${VERSIONS_NAMED} of the ${versions.length} versions there`
+        : "The versions there";
+    return `--baseline ${version} names no migration in drizzle/migrations. Nothing was run.\n` +
+        `${which}: ${named}. A baseline is one of them: the newest migration the database already holds.`;
+}
+
 /** How to keep `--baseline <version>`'s promise, given the newest recorded version. */
 export function planBaseline(version: string, latestRecorded: string | null): BaselinePlan {
     if (latestRecorded === null) return { kind: "atlas-baseline" };

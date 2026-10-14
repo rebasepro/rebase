@@ -70,7 +70,7 @@ import { ensureAtlasRevisionsTable } from "./schema/atlas-revisions";
 import { createApplyReportFilter } from "./schema/atlas-apply-report";
 import { nextStepAfterDbGenerate } from "./schema/generate-next-step";
 import { CommandStopped, ScratchDatabase } from "./cli-scratch-database";
-import { describeBaselinePlan, latestRecordedMigration, planBaseline } from "./schema/migrate-baseline";
+import { baselineVersionProblem, describeBaselinePlan, latestRecordedMigration, planBaseline } from "./schema/migrate-baseline";
 import { promptConfirm } from "./cli-prompt";
 import { applyPoliciesFile, applyPushPlan, stampableTables, type PolicyStamping } from "./cli-push";
 import { unexpectedBranchArgs } from "./branch-argv";
@@ -917,6 +917,13 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
             // silence on one that has any, so the history is read first and
             // `planBaseline` picks the way that works.
             const baseline = argsList["--baseline"];
+            const baselineProblem = baseline ? baselineVersionProblem(baseline, listMigrationFiles()) : null;
+            if (baselineProblem) {
+                const [message, ...detail] = baselineProblem.split("\n");
+                outError(chalk.red(`  ✗ ${message}`));
+                for (const line of detail) outError(chalk.gray(`    ${line}`));
+                throw new CommandStopped("The baseline names no migration.");
+            }
             const baselinePlan = baseline
                 ? planBaseline(baseline, databaseUrl ? await latestRecordedMigration(databaseUrl) : null)
                 : null;

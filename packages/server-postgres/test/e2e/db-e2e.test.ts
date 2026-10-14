@@ -356,6 +356,18 @@ describe("Database migration E2E", () => {
         expect(failed.all).toContain("42701");
         expect(failed.all).toContain(`rebase db migrate --baseline ${version}`);
 
+        // A baseline that names no migration file is refused before anything
+        // runs, naming the versions there are — not after "Marking every
+        // migration up to abc as applied…", nor as "Nothing to record".
+        for (const wrong of ["abc", "19990101000000"]) {
+            const refused = await run("db", "migrate", "--baseline", wrong);
+            expect(refused.exitCode, refused.all).toBe(1);
+            expect(refused.all).toContain(`--baseline ${wrong} names no migration in drizzle/migrations. Nothing was run.`);
+            expect(refused.all).toContain(version);
+            expect(refused.all).not.toMatch(/Marking every migration|Nothing to record|not found/);
+            expect(await recorded()).toEqual(before);
+        }
+
         const baselined = await run("db", "migrate", "--baseline", version);
         expect(baselined.all).toContain("Marking every migration up to");
         expect(baselined.all).not.toContain("42701");
