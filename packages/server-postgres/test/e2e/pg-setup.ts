@@ -2,6 +2,7 @@ import { execa } from "execa";
 import { spawnSync } from "node:child_process";
 import crypto from "crypto";
 import pg from "pg";
+import { detectToolMajor, resolvePgBinary } from "../../src/backup/backup-service.js";
 
 export interface PgContainer {
     containerName: string;
@@ -70,6 +71,30 @@ function installCleanup(): void {
  * {@link PGVECTOR_IMAGE}.
  */
 export const DEFAULT_PG_IMAGE = "postgres:18-alpine";
+
+/** The major {@link DEFAULT_PG_IMAGE} runs. A newer client is fine against it. */
+const DEFAULT_IMAGE_MAJOR = 18;
+
+/**
+ * The image for a suite that runs `pg_dump` / `pg_restore` against it.
+ *
+ * `pg_dump` must be at least as new as the server it reads, and CI's runner
+ * ships an older client than {@link DEFAULT_PG_IMAGE}, so the server's major
+ * follows the client's rather than the other way round. A missing client
+ * fails the suite instead of skipping it, because a skipped suite would report
+ * a pass.
+ */
+export async function imageForLocalClient(): Promise<string> {
+    const bin = resolvePgBinary("pg_dump");
+    const major = bin ? await detectToolMajor(bin) : null;
+    if (!bin || major === null) {
+        throw new Error(
+            "pg_dump was not found (or its version could not be read), so this suite cannot take a backup. " +
+            "Install the PostgreSQL client tools, or set PG_DUMP_PATH, PG_DUMPALL_PATH and PG_RESTORE_PATH."
+        );
+    }
+    return major >= DEFAULT_IMAGE_MAJOR ? DEFAULT_PG_IMAGE : `postgres:${major}-alpine`;
+}
 
 /**
  * The same major with pgvector built in, for callers that need `vector`.

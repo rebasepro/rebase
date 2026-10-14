@@ -35,29 +35,14 @@ import { execa } from "execa";
 import pg from "pg";
 import { drizzle } from "drizzle-orm/node-postgres";
 import type { CronJobContext } from "@rebasepro/types";
-import { DEFAULT_PG_IMAGE, startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
+import { imageForLocalClient, startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
 import { ensureAuthTablesExist } from "../../src/auth/ensure-tables.js";
 import { buildCdcFunctionSql, buildCdcTriggerSql } from "../../src/services/cdc/trigger-cdc.js";
 import { createBackupCron } from "../../src/backup/backup-cron.js";
-import { applyGlobals, detectToolMajor, resolvePgBinary, restoreDump } from "../../src/backup/backup-service.js";
+import { applyGlobals, resolvePgBinary, restoreDump } from "../../src/backup/backup-service.js";
 import { buildPgRestoreListArgs, globalsFileForDump } from "../../src/backup/pg-tools.js";
 
 const SEEDED_EMAIL = "restored-admin@example.com";
-
-/** The major `DEFAULT_PG_IMAGE` runs. A newer client is fine against it. */
-const DEFAULT_IMAGE_MAJOR = 18;
-
-async function imageForLocalClient(): Promise<string> {
-    const bin = resolvePgBinary("pg_dump");
-    const major = bin ? await detectToolMajor(bin) : null;
-    if (!bin || major === null) {
-        throw new Error(
-            "pg_dump was not found (or its version could not be read), so this suite cannot take a backup. " +
-            "Install the PostgreSQL client tools, or set PG_DUMP_PATH, PG_DUMPALL_PATH and PG_RESTORE_PATH."
-        );
-    }
-    return major >= DEFAULT_IMAGE_MAJOR ? DEFAULT_PG_IMAGE : `postgres:${major}-alpine`;
-}
 
 const withDatabase = (url: string, db: string) => url.replace(/\/rebase\?/, `/${db}?`);
 

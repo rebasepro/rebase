@@ -19,7 +19,7 @@ import path from "path";
 import pg from "pg";
 import { fileURLToPath } from "url";
 import { execa } from "execa";
-import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
+import { imageForLocalClient, startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const pkgRoot = path.resolve(__dirname, "../..");
@@ -69,7 +69,8 @@ describe("rebase db restore", () => {
     };
 
     beforeAll(async () => {
-        container = await startPgContainer();
+        // pg_dump must be at least as new as the server; see imageForLocalClient.
+        container = await startPgContainer({ image: await imageForLocalClient() });
         admin = new pg.Client({ connectionString: container.connectionString });
         await admin.connect();
         await admin.query(SEED_SQL);
