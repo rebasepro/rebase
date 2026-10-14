@@ -28,6 +28,8 @@
  * Side-effect free, so it is unit-tested without Atlas or a database.
  */
 
+import { atlasExcludePattern } from "./atlas-exclude";
+
 /** A constraint kind the collection model has no way to declare. */
 export type UndeclarableConstraintKind = "check" | "exclude";
 
@@ -76,23 +78,6 @@ export function declaredConstraintNames(desiredSql: string): Set<string> {
 }
 
 /**
- * One segment of an Atlas `--exclude` pattern that matches exactly this name.
- *
- * Atlas reads the pattern as a glob split on `.`, so a name is not a pattern
- * as it stands. Measured against the pinned 1.2.3:
- *
- *  - a `.` in a name makes one more segment, and Atlas refuses the whole
- *    command, `too many parts in pattern` — so a dot becomes `?`, which
- *    matches it (and any other one character: a pattern that also keeps a
- *    near-namesake errs on the side of keeping a rule);
- *  - `*`, `?`, `[` and `]` are glob syntax and match other names, or none —
- *    so they are escaped with `\`, which Atlas reads as the literal.
- */
-export function atlasExcludeSegment(name: string): string {
-    return name.replace(/[\\*?[\]]/g, ch => `\\${ch}`).replace(/\./g, "?");
-}
-
-/**
  * The `--exclude` patterns that keep Atlas from dropping the CHECK and EXCLUDE
  * constraints the desired state does not declare. Three-part
  * `schema.table.constraint`, which is what Atlas matches a constraint by: a
@@ -105,5 +90,5 @@ export function undeclaredConstraintExcludes(
     const declared = declaredConstraintNames(desiredSql);
     return existing
         .filter(constraint => !declared.has(constraint.name))
-        .map(constraint => [constraint.schema, constraint.table, constraint.name].map(atlasExcludeSegment).join("."));
+        .map(constraint => atlasExcludePattern(constraint.schema, constraint.table, constraint.name));
 }

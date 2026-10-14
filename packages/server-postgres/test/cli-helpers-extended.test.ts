@@ -4,6 +4,12 @@ import * as fs from "fs";
 import * as path from "path";
 import { execSync } from "child_process";
 
+/** `"public.users"` as the catalogue row `queryExistingTables` returns. */
+const asTable = (name: string) => {
+    const [schema, table] = name.split(".");
+    return { schema, table };
+};
+
 // ── Mock pg globally so dynamic import("pg") resolves to our mock ────────
 
 const mockQuery = jest.fn();
@@ -182,7 +188,7 @@ describe("CLI Helpers — Extended", () => {
 
         const runExcludes = () => getTableExcludes("postgres://x/db", "/collections", {
             getIncludes: () => getTableIncludesFromCollections(collections),
-            queryExistingTables: async () => ["public.users", "public.sessions", "public.migrations"],
+            queryExistingTables: async () => ["public.users", "public.sessions", "public.migrations"].map(asTable),
         });
 
         it("should always include atlas_schema_revisions.* in excludes", async () => {
@@ -324,7 +330,7 @@ describe("CLI Helpers — Extended", () => {
                 queryExistingTables: async () => [
                     "public.products", "catalog.categories", "public.products_categories",
                     "catalog.products_categories"
-                ],
+                ].map(asTable),
             });
             expect(excludes).not.toContain("public.products_categories");
             // A table of that name in `catalog` is somebody else's, and stays protected.

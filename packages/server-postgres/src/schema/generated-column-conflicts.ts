@@ -28,6 +28,7 @@
  * are rows someone else read. Unit-tested in
  * `generated-column-conflicts.test.ts`.
  */
+import { atlasExcludePattern } from "./atlas-exclude";
 import { extractPlanStatements, fromAlterTable } from "./destructive-sql";
 
 /** An operation on a column that PostgreSQL refuses while a dependant exists. */
@@ -175,7 +176,9 @@ export function partitionByOwnership(
     const managed: GeneratedColumnConflict[] = [];
     const foreign: GeneratedColumnConflict[] = [];
     for (const conflict of conflicts) {
-        const target = `${conflict.schema}.${conflict.table}.${conflict.column}`;
+        // Spelled the way the exclude was, so a name holding a `.` or glob
+        // syntax is still recognised as ours.
+        const target = atlasExcludePattern(conflict.schema, conflict.table, conflict.column);
         (owned.has(target) ? managed : foreign).push(conflict);
     }
     return { managed, foreign };

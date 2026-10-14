@@ -1,5 +1,11 @@
 import { getTableExcludes, ExcludeIntrospectionError } from "../src/cli-helpers";
 
+/** `"public.users"` as the catalogue row `queryExistingTables` returns. */
+const asTable = (name: string) => {
+    const [schema, table] = name.split(".");
+    return { schema, table };
+};
+
 // The exclude list is the ONLY thing shielding non-collection (user/system)
 // tables from `db push`'s auto-approved declarative apply. If introspection
 // fails we must abort — never fall back to a partial list that lets Atlas
@@ -35,7 +41,7 @@ describe("getTableExcludes fail-closed behaviour", () => {
             "public.posts", // managed → NOT excluded
             "public.legacy_orders", // unmapped → excluded
             "public.stripe_webhooks" // unmapped → excluded
-        ];
+        ].map(asTable);
 
         const excludes = await getTableExcludes("postgres://x/db", "/collections", {
             getIncludes,

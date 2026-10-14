@@ -30,6 +30,8 @@
  * can see beats a migration quietly rewritten wrong.
  */
 
+import { excludePatternParts } from "./atlas-exclude";
+
 /** Anything Postgres accepts in an unquoted identifier past ASCII. */
 const IDENT = "(?:\"(?:[^\"]|\"\")*\"|[A-Za-z_\\u0080-\\uffff][\\w$\\u0080-\\uffff]*)";
 const QUALIFIED = `${IDENT}(?:\\s*\\.\\s*${IDENT})*`;
@@ -69,16 +71,17 @@ export interface StripResult {
 }
 
 /**
- * Split `schema.table.object` patterns. Anything not in three parts is
- * ignored rather than guessed at — the two-part form is the one Atlas itself
- * silently mis-reads, and repeating that mistake here would be worse than
- * doing nothing.
+ * Split `schema.table.object` patterns back into the names they were built
+ * from (`excludePatternParts`, the inverse of how every exclude is spelled).
+ * Anything not in three parts is ignored rather than guessed at — the two-part
+ * form is the one Atlas itself silently mis-reads, and repeating that mistake
+ * here would be worse than doing nothing.
  */
 export function parseExcludePatterns(patterns: string[]): CarvedOutObject[] {
     const parsed: CarvedOutObject[] = [];
     for (const pattern of patterns) {
-        const parts = pattern.split(".");
-        if (parts.length !== 3) continue;
+        const parts = excludePatternParts(pattern);
+        if (parts === undefined || parts.length !== 3) continue;
         if (parts.some((p) => p.length === 0)) continue;
         parsed.push({ schema: parts[0], table: parts[1], object: parts[2] });
     }

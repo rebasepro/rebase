@@ -8,6 +8,7 @@ import { isRebaseIndexName } from "./schema/collection-index";
 import type { GeneratedColumnDependency } from "./schema/generated-column-conflicts";
 import { COLUMN_TYPES_SQL, type ExistingColumnType } from "./schema/destructive-sql";
 import { UNDECLARABLE_CONSTRAINTS_SQL, undeclaredConstraintExcludes, type ExistingConstraint } from "./schema/undeclarable-constraints";
+import { atlasExcludePattern, excludePatternParts } from "./schema/atlas-exclude";
 import { out, outWarn } from "./cli-output";
 import type { CollectionConfig } from "@rebasepro/types";
 import { moduleDir as __helpersDirname } from "./module-dir";
@@ -838,18 +839,25 @@ export async function getTriggerExcludes(collectionsPath: string): Promise<strin
  * catalogs. Separated from {@link getTableExcludes} so its failure mode can
  * be handled explicitly (fail closed) and so tests can inject a stub.
  */
+/** An index as the catalogue names it: its schema, its table and its own name. */
+export interface ExistingIndex {
+    schema: string;
+    table: string;
+    index: string;
+}
+
 /**
- * Every index Postgres holds on a table Rebase manages, as
- * `schema.table.index`.
+ * Every index Postgres holds on a table, by its parts — never joined with `.`,
+ * which a name may itself contain.
  *
  * Constraint-backed indexes are left out: a `PRIMARY KEY` or a `UNIQUE` is a
  * *constraint* to Atlas, diffed from the constraint declaration, and naming its
  * index in an exclude would shield the constraint itself.
  */
-export async function queryExistingIndexes(databaseUrl: string): Promise<string[]> {
+export async function queryExistingIndexes(databaseUrl: string): Promise<ExistingIndex[]> {
     return withAppClient(databaseUrl, async client => {
-        const res = await client.query(`
-            SELECT n.nspname || '.' || t.relname || '.' || i.relname AS full_name
+        const res = await client.query<ExistingIndex>(`
+            SELECT n.nspname AS "schema", t.relname AS "table", i.relname AS "index"
             FROM pg_index x
             JOIN pg_class i ON i.oid = x.indexrelid
             JOIN pg_class t ON t.oid = x.indrelid
@@ -860,7 +868,7 @@ export async function queryExistingIndexes(databaseUrl: string): Promise<string[
                   SELECT 1 FROM pg_constraint c WHERE c.conindid = i.oid
               );
         `);
-        return res.rows.map((row: { full_name: string }) => row.full_name);
+        return res.rows;
     });
 }
 
@@ -890,13 +898,15 @@ export async function queryExistingIndexes(databaseUrl: string): Promise<string[
  *
  * Three-part `schema.table.index`, never two: a two-part pattern reads as a
  * *table* named `<index>` in a *schema* named `<table>`, matches nothing, and
- * reports no error — the trap already recorded for the search excludes.
+ * reports no error — the trap already recorded for the search excludes. And
+ * spelled by `atlasExcludePattern`: a raw `orders_idx[v1]` is a glob that
+ * matches `orders_idxv`, so that index was dropped with no prompt.
  */
 export async function getForeignIndexExcludes(
     databaseUrl: string,
     collectionsPath: string,
     deps: {
-        queryExistingIndexes?: (databaseUrl: string) => Promise<string[]>;
+        queryExistingIndexes?: (databaseUrl: string) => Promise<ExistingIndex[]>;
         getManagedIndexNames?: (collectionsPath: string) => Promise<Set<string>>;
     } = {}
 ): Promise<string[]> {
@@ -905,7 +915,7 @@ export async function getForeignIndexExcludes(
 
     const managed = await getManaged(collectionsPath);
 
-    let existing: string[];
+    let existing: ExistingIndex[];
     try {
         existing = await queryIndexes(databaseUrl);
     } catch (err) {
@@ -918,11 +928,12 @@ export async function getForeignIndexExcludes(
         );
     }
 
-    return existing.filter(full => {
-        const indexName = full.slice(full.lastIndexOf(".") + 1);
-        if (managed.has(indexName)) return false;   // ours, and still declared
-        return !isRebaseIndexName(indexName);       // ours, but no longer declared -> let it drop
-    });
+    return existing
+        .filter(({ index }) => {
+            if (managed.has(index)) return false;   // ours, and still declared
+            return !isRebaseIndexName(index);       // ours, but no longer declared -> let it drop
+        })
+        .map(({ schema, table, index }) => atlasExcludePattern(schema, table, index));
 }
 
 /**
@@ -945,7 +956,8 @@ async function managedIndexNames(collectionsPath: string): Promise<Set<string>> 
     // vector was here long before it was — so an ANN index answered that
     // question with "somebody else's".
     for (const pattern of [...searchExcludePatterns(collections), ...vectorExcludePatterns(collections)]) {
-        names.add(pattern.slice(pattern.lastIndexOf(".") + 1));
+        const object = excludePatternParts(pattern)?.[2];
+        if (object !== undefined) names.add(object);
     }
     return names;
 }
@@ -984,15 +996,21 @@ export async function getUndeclaredConstraintExcludes(
     return undeclaredConstraintExcludes(existing, desiredSql);
 }
 
-export async function queryExistingTables(databaseUrl: string): Promise<string[]> {
+/** A table or view as the catalogue names it. */
+export interface ExistingTable {
+    schema: string;
+    table: string;
+}
+
+export async function queryExistingTables(databaseUrl: string): Promise<ExistingTable[]> {
     return withAppClient(databaseUrl, async client => {
-        const res = await client.query(`
-            SELECT table_schema || '.' || table_name AS full_name
+        const res = await client.query<ExistingTable>(`
+            SELECT table_schema AS "schema", table_name AS "table"
             FROM information_schema.tables
             WHERE table_schema NOT IN ('pg_catalog', 'information_schema')
               AND table_type IN ('BASE TABLE', 'VIEW');
         `);
-        return res.rows.map((row: { full_name: string }) => row.full_name);
+        return res.rows;
     });
 }
 
@@ -1026,7 +1044,7 @@ export async function getTableExcludes(
     databaseUrl: string,
     collectionsPath: string,
     deps: {
-        queryExistingTables?: (databaseUrl: string) => Promise<string[]>;
+        queryExistingTables?: (databaseUrl: string) => Promise<ExistingTable[]>;
         getIncludes?: (collectionsPath: string) => Promise<string[]>;
     } = {}
 ): Promise<string[]> {
@@ -1051,7 +1069,7 @@ export async function getTableExcludes(
     // Supabase installation.
     const excludes: string[] = ["atlas_schema_revisions.*", "auth", "auth.*", "rebase", "rebase.*"];
 
-    let existingTables: string[];
+    let existingTables: ExistingTable[];
     try {
         existingTables = await queryTables(databaseUrl);
     } catch (err) {
@@ -1061,9 +1079,9 @@ export async function getTableExcludes(
         );
     }
 
-    for (const table of existingTables) {
-        if (!includes.includes(table)) {
-            excludes.push(table);
+    for (const { schema, table } of existingTables) {
+        if (!includes.includes(`${schema}.${table}`)) {
+            excludes.push(atlasExcludePattern(schema, table));
         }
     }
 

@@ -40,6 +40,7 @@ import {
     vectorIndexNames,
     vectorIndexStatements
 } from "../vector-index";
+import { atlasExcludePattern } from "../atlas-exclude";
 import { collectionIndexStatements } from "../collection-index";
 import { quoteSqlLiteral } from "./plan-schema";
 import { triggerStatements } from "./updated-at-trigger";
@@ -416,7 +417,8 @@ export function renderSearchDdl(plan: SchemaPlan): string {
  * two-part form is what Atlas wants when the connection URL scopes it to one
  * schema and is *silently ignored* otherwise: it reads `posts.search_vector` as
  * a table named `search_vector` in a schema named `posts`, matches nothing, and
- * reports no error for the pattern that never fired.
+ * reports no error for the pattern that never fired. Each name is spelled by
+ * `atlasExcludePattern`, so one holding a `.` or glob syntax still matches.
  */
 export const searchExcludePatternsOf = (plan: SchemaPlan): string[] => {
     const patterns: string[] = [];
@@ -424,10 +426,10 @@ export const searchExcludePatternsOf = (plan: SchemaPlan): string[] => {
         if (!table.search) continue;
         for (const column of table.columns) {
             if (column.source.kind !== "search") continue;
-            patterns.push(`${table.schema}.${table.table}.${column.column}`);
+            patterns.push(atlasExcludePattern(table.schema, table.table, column.column));
         }
         for (const index of searchIndexNames(table.search)) {
-            patterns.push(`${table.schema}.${table.table}.${index}`);
+            patterns.push(atlasExcludePattern(table.schema, table.table, index));
         }
     }
     return patterns;
@@ -481,7 +483,7 @@ export const vectorExcludePatternsOf = (plan: SchemaPlan): string[] => {
             ...table.vectorColumns.map(spec => spec.column),
             ...(table.vector ? vectorIndexNames(table.vector) : [])
         ];
-        for (const name of names) patterns.push(`${table.schema}.${table.table}.${name}`);
+        for (const name of names) patterns.push(atlasExcludePattern(table.schema, table.table, name));
     }
     return patterns;
 };
@@ -520,4 +522,4 @@ const isTriggerFunction = (statement: string): boolean => statement.includes("RE
 
 /** @see searchExcludePatternsOf */
 export const triggerExcludePatternsOf = (plan: SchemaPlan): string[] =>
-    plan.tables.flatMap(table => table.triggers.map(t => `${table.schema}.${table.table}.${t.name}`));
+    plan.tables.flatMap(table => table.triggers.map(t => atlasExcludePattern(table.schema, table.table, t.name)));

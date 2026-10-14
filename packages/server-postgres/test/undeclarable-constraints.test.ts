@@ -1,7 +1,7 @@
 import { PGlite } from "@electric-sql/pglite";
+import { atlasExcludeSegment } from "../src/schema/atlas-exclude";
 import {
     UNDECLARABLE_CONSTRAINTS_SQL,
-    atlasExcludeSegment,
     declaredConstraintNames,
     undeclaredConstraintExcludes,
     type ExistingConstraint
