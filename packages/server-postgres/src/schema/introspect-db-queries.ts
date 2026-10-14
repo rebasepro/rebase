@@ -94,7 +94,8 @@ export function isUsableFileName(name: string): boolean {
  */
 export const TABLES_QUERY = `
     SELECT c.relname AS table_name,
-           c.relkind = 'p' AS is_partitioned
+           c.relkind = 'p' AS is_partitioned,
+           c.relrowsecurity AS rls_enabled
     FROM pg_class c
     JOIN pg_namespace n ON n.oid = c.relnamespace
     WHERE n.nspname = $1

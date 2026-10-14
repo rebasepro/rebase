@@ -34,6 +34,8 @@ export interface TableRow {
     table_name: string;
     /** True for the parent of a partitioned table (`relkind = 'p'`). */
     is_partitioned?: boolean;
+    /** Whether row-level security is on (`relrowsecurity`). Absent when the caller did not read it. */
+    rls_enabled?: boolean;
 }
 
 export interface TableColumn {
@@ -746,11 +748,12 @@ export interface GenerationContext {
  * Read back with `policyToSecurityRule` — what Studio's "Import from table"
  * and "Import to codebase" use — so the `TO` list, the mode and both clauses
  * come back as they are. The framework's own defaults
- * (`<table>_default_admin_read` and friends) are left out: every collection is
- * given them anyway, and described twice they would be written twice.
+ * (`<table>_default_admin_read` and friends) are left out when the collection
+ * keeps them (see {@link ownsItsAccess}): it is given them anyway, and
+ * described twice they would be written twice.
  */
-function renderSecurityRules(tableName: string, policies: readonly PolicyRow[]): string {
-    const injected = getGeneratedPolicyNames({ name: tableName, slug: tableName, table: tableName, properties: {} });
+function renderSecurityRules(tableName: string, policies: readonly PolicyRow[], keepsBaseline: boolean): string {
+    const injected = keepsBaseline ? adminBaselineNames(tableName) : new Set<string>();
     const own = policies.filter((policy) => policy.table_name === tableName && !injected.has(policy.policy_name));
     if (own.length === 0) return "";
 
@@ -774,6 +777,43 @@ function renderSecurityRules(tableName: string, policies: readonly PolicyRow[]):
     return "\n    // The table's row-level security policies, read from the database. `rebase db push`" +
         "\n    // recreates each from its rule, so a policy is changed here from now on." +
         `\n    securityRules: [${rules.join("")}\n    ],`;
+}
+
+/** The policies every collection is given unless it opts out: `<table>_default_admin_read` and friends. */
+const adminBaselineNames = (tableName: string): Set<string> =>
+    getGeneratedPolicyNames({ name: tableName, slug: tableName, table: tableName, properties: {} });
+
+/**
+ * Whether a table's access is its own, so that its collection must opt out of
+ * the admin baseline: row-level security on, and not every baseline policy
+ * there.
+ *
+ * Every collection is given the baseline (`<table>_default_admin_read`,
+ * `_write_insert`, `_update`, `_delete`), permissive policies that let the
+ * server and the `admin` role read and write every row. On a table whose
+ * policies grant no such thing, the push after an introspection created them,
+ * and an admin who had read no row of `orders` read them all. With
+ * `disableDefaultPolicies: true` the push writes the table's own policies and
+ * nothing else; a table that does hold the baseline (one Rebase built) keeps
+ * it as it is.
+ *
+ * A table with RLS off keeps the baseline: the push switches RLS on whatever
+ * the collection says, and that table had no policy narrowing anyone to begin
+ * with. {@link rlsOffNote} says so. `undefined` RLS — a caller that did not
+ * read it — is decided by the policies alone.
+ */
+function ownsItsAccess(tableName: string, table: TableRow | undefined, policies: readonly PolicyRow[] | undefined): boolean {
+    if (!policies || table?.rls_enabled === false) return false;
+    const present = new Set(policies.filter((policy) => policy.table_name === tableName).map((policy) => policy.policy_name));
+    if (table?.rls_enabled !== true && present.size === 0) return false;
+    return ![...adminBaselineNames(tableName)].every((name) => present.has(name));
+}
+
+/** What `rebase db push` does to a table whose row-level security is off. */
+function rlsOffNote(table: TableRow | undefined): string | undefined {
+    if (table?.rls_enabled !== false) return undefined;
+    return "row-level security is off on this table, so every request reaches every row. `rebase db push` " +
+        "switches it on: from then on its rows are reached through its policies, and the server and admins reach them all";
 }
 
 /** `pg_policies.cmd`, narrowed to the commands a policy can have. */
@@ -1559,7 +1599,17 @@ export function generateCollectionFile(
         ? `\n    relations: [${relationsOutput}\n    ],`
         : "";
 
-    const securityRulesBlock = renderSecurityRules(tableName, context.metadata?.policies ?? []);
+    const tableRow = context.metadata?.tables?.find((table) => table.table_name === tableName);
+    const ownsAccess = ownsItsAccess(tableName, tableRow, context.metadata?.policies);
+    const securityRulesBlock = renderSecurityRules(tableName, context.metadata?.policies ?? [], !ownsAccess);
+    const defaultPoliciesBlock = ownsAccess
+        ? "\n    // The table's policies are its whole access model: without this line `rebase db push`" +
+          "\n    // would add the admin baseline (`<table>_default_admin_*`), letting the server and" +
+          "\n    // admins read and write every row. Delete it to give them that." +
+          "\n    disableDefaultPolicies: true,"
+        : "";
+    const rlsOff = rlsOffNote(tableRow);
+    if (rlsOff) fileNotes.push(rlsOff);
 
     const sortedPropertiesOrder = sortPropertiesOrder(orderEntries);
     for (const key of sortedPropertiesOrder) {
@@ -1681,7 +1731,7 @@ ${open}
     slug: ${quote(tableName)},
     table: ${quote(tableName)},${schemaBlock}${descriptionBlock}${searchBlock}
     properties: {${propsOutput}
-    },${relationsBlock}${securityRulesBlock}${adminBlock}
+    },${relationsBlock}${defaultPoliciesBlock}${securityRulesBlock}${adminBlock}
 ${close}
 
 export default ${collectionVarName};
