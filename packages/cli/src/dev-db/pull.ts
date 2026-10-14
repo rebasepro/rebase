@@ -35,6 +35,7 @@
  */
 
 import { execa } from "execa";
+import fs from "fs";
 import type { Client } from "pg";
 
 import { PGLITE_EXTENSIONS } from "./constraints";
@@ -583,8 +584,21 @@ export type DumpOutcome =
  * it refused, get the banner every database command prints for a connection
  * that failed, and anything else is pg_dump's own words with a line saying
  * nothing was changed. A dump that succeeds with warnings still shows them.
+ * A dump that fails leaves no file behind.
  */
 export async function dumpSource(plan: PullPlan, dumpFile: string): Promise<DumpOutcome> {
+    try {
+        const outcome = await dumpInto(plan, dumpFile);
+        if (!outcome.ok) fs.rmSync(dumpFile, { force: true });
+
+        return outcome;
+    } catch (error) {
+        fs.rmSync(dumpFile, { force: true });
+        throw error;
+    }
+}
+
+async function dumpInto(plan: PullPlan, dumpFile: string): Promise<DumpOutcome> {
     let targetEngine = plan.targetEngine;
     if (!targetEngine) {
         const read = await readTargetEngine(plan.target);

@@ -337,6 +337,7 @@ describe("dumpSource", () => {
         expect(text).toContain("Nothing was changed");
         expect(text).not.toContain("s3cret");
         expect(text).not.toContain("Command failed");
+        expect(fs.existsSync(dumpFile)).toBe(false);
     });
 
     it("says so when the source refuses the credentials", async () => {
