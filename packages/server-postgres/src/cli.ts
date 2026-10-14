@@ -50,7 +50,7 @@ import {
     isSslNotEnabled,
     reportCommandFailure
 } from "./cli-errors";
-import { forLibpq, redactConnectionPasswords } from "./utils/connection-string";
+import { forAtlas, redactConnectionPasswords } from "./utils/connection-string";
 import { dropLegacyAuthSchema, RLS_BOOTSTRAP_SQL } from "./schema/rls-bootstrap-sql";
 import { detectDestructiveStatements, decidePushSafety, destructiveOptInFlag, extractPlanStatements, type DestructiveStatement, type ExistingColumnType } from "./schema/destructive-sql";
 import type { LegacyRename } from "./schema/push-legacy-renames";
@@ -1878,10 +1878,11 @@ async function runAtlas(
     if (takesDevUrl(domain, args) && !devDatabase.named) await scratchDatabase.ensure(databaseUrl, devDatabaseUrl);
 
     // Atlas speaks libpq, which rejects the `sslmode=no-verify` that
-    // node-postgres accepts — see `forLibpq`. Rewritten only for the argv, so
+    // node-postgres accepts, and defaults to `require` where node-postgres
+    // asks for no SSL — see `forAtlas`. Rewritten only for the argv, so
     // everything above still connects with the URL as configured.
-    const atlasUrl = forLibpq(databaseUrl);
-    const atlasDevUrl = forLibpq(devDatabaseUrl);
+    const atlasUrl = forAtlas(databaseUrl);
+    const atlasDevUrl = forAtlas(devDatabaseUrl);
 
     // Everything Atlas must keep its hands off, in one list.
     //

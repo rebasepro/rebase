@@ -1,4 +1,4 @@
-import { forLibpq } from "../src/utils/connection-string";
+import { forAtlas, forLibpq } from "../src/utils/connection-string";
 
 /**
  * `sslmode=no-verify` is a node-postgres invention. libpq does not have it and
@@ -47,5 +47,51 @@ describe("forLibpq", () => {
     it("ignores non-postgres URLs", () => {
         expect(forLibpq("mysql://u:p@host/db?sslmode=no-verify"))
             .toBe("mysql://u:p@host/db?sslmode=no-verify");
+    });
+});
+
+/**
+ * Atlas connects through lib/pq, whose default `sslmode` is `require`, while
+ * node-postgres — the app, and the CLI's own steps — asks for no SSL when the
+ * URL names none. A hand-written URL for a local Postgres without SSL worked
+ * for the app and failed every schema command with `pq: SSL is not enabled on
+ * the server`. Only a database on this machine is given the app's default.
+ */
+describe("forAtlas", () => {
+    it.each([
+        ["postgres://u:p@localhost:5432/db", "postgres://u:p@localhost:5432/db?sslmode=disable"],
+        ["postgresql://u:p@127.0.0.1:55432/shop", "postgresql://u:p@127.0.0.1:55432/shop?sslmode=disable"],
+        ["postgres://u:p@127.12.0.1/db", "postgres://u:p@127.12.0.1/db?sslmode=disable"],
+        ["postgres://u:p@[::1]:5432/db", "postgres://u:p@[::1]:5432/db?sslmode=disable"],
+        ["postgres://u:p@0.0.0.0:5432/db", "postgres://u:p@0.0.0.0:5432/db?sslmode=disable"]
+    ])("gives a loopback URL that names no sslmode the app's default: %s", (url, expected) => {
+        expect(forAtlas(url)).toBe(expected);
+    });
+
+    it("keeps the other parameters percent-encoded", () => {
+        expect(forAtlas("postgres://u:p@127.0.0.1:55432/shop?options=-c%20search_path%3Dpublic"))
+            .toBe("postgres://u:p@127.0.0.1:55432/shop?options=-c%20search_path%3Dpublic&sslmode=disable");
+    });
+
+    it.each([
+        // An sslmode asked for is kept, whatever it is.
+        "postgres://u:p@localhost/db?sslmode=require",
+        "postgres://u:p@localhost/db?sslmode=verify-full",
+        // As is any other way of saying something about SSL or the host.
+        "postgres://u:p@localhost/db?ssl=true",
+        "postgres://u:p@localhost/db?host=/var/run/postgresql",
+        "postgres://u:p@localhost/db?hostaddr=10.0.0.5",
+        // Not this machine, or only pretending to be.
+        "postgres://u:p@db.example.com/db",
+        "postgres://u:p@localhost.example.com/db",
+        "postgres://u:p@192.168.1.20/db",
+        // Not a URL.
+        "host=localhost port=5432 dbname=rebase"
+    ])("leaves %s as written", (url) => {
+        expect(forAtlas(url)).toBe(url);
+    });
+
+    it("still makes a node-postgres sslmode one libpq takes", () => {
+        expect(forAtlas("postgres://u:p@db.example.com/db?sslmode=no-verify")).toBe("postgres://u:p@db.example.com/db?sslmode=require");
     });
 });

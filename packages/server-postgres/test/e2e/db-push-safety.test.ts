@@ -161,6 +161,11 @@ describe("db push destructive-change gate E2E", () => {
         return res.rows.map((row: { datname: string }) => row.datname);
     }
 
+    /** What an earlier test's failed apply kept as its evidence, out of the way. */
+    async function dropScratchDatabases(): Promise<void> {
+        for (const name of await scratchDatabases()) await dbClient.query(`DROP DATABASE "${name}"`);
+    }
+
     async function noteColumnExists(): Promise<boolean> {
         const res = await dbClient.query(
             `SELECT 1 FROM information_schema.columns
@@ -362,6 +367,7 @@ export default translationsCollection;
             .find(net => net !== undefined && !net.internal && net.family === "IPv4")?.address;
         if (!address) throw new Error("This test needs a non-loopback IPv4 address to reach the container by.");
         const url = container.connectionString.replace("localhost", address).replace("?sslmode=disable", "");
+        await dropScratchDatabases();
         for (const file of fs.readdirSync(collectionsDir)) {
             if (file.endsWith(".js")) fs.rmSync(path.join(collectionsDir, file));
         }
@@ -371,6 +377,23 @@ export default translationsCollection;
         const failed = await runPushAt(url, ["--dry-run"]);
         expect(failed.exitCode, failed.all).toBe(1);
         expect(failed.all).toMatch(/SSL is not enabled on the server/);
+        expect(await scratchDatabases()).toEqual([]);
+    }, 150_000);
+
+    // The same URL on this machine is the common case — a `.env` written by
+    // hand, or by an older `init` — and Atlas is given the app's default.
+    it("connects Atlas without SSL to a database on this machine whose URL names no sslmode", async () => {
+        const url = container.connectionString.replace("?sslmode=disable", "");
+        await dropScratchDatabases();
+        for (const file of fs.readdirSync(collectionsDir)) {
+            if (file.endsWith(".js")) fs.rmSync(path.join(collectionsDir, file));
+        }
+        fs.writeFileSync(path.join(collectionsDir, "index.js"), collectionsIndex());
+        fs.writeFileSync(path.join(collectionsDir, "tasks.js"), tasksCollectionJs(true));
+
+        const planned = await runPushAt(url, ["--dry-run"]);
+        expect(planned.exitCode, planned.all).toBe(0);
+        expect(planned.all).not.toMatch(/SSL is not enabled/);
         expect(await scratchDatabases()).toEqual([]);
     }, 150_000);
 });

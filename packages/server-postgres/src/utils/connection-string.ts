@@ -57,6 +57,45 @@ export function forLibpq(connectionString: string): string {
     return url.toString();
 }
 
+/** Hosts that are this machine: `localhost`, `127.0.0.0/8`, `::1` and `0.0.0.0`. */
+const isLoopbackHost = (hostname: string): boolean =>
+    hostname === "localhost" || hostname === "[::1]" || hostname === "0.0.0.0" || /^127(\.\d{1,3}){3}$/.test(hostname);
+
+/**
+ * A connection string for Atlas: {@link forLibpq}, and `sslmode=disable` for a
+ * database on this machine whose URL says nothing about SSL.
+ *
+ * Atlas connects through lib/pq, whose default `sslmode` is `require`.
+ * node-postgres — the app, and every step of these commands — asks for no SSL
+ * when the URL names none. So a URL that served the app from a local Postgres
+ * without SSL (the Docker image, a Homebrew install) failed every schema
+ * command with `pq: SSL is not enabled on the server`. Given here, Atlas
+ * connects the way the app already does.
+ *
+ * Nothing that asked for something is touched: a URL naming `sslmode`, `ssl`,
+ * `host` or `hostaddr`, any other host, and anything that is not a postgres
+ * URL are returned as {@link forLibpq} returns them.
+ */
+export function forAtlas(connectionString: string): string {
+    const libpq = forLibpq(connectionString);
+    let url: URL;
+    try {
+        url = new URL(libpq);
+    } catch {
+        return libpq;
+    }
+    if (url.protocol !== "postgres:" && url.protocol !== "postgresql:") return libpq;
+    if (!isLoopbackHost(url.hostname)) return libpq;
+    if (["sslmode", "ssl", "host", "hostaddr"].some(key => url.searchParams.has(key))) return libpq;
+
+    url.searchParams.set("sslmode", "disable");
+    // By hand, for the reason `forLibpq` re-serializes by hand.
+    url.search = Array.from(url.searchParams.entries())
+        .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`)
+        .join("&");
+    return url.toString();
+}
+
 /**
  * A connection string with its password taken out, and the password.
  *
