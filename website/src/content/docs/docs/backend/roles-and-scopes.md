@@ -215,6 +215,13 @@ for any other project. It also needs `functions:invoke`, or
 `hasScope(c, scope, target)` and `getScopes(c)` answer the same question inside a
 handler.
 
+<span class="since-badge" data-since="0.25">Since 0.25</span> `requireScope`
+refuses a scope nobody could hold. A name that is not a scope, or a misspelt
+built-in one such as `data:raed`, throws as the function loads. An app scope the
+backend does not declare under `auth.scopes` answers every caller, an
+administrator too, `500 SCOPE_NOT_DECLARED`. On 0.24 both answer `403
+SCOPE_MISSING`.
+
 ## What admin means
 
 `admin` is the one built-in role, and it is more than a list of scopes:

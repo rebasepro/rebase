@@ -32,6 +32,7 @@
 import type { Context, MiddlewareHandler } from "hono";
 import type { HonoEnv } from "../api/types";
 import { getUser, isAdmin, getRoles, identityResolved, hasScope } from "./context";
+import { scopeGuardProblem } from "../auth/admin-roles";
 
 /**
  * The answer to "a guard ran, but no middleware had resolved anything".
@@ -166,7 +167,9 @@ export function requireRole(...roles: string[]): MiddlewareHandler<HonoEnv> {
  * Reject callers who do not hold `scope` with 403.
  *
  * `scope` is a built-in scope or one the app declares under `auth.scopes` on
- * the users collection. `target` narrows it to one resource — a key holding
+ * the users collection. A name nobody could hold — not a scope name, a typo of
+ * a built-in one (`data:raed`) — throws as the function loads; an app scope
+ * the backend does not declare is answered `500 SCOPE_NOT_DECLARED`. `target` narrows it to one resource — a key holding
  * `project:deploy:p1` passes `requireScope("project:deploy", c => c.req.param("project"))`
  * for `p1` only — and may be read from the request.
  *
@@ -183,6 +186,10 @@ export function requireScope(
     scope: string,
     target?: string | ((c: Context<HonoEnv>) => string | undefined)
 ): MiddlewareHandler<HonoEnv> {
+    // The root guard's rule, from the same function: refused as the route is
+    // registered — which, in a function file, is as the backend loads it.
+    const problem = scopeGuardProblem(scope, typeof target === "string" ? target : undefined);
+    if (problem) throw new Error(problem);
     return async (c, next) => {
         if (!getUser(c)) {
             if (!identityResolved(c)) return c.json(unresolvedIdentity(), 500);
@@ -193,6 +200,11 @@ export function requireScope(
                 }
             }, 401);
         }
+        // An app scope is declared per backend; the one serving the function
+        // says which. One it does not declare nobody holds.
+        const declared = c.get("services")?.access.model.scopes;
+        const undeclared = declared ? scopeGuardProblem(scope, undefined, Object.keys(declared)) : null;
+        if (undeclared) return c.json({ error: { message: undeclared, code: "SCOPE_NOT_DECLARED" } }, 500);
         const resolvedTarget = typeof target === "function" ? target(c) : target;
         if (!hasScope(c, scope, resolvedTarget)) {
             const wanted = resolvedTarget !== undefined ? `${scope}:${resolvedTarget}` : scope;

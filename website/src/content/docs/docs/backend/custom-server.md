@@ -378,11 +378,12 @@ import { createJwtService, requireAuth, requireScope } from "@rebasepro/server";
 // own. `userId` is the user's id in the users collection.
 const token = await backend.services.jwt.generateAccessToken(userId, ["editor"]);
 
-// Check a session token or an rk_ API key against this backend, for a socket
-// or a tunnel of your own: its uid, roles, scopes and kind, or null.
+// Check a session token, an rk_ API key or the service key for a socket or a tunnel of your
+// own, as this backend's routes judge it: its uid, roles, scopes and kind, or null.
 const caller = await backend.verifyCredential(token);
 
-// A route of your own, outside the groups, judged by this backend.
+// A route of your own, outside the groups, judged by this backend. The users collection
+// declares the app scope: auth: { scopes: { "project:deploy": { label: "Deploy projects" } } }.
 app.post("/deploy", (c, next) => { c.set("services", backend.services); return next(); },
     requireAuth, requireScope("project:deploy"), (c) => c.json({ ok: true }));
 
@@ -394,11 +395,11 @@ const payload = await jwt.verifyAccessToken(token);
 A minted session is checked like any other on every request, so its uid has to
 be a user that exists: for a uid with no user the request is refused.
 
-Every route group sets `c.var.services` itself. A route outside the groups
-that uses `requireAuth`, `requireScope` or another guard from
-`@rebasepro/server` reads it there, and falls back to the process default when
-it is unset. `requireScope` judges the caller `requireAuth` identified, so it
-goes after `requireAuth`: on its own it refuses every request with a 401.
+<span class="since-badge" data-since="0.25">Since 0.25</span> `verifyCredential` reaches the verdict the routes reach: a session its owner signed out of, a uid with no user and a disabled account come back null, and the roles are the ones the account holds now. It throws when the database cannot be reached. On 0.24 it checks the signature only, and reads the roles off the token.
+
+Every route group sets `c.var.services` itself. A route outside the groups that uses `requireAuth`, `requireScope` or another guard from `@rebasepro/server` reads it there, and falls back to the process default when it is unset. `requireScope` judges the caller `requireAuth` identified, so it goes after `requireAuth`: on its own it refuses every request with a 401. It takes a built-in scope, or an app scope the backend declares under `auth.scopes` on its users collection, as in the comment above.
+
+<span class="since-badge" data-since="0.25">Since 0.25</span> A name that is not a scope, or a misspelt built-in one such as `data:raed`, throws where the route is registered. An app scope the backend answering does not declare answers every caller, an administrator too, `500 SCOPE_NOT_DECLARED`. On 0.24 both answer every caller `403 SCOPE_MISSING`.
 
 ## Shutting down
 

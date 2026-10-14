@@ -39,6 +39,7 @@ import {
 import type { HonoEnv } from "../api/types";
 import { ApiError } from "../api/errors";
 import { refuse } from "./middleware";
+import { scopeGuardProblem } from "./admin-roles";
 import type { AuthRepository } from "./interfaces";
 
 /** The account a personal key acts as, as it is now. Null when it no longer exists. */
@@ -283,6 +284,12 @@ export function scopeMissing(c: Context<HonoEnv>, scope: string, target?: string
 /**
  * Refuse a request whose caller does not hold `scope`.
  *
+ * `scope` is a built-in scope or one this backend declares under
+ * `auth.scopes`. A name no caller could ever hold — not a scope name, a typo
+ * of a built-in one (`data:raed`) — throws as the route is registered; an app
+ * scope the backend answering does not declare is answered
+ * `500 SCOPE_NOT_DECLARED`, naming the declaration to add.
+ *
  * `target` narrows the check to one collection, bucket, function or app
  * resource, and may be read from the request. A guard, not an authenticator:
  * it judges the caller an auth middleware identified, so mount it after one —
@@ -298,10 +305,20 @@ export function requireScope(
     scope: string,
     target?: string | ((c: Context<HonoEnv>) => string | undefined)
 ): MiddlewareHandler<HonoEnv> {
+    // Refused as the route is registered, as an unknown scope in `auth.roles`
+    // is refused at boot: a guard no caller could ever pass is a mistake in
+    // the code, and answering every request 403 hid it.
+    const problem = scopeGuardProblem(scope, typeof target === "string" ? target : undefined);
+    if (problem) throw new Error(problem);
     return async (c, next) => {
         if (!c.get("user")) {
             return refuse(c, noCallerRefusal(c));
         }
+        // An app scope is declared per backend, so only the one answering can
+        // say whether it exists. One it does not declare nobody holds, an
+        // administrator neither: a server mistake, said as one.
+        const undeclared = scopeGuardProblem(scope, undefined, Object.keys(accessOf(c).model.scopes));
+        if (undeclared) return refuse(c, new ApiError(500, "SCOPE_NOT_DECLARED", undeclared));
         const resolvedTarget = typeof target === "function" ? target(c) : target;
         if (!hasScope(c, scope, resolvedTarget)) {
             return refuse(c, scopeMissing(c, scope, resolvedTarget));

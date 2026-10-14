@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach } from "@jest/globals";
-import { ADMIN_ROLE, ADMIN_SCOPES, EMPTY_ACCESS_MODEL, hasAdminRole, scopeGrants } from "@rebasepro/types";
-import { ADMIN_ROLE_NAME, heldScopesGrant, holdsAdminRole } from "../src/auth/admin-roles";
+import { ADMIN_ROLE, ADMIN_SCOPES, BUILT_IN_SCOPES, EMPTY_ACCESS_MODEL, SCOPE_TARGETS, hasAdminRole, scopeGrants, validateScopes } from "@rebasepro/types";
+import { ADMIN_ROLE_NAME, BUILT_IN_SCOPE_NAMES, heldScopesGrant, holdsAdminRole, scopeGuardProblem } from "../src/auth/admin-roles";
 import { configureAccess } from "../src/auth/access";
 import { createAuthRoutes } from "../src/auth/routes";
 
@@ -43,6 +43,22 @@ describe("the portable admin-role and scope rules", () => {
     ])("match scopes the same: %j grants %s on %s", (held, scope, target) => {
         expect(heldScopesGrant(held, scope, target)).toBe(scopeGrants(held, scope, target));
     });
+
+    it("list the same built-in scopes", () => {
+        expect(BUILT_IN_SCOPE_NAMES).toEqual([...BUILT_IN_SCOPES]);
+    });
+
+    it.each([...BUILT_IN_SCOPES])("agree whether %s takes a target", (scope) => {
+        expect(scopeGuardProblem(scope, "x") === null).toBe(SCOPE_TARGETS[scope] !== undefined);
+        expect(validateScopes([`${scope}:x`]).length === 0).toBe(SCOPE_TARGETS[scope] !== undefined);
+    });
+
+    it.each(["data:read", "logs:read", "data:raed", "logs:export", "deploy", "Data:Read"])(
+        "agree whether %s names a scope a guard could ask for, on a backend that declares none",
+        (scope) => {
+            expect(scopeGuardProblem(scope, undefined, []) === null).toBe(validateScopes([scope]).length === 0);
+        }
+    );
 });
 
 /**
