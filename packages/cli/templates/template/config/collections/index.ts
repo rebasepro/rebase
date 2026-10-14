@@ -4,8 +4,6 @@ import tagsCollection from "./tags";
 import usersCollection from "./users";
 import type { SecurityRule } from "@rebasepro/types";
 
-export const collections = [postsCollection, authorsCollection, tagsCollection, usersCollection];
-
 /**
  * Applied to any collection in this directory that declares no
  * `securityRules` of its own: every signed-in user reads every row, only
@@ -32,3 +30,15 @@ access: "public" },
     { operations: ["insert", "update", "delete"],
 roles: ["admin"] }
 ];
+
+export const collections = [postsCollection, authorsCollection, tagsCollection, usersCollection];
+
+// What `rebase dev`, `rebase db push` and the admin panel do when they read this
+// directory, done here as well: a collection with no `securityRules` of its own
+// gets `defaultSecurityRules`, on the collection object itself, so a relation's
+// target carries them too. So this array is safe to hand to a backend of your
+// own — `createRebaseBackend({ collections })` provisions the policies
+// `db push` would — rather than a version of these collections that is admin-only.
+for (const collection of collections) {
+    if (!collection.securityRules?.length) collection.securityRules = defaultSecurityRules;
+}

@@ -28,7 +28,13 @@ const TEMPLATE = path.join(__dirname, "../../cli/templates/template/config/colle
 // files was `from "./authors.js"` → `from "./authors"`, verified as the entire
 // diff. No collection, property or rule changed, so `scaffold.sql` and
 // `EXPECTED_BASELINE` still describe this template and were not re-recorded.
-const RECORDED = "1e83cf8922625194";
+// Moved 2026-10-14: index.ts now applies `defaultSecurityRules` to the
+// `collections` array it exports, the step the directory loader already took.
+// The rules each collection ends up with are unchanged —
+// packages/server/test/collections-array-carries-index-defaults.test.ts holds
+// them equal to the loader's — so `scaffold.sql` and `EXPECTED_BASELINE` still
+// describe this template and were not re-recorded.
+const RECORDED = "8e3313158163fbf7";
 
 describe("the recorded scaffold fixture", () => {
     it("was recorded from the template the CLI still ships", () => {
