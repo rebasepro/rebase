@@ -199,15 +199,27 @@ export class NotificationProxy {
 
         upstream.on("data", (chunk: Buffer) => {
             for (const message of connection.parser.push(chunk)) {
-                client.write(message);
+                // The rest of a response to a client that has gone is read
+                // and dropped — see `close`.
+                if (!client.destroyed) client.write(message);
                 if (isNotificationFrame(message)) this.broadcast(message, connection);
             }
         });
 
+        // The upstream socket is ended, never destroyed. A client that goes
+        // away mid-response (Atlas exiting on a failed migration) leaves the
+        // rest of that response in flight, and closing a socket with data
+        // unread makes the kernel answer with a reset. `PGLiteSocketServer`
+        // (0.2.9) handles a reset by detaching the connection's listeners
+        // before its `close`, the one event it stops counting a connection
+        // on, so every such exit cost one of the few connections it accepts
+        // until the daemon restarted, and the next `rebase db migrate` beside
+        // a running `rebase dev` got `Error: EOF`. Ended, the server reads an
+        // ordinary close, and the proxy's upstream closes once it has.
         const close = () => {
             this.connections.delete(connection);
             client.destroy();
-            upstream.destroy();
+            upstream.end();
         };
         client.on("close", close);
         client.on("error", close);
