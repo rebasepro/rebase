@@ -13,7 +13,23 @@
 
 import { describe, expect, it } from "vitest";
 
-import { anonymizableColumns, anonymizeStatements, describeTarget, dumpArgs, dumpEnv, provisionableSchemas, replacementFor, restoreArgs, restoreEnv, restoreOutcome, shouldAnonymize, type ColumnRef } from "./pull";
+import {
+    anonymizableColumns,
+    anonymizeStatements,
+    clearStatements,
+    describeRestoreFailure,
+    describeTarget,
+    dumpArgs,
+    dumpEnv,
+    provisionableSchemas,
+    replacementFor,
+    restoreArgs,
+    restoreEnv,
+    restoreOutcome,
+    schemasToClear,
+    shouldAnonymize,
+    type ColumnRef
+} from "./pull";
 
 function column(overrides: Partial<ColumnRef> & { column: string }): ColumnRef {
     return { schema: "public", table: "users", dataType: "text", ...overrides };
@@ -282,7 +298,26 @@ describe("pg_dump and pg_restore arguments", () => {
  */
 describe("restoreOutcome", () => {
     it("calls a clean exit complete", () => {
-        expect(restoreOutcome({ exitCode: 0, stderr: "" })).toEqual({ started: true, failure: null });
+        expect(restoreOutcome({ exitCode: 0, stderr: "" })).toEqual({ started: true, failure: null, advice: null });
+    });
+
+    it("does not send anyone to pull again for errors a second pull repeats", () => {
+        // The restore runs into an emptied database, so what it could not
+        // create it will not create next time either: an extension, a feature
+        // this server lacks. "Pull again" sent the tester round in a loop.
+        const outcome = restoreOutcome({
+            exitCode: 1,
+            stderr: "pg_restore: error: could not execute query: ERROR:  extension \"postgis\" is not available\n"
+                + "pg_restore: warning: errors ignored on restore: 12\n"
+        });
+
+        expect(outcome.advice).toMatch(/repeat/i);
+        expect(outcome.advice).toMatch(/extension/);
+        expect(outcome.advice).not.toMatch(/^.*pull again\.?$/i);
+    });
+
+    it("says to pull again only when that is what finishes the job", () => {
+        expect(restoreOutcome({ exitCode: undefined, signal: "SIGINT", stderr: "" }).advice).toMatch(/pull again/i);
     });
 
     it("counts the objects pg_restore skipped, from its own summary line", () => {
@@ -312,6 +347,69 @@ describe("restoreOutcome", () => {
 
         expect(outcome.started).toBe(false);
         expect(outcome.failure).toMatch(/ENOENT/);
+    });
+});
+
+/**
+ * A pull replaces the local database's contents, and `pg_restore --clean` alone
+ * does not: it drops what the dump holds, one object at a time and without
+ * CASCADE, so anything local the source lacks blocks it. `rebase db migrate`'s
+ * `rebase.atlas_schema_revisions` made `DROP SCHEMA IF EXISTS rebase` fail on
+ * every pull from a database that had never run it — a false "incomplete copy",
+ * exit 1, and "pull again", which failed the same way.
+ */
+describe("schemasToClear", () => {
+    const present = [{ schema: "public" }, { schema: "rebase" }, { schema: "scratch" }, { schema: "pg_toast" }, { schema: "information_schema" }];
+
+    it("clears every schema of the local database for a whole-database pull", () => {
+        expect(schemasToClear(present, [])).toEqual(["public", "rebase", "scratch"]);
+    });
+
+    it("clears only the schemas a --schema pull copies", () => {
+        expect(schemasToClear(present, ["public", "billing"])).toEqual(["public"]);
+    });
+});
+
+describe("clearStatements", () => {
+    it("drops each schema with what is in it, quoted", () => {
+        expect(clearStatements(["rebase", "odd\"name"])).toEqual([
+            'DROP SCHEMA IF EXISTS "rebase" CASCADE',
+            'DROP SCHEMA IF EXISTS "odd""name" CASCADE'
+        ]);
+    });
+
+    it("puts back an empty public schema, which a dump does not create", () => {
+        // pg_dump leaves out the CREATE for a default `public`, and every table
+        // in it would then have nowhere to go.
+        expect(clearStatements(["public"])).toEqual([
+            'DROP SCHEMA IF EXISTS "public" CASCADE',
+            "CREATE SCHEMA public",
+            "GRANT USAGE ON SCHEMA public TO PUBLIC"
+        ]);
+    });
+});
+
+describe("describeRestoreFailure", () => {
+    const source = "prod.example.com:5432/app";
+
+    it("says the copy is incomplete when something arrived", () => {
+        const lines = describeRestoreFailure({ cleared: true, started: true, failure: "pg_restore could not restore 2 object(s).", advice: "Fix it." }, source);
+
+        expect(lines[0]).toBe("pg_restore could not restore 2 object(s).");
+        expect(lines.join("\n")).toContain(`incomplete copy of ${source}`);
+        expect(lines[lines.length - 1]).toBe("Fix it.");
+    });
+
+    it("says the database was left as it was when emptying it failed", () => {
+        const lines = describeRestoreFailure({ cleared: false, started: false, failure: "x", advice: "y" }, source);
+
+        expect(lines.join("\n")).toContain("as it was");
+        expect(lines.join("\n")).not.toContain("incomplete copy");
+    });
+
+    it("says it was emptied when nothing arrived after that", () => {
+        expect(describeRestoreFailure({ cleared: true, started: false, failure: "x", advice: "y" }, source).join("\n"))
+            .toContain("emptied");
     });
 });
 

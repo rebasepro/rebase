@@ -441,9 +441,10 @@ function decodePercent(value: string): string {
 /**
  * `pg_restore` arguments for the target.
  *
- * `--clean --if-exists` because a pull replaces what is there: restoring into a
- * database that already has the tables would otherwise fail on every one of
- * them. `--no-owner` for the same reason as the dump.
+ * It restores into schemas {@link restoreCopy} has already emptied, so
+ * `--clean --if-exists` drops nothing that is there; it stays for whatever a
+ * dump holds outside them — an extension, say — which would otherwise fail as
+ * already existing. `--no-owner` for the same reason as the dump.
  */
 export function restoreArgs(plan: PullPlan, dumpFile: string): string[] {
     return ["--clean", "--if-exists", "--no-owner", "--no-privileges", "--dbname", splitPassword(plan.target).connectionString, dumpFile];
@@ -474,33 +475,176 @@ export interface RestoreRun {
     stderr?: string;
 }
 
+/** What a `pg_restore` run says about the copy. */
+export interface RestoreRunOutcome {
+    /** Whether anything can have arrived — what decides whether an anonymization pass has data to redact. */
+    started: boolean;
+    /** Null when the copy is complete. */
+    failure: string | null;
+    /**
+     * What to do about the failure. "Pull again" only where a second pull is
+     * what finishes the job: everything else repeats until its cause is fixed.
+     */
+    advice: string | null;
+}
+
 /**
  * What a finished `pg_restore` says about the copy.
  *
- * `--clean` empties the target before anything is written, so every way this
- * can end short of exit 0 leaves a partial or empty local database, and none of
+ * The target was emptied before anything was written, so every way this can
+ * end short of exit 0 leaves a partial or empty local database, and none of
  * them may be reported as a copy. A non-zero exit is pg_restore saying it
  * skipped statements — "errors ignored on restore: N" — and whatever those
  * statements created (a table, its rows, an RLS policy) is missing locally.
  *
- * `started` says whether anything can have arrived, which is what decides
- * whether an anonymization pass still has data to redact.
+ * Restoring into an emptied database, those errors come from what the source
+ * holds that this Postgres cannot create — an extension it does not have, a
+ * feature of a newer server — and a second pull meets them again. So the
+ * advice names that, rather than "pull again", which sent people in a loop.
  */
-export function restoreOutcome(run: RestoreRun): { started: boolean; failure: string | null } {
+export function restoreOutcome(run: RestoreRun): RestoreRunOutcome {
     if (run.signal) {
-        return { started: true, failure: `pg_restore was stopped by ${run.signal} before it finished.` };
+        return {
+            started: true,
+            failure: `pg_restore was stopped by ${run.signal} before it finished.`,
+            advice: "It was interrupted, not refused: pull again to finish the copy."
+        };
     }
     if (run.exitCode === undefined) {
-        return { started: false, failure: `pg_restore could not be started (${run.code ?? "unknown error"}).` };
+        return {
+            started: false,
+            failure: `pg_restore could not be started (${run.code ?? "unknown error"}).`,
+            advice: "Check that the PostgreSQL client tools are installed (`pg_restore --version`), then pull again."
+        };
     }
-    if (run.exitCode === 0) return { started: true, failure: null };
+    if (run.exitCode === 0) return { started: true, failure: null, advice: null };
 
     const ignored = /errors ignored on restore: (\d+)/.exec(run.stderr ?? "");
+    const repeats = "Pulling again repeats these errors until what they name is fixed — most often an extension "
+        + "the source uses that this Postgres does not have installed. Install it here, or pull only the schemas "
+        + "that do not need it (--schema).";
 
     return {
         started: true,
         failure: ignored
             ? `pg_restore could not restore ${ignored[1]} object(s) — the errors are above.`
-            : `pg_restore exited with code ${run.exitCode}.`
+            : `pg_restore exited with code ${run.exitCode} — the errors are above.`,
+        advice: repeats
     };
+}
+
+/** How {@link restoreCopy} ended. */
+export interface RestoreOutcome extends RestoreRunOutcome {
+    /** Whether the local database was emptied first. False means it is exactly as it was. */
+    cleared: boolean;
+}
+
+/**
+ * The local schemas a pull empties before it restores: every one of the local
+ * database's own for a whole-database pull, and those it copies for a
+ * `--schema` pull. `pg_catalog`, `information_schema` and the `pg_*` internals
+ * never — see {@link provisionableSchemas}.
+ */
+export function schemasToClear(present: readonly { schema: string }[], planned: readonly string[]): string[] {
+    const local = provisionableSchemas(present);
+
+    return planned.length === 0 ? local : local.filter((schema) => planned.includes(schema));
+}
+
+/**
+ * The statements that empty those schemas, in one transaction.
+ *
+ * `CASCADE`, which `pg_restore --clean` never uses: a table the source lacks —
+ * `rebase.atlas_schema_revisions` from `rebase db migrate`, a collection added
+ * locally that references a pulled table — is exactly what blocked its plain
+ * `DROP SCHEMA` and `DROP TABLE`. `public` is put back empty, with the access
+ * every role has to it by default, because a dump does not create a default
+ * `public` and every table in it would otherwise have nowhere to go.
+ */
+export function clearStatements(schemas: readonly string[]): string[] {
+    const statements = schemas.map((schema) => `DROP SCHEMA IF EXISTS ${quoteIdentifier(schema)} CASCADE`);
+    if (schemas.includes("public")) statements.push("CREATE SCHEMA public", "GRANT USAGE ON SCHEMA public TO PUBLIC");
+
+    return statements;
+}
+
+/**
+ * How long emptying the local database waits for a lock before giving up.
+ *
+ * A `rebase dev` serving from the database holds connections, and one inside
+ * a transaction would otherwise make the pull hang without a word.
+ */
+const CLEAR_LOCK_TIMEOUT = "15s";
+
+/** Why emptying the local database failed, in the reader's terms, and what fixes it. */
+function clearFailure(error: unknown): RestoreOutcome {
+    const code = typeof error === "object" && error !== null && "code" in error ? String(error.code) : "";
+    const reason = errorText(error);
+    const advice = code === "55P03"
+        ? "Something holds a lock on it — usually `rebase dev` serving from it. Stop that, then pull again."
+        : code === "42501"
+            ? "This connection may not drop those schemas. Connect as the role that owns them — the one "
+                + "that created them — and pull with that."
+            : "Fix what the error names; pulling again before that repeats it.";
+
+    return {
+        cleared: false,
+        started: false,
+        failure: `Could not empty the local database before restoring: ${reason}`,
+        advice
+    };
+}
+
+/**
+ * Replace the local database's contents with a dump: empty the schemas it
+ * holds, then `pg_restore` into them.
+ *
+ * Only ever `plan.target`, the local development database the command
+ * resolved — the pull's one destination, which no flag can change. Emptying it
+ * is one transaction: if any schema cannot be dropped, none is, nothing is
+ * restored, and the database is as it was.
+ */
+export async function restoreCopy(plan: PullPlan, dumpFile: string): Promise<RestoreOutcome> {
+    const { Client } = await import("pg");
+    const client = new Client({ connectionString: plan.target });
+    client.on("error", () => undefined);
+    try {
+        await client.connect();
+        const { rows } = await client.query<{ schema: string }>("SELECT nspname AS \"schema\" FROM pg_namespace");
+        await client.query("BEGIN");
+        await client.query(`SET LOCAL lock_timeout = '${CLEAR_LOCK_TIMEOUT}'`);
+        for (const statement of clearStatements(schemasToClear(rows, plan.schemas))) await client.query(statement);
+        await client.query("COMMIT");
+    } catch (error) {
+        await client.query("ROLLBACK").catch(() => undefined);
+        return clearFailure(error);
+    } finally {
+        await client.end().catch(() => undefined);
+    }
+
+    // stderr is shown as it arrives and kept, for the count in its summary
+    // line. Not rejected: every way this ends is judged by `restoreOutcome`.
+    const run = await execa("pg_restore", restoreArgs(plan, dumpFile), {
+        env: restoreEnv(plan),
+        stdin: "ignore",
+        stdout: "inherit",
+        stderr: ["pipe", "inherit"],
+        reject: false
+    });
+
+    return { cleared: true, ...restoreOutcome(run) };
+}
+
+/**
+ * The lines that report a failed restore: what failed, what state the local
+ * database is in now, and what to do. Plain text, for the caller to colour.
+ */
+export function describeRestoreFailure(outcome: RestoreOutcome, source: string): string[] {
+    const state = outcome.started
+        ? `The local database holds an incomplete copy of ${source}.`
+        : outcome.cleared
+            ? "The local database was emptied, and nothing was restored into it."
+            : "Nothing was restored, and the local database is as it was.";
+
+    return [outcome.failure ?? "The restore did not complete.", state, ...(outcome.advice ? [outcome.advice] : [])];
 }
