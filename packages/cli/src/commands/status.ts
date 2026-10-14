@@ -142,7 +142,7 @@ export async function statusDatabase(projectRoot: string, envFile: Record<string
         return {
             dockerDatabase: {
                 url: database.url,
-                detail: `${which}, as the last \`rebase dev --docker\` · ${describeTarget(database.url)}`
+                detail: which + ", as the last `rebase dev --docker` · " + describeTarget(database.url)
                     + (listening ? "" : " — not running; `rebase dev --docker` starts it")
             },
             branch,
