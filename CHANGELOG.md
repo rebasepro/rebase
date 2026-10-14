@@ -223,6 +223,15 @@
   shows "None", and choosing it still stores `null`. The relation field's
   open-record button has a translated tooltip and accessible name.
 
+#### CI & tooling
+
+- **A release no longer leaves a half-empty parenthesis where it removed a
+  badge.** 0.25.0's cut turned "(Since 0.25; on 0.24 …)" into "(; on 0.24 …)" on
+  six pages in every locale. The badge remover now takes a following semicolon
+  or colon along, as it took a comma, and a new verify:docs stage refuses a
+  parenthesis that opens or closes on a separator outside code, so the release
+  job stops before npm if a cut leaves one.
+
 ### Security
 
 #### CLI
