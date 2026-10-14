@@ -31,10 +31,17 @@
  * has subscribed to, which costs nothing. A client that *did* ask now always
  * gets it, which is the whole point.
  *
+ * It corrects one more defect on the way: PGlite answers a failed
+ * extended-protocol message with a ReadyForQuery of its own and the Sync after
+ * it with another, and the proxy drops the extra one (`ReadyForQueryLedger`),
+ * because a client that takes it for the next query's answer reads that
+ * query's rows as empty and every answer after it one request late.
+ *
  * Two properties make this safe rather than clever:
  *
  * - **It never parses SQL and never rewrites a byte.** Frames are forwarded
- *   verbatim; the only edit is delivering a copy of one to more sockets.
+ *   verbatim; the only edits are delivering a copy of one to more sockets and
+ *   holding back that extra ReadyForQuery.
  * - **Injection only happens on a message boundary.** The server→client stream
  *   is reassembled into whole protocol messages before anything is written on,
  *   so an injected frame can never land inside another message.
@@ -119,6 +126,137 @@ export class BackendMessageParser {
     }
 }
 
+/** The startup packet's protocol code, which no request code shares. */
+const PROTOCOL_3 = 196608;
+
+/**
+ * Reassembles the client→server stream into whole messages, so the proxy
+ * knows what each answer is an answer to.
+ *
+ * The connection opens untyped — an `SSLRequest` or `GSSENCRequest` (each
+ * answered with one byte) and then the startup packet, each a bare `Int32
+ * length` and a code — and is `type + Int32 length` after it. Each message is
+ * returned as its type character, `"startup"` for the startup packet, and the
+ * negotiation requests not at all.
+ */
+export class FrontendMessageParser {
+    private buffered: Buffer = Buffer.alloc(0);
+    private started = false;
+
+    push(chunk: Buffer): string[] {
+        const types: string[] = [];
+        this.buffered = this.buffered.length === 0 ? chunk : Buffer.concat([this.buffered, chunk]);
+
+        while (true) {
+            if (!this.started) {
+                if (this.buffered.length < 8) break;
+                const length = this.buffered.readInt32BE(0);
+                if (length < 8) break;
+                if (this.buffered.length < length) break;
+                if (this.buffered.readInt32BE(4) === PROTOCOL_3) {
+                    this.started = true;
+                    types.push("startup");
+                }
+                this.buffered = this.buffered.subarray(length);
+                continue;
+            }
+            if (this.buffered.length < 5) break;
+            const length = this.buffered.readInt32BE(1);
+            if (length < 4) break;
+            if (this.buffered.length < length + 1) break;
+            types.push(String.fromCharCode(this.buffered[0]));
+            this.buffered = this.buffered.subarray(length + 1);
+        }
+
+        return types;
+    }
+}
+
+/** One request the backend ends with a ReadyForQuery. */
+interface PendingRequest {
+    /** Parse/Bind/Describe/Execute/Close messages up to a Sync, rather than one Query. */
+    extended: boolean;
+    /** Its extended messages that answer with a message of their own. */
+    messages: number;
+    /** How many of them have been answered. */
+    answered: number;
+    /** The Sync that closes it has been sent. */
+    synced: boolean;
+    /** PGlite answered a failed message with a ReadyForQuery of its own, owed before the Sync's. */
+    extraReady: boolean;
+}
+
+/**
+ * The backend messages that complete one extended-protocol message: Parse,
+ * Bind, Close, Describe (its row description or NoData) and Execute (its
+ * CommandComplete, EmptyQueryResponse or PortalSuspended).
+ */
+const EXTENDED_REPLIES = new Set(["1", "2", "3", "T", "n", "C", "I", "s"]);
+
+/** Frontend messages that are part of an extended-protocol request and are answered. */
+const EXTENDED_MESSAGES = new Set(["P", "B", "D", "E", "C"]);
+
+/**
+ * Keeps a connection's ReadyForQuery messages one to a request.
+ *
+ * PGlite (0.5.6) answers an extended-protocol message that fails with an
+ * ErrorResponse *and* a ReadyForQuery, then answers the Sync after it with a
+ * second ReadyForQuery. Real Postgres sends one: after an error it ignores
+ * everything up to the Sync and answers the Sync. `pg` absorbs the extra one
+ * when both arrive in one read. When they arrive apart — under load, a script
+ * beside a running `rebase dev` — it takes the second as the answer to the
+ * next query it sent:
+ *
+ *  - a refused write's ROLLBACK "finished" on it, the pool saw the client
+ *    released in a failed transaction (status 'E'), and the real ROLLBACK's
+ *    answer arrived as "Received unexpected commandComplete message from
+ *    backend" — two `[pg-pool]` ERROR lines on every refused write;
+ *  - on a connection held across queries, the next query "finished" with no
+ *    rows: a `SELECT` that answered `[]`.
+ *
+ * So the proxy follows each request and drops the ReadyForQuery that answers
+ * a failed message before its Sync. An error raised *by* the Sync — a deferred
+ * constraint failing as the implicit transaction commits — comes with the
+ * one ReadyForQuery, and that is kept, as is every simple Query's.
+ */
+export class ReadyForQueryLedger {
+    private readonly pending: PendingRequest[] = [];
+
+    /** Note a message the client sent, before it is forwarded. */
+    sent(type: string): void {
+        const open = this.pending.at(-1);
+        const extendedOpen = open && open.extended && !open.synced ? open : undefined;
+        if (type === "startup" || type === "Q" || type === "F") {
+            this.pending.push({ extended: false, messages: 0, answered: 0, synced: true, extraReady: false });
+        } else if (EXTENDED_MESSAGES.has(type)) {
+            if (extendedOpen) extendedOpen.messages += 1;
+            else this.pending.push({ extended: true, messages: 1, answered: 0, synced: false, extraReady: false });
+        } else if (type === "S") {
+            if (extendedOpen) extendedOpen.synced = true;
+            else this.pending.push({ extended: true, messages: 0, answered: 0, synced: true, extraReady: false });
+        }
+    }
+
+    /** Whether a message the backend sent goes on to the client. */
+    deliver(message: Buffer): boolean {
+        const type = String.fromCharCode(message[0]);
+        const request = this.pending[0];
+        if (!request) return true;
+        if (request.extended && EXTENDED_REPLIES.has(type)) {
+            request.answered += 1;
+        } else if (type === "E" && request.extended && request.answered < request.messages) {
+            request.extraReady = true;
+        } else if (type === "Z") {
+            if (request.extraReady) {
+                request.extraReady = false;
+                return false;
+            }
+            this.pending.shift();
+        }
+        return true;
+    }
+}
+
 export function isNotificationFrame(message: Buffer): boolean {
     return message.length > 0 && message[0] === NOTIFICATION_RESPONSE;
 }
@@ -151,6 +289,8 @@ interface Connection {
     client: net.Socket;
     upstream: net.Socket;
     parser: BackendMessageParser;
+    frontend: FrontendMessageParser;
+    ledger: ReadyForQueryLedger;
 }
 
 /**
@@ -184,7 +324,13 @@ export class NotificationProxy {
 
     private accept(client: net.Socket, host: string): void {
         const upstream = net.connect(this.options.upstreamPort, host);
-        const connection: Connection = { client, upstream, parser: new BackendMessageParser() };
+        const connection: Connection = {
+            client,
+            upstream,
+            parser: new BackendMessageParser(),
+            frontend: new FrontendMessageParser(),
+            ledger: new ReadyForQueryLedger()
+        };
         this.connections.add(connection);
 
         // Nagle would batch a notification behind nothing at all, adding latency
@@ -194,11 +340,16 @@ export class NotificationProxy {
 
         client.on("data", (chunk: Buffer) => {
             if (isSslRequest(chunk)) connection.parser.expectSslReply();
+            // Noted before it is forwarded, so every answer finds its request.
+            for (const type of connection.frontend.push(chunk)) connection.ledger.sent(type);
             upstream.write(chunk);
         });
 
         upstream.on("data", (chunk: Buffer) => {
             for (const message of connection.parser.push(chunk)) {
+                // PGlite's second ReadyForQuery for one failed request; see
+                // `ReadyForQueryLedger`.
+                if (!connection.ledger.deliver(message)) continue;
                 // The rest of a response to a client that has gone is read
                 // and dropped — see `close`.
                 if (!client.destroyed) client.write(message);
