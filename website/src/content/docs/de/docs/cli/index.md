@@ -38,8 +38,9 @@ Richtet die Projektstruktur mit Frontend, Backend und geteilten Packages ein.
 | `-t, --template <preset>` | `blog`, `ecommerce` oder `blank`. Standard ist `blog` |
 | `--headless` | Nur Backend — kein Admin-Panel und keine Collection-Dateien. `--template` hat keine Auswirkung, da keine Collections zum Seeden vorhanden sind |
 | `-y, --yes` | Niemals nachfragen. **Erforderlich überall dort, wo kein Terminal zum Antworten vorhanden ist**, wie z. B. in CI. Überspringt Git-Init und die Installation von Abhängigkeiten — die interaktiven Standardeinstellungen bejahen beides; übergeben Sie also `--git` / `--install`, wenn Sie dies wünschen |
-| `-i, --install` | Abhängigkeiten nach dem Scaffolding installieren |
-| `-g, --git` | Ein Repository initialisieren und den ersten Commit erstellen |
+| `-i, --install` | Abhängigkeiten nach dem Scaffolding installieren. Ohne dieses Flag fragt init nach (Standard: ja); unter `--yes` wird nichts installiert |
+| `--no-install` | Nichts installieren und nicht nachfragen |
+| `-g, --git` | Ein Repository initialisieren und den ersten Commit erstellen. Ohne dieses Flag fragt init nach (Standard: ja); unter `--yes` kein Repository |
 | `--database-url <url>` | Eine bestehende Datenbank anstelle der verwalteten verwenden. <span class="since-badge" data-since="0.25">Seit 0.25</span> Es muss eine `postgres://`- oder `postgresql://`-URL sein: Alles andere wird verweigert, bevor eine Datei geschrieben wird, und die interaktive Abfrage fragt erneut |
 | `--introspect` | Collections aus dieser Datenbank generieren. Impliziert `--template blank` und erfordert `--install` |
 | `--project <slug>` | Das Scaffold mit einem Rebase Cloud-Projekt verknüpfen |
@@ -58,6 +59,19 @@ Startet sowohl Frontend als auch Backend mit Hot Reloading und generiert das Dri
 
 Beide Ports werden aus dem Pfad des Projekts abgeleitet, sodass mehrere Rebase-Projekte
 nebeneinander laufen können. Verwenden Sie die URLs, die `rebase dev` ausgibt. Einen Port festlegen können Sie mit `rebase dev --port 3001`.
+
+<span class="since-badge" data-since="0.25">Seit 0.25</span> Eine Änderung an `.env`
+startet das Backend neu, das die Datei erneut liest, wie es das Admin-Panel tut. Was
+`rebase dev` selbst setzt, bleibt erhalten, bis Sie es neu starten: `PORT` sowie
+`DATABASE_URL`, wenn es auf der verwalteten Datenbank oder auf Docker läuft. Unter 0.24
+erreichte eine `.env`-Änderung das Backend nur, wenn sich eine andere überwachte Datei änderte.
+
+<span class="since-badge" data-since="0.25">Seit 0.25</span> Mit
+`--database-url` prüft `rebase dev` zuerst, ob unter diesem Host und Port etwas antwortet.
+Wenn nicht, sagt es das, nennt dabei das Flag und beendet sich mit `1`, ohne etwas gestartet
+zu haben; außerdem lässt es die Datenbank, die `.env` nennt, in Ruhe und startet nie deren
+Compose-Container. Unter 0.24 sagte das Banner des Backends, man solle `DATABASE_URL` in
+`.env` prüfen, und dev lief weiter, während das Backend ausgefallen war.
 
 ### `rebase build`
 
@@ -110,7 +124,10 @@ Overrides in `pnpm-workspace.yaml` und `package.json` werden ebenfalls aktualisi
 etwa einem Canary, bleibt auf seinem Kanal, es sei denn, `latest` ist neuer. Ein Dist-Tag, das
 eine Versionsfixierung rückwärts verschieben würde, wird verweigert (`downgrade_refused` unter
 `--json`), es sei denn, Sie übergeben `--allow-downgrade`; ein exaktes `--to` wird angewendet und
-als Downgrade gekennzeichnet. Unter 0.24 nimmt `rebase upgrade` `latest` unabhängig davon.
+als Downgrade gekennzeichnet. Ein `--dry-run` eines Upgrades, das der echte Lauf verweigern
+würde, zeigt, was sich bewegen würde, und beendet sich mit 0, und unter `--json` trägt sein
+Dokument die Verweigerung als `wouldRefuse` (`{ code, message, hint }`). Unter 0.24 nimmt
+`rebase upgrade` `latest` unabhängig davon.
 
 ### `rebase start`
 
@@ -242,8 +259,9 @@ statischen App verwendet den Paketmanager des Projekts. Unter 0.24 wird der Name
 `npm run build --workspace frontend`.
 
 <span class="since-badge" data-since="0.25">Seit 0.25</span> Für einen Checkout, der nicht mit
-einem Cloud-Projekt verknüpft ist, gibt `apps config` die URL des Backends so an, wie
-`rebase dev` sie bereitstellt. Unter 0.24 gibt es `http://localhost:3001` aus.
+einem Cloud-Projekt verknüpft ist, sagt `apps config`, dass er nicht verknüpft ist, ob
+`rebase dev` läuft oder nicht, und gibt die URL des Backends so an, wie `rebase dev` sie
+bereitstellt. Unter 0.24 gibt es `http://localhost:3001` aus.
 
 ### `rebase status`
 
