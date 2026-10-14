@@ -138,7 +138,7 @@ vi.mock("execa", () => ({
     }
 }));
 
-import { DEV_PORT_FILENAME, devCommand, frontendCanStartWithBackend, overlapDevStartup } from "./dev";
+import { DEV_PORT_FILENAME, devCommand, devRestartTrigger, frontendCanStartWithBackend, overlapDevStartup } from "./dev";
 
 const managedDatabase: PreparedDatabase = {
     database: { kind: "external", source: "flag", url: "postgres://u@127.0.0.1:5432/app" },
@@ -601,3 +601,56 @@ describe("the SDK's example address", () => {
         await run;
     });
 });
+
+/**
+ * A headless `rebase dev`, then `rebase schema introspect` in another
+ * terminal: dev watched `config/collections` only when it existed at start,
+ * so the new collections changed nothing until a manual restart.
+ */
+describe("collections that appear while dev runs", () => {
+    type Listener = (event: string, filename: string | null) => void;
+    let watched: Array<{ dir: string; recursive: boolean; listener: Listener }>;
+
+    beforeEach(() => {
+        fs.rmSync(path.join(scratch, "config", "collections"), { recursive: true, force: true });
+        watched = [];
+        vi.mocked(fs.watch).mockImplementation(((dir: fs.PathLike, options: unknown, listener?: Listener) => {
+            const recursive = typeof options === "object" && options !== null && "recursive" in options && options.recursive === true;
+            const callback = typeof options === "function" ? options as Listener : listener;
+            if (callback) watched.push({ dir: String(dir), recursive, listener: callback });
+            return { close: () => undefined } as unknown as fs.FSWatcher;
+        }) as unknown as typeof fs.watch);
+    });
+
+    it("regenerates, restarts the backend, and watches them", async () => {
+        // Nothing to generate at start, and the regeneration later finishes.
+        generation.resolve();
+        const run = devCommand(["node", "rebase", "dev", "--backend-only", "--port", "45170"]);
+        await vi.waitFor(() => expect(spawned.some(s => s.file === "/bin/true")).toBe(true));
+        const collections = path.join(scratch, "config", "collections");
+        const config = watched.find(w => w.dir === path.join(scratch, "config") && !w.recursive);
+        expect(config).toBeDefined();
+        expect(watched.some(w => w.dir === collections)).toBe(false);
+
+        const trigger = devRestartTrigger(scratch);
+        const before = trigger && fs.existsSync(trigger) ? fs.readFileSync(trigger, "utf8") : null;
+        runDriverSchemaCommand.mockClear();
+        const sdkBefore = spawned.filter(s => s.args.includes("generate-sdk")).length;
+
+        // What introspect writes.
+        fs.mkdirSync(collections);
+        fs.writeFileSync(path.join(collections, "orders.ts"), "export default {};\n");
+        config?.listener("rename", "collections");
+
+        await vi.waitFor(() => expect(watched.some(w => w.dir === collections && w.recursive)).toBe(true));
+        await vi.waitFor(() => expect(runDriverSchemaCommand).toHaveBeenCalledWith(["node", "rebase", "schema", "generate"], { quiet: true }), { timeout: 3_000 });
+        await vi.waitFor(() => expect(spawned.filter(s => s.args.includes("generate-sdk")).length).toBe(sdkBefore + 1), { timeout: 3_000 });
+        if (trigger) {
+            await vi.waitFor(() => expect(fs.readFileSync(trigger, "utf8")).not.toBe(before), { timeout: 3_000 });
+        }
+
+        for (const child of spawned) child.end();
+        await run;
+    });
+});
+

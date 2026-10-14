@@ -303,6 +303,49 @@ function devCollectionsDir(projectRoot: string): string {
 }
 
 /**
+ * Call `onAppear` once, when `target` exists, and return what stops waiting.
+ *
+ * Watches the nearest directory above `target` that exists (no higher than
+ * `root`), and follows the path down as each part of it appears — `fs.watch`
+ * cannot watch a directory that is not there yet. A headless project has no
+ * `config/collections` until `rebase schema introspect` writes one, and dev
+ * watched it only when it was there at start: the backend kept serving the
+ * API it derived from the database, and edits to the new files did nothing,
+ * until dev was restarted by hand.
+ */
+export function whenDirectoryAppears(target: string, root: string, onAppear: () => void): () => void {
+    let watcher: fs.FSWatcher | null = null;
+    let watching: string | null = null;
+    let done = false;
+    const stop = (): void => {
+        done = true;
+        watcher?.close();
+        watcher = null;
+    };
+    const arm = (): void => {
+        if (done) return;
+        if (fs.existsSync(target)) {
+            stop();
+            onAppear();
+            return;
+        }
+        let dir = path.dirname(target);
+        while (!fs.existsSync(dir) && dir !== root && path.dirname(dir) !== dir) dir = path.dirname(dir);
+        if (dir === watching || !fs.existsSync(dir)) return;
+        watcher?.close();
+        watching = dir;
+        try {
+            watcher = fs.watch(dir, () => arm());
+        } catch {
+            // Unwatchable: the collections are picked up at the next start, as before.
+            watcher = null;
+        }
+    };
+    arm();
+    return stop;
+}
+
+/**
  * The file dev writes to restart the backend, or `null` when tsx would not see it.
  *
  * Outside the project, so nothing appears in the developer's tree, and keyed by
@@ -1900,7 +1943,7 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
         // during a dev session is a surprise waiting at the next deploy. The
         // reader's single instruction is still "save the file".
         const collectionsDir = devCollectionsDir(projectRoot);
-        if (fs.existsSync(collectionsDir)) {
+        {
             let debounce: NodeJS.Timeout | null = null;
             // The SQL schema and the SDK do not answer to the same edits. The
             // SDK is generated from the collections `index` module, which can
@@ -1911,9 +1954,8 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
             // debounce window because one burst can touch both kinds of file.
             let sqlSchemaAffected = false;
             let changed = "";
-            fs.watch(collectionsDir, { recursive: true }, (_eventType, filename) => {
-                if (!filename || filename.startsWith(".") || filename.endsWith(".tmp")) return;
-                sqlSchemaAffected = sqlSchemaAffected || affectsSqlSchema(collectionsDir, filename);
+            const collectionsChanged = (filename: string, affectsSchema: boolean): void => {
+                sqlSchemaAffected = sqlSchemaAffected || affectsSchema;
                 changed = filename;
                 if (debounce) clearTimeout(debounce);
                 debounce = setTimeout(() => {
@@ -1941,10 +1983,11 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
                         // The stock runtime imports the generated schema, so tsx
                         // already restarts when it is written; a second restart
                         // from the trigger is exactly what this avoids.
-                        // Otherwise — nothing was written, or an ejected
-                        // entrypoint may not import it — dev restarts the
-                        // backend itself.
-                        if (!(usesStockRuntime && generatedSchemaStamp() !== schemaBefore)) restartBackend();
+                        // Otherwise — nothing was written, a file that did not
+                        // exist at boot (so nothing imported it, and tsx is not
+                        // watching it), or an ejected entrypoint that may not
+                        // import it — dev restarts the backend itself.
+                        if (!(usesStockRuntime && schemaBefore !== null && generatedSchemaStamp() !== schemaBefore)) restartBackend();
 
                         console.log([
                             chalk.green("  ✓ Schema and SDK types regenerated. The backend restarts and boot"),
@@ -1957,7 +2000,24 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
                         ].join("\n"));
                     })();
                 }, 500);
-            });
+            };
+            const watchCollections = (): void => {
+                fs.watch(collectionsDir, { recursive: true }, (_eventType, filename) => {
+                    if (!filename || filename.startsWith(".") || filename.endsWith(".tmp")) return;
+                    collectionsChanged(filename, affectsSqlSchema(collectionsDir, filename));
+                });
+            };
+            if (fs.existsSync(collectionsDir)) {
+                watchCollections();
+            } else {
+                // A headless project has none until `rebase schema introspect`
+                // writes them. They are new to the backend as a whole, so they
+                // count as a schema change.
+                whenDirectoryAppears(collectionsDir, projectRoot, () => {
+                    watchCollections();
+                    collectionsChanged(`${path.basename(collectionsDir)}/`, true);
+                });
+            }
         }
 
         // The admin panel beside the backend, when the port it will bind is
