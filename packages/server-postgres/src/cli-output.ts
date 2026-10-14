@@ -61,6 +61,52 @@ export const wantsStack = (): boolean => parseEnvBoolean(process.env.REBASE_DEBU
  */
 export const describeFailure = (error: unknown): string => {
     if (!(error instanceof Error)) return String(error);
-    if (wantsStack() && error.stack) return error.stack;
+    const failedQuery = describeFailedQuery(error);
+    const lead = failedQuery?.reason ? `${failedQuery.reason}\n  ` : "";
+    if (wantsStack() && error.stack) {
+        if (!failedQuery) return error.stack;
+        // The stack opens with the message, `params:` line and all.
+        const opening = `${error.name}: ${error.message}`;
+        const frames = error.stack.startsWith(opening) ? error.stack.slice(opening.length) : `\n${error.stack}`;
+        return `${lead}${error.name}: ${failedQuery.query}${frames}`;
+    }
+    if (failedQuery) return `${lead}${failedQuery.query}\n  Re-run with --debug for the stack trace.`;
     return `${error.message}\n  Re-run with --debug for the stack trace.`;
 };
+
+/**
+ * A failed query as a reader needs it: why it failed — Postgres' own reason
+ * with its SQLSTATE (`relation "nope_table" does not exist (42P01)`), or the
+ * driver's when Postgres never answered — and the query without the values it
+ * ran with. `null` for any other error.
+ *
+ * Drizzle reports a failed query as `Failed query: <sql>` and a `params:` line
+ * and keeps the error underneath in `cause`, so the message alone names a query
+ * and no reason: `rebase console -e` printed exactly that, `--debug` included.
+ * The values stay off the terminal: they are whatever the code passed, a
+ * password hash or a token as readily as an id.
+ */
+function describeFailedQuery(error: Error): { reason: string | null; query: string } | null {
+    if (!error.message.startsWith("Failed query:")) return null;
+    const paramsAt = error.message.lastIndexOf("\nparams:");
+    const postgres = postgresError(error.cause);
+    return {
+        reason: postgres ? `${postgres.message} (${postgres.code})` : deepestMessage(error.cause),
+        query: paramsAt === -1 ? error.message : error.message.slice(0, paramsAt)
+    };
+}
+
+/** The error Postgres raised, from a cause chain: the one carrying a SQLSTATE. */
+function postgresError(cause: unknown, depth = 0): { code: string; message: string } | null {
+    if (!(cause instanceof Error) || depth > 5) return null;
+    if ("code" in cause && typeof cause.code === "string" && /^[0-9A-Z]{5}$/.test(cause.code) && cause.message) {
+        return { code: cause.code, message: cause.message };
+    }
+    return postgresError(cause.cause, depth + 1);
+}
+
+/** The innermost message in a cause chain, or `null` when there is none. */
+function deepestMessage(cause: unknown, depth = 0): string | null {
+    if (!(cause instanceof Error) || depth > 5) return null;
+    return deepestMessage(cause.cause, depth + 1) ?? (cause.message || null);
+}

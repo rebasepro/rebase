@@ -461,6 +461,19 @@ describe("openRebase (E2E)", () => {
                 expect(JSON.parse(counted.stdout)).toEqual([{ n: 1 }]);
             });
 
+            it("says why Postgres refused a query, and not the values it ran with", async () => {
+                // Drizzle's own message is `Failed query: …` and a `params:`
+                // line; the relation Postgres could not find is in its cause.
+                const result = await evalInConsole("rebase.sql('SELECT * FROM nope_table WHERE owner_id = $1', { params: ['s3cret-token'] })");
+                expect(result.code).toBe(1);
+                expect(result.stdout).toBe("");
+                expect(result.stderr.split("\n").slice(0, 2)).toEqual([
+                    "relation \"nope_table\" does not exist (42P01)",
+                    "  Failed query: SELECT * FROM nope_table WHERE owner_id = $1"
+                ]);
+                expect(result.stderr).not.toContain("s3cret-token");
+            });
+
             it("records history for a write to an audited collection, as the service", async () => {
                 const result = await evalInConsole(
                     "const row = await rebase.dataAsAdmin.ledger.create({ ownerId: 'bob', amount: 4 });\nreturn row.id;",
