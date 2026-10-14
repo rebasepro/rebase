@@ -47,7 +47,12 @@ Las políticas de una tabla son más que las `securityRules` propias de la colec
 - **`defaultSecurityRules`**, exportadas desde `config/collections/index.ts`. Una
   colección cuyas `securityRules` están ausentes o vacías toma todas ellas en su
   lugar, como si las hubiera escrito. Una colección que declara aunque sea una regla
-  propia no toma ninguna: las dos listas nunca se fusionan.
+  propia no toma ninguna: las dos listas nunca se fusionan. Se aplican dondequiera
+  que se lea el directorio: `rebase dev`, `rebase db push`, el panel de administración
+  y un backend al que se le da `collectionsDir`. <span class="since-badge" data-since="0.25">Desde 0.25</span>
+  El índice del scaffold también las aplica al array `collections` que exporta, así
+  que un backend al que se le pasa ese array también las recibe. Un array montado de
+  cualquier otra forma lleva solo las reglas que declaran sus colecciones.
 - **La base del administrador.** Cada colección recibe también
   `<table>_default_admin_read` y `<table>_default_admin_write_insert`,
   `_update` y `_delete`: políticas permisivas que permiten al contexto del servidor y
