@@ -19,7 +19,7 @@ import path from "node:path";
 
 import { releaseDocs } from "../release-docs.mjs";
 import {
-    checkUnreleasedBadges, dropReleasedBadges, pruneNotNew
+    checkUnreleasedBadges, dropReleasedBadges, pruneNotNew, removeBadges
 } from "../docs-verify/check-unreleased-badges.mjs";
 import {
     checkTranslationFreshness, sourceHash, CONTENT, LOCALES
@@ -361,4 +361,31 @@ test("a -to-next page beside the page [Unreleased] goes to is what a rename by c
     const [finding, ...rest] = checkUpgradeCoverage(d.root).findings;
     assert.deepEqual(rest, []);
     assert.match(finding.reason, /0-18-to-next\.mdx is named -to-next, but \[Unreleased\] goes to .*0-18-to-0-21\.mdx/);
+});
+
+test("a released badge set off by punctuation takes the punctuation with it", () => {
+    // 0.25.0's cut left "does not change them (, [details](…))" on storage.md
+    // in English, and German did not take the edit the same way.
+    const badge = '<span class="since-badge" data-since="0.25">Since 0.25</span>';
+    const released = (v) => v === "0.25";
+    const leading = removeBadges(`does not change them (${badge}, [details](/docs/x/)):`, released).text;
+    assert.equal(leading, "does not change them ([details](/docs/x/)):");
+    const trailing = removeBadges(`one more case ([details](/docs/x/), ${badge}).`, released).text;
+    assert.equal(trailing, "one more case ([details](/docs/x/)).");
+    const alone = removeBadges(`the default (${badge}) is kept.`, released).text;
+    assert.equal(alone, "the default is kept.");
+});
+
+test("a page copy_repo_docs.js writes loses its released badge in its source too", (t) => {
+    // Only the website copy used to be edited, and the release's own
+    // `generate-all` copied docs/compatibility.md — badge and all — back over
+    // it, leaving "Since 0.21" on a released page and the translations stale.
+    const body = `## Promises\n\n${badge("0.21")} A canary is \`main\` after the last release.\n`;
+    const d = tree(t, { "CHANGELOG.md": STAMPED,
+        "docs/compatibility.md": `# Compatibility\n\n${body}`,
+        [`${CONTENT}/docs/compatibility.md`]: `---\nslug: docs/compatibility\ntitle: Compatibility\n---\n\n${body}` });
+    dropReleasedBadges(d.root);
+    assert.doesNotMatch(d.read(`${CONTENT}/docs/compatibility.md`), /since-badge/);
+    assert.doesNotMatch(d.read("docs/compatibility.md"), /since-badge/);
+    assert.match(d.read("docs/compatibility.md"), /A canary is `main` after the last release\./);
 });

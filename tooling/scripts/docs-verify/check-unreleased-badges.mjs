@@ -32,6 +32,7 @@
  * most docs pages are plain `.md`, which cannot import a component, so they
  * write the same span by hand.
  */
+import { DOCUMENTS as COPIED_DOCUMENTS } from "../../../website/scripts/copy_repo_docs.js";
 import { readFileSync, writeFileSync, existsSync, globSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -586,9 +587,14 @@ export function removeBadges(text, released) {
                     removed.set(`text ${version}`, (removed.get(`text ${version}`) ?? 0) + 1);
                     continue;
                 }
-                next = next.includes(`${el} `) ? next.replace(`${el} `, "")
-                    : next.includes(` ${el}`) ? next.replace(` ${el}`, "")
-                        : next.replace(el, "");
+                // A badge set off by punctuation takes it along: `(badge, [details])`
+                // left `(, [details])`, and `(badge)` an empty pair of brackets.
+                next = next.includes(`(${el}, `) ? next.replace(`(${el}, `, "(")
+                    : next.includes(`, ${el})`) ? next.replace(`, ${el})`, ")")
+                        : next.includes(` (${el})`) ? next.replace(` (${el})`, "")
+                            : next.includes(`${el} `) ? next.replace(`${el} `, "")
+                                : next.includes(` ${el}`) ? next.replace(` ${el}`, "")
+                                    : next.replace(el, "");
                 removed.set(`badge ${version}`, (removed.get(`badge ${version}`) ?? 0) + 1);
             }
         }
@@ -645,6 +651,22 @@ swaps: removed });
         dropped.push({ file: rel,
 count: counted("badge"),
 asText: counted("text") });
+    }
+
+    // A page `website/scripts/copy_repo_docs.js` writes from a repository file
+    // (`docs/compatibility.md`, `docs/troubleshooting.md`): the same drop on its
+    // source, or the release's own `generate-all` copies the badges back over
+    // the edited page — and every translation stamped from the edited page
+    // then reads as stale.
+    const scriptsDir = path.join(root, "website", "scripts");
+    for (const doc of COPIED_DOCUMENTS) {
+        const dest = path.relative(root, path.resolve(scriptsDir, doc.dest)).split(path.sep).join("/");
+        if (!edits.has(dest)) continue;
+        const source = path.resolve(scriptsDir, doc.source);
+        if (!existsSync(source)) continue;
+        const before = readFileSync(source, "utf8");
+        const { text: after } = removeBadges(before, version => isReleased(version, versions));
+        if (after !== before) writeFileSync(source, after);
     }
 
     return { dropped,
