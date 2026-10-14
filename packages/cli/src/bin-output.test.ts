@@ -74,6 +74,24 @@ describe("bin/rebase.js writes plain text to a pipe", () => {
         expect(stderr).not.toContain("--debug");
     });
 
+    /**
+     * The same for a refusal the CLI raised itself, having said why: the
+     * compose-port impostor check, `--docker` with no compose `db` service.
+     * The stack points at the line that decided to refuse.
+     */
+    it("does not offer a stack trace for a refusal the CLI raised itself", async () => {
+        const project = fs.mkdtempSync(path.join(os.tmpdir(), "rebase-bin-refusal-"));
+        fs.writeFileSync(path.join(project, "rebase.json"), "{}\n");
+        try {
+            const { code, stderr } = await runCli(["db", "url", "--docker"], {}, project);
+            expect(code).toBe(1);
+            expect(stderr).toContain("--docker needs a docker-compose.yml");
+            expect(stderr).not.toContain("Re-run with --debug");
+        } finally {
+            fs.rmSync(project, { recursive: true, force: true });
+        }
+    });
+
     it("still offers one for a failure inside a command", async () => {
         // A real project whose collection files throw when imported: the command
         // line is fine, so what failed is not usage and the stack is worth

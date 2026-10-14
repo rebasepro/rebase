@@ -162,6 +162,9 @@ describe("an explicit database", () => {
     it("refuses --docker when there is no compose db service to reach", async () => {
         await expect(prepareDatabaseEnv(root, { flagDocker: true }))
             .rejects.toThrow(/--docker needs a docker-compose\.yml/);
+        // A refusal the CLI raised itself, which `bin/rebase.js` prints
+        // without "Re-run with --debug for the stack trace."
+        await expect(prepareDatabaseEnv(root, { flagDocker: true })).rejects.toMatchObject({ isRefusal: true });
     });
 
     it("treats an empty DATABASE_URL as absent rather than as a connection string", async () => {

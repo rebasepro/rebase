@@ -41,6 +41,7 @@ import chalk from "chalk";
 import { execa, ExecaError } from "execa";
 
 import { readEnvFile } from "./project";
+import { Refusal } from "./refusal";
 
 /** Where the preflight stopped, and why. Returned so tests can assert it. */
 export type PreflightOutcome =
@@ -588,7 +589,8 @@ async function refuseForeignListener(options: {
         log(`    ${chalk.gray(line)}`);
     }
 
-    throw new Error(
+    // Said in full above, so a `Refusal`: `bin/rebase.js` adds no stack hint.
+    throw new Refusal(
         holder.kind === "container"
             ? `Port ${port} belongs to ${holder.name}, not to this project's db service. Nothing was started.`
             : `Port ${port} belongs to a server outside Docker, not to this project's db service. Nothing was started.`

@@ -182,11 +182,15 @@ const { entry } = await import("../dist/index.es.js");
  * `--debug`/`REBASE_DEBUG`, because when the message is *not* enough that is
  * the only thing that helps.
  *
- * With one exception: a *usage* error. `rebase status extra` has no stack worth
+ * With two exceptions. A *usage* error: `rebase status extra` has no stack worth
  * reading — it points at `arg` and `utils/args.ts` — and the hint suggests
  * re-running with another flag, when the flags are precisely what went wrong.
- * `utils/args.ts` marks those with `isUsageError` rather than a class, because
- * this file imports the bundle and `instanceof` cannot reach across it.
+ * And a *refusal* the CLI raised itself, having said why: the compose-port
+ * check names the container holding the port and how to move, and its stack
+ * points at the line that decided to refuse. `utils/args.ts` and
+ * `utils/refusal.ts` mark those with `isUsageError` / `isRefusal` rather than a
+ * class, because this file imports the bundle and `instanceof` cannot reach
+ * across it.
  */
 // After the bundle, which already imports this package, and spelled as the
 // commands spell it: `wantsRawError` in `commands/cloud/errors.ts`.
@@ -198,12 +202,12 @@ if (wantsStack) process.env.REBASE_DEBUG = "1";
 
 entry(process.argv).catch((error) => {
     const message = error instanceof Error ? error.message : String(error);
-    const isUsage = Boolean(error && typeof error === "object" && error.isUsageError);
+    const saidWhy = Boolean(error && typeof error === "object" && (error.isUsageError || error.isRefusal));
 
     process.stderr.write(`${red(`✗ ${message}`)}\n`);
     if (wantsStack && error instanceof Error && error.stack) {
         process.stderr.write(`\n${error.stack}\n`);
-    } else if (!isUsage) {
+    } else if (!saidWhy) {
         process.stderr.write(`${dim("  Re-run with --debug for the stack trace.")}\n`);
     }
     process.exit(1);

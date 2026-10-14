@@ -764,6 +764,9 @@ describe("the compose port, held by someone else", () => {
         });
 
         await expect(outcome).rejects.toThrow(/u3-ops-db-1/);
+        // Said in full above it, so `bin/rebase.js` adds no "Re-run with
+        // --debug for the stack trace." — there is no stack worth reading.
+        await expect(outcome).rejects.toMatchObject({ isRefusal: true });
         expect(whoHoldsPort).toHaveBeenCalledWith(port);
         expect(pushSchema).not.toHaveBeenCalled();
         expect(startDatabase).not.toHaveBeenCalled();
@@ -778,6 +781,7 @@ describe("the compose port, held by someone else", () => {
     it("refuses a server outside Docker on that port too", async () => {
         const { outcome } = run(composeUrl(), { kind: "outside-docker" });
         await expect(outcome).rejects.toThrow(`Port ${port}`);
+        await expect(outcome).rejects.toMatchObject({ isRefusal: true });
         expect(logged.join("\n")).toMatch(/outside Docker/);
     });
 

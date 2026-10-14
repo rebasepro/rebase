@@ -24,6 +24,7 @@ import path from "path";
 
 import { composeDatabaseUrl } from "../utils/dev-preflight";
 import { findProjectRoot, readEnvFile } from "../utils/project";
+import { Refusal } from "../utils/refusal";
 import { resourceEnvSuffix } from "@rebasepro/types";
 import { branchUrl, databaseNameOf, readActiveBranch } from "./branch-pointer";
 import { readLastDevDocker } from "./last-dev-database";
@@ -331,7 +332,7 @@ export async function prepareDatabaseEnv(
         // that configured nothing gets — while the container it had just been
         // asked for was never started either.
         if (!database.url) {
-            throw new Error(
+            throw new Refusal(
                 "--docker needs a docker-compose.yml with a db service in this project, " +
                 "and this one has none that names POSTGRES_USER, POSTGRES_DB and a published port. " +
                 "Set DATABASE_URL in .env to point at the database you mean instead."
