@@ -133,6 +133,13 @@ The target is always this project's local development database and cannot be
 chosen: `--database-url` is refused rather than accepted, so there is no way to
 spell "pull into production". `--from` is the only direction.
 
+<span class="since-badge" data-since="0.25">Since 0.25</span> A pull replaces
+the local database's contents: it empties each schema it copies first, so a
+table that exists only locally does not survive it. Into the managed development
+database the rows travel as `INSERT` statements, which it takes where `COPY`
+would stop it. On 0.24 a pull into the managed database failed at the first
+table and left it answering nothing until it was killed.
+
 ### `rebase db url`
 
 Print the connection string this project is using, and nothing else, so it
@@ -163,6 +170,15 @@ and says how to reach Docker instead. A `rebase dev --docker` outranked that
 way keeps the remembered choice as it was, so once the connection string is
 gone the commands follow Docker again. On 0.24 every command needs its own
 `--docker`, and an outranked one still starts the container.
+
+<span class="since-badge" data-since="0.25">Since 0.25</span> `rebase init`
+gives each project its own compose port, from 5433–5632 by the project's path,
+and `--docker` checks that what answers on it is this project's `db` container.
+When another container or a Postgres outside Docker holds the port, it stops and
+names it rather than logging in to someone else's database. To move the
+project, change the host port of the `db` service in `docker-compose.yml`, and
+`DATABASE_URL` if `.env` sets one. On 0.24 every scaffold took the first free
+port from 5432, so projects made side by side could share one.
 
 ### `rebase db stop` / `rebase db reset`
 
