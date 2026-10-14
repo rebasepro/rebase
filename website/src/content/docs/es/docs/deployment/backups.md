@@ -265,8 +265,8 @@ transacción. Elimina entero cada esquema que crea la copia de seguridad (`rebas
 por ejemplo), y cada tabla que la copia crea en un esquema que no crea (`public`),
 con `CASCADE`, y luego restaura el dump en la misma transacción. Antes de preguntar,
 nombra lo que eso elimina y que la copia de seguridad no contiene, como
-`rebase.atlas_schema_revisions` de `rebase db migrate`, o una vista o una clave
-foránea en otro lugar que hace referencia a una de las tablas de la copia. Una
+`rebase.atlas_schema_revisions` de `rebase db migrate`, una función, un tipo o una
+secuencia en un esquema reemplazado, o una vista o una clave foránea en otro lugar que hace referencia a una de las tablas de la copia. Una
 restauración que se detiene en cualquier punto se revierte, y dice que la base de
 datos contiene lo que contenía antes. Pasa el dump por `psql`, que viene con
 `pg_restore` (`PSQL_PATH` nombra otro), y espera como máximo 15 segundos por un
