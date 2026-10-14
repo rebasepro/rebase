@@ -12,7 +12,8 @@ import fs from "fs";
 import path from "path";
 import chalk from "chalk";
 import { execa } from "execa";
-import { requireProjectRoot, findEnvFile, readEnvFile } from "../utils/project";
+import { requireProjectRoot, findEnvFile, findProjectRoot, readEnvFile } from "../utils/project";
+import { invokedRebaseCommand } from "../utils/invoked-command";
 import { parseCommandArgs, wantsHelp } from "../utils/args";
 import { detectPackageManager, getPMCommands, type PMCommands } from "../utils/package-manager";
 import { DEFAULT_BUNDLE_DIR } from "../bundle";
@@ -20,6 +21,22 @@ import type { RebaseBundleStatic } from "@rebasepro/types";
 import type { DevDatabase } from "../dev-db/resolve";
 import type { DaemonState } from "../dev-db/state";
 import { MANAGED_POOL_MAX } from "../dev-db/constraints";
+
+/**
+ * The help's line that runs `start` on the database `rebase dev` uses, spelled
+ * as the reader can type it.
+ *
+ * In a project, the project's package manager: a scaffold has `rebase` in
+ * `node_modules/.bin`, not on PATH, so a bare `rebase` is "command not found" —
+ * `pnpm exec rebase …`, as `missingDatabaseUrl` and the CLI's other hints say
+ * it. Outside one, the way this CLI was started (`invokedRebaseCommand`).
+ */
+export function startHelpRunLine(projectRoot: string | null = findProjectRoot()): string {
+    const rebase = (args: string[]): string => (projectRoot
+        ? getPMCommands(detectPackageManager(projectRoot)).exec("rebase", args)
+        : [...invokedRebaseCommand(), ...args]).join(" ");
+    return `DATABASE_URL="$(${rebase(["db", "url"])})" ${rebase(["start"])}`;
+}
 
 function printHelp(): void {
     console.log(`
@@ -40,7 +57,7 @@ register becomes the admin. For a production server, run it with
 NODE_ENV=production; it says so at start when it is not one.
 
 It needs a DATABASE_URL, and starts no database of its own. To run it on the
-database ${chalk.cyan("rebase dev")} uses: ${chalk.cyan('DATABASE_URL="$(rebase db url)" rebase start')}
+database ${chalk.cyan("rebase dev")} uses: ${chalk.cyan(startHelpRunLine())}
 
 Build first with ${chalk.cyan("rebase build")}.
 `.trim());

@@ -90,6 +90,54 @@ describe("rebase start --help", () => {
         expect(help).toContain("NODE_ENV");
         expect(help).toMatch(/NODE_ENV=production/);
     });
+
+    /**
+     * The help's run line said `DATABASE_URL="$(rebase db url)" rebase start`,
+     * and a scaffold has `rebase` in `node_modules/.bin`, not on PATH: copied
+     * as printed, it was "command not found". The runtime's own refusal
+     * already spelled it the project's way.
+     */
+    describe("the line that runs it on the development database", () => {
+        let cwd: string;
+        let dir: string;
+
+        beforeEach(() => {
+            cwd = process.cwd();
+            dir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "rebase-start-help-")));
+        });
+
+        afterEach(() => {
+            process.chdir(cwd);
+            fs.rmSync(dir, { recursive: true, force: true });
+        });
+
+        async function help(): Promise<string> {
+            const printed: string[] = [];
+            vi.spyOn(console, "log").mockImplementation((...args: unknown[]) => {
+                printed.push(args.map(String).join(" "));
+            });
+            await startCommand(["node", "rebase", "start", "--help"]);
+            return printed.join("\n").replace(ANSI, "");
+        }
+
+        it("is spelled the way the project runs the CLI", async () => {
+            fs.writeFileSync(path.join(dir, "rebase.json"), "{}");
+            fs.writeFileSync(path.join(dir, "pnpm-lock.yaml"), "lockfileVersion: '9.0'\n");
+            process.chdir(dir);
+
+            expect(await help()).toContain('DATABASE_URL="$(pnpm exec rebase db url)" pnpm exec rebase start');
+        });
+
+        it("is spelled the way this CLI was started, outside a project", async () => {
+            process.chdir(dir);
+            vi.stubEnv("npm_config_user_agent", "");
+            try {
+                expect(await help()).toContain('DATABASE_URL="$(rebase db url)" rebase start');
+            } finally {
+                vi.unstubAllEnvs();
+            }
+        });
+    });
 });
 
 /**
