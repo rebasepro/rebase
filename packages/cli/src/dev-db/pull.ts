@@ -860,9 +860,10 @@ export async function restoreCopy(plan: PullPlan, dumpFile: string): Promise<Res
 /**
  * Put the managed database's one session back to its own settings.
  *
- * `RESET ALL`, not `DISCARD ALL`: the session is every connection's, and
- * `DISCARD` would also drop the `LISTEN` a running `rebase dev`'s realtime
- * holds on it. Best effort: a daemon that cannot take this cannot take the
+ * `RESET ALL` and `DEALLOCATE ALL`, not `DISCARD ALL`: the session is every
+ * connection's, and `DISCARD` would also drop the `LISTEN` a running
+ * `rebase dev`'s realtime holds on it. The same pair the backup service runs
+ * after its tools (`resetSharedSession` in server-postgres' backup-service). Best effort: a daemon that cannot take this cannot take the
  * re-grant that follows either, and that step reports it.
  */
 async function resetSharedSession(target: string): Promise<void> {
@@ -872,6 +873,7 @@ async function resetSharedSession(target: string): Promise<void> {
     try {
         await client.connect();
         await client.query("RESET ALL");
+        await client.query("DEALLOCATE ALL");
     } catch {
         // Reported by the next step that connects; see above.
     } finally {

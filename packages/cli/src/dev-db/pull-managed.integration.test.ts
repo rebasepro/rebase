@@ -306,6 +306,9 @@ describe("rebase db pull into the managed database", () => {
         // stay on for the dev server's queries after the pull.
         expect((await sql(managed, "SELECT 1 AS ok")).rows).toEqual([{ ok: 1 }]);
         expect(await sessionSettings(managed)).toEqual([]);
+        // Nor a prepared statement: a second backup there failed on pg_dump's
+        // `dumpenumtype` still being prepared from the first.
+        expect((await sql(managed, "SELECT count(*)::int AS n FROM pg_prepared_statements")).rows).toEqual([{ n: 0 }]);
     });
 
     it("succeeds the second time too", async () => {
