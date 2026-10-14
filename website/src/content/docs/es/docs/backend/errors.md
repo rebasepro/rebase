@@ -353,7 +353,7 @@ Una ruta utiliza uno de estos cuando no aplica nada más específico.
 | `CONFLICT` | 409 | Un conflicto con el estado existente. | Consulta el mensaje. |
 | `INTERNAL_ERROR` | 500 | Algo falló en el servidor. El mensaje es genérico a propósito. | Cita el `requestId`; el motivo está en los logs. |
 | `NOT_CONFIGURED` | 503 | Una dependencia que necesita esta ruta no está configurada en este servidor. | Consulta el mensaje. |
-| `SERVICE_UNAVAILABLE` | 503 | Una dependencia no fue accesible. | Reintenta; comprueba los logs. |
+| `SERVICE_UNAVAILABLE` | 503 | No se pudo llegar a un servicio del que depende la solicitud: un bucket de S3 o MinIO, o un host al que una función hace `fetch()` y que rechaza la conexión o no se resuelve. El log del servidor nombra el host; la respuesta no. Una base de datos a la que no se puede llegar es `DATABASE_UNAVAILABLE`. <span class="since-badge" data-since="0.25">Desde 0.25</span> Una conexión fallida a un servicio así responde con este código; en la 0.24 responde un `500` cuyo código es el error del socket (`ECONNREFUSED`), o `INTERNAL_ERROR`. | Reintenta; comprueba los logs. |
 
 ## Mantener la precisión de esta página
 

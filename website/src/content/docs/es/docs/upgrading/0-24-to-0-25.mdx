@@ -45,6 +45,15 @@ estas si tu app depende del comportamiento anterior:
   `rebase init` o `rebase eject` monta su volumen en `/uploads`. Ese volumen
   contiene solo el bucket predeterminado, y el usuario de la imagen no puede escribir en él. Móntalo
   en `/storage` con `STORAGE_PATH: /storage/uploads`, tal como hacen los nuevos archivos compose.
+- **Un servicio al que llama una solicitud y que no es accesible se responde con
+  `503 SERVICE_UNAVAILABLE`,** como un bucket de S3 caído o un host al que una función
+  hace `fetch()`. Antes era un `500` cuyo código era el error del socket
+  (`ECONNREFUSED`), o `INTERNAL_ERROR`.
+- **`rebase db push` conserva las restricciones CHECK y EXCLUDE de la tabla de una
+  colección,** mientras que el primer push tras `rebase schema introspect` las eliminaba.
+  La comprobación de destrucción de datos ahora cuenta también la eliminación de una, de modo que
+  `rebase db migrate --refuse-destructive` se detiene ante una migración que elimina una.
+  Elimina a mano una restricción que ya no quieras.
 
 Estos nombres todavía funcionan, muestran una advertencia única en tiempo de ejecución y tienen un reemplazo:
 

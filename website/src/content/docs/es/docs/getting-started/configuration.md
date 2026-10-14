@@ -84,8 +84,8 @@ sustituido. Por lo tanto, la variable funciona de la misma manera en ambos entor
 los casos en los que se necesita en desarrollo son los habituales:
 
 ```bash
-# Un teléfono en la LAN, la máquina de un colega, un túnel ngrok,
-# un puerto reenviado de Codespaces: todos orígenes que no son localhost.
+# A phone on the LAN, a colleague's machine, an ngrok tunnel,
+# a forwarded Codespaces port — all non-localhost origins.
 CORS_ORIGINS=http://192.168.1.5:5173
 ```
 
@@ -169,7 +169,7 @@ la plantilla inicial), `STORAGE_PUBLIC_READ`, o `STORAGE_ALLOW_ANY_AUTHENTICATED
 | Variable | Descripción | Por defecto |
 |----------|-------------|-------------|
 | `STORAGE_TYPE` | Backend de almacenamiento: `local`, `s3` o `gcs`. En producción, `local` desactiva el almacenamiento a menos que se defina `FORCE_LOCAL_STORAGE=true` | `local` |
-| `STORAGE_PATH` | Ruta base para el almacenamiento local | `./uploads` |
+| `STORAGE_PATH` | Ruta base para el almacenamiento local. Una ruta relativa se lee desde el directorio en el que se ejecuta el servidor: la raíz del proyecto con `rebase dev`, `backend/` en un servidor escrito por `rebase eject` | `<project>/uploads` |
 | `FORCE_LOCAL_STORAGE` | Permite el almacenamiento local en producción —solo con un volumen duradero que contenga `STORAGE_PATH` y los directorios `<STORAGE_PATH>__<key>` de buckets locales nombrados junto a él | `false` |
 | `STORAGE_DOWNLOAD_TOKEN_TTL` | Segundos durante los cuales funciona la URL de descarga de un archivo privado (el token que `getSignedUrl()` incluye en ella). Máximo `604800` (una semana) | `300` |
 | `STORAGE_MAX_FILE_SIZE` | Tamaño máximo de archivo que acepta el origen, en bytes, en todas las rutas de subida (`__<KEY>` para un origen nombrado). Un valor que no sea un número entero de bytes impedirá el arranque | `52428800` (50 MB) |
