@@ -66,8 +66,9 @@ const UNREACHABLE = new Set(["ECONNREFUSED", "ENOTFOUND", "EAI_AGAIN", "ETIMEDOU
 
 /**
  * What to print when opening `url` failed with `error`: the banner, in the
- * case it is — the server not answering, credentials refused, or a database
- * of that name not there — or `null` when it is none of those three.
+ * case it is — the server not answering, credentials refused, a database
+ * closed to new connections, or a database of that name not there — or `null`
+ * when it is none of those four.
  *
  * `consequence` is the line saying what did not happen ("The password was not
  * reset."); `fixes` is what to do about a server that does not answer, which
@@ -99,6 +100,21 @@ export function connectionFailureBanner(
         return banner(`Authentication failed for user "${user}" at ${host}`, said, [
             "PostgreSQL rejected the credentials in the connection string.",
             options.consequence
+        ]);
+    }
+    // 55000 covers more than this, so the sentence is matched — as the driver's banner does.
+    const closed = /database "(.+)" is not currently accepting connections/.exec(text)?.[1];
+    if (closed) {
+        return banner(`Database "${closed}" at ${host} is closed to new connections`, said, [
+            "It is set to refuse every new connection (ALLOW_CONNECTIONS false).",
+            "`rebase db branch create --force` closes its source for the copy, and one",
+            "stopped before it finished (a closed terminal, a kill) leaves it closed.",
+            options.consequence,
+            "",
+            "Nothing in it is lost. Open it again with:",
+            "  rebase db branch list      (every rebase db branch command opens it first)",
+            "or run this, connected to the server's postgres database:",
+            `  ALTER DATABASE "${closed.replace(/"/g, '""')}" ALLOW_CONNECTIONS true;`
         ]);
     }
     if (code === "3D000") {

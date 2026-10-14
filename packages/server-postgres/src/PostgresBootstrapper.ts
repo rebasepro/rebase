@@ -160,7 +160,7 @@ export interface PostgresDriverInternals {
 }
 
 // Re-export from shared CLI error utilities
-import { deepestErrorMessage, diagnoseDbError, isEconnrefused, parseHostInfo } from "./cli-errors";
+import { closedDatabaseName, deepestErrorMessage, diagnoseDbError, isEconnrefused, parseHostInfo } from "./cli-errors";
 import { classifyConnectFailure, extractPgError } from "./utils/pg-error-utils";
 import type { OpenIndexBuildSession, ScheduledIndexBuild } from "./schema/deferred-index-build";
 
@@ -421,6 +421,18 @@ function diagnoseConnectFailure(err: unknown, connectionString: string | undefin
 
     const { fatal, reason, code } = classifyConnectFailure(err);
     const detail = code ? ` [${code}]` : "";
+
+    // Closed to new connections: settled until someone opens it again, which
+    // the banner says how to do.
+    const closed = closedDatabaseName(err);
+    if (closed) {
+        logger.error(diagnoseDbError(err, url) ?? `❌ Database "${closed}" at ${hostInfo} is closed to new connections`);
+        return new Error(
+            `Database "${closed}" at ${hostInfo} is closed to new connections: ${reason}${detail}. ` +
+            "Open it again with `rebase db branch list`.",
+            { cause: err }
+        );
+    }
 
     // Every connection the server accepts is taken: SQLSTATE 53300, what
     // Postgres answers over its `max_connections` and what the managed

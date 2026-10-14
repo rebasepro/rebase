@@ -17,8 +17,8 @@
  * - A forced create stopped mid-copy by anything but Ctrl-C or SIGTERM — a
  *   closed terminal (SIGHUP), a SIGKILL — left its source refusing every
  *   connection, and no command opened it again or said how. It now opens it on
- *   every signal Node can catch, and the next `branch` command opens what a
- *   SIGKILL left closed, and says why.
+ *   every signal Node can catch, the next `branch` command opens what a SIGKILL
+ *   left closed, and the connection banner names both ways.
  *
  * Requires Docker.
  */
@@ -32,6 +32,7 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { execa } from "execa";
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
 import { runPluginCommand } from "../../src/cli.js";
+import { checkDatabaseConnectivity, diagnoseDbError } from "../../src/cli-errors.js";
 import { BranchService } from "../../src/services/BranchService.js";
 import { DatabasePoolManager } from "../../src/databasePoolManager.js";
 import { resolveTsxLoader } from "../../src/tsx-loader.js";
@@ -329,5 +330,28 @@ describe("db branch with other clients connected, and from a switched checkout",
             const after = Object.fromEntries((["SIGHUP", "SIGINT", "SIGTERM", "SIGQUIT"] as const).map((s) => [s, process.listenerCount(s)]));
             expect(after).toEqual(before);
         }, 120_000);
+
+        it("the connection banner names the command and the statement that open a closed database", async () => {
+            await admin.query(`ALTER DATABASE "${SOURCE}" ALLOW_CONNECTIONS false`);
+            try {
+                const probe = new pg.Client({ connectionString: urlFor(SOURCE) });
+                probe.on("error", () => undefined);
+                const refused = await probe.connect().then(() => null, (error: unknown) => error);
+                expect(refused).not.toBeNull();
+                const banner = diagnoseDbError(refused, urlFor(SOURCE)) ?? "";
+                expect(banner).toContain(`Database "${SOURCE}" at`);
+                expect(banner).toContain("is closed to new connections");
+                expect(banner).toContain("rebase db branch list");
+                expect(banner).toContain(`ALTER DATABASE "${SOURCE}" ALLOW_CONNECTIONS true;`);
+
+                // And the check every driver command runs first stops on it, saying the same.
+                await expect(checkDatabaseConnectivity(urlFor(SOURCE))).rejects.toThrow(Exited);
+                const said = stderr.join("\n");
+                expect(said).toContain("rebase db branch list");
+                expect(said).toContain(`ALTER DATABASE "${SOURCE}" ALLOW_CONNECTIONS true;`);
+            } finally {
+                await admin.query(`ALTER DATABASE "${SOURCE}" ALLOW_CONNECTIONS true`);
+            }
+        }, 60_000);
     });
 });

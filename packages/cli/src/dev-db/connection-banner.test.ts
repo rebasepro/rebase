@@ -37,6 +37,20 @@ describe("connectionFailureBanner", () => {
         expect(text).toContain("Database \"rebase\" does not exist at 127.0.0.1:5508");
     });
 
+    it("names a database closed to new connections, and the command and statement that open it", () => {
+        const text = connectionFailureBanner(URL, pgError("database \"rebase\" is not currently accepting connections", "55000"), options)!.join("\n");
+        expect(text).toContain("Database \"rebase\" at 127.0.0.1:5508 is closed to new connections");
+        expect(text).toContain("rebase db branch create --force");
+        expect(text).toContain("The password was not reset.");
+        expect(text).toContain("rebase db branch list");
+        expect(text).toContain("ALTER DATABASE \"rebase\" ALLOW_CONNECTIONS true;");
+        expect(text).not.toContain("s3cret");
+    });
+
+    it("does not read every 55000 as a closed database", () => {
+        expect(connectionFailureBanner(URL, pgError("lastval is not yet defined in this session", "55000"), options)).toBeNull();
+    });
+
     it("leaves any other failure to the caller", () => {
         expect(connectionFailureBanner(URL, pgError("the server does not support SSL connections", "08P01"), options)).toBeNull();
     });

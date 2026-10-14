@@ -69,6 +69,30 @@ export function isSslNotEnabled(err: unknown): boolean {
 }
 
 /**
+ * The database a connection was refused by because it is closed to new
+ * connections (`ALLOW_CONNECTIONS false`), or null.
+ *
+ * Postgres says it as `database "x" is not currently accepting connections`,
+ * SQLSTATE 55000. That code also covers failures that have nothing to do with
+ * connecting (`lastval is not yet defined in this session`), so the sentence is
+ * what is matched, through Drizzle's `cause` and a dual-stack `AggregateError`.
+ */
+export function closedDatabaseName(err: unknown): string | null {
+    if (!err || typeof err !== "object") return null;
+    if ("message" in err && typeof err.message === "string") {
+        const named = /database "(.+)" is not currently accepting connections/.exec(err.message);
+        if (named) return named[1];
+    }
+    if (err instanceof AggregateError) {
+        for (const inner of err.errors) {
+            const named = closedDatabaseName(inner);
+            if (named) return named;
+        }
+    }
+    return "cause" in err ? closedDatabaseName(err.cause) : null;
+}
+
+/**
  * Detect PostgreSQL "cannot drop ... because other objects depend on it"
  * (error code 2BP01, dependent_objects_still_exist). This is the failure that
  * strands a declarative `db push` half-applied when a collection is removed but
@@ -258,6 +282,44 @@ function formatSslNotEnabledBanner(databaseUrl: string): string {
 }
 
 /**
+ * Format a diagnostic banner for a database closed to new connections.
+ *
+ * Nothing in a development database closes one but `rebase db branch create
+ * --force`, which does it for the length of the copy; one killed before it
+ * opened it again leaves the project's database refusing everything. Every
+ * `rebase db branch` command opens it again before it does anything else, so
+ * that is the command named — with the statement itself, for a server the CLI
+ * cannot reach that way.
+ */
+function formatClosedDatabaseBanner(databaseUrl: string, database: string, err?: unknown): string {
+    const hostInfo = parseHostInfo(databaseUrl);
+    const reopen = databaseSource() === "flag"
+        ? "rebase db branch list --database-url <the same URL>"
+        : "rebase db branch list";
+    return (
+        `\n` +
+        `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+        `  ❌  Database "${database}" at ${hostInfo} is closed to new connections\n` +
+        `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+        `\n` +
+        driverReasonLine(err) +
+        `  It is set to refuse every new connection (ALLOW_CONNECTIONS false).\n` +
+        `  \`rebase db branch create --force\` closes its source for the copy, and\n` +
+        `  one stopped before it finished (a closed terminal, a kill) leaves it\n` +
+        `  closed. Nothing in it is lost. Open it again with:\n` +
+        `\n` +
+        `    ${chalk.bold.green(reopen)}\n` +
+        `      (every rebase db branch command opens it before anything else)\n` +
+        `\n` +
+        `  or run this, connected to the server's postgres database:\n` +
+        `\n` +
+        `    ALTER DATABASE "${database.replace(/"/g, '""')}" ALLOW_CONNECTIONS true;\n` +
+        `\n` +
+        `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`
+    );
+}
+
+/**
  * Format a diagnostic banner for a dependency-drop failure during `db push`.
  * Explains that the database may be left partially migrated and how to recover.
  *
@@ -318,6 +380,11 @@ export async function checkDatabaseConnectivity(databaseUrl: string): Promise<vo
             outError(formatSslNotEnabledBanner(databaseUrl));
             process.exit(1);
         }
+        const closed = closedDatabaseName(err);
+        if (closed) {
+            outError(formatClosedDatabaseBanner(databaseUrl, closed, err));
+            process.exit(1);
+        }
         // Unknown error — warn but don't block; let the downstream tool surface details
         outWarn(chalk.yellow(`  ⚠  Could not verify database connectivity: ${err instanceof Error ? err.message : String(err)}`));
         outWarn(chalk.gray("    Proceeding anyway — the command may fail if the database is unreachable."));
@@ -338,6 +405,10 @@ export function diagnoseDbError(err: unknown, databaseUrl?: string): string | nu
     }
     if (isSslNotEnabled(err)) {
         return formatSslNotEnabledBanner(databaseUrl || "");
+    }
+    const closed = closedDatabaseName(err);
+    if (closed) {
+        return formatClosedDatabaseBanner(databaseUrl || "", closed, err);
     }
     if (isDependencyDropError(err)) {
         return formatDependencyDropBanner();
