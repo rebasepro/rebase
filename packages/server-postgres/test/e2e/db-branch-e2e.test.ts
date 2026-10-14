@@ -14,6 +14,10 @@
  *   to, which `delete` refuses. The CLI names that database to the driver
  *   (`REBASE_ACTIVE_BRANCH_DATABASE`), which keeps it and says so — and `list`
  *   marks it, where every branch had the same bullet.
+ * - A forced create stopped mid-copy by anything but Ctrl-C or SIGTERM — a
+ *   closed terminal (SIGHUP) — left its source refusing every connection. It
+ *   now opens it on every signal Node can catch, and opens a source it found
+ *   closed after the copy too.
  *
  * Requires Docker.
  */
@@ -22,8 +26,16 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import pg from "pg";
+import { fileURLToPath } from "node:url";
+import { drizzle } from "drizzle-orm/node-postgres";
+import { execa } from "execa";
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
 import { runPluginCommand } from "../../src/cli.js";
+import { BranchService } from "../../src/services/BranchService.js";
+import { DatabasePoolManager } from "../../src/databasePoolManager.js";
+import { resolveTsxLoader } from "../../src/tsx-loader.js";
+
+const pkgRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 
 class Exited extends Error {
     constructor(readonly code: number | undefined) {
@@ -194,4 +206,103 @@ describe("db branch with other clients connected, and from a switched checkout",
         expect(left).toContain("rb_mine");
         expect(left).not.toContain("rb_other");
     }, 60_000);
+
+    describe("a forced create stopped part-way", () => {
+        /**
+         * A source big enough that its copy lasts long enough to signal in
+         * the middle of: ~100 MB, about a second.
+         */
+        const SOURCE = "big";
+
+        beforeAll(async () => {
+            await admin.query(`CREATE DATABASE "${SOURCE}"`);
+            const filler = new pg.Client({ connectionString: urlFor(SOURCE) });
+            await filler.connect();
+            await filler.query("CREATE TABLE filler AS SELECT g AS id, repeat(md5(g::text), 30) AS pad FROM generate_series(1, 100000) g");
+            await filler.end();
+        }, 120_000);
+
+        const allowsConnections = async (database: string): Promise<boolean> =>
+            (await admin.query<{ datallowconn: boolean }>("SELECT datallowconn FROM pg_database WHERE datname = $1", [database]))
+                .rows[0].datallowconn;
+
+        /** The forced create, as its own Node process from source — one process, so a signal reaches it and not a relay. */
+        function spawnForcedCreate(name: string) {
+            const loader = resolveTsxLoader();
+            if (!loader) throw new Error("tsx's loader did not resolve");
+            const env: Record<string, string> = {};
+            for (const [key, value] of Object.entries(process.env)) {
+                if (value !== undefined && !/^(npm_|pnpm_)|^VITEST/i.test(key)) env[key] = value;
+            }
+            Object.assign(env, {
+                DATABASE_URL: urlFor(SOURCE),
+                // `@rebasepro/*` from this checkout's source, as the vitest aliases do.
+                TSX_TSCONFIG_PATH: path.resolve(pkgRoot, "../../tsconfig.typecheck.json")
+            });
+            return execa(process.execPath, ["--import", loader, path.join(pkgRoot, "src/cli.ts"), "db", "branch", "create", name, "--force"], {
+                cwd: workDir, env, reject: false, all: true
+            });
+        }
+
+        /** Until Postgres is copying `SOURCE` into `rb_<name>` — mid-copy, with the source closed. */
+        async function untilCopying(name: string): Promise<void> {
+            const deadline = Date.now() + 60_000;
+            for (;;) {
+                const copying = await admin.query(
+                    "SELECT 1 FROM pg_stat_activity WHERE state = 'active' AND query = $1",
+                    [`CREATE DATABASE "rb_${name}" TEMPLATE "${SOURCE}"`]
+                );
+                if (copying.rows.length > 0) return;
+                if (Date.now() > deadline) throw new Error(`the copy into rb_${name} never started`);
+                await new Promise((resolve) => setTimeout(resolve, 10));
+            }
+        }
+
+        /** Until no copy is running: Postgres finishes one whose client is gone. */
+        async function untilNoCopy(): Promise<void> {
+            await vi.waitFor(async () => {
+                const copying = await admin.query("SELECT 1 FROM pg_stat_activity WHERE state = 'active' AND query LIKE 'CREATE DATABASE%'");
+                expect(copying.rows).toHaveLength(0);
+            }, { timeout: 60_000, interval: 50 });
+        }
+
+        it("a SIGHUP mid-copy opens the source again before the process ends", async () => {
+            const child = spawnForcedCreate("hup");
+            await untilCopying("hup");
+            expect(await allowsConnections(SOURCE)).toBe(false);
+
+            child.kill("SIGHUP");
+            const ended = await child;
+
+            // Ended by the signal it was sent, re-raised once the source was open.
+            expect(ended.signal, ended.all).toBe("SIGHUP");
+            expect(await allowsConnections(SOURCE)).toBe(true);
+            const client = new pg.Client({ connectionString: urlFor(SOURCE) });
+            await client.connect();
+            await client.end();
+            await untilNoCopy();
+        }, 120_000);
+
+        it("a forced create opens a source it found closed, and leaves no signal handler behind", async () => {
+            await admin.query(`ALTER DATABASE "${SOURCE}" ALLOW_CONNECTIONS false`);
+            const before = Object.fromEntries((["SIGHUP", "SIGINT", "SIGTERM", "SIGQUIT"] as const).map((s) => [s, process.listenerCount(s)]));
+            const pool = new pg.Pool({ connectionString: container.connectionString, max: 3 });
+            const poolManager = new DatabasePoolManager(container.connectionString);
+            try {
+                // The service itself, past the CLI's own reopening, as a run
+                // whose source was closed by a killed one meets it.
+                const service = new BranchService(drizzle(pool), poolManager);
+                await service.ensureBranchMetadataTable();
+                await service.createBranch("from_closed", { source: SOURCE, force: true });
+            } finally {
+                await poolManager.shutdown();
+                await pool.end();
+            }
+
+            expect(await databases()).toContain("rb_from_closed");
+            expect(await allowsConnections(SOURCE)).toBe(true);
+            const after = Object.fromEntries((["SIGHUP", "SIGINT", "SIGTERM", "SIGQUIT"] as const).map((s) => [s, process.listenerCount(s)]));
+            expect(after).toEqual(before);
+        }, 120_000);
+    });
 });

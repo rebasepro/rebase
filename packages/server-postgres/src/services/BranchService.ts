@@ -31,6 +31,18 @@ const FORCE_ATTEMPTS = 3;
 const MAINTENANCE_DATABASE = "postgres";
 
 /**
+ * The signals Node can catch that end a forced copy part-way: a closed
+ * terminal or a lost SSH session (SIGHUP), Ctrl-C (SIGINT), a supervisor's
+ * stop (SIGTERM) and Ctrl-\ (SIGQUIT). SIGKILL cannot be caught.
+ */
+const REOPEN_ON_SIGNALS: readonly NodeJS.Signals[] = ["SIGHUP", "SIGINT", "SIGTERM", "SIGQUIT"];
+
+/** `ALTER DATABASE … ALLOW_CONNECTIONS true`, the statement that opens a closed database again. */
+function reopenStatement(dbName: string): string {
+    return `ALTER DATABASE "${dbName.replace(/"/g, '""')}" ALLOW_CONNECTIONS true`;
+}
+
+/**
  * Describe a failed branch DDL statement in terms a user can act on.
  *
  * Drizzle reports failures as `Failed query: <sql> params:` and hides the real
@@ -480,11 +492,13 @@ export class BranchService {
      * the database a session is connected to, so both statements run from the
      * server's `postgres` database, and they need the database's owner. Where
      * either is missing, the retries of {@link disconnectingOthers} are what is
-     * left. A database that already refused connections is left as it was.
+     * left. A database found closed already — by a run killed before it could
+     * open it — is copied as it is and opened after, like one this run closed.
      *
-     * Interrupted (Ctrl-C) while closed, it opens the database again before
-     * the process exits; one it could not open is named in the error, with the
-     * statement that does.
+     * Stopped by a signal while closed ({@link REOPEN_ON_SIGNALS}), it opens
+     * the database again before the process exits; a second signal waits for
+     * that rather than cutting it short. One it could not open is named, with
+     * the statement that does. No handler is left installed after the copy.
      */
     private async whileClosedToNewConnections(dbName: string, operation: () => Promise<void>): Promise<void> {
         const safe = dbName.replace(/"/g, '""');
@@ -496,8 +510,8 @@ export class BranchService {
                 const [row] = state.rows as Record<string, unknown>[];
                 if (row?.datallowconn === true) {
                     await maintenance.execute(sql.raw(`ALTER DATABASE "${safe}" ALLOW_CONNECTIONS false`));
-                    closed = true;
                 }
+                closed = row !== undefined;
             }
         } catch {
             // No `postgres` database to run it from, or not the owner.
@@ -513,23 +527,44 @@ export class BranchService {
             reopening ??= this.reopenToConnections(dbName);
             return reopening;
         };
-        const onSignal = (signal: NodeJS.Signals): void => {
-            void reopen().finally(() => process.kill(process.pid, signal));
+        let caught: NodeJS.Signals | undefined;
+        const release = (): void => {
+            for (const signal of REOPEN_ON_SIGNALS) process.removeListener(signal, onSignal);
         };
-        process.once("SIGINT", onSignal);
-        process.once("SIGTERM", onSignal);
+        const onSignal = (signal: NodeJS.Signals): void => {
+            if (caught) return;
+            caught = signal;
+            void reopen()
+                .catch((err: unknown) => {
+                    console.error(err instanceof Error ? err.message : String(err));
+                })
+                .finally(() => {
+                    release();
+                    process.kill(process.pid, signal);
+                });
+        };
+        for (const signal of REOPEN_ON_SIGNALS) {
+            try {
+                process.on(signal, onSignal);
+            } catch {
+                // A signal this platform cannot deliver (SIGQUIT on Windows).
+            }
+        }
         try {
             await operation();
         } finally {
-            process.removeListener("SIGINT", onSignal);
-            process.removeListener("SIGTERM", onSignal);
-            await reopen();
+            try {
+                await reopen();
+            } finally {
+                // A caught signal releases them itself, once the database is open.
+                if (!caught) release();
+            }
         }
     }
 
     /** `ALLOW_CONNECTIONS true` again, from the maintenance database, or an error that says how to do it by hand. */
     private async reopenToConnections(dbName: string): Promise<void> {
-        const statement = `ALTER DATABASE "${dbName.replace(/"/g, '""')}" ALLOW_CONNECTIONS true`;
+        const statement = reopenStatement(dbName);
         try {
             await this.poolManager.getDrizzle(MAINTENANCE_DATABASE).execute(sql.raw(statement));
         } catch (err) {
