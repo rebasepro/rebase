@@ -668,8 +668,59 @@ export async function readDumpObjects(
     const toolEnv = Object.fromEntries(
         Object.entries(env).filter((entry): entry is [string, string] => entry[1] !== undefined)
     );
-    const { stdout } = await execa(bin, buildPgRestoreListArgs(inputFile), { stdio: "pipe", env: toolEnv });
-    return parseDumpObjects(stdout);
+    let listed: string;
+    try {
+        ({ stdout: listed } = await execa(bin, buildPgRestoreListArgs(inputFile), { stdio: "pipe", env: toolEnv }));
+    } catch (err) {
+        // execa's message is the command line and pg_restore's stderr, which
+        // tells the reader neither what is wrong with the file nor that
+        // nothing has happened yet.
+        const stderr = err instanceof Error && "stderr" in err && typeof err.stderr === "string" ? err.stderr : "";
+        const { message, hint } = describeUnreadableDump(path.basename(inputFile), stderr);
+        throw new BackupToolError(message, hint);
+    }
+    return parseDumpObjects(listed);
+}
+
+/**
+ * What `db restore` says of a file whose table of contents pg_restore cannot
+ * read: before anything is restored, so nothing has changed.
+ *
+ * `pgRestoreStderr` is what `pg_restore --list` printed. Its first error line
+ * is quoted, so the reader sees the tool's own words too.
+ */
+export function describeUnreadableDump(file: string, pgRestoreStderr: string): { message: string; hint: string } {
+    const said = pgRestoreStderr.split("\n")
+        .map(line => line.replace(/^pg_restore:\s*(?:error:\s*)?/, "").trim())
+        .find(line => line.length > 0);
+    const quoted = said ? ` (pg_restore: ${said})` : "";
+    const unchanged = "Nothing was restored or changed.";
+    const elsewhere = "Restore from another backup (`rebase db backups list` lists them), or copy this one again from where it came from.";
+
+    if (said && /unsupported version \(([\d.]+)\) in file header/.test(said)) {
+        return {
+            message: `${file} was written by a newer pg_dump than this pg_restore reads${quoted}. ${unchanged}`,
+            hint: "Install the PostgreSQL client tools of the version that wrote it, or set PG_RESTORE_PATH to that pg_restore."
+        };
+    }
+    if (said && /does not appear to be a valid archive/.test(said)) {
+        return {
+            message: `${file} is not a backup pg_restore can read${quoted}. \`rebase db restore\` takes the .dump files \`rebase db backup\` writes. ${unchanged}`,
+            hint: elsewhere
+        };
+    }
+    if (said && /end of file|too short/.test(said)) {
+        return {
+            message: `${file} is truncated: it ends before pg_restore can read what it holds${quoted}. ` +
+                "A copy or download that did not finish, or a disk that filled while it was written, leaves a file like this. " +
+                unchanged,
+            hint: elsewhere
+        };
+    }
+    return {
+        message: `${file} cannot be read as a backup${quoted}: it is damaged, or not a pg_dump archive. ${unchanged}`,
+        hint: elsewhere
+    };
 }
 
 /**

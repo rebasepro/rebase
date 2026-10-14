@@ -129,6 +129,25 @@ describe("rebase db restore", () => {
         expect(await postsIn("rebase")).toBe(2);
     }, 120_000);
 
+    // The table of contents is read before anything runs, and a dump cut
+    // short in it failed there with execa's `Command failed … pg_restore
+    // --list …` and pg_restore's raw line, which said neither what is wrong
+    // with the file nor that nothing had changed.
+    it("refuses a truncated dump before anything is applied, and says it is truncated", async () => {
+        const truncated = path.join(path.dirname(dumpFile), "truncated.dump");
+        fs.writeFileSync(truncated, fs.readFileSync(dumpFile).subarray(0, 12));
+
+        const restored = await cli(["db", "restore", truncated, "--clean", "--yes"]);
+        const said = restored.all ?? "";
+
+        expect(restored.exitCode, said).toBe(1);
+        expect(said).toMatch(/truncated\.dump is truncated: it ends before pg_restore can read what it holds/);
+        expect(said).toMatch(/Nothing was restored or changed\./);
+        expect(said).not.toMatch(/Command failed/);
+        expect(said).not.toMatch(/Roles: \d+ applied/);
+        expect(await postsIn("rebase")).toBe(2);
+    }, 120_000);
+
     it("with no terminal and no --yes, refuses and says to pass --yes", async () => {
         const restored = await cli(["db", "restore", dumpFile, "--create-db", "--target-db", "restored_untyped"]);
         const said = restored.all ?? "";
