@@ -3,6 +3,7 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { logger } from "@rebasepro/server";
 import { guardPoolAgainstDirtyRelease, pinSearchPath, cappedPoolMax, defaultPoolTimeouts } from "./connection";
+import { reportPoolError } from "./pool-disconnects";
 
 export class DatabasePoolManager {
     private pools: Map<string, Pool> = new Map();
@@ -57,9 +58,7 @@ export class DatabasePoolManager {
         });
 
         // Prevent idle client errors from crashing the Node.js process
-        pool.on("error", (err) => {
-            logger.error(`[DatabasePoolManager] Unexpected error on idle client for db ${databaseName}`, { error: err });
-        });
+        pool.on("error", (err) => reportPoolError(`DatabasePoolManager:${databaseName}`, err));
         guardPoolAgainstDirtyRelease(pool, `pg-pool:${databaseName}`);
 
         this.pools.set(databaseName, pool);

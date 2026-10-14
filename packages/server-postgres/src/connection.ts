@@ -2,6 +2,8 @@ import { Pool, PoolConfig } from "pg";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { logger } from "@rebasepro/server";
 
+import { reportPoolError } from "./pool-disconnects";
+
 /**
  * Configuration for the Postgres connection pool.
  *
@@ -254,7 +256,7 @@ export function createPostgresDatabaseConnection(
     // (a separate package). The caller can replace these with the structured
     // logger if desired via pool.on() after creation.
     pool.on("error", (err) => {
-        logger.error("[pg-pool] Unexpected pool error", { detail: err.message });
+        reportPoolError("pg-pool", err);
         if (err.message.includes("ETIMEDOUT")) {
             logger.warn("[pg-pool] Connection timeout detected — pool will auto-retry");
         }
@@ -301,9 +303,7 @@ export function createDirectDatabaseConnection(
 
     const pool = new Pool(pgPoolConfig);
 
-    pool.on("error", (err) => {
-        logger.error("[pg-direct-pool] Unexpected pool error", { detail: err.message });
-    });
+    pool.on("error", (err) => reportPoolError("pg-direct-pool", err));
     guardPoolAgainstDirtyRelease(pool, "pg-direct-pool");
 
     const db = schema ? drizzle(pool, { schema }) : drizzle(pool);
@@ -342,9 +342,7 @@ export function createReadReplicaConnection(
 
     const pool = new Pool(pgPoolConfig);
 
-    pool.on("error", (err) => {
-        logger.error("[pg-replica-pool] Unexpected pool error", { detail: err.message });
-    });
+    pool.on("error", (err) => reportPoolError("pg-replica-pool", err));
     guardPoolAgainstDirtyRelease(pool, "pg-replica-pool");
 
     const db = schema ? drizzle(pool, { schema }) : drizzle(pool);
