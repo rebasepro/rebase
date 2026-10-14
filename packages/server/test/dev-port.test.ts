@@ -18,7 +18,8 @@ import os from "os";
 import path from "path";
 import net from "net";
 import { createServer, type Server } from "http";
-import { listenWithPortRetry, DEV_PORT_FILENAME } from "../src/utils/dev-port";
+import { spawnSync } from "child_process";
+import { cleanupDevPortFile, listenWithPortRetry, DEV_PORT_FILENAME } from "../src/utils/dev-port";
 import { logger } from "../src/utils/logger";
 
 /** A port nothing is listening on. */
@@ -270,6 +271,141 @@ describe("listenWithPortRetry", () => {
             } finally {
                 delete process.env.REBASE_DEV_PORT_EXPLICIT;
             }
+        });
+    });
+
+    /**
+     * `rebase start` beside `rebase dev`, which is the documented local check.
+     *
+     * Both run this function, and both used to write `.rebase-dev-port` and
+     * `.rebase/state.json` on every bind and delete them on every stop. So
+     * `start` took the files over while it ran — `rebase api-keys`,
+     * `generate-sdk` and the `db stop` message all pointed at it — and when it
+     * stopped it deleted them, while dev was still serving: `api-keys list`
+     * then said "This project's server is not running".
+     */
+    describe("two servers in one project", () => {
+        const stateFile = () => path.join(dir, ".rebase", "state.json");
+        const readState = () => JSON.parse(fs.readFileSync(stateFile(), "utf-8")) as { port: number; pid: number };
+
+        /** Dev's files, as its backend wrote them: another live process, on a port that answers. */
+        async function devIsRunning(): Promise<{ port: number; portFile: string; state: string }> {
+            const port = await freePort();
+            await new Promise<void>(r => track(createServer()).listen(port, "127.0.0.1", r));
+            fs.mkdirSync(path.join(dir, ".rebase"), { recursive: true });
+            // The parent is alive for as long as this test runs, and is not us.
+            const state = JSON.stringify({ port, baseUrl: `http://localhost:${port}`, pid: process.ppid, startedAt: new Date().toISOString() });
+            fs.writeFileSync(stateFile(), state);
+            fs.writeFileSync(portFile(), `${port} ${port}`);
+            return { port, portFile: `${port} ${port}`, state };
+        }
+
+        it("leaves a running dev's files alone, and they survive the other server stopping", async () => {
+            const dev = await devIsRunning();
+
+            const startPort = await freePort();
+            const bound = await listenWithPortRetry(track(createServer()), startPort, { portFileDir: dir });
+            expect(bound).toBe(startPort);
+
+            expect(fs.readFileSync(stateFile(), "utf-8")).toBe(dev.state);
+            expect(fs.readFileSync(portFile(), "utf-8")).toBe(dev.portFile);
+
+            cleanupDevPortFile(dir);
+
+            expect(fs.readFileSync(stateFile(), "utf-8")).toBe(dev.state);
+            expect(fs.readFileSync(portFile(), "utf-8")).toBe(dev.portFile);
+        });
+
+        it("takes the files over from a server that is gone", async () => {
+            // A dev that crashed leaves its files behind, naming a pid that has
+            // exited — and its port may be somebody else's by now.
+            const gone = spawnSync(process.execPath, ["-e", ""]).pid;
+            const stalePort = await freePort();
+            await new Promise<void>(r => track(createServer()).listen(stalePort, "127.0.0.1", r));
+            fs.mkdirSync(path.join(dir, ".rebase"), { recursive: true });
+            fs.writeFileSync(stateFile(), JSON.stringify({ port: stalePort, pid: gone }));
+            fs.writeFileSync(portFile(), `${stalePort} ${stalePort}`);
+
+            const startPort = await freePort();
+            const bound = await listenWithPortRetry(track(createServer()), startPort, { portFileDir: dir });
+
+            expect(readState()).toMatchObject({ port: bound, pid: process.pid });
+            expect(fs.readFileSync(portFile(), "utf-8")).toBe(`${bound} ${startPort}`);
+        });
+
+        it("takes them over on the port they name, which is a restart rather than another server", async () => {
+            // `tsx watch` restarts dev's backend; the old process can outlive
+            // its socket, and the probe of that port reaches this server itself.
+            const port = await freePort();
+            fs.mkdirSync(path.join(dir, ".rebase"), { recursive: true });
+            fs.writeFileSync(stateFile(), JSON.stringify({ port, pid: process.ppid }));
+            fs.writeFileSync(portFile(), `${port} ${port}`);
+
+            const bound = await listenWithPortRetry(track(createServer()), port, { portFileDir: dir });
+
+            expect(bound).toBe(port);
+            expect(readState()).toMatchObject({ port, pid: process.pid });
+        });
+
+        it("takes them over from a live server when rebase dev started this one", async () => {
+            // `rebase dev` states REBASE_DEV_PORT_EXPLICIT on every backend it
+            // spawns, and the files are its own: a dev started after a
+            // `rebase start` must not leave every command pointed at start.
+            await devIsRunning();
+
+            process.env.REBASE_DEV_PORT_EXPLICIT = "false";
+            try {
+                const devPort = await freePort();
+                const bound = await listenWithPortRetry(track(createServer()), devPort, { portFileDir: dir });
+
+                expect(readState()).toMatchObject({ port: bound, pid: process.pid });
+                expect(fs.readFileSync(portFile(), "utf-8")).toBe(`${bound} ${devPort}`);
+            } finally {
+                delete process.env.REBASE_DEV_PORT_EXPLICIT;
+            }
+        });
+
+        it("removes only what it wrote, once another server has taken the files over", async () => {
+            const startPort = await freePort();
+            await listenWithPortRetry(track(createServer()), startPort, { portFileDir: dir });
+
+            // Then `rebase dev` starts, and its backend takes them over.
+            const devPort = await freePort();
+            const devState = JSON.stringify({ port: devPort, pid: process.ppid });
+            fs.writeFileSync(stateFile(), devState);
+            fs.writeFileSync(portFile(), `${devPort} ${devPort}`);
+
+            cleanupDevPortFile(dir);
+
+            expect(fs.readFileSync(stateFile(), "utf-8")).toBe(devState);
+            expect(fs.readFileSync(portFile(), "utf-8")).toBe(`${devPort} ${devPort}`);
+        });
+
+        it("keeps the port file a restart on the same port wrote, though it reads the same", async () => {
+            // The old process of a `tsx watch` restart can stop after the new
+            // one has bound: same port, same `.rebase-dev-port`, and
+            // `state.json` already names the new pid.
+            const port = await freePort();
+            const server = track(createServer());
+            await listenWithPortRetry(server, port, { portFileDir: dir });
+            const written = fs.readFileSync(portFile(), "utf-8");
+            fs.writeFileSync(stateFile(), JSON.stringify({ port, pid: process.ppid }));
+
+            cleanupDevPortFile(dir);
+
+            expect(fs.readFileSync(portFile(), "utf-8")).toBe(written);
+            expect(readState().pid).toBe(process.ppid);
+        });
+
+        it("still removes its own files when it stops", async () => {
+            const port = await freePort();
+            await listenWithPortRetry(track(createServer()), port, { portFileDir: dir });
+            expect(readState().pid).toBe(process.pid);
+
+            cleanupDevPortFile(dir);
+
+            expect(fs.existsSync(stateFile())).toBe(false);
+            expect(fs.existsSync(portFile())).toBe(false);
         });
     });
 });

@@ -1705,6 +1705,8 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
         // the server may walk past a collision. Always stated, never merely
         // set: `env` starts as a copy of this process's, so leaving the key
         // alone would let an inherited value pin a port nobody asked for.
+        // The server also reads its presence as "rebase dev started me", and
+        // takes over `.rebase/state.json` from a `rebase start` beside it.
         env.REBASE_DEV_PORT_EXPLICIT = String(portIsPinned);
 
         // And where the frontend will be, for the same reason. `FRONTEND_URL`

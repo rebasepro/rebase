@@ -9,6 +9,9 @@
  * restart), the saved port is tried FIRST so the backend stays on the same
  * port the frontend was configured with.
  *
+ * One server in a project holds the files at a time, and each removes only its
+ * own: see `heldByAnotherServer` and {@link cleanupDevPortFile}.
+ *
  * This module is dev-only and should never run in production.
  */
 import type { Server } from "http";
@@ -225,24 +228,17 @@ export function listenWithPortRetry(
                 // the same in both: the socket is the only thing that knows.
                 const bound = boundPort(server) ?? port;
 
-                // Write the port file so the CLI can pick it up
-                if (portFileDir) {
-                    try {
-                        const portFile = path.join(portFileDir, DEV_PORT_FILENAME);
-                        // Bound port first so `parseInt` still yields it, then the
-                        // port that was requested — that is what makes the affinity
-                        // above conditional rather than absolute.
-                        fs.writeFileSync(portFile, `${bound} ${startPort}`, "utf-8");
-                    } catch {
-                        // Non-fatal — the CLI will fall back to parsing stdout
-                    }
-
-                    // Write .rebase/state.json so external scripts can discover
-                    // the running server port, URL, etc.
-                    writeStateFile(portFileDir, bound, options?.serviceKey);
+                if (!portFileDir) {
+                    resolve(bound);
+                    return;
                 }
 
-                resolve(bound);
+                // Only when no other live server holds the files — see
+                // `heldByAnotherServer`. Never a reason not to serve.
+                void heldByAnotherServer(portFileDir, bound).catch(() => false).then(held => {
+                    if (!held) writeDevFiles(portFileDir, bound, startPort, options?.serviceKey);
+                    resolve(bound);
+                });
             };
 
             /**
@@ -314,26 +310,130 @@ export function listenWithPortRetry(
 }
 
 /**
+ * What this process wrote into each project's `.rebase-dev-port`, by
+ * directory, so that stopping removes the file only while it still says that.
+ */
+const writtenPortFiles = new Map<string, string>();
+
+function stateFilePath(dir: string): string {
+    return path.join(dir, ".rebase", "state.json");
+}
+
+/** The pid and port `.rebase/state.json` names, or `null` when there is none to read. */
+function readStateOwner(dir: string): { pid: number | null; port: number | null } | null {
+    let raw: string;
+    try {
+        raw = fs.readFileSync(stateFilePath(dir), "utf-8");
+    } catch {
+        return null;
+    }
+    try {
+        const parsed: unknown = JSON.parse(raw);
+        if (typeof parsed !== "object" || parsed === null) return { pid: null, port: null };
+        const pid = "pid" in parsed && typeof parsed.pid === "number" && Number.isInteger(parsed.pid) && parsed.pid > 0 ? parsed.pid : null;
+        const port = "port" in parsed && typeof parsed.port === "number" && Number.isInteger(parsed.port) ? parsed.port : null;
+        return { pid, port };
+    } catch {
+        return { pid: null, port: null };
+    }
+}
+
+/** Is *some* process with this pid running? EPERM means it is, as someone else. */
+function processAlive(pid: number): boolean {
+    try {
+        process.kill(pid, 0);
+        return true;
+    } catch (error) {
+        return (error as NodeJS.ErrnoException).code === "EPERM";
+    }
+}
+
+/**
+ * Whether `rebase dev` started this server.
+ *
+ * It states `REBASE_DEV_PORT_EXPLICIT`, true or false, on every backend it
+ * spawns (see `options.explicit` above), so the variable being there at all is
+ * the mark. The dev files are named for that server and describe it first.
+ */
+function startedByRebaseDev(): boolean {
+    return process.env.REBASE_DEV_PORT_EXPLICIT !== undefined;
+}
+
+/**
+ * Whether another server in this project holds the dev files, so this one must
+ * leave them alone.
+ *
+ * `rebase start` beside `rebase dev` is the documented local check, and both
+ * bind through {@link listenWithPortRetry}. The files used to belong to
+ * whoever bound last: `start` took them over while it ran, so `rebase
+ * api-keys`, `generate-sdk` and MCP discovery all reached it rather than dev,
+ * and when it stopped it deleted them under a dev that was still serving —
+ * `api-keys list` then answered "This project's server is not running".
+ *
+ * So the files belong to the server `state.json` names while that server is
+ * still there: its pid alive, and its port answering, because a pid alone can
+ * be a stranger's after a crash and a reboot. A server on the very port it
+ * names is not "another" one — that is a `tsx watch` restart, or a crash this
+ * server has replaced. A server `rebase dev` started takes the files over in
+ * every case: they are its own.
+ */
+async function heldByAnotherServer(dir: string, bound: number): Promise<boolean> {
+    if (startedByRebaseDev()) return false;
+    const owner = readStateOwner(dir);
+    if (!owner || owner.pid === null || owner.pid === process.pid) return false;
+    if (owner.port === null || owner.port === bound) return false;
+    if (!processAlive(owner.pid)) return false;
+    return loopbackInUse(owner.port);
+}
+
+/** Write `.rebase-dev-port` and `.rebase/state.json` for a server this process just bound. */
+function writeDevFiles(dir: string, bound: number, requested: number, serviceKey?: string): void {
+    try {
+        // Bound port first so `parseInt` still yields it, then the port that
+        // was requested — that is what makes the affinity above conditional
+        // rather than absolute.
+        const contents = `${bound} ${requested}`;
+        fs.writeFileSync(path.join(dir, DEV_PORT_FILENAME), contents, "utf-8");
+        writtenPortFiles.set(path.resolve(dir), contents);
+    } catch {
+        // Non-fatal — the CLI will fall back to parsing stdout
+    }
+
+    // Write .rebase/state.json so external scripts can discover
+    // the running server port, URL, etc.
+    writeStateFile(dir, bound, serviceKey);
+}
+
+/**
  * Clean up the dev port file and state file (call on graceful shutdown).
+ *
+ * Only this process's own: `state.json` while it names this pid, and
+ * `.rebase-dev-port` while it holds what this process wrote and no other
+ * server has taken `state.json` over. A `rebase start` that stopped beside a
+ * running `rebase dev` used to delete dev's files — see `heldByAnotherServer`.
  *
  * @internal Not part of the stable public API. See {@link listenWithPortRetry}.
  */
 export function cleanupDevPortFile(dir: string): void {
+    const owner = readStateOwner(dir);
+    const ownsState = owner?.pid === process.pid;
+    if (ownsState) {
+        try {
+            fs.unlinkSync(stateFilePath(dir));
+        } catch {
+            // Already gone is the desired end state.
+        }
+    }
+
+    const key = path.resolve(dir);
+    const wrote = writtenPortFiles.get(key);
+    if (wrote === undefined || !(ownsState || owner === null)) return;
     try {
         const portFile = path.join(dir, DEV_PORT_FILENAME);
-        if (fs.existsSync(portFile)) {
-            fs.unlinkSync(portFile);
-        }
+        if (fs.readFileSync(portFile, "utf-8") === wrote) fs.unlinkSync(portFile);
+        writtenPortFiles.delete(key);
     } catch {
-        // ignore
-    }
-    try {
-        const stateFile = path.join(dir, ".rebase", "state.json");
-        if (fs.existsSync(stateFile)) {
-            fs.unlinkSync(stateFile);
-        }
-    } catch {
-        // ignore
+        // Already gone is the desired end state.
     }
 }
 
