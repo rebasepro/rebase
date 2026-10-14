@@ -10,7 +10,7 @@ This is a **headless** Rebase project: a REST API, auth, storage and realtime ov
 |---|---|
 | `pnpm dev` | The backend and the managed development database, together |
 | `rebase db url` | Print the connection string in use — it pipes straight into `psql` |
-| `pnpm db:migrate` | Apply the migration files in `backend/drizzle/migrations`. Needs your own PostgreSQL, not the managed development database |
+| `pnpm db:migrate` | Apply the migration files in `backend/drizzle/migrations`, on the managed development database or your own PostgreSQL. A headless project has no collections, so nothing writes those files for it — `rebase db generate` has no schema to generate from — and until you add one there is nothing to apply. A file you write by hand needs `pnpm exec atlas migrate hash --dir file://drizzle/migrations`, run in `backend/`, before it applies |
 | `pnpm schema:introspect` | Existing tables → collection definitions in `config/collections/`. That directory ends headless mode; see rule 1 |
 | `pnpm generate:sdk` | Regenerate the typed client from `config/collections/` — so in a headless project it has nothing to read until you introspect. Once there are collections, `pnpm dev` does this on start and on every save; the script is for CI and for when `pnpm dev` is not running |
 | `pnpm build` then `pnpm start` | Build the deployable bundle, then run it |
