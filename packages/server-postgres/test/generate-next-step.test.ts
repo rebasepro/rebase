@@ -54,14 +54,32 @@ describe("the next step after generating a schema", () => {
  * `db migrate --help` and the failure itself named.
  */
 describe("the next step after generating a migration", () => {
-    it("names db migrate, and the --baseline a booted database needs the first time, with the version", () => {
-        const text = nextStepAfterDbGenerate("20261014000000").join("\n");
-        expect(text).toContain("rebase db migrate");
-        expect(text).toContain("booted");
+    it("names db migrate, and for a project's first migration the --baseline a booted database needs, with the version", () => {
+        const text = nextStepAfterDbGenerate({ newestVersion: "20261014000000", wrote: true, first: true }).join("\n");
+        expect(text).toContain("Apply it with rebase db migrate.");
+        expect(text).toContain(
+            "On a database boot has already set up, these tables exist: record this first migration as applied instead,"
+        );
         expect(text).toContain("rebase db migrate --baseline 20261014000000");
     });
 
-    it("still prints a typeable shape when there is no migration on disk", () => {
-        expect(nextStepAfterDbGenerate(null).join("\n")).toContain("rebase db migrate --baseline <version>");
+    // The sentence was garbled, and it ran after every migration: after a
+    // destructive one, baselining would skip its DROP.
+    it("does not offer --baseline for a later migration, and says when migrate names one", () => {
+        const text = nextStepAfterDbGenerate({ newestVersion: "20261015000000", wrote: true, first: false }).join("\n");
+        expect(text).toContain("Apply it with rebase db migrate.");
+        expect(text).not.toContain("--baseline 20261015000000");
+        expect(text).toContain("If boot has already made this change there, migrate stops and names the version to record.");
+    });
+
+    // "No migration written — nothing in this change is visible to Atlas" was
+    // followed by "You can now run rebase db migrate to apply the migrations".
+    it("says nothing about migrating when no migration was written", () => {
+        expect(nextStepAfterDbGenerate({ newestVersion: "20261014000000", wrote: false, first: false })).toEqual([]);
+    });
+
+    it("still prints a typeable shape when there is no version to name", () => {
+        expect(nextStepAfterDbGenerate({ newestVersion: null, wrote: true, first: true }).join("\n"))
+            .toContain("rebase db migrate --baseline <version>");
     });
 });

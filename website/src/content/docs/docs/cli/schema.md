@@ -276,6 +276,11 @@ rebase db generate
   `TRUNCATE`, a column type change that can lose values, a primary key
   change, or the drop of a CHECK or EXCLUDE constraint the database holds. It
   still writes the file and exits 0, so it warns and does not refuse.
+- <span class="since-badge" data-since="0.25">Since 0.25</span> Ends on what to
+  do next: `rebase db migrate`, and for a project's first migration, the
+  `--baseline <version>` a database boot has already set up needs instead. A
+  later migration gets no baseline line, since a destructive one baselined would
+  skip its `DROP`, and a run that writes no migration says only that.
 
 **A CHECK a migration of yours added is dropped by the next one.** `db generate`
 diffs your migration files, not the database, and Atlas has no way to leave an

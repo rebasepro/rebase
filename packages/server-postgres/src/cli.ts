@@ -653,9 +653,14 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
             ));
         }
 
+        const nextStep = nextStepAfterDbGenerate({
+            newestVersion: latestMigrationVersion(),
+            wrote: wroteNewMigration,
+            first: migrationsBefore.length === 0
+        });
         out("");
-        for (const line of nextStepAfterDbGenerate(latestMigrationVersion())) out(line);
-        out("");
+        for (const line of nextStep) out(line);
+        if (nextStep.length > 0) out("");
     } else {
         out("");
         out(chalk.bold(`  🗄️  Rebase DB ${subcommand.charAt(0).toUpperCase() + subcommand.slice(1)}`));

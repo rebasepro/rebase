@@ -46,20 +46,37 @@ export const nextStepAfterGenerate = (): string => {
 };
 
 /**
- * What to do with the migration `rebase db generate` just wrote.
+ * What to do with the migration `rebase db generate` just wrote, or nothing
+ * when it wrote none.
  *
- * `db migrate`, and on a database that has already booted, `--baseline` first.
- * Boot creates every collection's tables, so the first migration of a project —
- * which creates them too — stops on `already exists` there, on the managed
- * database and on a server of your own alike. `--baseline <version>` records
- * the migration as applied instead. The newest version is named: boot made the
- * tables the collections declare now, which is what that migration describes.
+ * `db migrate`, and for a project's first migration on a database that has
+ * already booted, `--baseline` instead. Boot creates every collection's tables,
+ * so the first migration — which creates them too — stops on `already exists`
+ * there, on the managed database and on a server of your own alike. The newest
+ * version is named: boot made the tables the collections declare now, which is
+ * what that migration describes.
+ *
+ * Not for a later one: boot may have made an additive change already, and then
+ * `db migrate` stops and names the version itself, but it never drops a
+ * column, and baselining a destructive migration would skip its DROP.
  */
-export const nextStepAfterDbGenerate = (newestVersion: string | null): string[] => {
-    const version = newestVersion ?? "<version>";
+export const nextStepAfterDbGenerate = (migration: {
+    /** The newest migration's version, or null when none can be read. */
+    newestVersion: string | null;
+    /** Whether this run wrote a migration. */
+    wrote: boolean;
+    /** Whether it is the project's first. */
+    first: boolean;
+}): string[] => {
+    if (!migration.wrote) return [];
+    const apply = `  Apply it with ${chalk.bold.green("rebase db migrate")}.`;
+    if (!migration.first) {
+        return [`${apply} If boot has already made this change there, migrate stops and names the version to record.`];
+    }
+    const version = migration.newestVersion ?? "<version>";
     return [
-        `  You can now run ${chalk.bold.green("rebase db migrate")} to apply the migrations to your database.`,
-        "  On a database that has already booted and has never been migrated, boot made these tables:",
-        `  the first time, record them instead with ${chalk.bold.green(`rebase db migrate --baseline ${version}`)}.`
+        apply,
+        "  On a database boot has already set up, these tables exist: record this first migration as applied instead,",
+        `  with ${chalk.bold.green(`rebase db migrate --baseline ${version}`)}.`
     ];
 };
