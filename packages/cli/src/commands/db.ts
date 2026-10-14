@@ -18,8 +18,8 @@ import {
     dependenciesNotInstalled
 } from "../utils/project";
 import { reportSpawnFailure } from "../utils/spawn-error";
-import { parseCommandArgs } from "../utils/args";
-import { unknownCommand } from "../utils/unknown-command";
+import { parseCommandArgs, UsageError } from "../utils/args";
+import { suggestCommand, unknownCommand } from "../utils/unknown-command";
 import { argsFromCommand, commandWords } from "../utils/command-words";
 import { COLLECTIONS_FLAG_HELP, refuseMissingCollectionsPath } from "../utils/path-flags";
 import { recordEvent } from "../telemetry";
@@ -1234,6 +1234,33 @@ async function onParentDatabase(projectRoot: string, rawArgs: string[], action: 
 }
 
 /**
+ * The flags `rebase db branch switch` takes, the relayed database flags and
+ * `--debug` included.
+ */
+const SWITCH_FLAGS = ["--off", "--main", "--database-url", "--docker", "--debug"] as const;
+
+/**
+ * Refuse a flag `switch` does not take, naming the one it was probably meant to be.
+ *
+ * `switch` is answered here, never by the driver, so the driver's strict
+ * branch flags do not reach it: `rebase db branch switch --of` reported the
+ * current branch, exit 0, instead of leaving it.
+ */
+export function assertSwitchFlags(rawArgs: readonly string[]): void {
+    for (const word of rawArgs.slice(2)) {
+        if (!word.startsWith("-")) continue;
+        const flag = word.split("=")[0];
+        if ((SWITCH_FLAGS as readonly string[]).includes(flag)) continue;
+        const near = suggestCommand(flag.replace(/^-+/, ""), SWITCH_FLAGS.map(known => known.slice(2)));
+        throw new UsageError(
+            `\`rebase db branch switch\` has no option ${flag}` +
+            (near ? ` — did you mean --${near}?` : " — it takes --off (or --main) and a branch name.") +
+            " Nothing was changed."
+        );
+    }
+}
+
+/**
  * `rebase db branch switch <name>` — point this checkout at a branch.
  *
  * The step branching was missing. `create` copied the database in about a
@@ -1258,6 +1285,8 @@ async function onParentDatabase(projectRoot: string, rawArgs: string[], action: 
  * - **It never edits `.env`.** See `branch-pointer.ts`.
  */
 async function switchBranch(projectRoot: string, rawArgs: readonly string[]): Promise<void> {
+    assertSwitchFlags(rawArgs);
+
     const { branchDatabaseName, clearActiveBranch, databaseNameOf, readActiveBranch, writeActiveBranch } =
         await import("../dev-db/branch-pointer");
     const { readEnvFile } = await import("../utils/project");
