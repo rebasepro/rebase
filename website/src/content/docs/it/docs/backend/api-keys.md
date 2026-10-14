@@ -1,5 +1,5 @@
 ---
-sourceHash: 376a90002cda8008
+sourceHash: 56f735f039d14350
 title: Chiavi API
 sidebar_label: Chiavi API
 description: "Chiavi di lunga durata per script, CI, agenti e integrazioni: chiavi di servizio e chiavi personali, gli scope che possiedono, come si combinano con la sicurezza a livello di riga e le route che le gestiscono."

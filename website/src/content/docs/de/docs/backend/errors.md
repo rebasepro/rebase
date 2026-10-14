@@ -1,5 +1,5 @@
 ---
-sourceHash: 53f0b67ce499f232
+sourceHash: 1443ec9c258445ee
 title: Fehlercodes
 sidebar_label: Fehlercodes
 description: Jeder Fehlercode, den ein Rebase-Backend zurückgeben kann, mit seinem HTTP-Status, seiner Bedeutung und Lösungsansätzen – plus Response-Envelope, X-Request-ID und den Details-Regeln.

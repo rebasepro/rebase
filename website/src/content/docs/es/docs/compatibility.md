@@ -1,5 +1,5 @@
 ---
-sourceHash: aee0eb96daa6ef91
+sourceHash: 1eb9aef75c2112ff
 slug: es/docs/compatibility
 title: Compatibilidad
 description: "Lo que Rebase promete entre versiones y lo que no: los seis contratos versionados, cómo falla cada uno y qué puede seguir cambiando en una versión menor."

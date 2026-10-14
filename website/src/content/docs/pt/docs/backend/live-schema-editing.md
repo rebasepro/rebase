@@ -1,5 +1,5 @@
 ---
-sourceHash: 93dc2717d7cba3ac
+sourceHash: 0812219cab5f0d00
 title: Edição de schema ao vivo
 description: Crie e altere coleções em um backend em execução — comitadas primeiro no seu repositório, depois aplicadas.
 ---

@@ -1,5 +1,5 @@
 ---
-sourceHash: 01546a922a601fac
+sourceHash: dc4cb3811023b966
 title: Guida rapida
 sidebar_label: Guida rapida
 description: Crea un nuovo progetto Rebase e avvialo localmente in meno di 2 minuti.

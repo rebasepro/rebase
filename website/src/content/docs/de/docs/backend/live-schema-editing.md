@@ -1,5 +1,5 @@
 ---
-sourceHash: 93dc2717d7cba3ac
+sourceHash: 0812219cab5f0d00
 title: Live-Schema-Bearbeitung
 description: Erstellen und Ändern von Collections auf einem laufenden Backend – zuerst in Ihr Repository committet, dann angewendet.
 ---

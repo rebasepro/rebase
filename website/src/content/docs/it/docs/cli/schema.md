@@ -1,5 +1,5 @@
 ---
-sourceHash: d2dda811dc43afa7
+sourceHash: 9b1b8edf410cbb6e
 title: Generazione dello Schema
 sidebar_label: Generazione dello Schema
 description: Genera schemi Drizzle ORM dalle definizioni delle collezioni, crea migrazioni SQL e mantieni il tuo database sincronizzato con la CLI di Rebase.

@@ -1,5 +1,5 @@
 ---
-sourceHash: 6eb6098e26cb24c0
+sourceHash: cc03d759eb4057c2
 title: Database e Bucket Multipli
 sidebar_label: Sorgenti Multiple
 description: Indirizza le collection a database diversi e le proprietà a bucket di archiviazione diversi, configurando ciascuno dall'ambiente.

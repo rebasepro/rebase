@@ -1,5 +1,5 @@
 ---
-sourceHash: 6eb6098e26cb24c0
+sourceHash: cc03d759eb4057c2
 title: Múltiples bases de datos y buckets
 sidebar_label: Múltiples orígenes
 description: Enrute colecciones a diferentes bases de datos y propiedades a diferentes buckets de almacenamiento, y configure cada uno desde el entorno.

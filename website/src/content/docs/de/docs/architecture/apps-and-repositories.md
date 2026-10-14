@@ -1,5 +1,5 @@
 ---
-sourceHash: 6005371e69144db0
+sourceHash: 13c5a740a1cf4bc3
 title: Apps und Repositories
 sidebar_label: Apps & Repositories
 description: Ein Projekt besteht aus einem Backend und den Apps, die damit kommunizieren, welche jeweils in ihrem eigenen Repository liegen können.

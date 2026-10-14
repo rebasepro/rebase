@@ -1,5 +1,5 @@
 ---
-sourceHash: 6598745a12831632
+sourceHash: 1e15534f9a5fc19a
 title: Umgebung & Konfiguration
 sidebar_label: Konfiguration
 description: Alle Umgebungsvariablen und Konfigurationsoptionen für Rebase-Projekte.

@@ -1,5 +1,5 @@
 ---
-sourceHash: 376a90002cda8008
+sourceHash: 56f735f039d14350
 title: Chaves de API
 sidebar_label: Chaves de API
 description: "Chaves de longa duração para scripts, CI, agentes e integrações: chaves de serviço e chaves pessoais, os escopos que elas têm, como se combinam com a segurança em nível de linha (RLS) e as rotas que as gerenciam."

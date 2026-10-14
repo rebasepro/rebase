@@ -1,5 +1,5 @@
 ---
-sourceHash: 5cc79175741f55e8
+sourceHash: 7db21cd525636ef0
 title: Projektstruktur
 sidebar_label: Projektstruktur
 description: Verstehen Sie die Struktur eines Rebase-Projekts – Frontend, Backend und Collections-Konfiguration.

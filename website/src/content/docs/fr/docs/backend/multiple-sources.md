@@ -1,5 +1,5 @@
 ---
-sourceHash: 6eb6098e26cb24c0
+sourceHash: cc03d759eb4057c2
 title: Multiples bases de données et buckets
 sidebar_label: Multiples sources
 description: Acheminez les collections vers différentes bases de données et les propriétés vers différents buckets de stockage, et configurez chacun depuis l'environnement.

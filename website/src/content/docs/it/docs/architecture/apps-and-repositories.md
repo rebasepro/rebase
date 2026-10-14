@@ -1,5 +1,5 @@
 ---
-sourceHash: 6005371e69144db0
+sourceHash: 13c5a740a1cf4bc3
 title: App e repository
 sidebar_label: App & repository
 description: Un progetto è un backend insieme alle app che comunicano con esso, ognuna delle quali può risiedere nel proprio repository.

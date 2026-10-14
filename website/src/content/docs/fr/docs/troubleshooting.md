@@ -1,5 +1,5 @@
 ---
-sourceHash: 31f3a0f8e24a2f69
+sourceHash: e9385ebca9727baf
 slug: fr/docs/troubleshooting
 title: Dépannage
 description: Les pannes qui empêchent un backend Rebase de démarrer ou de répondre — base de données inaccessible, identifiants incorrects, extension manquante, refus RLS, dérive de schéma, port occupé, fonction qui ne se charge pas — et à quoi ressemble chacune d'entre elles.

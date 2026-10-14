@@ -1,5 +1,5 @@
 ---
-sourceHash: c331939eb774410b
+sourceHash: c4bd74c31b505f6c
 title: Nur Backend (Headless)
 sidebar_label: Nur Backend
 description: Betreiben Sie Rebase als headless Backend-as-a-Service über Ihrer eigenen PostgreSQL-Datenbank – eine REST-API, Authentifizierung, Storage und Echtzeitfunktionen, ohne Admin-Panel und ohne Collection-Dateien.

@@ -1,5 +1,5 @@
 ---
-sourceHash: 376a90002cda8008
+sourceHash: 56f735f039d14350
 title: Claves de API
 sidebar_label: Claves de API
 description: "Claves de larga duración para scripts, CI, agentes e integraciones: claves de servicio y claves personales, los alcances que tienen, cómo se combinan con la seguridad a nivel de fila y las rutas que las gestionan."

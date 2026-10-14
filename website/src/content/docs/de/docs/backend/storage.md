@@ -1,5 +1,5 @@
 ---
-sourceHash: 5be4e3768bac692e
+sourceHash: 552bf6fc4d37691a
 title: Speicher-Konfiguration
 sidebar_label: Speicher-Konfiguration
 description: Konfigurieren Sie lokales Dateisystem, S3-kompatible Backends oder GCS/Firebase Storage für Datei-Uploads, Bilder und Medien.

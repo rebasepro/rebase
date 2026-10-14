@@ -1,5 +1,5 @@
 ---
-sourceHash: 668fde6c17984b6c
+sourceHash: b806e08525154a2e
 title: Skripte und die Konsole
 sidebar_label: Skripte und Konsole
 description: Öffnen Sie die Daten eines Projekts aus einem Skript, einem Test oder einer REPL mit openRebase oder über das Terminal mit rebase console. Kein Server, keine Schemaänderungen.

@@ -1,5 +1,5 @@
 ---
-sourceHash: 9d9d74a72022b7d6
+sourceHash: 32c7b310f4621e8a
 title: KI-Instruktionsdateien
 sidebar_label: KI-Instruktionsdateien
 description: Jedes erstellte Rebase-Projekt enthält ai-instructions.md sowie dreizeilige Pointer-Dateien für Claude, Cursor, Windsurf, Copilot und AGENTS.md – eine Single Source of Truth, viele Dateinamen.

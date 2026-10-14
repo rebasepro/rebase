@@ -1,4 +1,5 @@
 ---
+sourceHash: 866dbef37f99114d
 title: Comandos de Banco de Dados
 sidebar_label: Comandos de Banco de Dados
 description: Os comandos rebase db — push, generate e migrate, backups e restaurações, importar uma cópia, a string de conexão, o banco de dados de desenvolvimento gerenciado e os branches.

@@ -1,5 +1,5 @@
 ---
-sourceHash: 5be4e3768bac692e
+sourceHash: 552bf6fc4d37691a
 title: Configuración de Storage
 sidebar_label: Configuración de Storage
 description: Configura backends de sistema de archivos local, compatibles con S3 o GCS/Firebase Storage para subidas de archivos, imágenes y medios.

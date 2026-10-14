@@ -1,5 +1,5 @@
 ---
-sourceHash: 5be4e3768bac692e
+sourceHash: 552bf6fc4d37691a
 title: Configuration du stockage
 sidebar_label: Configuration du stockage
 description: Configurez les backends de stockage sur système de fichiers local, compatible S3 ou GCS/Firebase Storage pour les téléversements de fichiers, les images et les médias.

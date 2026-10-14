@@ -1,5 +1,5 @@
 ---
-sourceHash: 6005371e69144db0
+sourceHash: 13c5a740a1cf4bc3
 title: Apps e Repositórios
 sidebar_label: Apps & Repositórios
 description: Um projeto é um backend mais os apps que se comunicam com ele, os quais podem viver cada um em seu próprio repositório.

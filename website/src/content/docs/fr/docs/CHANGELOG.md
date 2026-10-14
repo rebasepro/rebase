@@ -151,6 +151,16 @@ La traduction est à venir. Le contenu ci-dessous est en anglais.
   `controller.getSignedUrl()` called from your own server code signs for an
   hour, the old default.
 
+- **A named bucket no longer becomes the default storage source by declaration
+  order.** A project that declared only named buckets had the first one promoted
+  to serve uploads whose property names no `storageSource`. The default source
+  now always reads its own configuration: `STORAGE_TYPE`, `STORAGE_PATH` (or
+  `./uploads`), and the unsuffixed `S3_*` / `GCS_*`. If your unqualified uploads
+  relied on the promotion, mark that bucket
+  `bucket("media", { default: true })`; in production these are the files the
+  default wrote into the named bucket. Without the mark, those uploads answer
+  `501 STORAGE_NOT_CONFIGURED` in production, and boot says so once.
+
 ### Added
 
 #### Storage & email
@@ -184,6 +194,11 @@ La traduction est à venir. Le contenu ci-dessous est en anglais.
   system** (macOS, Windows), where `Avatar.png` and `avatar.png` are one file.
 
 #### Server & REST
+
+- **`isDatabaseUnreachable()`, `ApiError.databaseUnavailable()` and
+  `DATABASE_UNAVAILABLE_MESSAGE` in `@rebasepro/server`**, for a custom route or
+  function that wants to answer an unreachable database the way the built-in
+  routes do: `503 DATABASE_UNAVAILABLE` with `Retry-After: 5`.
 
 - **A list can skip its count, with `?count=none` over REST or
   `count: "none"` on `find()`; a value the server does not know is a 400
@@ -327,6 +342,11 @@ La traduction est à venir. Le contenu ci-dessous est en anglais.
   hand can repeat `initializeRebaseBackend`'s first step. It returns a function
   that uninstalls the handler, or `undefined` when one was already installed or
   `REBASE_EXIT_ON_UNHANDLED_REJECTION` is set.
+
+- **`setLogOutput("stderr")` sends every log line to stderr.** From
+  `@rebasepro/server`, whatever the level and in both the development and the
+  production (JSON) format; `setLogOutput()` restores the default. For a process
+  whose stdout is its result, as `rebase console -e` is.
 
 #### Client SDK
 
@@ -484,6 +504,11 @@ La traduction est à venir. Le contenu ci-dessous est en anglais.
 
 #### CLI
 
+- **Schema introspection writes each table's row-level security policies into
+  its collection's securityRules**, with their names, commands, modes, `TO`
+  lists and clauses, so the `rebase db push` after it recreates them as they
+  were. The `<table>_default_*` policies Rebase adds itself are left out.
+
 - **rebase doctor names a junction table no collection declares
   (orphaned_junction, info).** It shows the `DROP TABLE` fix and never runs
   it.
@@ -520,6 +545,19 @@ La traduction est à venir. Le contenu ci-dessous est en anglais.
   body's `return`, is printed as JSON on stdout, with notices on stderr, and a
   throw exits 1. History is kept in `.rebase/console_history`.
 
+- **`rebase upgrade --allow-downgrade` lets a dist-tag move pins to an older
+  release.** Without it, `rebase upgrade` refuses such a move, with
+  `downgrade_refused` under `--json`.
+
+- **`normalizeEsmSpecifiers(outDir, { write: false })` computes the import
+  rewrite without writing anything.** From `@rebasepro/cli`;
+  `rebase normalize-imports --check` uses it.
+
+- **A new project ships a root TypeScript config that typechecks `scripts/`.**
+  The root also declares `@types/node`, so `tsc --noEmit` at the project root
+  checks something instead of printing its help and exiting 0. Each workspace
+  still typechecks on its own.
+
 #### CI & tooling
 
 - **Three new gates: `pnpm check:test-types`, `pnpm check:casts` and
@@ -534,6 +572,11 @@ La traduction est à venir. Le contenu ci-dessous est en anglais.
 
 - **`pnpm check:icon-button-names` fails on any `IconButton` in package source
   without an accessible name.**
+
+- **A package build fails when its `dist` contains Vite's browser stub for a
+  Node built-in.** `assert-build-output.mjs` looks for `__vite-browser-external`
+  in every emitted file. The published Postgres driver carried one for
+  `readline`, which crashed every confirmation prompt.
 
 #### Auth
 
@@ -657,9 +700,32 @@ La traduction est à venir. Le contenu ci-dessous est en anglais.
   config** are the explicit forms of `REALTIME_CDC` and `DATABASE_DIRECT_URL`.
   Both variables keep working, and still win or fill in as before.
 
+- **A script's openRebase() is typed the way a function's rebase is.** Its
+  accessors follow the `Database` that `rebase generate-sdk --register`
+  registers, so a misspelled collection, field or enum value in a script is a
+  type error. `openRebase<Database>()` and `OpenedRebase<Database>` name the
+  type per call, or for a helper.
+
 ### Changed
 
 #### Server & REST
+
+- **A database that cannot be reached is answered with 503
+  DATABASE_UNAVAILABLE, and Retry-After: 5, on every door:** the data API,
+  sign-in and the other auth routes, the admin routes, a service-key or API-key
+  request, the realtime socket (an `ERROR` frame, also on `AUTHENTICATE`) and a
+  subscription. They answered `503 ROLE_LOOKUP_FAILED` "Could not verify your
+  permissions", `500 INTERNAL_ERROR`, a 500 with the code `ECONNREFUSED`, or,
+  on the socket, `AUTH_ERROR INVALID_TOKEN`, which sent the SDK to refresh a
+  valid session. `ROLE_LOOKUP_FAILED` remains for a role lookup the database
+  answered and that still failed.
+
+- **A service a request calls that cannot be reached is answered with 503
+  SERVICE_UNAVAILABLE,** such as an S3 or MinIO bucket that is down, or a
+  `fetch()` to a host that refuses the connection or does not resolve. It
+  answered `500` with the socket error as the code (`ECONNREFUSED`), or
+  `500 INTERNAL_ERROR`. The server log names the host and the error; the
+  response does not.
 
 - **A list page and its count are read in one transaction.** A
   `GET /posts?limit=25` was 8 statements in 2 transactions and is 5 in 1 (4
@@ -1136,6 +1202,16 @@ La traduction est à venir. Le contenu ci-dessous est en anglais.
 
 #### CLI
 
+- **The check that stops a destructive schema change also stops the drop of a
+  CHECK or EXCLUDE constraint the database holds, and names it.** It is the
+  check behind `rebase db push`, `rebase db migrate --refuse-destructive` and
+  the report `rebase db generate` prints. A push that would still drop one asks
+  on a terminal and refuses elsewhere; `--allow-destructive` applies it.
+
+- **Schema introspection classifies a table whose policies give each user
+  their own rows as an entity,** not as a code list or as a child hidden from
+  the navigation, however few rows it has.
+
 - **`rebase dev` no longer reads through the node_modules folder under config
   before it starts the backend.** tsx's default ignores apply only under the
   project root, so with a `config/node_modules`, as in the monorepo's example
@@ -1160,6 +1236,56 @@ La traduction est à venir. Le contenu ci-dessous est en anglais.
 - **The CLI loads a command's code only when that command runs.**
   `rebase --version` and `--help` load about a fifth of the modules they did:
   from source, 254 → 103 ms. Their output is unchanged.
+
+- **A project pinned to a prerelease stays on its channel when upgraded.**
+  `rebase upgrade` with no `--to`, on a canary for example, takes the newest
+  canary unless `latest` is newer. An exact `--to` older than the project is
+  still applied, and the summary says it is a downgrade.
+
+- **The telemetry question at the end of an interactive init defaults to no.**
+
+- **A failed import check reports on stderr with exit code 1.**
+  `rebase normalize-imports --check` used to throw, with a stack-trace hint.
+
+- **The other commands follow the database the last dev server ran on.**
+  `rebase dev` records whether it ran with `--docker`. The choice is kept in
+  `.rebase/dev-database.json` (gitignored) and ranks where `--docker` does,
+  below every `DATABASE_URL`, the branch pointer and `--database-url`; commands
+  say so on stderr. The next `rebase dev` without `--docker` switches them back
+  to the managed database, and warns that it is leaving the Docker one.
+
+- **Anonymized emails are random.** `rebase db pull --anonymize` writes
+  `user-<random hex>@example.invalid` (no longer `user<id>@…`), and gives unique
+  columns `<label>-<random hex>` values.
+
+- **The resource graph in JSON says what the check or the write found.**
+  `rebase resources --check --json` and `--write --json` print the graph with
+  `check: { file, status }` or `written: { file, changed }` beside `version` and
+  `resources`.
+
+- **Starting a bundle with no database URL stops before it boots.**
+  `rebase start` exits 1 when no `DATABASE_URL` is set, and prints
+  `DATABASE_URL="$(rebase db url)" rebase start` for a local run. It already
+  failed then, inside the runtime, with a less useful message.
+
+- **Backups default to ./backups where you run the CLI.** `rebase db backup`
+  without `--out`, and `rebase db backups list`, use `./backups` in the
+  directory you run `rebase` from, normally the project root: the same directory
+  `--out ./backups` names. Before, they used `backend/backups`. A relative
+  `--out`, and the dump path `rebase db restore` takes, resolve against that
+  directory; a relative `BACKUP_DESTINATION` still resolves against the backend
+  directory, where the server reads it. If the new location is empty and
+  `backend/backups` holds dumps, `backups list` says where they are.
+
+- **A backup takes its destination only from --out.** Use `--out ./backups`
+  instead of `rebase db backup ./backups`. `rebase db restore` refuses more than
+  one backup.
+
+- **The manifest the CLI infers for a project leaves out what equals a default,
+  and spells the build for the project's package manager.** `synthesizeManifest`
+  (`@rebasepro/cli`) writes `spa`, `functions` and `crons` only when they differ
+  from their defaults, and builds the static app with pnpm in a pnpm project.
+  The inferred static app is still named `web`.
 
 #### Client SDK
 
@@ -1257,6 +1383,14 @@ La traduction est à venir. Le contenu ci-dessous est en anglais.
   against a server with no connection cap took 175 ms and take 1.15 s. Set
   `smtp.maxConnections` to change the cap (3 for Office 365); the pool closes
   5 s after the last send.
+
+- **In production, a project whose named buckets are bound but whose default
+  source is not logs one warning at boot naming both fixes.** Before, it logged
+  an INFO "File storage is off" and an ERROR "No default storage source".
+
+- **A transform without its image library throws a named error.**
+  `transformImage` throws `ImageTransformUnavailableError` when `sharp` is not
+  installed, with a message naming `pnpm add sharp`.
 
 #### Jobs & cron
 
@@ -1382,6 +1516,17 @@ La traduction est à venir. Le contenu ci-dessous est en anglais.
 ### Fixed
 
 #### Server & REST
+
+- **`NO_COLLECTIONS` on `/api/data` and `/api/docs` names the tables that were
+  skipped because row-level security is off on them,** with the SQL to enable
+  it, and `details.unprotectedTables` lists them. It said the database had no
+  tables.
+
+- **A `400 INVALID_SCOPES` no longer offers `keys:read` and `keys:write` as
+  valid scopes for a key**, in its message or in `details.validScopes`.
+
+- **A backend with a single database driver no longer warns
+  `No "(default)" driver provided` at every boot.**
 
 - **A `via` relation loads on a booted schema.** `include`, get-by-id, and the
   nested listing whose path ends on a foreign key returned the relation absent:
@@ -1551,7 +1696,78 @@ La traduction est à venir. Le contenu ci-dessous est en anglais.
 - **`readConnectionString` on the Postgres adapter config is honoured.** It
   was declared and ignored, and only `DATABASE_READ_URL` worked.
 
+- **Add existing on a many-to-many tab links the chosen rows again.** In the
+  admin panel, a post's Tags tab answered 404 "No row with id …" for every tag
+  not linked yet: `PATCH /api/data/<parent>/<id>/<relation>/<targetId>` judged
+  the row's existence as a member of the set it was being added to. A missing
+  target, a missing or hidden parent and a stale `If-Match` are still refused.
+
+- **The history refusal reads "this database is missing the
+  rebase.entity_history table".** The `HISTORY_UNAVAILABLE` message said "has no
+  the …".
+
+- **When `schema.generated.ts` and the database disagree, the boot warning says
+  to run `rebase db push` (or `rebase db generate`).** It said
+  `rebase schema generate`, which leaves the database as it is.
+
 #### CLI
+
+- **`rebase db push` after `rebase schema introspect` no longer drops a policy
+  whose name has the shape an unnamed rule compiles to** (`<table>_<op>_<hash>`,
+  as on a database Rebase built), and `rebase doctor --policies` no longer
+  reports an introspected database's own policies as orphans.
+
+- **`rebase doctor --policies` and `rebase db push` tell a superseded policy
+  from one written by hand.** The first is dropped by the next push; the second
+  is still in force, and is kept by describing it in `securityRules`. Both were
+  "left behind by an earlier push".
+
+- **`rebase db push` no longer drops the CHECK and EXCLUDE constraints on a
+  collection's table.** A collection cannot declare either, so on a database
+  adopted with `rebase schema introspect` the first push dropped every one of
+  them without a prompt, and the database then accepted the rows they refused.
+  Push now leaves them alone, as it does the tables and indexes your
+  collections do not describe; to remove one, drop it by hand. Triggers and
+  functions you wrote were never touched, and still are not.
+
+- **`rebase db push` no longer drops a hand-written index whose name holds `[`,
+  `]`, `*` or `?`, and no longer refuses a database with a `.` in a table's or
+  an index's name.** Each name went to Atlas as a pattern, so
+  `orders_idx[v1]` matched nothing and the index was dropped without a prompt,
+  and a dotted name failed every push with `too many parts in pattern`.
+
+- **`rebase db backup`, `rebase db restore`, `rebase db branch` and
+  `rebase schema introspect` against a database that is not running print the
+  banner `rebase db push` prints,** "Cannot connect to PostgreSQL at
+  host:port", instead of a raw `connect ECONNREFUSED` or a Drizzle
+  `Failed query: CREATE SCHEMA …`.
+
+- **Listing branches, and asking about one, only reads.** `rebase db branch
+  list` and `info` created the `rebase` schema and the branch registry.
+
+- **`rebase db branch prune` with no terminal and no `--yes` exits 1 and says to
+  pass `--yes`,** instead of printing "Nothing was changed." and exiting 0.
+
+- **`rebase db push --yes` says it proceeded because `--yes` was passed**, not
+  `--allow-destructive`.
+
+- **`rebase schema introspect` no longer leaves an empty output directory when
+  it cannot connect,** says why once, and prints the output directory as an
+  absolute path.
+
+- **Backups and their `.globals.sql` roles file are readable by their owner
+  only (0600)**, from `rebase db backup` and from scheduled backups. They were
+  0644.
+
+- **A server created by `rebase eject` keeps local uploads in the project's
+  `uploads/` when it runs compiled,** as it does under `rebase dev`. Compiled,
+  it used `backend/dist/uploads`, which the next build deleted.
+
+- **The `.env.example` a new project gets no longer suggests
+  `STORAGE_PATH=./uploads`.** After `rebase eject` the server runs in
+  `backend/`, so that line pointed at `backend/uploads`, not the
+  `<project>/uploads` the server uses when the variable is unset. It now says
+  where files land by default and suggests an absolute path.
 
 - **`pnpm run build` in a new project no longer warns that "Some chunks are
   larger than 500 kB".** The chunks it named were the admin's, already
@@ -1618,6 +1834,160 @@ La traduction est à venir. Le contenu ci-dessous est en anglais.
   `rebase-basics` skill's MCP reference lists all 42 local tools and the remote
   `/mcp` endpoint's tools.** The scaffold's agent instructions no longer send
   `pnpm db:push` at the managed development database, which refuses it.
+
+- **A new git-initialized project stays clean through its first dev run**, so
+  its first Studio schema edit is no longer refused with
+  `SCHEMA_EDIT_DIRTY_TREE`. `rebase init --git` writes the preset's real
+  generated schema instead of a stub that `rebase dev` rewrote.
+
+- **Every next step init prints exists in the project it printed it for.**
+  `rebase init --headless --database-url` told you to run `pnpm run db:push`, a
+  script the headless scaffold does not have. Every next step is now checked per
+  flavour, and the headless steps include the `CREATE POLICY` that opens a
+  table's rows.
+
+- **The headless scaffold's config workspace typechecks on its own**; it was
+  missing `@types/node` (TS2688).
+
+- **Upgrading a canary project no longer moves it back to the stable release
+  without asking**, and no longer orders two canary builds of one version by
+  their git hash.
+
+- **The import check no longer rewrites the files it reports on.**
+  `rebase normalize-imports --check` wrote its fixes. Imports that resolve to no
+  file are counted separately, with a message that says the command cannot
+  complete them.
+
+- **The status report shows each function's real mount path** instead of
+  `/api/functions/<name>`.
+
+- **The telemetry project id is stable for the life of a checkout**; it changed
+  on every `rebase dev` restart.
+
+- **A dev server on a fresh compose database no longer fails its schema push
+  with `read ECONNRESET`.** `rebase dev --docker` waits until the database
+  answers a query (up to 60 s) before pushing, and a push that does fail prints
+  its own output above the warning that refers to it.
+
+- **Anonymizing a pulled database works where users have signed in more than
+  once, and is all-or-nothing.** In `rebase db pull --anonymize`, a column under
+  a unique index (such as `refresh_tokens.token_hash`) gets a distinct value per
+  row, replacements fit the column's length, NULLs stay NULL, views and
+  generated columns are skipped, and `citext` columns are matched. The pass is
+  one transaction: if it fails, the tables it would have rewritten are emptied
+  and named and the command exits 1, so real personal data is never left behind
+  silently. The pull re-grants `rebase_user` after any restore that started.
+
+- **The resource check fails in JSON mode too.**
+  `rebase resources --check --json` exits 1 with an error envelope
+  (`resource_graph_missing` / `resource_graph_stale`) on a missing or stale
+  `rebase.resources.json`, and `--write --json` writes the file. Both printed
+  the graph and exited 0.
+
+- **After a dev server on Docker, the other commands use that database.**
+  `rebase db url`, `db push`, `console` and the rest used to start an empty
+  managed database beside it.
+
+- **With the backend stopped, the hint names the port the dev server uses.**
+  `rebase api-keys` and `rebase storage` named only the `PORT` in `.env`.
+
+- **`rebase db push` asks before a destructive change on a terminal again, and a
+  restore without --yes asks for "yes" again.** In the published driver every
+  confirmation prompt crashed with `createInterface is not a function`. Ctrl-C
+  or Ctrl-D at a prompt answers no instead of hanging.
+
+- **A destructive `rebase db push` that you decline, that cannot ask, or that
+  crashes no longer leaves the `<db>_dev_diff` scratch database behind.**
+
+- **Backup and restore refuse an option they do not take, before doing
+  anything.** `rebase db backup`, `rebase db restore` and
+  `rebase db backups list` name the one you probably meant (`--targt-db`: did
+  you mean `--target-db`?). A misspelled `--target-db` was ignored, and the
+  restore went into the live database.
+
+- **A failed restore from `s3://` or `gs://` no longer leaves the downloaded
+  dump in the temp directory.**
+
+- **`rebase db migrate --baseline <version>` records the version on a database
+  that already has a migration history**, with Atlas's `migrate set`. It printed
+  that it had, then failed with the same error. When the history already reaches
+  the version, it says there is nothing to record.
+
+- **When `rebase db migrate` fails on a column (`42701`) or a schema (`42P06`)
+  that already exists, it prints the `--baseline` remedy**, and names the
+  migration that failed when that is not the newest one.
+
+- **`rebase db push` on the managed database while the dev server runs no longer
+  fails with a bare `Error: EOF`.** If Atlas does lose its connection, the error
+  says what happened and that the command is safe to repeat.
+
+- **`rebase console -e "…" | jq .` works as documented: stdout holds only the
+  result.** Log lines, such as the `RLS enforcement active` note the scaffold's
+  `LOG_LEVEL=info` let through, go to stderr.
+
+- **Input piped into `rebase console` runs one line at a time**, each after the
+  previous line's `await` has settled, so the documented two-line example no
+  longer fails with `Cannot read properties of undefined`. Input after `.exit`
+  is ignored, and piped output has no colour codes.
+
+- **The status report follows the database the last dev server ran on.** On a
+  project on `rebase dev --docker`, `rebase status` no longer reads as a managed
+  database that is not running.
+
+- **`rebase apps config <app>`, for a checkout not linked to a project, prints
+  this project's dev backend URL** instead of a fixed `localhost:3001`.
+
+- **`rebase db pull` keeps both connection strings' passwords off `pg_dump`'s
+  and `pg_restore`'s command lines**, where any process listing could read them;
+  each tool gets its password in `PGPASSWORD`.
+
+- **`rebase apps init --force` on a scaffolded project writes back the
+  `rebase.json` the scaffold ships.** It keeps each app's name, `path` and `cms`
+  from the file it replaces, infers the rest, builds the static app with the
+  project's package manager, and names a declared app it no longer finds
+  instead of dropping it.
+
+- **A project without a `rebase.json` builds its frontend with its own package
+  manager.** The inferred build command was always
+  `npm run build --workspace frontend`, even in a pnpm project.
+
+- **`rebase apps init <name>` is refused.** It never registered one app: it
+  ignored the name and inferred the whole manifest.
+
+- **A `--docker` that a `DATABASE_URL` outranks no longer starts the compose
+  container,** on `rebase dev`, the `rebase db` commands and `rebase console`.
+  `dev` also pushed the schema into that container while the backend ran on the
+  other database. One line now says `--docker` was ignored, and why.
+
+- **`rebase init` accepts only a `postgres://` or `postgresql://` connection
+  string as the database.** The prompt asks again (typing `n` used to write
+  `DATABASE_URL=n`), and `--database-url` with anything else is refused before
+  anything is written.
+
+- **Interactive `rebase init` refuses a directory that already holds files
+  before it asks anything,** and checks a typed project name as it is typed.
+
+- **`rebase generate-sdk --from <url>` says why the contract endpoint refused:**
+  a key in `.env` is not sent, the shell's `REBASE_SERVICE_KEY` goes only to the
+  linked project, or the token sent was refused. It always said "set
+  REBASE_SERVICE_KEY".
+
+- **`rebase auth reset-password` prints the backend's refusal, a weak password
+  say, as its message and code**, not as the raw JSON body. Both paths label a
+  generated password `Password:`.
+
+- **`rebase console --collections` and `rebase doctor --collections` with a
+  missing path no longer warn that applying it would drop every table.** Each
+  says what it did not do instead.
+
+- **`rebase dev` says when it regenerated an out-of-date
+  `backend/src/schema.generated.ts`.**
+
+- **The top-level help lists the api-keys get command, and the help pages of
+  db push, generate and migrate name the database flags they take.**
+  `rebase --help` left out `api-keys get`, which `rebase api-keys --help`
+  lists, and `rebase db push --help` never said it takes `--database-url` and
+  `--docker`.
 
 #### Admin (CMS & app)
 
@@ -1829,6 +2199,9 @@ La traduction est à venir. Le contenu ci-dessous est en anglais.
   the collections editor are translated, and cron relative times follow the
   app's language.
 
+- **Studio "Commit and apply" commits are authored by the user's display name
+  and email** instead of their user id.
+
 #### Realtime
 
 - **A batch on the server's own driver announces its rows after it commits,
@@ -1962,6 +2335,14 @@ La traduction est à venir. Le contenu ci-dessous est en anglais.
   report a weak password with the WEAK_PASSWORD code.** That is `PUT
   /api/admin/users/:id` and `POST /api/admin/users/:uid/reset-password`.
 
+- **A session token whose uid names no account is refused with `401` instead of
+  `503 ROLE_LOOKUP_FAILED` "Please try again".** This includes a uid the users
+  table cannot hold, such as `generateAccessToken("u1", …)` against UUID ids.
+
+- **`requireScope` mounted with no auth middleware in front of it says so in its
+  401 and names `requireAuth`**, instead of answering "Authentication required"
+  to a valid session.
+
 #### UI kit & plugins
 
 - **A `VirtualTable` cell draws with the current renderer, columns and sort
@@ -2077,6 +2458,19 @@ La traduction est à venir. Le contenu ci-dessous est en anglais.
   names. `storageReferencesForDownloadUrls(text)` rewrites such text to store
   references; `storageTargetOfDownloadUrl(url)` reads one URL.
 
+- **Adding `bucket("media", { engine: "s3" })` to `config/resources.ts` no
+  longer hides the files already in `./uploads`.** The default source stays on
+  `./uploads` (or its `S3_BUCKET`), and `media` gets its own `uploads__media`.
+
+- **Two storage sources configured onto one directory (or one inside another),
+  or onto one bucket on one endpoint, are refused at boot** with the variable to
+  change. They silently served each other's files.
+
+- **Without the optional image library, a resized-image request is served the
+  original image instead of a 500.** That library is `sharp`. The backend logs
+  one warning naming `pnpm add sharp`, instead of an error with a stack for
+  every thumbnail.
+
 #### Inference
 
 - **inferTypeFromValue calls a `Date` a `date`.**
@@ -2105,6 +2499,13 @@ La traduction est à venir. Le contenu ci-dessous est en anglais.
 - **The headless guard imports the template's preset collections, and
   introspect-live fails under CI when it cannot fetch its pinned dumps or
   reach a server.** Locally it skips instead of failing.
+
+- **A release no longer cuts the first words off a sentence that a "Since" badge
+  started.** Written `<badge> for the SDK types: on 0.23, …`, the badge's words
+  were the sentence's head, and the 0.24.0 cut left ten pages starting
+  mid-sentence. `verify:docs` now refuses such a badge on an English page, and
+  `release-docs.mjs` keeps its words as plain text if one still reaches a
+  release.
 
 ### Security
 
@@ -2175,6 +2576,14 @@ La traduction est à venir. Le contenu ci-dessous est en anglais.
   embedded values removed, and the recorder strips an embedded row before it
   stores an entry. New `withRelationReferencesOnly` in `@rebasepro/common`.
 
+#### CLI
+
+- **Backup and restore never print the database password.** `pg_dump`,
+  `pg_dumpall` and `pg_restore` receive it in `PGPASSWORD` instead of on their
+  command line, so it is in neither an error message, the scheduled backup's run
+  history nor the process list, and connection strings in the driver CLI's
+  errors are shown as `user:***@`.
+
 ### Documentation
 
 #### Storage & email
@@ -2206,6 +2615,45 @@ La traduction est à venir. Le contenu ci-dessous est en anglais.
 - **Scripts and the console have their own page,** "Scripts and the Console"
   (`/docs/backend/scripts/`), and "Custom Server Integration" teaches the
   backend as public pieces.
+
+- **The custom-server page's "one step under `initializeRebaseBackend`" file
+  serves what the runtime serves when pasted into a scaffold.** It bound port
+  3000, loaded no `.env` (so sign-in was off) and served no functions, crons,
+  storage, health routes or CORS. The services snippet mints a session for a
+  user that exists and puts `requireAuth` before `requireScope`; the scripts
+  page's snippets live in `backend/scripts/`, where the driver can be imported,
+  and say how to run them.
+
+- **The quickstart, the instruction-files page and the agent skills say that
+  `rebase db push`, `db generate` and `db migrate` work on the managed
+  database**, as the CLI does; they said it needs your own PostgreSQL.
+
+#### CLI
+
+- **`rebase schema stale` is documented**, on the CLI reference and the schema
+  page, and `rebase db branch delete` is documented as refusing the branch you
+  are on (it said it returned you to the main database).
+
+- **The database commands have their own page,** "Database Commands"
+  (`/docs/cli/database/`): push, generate and migrate, backups, pull, the
+  connection string, the managed database and branches. The CLI reference
+  lists them and links there.
+
+- **The compatibility page says what a Since badge means on a canary.** A
+  canary such as `0.24.1-canary.g<commit>` is built from `main` and carries what
+  the badges for the next minor describe; its users read "On 0.24 there is
+  none" as applying to them.
+
+- **The CLI reference lists the api-keys get command and the database flags
+  of db push.** `rebase db push` takes `--database-url` and `--docker`, as
+  `generate`, `migrate`, `branch`, `backup` and `restore` do.
+
+- **The agent skill and the MCP page no longer say the CLI refuses db push on
+  the managed database.** The MCP gate still refuses its database tools there;
+  the CLI runs `db push` and `db migrate`.
+
+- **The custom-server page no longer tells you not to declare zod** while the
+  scaffold declares it, at the runtime's range: keep the two ranges equal.
 
 ## [0.24.0] - 2026-10-08
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: 5be4e3768bac692e
+sourceHash: 552bf6fc4d37691a
 title: Configuração de Storage
 sidebar_label: Configuração de Storage
 description: Configure backends de sistema de arquivos local, compatíveis com S3 ou GCS/Firebase Storage para uploads de arquivos, imagens e mídia.
@@ -16,7 +16,7 @@ O Rebase suporta três backends de armazenamento:
 ## Configuração
 
 :::note[Onde isso fica]
-**Runtime gerenciado** — as variáveis `STORAGE_*` no `.env` (`STORAGE_TYPE`, `STORAGE_BUCKET` ou `S3_BUCKET` / `GCS_BUCKET`, `STORAGE_PATH`, `STORAGE_PUBLIC_READ`, … — adicione o sufixo `__<CHAVE>` a qualquer uma delas para uma fonte nomeada), além de uma declaração `bucket("<chave>")` em `config/resources.ts` para cada bucket além do padrão, e `export const storageAuthorize` a partir de `config/index.ts`. `storageAuthorize` não possui uma forma via variável de ambiente de propósito: nenhuma variável pode expressar "este usuário pode ler esta chave".
+**Runtime gerenciado** — as variáveis `STORAGE_*` no `.env` (`STORAGE_TYPE`, `STORAGE_BUCKET` ou `S3_BUCKET` / `GCS_BUCKET`, `STORAGE_PATH`, `STORAGE_PUBLIC_READ`, … — adicione o sufixo `__<KEY>` a qualquer uma delas para uma fonte nomeada), além de uma declaração `bucket("<key>")` em `config/resources.ts` para cada bucket além do padrão, e `export const storageAuthorize` a partir de `config/index.ts`. `storageAuthorize` não possui uma forma via variável de ambiente de propósito: nenhuma variável pode expressar "este usuário pode ler esta chave".
 
 **Ejetado** — o bloco `storage` em `initializeRebaseBackend({ … })`. `storagePolicies` e `storageTriggers` são exclusivos do modo ejetado.
 
@@ -281,7 +281,7 @@ acessar os cookies ou endpoints da API.
 ## Limite de tamanho de arquivo
 
 Cada fonte de armazenamento aceita arquivos até o seu próprio limite: **50 MB**, a menos que
-`STORAGE_MAX_FILE_SIZE` (bytes, com sufixo `__<CHAVE>` para uma fonte nomeada) ou o
+`STORAGE_MAX_FILE_SIZE` (bytes, com sufixo `__<KEY>` para uma fonte nomeada) ou o
 `maxFileSize` da fonte indique o contrário. Todas as portas limitam o arquivo ao mesmo
 valor. `POST /api/storage/upload` responde `413 PAYLOAD_TOO_LARGE` acima disso; um
 upload retomável é recusado na criação, antes de seu primeiro bloco; e
@@ -308,7 +308,7 @@ protocolo, o que ele responde e como se comporta entre instâncias.
 | Variável | Descrição |
 |----------|-----------|
 | `STORAGE_TYPE` | `"local"`, `"s3"`, ou `"gcs"` |
-| `STORAGE_PATH` | Diretório de armazenamento local (padrão: `<project>/uploads`, tanto sob `rebase dev` quanto em um servidor escrito por `rebase eject`). Um caminho relativo é lido a partir do diretório em que o servidor roda, que depois de `rebase eject` é `backend/`. Um bucket local nomeado mantém seus arquivos ao lado dele, em `<STORAGE_PATH>__<chave>`, a menos que `STORAGE_PATH__<CHAVE>` defina o seu próprio |
+| `STORAGE_PATH` | Diretório de armazenamento local (padrão: `<project>/uploads`, tanto sob `rebase dev` quanto em um servidor escrito por `rebase eject`). Um caminho relativo é lido a partir do diretório em que o servidor roda, que depois de `rebase eject` é `backend/`. Um bucket local nomeado mantém seus arquivos ao lado dele, em `<STORAGE_PATH>__<key>`, a menos que `STORAGE_PATH__<KEY>` defina o seu próprio |
 | `S3_BUCKET` | Nome do bucket S3 |
 | `S3_REGION` | Região AWS (padrão: `"auto"`) |
 | `S3_ACCESS_KEY_ID` | Chave de acesso AWS |
@@ -320,7 +320,7 @@ protocolo, o que ele responde e como se comporta entre instâncias.
 | `GCS_KEY_FILENAME` | Caminho para o arquivo de chave da conta de serviço GCP (omita no GKE — o Workload Identity/ADC fornece as credenciais) |
 | `GOOGLE_APPLICATION_CREDENTIALS` | Variável padrão do ADC, lida pelo próprio SDK do Google (não necessária no GCP com credenciais padrão) |
 | `STORAGE_DOWNLOAD_TOKEN_TTL` | Por quanto tempo a URL de download de um arquivo privado funciona, em segundos — o tempo de vida do token gerado por `/api/storage/metadata/*` (padrão `300`, no máximo `604800`, uma semana). Aumente para vídeos e áudios privados, que continuam solicitando intervalos após a renderização da página. O formato em variável de ambiente de `storageDownloadTokenTtl` |
-| `STORAGE_MAX_FILE_SIZE` | Maior arquivo que a fonte aceita, em bytes (padrão `52428800`, 50 MB). Sufixo `__<CHAVE>` para uma fonte nomeada. Um valor que não seja um número inteiro de bytes recusa a inicialização. Consulte [Limite de tamanho de arquivo](#limite-de-tamanho-de-arquivo) |
+| `STORAGE_MAX_FILE_SIZE` | Maior arquivo que a fonte aceita, em bytes (padrão `52428800`, 50 MB). Sufixo `__<KEY>` para uma fonte nomeada. Um valor que não seja um número inteiro de bytes recusa a inicialização. Consulte [Limite de tamanho de arquivo](#limite-de-tamanho-de-arquivo) |
 | `FORCE_LOCAL_STORAGE` | Permitir `STORAGE_TYPE=local` em produção — veja abaixo |
 | `STORAGE_PUBLIC_READ` | Servir objetos armazenados para leitores não autenticados. A forma em variável de ambiente de `storagePublicRead`, e uma das três maneiras de satisfazer a [proteção de inicialização em produção](#autorização-por-objeto). |
 | `STORAGE_ALLOW_ANY_AUTHENTICATED` | Desativa a proteção de inicialização, restaurando o comportamento onde qualquer usuário autenticado pode ler, sobrescrever, excluir ou listar qualquer chave. A forma em variável de ambiente de `storageInsecureAllowAnyAuthenticated`. Aceitável apenas quando todos os usuários conectados são confiáveis com relação a todos os arquivos. |
@@ -438,7 +438,7 @@ descreve os cabeçalhos e o que configurar em uma CDN à frente.
 
 Por essa razão, o padrão local não é registrado, e uma requisição para `/api/storage/*` que não informe nenhuma fonte de armazenamento responde **`501 STORAGE_NOT_CONFIGURED`**, listando as fontes atendidas. Uma fonte nomeada que esteja configurada, como `bucket("media", { engine: "s3" })`, continua operando normalmente. Os uploads falham de maneira explícita e recuperável; o restante do aplicativo continua funcionando. O armazenamento de arquivos é opcional (opt-in) em produção: ele existe assim que um bucket existir.
 
-Defina `STORAGE_TYPE=s3` ou `gcs`. Se um **volume persistente** realmente mantiver o `STORAGE_PATH`, defina `FORCE_LOCAL_STORAGE=true` para declarar isso explicitamente. Monte-o no diretório pai de `STORAGE_PATH`, para que o diretório `<STORAGE_PATH>__<chave>` de cada bucket local nomeado também fique nele.
+Defina `STORAGE_TYPE=s3` ou `gcs`. Se um **volume persistente** realmente mantiver o `STORAGE_PATH`, defina `FORCE_LOCAL_STORAGE=true` para declarar isso explicitamente. Monte-o no diretório pai de `STORAGE_PATH`, para que o diretório `<STORAGE_PATH>__<key>` de cada bucket local nomeado também fique nele.
 :::
 
 - Monte um **volume persistente** sobre o diretório pai de `STORAGE_PATH` se estiver usando armazenamento local no Docker/Kubernetes, e defina `FORCE_LOCAL_STORAGE=true` — consulte [Auto-hospedagem](/docs/deployment/self-hosting/#file-storage)

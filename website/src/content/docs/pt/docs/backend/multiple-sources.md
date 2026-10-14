@@ -1,5 +1,5 @@
 ---
-sourceHash: 6eb6098e26cb24c0
+sourceHash: cc03d759eb4057c2
 title: Múltiplos Bancos de Dados e Buckets
 sidebar_label: Múltiplas Fontes
 description: Direcione coleções para diferentes bancos de dados e propriedades para diferentes buckets de armazenamento, e configure cada um a partir do ambiente.
