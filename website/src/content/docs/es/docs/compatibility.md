@@ -1,5 +1,5 @@
 ---
-sourceHash: 1eb9aef75c2112ff
+sourceHash: ac7319874967a5d6
 slug: es/docs/compatibility
 title: Compatibilidad
 description: "Lo que Rebase promete entre versiones y lo que no: los seis contratos versionados, cómo falla cada uno y qué puede seguir cambiando en una versión menor."
@@ -66,7 +66,7 @@ Rebase Cloud consume exactamente estos contratos y nada más. Cualquier cosa no 
 
 Los documentos se publican desde `main`, así que una página puede describir algo que ninguna versión estable incluye todavía. Una insignia *Desde* indica la primera versión estable que lo incluye, y el texto que la acompaña dice qué hace la versión anterior.
 
-Un canary es una compilación de `main` numerada después de la última versión estable: `0.24.1-canary.g<commit>` es `main` en ese commit, algún tiempo después de 0.24.0, y `rebase upgrade --to canary` instala el más reciente. Incluye todo lo que había llegado a `main` cuando se compiló, así que en un canary reciente una insignia que nombra la siguiente versión menor (0.25, tras 0.24.0) se aplica a usted, y la nota sobre la versión anterior (en la 0.24) describe la versión estable de la que viene.
+Un canary es una compilación de `main` numerada como la versión hacia la que va: `0.25.0-canary.g<commit>` es `main` en ese commit, después de 0.24.0 y antes de 0.25.0, y `rebase upgrade --to canary` instala el más reciente. Incluye todo lo que había llegado a `main` cuando se compiló, así que una insignia que nombra su versión (Desde 0.25) se aplica a usted, y la nota sobre la versión anterior (en la 0.24) describe la versión estable de la que viene. Los canaries anteriores a 0.25.0 se numeraban después de la última versión: `0.24.1-canary.g<commit>` también es una vista previa de la 0.25.
 
 ## Los contratos versionados
 

@@ -107,12 +107,14 @@ The docs are published from `main`, so a page can describe something no stable
 release has yet. A *Since* badge names the first stable release that carries it,
 and the text beside it says what the release before does.
 
-A canary is a build of `main` numbered after the last stable release:
-`0.24.1-canary.g<commit>` is `main` at that commit, some time after 0.24.0, and
-`rebase upgrade --to canary` installs the newest one. It carries everything that
-had reached `main` when it was built, so on a recent canary a badge naming the
-next minor (0.25, after 0.24.0) applies to you, and the note about the release
-before (on 0.24) describes the stable release you came from.
+A canary is a build of `main` numbered as the release it is heading for:
+`0.25.0-canary.g<commit>` is `main` at that commit, after 0.24.0 and before
+0.25.0, and `rebase upgrade --to canary` installs the newest one. It carries
+everything that had reached `main` when it was built, so a badge naming its
+version (Since 0.25) applies to you, and the note about the release before (on
+0.24) describes the stable release you came from. Canaries before 0.25.0 were
+numbered after the last release instead: `0.24.1-canary.g<commit>` is a 0.25
+preview too.
 
 ## The versioned contracts
 

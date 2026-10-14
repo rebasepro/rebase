@@ -1,5 +1,5 @@
 ---
-sourceHash: 1eb9aef75c2112ff
+sourceHash: ac7319874967a5d6
 slug: pt/docs/compatibility
 title: Compatibilidade
 description: O que o Rebase promete entre versões e o que não promete — os seis contratos versionados, como cada um falha e o que ainda pode mudar em uma versão minor.
@@ -108,12 +108,13 @@ A documentação é publicada a partir da `main`, então uma página pode descre
 que nenhuma versão estável ainda tem. Um badge *Desde* nomeia a primeira versão
 estável que o inclui, e o texto ao lado dele diz o que a versão anterior faz.
 
-Um canary é um build da `main` numerado depois da última versão estável:
-`0.24.1-canary.g<commit>` é a `main` naquele commit, algum tempo depois da 0.24.0, e
+Um canary é um build da `main` numerado como a versão para a qual ela caminha:
+`0.25.0-canary.g<commit>` é a `main` naquele commit, depois da 0.24.0 e antes da 0.25.0, e
 `rebase upgrade --to canary` instala o mais recente. Ele carrega tudo o que já
-havia chegado à `main` quando foi compilado, então, em um canary recente, um badge que
-nomeia a próxima minor (0.25, depois da 0.24.0) se aplica a você, e a nota sobre a
-versão anterior (na 0.24) descreve a versão estável de onde você veio.
+havia chegado à `main` quando foi compilado, então um badge que nomeia a versão dele
+(Desde 0.25) se aplica a você, e a nota sobre a versão anterior (na 0.24) descreve a
+versão estável de onde você veio. Os canaries anteriores à 0.25.0 eram numerados depois
+da última versão: `0.24.1-canary.g<commit>` também é uma prévia da 0.25.
 
 ## Os contratos versionados
 

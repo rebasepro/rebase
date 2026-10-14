@@ -1,5 +1,5 @@
 ---
-sourceHash: 1eb9aef75c2112ff
+sourceHash: ac7319874967a5d6
 slug: de/docs/compatibility
 title: Kompatibilität
 description: Was Rebase über Versionen hinweg verspricht und was nicht – die sechs versionierten Verträge, wie jeder einzelne fehlschlägt und was sich in einem Minor-Release noch ändern kann.
@@ -121,12 +121,13 @@ Die Docs werden aus `main` veröffentlicht, daher kann eine Seite etwas beschrei
 das noch kein stabiles Release enthält. Ein *Seit*-Badge nennt das erste stabile
 Release, das es enthält, und der Text daneben sagt, was das Release davor tut.
 
-Ein Canary ist ein Build von `main`, nummeriert nach dem letzten stabilen Release:
-`0.24.1-canary.g<commit>` ist `main` an diesem Commit, einige Zeit nach 0.24.0, und
+Ein Canary ist ein Build von `main`, nummeriert nach dem Release, auf das er zugeht:
+`0.25.0-canary.g<commit>` ist `main` an diesem Commit, nach 0.24.0 und vor 0.25.0, und
 `rebase upgrade --to canary` installiert den neuesten. Er enthält alles, was `main`
-erreicht hatte, als er gebaut wurde, sodass auf einem aktuellen Canary ein Badge, das
-die nächste Minor-Version nennt (0.25, nach 0.24.0), für Sie gilt, und der Hinweis zum
-Release davor (unter 0.24) das stabile Release beschreibt, von dem Sie kommen.
+erreicht hatte, als er gebaut wurde, sodass ein Badge, das seine Version nennt
+(Seit 0.25), für Sie gilt, und der Hinweis zum Release davor (unter 0.24) das stabile
+Release beschreibt, von dem Sie kommen. Canaries vor 0.25.0 wurden stattdessen nach dem
+letzten Release nummeriert: Auch `0.24.1-canary.g<commit>` ist eine Vorschau auf 0.25.
 
 ## Die versionierten Verträge
 

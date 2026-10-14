@@ -148,12 +148,18 @@ jobs:
       # Derived from the last release tag, the same source the stable job reads,
       # so the two cannot disagree about what shipped.
       #
-      # The base is the NEXT patch, not the current release: semver orders a
-      # prerelease BELOW its own version, so 0.9.0-canary.abc would sort under
-      # 0.9.0 and `@canary` would resolve older than `@latest`. 0.9.1-canary.abc
-      # sorts above 0.9.0 and below a future 0.9.1, which is what a build of
-      # "main since 0.9.0" should mean. Ranges like ^0.9.0 still never select it
-      # — semver excludes prereleases unless the range names one.
+      # The base is the NEXT MINOR, the release `main` is on its way to, and the
+      # version every Since badge in the docs names (`nextVersion()` in
+      # tooling/scripts/docs-verify/check-unreleased-badges.mjs). It used to be
+      # the next patch, and 0.24.1-canary.g19596ef shipped docs telling its own
+      # users that "on 0.24" the features they were running did not exist.
+      #
+      # Semver orders a prerelease BELOW its own version, which is why the base
+      # is never the current release: 0.9.0-canary.abc would sort under 0.9.0
+      # and `@canary` would resolve older than `@latest`. 0.10.0-canary.abc sorts
+      # above every 0.9.x, a hotfix included, and below 0.10.0, the release it
+      # previews. Ranges like ^0.9.0 still never select it — semver excludes
+      # prereleases unless the range names one.
       - name: Set canary version
         run: |
           # `g` for git, as in `git describe` (v1.0.0-2-gabc1234).
@@ -196,8 +202,8 @@ jobs:
             fi
           fi
 
-          IFS='.' read -r MAJOR MINOR PATCH <<< "$BASE"
-          NEXT="$MAJOR.$MINOR.$((PATCH + 1))"
+          IFS='.' read -r MAJOR MINOR _ <<< "$BASE"
+          NEXT="$MAJOR.$((MINOR + 1)).0"
           CANARY_VERSION="${NEXT}-canary.${SHORT_SHA}"
 
           echo "CANARY_VERSION=$CANARY_VERSION" >> $GITHUB_ENV
