@@ -1571,6 +1571,12 @@ async function switchBranch(projectRoot: string, rawArgs: readonly string[]): Pr
 
     const database = branchDatabaseName(name);
 
+    // First, as every `branch` action the driver runs does: a database a
+    // killed `create --force` left closed is opened again, and said.
+    const { reopenClosedDatabases, reopenedDatabasesNotice } = await import("@rebasepro/server-postgres");
+    const healed = await reopenClosedDatabases(base, [readActiveBranch(projectRoot)?.database]);
+    for (const line of reopenedDatabasesNotice(healed)) console.error(chalk.yellow(`  ${line}`));
+
     // Verified before the pointer is written, not after.
     const { Client } = await import("pg");
     const client = new Client({ connectionString: base });

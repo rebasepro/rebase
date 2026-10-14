@@ -15,9 +15,10 @@
  *   (`REBASE_ACTIVE_BRANCH_DATABASE`), which keeps it and says so — and `list`
  *   marks it, where every branch had the same bullet.
  * - A forced create stopped mid-copy by anything but Ctrl-C or SIGTERM — a
- *   closed terminal (SIGHUP) — left its source refusing every connection. It
- *   now opens it on every signal Node can catch, and opens a source it found
- *   closed after the copy too.
+ *   closed terminal (SIGHUP), a SIGKILL — left its source refusing every
+ *   connection, and no command opened it again or said how. It now opens it on
+ *   every signal Node can catch, and the next `branch` command opens what a
+ *   SIGKILL left closed, and says why.
  *
  * Requires Docker.
  */
@@ -281,6 +282,30 @@ describe("db branch with other clients connected, and from a switched checkout",
             await client.connect();
             await client.end();
             await untilNoCopy();
+        }, 120_000);
+
+        it("after a SIGKILL mid-copy, the next branch command opens the source again and says why", async () => {
+            const child = spawnForcedCreate("killed");
+            await untilCopying("killed");
+            child.kill("SIGKILL");
+            await child;
+            await untilNoCopy();
+            // Nothing can catch a SIGKILL: the source is left closed.
+            expect(await allowsConnections(SOURCE)).toBe(false);
+
+            process.env.DATABASE_URL = urlFor(SOURCE);
+            const listed = await run(["db", "branch", "list"]);
+
+            expect(listed.code, listed.said).toBe(0);
+            expect(listed.said).toContain(`"${SOURCE}" was refusing every connection — an interrupted \`rebase db branch create --force\` had closed it for the copy. It is open again.`);
+            expect(await allowsConnections(SOURCE)).toBe(true);
+
+            // Said once, for a database that was closed, and never otherwise.
+            stdout.length = 0;
+            stderr.length = 0;
+            const again = await run(["db", "branch", "list"]);
+            expect(again.code, again.said).toBe(0);
+            expect(again.said).not.toContain("was refusing every connection");
         }, 120_000);
 
         it("a forced create opens a source it found closed, and leaves no signal handler behind", async () => {

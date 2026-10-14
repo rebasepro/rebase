@@ -8,6 +8,7 @@
  */
 
 import { sql } from "drizzle-orm";
+import { Client } from "pg";
 import { BranchInfo } from "@rebasepro/types";
 import { revokeInternalTableSql } from "@rebasepro/common";
 import { DrizzleClient } from "../interfaces";
@@ -33,13 +34,116 @@ const MAINTENANCE_DATABASE = "postgres";
 /**
  * The signals Node can catch that end a forced copy part-way: a closed
  * terminal or a lost SSH session (SIGHUP), Ctrl-C (SIGINT), a supervisor's
- * stop (SIGTERM) and Ctrl-\ (SIGQUIT). SIGKILL cannot be caught.
+ * stop (SIGTERM) and Ctrl-\ (SIGQUIT). SIGKILL cannot be caught; what it leaves
+ * closed, {@link reopenClosedDatabases} opens again.
  */
 const REOPEN_ON_SIGNALS: readonly NodeJS.Signals[] = ["SIGHUP", "SIGINT", "SIGTERM", "SIGQUIT"];
 
 /** `ALTER DATABASE … ALLOW_CONNECTIONS true`, the statement that opens a closed database again. */
 function reopenStatement(dbName: string): string {
     return `ALTER DATABASE "${dbName.replace(/"/g, '""')}" ALLOW_CONNECTIONS true`;
+}
+
+/** What {@link reopenClosedDatabases} found closed, and what became of each. */
+export interface ReopenedDatabases {
+    /** Databases that refused new connections, and accept them again. */
+    reopened: string[];
+    /** Databases that refuse new connections and could not be opened, with Postgres's reason. */
+    failed: { database: string; reason: string; statement: string }[];
+}
+
+/**
+ * Open again the database `connectionString` names, and each of `others`,
+ * where one refuses new connections.
+ *
+ * `rebase db branch create --force` closes its source with `ALLOW_CONNECTIONS
+ * false` for the copy, and opens it again after, and on every signal it can
+ * catch. A SIGKILL — an out-of-memory kill, a CI runner's hard stop — leaves
+ * it closed: the app answers 503, and `rebase dev`, `console` and `push` all
+ * fail, on the project's own database. Nothing else in a development database
+ * closes one, so a closed one found here is that, and every `rebase db branch`
+ * command calls this before it does anything else.
+ *
+ * Runs from the server's `postgres` database, since a closed database cannot
+ * be connected to. A template is never touched (`template0` is closed by
+ * design), nor a database a `CREATE DATABASE … TEMPLATE` is copying right now:
+ * that is another forced create, which opens it itself.
+ *
+ * Best-effort: a server it cannot reach, or a catalogue it cannot read, is an
+ * empty answer, and the command's own connection check speaks next.
+ */
+export async function reopenClosedDatabases(
+    connectionString: string,
+    others: readonly (string | null | undefined)[] = []
+): Promise<ReopenedDatabases> {
+    const result: ReopenedDatabases = { reopened: [], failed: [] };
+    let maintenanceUrl: string;
+    let named: string;
+    try {
+        const url = new URL(connectionString);
+        named = decodeURIComponent(url.pathname.slice(1));
+        url.pathname = `/${MAINTENANCE_DATABASE}`;
+        maintenanceUrl = url.toString();
+    } catch {
+        return result;
+    }
+    const names = [...new Set([named, ...others].map((name) => name?.trim() ?? "")
+        .filter((name) => name !== "" && name !== MAINTENANCE_DATABASE))];
+    if (names.length === 0) return result;
+
+    const client = new Client({ connectionString: maintenanceUrl, connectionTimeoutMillis: 5000 });
+    // A connection dropped while idle must not take the command down with it.
+    client.on("error", () => undefined);
+    try {
+        await client.connect();
+    } catch {
+        return result;
+    }
+    try {
+        const closed = await client.query<{ datname: string }>(
+            `SELECT d.datname
+               FROM pg_database d
+              WHERE d.datname = ANY($1::text[])
+                AND NOT d.datallowconn
+                AND NOT d.datistemplate
+                AND NOT EXISTS (
+                    SELECT 1 FROM pg_stat_activity a
+                     WHERE a.state = 'active'
+                       AND position(('TEMPLATE "' || replace(d.datname, '"', '""') || '"') IN a.query) > 0)
+              ORDER BY 1`,
+            [names]
+        );
+        for (const { datname } of closed.rows) {
+            const statement = reopenStatement(datname);
+            try {
+                await client.query(statement);
+                result.reopened.push(datname);
+            } catch (err) {
+                result.failed.push({
+                    database: datname,
+                    reason: extractPgError(err)?.message ?? extractCauseMessage(err) ?? String(err),
+                    statement
+                });
+            }
+        }
+    } catch {
+        // The catalogue could not be read: nothing found to open.
+    } finally {
+        await client.end().catch(() => undefined);
+    }
+    return result;
+}
+
+/** What to say about {@link reopenClosedDatabases}'s answer: one line a database, or none. */
+export function reopenedDatabasesNotice(result: ReopenedDatabases): string[] {
+    return [
+        ...result.reopened.map((database) =>
+            `⚠ "${database}" was refusing every connection — an interrupted \`rebase db branch create --force\` ` +
+            "had closed it for the copy. It is open again."),
+        ...result.failed.map(({ database, reason, statement }) =>
+            `⚠ "${database}" refuses every connection — an interrupted \`rebase db branch create --force\` closed it — ` +
+            `and could not be opened again (${reason}). Run, connected to the server's postgres database: ${statement};`)
+    ];
 }
 
 /**

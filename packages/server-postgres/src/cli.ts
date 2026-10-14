@@ -1456,6 +1456,12 @@ const BRANCH_FLAGS = {
     "-y": "--yes"
 } as const;
 
+/** The source `branch create --from <source>` names, if it names one. */
+function createSource(rawArgs: readonly string[]): string | undefined {
+    const at = rawArgs.indexOf("--from");
+    return at !== -1 && rawArgs[at + 1] ? rawArgs[at + 1] : undefined;
+}
+
 async function branchCommand(rawArgs: string[]): Promise<void> {
     const branchAction = rawArgs[2]; // create, list, delete, info
 
@@ -1501,9 +1507,19 @@ async function branchCommand(rawArgs: string[]): Promise<void> {
 
     // Dynamic imports to avoid loading heavy deps when not needed
     const { DatabasePoolManager } = await import("./databasePoolManager");
-    const { BranchService } = await import("./services/BranchService");
+    const { BranchService, reopenClosedDatabases, reopenedDatabasesNotice } = await import("./services/BranchService");
     const { drizzle } = await import("drizzle-orm/node-postgres");
     const { Pool } = await import("pg");
+
+    // Before anything else, the databases this command can copy from opened
+    // again if a forced create was killed with them closed — the main one, a
+    // `--from` source, the branch this checkout is on. Every connection below,
+    // the check just after this included, would otherwise fail on them.
+    const healed = await reopenClosedDatabases(databaseUrl, [
+        branchAction === "create" ? createSource(rawArgs) : undefined,
+        process.env[ACTIVE_BRANCH_DATABASE_ENV]
+    ]);
+    for (const line of reopenedDatabasesNotice(healed)) outWarn(chalk.yellow(`  ${line}`));
 
     // A database that is not running is said the way `db push` says it, not
     // as the Drizzle wrapper of whatever statement met it first.
@@ -1536,11 +1552,7 @@ max: 3 });
                     out(chalk.gray("  Usage: rebase db branch create <name> [--from <source>]"));
                     process.exit(1);
                 }
-                let source: string | undefined;
-                const fromIdx = rawArgs.indexOf("--from");
-                if (fromIdx !== -1 && rawArgs[fromIdx + 1]) {
-                    source = rawArgs[fromIdx + 1];
-                }
+                const source = createSource(rawArgs);
                 const force = rawArgs.includes("--force");
                 out("");
                 out(chalk.bold("  🌿 Creating database branch..."));
