@@ -77,6 +77,26 @@ describe("db backup", () => {
         expect(() => parseBackupLine(["db", "backup", "--docker", "--debug", "--database-url", "postgres://u:p@h/db"]))
             .not.toThrow();
     });
+
+    // The schema holds the users, the roles and the functions every policy
+    // calls: a dump without it wrote and validated, then could not be restored.
+    it("refuses to leave out the rebase schema, however the pattern spells it", () => {
+        for (const pattern of ["rebase", "REBASE", "\"rebase\"", "reb*", "re?ase", "shop.rebase", "*"]) {
+            expect(() => parseBackupLine(["db", "backup", "--exclude-schema", "audit", "--exclude-schema", pattern]))
+                .toThrow(/--exclude-schema .* leaves out the rebase schema, and a backup without it cannot be restored/);
+        }
+    });
+
+    it("says why, and that nothing was run", () => {
+        expect(() => parseBackupLine(["db", "backup", "--exclude-schema=rebase"]))
+            .toThrow(/the users, roles and the functions every policy calls\. Nothing was run\./);
+    });
+
+    it("leaves out any other schema, a quoted one spelled otherwise included", () => {
+        for (const pattern of ["audit", "rebase_archive", "\"Rebase\"", "x.audit"]) {
+            expect(parseBackupLine(["db", "backup", "--exclude-schema", pattern])["--exclude-schema"]).toEqual([pattern]);
+        }
+    });
 });
 
 describe("parseCommandFlags", () => {

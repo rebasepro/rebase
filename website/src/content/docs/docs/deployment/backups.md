@@ -62,7 +62,7 @@ retention and listing sort by.
 | Option | Description |
 | --- | --- |
 | `--out`, `-o` | A local path, or an `s3://bucket/prefix` / `gs://bucket/prefix` URL. Defaults to `$BACKUP_DESTINATION`, then `./backups` in the directory you run `rebase` from. |
-| `--exclude-schema <s>` | Leave a schema out of the dump (repeatable). Never leave out `rebase` — see below. |
+| `--exclude-schema <s>` | Leave a schema out of the dump (repeatable). A pattern that matches `rebase` is refused — see below. |
 | `--no-owner` | Omit ownership commands, for restoring as a different role. |
 | `--enable-row-security` | Dump as an admin subject instead of failing on row-level security. **May produce a partial dump** — see [Row-level security](#row-level-security-and-the-dump-that-is-silently-short). |
 | `--row-security-role <r>` | The role to read as with the flag above. Defaults to `admin`. |
@@ -97,6 +97,11 @@ cron logs, and the functions your RLS policies and change-capture triggers
 call. A dump without it has no users, and cannot be restored into an empty
 database at all: the tables it does contain have policies that call functions
 it does not.
+
+<span class="since-badge" data-since="0.25">Since 0.25</span> So
+`rebase db backup` refuses an `--exclude-schema` that matches `rebase`, by
+pg_dump's own pattern rules (`reb*` and `*` included), before it runs anything.
+On 0.24 it wrote the dump and validated it, and only the restore failed.
 
 <span class="since-badge" data-since="0.25">Since 0.25</span> Because it holds
 every password and key hash, a local dump and its `.globals.sql` are created

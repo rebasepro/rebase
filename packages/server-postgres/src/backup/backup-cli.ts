@@ -190,7 +190,41 @@ export function parseBackupLine(rawArgs: string[]) {
             `To choose where the backup goes, pass --out ${stray}.`
         );
     }
+    const dropsRebase = (args["--exclude-schema"] ?? []).find(excludesRebaseSchema);
+    if (dropsRebase !== undefined) {
+        throw new Error(
+            `--exclude-schema ${dropsRebase} leaves out the rebase schema, and a backup without it cannot be restored: ` +
+            "it holds the users, roles and the functions every policy calls. Nothing was run."
+        );
+    }
     return args;
+}
+
+/**
+ * Whether a `pg_dump --exclude-schema` pattern matches the `rebase` schema, by
+ * pg_dump's own rules: `*` and `?` are wildcards, an unquoted name is folded
+ * to lower case and a double-quoted one is taken as written, and a
+ * `<database>.<schema>` pattern is matched on its schema.
+ */
+export function excludesRebaseSchema(pattern: string): boolean {
+    let source = "";
+    let quoted = false;
+    for (const char of pattern) {
+        if (char === "\"") {
+            quoted = !quoted;
+        } else if (char === "." && !quoted) {
+            // What came before was the database: the schema is what follows.
+            source = "";
+        } else if (char === "*" && !quoted) {
+            source += ".*";
+        } else if (char === "?" && !quoted) {
+            source += ".";
+        } else {
+            const literal = quoted ? char : char.toLowerCase();
+            source += literal.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        }
+    }
+    return new RegExp(`^(?:${source})$`).test("rebase");
 }
 
 export async function backupCommand(rawArgs: string[]): Promise<void> {
@@ -793,7 +827,8 @@ ${chalk.green.bold("Usage")}
 
 ${chalk.green.bold("Options")}
   ${chalk.blue("--out, -o")} <dest>        Local path or s3://…/gs://… URL (default: ./backups)
-  ${chalk.blue("--exclude-schema")} <s>    Exclude a schema (repeatable)
+  ${chalk.blue("--exclude-schema")} <s>    Exclude a schema (repeatable). Never rebase: a backup
+                             without it cannot be restored
   ${chalk.blue("--no-owner")}              Omit ownership commands from the dump
   ${chalk.blue("--enable-row-security")}   Dump as an admin subject instead of failing on RLS
                              ${chalk.red("(may produce a partial dump — see below)")}
