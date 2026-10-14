@@ -352,11 +352,12 @@ function processAlive(pid: number): boolean {
  * Whether `rebase dev` started this server.
  *
  * It states `REBASE_DEV_PORT_EXPLICIT`, true or false, on every backend it
- * spawns (see `options.explicit` above), so the variable being there at all is
- * the mark. The dev files are named for that server and describe it first.
+ * spawns (see `options.explicit` above), so the variable reading as either at
+ * all is the mark. The dev files are named for that server and describe it
+ * first.
  */
 function startedByRebaseDev(): boolean {
-    return process.env.REBASE_DEV_PORT_EXPLICIT !== undefined;
+    return parseEnvBoolean(process.env.REBASE_DEV_PORT_EXPLICIT) !== undefined;
 }
 
 /**
