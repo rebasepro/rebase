@@ -47,6 +47,15 @@ these if your app relies on the old behaviour:
   holds only the default bucket, and the image's user cannot write to it. Mount
   it at `/storage` with `STORAGE_PATH: /storage/uploads`, as the new compose
   files do.
+- **A service a request calls that cannot be reached is answered with
+  `503 SERVICE_UNAVAILABLE`,** such as an S3 bucket that is down or a host a
+  function `fetch()`es. It was a `500` whose code was the socket error
+  (`ECONNREFUSED`), or `INTERNAL_ERROR`.
+- **`rebase db push` keeps the CHECK and EXCLUDE constraints on a collection's
+  table,** where the first push after `rebase schema introspect` dropped them.
+  The destructive check now counts the drop of one too, so
+  `rebase db migrate --refuse-destructive` stops on a migration that drops one.
+  Drop a constraint you no longer want by hand.
 
 These names still work, warn once at runtime, and have a replacement:
 

@@ -711,6 +711,13 @@
   valid session. `ROLE_LOOKUP_FAILED` remains for a role lookup the database
   answered and that still failed.
 
+- **A service a request calls that cannot be reached is answered with 503
+  SERVICE_UNAVAILABLE,** such as an S3 or MinIO bucket that is down, or a
+  `fetch()` to a host that refuses the connection or does not resolve. It
+  answered `500` with the socket error as the code (`ECONNREFUSED`), or
+  `500 INTERNAL_ERROR`. The server log names the host and the error; the
+  response does not.
+
 - **A list page and its count are read in one transaction.** A
   `GET /posts?limit=25` was 8 statements in 2 transactions and is 5 in 1 (4
   with `?count=none`); with `include=*`, 13 → 10. The count now comes from the
@@ -1185,6 +1192,12 @@
   load.** The new-collection dialog asks when it opens, its only reader.
 
 #### CLI
+
+- **The check that stops a destructive schema change also stops the drop of a
+  CHECK or EXCLUDE constraint the database holds, and names it.** It is the
+  check behind `rebase db push`, `rebase db migrate --refuse-destructive` and
+  the report `rebase db generate` prints. A push that would still drop one asks
+  on a terminal and refuses elsewhere; `--allow-destructive` applies it.
 
 - **Schema introspection classifies a table whose policies give each user
   their own rows as an entity,** not as a code list or as a child hidden from
@@ -1700,6 +1713,20 @@
   is still in force, and is kept by describing it in `securityRules`. Both were
   "left behind by an earlier push".
 
+- **`rebase db push` no longer drops the CHECK and EXCLUDE constraints on a
+  collection's table.** A collection cannot declare either, so on a database
+  adopted with `rebase schema introspect` the first push dropped every one of
+  them without a prompt, and the database then accepted the rows they refused.
+  Push now leaves them alone, as it does the tables and indexes your
+  collections do not describe; to remove one, drop it by hand. Triggers and
+  functions you wrote were never touched, and still are not.
+
+- **`rebase db push` no longer drops a hand-written index whose name holds `[`,
+  `]`, `*` or `?`, and no longer refuses a database with a `.` in a table's or
+  an index's name.** Each name went to Atlas as a pattern, so
+  `orders_idx[v1]` matched nothing and the index was dropped without a prompt,
+  and a dotted name failed every push with `too many parts in pattern`.
+
 - **`rebase db backup`, `rebase db restore`, `rebase db branch` and
   `rebase schema introspect` against a database that is not running print the
   banner `rebase db push` prints,** "Cannot connect to PostgreSQL at
@@ -1726,6 +1753,12 @@
 - **A server created by `rebase eject` keeps local uploads in the project's
   `uploads/` when it runs compiled,** as it does under `rebase dev`. Compiled,
   it used `backend/dist/uploads`, which the next build deleted.
+
+- **The `.env.example` a new project gets no longer suggests
+  `STORAGE_PATH=./uploads`.** After `rebase eject` the server runs in
+  `backend/`, so that line pointed at `backend/uploads`, not the
+  `<project>/uploads` the server uses when the variable is unset. It now says
+  where files land by default and suggests an absolute path.
 
 - **`pnpm run build` in a new project no longer warns that "Some chunks are
   larger than 500 kB".** The chunks it named were the admin's, already

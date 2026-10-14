@@ -101,6 +101,11 @@ rebase schema introspect
 - <span class="since-badge" data-since="0.25">Since 0.25</span> Against a
   database that is not running, prints the same banner `db push` does, once,
   and creates nothing. It prints the output directory as an absolute path
+- <span class="since-badge" data-since="0.25">Since 0.25</span> Leaves a
+  table's CHECK and EXCLUDE constraints in the database, where the `db push`
+  after it keeps them. A collection cannot declare either; a CHECK
+  introspection can read (`total >= 0`) also becomes the property's
+  `validation`. On 0.24 that push dropped them
 
 **Options:**
 
@@ -142,6 +147,9 @@ rebase db push
   change that can lose values (`timestamptz` → `date`, `numeric` → `integer`),
   or a primary key change — `(id)` → `(id, locale)` gives every row a new id, so
   links, foreign keys and ids stored elsewhere stop finding their row.
+  <span class="since-badge" data-since="0.25">Since 0.25</span> It also stops
+  before the drop of a CHECK or EXCLUDE constraint the database holds: no row
+  is lost, but from then on the database accepts the rows it refused.
   It asks on a terminal, where Ctrl-C or Ctrl-D answers no, and refuses
   otherwise; `--allow-destructive` (or `--yes`) applies it anyway. A push that
   stops there drops its scratch `<db>_dev_diff` database on the way out
@@ -149,6 +157,18 @@ rebase db push
   schema change and before any step that can fail, so a push that stops part-way leaves a new table
   denying every request rather than open to it
 - Applies your collections' RLS policies, and **removes policies an earlier push superseded**
+- <span class="since-badge" data-since="0.25">Since 0.25</span> Leaves every
+  CHECK and EXCLUDE constraint on a collection's table as it is. A collection
+  cannot declare either, so they are the database's own rules, written by hand
+  or carried by a database `schema introspect` adopted; to remove one, drop it
+  by hand (`ALTER TABLE … DROP CONSTRAINT …`). Triggers and functions you wrote
+  are not touched either. On 0.24 the first push after an introspection dropped
+  every CHECK and EXCLUDE constraint without a prompt
+- <span class="since-badge" data-since="0.25">Since 0.25</span> Matches the
+  name of everything it leaves alone exactly, a `.`, `[`, `]` or `*` in it
+  included. On 0.24 a hand-written index named like `orders_idx[v1]` was
+  dropped without a prompt, and a `.` in a table's or an index's name failed
+  every push with `too many parts in pattern`
 - <span class="since-badge" data-since="0.25">Since 0.25</span> Builds any
   [foreign-key index Rebase derives](/docs/backend/indexes#foreign-keys-are-indexed-for-you)
   that an existing table is missing **before** planning, with
@@ -228,8 +248,20 @@ rebase db generate
 - <span class="since-badge" data-since="0.25">Since 0.25</span> Names every
   statement in the new migration that destroys data, using the check `db push`
   runs before it applies: a dropped table, column, schema, view or type, a
-  `TRUNCATE`, a column type change that can lose values, or a primary key
-  change. It still writes the file and exits 0, so it warns and does not refuse.
+  `TRUNCATE`, a column type change that can lose values, a primary key
+  change, or the drop of a CHECK or EXCLUDE constraint the database holds. It
+  still writes the file and exits 0, so it warns and does not refuse.
+
+**A CHECK a migration of yours added is dropped by the next one.** `db generate`
+diffs your migration files, not the database, and Atlas has no way to leave an
+object out of that diff. So a CHECK or EXCLUDE constraint that you wrote into a
+migration by hand, and that no collection can declare, comes back as
+`ALTER TABLE … DROP CONSTRAINT …` in the next migration it writes, folded into
+the same statement as the real change. The report above names that drop when
+the database already holds the constraint; it does not take it out of the
+file. Delete the clause before `rebase db migrate`, or let
+`rebase db migrate --refuse-destructive` stop on it. `db push` reads the
+database and keeps the constraint.
 
 The generated migrations are plain SQL files — you can inspect and modify them before applying.
 

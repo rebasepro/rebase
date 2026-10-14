@@ -168,7 +168,7 @@ ships), `STORAGE_PUBLIC_READ`, or `STORAGE_ALLOW_ANY_AUTHENTICATED`.
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `STORAGE_TYPE` | Storage backend: `local`, `s3` or `gcs`. In production `local` disables storage unless `FORCE_LOCAL_STORAGE=true` | `local` |
-| `STORAGE_PATH` | Base path for local storage | `./uploads` |
+| `STORAGE_PATH` | Base path for local storage. A relative path is read from the directory the server runs in: the project root under `rebase dev`, `backend/` in a server `rebase eject` wrote | `<project>/uploads` |
 | `FORCE_LOCAL_STORAGE` | Allow local storage in production — only with a durable volume holding `STORAGE_PATH` and the `<STORAGE_PATH>__<key>` directories of named local buckets beside it | `false` |
 | `STORAGE_DOWNLOAD_TOKEN_TTL` | Seconds a private file's download URL works — the token `getSignedUrl()` puts in it. At most `604800` (a week) | `300` |
 | `STORAGE_MAX_FILE_SIZE` | Largest file the source accepts, in bytes, on every upload path — `__<KEY>` for a named source. Not a whole number of bytes refuses the boot | `52428800` (50 MB) |

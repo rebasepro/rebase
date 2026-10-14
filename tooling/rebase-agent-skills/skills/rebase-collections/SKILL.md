@@ -523,6 +523,11 @@ touched. **Do not tell a user to re-create a hand-written index defensively, and
 do not rename one to look generated** — the hash is over the index's semantics
 and the name is frozen in `contracts/derived-names.txt`.
 
+On 0.24 that exclusion still missed an index whose name holds `[`, `]`, `*` or
+`?` (Atlas read `orders_idx[v1]` as a glob, matched nothing, and dropped it),
+and a `.` in an index's name failed every push. From 0.25 every name is matched
+exactly.
+
 Declared indexes are created by `rebase db push` *and* by boot-time schema
 ensure (`CREATE INDEX CONCURRENTLY IF NOT EXISTS`), so a deployment that never
 runs `db push` still gets them.

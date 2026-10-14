@@ -344,7 +344,7 @@ A route uses one of these when nothing more specific applies.
 | `CONFLICT` | 409 | A conflict with existing state. | See the message. |
 | `INTERNAL_ERROR` | 500 | Something on the server failed. The message is generic on purpose. | Quote the `requestId`; the reason is in the logs. |
 | `NOT_CONFIGURED` | 503 | A dependency this route needs is not configured on this server. | See the message. |
-| `SERVICE_UNAVAILABLE` | 503 | A dependency was unreachable. | Retry; check the logs. |
+| `SERVICE_UNAVAILABLE` | 503 | A service the request depends on could not be reached: an S3 or MinIO bucket, or a host a function `fetch()`es that refuses the connection or does not resolve. The server log names the host; the response does not. An unreachable database is `DATABASE_UNAVAILABLE`. <span class="since-badge" data-since="0.25">Since 0.25</span> A connection to such a service that fails answers this; on 0.24 it answers a `500` whose code is the socket error (`ECONNREFUSED`), or `INTERNAL_ERROR`. | Retry; check the logs. |
 
 ## Keeping this page true
 

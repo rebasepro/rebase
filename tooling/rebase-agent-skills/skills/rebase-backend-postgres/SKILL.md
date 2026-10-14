@@ -85,7 +85,9 @@ rebase db migrate
 > `rebase db push` refuses a destructive change on a non-TTY (dropped column, dropped
 > table, a column type change that can lose values, such as `timestamptz` → `date` or
 > `numeric` → `integer`, or a primary key change, which gives every row a new id). In CI or from an agent, pass `--allow-destructive` (or `--yes`)
-> once you have confirmed the data loss is intended.
+> once you have confirmed the data loss is intended. From 0.25 the same check stops the drop
+> of a CHECK or EXCLUDE constraint the database holds, and `db push` leaves those
+> constraints out of its plan, so it only fires when one was missed.
 
 ## Key Backend Packages
 
@@ -661,6 +663,18 @@ The `shutdown(timeoutMs?: number, options?: { server })` method (default timeout
 - **Never use `schema introspect` then `db migrate`** — introspected databases already have the tables
 - **Always backup before production migrations** — `ALTER COLUMN` or `DROP COLUMN` can cause data loss
 - **Tables not in schema are ignored** — custom tables and internal Rebase tables are safe
+- **CHECK and EXCLUDE constraints are kept (0.25+)** — a collection cannot declare either, so
+  `db push` leaves every one on a collection's table alone: hand-written, or carried by a database
+  `schema introspect` adopted (a readable CHECK also becomes the property's `validation`). On 0.24
+  the first push after an introspection dropped them all without a prompt. To remove one, drop it
+  by hand. Triggers and functions a user wrote are never touched (Atlas does not inspect them).
+  `db generate` is different: it diffs the migration files, so a CHECK a hand-written migration
+  added is dropped again by the next generated migration. Its report names the drop when the
+  database holds the constraint, but the statement stays in the file — delete it before
+  `db migrate`, or let `db migrate --refuse-destructive` stop on it
+- **Odd names are safe (0.25+)** — every exclude matches the name exactly, a `.`, `[`, `]` or `*`
+  in it included. On 0.24 a hand-written index named like `orders_idx[v1]` was dropped without a
+  prompt, and a `.` in a table's or an index's name failed every push (`too many parts in pattern`)
 - **Indexes are declared too** — a collection's `indexes` array is emitted into `schema.sql` by
   `db push`/`db generate` *and* created at boot with `CREATE INDEX CONCURRENTLY IF NOT EXISTS`,
   so a deployment that never runs `db push` still gets them. See the `rebase-collections` skill.

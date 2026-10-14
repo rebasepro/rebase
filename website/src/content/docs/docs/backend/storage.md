@@ -307,7 +307,7 @@ protocol, what it answers and how it behaves across instances.
 | Variable | Description |
 |----------|-------------|
 | `STORAGE_TYPE` | `"local"`, `"s3"`, or `"gcs"` |
-| `STORAGE_PATH` | Local storage directory (default: `./uploads`). A named local bucket keeps its files beside it, in `<STORAGE_PATH>__<key>`, unless `STORAGE_PATH__<KEY>` names its own |
+| `STORAGE_PATH` | Local storage directory (default: `<project>/uploads`, under `rebase dev` and in a server `rebase eject` wrote alike). A relative path is read from the directory the server runs in, which after `rebase eject` is `backend/`. A named local bucket keeps its files beside it, in `<STORAGE_PATH>__<key>`, unless `STORAGE_PATH__<KEY>` names its own |
 | `S3_BUCKET` | S3 bucket name |
 | `S3_REGION` | AWS region (default: `"auto"`) |
 | `S3_ACCESS_KEY_ID` | AWS access key |

@@ -341,7 +341,7 @@ The `details` field is optional and only present when additional context is avai
 | `409` | `EMAIL_EXISTS` | Registration with existing email |
 | `413` | `PAYLOAD_TOO_LARGE` | Request body exceeds max size (default 10MB) |
 | `500` | `INTERNAL_ERROR` | Unexpected server error |
-| `503` | `SERVICE_UNAVAILABLE` | Service not available |
+| `503` | `SERVICE_UNAVAILABLE` | A service the request depends on could not be reached: an S3/MinIO bucket, or a host a function `fetch()`es (0.25+; on 0.24 a `500` whose code is the socket error, such as `ECONNREFUSED`, or `INTERNAL_ERROR`). The host is in the server log only |
 | `503` | `DATABASE_UNAVAILABLE` | The database could not be reached (0.25+). Sent with `Retry-After: 5`, by every route and the realtime socket |
 
 ### ApiError Factory Methods
