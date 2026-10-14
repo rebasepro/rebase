@@ -710,6 +710,33 @@ describe("useRebaseAuthController hook (Unified Auth)", () => {
             await expect(result.current.getAuthToken())
                 .rejects.toThrow("Rebase client with auth is required");
         });
+
+        // Nobody signed in: there is nothing to refresh. Asking anyway sent a
+        // `POST /auth/refresh` the server could only refuse (401 NO_SESSION in
+        // cookie mode), an error in the console for every anonymous caller.
+        it("does not refresh when nobody is signed in", async () => {
+            mockAuth.getSession.mockReturnValue(null);
+
+            const { result } = renderHook(() => useRebaseAuthController({ client: mockClient }));
+            await act(async () => { await Promise.resolve(); });
+
+            await expect(result.current.getAuthToken()).rejects.toMatchObject({ code: "NOT_SIGNED_IN" });
+            expect(mockAuth.refreshSession).not.toHaveBeenCalled();
+        });
+
+        it("waits for the session being restored on load, and returns its token", async () => {
+            let resolveInit!: () => void;
+            mockAuth.isInitialized.mockReturnValue(new Promise<void>(resolve => { resolveInit = resolve; }));
+            mockAuth.getSession.mockReturnValue(null);
+
+            const { result } = renderHook(() => useRebaseAuthController({ client: mockClient }));
+            const token = result.current.getAuthToken();
+            mockAuth.getSession.mockReturnValue(mockSession);
+            await act(async () => { resolveInit(); await Promise.resolve(); });
+
+            await expect(token).resolves.toBe("access_token_123");
+            expect(mockAuth.refreshSession).not.toHaveBeenCalled();
+        });
     });
 
     // ─── skipLogin ───────────────────────────────────────────────────

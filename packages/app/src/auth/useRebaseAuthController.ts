@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { deepEqual } from "fast-equals";
+import { RebaseClientError } from "@rebasepro/types";
 import type { User, AuthChangeEvent, RebaseSession } from "@rebasepro/types";
 import type { AuthConfigResponse } from "./api";
 import { RebaseAuthController, RebaseAuthControllerProps } from "./types";
@@ -177,10 +178,24 @@ export function useRebaseAuthController(
 
     const getAuthToken = useCallback(async (): Promise<string> => {
         if (!auth) throw new Error("Rebase client with auth is required");
-        const session = auth.getSession();
+        let session = auth.getSession();
+
+        // On load the session may still be being restored (in cookie mode it
+        // always is, until the server answers): what that finds is the answer.
+        if (!session) {
+            await auth.isInitialized().catch(() => undefined);
+            session = auth.getSession();
+        }
+
+        // Nobody is signed in, so there is nothing to refresh. Asking anyway
+        // sent a `POST /auth/refresh` the server could only refuse, an error in
+        // the console for every anonymous caller.
+        if (!session) {
+            throw new RebaseClientError("Not signed in: there is no session to read a token from.", { code: "NOT_SIGNED_IN" });
+        }
 
         // If we have a valid token, return it
-        if (session?.accessToken && session.expiresAt > Date.now() + 10000) {
+        if (session.accessToken && session.expiresAt > Date.now() + 10000) {
             return session.accessToken;
         }
 
