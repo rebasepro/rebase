@@ -28,6 +28,7 @@ jest.mock("drizzle-orm/node-postgres", () => ({
 // ── Mock logger ───────────────────────────────────────────────────────────────
 jest.mock("@rebasepro/server", () => ({
     logger: {
+        debug: jest.fn(),
         info: jest.fn(),
         warn: jest.fn(),
         error: jest.fn()
@@ -258,6 +259,25 @@ describe("DatabasePoolManager", () => {
             // A fresh drizzle call should be needed after shutdown
             manager.getDrizzle("z");
             expect(drizzle).toHaveBeenCalledTimes(1);
+        });
+
+        /**
+         * `ℹ️ [INFO] [DatabasePoolManager] Shutting down pool for rebase` was
+         * the last line of every `rebase db branch create`, `delete` and
+         * `prune`: the CLI's own pool ending as the command finished, which is
+         * nothing the reader asked about.
+         */
+        it("says so at debug, not info: closing a pool is routine, and CLI commands close theirs on every run", async () => {
+            const { logger } = jest.requireMock("@rebasepro/server") as {
+                logger: { debug: jest.Mock; info: jest.Mock };
+            };
+            const manager = new DatabasePoolManager(VALID_CONNECTION_STRING);
+            manager.getPool("rebase");
+
+            await manager.shutdown();
+
+            expect(logger.info).not.toHaveBeenCalled();
+            expect(logger.debug).toHaveBeenCalledWith(expect.stringContaining("Shutting down pool for rebase"));
         });
 
         it("should not throw when called on a manager with no pools", async () => {

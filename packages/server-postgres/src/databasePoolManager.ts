@@ -136,7 +136,9 @@ export class DatabasePoolManager {
     public async shutdown(): Promise<void> {
         const promises = [];
         for (const [dbName, pool] of this.pools.entries()) {
-            logger.info(`[DatabasePoolManager] Shutting down pool for ${dbName}`);
+            // Debug: every CLI command that reaches a database ends here, and
+            // the reader of `rebase db branch create` did not ask about pools.
+            logger.debug(`[DatabasePoolManager] Shutting down pool for ${dbName}`);
             promises.push(pool.end());
         }
         await Promise.all(promises);
