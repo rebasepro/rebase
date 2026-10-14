@@ -28,7 +28,7 @@ ordinary one.
 
 An embedding is long in a URL: 768 dimensions are about 17 KB of query string and
 1,536 about 33 KB. The server accepts up to 64 KB of request line and headers
-(; 16 KB before, a 431
+(16 KB before, a 431
 from 768 dimensions up), and a proxy in front of it usually accepts less — nginx's
 default is 8 KB. Send a vector search as [`POST …/query`](#queries-too-long-for-a-url)
 instead; the SDK always does.

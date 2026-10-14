@@ -1,5 +1,5 @@
 ---
-sourceHash: 8376384a90695757
+sourceHash: 03e1d41a65491026
 title: Busca vetorial
 sidebar_label: Busca vetorial
 description: Busca de vizinhos mais próximos sobre uma propriedade vetorial pela API REST — os parâmetros de consulta, limiares, embeddings longos demais para uma URL e como os filtros se comportam em um índice HNSW.
@@ -29,7 +29,7 @@ comum.
 
 Um embedding é longo em uma URL: 768 dimensões são cerca de 17 KB de query string e
 1.536 cerca de 33 KB. O servidor aceita até 64 KB de linha de requisição e cabeçalhos
-(; antes eram 16 KB, um 431
+(antes eram 16 KB, um 431
 a partir de 768 dimensões), e um proxy na frente dele costuma aceitar menos — o padrão do nginx
 é 8 KB. Envie uma busca vetorial como [`POST …/query`](#consultas-longas-demais-para-uma-url)
 em vez disso; o SDK sempre faz isso.

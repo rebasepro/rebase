@@ -1,5 +1,5 @@
 ---
-sourceHash: 8376384a90695757
+sourceHash: 03e1d41a65491026
 title: Búsqueda vectorial
 sidebar_label: Búsqueda vectorial
 description: Búsqueda del vecino más cercano sobre una propiedad vectorial a través de la API REST — los parámetros de consulta, los umbrales, los embeddings demasiado largos para una URL y cómo se comportan los filtros en un índice HNSW.
@@ -29,7 +29,7 @@ habitual.
 
 Un embedding es largo en una URL: 768 dimensiones son unos 17 KB de cadena de consulta y
 1536 unos 33 KB. El servidor acepta hasta 64 KB de línea de petición y cabeceras
-(; antes eran 16 KB, un 431
+(antes eran 16 KB, un 431
 a partir de 768 dimensiones), y un proxy delante suele aceptar menos — el valor por defecto de
 nginx es 8 KB. Envía una búsqueda vectorial como [`POST …/query`](#consultas-demasiado-largas-para-una-url)
 en su lugar; el SDK siempre lo hace.

@@ -1,5 +1,5 @@
 ---
-sourceHash: 6cfa40d6d7fc1902
+sourceHash: fcc8e36632d57207
 title: Modifica dello schema live
 description: "Crea e modifica collection a fronte di un backend in esecuzione: prima committate nel repository, poi applicate."
 ---
@@ -120,7 +120,7 @@ Il verdetto viene letto dallo schema che ciascun lato produce — lo stesso
 piano a partire dal quale vengono generati `schema.generated.ts` e `db push`
 — quindi una modifica che cambia il database non può essere segnalata come
 nessuna modifica. Due modifiche che sembrano cambiamenti e non vengono
-rifiutate (; la 0.23 segnala entrambe come richiedenti una migrazione):
+rifiutate (la 0.23 segnala entrambe come richiedenti una migrazione):
 
 - **Rinominare la chiave di una proprietà mantenendo la sua colonna**
   (`columnName` impostato sul vecchio nome della colonna) non sposta alcun

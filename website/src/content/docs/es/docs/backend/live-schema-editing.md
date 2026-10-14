@@ -1,5 +1,5 @@
 ---
-sourceHash: 6cfa40d6d7fc1902
+sourceHash: fcc8e36632d57207
 title: Edición de esquemas en vivo
 description: "Crea y modifica colecciones en un backend en ejecución: primero se confirman en tu repositorio y luego se aplican."
 ---
@@ -117,7 +117,7 @@ especifica el cambio y qué hacer en su lugar.
 El veredicto se lee a partir del esquema que produce cada lado — el mismo del
 que se generan `schema.generated.ts` y `db push` — de modo que una edición que
 cambia la base de datos no puede reportarse como que no hay cambio. Dos
-ediciones que parecen cambios y no se rechazan (; 0.23 reporta
+ediciones que parecen cambios y no se rechazan (0.23 reporta
 ambas como que necesitan una migración):
 
 - **Renombrar la clave de una propiedad conservando su columna** (`columnName`

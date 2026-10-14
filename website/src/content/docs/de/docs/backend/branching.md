@@ -1,5 +1,5 @@
 ---
-sourceHash: 9f9448404128f745
+sourceHash: 24b4fea53f88a18f
 title: Datenbank-Branching
 sidebar_label: Branching
 description: Erstellen Sie isolierte Datenbank-Branches für Entwicklung, Staging und Tests mit PostgreSQLs CREATE DATABASE ... TEMPLATE – sofortige, originalgetreue Kopien ohne Ausfallzeiten.

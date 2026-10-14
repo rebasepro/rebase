@@ -1,5 +1,5 @@
 ---
-sourceHash: 8376384a90695757
+sourceHash: 03e1d41a65491026
 title: Recherche vectorielle
 sidebar_label: Recherche vectorielle
 description: Recherche des plus proches voisins sur une propriété vectorielle via l'API REST — les paramètres de requête, les seuils, les embeddings trop longs pour une URL, et le comportement des filtres sur un index HNSW.
@@ -29,7 +29,7 @@ ordinaire.
 
 Un embedding est long dans une URL : 768 dimensions représentent environ 17 Ko de chaîne de requête et
 1 536 environ 33 Ko. Le serveur accepte jusqu'à 64 Ko de ligne de requête et d'en-têtes
-(; 16 Ko auparavant, un 431
+(16 Ko auparavant, un 431
 à partir de 768 dimensions), et un proxy placé devant en accepte généralement moins — la valeur par défaut de nginx
 est de 8 Ko. Envoyez plutôt une recherche vectorielle par [`POST …/query`](#requêtes-trop-longues-pour-une-url) ;
 le SDK le fait toujours.

@@ -11,6 +11,252 @@ La traduction est à venir. Le contenu ci-dessous est en anglais.
 
 ## [Unreleased]
 
+### Changed
+
+#### CLI
+
+- **A pull anonymizes the names on any table of people.** `rebase db pull
+  --anonymize` kept a bare `name` everywhere but tables named like users or
+  customers, so the blog scaffold's `authors` arrived with real names. `authors`
+  now counts, and so does any table with an email address column; a table of
+  organisations with a contact address gets its name redacted in the local copy.
+
+#### Realtime
+
+- **The realtime socket ends a revoked session with the HTTP routes' code.**
+  With the built-in auth, a socket whose session is revoked, or whose account is
+  deleted or disabled, now receives `AUTH_ERROR` with `SESSION_REVOKED` or
+  `ACCOUNT_DISABLED` before it is closed (4001), where it received
+  `SESSION_ENDED`, and a refused `AUTHENTICATE` gets those codes instead of
+  `INVALID_TOKEN`. Another auth adapter's socket still receives `SESSION_ENDED`.
+  A client that matches on the old codes should match these too.
+  `isDatabaseUnreachable` from `@rebasepro/server` also answers `true` now for a
+  database closed to new connections.
+
+#### Studio
+
+- **The schema change dialog's and the API explorer's retry buttons say
+  "Retry"**, the same translated word as the rest of the admin, where they said
+  "Try again".
+
+### Fixed
+
+#### CLI
+
+- **A start beside a running dev no longer takes over dev's state, or deletes it
+  when it stops.** Both wrote `.rebase/state.json` and `.rebase-dev-port` on
+  every bind and deleted them on every stop, so while `rebase start` ran,
+  `rebase api-keys`, `generate-sdk` and MCP discovery reached it, and when it
+  stopped, `rebase api-keys list` said the server was not running while dev was
+  serving. A server now leaves the files to the live server that wrote them,
+  `rebase dev`'s backend takes them over in either order, and each process
+  removes only what it wrote.
+
+- **A managed database started by an older CLI is restarted after an upgrade.**
+  The database proxy runs inside the daemon, which outlives every command, so
+  after `rebase upgrade` the old daemon and its bugs kept serving until `rebase
+  db stop` or 30 idle minutes. The daemon now records which CLI started it. A
+  newer CLI restarts an older one when nothing is connected to it (data and port
+  kept), or says once to stop what uses it and run `rebase db stop`, and `rebase
+  upgrade` says so when such a daemon is running.
+
+- **Dev recovers from a database that went away during boot.** A `rebase db
+  branch create --force`, or a database restarting, that landed while the
+  backend booted left it down with "Fix the error above; the watcher restarts it
+  on the next change", though nothing needed fixing. Dev now retries such a boot
+  up to three times, after 1, 2 and 4 seconds, and says so. It also no longer
+  polls for a minute on a database closed to new connections: it opens it again,
+  as every `rebase db branch` command does, or stops at once and names the
+  database, `rebase db branch list`, and the `ALTER DATABASE … ALLOW_CONNECTIONS
+  true` to run.
+
+- **A misspelt flag on a driver command is refused before a database starts.**
+  `rebase db push --dry-rn` started the remembered Docker container, or the
+  managed database, before the driver refused the flag. `db push`, `generate`,
+  `migrate`, `branch`, `backup`, `restore` and `backups list` are now checked by
+  the driver's own parser first, and so are `branch switch`'s flags and a
+  missing `--collections` path.
+
+- **Two forced branch creates on one source no longer step on each other.** A
+  forced create holds an advisory lock on its source while it keeps it closed:
+  the reopening every `rebase db branch` command does leaves that source alone,
+  and a second forced create from it waits for the first. Forced creates under a
+  running dev no longer flood its log: the database ending the server's idle
+  connections is one warning per 10-second burst, not one error per connection.
+
+- **The doctor reports the drift that boot warns about.** `rebase doctor` said
+  "Collections → Database: In sync" while boot warned that `schema.generated.ts`
+  and the database disagree, as after renaming a property: a NOT NULL against a
+  nullable column, and the old column left behind. It now runs boot's own
+  comparison, so every difference boot warns about is in its report, in the same
+  words, naming `rebase db push`. Its "Cannot connect" banner names what chose
+  the database, so a stopped remembered Docker database gets the Docker fix
+  instead of ".env".
+
+- **The first boot after a migrate leaves the policies alone.** `rebase db
+  migrate` applied the migration's row-level security policies without the stamp
+  that `db push` and the boot write, so the first boot after every migrate
+  dropped and re-created every policy once, an ACCESS EXCLUSIVE lock per table.
+  Migrate now stamps each policy whose stored definition is exactly what its
+  rule makes, which it checks with Postgres in a rolled-back transaction. A
+  policy that differs gets no stamp, and the boot re-applies it as before.
+
+- **Introspection keeps a many-to-many junction's write policies.** After
+  `rebase schema introspect`, the junction's `<junction>_default_edge_write_*`
+  policies had no rule behind them: introspection wrote a role rule as the SQL
+  Postgres stores (`string_to_array(rebase.roles(), ','::text) &&
+  ARRAY['admin'::text]`), which a junction could not inherit, so the dry run
+  listed the three policies as ones no collection describes and a later change
+  to the rule never reached them. A role rule written that way now reads as the
+  role rule, so the push derives the same policies, and the admin UI's policy
+  check reads it as a role check.
+
+- **A headless dev picks up the collections an introspection writes while it
+  runs.** Dev watched `config/collections` only when it existed at start, so new
+  collections, and edits to them, changed nothing until a restart. Dev now
+  regenerates the schema and the SDK and restarts the backend when the directory
+  appears.
+
+- **A fresh project passes its own resource check.** Every scaffold declares a
+  database and a function, and nothing wrote `rebase.resources.json` until the
+  first build, so `rebase resources --check` in CI failed on a project nobody
+  had touched. `rebase init` now writes the file, and it is in a `--git`
+  project's first commit.
+
+- **Database command details.** A restore from a truncated dump says the file is
+  truncated (or is not a backup, or came from a newer pg_dump), quotes
+  pg_restore, and says nothing was restored or changed, instead of `Command
+  failed … pg_restore --list`. The NOT NULL box's backfill line survives the
+  value typed into it: the SQL is double-quoted for the shell with a `'…'`
+  placeholder, where typing `'tbd'` closed the quote. A pull refuses a source
+  that is not a connection string up front, without repeating the value; libpq's
+  `host=… dbname=…` form still works. The switched-branch note goes to stderr
+  instead of ahead of the command's output.
+
+- **CLI details.** The SDK README names the port `rebase dev` is on, where it
+  said `localhost:3001` after every start. The start command's help prints a run
+  line that works in a project (`pnpm exec rebase`, or the project's package
+  manager), and the scaffold's `.env` comment says `rebase start` keeps local
+  uploads in `<project>/uploads` too. Ctrl-C at an init question exits 130
+  quietly, and the "Re-run with --debug" hint no longer follows init's and dev's
+  own refusals or `generate-sdk`'s collection-loading errors. A local build no
+  longer breaks `pnpm install --frozen-lockfile` in this repository: `app/*`
+  matched `rebase build`'s output.
+
+#### Server & REST
+
+- **A script that builds a backend prints only its own output.** A script that
+  called `createRebaseBackend` and never mounted it, as the scripts page
+  suggests, opened its stdout with the boot's info lines: the schema owner,
+  change capture, the RLS posture, the per-boot key, `backend.fetch`'s request
+  log and the shutdown, and its stderr warned about nine admin routes it had not
+  mounted. The build's info lines now wait until the backend serves (`mount()`,
+  a route group, `attachRealtime()` or `start()`), so a server's boot prints
+  what it always printed and a script prints nothing of it. Warnings and errors
+  are written at once, `LOG_LEVEL=debug` still shows everything, and the "routes
+  are mounted but DISABLED" warnings are said when those routes are mounted.
+
+- **A database closed to new connections answers 503 DATABASE_UNAVAILABLE.** A
+  running app whose database refused new connections (`ALLOW_CONNECTIONS false`,
+  which an interrupted `rebase db branch create --force` leaves on its source)
+  answered signed-in requests `503 ROLE_LOOKUP_FAILED` "Could not verify your
+  permissions", and a query a 500. It now answers `503 DATABASE_UNAVAILABLE`
+  with `Retry-After`, as for a database that is down, and the log names the
+  database once a minute, says nothing is lost, and gives `rebase db branch
+  list` and the `ALTER DATABASE … ALLOW_CONNECTIONS true` that open it.
+
+- **Quieter logs.** A cross-instance or change-capture LISTEN connection that
+  could not be opened logged `❌ [ERROR] … Failed to connect LISTEN client`, with
+  the stack, on every retry, while realtime carried on; it is now one warning
+  per outage, naming the reason and the retry interval. The schema editor's
+  ts-morph hint names the package the backend runs in, in your package manager
+  (`pnpm --dir backend add -D ts-morph@28.0.0` in a scaffold), where `pnpm add
+  -D` at a scaffold's root is refused, and it is logged the first time the admin
+  panel asks for the editor instead of on every boot.
+
+#### Realtime
+
+- **A revoked session on the realtime socket is refused promptly, and the error
+  says why.** With a signed-out or revoked session, or a disabled account, the
+  socket answered `INVALID_TOKEN`, and the SDK logged "WebSocket connected
+  without auth" and retried for over three seconds before `listen()`'s `onError`
+  heard anything. The SDK now warns once that the session was refused, does not
+  ask again with the same token, and passes the error, with its `code`, to
+  `onError` at once.
+
+#### Client SDK
+
+- **The client SDK no longer writes connection messages to a Node script's
+  stdout.** "Connected to PostgreSQL backend" and "WebSocket auto-authenticated"
+  went to stdout, because `console.debug` is `console.log` in Node. In a browser
+  they stay at the console's Verbose level; in Node they print only with
+  `globalThis.__REBASE_DEBUG_REALTIME__ = true`.
+
+#### Studio
+
+- **Studio's schema change dialog and column selects are translated.** The
+  dialog's review, verdicts, chips, disclosures, receipt and buttons, and the
+  column type and primary key selects on string, number and date properties
+  (their options, the value they show and the caption under them), now follow
+  the admin language in all seven locales; they were English in every language.
+  The server's own explanations of each change, and SQL type names, are shown as
+  written. The policy editor's expression boxes use the theme's card surface
+  instead of a fixed white and near-black pair.
+
+- **The API explorer's load-failure screen and the policy editor's help are
+  translated.** Both titles and explanations of the explorer's failure screen,
+  and the policy help's auth-helper bullets, example label and screen-reader
+  title, follow the admin language. The demo app creates its client once per
+  page, as the scaffold now does.
+
+#### Admin (CMS & app)
+
+- **Admin details.** The relation picker's title and its Clear and Done buttons
+  follow the admin language, where they were English beside a translated "Add"
+  button. A select's chevron in the record form is drawn at full size, the same
+  icon as the relation field's, where it was about half size with a hairline
+  stroke.
+
+- **A new project's admin creates one API client per page.** The scaffold built
+  its client inside a component, which `<React.StrictMode>` runs twice in
+  development, so every dev page load made two clients, each restoring the
+  session, with two `POST /api/auth/refresh` 401s for a visitor who was not
+  signed in, and one client never closed. Existing projects can move the
+  `createRebaseClient(...)` call in `frontend/src/App.tsx` out of the component
+  to module scope.
+
+- **The date property's selects are translated, and an empty automatic value
+  shows.** Its mode, automatic-value and timezone selects and their captions
+  follow the admin language. With no automatic value the closed select showed
+  nothing in every language, because it was given a value no item has; it now
+  shows "None", and choosing it still stores `null`. The relation field's
+  open-record button has a translated tooltip and accessible name.
+
+### Security
+
+#### CLI
+
+- **A switch given false is now off.** On the driver, `db push
+  --allow-destructive=false` allowed the destructive statements it was written
+  to forbid, `--dry-run=false` ran a dry run, and `rebase db pull
+  --anonymize=false` anonymized. A switch's value is now read on every CLI
+  command and every `rebase db` command: `=true` or `=1` turns it on, as `=true`
+  always did, `=false` or `=0` leaves it off, and any other value is refused
+  before anything runs.
+
+- **A refusal no longer repeats a password quoted into one argument.** `rebase
+  db pull "--fro postgres://user:pw@host/db"`, a flag and its value in one shell
+  word, printed the URL, password included, and `rebase db
+  "postgres://user:pw@host/db"` printed it in its "Unknown db command" line.
+  Both are masked as `user:***@` now, and the stray-argument refusals of `db
+  backup`, `db restore` and `db branch` mask what they quote too.
+
+- **The guard on backups without the rebase schema reads patterns as pg_dump
+  does.** `rebase db backup --exclude-schema '[r]ebase'` (or `audit|rebase`)
+  wrote a dump that cannot be restored. Regular-expression syntax in a pattern
+  is now read the way pg_dump reads it, and the server is asked about each
+  pattern before `pg_dump` runs.
+
 ## [0.25.0] - 2026-10-14
 
 ### Breaking

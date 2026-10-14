@@ -1,5 +1,5 @@
 ---
-sourceHash: 6cfa40d6d7fc1902
+sourceHash: fcc8e36632d57207
 title: Live-Schema-Bearbeitung
 description: Erstellen und Ändern von Collections auf einem laufenden Backend – zuerst in Ihr Repository committet, dann angewendet.
 ---
@@ -143,7 +143,7 @@ was stattdessen zu tun ist.
 Das Urteil wird aus dem Schema gelesen, das jede Seite erzeugt — demselben Plan, aus dem
 `schema.generated.ts` und `db push` gerendert werden — sodass eine Änderung, die die Datenbank
 verändert, nicht als „keine Änderung" gemeldet werden kann. Zwei Änderungen, die wie Änderungen
-aussehen und nicht abgelehnt werden (; 0.23 meldet beide als migrationsbedürftig):
+aussehen und nicht abgelehnt werden (0.23 meldet beide als migrationsbedürftig):
 
 - **Das Umbenennen des Schlüssels einer Property bei gleichbleibender Spalte** (`columnName`
   auf die alte Spalte gesetzt) bewegt keine Daten. Es ist `safe`; API-Clients lesen den neuen

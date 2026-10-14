@@ -1,5 +1,5 @@
 ---
-sourceHash: 9f9448404128f745
+sourceHash: 24b4fea53f88a18f
 title: Branches de base de données
 sidebar_label: Branches
 description: Créez des branches de base de données isolées pour le développement, le staging et les tests à l'aide de CREATE DATABASE ... TEMPLATE de PostgreSQL — des copies instantanées et parfaitement fidèles, sans temps d'arrêt.

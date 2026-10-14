@@ -1,5 +1,5 @@
 ---
-sourceHash: c782dc72c3c2aff6
+sourceHash: 0ad3c09f2832ec0a
 title: Copias de seguridad y restauración
 sidebar_label: Copias de seguridad
 description: Crea, programa, lista y restaura copias de seguridad de la base de datos con pg_dump — qué contiene una copia de seguridad, el archivo de roles que la acompaña, y lo único que no cubre, tus archivos subidos.

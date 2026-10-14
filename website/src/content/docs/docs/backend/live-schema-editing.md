@@ -140,7 +140,7 @@ refused too. Each refusal names the change and what to do instead.
 The verdict is read from the schema each side produces — the same plan
 `schema.generated.ts` and `db push` are rendered from — so an edit that changes
 the database cannot be reported as no change. Two edits that look like changes
-and are not refused (; 0.23 reports both as needing a migration):
+and are not refused (0.23 reports both as needing a migration):
 
 - **Renaming a property's key while keeping its column** (`columnName` set to
   the old column) moves no data. It is `safe`; API clients read the new name.

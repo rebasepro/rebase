@@ -1,5 +1,5 @@
 ---
-sourceHash: 8376384a90695757
+sourceHash: 03e1d41a65491026
 title: Vektorsuche
 sidebar_label: Vektorsuche
 description: Nächste-Nachbarn-Suche über eine Vektor-Property per REST-API — die Query-Parameter, Schwellenwerte, für eine URL zu lange Embeddings und wie sich Filter auf einem HNSW-Index verhalten.
@@ -29,7 +29,7 @@ gewöhnliche.
 
 Ein Embedding ist in einer URL lang: 768 Dimensionen sind etwa 17 KB Query-String und
 1.536 etwa 33 KB. Der Server akzeptiert bis zu 64 KB an Request-Zeile und Headern
-(; zuvor 16 KB, ein 431
+(zuvor 16 KB, ein 431
 ab 768 Dimensionen), und ein Proxy davor akzeptiert meist weniger — beim Standard von nginx
 sind es 8 KB. Senden Sie eine Vektorsuche stattdessen als [`POST …/query`](#abfragen-die-für-eine-url-zu-lang-sind);
 das SDK tut das immer.

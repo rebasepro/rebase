@@ -1,5 +1,5 @@
 ---
-sourceHash: 8376384a90695757
+sourceHash: 03e1d41a65491026
 title: Ricerca vettoriale
 sidebar_label: Ricerca vettoriale
 description: Ricerca del vicino più prossimo su una proprietà vector tramite l'API REST — i parametri di query, le soglie, gli embedding troppo lunghi per un URL e come si comportano i filtri su un indice HNSW.
@@ -29,7 +29,7 @@ quello ordinario.
 
 Un embedding è lungo in un URL: 768 dimensioni sono circa 17 KB di query string e
 1.536 circa 33 KB. Il server accetta fino a 64 KB di request line e header
-(; prima 16 KB, un 431
+(prima 16 KB, un 431
 da 768 dimensioni in su), e un proxy davanti ad esso di solito ne accetta meno — il valore
 predefinito di nginx è 8 KB. Invia invece una ricerca vettoriale come [`POST …/query`](#query-troppo-lunghe-per-un-url);
 l'SDK lo fa sempre.

@@ -1,5 +1,5 @@
 ---
-sourceHash: 6cfa40d6d7fc1902
+sourceHash: fcc8e36632d57207
 title: Édition de schéma en direct
 description: Créez et modifiez des collections sur un backend en cours d'exécution — d'abord validé dans votre dépôt, puis appliqué.
 ---
@@ -114,7 +114,7 @@ Chaque refus nomme le changement et indique quoi faire à la place.
 Le verdict est lu depuis le schéma que chaque côté produit — le même plan dont sont rendus
 `schema.generated.ts` et `db push` — si bien qu'une modification qui change la base de données ne peut pas
 être signalée comme n'étant pas un changement. Deux modifications qui ressemblent à des changements et ne
-sont pas refusées (; la 0.23 signale les deux comme nécessitant une migration) :
+sont pas refusées (la 0.23 signale les deux comme nécessitant une migration) :
 
 - **Renommer la clé d'une propriété en conservant sa colonne** (`columnName` réglé sur l'ancienne colonne) ne
   déplace aucune donnée. C'est `safe` ; les clients API lisent le nouveau nom.

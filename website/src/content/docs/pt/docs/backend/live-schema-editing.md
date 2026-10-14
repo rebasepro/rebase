@@ -1,5 +1,5 @@
 ---
-sourceHash: 6cfa40d6d7fc1902
+sourceHash: fcc8e36632d57207
 title: Edição de schema ao vivo
 description: Crie e altere coleções em um backend em execução — comitadas primeiro no seu repositório, depois aplicadas.
 ---
@@ -143,7 +143,7 @@ alteração e o que fazer em vez disso.
 O veredito é lido a partir do esquema que cada lado produz — o mesmo plano a
 partir do qual o `schema.generated.ts` e o `db push` são renderizados — então
 uma edição que altera o banco de dados não pode ser relatada como nenhuma
-alteração. Duas edições que parecem alterações e não são recusadas (; a 0.23 relata ambas como exigindo uma migração):
+alteração. Duas edições que parecem alterações e não são recusadas (a 0.23 relata ambas como exigindo uma migração):
 
 - **Renomear a chave de uma propriedade mantendo sua coluna** (`columnName`
   definido como a coluna antiga) não move nenhum dado. É `safe`; os clientes da

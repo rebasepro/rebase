@@ -1,5 +1,5 @@
 ---
-sourceHash: 7508b9aae8deef79
+sourceHash: 02fa0bb111c71ed5
 title: Comandi del database
 sidebar_label: Comandi del database
 description: I comandi rebase db — push, generate e migrate, backup e ripristini, la copia di un database, la stringa di connessione, il database di sviluppo gestito e i branch.
