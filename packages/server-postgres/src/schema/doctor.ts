@@ -12,9 +12,10 @@ import * as fs from "fs";
 import path from "path";
 import { pathToFileURL } from "url";
 import chalk from "chalk";
-import { computeSchemaVersion, CollectionConfig, isPostgresCollectionConfig, Property, NumberProperty, StringProperty, DateProperty, ArrayProperty, MapProperty, RelationProperty, type ResolvedManyToMany, type ResolvedBelongsTo, isManyToMany } from "@rebasepro/types";
+import { computeSchemaVersion, CollectionConfig, DEFAULT_DATA_SOURCE_KEY, isPostgresCollectionConfig, Property, NumberProperty, StringProperty, DateProperty, ArrayProperty, MapProperty, RelationProperty, type ResolvedManyToMany, type ResolvedBelongsTo, isManyToMany } from "@rebasepro/types";
 import { generateSchema } from "./generate-drizzle-schema-logic";
 import { compareGeneratedDeclarations, describeDeclarationDifferences } from "./generated-schema-staleness";
+import { describeSchemaDifference, readGeneratedSchemaDrift, type SchemaDifference } from "./generated-schema-diff";
 import { columnPgType, planSchema } from "./plan/plan-schema";
 import { renderPgType } from "./plan/render-ddl";
 import type { PgType, SchemaPlan, TablePlan } from "./plan/types";
@@ -44,7 +45,7 @@ export type IssueSeverity = "error" | "warning" | "info";
 
 export interface DoctorIssue {
     severity: IssueSeverity;
-    category: "missing_table" | "missing_column" | "type_mismatch" | "missing_constraint" | "primary_key_mismatch" | "schema_stale" | "missing_enum" | "enum_value_mismatch" | "missing_foreign_key" | "orphaned_junction" | "sdk_stale" | "sdk_not_generated" | "sdk_ungeneratable";
+    category: "missing_table" | "missing_column" | "type_mismatch" | "nullability_mismatch" | "extra_column" | "missing_constraint" | "primary_key_mismatch" | "schema_stale" | "missing_enum" | "enum_value_mismatch" | "missing_foreign_key" | "orphaned_junction" | "sdk_stale" | "sdk_not_generated" | "sdk_ungeneratable";
     table?: string;
     column?: string;
     expected?: string;
@@ -538,9 +539,97 @@ export function junctionKeyIssues(
     return issues;
 }
 
+/** A table as the other issues name it: bare in `public`, `schema.table` elsewhere. */
+function displayTableOf(difference: SchemaDifference, collections: CollectionConfig[]): string {
+    const collection = difference.collection ? collections.find(c => c.slug === difference.collection) : undefined;
+    const schema = collection && isPostgresCollectionConfig(collection) ? collection.schema : undefined;
+    return schema && schema !== "public" ? `${schema}.${difference.table}` : difference.table;
+}
+
+/** Which of the doctor's own categories already says what a boot difference says. */
+const COVERING_CATEGORY: Record<SchemaDifference["kind"], DoctorIssue["category"]> = {
+    "missing-table": "missing_table",
+    "missing-column": "missing_column",
+    type: "type_mismatch",
+    nullability: "nullability_mismatch",
+    "extra-column": "extra_column"
+};
+
+/** What to do about one boot difference, said the way the boot warning says it. */
+function generatedDriftFix(difference: SchemaDifference): string {
+    const regenerate = " If the collections changed since schema.generated.ts was written, run `rebase schema generate` first.";
+    switch (difference.kind) {
+        case "nullability":
+            return difference.generated === "NOT NULL"
+                ? "`rebase db push` applies it; a NOT NULL needs every row filled first (UPDATE the empty ones, or give "
+                    + "the property a default). Boot adds one only with a new column on an empty table." + regenerate
+                : "`rebase db push` drops the NOT NULL, which boot never does. If the column should stay required, "
+                    + "mark the property `validation: { required: true }`." + regenerate;
+        case "extra-column":
+            return "Boot never drops a column, so its data is still there. `rebase db push` removes it (it asks first, "
+                + "since that deletes the data), or a migration does (`rebase db generate`). If a property should still "
+                + "read it, declare it again." + regenerate;
+        case "type":
+            return "`rebase db push` converts it (it asks first when values may not convert), or a migration does." + regenerate;
+        case "missing-column":
+            return "`rebase db push` adds it." + regenerate;
+        case "missing-table":
+            return "Run `rebase db push` or `rebase db generate && rebase db migrate`";
+    }
+}
+
+/**
+ * Boot's drift warnings, as doctor issues — one per difference, in boot's own
+ * words ({@link describeSchemaDifference}), and a warning, as boot raises them.
+ *
+ * Except where an issue the collections-side checks above already raised says
+ * the same thing: a missing table, a missing column or a type mismatch on the
+ * same column. Nullability and columns no collection declares are boot's alone;
+ * the doctor never compared them, which is how it came to say "In sync" beside
+ * a boot that had just warned about both.
+ */
+export function generatedSchemaDriftIssues(
+    differences: SchemaDifference[],
+    already: DoctorIssue[],
+    collections: CollectionConfig[]
+): DoctorIssue[] {
+    const bare = (table: string | undefined) => table?.split(".").pop();
+    const covered = (difference: SchemaDifference) => already.some(issue =>
+        issue.category === COVERING_CATEGORY[difference.kind]
+        && bare(issue.table) === difference.table
+        && (difference.kind === "missing-table" || issue.column === difference.column));
+
+    return differences.filter(difference => !covered(difference)).map(difference => ({
+        severity: "warning",
+        category: COVERING_CATEGORY[difference.kind],
+        table: displayTableOf(difference, collections),
+        ...(difference.column ? { column: difference.column } : {}),
+        ...(difference.generated ? { expected: difference.generated } : {}),
+        ...(difference.live ? { actual: difference.live } : {}),
+        message: describeSchemaDifference(difference),
+        fix: generatedDriftFix(difference)
+    }));
+}
+
+/**
+ * The collections whose tables the default database holds — the filter boot
+ * applies before it reads the catalogue, for the same reason: a collection
+ * routed to `database("analytics")` has no table here.
+ */
+function defaultSourceCollections(collections: CollectionConfig[]): CollectionConfig[] {
+    return collections.filter(c => !c.dataSource || c.dataSource === DEFAULT_DATA_SOURCE_KEY);
+}
+
 export async function checkCollectionsVsDatabase(
     collections: CollectionConfig[],
-    databaseUrl: string
+    databaseUrl: string,
+    options: {
+        /**
+         * The `tables` export of `schema.generated.ts`, for boot's own drift
+         * comparison. Without it the doctor compares the collections alone.
+         */
+        generated?: Record<string, unknown>;
+    } = {}
 ): Promise<DoctorPhase> {
     const issues: DoctorIssue[] = [];
 
@@ -927,6 +1016,19 @@ export async function checkCollectionsVsDatabase(
         if (plan) {
             issues.push(...orphanedJunctionIssues(plan, columnsByTable, pksByTable, fksByTable));
         }
+
+        // The question boot asks, through boot's code: `schema.generated.ts`
+        // against the catalogue. Last, so the differences the checks above
+        // already named are not named twice.
+        if (options.generated) {
+            const differences = await readGeneratedSchemaDrift({
+                client: pool,
+                generated: options.generated,
+                collections: defaultSourceCollections(collections),
+                defaultSchema: "public"
+            });
+            issues.push(...generatedSchemaDriftIssues(differences, issues, collections));
+        }
     } finally {
         await pool.end();
     }
@@ -1101,6 +1203,8 @@ function formatCategory(cat: DoctorIssue["category"]): string {
         missing_table: "Missing Table",
         missing_column: "Missing Column",
         type_mismatch: "Type Mismatch",
+        nullability_mismatch: "Nullability Mismatch",
+        extra_column: "Extra Column",
         missing_constraint: "Missing Constraint",
         primary_key_mismatch: "Primary Key Mismatch",
         schema_stale: "Stale Schema",
@@ -1116,6 +1220,25 @@ function formatCategory(cat: DoctorIssue["category"]): string {
 }
 
 // ── Main entry point ─────────────────────────────────────────────────────
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+    typeof value === "object" && value !== null;
+
+/**
+ * The `tables` export of `schema.generated.ts`, imported as boot imports it.
+ *
+ * Nothing, and no error, when the file is not there: phase 1 reports that, and
+ * boot then has nothing to compare either.
+ */
+async function loadGeneratedTables(schemaPath: string): Promise<{ tables?: Record<string, unknown>; error?: string }> {
+    if (!fs.existsSync(schemaPath)) return {};
+    try {
+        const module: unknown = await import(pathToFileURL(schemaPath).href);
+        return isRecord(module) && isRecord(module.tables) ? { tables: module.tables } : {};
+    } catch (err: unknown) {
+        return { error: err instanceof Error ? err.message : String(err) };
+    }
+}
 
 export async function runDoctor(options: {
     collectionsPath: string;
@@ -1142,7 +1265,18 @@ export async function runDoctor(options: {
     if (options.databaseUrl) {
         out(chalk.gray("  Checking Collections → Database..."));
         try {
-            schemaToDatabase = await checkCollectionsVsDatabase(collections, options.databaseUrl);
+            const generated = await loadGeneratedTables(options.schemaPath);
+            schemaToDatabase = await checkCollectionsVsDatabase(collections, options.databaseUrl, { generated: generated.tables });
+            if (generated.error) {
+                // Boot imports this module too, and would stop on it.
+                schemaToDatabase.issues.push({
+                    severity: "warning",
+                    category: "schema_stale",
+                    message: `schema.generated.ts could not be loaded, so it was not compared against the database as boot compares it: ${generated.error}`,
+                    fix: "Run `rebase schema generate`, then `rebase doctor` again"
+                });
+                schemaToDatabase.passed = false;
+            }
         } catch (err: unknown) {
             // A database that cannot be reached used to end the whole run: the
             // error escaped `runDoctor` and the CLI's last-resort catch printed

@@ -27,6 +27,8 @@ import { logger } from "@rebasepro/server";
 import { AUTH_USERS_COLUMNS, isAuthCollection } from "./auth-users-columns";
 import type { TableMeta } from "./introspect-db-logic";
 import { bareTableName } from "./config-relations";
+import { readCatalogueSchema } from "./catalogue-schema";
+import type { Queryable } from "./introspect-runtime";
 
 export type SchemaDifferenceKind =
     | "missing-table"
@@ -258,6 +260,32 @@ export function diffGeneratedSchemaAgainstCatalogue(options: {
     }
 
     return differences;
+}
+
+/**
+ * Boot's drift question, asked of a database from outside a boot.
+ *
+ * The same two calls boot makes before it warns, with the arguments it makes
+ * them with: the catalogue read the way the registry reads it
+ * ({@link readCatalogueSchema}), then {@link diffGeneratedSchemaAgainstCatalogue}
+ * over its metadata. `rebase doctor` asks through here, because the boot
+ * warning sends the reader to the doctor for "the full report" — and while the
+ * doctor compared on its own terms, it answered "In sync" over a NOT NULL and a
+ * left-behind column that boot had just warned about.
+ *
+ * `collections` are the data source's own, as boot filters them.
+ */
+export async function readGeneratedSchemaDrift(options: {
+    client: Queryable;
+    /** The `tables` export of `schema.generated.ts`. */
+    generated: Record<string, unknown> | undefined;
+    collections: CollectionConfig[];
+    defaultSchema: string;
+}): Promise<SchemaDifference[]> {
+    const { client, generated, collections, defaultSchema } = options;
+    if (!generated || collections.length === 0) return [];
+    const catalogue = await readCatalogueSchema({ client, collections, defaultSchema });
+    return diffGeneratedSchemaAgainstCatalogue({ generated, catalogue: catalogue.meta, collections });
 }
 
 /** One line, in the terms the reader has: collection, property, column. */
