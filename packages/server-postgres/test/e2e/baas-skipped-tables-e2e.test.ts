@@ -10,7 +10,7 @@
  * Requires Docker.
  */
 
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { createServer } from "node:http";
 import pg from "pg";
 import { Hono } from "hono";
@@ -18,7 +18,7 @@ import { Hono } from "hono";
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
 import { createPostgresAdapter } from "../../src/PostgresAdapter.js";
 import { createPostgresDatabaseConnection } from "../../src/connection.js";
-import { initializeRebaseBackend, _resetRebaseMock } from "../../../server/src/index.js";
+import { initializeRebaseBackend, _resetRebaseMock, logger } from "../../../server/src/index.js";
 import type { HonoEnv } from "../../../server/src/api/types.js";
 
 const JWT_SECRET = "baas-skipped-tables-e2e-secret-that-is-long-enough-0123";
@@ -30,6 +30,8 @@ describe("a BaaS database whose tables have RLS off (E2E)", () => {
     let backend: Awaited<ReturnType<typeof initializeRebaseBackend>>;
     const app = new Hono<HonoEnv>();
     const originalNodeEnv = process.env.NODE_ENV;
+    /** What boot warned, as it booted. */
+    const warned: string[] = [];
 
     beforeAll(async () => {
         process.env.NODE_ENV = "test";
@@ -43,6 +45,7 @@ describe("a BaaS database whose tables have RLS off (E2E)", () => {
         `);
 
         connection = createPostgresDatabaseConnection(container.connectionString);
+        const warn = vi.spyOn(logger, "warn").mockImplementation((message: string) => { warned.push(message); });
         backend = await initializeRebaseBackend({
             app,
             server: createServer(),
@@ -54,6 +57,7 @@ describe("a BaaS database whose tables have RLS off (E2E)", () => {
             }),
             auth: { jwtSecret: JWT_SECRET }
         });
+        warn.mockRestore();
     }, 180_000);
 
     afterAll(async () => {
@@ -80,6 +84,20 @@ describe("a BaaS database whose tables have RLS off (E2E)", () => {
         expect(answer.message).toContain("public.orders");
         expect(answer.message).toContain("ENABLE ROW LEVEL SECURITY");
         expect(answer.details?.unprotectedTables?.sort()).toEqual(["public.customers", "public.orders"]);
+    });
+
+    /**
+     * The boot log suggested `baas.unprotectedTables: "serve"` as the way to
+     * serve them anyway. That is an option of the server entry, so the managed
+     * runtime — the one a headless project runs — never reads it: it is
+     * reachable only after `rebase eject`, which headless.md says and the log
+     * did not.
+     */
+    it("boot says the setting that serves them anyway is reachable only after eject", () => {
+        const skipped = warned.find((message) => message.includes("Not serving"));
+        expect(skipped).toBeDefined();
+        expect(skipped).toContain("unprotectedTables");
+        expect(skipped).toContain("rebase eject");
     });
 
     it("says the same on the docs", async () => {

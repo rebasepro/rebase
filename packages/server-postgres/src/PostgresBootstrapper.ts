@@ -605,7 +605,9 @@ export async function openPostgresDriver(
                     `🔒 [rls] Not serving ${unprotected.length} table(s) — row-level security is disabled, so they have no ` +
                     `authorization model: ${unprotected.join(", ")}\n` +
                     unprotected.map((t) => `      ALTER TABLE "${pgSchemaName}"."${t}" ENABLE ROW LEVEL SECURITY;  -- then add a policy`).join("\n") +
-                    "\n      Set baas.unprotectedTables: \"serve\" to expose them regardless."
+                    "\n      To serve them without RLS anyway, pass baas: { unprotectedTables: \"serve\" } to the server " +
+                    "entry: an option `rebase eject` gives you, which the managed runtime does not read from config/ or " +
+                    "the environment."
                 );
                 for (const t of unprotected) schema.tablesMap.delete(t);
                 skippedUnprotected = unprotected.map((table) => ({ schema: pgSchemaName, table }));
