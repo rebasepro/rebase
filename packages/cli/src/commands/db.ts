@@ -741,7 +741,7 @@ async function manageLocalDatabase(
     projectRoot: string,
     rawArgs: readonly string[]
 ): Promise<void> {
-    const { resetManagedDatabase, stopManagedDatabase, findRunningDaemon } = await import("../dev-db/daemon");
+    const { resetManagedDatabase, stopManagedDatabase, stoppedManagedDatabaseLines, findRunningDaemon } = await import("../dev-db/daemon");
     const { dataDir } = await import("../dev-db/state");
 
     // What "nothing here" means, in the words of the project it is said to.
@@ -771,10 +771,16 @@ async function manageLocalDatabase(
     };
 
     if (subcommand === "stop") {
-        const stopped = await stopManagedDatabase(projectRoot);
-        console.log(stopped
-            ? chalk.green("✓ Development database stopped. Data is kept — `rebase dev` will start it again.")
-            : chalk.gray(nothingHere()));
+        if (!(await stopManagedDatabase(projectRoot))) {
+            console.log(chalk.gray(nothingHere()));
+
+            return;
+        }
+        // "`rebase dev` will start it again" was not true of a dev that is
+        // running: see `stoppedManagedDatabaseLines`.
+        const [headline, ...detail] = stoppedManagedDatabaseLines(projectRoot);
+        console.log(chalk.green(headline));
+        for (const line of detail) console.log(chalk.gray(line));
 
         return;
     }

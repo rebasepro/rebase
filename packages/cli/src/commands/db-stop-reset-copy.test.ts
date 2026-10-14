@@ -38,6 +38,7 @@ vi.mock("../dev-db/prepare", () => ({
 
 vi.mock("../dev-db/daemon", () => ({
     stopManagedDatabase: vi.fn(async () => false),
+    stoppedManagedDatabaseLines: vi.fn(() => ["✓ Development database stopped. Data is kept.", "  The backend at http://localhost:3755 cannot reach it until it is back."]),
     findRunningDaemon: vi.fn(async () => null),
     resetManagedDatabase: vi.fn()
 }));
@@ -48,6 +49,7 @@ vi.mock("../dev-db/state", () => ({
 }));
 
 import { dbCommand } from "./db";
+import { stopManagedDatabase } from "../dev-db/daemon";
 
 const argv = (...line: string[]) => ["/usr/bin/node", "/usr/local/bin/rebase", ...line];
 
@@ -101,5 +103,21 @@ describe.each(["stop", "reset"] as const)("db %s on a project on Postgres in Doc
         expect(printed()).toContain("managed development database (PGlite)");
         expect(printed()).toContain("Postgres in Docker");
         expect(printed()).not.toContain("DATABASE_URL");
+    });
+});
+
+// "Data is kept — `rebase dev` will start it again", under a running dev that
+// does not: what it says now comes from `stoppedManagedDatabaseLines`.
+describe("db stop once the managed database has stopped", () => {
+    it("prints what stoppedManagedDatabaseLines says, headline first", async () => {
+        kind = "managed";
+        vi.mocked(stopManagedDatabase).mockResolvedValueOnce(true);
+        await dbCommand("stop", argv("db", "stop"));
+
+        expect(printed()).toBe(
+            "✓ Development database stopped. Data is kept.\n"
+            + "  The backend at http://localhost:3755 cannot reach it until it is back."
+        );
+        expect(printed()).not.toContain("will start it again");
     });
 });
