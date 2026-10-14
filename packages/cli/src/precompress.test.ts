@@ -11,7 +11,8 @@ import path from "path";
 import zlib from "zlib";
 import { afterEach, describe, expect, it } from "vitest";
 import { buildStaticBundle, foldStaticIntoBundle } from "./bundle";
-import { isContentHashedName, precompressStaticAssets } from "./precompress";
+import { isContentHashedFileName } from "@rebasepro/types";
+import { precompressStaticAssets } from "./precompress";
 
 const CHUNK = "export const value = 1;\n".repeat(200);
 
@@ -64,11 +65,11 @@ describe("precompressStaticAssets", () => {
     });
 
     it("reads a content hash by the runtime's rule", () => {
-        expect(isContentHashedName("index-vgugiqRO.js")).toBe(true);
-        expect(isContentHashedName("rebase-admin-DTJBWfJW.css")).toBe(true);
-        expect(isContentHashedName("vendor-analytics.js")).toBe(false);
-        expect(isContentHashedName("index.js")).toBe(false);
-        expect(isContentHashedName("index-abc.js")).toBe(false);
+        expect(isContentHashedFileName("index-vgugiqRO.js")).toBe(true);
+        expect(isContentHashedFileName("rebase-admin-DTJBWfJW.css")).toBe(true);
+        expect(isContentHashedFileName("vendor-analytics.js")).toBe(false);
+        expect(isContentHashedFileName("index.js")).toBe(false);
+        expect(isContentHashedFileName("index-abc.js")).toBe(false);
     });
 });
 

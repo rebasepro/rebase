@@ -10,7 +10,7 @@
  * only ever sends gzip.
  *
  * Which files: the ones the runtime caches as `immutable` — a content hash in
- * the name, by the same rule as the server's `isContentHashed` — of a type worth
+ * the name, by the rule the runtime reads it with (`isContentHashedFileName`) — of a type worth
  * compressing, and 1 KB or more (the runtime's own compression threshold). An
  * unhashed file (`index.html`) is left to on-the-fly compression, where a
  * rewrite of it can never be served stale from a sibling. A sibling is written
@@ -24,6 +24,7 @@
 import fs from "fs";
 import path from "path";
 import zlib from "zlib";
+import { isContentHashedFileName } from "@rebasepro/types";
 
 /** Below this a compressed response saves less than its headers cost — the runtime's threshold. */
 const MIN_BYTES = 1024;
@@ -38,22 +39,6 @@ const COMPRESSIBLE = new Set([
     "js", "mjs", "cjs", "css", "html", "htm", "txt", "csv", "md", "xml", "json", "webmanifest",
     "svg", "wasm", "ttf", "otf", "eot", "ico", "bmp"
 ]);
-
-/**
- * A content hash in the name, by the runtime's rule (`isContentHashed` in the
- * server's `serve-spa.ts`): 8+ base64url characters after the last `-` with a
- * digit or a capital in them. `index-vgugiqRO.js` is; `vendor-analytics.js` is
- * not.
- */
-export function isContentHashedName(fileName: string): boolean {
-    const dot = fileName.lastIndexOf(".");
-    if (dot <= 0) return false;
-    const stem = fileName.slice(0, dot);
-    const dash = stem.lastIndexOf("-");
-    if (dash < 0) return false;
-    const suffix = stem.slice(dash + 1);
-    return suffix.length >= 8 && /^[A-Za-z0-9_-]+$/.test(suffix) && /[0-9A-Z]/.test(suffix);
-}
 
 export interface PrecompressOutcome {
     /** Files that got at least one sibling. */
@@ -102,7 +87,7 @@ export function precompressStaticAssets(dir: string): PrecompressOutcome {
 
 function worthCompressing(fileName: string): boolean {
     const extension = fileName.slice(fileName.lastIndexOf(".") + 1).toLowerCase();
-    return COMPRESSIBLE.has(extension) && isContentHashedName(fileName);
+    return COMPRESSIBLE.has(extension) && isContentHashedFileName(fileName);
 }
 
 /** The sibling's size, or 0 when there already was one or it would not be smaller. */

@@ -312,6 +312,7 @@ describe("serveSPA cache headers", () => {
             dir: writeApp("site", {
                 "index.html": "SITE_INDEX",
                 "assets/index-vgugiqRO.js": "HASHED",
+                "assets/index-C-WpENHZ.js": "HASHED, A DASH IN THE HASH",
                 "assets/vendor-analytics.js": "UNHASHED",
                 "favicon.svg": "ICON"
             })
@@ -321,6 +322,13 @@ describe("serveSPA cache headers", () => {
     it("pins a content-hashed chunk for a year", async () => {
         // Safe precisely because the URL changes with the bytes.
         expect(await cacheControl(hashedBuild(), "/assets/index-vgugiqRO.js"))
+            .toBe("public, max-age=31536000, immutable");
+    });
+
+    it("pins a chunk whose hash holds a `-`, as one in eight of Vite's do", async () => {
+        // Vite's hash is base64url: `C-WpENHZ` is one hash, not a name ending
+        // in `-C` and a six-character one.
+        expect(await cacheControl(hashedBuild(), "/assets/index-C-WpENHZ.js"))
             .toBe("public, max-age=31536000, immutable");
     });
 

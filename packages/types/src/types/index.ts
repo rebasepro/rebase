@@ -34,6 +34,7 @@ export * from "./scopes";
 export * from "./history";
 export * from "./postgres_introspection";
 export * from "./project_manifest";
+export * from "./content_hash";
 export * from "./collection_contract";
 export * from "./schema_version";
 export * from "./storage_authorize";

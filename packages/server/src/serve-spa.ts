@@ -9,6 +9,7 @@ import { getMimeType } from "hono/utils/mime";
 import { responseCompression } from "./utils/compression.js";
 import { logger } from "./utils/logger.js";
 import { STATIC_APP_CSP } from "./boot/security-headers.js";
+import { isContentHashedFileName } from "@rebasepro/types";
 
 /**
  * Configuration for serving a Single Page Application
@@ -480,28 +481,17 @@ function isAssetRequest(requestPath: string, destination: string | undefined): b
  * Erring toward "not hashed" is therefore the safe direction: the cost is a
  * revalidation that usually answers 304, against serving a year-stale file with
  * no way to recall it. So this demands positive evidence of a hash rather than
- * assuming one — a segment of 8+ characters after the last `-` that is not
- * ordinary lowercase prose. Vite and Rollup emit base64url digests, which
- * essentially always carry a digit or a capital; a hand-written
- * `vendor-analytics.js` does not, and gets revalidated.
+ * assuming one, by the rule `rebase build` precompresses with
+ * (`isContentHashedFileName`): Vite's eight base64url characters after a `-`,
+ * or 8+ after the last `-`, with a digit or a capital in them. A hand-written
+ * `vendor-analytics.js` has neither, and gets revalidated.
  *
  * Deliberately not "everything under /assets/": that is a Vite convention, not a
  * guarantee, and a build that drops an unhashed file there would have it pinned
  * in every visitor's cache for a year with no way to correct it.
  */
 function isContentHashed(requestPath: string): boolean {
-    const lastSegment = requestPath.slice(requestPath.lastIndexOf("/") + 1);
-    const dot = lastSegment.lastIndexOf(".");
-    if (dot <= 0) return false;
-
-    const stem = lastSegment.slice(0, dot);
-    const dash = stem.lastIndexOf("-");
-    if (dash < 0) return false;
-
-    const suffix = stem.slice(dash + 1);
-    if (suffix.length < 8) return false;
-    if (!/^[A-Za-z0-9_-]+$/.test(suffix)) return false;
-    return /[0-9A-Z]/.test(suffix);
+    return isContentHashedFileName(requestPath.slice(requestPath.lastIndexOf("/") + 1));
 }
 
 /** A year, and never revalidated: the URL changes when the bytes do. */
