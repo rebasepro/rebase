@@ -781,6 +781,8 @@ When the server returns an `AUTH_ERROR` or `UNAUTHORIZED` error for any request 
 2. If the refresh succeeds, the failed request is retried automatically.
 3. If the refresh fails, the error is propagated to the callback.
 
+A session that was **refused**, not merely expired, is not refreshed and retried. The socket refuses a signed-out or revoked session with `SESSION_REVOKED` and a disabled account with `ACCOUNT_DISABLED` (0.25.1+, as the HTTP routes do; earlier it said `INVALID_TOKEN`). The SDK warns once, does not ask again with the same token, and passes the error, with its `code`, straight to `listen()`'s `onError`. Handle those two codes as "sign the user out", not "try again".
+
 ## Client Configuration
 
 ### `RebaseWebSocketConfig`
