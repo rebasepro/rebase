@@ -465,13 +465,17 @@ accessExpiresIn: "1s" });
     /**
      * An access token that has merely expired is the 401 that drives the
      * SDK's refresh — routine, many times an hour per signed-in client. It was
-     * logged at ERROR and teed into the Logs Explorer as one. A token that
-     * fails for any other reason (a bad signature, a forgery) still is.
+     * logged at ERROR and teed into the Logs Explorer as one. A token with a
+     * signature this backend did not make (another backend's, or a forgery) is
+     * still worth a line an operator sees, at warn — not an ERROR with a
+     * stack, since the client was answered 401 and nothing on the server
+     * failed.
      */
     describe("what a refused token logs", () => {
-        it("logs an expired token below ERROR, and a forged one at ERROR", async () => {
+        it("logs an expired token below ERROR, and a forged one at WARN", async () => {
             const { logger } = await import("../src/utils/logger");
             const error = jest.spyOn(logger, "error").mockImplementation(() => undefined);
+            const warn = jest.spyOn(logger, "warn").mockImplementation(() => undefined);
             const debug = jest.spyOn(logger, "debug").mockImplementation(() => undefined);
             try {
                 configureJwt({ secret: testSecret, accessExpiresIn: "1s" });
@@ -487,9 +491,12 @@ accessExpiresIn: "1s" });
 
                 const forged = jwt.sign({ uid: "user-1", roles: ["admin"] }, "not-the-secret-not-the-secret-not-the-secret");
                 expect(await verifyAccessToken(forged)).toBeNull();
-                expect(error).toHaveBeenCalledTimes(1);
+                expect(error).not.toHaveBeenCalled();
+                expect(warn).toHaveBeenCalledTimes(1);
+                expect(warn).toHaveBeenCalledWith(expect.stringContaining("invalid signature"));
             } finally {
                 error.mockRestore();
+                warn.mockRestore();
                 debug.mockRestore();
             }
         });

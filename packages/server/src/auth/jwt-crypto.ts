@@ -110,13 +110,22 @@ export function isExpiredJwtError(error: unknown): boolean {
 }
 
 /**
- * Whether a {@link verifyJwt} rejection is a verdict on the token — not ours,
- * malformed, expired, not yet valid — rather than a fault of the verifier's
- * own, such as a key it could not use. The first is a client's bad
- * credential, answered with a 401; only the second is a server error.
+ * What a {@link verifyJwt} rejection says about the token, when it is a
+ * verdict on the token rather than a fault of the verifier's own (a key it
+ * could not use):
+ *
+ * - `"signature"`: signed with a key or an algorithm this verifier does not
+ *   accept — another backend's session, one from before a key rotation, or a
+ *   forgery. Indistinguishable from here, so worth a line an operator sees.
+ * - `"invalid"`: not a token, or refused for its claims — malformed, expired,
+ *   not yet valid.
+ *
+ * Either is a client's bad credential, answered with a 401. `undefined` is the
+ * one that is a server error.
  */
-export function isRefusedJwtError(error: unknown): error is Error {
-    return error instanceof jwt.JsonWebTokenError;
+export function jwtRefusal(error: unknown): "signature" | "invalid" | undefined {
+    if (!(error instanceof jwt.JsonWebTokenError)) return undefined;
+    return error.message === "invalid signature" || error.message === "invalid algorithm" ? "signature" : "invalid";
 }
 
 /**
