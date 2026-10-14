@@ -263,19 +263,46 @@ export function assertKnownFlags(domain: string, subcommand: string | undefined,
     try {
         arg({ ...RELAYED_FLAGS, ...spec }, { argv: args.slice(2) });
     } catch (err) {
-        const unknown = unknownFlagIn(err);
-        if (unknown !== null && err instanceof Error) {
-            // In the words `parseCommandFlags` and the CLI's own parser use.
-            const suggestion = closestFlag(unknown, { ...RELAYED_FLAGS, ...spec });
-            const own = Object.keys(spec).filter(flag => flag.startsWith("--"));
-            throw new Error(
-                `\`rebase ${domain} ${subcommand}\` has no option ${unknown.split("=")[0]}` +
-                (suggestion ? ` — did you mean ${suggestion}?` : ` — it takes ${own.join(", ")}.`) +
-                ` Nothing was run. See \`rebase ${domain} --help\`.`
-            );
-        }
-        throw err;
+        const unknown = unknownFlagIn(err, args.slice(2));
+        if (unknown === null) throw err;
+        throw new Error(unknownOptionSentence(`${domain} ${subcommand}`, domain, unknown, spec));
     }
+}
+
+/**
+ * The sentence an undeclared flag is refused with, in the words the CLI's own
+ * parser uses: "`rebase db push` has no option --dry-rn — did you mean
+ * --dry-run? Nothing was run."
+ *
+ * `token` is the whole argument `arg` refused, which is not always a flag: one
+ * argument holding a flag and its value, quoted together
+ * (`"--from postgres://u:pw@h/db"`), is refused whole. That one is named as
+ * what it is, and what it quotes is password-masked; no other part of an
+ * argument is quoted at all.
+ *
+ * @param command the command as typed: `"db push"`.
+ * @param help the command whose `--help` the sentence names.
+ * @param spec the command's own flags; the relayed ones are offered too.
+ */
+export function unknownOptionSentence(command: string, help: string, token: string, spec: arg.Spec): string {
+    const full = { ...RELAYED_FLAGS, ...spec };
+    const name = token.split(/[=\s]/)[0];
+    const suggestion = closestWord(name, Object.keys(full).filter(flag => flag.startsWith("--")));
+    const tail = ` Nothing was run. See \`rebase ${help} --help\`.`;
+
+    if (/\s/.test(token.trim())) {
+        const flag = name in full ? name : suggestion;
+        const how = flag
+            ? ` Write them as two arguments, ${flag} <value>, or as ${flag}=<value>.`
+            : " Write a flag and its value as two arguments.";
+        return `\`rebase ${command}\` has no option "${redactConnectionPasswords(token)}": ` +
+            `that is a flag and a value in one argument, quoted together.${how}${tail}`;
+    }
+
+    const own = Object.keys(spec).filter(flag => flag.startsWith("--"));
+    const takes = own.length > 0 ? `it takes ${own.join(", ")}` : "it takes no options of its own";
+    return `\`rebase ${command}\` has no option ${name}` +
+        (suggestion ? ` — did you mean ${suggestion}?` : ` — ${takes}.`) + tail;
 }
 
 /** What a flag resolves to, through its alias (`"-y": "--yes"`). */
@@ -315,17 +342,21 @@ export function refuseSwitchValues(spec: arg.Spec, argv: readonly string[], comm
     }
 }
 
-/** The flag `arg` refused as undeclared, or `null` for any other failure. */
-function unknownFlagIn(err: unknown): string | null {
+/**
+ * The argument `arg` refused as undeclared, whole, or `null` for any other
+ * failure.
+ *
+ * arg's wording is `unknown or unexpected option: --targt-db`, naming the
+ * argument up to its first `=`. An argument with a space in it is named past
+ * the space too, so the match runs to the end of the message; and the word
+ * in `argv` it came from is returned, `=` and all, so a refusal that quotes it
+ * quotes what was typed.
+ */
+export function unknownFlagIn(err: unknown, argv: readonly string[]): string | null {
     if (!(err instanceof Error) || !("code" in err) || err.code !== "ARG_UNKNOWN_OPTION") return null;
-    // arg's wording: `unknown or unexpected option: --targt-db`.
-    return /option: (\S+)$/.exec(err.message)?.[1] ?? null;
-}
-
-/** The declared long flag `typed` is one edit or one swap away from, if there is one. */
-function closestFlag(typed: string, spec: arg.Spec): string | undefined {
-    const name = typed.split("=")[0];
-    return closestWord(name, Object.keys(spec).filter(flag => flag.startsWith("--")));
+    const named = /option: ([\s\S]+)$/.exec(err.message)?.[1];
+    if (named === undefined) return null;
+    return argv.find(word => word === named || word.startsWith(`${named}=`)) ?? named;
 }
 
 /**
@@ -370,14 +401,8 @@ export function parseCommandFlags<S extends arg.Spec>(
     try {
         return arg(full, { argv });
     } catch (err) {
-        const unknown = unknownFlagIn(err);
+        const unknown = unknownFlagIn(err, argv);
         if (unknown === null) throw err;
-        const suggestion = closestFlag(unknown, full);
-        const flags = Object.keys(spec).filter(flag => flag.startsWith("--"));
-        throw new Error(
-            `\`rebase ${command}\` has no option ${unknown}` +
-            (suggestion ? ` — did you mean ${suggestion}?` : ` — it takes ${flags.join(", ")}.`) +
-            ` Nothing was run. See \`rebase ${command} --help\`.`
-        );
+        throw new Error(unknownOptionSentence(command, command, unknown, spec));
     }
 }

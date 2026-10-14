@@ -8,7 +8,7 @@
  */
 import arg from "arg";
 
-import { closestWord, refuseSwitchValues, RELAYED_FLAGS } from "./cli-flags";
+import { refuseSwitchValues, RELAYED_FLAGS, unknownFlagIn, unknownOptionSentence } from "./cli-flags";
 
 /**
  * The flags each driver-side `db branch` action takes, besides the ones the CLI
@@ -44,19 +44,9 @@ export function assertKnownBranchFlags(action: string, rest: readonly string[]):
     try {
         arg(full, { argv: [...rest] });
     } catch (error) {
-        if (!(error instanceof Error) || !("code" in error) || error.code !== "ARG_UNKNOWN_OPTION") throw error;
-        // arg's wording: `unknown or unexpected option: --froce`.
-        const unknown = /option: (\S+)$/.exec(error.message)?.[1] ?? error.message;
-        const typed = unknown.split("=")[0];
-        const known = Object.keys(full).filter((flag) => flag.startsWith("--"));
-        const suggestion = closestWord(typed, known);
-        const own = Object.keys(spec).filter((flag) => flag.startsWith("--"));
-        const takes = own.length > 0 ? `it takes ${own.join(", ")}` : "it takes no options of its own";
-        throw new Error(
-            `\`rebase db branch ${action}\` has no option ${typed}` +
-            (suggestion ? ` — did you mean ${suggestion}?` : ` — ${takes}.`) +
-            " Nothing was run. See `rebase db branch --help`."
-        );
+        const unknown = unknownFlagIn(error, rest);
+        if (unknown === null) throw error;
+        throw new Error(unknownOptionSentence(`db branch ${action}`, "db branch", unknown, spec));
     }
 }
 

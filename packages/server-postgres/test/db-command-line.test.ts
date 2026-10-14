@@ -53,6 +53,15 @@ describe("assertDbCommandLine", () => {
         expect(() => assertDbCommandLine(line)).not.toThrow();
     });
 
+    // A connection string typed where a flag's value belongs is still a password.
+    it.each([
+        [["db", "backup", "postgres://app:hunter2@db/prod"]],
+        [["db", "restore", "x.dump", "postgres://app:hunter2@db/prod"]],
+        [["db", "branch", "create", "x", "--from postgres://app:hunter2@db/prod"]]
+    ])("refuses %j without repeating the password", (line) => {
+        expect(() => assertDbCommandLine(line)).toThrow(/postgres:\/\/app:\*\*\*@db\/prod/);
+    });
+
     it("leaves --help to the dispatch, which prints rather than runs", () => {
         expect(() => assertDbCommandLine(["db", "push", "--dry-rn", "--help"])).not.toThrow();
     });

@@ -175,6 +175,27 @@ describe("rebase db pull refuses a flag it does not take", () => {
         expect(printed.join("\n")).not.toContain("needs a source");
     });
 
+    // One shell word holding the flag and the URL: a quoting mistake, refused
+    // with arg's sentence inside ours and the password in it.
+    it("refuses a flag quoted together with its URL, and does not echo the password", async () => {
+        const refusal = await dbCommand("pull", argv("pull", `--fro ${PROD}`, "--yes")).catch((error: unknown) => error);
+
+        expect(refusal).toMatchObject({ isUsageError: true });
+        const said = String(refusal);
+        expect(said).toContain("has no option \"--fro postgresql://app:***@prod.example.com/app\": that is a flag and a value in one argument");
+        expect(said).toContain("--from <value>");
+        expect(said).not.toContain("hunter2");
+        expect(said).not.toContain("unknown or unexpected option");
+        expectNothingRan();
+    });
+
+    it("refuses --anonymize=false rather than anonymizing", async () => {
+        await expect(dbCommand("pull", argv("pull", "--from", PROD, "--anonymize=false", "--yes")))
+            .rejects.toThrow("takes --anonymize without a value (--anonymize=false)");
+
+        expectNothingRan();
+    });
+
     it("refuses a stray argument without echoing the password in it", async () => {
         const refusal = dbCommand("pull", argv("pull", PROD, "--yes"));
 

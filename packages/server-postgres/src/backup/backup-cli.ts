@@ -183,8 +183,9 @@ const BACKUP_FLAGS = {
  */
 export function parseBackupLine(rawArgs: string[]) {
     const args = parseCommandFlags(BACKUP_FLAGS, rawArgs.slice(2), "db backup");
-    const [stray] = args._;
-    if (stray !== undefined) {
+    const [typed] = args._;
+    if (typed !== undefined) {
+        const stray = redactConnectionPasswords(typed);
         throw new Error(
             `\`rebase db backup\` takes no argument "${stray}". Nothing was run. ` +
             `To choose where the backup goes, pass --out ${stray}.`
@@ -356,7 +357,7 @@ export function parseRestoreLine(rawArgs: string[]) {
     if (args._.length > 1) {
         throw new Error(
             `\`rebase db restore\` restores one backup, and was given ${args._.length}: ` +
-            `${args._.map(word => `"${word}"`).join(", ")}. Nothing was run.`
+            `${args._.map(word => `"${redactConnectionPasswords(word)}"`).join(", ")}. Nothing was run.`
         );
     }
     return args;

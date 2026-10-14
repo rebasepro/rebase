@@ -113,6 +113,53 @@ describe("parseCommandArgs", () => {
 });
 
 /**
+ * One argument holding a flag and its value, a quoting mistake:
+ *
+ *     rebase db pull "--fro postgres://rebase_app:secretpw123@127.0.0.1:5998/prod" --yes
+ *
+ * was refused with `has no option unknown or unexpected option: --fro
+ * postgres://rebase_app:secretpw123@…`: arg's own sentence inside ours, and
+ * the password with it.
+ */
+describe("an argument holding a flag and its value", () => {
+    const PULL = { "--from": String, "--anonymize": Boolean, "--yes": Boolean } as const;
+    const pull = (...line: string[]) =>
+        parseCommandArgs({ spec: PULL, rawArgs: argv("db", "pull", ...line), commandWords: 2, command: "db pull", maxPositionals: 0 });
+    const refusal = (...line: string[]): string => {
+        try {
+            pull(...line);
+        } catch (err) {
+            return err instanceof Error ? err.message : String(err);
+        }
+        throw new Error("expected a refusal");
+    };
+
+    it("is named as that, masked, with the flag it was probably meant to be", () => {
+        expect(refusal("--fro postgres://rebase_app:secretpw123@127.0.0.1:5998/prod", "--yes")).toBe(
+            "`rebase db pull` has no option \"--fro postgres://rebase_app:***@127.0.0.1:5998/prod\": " +
+            "that is a flag and a value in one argument, quoted together. " +
+            "Write them as two arguments, --from <value>, or as --from=<value>. Nothing was run. See `rebase db pull --help`."
+        );
+    });
+
+    it("names the flag itself when it is the right one, quoted together with its value", () => {
+        const said = refusal("--from postgres://app:hunter2@db.example.com/prod?sslmode=require");
+        expect(said).toContain("Write them as two arguments, --from <value>, or as --from=<value>.");
+        expect(said).not.toContain("hunter2");
+    });
+
+    it("never repeats a password given inline", () => {
+        expect(refusal("--fro=postgres://app:hunter2@db/prod")).toBe(
+            "`rebase db pull` has no option --fro — did you mean --from? Nothing was run. See `rebase db pull --help`."
+        );
+    });
+
+    it("masks a password in a value that looks like an option", () => {
+        expect(refusal("--", "-postgres://app:hunter2@db/prod")).not.toContain("hunter2");
+    });
+});
+
+/**
  * `arg` drops the value of a flag that takes none and turns it on, so
  * `rebase db pull --anonymize=false` anonymized and `--yes=false` answered
  * yes. A value on a switch is refused instead, on every command on this

@@ -72,11 +72,30 @@ const LISTED_FLAGS_MAX = 8;
  * With nothing close it lists what the command takes, when that list is short
  * enough to read.
  *
+ * `typed` is the argument as `arg` refused it, and only its flag part is
+ * repeated: a value given inline (`--fro=postgres://u:pw@h/db`) is not. One
+ * argument holding a flag and its value, quoted together, is named as that,
+ * and what it quotes is password-masked: `"--fro postgres://u:pw@h/db"` was
+ * refused with the whole URL, password included, in the middle of a garbled
+ * sentence.
+ *
  * Exported for the commands that refuse a flag outside `parseCommandArgs`.
  */
 export function unknownOptionMessage(command: string, typed: string, spec: Readonly<Record<string, unknown>>): string {
     const declared = Object.keys({ ...GLOBAL_COMMAND_FLAGS, ...spec });
-    const near = closestDeclaredFlag(typed, declared);
+    const name = typed.split(/[=\s]/)[0];
+    const near = closestDeclaredFlag(name, declared);
+    const tail = ` Nothing was run. See \`rebase ${command} --help\`.`;
+
+    if (/\s/.test(typed.trim())) {
+        const flag = declared.includes(name) ? name : near;
+        const how = flag
+            ? ` Write them as two arguments, ${flag} <value>, or as ${flag}=<value>.`
+            : " Write a flag and its value as two arguments.";
+        return `\`rebase ${command}\` has no option "${redactConnectionPasswords(typed)}": ` +
+            `that is a flag and a value in one argument, quoted together.${how}${tail}`;
+    }
+
     const own = Object.keys(spec).filter(flag => flag.startsWith("--") && !(flag in GLOBAL_COMMAND_FLAGS));
     const takes = near
         ? ` — did you mean ${near}?`
@@ -84,7 +103,7 @@ export function unknownOptionMessage(command: string, typed: string, spec: Reado
             ? " — it takes no options."
             : own.length <= LISTED_FLAGS_MAX ? ` — it takes ${own.join(", ")}.` : ".";
 
-    return `\`rebase ${command}\` has no option ${typed}${takes} Nothing was run. See \`rebase ${command} --help\`.`;
+    return `\`rebase ${command}\` has no option ${name}${takes}${tail}`;
 }
 
 /** What a flag resolves to, through its alias (`"-y": "--yes"`). */
@@ -201,9 +220,12 @@ export function parseCommandArgs<S extends arg.Spec>({
         parsed = arg(merged, { argv: rawArgs.slice(2) }) as arg.Result<S> & { "--help"?: boolean };
     } catch (err) {
         if (err instanceof Error && (err as arg.ArgError).code === "ARG_UNKNOWN_OPTION") {
-            // arg's wording: `unknown or unexpected option: --form`.
-            const typed = /option: (\S+)$/.exec(err.message)?.[1] ?? err.message;
-            throw new UsageError(unknownOptionMessage(command, typed.split("=")[0], spec));
+            // arg's wording: `unknown or unexpected option: --form`, naming
+            // the argument up to its first `=`, past a space in it too. The
+            // word it came from is what was typed.
+            const named = /option: ([\s\S]+)$/.exec(err.message)?.[1] ?? "";
+            const typed = rawArgs.slice(2).find(word => word === named || word.startsWith(`${named}=`)) ?? named;
+            throw new UsageError(unknownOptionMessage(command, typed, spec));
         }
         throw err;
     }
@@ -218,7 +240,7 @@ export function parseCommandArgs<S extends arg.Spec>({
         // password.
         if (value.startsWith("-")) {
             throw new UsageError(
-                `\`${value}\` looks like an option, not a value — pass it with an explicit flag ` +
+                `\`${redactConnectionPasswords(value)}\` looks like an option, not a value — pass it with an explicit flag ` +
                 `(\`rebase ${command} --help\`).`
             );
         }

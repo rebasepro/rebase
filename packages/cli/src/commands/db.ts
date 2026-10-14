@@ -1479,7 +1479,9 @@ const SWITCH_FLAGS = ["--off", "--main", "--database-url", "--docker", "--debug"
 export function assertSwitchFlags(rawArgs: readonly string[]): void {
     for (const word of rawArgs.slice(2)) {
         if (!word.startsWith("-")) continue;
-        const flag = word.split("=")[0];
+        // The flag part only: a value given inline, or quoted into the same
+        // argument after a space, may be a connection string.
+        const flag = word.split(/[=\s]/)[0];
         // Every flag `switch` takes but `--database-url` is a switch, which
         // a value would only misstate: `--off=false` is not "stay on".
         if (word.includes("=") && flag !== "--database-url" && (SWITCH_FLAGS as readonly string[]).includes(flag)) {

@@ -1479,12 +1479,12 @@ async function branchCommand(rawArgs: string[]): Promise<void> {
     const extras = unexpectedBranchArgs(rawArgs.slice(2));
     if (extras.length > 0) {
         outError("");
-        outError(chalk.red(`  ✗ Unexpected argument${extras.length > 1 ? "s" : ""}: ${extras.join(" ")}`));
+        outError(chalk.red(`  ✗ Unexpected argument${extras.length > 1 ? "s" : ""}: ${redactConnectionPasswords(extras.join(" "))}`));
         outError("");
         outError(chalk.gray(`  ${chalk.bold("rebase db branch")} takes one name. A branch name may contain letters,`));
         outError(chalk.gray("  digits, underscores and hyphens — no spaces."));
         if (rawArgs[3]) {
-            outError(chalk.gray(`  Did you mean: ${chalk.cyan(`rebase db branch ${branchAction} ${[rawArgs[3], ...extras].join("-")}`)}`));
+            outError(chalk.gray(`  Did you mean: ${chalk.cyan(redactConnectionPasswords(`rebase db branch ${branchAction} ${[rawArgs[3], ...extras].join("-")}`))}`));
         }
         outError("");
         process.exit(1);

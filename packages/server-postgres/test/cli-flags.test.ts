@@ -280,3 +280,38 @@ describe("a switch given a value", () => {
             .toThrow("(--yes=postgres://app:***@db/prod)");
     });
 });
+
+/**
+ * One argument holding a flag and its value, quoted together, as
+ * `rebase db branch create x "--from postgres://u:pw@h/db"`: the driver's
+ * parsers matched arg's message up to the first space, found nothing, and
+ * rethrew arg's own error, which quotes the argument whole, password and all.
+ */
+describe("an argument holding a flag and its value", () => {
+    const URL_WITH_PASSWORD = "postgres://app:hunter2@db.example.com/prod?sslmode=require";
+
+    it("is refused by db push as that, masked", () => {
+        expect(() => assertKnownFlags("db", "push", line("db", "push", `--colections ${URL_WITH_PASSWORD}`))).toThrow(
+            "`rebase db push` has no option \"--colections postgres://app:***@db.example.com/prod?sslmode=require\": " +
+            "that is a flag and a value in one argument, quoted together. " +
+            "Write them as two arguments, --collections <value>, or as --collections=<value>. Nothing was run. See `rebase db --help`."
+        );
+    });
+
+    it.each([
+        () => parseCommandFlags({ "--target-db": String }, ["x.dump", `--target-db ${URL_WITH_PASSWORD}`], "db restore"),
+        () => parseCommandFlags({ "--target-db": String }, ["x.dump", `--targt-db=${URL_WITH_PASSWORD}`], "db restore"),
+        () => unexpectedBranchArgs(["create", "x", `--from ${URL_WITH_PASSWORD}`]),
+        () => unexpectedBranchArgs(["create", "x", `--frm=${URL_WITH_PASSWORD}`])
+    ])("never repeats the password (%#)", (refuse) => {
+        let said = "";
+        try {
+            refuse();
+        } catch (error) {
+            said = error instanceof Error ? error.message : String(error);
+        }
+        expect(said).toMatch(/has no option/);
+        expect(said).not.toContain("hunter2");
+        expect(said).not.toContain("unknown or unexpected option");
+    });
+});
