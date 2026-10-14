@@ -14,6 +14,7 @@ const ExportCollectionAction = lazyChunk(() => import("../../data_export/export"
 import { EditorCollectionAction } from "../../collection_editor/ui/EditorCollectionAction";
 import { useCollectionEditorController } from "../../collection_editor/useCollectionEditorController";
 import { useAdminContext } from "../../hooks/useAdminContext";
+import { useToolbarLabels } from "../CollectionTableBinding/internal/CollectionTableToolbar";
 
 export type CollectionViewActionsProps<M extends Record<string, unknown>> = {
     collection: AdminCollection<M>;
@@ -63,6 +64,10 @@ export function CollectionViewActions<M extends Record<string, unknown>>({
     const { canCreate, canDelete } = usePermissions();
 
     const largeLayout = useLargeLayout();
+    const toolbarLabels = useToolbarLabels();
+    // Labelled controls on a wide layout whose toolbar has room for them;
+    // their icon-only forms otherwise.
+    const labelled = largeLayout && !compact && toolbarLabels;
     const { t } = useTranslation();
 
     // Check if the collection editor context is available (ConfigControllerProvider present)
@@ -72,7 +77,7 @@ export function CollectionViewActions<M extends Record<string, unknown>>({
     const { selectedCount, hasSelection } = selectionController;
 
     const addButton = canCreate(collection, path) &&
-        onNewClick && (largeLayout && !compact
+        onNewClick && (labelled
             ? <Button
                 id={`add_entity_${path}`}
                 onClick={onNewClick}
@@ -99,7 +104,7 @@ export function CollectionViewActions<M extends Record<string, unknown>>({
     // the far more common act is attaching one that already exists. There was no
     // way to do that at all — the junction row was only ever written alongside an
     // insert — so a shared vocabulary could only ever grow.
-    const linkButton = onAddExistingClick && (largeLayout && !compact
+    const linkButton = onAddExistingClick && (labelled
         ? <Button
             id={`link_entity_${path}`}
             onClick={onAddExistingClick}
@@ -135,7 +140,7 @@ export function CollectionViewActions<M extends Record<string, unknown>>({
     let multipleDeleteButton: React.ReactNode | undefined;
     if (hasSelection) {
         const RemoveIcon = removeUnlinks ? Unlink2Icon : Trash2Icon;
-        const button = largeLayout && !compact
+        const button = labelled
             // `min-w`, not `w`. A fixed 80px was enough for the one- and
             // two-digit counts you could reach by ticking rows; "select all
             // matching" put six digits in here, and a flex child over its width

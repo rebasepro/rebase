@@ -16,6 +16,7 @@ import { useAdminContext } from "../../hooks/useAdminContext";
 import { withListState } from "../../util/view_mode";
 import { useSplitView } from "./SplitViewContext";
 import { SelectionMenu } from "../../selection";
+import { useToolbarLabels } from "../CollectionTableBinding/internal/CollectionTableToolbar";
 
 export type CollectionViewStartActionsProps<M extends Record<string, unknown>> = {
     collection: AdminCollection<M>;
@@ -69,6 +70,7 @@ export function CollectionViewStartActions<M extends Record<string, unknown>>({
 
     const context = useAdminContext();
     const largeLayout = useLargeLayout();
+    const toolbarLabels = useToolbarLabels();
     const { t } = useTranslation();
 
     const navigate = useNavigate();
@@ -124,8 +126,9 @@ parentEntityIds,
     // drops its label — and its icon a size with it — on a narrow layout as
     // well as in the split view, and the sort and clear controls beside it
     // follow: keyed on `compact` alone they stayed 20px next to a 16px filter
-    // icon at every width below `largeLayout`.
-    const iconOnlyToolbar = !largeLayout || Boolean(compact);
+    // icon at every width below `largeLayout`. A toolbar too narrow for its
+    // labels (`useToolbarLabels`) is a narrow layout too, whatever the window.
+    const iconOnlyToolbar = !largeLayout || Boolean(compact) || !toolbarLabels;
 
     const filtersButton = resolvedProperties && tableController.setFilterValues && (
         <Tooltip title={t("filters")}
@@ -134,7 +137,7 @@ parentEntityIds,
                 color="primary"
                 invisible={activeFilterCount === 0}
             >
-                {largeLayout && !compact ? (
+                {!iconOnlyToolbar ? (
                     <Button
                         variant="text"
                         size="small"
