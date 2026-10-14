@@ -1998,7 +1998,7 @@ Rules are a discriminated union — you must use exactly one of: `ownerField`, `
 
 | Variant | Key Field | Generates |
 |---------|-----------|-----------|
-| `OwnerSecurityRule` | `ownerField: "user_id"` | `USING (user_id = rebase.uid())` |
+| `OwnerSecurityRule` | `ownerField: "user_id"` | `USING ((user_id)::text = (SELECT rebase.uid()))`: `rebase.uid()` is text, so the column is cast |
 | `PublicSecurityRule` | `access: "public"` | `USING (true)` |
 | `RawSQLSecurityRule` | `using: "..."` | Custom USING/WITH CHECK clause |
 | `RolesOnlySecurityRule` | (none of the above) | Roles-only, no row filter |
