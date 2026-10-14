@@ -7,6 +7,8 @@ description: Every released change to Rebase — new features, fixes, and the br
 
 ## [Unreleased]
 
+## [0.25.1] - 2026-10-14
+
 ### Changed
 
 #### CLI
