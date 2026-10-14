@@ -610,6 +610,19 @@ describe("template package.json contracts", () => {
         expect(envExample).toMatch(new RegExp(`^PORT=${SCAFFOLD_DEFAULT_PORT}$`, "m"));
     });
 
+    it("scripts/example.ts says the service key is already in .env, as init leaves it", async () => {
+        // The header's last instruction was "Generate a service key", and the
+        // first thing a reader then did was replace the one init had written.
+        const targetDir = await simulateInit("example-service-key-app");
+        await configureEnvFile(targetDir);
+        expect(fs.readFileSync(path.join(targetDir, ".env"), "utf-8")).toMatch(/^REBASE_SERVICE_KEY=\S{40,}$/m);
+
+        const example = fs.readFileSync(path.join(TEMPLATE_DIR, "scripts", "example.ts"), "utf-8");
+        const header = example.slice(0, example.indexOf("*/"));
+        expect(header).toMatch(/`rebase init` (already )?wrote/);
+        expect(header).not.toMatch(/^\s*\*\s*Generate a service key:/m);
+    });
+
     it("ships everything scripts/example.ts needs to run", () => {
         // The script is in the template. Its runner and its three imports were
         // in the baas overlay only, so `pnpm example` in the default scaffold
