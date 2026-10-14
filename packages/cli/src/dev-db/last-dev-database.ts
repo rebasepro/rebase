@@ -39,17 +39,31 @@ export function readLastDevDocker(projectRoot: string): boolean {
     }
 }
 
+/** What this `rebase dev` was asked for, beside what it runs on. */
+export interface LastDevRun {
+    /** `--docker` was on this command line. */
+    dockerFlag?: boolean;
+}
+
 /**
  * Record what this `rebase dev` runs on, and say what the last one ran on.
+ *
+ * A run that asked for Docker and was outranked by a connection string leaves
+ * the record as it was. It is not on Docker, so it records nothing; but it is
+ * not a run without `--docker` either, which is what forgets the record. The
+ * reader was told to comment the `.env` line out to reach Docker, and once
+ * they have, the other commands follow Docker as they did before.
  *
  * Best effort: a checkout whose `.rebase/` cannot be written still runs, and
  * the other commands then resolve as they did before this existed.
  */
 export function recordLastDevDatabase(
     projectRoot: string,
-    kind: DevDatabase["kind"]
+    kind: DevDatabase["kind"],
+    run: LastDevRun = {}
 ): { previous: "docker" | null } {
     const previous = readLastDevDocker(projectRoot) ? "docker" : null;
+    if (run.dockerFlag && kind !== "docker") return { previous };
     const file = lastDevDatabasePath(projectRoot);
     try {
         if (kind === "docker") {
@@ -70,10 +84,11 @@ export function recordLastDevDatabase(
  *
  * Said rather than left to be noticed: the data a developer was working with
  * is in the container, and the managed database this run is on is a different,
- * possibly empty, one.
+ * possibly empty, one. Not said to a run that asked for Docker: the line that
+ * says `--docker` was ignored, and what outranked it, is the one that applies.
  */
-export function lastDevDatabaseNotice(previous: "docker" | null, kind: DevDatabase["kind"]): string | null {
-    if (previous !== "docker" || kind === "docker") return null;
+export function lastDevDatabaseNotice(previous: "docker" | null, kind: DevDatabase["kind"], run: LastDevRun = {}): string | null {
+    if (previous !== "docker" || kind === "docker" || run.dockerFlag) return null;
 
     return "The last `rebase dev` ran on Postgres in Docker; this one does not. "
         + "Pass --docker to stay on it — the other commands now follow this run.";

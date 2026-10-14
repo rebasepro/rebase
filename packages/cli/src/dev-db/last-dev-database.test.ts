@@ -48,6 +48,24 @@ describe("recordLastDevDatabase", () => {
         expect(path.relative(root, lastDevDatabasePath(root))).toBe(path.join(".rebase", "dev-database.json"));
     });
 
+    /**
+     * `rebase dev --docker` with DATABASE_URL in `.env`: the flag is ignored,
+     * and the run is on `.env`'s database — but the reader asked for Docker,
+     * and was told to comment the `.env` line out to get it. Erasing the
+     * record here sent the other commands to the managed database once they
+     * did, instead of back to Docker.
+     */
+    it("leaves the record alone when this run asked for Docker and a connection string outranked it", () => {
+        recordLastDevDatabase(root, "docker");
+
+        expect(recordLastDevDatabase(root, "external", { dockerFlag: true })).toEqual({ previous: "docker" });
+        expect(readLastDevDocker(root)).toBe(true);
+
+        fs.rmSync(lastDevDatabasePath(root));
+        recordLastDevDatabase(root, "external", { dockerFlag: true });
+        expect(fs.existsSync(lastDevDatabasePath(root))).toBe(false);
+    });
+
     it("treats a file it cannot read as no record", () => {
         fs.mkdirSync(path.join(root, ".rebase"), { recursive: true });
         fs.writeFileSync(lastDevDatabasePath(root), "{not json");
@@ -58,6 +76,11 @@ describe("recordLastDevDatabase", () => {
 describe("lastDevDatabaseNotice", () => {
     it("says so when `rebase dev` leaves Docker for the managed database", () => {
         expect(lastDevDatabaseNotice("docker", "managed")).toContain("--docker");
+    });
+
+    it("says nothing when this run asked for Docker: the line that says --docker was ignored is the one that applies", () => {
+        // "Pass --docker to stay on it", to a reader who just did.
+        expect(lastDevDatabaseNotice("docker", "external", { dockerFlag: true })).toBeNull();
     });
 
     it("says nothing when nothing changed, or when Docker is chosen again", () => {

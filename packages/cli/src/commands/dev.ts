@@ -1310,8 +1310,9 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
     // so they reach the database this server is on rather than resolve their
     // own. See `last-dev-database.ts`.
     if (prepared) {
-        const { previous } = recordLastDevDatabase(projectRoot, prepared.database.kind);
-        const notice = lastDevDatabaseNotice(previous, prepared.database.kind);
+        const run = { dockerFlag: Boolean(args["--docker"]) };
+        const { previous } = recordLastDevDatabase(projectRoot, prepared.database.kind, run);
+        const notice = lastDevDatabaseNotice(previous, prepared.database.kind, run);
         if (notice) console.log(`  ${chalk.yellow("⚠")} ${chalk.gray(notice)}`);
     }
 

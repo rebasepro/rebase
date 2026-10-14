@@ -145,7 +145,9 @@ already running.
 kept in `.rebase/dev-database.json` and ranks where `--docker` does, below every
 connection string. A `--docker` you type that a connection string outranks
 starts no container: one line on stderr says it was ignored, names what won,
-and says how to reach Docker instead. On 0.24 every command needs its own
+and says how to reach Docker instead. A `rebase dev --docker` outranked that
+way keeps the remembered choice as it was, so once the connection string is
+gone the commands follow Docker again. On 0.24 every command needs its own
 `--docker`, and an outranked one still starts the container.
 
 ### `rebase db stop` / `rebase db reset`
