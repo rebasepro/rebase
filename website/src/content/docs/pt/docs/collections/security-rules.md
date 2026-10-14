@@ -309,7 +309,7 @@ interface SecurityRuleBase {
 
 `roles` e `pgRoles` são as duas que geram confusão. `roles` é uma role da aplicação, imposta *dentro* da cláusula `USING` / `WITH CHECK` através de `rebase.roles()`. `pgRoles` é uma role do banco de dados e controla a quais conexões a política está vinculada. Quase todos os projetos precisam de `roles`.
 
-:::tip[Preenchendo a coluna indicada por ownerField]
+:::tip[Preenchendo a coluna que o `ownerField` indica]
 `ownerField` compara uma coluna com `rebase.uid()`; ele não insere nada nela. Declare essa coluna como uma string com [`autoValue: "user_on_create"`](/docs/collections/properties#audit-columns) e o driver registrará o uid do usuário atuante na inserção, sobrescrevendo qualquer coisa enviada no corpo da requisição — o que torna a premissa da política verdadeira. Uma coluna fornecida pelo chamador é uma coluna sobre a qual o chamador pode mentir.
 :::
 

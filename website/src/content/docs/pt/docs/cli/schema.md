@@ -305,20 +305,20 @@ Uma migração que reconstrói uma coluna de busca a remove primeiro, então est
 migração também. Leia a lista que ele imprime e depois execute `rebase db migrate`
 sem a flag para aplicá-la.
 
-#### Definir uma baseline num banco de dados que o Rebase já arrancou
+#### Definindo uma baseline em um banco de dados que o Rebase já inicializou
 
-Cada arranque do Rebase assegura o esquema, e `rebase db push` aplica-o diretamente. Um banco de dados em que qualquer um dos dois já tenha corrido já tem as tabelas e os tipos que a primeira migração criaria, e `rebase db migrate` para em `pq: type "posts_status" already exists (42710)`.
+Cada inicialização do Rebase garante o esquema, e o `rebase db push` o aplica diretamente. Então um banco de dados em que qualquer um dos dois já tenha rodado já tem as tabelas e os tipos que a primeira migração criaria, e o `rebase db migrate` para em `pq: type "posts_status" already exists (42710)`.
 
-Não há nada de errado com a migração: o banco de dados foi provisionado por outra via. Registe onde ele já está e migre normalmente:
+Não há nada de errado com a migração: o banco de dados foi provisionado por outro caminho. Registre onde ele já está e depois migre normalmente:
 
 ```bash
 rebase db migrate --baseline 20260906101530
 rebase db migrate
 ```
 
-A versão é o prefixo numérico do ficheiro de migração que descreve o que está no banco de dados *agora*. Essa migração e todas as anteriores ficam registadas como aplicadas; tudo o que vem depois é executado. Num banco de dados que nunca arrancou não é precisa baseline — migre diretamente.
+A versão é o prefixo numérico do arquivo de migração que descreve o que está no banco de dados *agora*. Essa migração e todas as anteriores são registradas como aplicadas; tudo o que vem depois é executado. Em um banco de dados em que nada nunca foi inicializado, nenhuma baseline é necessária — migre direto.
 
-O mesmo acontece mais tarde no ciclo habitual: edite uma coleção enquanto o `rebase dev` corre, e o arranque adiciona a coluna antes de o `rebase db generate` escrever a migração que a adiciona, de modo que o `rebase db migrate` para em `column … already exists (42701)`. Registe essa migração como baseline do mesmo modo. O `--baseline` funciona num banco de dados que já regista migrações: marca tudo até à versão como aplicado com `atlas migrate set` e informa isso, ou informa que não há nada a registar quando o histórico já a alcança. Na 0.24 o Atlas ignora o `--baseline` assim que qualquer migração está registada, pelo que o mesmo erro volta. Uma versão que nenhum arquivo em `drizzle/migrations` tem é recusada antes de qualquer execução, nomeando as versões que existem ali.
+O mesmo acontece depois, no ciclo de sempre: edite uma coleção enquanto o `rebase dev` roda, e a inicialização adiciona a coluna antes que o `rebase db generate` escreva a migração que a adiciona, de modo que o `rebase db migrate` para em `column … already exists (42701)`. Registre essa migração como baseline da mesma forma. O `--baseline` funciona em um banco de dados que já registra migrações: ele marca tudo até a versão como aplicado com `atlas migrate set` e diz isso, ou diz que não há nada a registrar quando o histórico já chega até ela. Na 0.24 o Atlas ignora o `--baseline` assim que qualquer migração está registrada, então o mesmo erro volta. Uma versão que nenhum arquivo em `drizzle/migrations` tem é recusada antes de qualquer execução, nomeando as versões que existem ali.
 
 ### `rebase db branch`
 
@@ -459,8 +459,8 @@ rebase db migrate
 | A migração mostra mudanças inesperadas | Execute `rebase doctor` para identificar a divergência |
 | `db push` falha em produção | Use `db generate` + `db migrate` em vez disso |
 | Uma migração não pode destruir dados em CI ou produção | `rebase db migrate --refuse-destructive` sai com 1 e não aplica nada quando uma instrução pendente destrói dados |
-| `db migrate` falha com `already exists (42710)` | O arranque ou `db push` já provisionaram o esquema — registe-o com `rebase db migrate --baseline <version>` |
-| `db migrate` falha com `column … already exists (42701)` | O `rebase dev` adicionou a coluna no arranque — registe essa migração como baseline do mesmo modo |
+| `db migrate` falha com `already exists (42710)` | A inicialização ou o `db push` já provisionou o esquema — registre-o com `rebase db migrate --baseline <version>` |
+| `db migrate` falha com `column … already exists (42701)` | O `rebase dev` adicionou a coluna na inicialização — registre essa migração como baseline da mesma forma |
 | `db push` no banco de dados gerenciado falha com `Error: EOF` | O Atlas perdeu uma conexão que o `rebase dev` em execução mantém. Execute-o de novo; se continuar falhando, pare primeiro o `rebase dev` |
 
 ## Próximos Passos
