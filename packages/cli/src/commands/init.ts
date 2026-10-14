@@ -1473,6 +1473,44 @@ function setEnvValue(content: string, key: string, value: string, header?: strin
     return `${content.trimEnd()}\n\n${header ? `${header}\n` : ""}${key}=${value}\n`;
 }
 
+/**
+ * `sslmode=disable` on a URL that names a database on this machine and says
+ * nothing about TLS.
+ *
+ * A local Postgres — Homebrew, Postgres.app, a container — serves no TLS, and
+ * Atlas, which `rebase db push`, `db generate` and `db migrate` run, requires it
+ * unless the URL says otherwise: `pq: SSL is not enabled on the server`. The URL
+ * `init` writes when it picks the database has always carried the parameter; a
+ * URL passed with `--database-url` reached `.env` without it, so the app
+ * connected and the first push failed.
+ *
+ * Only a loopback address, and only when the URL names no `sslmode` or `ssl` of
+ * its own: another machine's TLS is not ours to turn off, and a choice the
+ * developer wrote down is theirs. A `host` or `hostaddr` parameter is the real
+ * address (a socket directory, say), so that URL is left as given too, and so
+ * is anything this cannot parse.
+ */
+export function disableSslOnLoopback(connectionString: string): string {
+    let url: URL;
+    try {
+        url = new URL(connectionString);
+    } catch {
+        return connectionString;
+    }
+    if (url.protocol !== "postgres:" && url.protocol !== "postgresql:") return connectionString;
+    if (["sslmode", "ssl", "host", "hostaddr"].some(param => url.searchParams.has(param))) return connectionString;
+
+    // `hostname` keeps an IPv6 literal's brackets.
+    const host = url.hostname.replace(/^\[(.+)\]$/, "$1");
+    const loopback = host === "localhost" || host === "::1" || host === "0.0.0.0" || /^127(?:\.\d{1,3}){3}$/.test(host);
+    if (!loopback) return connectionString;
+
+    // Appended to the query as it stands, so the percent-encoding `pinSearchPath`
+    // chose for `options` — the form libpq accepts — is kept byte for byte.
+    url.search = url.search ? `${url.search}&sslmode=disable` : "?sslmode=disable";
+    return url.toString();
+}
+
 export async function configureEnvFile(targetDirectory: string, databaseUrl?: string) {
     const envExamplePath = path.join(targetDirectory, ".env.example");
     const envPath = path.join(targetDirectory, ".env");
@@ -1651,7 +1689,7 @@ export async function configureEnvFile(targetDirectory: string, databaseUrl?: st
             // Postgres package, and a static import would load pg + drizzle on
             // every CLI invocation.
             const { pinSearchPath } = await import("@rebasepro/server-postgres");
-            const pinnedUrl = pinSearchPath(databaseUrl);
+            const pinnedUrl = disableSslOnLoopback(pinSearchPath(databaseUrl));
             // DATABASE_PASSWORD is still written even though the URL points
             // elsewhere: docker-compose.yml interpolates it into both
             // POSTGRES_PASSWORD and the backend's own DATABASE_URL, defaulting

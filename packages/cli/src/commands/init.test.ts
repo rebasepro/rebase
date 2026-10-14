@@ -1187,6 +1187,50 @@ describe(".env.example", () => {
         expect(envContent.match(/^DATABASE_URL=(.*)$/m)![1]).toBe(customDbUrl);
     });
 
+    /**
+     * A Postgres on this machine — Homebrew, Postgres.app, a container — has no
+     * TLS, and Atlas, which `rebase db push`, `db generate` and `db migrate` run,
+     * requires it unless the URL says otherwise. headless.md's own command wrote
+     * `postgres://u2:u2pass@127.0.0.1:55432/shop?options=…`, the app connected,
+     * and the first push died on "pq: SSL is not enabled on the server". The URL
+     * `init` writes when it picks the database has always carried
+     * `sslmode=disable`; a URL the developer passed did not.
+     */
+    it.each([
+        ["env-ssl-v4-app", "postgres://u2:u2pass@127.0.0.1:55432/shop"],
+        ["env-ssl-localhost-app", "postgresql://u:p@localhost:5432/app"],
+        ["env-ssl-v6-app", "postgresql://u:p@[::1]:5432/app"],
+        ["env-ssl-loopback-range-app", "postgresql://u:p@127.0.1.1/app"]
+    ])("configureEnvFile disables SSL for a database on this machine (%s)", async (name, customDbUrl) => {
+        const targetDir = await simulateInit(name);
+        await configureEnvFile(targetDir, customDbUrl);
+
+        const written = fs.readFileSync(path.join(targetDir, ".env"), "utf-8").match(/^DATABASE_URL=(.*)$/m)![1];
+        const url = new URL(written);
+        expect(url.searchParams.get("sslmode")).toBe("disable");
+        // Still the database that was named, still pinned to public.
+        expect(written.startsWith(customDbUrl)).toBe(true);
+        expect(url.searchParams.get("options")).toBe("-c search_path=public");
+    });
+
+    it.each([
+        // The developer said what they want; it is theirs.
+        ["env-ssl-named-app", "postgresql://u:p@127.0.0.1:5432/app?sslmode=require"],
+        ["env-ssl-ssl-param-app", "postgresql://u:p@localhost:5432/app?ssl=true"],
+        // Another machine's TLS is not ours to turn off.
+        ["env-ssl-remote-app", "postgresql://u:p@db.example.com:5432/app"],
+        ["env-ssl-lookalike-app", "postgresql://u:p@localhost.example.com:5432/app"],
+        // A socket directory or another host in the query is the real address.
+        ["env-ssl-host-param-app", "postgresql://u:p@localhost/app?host=/var/run/postgresql"]
+    ])("configureEnvFile leaves sslmode alone otherwise (%s)", async (name, customDbUrl) => {
+        const { pinSearchPath } = await import("@rebasepro/server-postgres");
+        const targetDir = await simulateInit(name);
+        await configureEnvFile(targetDir, customDbUrl);
+
+        const written = fs.readFileSync(path.join(targetDir, ".env"), "utf-8").match(/^DATABASE_URL=(.*)$/m)![1];
+        expect(written).toBe(pinSearchPath(customDbUrl));
+    });
+
     it("configureEnvFile writes a password with `$` in it exactly as given", async () => {
         // The URL was a `String.replace` replacement string, where `$$`, `$&`,
         // `` $` `` and `$'` are patterns: `pa$$w0rd` reached .env as `pa$w0rd`,
