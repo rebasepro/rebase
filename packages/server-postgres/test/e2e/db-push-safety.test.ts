@@ -145,6 +145,16 @@ describe("db push destructive-change gate E2E", () => {
         );
     }
 
+    /** {@link runPush} against another connection string. */
+    function runPushAt(databaseUrl: string, extra: string[] = []) {
+        const tsxBin = path.join(monorepoRoot, "node_modules", ".bin", "tsx");
+        return execa(
+            tsxBin,
+            [cliScript, "db", "push", "--collections", collectionsDir, ...extra],
+            { cwd: workDir, env: cleanEnv(databaseUrl), reject: false, stdin: "ignore", all: true }
+        );
+    }
+
     /** Atlas scratch databases (`<db>_dev_diff`) left on the server. */
     async function scratchDatabases(): Promise<string[]> {
         const res = await dbClient.query(`SELECT datname FROM pg_database WHERE datname LIKE '%\\_dev\\_diff' ORDER BY datname`);
@@ -335,5 +345,32 @@ export default translationsCollection;
             { id: 1, locale: "en", title: "Hello" },
             { id: 2, locale: "en", title: "Bye" }
         ]);
+    }, 150_000);
+
+    /**
+     * Atlas speaks to Postgres through lib/pq, whose default `sslmode` is
+     * `require`; node-postgres, which the app and the CLI's own steps use,
+     * asks for no SSL. So a hand-written URL with no `sslmode` passed the
+     * CLI's connection check, then Atlas failed on `querying system
+     * variables: pq: SSL is not enabled on the server` — and the scratch
+     * database made for it stayed behind, kept as "evidence" of a run that
+     * planned nothing.
+     */
+    it("drops the scratch database when Atlas fails before planning", async () => {
+        // Not loopback, so the URL is handed to Atlas as written.
+        const address = Object.values(os.networkInterfaces()).flat()
+            .find(net => net !== undefined && !net.internal && net.family === "IPv4")?.address;
+        if (!address) throw new Error("This test needs a non-loopback IPv4 address to reach the container by.");
+        const url = container.connectionString.replace("localhost", address).replace("?sslmode=disable", "");
+        for (const file of fs.readdirSync(collectionsDir)) {
+            if (file.endsWith(".js")) fs.rmSync(path.join(collectionsDir, file));
+        }
+        fs.writeFileSync(path.join(collectionsDir, "index.js"), collectionsIndex());
+        fs.writeFileSync(path.join(collectionsDir, "tasks.js"), tasksCollectionJs(true));
+
+        const failed = await runPushAt(url, ["--dry-run"]);
+        expect(failed.exitCode, failed.all).toBe(1);
+        expect(failed.all).toMatch(/SSL is not enabled on the server/);
+        expect(await scratchDatabases()).toEqual([]);
     }, 150_000);
 });

@@ -13,11 +13,12 @@
  * kept it left it for good, because the next push finds it already there and
  * takes it for one made by hand.
  *
- * Two cases keep it. An Atlas run that failed against it leaves the state Atlas
- * was planning, which is the one thing worth inspecting. And one this process
- * did not create (made by hand, the remedy for a role without `CREATEDB`) is
- * the user's, and dropping it would put them back at the same refusal next
- * time.
+ * Two cases keep it. An Atlas run that failed while planning against it leaves
+ * the state Atlas was planning, which is the one thing worth inspecting. And
+ * one this process did not create (made by hand, the remedy for a role without
+ * `CREATEDB`) is the user's, and dropping it would put them back at the same
+ * refusal next time. An Atlas run that failed before planning (see
+ * {@link atlasFailedBeforePlanning}) left nothing in it, and it is dropped.
  */
 export interface ScratchDatabaseOps {
     /** Create it if it is missing; `true` only when this call created it. */
@@ -41,6 +42,17 @@ export class ScratchDatabase {
     /** An Atlas run against it failed: keep it, whatever the command does next. */
     keepAsEvidence(): void {
         this.keptAsEvidence = true;
+    }
+
+    /**
+     * An Atlas run failed with `stderr`. Failing before it planned, it left
+     * nothing here to read, so the database is dropped now — before the
+     * command exits, which may not unwind through {@link around}. Otherwise
+     * it is kept as the evidence.
+     */
+    async afterAtlasFailure(stderr: string): Promise<void> {
+        if (atlasFailedBeforePlanning(stderr)) await this.release();
+        else this.keepAsEvidence();
     }
 
     /**
@@ -69,6 +81,15 @@ export class ScratchDatabase {
         this.created = undefined;
         await this.ops.drop(created.databaseUrl, created.devDatabaseUrl);
     }
+}
+
+/**
+ * Whether Atlas failed before it planned anything: on connecting, which it
+ * reports as `querying system variables: …` — SSL the server does not offer, a
+ * login refused, a socket that closed or never opened.
+ */
+export function atlasFailedBeforePlanning(stderr: string): boolean {
+    return /querying system variables:/.test(stderr);
 }
 
 /**

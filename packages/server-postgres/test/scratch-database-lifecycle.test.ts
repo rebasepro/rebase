@@ -14,7 +14,7 @@
  * dropped again: the next push finds it there and takes it for one made by hand.
  */
 import { buildAtlasArgs, takesDevUrl } from "../src/schema/atlas-argv";
-import { CommandStopped, ScratchDatabase } from "../src/cli-scratch-database";
+import { atlasFailedBeforePlanning, CommandStopped, ScratchDatabase } from "../src/cli-scratch-database";
 
 const URL = "postgres://u:p@localhost:5432/app";
 const DEV_URL = "postgres://u:p@localhost:5432/app_dev_diff";
@@ -58,6 +58,42 @@ describe("the scratch database around a db command", () => {
         })).rejects.toThrow("atlas exited 1");
 
         expect(drop).not.toHaveBeenCalled();
+    });
+
+    // Atlas's first step on every connection is `querying system variables`.
+    // Failing there — SSL refused, a login refused, a dropped socket — it
+    // planned nothing, so the scratch database holds nothing to read; kept, it
+    // stayed on the server for good, the next push taking it for one made by hand.
+    it.each([
+        "Error: postgres: querying system variables: pq: SSL is not enabled on the server",
+        "Error: postgres: querying system variables: EOF",
+        "Error: postgres: querying system variables: pq: password authentication failed for user \"rebase\" (28P01)",
+        "Error: postgres: querying system variables: dial tcp 127.0.0.1:5432: connect: connection refused"
+    ])("is dropped after an Atlas run that failed before planning: %s", async (stderr) => {
+        const { database, drop } = scratch(true);
+
+        await expect(database.around(async () => {
+            await database.ensure(URL, DEV_URL);
+            await database.afterAtlasFailure(stderr);
+            throw new Error("atlas exited 1");
+        })).rejects.toThrow("atlas exited 1");
+
+        expect(drop).toHaveBeenCalledTimes(1);
+        expect(atlasFailedBeforePlanning(stderr)).toBe(true);
+    });
+
+    it("is kept after an Atlas run that failed while planning", async () => {
+        const { database, drop } = scratch(true);
+        const stderr = "Error: schema.sql:1: pq: type \"nosuchtype\" does not exist at column 33 (42704)";
+
+        await expect(database.around(async () => {
+            await database.ensure(URL, DEV_URL);
+            await database.afterAtlasFailure(stderr);
+            throw new Error("atlas exited 1");
+        })).rejects.toThrow("atlas exited 1");
+
+        expect(drop).not.toHaveBeenCalled();
+        expect(atlasFailedBeforePlanning(stderr)).toBe(false);
     });
 
     // The confirmation prompt crashed in the published driver, and the throw

@@ -2007,8 +2007,9 @@ async function runAtlas(
         await subprocess;
     } catch {
         // What Atlas was planning against is the one thing worth reading after
-        // its own failure, so the scratch database outlives this command.
-        scratchDatabase.keepAsEvidence();
+        // its own failure, so the scratch database outlives this command —
+        // unless Atlas never got as far as planning, when it holds nothing.
+        await scratchDatabase.afterAtlasFailure(stderrText);
         outError(chalk.red(`\n✗ atlas ${domain} ${args.join(" ")} failed.\n`));
         // Surface actionable recovery guidance for recognized failures. The
         // Atlas-shaped ones first: they read the invocation as well as the
