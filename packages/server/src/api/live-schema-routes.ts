@@ -49,6 +49,7 @@ import {
 import { HonoEnv } from "./types";
 import { ApiError, errorHandler } from "./errors";
 import { logger } from "../utils/logger";
+import { tsMorphInstallSentence } from "../utils/dev-dependency-command";
 import {
     applySchemaChange,
     DirtyWorkingTreeError,
@@ -771,7 +772,7 @@ export function createLiveSchemaRoutes(config: LiveSchemaRoutesConfig): Hono<Hon
                 code: off?.code ?? "SCHEMA_EDITOR_MISSING_DEPENDENCY",
                 reason: off?.message
                     ?? "Rewriting collection source needs `ts-morph`, which is not installed " +
-                    "on this server. Run `pnpm add -D ts-morph@28.0.0` to enable it."
+                    `on this server. ${tsMorphInstallSentence()}`
             });
         }
         if (!repository) {

@@ -81,6 +81,7 @@ import type { HonoEnv } from "../api/types";
 import { logger, setLogLevel } from "../utils/logger";
 import { createBootAnnouncements, type BootAnnouncements } from "./boot-announcements";
 import { formatByteSize } from "../utils/byte-size";
+import { tsMorphInstallSentence } from "../utils/dev-dependency-command";
 import { configureMiddlewares } from "../init/middlewares";
 import { initializeStorage, assertStorageAccessControlConfigured } from "../init/storage";
 import { resolveStorageAccessControl } from "../storage/policies";
@@ -1833,19 +1834,36 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
             if ((err as { code?: string })?.code === "ERR_MODULE_NOT_FOUND") {
                 schemaEditorOff = {
                     code: "SCHEMA_EDITOR_MISSING_DEPENDENCY",
+                    // The install as it works from the project root — a bare
+                    // `pnpm add -D` there refuses with ERR_PNPM_ADDING_TO_ROOT —
+                    // in the project's own package manager.
                     message: "The schema editor needs `ts-morph`, which is not installed on this server. " +
-                        // `pnpm`, not `npm`: a Rebase project is a pnpm workspace, and
-                        // running npm inside one rewrites node_modules into a hoisted
-                        // layout that pnpm then disagrees with. Advice that damages the
-                        // project is worse than no advice — see docs/bug-classes.md §5.
-                        "Run `pnpm add -D ts-morph@28.0.0` to enable it."
+                        tsMorphInstallSentence()
                 };
-                logger.warn(`Schema Editor disabled: ${schemaEditorOff.message}`);
+                // Not said here. A project with no admin panel — a headless one
+                // with collections — never asks for the editor, and was told
+                // on every boot. It is said once somebody does: see
+                // `sayEditorNeedsTsMorph`.
+                logger.debug(`Schema Editor disabled: ${schemaEditorOff.message}`);
             } else {
                 throw err;
             }
         }
     }
+
+    /**
+     * The missing `ts-morph`, said the first time the editor is asked for —
+     * the admin panel's collection editor asks both schema surfaces for their
+     * status — rather than at boot. Once per backend.
+     */
+    let toldEditorNeedsTsMorph = false;
+    const sayEditorNeedsTsMorph: MiddlewareHandler<HonoEnv> = async (_c, next) => {
+        if (!toldEditorNeedsTsMorph && schemaEditorOff?.code === "SCHEMA_EDITOR_MISSING_DEPENDENCY") {
+            toldEditorNeedsTsMorph = true;
+            logger.warn(`Schema Editor disabled: ${schemaEditorOff.message}`);
+        }
+        await next();
+    };
 
     // The two schema surfaces of the admin group: `/schema` (live editing)
     // and `/schema-editor` (source-only editing).
@@ -1866,6 +1884,8 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         const schemaEditorRouter = new Hono<HonoEnv>();
 
         applyAdminGate(schemaEditorRouter, "Schema editor", { read: "schema:read", write: "schema:write" });
+        // Behind the gate, so a caller it refuses is not news.
+        schemaEditorRouter.use("/*", sayEditorNeedsTsMorph);
 
         schemaEditorRouter.get("/status", (c) => c.json(
             schemaEditorOff
@@ -1927,8 +1947,10 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
                 if ((err as { code?: string })?.code !== "ERR_MODULE_NOT_FOUND") throw err;
                 remoteEditingOff = {
                     code: "SCHEMA_EDITOR_MISSING_DEPENDENCY",
+                    // Said at boot: a configured repository is somebody asking
+                    // for live editing.
                     message: "Live schema editing rewrites collection source with `ts-morph`, which is " +
-                        "not installed on this server. Run `pnpm add -D ts-morph@28.0.0` to enable it."
+                        `not installed on this server. ${tsMorphInstallSentence()}`
                 };
                 logger.warn(`Live schema editing disabled: ${remoteEditingOff.message}`);
             }
@@ -1969,6 +1991,7 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
             let undeployedCommit: string | undefined;
             // `apply` additionally needs `schema:write` — checked on its route.
             applyAdminGate(liveSchemaRouter, "Live schema editing", "schema:read");
+            liveSchemaRouter.use("/*", sayEditorNeedsTsMorph);
 
             // Correct for a project in a subdirectory: the generated-artifact
             // paths are relative to the *project*, and the repository resolves
