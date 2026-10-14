@@ -26,8 +26,11 @@ import {
     assertSpecMatchesUsage,
     DRIVER_FLAG_SPECS,
     flagsInUsage,
-    OUTPUT_FLAG_ALIASES
+    OUTPUT_FLAG_ALIASES,
+    parseCommandFlags,
+    refuseSwitchValues
 } from "../src/cli-flags";
+import { unexpectedBranchArgs } from "../src/branch-argv";
 
 /** The driver's own line: `["db", "push", …]`, as the CLI relays it. */
 const line = (...args: string[]) => args;
@@ -233,5 +236,47 @@ describe("the --out / --output pair", () => {
             expect(() => assertKnownFlags("schema", subcommand, line("schema", subcommand, flag, "/tmp/x.ts")))
                 .not.toThrow();
         }
+    });
+});
+
+/**
+ * `arg` drops the value of a flag that takes none and turns it on: `db push
+ * --allow-destructive=false` allowed the destructive statements it was
+ * written to forbid, and `--dry-run=false` was a dry run. A value on a switch
+ * is refused, on every strict driver parser.
+ */
+describe("a switch given a value", () => {
+    it.each(["--allow-destructive=false", "--dry-run=false", "--dry-run=true", "--yes=no", "--docker=false", "--debug="])(
+        "is refused on db push: %s",
+        (typed) => {
+            const flag = typed.slice(0, typed.indexOf("="));
+            expect(() => assertKnownFlags("db", "push", line("db", "push", typed))).toThrow(
+                `\`rebase db push\` takes ${flag} without a value (${typed}): give it to turn it on, and leave it out to turn it off. ` +
+                "Nothing was run. See `rebase db --help`."
+            );
+        }
+    );
+
+    it("is refused through an alias's target, and on the schema commands", () => {
+        expect(() => assertKnownFlags("schema", "introspect", line("schema", "introspect", "--force=false")))
+            .toThrow(/takes --force without a value/);
+    });
+
+    it("is refused by the commands that parse their own line", () => {
+        expect(() => parseCommandFlags({ "--clean": Boolean }, ["x.dump", "--clean=false"], "db restore"))
+            .toThrow("`rebase db restore` takes --clean without a value (--clean=false): give it to turn it on, and leave it out to turn it off. Nothing was run. See `rebase db restore --help`.");
+        expect(() => unexpectedBranchArgs(["create", "x", "--force=false"]))
+            .toThrow(/`rebase db branch create` takes --force without a value .* See `rebase db branch --help`\./);
+    });
+
+    it("leaves a value on a flag that takes one, and a switch alone, as they are", () => {
+        expect(() => assertKnownFlags("db", "push", line("db", "push", "--collections=../config", "--dry-run"))).not.toThrow();
+        expect(() => assertKnownFlags("db", "push", line("db", "push", "--database-url=postgres://u:p@h/db"))).not.toThrow();
+        expect(() => refuseSwitchValues({ "--yes": Boolean }, ["--", "--yes=false"], "db push")).not.toThrow();
+    });
+
+    it("masks a password in what it quotes", () => {
+        expect(() => refuseSwitchValues({ "--yes": Boolean }, ["--yes=postgres://app:hunter2@db/prod"], "db push"))
+            .toThrow("(--yes=postgres://app:***@db/prod)");
     });
 });

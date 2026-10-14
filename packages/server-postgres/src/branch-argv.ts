@@ -8,7 +8,7 @@
  */
 import arg from "arg";
 
-import { closestWord, RELAYED_FLAGS } from "./cli-flags";
+import { closestWord, refuseSwitchValues, RELAYED_FLAGS } from "./cli-flags";
 
 /**
  * The flags each driver-side `db branch` action takes, besides the ones the CLI
@@ -40,6 +40,7 @@ export function assertKnownBranchFlags(action: string, rest: readonly string[]):
     if (!spec) return;
 
     const full = { ...RELAYED_FLAGS, ...spec };
+    refuseSwitchValues(full, rest, `db branch ${action}`, "db branch");
     try {
         arg(full, { argv: [...rest] });
     } catch (error) {

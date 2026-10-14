@@ -25,6 +25,8 @@
 import arg from "arg";
 import { suggestNearMiss } from "@rebasepro/utils";
 
+import { redactConnectionPasswords } from "./utils/connection-string";
+
 /**
  * Flags that reach this process on a line it did not compose.
  *
@@ -257,6 +259,7 @@ export function assertKnownFlags(domain: string, subcommand: string | undefined,
     const spec = DRIVER_FLAG_SPECS[`${domain} ${subcommand}`];
     if (!spec) return;
 
+    refuseSwitchValues({ ...RELAYED_FLAGS, ...spec }, args.slice(2), `${domain} ${subcommand}`, domain);
     try {
         arg({ ...RELAYED_FLAGS, ...spec }, { argv: args.slice(2) });
     } catch (err) {
@@ -272,6 +275,43 @@ export function assertKnownFlags(domain: string, subcommand: string | undefined,
             );
         }
         throw err;
+    }
+}
+
+/** What a flag resolves to, through its alias (`"-y": "--yes"`). */
+function handlerOf(spec: arg.Spec, flag: string): arg.Spec[string] | undefined {
+    const declared = spec[flag];
+    return typeof declared === "string" ? spec[declared] : declared;
+}
+
+/** A flag that takes no value: on when given, off when left out. */
+function isSwitch(handler: arg.Spec[string] | undefined): boolean {
+    return handler === Boolean || (Array.isArray(handler) && handler[0] === Boolean);
+}
+
+/**
+ * Refuse `--switch=value` on a line, before `arg` reads it.
+ *
+ * `arg` drops the value of a flag that takes none and turns the flag on, so
+ * `db push --dry-run=false` was a dry run and `--allow-destructive=false`
+ * allowed the destructive statements it was typed to forbid. A value there is
+ * the reader saying which way the switch goes; reading `=false` as "on" is
+ * never what they meant, so it is refused. Past `--` every word is a
+ * positional, so the scan stops there.
+ *
+ * @param command the command as typed, for the message: `"db push"`.
+ * @param help the command whose `--help` the message names.
+ */
+export function refuseSwitchValues(spec: arg.Spec, argv: readonly string[], command: string, help = command): void {
+    for (const word of argv) {
+        if (word === "--") return;
+        if (!word.startsWith("--") || !word.includes("=")) continue;
+        const flag = word.slice(0, word.indexOf("="));
+        if (!isSwitch(handlerOf(spec, flag))) continue;
+        throw new Error(
+            `\`rebase ${command}\` takes ${flag} without a value (${redactConnectionPasswords(word)}): ` +
+            `give it to turn it on, and leave it out to turn it off. Nothing was run. See \`rebase ${help} --help\`.`
+        );
     }
 }
 
@@ -326,6 +366,7 @@ export function parseCommandFlags<S extends arg.Spec>(
     command: string
 ): arg.Result<typeof RELAYED_FLAGS & S> {
     const full = { ...RELAYED_FLAGS, ...spec };
+    refuseSwitchValues(full, argv, command);
     try {
         return arg(full, { argv });
     } catch (err) {

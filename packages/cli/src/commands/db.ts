@@ -19,7 +19,7 @@ import {
     dependenciesNotInstalled
 } from "../utils/project";
 import { reportSpawnFailure } from "../utils/spawn-error";
-import { parseCommandArgs, UsageError } from "../utils/args";
+import { parseCommandArgs, switchValueMessage, UsageError } from "../utils/args";
 import { redactConnectionPasswords } from "../utils/redact";
 import { suggestCommand, unknownCommand } from "../utils/unknown-command";
 import { argsFromCommand, commandWords } from "../utils/command-words";
@@ -1480,6 +1480,11 @@ export function assertSwitchFlags(rawArgs: readonly string[]): void {
     for (const word of rawArgs.slice(2)) {
         if (!word.startsWith("-")) continue;
         const flag = word.split("=")[0];
+        // Every flag `switch` takes but `--database-url` is a switch, which
+        // a value would only misstate: `--off=false` is not "stay on".
+        if (word.includes("=") && flag !== "--database-url" && (SWITCH_FLAGS as readonly string[]).includes(flag)) {
+            throw new UsageError(switchValueMessage("db branch switch", flag, word));
+        }
         if ((SWITCH_FLAGS as readonly string[]).includes(flag)) continue;
         const near = suggestCommand(flag.replace(/^-+/, ""), SWITCH_FLAGS.map(known => known.slice(2)));
         throw new UsageError(

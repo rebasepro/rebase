@@ -152,6 +152,9 @@ does not take is refused before anything is read or copied, naming the one it
 was probably meant to be: `--anonymise` answers "did you mean --anonymize?" and
 exits 1. On 0.24 a misspelt flag was ignored, so `--anonymise`, `--anon` or
 `--schem` ran the pull without it, and personal data arrived as it was.
+A switch takes no value, on `pull` and on every other command: `--anonymize=false`
+is refused rather than read as `--anonymize`, which is what 0.25 did. To turn a
+switch off, leave it out.
 
 `pg_dump` strips privileges, so the copy would arrive with the source's RLS
 policies and none of the grants behind them — every read as `rebase_user` failing

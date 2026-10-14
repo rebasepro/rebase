@@ -87,6 +87,45 @@ export function unknownOptionMessage(command: string, typed: string, spec: Reado
     return `\`rebase ${command}\` has no option ${typed}${takes} Nothing was run. See \`rebase ${command} --help\`.`;
 }
 
+/** What a flag resolves to, through its alias (`"-y": "--yes"`). */
+function handlerOf(spec: Readonly<Record<string, unknown>>, flag: string): unknown {
+    const declared = spec[flag];
+    return typeof declared === "string" ? spec[declared] : declared;
+}
+
+/** A flag that takes no value: on when given, off when left out. */
+function isSwitch(handler: unknown): boolean {
+    return handler === Boolean || (Array.isArray(handler) && handler[0] === Boolean);
+}
+
+/**
+ * The first `--switch=value` on a line, if there is one.
+ *
+ * `arg` drops the value of a flag that takes none and turns the flag on, so
+ * `--anonymize=false` anonymized and `--yes=false` answered yes. A value there
+ * is the reader saying which way the switch goes, and there is no reading of
+ * `=false` as "on" that is not a surprise. Past `--` every word is a
+ * positional, so the scan stops there.
+ */
+export function switchGivenAValue(
+    spec: Readonly<Record<string, unknown>>,
+    argv: readonly string[]
+): { flag: string; typed: string } | null {
+    for (const word of argv) {
+        if (word === "--") return null;
+        if (!word.startsWith("--") || !word.includes("=")) continue;
+        const flag = word.slice(0, word.indexOf("="));
+        if (isSwitch(handlerOf(spec, flag))) return { flag, typed: word };
+    }
+    return null;
+}
+
+/** The sentence a switch given a value is refused with. */
+export function switchValueMessage(command: string, flag: string, typed: string): string {
+    return `\`rebase ${command}\` takes ${flag} without a value (${redactConnectionPasswords(typed)}): ` +
+        `give it to turn it on, and leave it out to turn it off. Nothing was run. See \`rebase ${command} --help\`.`;
+}
+
 export interface ParsedCommand<S extends arg.Spec> {
     /** The declared flags, as `arg` resolved them. */
     flags: arg.Result<S>;
@@ -134,9 +173,9 @@ export class UsageError extends Error {
  *
  * `command` names the command in error messages, e.g. `auth reset-password`.
  *
- * Throws on an unknown flag, on a positional that looks like a flag, and on
- * more positionals than the command takes. `bin/rebase.js` turns each into a
- * one-line `✗ …` and exit 1.
+ * Throws on an unknown flag, on a switch given a value (`--yes=false`), on a
+ * positional that looks like a flag, and on more positionals than the command
+ * takes. `bin/rebase.js` turns each into a one-line `✗ …` and exit 1.
  */
 export function parseCommandArgs<S extends arg.Spec>({
     spec,
@@ -152,11 +191,13 @@ export function parseCommandArgs<S extends arg.Spec>({
     maxPositionals?: number;
 }): ParsedCommand<S> {
     let parsed: arg.Result<S> & { "--help"?: boolean };
+    const merged = {
+        ...GLOBAL_COMMAND_FLAGS,
+        ...spec
+    };
+    const switchValue = switchGivenAValue(merged, rawArgs.slice(2));
+    if (switchValue) throw new UsageError(switchValueMessage(command, switchValue.flag, switchValue.typed));
     try {
-        const merged = {
-            ...GLOBAL_COMMAND_FLAGS,
-            ...spec
-        };
         parsed = arg(merged, { argv: rawArgs.slice(2) }) as arg.Result<S> & { "--help"?: boolean };
     } catch (err) {
         if (err instanceof Error && (err as arg.ArgError).code === "ARG_UNKNOWN_OPTION") {

@@ -112,6 +112,58 @@ describe("parseCommandArgs", () => {
     });
 });
 
+/**
+ * `arg` drops the value of a flag that takes none and turns it on, so
+ * `rebase db pull --anonymize=false` anonymized and `--yes=false` answered
+ * yes. A value on a switch is refused instead, on every command on this
+ * parser.
+ */
+describe("a switch given a value", () => {
+    const SWITCHES = { "--anonymize": Boolean, "--yes": Boolean, "-y": "--yes", "--schema": [String], "--tag": [Boolean] } as const;
+    const pull = (...line: string[]) =>
+        parseCommandArgs({ spec: SWITCHES, rawArgs: argv("db", "pull", ...line), commandWords: 2, command: "db pull", maxPositionals: 0 });
+
+    it.each(["--anonymize=false", "--anonymize=true", "--anonymize=no", "--anonymize=", "--yes=false", "--tag=x"])(
+        "refuses %s rather than turning it on",
+        (typed) => {
+            const flag = typed.slice(0, typed.indexOf("="));
+            expect(() => pull(typed)).toThrow(
+                `\`rebase db pull\` takes ${flag} without a value (${typed}): give it to turn it on, and leave it out to turn it off. ` +
+                "Nothing was run. See `rebase db pull --help`."
+            );
+        }
+    );
+
+    it("refuses one on a global switch too", () => {
+        expect(() => pull("--debug=false")).toThrow(/takes --debug without a value/);
+    });
+
+    it("leaves a flag that takes a value, and a switch written alone, as they are", () => {
+        const { flags } = pull("--anonymize", "--schema=public", "-y");
+        expect(flags["--anonymize"]).toBe(true);
+        expect(flags["--schema"]).toEqual(["public"]);
+        expect(flags["--yes"]).toBe(true);
+    });
+
+    it("reads nothing past `--`", () => {
+        expect(() => parseCommandArgs({ spec: SWITCHES, rawArgs: argv("x", "--", "--yes=false"), commandWords: 1, command: "x" }))
+            .toThrow(/looks like an option/);
+    });
+
+    it("masks a password in what it quotes", () => {
+        expect(() => pull("--yes=postgres://app:hunter2@db/prod")).toThrow("(--yes=postgres://app:***@db/prod)");
+    });
+
+    it("is a usage error", () => {
+        try {
+            pull("--yes=false");
+            throw new Error("expected a refusal");
+        } catch (err) {
+            expect(err).toMatchObject({ isUsageError: true });
+        }
+    });
+});
+
 describe("wantsHelp", () => {
     it("sees --help and -h anywhere on the line", () => {
         expect(wantsHelp(argv("skills", "install", "--help"))).toBe(true);

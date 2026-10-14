@@ -31,6 +31,13 @@ describe("assertSwitchFlags", () => {
         expect(() => assertSwitchFlags(["/usr/bin/node", "/usr/local/bin/rebase", "--debug", "db", "branch", "switch", "x"])).not.toThrow();
     });
 
+    // `--off=false` is not "stay on": a value on a switch is refused.
+    it("refuses a value on one of its switches", () => {
+        expect(() => assertSwitchFlags(line("--off=false")))
+            .toThrow("`rebase db branch switch` takes --off without a value (--off=false): give it to turn it on, and leave it out to turn it off.");
+        expect(() => assertSwitchFlags(line("feature", "--docker=true"))).toThrow(/takes --docker without a value/);
+    });
+
     it("is a usage error, which the CLI prints as one line", () => {
         try {
             assertSwitchFlags(line("--of"));
