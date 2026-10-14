@@ -19,7 +19,7 @@ import {
     dependenciesNotInstalled
 } from "../utils/project";
 import { reportSpawnFailure } from "../utils/spawn-error";
-import { parseCommandArgs, switchValueMessage, UsageError } from "../utils/args";
+import { parseCommandArgs, resolveSwitchValues, switchOn, UsageError } from "../utils/args";
 import { redactConnectionPasswords } from "../utils/redact";
 import { suggestCommand, unknownCommand } from "../utils/unknown-command";
 import { argsFromCommand, commandWords } from "../utils/command-words";
@@ -616,7 +616,7 @@ export async function runDriverDbCommand(
     const { resolveProjectDatabase } = await import("../dev-db/prepare");
     const resolvedKind = resolveProjectDatabase(projectRoot, {
         flagUrl: readFlagValue(rawArgs, "--database-url"),
-        flagDocker: rawArgs.includes("--docker")
+        flagDocker: switchOn(rawArgs, "--docker")
     }).kind;
     refuseBranchOnManagedDatabase(rawArgs, resolvedKind);
     refuseRestoreOnManagedDatabase(rawArgs, resolvedKind);
@@ -624,7 +624,7 @@ export async function runDriverDbCommand(
     const { prepareDatabaseEnv, managedNotices } = await import("../dev-db/prepare");
     const prepared = await prepareDatabaseEnv(projectRoot, {
         flagUrl: readFlagValue(rawArgs, "--database-url"),
-        flagDocker: rawArgs.includes("--docker"),
+        flagDocker: switchOn(rawArgs, "--docker"),
         onProgress: (message) => { if (!options.quiet) console.log(chalk.gray(`  ${message}`)); }
     });
     Object.assign(env, prepared.env);
@@ -1317,7 +1317,7 @@ export async function ensureDockerDatabase(projectRoot: string, rawArgs: readonl
     // nothing to start: `prepareDatabaseEnv` says the flag was ignored.
     const resolved = resolveProjectDatabase(projectRoot, {
         flagUrl: readFlagValue(rawArgs, "--database-url"),
-        flagDocker: rawArgs.includes("--docker")
+        flagDocker: switchOn(rawArgs, "--docker")
     });
     if (resolved.kind !== "docker") return;
 
@@ -1453,7 +1453,7 @@ async function onParentDatabase(projectRoot: string, rawArgs: string[], action: 
 
     const envFile = readEnvFile(projectRoot);
     const parent = resolveDevDatabase({
-        flagDocker: rawArgs.includes("--docker"),
+        flagDocker: switchOn(rawArgs, "--docker"),
         lastDevDocker: readLastDevDocker(projectRoot),
         env: process.env,
         envFile,
@@ -1479,7 +1479,16 @@ async function onParentDatabase(projectRoot: string, rawArgs: string[], action: 
  * The flags `rebase db branch switch` takes, the relayed database flags and
  * `--debug` included.
  */
-const SWITCH_FLAGS = ["--off", "--main", "--database-url", "--docker", "--debug"] as const;
+const SWITCH_FLAGS = {
+    "--off": Boolean,
+    "--main": Boolean,
+    "--database-url": String,
+    "--docker": Boolean,
+    "--debug": Boolean
+} satisfies arg.Spec;
+
+/** The long flags in {@link SWITCH_FLAGS}, for the did-you-mean. */
+const SWITCH_FLAG_NAMES: readonly string[] = Object.keys(SWITCH_FLAGS);
 
 /**
  * Refuse a flag `switch` does not take, naming the one it was probably meant to be.
@@ -1494,19 +1503,18 @@ export function assertSwitchFlags(rawArgs: readonly string[]): void {
         // The flag part only: a value given inline, or quoted into the same
         // argument after a space, may be a connection string.
         const flag = word.split(/[=\s]/)[0];
-        // Every flag `switch` takes but `--database-url` is a switch, which
-        // a value would only misstate: `--off=false` is not "stay on".
-        if (word.includes("=") && flag !== "--database-url" && (SWITCH_FLAGS as readonly string[]).includes(flag)) {
-            throw new UsageError(switchValueMessage("db branch switch", flag, word));
-        }
-        if ((SWITCH_FLAGS as readonly string[]).includes(flag)) continue;
-        const near = suggestCommand(flag.replace(/^-+/, ""), SWITCH_FLAGS.map(known => known.slice(2)));
+        if (SWITCH_FLAG_NAMES.includes(flag)) continue;
+        const near = suggestCommand(flag.replace(/^-+/, ""), SWITCH_FLAG_NAMES.map(known => known.slice(2)));
         throw new UsageError(
             `\`rebase db branch switch\` has no option ${flag}` +
             (near ? ` — did you mean --${near}?` : " — it takes --off (or --main) and a branch name.") +
             " Nothing was run. See `rebase db branch --help`."
         );
     }
+    // Every flag `switch` takes but `--database-url` is a switch: `=true` or
+    // `=1` turns one on, `=false` or `=0` leaves it off, and nothing else is
+    // read. `--off=false` is not "leave".
+    resolveSwitchValues(SWITCH_FLAGS, rawArgs.slice(2), "db branch switch");
 }
 
 /**
@@ -1555,7 +1563,7 @@ async function switchBranch(projectRoot: string, rawArgs: readonly string[]): Pr
     // verifier reads a command's flags out of exactly this shape, which is the
     // other reason: a flag it cannot see is one it reports as unrunnable in
     // every page that documents it.
-    const goingOff = rawArgs.includes("--off") || rawArgs.includes("--main");
+    const goingOff = switchOn(rawArgs, "--off") || switchOn(rawArgs, "--main");
 
     // ["db", "branch", "switch", <name>], with any flags taken back out —
     // `rebase --debug db branch switch feature` read the name as "switch".
@@ -1575,7 +1583,7 @@ async function switchBranch(projectRoot: string, rawArgs: readonly string[]): Pr
     const envFile = readEnvFile(projectRoot);
     const resolved = resolveDevDatabase({
         flagUrl: readFlagValue(rawArgs, "--database-url"),
-        flagDocker: rawArgs.includes("--docker"),
+        flagDocker: switchOn(rawArgs, "--docker"),
         lastDevDocker: readLastDevDocker(projectRoot),
         env: process.env,
         envFile,

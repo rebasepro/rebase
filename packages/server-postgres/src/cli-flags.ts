@@ -259,9 +259,9 @@ export function assertKnownFlags(domain: string, subcommand: string | undefined,
     const spec = DRIVER_FLAG_SPECS[`${domain} ${subcommand}`];
     if (!spec) return;
 
-    refuseSwitchValues({ ...RELAYED_FLAGS, ...spec }, args.slice(2), `${domain} ${subcommand}`, domain);
+    const argv = resolveSwitchValues({ ...RELAYED_FLAGS, ...spec }, args.slice(2), `${domain} ${subcommand}`, domain);
     try {
-        arg({ ...RELAYED_FLAGS, ...spec }, { argv: args.slice(2) });
+        arg({ ...RELAYED_FLAGS, ...spec }, { argv });
     } catch (err) {
         const unknown = unknownFlagIn(err, args.slice(2));
         if (unknown === null) throw err;
@@ -316,30 +316,63 @@ function isSwitch(handler: arg.Spec[string] | undefined): boolean {
     return handler === Boolean || (Array.isArray(handler) && handler[0] === Boolean);
 }
 
+/** The values a switch reads as on, and as off, after its `=`. */
+const SWITCH_ON = /^(?:true|1)$/i;
+const SWITCH_OFF = /^(?:false|0)$/i;
+
 /**
- * Refuse `--switch=value` on a line, before `arg` reads it.
+ * A line with every `--switch=value` resolved, before `arg` reads it: `=true`
+ * or `=1` is the switch alone, `=false` or `=0` drops it, and any other value
+ * is refused.
  *
  * `arg` drops the value of a flag that takes none and turns the flag on, so
  * `db push --dry-run=false` was a dry run and `--allow-destructive=false`
- * allowed the destructive statements it was typed to forbid. A value there is
- * the reader saying which way the switch goes; reading `=false` as "on" is
- * never what they meant, so it is refused. Past `--` every word is a
- * positional, so the scan stops there.
+ * allowed the destructive statements it was typed to forbid. `=true` kept
+ * working by the same accident, and scripts write it, so both readings a value
+ * can have are honoured and nothing else is guessed at. Past `--` every word
+ * is a positional, so nothing there is read.
  *
  * @param command the command as typed, for the message: `"db push"`.
  * @param help the command whose `--help` the message names.
  */
-export function refuseSwitchValues(spec: arg.Spec, argv: readonly string[], command: string, help = command): void {
-    for (const word of argv) {
-        if (word === "--") return;
-        if (!word.startsWith("--") || !word.includes("=")) continue;
-        const flag = word.slice(0, word.indexOf("="));
-        if (!isSwitch(handlerOf(spec, flag))) continue;
-        throw new Error(
-            `\`rebase ${command}\` takes ${flag} without a value (${redactConnectionPasswords(word)}): ` +
-            `give it to turn it on, and leave it out to turn it off. Nothing was run. See \`rebase ${help} --help\`.`
-        );
+export function resolveSwitchValues(spec: arg.Spec, argv: readonly string[], command: string, help = command): string[] {
+    const resolved: string[] = [];
+    for (let index = 0; index < argv.length; index += 1) {
+        const word = argv[index];
+        if (word === "--") {
+            resolved.push(...argv.slice(index));
+            break;
+        }
+        const flag = word.startsWith("--") && word.includes("=") ? word.slice(0, word.indexOf("=")) : null;
+        if (flag === null || !isSwitch(handlerOf(spec, flag))) {
+            resolved.push(word);
+            continue;
+        }
+        const value = word.slice(flag.length + 1);
+        if (SWITCH_ON.test(value)) {
+            resolved.push(flag);
+        } else if (!SWITCH_OFF.test(value)) {
+            throw new Error(
+                `\`rebase ${command}\` cannot read ${redactConnectionPasswords(word)}: ${flag} is a switch, ` +
+                "and after its = it takes true or 1 to turn it on, false or 0 to turn it off. " +
+                `Nothing was run. See \`rebase ${help} --help\`.`
+            );
+        }
     }
+    return resolved;
+}
+
+/**
+ * A driver command's line, `["<domain>", "<subcommand>", …]`, with its
+ * switches' values resolved by {@link resolveSwitchValues} against the
+ * command's spec: what `runPluginCommand` hands every parser after it, so a
+ * permissive one never reads `--allow-destructive=false` as on. A command with
+ * no spec here comes back as it was.
+ */
+export function resolveDriverSwitches(domain: string, subcommand: string | undefined, args: readonly string[]): string[] {
+    const spec = subcommand ? DRIVER_FLAG_SPECS[`${domain} ${subcommand}`] : undefined;
+    if (!spec) return [...args];
+    return [...args.slice(0, 2), ...resolveSwitchValues({ ...RELAYED_FLAGS, ...spec }, args.slice(2), `${domain} ${subcommand}`, domain)];
 }
 
 /**
@@ -397,9 +430,8 @@ export function parseCommandFlags<S extends arg.Spec>(
     command: string
 ): arg.Result<typeof RELAYED_FLAGS & S> {
     const full = { ...RELAYED_FLAGS, ...spec };
-    refuseSwitchValues(full, argv, command);
     try {
-        return arg(full, { argv });
+        return arg(full, { argv: resolveSwitchValues(full, argv, command) });
     } catch (err) {
         const unknown = unknownFlagIn(err, argv);
         if (unknown === null) throw err;

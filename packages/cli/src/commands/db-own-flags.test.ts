@@ -189,9 +189,18 @@ describe("rebase db pull refuses a flag it does not take", () => {
         expectNothingRan();
     });
 
-    it("refuses --anonymize=false rather than anonymizing", async () => {
-        await expect(dbCommand("pull", argv("pull", "--from", PROD, "--anonymize=false", "--yes")))
-            .rejects.toThrow("takes --anonymize without a value (--anonymize=false)");
+    // `arg` read `--anonymize=false` as `--anonymize`; it is off now, and
+    // `--yes=true`, which scripts write, is still a yes.
+    it("reads --anonymize=false as off and --yes=true as on", async () => {
+        await dbCommand("pull", argv("pull", "--from", PROD, "--anonymize=false", "--yes=true"));
+
+        expect(state.dumped).toHaveLength(1);
+        expect(state.dumped[0]).toMatchObject({ anonymize: false });
+    });
+
+    it("refuses a switch value it cannot read, before anything runs", async () => {
+        await expect(dbCommand("pull", argv("pull", "--from", PROD, "--anonymize=maybe", "--yes")))
+            .rejects.toThrow("cannot read --anonymize=maybe: --anonymize is a switch");
 
         expectNothingRan();
     });

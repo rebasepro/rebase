@@ -28,9 +28,11 @@ import {
     flagsInUsage,
     OUTPUT_FLAG_ALIASES,
     parseCommandFlags,
-    refuseSwitchValues
+    parseDriverLine,
+    resolveDriverSwitches,
+    resolveSwitchValues
 } from "../src/cli-flags";
-import { unexpectedBranchArgs } from "../src/branch-argv";
+import { resolveBranchSwitches, unexpectedBranchArgs } from "../src/branch-argv";
 
 /** The driver's own line: `["db", "push", …]`, as the CLI relays it. */
 const line = (...args: string[]) => args;
@@ -242,42 +244,70 @@ describe("the --out / --output pair", () => {
 /**
  * `arg` drops the value of a flag that takes none and turns it on: `db push
  * --allow-destructive=false` allowed the destructive statements it was
- * written to forbid, and `--dry-run=false` was a dry run. A value on a switch
- * is refused, on every strict driver parser.
+ * written to forbid, and `--dry-run=false` was a dry run. A switch's value is
+ * read on every strict driver parser, and resolved on the line the permissive
+ * ones read: `=true`/`=1` on, `=false`/`=0` off, anything else refused.
  */
 describe("a switch given a value", () => {
-    it.each(["--allow-destructive=false", "--dry-run=false", "--dry-run=true", "--yes=no", "--docker=false", "--debug="])(
-        "is refused on db push: %s",
-        (typed) => {
-            const flag = typed.slice(0, typed.indexOf("="));
-            expect(() => assertKnownFlags("db", "push", line("db", "push", typed))).toThrow(
-                `\`rebase db push\` takes ${flag} without a value (${typed}): give it to turn it on, and leave it out to turn it off. ` +
-                "Nothing was run. See `rebase db --help`."
-            );
-        }
-    );
-
-    it("is refused through an alias's target, and on the schema commands", () => {
-        expect(() => assertKnownFlags("schema", "introspect", line("schema", "introspect", "--force=false")))
-            .toThrow(/takes --force without a value/);
+    it.each([
+        ["--allow-destructive=false", []],
+        ["--allow-destructive=0", []],
+        ["--dry-run=true", ["--dry-run"]],
+        ["--dry-run=1", ["--dry-run"]],
+        ["--docker=false", []]
+    ])("is read on db push, before any parser sees it: %s", (typed, resolved) => {
+        expect(() => assertKnownFlags("db", "push", line("db", "push", typed))).not.toThrow();
+        expect(resolveDriverSwitches("db", "push", line("db", "push", typed, "--collections=../config")))
+            .toEqual(["db", "push", ...resolved, "--collections=../config"]);
     });
 
-    it("is refused by the commands that parse their own line", () => {
-        expect(() => parseCommandFlags({ "--clean": Boolean }, ["x.dump", "--clean=false"], "db restore"))
-            .toThrow("`rebase db restore` takes --clean without a value (--clean=false): give it to turn it on, and leave it out to turn it off. Nothing was run. See `rebase db restore --help`.");
-        expect(() => unexpectedBranchArgs(["create", "x", "--force=false"]))
-            .toThrow(/`rebase db branch create` takes --force without a value .* See `rebase db branch --help`\./);
+    // The permissive parse `db push` runs reads the resolved line, so the gate
+    // `--allow-destructive=false` was typed to keep shut stays shut.
+    it("leaves --allow-destructive=false off where the push reads it", () => {
+        const resolved = resolveDriverSwitches("db", "push", line("db", "push", "--allow-destructive=false"));
+        expect(parseDriverLine({ "--allow-destructive": Boolean }, resolved)["--allow-destructive"]).toBeUndefined();
     });
 
-    it("leaves a value on a flag that takes one, and a switch alone, as they are", () => {
+    it.each(["--yes=no", "--dry-run=maybe", "--debug="])("is refused on db push when it is not true, false, 1 or 0: %s", (typed) => {
+        const flag = typed.slice(0, typed.indexOf("="));
+        expect(() => assertKnownFlags("db", "push", line("db", "push", typed))).toThrow(
+            `\`rebase db push\` cannot read ${typed}: ${flag} is a switch, and after its = it takes true or 1 to turn it on, ` +
+            "false or 0 to turn it off. Nothing was run. See `rebase db --help`."
+        );
+    });
+
+    it("is read through an alias's target, and on the schema commands", () => {
+        expect(() => assertKnownFlags("schema", "introspect", line("schema", "introspect", "--force=false"))).not.toThrow();
+        expect(() => assertKnownFlags("schema", "introspect", line("schema", "introspect", "--force=yes")))
+            .toThrow(/cannot read --force=yes: --force is a switch/);
+    });
+
+    it("is read by the commands that parse their own line", () => {
+        expect(parseCommandFlags({ "--clean": Boolean }, ["x.dump", "--clean=false"], "db restore")["--clean"]).toBeUndefined();
+        expect(parseCommandFlags({ "--clean": Boolean }, ["x.dump", "--clean=true"], "db restore")["--clean"]).toBe(true);
+        expect(() => parseCommandFlags({ "--clean": Boolean }, ["x.dump", "--clean=maybe"], "db restore"))
+            .toThrow("`rebase db restore` cannot read --clean=maybe: --clean is a switch, and after its = it takes true or 1 to turn it on, false or 0 to turn it off. Nothing was run. See `rebase db restore --help`.");
+        expect(() => unexpectedBranchArgs(["create", "x", "--force=false"])).not.toThrow();
+        expect(() => unexpectedBranchArgs(["create", "x", "--force=maybe"]))
+            .toThrow(/`rebase db branch create` cannot read --force=maybe: .* See `rebase db branch --help`\./);
+    });
+
+    // `prune` parses permissively, and `arg` read `--yes=false` as a yes.
+    it("resolves a branch line's switches before the dispatch reads them", () => {
+        expect(resolveBranchSwitches(["db", "branch", "prune", "--older-than", "1d", "--yes=false", "--include-dev-diff=1"]))
+            .toEqual(["db", "branch", "prune", "--older-than", "1d", "--include-dev-diff"]);
+        expect(resolveBranchSwitches(["db", "branch", "rename", "--yes=false"])).toEqual(["db", "branch", "rename", "--yes=false"]);
+    });
+
+    it("leaves a value on a flag that takes one, a switch alone, and what follows `--`, as they are", () => {
         expect(() => assertKnownFlags("db", "push", line("db", "push", "--collections=../config", "--dry-run"))).not.toThrow();
         expect(() => assertKnownFlags("db", "push", line("db", "push", "--database-url=postgres://u:p@h/db"))).not.toThrow();
-        expect(() => refuseSwitchValues({ "--yes": Boolean }, ["--", "--yes=false"], "db push")).not.toThrow();
+        expect(resolveSwitchValues({ "--yes": Boolean }, ["--", "--yes=maybe"], "db push")).toEqual(["--", "--yes=maybe"]);
     });
 
     it("masks a password in what it quotes", () => {
-        expect(() => refuseSwitchValues({ "--yes": Boolean }, ["--yes=postgres://app:hunter2@db/prod"], "db push"))
-            .toThrow("(--yes=postgres://app:***@db/prod)");
+        expect(() => resolveSwitchValues({ "--yes": Boolean }, ["--yes=postgres://app:hunter2@db/prod"], "db push"))
+            .toThrow("cannot read --yes=postgres://app:***@db/prod:");
     });
 });
 

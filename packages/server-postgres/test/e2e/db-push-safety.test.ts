@@ -194,6 +194,15 @@ describe("db push destructive-change gate E2E", () => {
         // dropped again: the next push takes it for one made by hand.
         expect(await scratchDatabases()).toEqual([]);
 
+        // ── 2b. `--allow-destructive=false` keeps the gate shut ───────────
+        // `arg` dropped the value and read it as the opt-in: written to keep
+        // the gate shut, it opened it and the column went.
+        const stillRefused = await runPush(["--allow-destructive=false"]);
+        expect(stillRefused.exitCode, stillRefused.all).not.toBe(0);
+        expect(stillRefused.all ?? "").toMatch(/destructive/i);
+        expect(await noteColumnExists()).toBe(true);
+        expect(await scratchDatabases()).toEqual([]);
+
         // ── 3. Opt in explicitly → the drop is applied ───────────────────
         const allowed = await runPush(["--allow-destructive"]);
         expect(allowed.exitCode).toBe(0);

@@ -8,7 +8,7 @@
  */
 import arg from "arg";
 
-import { refuseSwitchValues, RELAYED_FLAGS, unknownFlagIn, unknownOptionSentence } from "./cli-flags";
+import { RELAYED_FLAGS, resolveSwitchValues, unknownFlagIn, unknownOptionSentence } from "./cli-flags";
 
 /**
  * The flags each driver-side `db branch` action takes, besides the ones the CLI
@@ -40,14 +40,27 @@ export function assertKnownBranchFlags(action: string, rest: readonly string[]):
     if (!spec) return;
 
     const full = { ...RELAYED_FLAGS, ...spec };
-    refuseSwitchValues(full, rest, `db branch ${action}`, "db branch");
+    const argv = resolveSwitchValues(full, rest, `db branch ${action}`, "db branch");
     try {
-        arg(full, { argv: [...rest] });
+        arg(full, { argv });
     } catch (error) {
         const unknown = unknownFlagIn(error, rest);
         if (unknown === null) throw error;
         throw new Error(unknownOptionSentence(`db branch ${action}`, "db branch", unknown, spec));
     }
+}
+
+/**
+ * A `db branch` line, `["db", "branch", <action>, …]`, with its switches'
+ * values resolved against the action's flags (see `resolveSwitchValues`):
+ * what the branch dispatch reads, so `prune --yes=false` is not a yes. An
+ * action the table does not list comes back as it was.
+ */
+export function resolveBranchSwitches(rawArgs: readonly string[]): string[] {
+    const action = rawArgs[2];
+    const spec = action === undefined ? undefined : BRANCH_ACTION_FLAGS[action];
+    if (!spec) return [...rawArgs];
+    return [...rawArgs.slice(0, 3), ...resolveSwitchValues({ ...RELAYED_FLAGS, ...spec }, rawArgs.slice(3), `db branch ${action}`, "db branch")];
 }
 
 /**

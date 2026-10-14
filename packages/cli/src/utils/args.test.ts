@@ -14,7 +14,7 @@
  */
 import type arg from "arg";
 import { describe, expect, it } from "vitest";
-import { parseCommandArgs, wantsHelp } from "./args";
+import { parseCommandArgs, switchOn, wantsHelp } from "./args";
 
 const SPEC = {
     "--email": String,
@@ -163,27 +163,37 @@ describe("an argument holding a flag and its value", () => {
 /**
  * `arg` drops the value of a flag that takes none and turns it on, so
  * `rebase db pull --anonymize=false` anonymized and `--yes=false` answered
- * yes. A value on a switch is refused instead, on every command on this
- * parser.
+ * yes. A switch's value is now read: `=true` and `=1` turn it on, as `=true`
+ * always did, `=false` and `=0` leave it off, and anything else is refused.
  */
 describe("a switch given a value", () => {
     const SWITCHES = { "--anonymize": Boolean, "--yes": Boolean, "-y": "--yes", "--schema": [String], "--tag": [Boolean] } satisfies arg.Spec;
     const pull = (...line: string[]) =>
         parseCommandArgs({ spec: SWITCHES, rawArgs: argv("db", "pull", ...line), commandWords: 2, command: "db pull", maxPositionals: 0 });
 
-    it.each(["--anonymize=false", "--anonymize=true", "--anonymize=no", "--anonymize=", "--yes=false", "--tag=x"])(
-        "refuses %s rather than turning it on",
-        (typed) => {
-            const flag = typed.slice(0, typed.indexOf("="));
-            expect(() => pull(typed)).toThrow(
-                `\`rebase db pull\` takes ${flag} without a value (${typed}): give it to turn it on, and leave it out to turn it off. ` +
-                "Nothing was run. See `rebase db pull --help`."
-            );
-        }
-    );
+    it.each(["--yes=true", "--yes=1", "--yes=TRUE"])("reads %s as on, as it always did", (typed) => {
+        expect(pull(typed).flags["--yes"]).toBe(true);
+    });
 
-    it("refuses one on a global switch too", () => {
-        expect(() => pull("--debug=false")).toThrow(/takes --debug without a value/);
+    it.each(["--anonymize=false", "--anonymize=0", "--anonymize=False"])("reads %s as off", (typed) => {
+        expect(pull(typed).flags["--anonymize"]).toBeUndefined();
+    });
+
+    it("reads a repeatable switch's values one by one", () => {
+        expect(pull("--tag=true", "--tag=false", "--tag").flags["--tag"]).toEqual([true, true]);
+    });
+
+    it.each(["--yes=maybe", "--anonymize=no", "--anonymize=", "--tag=x"])("refuses %s, naming the values a switch takes", (typed) => {
+        const flag = typed.slice(0, typed.indexOf("="));
+        expect(() => pull(typed)).toThrow(
+            `\`rebase db pull\` cannot read ${typed}: ${flag} is a switch, and after its = it takes true or 1 to turn it on, ` +
+            "false or 0 to turn it off. Nothing was run. See `rebase db pull --help`."
+        );
+    });
+
+    it("reads one on a global switch too", () => {
+        expect(() => pull("--debug=false")).not.toThrow();
+        expect(() => pull("--debug=on")).toThrow(/cannot read --debug=on: --debug is a switch/);
     });
 
     it("leaves a flag that takes a value, and a switch written alone, as they are", () => {
@@ -194,21 +204,37 @@ describe("a switch given a value", () => {
     });
 
     it("reads nothing past `--`", () => {
-        expect(() => parseCommandArgs({ spec: SWITCHES, rawArgs: argv("x", "--", "--yes=false"), commandWords: 1, command: "x" }))
+        expect(() => parseCommandArgs({ spec: SWITCHES, rawArgs: argv("x", "--", "--yes=maybe"), commandWords: 1, command: "x" }))
             .toThrow(/looks like an option/);
     });
 
     it("masks a password in what it quotes", () => {
-        expect(() => pull("--yes=postgres://app:hunter2@db/prod")).toThrow("(--yes=postgres://app:***@db/prod)");
+        expect(() => pull("--yes=postgres://app:hunter2@db/prod")).toThrow("cannot read --yes=postgres://app:***@db/prod:");
     });
 
     it("is a usage error", () => {
         try {
-            pull("--yes=false");
+            pull("--yes=maybe");
             throw new Error("expected a refusal");
         } catch (err) {
             expect(err).toMatchObject({ isUsageError: true });
         }
+    });
+});
+
+/** The same reading, for the code that looks at a line by hand. */
+describe("switchOn", () => {
+    it.each([
+        [["--docker"], true],
+        [["--docker=true"], true],
+        [["--docker=1"], true],
+        [["--docker=false"], false],
+        [["--docker=0"], false],
+        [["--dockerfile"], false],
+        [["--", "--docker"], false],
+        [[], false]
+    ])("reads %j as %s", (line, on) => {
+        expect(switchOn(line, "--docker")).toBe(on);
     });
 });
 

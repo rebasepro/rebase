@@ -73,8 +73,8 @@ import { CommandStopped, ScratchDatabase } from "./cli-scratch-database";
 import { baselineVersionProblem, describeBaselinePlan, latestRecordedMigration, planBaseline } from "./schema/migrate-baseline";
 import { promptConfirm } from "./cli-prompt";
 import { applyPoliciesFile, applyPushPlan, stampableTables, type PolicyStamping } from "./cli-push";
-import { unexpectedBranchArgs } from "./branch-argv";
-import { assertKnownFlags, collectionsPathIn, parseDriverLine } from "./cli-flags";
+import { resolveBranchSwitches, unexpectedBranchArgs } from "./branch-argv";
+import { assertKnownFlags, collectionsPathIn, parseDriverLine, resolveDriverSwitches } from "./cli-flags";
 import { assertCollectionsPathExists } from "./cli-collections-path";
 import { DESIRED_STATE_URL, GENERATED_SQL_DIR, generatedSqlDir, prepareGeneratedSqlDir } from "./generated-sql";
 import { backupActionOf } from "./backup-argv";
@@ -235,6 +235,9 @@ export async function runPluginCommand(args: string[]) {
     // and `schema generate --ouput x` wrote the default path in silence. See
     // cli-flags.ts for why the check has to be here and not in those parsers.
     assertKnownFlags(domain, subcommand, args);
+    // Every parser below reads the line with its switches' values resolved:
+    // they run `permissive`, and `arg` reads `--allow-destructive=false` as on.
+    args = resolveDriverSwitches(domain, subcommand, args);
 
     // And before anything is generated: a `--collections` path that does not
     // resolve used to warn and carry on, four times over, and the generators
@@ -1477,6 +1480,9 @@ async function branchCommand(rawArgs: string[]): Promise<void> {
     // Before anything connects: a name that is not the name asked for is worth
     // refusing, and it costs a database round-trip to discover later.
     const extras = unexpectedBranchArgs(rawArgs.slice(2));
+    // And read from here with its switches' values resolved: `prune` parses
+    // permissively, and `arg` reads `--yes=false` as a yes.
+    rawArgs = resolveBranchSwitches(rawArgs);
     if (extras.length > 0) {
         outError("");
         outError(chalk.red(`  ✗ Unexpected argument${extras.length > 1 ? "s" : ""}: ${redactConnectionPasswords(extras.join(" "))}`));
