@@ -285,7 +285,7 @@ interface BaasOptions { unprotectedTables }
 interface BackendConfig { connection, schema, type }
 interface BackendInstance { admin, collectionRegistry, connection, destroy, entityRepository, healthCheck, initialize, realtimeProvider }
 interface BackendMountOptions { basePath }
-interface BackendServices { access, apiKeyStore, authLimiters, collections, jwt, queues, rateLimitStore, topics }
+interface BackendServices { access, apiKeyStore, authAdapter, authLimiters, collections, jwt, queues, rateLimitStore, topics }
 interface BackupRoutesConfig { getDestination, getSchedule, scheduledElsewhere, storageFor }
 interface BootOptions { bundle, bundleDir, bundleFallbackDir, handleSignals, listen, provisionSchema }
 interface BootedRuntime { app, backend, bundle, dataSources, env, port, server, shutdown }
