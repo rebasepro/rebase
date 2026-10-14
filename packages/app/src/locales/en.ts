@@ -1208,6 +1208,16 @@ export const en: RebaseTranslations = {
     // ─── DateTime property ──────────────────────────────────────
     datetime_automatic_value: "Automatic value",
 
+    // ─── Date property selects ───────────────────────────────
+    datetime_mode_date_time: "Date/Time",
+    datetime_mode_date: "Date",
+    datetime_auto_value_none: "None",
+    datetime_auto_value_on_create: "On create",
+    datetime_auto_value_on_update: "On any update",
+    datetime_auto_value_caption: "Update this field automatically when creating or updating the entity",
+    datetime_timezone_local: "Local timezone",
+    datetime_timezone_caption: "Timezone for displaying and inputting dates. Values are always stored in UTC.",
+
     // ─── Markdown property ──────────────────────────────────────
     markdown_paste_behavior: "Paste behavior",
 

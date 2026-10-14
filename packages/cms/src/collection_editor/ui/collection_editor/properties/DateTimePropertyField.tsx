@@ -145,16 +145,16 @@ export function DateTimePropertyField({ disabled }: {
                         renderValue={(v) => {
                             switch (v) {
                                 case "date_time":
-                                    return "Date/Time";
+                                    return t("datetime_mode_date_time");
                                 case "date":
-                                    return "Date";
+                                    return t("datetime_mode_date");
                                 default:
                                     return "";
                             }
                         }}
                         disabled={disabled}>
-                        <SelectItem value={"date_time"}> Date/Time </SelectItem>
-                        <SelectItem value={"date"}> Date </SelectItem>
+                        <SelectItem value={"date_time"}>{t("datetime_mode_date_time")}</SelectItem>
+                        <SelectItem value={"date"}>{t("datetime_mode_date")}</SelectItem>
                     </Select>
                     <FieldCaption error={Boolean(modeError)}>
                         {modeError}
@@ -164,26 +164,29 @@ export function DateTimePropertyField({ disabled }: {
                     <Select name={autoValuePath}
                         disabled={disabled}
                         fullWidth={true}
-                        value={autoValueValue ?? ""}
+                        // No automatic value is stored as null, and shown as
+                        // the "none" item: an empty value would leave the
+                        // closed select blank.
+                        value={autoValueValue ?? "none"}
                         onValueChange={(v) => setFieldValue(autoValuePath, v === "none" ? null : v)}
                         renderValue={(v) => {
                             switch (v) {
                                 case "on_create":
-                                    return "On create";
+                                    return t("datetime_auto_value_on_create");
                                 case "on_update":
-                                    return "On any update";
+                                    return t("datetime_auto_value_on_update");
                                 default:
-                                    return "None";
+                                    return t("datetime_auto_value_none");
                             }
                         }}
                         error={Boolean(autoValueError)}
                         label={t("datetime_automatic_value")}>
-                        <SelectItem value={"none"}> None </SelectItem>
-                        <SelectItem value={"on_create"}> On create </SelectItem>
-                        <SelectItem value={"on_update"}> On any update </SelectItem>
+                        <SelectItem value={"none"}>{t("datetime_auto_value_none")}</SelectItem>
+                        <SelectItem value={"on_create"}>{t("datetime_auto_value_on_create")}</SelectItem>
+                        <SelectItem value={"on_update"}>{t("datetime_auto_value_on_update")}</SelectItem>
                     </Select>
                     <FieldCaption error={Boolean(autoValueError)}>
-                        {autoValueError ?? "Update this field automatically when creating or updating the entity"}
+                        {autoValueError ?? t("datetime_auto_value_caption")}
                     </FieldCaption>
                 </div>
                 <div>
@@ -193,13 +196,13 @@ export function DateTimePropertyField({ disabled }: {
                         value={timezoneValue ?? "__local__"}
                         onValueChange={(v) => setFieldValue(timezonePath, v === "__local__" ? undefined : v)}
                         renderValue={(v) => {
-                            if (!v || v === "__local__") return "Local timezone";
-                            const tz = TIMEZONES.find(t => t.value === v);
+                            if (!v || v === "__local__") return t("datetime_timezone_local");
+                            const tz = TIMEZONES.find(zone => zone.value === v);
                             return tz?.label ?? v;
                         }}
                         error={Boolean(timezoneError)}
                         label={t("timezone")}>
-                        <SelectItem value={"__local__"}> Local timezone </SelectItem>
+                        <SelectItem value={"__local__"}>{t("datetime_timezone_local")}</SelectItem>
                         {TIMEZONES.map((tz) => (
                             <SelectItem key={tz.value} value={tz.value}>
                                 {tz.label}
@@ -207,7 +210,7 @@ export function DateTimePropertyField({ disabled }: {
                         ))}
                     </Select>
                     <FieldCaption error={Boolean(timezoneError)}>
-                        {timezoneError ?? "Timezone for displaying and inputting dates. Values are always stored in UTC."}
+                        {timezoneError ?? t("datetime_timezone_caption")}
                     </FieldCaption>
                 </div>
 

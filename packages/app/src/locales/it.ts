@@ -1200,6 +1200,16 @@ export const it: RebaseTranslations = {
     // ─── DateTime property ──────────────────────────────────────
     datetime_automatic_value: "Valore automatico",
 
+    // ─── Date property selects ───────────────────────────────
+    datetime_mode_date_time: "Data/ora",
+    datetime_mode_date: "Data",
+    datetime_auto_value_none: "Nessuno",
+    datetime_auto_value_on_create: "Alla creazione",
+    datetime_auto_value_on_update: "A ogni aggiornamento",
+    datetime_auto_value_caption: "Aggiorna questo campo automaticamente quando il record viene creato o aggiornato",
+    datetime_timezone_local: "Fuso orario locale",
+    datetime_timezone_caption: "Fuso orario per mostrare e inserire le date. I valori vengono sempre salvati in UTC.",
+
     // ─── Markdown property ──────────────────────────────────────
     markdown_paste_behavior: "Comportamento incolla",
 

@@ -1200,6 +1200,16 @@ export const hi: RebaseTranslations = {
     // ─── DateTime property ──────────────────────────────────────
     datetime_automatic_value: "स्वचालित मान",
 
+    // ─── Date property selects ───────────────────────────────
+    datetime_mode_date_time: "तारीख/समय",
+    datetime_mode_date: "तारीख",
+    datetime_auto_value_none: "कोई नहीं",
+    datetime_auto_value_on_create: "बनाते समय",
+    datetime_auto_value_on_update: "हर अपडेट पर",
+    datetime_auto_value_caption: "रिकॉर्ड बनाते या अपडेट करते समय इस फ़ील्ड को अपने-आप अपडेट करें",
+    datetime_timezone_local: "स्थानीय समय क्षेत्र",
+    datetime_timezone_caption: "तारीखें दिखाने और दर्ज करने का समय क्षेत्र। मान हमेशा UTC में सहेजे जाते हैं।",
+
     // ─── Markdown property ──────────────────────────────────────
     markdown_paste_behavior: "पेस्ट व्यवहार",
 

@@ -1307,6 +1307,16 @@ export interface RebaseTranslations {
     // ─── DateTime property ──────────────────────────────────────
     datetime_automatic_value?: string;
 
+    // ─── Date property selects ───────────────────────────────
+    datetime_mode_date_time?: string;
+    datetime_mode_date?: string;
+    datetime_auto_value_none?: string;
+    datetime_auto_value_on_create?: string;
+    datetime_auto_value_on_update?: string;
+    datetime_auto_value_caption?: string;
+    datetime_timezone_local?: string;
+    datetime_timezone_caption?: string;
+
     // ─── Markdown property ──────────────────────────────────────
     markdown_paste_behavior?: string;
     markdown_strip_html?: string;
