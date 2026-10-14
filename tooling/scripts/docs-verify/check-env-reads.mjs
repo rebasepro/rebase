@@ -110,6 +110,10 @@ const NOT_OURS = new Map([
     // Docker, the managed one), so the driver's "Cannot connect" banner names
     // it. Nobody sets it.
     ["REBASE_DATABASE_SOURCE", "set by the CLI for the driver child it spawns"],
+    // The database the checkout is switched to, from the CLI's branch pointer,
+    // so the driver's `branch prune` keeps it and `branch list` marks it.
+    // Nobody sets it; `rebase db branch switch` is how a checkout moves.
+    ["REBASE_ACTIVE_BRANCH_DATABASE", "set by the CLI for the driver child it spawns"],
     ["REBASE_JSON", "set by the CLI for its own subprocesses"],
     // Only in the frozen 0.17.3 `bucket` literal in resource_kinds.ts; the
     // runtime binds from the amendment, which the page documents.
