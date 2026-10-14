@@ -63,7 +63,12 @@ O `--force` encerra essas sessões antes da criação do template, tanto no `cre
 <span class="since-badge" data-since="0.25">Desde 0.25</span> O `create --force`
 também fecha a origem para novas conexões durante a cópia
 (`ALTER DATABASE … ALLOW_CONNECTIONS false`, executado a partir do banco de dados
-`postgres` do servidor) e a abre de novo depois, inclusive em caso de falha e de Ctrl-C. Um cliente
+`postgres` do servidor) e a abre de novo depois: em caso de falha, e em qualquer sinal que ele consiga
+capturar (fechar o terminal, Ctrl-C, SIGTERM, SIGQUIT). Encerrado à força
+(SIGKILL), ele deixa a origem fechada até o próximo comando `rebase db branch`,
+qualquer um deles, que primeiro a reabre e avisa isso;
+`ALTER DATABASE "<db>" ALLOW_CONNECTIONS true`, executado a partir do banco de dados
+`postgres`, faz o mesmo à mão. Um cliente
 que se reconecta assim que é desconectado, como faz um `rebase dev` em execução,
 então não consegue voltar a entrar antes de a cópia começar. Isso exige o owner da origem;
 sem ele, e no `delete`, o `--force` desconecta as sessões até três
