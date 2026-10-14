@@ -303,12 +303,42 @@ export async function upgradeCommand(rawArgs: string[], io: UpgradeIo = defaultI
         wouldRefuse: dryRun ? downgradeRefusal : null
     };
 
+    const databaseNotice = wrote ? await runningDatabaseNotice(projectRoot, plan.target) : [];
+
     if (json) {
         console.log(JSON.stringify(result, null, 2));
+        for (const line of databaseNotice) console.error(line);
         return;
     }
 
     printOutcome(plan, { dryRun, wrote, installed, installLine, wouldRefuse: dryRun ? downgradeRefusal : null });
+    if (databaseNotice.length > 0) {
+        for (const line of databaseNotice) console.log(chalk.yellow(line));
+        console.log("");
+    }
+}
+
+/**
+ * What to say about this project's managed database when an older CLI started
+ * it, or nothing.
+ *
+ * The daemon outlives every command and the database proxy runs inside it, so
+ * moving the pins does not move the proxy: the old one, with whatever the
+ * upgrade fixed in it, kept serving until `rebase db stop` or thirty idle
+ * minutes — and under a running `rebase dev` it never idles. The upgraded CLI
+ * restarts it when nothing is connected (`daemonOutdated`); this says so, and
+ * what to do while something is.
+ */
+export async function runningDatabaseNotice(projectRoot: string, target: string): Promise<string[]> {
+    const { daemonOutdated, findRunningDaemon } = await import("../dev-db/daemon");
+    const state = await findRunningDaemon(projectRoot);
+    if (!state || !daemonOutdated(state.cliVersion, target)) return [];
+    const startedBy = state.cliVersion ? `Rebase CLI ${state.cliVersion}` : "an earlier Rebase CLI";
+    return [
+        `⚠ This project's development database is still running, started by ${startedBy}, and its database proxy is that CLI's until it restarts.`,
+        `  The next command that needs it restarts it on ${target} when nothing is connected to it. ` +
+        "While `rebase dev` runs, stop it, then run `rebase db stop`. Data is kept."
+    ];
 }
 
 /** Changes grouped by file, then what was left alone and why, then overrides. */

@@ -36,7 +36,8 @@ import {
     resolveSpawn,
     stopManagedDatabase
 } from "./daemon";
-import { acquireStartLock, dataDir, readState, releaseStartLock, startLockFile } from "./state";
+import { acquireStartLock, dataDir, readState, releaseStartLock, startLockFile, stateFile } from "./state";
+import { cliVersion } from "../utils/version";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 /**
@@ -414,5 +415,64 @@ describe("lifecycle", () => {
 
         expect(fs.existsSync(dataDir(root))).toBe(false);
         expect(readState(root)).toBeNull();
+    });
+});
+
+/**
+ * `rebase upgrade`, then `rebase dev`: the daemon the older CLI started was
+ * adopted without a word, and its proxy — with the bugs the upgrade fixed —
+ * kept serving until `rebase db stop` or thirty idle minutes.
+ */
+describe("a daemon an older CLI started", () => {
+    /** What a 0.25 daemon's record looks like: no version. */
+    function unstamp(): void {
+        const record = JSON.parse(fs.readFileSync(stateFile(root), "utf8")) as Record<string, unknown>;
+        delete record.cliVersion;
+        fs.writeFileSync(stateFile(root), JSON.stringify(record));
+    }
+
+    it("is stamped with the version of the CLI that started it", { timeout: BOOT_TIMEOUT }, async () => {
+        await ensureManagedDatabase(root, { entry: CLI_ENTRY, quiet: true });
+        expect(readState(root)?.cliVersion).toBe(cliVersion());
+    });
+
+    it("is restarted when nothing is connected to it, and keeps its data", { timeout: BOOT_TIMEOUT }, async () => {
+        const first = await ensureManagedDatabase(root, { entry: CLI_ENTRY, quiet: true });
+        const pool = connect(first.url);
+        await pool.query("CREATE TABLE kept (id int)");
+        await pool.query("INSERT INTO kept VALUES (1),(2)");
+        await pool.end();
+        pools.pop();
+        unstamp();
+
+        const progress: string[] = [];
+        const second = await ensureManagedDatabase(root, { entry: CLI_ENTRY, onProgress: line => progress.push(line) });
+
+        expect(second.started).toBe(true);
+        expect(second.pid).not.toBe(first.pid);
+        expect(second.port).toBe(first.port);
+        expect(readState(root)?.cliVersion).toBe(cliVersion());
+        expect(progress.join("\n")).toContain("Restarting the development database");
+        const { rows } = await connect(second.url).query<{ c: number }>("select count(*)::int c from kept");
+        expect(rows[0].c).toBe(2);
+    });
+
+    it("keeps serving a client connected to it, and says once to run rebase db stop", { timeout: BOOT_TIMEOUT }, async () => {
+        const first = await ensureManagedDatabase(root, { entry: CLI_ENTRY, quiet: true });
+        const pool = connect(first.url);
+        expect((await pool.query<{ n: number }>("select 1 as n")).rows[0].n).toBe(1);
+        unstamp();
+
+        const notices: string[] = [];
+        const second = await ensureManagedDatabase(root, { entry: CLI_ENTRY, quiet: true, onNotice: line => notices.push(line) });
+        const third = await ensureManagedDatabase(root, { entry: CLI_ENTRY, quiet: true, onNotice: line => notices.push(line) });
+
+        expect(second.started).toBe(false);
+        expect(second.pid).toBe(first.pid);
+        expect(third.pid).toBe(first.pid);
+        expect(notices).toHaveLength(1);
+        expect(notices[0]).toContain("an earlier Rebase CLI");
+        expect(notices[0]).toContain("rebase db stop");
+        expect((await pool.query<{ n: number }>("select 2 as n")).rows[0].n).toBe(2);
     });
 });

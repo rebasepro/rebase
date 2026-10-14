@@ -76,6 +76,15 @@ export interface DaemonState {
      * a reset can see them. The default database is the fields above.
      */
     databases?: Record<string, { port: number; dataDir: string }>;
+    /**
+     * The version of the CLI that started this daemon.
+     *
+     * The daemon outlives the command that started it, and the database proxy
+     * runs inside it — so after `rebase upgrade` the old proxy, and its bugs,
+     * kept serving until `rebase db stop` or thirty idle minutes. A daemon
+     * started before this was recorded has none; see `daemonOutdated`.
+     */
+    cliVersion?: string;
 }
 
 export function devDbDir(projectRoot: string): string {
@@ -216,7 +225,8 @@ export function readState(projectRoot: string): DaemonState | null {
             startedAt: typeof parsed.startedAt === "string" ? parsed.startedAt : "",
             token: parsed.token,
             identityPort: parsed.identityPort,
-            ...(Object.keys(databases).length > 0 ? { databases } : {})
+            ...(Object.keys(databases).length > 0 ? { databases } : {}),
+            ...(typeof parsed.cliVersion === "string" && parsed.cliVersion.trim() ? { cliVersion: parsed.cliVersion.trim() } : {})
         };
     } catch {
         return null;

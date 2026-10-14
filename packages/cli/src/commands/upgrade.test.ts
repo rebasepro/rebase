@@ -10,6 +10,7 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 import { execFileSync } from "child_process";
+import net from "net";
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from "vitest";
 import { npmFailure, upgradeCommand, type UpgradeIo } from "./upgrade";
 
@@ -475,6 +476,79 @@ describe("rebase upgrade on a prerelease", () => {
         expect(text).toMatch(/older release/);
         expect(read("package.json")).toContain("\"0.24.0\"");
         expect(fake.npmView).not.toHaveBeenCalled();
+    });
+});
+
+/**
+ * The managed database outlives every command, and its proxy runs inside it:
+ * after an upgrade the daemon the older CLI started kept serving with the old
+ * proxy, and nothing said so.
+ */
+describe("rebase upgrade with the development database running", () => {
+    const servers: net.Server[] = [];
+
+    afterEach(async () => {
+        await Promise.all(servers.splice(0).map(server => new Promise<void>(resolve => server.close(() => resolve()))));
+    });
+
+    /** A daemon record whose identity check this process answers, as a live daemon's would. */
+    async function daemonRunning(cliVersion?: string): Promise<void> {
+        const token = "0123456789abcdef";
+        const identity = net.createServer(socket => socket.end(`rebase-dev-db ${token}\n`));
+        servers.push(identity);
+        await new Promise<void>(resolve => identity.listen(0, "127.0.0.1", resolve));
+        write(".rebase/pglite.json", JSON.stringify({
+            port: 25999,
+            pid: process.pid,
+            dataDir: path.join(root, ".rebase", "pgdata"),
+            startedAt: new Date().toISOString(),
+            token,
+            identityPort: (identity.address() as net.AddressInfo).port,
+            ...(cliVersion ? { cliVersion } : {})
+        }));
+    }
+
+    it("says the daemon an older CLI started is still running, and how it restarts", async () => {
+        project();
+        await daemonRunning("0.19.1");
+
+        expect(await run(["--to", "0.21.0", "--no-install"], io())).toBe(0);
+
+        const text = stdout.join("\n");
+        expect(text).toContain("development database is still running");
+        expect(text).toContain("Rebase CLI 0.19.1");
+        expect(text).toContain("rebase db stop");
+    });
+
+    it("says it of a daemon from before daemons were stamped", async () => {
+        project();
+        await daemonRunning();
+
+        expect(await run(["--to", "0.21.0", "--no-install"], io())).toBe(0);
+
+        expect(stdout.join("\n")).toContain("an earlier Rebase CLI");
+    });
+
+    it("says it on stderr under --json, keeping stdout to the document", async () => {
+        project();
+        await daemonRunning("0.19.1");
+
+        expect(await run(["--to", "0.21.0", "--no-install", "--json"], io())).toBe(0);
+
+        expect(JSON.parse(stdout.join("\n"))).toMatchObject({ target: "0.21.0" });
+        expect(stderr.join("\n")).toContain("rebase db stop");
+    });
+
+    it("says nothing when no daemon is running, or when it is already on the target", async () => {
+        project();
+        expect(await run(["--to", "0.21.0", "--no-install"], io())).toBe(0);
+        expect(stdout.join("\n")).not.toContain("development database");
+
+        await daemonRunning("0.21.0");
+        write("package.json", JSON.stringify({ devDependencies: { "@rebasepro/cli": "0.19.1" } }, null, 2) + "\n");
+        stdout.length = 0;
+        expect(await run(["--to", "0.21.0", "--no-install"], io())).toBe(0);
+        expect(stdout.join("\n")).not.toContain("development database");
     });
 });
 

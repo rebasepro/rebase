@@ -84,6 +84,19 @@ describe("writeState / readState", () => {
         expect(leftovers).toEqual([]);
     });
 
+    it("keeps the version of the CLI that started the daemon", () => {
+        writeState(root, state({ cliVersion: "0.26.0" }));
+        expect(readState(root)?.cliVersion).toBe("0.26.0");
+    });
+
+    it("reads a record from before daemons were stamped, with no version", () => {
+        // What a 0.25 daemon wrote: everything but the version.
+        writeState(root, state());
+        const read = readState(root);
+        expect(read).not.toBeNull();
+        expect(read?.cliVersion).toBeUndefined();
+    });
+
     it("reads back as absent when nothing was written", () => {
         expect(readState(root)).toBeNull();
     });

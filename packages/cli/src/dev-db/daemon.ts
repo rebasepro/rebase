@@ -16,13 +16,14 @@
  */
 
 import { randomBytes } from "crypto";
-import { type ChildProcess, spawn } from "child_process";
+import { type ChildProcess, execFile, spawn } from "child_process";
 import fs from "fs";
 import net from "net";
 import path from "path";
 import { fileURLToPath } from "url";
 
 import { runningBackendUrl } from "../utils/dev-server";
+import { cliVersion } from "../utils/version";
 import {
     acquireStartLock,
     chooseManagedPort,
@@ -143,6 +144,182 @@ export function isDaemonAlive(state: DaemonState): Promise<boolean> {
     });
 }
 
+/**
+ * Whether a daemon `started` by one CLI should give way to the CLI `running` now.
+ *
+ * The database proxy runs inside the daemon, and the daemon outlives every
+ * command — so the proxy a project gets is whichever CLI started the daemon
+ * last, not the one it upgraded to. True for a daemon from before daemons were
+ * stamped, for an older release, and for another build of the same release
+ * (two canaries, a canary and its release): canary hashes do not sort by date,
+ * and this CLI's proxy is the one it can vouch for. False for a newer release,
+ * which an older CLI leaves alone, and when this CLI cannot read its own
+ * version.
+ */
+export function daemonOutdated(started: string | undefined, running: string): boolean {
+    const core = (version: string): number[] | null => {
+        const match = /^(\d+)\.(\d+)\.(\d+)/.exec(version);
+        return match ? match.slice(1, 4).map(Number) : null;
+    };
+    const ours = core(running);
+    if (!ours || started === running) return false;
+    const theirs = started === undefined ? null : core(started);
+    if (!theirs) return true;
+    for (let i = 0; i < 3; i++) {
+        if (theirs[i] !== ours[i]) return theirs[i] < ours[i];
+    }
+    return true;
+}
+
+/**
+ * Send the daemon one command over its identity socket, and get the reply line.
+ *
+ * `null` for anything that is not the daemon answering: no connection, another
+ * token, no reply in time. The identity line comes first, so a stranger on a
+ * recycled port is never mistaken for it.
+ */
+function askDaemon(state: DaemonState, command: string, timeoutMs = IDENTITY_TIMEOUT_MS): Promise<string | null> {
+    return new Promise((resolve) => {
+        const socket = new net.Socket();
+        let buffered = "";
+        let identified = false;
+        const settle = (reply: string | null) => {
+            socket.removeAllListeners();
+            socket.destroy();
+            resolve(reply);
+        };
+        socket.setTimeout(timeoutMs);
+        socket.once("timeout", () => settle(null));
+        socket.once("error", () => settle(null));
+        socket.once("close", () => settle(null));
+        socket.on("data", (chunk) => {
+            buffered += chunk.toString("utf8");
+            let newline = buffered.indexOf("\n");
+            while (newline !== -1) {
+                const line = buffered.slice(0, newline).trim();
+                buffered = buffered.slice(newline + 1);
+                if (identified) return settle(line);
+                if (line !== `rebase-dev-db ${state.token}`) return settle(null);
+                identified = true;
+                socket.write(`${command}\n`);
+                newline = buffered.indexOf("\n");
+            }
+        });
+        socket.connect(state.identityPort, "127.0.0.1");
+    });
+}
+
+/**
+ * How many of `lsof -Fn`'s sockets are connections accepted on `ports`.
+ *
+ * Each socket is a line `n<local>-><remote>`. The daemon's accepted client
+ * connections have one of its public ports on the local side; its own
+ * connections to the socket server behind the proxy are on other ports.
+ */
+export function acceptedConnections(lsofOutput: string, ports: readonly number[]): number {
+    let count = 0;
+    for (const line of lsofOutput.split("\n")) {
+        if (!line.startsWith("n") || !line.includes("->")) continue;
+        const local = line.slice(1, line.indexOf("->"));
+        if (ports.includes(Number(local.slice(local.lastIndexOf(":") + 1)))) count++;
+    }
+    return count;
+}
+
+/**
+ * The connections the operating system says the daemon has accepted, or `null`
+ * when it cannot be asked.
+ *
+ * For a daemon from before the `clients` command: it cannot be asked itself.
+ * `lsof` ships with macOS and most Linux installs; where it is missing, the
+ * answer is "cannot tell", and the caller does not restart anything.
+ */
+function osAcceptedConnections(state: DaemonState): Promise<number | null> {
+    const ports = [state.port, ...Object.values(state.databases ?? {}).map(database => database.port)];
+    return new Promise((resolve) => {
+        execFile(
+            "lsof",
+            ["-nP", "-a", "-p", String(state.pid), `-iTCP:${ports.join(",")}`, "-sTCP:ESTABLISHED", "-Fn"],
+            { timeout: 3_000 },
+            (error, stdout) => {
+                // lsof exits 1 when it finds nothing to list, which is an answer.
+                if (error && !(error.code === 1 && stdout.trim() === "")) return resolve(null);
+                resolve(acceptedConnections(stdout, ports));
+            }
+        );
+    });
+}
+
+/**
+ * How many clients are connected to the daemon, over all its databases, or
+ * `null` when that cannot be known.
+ *
+ * Asked of the daemon first (`clients`). A daemon from before that command
+ * answers `error unknown command`, and then the operating system is asked.
+ */
+export async function connectedClients(state: DaemonState): Promise<number | null> {
+    const reply = await askDaemon(state, "clients");
+    if (reply === null) return null;
+    if (reply.startsWith("ok ")) {
+        const count = Number(reply.slice(3));
+        return Number.isInteger(count) && count >= 0 ? count : null;
+    }
+    return osAcceptedConnections(state);
+}
+
+/**
+ * What to say about a daemon an older CLI started that cannot be restarted
+ * here, because something is connected to it — or nothing can say whether
+ * anything is.
+ */
+export function outdatedDaemonNotice(
+    state: Pick<DaemonState, "cliVersion">,
+    running: string,
+    clients: number | null
+): string[] {
+    const startedBy = state.cliVersion ? `Rebase CLI ${state.cliVersion}` : "an earlier Rebase CLI";
+    const connected = clients === null
+        ? "this CLI cannot tell whether anything is connected to it"
+        : `${clients} client${clients === 1 ? " is" : "s are"} connected to it`;
+    return [
+        `⚠ The development database was started by ${startedBy}, and ${connected}, so it keeps running ` +
+        `with that CLI's database proxy rather than this one's (${running}).`,
+        "  Stop what uses it — `rebase dev`, `rebase console`, a database GUI — then run `rebase db stop`. " +
+        "The next command starts it again, on this CLI. Data is kept."
+    ];
+}
+
+/** Said once per daemon in a process: every command that needs the database asks again. */
+const outdatedNoticeShown = new Set<string>();
+
+/**
+ * Restart a daemon an older CLI started, when nothing is connected to it.
+ *
+ * Returns whether it was stopped — the caller then starts a fresh one. With a
+ * client connected, stopping would cut it off mid-session, so it says once
+ * what to do instead and leaves the daemon serving.
+ */
+async function giveWayToThisCli(projectRoot: string, state: DaemonState, options: EnsureOptions): Promise<boolean> {
+    const running = cliVersion();
+    if (!daemonOutdated(state.cliVersion, running)) return false;
+    const clients = await connectedClients(state);
+    if (clients === 0) {
+        if (!options.quiet) {
+            options.onProgress?.(
+                `Restarting the development database: ${state.cliVersion ? `Rebase CLI ${state.cliVersion}` : "an earlier Rebase CLI"} ` +
+                `started it, and this is ${running}. Data is kept.`
+            );
+        }
+        return stopManagedDatabase(projectRoot);
+    }
+    const said = `${path.resolve(projectRoot)}\0${state.pid}`;
+    if (!outdatedNoticeShown.has(said)) {
+        outdatedNoticeShown.add(said);
+        (options.onNotice ?? ((line: string) => console.error(line)))(outdatedDaemonNotice(state, running, clients).join("\n"));
+    }
+    return false;
+}
+
 /** The running daemon for this project, or `null`. Never starts anything. */
 export async function findRunningDaemon(projectRoot: string): Promise<DaemonState | null> {
     const state = readState(projectRoot);
@@ -212,6 +389,12 @@ export interface EnsureOptions {
      * — spawning vitest with `__dev-db-daemon` rather than the CLI.
      */
     entry?: string;
+    /**
+     * Where the notice about a daemon an older CLI started goes, when it
+     * cannot be restarted. stderr by default, so `rebase db url` keeps stdout
+     * to the URL. Injected for tests.
+     */
+    onNotice?: (message: string) => void;
     /**
      * Keys of the additional databases the project declares, beyond the
      * default. Each is served by the daemon on request, so a project that
@@ -291,7 +474,11 @@ export async function ensureManagedDatabase(
 ): Promise<ManagedDatabase> {
     const keys = options.additionalKeys ?? [];
     const existing = await findRunningDaemon(projectRoot);
-    if (existing) return adoptWithAdditional(existing, false, keys);
+    // A daemon an older CLI started is restarted when nothing is connected to
+    // it, so the upgrade reaches the proxy inside it. See `daemonOutdated`.
+    if (existing && !(await giveWayToThisCli(projectRoot, existing, options))) {
+        return adoptWithAdditional(existing, false, keys);
+    }
 
     fs.mkdirSync(devDbDir(projectRoot), { recursive: true });
     ensureGitignore(projectRoot);

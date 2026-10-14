@@ -28,6 +28,7 @@ import {
     MANAGED_SERVER_MAX_CONNECTIONS,
     PGLITE_EXTENSIONS
 } from "./constraints";
+import { cliVersion } from "../utils/version";
 import { NotificationProxy } from "./notification-proxy";
 import { additionalDataDir, chooseManagedPort, clearState, dataDir, findFreePort, recordManagedPorts, writeState } from "./state";
 
@@ -137,6 +138,9 @@ const COMMAND_TIMEOUT_MS = 2_000;
  * database is serving, starting it if it is not. A daemon started before a
  * second database was declared serves it without a restart, which matters
  * because `rebase studio` in another terminal is connected to the first.
+ *
+ * `clients` answers `ok <n>`: the clients connected to every database it
+ * serves. A newer CLI asks before restarting a daemon an older one started.
  */
 type CommandHandler = (command: string) => Promise<string>;
 
@@ -250,7 +254,10 @@ export async function runDaemon(args: DaemonArgs): Promise<void> {
             startedAt: new Date().toISOString(),
             token: args.token,
             identityPort,
-            ...(additional.size > 0 ? { databases } : {})
+            ...(additional.size > 0 ? { databases } : {}),
+            // Which CLI's proxy this is, for the next CLI to compare against
+            // its own (`daemonOutdated`).
+            cliVersion: cliVersion()
         });
     };
 
@@ -279,6 +286,9 @@ export async function runDaemon(args: DaemonArgs): Promise<void> {
     const identity = await startIdentityServer(args.token, () => {
         idleSince = null;
     }, async (command) => {
+        if (command === "clients") {
+            return `ok ${[primary, ...additional.values()].reduce((sum, instance) => sum + instance.proxy.connectionCount, 0)}`;
+        }
         const match = /^ensure\s+(\S+)$/.exec(command);
         if (!match) return `error unknown command "${command}"`;
         const key = match[1];
