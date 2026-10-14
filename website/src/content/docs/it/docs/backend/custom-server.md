@@ -1,5 +1,5 @@
 ---
-sourceHash: 0360050a2596e8b1
+sourceHash: a703c4791f9384f2
 title: Integrazione Server Personalizzato
 sidebar_label: Server Personalizzato
 description: Costruisci il backend Rebase da componenti pubblici nel tuo server — createRebaseBackend, i suoi gruppi di rotte, mount, attachRealtime e start — oppure incorpora il driver Postgres in Express.

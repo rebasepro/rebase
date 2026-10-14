@@ -1,5 +1,5 @@
 ---
-sourceHash: 48ce9150935742b8
+sourceHash: cc000bf4cb3fb671
 title: Roles y alcances
 sidebar_label: Roles y alcances
 description: "Lo que puede hacer quien llama: el plano de datos que tiene toda persona, el plano de administración que conceden los roles, los alcances que una aplicación declara para sí misma y cómo los lleva cada credencial."

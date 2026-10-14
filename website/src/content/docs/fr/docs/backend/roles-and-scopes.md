@@ -1,5 +1,5 @@
 ---
-sourceHash: 48ce9150935742b8
+sourceHash: cc000bf4cb3fb671
 title: Rôles et portées
 sidebar_label: Rôles et portées
 description: "Ce qu'un appelant peut faire : le plan des données que détient chaque personne, le plan d'administration que les rôles accordent, les portées qu'une application déclare pour elle-même, et la façon dont chaque identifiant les porte."

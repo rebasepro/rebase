@@ -1,5 +1,5 @@
 ---
-sourceHash: 0360050a2596e8b1
+sourceHash: a703c4791f9384f2
 title: Integration eines eigenen Servers
 sidebar_label: Eigener Server
 description: Bauen Sie das Rebase-Backend aus öffentlichen Bausteinen in Ihrem eigenen Server – createRebaseBackend, seine Routengruppen, mount, attachRealtime und start – oder betten Sie den Postgres-Treiber in Express ein.

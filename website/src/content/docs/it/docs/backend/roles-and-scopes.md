@@ -1,5 +1,5 @@
 ---
-sourceHash: 48ce9150935742b8
+sourceHash: cc000bf4cb3fb671
 title: Ruoli e scope
 sidebar_label: Ruoli e scope
 description: "Cosa può fare un chiamante: il piano dati che ogni persona possiede, il piano di amministrazione che i ruoli concedono, gli scope che un'app dichiara per sé e come ogni credenziale li porta con sé."
