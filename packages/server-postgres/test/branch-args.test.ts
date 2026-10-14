@@ -41,6 +41,7 @@ describe("unexpectedBranchArgs", () => {
     it("accepts the flags each action takes", () => {
         expect(unexpectedBranchArgs(["create", "x", "--force", "--from", "main"])).toEqual([]);
         expect(unexpectedBranchArgs(["delete", "x", "--force"])).toEqual([]);
+        expect(unexpectedBranchArgs(["delete", "x", "--yes"])).toEqual([]);
         expect(unexpectedBranchArgs(["prune", "--older-than", "2w", "--include-dev-diff", "-y"])).toEqual([]);
         expect(unexpectedBranchArgs(["prune", "--yes"])).toEqual([]);
     });
