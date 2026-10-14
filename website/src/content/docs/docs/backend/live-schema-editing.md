@@ -66,9 +66,11 @@ curl -X POST https://your-app/api/admin/schema/plan \
       "property": "subtitle", "detail": "New optional property subtitle …" }
   ],
   "statements": ["ALTER TABLE \"public\".\"posts\" ADD COLUMN IF NOT EXISTS \"subtitle\" TEXT;"],
-  "files": ["backend/src/schema.generated.ts"]
+  "files": ["config/collections/posts.ts", "backend/src/schema.generated.ts"]
 }
 ```
+
+`files` is every file the apply commits: the collection's source, when the backend can write it, then the generated schema.
 
 This is not a convenience. Two of the three verdicts are refusals, and one of
 them is a refusal you would otherwise only discover by pressing the button on a

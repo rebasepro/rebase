@@ -1,5 +1,5 @@
 ---
-sourceHash: 0812219cab5f0d00
+sourceHash: 8bd32575d082fb6c
 title: Edición de esquemas en vivo
 description: "Crea y modifica colecciones en un backend en ejecución: primero se confirman en tu repositorio y luego se aplican."
 ---
@@ -60,9 +60,11 @@ curl -X POST https://your-app/api/admin/schema/plan \
       "property": "subtitle", "detail": "New optional property subtitle …" }
   ],
   "statements": ["ALTER TABLE \"public\".\"posts\" ADD COLUMN IF NOT EXISTS \"subtitle\" TEXT;"],
-  "files": ["backend/src/schema.generated.ts"]
+  "files": ["config/collections/posts.ts", "backend/src/schema.generated.ts"]
 }
 ```
+
+`files` es cada archivo que el apply incluye en el commit: el código fuente de la colección, cuando el backend puede escribirlo, y después el esquema generado.
 
 Esto no es una simple comodidad. Dos de los tres veredictos son rechazos, y uno de ellos es un rechazo que, de otro modo, solo descubrirías al presionar el botón en una base de datos en vivo.
 

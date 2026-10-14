@@ -1,5 +1,5 @@
 ---
-sourceHash: 0812219cab5f0d00
+sourceHash: 8bd32575d082fb6c
 title: Live-Schema-Bearbeitung
 description: Erstellen und Ändern von Collections auf einem laufenden Backend – zuerst in Ihr Repository committet, dann angewendet.
 ---
@@ -68,9 +68,11 @@ curl -X POST https://your-app/api/admin/schema/plan \
       "property": "subtitle", "detail": "New optional property subtitle …" }
   ],
   "statements": ["ALTER TABLE \"public\".\"posts\" ADD COLUMN IF NOT EXISTS \"subtitle\" TEXT;"],
-  "files": ["backend/src/schema.generated.ts"]
+  "files": ["config/collections/posts.ts", "backend/src/schema.generated.ts"]
 }
 ```
+
+`files` ist jede Datei, die das Apply committet: die Quelle der Collection, wenn das Backend sie schreiben kann, dann das generierte Schema.
 
 Das ist keine bloße Bequemlichkeit. Zwei der drei Urteile sind Ablehnungen, und
 eines davon ist eine Ablehnung, die Sie andernfalls erst bemerken würden, wenn Sie den Button

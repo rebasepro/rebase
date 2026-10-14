@@ -1,5 +1,5 @@
 ---
-sourceHash: 0812219cab5f0d00
+sourceHash: 8bd32575d082fb6c
 title: Modifica dello schema live
 description: "Crea e modifica collection a fronte di un backend in esecuzione: prima committate nel repository, poi applicate."
 ---
@@ -61,9 +61,11 @@ curl -X POST https://your-app/api/admin/schema/plan \
       "property": "subtitle", "detail": "New optional property subtitle …" }
   ],
   "statements": ["ALTER TABLE \"public\".\"posts\" ADD COLUMN IF NOT EXISTS \"subtitle\" TEXT;"],
-  "files": ["backend/src/schema.generated.ts"]
+  "files": ["config/collections/posts.ts", "backend/src/schema.generated.ts"]
 }
 ```
+
+`files` è ogni file che l'apply include nel commit: il sorgente della collezione, quando il backend può scriverlo, poi lo schema generato.
 
 Non si tratta di una comodità superflua. Due dei tre verdetti sono rifiuti, e uno di essi è un rifiuto che altrimenti scopriresti solo premendo il pulsante su un database attivo.
 

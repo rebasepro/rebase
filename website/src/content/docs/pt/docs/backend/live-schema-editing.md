@@ -1,5 +1,5 @@
 ---
-sourceHash: 0812219cab5f0d00
+sourceHash: 8bd32575d082fb6c
 title: Edição de schema ao vivo
 description: Crie e altere coleções em um backend em execução — comitadas primeiro no seu repositório, depois aplicadas.
 ---
@@ -67,9 +67,11 @@ curl -X POST https://your-app/api/admin/schema/plan \
       "property": "subtitle", "detail": "New optional property subtitle …" }
   ],
   "statements": ["ALTER TABLE \"public\".\"posts\" ADD COLUMN IF NOT EXISTS \"subtitle\" TEXT;"],
-  "files": ["backend/src/schema.generated.ts"]
+  "files": ["config/collections/posts.ts", "backend/src/schema.generated.ts"]
 }
 ```
+
+`files` é cada arquivo que o apply inclui no commit: o código-fonte da coleção, quando o backend pode gravá-lo, e depois o schema gerado.
 
 Isso não é apenas uma conveniência. Dois dos três vereditos são recusas, e um
 deles é uma recusa que você só descobriria ao apertar o botão em um banco de

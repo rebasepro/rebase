@@ -1,5 +1,5 @@
 ---
-sourceHash: 0812219cab5f0d00
+sourceHash: 8bd32575d082fb6c
 title: Édition de schéma en direct
 description: Créez et modifiez des collections sur un backend en cours d'exécution — d'abord validé dans votre dépôt, puis appliqué.
 ---
@@ -59,9 +59,11 @@ curl -X POST https://your-app/api/admin/schema/plan \
       "property": "subtitle", "detail": "New optional property subtitle …" }
   ],
   "statements": ["ALTER TABLE \"public\".\"posts\" ADD COLUMN IF NOT EXISTS \"subtitle\" TEXT;"],
-  "files": ["backend/src/schema.generated.ts"]
+  "files": ["config/collections/posts.ts", "backend/src/schema.generated.ts"]
 }
 ```
+
+`files` est chaque fichier que l'apply commite : la source de la collection, quand le backend peut l'écrire, puis le schéma généré.
 
 Il ne s'agit pas d'un simple confort. Deux des trois verdicts sont des refus, et l'un d'eux est un refus que vous ne découvririez autrement qu'en appuyant sur le bouton sur une base de données en production.
 
