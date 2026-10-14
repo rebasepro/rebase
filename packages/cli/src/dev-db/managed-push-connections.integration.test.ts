@@ -188,4 +188,32 @@ describe("db push against the managed database while a dev server holds connecti
         expect(await recorded()).toEqual([...before, version]);
         expect(await revisionTables()).toEqual(["rebase"]);
     });
+
+    // On a database that already records migrations, `--baseline` is `atlas
+    // migrate set`, which takes no `--skip-lock`: beside the dev server's two
+    // connections it failed on `EOF` every time, and worked with dev stopped.
+    it("records a column boot already added with a second --baseline, beside the dev server's connections", async () => {
+        fs.writeFileSync(path.join(collectionsDir(), "tasks.js"), tasks.replace(
+            "title: { name: \"Title\", type: \"string\", validation: { required: true } }",
+            "title: { name: \"Title\", type: \"string\", validation: { required: true } },\n        done: { name: \"Done\", type: \"boolean\" },\n        slug: { name: \"Slug\", type: \"string\" }"
+        ));
+        // What boot does with the new property before any migration does.
+        await held[0].query("ALTER TABLE public.tasks ADD COLUMN slug varchar");
+        const before = await recorded();
+        const generated = await driver("db", "generate", "--collections", collectionsDir(), "add_slug");
+        expect(generated.exitCode).toBe(0);
+        const version = newestVersion();
+        expect(before).not.toContain(version);
+
+        const failed = await driver("db", "migrate");
+        expect(failed.all).toContain(`rebase db migrate --baseline ${version}`);
+        expect(failed.exitCode).toBe(1);
+
+        const baselined = await driver("db", "migrate", "--baseline", version);
+        expect(baselined.all).not.toContain("EOF");
+        expect(baselined.all).toContain("Marking every migration up to");
+        expect(baselined.exitCode, baselined.all).toBe(0);
+        expect(await recorded()).toEqual([...before, version]);
+        expect(await revisionTables()).toEqual(["rebase"]);
+    });
 });

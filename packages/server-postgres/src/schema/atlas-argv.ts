@@ -93,7 +93,9 @@ export function readsRevisions(domain: string, args: string[]): boolean {
  * all of them, so it excludes no one; what it does cost there is a connection.
  * The managed database accepts four and a running `rebase dev` holds two, so
  * `migrate apply`'s third — its own, the lock's, the revisions table's — was
- * closed unanswered and Atlas said only `Error: EOF`.
+ * closed unanswered and Atlas said only `Error: EOF`. `migrate set`, which has
+ * no `--skip-lock`, is bound to the revisions schema instead, which spares it
+ * the revisions table's connection.
  */
 export function buildAtlasArgs(invocation: AtlasInvocation): string[] {
     const { domain, args, url, devUrl, excludes = [], singleSession = false } = invocation;
@@ -108,6 +110,13 @@ export function buildAtlasArgs(invocation: AtlasInvocation): string[] {
     } else if (domain === "migrate") {
         if (args.includes("diff")) {
             argv.push("--dev-url", devUrl);
+        } else if (args.includes("set") && singleSession) {
+            // `migrate set` takes no `--skip-lock`, and with `--revisions-schema`
+            // it opens a second client for that schema: three connections, of
+            // which beside a running `rebase dev` the third was closed
+            // unanswered (`EOF`). Bound to the schema the table is in, Atlas
+            // reads and writes it on the connection it already has — two.
+            argv.push("--url", withSearchPath(url, "rebase"));
         } else if (readsRevisions(domain, args)) {
             argv.push("--url", url, "--revisions-schema", "rebase");
             // Measured against the pinned binary: `sql/migrate: baseline and
@@ -134,6 +143,26 @@ export function buildAtlasArgs(invocation: AtlasInvocation): string[] {
     }
 
     return argv;
+}
+
+/**
+ * The URL with its `search_path` set to `schema`: an Atlas URL bound to that
+ * schema. Every other parameter is kept as written. A URL that does not
+ * parse is returned unchanged.
+ */
+function withSearchPath(url: string, schema: string): string {
+    let parsed: URL;
+    try {
+        parsed = new URL(url);
+    } catch {
+        return url;
+    }
+    const params = Array.from(parsed.searchParams.entries()).filter(([key]) => key !== "search_path");
+    params.push(["search_path", schema]);
+    // By hand, as `forLibpq` re-serializes: URLSearchParams writes a space as
+    // `+`, which libpq does not read as one.
+    parsed.search = params.map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`).join("&");
+    return parsed.toString();
 }
 
 /**

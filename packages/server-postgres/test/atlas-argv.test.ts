@@ -172,6 +172,28 @@ describe("migrate on a single-session database", () => {
         expect(build("migrate", ["apply", "--dir", "file://drizzle/migrations"], [])).not.toContain("--skip-lock");
     });
 
+    // `migrate set` takes no `--skip-lock`, and opened three connections: its
+    // own, the lock's, and a second client for `--revisions-schema`. Beside a
+    // dev server's two, the third was closed unanswered — `EOF`, five times
+    // out of five, on every second `--baseline`. Bound to the `rebase` schema
+    // the revisions table is in, it needs no second client: two connections.
+    it("`migrate set` is bound to the revisions schema instead of opening a second client for it", () => {
+        expect(managed("migrate", ["set", "20260101000000", "--dir", "file://d"])).toEqual([
+            "migrate", "set", "20260101000000", "--dir", "file://d", "--url", `${URL}?search_path=rebase`
+        ]);
+        expect(managed("migrate", ["set", "1", "--dir", "file://d"])).not.toContain("--revisions-schema");
+        // Whatever the URL already carries is kept, and a search_path it names is replaced.
+        expect(buildAtlasArgs({
+            domain: "migrate", args: ["set", "1"], url: `${URL}?sslmode=disable&search_path=public`, devUrl: DEV_URL, singleSession: true
+        })).toContain(`${URL}?sslmode=disable&search_path=rebase`);
+    });
+
+    it("a real server's `migrate set` keeps its URL and names the revisions schema", () => {
+        expect(build("migrate", ["set", "1", "--dir", "file://d"], [])).toEqual([
+            "migrate", "set", "1", "--dir", "file://d", "--url", URL, "--revisions-schema", "rebase"
+        ]);
+    });
+
     it("nothing else gets the flag: `migrate set` and `status` do not take it", () => {
         expect(managed("migrate", ["set", "20260101000000", "--dir", "file://d"])).not.toContain("--skip-lock");
         expect(managed("migrate", ["status"])).not.toContain("--skip-lock");
