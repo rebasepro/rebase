@@ -330,6 +330,67 @@ export async function readPolicyStamps(
     return states;
 }
 
+/** The name a probed policy is made under, in a transaction nothing commits. */
+const PROBE_POLICY = "rebase_policy_probe";
+
+/**
+ * For each of `policies`, whether the `CREATE POLICY` the plan renders for it
+ * stores the definition the database holds now: made under a probe name on
+ * the same table, read back, compared with the one there, and rolled back.
+ *
+ * What a stamp cannot answer. A stamp covers the statement as rendered, so a
+ * rule whose text differs from the one that made the policy reads as changed
+ * though Postgres would store the same thing: `schema introspect` writes a role
+ * rule back as its deparsed SQL, and every such policy was planned as a
+ * replacement of itself. A policy `db migrate` created has no stamp at all.
+ *
+ * One short transaction per policy, which takes the table's lock for as long
+ * as it lasts and gives up on it after two seconds. A policy that could not be
+ * probed — no statement for it, a lock not granted, a rule that does not
+ * parse — is left out of the answer, and the caller keeps what the stamp said.
+ * Keyed `schema.table.name`.
+ */
+export async function probeRenderedPolicies(
+    client: Queryable,
+    collections: CollectionConfig[],
+    policies: readonly { schema: string; table: string; name: string }[],
+    options: { searchPath?: string } = {}
+): Promise<Map<string, boolean>> {
+    const statements = new Map<string, string>();
+    for (const plan of planCollectionPolicies(collections)) {
+        for (const statement of plan.policyStatements) {
+            const match = /^\s*CREATE POLICY\s+"([^"]+)"/i.exec(statement);
+            if (match) statements.set(`${plan.schema}.${plan.table}.${match[1]}`, statement.trim());
+        }
+    }
+    const answers = new Map<string, boolean>();
+    for (const policy of policies) {
+        const key = `${policy.schema}.${policy.table}.${policy.name}`;
+        const statement = statements.get(key);
+        if (!statement) continue;
+        const probe = statement.replace(/^(\s*CREATE POLICY\s+)"[^"]+"/i, `$1"${PROBE_POLICY}"`);
+        const target = `"${policy.schema.replace(/"/g, '""')}"."${policy.table.replace(/"/g, '""')}"`;
+        const definition = (name: string): string =>
+            `(SELECT ${liveDefinitionSql("p")} FROM pg_policy p WHERE p.polrelid = $1::regclass AND p.polname = ${name})`;
+        try {
+            await client.query("BEGIN");
+            await client.query("SET LOCAL lock_timeout = '2s'");
+            if (options.searchPath) await client.query(`SET LOCAL search_path TO ${options.searchPath}`);
+            await client.query(probe);
+            const { rows } = await client.query<{ same: boolean | null }>(
+                `SELECT ${definition("$2")} IS NOT DISTINCT FROM ${definition("$3")} AS same`,
+                [target, PROBE_POLICY, policy.name]
+            );
+            if (typeof rows[0]?.same === "boolean") answers.set(key, rows[0].same);
+        } catch {
+            // Not probed; see above.
+        } finally {
+            await client.query("ROLLBACK").catch(() => undefined);
+        }
+    }
+    return answers;
+}
+
 /**
  * Every declared schema's tables, and whether each has row-level security on.
  *

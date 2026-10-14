@@ -18,8 +18,11 @@
  *   it: by name, `TO` list, command, mode and which clauses there are. Text
  *   is compared through the stamp the push and every boot write
  *   ({@link readPolicyStamps}), which is what catches a rule whose SQL changed
- *   under the same name. A policy without one is re-created from its rule with
- *   nothing to tell beforehand whether it changes, and is listed as such.
+ *   under the same name. Where the stamp does not match, or there is none (a
+ *   policy `db migrate` or a hand made), the policy is made again under a probe
+ *   name and rolled back ({@link probeRenderedPolicies}): one Postgres would
+ *   store exactly as it is now is no change. Only one that could not be probed
+ *   is listed as unstamped.
  * - **Policies dropped and kept:** {@link partitionOrphans}, which is how the
  *   push's reconcile step decides.
  */
@@ -32,7 +35,7 @@ import {
     type Queryable
 } from "../security/policy-drift";
 import { generatePostgresPoliciesDdl } from "./generate-postgres-ddl-logic";
-import { readPolicyStamps, tablesRlsWouldEnable } from "./ensure-collection-policies";
+import { probeRenderedPolicies, readPolicyStamps, tablesRlsWouldEnable } from "./ensure-collection-policies";
 
 export interface PolicyPushPlan {
     /** Declared tables in the database with row-level security off, as `schema.table`: the push switches it on. */
@@ -54,6 +57,9 @@ const keyOf = (p: PolicyRef): string => `${p.schema}.${p.table}.${p.name}`;
 /** What a stamp that no longer matches says. */
 const STALE = "its rule, or the policy itself, has changed since Rebase wrote it";
 
+/** What a policy with no stamp, whose rule stores something else, says. */
+const UNSTAMPED_DIFFERS = "it carries no stamp of Rebase's, and its rule defines it otherwise";
+
 /**
  * Read the plan.
  *
@@ -73,12 +79,24 @@ export async function planPolicyPush(
 
     const replace = drift.diverged.map(d => ({ policy: d.expected, why: d.differences }));
     const settled = new Set([...drift.missing, ...drift.diverged.map(d => d.expected)].map(keyOf));
-    const unstamped: PolicyRef[] = [];
+    const unsure: { policy: PolicyRef; state: "stale" | "unstamped" }[] = [];
     for (const policy of parseExpectedPolicies(generatePostgresPoliciesDdl(collections))) {
         if (settled.has(keyOf(policy))) continue;
         const state = stamps.get(`${policy.schema}.${policy.table}`)?.get(policy.name);
+        if (state === "stale" || state === "unstamped") unsure.push({ policy, state });
+    }
+    // What the stamp cannot say, asked of Postgres: would the push store the
+    // definition that is there? A policy it would re-create exactly is no change.
+    const rendersAsStored = unsure.length === 0
+        ? new Map<string, boolean>()
+        : await probeRenderedPolicies(client, collections, unsure.map(entry => entry.policy), { searchPath: options.searchPath });
+    const unstamped: PolicyRef[] = [];
+    for (const { policy, state } of unsure) {
+        const same = rendersAsStored.get(keyOf(policy));
+        if (same === true) continue;
         if (state === "stale") replace.push({ policy, why: [STALE] });
-        else if (state === "unstamped") unstamped.push(policy);
+        else if (same === false) replace.push({ policy, why: [UNSTAMPED_DIFFERS] });
+        else unstamped.push(policy);
     }
 
     return { enableRls, create: drift.missing, replace, drop: dropped, keep: kept, unstamped };

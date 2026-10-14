@@ -50,6 +50,10 @@ CREATE POLICY docs_read ON public.docs FOR ALL USING (true);
 
 CREATE TABLE public.items (id text PRIMARY KEY, owner_id text);
 
+CREATE TABLE public.memos (id text PRIMARY KEY, owner_id text);
+ALTER TABLE public.memos ENABLE ROW LEVEL SECURITY;
+CREATE POLICY memos_hand ON public.memos FOR SELECT USING (owner_id = 'someone');
+
 CREATE TABLE public.legacy (id text PRIMARY KEY);
 ALTER TABLE public.legacy ENABLE ROW LEVEL SECURITY;
 CREATE POLICY legacy_read ON public.legacy FOR SELECT USING (true);
@@ -144,7 +148,8 @@ describe("the push's row-level security plan", () => {
         collection("notes", { securityRules: [{ operation: "select", access: "public" }] }),
         collection("tags"),
         collection("docs", { securityRules: [{ name: "docs_read", operation: "select", using: "true" }] }),
-        collection("items", { securityRules: [{ name: "items_read", operation: "select", using: itemsCondition }] })
+        collection("items", { securityRules: [{ name: "items_read", operation: "select", using: itemsCondition }] }),
+        collection("memos", { securityRules: [{ name: "memos_hand", operation: "select", using: "true" }], disableDefaultPolicies: true })
     ];
 
     it("says everything the push then does, and the push does nothing else", async () => {
@@ -167,12 +172,18 @@ describe("the push's row-level security plan", () => {
             "public.orders.orders_default_admin_write_update",
             "public.orders.orders_default_admin_write_delete"
         ]));
-        expect(keys(plan.unstamped)).toEqual(["public.orders.orders owner [hand]"]);
+        // Hand-written, unstamped, and stored exactly as its rule would store
+        // it: the push re-creates it as it is, which is no change.
+        expect(keys(plan.unstamped)).toEqual([]);
+        expect(keys(plan.replace.map(r => r.policy))).not.toContain("public.orders.orders owner [hand]");
         expect(keys(plan.drop)).toEqual(["public.notes.notes_select_1a2b3c4"]);
         expect(plan.enableRls).toEqual(["public.tags"]);
-        expect(keys(plan.replace.map(r => r.policy))).toEqual(["public.docs.docs_read", "public.items.items_read"]);
+        expect(keys(plan.replace.map(r => r.policy))).toEqual(["public.docs.docs_read", "public.items.items_read", "public.memos.memos_hand"]);
         expect(plan.replace.find(r => r.policy.name === "docs_read")?.why.join(" ")).toMatch(/command: expected SELECT, database has ALL/);
         expect(plan.replace.find(r => r.policy.name === "items_read")?.why.join(" ")).toMatch(/has changed since Rebase wrote it/);
+        // Unstamped, and its rule stores something else: a replacement, said so.
+        expect(plan.replace.find(r => r.policy.name === "memos_hand")?.why.join(" "))
+            .toBe("it carries no stamp of Rebase's, and its rule defines it otherwise");
         expect(keys(plan.keep)).toEqual(["public.legacy.legacy_read"]);
 
         const printed = formatPolicyPushPlan(plan);
@@ -190,6 +201,50 @@ describe("the push's row-level security plan", () => {
         // Every policy it wrote is stamped now, so none is left to guess about.
         expect(again.unstamped).toEqual([]);
         expect(formatPolicyPushPlan(again).changes).toEqual([]);
+    });
+
+    // `schema introspect` writes a role rule back as the SQL Postgres deparsed,
+    // so the statement it renders is not the one that made the policy, and the
+    // stamp over it differed: the first dry run after an introspection planned
+    // each such policy as a replacement of itself.
+    it("plans nothing for a stamped policy whose rule now reads as the SQL Postgres stored", async () => {
+        const roles = [
+            { operation: "select", access: "public" },
+            { operations: ["insert", "update", "delete"], roles: ["admin"] }
+        ];
+        await push(client, [collection("legacy", { securityRules: roles })]);
+        const stored = await db.query<{ policyname: string; cmd: string; qual: string | null; with_check: string | null }>(
+            "SELECT policyname, cmd, qual, with_check FROM pg_policies WHERE tablename = 'legacy' AND policyname NOT LIKE 'legacy_default_%' AND policyname <> 'legacy_read'");
+        expect(stored.rows.length).toBe(4);
+        // What introspection writes: one rule per policy, by name, as stored.
+        const introspected = stored.rows.map(row => ({
+            name: row.policyname,
+            operation: row.cmd.toLowerCase(),
+            ...(row.qual ? { using: row.qual } : {}),
+            ...(row.with_check ? { withCheck: row.with_check } : {})
+        }));
+        const legacy = [collection("legacy", { securityRules: [...introspected, { name: "legacy_read", operation: "select", using: "true" }] })];
+
+        const plan = await planPolicyPush(client, legacy);
+        expect(plan.replace).toEqual([]);
+        expect(plan.unstamped).toEqual([]);
+        expect(policyPlanChanges(plan)).toBe(false);
+    });
+
+    // `db migrate` creates the policies from the same statements, with no
+    // stamp: every later dry run listed all of them as unstamped.
+    it("plans nothing for unstamped policies its rules would store as they are", async () => {
+        const declared = [collection("items", { securityRules: [{ name: "items_read", operation: "select", using: OWNER }] })];
+        await lockCollectionTables(client, declared);
+        await client.query(generatePostgresPoliciesDdl(declared));
+
+        const plan = await planPolicyPush(client, declared);
+        expect(plan.unstamped).toEqual([]);
+        expect(plan.replace).toEqual([]);
+        expect(policyPlanChanges(plan)).toBe(false);
+        // The probe was rolled back: nothing of it is left on the table.
+        const left = await db.query<{ policyname: string }>("SELECT policyname FROM pg_policies WHERE policyname = 'rebase_policy_probe'");
+        expect(left.rows).toEqual([]);
     });
 
     it("plans no baseline for a table that opts out of it, as introspection now writes", async () => {

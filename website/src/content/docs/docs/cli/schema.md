@@ -191,11 +191,15 @@ rebase db push
   row-level security changes": the tables it switches RLS on for, and each
   policy it creates, replaces or drops, worked out the way the push's own
   steps decide. It says "No changes" only when neither the schema nor
-  row-level security would change. A policy with no stamp of Rebase's (one
-  written by hand, or read in by `schema introspect`) is re-created from its
-  rule with nothing to compare it to beforehand, and is listed apart. The push
-  itself prints one line counting them. On 0.24 the dry run showed Atlas's plan
-  alone, which has no policies in it
+  row-level security would change. Where a policy's stamp does not match its
+  rule, or it has none (one `db migrate` created, one written by hand), the dry
+  run makes it again from its rule under another name, in a transaction it
+  rolls back, and compares what Postgres stored: one that comes out the same is
+  no change. So a rule `schema introspect` read back as SQL plans nothing, and
+  neither do policies `db migrate` applied. Only one it could not compare (its
+  table's lock not granted within two seconds, say) is listed apart. The push
+  itself prints one line counting the changes. On 0.24 the dry run showed
+  Atlas's plan alone, which has no policies in it
 - <span class="since-badge" data-since="0.25">Since 0.25</span> Shows each
   statement Atlas applies once. Atlas connects without SSL to a database on this
   machine (`localhost`, `127.x`, `::1`) whose URL names no `sslmode`, as the app
