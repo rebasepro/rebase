@@ -31,5 +31,6 @@ export function noCollectionsCause(unprotected: readonly { schema: string; table
         "so nothing decides who may read which rows. Enable it on each — " +
         `\`ALTER TABLE "${first.schema}"."${first.table}" ENABLE ROW LEVEL SECURITY;\` — add a policy that opens ` +
         "the rows each user may see, and restart. A table with RLS and no policy is served and returns no rows. " +
-        "To serve them without RLS, set `baas.unprotectedTables: \"serve\"`.";
+        "To serve them without RLS anyway, pass `baas: { unprotectedTables: \"serve\" }` to the server entry, " +
+        "which takes `rebase eject`: the managed runtime does not read it from config/ or the environment.";
 }
