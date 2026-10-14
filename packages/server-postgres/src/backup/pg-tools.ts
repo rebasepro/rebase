@@ -328,6 +328,36 @@ export function buildPgRestoreListArgs(inputFile: string): string[] {
     return ["--list", inputFile];
 }
 
+/** The schemas and tables a dump creates, read off its table of contents. */
+export interface DumpObjects {
+    schemas: string[];
+    tables: { schema: string; table: string }[];
+}
+
+/** `<id>; <catalog oid> <oid> <description> <namespace> <tag…> <owner>`, the shape of a TOC entry. */
+const TOC_ENTRY = /^\d+;\s+\d+\s+\d+\s+(SCHEMA|TABLE)\s+(?!DATA\s)(\S+)\s+(.+)\s+(\S+)$/;
+
+/**
+ * The schemas and tables in `pg_restore --list` output: the objects a
+ * restore without `--clean` fails on when the target already has them.
+ *
+ * A TOC line ends in the object's owner, after its namespace and its name;
+ * a schema's namespace is `-`. The name is what lies between the two, so a
+ * name with a space in it (`Odd Name`) reads whole. `TABLE DATA` and every
+ * other kind of entry are not objects of their own here.
+ */
+export function parseDumpObjects(list: string): DumpObjects {
+    const objects: DumpObjects = { schemas: [], tables: [] };
+    for (const line of list.split("\n")) {
+        const entry = TOC_ENTRY.exec(line.trim());
+        if (!entry) continue;
+        const [, kind, namespace, name] = entry;
+        if (kind === "SCHEMA") objects.schemas.push(name);
+        else objects.tables.push({ schema: namespace, table: name });
+    }
+    return objects;
+}
+
 /**
  * Assemble the `pg_dumpall --globals-only` argument vector. Roles (and other
  * cluster-wide objects) live outside any single database, so a per-database

@@ -1513,7 +1513,10 @@ const DB_ACTION_HELP: Record<string, { usage: string; summary: string; notes?: s
     restore: {
         usage: "rebase db restore <dump> [--target-db <name>] [--create-db] [--clean] [--yes]",
         summary: "Restore a backup with pg_restore.",
-        notes: ["Destructive: on a terminal it asks first, and with no terminal it refuses without --yes."]
+        notes: [
+            "Destructive: on a terminal it asks first, and with no terminal it refuses without --yes.",
+            "Into a database that already holds what the backup creates, it needs --clean, and changes nothing without it."
+        ]
     },
     pull: {
         usage: "rebase db pull --from <url> [--schema <name>] [--anonymize] [--yes]",

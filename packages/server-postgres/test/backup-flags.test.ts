@@ -130,4 +130,3 @@ describe("db backups with an action it does not have", () => {
             .toBe("Unknown db backups command \"show\". Run `rebase db backups --help` for the ones there are.");
     });
 });
-

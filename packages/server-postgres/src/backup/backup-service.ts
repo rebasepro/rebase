@@ -24,10 +24,12 @@ import {
     buildPgRestoreArgs,
     buildPgRestoreListArgs,
     checkToolServerCompatibility,
+    type DumpObjects,
     globalsFileForDump,
     joinStorageKey,
     parsePgToolMajor,
     parseBackupTimestamp,
+    parseDumpObjects,
     serverVersionNumToMajor,
     VersionCompatibility
 } from "./pg-tools";
@@ -391,6 +393,68 @@ export async function restoreDump(opts: {
         stdio: opts.inheritStdio ? "inherit" : "pipe",
         env: tool.env
     });
+}
+
+/** The schemas and tables a dump creates, from `pg_restore --list`. See {@link parseDumpObjects}. */
+export async function readDumpObjects(
+    inputFile: string,
+    env: Record<string, string | undefined> = process.env
+): Promise<DumpObjects> {
+    const bin = resolvePgBinary("pg_restore", env);
+    if (!bin) {
+        throw new BackupToolError(
+            "Could not find the 'pg_restore' binary.",
+            "Install the PostgreSQL client tools or set PG_RESTORE_PATH."
+        );
+    }
+    const toolEnv = Object.fromEntries(
+        Object.entries(env).filter((entry): entry is [string, string] => entry[1] !== undefined)
+    );
+    const { stdout } = await execa(bin, buildPgRestoreListArgs(inputFile), { stdio: "pipe", env: toolEnv });
+    return parseDumpObjects(stdout);
+}
+
+/**
+ * Which of a dump's schemas and tables the target database already holds,
+ * as `schema <name>` / `table <schema>.<name>`: what a restore without
+ * `--clean` would stop on. `public` is left out of the schemas — every
+ * database has it, and pg_restore does not create it. None for a database
+ * that does not exist yet.
+ */
+export async function findRestoreConflicts(connectionString: string, objects: DumpObjects): Promise<string[]> {
+    const schemas = objects.schemas.filter((schema) => schema !== "public");
+    if (schemas.length === 0 && objects.tables.length === 0) return [];
+    const { Client } = await import("pg");
+    const client = new Client({ connectionString });
+    try {
+        await client.connect();
+    } catch (err) {
+        // 3D000: the database does not exist yet, as `--create-db` finds it.
+        if (err instanceof Error && "code" in err && err.code === "3D000") return [];
+        throw err;
+    }
+    try {
+        const existingSchemas = await client.query<{ nspname: string }>(
+            "SELECT nspname FROM pg_namespace WHERE nspname = ANY($1::text[]) ORDER BY nspname",
+            [schemas]
+        );
+        const existingTables = await client.query<{ nspname: string; relname: string }>(
+            `SELECT n.nspname, c.relname
+               FROM pg_class c
+               JOIN pg_namespace n ON n.oid = c.relnamespace
+               JOIN unnest($1::text[], $2::text[]) AS d(schema_name, table_name)
+                 ON d.schema_name = n.nspname AND d.table_name = c.relname
+              WHERE c.relkind IN ('r', 'p')
+              ORDER BY n.nspname, c.relname`,
+            [objects.tables.map((t) => t.schema), objects.tables.map((t) => t.table)]
+        );
+        return [
+            ...existingSchemas.rows.map((row) => `schema ${row.nspname}`),
+            ...existingTables.rows.map((row) => `table ${row.nspname}.${row.relname}`)
+        ];
+    } finally {
+        await client.end();
+    }
 }
 
 /**

@@ -32,8 +32,10 @@ import {
     createDump,
     discardPartialDump,
     ensureDatabaseExists,
+    findRestoreConflicts,
     listBackups,
     preflight,
+    readDumpObjects,
     restoreDump,
     uploadBackup,
     validateDump
@@ -350,6 +352,31 @@ export async function confirmRestore(opts: {
     return confirmed;
 }
 
+/** How many of the conflicting objects a refusal names before counting the rest. */
+const CONFLICTS_NAMED = 5;
+
+/**
+ * What `db restore` says when the target already holds what the backup
+ * creates, and the two ways round it: `--clean` replaces them with the
+ * backup's copy, a new database restores beside them.
+ */
+export function describeRestoreConflict(
+    target: string,
+    backupArg: string,
+    conflicts: readonly string[]
+): { message: string; hint: string } {
+    const named = conflicts.slice(0, CONFLICTS_NAMED).join(", ");
+    const more = conflicts.length > CONFLICTS_NAMED ? `, and ${conflicts.length - CONFLICTS_NAMED} more` : "";
+    return {
+        message: `"${target}" already holds ${named}${more}, which this backup creates. ` +
+            "Without --clean, pg_restore stops at the first of them. Nothing was restored or changed.",
+        hint: [
+            `To replace them with the backup's copy:  rebase db restore ${backupArg} --clean`,
+            `To restore beside them, in a new database:  rebase db restore ${backupArg} --create-db --target-db <new name>`
+        ].join("\n    ")
+    };
+}
+
 export async function restoreCommand(rawArgs: string[]): Promise<void> {
     if (rawArgs.includes("--help")) {
         printRestoreHelp();
@@ -438,6 +465,18 @@ export async function restoreCommand(rawArgs: string[]): Promise<void> {
         // second, confirmed run then reported as "already exists". The gate is
         // now the first thing that can stop the command, so its own message is
         // true whichever way the answer goes.
+        // Before the question and before anything is applied, roles included:
+        // without --clean, pg_restore stops at the first object the target
+        // already has, and said so in its own words and execa's, after the
+        // roles had run. A target that does not exist yet holds nothing.
+        if (!args["--clean"]) {
+            const conflicts = await findRestoreConflicts(targetConnection, await readDumpObjects(localFile));
+            if (conflicts.length > 0) {
+                const { message, hint } = describeRestoreConflict(targetDb ?? "the target database", backupArg, conflicts);
+                throw new BackupToolError(message, hint);
+            }
+        }
+
         const confirmed = await confirmRestore({
             target: targetDb ?? "the target database",
             yes: args["--yes"] === true,
@@ -458,6 +497,7 @@ export async function restoreCommand(rawArgs: string[]): Promise<void> {
 
         // Recreate cluster roles before restoring so GRANT/RLS statements in
         // the dump apply. Best-effort and idempotent (see applyGlobals).
+        let rolesApplied = 0;
         if (globalsSql) {
             print(chalk.gray("  Recreating cluster roles from the backup's roles sidecar…"));
             const { applied, skipped } = await applyGlobals(
@@ -465,6 +505,7 @@ export async function restoreCommand(rawArgs: string[]): Promise<void> {
                 globalsSql,
                 (m) => print(chalk.gray(m))
             );
+            rolesApplied = applied;
             print(chalk.gray(`  ✓ Roles: ${applied} applied, ${skipped} skipped (already present or not permitted).`));
         } else {
             outWarn(chalk.yellow("  ⚠️  No roles sidecar (.globals.sql) accompanies this backup."));
@@ -472,15 +513,27 @@ export async function restoreCommand(rawArgs: string[]): Promise<void> {
             outWarn(chalk.yellow("     will fail — recreate those roles first, or use a backup that includes its globals."));
         }
 
-        await restoreDump({
-            connectionString: targetConnection,
-            inputFile: localFile,
-            clean: args["--clean"],
-            noOwner: args["--no-owner"],
-            // Fail loudly by default so a skipped GRANT never leaves RLS off.
-            exitOnError: !args["--continue-on-error"],
-            inheritStdio: true
-        });
+        try {
+            await restoreDump({
+                connectionString: targetConnection,
+                inputFile: localFile,
+                clean: args["--clean"],
+                noOwner: args["--no-owner"],
+                // Fail loudly by default so a skipped GRANT never leaves RLS off.
+                exitOnError: !args["--continue-on-error"],
+                inheritStdio: true
+            });
+        } catch (err) {
+            if (err instanceof BackupToolError) throw err;
+            // pg_restore has printed its own error above; execa's repeats the
+            // command line, which says nothing the reader can act on.
+            throw new BackupToolError(
+                `pg_restore stopped on the error above. What it restored before that stays in "${targetDb ?? "the target database"}".`,
+                rolesApplied > 0
+                    ? `The ${rolesApplied} cluster role(s) recreated from the backup's sidecar before it stay too.`
+                    : undefined
+            );
+        }
 
         print("");
         print(chalk.green(`  ✓ Restore completed into "${targetDb ?? "the target database"}".`));
@@ -685,7 +738,9 @@ ${chalk.red.bold("Warning")}
   Restore is destructive and never runs automatically. Without --yes it
   asks for a typed 'yes' on a terminal, and with no terminal to ask on it
   refuses. Prefer --create-db/--target-db to restore into a fresh database
-  rather than overwriting a live one.
+  rather than overwriting a live one. Into a database that already holds
+  what the backup creates, it needs --clean, and refuses before changing
+  anything without it.
 
   By default the restore aborts on the first error (--exit-on-error) so a
   skipped GRANT never silently leaves RLS un-enforced. Roles are recreated
