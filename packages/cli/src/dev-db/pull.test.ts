@@ -17,6 +17,7 @@ import {
     anonymizableColumns,
     anonymizeStatements,
     clearStatements,
+    describeDumpFailure,
     describeRestoreFailure,
     describeTarget,
     dumpArgs,
@@ -242,6 +243,14 @@ describe("pg_dump and pg_restore arguments", () => {
         expect(args).toContain("--format=custom");
     });
 
+    it("writes the rows as INSERTs for the managed database, and as COPY for Postgres", () => {
+        // PGlite's socket server cannot receive COPY data: the restore failed
+        // at the first table and the daemon stopped answering anyone.
+        expect(dumpArgs({ ...plan, targetEngine: "pglite" })).toContain("--rows-per-insert=100");
+        expect(dumpArgs({ ...plan, targetEngine: "postgres" }).join(" ")).not.toMatch(/--inserts|--rows-per-insert/);
+        expect(dumpArgs(plan).join(" ")).not.toMatch(/--inserts|--rows-per-insert/);
+    });
+
     it("passes each requested schema through", () => {
         const args = dumpArgs({ ...plan, schemas: ["public", "billing"] });
 
@@ -314,6 +323,18 @@ describe("restoreOutcome", () => {
         expect(outcome.advice).toMatch(/repeat/i);
         expect(outcome.advice).toMatch(/extension/);
         expect(outcome.advice).not.toMatch(/^.*pull again\.?$/i);
+    });
+
+    it("on the managed database, sends a missing extension to Postgres in Docker", () => {
+        // An extension cannot be installed into PGlite, so "install it here"
+        // was advice nobody could follow.
+        const run = { exitCode: 1, stderr: "pg_restore: warning: errors ignored on restore: 1\n" };
+
+        const managed = restoreOutcome(run, "pglite").advice ?? "";
+        expect(managed).toContain("rebase db pull --docker");
+        expect(managed).toContain("pg_trgm, unaccent, vector");
+        expect(managed).not.toContain("Install it here");
+        expect(restoreOutcome(run).advice).toContain("Install it here");
     });
 
     it("says to pull again only when that is what finishes the job", () => {
@@ -457,5 +478,67 @@ describe("provisionableSchemas", () => {
 
     it("survives a database with nothing but catalogs", () => {
         expect(provisionableSchemas([{ schema: "pg_catalog" }])).toEqual([]);
+    });
+});
+
+/**
+ * Why `pg_dump` could not read the source. It printed its own error and then
+ * the CLI's `✗ Command failed with exit code 1: pg_dump …`, where every other
+ * database command prints a banner naming the server it could not reach.
+ */
+describe("describeDumpFailure", () => {
+    const source = "postgresql://app:s3cret@db.example.com:6543/app";
+
+    it("names the server it could not reach, in the banner, and says nothing was changed", () => {
+        const text = describeDumpFailure(source, {
+            exitCode: 1,
+            stderr: "pg_dump: error: connection to server at \"db.example.com\" (10.0.0.5), port 6543 failed: Connection refused\n"
+                + "\tIs the server running on that host and accepting TCP/IP connections?\n"
+        }).join("\n");
+
+        expect(text).toContain("Cannot connect to PostgreSQL at db.example.com:6543");
+        expect(text).toContain("pg_dump said: connection to server at");
+        expect(text).toContain("--from");
+        expect(text).toContain("Nothing was changed");
+        expect(text).not.toContain("s3cret");
+        expect(text).not.toContain("Command failed");
+    });
+
+    it("calls a host name that does not resolve unreachable too", () => {
+        const text = describeDumpFailure(source, {
+            exitCode: 1,
+            stderr: "pg_dump: error: could not translate host name \"db.example.com\" to address: nodename nor servname provided, or not known\n"
+        }).join("\n");
+
+        expect(text).toContain("Cannot connect to PostgreSQL at db.example.com:6543");
+    });
+
+    it("says the credentials were refused, naming the user and not the password", () => {
+        const text = describeDumpFailure(source, {
+            exitCode: 1,
+            stderr: "pg_dump: error: connection to server at \"db.example.com\", port 6543 failed: FATAL:  password authentication failed for user \"app\"\n"
+        }).join("\n");
+
+        expect(text).toContain("Authentication failed for user \"app\" at db.example.com:6543");
+        expect(text).not.toContain("Cannot connect");
+        expect(text).not.toContain("s3cret");
+    });
+
+    it("keeps pg_dump's own words for anything else, and says what to do about a version mismatch", () => {
+        const lines = describeDumpFailure(source, {
+            exitCode: 1,
+            stderr: "pg_dump: error: aborting because of server version mismatch\n"
+                + "pg_dump: detail: server version: 19.0; pg_dump version: 18.4\n"
+        });
+
+        expect(lines[0]).toBe("pg_dump: error: aborting because of server version mismatch");
+        expect(lines).toContain("✗ pg_dump could not dump db.example.com:6543/app (exit code 1).");
+        expect(lines.join("\n")).toContain("at least as new");
+        expect(lines.join("\n")).toContain("Nothing was changed");
+    });
+
+    it("says pg_dump could not start, or was stopped", () => {
+        expect(describeDumpFailure(source, { exitCode: undefined, code: "ENOENT" })[0]).toMatch(/could not be started \(ENOENT\)/);
+        expect(describeDumpFailure(source, { exitCode: undefined, signal: "SIGINT" })[0]).toMatch(/stopped by SIGINT/);
     });
 });

@@ -37,6 +37,8 @@
 import { execa } from "execa";
 import type { Client } from "pg";
 
+import { PGLITE_EXTENSIONS } from "./constraints";
+
 /**
  * How one kind of personal-looking column is overwritten.
  *
@@ -355,6 +357,19 @@ export function describeTarget(connectionString: string): string {
     }
 }
 
+/**
+ * What the local database runs on.
+ *
+ * `pglite` is the managed development database: one PGlite session behind a
+ * socket server. Two things a restore relies on are not there. The server runs
+ * each protocol message on its own, so the `CopyData` that follows a `COPY …
+ * FROM stdin` never reaches the backend waiting for it: the COPY fails on
+ * "unexpected EOF", and the session stops answering anyone until the daemon
+ * is killed. And every connection shares that one session, so what pg_restore
+ * `SET`s for itself stays set for everyone after it disconnects.
+ */
+export type PullTargetEngine = "postgres" | "pglite";
+
 export interface PullPlan {
     /** Where the data comes from. */
     source: string;
@@ -363,7 +378,20 @@ export interface PullPlan {
     anonymize: boolean;
     /** Schemas to copy. Empty means every non-system schema. */
     schemas: string[];
+    /**
+     * What the target runs on, which decides how the dump carries its rows.
+     * Absent means `postgres`. {@link dumpSource} reads it off the target.
+     */
+    targetEngine?: PullTargetEngine;
 }
+
+/**
+ * Rows per `INSERT` in a dump for the managed database.
+ *
+ * One per statement restored 100k rows in 8s; a hundred took 0.8s. A hundred
+ * 512KB rows, a 100MB statement, still went in.
+ */
+const ROWS_PER_INSERT = 100;
 
 /**
  * `pg_dump` arguments for the source.
@@ -372,9 +400,15 @@ export interface PullPlan {
  * exist locally, and without them every `ALTER … OWNER TO` in the dump fails and
  * buries the real output in noise. `--format=custom` so `pg_restore` can be told
  * to continue past errors selectively rather than all-or-nothing.
+ *
+ * For the managed database the rows travel as `INSERT`s, which PGlite takes
+ * like any other statement, instead of `COPY` data, which it cannot take at
+ * all — see {@link PullTargetEngine}. The copy is the same; only how the rows
+ * are written in the dump differs.
  */
 export function dumpArgs(plan: PullPlan): string[] {
     const args = ["--format=custom", "--no-owner", "--no-acl", "--no-privileges"];
+    if (plan.targetEngine === "pglite") args.push(`--rows-per-insert=${ROWS_PER_INSERT}`);
     for (const schema of plan.schemas) args.push("--schema", schema);
     args.push("--dbname", splitPassword(plan.source).connectionString);
 
@@ -466,7 +500,178 @@ export async function findPgTool(tool: "pg_dump" | "pg_restore"): Promise<string
     }
 }
 
-/** The fields of a finished `pg_restore` run that decide {@link restoreOutcome}. */
+/** PGlite names itself in `version()`: `PostgreSQL 18.3 (PGlite 0.5.6) on wasm32-…`. */
+function engineOf(version: string): PullTargetEngine {
+    return /\bPGlite\b/i.test(version) ? "pglite" : "postgres";
+}
+
+/** `host:port` of a connection string, for a message: never the string, which carries the password. */
+function hostOf(connectionString: string): string {
+    try {
+        const url = new URL(connectionString);
+
+        return `${url.hostname || "localhost"}:${url.port || "5432"}`;
+    } catch {
+        return "(unparseable connection string)";
+    }
+}
+
+/**
+ * A connection error's own sentence. A refused connection on a dual-stack
+ * host is an `AggregateError` with an empty message, and its sentence —
+ * `connect ECONNREFUSED 127.0.0.1:5432` — is in the attempts it holds.
+ */
+function connectionErrorText(error: unknown): string {
+    if (error instanceof AggregateError && error.errors.length > 0 && !error.message) {
+        return connectionErrorText(error.errors[0]);
+    }
+
+    return errorText(error);
+}
+
+const RULE = "━".repeat(60);
+
+/**
+ * The boxed banner the database commands print when a connection fails —
+ * `Cannot connect to PostgreSQL at …` — as plain lines for the caller to print.
+ */
+function banner(title: string, said: string | null, body: readonly string[]): string[] {
+    return ["", RULE, `  ❌  ${title}`, RULE, "", ...(said ? [`  ${said}`, ""] : []), ...body.map(line => `  ${line}`), "", RULE];
+}
+
+const NOTHING_CHANGED = "Nothing was changed: the local database is as it was.";
+
+/** What the target database runs on, or why it could not be asked. */
+async function readTargetEngine(target: string): Promise<{ engine: PullTargetEngine } | { error: unknown }> {
+    const { Client } = await import("pg");
+    const client = new Client({ connectionString: target, connectionTimeoutMillis: 10_000 });
+    client.on("error", () => undefined);
+    try {
+        await client.connect();
+        const { rows } = await client.query<{ version: string }>("SELECT version() AS version");
+
+        return { engine: engineOf(rows[0]?.version ?? "") };
+    } catch (error) {
+        return { error };
+    } finally {
+        await client.end().catch(() => undefined);
+    }
+}
+
+/** How {@link dumpSource} ended. */
+export type DumpOutcome =
+    | {
+        ok: true;
+        /** The plan the dump was taken for, with its target's engine read: what {@link restoreCopy} takes. */
+        plan: PullPlan;
+    }
+    | {
+        ok: false;
+        /** What failed and what to do, as plain lines for the caller to print. Nothing was changed. */
+        lines: string[];
+    };
+
+/**
+ * `pg_dump` the source into `dumpFile`, in the form the target can restore.
+ *
+ * It asks the target what it runs on first — the managed database cannot take
+ * `COPY` data, see {@link PullTargetEngine} — which also finds a local
+ * database that is not there before anything is read from the source.
+ *
+ * pg_dump's stderr is kept rather than shown as it arrives, so a failure is
+ * reported once, in the reader's terms: an unreachable source, or credentials
+ * it refused, get the banner every database command prints for a connection
+ * that failed, and anything else is pg_dump's own words with a line saying
+ * nothing was changed. A dump that succeeds with warnings still shows them.
+ */
+export async function dumpSource(plan: PullPlan, dumpFile: string): Promise<DumpOutcome> {
+    let targetEngine = plan.targetEngine;
+    if (!targetEngine) {
+        const read = await readTargetEngine(plan.target);
+        if ("error" in read) {
+            return {
+                ok: false,
+                lines: banner(`Cannot connect to PostgreSQL at ${hostOf(plan.target)}`,
+                    `The driver said: ${connectionErrorText(read.error)}`, [
+                        "That is the local database the pull would replace, and nothing",
+                        "was read from the source.",
+                        "Start it — `rebase dev` starts the managed one, `rebase dev --docker`",
+                        "Postgres in Docker — or check DATABASE_URL in .env, then pull again."
+                    ])
+            };
+        }
+        targetEngine = read.engine;
+    }
+
+    const planned: PullPlan = { ...plan, targetEngine };
+    const run = await execa("pg_dump", [...dumpArgs(planned), "--file", dumpFile], {
+        env: dumpEnv(planned),
+        stdin: "ignore",
+        stdout: "inherit",
+        stderr: "pipe",
+        reject: false
+    });
+    if (run.exitCode === 0) {
+        if (run.stderr.trim()) process.stderr.write(`${run.stderr.trimEnd()}\n`);
+
+        return { ok: true, plan: planned };
+    }
+
+    return { ok: false, lines: describeDumpFailure(plan.source, run) };
+}
+
+/**
+ * Why `pg_dump` could not read the source, as plain lines for the caller to
+ * print. The dump is taken before anything local is touched, so every one of
+ * them ends the same way: nothing was changed.
+ */
+export function describeDumpFailure(source: string, run: RestoreRun): string[] {
+    if (run.signal) return [`✗ pg_dump was stopped by ${run.signal} before it finished.`, NOTHING_CHANGED];
+    if (run.exitCode === undefined) {
+        return [
+            `✗ pg_dump could not be started (${run.code ?? "unknown error"}).`,
+            NOTHING_CHANGED,
+            "Check that the PostgreSQL client tools are installed (`pg_dump --version`)."
+        ];
+    }
+
+    const stderr = (run.stderr ?? "").trim();
+    const host = hostOf(source);
+    const error = /pg_dump: error: (.+)/.exec(stderr)?.[1]?.trim() ?? null;
+    const said = error ? `pg_dump said: ${error}` : null;
+
+    if (/could not translate host name|could not connect to server|connection to server .* failed: (?:Connection refused|timeout expired|No route to host|Network is unreachable|Operation timed out|Host is down)/i.test(stderr)) {
+        return banner(`Cannot connect to PostgreSQL at ${host}`, said, [
+            "That is the database --from names, which the pull reads.",
+            NOTHING_CHANGED,
+            "Check the host and port in --from, and that this machine can reach",
+            "that server: a VPN, an allow-list, or an SSH tunnel."
+        ]);
+    }
+    if (/password authentication failed|no pg_hba\.conf entry|role "[^"]+" does not exist/i.test(stderr)) {
+        let user = "unknown";
+        try {
+            user = decodePercent(new URL(source).username) || "unknown";
+        } catch { /* named as unknown */ }
+        return banner(`Authentication failed for user "${user}" at ${host}`, said, [
+            "PostgreSQL rejected the credentials --from carries.",
+            NOTHING_CHANGED,
+            "Check the user and password in --from."
+        ]);
+    }
+
+    const versions = /server version mismatch/i.test(stderr)
+        ? ["pg_dump is older than the server: install client tools at least as new as it (`brew install libpq`)."]
+        : [];
+    return [
+        ...(stderr ? stderr.split("\n") : []),
+        `✗ pg_dump could not dump ${describeTarget(source)} (exit code ${run.exitCode}).`,
+        NOTHING_CHANGED,
+        ...versions
+    ];
+}
+
+/** The fields of a finished `pg_restore` (or `pg_dump`) run that decide {@link restoreOutcome}. */
 export interface RestoreRun {
     exitCode?: number;
     signal?: string;
@@ -501,8 +706,10 @@ export interface RestoreRunOutcome {
  * holds that this Postgres cannot create — an extension it does not have, a
  * feature of a newer server — and a second pull meets them again. So the
  * advice names that, rather than "pull again", which sent people in a loop.
+ * On the managed database an extension cannot be installed at all, so the
+ * advice there is Postgres in Docker.
  */
-export function restoreOutcome(run: RestoreRun): RestoreRunOutcome {
+export function restoreOutcome(run: RestoreRun, engine: PullTargetEngine = "postgres"): RestoreRunOutcome {
     if (run.signal) {
         return {
             started: true,
@@ -520,9 +727,14 @@ export function restoreOutcome(run: RestoreRun): RestoreRunOutcome {
     if (run.exitCode === 0) return { started: true, failure: null, advice: null };
 
     const ignored = /errors ignored on restore: (\d+)/.exec(run.stderr ?? "");
-    const repeats = "Pulling again repeats these errors until what they name is fixed — most often an extension "
-        + "the source uses that this Postgres does not have installed. Install it here, or pull only the schemas "
-        + "that do not need it (--schema).";
+    const repeats = engine === "pglite"
+        ? "Pulling again repeats these errors until what they name is fixed — most often an extension the "
+            + `source uses that the managed database does not have (it has ${PGLITE_EXTENSIONS.map(extension => extension.name).join(", ")}). `
+            + "Pull into Postgres in Docker instead (`rebase db pull --docker`), or pull only the schemas that do "
+            + "not need it (--schema)."
+        : "Pulling again repeats these errors until what they name is fixed — most often an extension "
+            + "the source uses that this Postgres does not have installed. Install it here, or pull only the schemas "
+            + "that do not need it (--schema).";
 
     return {
         started: true,
@@ -603,13 +815,30 @@ function clearFailure(error: unknown): RestoreOutcome {
  * resolved — the pull's one destination, which no flag can change. Emptying it
  * is one transaction: if any schema cannot be dropped, none is, nothing is
  * restored, and the database is as it was.
+ *
+ * On the managed database the dump must be one {@link dumpSource} took for it,
+ * with its rows as INSERTs: a COPY would leave the daemon answering nobody, so
+ * one is refused before anything is emptied. And afterwards its one session —
+ * every connection's — is given back its own settings: pg_restore leaves
+ * `search_path` empty and `row_security` off behind it, which a running
+ * `rebase dev` would otherwise query under.
  */
 export async function restoreCopy(plan: PullPlan, dumpFile: string): Promise<RestoreOutcome> {
     const { Client } = await import("pg");
     const client = new Client({ connectionString: plan.target });
     client.on("error", () => undefined);
+    let engine: PullTargetEngine;
     try {
         await client.connect();
+        engine = engineOf((await client.query<{ version: string }>("SELECT version() AS version")).rows[0]?.version ?? "");
+        if (engine === "pglite" && plan.targetEngine !== "pglite") {
+            return {
+                cleared: false,
+                started: false,
+                failure: "The managed development database cannot take this dump: its rows are COPY data, which PGlite's socket server cannot receive.",
+                advice: "Pull into Postgres in Docker instead: `rebase db pull --docker`."
+            };
+        }
         const { rows } = await client.query<{ schema: string }>("SELECT nspname AS \"schema\" FROM pg_namespace");
         await client.query("BEGIN");
         await client.query(`SET LOCAL lock_timeout = '${CLEAR_LOCK_TIMEOUT}'`);
@@ -632,7 +861,31 @@ export async function restoreCopy(plan: PullPlan, dumpFile: string): Promise<Res
         reject: false
     });
 
-    return { cleared: true, ...restoreOutcome(run) };
+    if (engine === "pglite") await resetSharedSession(plan.target);
+
+    return { cleared: true, ...restoreOutcome(run, engine) };
+}
+
+/**
+ * Put the managed database's one session back to its own settings.
+ *
+ * `RESET ALL`, not `DISCARD ALL`: the session is every connection's, and
+ * `DISCARD` would also drop the `LISTEN` a running `rebase dev`'s realtime
+ * holds on it. Best effort: a daemon that cannot take this cannot take the
+ * re-grant that follows either, and that step reports it.
+ */
+async function resetSharedSession(target: string): Promise<void> {
+    const { Client } = await import("pg");
+    const client = new Client({ connectionString: target, connectionTimeoutMillis: 10_000, query_timeout: 15_000 });
+    client.on("error", () => undefined);
+    try {
+        await client.connect();
+        await client.query("RESET ALL");
+    } catch {
+        // Reported by the next step that connects; see above.
+    } finally {
+        await client.end().catch(() => undefined);
+    }
 }
 
 /**
