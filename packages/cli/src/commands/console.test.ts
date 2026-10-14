@@ -70,6 +70,18 @@ afterEach(() => {
     fs.rmSync(scratch, { recursive: true, force: true });
 });
 
+/** Run `body` with `process.stdin.isTTY` reading `tty`. */
+async function withStdinTTY(tty: boolean, body: () => Promise<unknown>): Promise<void> {
+    const own = Object.getOwnPropertyDescriptor(process.stdin, "isTTY");
+    Object.defineProperty(process.stdin, "isTTY", { value: tty, configurable: true, writable: true });
+    try {
+        await body();
+    } finally {
+        if (own) Object.defineProperty(process.stdin, "isTTY", own);
+        else Reflect.deleteProperty(process.stdin, "isTTY");
+    }
+}
+
 /** What the driver was spawned with: its argv after the script, and its environment. */
 function spawned(): { args: string[]; env: Record<string, string> } {
     expect(execaSpy).toHaveBeenCalledTimes(1);
@@ -95,6 +107,23 @@ describe("rebase console", () => {
         await consoleCommand(["node", "rebase", "console", "--eval", "1 + 1"]);
         expect(stdout).toEqual([]);
         expect(stderr.join("\n")).toContain("Using the managed development database.");
+    });
+
+    /**
+     * `printf '…' | rebase console > out` put "Using the managed development
+     * database…" in `out`, among the REPL's answers. Piped, stdout is what a
+     * pipe reads; what the console says about itself goes to stderr, as it
+     * does with --eval.
+     */
+    it("piped into the REPL, the database notices go to stderr", async () => {
+        await withStdinTTY(false, () => consoleCommand(["node", "rebase", "console"]));
+        expect(stdout).toEqual([]);
+        expect(stderr.join("\n")).toContain("Using the managed development database.");
+    });
+
+    it("typed at a terminal, they stay on stdout", async () => {
+        await withStdinTTY(true, () => consoleCommand(["node", "rebase", "console"]));
+        expect(stdout.join("\n")).toContain("Using the managed development database.");
     });
 
     it("resolves --collections from where the command was run, not from backend/", async () => {

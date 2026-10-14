@@ -98,8 +98,9 @@ export async function consoleCommand(rawArgs: string[]): Promise<void> {
     await ensureDockerDatabase(projectRoot, rawArgs);
 
     // With --eval, stdout is the result and nothing else, so it can be piped
-    // into `jq`; what the database resolution has to say goes to stderr.
-    const say = flags["--eval"] === undefined
+    // into `jq`; piped into the REPL, it is the REPL's answers. Either way what
+    // the database resolution has to say goes to stderr.
+    const say = flags["--eval"] === undefined && process.stdin.isTTY
         ? (line: string) => console.log(chalk.gray(`  ${line}`))
         : (line: string) => console.error(chalk.gray(`  ${line}`));
     const prepared = await prepareDatabaseEnv(projectRoot, {

@@ -580,6 +580,11 @@ describe("openRebase (E2E)", () => {
                     expect(result.stdout).not.toMatch(/Uncaught/);
                     expect(result.stdout).not.toContain("\u001b[");
                     expect(result.stdout).not.toMatch(/\[INFO\]/);
+                    // The banner is the console talking about itself: stderr,
+                    // so `printf '…' | rebase console > out` holds only answers.
+                    expect(result.stdout).not.toContain("rebase console —");
+                    expect(result.stdout).not.toContain("Try:");
+                    expect(result.stderr).toContain("rebase console —");
                 }, 60_000);
             });
 

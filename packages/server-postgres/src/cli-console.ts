@@ -171,18 +171,24 @@ async function openAndRun(
 
 /** The interactive half: a Node REPL until `.exit`, Ctrl-D or the end of piped input. */
 async function startRepl(scope: ConsoleScope, options: { history?: string; database: string } & ConsoleStreams): Promise<void> {
-    out("");
-    out(`  rebase console — ${options.database}, ${scope.collections.length} collection(s)`);
-    out("  In scope: rebase (dataAsAdmin, sql, withAuth, close) and collections. Top-level await works.");
-    out("  Try: await rebase.dataAsAdmin.<collection>.find({ limit: 5 })");
-    out("");
-
     const input = options.input ?? process.stdin;
     const output = options.output ?? process.stdout;
+    const typed = input instanceof tty.ReadStream && input.isTTY;
+
+    // For a person at a terminal. Piped, stdout is the REPL's answers, which
+    // whatever reads the pipe is after, so the banner goes to stderr with the
+    // rest of what the console says about itself.
+    const say = typed ? out : outError;
+    say("");
+    say(`  rebase console — ${options.database}, ${scope.collections.length} collection(s)`);
+    say("  In scope: rebase (dataAsAdmin, sql, withAuth, close) and collections. Top-level await works.");
+    say("  Try: await rebase.dataAsAdmin.<collection>.find({ limit: 5 })");
+    say("");
+
     // Typed at a terminal, the REPL reads it as one. Anything else — a pipe, a
     // file, a stream handed in — reaches it a line at a time through `feed`
     // (see `feedLineByLine`).
-    const feed = input instanceof tty.ReadStream && input.isTTY ? undefined : new PassThrough();
+    const feed = typed ? undefined : new PassThrough();
     // Colours for a terminal only: piped to a file or another program, the
     // escape codes are noise in the text.
     const colors = output instanceof tty.WriteStream && output.isTTY;
