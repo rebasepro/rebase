@@ -29,17 +29,21 @@ import {
 import {
     applyGlobals,
     BackupToolError,
+    CleanRestoreFailed,
     createDump,
     discardPartialDump,
     ensureDatabaseExists,
+    findCleanExtras,
     findRestoreConflicts,
     listBackups,
     preflight,
     readDumpObjects,
     restoreDump,
+    restoreDumpReplacing,
     uploadBackup,
     validateDump
 } from "./backup-service";
+import { resolvePgBinary } from "./pg-binary";
 
 function formatBytes(bytes: number): string {
     if (bytes < 1024) return `${bytes} B`;
@@ -359,6 +363,7 @@ const CONFLICTS_NAMED = 5;
  * What `db restore` says when the target already holds what the backup
  * creates, and the two ways round it: `--clean` replaces them with the
  * backup's copy, a new database restores beside them.
+
  */
 export function describeRestoreConflict(
     target: string,
@@ -374,6 +379,56 @@ export function describeRestoreConflict(
             `To replace them with the backup's copy:  rebase db restore ${backupArg} --clean`,
             `To restore beside them, in a new database:  rebase db restore ${backupArg} --create-db --target-db <new name>`
         ].join("\n    ")
+    };
+}
+
+/** How many of the objects `--clean` drops beyond the backup's own it names before counting the rest. */
+const EXTRAS_NAMED = 10;
+
+/**
+ * What `restore --clean` says, before it asks, about what it drops that the
+ * backup does not hold — see `findCleanExtras`. Nothing when there is none.
+ */
+export function describeCleanExtras(schemas: readonly string[], extras: readonly string[]): string[] {
+    if (extras.length === 0) return [];
+    const replaced = schemas.filter((schema) => schema !== "public");
+    const lead = replaced.length > 0
+        ? `--clean replaces ${replaced.length === 1 ? "schema" : "schemas"} ${replaced.join(", ")} whole, so it also drops what this backup does not hold:`
+        : "--clean also drops what this backup does not hold:";
+    return [
+        lead,
+        ...extras.slice(0, EXTRAS_NAMED).map((extra) => `  ${extra}`),
+        ...(extras.length > EXTRAS_NAMED ? [`  and ${extras.length - EXTRAS_NAMED} more`] : [])
+    ];
+}
+
+/**
+ * What a `restore --clean` that stopped says: it ran as one transaction, so
+ * nothing changed. The cluster roles the sidecar recreated are the exception,
+ * and are said to be.
+ */
+export function describeCleanRestoreFailure(
+    target: string,
+    failure: { tool: "pg_restore" | "psql"; lockTimeout: boolean },
+    rolesApplied: number
+): { message: string; hint?: string } {
+    const why = failure.tool === "pg_restore"
+        ? "pg_restore could not read the whole backup"
+        : failure.lockTimeout
+            ? `it waited too long for a lock on "${target}"`
+            : "a statement failed";
+    const hints = [
+        ...(failure.lockTimeout
+            ? ["Something holds a lock on it — usually a `rebase dev` serving from it. Stop that, then restore again."]
+            : []),
+        ...(rolesApplied > 0
+            ? [`The ${rolesApplied} cluster role(s) recreated from the backup's sidecar before it stay.`]
+            : [])
+    ];
+    return {
+        message: `Nothing was restored or changed: the restore ran as one transaction, and it was rolled back when ${why} (above). ` +
+            `"${target}" holds what it held before.`,
+        hint: hints.length > 0 ? hints.join("\n    ") : undefined
     };
 }
 
@@ -469,11 +524,31 @@ export async function restoreCommand(rawArgs: string[]): Promise<void> {
         // without --clean, pg_restore stops at the first object the target
         // already has, and said so in its own words and execa's, after the
         // roles had run. A target that does not exist yet holds nothing.
+        const objects = await readDumpObjects(localFile);
         if (!args["--clean"]) {
-            const conflicts = await findRestoreConflicts(targetConnection, await readDumpObjects(localFile));
+            const conflicts = await findRestoreConflicts(targetConnection, objects);
             if (conflicts.length > 0) {
                 const { message, hint } = describeRestoreConflict(targetDb ?? "the target database", backupArg, conflicts);
                 throw new BackupToolError(message, hint);
+            }
+        }
+
+        // `--clean` replaces the backup's schemas whole, in one transaction
+        // with the restore — see `restoreDumpReplacing`. `--continue-on-error`
+        // asks for the opposite of one transaction, and gets pg_restore's own
+        // `--clean`, statement by statement, as it asked.
+        const replacing = args["--clean"] === true && args["--continue-on-error"] !== true;
+        if (replacing) {
+            if (!resolvePgBinary("psql")) {
+                throw new BackupToolError(
+                    "Could not find the 'psql' binary, which runs a --clean restore as one transaction. Nothing was restored or changed.",
+                    "Install the PostgreSQL client tools (they ship psql beside pg_restore), or set PSQL_PATH to its full path."
+                );
+            }
+            const extras = describeCleanExtras(objects.schemas, await findCleanExtras(targetConnection, objects));
+            if (extras.length > 0) {
+                outWarn(chalk.yellow(`  ⚠️  ${extras[0]}`));
+                for (const extra of extras.slice(1)) outWarn(chalk.yellow(`     ${extra}`));
             }
         }
 
@@ -514,17 +589,31 @@ export async function restoreCommand(rawArgs: string[]): Promise<void> {
         }
 
         try {
-            await restoreDump({
-                connectionString: targetConnection,
-                inputFile: localFile,
-                clean: args["--clean"],
-                noOwner: args["--no-owner"],
-                // Fail loudly by default so a skipped GRANT never leaves RLS off.
-                exitOnError: !args["--continue-on-error"],
-                inheritStdio: true
-            });
+            if (replacing) {
+                await restoreDumpReplacing({
+                    connectionString: targetConnection,
+                    inputFile: localFile,
+                    objects,
+                    noOwner: args["--no-owner"],
+                    inheritStdio: true
+                });
+            } else {
+                await restoreDump({
+                    connectionString: targetConnection,
+                    inputFile: localFile,
+                    clean: args["--clean"],
+                    noOwner: args["--no-owner"],
+                    // Fail loudly by default so a skipped GRANT never leaves RLS off.
+                    exitOnError: !args["--continue-on-error"],
+                    inheritStdio: true
+                });
+            }
         } catch (err) {
             if (err instanceof BackupToolError) throw err;
+            if (err instanceof CleanRestoreFailed) {
+                const { message, hint } = describeCleanRestoreFailure(targetDb ?? "the target database", err, rolesApplied);
+                throw new BackupToolError(message, hint);
+            }
             // pg_restore has printed its own error above; execa's repeats the
             // command line, which says nothing the reader can act on.
             throw new BackupToolError(
@@ -729,7 +818,8 @@ ${chalk.green.bold("Arguments")}
 ${chalk.green.bold("Options")}
   ${chalk.blue("--target-db")} <name>      Restore into this database instead of DATABASE_URL's
   ${chalk.blue("--create-db")}             Create the target database first if it doesn't exist
-  ${chalk.blue("--clean")}                 Drop existing objects before recreating them
+  ${chalk.blue("--clean")}                 Replace what the backup holds, in one transaction with
+                             the restore (runs the dump through psql)
   ${chalk.blue("--no-owner")}              Ignore ownership from the dump
   ${chalk.blue("--continue-on-error")}     Log and continue past errors ${chalk.red("(may leave RLS un-enforced!)")}
   ${chalk.blue("--yes, -y")}               Skip the interactive confirmation ${chalk.red("(destructive!)")}
@@ -740,7 +830,9 @@ ${chalk.red.bold("Warning")}
   refuses. Prefer --create-db/--target-db to restore into a fresh database
   rather than overwriting a live one. Into a database that already holds
   what the backup creates, it needs --clean, and refuses before changing
-  anything without it.
+  anything without it. --clean drops each schema the backup creates whole,
+  with what it holds that the backup does not (it names those first), and
+  restores in the same transaction: a restore that stops changes nothing.
 
   By default the restore aborts on the first error (--exit-on-error) so a
   skipped GRANT never silently leaves RLS un-enforced. Roles are recreated

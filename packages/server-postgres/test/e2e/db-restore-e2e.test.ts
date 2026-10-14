@@ -9,6 +9,13 @@
  *   nothing.
  * - With no terminal and no `--yes`: "Aborted. No changes were made." never
  *   said to pass `--yes`, as `db reset`, `db pull` and `db branch prune` do.
+ * - With `--clean`, over a database `rebase db migrate` had run on: pg_restore
+ *   dropped every table the backup holds, then stopped at `DROP SCHEMA rebase`,
+ *   which `rebase.atlas_schema_revisions` blocked, and said "What it restored
+ *   before that stays" about a database it had emptied. It now replaces the
+ *   backup's schemas whole, as one transaction with the restore, says first
+ *   what that drops that the backup lacks, and a restore that stops changes
+ *   nothing.
  *
  * Requires Docker and the Postgres client tools (`pg_dump`, `pg_restore`).
  */
@@ -26,6 +33,7 @@ const pkgRoot = path.resolve(__dirname, "../..");
 const monorepoRoot = path.resolve(pkgRoot, "../..");
 const cliScript = path.join(pkgRoot, "src", "cli.ts");
 const tsxBin = path.join(monorepoRoot, "node_modules", ".bin", "tsx");
+const atlasBin = path.join(pkgRoot, "node_modules", ".bin", "atlas");
 
 const SEED_SQL = `
 CREATE SCHEMA rebase;
@@ -50,23 +58,33 @@ describe("rebase db restore", () => {
     let backend: string;
     let dumpFile: string;
 
-    const cli = (args: string[]) =>
+    const urlFor = (db: string) => container.connectionString.replace(/\/rebase\?/, `/${db}?`);
+
+    const cliOn = (db: string, args: string[]) =>
         execa(tsxBin, [cliScript, ...args], {
-            cwd: backend, env: cleanEnv(container.connectionString), reject: false, stdin: "ignore", all: true
+            cwd: backend, env: cleanEnv(urlFor(db)), reject: false, stdin: "ignore", all: true
         });
 
-    const databases = async (): Promise<string[]> =>
-        (await admin.query<{ datname: string }>("SELECT datname FROM pg_database ORDER BY datname")).rows.map(r => r.datname);
+    const cli = (args: string[]) => cliOn("rebase", args);
 
-    const postsIn = async (db: string): Promise<number> => {
-        const client = new pg.Client({ connectionString: container.connectionString.replace(/\/rebase\?/, `/${db}?`) });
+    const sqlIn = async <T extends Record<string, unknown>>(db: string, text: string): Promise<T[]> => {
+        const client = new pg.Client({ connectionString: urlFor(db) });
         await client.connect();
         try {
-            return Number((await client.query("SELECT count(*) AS n FROM public.posts")).rows[0].n);
+            return (await client.query<T>(text)).rows;
         } finally {
             await client.end();
         }
     };
+
+    const exists = async (db: string, relation: string): Promise<boolean> =>
+        (await sqlIn<{ present: boolean }>(db, `SELECT to_regclass('${relation}') IS NOT NULL AS present`))[0].present;
+
+    const databases = async (): Promise<string[]> =>
+        (await admin.query<{ datname: string }>("SELECT datname FROM pg_database ORDER BY datname")).rows.map(r => r.datname);
+
+    const postsIn = async (db: string): Promise<number> =>
+        Number((await sqlIn<{ n: string }>(db, "SELECT count(*) AS n FROM public.posts"))[0].n);
 
     beforeAll(async () => {
         // pg_dump must be at least as new as the server; see imageForLocalClient.
@@ -128,5 +146,74 @@ describe("rebase db restore", () => {
         const clean = await cli(["db", "restore", dumpFile, "--clean", "--yes"]);
         expect(clean.exitCode, clean.all).toBe(0);
         expect(await postsIn("rebase")).toBe(2);
+    }, 180_000);
+
+    it("with --clean, replaces a database `db migrate` has run on, and names what the backup does not hold", async () => {
+        const restored = await cli(["db", "restore", dumpFile, "--create-db", "--target-db", "migrated", "--yes"]);
+        expect(restored.exitCode, restored.all).toBe(0);
+
+        // `rebase db migrate --baseline`, as on any project: it writes
+        // `rebase.atlas_schema_revisions`, which the backup was taken before.
+        const migrations = path.join(backend, "drizzle", "migrations");
+        fs.mkdirSync(migrations, { recursive: true });
+        fs.writeFileSync(path.join(migrations, "20260101000000_init.sql"), "SELECT 1;\n");
+        await execa(atlasBin, ["migrate", "hash", "--dir", "file://drizzle/migrations"], { cwd: backend });
+        const migrated = await cliOn("migrated", ["db", "migrate", "--baseline", "20260101000000"]);
+        expect(migrated.exitCode, migrated.all).toBe(0);
+        expect(await exists("migrated", "rebase.atlas_schema_revisions")).toBe(true);
+        // And a table a newer runtime adds, which references one of the backup's.
+        await sqlIn("migrated", "CREATE TABLE rebase.sessions (id serial PRIMARY KEY, user_id integer REFERENCES rebase.users(id))");
+        await sqlIn("migrated", "INSERT INTO public.posts (title) VALUES ('three')");
+
+        const clean = await cli(["db", "restore", dumpFile, "--target-db", "migrated", "--clean", "--yes"]);
+        const said = clean.all ?? "";
+
+        expect(clean.exitCode, said).toBe(0);
+        expect(said).toMatch(/--clean replaces schema rebase whole, so it also drops what this backup does not hold:/);
+        expect(said).toContain("table rebase.atlas_schema_revisions");
+        expect(said).toContain("table rebase.sessions");
+        expect(said).toMatch(/Restore completed into "migrated"/);
+        expect(await postsIn("migrated")).toBe(2);
+        expect(await exists("migrated", "rebase.users")).toBe(true);
+        expect(await exists("migrated", "rebase.atlas_schema_revisions")).toBe(false);
+        expect(await exists("migrated", "rebase.sessions")).toBe(false);
+    }, 180_000);
+
+    it("a --clean restore that stops is rolled back whole, and says the database is as it was", async () => {
+        await admin.query("CREATE DATABASE moods");
+        await sqlIn("moods", `
+            CREATE SCHEMA rebase;
+            CREATE TABLE rebase.users (id serial PRIMARY KEY, email text NOT NULL);
+            CREATE TYPE public.mood AS ENUM ('calm', 'loud');
+            CREATE TABLE public.posts (id serial PRIMARY KEY, title text NOT NULL, mood public.mood);
+            INSERT INTO public.posts (title) VALUES ('one'), ('two');
+        `);
+        const backupDir = fs.mkdtempSync(path.join(os.tmpdir(), "rebase-restore-moods-"));
+        const backedUp = await cliOn("moods", ["db", "backup", "--out", backupDir]);
+        expect(backedUp.exitCode, backedUp.all).toBe(0);
+        const moodsDump = path.join(backupDir, fs.readdirSync(backupDir).find(name => name.endsWith(".dump"))!);
+
+        const restored = await cli(["db", "restore", moodsDump, "--create-db", "--target-db", "moods_copy", "--yes"]);
+        expect(restored.exitCode, restored.all).toBe(0);
+        await sqlIn("moods_copy", `
+            INSERT INTO public.posts (title) VALUES ('three');
+            CREATE TABLE rebase.local_only (id integer);
+            CREATE TABLE public.mood_log (felt public.mood);
+        `);
+
+        // `public.mood_log` needs the type the dump drops and creates again,
+        // so the restore stops there — after the schemas it replaces were
+        // dropped, inside the transaction that rolls them back.
+        const clean = await cli(["db", "restore", moodsDump, "--target-db", "moods_copy", "--clean", "--yes"]);
+        const said = clean.all ?? "";
+
+        expect(clean.exitCode, said).toBe(1);
+        expect(said).toMatch(/cannot drop type public\.mood because other objects depend on it/);
+        expect(said).toMatch(/Nothing was restored or changed: the restore ran as one transaction, and it was rolled back/);
+        expect(said).not.toMatch(/What it restored before that stays/);
+        expect(await postsIn("moods_copy")).toBe(3);
+        expect(await exists("moods_copy", "rebase.users")).toBe(true);
+        expect(await exists("moods_copy", "rebase.local_only")).toBe(true);
+        expect(await exists("moods_copy", "public.mood_log")).toBe(true);
     }, 180_000);
 });

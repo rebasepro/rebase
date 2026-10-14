@@ -237,6 +237,21 @@ stopped on pg_restore's `schema "rebase" already exists`. It refuses the
 managed development database, which cannot take a dump's COPY data; restore
 into Postgres in Docker with `--docker` instead.
 
+<span class="since-badge" data-since="0.25">Since 0.25</span> With `--clean`,
+the restore replaces what the backup holds as one transaction. It drops each
+schema the backup creates whole (`rebase`, say), and each table the backup
+creates in a schema it does not (`public`), with `CASCADE`, then restores the
+dump in the same transaction. Before it asks, it names what that drops that the
+backup does not hold, such as `rebase.atlas_schema_revisions` from
+`rebase db migrate`, or a view or foreign key elsewhere that references one of
+the backup's tables. A restore that stops anywhere is rolled back, and it says
+the database holds what it held before. It runs the dump through `psql`, which
+ships with `pg_restore` (`PSQL_PATH` names another one), and waits at most
+15 seconds for a lock, which a running `rebase dev` can hold. On 0.24, `--clean`
+was pg_restore's own, one statement at a time: a table the backup lacked in
+`rebase` stopped it at `DROP SCHEMA rebase`, after every table had been dropped.
+`--continue-on-error` still runs pg_restore's own `--clean`.
+
 Before restoring, it recreates the cluster roles from the backup's
 `.globals.sql` — an existing role is skipped, not an error — so the dump's
 grants and policies apply. It then runs with `--exit-on-error`: a restore that
@@ -248,7 +263,7 @@ roles may be missing.
 | --- | --- |
 | `--target-db <name>` | Restore into this database instead of the one in `DATABASE_URL`. |
 | `--create-db` | Create the target database first if it does not exist. |
-| `--clean` | Drop existing objects before recreating them (`--clean --if-exists`). |
+| `--clean` | Replace what the backup holds, in one transaction with the restore: its schemas whole, and its tables elsewhere. Says first what that drops beyond the backup. |
 | `--no-owner` | Ignore the ownership recorded in the dump. |
 | `--continue-on-error` | Log and continue past errors. **May leave RLS unenforced**; use it only when you know why. |
 | `--yes`, `-y` | Skip the confirmation. |

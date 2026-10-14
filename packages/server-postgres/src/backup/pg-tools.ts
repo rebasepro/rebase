@@ -332,10 +332,19 @@ export function buildPgRestoreListArgs(inputFile: string): string[] {
 export interface DumpObjects {
     schemas: string[];
     tables: { schema: string; table: string }[];
+    /**
+     * Every relation it creates — tables, views, materialized views, foreign
+     * tables and sequences — by schema and name: what `restore --clean` can
+     * tell apart from what the target holds besides.
+     */
+    relations: { schema: string; name: string }[];
 }
 
 /** `<id>; <catalog oid> <oid> <description> <namespace> <tag…> <owner>`, the shape of a TOC entry. */
 const TOC_ENTRY = /^\d+;\s+\d+\s+\d+\s+(SCHEMA|TABLE)\s+(?!DATA\s)(\S+)\s+(.+)\s+(\S+)$/;
+
+/** A TOC entry for a relation of any kind. `TABLE DATA`, `SEQUENCE SET` and `SEQUENCE OWNED BY` are not relations. */
+const TOC_RELATION = /^\d+;\s+\d+\s+\d+\s+(?:FOREIGN TABLE|MATERIALIZED VIEW|TABLE|VIEW|SEQUENCE)\s+(?!DATA\s|SET\s|OWNED BY\s)(\S+)\s+(.+)\s+(\S+)$/;
 
 /**
  * The schemas and tables in `pg_restore --list` output: the objects a
@@ -347,15 +356,83 @@ const TOC_ENTRY = /^\d+;\s+\d+\s+\d+\s+(SCHEMA|TABLE)\s+(?!DATA\s)(\S+)\s+(.+)\s
  * other kind of entry are not objects of their own here.
  */
 export function parseDumpObjects(list: string): DumpObjects {
-    const objects: DumpObjects = { schemas: [], tables: [] };
+    const objects: DumpObjects = { schemas: [], tables: [], relations: [] };
     for (const line of list.split("\n")) {
-        const entry = TOC_ENTRY.exec(line.trim());
+        const trimmed = line.trim();
+        const relation = TOC_RELATION.exec(trimmed);
+        if (relation) objects.relations.push({ schema: relation[1], name: relation[2] });
+        const entry = TOC_ENTRY.exec(trimmed);
         if (!entry) continue;
         const [, kind, namespace, name] = entry;
         if (kind === "SCHEMA") objects.schemas.push(name);
         else objects.tables.push({ schema: namespace, table: name });
     }
     return objects;
+}
+
+/** A Postgres identifier, double-quoted. */
+function quoteIdentifier(name: string): string {
+    return `"${name.replace(/"/g, "\"\"")}"`;
+}
+
+/**
+ * How long `restore --clean` waits for a lock before it gives up.
+ *
+ * A `rebase dev` serving from the database holds connections, and one inside a
+ * transaction would otherwise make the restore wait without a word. The dump's
+ * own script sets `lock_timeout = 0` after this, for the objects it creates.
+ */
+export const CLEAN_LOCK_TIMEOUT = "15s";
+
+/**
+ * What `restore --clean` runs first, in the transaction the restore runs in:
+ * every schema the dump creates, dropped with `CASCADE`, and every table it
+ * creates in a schema it does not (`public`), the same.
+ *
+ * `CASCADE`, which `pg_restore --clean` never uses: a table the backup lacks
+ * in one of its schemas — `rebase.atlas_schema_revisions` from `rebase db
+ * migrate`, a table a newer runtime added — is exactly what stopped its plain
+ * `DROP SCHEMA rebase`, and a table that references one of the backup's is what
+ * stops a plain `DROP TABLE`. The dump's script follows, with its own `DROP …
+ * IF EXISTS` for everything else it creates.
+ */
+export function cleanRestorePrelude(objects: DumpObjects): string[] {
+    const schemas = objects.schemas.filter((schema) => schema !== "public");
+    const dropped = new Set(schemas);
+    const tables = objects.tables.filter((table) => !dropped.has(table.schema));
+    return [
+        "SET client_min_messages = warning",
+        `SET lock_timeout = '${CLEAN_LOCK_TIMEOUT}'`,
+        ...schemas.map((schema) => `DROP SCHEMA IF EXISTS ${quoteIdentifier(schema)} CASCADE`),
+        ...tables.map((table) => `DROP TABLE IF EXISTS ${quoteIdentifier(table.schema)}.${quoteIdentifier(table.table)} CASCADE`)
+    ];
+}
+
+/**
+ * `pg_restore` writing the dump as a SQL script on stdout, with the `DROP …
+ * IF EXISTS` that `--clean` adds, for `psql` to run. See {@link buildPsqlScriptArgs}.
+ */
+export function buildPgRestoreScriptArgs(opts: { inputFile: string; noOwner?: boolean }): string[] {
+    return [
+        "--format=custom",
+        "--clean",
+        "--if-exists",
+        ...(opts.noOwner ? ["--no-owner"] : []),
+        "--file=-",
+        opts.inputFile
+    ];
+}
+
+/**
+ * `psql` running a script read from stdin, stopping at its first error.
+ *
+ * `-X`, so no `.psqlrc` changes what runs; `-q`, so it prints errors and
+ * warnings, not a command tag per statement. The transaction is the script's
+ * own: `restore --clean` writes the `BEGIN`, and the `COMMIT` only once
+ * `pg_restore` has written the whole dump.
+ */
+export function buildPsqlScriptArgs(connectionString: string): string[] {
+    return ["-X", "-q", "--no-password", "-v", "ON_ERROR_STOP=1", `--dbname=${forLibpq(connectionString)}`, "--file=-"];
 }
 
 /**

@@ -12,7 +12,7 @@ import os from "os";
 import path from "path";
 import { execa } from "execa";
 import type { StorageController } from "@rebasepro/server";
-import { resolvePgBinary } from "./pg-binary";
+import { pgToolVariable, resolvePgBinary } from "./pg-binary";
 import {
     BackupDestination,
     buildBackupFilename,
@@ -23,6 +23,9 @@ import {
     type RowSecurityIdentity,
     buildPgRestoreArgs,
     buildPgRestoreListArgs,
+    buildPgRestoreScriptArgs,
+    buildPsqlScriptArgs,
+    cleanRestorePrelude,
     checkToolServerCompatibility,
     type DumpObjects,
     globalsFileForDump,
@@ -393,6 +396,171 @@ export async function restoreDump(opts: {
         stdio: opts.inheritStdio ? "inherit" : "pipe",
         env: tool.env
     });
+}
+
+/**
+ * A `restore --clean` that stopped, and so was rolled back whole.
+ *
+ * `tool` is the one that stopped it: `pg_restore`, writing the dump's script,
+ * or `psql`, running it. `lockTimeout` when what `psql` stopped on was the
+ * wait for a lock — `CLEAN_LOCK_TIMEOUT` in `pg-tools.ts`.
+ */
+export class CleanRestoreFailed extends Error {
+    constructor(
+        readonly tool: "pg_restore" | "psql",
+        readonly exitCode: number | undefined,
+        readonly lockTimeout: boolean
+    ) {
+        super(`${tool} exited with code ${exitCode ?? "unknown"}`);
+        this.name = "CleanRestoreFailed";
+    }
+}
+
+/**
+ * Restore a dump over what the database holds, as one transaction:
+ * {@link cleanRestorePrelude} first, then the dump as `pg_restore` writes it
+ * for `psql`, and the `COMMIT` only after the last of it.
+ *
+ * One unit, so it either replaces what the dump holds or changes nothing:
+ * `pg_restore --clean` runs each statement on its own, so the drops it starts
+ * with had all happened when a later one failed — and its plain `DROP SCHEMA
+ * rebase` fails on any table the backup lacks, which left a database with
+ * every table dropped and nothing restored. Here a failure anywhere —
+ * `pg_restore` cannot read the archive, a statement fails, the connection
+ * drops — ends the transaction without a `COMMIT`, and Postgres rolls it back.
+ *
+ * Throws {@link CleanRestoreFailed} when it did not commit.
+ */
+export async function restoreDumpReplacing(opts: {
+    connectionString: string;
+    inputFile: string;
+    objects: DumpObjects;
+    noOwner?: boolean;
+    inheritStdio?: boolean;
+    env?: Record<string, string | undefined>;
+}): Promise<void> {
+    const env = opts.env ?? process.env;
+    const restoreBin = resolvePgBinary("pg_restore", env);
+    const psqlBin = resolvePgBinary("psql", env);
+    if (!restoreBin || !psqlBin) {
+        const tool = restoreBin ? "psql" : "pg_restore";
+        throw new BackupToolError(
+            `Could not find the '${tool}' binary${tool === "psql" ? ", which runs a --clean restore as one transaction" : ""}.`,
+            `Install the PostgreSQL client tools or set ${pgToolVariable(tool)}.`
+        );
+    }
+    const tool = libpqInvocation(opts.connectionString, env);
+
+    const script = execa(restoreBin, buildPgRestoreScriptArgs({ inputFile: opts.inputFile, noOwner: opts.noOwner }), {
+        stdin: "ignore",
+        stdout: "pipe",
+        stderr: opts.inheritStdio ? "inherit" : "ignore",
+        buffer: false,
+        reject: false,
+        env: tool.env
+    });
+    // stdout is the rows of the script's own `SELECT`s (`set_config`,
+    // `setval`), which say nothing. stderr is shown as it arrives and kept, to
+    // tell a lock timeout from anything else.
+    const apply = execa(psqlBin, buildPsqlScriptArgs(tool.connectionString), {
+        stdin: "pipe",
+        stdout: "ignore",
+        stderr: opts.inheritStdio ? ["pipe", "inherit"] : "pipe",
+        reject: false,
+        env: tool.env
+    });
+
+    const sink = apply.stdin;
+    const source = script.stdout;
+    if (!sink || !source) throw new BackupToolError("Could not connect pg_restore to psql.");
+    // psql stops reading at its first error, and the script behind it must not
+    // wait on a pipe nobody drains.
+    sink.on("error", () => undefined);
+    apply.once("exit", () => {
+        source.unpipe(sink);
+        source.resume();
+        script.kill();
+    });
+
+    sink.write(["BEGIN", ...cleanRestorePrelude(opts.objects)].map((statement) => `${statement};\n`).join(""));
+    source.pipe(sink, { end: false });
+
+    const written = await script;
+    const committed = written.exitCode === 0 && sink.writable;
+    sink.end(committed ? "COMMIT;\n" : undefined);
+    const applied = await apply;
+
+    if (applied.exitCode !== 0) {
+        const stderr = typeof applied.stderr === "string" ? applied.stderr : "";
+        throw new CleanRestoreFailed("psql", applied.exitCode, /lock timeout/i.test(stderr));
+    }
+    if (!committed) throw new CleanRestoreFailed("pg_restore", written.exitCode, false);
+}
+
+/**
+ * What `restore --clean` drops that the backup does not hold, so it can say
+ * so before it runs: the tables and views in a schema the backup replaces
+ * whole that it has no copy of, and the views and foreign keys elsewhere that
+ * reference one of the relations it replaces. As `<kind> <name>`.
+ *
+ * None for a database that does not exist yet.
+ */
+export async function findCleanExtras(connectionString: string, objects: DumpObjects): Promise<string[]> {
+    const schemas = objects.schemas.filter((schema) => schema !== "public");
+    if (schemas.length === 0 && objects.relations.length === 0) return [];
+    const { Client } = await import("pg");
+    const client = new Client({ connectionString });
+    try {
+        await client.connect();
+    } catch (err) {
+        // 3D000: the database does not exist yet, as `--create-db` finds it.
+        if (err instanceof Error && "code" in err && err.code === "3D000") return [];
+        throw err;
+    }
+    try {
+        const { rows } = await client.query<{ kind: string; name: string }>(
+            `WITH dumped AS (
+                 SELECT c.oid
+                   FROM pg_class c
+                   JOIN pg_namespace n ON n.oid = c.relnamespace
+                   JOIN unnest($2::text[], $3::text[]) AS d(schema_name, rel_name)
+                     ON d.schema_name = n.nspname AND d.rel_name = c.relname
+             )
+             SELECT kind, name FROM (
+                 SELECT CASE c.relkind WHEN 'v' THEN 'view' WHEN 'm' THEN 'materialized view'
+                                       WHEN 'f' THEN 'foreign table' ELSE 'table' END AS kind,
+                        n.nspname || '.' || c.relname AS name
+                   FROM pg_class c
+                   JOIN pg_namespace n ON n.oid = c.relnamespace
+                  WHERE n.nspname = ANY($1::text[])
+                    AND c.relkind IN ('r', 'p', 'v', 'm', 'f')
+                    AND c.oid NOT IN (SELECT oid FROM dumped)
+                 UNION
+                 SELECT 'view', vn.nspname || '.' || v.relname
+                   FROM pg_depend dep
+                   JOIN pg_rewrite r ON r.oid = dep.objid AND dep.classid = 'pg_rewrite'::regclass
+                   JOIN pg_class v ON v.oid = r.ev_class
+                   JOIN pg_namespace vn ON vn.oid = v.relnamespace
+                  WHERE dep.refobjid IN (SELECT oid FROM dumped)
+                    AND v.oid NOT IN (SELECT oid FROM dumped)
+                    AND NOT vn.nspname = ANY($1::text[])
+                 UNION
+                 SELECT 'foreign key', con.conname || ' on ' || cn.nspname || '.' || cr.relname
+                   FROM pg_constraint con
+                   JOIN pg_class cr ON cr.oid = con.conrelid
+                   JOIN pg_namespace cn ON cn.oid = cr.relnamespace
+                  WHERE con.contype = 'f'
+                    AND con.confrelid IN (SELECT oid FROM dumped)
+                    AND con.conrelid NOT IN (SELECT oid FROM dumped)
+                    AND NOT cn.nspname = ANY($1::text[])
+             ) extra
+             ORDER BY name`,
+            [schemas, objects.relations.map((r) => r.schema), objects.relations.map((r) => r.name)]
+        );
+        return rows.map((row) => `${row.kind} ${row.name}`);
+    } finally {
+        await client.end();
+    }
 }
 
 /** The schemas and tables a dump creates, from `pg_restore --list`. See {@link parseDumpObjects}. */

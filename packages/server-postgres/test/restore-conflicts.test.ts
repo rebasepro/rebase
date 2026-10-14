@@ -8,8 +8,8 @@
  * roles from the backup's sidecar had been applied. The conflict is read from
  * the dump's table of contents and the target's catalogue before anything runs.
  */
-import { parseDumpObjects } from "../src/backup/pg-tools";
-import { describeRestoreConflict } from "../src/backup/backup-cli";
+import { buildPgRestoreScriptArgs, buildPsqlScriptArgs, cleanRestorePrelude, parseDumpObjects } from "../src/backup/pg-tools";
+import { describeCleanExtras, describeCleanRestoreFailure, describeRestoreConflict } from "../src/backup/backup-cli";
 
 jest.mock("execa", () => ({ execa: jest.fn() }));
 
@@ -43,12 +43,33 @@ describe("the objects a dump creates", () => {
                 { schema: "public", table: "Odd Name" },
                 { schema: "public", table: "tags" },
                 { schema: "rebase", table: "users" }
+            ],
+            relations: [
+                { schema: "public", name: "Odd Name" },
+                { schema: "public", name: "tags" },
+                { schema: "public", name: "tags_id_seq" },
+                { schema: "rebase", name: "users" }
             ]
         });
     });
 
+    it("reads views, materialized views and foreign tables as relations, and no entry about one", () => {
+        const list = [
+            "230; 1259 16500 VIEW public recent rebase",
+            "231; 1259 16501 MATERIALIZED VIEW public totals rebase",
+            "232; 1259 16502 FOREIGN TABLE public remote rebase",
+            "3500; 0 16501 MATERIALIZED VIEW DATA public totals rebase",
+            "3501; 0 0 SEQUENCE SET public tags_id_seq rebase"
+        ].join("\n");
+        expect(parseDumpObjects(list).relations).toEqual([
+            { schema: "public", name: "recent" },
+            { schema: "public", name: "totals" },
+            { schema: "public", name: "remote" }
+        ]);
+    });
+
     it("reads nothing from an empty table of contents", () => {
-        expect(parseDumpObjects(";\n; Selected TOC Entries:\n;\n")).toEqual({ schemas: [], tables: [] });
+        expect(parseDumpObjects(";\n; Selected TOC Entries:\n;\n")).toEqual({ schemas: [], tables: [], relations: [] });
     });
 });
 
@@ -67,5 +88,64 @@ describe("the refusal", () => {
     it("counts what it does not list", () => {
         const many = Array.from({ length: 8 }, (_, i) => `table public.t${i}`);
         expect(describeRestoreConflict("shop", "x.dump", many).message).toMatch(/table public\.t4, and 3 more, which/);
+    });
+});
+
+describe("restore --clean", () => {
+    const objects = parseDumpObjects(LIST);
+
+    it("drops the backup's schemas whole, and its tables in schemas it does not create, with CASCADE", () => {
+        expect(cleanRestorePrelude(objects)).toEqual([
+            "SET client_min_messages = warning",
+            "SET lock_timeout = '15s'",
+            "DROP SCHEMA IF EXISTS \"rebase\" CASCADE",
+            "DROP TABLE IF EXISTS \"public\".\"Odd Name\" CASCADE",
+            "DROP TABLE IF EXISTS \"public\".\"tags\" CASCADE"
+        ]);
+    });
+
+    it("never drops public itself", () => {
+        const withPublic = { ...objects, schemas: ["public", ...objects.schemas] };
+        expect(cleanRestorePrelude(withPublic).filter(statement => statement.includes("SCHEMA"))).toEqual([
+            "DROP SCHEMA IF EXISTS \"rebase\" CASCADE"
+        ]);
+    });
+
+    it("has pg_restore write the script and psql run it, stopping at the first error", () => {
+        expect(buildPgRestoreScriptArgs({ inputFile: "/b/x.dump", noOwner: true }))
+            .toEqual(["--format=custom", "--clean", "--if-exists", "--no-owner", "--file=-", "/b/x.dump"]);
+        const psql = buildPsqlScriptArgs("postgres://u@h/shop");
+        expect(psql).toEqual(expect.arrayContaining(["-X", "-v", "ON_ERROR_STOP=1", "--file=-", "--dbname=postgres://u@h/shop"]));
+        // The transaction is the script's own, so it can end without a COMMIT.
+        expect(psql).not.toContain("--single-transaction");
+        expect(psql).not.toContain("-1");
+    });
+
+    it("names what it drops that the backup does not hold, and counts past ten", () => {
+        expect(describeCleanExtras(["rebase"], ["table rebase.atlas_schema_revisions"])).toEqual([
+            "--clean replaces schema rebase whole, so it also drops what this backup does not hold:",
+            "  table rebase.atlas_schema_revisions"
+        ]);
+        expect(describeCleanExtras(["rebase"], [])).toEqual([]);
+        const many = Array.from({ length: 12 }, (_, i) => `table rebase.t${i}`);
+        expect(describeCleanExtras(["rebase", "audit"], many).at(-1)).toBe("  and 2 more");
+        expect(describeCleanExtras(["rebase", "audit"], many)[0]).toMatch(/^--clean replaces schemas rebase, audit whole/);
+    });
+
+    it("says a restore that stopped changed nothing, and why", () => {
+        const failed = describeCleanRestoreFailure("shop", { tool: "psql", lockTimeout: false }, 0);
+        expect(failed.message).toBe(
+            "Nothing was restored or changed: the restore ran as one transaction, and it was rolled back when a statement failed (above). " +
+            "\"shop\" holds what it held before."
+        );
+        expect(failed.hint).toBeUndefined();
+
+        const locked = describeCleanRestoreFailure("shop", { tool: "psql", lockTimeout: true }, 3);
+        expect(locked.message).toMatch(/it waited too long for a lock on "shop"/);
+        expect(locked.hint).toMatch(/usually a `rebase dev` serving from it/);
+        expect(locked.hint).toMatch(/The 3 cluster role\(s\) recreated from the backup's sidecar before it stay\./);
+
+        expect(describeCleanRestoreFailure("shop", { tool: "pg_restore", lockTimeout: false }, 0).message)
+            .toMatch(/pg_restore could not read the whole backup/);
     });
 });
