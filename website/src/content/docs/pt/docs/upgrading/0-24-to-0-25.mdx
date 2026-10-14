@@ -1,5 +1,5 @@
 ---
-sourceHash: b34dc9a5e8d1be27
+sourceHash: 5fe43cc6af8d171f
 slug: pt/docs/upgrading/0-24-to-0-25
 title: Atualizando da versão 0.24 para a 0.25
 sidebar_label: 0.24 → 0.25
@@ -20,6 +20,14 @@ da sessão, a política de senhas em uma senha escolhida por um administrador e
 uma string vazia em um campo obrigatório. Em seguida, três remoções: duas exportações do cliente
 que eram apenas mecanismos internos, um hook do painel de administração que nada necessita e uma opção de armazenamento que
 não chegava a nenhum cliente. A última é a fonte de armazenamento padrão, que declarar um bucket nomeado não move mais.
+
+:::tip[Depois de atualizar, reinicie o banco de dados gerenciado]
+O banco de dados de desenvolvimento gerenciado sobrevive ao `rebase dev`, então um
+que a 0.24 iniciou mantém o proxy de conexões da 0.24 e, com ele, um bug que a 0.25
+corrige: ao lado de um `rebase dev` em execução, uma instrução que falhou podia
+deixar a consulta seguinte dessa conexão sem linhas. Execute `rebase db stop` uma
+vez depois da atualização; o próximo comando o inicia de novo com a 0.25.
+:::
 
 :::note[Comportamentos alterados e nomes obsoletos]
 A versão 0.25 também altera o funcionamento de algumas chamadas existentes, sem quebrá-las. Verifique

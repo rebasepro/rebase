@@ -1,5 +1,5 @@
 ---
-sourceHash: b34dc9a5e8d1be27
+sourceHash: 5fe43cc6af8d171f
 slug: it/docs/upgrading/0-24-to-0-25
 title: Aggiornamento da 0.24 a 0.25
 sidebar_label: 0.24 → 0.25
@@ -11,6 +11,14 @@ description: I breaking change introdotti da 0.25 per un'app su 0.24 — lo swit
 Queste sono le voci `### Breaking` che la versione 0.25 introduce per un'applicazione su 0.24.
 
 Le prime tre derivano dal lavoro sulle prestazioni: lo switch per il conteggio negli elenchi REST, l'elenco delle collezioni MCP e le traduzioni del pannello admin. Il resto proviene dalla revisione del backlog: rifiuti più severi all'avvio e su `OPTIONS`, il percorso cron e le letture offline dell'SDK, il registro delle sorgenti di storage, proprietà inutilizzate della UI kit, l'upsert sulla collezione utenti, una lettura che specifica sia `page` che `offset`, e i nomi predefiniti delle policy su tabelle con nomi lunghi. Le ultime tre sono decisioni di prodotto: la durata predefinita della sessione, la password policy sulle password scelte dall'amministratore e la stringa vuota su un campo obbligatorio. Seguono tre rimozioni: due export del client che fungevano solo da motori interni, un hook admin non necessario e un'opzione di storage mai esposta a nessun client. L'ultima è la sorgente di storage predefinita, che dichiarare un bucket con nome non sposta più.
+
+:::tip[Dopo l'aggiornamento, riavvia il database gestito]
+Il database di sviluppo gestito sopravvive a `rebase dev`, quindi uno avviato dalla
+0.24 mantiene il proxy di connessione della 0.24 e, con esso, un bug che la 0.25
+corregge: accanto a un `rebase dev` in esecuzione, un'istruzione fallita poteva far
+rispondere senza righe la query successiva su quella connessione. Esegui una volta
+`rebase db stop` dopo l'aggiornamento; il comando successivo lo riavvia con la 0.25.
+:::
 
 :::note[Comportamenti modificati e nomi deprecati]
 La versione 0.25 modifica anche il comportamento di alcune chiamate esistenti, senza renderle incompatibili. Verifica questi aspetti se la tua app fa affidamento sul vecchio comportamento:

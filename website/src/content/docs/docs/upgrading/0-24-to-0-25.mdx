@@ -21,6 +21,14 @@ that were only engines, an admin hook nothing needs, and a storage option that
 reached no client. The last is the default storage source, which declaring a
 named bucket no longer moves.
 
+:::tip[After upgrading, restart the managed database]
+The managed development database outlives `rebase dev`, so one that 0.24 started
+keeps 0.24's connection proxy, and with it a bug 0.25 fixes: beside a running
+`rebase dev`, a failed statement could leave the next query on that connection
+answering no rows. Run `rebase db stop` once after the upgrade; the next command
+starts it again with 0.25.
+:::
+
 :::note[Changed behaviour and deprecated names]
 0.25 also changes what a few existing calls do, without breaking them. Check
 these if your app relies on the old behaviour:

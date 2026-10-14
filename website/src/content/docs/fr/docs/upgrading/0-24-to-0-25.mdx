@@ -1,5 +1,5 @@
 ---
-sourceHash: b34dc9a5e8d1be27
+sourceHash: 5fe43cc6af8d171f
 slug: fr/docs/upgrading/0-24-to-0-25
 title: Mise à niveau de 0.24 à 0.25
 sidebar_label: 0.24 → 0.25
@@ -11,6 +11,14 @@ description: Les changements cassants apportés par la version 0.25 pour une app
 Voici les entrées `### Breaking` qu'apporte la version 0.25 pour une application sous 0.24.
 
 Les trois premières découlent des travaux d'optimisation des performances : le commutateur count sur les listes REST, le listing des collections MCP et les traductions de l'interface d'administration. Le reste provient du nettoyage du backlog : des refus plus stricts au démarrage et sur `OPTIONS`, le chemin cron et les lectures hors ligne du SDK, le registre des sources de stockage, les props inutilisées du kit d'interface utilisateur, l'upsert sur la collection des utilisateurs, une lecture spécifiant à la fois `page` et `offset`, ainsi que les noms de stratégie par défaut sur les tables longues. Les trois dernières sont des décisions produit : la durée de session par défaut, la politique de mot de passe sur un mot de passe choisi par un administrateur, et une chaîne vide sur un champ obligatoire. Trois suppressions suivent : deux exports client qui n'étaient que des moteurs internes, un hook admin dont rien n'a besoin, et une option de stockage qui n'atteignait aucun client. La dernière est la source de stockage par défaut, que la déclaration d'un bucket nommé ne déplace plus.
+
+:::tip[Après la mise à jour, redémarrez la base de données gérée]
+La base de données de développement gérée survit à `rebase dev` : une base démarrée
+par la 0.24 garde le proxy de connexions de la 0.24 et, avec lui, un bug que la
+0.25 corrige : à côté d'un `rebase dev` en cours, une instruction en échec pouvait
+laisser la requête suivante de cette connexion sans aucune ligne. Lancez une fois
+`rebase db stop` après la mise à jour ; la commande suivante la redémarre avec la 0.25.
+:::
 
 :::note[Comportements modifiés et noms obsolètes]
 La version 0.25 modifie également le comportement de quelques appels existants, sans toutefois les casser. Vérifiez ces points si votre application dépend de l'ancien comportement :

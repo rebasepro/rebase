@@ -1,5 +1,5 @@
 ---
-sourceHash: b34dc9a5e8d1be27
+sourceHash: 5fe43cc6af8d171f
 slug: de/docs/upgrading/0-24-to-0-25
 title: Upgrade von 0.24 auf 0.25
 sidebar_label: 0.24 → 0.25
@@ -21,6 +21,14 @@ und ein leerer String in einem Pflichtfeld. Danach folgen drei Entfernungen: zwe
 die lediglich Engines waren, ein Admin-Hook, der nicht benötigt wird, und eine Storage-Option,
 die keinen Client erreichte. Die letzte ist die Standard-Storage-Quelle, die das Deklarieren
 eines benannten Buckets nicht mehr verschiebt.
+
+:::tip[Nach dem Upgrade die verwaltete Datenbank neu starten]
+Die verwaltete Entwicklungsdatenbank überdauert `rebase dev`, daher behält eine von
+0.24 gestartete den Verbindungs-Proxy von 0.24 und damit einen Fehler, den 0.25
+behebt: Neben einem laufenden `rebase dev` konnte eine fehlgeschlagene Anweisung
+die nächste Abfrage dieser Verbindung ohne Zeilen antworten lassen. Führen Sie nach
+dem Upgrade einmal `rebase db stop` aus; der nächste Befehl startet sie mit 0.25 neu.
+:::
 
 :::note[Geändertes Verhalten und veraltete Namen]
 0.25 ändert außerdem die Funktionsweise einiger bestehender Aufrufe, ohne diese zu brechen.

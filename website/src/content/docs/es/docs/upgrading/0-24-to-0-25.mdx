@@ -1,5 +1,5 @@
 ---
-sourceHash: b34dc9a5e8d1be27
+sourceHash: 5fe43cc6af8d171f
 slug: es/docs/upgrading/0-24-to-0-25
 title: Actualización de 0.24 a 0.25
 sidebar_label: 0.24 → 0.25
@@ -21,6 +21,14 @@ una cadena vacía en un campo obligatorio. Le siguen tres eliminaciones: dos exp
 que solo eran motores internos, un hook del admin que nada necesita y una opción de almacenamiento que
 no llegaba a ningún cliente. La última es el origen de almacenamiento predeterminado,
 que declarar un bucket con nombre ya no mueve.
+
+:::tip[Tras actualizar, reinicie la base de datos gestionada]
+La base de datos de desarrollo gestionada sobrevive a `rebase dev`, así que una que
+arrancó 0.24 conserva el proxy de conexiones de 0.24 y, con él, un fallo que 0.25
+corrige: junto a un `rebase dev` en marcha, una sentencia fallida podía dejar la
+siguiente consulta de esa conexión sin filas. Ejecute `rebase db stop` una vez tras
+la actualización; el siguiente comando la vuelve a arrancar con 0.25.
+:::
 
 :::note[Comportamiento modificado y nombres obsoletos]
 0.25 también cambia lo que hacen algunas llamadas existentes, sin romper la compatibilidad. Revisa
