@@ -48,15 +48,42 @@ export const GLOBAL_COMMAND_FLAGS = {
 } as const;
 
 /**
- * The declared long flag an undeclared one was probably meant to be, from
- * `arg`'s `unknown or unexpected option: --form`: one edit or one swap away
- * (`--from`), the way the driver's flag check and `db backup` answer a typo.
+ * The declared long flag an undeclared one was probably meant to be: one edit
+ * or one swap away (`--form` → `--from`), or an abbreviation of exactly one
+ * (`--anon` → `--anonymize`).
  */
-function closestDeclaredFlag(argMessage: string, declared: readonly string[]): string | undefined {
-    const typed = /option: (--[^\s=]+)/.exec(argMessage)?.[1];
-    if (!typed) return undefined;
+function closestDeclaredFlag(typed: string, declared: readonly string[]): string | undefined {
+    if (!typed.startsWith("--")) return undefined;
     const near = suggestCommand(typed.slice(2), declared.filter(flag => flag.startsWith("--")).map(flag => flag.slice(2)));
     return near ? `--${near}` : undefined;
+}
+
+/** Past this many, a refusal names the help page rather than listing every flag. */
+const LISTED_FLAGS_MAX = 8;
+
+/**
+ * The sentence an undeclared flag is refused with — the one `db backup`,
+ * `db restore` and `db branch` say, so one CLI answers a typo one way:
+ *
+ *     `rebase db pull` has no option --anonymise — did you mean --anonymize?
+ *     Nothing was run. See `rebase db pull --help`.
+ *
+ * With nothing close it lists what the command takes, when that list is short
+ * enough to read.
+ *
+ * Exported for the commands that refuse a flag outside `parseCommandArgs`.
+ */
+export function unknownOptionMessage(command: string, typed: string, spec: Readonly<Record<string, unknown>>): string {
+    const declared = Object.keys({ ...GLOBAL_COMMAND_FLAGS, ...spec });
+    const near = closestDeclaredFlag(typed, declared);
+    const own = Object.keys(spec).filter(flag => flag.startsWith("--") && !(flag in GLOBAL_COMMAND_FLAGS));
+    const takes = near
+        ? ` — did you mean ${near}?`
+        : own.length === 0
+            ? " — it takes no options."
+            : own.length <= LISTED_FLAGS_MAX ? ` — it takes ${own.join(", ")}.` : ".";
+
+    return `\`rebase ${command}\` has no option ${typed}${takes} Nothing was run. See \`rebase ${command} --help\`.`;
 }
 
 export interface ParsedCommand<S extends arg.Spec> {
@@ -132,10 +159,9 @@ export function parseCommandArgs<S extends arg.Spec>({
         parsed = arg(merged, { argv: rawArgs.slice(2) }) as arg.Result<S> & { "--help"?: boolean };
     } catch (err) {
         if (err instanceof Error && (err as arg.ArgError).code === "ARG_UNKNOWN_OPTION") {
-            const near = closestDeclaredFlag(err.message, Object.keys({ ...GLOBAL_COMMAND_FLAGS, ...spec }));
-            throw new UsageError(
-                `${err.message}${near ? ` (did you mean ${near}?)` : ""} — run \`rebase ${command} --help\` for the options it takes.`
-            );
+            // arg's wording: `unknown or unexpected option: --form`.
+            const typed = /option: (\S+)$/.exec(err.message)?.[1] ?? err.message;
+            throw new UsageError(unknownOptionMessage(command, typed.split("=")[0], spec));
         }
         throw err;
     }

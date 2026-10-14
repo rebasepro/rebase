@@ -114,7 +114,7 @@ describe("what `rebase build` does with each runtime", () => {
     it("refuses a flag nobody declared instead of building anyway", async () => {
         manifest("managed");
         await expect(buildCommand(["node", "rebase", "build", "--skip-typecheck"]))
-            .rejects.toThrow(/unknown or unexpected option/);
+            .rejects.toThrow(/has no option --/);
         expect(buildBundle).not.toHaveBeenCalled();
     });
 

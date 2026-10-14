@@ -257,7 +257,7 @@ describe("rebase eject", () => {
         // silence and the command went ahead and rewrote the project.
         manifestWith("managed");
 
-        await expect(run("--dry")).rejects.toThrow(/unknown or unexpected option/);
+        await expect(run("--dry")).rejects.toThrow(/has no option --dry/);
         expect(fs.existsSync(path.join(scratch, "backend/src/index.ts"))).toBe(false);
         expect(loadManifest(scratch).manifest.apps.backend).toMatchObject({ runtime: "managed" });
     });

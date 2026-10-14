@@ -271,7 +271,7 @@ output: "./out" })
      */
     it("rejects a misspelled flag instead of writing to the default path", async () => {
         await expect(entry(["node", "rebase", "generate-sdk", "--ouput", "./sdk"]))
-            .rejects.toThrow(/unknown or unexpected option: --ouput/);
+            .rejects.toThrow(/has no option --ouput — did you mean --output\?/);
         expect(generateSdkCommand).not.toHaveBeenCalled();
     });
 

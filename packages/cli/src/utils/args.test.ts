@@ -47,18 +47,28 @@ describe("parseCommandArgs", () => {
         expect(() => parse("auth", "reset-password", "bob@example.com", "--debug"))
             .not.toThrow();
         expect(() => parse("auth", "reset-password", "bob@example.com", "--nope"))
-            .toThrow(/unknown or unexpected option/);
+            .toThrow(/has no option --nope/);
     });
 
-    it("names the declared flag a typo is closest to", () => {
+    /**
+     * One sentence for a typo, the one `db backup`, `db restore` and `db
+     * branch` say. This family said `unknown or unexpected option: --x (did
+     * you mean --y?) — run …`, so the same mistake read two ways depending on
+     * which half of the CLI caught it.
+     */
+    it("names the declared flag a typo is closest to, in the sentence db backup says", () => {
         expect(() => parse("auth", "reset-password", "--emial", "bob@example.com"))
-            .toThrow("unknown or unexpected option: --emial (did you mean --email?) — run `rebase auth reset-password --help` for the options it takes.");
+            .toThrow("`rebase auth reset-password` has no option --emial — did you mean --email? Nothing was run. See `rebase auth reset-password --help`.");
         // `--debug` and `--help` are declared on every command, so they are
         // offered too.
         expect(() => parse("auth", "reset-password", "--hepl")).toThrow(/did you mean --help\?/);
-        // Nothing close: no guess, only the help.
+        // Nothing close: no guess, and what it does take.
         expect(() => parse("auth", "reset-password", "--frobnicate"))
-            .toThrow("unknown or unexpected option: --frobnicate — run `rebase auth reset-password --help` for the options it takes.");
+            .toThrow("`rebase auth reset-password` has no option --frobnicate — it takes --email, --password. Nothing was run. See `rebase auth reset-password --help`.");
+        // An abbreviation of exactly one flag is offered too.
+        expect(() => parse("auth", "reset-password", "--pass")).toThrow(/did you mean --password\?/);
+        // A value given inline is not part of the flag's name.
+        expect(() => parse("auth", "reset-password", "--emial=bob@example.com")).toThrow(/has no option --emial — /);
     });
 
     it("names the command's help in the error, so the flag can be looked up", () => {

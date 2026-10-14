@@ -122,7 +122,7 @@ describe("resolveResetPasswordArgs", () => {
 
     it("refuses a flag nobody declared rather than resetting the account to it", () => {
         expect(() => resolveResetPasswordArgs(line("bob@example.com", "--force")))
-            .toThrow(/unknown or unexpected option/);
+            .toThrow(/has no option --/);
     });
 
     it("is not shifted by a flag placed before the command", () => {

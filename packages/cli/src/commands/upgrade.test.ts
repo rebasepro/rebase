@@ -293,7 +293,7 @@ describe("rebase upgrade, for a person", () => {
     it("rejects an unknown flag before touching anything", async () => {
         project();
         const before = read("package.json");
-        await expect(upgradeCommand(["node", "rebase", "upgrade", "--frobnicate"], io())).rejects.toThrow(/unknown or unexpected option/i);
+        await expect(upgradeCommand(["node", "rebase", "upgrade", "--frobnicate"], io())).rejects.toThrow(/has no option --frobnicate/);
         expect(read("package.json")).toBe(before);
     });
 

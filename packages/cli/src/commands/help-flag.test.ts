@@ -269,7 +269,7 @@ describe("a flag nobody declared is refused", () => {
      * hands a script a bare string it will try to parse as JSON.
      */
     it.each([["--bogus"], ["--json"], ["--verbose"]])("rebase db url %s", async (flag) => {
-        await expect(dbCommand("url", argv("db", "url", flag))).rejects.toThrow(/unknown or unexpected option/i);
+        await expect(dbCommand("url", argv("db", "url", flag))).rejects.toThrow(/has no option --/);
 
         // Refused before anything is started, not after.
         expect(prepareSpy).not.toHaveBeenCalled();
@@ -352,7 +352,7 @@ describe("rebase skills rejects an unknown flag before writing anything", () => 
     it("refuses --frobnicate and writes no file", async () => {
         await expect(
             skillsCommand("install", argv("skills", "install", "--frobnicate", "--agent", "claude"))
-        ).rejects.toThrow(/unknown or unexpected option/i);
+        ).rejects.toThrow(/has no option --/);
 
         expect(filesUnder(path.join(scratch, ".claude"))).toEqual([]);
     });

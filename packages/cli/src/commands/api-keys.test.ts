@@ -94,7 +94,7 @@ describe("resolveRevokeKeyArgs", () => {
 
     it("refuses an undeclared flag rather than sending a DELETE for it", () => {
         expect(() => resolveRevokeKeyArgs(argv("api-keys", "revoke", "--foo")))
-            .toThrow(/unknown or unexpected option/);
+            .toThrow(/has no option --/);
     });
 
     it("does not take --debug for the key to revoke", () => {
@@ -140,7 +140,7 @@ describe("resolveCreateKeyArgs", () => {
         // `--debug` is consumed as the global flag, so there is no name at all —
         // and no key is minted without one.
         expect(() => create("--debug", "--full-access")).toThrow(/needs a name/);
-        expect(() => create("--foo", "--full-access")).toThrow(/unknown or unexpected option/);
+        expect(() => create("--foo", "--full-access")).toThrow(/has no option --/);
     });
 
     it("names the flag a typo was one swap away from", () => {
