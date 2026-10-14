@@ -264,7 +264,8 @@ entier chaque schéma que la sauvegarde crée (`rebase`, par exemple), et chaque
 sauvegarde crée dans un schéma qu'elle ne crée pas (`public`), avec `CASCADE`, puis restaure le
 dump dans la même transaction. Avant de demander confirmation, elle nomme ce que cela supprime et
 que la sauvegarde ne contient pas, comme `rebase.atlas_schema_revisions` issue de
-`rebase db migrate`, ou une vue ou une clé étrangère ailleurs qui référence l'une des tables de la
+`rebase db migrate`, une fonction, un type ou une séquence dans un schéma remplacé, ou une vue ou une
+clé étrangère ailleurs qui référence l'une des tables de la
 sauvegarde. Une restauration qui s'arrête à n'importe quel moment est annulée, et elle indique que
 la base de données contient ce qu'elle contenait auparavant. Elle fait passer le dump par `psql`,
 qui est fourni avec `pg_restore` (`PSQL_PATH` en désigne un autre), et attend au plus

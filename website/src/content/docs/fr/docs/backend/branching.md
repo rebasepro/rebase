@@ -63,7 +63,11 @@ Cannot create branch: the source database "leadgen" has active connections.
 <span class="since-badge" data-since="0.25">Depuis 0.25</span> `create --force`
 ferme aussi la source aux nouvelles connexions pendant la copie
 (`ALTER DATABASE … ALLOW_CONNECTIONS false`, exécuté depuis la base de données `postgres`
-du serveur) et la rouvre ensuite, y compris en cas d'échec et de Ctrl-C. Un client
+du serveur) et la rouvre ensuite : en cas d'échec, et sur tout signal qu'elle peut
+intercepter (fermeture du terminal, Ctrl-C, SIGTERM, SIGQUIT). Tuée net (SIGKILL), elle laisse la
+source fermée jusqu'à la prochaine commande `rebase db branch`, quelle qu'elle soit, qui la rouvre
+d'abord et le signale ; `ALTER DATABASE "<db>" ALLOW_CONNECTIONS true`, exécuté depuis la base de
+données `postgres`, fait la même chose à la main. Un client
 qui se reconnecte dès qu'il est déconnecté, comme le fait un `rebase dev` en cours d'exécution,
 ne peut alors plus se glisser à nouveau avant le début de la copie. Cela exige les droits du
 propriétaire de la source ; sans eux, et pour `delete`, `--force` déconnecte les sessions jusqu'à
