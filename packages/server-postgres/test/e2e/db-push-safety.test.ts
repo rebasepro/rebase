@@ -183,6 +183,10 @@ describe("db push destructive-change gate E2E", () => {
         const allowed = await runPush(["--allow-destructive"]);
         expect(allowed.exitCode).toBe(0);
         expect(await noteColumnExists()).toBe(false);
+        // Atlas's report shows the statement it applies once: the plan it
+        // prints before applying is the one the push already listed.
+        expect(allowed.all?.match(/->\s+ALTER TABLE "public"\."tasks" DROP COLUMN "note"/g) ?? []).toHaveLength(1);
+        expect(allowed.all).toMatch(/Applying approved migration/);
     }, 150_000);
 
     /**

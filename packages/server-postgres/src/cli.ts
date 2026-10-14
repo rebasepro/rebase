@@ -64,6 +64,7 @@ import type { ExistingConstraint } from "./schema/undeclarable-constraints";
 import { finishNewMigration } from "./schema/migration-post-process";
 import { acceptsExcludeFlag, buildAtlasArgs, migrateApplyArgs, readsRevisions, takesDevUrl } from "./schema/atlas-argv";
 import { ensureAtlasRevisionsTable } from "./schema/atlas-revisions";
+import { createApplyReportFilter } from "./schema/atlas-apply-report";
 import { nextStepAfterDbGenerate } from "./schema/generate-next-step";
 import { CommandStopped, ScratchDatabase } from "./cli-scratch-database";
 import { describeBaselinePlan, latestRecordedMigration, planBaseline } from "./schema/migrate-baseline";
@@ -871,7 +872,7 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
                 // rebuild below entirely, so a failed apply left the search
                 // columns it had just dropped dropped.
                 atlasApply: async () => {
-                    await runAtlas("schema", ["apply", "--to", DESIRED_STATE_URL, "--auto-approve"], collectionsPath, { throwOnFailure: true });
+                    await runAtlas("schema", ["apply", "--to", DESIRED_STATE_URL, "--auto-approve"], collectionsPath, { throwOnFailure: true, omitPlanEcho: true });
                 },
                 reportSynced: () => out("Schema is synced, no changes to be made"),
                 rebuildAfterFailure: async () => {
@@ -1740,6 +1741,12 @@ async function runAtlas(
          * `alreadyReported`: everything worth saying is on stderr already.
          */
         throwOnFailure?: boolean;
+        /**
+         * Show the apply's report without the plan Atlas prints before it —
+         * see `schema/atlas-apply-report.ts`. For the apply a push has already
+         * planned, which otherwise shows each statement twice.
+         */
+        omitPlanEcho?: boolean;
     } = {}
 ): Promise<string> {
     const atlasBin = resolveLocalBin("atlas");
@@ -1956,7 +1963,7 @@ async function runAtlas(
     // for the destructive-change dry-run), pipe stdout and collect it instead.
     const subprocess = execa(atlasBin, atlasArgs, {
         cwd: process.cwd(),
-        stdout: opts.captureStdout ? "pipe" : "inherit",
+        stdout: opts.captureStdout || opts.omitPlanEcho ? "pipe" : "inherit",
         stderr: "pipe",
         env
     });
@@ -1965,6 +1972,10 @@ async function runAtlas(
         subprocess.stdout?.on("data", (chunk: Buffer) => {
             stdoutText += chunk.toString();
         });
+    } else if (opts.omitPlanEcho) {
+        const report = createApplyReportFilter();
+        subprocess.stdout?.on("data", (chunk: Buffer) => process.stdout.write(report.push(chunk.toString())));
+        subprocess.stdout?.on("end", () => process.stdout.write(report.flush()));
     }
     let stderrText = "";
     subprocess.stderr?.on("data", (chunk: Buffer) => {
