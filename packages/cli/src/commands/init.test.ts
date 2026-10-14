@@ -1526,6 +1526,30 @@ runtime: "managed" });
         expect(pkg.workspaces).toEqual(["backend", "config"]);
     });
 
+    /**
+     * `rebase db push`, `db generate` and `db migrate` run the driver with
+     * `cwd: backend/` and need the `atlas` binary from that workspace's
+     * `node_modules/.bin`. The overlay ships `"db:migrate": "rebase db migrate"`,
+     * and `init --headless --introspect` ends on "You can now run `rebase db
+     * generate`", yet its backend did not install Atlas: both failed on "The
+     * atlas binary is missing", and the printed fix failed at the project root.
+     */
+    it.each([
+        ["template", TEMPLATE_DIR],
+        ["baas overlay", overlay]
+    ])("%s: every db script it ships can find atlas in the backend", (_name, root) => {
+        const pkg = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8"));
+        const backend = JSON.parse(fs.readFileSync(path.join(root, "backend", "package.json"), "utf8"));
+        const shipped = JSON.parse(fs.readFileSync(path.join(TEMPLATE_DIR, "backend", "package.json"), "utf8"));
+
+        const atlasScripts = Object.values<string>(pkg.scripts ?? {}).filter(script => /\brebase db (push|generate|migrate)\b/.test(script));
+        expect(atlasScripts.length).toBeGreaterThan(0);
+        // The same range the CMS backend ships, so `rebase upgrade` and the
+        // template gates see one Atlas, not two.
+        expect(backend.dependencies?.["@ariga/atlas"]).toBe(shipped.dependencies["@ariga/atlas"]);
+        expect(pkg.pnpm?.onlyBuiltDependencies).toContain("@ariga/atlas");
+    });
+
     it("declares no UI packages anywhere", () => {
         const pkg = JSON.parse(fs.readFileSync(path.join(overlay, "package.json"), "utf8"));
         const backend = JSON.parse(fs.readFileSync(path.join(overlay, "backend", "package.json"), "utf8"));
