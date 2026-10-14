@@ -749,9 +749,15 @@ async function manageLocalDatabase(
     const nothingHere = (): string => {
         const kind = devDatabaseKind(projectRoot);
         const verb = subcommand === "stop" ? "was not running" : "does not exist";
-        if (kind && kind !== "managed") {
+        if (kind === "docker") {
+            // The compose `db` service: the project names no DATABASE_URL for it.
             return `  The managed development database (PGlite) ${verb}; `
-                + `this project uses its own DATABASE_URL, which is untouched.`;
+                + "this project is on Postgres in Docker, which is untouched."
+                + (subcommand === "stop" ? " `docker compose stop db` stops it." : "");
+        }
+        if (kind === "external") {
+            return `  The managed development database (PGlite) ${verb}; `
+                + "this project uses its own DATABASE_URL, which is untouched.";
         }
 
         return subcommand === "stop"

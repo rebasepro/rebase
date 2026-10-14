@@ -90,3 +90,16 @@ describe.each(["stop", "reset"] as const)("db %s on a project on the managed dat
         expect(printed()).not.toContain("untouched");
     });
 });
+
+// The compose database is not a DATABASE_URL the project names: a project on
+// it has none, and "its own DATABASE_URL" sent the reader looking for one.
+describe.each(["stop", "reset"] as const)("db %s on a project on Postgres in Docker", subcommand => {
+    it("says the Docker database was left alone, and names no DATABASE_URL", async () => {
+        kind = "docker";
+        await dbCommand(subcommand, argv("db", subcommand));
+
+        expect(printed()).toContain("managed development database (PGlite)");
+        expect(printed()).toContain("Postgres in Docker");
+        expect(printed()).not.toContain("DATABASE_URL");
+    });
+});
