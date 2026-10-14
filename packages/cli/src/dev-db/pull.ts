@@ -640,6 +640,16 @@ export function describeDumpFailure(source: string, run: RestoreRun): string[] {
             "Check the user and password in --from."
         ]);
     }
+    // The server answered and has no database of that name: a typo in
+    // --from, usually, or a database not created yet.
+    const missing = /database "([^"]+)" does not exist/i.exec(stderr)?.[1];
+    if (missing) {
+        return banner(`Database "${missing}" does not exist at ${host}`, said, [
+            "That is the database --from names, which the pull reads.",
+            NOTHING_CHANGED,
+            "Check the database name in --from."
+        ]);
+    }
 
     const versions = /server version mismatch/i.test(stderr)
         ? ["pg_dump is older than the server: install client tools at least as new as it (`brew install libpq`)."]

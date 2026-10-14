@@ -524,6 +524,26 @@ describe("describeDumpFailure", () => {
         expect(text).not.toContain("s3cret");
     });
 
+    /**
+     * The third way a `--from` can be wrong, and the one that was left raw:
+     * `pg_dump: error: … database "nodb" does not exist` and then a ✗ line,
+     * where the unreachable and wrong-password cases had their banner.
+     */
+    it("says the database --from names does not exist, in the banner", () => {
+        const lines = describeDumpFailure(source, {
+            exitCode: 1,
+            stderr: "pg_dump: error: connection to server at \"db.example.com\" (10.0.0.5), port 6543 failed: FATAL:  database \"nodb\" does not exist\n"
+        });
+        const text = lines.join("\n");
+
+        expect(text).toContain("Database \"nodb\" does not exist at db.example.com:6543");
+        expect(text).toContain("Check the database name in --from");
+        expect(text).toContain("Nothing was changed");
+        expect(text).not.toContain("Authentication failed");
+        expect(lines.some(line => line.startsWith("pg_dump: error:"))).toBe(false);
+        expect(lines.some(line => line.startsWith("✗"))).toBe(false);
+    });
+
     it("keeps pg_dump's own words for anything else, and says what to do about a version mismatch", () => {
         const lines = describeDumpFailure(source, {
             exitCode: 1,
