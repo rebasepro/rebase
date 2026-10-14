@@ -1242,6 +1242,15 @@
   on unchanged. Before, only the last plugin that returned a wrapper
   rendered.
 
+- **Every neutral in the theme sits on the brand hue.** `@rebasepro/ui`'s
+  `theme.css` re-hues the surface ladder, the six text tokens and the numbered
+  and slate scales to the brand blue's hue (oklch, hue 258, chroma 0.002–0.014),
+  each at the lightness it had, so contrast and the ladder's steps do not move.
+  It adds a `--color-graphite` ramp and points Tailwind's `zinc`, `neutral`,
+  `gray` and `stone` palettes at it, so a `bg-zinc-*` in your own code lands on
+  the same hue. Light secondary text rises to 4.85:1 on the frame (it was 4.17,
+  under AA), and dark disabled text clears 4.6:1 on a card.
+
 #### Studio
 
 - **The SQL console keeps at most 10,000 rows, or 32 MB of values, of a
