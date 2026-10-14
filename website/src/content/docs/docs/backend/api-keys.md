@@ -329,7 +329,12 @@ personal key, its `owner_uid`.
 
 The CLI covers service keys: `rebase api-keys list`, `get`, `create`, `revoke`,
 and `scopes`, which lists every scope the backend knows. See the
-[CLI reference](/docs/cli/#rebase-api-keys).
+[CLI reference](/docs/cli/#rebase-api-keys). It authenticates with
+`REBASE_SERVICE_KEY` from `.env`, and sends it only to the server `rebase dev`
+is running for this project, so with that server stopped it sends nothing. For
+a server run another way, such as `rebase start` or a container, set
+`REBASE_BASE_URL` to its address
+([the CLI's own environment](/docs/getting-started/configuration/#the-clis-own-environment)).
 
 ## Keys made before scopes
 

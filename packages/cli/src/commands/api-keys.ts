@@ -146,7 +146,12 @@ type ProjectClient = ReturnType<typeof createRebaseClient>;
 interface Connection {
     client: ProjectClient;
     baseUrl: string;
+    /** The variable the service key was read from, for a hint that names it. */
+    keyVariable: ServiceKeyVariable;
 }
+
+/** Where a service key is read from: the name a scaffold writes, or the older one. */
+type ServiceKeyVariable = "REBASE_SERVICE_KEY" | "SERVICE_KEY";
 
 /**
  * An SDK client for this project's backend, holding the service key.
@@ -158,10 +163,11 @@ interface Connection {
 function connect(): Connection {
     const projectRoot = requireProjectRoot();
     const env = loadEnv(projectRoot);
-    const serviceKey = env.SERVICE_KEY || env.REBASE_SERVICE_KEY;
+    const keyVariable: ServiceKeyVariable = env.SERVICE_KEY ? "SERVICE_KEY" : "REBASE_SERVICE_KEY";
+    const serviceKey = env[keyVariable];
 
     if (!serviceKey) {
-        console.error(chalk.red("✗ SERVICE_KEY not found in .env — required to manage API keys."));
+        console.error(chalk.red("✗ REBASE_SERVICE_KEY not found in .env — required to manage API keys."));
         process.exit(1);
     }
     const baseUrl = requireBackendUrl(env, projectRoot);
@@ -173,7 +179,7 @@ function connect(): Connection {
         headers: { "User-Agent": cliUserAgent() },
         auth: { persistSession: false, autoRefresh: false }
     });
-    return { client, baseUrl };
+    return { client, baseUrl, keyVariable };
 }
 
 /**
@@ -183,7 +189,12 @@ function connect(): Connection {
  *
  * Exported so its tests can read the lines without a server.
  */
-export function describeFailure(action: string, error: unknown, baseUrl: string): string[] {
+export function describeFailure(
+    action: string,
+    error: unknown,
+    baseUrl: string,
+    keyVariable: ServiceKeyVariable = "REBASE_SERVICE_KEY"
+): string[] {
     if (!(error instanceof RebaseApiError)) {
         return [`✗ ${action}: ${error instanceof Error ? error.message : String(error)}`];
     }
@@ -195,7 +206,7 @@ export function describeFailure(action: string, error: unknown, baseUrl: string)
     const lines = [`✗ ${action}${label ? ` — ${label}` : ""}: ${error.message}`];
 
     if (error.status === 401) {
-        lines.push(`  The server at ${baseUrl} did not accept SERVICE_KEY from .env — is it this project's server?`);
+        lines.push(`  The server at ${baseUrl} did not accept ${keyVariable} from .env — is it this project's server?`);
     }
     // The message names the target that is not there; what *is* there rides
     // in `details`, and is the thing to pick from.
@@ -214,8 +225,8 @@ function isRecord(value: unknown): value is Record<string, unknown> {
     return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function fail(action: string, error: unknown, baseUrl: string): never {
-    for (const line of describeFailure(action, error, baseUrl)) {
+function fail(action: string, error: unknown, connection: Connection): never {
+    for (const line of describeFailure(action, error, connection.baseUrl, connection.keyVariable)) {
         console.error(line.startsWith("✗") ? chalk.red(line) : chalk.gray(line));
     }
     process.exit(1);
@@ -317,12 +328,13 @@ async function listKeys(rawArgs: string[]): Promise<void> {
         maxPositionals: 0
     });
 
-    const { client, baseUrl } = connect();
+    const connection = connect();
+    const { client } = connection;
     let keys: ApiKeyMasked[];
     try {
         ({ keys } = await client.apiKeys.listKeys());
     } catch (e: unknown) {
-        fail("Failed to list API keys", e, baseUrl);
+        fail("Failed to list API keys", e, connection);
     }
 
     console.log("");
@@ -374,12 +386,13 @@ async function getKey(rawArgs: string[]): Promise<void> {
         throw new UsageError("Key ID is required: rebase api-keys get <key-id> (`rebase api-keys list` shows them).");
     }
 
-    const { client, baseUrl } = connect();
+    const connection = connect();
+    const { client } = connection;
     let key: ApiKeyMasked;
     try {
         ({ key } = await client.apiKeys.getKey(id));
     } catch (e: unknown) {
-        fail("Failed to read API key", e, baseUrl);
+        fail("Failed to read API key", e, connection);
     }
 
     console.log("");
@@ -556,7 +569,8 @@ export function grantableScopes(held: readonly string[]): string[] {
 
 async function createKey(rawArgs: string[]): Promise<void> {
     const plan = resolveCreateKeyArgs(rawArgs);
-    const { client, baseUrl } = connect();
+    const connection = connect();
+    const { client } = connection;
 
     let scopes: string[];
     if (plan.scopes === "held") {
@@ -564,7 +578,7 @@ async function createKey(rawArgs: string[]): Promise<void> {
         try {
             ({ held } = await client.personalKeys.listScopes());
         } catch (e: unknown) {
-            fail("Failed to read the scopes you hold", e, baseUrl);
+            fail("Failed to read the scopes you hold", e, connection);
         }
         scopes = grantableScopes(held);
         if (scopes.length === 0) {
@@ -587,7 +601,7 @@ async function createKey(rawArgs: string[]): Promise<void> {
     try {
         ({ key: created } = await client.apiKeys.createKey(request));
     } catch (e: unknown) {
-        fail("Failed to create API key", e, baseUrl);
+        fail("Failed to create API key", e, connection);
     }
 
     console.log("");
@@ -639,11 +653,12 @@ async function revokeKey(rawArgs: string[]): Promise<void> {
         throw new UsageError("Key ID is required: rebase api-keys revoke <key-id> (`rebase api-keys list` shows them).");
     }
 
-    const { client, baseUrl } = connect();
+    const connection = connect();
+    const { client } = connection;
     try {
         await client.apiKeys.revokeKey(id);
     } catch (e: unknown) {
-        fail("Failed to revoke API key", e, baseUrl);
+        fail("Failed to revoke API key", e, connection);
     }
 
     console.log("");
@@ -701,12 +716,13 @@ async function listScopes(rawArgs: string[]): Promise<void> {
         maxPositionals: 0
     });
 
-    const { client, baseUrl } = connect();
+    const connection = connect();
+    const { client } = connection;
     let catalogue: { scopes: ScopeSummary[]; held: string[] };
     try {
         catalogue = await client.personalKeys.listScopes();
     } catch (e: unknown) {
-        fail("Failed to read the scopes", e, baseUrl);
+        fail("Failed to read the scopes", e, connection);
     }
 
     console.log("");

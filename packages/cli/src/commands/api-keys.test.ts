@@ -263,6 +263,19 @@ describe("describeFailure", () => {
         expect(text).not.toContain("Functions:");
     });
 
+    /**
+     * The hint named `SERVICE_KEY`, while the variable a scaffold's `.env`
+     * carries — and the one the server reads — is `REBASE_SERVICE_KEY`.
+     */
+    it("names the variable the key came from when the server refuses it", () => {
+        const error = new RebaseApiError("Invalid token", { status: 401, code: "UNAUTHORIZED" });
+
+        expect(plain(describeFailure("Failed to list API keys", error, "http://rebase.test")))
+            .toContain("The server at http://rebase.test did not accept REBASE_SERVICE_KEY from .env");
+        expect(plain(describeFailure("Failed to list API keys", error, "http://rebase.test", "SERVICE_KEY")))
+            .toContain("did not accept SERVICE_KEY from .env");
+    });
+
     it("asks whether the server is running when there was no answer", () => {
         const error = new RebaseApiError("Could not reach the server at http://rebase.test/api/admin/api-keys: fetch failed", {
             status: 0,
