@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+### Fixed
+
+#### CLI
+
+- **The cloud debug boot view shows the functions and crons a 0.25 runtime
+  loaded.** It kept a line only if it said "Loaded function" or "Mounted", the
+  words runtimes used up to 0.24; 0.25 says "Loaded custom functions", "Loaded
+  cron job: …" and "Cron jobs scheduled", so `rebase cloud debug boot` showed a
+  project's storage and its port and none of the code it runs. Both wordings are
+  shown now.
+
 ## [0.25.1] - 2026-10-14
 
 ### Changed
