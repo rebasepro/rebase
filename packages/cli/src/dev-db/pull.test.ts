@@ -50,6 +50,28 @@ describe("shouldAnonymize", () => {
         }
     );
 
+    it.each(["display_name", "first_name", "last_name", "full_name", "family_name", "middle_name"])(
+        "redacts %s, a person's name wherever it is",
+        (name) => {
+            // `rebase.users.display_name` is the one place every user's name is
+            // guaranteed to be, and `--anonymize` kept it: `Alice Real`.
+            expect(shouldAnonymize(name, "users")).toBe(true);
+            expect(shouldAnonymize(name, "orders")).toBe(true);
+        }
+    );
+
+    it("redacts a bare `name` on a table of people, and nowhere else", () => {
+        // A tag, a product or a category has a `name` too, and it is not
+        // personal data; overwriting it would ruin the copy for nothing.
+        for (const table of ["users", "profiles", "people", "customers", "members", "contacts", "employees"]) {
+            expect(shouldAnonymize("name", table)).toBe(true);
+        }
+        for (const table of ["tags", "products", "categories", "posts"]) {
+            expect(shouldAnonymize("name", table)).toBe(false);
+        }
+        expect(shouldAnonymize("name")).toBe(false);
+    });
+
     it("does not pretend to find personal data in free text", () => {
         // The honest limit of a name-based pass, stated here so nobody reads
         // `--anonymize` as a guarantee. A `notes` column can hold anything.
@@ -109,6 +131,19 @@ describe("anonymizeStatements", () => {
         ];
 
         expect(anonymizeStatements(columns)).toEqual(anonymizeStatements([...columns].reverse()));
+    });
+
+    it("rewrites the users table's names, and leaves a tag's name alone", () => {
+        const statements = anonymizeStatements([
+            column({ schema: "rebase", table: "users", column: "display_name" }),
+            column({ schema: "rebase", table: "users", column: "name" }),
+            column({ table: "tags", column: "name" })
+        ]);
+
+        expect(statements).toEqual([
+            'UPDATE "rebase"."users" SET "display_name" = CASE WHEN "display_name" IS NULL THEN NULL ELSE \'Redacted\' END, '
+                + '"name" = CASE WHEN "name" IS NULL THEN NULL ELSE \'Redacted\' END;'
+        ]);
     });
 
     it("produces nothing when no column matches", () => {

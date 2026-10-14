@@ -47,12 +47,24 @@ import type { Client } from "pg";
  */
 export interface AnonymizeRule {
     pattern: RegExp;
+    /**
+     * Only on tables whose name matches, when set. For a column name that is
+     * personal on one table and not on another: a user's `name` is a person's,
+     * a tag's is not.
+     */
+    tables?: RegExp;
     /** The value for a column no unique index covers, or null to always use the unique form. */
     value: string | null;
     /** The unique form is `prefix` + random hex + `suffix`, cut to fit the column. */
     prefix: string;
     suffix: string;
 }
+
+/**
+ * Tables whose rows are people, by name: `rebase.users` and the usual spellings
+ * of a project's own. Singular or plural.
+ */
+const PERSON_TABLES = /^(users?|user_profiles?|profiles?|people|persons?|members?|customers?|contacts?|employees?)$/i;
 
 /**
  * Column-name patterns the anonymizer overwrites.
@@ -66,15 +78,29 @@ export const ANONYMIZE_PATTERNS: readonly AnonymizeRule[] = [
     // always get a value of their own.
     { pattern: /^(.*_)?e?mail(_.*)?$/i, value: null, prefix: "user-", suffix: "@example.invalid" },
     { pattern: /^(.*_)?(phone|mobile|tel|telephone)(_.*)?$/i, value: "+10000000000", prefix: "+1-", suffix: "" },
-    { pattern: /^(.*_)?(first_name|last_name|full_name|surname|given_name)(_.*)?$/i, value: "Redacted", prefix: "Redacted-", suffix: "" },
+    // `display_name` is how `rebase.users` holds every user's name.
+    {
+        pattern: /^(.*_)?(display_name|first_name|last_name|full_name|middle_name|family_name|surname|given_name)(_.*)?$/i,
+        value: "Redacted",
+        prefix: "Redacted-",
+        suffix: ""
+    },
+    // A bare `name` is a person's only on a table of people.
+    { pattern: /^name$/i, tables: PERSON_TABLES, value: "Redacted", prefix: "Redacted-", suffix: "" },
     { pattern: /^(.*_)?(address|street|postcode|zip|zipcode)(_.*)?$/i, value: "Redacted", prefix: "Redacted-", suffix: "" },
     { pattern: /^(.*_)?(ssn|tax_id|national_id|passport)(_.*)?$/i, value: "REDACTED", prefix: "REDACTED-", suffix: "" },
     { pattern: /^(.*_)?(password|password_hash|secret|token|api_key|access_token|refresh_token)(_.*)?$/i, value: "REDACTED", prefix: "REDACTED-", suffix: "" },
     { pattern: /^(.*_)?(ip|ip_address|user_agent)(_.*)?$/i, value: "REDACTED", prefix: "REDACTED-", suffix: "" }
 ];
 
-export function shouldAnonymize(columnName: string): boolean {
-    return ANONYMIZE_PATTERNS.some((rule) => rule.pattern.test(columnName));
+/** The rule that overwrites this column, if any. Without a table, a table-bound rule never applies. */
+function ruleFor(columnName: string, table?: string): AnonymizeRule | undefined {
+    return ANONYMIZE_PATTERNS.find((rule) =>
+        rule.pattern.test(columnName) && (!rule.tables || (table !== undefined && rule.tables.test(table))));
+}
+
+export function shouldAnonymize(columnName: string, table?: string): boolean {
+    return ruleFor(columnName, table) !== undefined;
 }
 
 /** A text-ish column the anonymizer can overwrite without a type error. */
@@ -115,7 +141,7 @@ const MIN_UNIQUE_HEX = 12;
  * A NULL stays NULL: an empty optional field is not personal data.
  */
 export function replacementFor(column: ColumnRef): string | null {
-    const rule = ANONYMIZE_PATTERNS.find((candidate) => candidate.pattern.test(column.column));
+    const rule = ruleFor(column.column, column.table);
     if (!rule) return null;
     const limit = typeof column.maxLength === "number" && column.maxLength > 0 ? column.maxLength : null;
 
@@ -151,7 +177,8 @@ export function quoteIdentifier(name: string): string {
 export function anonymizableColumns(columns: readonly ColumnRef[]): ColumnRef[] {
     const textual = new Set(["text", "character varying", "varchar", "character", "char", "citext"]);
 
-    return columns.filter((column) => shouldAnonymize(column.column) && textual.has(column.dataType.toLowerCase()));
+    return columns.filter((column) =>
+        shouldAnonymize(column.column, column.table) && textual.has(column.dataType.toLowerCase()));
 }
 
 /** `"schema"."table"` for each table the pass rewrites, sorted. */

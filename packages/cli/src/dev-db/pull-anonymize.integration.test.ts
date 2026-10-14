@@ -43,6 +43,7 @@ beforeEach(async () => {
         CREATE TABLE rebase.users (
             id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
             email text NOT NULL UNIQUE,
+            display_name text,
             password_hash text,
             phone varchar(20),
             -- Matches the email pattern by name, and cannot be UPDATEd.
@@ -65,9 +66,9 @@ beforeEach(async () => {
         CREATE VIEW public.user_emails AS SELECT email FROM rebase.users;
     `);
     const users = await client.query<{ id: string }>(
-        `INSERT INTO rebase.users (email, password_hash, phone) VALUES
-            ('${REAL_EMAILS[0]}', '$argon2id$real-1', '+44 20 7946 0000'),
-            ('${REAL_EMAILS[1]}', '$argon2id$real-2', NULL)
+        `INSERT INTO rebase.users (email, display_name, password_hash, phone) VALUES
+            ('${REAL_EMAILS[0]}', 'Ada Lovelace', '$argon2id$real-1', '+44 20 7946 0000'),
+            ('${REAL_EMAILS[1]}', 'Grace Hopper', '$argon2id$real-2', NULL)
          RETURNING id`
     );
     await client.query(
@@ -107,10 +108,12 @@ describe("anonymizeCopy", () => {
         expect(new Set(tokens).size).toBe(3);
         expect(tokens.some(token => token.startsWith("hash-"))).toBe(false);
 
-        const users = (await client.query<{ email: string; password_hash: string; phone: string | null; email_domain: string }>(
-            "SELECT email, password_hash, phone, email_domain FROM rebase.users ORDER BY phone NULLS LAST"
+        const users = (await client.query<{ email: string; display_name: string; password_hash: string; phone: string | null; email_domain: string }>(
+            "SELECT email, display_name, password_hash, phone, email_domain FROM rebase.users ORDER BY phone NULLS LAST"
         )).rows;
         expect(users.every(user => user.email.endsWith("@example.invalid"))).toBe(true);
+        // Every user's name is here, and the pass kept it.
+        expect(users.map(user => user.display_name)).toEqual(["Redacted", "Redacted"]);
         expect(users.every(user => !user.password_hash.startsWith("$argon2id$real"))).toBe(true);
         // A NULL stays NULL; the generated column follows the new address.
         expect(users.map(user => user.phone)).toEqual(["+10000000000", null]);
@@ -132,7 +135,8 @@ describe("anonymizeCopy", () => {
         const notes = (await client.query<{ body: string }>("SELECT body FROM public.notes ORDER BY id")).rows;
         expect(notes.map(note => note.body)).toEqual(["kept as it is", "also kept"]);
         const authors = (await client.query<{ name: string }>("SELECT name FROM public.authors ORDER BY id")).rows;
-        // `name` is not one of the patterns: only first/last/full names are.
+        // A bare `name` is redacted only on a table of people (`users`,
+        // `customers`, …): an author's byline is what the site publishes.
         expect(authors.map(author => author.name)).toEqual(["Ada", "Edsger"]);
     });
 
