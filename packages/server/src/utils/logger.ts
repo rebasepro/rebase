@@ -106,6 +106,55 @@ function getMinLevel(): LogLevel {
     return "info";
 }
 
+/** Whether a line at `level` is written at all, by the level in effect now. */
+export function logLevelEnabled(level: LogLevel): boolean {
+    return LOG_PRIORITY[level] >= LOG_PRIORITY[getMinLevel()];
+}
+
+/**
+ * A host's say over a line that is about to be written: `true` when it took
+ * the line — to write later by calling `write`, or never — and `false` to have
+ * it written now.
+ *
+ * The one installed is the backend's (`backend/boot-announcements.ts`): what a
+ * backend says while it is built is held until it serves, so a script that
+ * builds one and never mounts it prints nothing of the boot's on its stdout.
+ * That needs the async context, which this module cannot reach — it is
+ * portable — so the decision is a hook a host-side module installs.
+ *
+ * A global slot rather than a module-local, for the reason `host.ts` gives:
+ * more than one copy of this module can be loaded into one process, and a
+ * line logged through any of them has to be asked about.
+ */
+export type LogLineHook = (level: LogLevel, write: () => void) => boolean;
+
+const LINE_HOOK_SLOT = Symbol.for("@rebasepro/server:log-line-hook");
+
+type GlobalWithLineHook = typeof globalThis & { [LINE_HOOK_SLOT]?: LogLineHook };
+
+/**
+ * Install the hook every line is offered to, returning the one it replaces so
+ * the installer can ask it about lines that are not its own. Internal: not
+ * exported from the package entry.
+ */
+export function _setLogLineHook(hook: LogLineHook | undefined): LogLineHook | undefined {
+    const global = globalThis as GlobalWithLineHook;
+    const previous = global[LINE_HOOK_SLOT];
+    global[LINE_HOOK_SLOT] = hook;
+    return previous;
+}
+
+/** Whether the installed hook takes this line. A hook that throws takes nothing. */
+function lineTaken(level: LogLevel, write: () => void): boolean {
+    const hook = (globalThis as GlobalWithLineHook)[LINE_HOOK_SLOT];
+    if (!hook) return false;
+    try {
+        return hook(level, write) === true;
+    } catch {
+        return false;
+    }
+}
+
 // ── Redaction ───────────────────────────────────────────────────────
 //
 // Drizzle builds every query failure as
@@ -430,7 +479,16 @@ function createLogger(rawDefaultFields: Record<string, unknown> = {}): Logger {
         const safeMessage = redactSensitiveText(message);
         const merged = { ...defaultFields,
 ...formatData(data) };
+        // When it was said, not when it is written: a line a host held (see
+        // `LogLineHook`) is ordered by an aggregator where it was logged.
+        const timestamp = new Date().toISOString();
 
+        const write = (): void => writeEntry(level, safeMessage, merged, timestamp);
+        if (lineTaken(level, write)) return;
+        write();
+    }
+
+    function writeEntry(level: LogLevel, safeMessage: string, merged: Record<string, unknown>, timestamp: string): void {
         // Before the write, so a sink still sees the line if stdout is the
         // thing that is broken.
         fanOut(level, safeMessage, merged);
@@ -440,7 +498,7 @@ function createLogger(rawDefaultFields: Record<string, unknown> = {}): Logger {
             const entry: LogEntry = {
                 severity: GCP_SEVERITY[level],
                 message: safeMessage,
-                timestamp: new Date().toISOString(),
+                timestamp,
                 ...merged
             };
             const line = JSON.stringify(entry);

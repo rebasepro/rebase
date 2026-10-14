@@ -79,6 +79,7 @@ import { installRootErrorHandler, installUnmatchedApiEnvelope } from "../api/roo
 import { recordMountPath } from "../api/mount-path";
 import type { HonoEnv } from "../api/types";
 import { logger, setLogLevel } from "../utils/logger";
+import { createBootAnnouncements, type BootAnnouncements } from "./boot-announcements";
 import { formatByteSize } from "../utils/byte-size";
 import { configureMiddlewares } from "../init/middlewares";
 import { initializeStorage, assertStorageAccessControlConfigured } from "../init/storage";
@@ -229,6 +230,9 @@ export interface RebaseRoutes {
     /** The project contract a generated SDK reads, normally at `/api/meta`. */
     meta(): Hono<HonoEnv>;
 }
+
+/** A route group, by the name `routes` gives it. */
+type MountGroup = keyof RebaseRoutes;
 
 /** Where {@link RebaseBackend.mount} puts the backend. */
 export interface BackendMountOptions {
@@ -514,8 +518,24 @@ function resolveProvision(provision: boolean | ProvisionOptions | undefined): Re
  * which {@link setDefaultBackend} sets and `initializeRebaseBackend` sets for
  * its backend. The one process-wide setting it touches is the log level, and
  * only when `logging.level` is given: the logger is the process's.
+ *
+ * What the build logs at info is written when the backend first serves — see
+ * `boot-announcements.ts` — so a script that builds one and never mounts it
+ * prints nothing of the boot's on its stdout.
  */
 export async function createRebaseBackend(options: RebaseBackendOptions): Promise<RebaseBackend> {
+    const announcements = createBootAnnouncements();
+    try {
+        const backend = await announcements.run(() => buildRebaseBackend(options, announcements));
+        announcements.built();
+        return backend;
+    } catch (error) {
+        announcements.failed();
+        throw error;
+    }
+}
+
+async function buildRebaseBackend(options: RebaseBackendOptions, announcements: BootAnnouncements): Promise<RebaseBackend> {
     const config = options;
     const provision = resolveProvision(config.provision);
 
@@ -1645,6 +1665,24 @@ export async function createRebaseBackend(options: RebaseBackendOptions): Promis
         if (announce) logger.info(`MCP endpoint mounted at ${publicUrl}${mcpPath} (OAuth at ${oauthBasePath})`);
     };
 
+    // ─── Warnings that belong to a mount ──────────────────────────────────
+    // What a route group owes the person who mounts it — "these routes are
+    // mounted but disabled" — said when it is mounted (`mount()`, or the group
+    // from `routes`), once, in the order the build found them. Never for the
+    // in-process app `fetch` and the in-process client dispatch into: nothing
+    // outside the process can reach it.
+    const mountWarnings: Array<{ group: MountGroup; message: string; said: boolean }> = [];
+    const warnOnMount = (group: MountGroup, message: string): void => {
+        mountWarnings.push({ group, message, said: false });
+    };
+    const sayMountWarnings = (groups: ReadonlySet<MountGroup>): void => {
+        for (const warning of mountWarnings) {
+            if (warning.said || !groups.has(warning.group)) continue;
+            warning.said = true;
+            logger.warn(warning.message);
+        }
+    };
+
     // ─── Shared gate for admin-only surfaces ──────────────────────────────
     // Cron, backups, logs, and the schema editor previously gated on the
     // plain JWT-only `requireAuth`, which silently rejected both the service
@@ -1686,7 +1724,7 @@ export async function createRebaseBackend(options: RebaseBackendOptions): Promis
         createRequireAuth({ serviceKey: internalServiceKey, ...adminGateIdentity }),
         typeof scopes === "string" ? requireScope(scopes) : requireScopeByMethod(scopes)
     ];
-    const applyAdminGate = (router: Hono<HonoEnv>, surface: string, scopes: SurfaceScopes): void => {
+    const applyAdminGate = (router: Hono<HonoEnv>, surface: string, scopes: SurfaceScopes, mountedWith: MountGroup = "admin"): void => {
         if (!adminSurfacesGated) {
             // No adapter and no `jwtSecret`: there is no credential this server
             // could check a caller against, so it cannot tell an admin from the
@@ -1698,7 +1736,12 @@ export async function createRebaseBackend(options: RebaseBackendOptions): Promis
             // They answer 501 instead, and stay mounted to say why: an
             // unexplained 404 on `/api/cron` reads as a broken path or a failed
             // deploy, and gets debugged as one.
-            logger.warn(
+            //
+            // Said when the group is mounted, not here: a script that builds a
+            // backend and never mounts it was told about eight routes it did
+            // not mount.
+            warnOnMount(
+                mountedWith,
                 `${surface} routes are mounted but DISABLED: no authentication is configured ` +
                 "(no auth adapter and no auth.jwtSecret), so there is no way to tell an admin " +
                 "from an anonymous caller. They answer 501 until auth is configured."
@@ -2530,8 +2573,10 @@ export async function createRebaseBackend(options: RebaseBackendOptions): Promis
         // no socket for it to open and never was.
         realtime: false,
         token: internalServiceKey,
+        // As this backend: a call from a script that never mounted it is the
+        // library talking to itself, and its request log is not written.
         fetch: async (input: RequestInfo | URL, init?: RequestInit) => {
-            return await inProcessApp().request(input as string | Request | URL, init);
+            return await announcements.run(() => inProcessApp().request(input as string | Request | URL, init));
         }
     });
 
@@ -2916,7 +2961,7 @@ export async function createRebaseBackend(options: RebaseBackendOptions): Promis
         const cronRouter = new Hono<HonoEnv>();
 
         // Cron admin routes require authentication + admin role
-        applyAdminGate(cronRouter, "Cron", { read: "cron:read", write: "cron:write" });
+        applyAdminGate(cronRouter, "Cron", { read: "cron:read", write: "cron:write" }, "cron");
 
         cronRouter.route("/", createCronRoutes(cronScheduler, cronProblems.length));
         cronSurface = cronRouter;
@@ -3244,7 +3289,8 @@ export async function createRebaseBackend(options: RebaseBackendOptions): Promis
                         "because it describes every table and relation in the project."
                 }
             }, 404));
-            logger.warn(
+            warnOnMount(
+                "meta",
                 "Contract endpoint disabled: no auth is configured (no adapter or no jwtSecret), " +
                 "and it would otherwise expose the full collection schema to anyone. " +
                 "`/api/meta/schema-version` is still served."
@@ -3366,7 +3412,8 @@ export async function createRebaseBackend(options: RebaseBackendOptions): Promis
         );
     };
 
-    const routes: RebaseRoutes = {
+    /** The groups as they are built. `mountInto` and the public {@link routes} below compose from these. */
+    const groups: RebaseRoutes = {
         auth: () => {
             requireSurface("auth");
             const authGroup = group();
@@ -3433,6 +3480,26 @@ export async function createRebaseBackend(options: RebaseBackendOptions): Promis
         }
     };
 
+    /**
+     * The groups an application mounts one by one. Asking for one is serving:
+     * what the build said is written, and the group's own warnings with it.
+     */
+    const servedGroup = (name: MountGroup) => (): Hono<HonoEnv> => {
+        const router = groups[name]();
+        announcements.serve();
+        sayMountWarnings(new Set([name]));
+        return router;
+    };
+    const routes: RebaseRoutes = {
+        auth: servedGroup("auth"),
+        data: servedGroup("data"),
+        storage: servedGroup("storage"),
+        functions: servedGroup("functions"),
+        admin: servedGroup("admin"),
+        cron: servedGroup("cron"),
+        meta: servedGroup("meta")
+    };
+
     /** The base path the application last mounted at — where the SDK's socket dials by default. */
     let mountedBasePath: string | undefined;
 
@@ -3447,6 +3514,17 @@ export async function createRebaseBackend(options: RebaseBackendOptions): Promis
      */
     const mountInto = (app: Hono<HonoEnv>, basePathOption: string | undefined, announce: boolean): void => {
         const basePath = basePathOption || "/api";
+
+        if (announce) {
+            // Serving: the build's lines first, as the boot has always opened,
+            // then what the groups mounted below owe whoever mounts them.
+            announcements.serve();
+            const mounted = new Set<MountGroup>();
+            if (surfaces.admin) mounted.add("admin");
+            if (surfaces.cron && cronSurface) mounted.add("cron");
+            if (surfaces.meta && metaSurface) mounted.add("meta");
+            sayMountWarnings(mounted);
+        }
 
         // The JSON envelope, on the root app, before any middleware is added —
         // so that a throw *in* a middleware is caught too. It used to live on
@@ -3476,8 +3554,8 @@ export async function createRebaseBackend(options: RebaseBackendOptions): Promis
         // `auth/impersonation.ts`.
         app.use(`${basePath}/*`, refuseUnhonouredImpersonation([`${basePath}/data`, `${basePath}/functions`]));
 
-        if (surfaces.admin) app.route(`${basePath}/admin`, routes.admin());
-        if (surfaces.auth) app.route(`${basePath}/auth`, routes.auth());
+        if (surfaces.admin) app.route(`${basePath}/admin`, groups.admin());
+        if (surfaces.auth) app.route(`${basePath}/auth`, groups.auth());
 
         // ── JWKS ─────────────────────────────────────────────────────────
         // At the root, not under `basePath`: `/.well-known/` is where verifiers
@@ -3505,7 +3583,7 @@ export async function createRebaseBackend(options: RebaseBackendOptions): Promis
         }
 
         if (surfaces.storage) {
-            app.route(`${basePath}/storage`, routes.storage());
+            app.route(`${basePath}/storage`, groups.storage());
             if (storageCarriesUploadLimit) {
                 // Only the upload route. Every other path under `/storage` stays
                 // on the global limit, TUS included: `PATCH /tus/:id` reads its
@@ -3518,7 +3596,7 @@ export async function createRebaseBackend(options: RebaseBackendOptions): Promis
         }
 
         if (surfaces.data) {
-            app.route(`${basePath}/data`, routes.data());
+            app.route(`${basePath}/data`, groups.data());
             if (announce && activeCollections.length === 0) {
                 logger.info("No collections to serve — /data returns 404 NO_COLLECTIONS");
             }
@@ -3538,12 +3616,12 @@ export async function createRebaseBackend(options: RebaseBackendOptions): Promis
         }
 
         if (functionsSurface) {
-            app.route(`${basePath}/functions`, routes.functions());
+            app.route(`${basePath}/functions`, groups.functions());
             if (announce) logger.debug("Function routes mounted", { path: `${basePath}/functions` });
         }
 
         if (surfaces.cron && cronSurface) {
-            app.route(`${basePath}/admin/cron`, routes.cron());
+            app.route(`${basePath}/admin/cron`, groups.cron());
             app.route(`${basePath}/cron`, deprecatedAlias(cronSurface, `${basePath}/admin/cron`));
         }
 
@@ -3551,7 +3629,7 @@ export async function createRebaseBackend(options: RebaseBackendOptions): Promis
             app.route(`${basePath}/logs`, deprecatedAlias(logsSurface, `${basePath}/admin/logs`));
         }
 
-        if (surfaces.meta && metaSurface) app.route(`${basePath}/meta`, routes.meta());
+        if (surfaces.meta && metaSurface) app.route(`${basePath}/meta`, groups.meta());
 
         if (announce) logger.debug("Rebase backend mounted", { basePath });
     };
@@ -3576,6 +3654,8 @@ export async function createRebaseBackend(options: RebaseBackendOptions): Promis
         // mount no surfaces at all. A `worker` serves no HTTP a client can reach
         // and a `functions` process has no subscribers; upgrading a connection
         // for either is a listener nobody asked for on a port nobody routes to.
+        // Attaching is serving, whether or not there is a socket to attach.
+        announcements.serve();
         if (!surfaces.realtime || !defaultBootstrapper.initializeWebsockets || !effectiveRealtimeService) return;
         if (realtimeAttached) {
             throw new Error("attachRealtime(): this backend's websocket is already attached to a server.");
@@ -3610,6 +3690,8 @@ export async function createRebaseBackend(options: RebaseBackendOptions): Promis
     let historyRetentionSweep: { stop(): Promise<void> | void } | undefined;
 
     const start = (): void => {
+        // A process that only runs timers — a `worker` — serves too.
+        announcements.serve();
         if (started) return;
         started = true;
         // Inside this backend's scope, so every timer started below — the cron
@@ -3689,8 +3771,10 @@ export async function createRebaseBackend(options: RebaseBackendOptions): Promis
 
     // ── Graceful Shutdown ─────────────────────────────────────────────────
     // Assembled when called, so it stops what `start()` actually started.
+    //
+    // As this backend: one that never served says nothing at info as it goes.
     const shutdown = (timeoutMs?: number, shutdownOptions: { server?: Server } = {}): Promise<void> =>
-        createShutdown({
+        announcements.run(() => createShutdown({
             server: shutdownOptions.server,
             cronScheduler,
             jobQueue,
@@ -3701,7 +3785,7 @@ export async function createRebaseBackend(options: RebaseBackendOptions): Promis
             realtimeServices,
             closeLongLivedResponses: () => longLivedResponses.abort(),
             emailService
-        })(timeoutMs);
+        })(timeoutMs));
 
     logger.debug("Rebase Backend Initialized");
 
@@ -3723,7 +3807,8 @@ export async function createRebaseBackend(options: RebaseBackendOptions): Promis
         cronScheduler,
         jobQueue,
         routes,
-        fetch: async (request: Request) => await inProcessApp().fetch(request),
+        // As this backend, for the same reason as the in-process client.
+        fetch: async (request: Request) => await announcements.run(() => inProcessApp().fetch(request)),
         mount: (app: Hono<HonoEnv>, mountOptions: BackendMountOptions = {}) => {
             mountInto(app, mountOptions.basePath, true);
             mountedBasePath = mountOptions.basePath || "/api";
