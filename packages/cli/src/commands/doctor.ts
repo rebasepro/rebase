@@ -24,7 +24,7 @@ import { analyseFunctionsDirectory, summarisePortability } from "../function-por
 import { reportSpawnFailure } from "../utils/spawn-error";
 import { argsFromCommand } from "../utils/command-words";
 import { COLLECTIONS_FLAG_HELP, refuseMissingCollectionsPath } from "../utils/path-flags";
-import { absolutizeLocalPathArgs } from "./db";
+import { absolutizeLocalPathArgs, DATABASE_SOURCE_ENV } from "./db";
 import { parseCommandArgs, wantsHelp } from "../utils/args";
 import { loadManifest, findBackendApp, resolveBackendPaths } from "../manifest";
 import { DEV_DATABASE_KIND_ENV, devDatabaseKind, managedNotices, prepareDatabaseEnv } from "../dev-db/prepare";
@@ -581,6 +581,11 @@ export async function doctorCommand(rawArgs: string[]): Promise<void> {
             onProgress: (message) => console.log(chalk.gray(`  ${message}`))
         });
         Object.assign(env, prepared.env);
+        // What named the database, as the `db` commands pass it: the driver's
+        // "Cannot connect" banner picks its fixes by it. Without it, the
+        // remembered Docker database, stopped, got "Verify DATABASE_URL in
+        // your .env file" — a file that had named nothing.
+        env[DATABASE_SOURCE_ENV] = prepared.database.source;
         for (const line of managedNotices(prepared)) console.log(chalk.gray(`  ${line}`));
     } catch (error) {
         console.log("");
