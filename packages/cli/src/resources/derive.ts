@@ -665,7 +665,7 @@ export function parseResourceGraph(contents: string): ResourceGraph {
  * so both are listed. The default is displaced only by declaring it — or, for a
  * bucket, by marking exactly one server-side bucket `default: true`, which then
  * serves the uploads that name no `storageSource`. This used to drop the
- * default as soon as any bucket was declared, and `rebase status` and `rebase
+ * default once a bucket was declared, and `rebase status` and `rebase
  * resources` stopped listing a source the server was still serving.
  */
 export function withImplicitDefaults(graph: ResourceGraph): {
