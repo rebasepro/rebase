@@ -13,6 +13,7 @@ import {
     describeBuildScriptRemedy,
     describeDevAddCommand,
     describeReinstallCommand,
+    workspaceMemberDir,
     resolveLocalBin,
     getTableIncludes,
     atlasDevDatabaseUrl,
@@ -1789,8 +1790,9 @@ async function runAtlas(
             outError("");
         } else {
             outError(chalk.gray("  It is not installed in this project.\n"));
-            outError("  Install it with:\n");
-            outError(chalk.bold(`    ${describeDevAddCommand("@ariga/atlas", manager)}\n`));
+            const member = workspaceMemberDir();
+            outError(member === null ? "  Install it with:\n" : "  Install it with (from the project root):\n");
+            outError(chalk.bold(`    ${describeDevAddCommand("@ariga/atlas", manager, member)}\n`));
             outError(chalk.gray(
                 "  If the install then reports blocked or ignored build scripts, allow them too —\n" +
                 "  the package carries a `preinstall` script that fetches the binary.\n"

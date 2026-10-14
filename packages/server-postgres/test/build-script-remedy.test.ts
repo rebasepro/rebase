@@ -20,7 +20,8 @@ import {
     describeBuildScriptRemedy,
     describeDevAddCommand,
     describeReinstallCommand,
-    diagnoseMissingBin
+    diagnoseMissingBin,
+    workspaceMemberDir
 } from "../src/cli-helpers";
 
 describe("detectProjectPackageManager", () => {
@@ -102,10 +103,54 @@ describe("describeBuildScriptRemedy", () => {
 
 describe("describeDevAddCommand", () => {
     it("names each manager's own add command", () => {
-        expect(describeDevAddCommand("@ariga/atlas", "npm")).toBe("npm install -D @ariga/atlas");
-        expect(describeDevAddCommand("@ariga/atlas", "pnpm")).toBe("pnpm add -D @ariga/atlas");
-        expect(describeDevAddCommand("@ariga/atlas", "yarn")).toBe("yarn add -D @ariga/atlas");
-        expect(describeDevAddCommand("@ariga/atlas", "bun")).toBe("bun add -d @ariga/atlas");
+        expect(describeDevAddCommand("@ariga/atlas", "npm", null)).toBe("npm install -D @ariga/atlas");
+        expect(describeDevAddCommand("@ariga/atlas", "pnpm", null)).toBe("pnpm add -D @ariga/atlas");
+        expect(describeDevAddCommand("@ariga/atlas", "yarn", null)).toBe("yarn add -D @ariga/atlas");
+        expect(describeDevAddCommand("@ariga/atlas", "bun", null)).toBe("bun add -d @ariga/atlas");
+    });
+
+    // The driver runs in `backend/`, and the reader types the fix at the
+    // project root, where a bare `pnpm add -D` refuses with
+    // ERR_PNPM_ADDING_TO_ROOT. So a workspace member's command names it.
+    it("adds to the workspace member, typed from the workspace root", () => {
+        expect(describeDevAddCommand("@ariga/atlas", "pnpm", "backend")).toBe("pnpm --dir backend add -D @ariga/atlas");
+        expect(describeDevAddCommand("@ariga/atlas", "npm", "backend")).toBe("npm install -D @ariga/atlas -w backend");
+        expect(describeDevAddCommand("@ariga/atlas", "yarn", "backend")).toBe("yarn --cwd backend add -D @ariga/atlas");
+        expect(describeDevAddCommand("@ariga/atlas", "bun", "backend")).toBe("bun add -d @ariga/atlas --cwd backend");
+    });
+});
+
+describe("workspaceMemberDir", () => {
+    let root: string;
+
+    beforeEach(() => {
+        root = fs.mkdtempSync(path.join(os.tmpdir(), "rebase-ws-member-"));
+        fs.writeFileSync(path.join(root, "package.json"), JSON.stringify({ name: "app", private: true }));
+        fs.mkdirSync(path.join(root, "backend", "src"), { recursive: true });
+        fs.writeFileSync(path.join(root, "backend", "package.json"), JSON.stringify({ name: "backend" }));
+    });
+
+    afterEach(() => {
+        fs.rmSync(root, { recursive: true, force: true });
+    });
+
+    it("is the member's directory, relative to a pnpm workspace's root", () => {
+        fs.writeFileSync(path.join(root, "pnpm-workspace.yaml"), "packages:\n  - backend\n");
+        expect(workspaceMemberDir(path.join(root, "backend"))).toBe("backend");
+        // From inside the member, still the member's own package.
+        expect(workspaceMemberDir(path.join(root, "backend", "src"))).toBe("backend");
+    });
+
+    it("reads an npm/yarn `workspaces` root too", () => {
+        fs.writeFileSync(path.join(root, "package.json"), JSON.stringify({ name: "app", workspaces: ["backend"] }));
+        expect(workspaceMemberDir(path.join(root, "backend"))).toBe("backend");
+    });
+
+    it("is null at the workspace root, and outside any workspace", () => {
+        fs.writeFileSync(path.join(root, "pnpm-workspace.yaml"), "packages:\n  - backend\n");
+        expect(workspaceMemberDir(root)).toBeNull();
+        fs.rmSync(path.join(root, "pnpm-workspace.yaml"));
+        expect(workspaceMemberDir(path.join(root, "backend"))).toBeNull();
     });
 });
 

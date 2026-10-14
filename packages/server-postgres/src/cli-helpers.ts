@@ -152,19 +152,62 @@ export function describeReinstallCommand(
     }
 }
 
-/** `add <pkg>` as a dev dependency, in the reader's own package manager. */
-export function describeDevAddCommand(
-    packageName: string,
-    manager: ProjectPackageManager = detectProjectPackageManager()
-): string {
-    switch (manager) {
-        case "npm": return `npm install -D ${packageName}`;
-        case "yarn": return `yarn add -D ${packageName}`;
-        case "bun": return `bun add -d ${packageName}`;
-        case "pnpm":
-        default: return `pnpm add -D ${packageName}`;
+/**
+ * The workspace member a command runs in, relative to the workspace's root —
+ * `backend` in a scaffolded project — or null at that root and outside any
+ * workspace.
+ *
+ * The member is the nearest directory at or above `startDir` holding a
+ * `package.json`; the root is the nearest one above it holding a
+ * `pnpm-workspace.yaml`, or a `package.json` that declares `workspaces`.
+ */
+export function workspaceMemberDir(startDir: string = process.cwd()): string | null {
+    let member = path.resolve(startDir);
+    while (!fs.existsSync(path.join(member, "package.json"))) {
+        const parent = path.dirname(member);
+        if (parent === member) return null;
+        member = parent;
+    }
+    for (let dir = path.dirname(member); ; dir = path.dirname(dir)) {
+        if (isWorkspaceRoot(dir)) return path.relative(dir, member).split(path.sep).join("/");
+        if (path.dirname(dir) === dir) return null;
     }
 }
+
+function isWorkspaceRoot(dir: string): boolean {
+    if (fs.existsSync(path.join(dir, "pnpm-workspace.yaml"))) return true;
+    try {
+        const manifest: unknown = JSON.parse(fs.readFileSync(path.join(dir, "package.json"), "utf8"));
+        return typeof manifest === "object" && manifest !== null && "workspaces" in manifest;
+    } catch {
+        return false;
+    }
+}
+
+/**
+ * `add <pkg>` as a dev dependency, in the reader's own package manager, typed
+ * from the project root: into `workspaceDir` when the command runs in a
+ * workspace member, where a bare `pnpm add -D` at the root refuses with
+ * `ERR_PNPM_ADDING_TO_ROOT`.
+ */
+export function describeDevAddCommand(
+    packageName: string,
+    manager: ProjectPackageManager = detectProjectPackageManager(),
+    workspaceDir: string | null = workspaceMemberDir()
+): string {
+    const dir = workspaceDir === null ? null : shellWord(workspaceDir);
+    switch (manager) {
+        case "npm": return dir ? `npm install -D ${packageName} -w ${dir}` : `npm install -D ${packageName}`;
+        case "yarn": return dir ? `yarn --cwd ${dir} add -D ${packageName}` : `yarn add -D ${packageName}`;
+        case "bun": return dir ? `bun add -d ${packageName} --cwd ${dir}` : `bun add -d ${packageName}`;
+        case "pnpm":
+        default: return dir ? `pnpm --dir ${dir} add -D ${packageName}` : `pnpm add -D ${packageName}`;
+    }
+}
+
+/** A path as one shell word: as it is when it needs no quoting, single-quoted otherwise. */
+const shellWord = (value: string): string =>
+    /^[\w./-]+$/.test(value) ? value : `'${value.replace(/'/g, "'\\''")}'`;
 
 /**
  * Why a dependency's binary is not on `PATH`.
