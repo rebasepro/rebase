@@ -30,14 +30,18 @@ import { DemoLoginView } from "./DemoLoginView";
 const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? "http://localhost:3001" : undefined);
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
+// One client for the page, created when this module loads. Inside a component,
+// even in a `useMemo`, `<React.StrictMode>` builds a second one in development,
+// and both restore the session and open their own connections.
+const rebaseClient = createRebaseClient({
+    baseUrl: API_URL,
+    // Local-first: reads populate an IndexedDB row database and fall back
+    // to it when the network is gone, and writes made offline apply
+    // immediately and replay when it returns.
+    offline: true
+});
+
 export function App() {
-    const rebaseClient = React.useMemo(() => createRebaseClient({
-        baseUrl: API_URL,
-        // Local-first: reads populate an IndexedDB row database and fall back
-        // to it when the network is gone, and writes made offline apply
-        // immediately and replay when it returns.
-        offline: true
-    }), []);
 
     // Forward all Rebase analytics events to GA4
     const onAnalyticsEvent = React.useCallback((event: AnalyticsEvent, data?: object) => {
