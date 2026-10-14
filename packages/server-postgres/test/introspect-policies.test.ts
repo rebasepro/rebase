@@ -12,7 +12,7 @@
  * `test/e2e/introspect-policies-e2e.test.ts`.
  */
 import { classifyTables } from "../src/schema/introspect-db-structure";
-import { buildEnumMap, generateCollectionFile } from "../src/schema/introspect-db-logic";
+import { buildEnumMap, describeRlsOffTables, generateCollectionFile } from "../src/schema/introspect-db-logic";
 import { formatPolicyDrift, type PolicyDrift, type PolicyRef } from "../src/security/policy-drift";
 import { autoStamp, buildSchema, column, foreignKey, rlsPolicy, serialPk } from "./helpers/schema-metadata";
 
@@ -160,7 +160,10 @@ describe("writing a table's policies into its collection", () => {
     it("keeps the baseline for a table with RLS off, and says what the push will do to it", () => {
         const source = generated([rlsPolicy("customers", "customers_owner", { qual: OWNER })], false);
         expect(source).not.toContain("disableDefaultPolicies");
-        expect(source).toMatch(/row-level security is off on this table, so every request reaches every row\. `rebase db push` switches it on/);
+        expect(source).toMatch(/\/\/ ⚠ Row-level security is off on this table, so every request reaches every row\. `rebase db push`\n\/\/ switches it on/);
+        expect(describeRlsOffTables(["orders", "customers"])).toMatch(
+            /^2 table\(s\) have row-level security off, so every request reaches every row: customers, orders\.\n`rebase db push` switches it on/);
+        expect(describeRlsOffTables([])).toBeUndefined();
     });
 
     it("decides by the policies alone when RLS was not read", () => {

@@ -17,9 +17,11 @@
  *   1. a database Rebase built (`db push` of a property × relation matrix),
  *      introspected into fresh collection files, planned again — no changes;
  *   2. a hand-written legacy database of shapes a property can state,
- *      introspected and planned — no changes. A table keyed on two columns is
- *      one composite key, `isId` on each column; one keyed on a column no
- *      `isId` can mark is left out with its reason.
+ *      introspected and planned — no schema change. A table keyed on two
+ *      columns is one composite key, `isId` on each column; one keyed on a
+ *      column no `isId` can mark is left out with its reason. Its tables have
+ *      row-level security off, which no collection keeps: the push switches
+ *      it on, and both the introspection and the dry run say so.
  *
  * Requires Docker. Spins up a throwaway Postgres container and tears it down.
  */
@@ -257,7 +259,7 @@ describe("introspect, then push: adopting a database changes nothing", () => {
         expect(planned.all).toMatch(/No changes: the database already matches these collections/);
     }, 300_000);
 
-    it("a hand-written database of shapes a property can state plans no changes", async () => {
+    it("a hand-written database of shapes a property can state plans no schema change", async () => {
         await admin.query("CREATE DATABASE legacy");
         const legacy = new pg.Client({ connectionString: urlFor("legacy") });
         await legacy.connect();
@@ -275,6 +277,15 @@ describe("introspect, then push: adopting a database changes nothing", () => {
         expect(introspected.all).toMatch(/Skipping table "readings": it is keyed on \(sensor_id, taken_at\), and its key column "taken_at" cannot carry `isId`/);
         expect(introspected.all).not.toMatch(/will not round-trip/);
         expect(planned.exitCode, planned.all).toBe(0);
-        expect(planned.all).toMatch(/No changes: the database already matches these collections/);
+        // Nothing for Atlas: no column, key or constraint moves.
+        expect(planned.all).not.toMatch(/Planned changes:/);
+        // What does change, said in both places: RLS goes on, and with it
+        // the admin baseline every collection keeps.
+        expect(introspected.all).toMatch(/5 table\(s\) have row-level security off, so every request reaches every row: UserAccounts, codes, customers, order, order_lines\./);
+        expect(planned.all).toMatch(/Planned row-level security changes:/);
+        for (const table of ["UserAccounts", "codes", "customers", "order", "order_lines"]) {
+            expect(planned.all).toContain(`switch RLS on   public.${table}`);
+            expect(planned.all).toContain(`create policy   public.${table} → "${table}_default_admin_read"`);
+        }
     }, 300_000);
 });

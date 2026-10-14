@@ -799,7 +799,7 @@ const adminBaselineNames = (tableName: string): Set<string> =>
  *
  * A table with RLS off keeps the baseline: the push switches RLS on whatever
  * the collection says, and that table had no policy narrowing anyone to begin
- * with. {@link rlsOffNote} says so. `undefined` RLS — a caller that did not
+ * with. {@link describeRlsOffTables} says so. `undefined` RLS — a caller that did not
  * read it — is decided by the policies alone.
  */
 function ownsItsAccess(tableName: string, table: TableRow | undefined, policies: readonly PolicyRow[] | undefined): boolean {
@@ -809,11 +809,24 @@ function ownsItsAccess(tableName: string, table: TableRow | undefined, policies:
     return ![...adminBaselineNames(tableName)].every((name) => present.has(name));
 }
 
-/** What `rebase db push` does to a table whose row-level security is off. */
-function rlsOffNote(table: TableRow | undefined): string | undefined {
-    if (table?.rls_enabled !== false) return undefined;
-    return "row-level security is off on this table, so every request reaches every row. `rebase db push` " +
-        "switches it on: from then on its rows are reached through its policies, and the server and admins reach them all";
+/**
+ * What `rebase db push` does to tables whose row-level security is off, for
+ * the introspection to say once — or `undefined` when there are none.
+ */
+export function describeRlsOffTables(tableNames: readonly string[]): string | undefined {
+    if (tableNames.length === 0) return undefined;
+    return `${tableNames.length} table(s) have row-level security off, so every request reaches every row: ` +
+        `${[...tableNames].sort().join(", ")}.\n` +
+        "`rebase db push` switches it on: from then on the server and admins reach their rows, and anyone else " +
+        "what each collection's securityRules grant.";
+}
+
+/** The comment a collection whose table has row-level security off opens with. */
+function rlsOffComment(table: TableRow | undefined): string {
+    if (table?.rls_enabled !== false) return "";
+    return "\n// ⚠ Row-level security is off on this table, so every request reaches every row. `rebase db push`" +
+        "\n// switches it on: from then on the server and admins reach its rows, and anyone else what" +
+        "\n// securityRules grant.\n";
 }
 
 /** `pg_policies.cmd`, narrowed to the commands a policy can have. */
@@ -1608,8 +1621,6 @@ export function generateCollectionFile(
           "\n    // admins read and write every row. Delete it to give them that." +
           "\n    disableDefaultPolicies: true,"
         : "";
-    const rlsOff = rlsOffNote(tableRow);
-    if (rlsOff) fileNotes.push(rlsOff);
 
     const sortedPropertiesOrder = sortPropertiesOrder(orderEntries);
     for (const key of sortedPropertiesOrder) {
@@ -1724,7 +1735,7 @@ export function generateCollectionFile(
         ...importLines.filter((line) => line.includes('from "./'))
     ];
     const fileContent = `${orderedImports.join("\n")}
-${classificationNote}${storageNote}
+${classificationNote}${storageNote}${rlsOffComment(tableRow)}
 ${open}
     name: ${quote(collectionName)},
     singularName: ${quote(singular)},

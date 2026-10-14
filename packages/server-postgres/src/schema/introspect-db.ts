@@ -9,6 +9,7 @@ import {
     buildTablesMap,
     buildEnumMap,
     compositeKeySkipReason,
+    describeRlsOffTables,
     generateCollectionFile,
     generateIndexContent,
     mergeIndexContent,
@@ -271,6 +272,19 @@ async function main() {
             outWarn(chalk.yellow(`⚠ ${notes.length} column(s) will not round-trip exactly — \`rebase db push\` would change them:`));
             for (const note of [...notes].sort()) outWarn(chalk.gray(`  - ${note}`));
             outWarn(chalk.gray("  Read these before the first push. Run `rebase db push --dry-run` to see the plan."));
+        }
+
+        // And the tables whose access the push changes whatever their
+        // collections say: no collection keeps row-level security off.
+        const rlsOff = describeRlsOffTables(metadata.tables
+            .filter((table) => table.rls_enabled === false && generatedFiles.includes(table.table_name))
+            .map((table) => table.table_name));
+        if (rlsOff) {
+            const [headline, ...rest] = rlsOff.split("\n");
+            outWarn("");
+            outWarn(chalk.yellow(`⚠ ${headline}`));
+            for (const line of rest) outWarn(chalk.gray(`  ${line}`));
+            outWarn(chalk.gray("  `rebase db push --dry-run` lists every policy it would create."));
         }
 
         // Generate index.ts (sorted alphabetically for deterministic output)
