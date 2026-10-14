@@ -262,6 +262,12 @@ Trois fichiers déterminent ce à quoi un backend peut accéder, et cette comman
 
 Un `○` représente l'état qu'il vaut mieux connaître avant un déploiement plutôt qu'après : déclaré, non configuré. Un `✗` signifie que l'environnement configure quelque chose d'*incorrectement*, ce qui bloque le démarrage plutôt que de fonctionner en mode dégradé.
 
+<span class="since-badge" data-since="0.25">Depuis 0.25</span> Un
+`rebase.resources.json` qui ne correspond plus aux déclarations reçoit une ligne `○`.
+Un fichier qui n'a pas encore été écrit n'en reçoit pas : `rebase build` l'écrit à chaque
+exécution, si bien qu'un projet qui n'a jamais été compilé, comme un scaffold tout neuf, n'a
+rien à corriger. En 0.24, le `status` de chaque nouveau projet se terminait par « is missing ».
+
 ### `rebase resources`
 
 Ce dont ce projet déclare avoir besoin — les bases de données, buckets, topics et files d'attente demandés par son code de configuration, ainsi que les crons et fonctions définis par ses fichiers :
@@ -283,6 +289,7 @@ le graphe porte `check.status`. `--write --json` écrit le fichier et signale
 Une ressource est déclarée dans le code de configuration — `database("analytics")`, `bucket("media")`, `topic("signups")`, `queue("thumbnails")` — ou correspond à un fichier situé sous `backend/crons` ou `backend/functions`, et n'est jamais écrite à la main dans `rebase.resources.json`, qui est généré à partir de ces déclarations afin qu'un hôte puisse lire ce dont un projet a besoin sans avoir à le compiler. Chaque entrée enregistre qui l'utilise (`collection:events`, `property:posts.cover`, `function:report`).
 
 Un backend dispose également d'une base de données par défaut et d'une source de stockage par défaut que personne ne déclare. Toutes deux sont répertoriées ici avec la mention `implicit`, et aucune n'est écrite dans `rebase.resources.json` — l'hôte les fournit, donc les consigner reviendrait à demander le provisionnement de ressources que personne n'a sollicitées.
+<span class="since-badge" data-since="0.25">Depuis 0.25</span> Déclarer une ressource nommée, comme `bucket("media")`, laisse la ressource par défaut en place : les deux sont donc listées. Seule la déclaration de la ressource par défaut elle-même, ou le marquage d'un bucket avec `default: true`, la remplace. En 0.24, la source de stockage par défaut disparaissait de `rebase status` et de `rebase resources` dès qu'un bucket était déclaré, alors que le serveur continuait de la servir.
 
 Pour comparer ce que la plateforme détient pour un projet avec ce que son code déclare, et pour supprimer une base de données provisionnée que le code ne mentionne plus, consultez [`rebase cloud resources`](/docs/cli/cloud#resources).
 

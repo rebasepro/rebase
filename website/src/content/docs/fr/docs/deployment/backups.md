@@ -39,9 +39,11 @@ rebase db restore ./backups/rebase-app-20260714T030000Z.dump \
   --create-db --target-db app_restored
 ```
 
-La chaîne de connexion provient de l'environnement de votre projet, comme pour toute
-autre [commande `rebase db`](/docs/cli/database/) : `DATABASE_URL`, avec repli sur
-`ADMIN_CONNECTION_STRING`.
+La base de données est celle que résout toute autre [commande `rebase db`](/docs/cli/database/),
+dans le même ordre : `--database-url`, `DATABASE_URL` dans le shell, la
+[branche](/docs/backend/branching/) sur laquelle l'espace de travail est basculé, `DATABASE_URL`
+dans `.env`, Postgres sous Docker (`--docker`, ou le dernier `rebase dev --docker`),
+puis la base de données de développement gérée, que `restore` refuse.
 
 <span class="since-badge" data-since="0.25">Depuis 0.25</span> Un `--out` relatif,
 la valeur par défaut `./backups` et un chemin de dump passé à `rebase db restore`
@@ -65,7 +67,7 @@ se basent la rétention et le tri de la liste.
 | Option | Description |
 | --- | --- |
 | `--out`, `-o` | Un chemin local, ou une URL `s3://bucket/prefix` / `gs://bucket/prefix`. Par défaut `$BACKUP_DESTINATION`, puis `./backups` dans le répertoire depuis lequel vous lancez `rebase`. |
-| `--exclude-schema <s>` | Exclut un schéma du dump (répétable). N'excluez jamais `rebase` — voir ci-dessous. |
+| `--exclude-schema <s>` | Exclut un schéma du dump (répétable). Un motif qui correspond à `rebase` est refusé — voir ci-dessous. |
 | `--no-owner` | Omet les commandes de propriété, pour une restauration sous un rôle différent. |
 | `--enable-row-security` | Effectue le dump en tant que sujet administrateur plutôt que d'échouer sur la sécurité au niveau des lignes. **Peut produire un dump partiel** — voir [Sécurité au niveau des lignes](#sécurité-au-niveau-des-lignes-et-le-dump-silencieusement-incomplet). |
 | `--row-security-role <r>` | Le rôle à utiliser pour la lecture avec l'option ci-dessus. Par défaut `admin`. |
@@ -102,6 +104,11 @@ qu'appellent vos politiques RLS et vos déclencheurs de capture de modifications
 dump sans lui ne comporte aucun utilisateur, et ne peut pas du tout être restauré dans
 une base de données vide : les tables qu'il contient ont des politiques qui appellent
 des fonctions qu'il ne contient pas.
+
+<span class="since-badge" data-since="0.25">Depuis 0.25</span> C'est pourquoi
+`rebase db backup` refuse un `--exclude-schema` qui correspond à `rebase`, selon les propres
+règles de motif de pg_dump (`reb*` et `*` compris), avant d'exécuter quoi que ce soit.
+En 0.24, il écrivait le dump et le validait, et seule la restauration échouait.
 
 <span class="since-badge" data-since="0.25">Depuis 0.25</span> Comme il contient
 chaque mot de passe et chaque hash de clé, un dump local et son `.globals.sql` sont créés
@@ -198,6 +205,8 @@ Installez-les avec `brew install libpq` ou
 `apt-get install postgresql-client-18` (depuis le dépôt apt de PostgreSQL, celui de
 Debian étant plus ancien), ou pointez vers un binaire spécifique avec
 `PG_DUMP_PATH`, `PG_RESTORE_PATH` et `PG_DUMPALL_PATH`.
+`restore --clean` exécute aussi `psql`, qui est fourni avec eux ; `PSQL_PATH` en désigne
+un autre.
 
 ## Sécurité au niveau des lignes, et le dump silencieusement incomplet
 
@@ -249,6 +258,21 @@ gênent, et dit de passer `--clean` ou de restaurer dans une nouvelle base de do
 développement gérée, qui ne peut pas recevoir les données COPY d'un dump ; restaurez plutôt
 dans un Postgres sous Docker avec `--docker`.
 
+<span class="since-badge" data-since="0.25">Depuis 0.25</span> Avec `--clean`,
+la restauration remplace ce que contient la sauvegarde en une seule transaction. Elle supprime en
+entier chaque schéma que la sauvegarde crée (`rebase`, par exemple), et chaque table que la
+sauvegarde crée dans un schéma qu'elle ne crée pas (`public`), avec `CASCADE`, puis restaure le
+dump dans la même transaction. Avant de demander confirmation, elle nomme ce que cela supprime et
+que la sauvegarde ne contient pas, comme `rebase.atlas_schema_revisions` issue de
+`rebase db migrate`, ou une vue ou une clé étrangère ailleurs qui référence l'une des tables de la
+sauvegarde. Une restauration qui s'arrête à n'importe quel moment est annulée, et elle indique que
+la base de données contient ce qu'elle contenait auparavant. Elle fait passer le dump par `psql`,
+qui est fourni avec `pg_restore` (`PSQL_PATH` en désigne un autre), et attend au plus
+15 secondes un verrou, qu'un `rebase dev` en cours d'exécution peut détenir. En 0.24, `--clean`
+était celui de pg_restore, une instruction à la fois : une table absente de la sauvegarde dans
+`rebase` l'arrêtait sur `DROP SCHEMA rebase`, après que chaque table avait été supprimée.
+`--continue-on-error` exécute toujours le `--clean` de pg_restore.
+
 Avant de restaurer, elle recrée les rôles du cluster à partir du `.globals.sql` de la
 sauvegarde — un rôle déjà existant est ignoré, pas une erreur — afin que les
 attributions et politiques du dump s'appliquent. Elle s'exécute ensuite avec
@@ -261,7 +285,7 @@ manquer.
 | --- | --- |
 | `--target-db <name>` | Restaure dans cette base de données plutôt que celle de `DATABASE_URL`. |
 | `--create-db` | Crée d'abord la base de données cible si elle n'existe pas. |
-| `--clean` | Supprime les objets existants avant de les recréer (`--clean --if-exists`). |
+| `--clean` | Remplace ce que contient la sauvegarde, en une seule transaction avec la restauration : ses schémas en entier, et ses tables ailleurs. Indique d'abord ce que cela supprime au-delà de la sauvegarde. |
 | `--no-owner` | Ignore la propriété enregistrée dans le dump. |
 | `--continue-on-error` | Journalise les erreurs et continue malgré elles. **Peut laisser la RLS non appliquée** ; utilisez-la seulement si vous savez pourquoi. |
 | `--yes`, `-y` | Ignore la confirmation. |

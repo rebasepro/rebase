@@ -60,6 +60,18 @@ Cannot create branch: the source database "leadgen" has active connections.
 
 `--force` met fin à ces sessions avant l'opération de template, aussi bien lors de `create` que de `delete`. Il ne met jamais fin à la session qui exécute la commande elle-même.
 
+<span class="since-badge" data-since="0.25">Depuis 0.25</span> `create --force`
+ferme aussi la source aux nouvelles connexions pendant la copie
+(`ALTER DATABASE … ALLOW_CONNECTIONS false`, exécuté depuis la base de données `postgres`
+du serveur) et la rouvre ensuite, y compris en cas d'échec et de Ctrl-C. Un client
+qui se reconnecte dès qu'il est déconnecté, comme le fait un `rebase dev` en cours d'exécution,
+ne peut alors plus se glisser à nouveau avant le début de la copie. Cela exige les droits du
+propriétaire de la source ; sans eux, et pour `delete`, `--force` déconnecte les sessions jusqu'à
+trois fois avant d'abandonner. Quand une session est encore là après cela, l'erreur dit qu'elles
+se sont reconnectées et qu'il faut les arrêter, et non de repasser `--force`. En 0.24, il les
+déconnectait une seule fois, et environ un `create --force` sur sept sous un `rebase dev` en
+cours d'exécution échouait en conseillant de relancer avec `--force`.
+
 `DatabasePoolManager` déconnecte ses propres pools inactifs avant de cloner ou de supprimer — mais uniquement les pools **au sein du processus qui effectue le travail**. `rebase db branch` s'exécute en tant que processus distinct, cela ne touche donc à rien d'autre sur votre machine :
 
 - **Une instance de `rebase dev` en cours d'exécution bloque la création de branches.** C'est le cas le plus fréquent, et non un cas particulier : vouloir une branche et faire tourner l'application arrivent généralement au même moment. Arrêtez le serveur de développement, créez la branche, puis redémarrez-le.
@@ -188,6 +200,15 @@ rebase db branch delete dev_sandbox
 ```
 
 `switch` est ce qui rend une branche utilisable. Il enregistre la branche dans `.rebase/branch.json` — un nom, jamais une chaîne de connexion, de sorte que vos identifiants restent uniquement dans `.env` — et chaque commande `rebase` dans cet espace de travail résout alors la base de données de la branche à la place : `dev`, `db push`, `db migrate`, `db backup`.
+Un `rebase dev` déjà en cours d'exécution garde la base de données sur laquelle il a démarré jusqu'à ce
+que vous le redémarriez, et `switch` le signale.
+
+<span class="since-badge" data-since="0.25">Depuis 0.25</span> `rebase db branch list`
+marque la branche sur laquelle se trouve cet espace de travail, et `prune` ne la supprime jamais,
+pas plus que `delete` n'accepte de le faire : le plan la liste comme conservée, et dit de la quitter
+d'abord avec `rebase db branch switch --off`. En 0.24, `prune --older-than … --yes` la supprimait,
+et l'espace de travail faisait alors pointer chaque commande vers une base de données qui
+n'existait plus.
 
 Il s'intercale entre le shell et le fichier de projet dans l'ordre de résolution :
 
@@ -217,11 +238,10 @@ un espace de travail basculé n'était enregistrée que dans le snapshot de la b
 
 Les branches sont des bases de données PostgreSQL ordinaires nommées d'après la branche avec un préfixe `rb_` ; ainsi, `dev_sandbox` ci-dessus correspond à la base de données `rb_dev_sandbox` sur le même serveur.
 
-Créer une branche ne modifie **pas** la base de données avec laquelle votre projet communique. `rebase db branch create` effectue la copie et s'arrête là ; rien n'est écrit dans `.env`, et le prochain `rebase dev` utilisera toujours la base de données qu'il utilisait auparavant. Pour travailler sur une branche, faites pointer `DATABASE_URL` dessus vous-même — la chaîne de connexion est celle que vous avez déjà, avec le nom de la base de données remplacé :
+Créer une branche ne modifie **pas** la base de données avec laquelle votre projet communique. `rebase db branch create` effectue la copie et s'arrête là ; rien n'est écrit dans `.env`, et le prochain `rebase dev` utilisera toujours la base de données qu'il utilisait auparavant. Pour travailler sur une branche, basculez dessus avec `rebase db branch switch <name>`, comme ci-dessus. Pour l'atteindre depuis tout ce qui n'est pas une commande `rebase`, sa chaîne de connexion est celle que vous avez déjà, avec le nom de la base de données remplacé :
 
 ```bash
-# .env
-DATABASE_URL=postgresql://user:pass@localhost:5432/rb_dev_sandbox
+postgresql://user:pass@localhost:5432/rb_dev_sandbox
 ```
 
 ---

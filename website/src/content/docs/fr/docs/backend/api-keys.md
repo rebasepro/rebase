@@ -329,7 +329,12 @@ Chaque route renvoie les clés masquées : `key_prefix`, jamais le hash. Chaque 
 
 Le CLI couvre les clés de service : `rebase api-keys list`, `get`, `create`, `revoke`, et `scopes`,
 qui liste toutes les portées que le backend connaît. Voir la
-[référence du CLI](/docs/cli/#rebase-api-keys).
+[référence du CLI](/docs/cli/#rebase-api-keys). Il s'authentifie avec
+`REBASE_SERVICE_KEY` lu dans `.env`, et ne l'envoie qu'au serveur que `rebase dev`
+exécute pour ce projet : quand ce serveur est arrêté, il n'envoie rien. Pour un
+serveur lancé autrement, comme `rebase start` ou un conteneur, définissez
+`REBASE_BASE_URL` sur son adresse
+([l'environnement propre au CLI](/docs/getting-started/configuration/#the-clis-own-environment)).
 
 ## Clés créées avant les portées
 

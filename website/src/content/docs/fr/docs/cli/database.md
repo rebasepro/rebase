@@ -69,9 +69,21 @@ rebase db migrate --baseline <version>
 ```
 
 La version est le préfixe numérique du fichier de migration ; `db generate` affiche la
-commande avec la version déjà renseignée. Chaque `db migrate` qui suit est ordinaire. Voir
+commande avec la version déjà renseignée. Voir
 [`--baseline`](/docs/cli/schema/#rebase-db-migrate) pour une base de données qui enregistre
 déjà des migrations.
+
+Ensuite, `db migrate` applique ce que le démarrage n'a pas appliqué, et sur une base de données que
+`rebase dev` sert, c'est moins qu'il n'y paraît. Le démarrage ajoute chaque nouvelle table,
+colonne et valeur d'enum dès qu'une collection change, si bien qu'au moment où
+`db generate` écrit la migration qui ajoute une colonne, la colonne est déjà
+là : ce `db migrate` s'arrête de nouveau sur `already exists` et nomme le
+`--baseline <version>` qui l'enregistre. Chaque nouvelle propriété implique une nouvelle
+baseline. N'enregistrez une migration que lorsque le démarrage a effectué chacune de ses
+modifications. Une migration qui supprime, renomme ou rétrécit aussi quelque chose contient des
+instructions que le démarrage n'exécute jamais, et l'enregistrer les fait sauter. En
+développement, `rebase db push` est la commande qui modifie le schéma ; réservez `db generate`
+et `db migrate` à une base de données que le démarrage n'a pas déjà modifiée.
 
 ### `rebase db backup` / `backups` / `restore`
 
@@ -90,12 +102,22 @@ refuse avant que quoi que ce soit ne soit appliqué, rôles du cluster compris, 
 qui gênent ainsi que les deux façons de les contourner : `--clean`, ou
 `--create-db --target-db <new name>`. En 0.24, il appliquait les rôles puis échouait sur le
 `schema "rebase" already exists` de pg_restore.
+<span class="since-badge" data-since="0.25">Depuis 0.25</span> Avec `--clean`,
+la restauration est une seule transaction : elle supprime les schémas de la sauvegarde avec tout
+ce qu'ils contiennent, restaure, et ne valide qu'une fois toute la restauration réussie, si bien
+qu'un échec laisse la base de données telle qu'elle était. Avant de demander confirmation, elle
+nomme ce qu'elle supprime et que la sauvegarde ne contient pas. Elle exécute `psql`, fourni avec
+`pg_restore`. En 0.24, une restauration `--clean` dans une base de données contenant une table
+absente de la sauvegarde, comme la table des révisions d'Atlas après `db migrate`, supprimait
+tout et ne restaurait rien.
 <span class="since-badge" data-since="0.25">Depuis 0.25</span> `restore` refuse
 la base de données de développement gérée : une sauvegarde transporte ses lignes sous forme de
 données COPY, qu'elle ne peut pas recevoir, et en 0.24 la restauration la laissait bloquée jusqu'à
 ce qu'on l'arrête. Restaurez dans un Postgres sous Docker (`rebase db restore <dump> --docker --clean --yes`),
 puis `rebase db pull --from "$(rebase db url --docker)" --yes` la copie dans
-la base de données gérée.
+la base de données gérée. Une sauvegarde de la base de données gérée la laisse telle qu'elle
+était ; en 0.24, les réglages qu'appliquait `pg_dump` y restaient, et chaque requête d'API
+échouait jusqu'à `rebase db stop`.
 <span class="since-badge" data-since="0.25">Depuis 0.25</span> Les chemins relatifs,
 et la valeur par défaut `./backups`, se résolvent par rapport au répertoire depuis lequel vous lancez
 `rebase`, de sorte que les trois lignes ci-dessus se retrouvent dans un même répertoire ; une
@@ -121,6 +143,12 @@ Une colonne sous un index unique reçoit une valeur distincte par ligne, et le p
 transaction : s'il échoue, les tables qu'il aurait réécrites sont vidées et
 nommées, et la commande se termine avec le code 1. En 0.24, il échouait sur `token_hash` dès que des utilisateurs
 s'étaient connectés deux fois, en laissant de réelles données derrière lui.
+
+<span class="since-badge" data-since="0.25">Depuis 0.25</span> Une option que `pull`
+n'accepte pas est refusée avant que quoi que ce soit ne soit lu ou copié, avec le nom de celle qui
+était probablement voulue : `--anonymise` répond « did you mean --anonymize? » et se termine avec
+le code 1. En 0.24, une option mal orthographiée était ignorée, si bien que `--anonymise`, `--anon`
+ou `--schem` lançaient le pull sans elle, et les données personnelles arrivaient telles quelles.
 
 `pg_dump` supprime les privilèges, de sorte que la copie arriverait avec les politiques RLS de la source et aucun des droits d'accès (grants) sous-jacents — chaque lecture en tant que `rebase_user` échouant avec `permission denied`. Le pull réattribue ensuite le rôle de l'application, en utilisant la même routine que le démarrage et `rebase db push`, afin que les tables internes de Rebase restent révoquées comme il se doit.
 

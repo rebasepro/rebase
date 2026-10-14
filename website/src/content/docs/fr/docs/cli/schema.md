@@ -23,7 +23,7 @@ Vos définitions de collections dans `config/collections/` décrivent les tables
 
 ### 2. Schéma Drizzle → Migrations
 
-À partir du schéma Drizzle généré, `db generate` compare avec l'état actuel de la base de données et produit des fichiers de migration SQL horodatés.
+À partir du schéma Drizzle généré, `db generate` compare avec les migrations déjà présentes dans `drizzle/migrations/`, rejouées sur une base de données jetable, et produit des fichiers de migration SQL horodatés. Elle ne lit jamais votre base de données : une colonne que le démarrage ou `db push` a déjà ajoutée ressort quand même en `ADD COLUMN`.
 
 ### 3. Migrations → PostgreSQL
 
@@ -93,6 +93,11 @@ rebase schema introspect
   `db push` qui suit recrée donc chaque politique telle qu'elle était. En 0.24, les politiques
   restent hors des fichiers, et un push peut en supprimer une dont le nom a la forme de celui
   d'une politique générée (`<table>_<op>_<hash>`)
+- <span class="since-badge" data-since="0.25">Depuis 0.25</span> Lit chaque
+  expression (le `USING` d'une politique, un CHECK, la valeur par défaut d'une colonne) sous le
+  `search_path` qu'utilise le serveur, `public`, si bien qu'une fonction du schéma `rebase`
+  s'écrit `rebase.roles()`. Connecté avec un rôle nommé `rebase`, le chemin par défaut plaçait ce
+  schéma en premier et la règle revenait sous la forme `roles()`, que le push ne trouvait pas
 - <span class="since-badge" data-since="0.25">Depuis 0.25</span> Écrit
   `disableDefaultPolicies: true` sur une table dont la sécurité au niveau des lignes est activée et
   qui ne détient pas toute la [base administrateur](/docs/collections/security-rules/#policies-a-collection-gets-without-writing-them),
@@ -164,10 +169,14 @@ rebase db push
   liste la sécurité au niveau des lignes que le push modifierait, sous « Planned row-level security
   changes » : les tables pour lesquelles il active la RLS, et chaque politique qu'il crée, remplace
   ou supprime, déterminées comme les décident les propres étapes du push. Il ne dit « No changes »
-  que lorsque ni le schéma ni la sécurité au niveau des lignes ne changeraient. Une politique sans
-  estampille de Rebase (écrite à la main, ou lue par `schema introspect`) est recréée à partir de sa
-  règle sans rien à quoi la comparer au préalable, et elle est listée à part. Le push lui-même
-  affiche une ligne qui les compte. En 0.24, le dry run ne montrait que le plan d'Atlas, qui ne
+  que lorsque ni le schéma ni la sécurité au niveau des lignes ne changeraient. Là où l'estampille
+  d'une politique ne correspond pas à sa règle, ou qu'elle n'en a aucune (une politique créée par
+  `db migrate`, une politique écrite à la main), le dry run la recrée à partir de sa règle sous un
+  autre nom, dans une transaction qu'il annule, et compare ce que Postgres a stocké : une politique
+  qui ressort identique n'est pas un changement. Ainsi, une règle que `schema introspect` a relue
+  sous forme de SQL ne planifie rien, pas plus que les politiques appliquées par `db migrate`. Seule
+  une politique qu'il n'a pas pu comparer (le verrou de sa table non accordé en deux secondes, par
+  exemple) est listée à part. Le push lui-même affiche une ligne qui compte les changements. En 0.24, le dry run ne montrait que le plan d'Atlas, qui ne
   contient aucune politique
 - <span class="since-badge" data-since="0.25">Depuis 0.25</span> Affiche une seule fois
   chaque instruction qu'applique Atlas. Atlas se connecte sans SSL à une base de données sur cette
@@ -229,7 +238,7 @@ rebase db generate
 ```
 
 **Ce qu'elle fait :**
-- Compare le schéma Drizzle avec l'état actuel de la base de données
+- Compare le schéma Drizzle avec l'état que construisent les migrations de `drizzle/migrations/`, pas avec votre base de données
 - Produit des fichiers de migration SQL horodatés dans `drizzle/migrations/`
 - Les fichiers peuvent être examinés, modifiés et validés dans le contrôle de version
 - <span class="since-badge" data-since="0.25">Depuis 0.25</span> Nomme chaque
@@ -239,6 +248,12 @@ rebase db generate
   un changement de clé primaire, ou la suppression d'une contrainte CHECK ou EXCLUDE que la
   base de données détient. Elle écrit quand même le fichier et se termine
   avec le code 0 : elle avertit, elle ne refuse pas.
+- <span class="since-badge" data-since="0.25">Depuis 0.25</span> Se termine sur ce qu'il faut
+  faire ensuite : `rebase db migrate`, et pour la première migration d'un projet, le
+  `--baseline <version>` dont a besoin à la place une base de données que le démarrage a déjà
+  préparée. Une migration ultérieure ne reçoit aucune ligne de baseline, puisqu'une migration
+  destructive enregistrée par baseline sauterait son `DROP`, et une exécution qui n'écrit aucune
+  migration ne dit que cela.
 
 **Un CHECK qu'une de vos migrations a ajouté est supprimé par la suivante.** `db generate`
 compare vos fichiers de migration, pas la base de données, et Atlas n'a aucun moyen d'exclure
