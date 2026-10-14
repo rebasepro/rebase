@@ -1422,6 +1422,12 @@ async function branchCommand(rawArgs: string[]): Promise<void> {
     // A database that is not running is said the way `db push` says it, not
     // as the Drizzle wrapper of whatever statement met it first.
     await checkDatabaseConnectivity(databaseUrl);
+    // …and the probe's connection let go at once. It is the one the other
+    // commands keep between steps, and this one does not use it again — while
+    // open it is a session on the source database, and `CREATE DATABASE …
+    // TEMPLATE` refuses a source with active connections, so every
+    // `branch create` failed with "the source database has active connections".
+    await closeAppClients();
 
     const pool = new Pool({ connectionString: databaseUrl,
 max: 3 });

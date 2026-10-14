@@ -113,3 +113,81 @@ describe("db branch list and info on a database with no branches", () => {
         expect(await rebaseSchemaExists()).toBe(false);
     });
 });
+
+/**
+ * `db branch create` copies the database with `CREATE DATABASE … TEMPLATE`,
+ * which refuses a source anyone is connected to. The connectivity probe every
+ * `db` command runs first keeps its connection for the next step — on the
+ * source database — and the branch command does not reuse it, so it has to be
+ * let go before the copy. With it open, every create failed with "the source
+ * database has active connections".
+ */
+describe("db branch create after the connectivity probe", () => {
+    let container: PgContainer;
+    let maintenance: pg.Client;
+    let workDir: string;
+    const original = { DATABASE_URL: process.env.DATABASE_URL, cwd: process.cwd() };
+
+    beforeAll(async () => {
+        container = await startPgContainer();
+        // Every check runs on the `postgres` database: a session on the source
+        // would itself block the copy under test.
+        const url = new URL(container.connectionString);
+        url.pathname = "/postgres";
+        for (let attempt = 1; ; attempt++) {
+            try {
+                maintenance = new pg.Client({ connectionString: url.toString() });
+                await maintenance.connect();
+                break;
+            } catch (error) {
+                if (attempt >= 10) throw error;
+                await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+        }
+    }, 120_000);
+
+    afterAll(async () => {
+        if (maintenance) await maintenance.end().catch(() => {});
+        if (container) await stopPgContainer(container.containerName);
+    }, 30_000);
+
+    beforeEach(() => {
+        process.env.DATABASE_URL = container.connectionString;
+        workDir = fs.mkdtempSync(path.join(os.tmpdir(), "rebase-branch-create-"));
+        process.chdir(workDir);
+        vi.spyOn(console, "log").mockImplementation(() => {});
+        vi.spyOn(console, "error").mockImplementation(() => {});
+        vi.spyOn(console, "warn").mockImplementation(() => {});
+        vi.spyOn(process, "exit").mockImplementation((code?: string | number | null) => {
+            throw new Exited(typeof code === "number" ? code : undefined);
+        });
+    });
+
+    afterEach(() => {
+        vi.restoreAllMocks();
+        process.chdir(original.cwd);
+        if (original.DATABASE_URL === undefined) delete process.env.DATABASE_URL;
+        else process.env.DATABASE_URL = original.DATABASE_URL;
+        fs.rmSync(workDir, { recursive: true, force: true });
+    });
+
+    async function run(args: string[]): Promise<number | undefined> {
+        try {
+            await runPluginCommand(args);
+            return 0;
+        } catch (error) {
+            if (error instanceof Exited) return error.code;
+            throw error;
+        }
+    }
+
+    it("creates the branch database, and deletes it again", async () => {
+        expect(await run(["db", "branch", "create", "probe_branch"])).toBe(0);
+        const created = await maintenance.query("SELECT datname FROM pg_database WHERE datname LIKE '%probe_branch%'");
+        expect(created.rows).toHaveLength(1);
+
+        expect(await run(["db", "branch", "delete", "probe_branch", "--yes"])).toBe(0);
+        const gone = await maintenance.query("SELECT datname FROM pg_database WHERE datname LIKE '%probe_branch%'");
+        expect(gone.rows).toHaveLength(0);
+    }, 60_000);
+});
