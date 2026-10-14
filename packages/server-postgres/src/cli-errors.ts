@@ -260,8 +260,12 @@ function formatSslNotEnabledBanner(databaseUrl: string): string {
 /**
  * Format a diagnostic banner for a dependency-drop failure during `db push`.
  * Explains that the database may be left partially migrated and how to recover.
+ *
+ * The DROP reads the connection string from `rebase db url`, as the NOT NULL
+ * box's backfill does: on the managed development database `.env` leaves
+ * `DATABASE_URL` unset, and the shell has none.
  */
-function formatDependencyDropBanner(): string {
+function formatDependencyDropBanner(manager: ProjectPackageManager = detectProjectPackageManager()): string {
     return (
         `\n` +
         `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
@@ -278,7 +282,7 @@ function formatDependencyDropBanner(): string {
         `\n` +
         `    1. Inspect the leftover object named in the error above.\n` +
         `    2. Drop it with CASCADE, e.g.:\n` +
-        `         psql "$DATABASE_URL" -c 'DROP TYPE "<name>" CASCADE;'\n` +
+        `         psql "$(${projectRebaseCommand(manager)} db url)" -c 'DROP TYPE "<name>" CASCADE;'\n` +
         `    3. Re-run:  ${chalk.bold.green("rebase db push")}\n` +
         `\n` +
         `  Prefer a safe, versioned workflow? Use ${chalk.bold("rebase db generate")}\n` +
