@@ -8,7 +8,7 @@
  * it, and with `--clean` on the line nothing would have. `db backup --ot ../x`
  * wrote to the default directory. Every other `db` subcommand already refused.
  */
-import { parseBackupLine, parseRestoreLine, unknownBackupsAction } from "../src/backup/backup-cli";
+import { confirmRestore, parseBackupLine, parseRestoreLine, unknownBackupsAction } from "../src/backup/backup-cli";
 import { parseCommandFlags } from "../src/cli-flags";
 
 // The backup module runs pg_dump through execa, which is ESM-only and which
@@ -83,6 +83,42 @@ describe("parseCommandFlags", () => {
     it("leaves a missing value to arg's own message", () => {
         expect(() => parseCommandFlags({ "--out": String }, ["--out"], "db backups list"))
             .toThrow(/option requires argument: --out/);
+    });
+});
+
+describe("the restore's confirmation", () => {
+    let said: string[];
+    beforeEach(() => {
+        said = [];
+        const capture = (...parts: unknown[]) => { said.push(parts.join(" ")); };
+        jest.spyOn(console, "log").mockImplementation(capture);
+        jest.spyOn(console, "warn").mockImplementation(capture);
+        jest.spyOn(console, "error").mockImplementation(capture);
+    });
+    afterEach(() => jest.restoreAllMocks());
+    // eslint-disable-next-line no-control-regex
+    const text = () => said.join("\n").replace(/\x1b\[[0-9;]*m/g, "");
+
+    it("with no terminal, refuses and says to pass --yes, as db reset, pull and prune do", async () => {
+        const ask = jest.fn(async () => true);
+        await expect(confirmRestore({ target: "shop", yes: false, interactive: false, ask })).resolves.toBe(false);
+        expect(ask).not.toHaveBeenCalled();
+        expect(text()).toMatch(/Nothing was restored: there is no terminal to confirm on/);
+        expect(text()).toMatch(/Re-run with --yes to restore into "shop"/);
+    });
+
+    it("on a terminal, asks, and a no changes nothing", async () => {
+        const ask = jest.fn(async () => false);
+        await expect(confirmRestore({ target: "shop", yes: false, interactive: true, ask })).resolves.toBe(false);
+        expect(ask).toHaveBeenCalledTimes(1);
+        expect(text()).toMatch(/Aborted\. No changes were made\./);
+    });
+
+    it("goes ahead on a typed yes, and on --yes without asking", async () => {
+        await expect(confirmRestore({ target: "shop", yes: false, interactive: true, ask: async () => true })).resolves.toBe(true);
+        const ask = jest.fn(async () => false);
+        await expect(confirmRestore({ target: "shop", yes: true, interactive: false, ask })).resolves.toBe(true);
+        expect(ask).not.toHaveBeenCalled();
     });
 });
 

@@ -1511,9 +1511,9 @@ const DB_ACTION_HELP: Record<string, { usage: string; summary: string; notes?: s
         ]
     },
     restore: {
-        usage: "rebase db restore <dump> [--target-db <name>] [--create-db] --yes",
+        usage: "rebase db restore <dump> [--target-db <name>] [--create-db] [--clean] [--yes]",
         summary: "Restore a backup with pg_restore.",
-        notes: ["Destructive, and refuses to run without --yes."]
+        notes: ["Destructive: on a terminal it asks first, and with no terminal it refuses without --yes."]
     },
     pull: {
         usage: "rebase db pull --from <url> [--schema <name>] [--anonymize] [--yes]",
@@ -1564,7 +1564,7 @@ ${chalk.green.bold("Commands")}
   ${chalk.blue.bold("migrate")}    Run pending migrations
   ${chalk.blue.bold("branch")}     Database branching (create, list, switch, delete, info, prune)
   ${chalk.blue.bold("backup")}     Create a backup with pg_dump (--out <path|s3://…>)
-  ${chalk.blue.bold("restore")}    Restore a backup with pg_restore (destructive; needs --yes)
+  ${chalk.blue.bold("restore")}    Restore a backup with pg_restore (destructive; asks, or --yes)
   ${chalk.blue.bold("backups")}    List stored backups (db backup list is the same)
 
 ${chalk.green.bold("Examples")}

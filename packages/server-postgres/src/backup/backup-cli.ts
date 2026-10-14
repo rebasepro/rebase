@@ -322,6 +322,34 @@ export function parseRestoreLine(rawArgs: string[]) {
     return args;
 }
 
+/**
+ * The restore's one question, asked before anything can change.
+ *
+ * `--yes` skips it. On a terminal it asks for a typed 'yes'. With no terminal
+ * nobody can answer, and the refusal says to pass `--yes`, as `db reset`,
+ * `db pull` and `db branch prune` do: "Aborted. No changes were made." alone
+ * read as though someone had answered no.
+ *
+ * @returns whether to go on. When not, it has said why.
+ */
+export async function confirmRestore(opts: {
+    target: string;
+    yes: boolean;
+    interactive: boolean;
+    ask: (question: string) => Promise<boolean>;
+}): Promise<boolean> {
+    if (opts.yes) return true;
+    outWarn(chalk.yellow(`  ⚠️  This will restore into "${opts.target}" and may overwrite existing data.`));
+    if (!opts.interactive) {
+        outError(chalk.red("  ✗ Nothing was restored: there is no terminal to confirm on."));
+        outError(chalk.gray(`    Re-run with --yes to restore into "${opts.target}".`));
+        return false;
+    }
+    const confirmed = await opts.ask(chalk.yellow("     Type 'yes' to continue: "));
+    if (!confirmed) print(chalk.gray("  Aborted. No changes were made."));
+    return confirmed;
+}
+
 export async function restoreCommand(rawArgs: string[]): Promise<void> {
     if (rawArgs.includes("--help")) {
         printRestoreHelp();
@@ -383,10 +411,7 @@ export async function restoreCommand(rawArgs: string[]): Promise<void> {
             if (globalsObj) globalsSql = Buffer.from(await globalsObj.arrayBuffer()).toString("utf-8");
         } else {
             localFile = path.resolve(invocationDir(), backupArg);
-            if (!fs.existsSync(localFile)) {
-                outError(chalk.red(`  ✗ Backup file not found: ${localFile}`));
-                process.exit(1);
-            }
+            if (!fs.existsSync(localFile)) throw new BackupToolError(`Backup file not found: ${localFile}`);
             const globalsPath = globalsFileForDump(localFile);
             if (fs.existsSync(globalsPath)) globalsSql = fs.readFileSync(globalsPath, "utf-8");
         }
@@ -394,16 +419,14 @@ export async function restoreCommand(rawArgs: string[]): Promise<void> {
         // Version pre-flight. Check against the base connection — the server
         // version is identical for every database, and the target may not
         // exist yet when --create-db is used.
+        // Thrown, not exited, from here down: an exit skipped the `finally`
+        // that removes a dump downloaded from object storage.
         const pf = await preflight("pg_restore", baseConnection);
-        if (!pf.compatible) {
-            outError(chalk.red(`  ✗ ${pf.reason}`));
-            process.exit(1);
-        }
+        if (!pf.compatible) throw new BackupToolError(pf.reason ?? "pg_restore cannot restore into this server.");
 
         // `--create-db` needs a name before anything else can be decided.
         if (args["--create-db"] && !targetDb) {
-            outError(chalk.red("  ✗ --create-db requires a resolvable target database name (use --target-db)."));
-            process.exit(1);
+            throw new BackupToolError("--create-db requires a resolvable target database name (use --target-db).");
         }
 
         // Destructive-action gate. Restores overwrite data; never run without
@@ -415,15 +438,16 @@ export async function restoreCommand(rawArgs: string[]): Promise<void> {
         // second, confirmed run then reported as "already exists". The gate is
         // now the first thing that can stop the command, so its own message is
         // true whichever way the answer goes.
-        if (!args["--yes"]) {
-            outWarn(chalk.yellow(
-                `  ⚠️  This will restore into "${targetDb ?? "the target database"}" and may overwrite existing data.`
-            ));
-            const confirmed = await promptConfirm(chalk.yellow("     Type 'yes' to continue: "));
-            if (!confirmed) {
-                print(chalk.gray("  Aborted. No changes were made."));
-                process.exit(1);
-            }
+        const confirmed = await confirmRestore({
+            target: targetDb ?? "the target database",
+            yes: args["--yes"] === true,
+            interactive: process.stdin.isTTY === true,
+            ask: promptConfirm
+        });
+        if (!confirmed) {
+            // An exit code, so the `finally` still removes a downloaded dump.
+            process.exitCode = 1;
+            return;
         }
 
         // Create the target database when requested.
@@ -659,8 +683,9 @@ ${chalk.green.bold("Options")}
 
 ${chalk.red.bold("Warning")}
   Restore is destructive and never runs automatically. Without --yes it
-  requires an interactive 'yes'. Prefer --create-db/--target-db to restore
-  into a fresh database rather than overwriting a live one.
+  asks for a typed 'yes' on a terminal, and with no terminal to ask on it
+  refuses. Prefer --create-db/--target-db to restore into a fresh database
+  rather than overwriting a live one.
 
   By default the restore aborts on the first error (--exit-on-error) so a
   skipped GRANT never silently leaves RLS un-enforced. Roles are recreated
