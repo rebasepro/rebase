@@ -19,6 +19,8 @@
  */
 import chalk from "chalk";
 
+import { redactConnectionPasswords } from "./redact";
+
 /**
  * Damerau–Levenshtein distance, capped by the caller.
  *
@@ -109,6 +111,10 @@ function familyCommand(typed: string, families: Readonly<Record<string, readonly
  * `family` is empty for the top level: `rebase --help`, not `rebase  --help`.
  * `families` are the command families below this level, by name, whose
  * commands a word may be one of.
+ *
+ * The typed word is repeated with any connection-string password masked: a URL
+ * pasted where the command goes (`rebase db "postgres://u:pw@h/db"`) is a
+ * word like any other here, and this line lands in terminals and CI logs.
  */
 export function unknownCommandMessage(
     typed: string | undefined,
@@ -119,10 +125,11 @@ export function unknownCommandMessage(
     const what = family ? `${family} command` : "command";
     const suggestion = typed ? suggestCommand(typed, known) ?? familyCommand(typed, families) : undefined;
     const help = family ? `rebase ${family} --help` : "rebase --help";
+    const shown = redactConnectionPasswords(typed ?? "");
 
     return suggestion
-        ? `Unknown ${what} "${typed}" — did you mean \`${suggestion}\`? Run \`${help}\` for the rest.`
-        : `Unknown ${what} "${typed ?? ""}". Run \`${help}\` for the ones there are.`;
+        ? `Unknown ${what} "${shown}" — did you mean \`${suggestion}\`? Run \`${help}\` for the rest.`
+        : `Unknown ${what} "${shown}". Run \`${help}\` for the ones there are.`;
 }
 
 /**

@@ -108,3 +108,24 @@ describe("a command that lives in a family", () => {
         );
     });
 });
+
+/**
+ * The line repeats what was typed, and what was typed can be a connection
+ * string: `rebase db "postgres://u:pw@h/db"` — a URL pasted where the command
+ * goes — printed the password into the terminal, the CI log and the issue.
+ */
+describe("a connection string where the command goes", () => {
+    it("is repeated with its password masked", () => {
+        const message = unknownCommandMessage("postgres://u:s3cret@db.example.com:5432/app", ["push", "pull", "url"], "db");
+
+        expect(message).not.toContain("s3cret");
+        expect(message).toContain('"postgres://u:***@db.example.com:5432/app"');
+    });
+
+    it("is masked in the password= form too", () => {
+        const message = unknownCommandMessage("host=db password=s3cret", ["push"], "db");
+
+        expect(message).not.toContain("s3cret");
+        expect(message).toContain("password=***");
+    });
+});
