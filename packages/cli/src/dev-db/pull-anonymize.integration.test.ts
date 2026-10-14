@@ -62,6 +62,9 @@ beforeEach(async () => {
         -- Short columns: a replacement must fit them.
         CREATE TABLE public.leads (id serial PRIMARY KEY, zip char(5), billing_email varchar(30) UNIQUE);
         CREATE TABLE public.notes (id serial PRIMARY KEY, body text);
+        -- People that no list of table names could know: they have an address.
+        CREATE TABLE public.speakers (id serial PRIMARY KEY, name text, contact_email text);
+        CREATE TABLE public.tags (id serial PRIMARY KEY, name text);
         -- A view has an email column too, and is not a table to UPDATE.
         CREATE VIEW public.user_emails AS SELECT email FROM rebase.users;
     `);
@@ -80,6 +83,8 @@ beforeEach(async () => {
     await client.query(`INSERT INTO public.contacts (email) VALUES ('${REAL_EMAILS[1]}'), ('${REAL_EMAILS[2]}')`);
     await client.query(`INSERT INTO public.leads (zip, billing_email) VALUES ('94105', 'ap@corp.example'), ('10001', 'ar@corp.example')`);
     await client.query("INSERT INTO public.notes (body) VALUES ('kept as it is'), ('also kept')");
+    await client.query("INSERT INTO public.speakers (name, contact_email) VALUES ('Barbara Liskov', 'barbara@corp.example')");
+    await client.query("INSERT INTO public.tags (name) VALUES ('postgres'), ('rls')");
 });
 
 /** Every value of every column in the database that still reads as a real address. */
@@ -134,10 +139,20 @@ describe("anonymizeCopy", () => {
 
         const notes = (await client.query<{ body: string }>("SELECT body FROM public.notes ORDER BY id")).rows;
         expect(notes.map(note => note.body)).toEqual(["kept as it is", "also kept"]);
+        const tags = (await client.query<{ name: string }>("SELECT name FROM public.tags ORDER BY id")).rows;
+        // A bare `name` is redacted only on a table of people: a tag's is not one.
+        expect(tags.map(tag => tag.name)).toEqual(["postgres", "rls"]);
+    });
+
+    // The blog scaffold's `authors` is a table of people, and its names were
+    // copied as they were while its addresses were replaced.
+    it("redacts the names on a table of people, the blog scaffold's authors included", async () => {
+        await anonymizeCopy(client);
+
         const authors = (await client.query<{ name: string }>("SELECT name FROM public.authors ORDER BY id")).rows;
-        // A bare `name` is redacted only on a table of people (`users`,
-        // `customers`, …): an author's byline is what the site publishes.
-        expect(authors.map(author => author.name)).toEqual(["Ada", "Edsger"]);
+        expect(authors.map(author => author.name)).toEqual(["Redacted", "Redacted"]);
+        const speakers = (await client.query<{ name: string }>("SELECT name FROM public.speakers ORDER BY id")).rows;
+        expect(speakers.map(speaker => speaker.name)).toEqual(["Redacted"]);
     });
 
     it("is all-or-nothing, and empties what it could not anonymize rather than leave real data", async () => {

@@ -80,7 +80,7 @@ describe("shouldAnonymize", () => {
     it("redacts a bare `name` on a table of people, and nowhere else", () => {
         // A tag, a product or a category has a `name` too, and it is not
         // personal data; overwriting it would ruin the copy for nothing.
-        for (const table of ["users", "profiles", "people", "customers", "members", "contacts", "employees"]) {
+        for (const table of ["users", "profiles", "people", "customers", "members", "contacts", "employees", "authors"]) {
             expect(shouldAnonymize("name", table)).toBe(true);
         }
         for (const table of ["tags", "products", "categories", "posts"]) {
@@ -98,6 +98,41 @@ describe("shouldAnonymize", () => {
 });
 
 describe("anonymizableColumns", () => {
+    // The blog scaffold's `authors` is a table of people (`name`, `email`,
+    // `picture`), and `--anonymize` replaced the addresses and copied every
+    // name as it was: `Ann Author`, `Ben Writer`, `Cara Pen`.
+    it("redacts a bare `name` on a table that also holds an email address", () => {
+        const columns = [
+            column({ table: "speakers", column: "name" }),
+            column({ table: "speakers", column: "contact_email" }),
+            column({ table: "tags", column: "name" }),
+            column({ table: "tags", column: "slug" })
+        ];
+
+        expect(anonymizableColumns(columns).map((c) => `${c.table}.${c.column}`))
+            .toEqual(["speakers.name", "speakers.contact_email"]);
+    });
+
+    it("judges each table by its own columns, in each schema", () => {
+        const columns = [
+            column({ schema: "public", table: "speakers", column: "name" }),
+            column({ schema: "archive", table: "speakers", column: "name" }),
+            column({ schema: "archive", table: "speakers", column: "email" })
+        ];
+
+        expect(anonymizableColumns(columns).map((c) => `${c.schema}.${c.table}.${c.column}`))
+            .toEqual(["archive.speakers.name", "archive.speakers.email"]);
+    });
+
+    it("does not count an email-named column that holds no address", () => {
+        const columns = [
+            column({ table: "campaigns", column: "name" }),
+            column({ table: "campaigns", column: "email_count", dataType: "integer" })
+        ];
+
+        expect(anonymizableColumns(columns)).toEqual([]);
+    });
+
     it("skips a matching name whose type cannot hold the replacement", () => {
         // The failure this prevents: `UPDATE … SET user_id = 'Redacted'` on an
         // integer column, which errors and takes the whole pass down with it.
@@ -118,6 +153,18 @@ describe("anonymizableColumns", () => {
 });
 
 describe("anonymizeStatements", () => {
+    it("rewrites the blog scaffold's authors, name and email both", () => {
+        const statements = anonymizeStatements([
+            column({ table: "authors", column: "name" }),
+            column({ table: "authors", column: "email", unique: true }),
+            column({ table: "authors", column: "picture" })
+        ]);
+
+        expect(statements).toHaveLength(1);
+        expect(statements[0]).toContain('"name" = CASE WHEN "name" IS NULL THEN NULL ELSE \'Redacted\' END');
+        expect(statements[0]).toContain('"email" = CASE WHEN "email" IS NULL THEN NULL ELSE concat(\'user-\'');
+    });
+
     it("writes one UPDATE per table, with every matching column in it", () => {
         const statements = anonymizeStatements([
             column({ table: "users", column: "email" }),

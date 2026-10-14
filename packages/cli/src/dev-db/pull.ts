@@ -52,11 +52,11 @@ import { PGLITE_EXTENSIONS } from "./constraints";
 export interface AnonymizeRule {
     pattern: RegExp;
     /**
-     * Only on tables whose name matches, when set. For a column name that is
-     * personal on one table and not on another: a user's `name` is a person's,
-     * a tag's is not.
+     * Only on a table of people (see {@link isPeopleTable}), when set. For a
+     * column name that is personal on one table and not on another: a user's
+     * `name` is a person's, a tag's is not.
      */
-    tables?: RegExp;
+    peopleOnly?: true;
     /** The value for a column no unique index covers, or null to always use the unique form. */
     value: string | null;
     /** The unique form is `prefix` + random hex + `suffix`, cut to fit the column. */
@@ -65,10 +65,45 @@ export interface AnonymizeRule {
 }
 
 /**
- * Tables whose rows are people, by name: `rebase.users` and the usual spellings
- * of a project's own. Singular or plural.
+ * Tables whose rows are people, by name: `rebase.users`, the blog scaffold's
+ * `authors`, and the usual spellings of a project's own. Singular or plural.
  */
-const PERSON_TABLES = /^(users?|user_profiles?|profiles?|people|persons?|members?|customers?|contacts?|employees?)$/i;
+const PERSON_TABLES = /^(users?|user_profiles?|profiles?|people|persons?|members?|customers?|contacts?|employees?|authors?)$/i;
+
+/** An email address column, by name: the email rule's own pattern. */
+const EMAIL_COLUMN = /^(.*_)?e?mail(_.*)?$/i;
+
+/** The column types a replacement string fits. */
+const TEXTUAL_TYPES = new Set(["text", "character varying", "varchar", "character", "char", "citext"]);
+
+function isTextual(column: ColumnRef): boolean {
+    return TEXTUAL_TYPES.has(column.dataType.toLowerCase());
+}
+
+/** `"schema"."table"`, the key a column's table is known by. */
+function tableKey(column: ColumnRef): string {
+    return `${quoteIdentifier(column.schema)}.${quoteIdentifier(column.table)}`;
+}
+
+/**
+ * The tables whose rows are people: those {@link PERSON_TABLES} names, and any
+ * that holds an email address column.
+ *
+ * The second is what reaches the tables no list of names could: a row with an
+ * address of its own is a person's, so its `name` is one too. The blog
+ * scaffold's `authors` (`name`, `email`, `picture`) arrived with every name
+ * as it was. A table of organisations with a contact address gets its `name`
+ * redacted too, which costs a local copy little.
+ */
+export function peopleTables(columns: readonly ColumnRef[]): Set<string> {
+    const people = new Set<string>();
+    for (const column of columns) {
+        if (PERSON_TABLES.test(column.table) || (EMAIL_COLUMN.test(column.column) && isTextual(column))) {
+            people.add(tableKey(column));
+        }
+    }
+    return people;
+}
 
 /**
  * Column-name patterns the anonymizer overwrites.
@@ -80,7 +115,7 @@ const PERSON_TABLES = /^(users?|user_profiles?|profiles?|people|persons?|members
 export const ANONYMIZE_PATTERNS: readonly AnonymizeRule[] = [
     // Emails are unique in practice even where nothing enforces it, so they
     // always get a value of their own.
-    { pattern: /^(.*_)?e?mail(_.*)?$/i, value: null, prefix: "user-", suffix: "@example.invalid" },
+    { pattern: EMAIL_COLUMN, value: null, prefix: "user-", suffix: "@example.invalid" },
     { pattern: /^(.*_)?(phone|mobile|tel|telephone)(_.*)?$/i, value: "+10000000000", prefix: "+1-", suffix: "" },
     // `display_name` is how `rebase.users` holds every user's name.
     {
@@ -90,21 +125,25 @@ export const ANONYMIZE_PATTERNS: readonly AnonymizeRule[] = [
         suffix: ""
     },
     // A bare `name` is a person's only on a table of people.
-    { pattern: /^name$/i, tables: PERSON_TABLES, value: "Redacted", prefix: "Redacted-", suffix: "" },
+    { pattern: /^name$/i, peopleOnly: true, value: "Redacted", prefix: "Redacted-", suffix: "" },
     { pattern: /^(.*_)?(address|street|postcode|zip|zipcode)(_.*)?$/i, value: "Redacted", prefix: "Redacted-", suffix: "" },
     { pattern: /^(.*_)?(ssn|tax_id|national_id|passport)(_.*)?$/i, value: "REDACTED", prefix: "REDACTED-", suffix: "" },
     { pattern: /^(.*_)?(password|password_hash|secret|token|api_key|access_token|refresh_token)(_.*)?$/i, value: "REDACTED", prefix: "REDACTED-", suffix: "" },
     { pattern: /^(.*_)?(ip|ip_address|user_agent)(_.*)?$/i, value: "REDACTED", prefix: "REDACTED-", suffix: "" }
 ];
 
-/** The rule that overwrites this column, if any. Without a table, a table-bound rule never applies. */
-function ruleFor(columnName: string, table?: string): AnonymizeRule | undefined {
-    return ANONYMIZE_PATTERNS.find((rule) =>
-        rule.pattern.test(columnName) && (!rule.tables || (table !== undefined && rule.tables.test(table))));
+/** The rule that overwrites this column, if any. A people-only rule applies only on a table of people. */
+function ruleFor(columnName: string, onPeopleTable: boolean): AnonymizeRule | undefined {
+    return ANONYMIZE_PATTERNS.find((rule) => rule.pattern.test(columnName) && (!rule.peopleOnly || onPeopleTable));
 }
 
+/**
+ * Whether a column of this name is overwritten. A table is judged a table of
+ * people by its name here; {@link anonymizableColumns}, which sees the
+ * table's other columns, also counts one that holds an email address.
+ */
 export function shouldAnonymize(columnName: string, table?: string): boolean {
-    return ruleFor(columnName, table) !== undefined;
+    return ruleFor(columnName, table !== undefined && PERSON_TABLES.test(table)) !== undefined;
 }
 
 /** A text-ish column the anonymizer can overwrite without a type error. */
@@ -144,8 +183,8 @@ const MIN_UNIQUE_HEX = 12;
  * kept to at least {@link MIN_UNIQUE_HEX} digits while there is room for them.
  * A NULL stays NULL: an empty optional field is not personal data.
  */
-export function replacementFor(column: ColumnRef): string | null {
-    const rule = ruleFor(column.column, column.table);
+export function replacementFor(column: ColumnRef, onPeopleTable = PERSON_TABLES.test(column.table)): string | null {
+    const rule = ruleFor(column.column, onPeopleTable);
     if (!rule) return null;
     const limit = typeof column.maxLength === "number" && column.maxLength > 0 ? column.maxLength : null;
 
@@ -179,23 +218,23 @@ export function quoteIdentifier(name: string): string {
  * whole pass on a technicality.
  */
 export function anonymizableColumns(columns: readonly ColumnRef[]): ColumnRef[] {
-    const textual = new Set(["text", "character varying", "varchar", "character", "char", "citext"]);
+    const people = peopleTables(columns);
 
     return columns.filter((column) =>
-        shouldAnonymize(column.column, column.table) && textual.has(column.dataType.toLowerCase()));
+        isTextual(column) && ruleFor(column.column, people.has(tableKey(column))) !== undefined);
 }
 
 /** `"schema"."table"` for each table the pass rewrites, sorted. */
 export function anonymizedTables(columns: readonly ColumnRef[]): string[] {
-    return [...new Set(anonymizableColumns(columns).map((column) =>
-        `${quoteIdentifier(column.schema)}.${quoteIdentifier(column.table)}`))].sort();
+    return [...new Set(anonymizableColumns(columns).map(tableKey))].sort();
 }
 
 /** `UPDATE` statements for one anonymization pass, in a stable order. */
 export function anonymizeStatements(columns: readonly ColumnRef[]): string[] {
+    const people = peopleTables(columns);
     const byTable = new Map<string, ColumnRef[]>();
     for (const column of anonymizableColumns(columns)) {
-        const key = `${quoteIdentifier(column.schema)}.${quoteIdentifier(column.table)}`;
+        const key = tableKey(column);
         byTable.set(key, [...(byTable.get(key) ?? []), column]);
     }
 
@@ -204,7 +243,7 @@ export function anonymizeStatements(columns: readonly ColumnRef[]): string[] {
         .map(([table, cols]) => {
             const assignments = [...cols]
                 .sort((a, b) => a.column.localeCompare(b.column))
-                .map((column) => `${quoteIdentifier(column.column)} = ${replacementFor(column)}`)
+                .map((column) => `${quoteIdentifier(column.column)} = ${replacementFor(column, people.has(table))}`)
                 .join(", ");
 
             return `UPDATE ${table} SET ${assignments};`;

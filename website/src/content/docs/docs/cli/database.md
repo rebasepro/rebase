@@ -139,7 +139,9 @@ rebase db pull --from postgres://…  [--anonymize]
 
 `--anonymize` replaces personal fields on the way in, so a production copy can be
 worked on locally without carrying real customer data onto a laptop. It matches
-columns by name and is best-effort.
+columns by name and is best-effort. A bare `name` column is replaced only on a
+table of people: one called `users`, `authors`, `customers` or the like, or any
+table that also holds an email address column.
 A column under a unique index gets a distinct value per row, and the pass is one
 transaction: if it fails, the tables it would have rewritten are emptied and
 named, and the command exits 1. On 0.24 it failed on `token_hash` once users had
