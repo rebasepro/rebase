@@ -296,6 +296,12 @@ Ein `○` ist der Status, den man besser vor einem Deployment kennt als danach:
 deklariert, nicht konfiguriert. Ein `✗` bedeutet, dass die Umgebung etwas *falsch* setzt,
 was den Start verweigert, anstatt in einen eingeschränkten Modus überzugehen.
 
+<span class="since-badge" data-since="0.25">Seit 0.25</span> Eine
+`rebase.resources.json`, die nicht mehr zu den Deklarationen passt, erhält eine `○`-Zeile.
+Eine, die noch nicht geschrieben wurde, nicht: `rebase build` schreibt sie bei jedem Build, sodass
+ein Projekt, das nie gebaut wurde, etwa ein frisches Scaffold, nichts zu beheben hat. Unter 0.24
+endete der `status` jedes neuen Projekts mit "is missing".
+
 ### `rebase resources`
 
 Was dieses Projekt deklariertermaßen benötigt — die Datenbanken, Buckets, Topics und
@@ -327,6 +333,11 @@ Ein Backend hat außerdem eine Standarddatenbank und eine Standard-Speicherquell
 deklariert. Beide werden hier aufgelistet, als `implicit` markiert und keine von beiden wird in
 `rebase.resources.json` geschrieben — der Host stellt sie bereit, sodass ihre Erfassung
 etwas anfordern würde, nach dem niemand gefragt hat.
+<span class="since-badge" data-since="0.25">Seit 0.25</span> Eine benannte zu deklarieren, etwa
+`bucket("media")`, lässt die Standardquelle, wo sie ist, sodass beide aufgelistet werden. Nur die
+Deklaration der Standardquelle selbst oder ein Bucket mit `default: true` ersetzt sie. Unter 0.24
+verschwand die Standard-Speicherquelle aus `rebase status` und `rebase resources`, sobald irgendein
+Bucket deklariert war, obwohl der Server sie weiter auslieferte.
 
 Um zu sehen, was die Plattform für ein Projekt im Vergleich zu dem vorhält, was ihr Code deklariert,
 und um eine bereitgestellte Datenbank zu entfernen, die der Code nicht mehr nennt, siehe

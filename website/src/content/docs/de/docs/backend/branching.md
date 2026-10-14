@@ -60,6 +60,18 @@ Cannot create branch: the source database "leadgen" has active connections.
 
 `--force` beendet diese Sitzungen vor dem Templating, sowohl bei `create` als auch bei `delete`. Die Sitzung, die den Befehl selbst ausführt, wird dabei niemals beendet.
 
+<span class="since-badge" data-since="0.25">Seit 0.25</span> `create --force`
+schließt die Quelle außerdem für die Dauer der Kopie für neue Verbindungen
+(`ALTER DATABASE … ALLOW_CONNECTIONS false`, ausgeführt aus der `postgres`-Datenbank des Servers)
+und öffnet sie danach wieder, auch bei einem Fehler und bei Ctrl-C. Ein Client, der sich sofort
+nach dem Trennen wieder verbindet, wie es ein laufendes `rebase dev` tut, kann dann nicht
+zurückschlüpfen, bevor die Kopie beginnt. Dafür braucht es den Eigentümer der Quelle; ohne ihn,
+und bei `delete`, trennt `--force` die Sitzungen bis zu dreimal, bevor es aufgibt. Ist danach noch
+eine Sitzung da, sagt der Fehler, dass sie sich wieder verbunden haben und gestoppt werden müssen,
+statt erneut `--force` zu empfehlen. Unter 0.24 trennte es sie einmal, und etwa jedes siebte
+`create --force` unter einem laufenden `rebase dev` scheiterte mit dem Rat, es mit `--force`
+erneut auszuführen.
+
 Der `DatabasePoolManager` trennt vor dem Klonen oder Löschen seine eigenen Idle-Pools – allerdings nur die Pools **innerhalb des Prozesses, der die Arbeit ausführt**. Da `rebase db branch` als eigener Prozess läuft, erreicht dies nichts anderes auf Ihrem Rechner:
 
 - **Ein laufendes `rebase dev` blockiert das Branching.** Das ist der Regelfall, kein Randfall: Das Verlangen nach einem Branch und das Ausführen der App fallen meist zusammen. Stoppen Sie den Dev-Server, erstellen Sie den Branch und starten Sie ihn wieder.
@@ -199,6 +211,14 @@ rebase db branch delete dev_sandbox
 ```
 
 `switch` macht einen Branch erst nutzbar. Es hinterlegt den Branch in `.rebase/branch.json` – nur den Namen, niemals einen Connection-String, sodass Ihre Anmeldedaten ausschließlich in `.env` verbleiben – und jeder nachfolgende `rebase`-Befehl in diesem Checkout verwendet stattdessen die Datenbank des Branches: `dev`, `db push`, `db migrate`, `db backup`.
+Ein bereits laufendes `rebase dev` behält die Datenbank, mit der es gestartet wurde, bis Sie es neu
+starten, und `switch` sagt das.
+
+<span class="since-badge" data-since="0.25">Seit 0.25</span> `rebase db branch
+list` markiert den Branch, auf dem dieser Checkout steht, und `prune` entfernt ihn nie, so wie
+`delete` ihn verweigert: Der Plan führt ihn als behalten auf und sagt, ihn zuerst mit
+`rebase db branch switch --off` zu verlassen. Unter 0.24 löschte `prune --older-than … --yes` ihn,
+und der Checkout richtete danach jeden Befehl auf eine Datenbank, die nicht mehr existierte.
 
 In der Auflösungsreihenfolge steht es zwischen der Shell und der Projektdatei:
 
@@ -229,11 +249,10 @@ Branches erfasst.
 
 Branches sind ganz gewöhnliche PostgreSQL-Datenbanken, die nach dem Branch mit dem Präfix `rb_` benannt sind. So entspricht `dev_sandbox` oben der Datenbank `rb_dev_sandbox` auf demselben Server.
 
-Das Erstellen eines Branches ändert **nicht**, mit welcher Datenbank Ihr Projekt kommuniziert. `rebase db branch create` erstellt die Kopie und belässt es dabei; es wird nichts in `.env` geschrieben, und das nächste `rebase dev` verwendet weiterhin die zuvor genutzte Datenbank. Um mit einem Branch zu arbeiten, verweisen Sie selbst per `DATABASE_URL` darauf – der Connection-String entspricht dem vorhandenen, lediglich der Datenbankname wird ausgetauscht:
+Das Erstellen eines Branches ändert **nicht**, mit welcher Datenbank Ihr Projekt kommuniziert. `rebase db branch create` erstellt die Kopie und belässt es dabei; es wird nichts in `.env` geschrieben, und das nächste `rebase dev` verwendet weiterhin die zuvor genutzte Datenbank. Um mit einem Branch zu arbeiten, wechseln Sie mit `rebase db branch switch <name>` zu ihm, wie oben. Um ihn aus etwas zu erreichen, das kein `rebase`-Befehl ist: Sein Connection-String entspricht dem vorhandenen, lediglich der Datenbankname wird ausgetauscht:
 
 ```bash
-# .env
-DATABASE_URL=postgresql://user:pass@localhost:5432/rb_dev_sandbox
+postgresql://user:pass@localhost:5432/rb_dev_sandbox
 ```
 
 ---

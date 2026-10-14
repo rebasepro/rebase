@@ -323,6 +323,7 @@ verwendbare Anmeldedaten benannt wird, verweigert den Start. Siehe
 | `BACKUP_KEEP_MINIMUM` | Immer mindestens N der neuesten Backups behalten, unabhängig von den Aufbewahrungsregeln. | — |
 | `PG_DUMP_PATH` | Überschreibt die `pg_dump`-Binärdatei – sie muss der Hauptversion des Servers entsprechen oder neuer sein. | — |
 | `PG_RESTORE_PATH` | Überschreibt die `pg_restore`-Binärdatei. | — |
+| `PSQL_PATH` | Überschreibt die `psql`-Binärdatei, die `rebase db restore --clean` ausführt, um die Wiederherstellung zu einer einzigen Transaktion zu machen. | — |
 | `PG_DUMPALL_PATH` | Wo `pg_dumpall` liegt, wenn es sich nicht im `PATH` befindet. Ohne diesen Pfad – und ohne installierte PostgreSQL-Client-Tools – schlägt ein globales Backup mit einem Fehler fehl, der diese Variable nennt. | — |
 
 Das offizielle Runtime-Image (`rebasepro/server`) enthält die PostgreSQL 18 Client-Tools,
@@ -365,9 +366,9 @@ Wird von `rebase` gelesen, nicht vom Server. Nichts hier beeinflusst ein Deploym
 
 | Variable | Beschreibung | Standard |
 |----------|-------------|---------|
-| `REBASE_BASE_URL` | Das Backend, mit dem `rebase auth` und `rebase api-keys` kommunizieren, anstatt es vom Projekt abzuleiten. | — |
-| `REBASE_PORT` | Der Port, den diese Befehle bei der Ableitung dieser URL annehmen. | — |
-| `SERVICE_KEY` | Der Service-Key, mit dem sie sich authentifizieren, anstatt danach zu fragen. | — |
+| `REBASE_BASE_URL` | Wohin `rebase api-keys`, `rebase storage` und `rebase auth reset-password` den Service-Key senden, in der Shell oder in `.env`. Setzen Sie sie, wenn der Server anders läuft als mit `rebase dev` in diesem Projekt: mit `rebase start`, in einem Container, auf einem anderen Host. Ist sie nicht gesetzt, verwenden sie den Server, den `rebase dev` vermerkt hat, solange dieser Server läuft, und senden nichts, wenn er nicht läuft. | — |
+| `REBASE_SERVICE_KEY` | Der Service-Key, mit dem sich diese Befehle authentifizieren, gelesen aus `.env`: dieselbe Variable, die der Server liest (siehe oben). | — |
+| `SERVICE_KEY` | Ein älterer Name für diesen Key. Wenn `.env` ihn setzt, lesen `rebase api-keys` und `rebase storage` ihn anstelle von `REBASE_SERVICE_KEY`. | — |
 | `REBASE_ENV_FILE_PATH` | Welche `.env`-Datei die CLI liest und schreibt, wenn es nicht die des Projekts ist. | — |
 | `REBASE_CLOUD_URL` | Die Control Plane, mit der `rebase cloud` spricht. | — |
 | `REBASE_CLOUD_EMAIL` | Das Konto, als das sich `rebase cloud login` anmeldet, anstatt danach zu fragen. | — |

@@ -69,9 +69,20 @@ rebase db migrate --baseline <version>
 ```
 
 Die Version ist das Zahlenpräfix der Migrationsdatei; `db generate` gibt den Befehl mit
-eingesetzter Version aus. Jedes `db migrate` danach ist ein gewöhnliches. Siehe
+eingesetzter Version aus. Siehe
 [`--baseline`](/docs/cli/schema/#rebase-db-migrate) für eine Datenbank, die bereits Migrationen
 verzeichnet.
+
+Danach wendet `db migrate` an, was der Boot nicht angewendet hat, und auf einer Datenbank, die
+`rebase dev` bedient, ist das weniger, als es scheint. Der Boot fügt jede neue Tabelle, Spalte und
+jeden neuen Enum-Wert hinzu, sobald sich eine Collection ändert, sodass die Spalte bereits da ist,
+wenn `db generate` die Migration schreibt, die sie hinzufügt: Dieses `db migrate` hält erneut bei
+`already exists` an und nennt das `--baseline <version>`, das sie verzeichnet. Jede neue Property
+bedeutet eine weitere Baseline. Verzeichnen Sie eine Migration nur, wenn der Boot jede Änderung
+darin vorgenommen hat. Eine, die außerdem etwas löscht, umbenennt oder verengt, enthält Statements,
+die der Boot nie ausführt, und das Verzeichnen überspringt sie. In der Entwicklung ist
+`rebase db push` der Befehl, der das Schema ändert; behalten Sie `db generate` und `db migrate` für
+eine Datenbank, die der Boot nicht bereits verändert hat.
 
 ### `rebase db backup` / `backups` / `restore`
 
@@ -89,11 +100,20 @@ braucht `restore` `--clean`. Ohne das Flag verweigert es, bevor irgendetwas ange
 Cluster-Rollen eingeschlossen, und nennt die Objekte, die im Weg sind, sowie beide Wege daran
 vorbei: `--clean` oder `--create-db --target-db <new name>`. Unter 0.24 wendete es die Rollen an
 und scheiterte dann an `schema "rebase" already exists` von pg_restore.
+<span class="since-badge" data-since="0.25">Seit 0.25</span> Mit `--clean` ist die Wiederherstellung eine einzige
+Transaktion: Sie löscht die Schemas des Backups mit allem, was darin ist, stellt wieder her und
+committet erst, wenn die gesamte Wiederherstellung gelungen ist, sodass ein Fehler die Datenbank
+so lässt, wie sie war. Bevor sie nachfragt, nennt sie, was sie löscht, das das Backup nicht
+enthält. Sie führt `psql` aus, das mit `pg_restore` ausgeliefert wird. Unter 0.24 löschte eine
+`--clean`-Wiederherstellung in eine Datenbank mit einer Tabelle, die dem Backup fehlte, etwa der
+Revisionstabelle von Atlas nach `db migrate`, alles und stellte nichts wieder her.
 <span class="since-badge" data-since="0.25">Seit 0.25</span> `restore` verweigert die verwaltete Entwicklungsdatenbank: Ein
 Backup trägt seine Zeilen als COPY-Daten, die sie nicht empfangen kann, und unter 0.24 ließ die
 Wiederherstellung sie hängen, bis sie gestoppt wurde. Stellen Sie in Postgres in Docker wieder
 her (`rebase db restore <dump> --docker --clean --yes`), dann kopiert
-`rebase db pull --from "$(rebase db url --docker)" --yes` sie in die verwaltete Datenbank.
+`rebase db pull --from "$(rebase db url --docker)" --yes` sie in die verwaltete Datenbank. Ein
+Backup der verwalteten Datenbank lässt sie, wie sie war; unter 0.24 blieben die Einstellungen, die
+`pg_dump` vorgenommen hatte, auf ihr bestehen, und jede API-Anfrage scheiterte bis `rebase db stop`.
 <span class="since-badge" data-since="0.25">Seit 0.25</span> Relative Pfade und der Standard
 `./backups` werden gegen das Verzeichnis aufgelöst, aus dem Sie `rebase` ausführen, sodass sich
 die drei Zeilen oben in einem Verzeichnis treffen; eine Option, die ein Befehl nicht kennt, wird
@@ -120,6 +140,12 @@ Eine Spalte unter einem Unique-Index erhält pro Zeile einen eigenen Wert, und d
 eine Transaktion: Schlägt er fehl, werden die Tabellen, die er umgeschrieben hätte, geleert und
 namentlich genannt, und der Befehl beendet sich mit 1. Unter 0.24 scheiterte er an `token_hash`,
 sobald sich Benutzer zweimal angemeldet hatten, und ließ echte Daten zurück.
+
+<span class="since-badge" data-since="0.25">Seit 0.25</span> Ein Flag, das `pull` nicht kennt, wird verweigert, bevor
+irgendetwas gelesen oder kopiert wird, und das vermutlich gemeinte wird genannt: `--anonymise`
+antwortet mit "did you mean --anonymize?" und beendet sich mit 1. Unter 0.24 wurde ein falsch
+geschriebenes Flag ignoriert, sodass `--anonymise`, `--anon` oder `--schem` den Pull ohne es
+ausführten und personenbezogene Daten unverändert ankamen.
 
 `pg_dump` entfernt Berechtigungen, sodass die Kopie mit den RLS-Policies der Quelle ankommen
 würde, aber ohne die dahinterliegenden Grants — jeder Lesevorgang als `rebase_user` würde

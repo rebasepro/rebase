@@ -23,7 +23,7 @@ Ihre Collection-Definitionen in `config/collections/` beschreiben Tabellen, Spal
 
 ### 2. Drizzle-Schema → Migrationen
 
-Aus dem generierten Drizzle-Schema vergleicht `db generate` mit dem aktuellen Datenbankzustand und erzeugt zeitgestempelte SQL-Migrationsdateien.
+Aus dem generierten Drizzle-Schema vergleicht `db generate` mit den Migrationen, die bereits in `drizzle/migrations/` liegen, auf einer Scratch-Datenbank nachgespielt, und erzeugt zeitgestempelte SQL-Migrationsdateien. Es liest Ihre Datenbank nie: Eine Spalte, die der Boot oder `db push` bereits hinzugefügt hat, kommt trotzdem als `ADD COLUMN` heraus.
 
 ### 3. Migrationen → PostgreSQL
 
@@ -93,6 +93,12 @@ rebase schema introspect
   das `db push` danach jede Policy so neu an, wie sie war. Unter 0.24 bleiben die Policies
   aus den Dateien heraus, und ein Push kann eine löschen, deren Name die Form einer
   generierten Policy hat (`<table>_<op>_<hash>`)
+- <span class="since-badge" data-since="0.25">Seit 0.25</span> Liest jeden
+  Ausdruck (das `USING` einer Policy, einen CHECK, einen Spalten-Default) unter dem
+  `search_path`, den der Server verwendet, `public`, sodass eine Funktion im Schema `rebase` als
+  `rebase.roles()` geschrieben wird. Verbunden als eine Rolle namens `rebase` setzte der
+  Standardpfad dieses Schema an die erste Stelle, und die Regel kam als `roles()` zurück, was der
+  Push nicht finden konnte
 - <span class="since-badge" data-since="0.25">Seit 0.25</span> Schreibt
   `disableDefaultPolicies: true` an eine Tabelle, die Row-Level-Security aktiviert hat und
   nicht die ganze [Admin-Basis](/docs/collections/security-rules/#policies-a-collection-gets-without-writing-them) hält,
@@ -176,11 +182,16 @@ rebase db push
   führt unter "Planned row-level security changes" die Row-Level-Security auf, die der Push
   ändern würde: die Tabellen, für die er RLS einschaltet, und jede Policy, die er anlegt, ersetzt
   oder löscht, ermittelt so, wie die eigenen Schritte des Pushs entscheiden. Er sagt "No changes"
-  nur, wenn sich weder das Schema noch die Row-Level-Security ändern würde. Eine Policy ohne
-  Stempel von Rebase (von Hand geschrieben oder von `schema introspect` eingelesen) wird aus ihrer
-  Regel neu angelegt, ohne vorher etwas zum Vergleichen zu haben, und wird getrennt aufgeführt. Der
-  Push selbst gibt eine Zeile aus, die sie zählt. Unter 0.24 zeigte der Dry Run nur den Plan von
-  Atlas, in dem keine Policies stehen
+  nur, wenn sich weder das Schema noch die Row-Level-Security ändern würde. Wo der Stempel einer
+  Policy nicht zu ihrer Regel passt oder sie keinen hat (eine, die `db migrate` angelegt hat, eine
+  von Hand geschriebene), legt der Dry Run sie aus ihrer Regel unter einem anderen Namen neu an, in
+  einer Transaktion, die er zurückrollt, und vergleicht, was Postgres gespeichert hat: Eine, die
+  gleich herauskommt, ist keine Änderung. So plant eine Regel, die `schema introspect` als SQL
+  zurückgelesen hat, nichts, und ebenso wenig Policies, die `db migrate` angewendet hat. Nur eine,
+  die er nicht vergleichen konnte (etwa weil die Sperre ihrer Tabelle nicht innerhalb von zwei
+  Sekunden gewährt wurde), wird getrennt aufgeführt. Der Push selbst gibt eine Zeile aus, die die
+  Änderungen zählt. Unter 0.24 zeigte der Dry Run nur den Plan von Atlas, in dem keine Policies
+  stehen
 - <span class="since-badge" data-since="0.25">Seit 0.25</span> Zeigt jedes
   Statement, das Atlas anwendet, einmal. Atlas verbindet sich ohne SSL mit einer Datenbank auf
   diesem Rechner (`localhost`, `127.x`, `::1`), deren URL kein `sslmode` nennt, wie es die App tut,
@@ -243,10 +254,15 @@ rebase db generate
 ```
 
 **Was er tut:**
-- Vergleicht das Drizzle-Schema mit dem aktuellen Datenbankzustand
+- Vergleicht das Drizzle-Schema mit dem Zustand, den die Migrationen in `drizzle/migrations/` aufbauen, nicht mit Ihrer Datenbank
 - Erzeugt zeitgestempelte SQL-Migrationsdateien in `drizzle/migrations/`
 - Dateien können überprüft, bearbeitet und in die Versionskontrolle committet werden
 - <span class="since-badge" data-since="0.25">Seit 0.25</span> Nennt jede Anweisung der neuen Migration, die Daten zerstört, mit derselben Prüfung, die `db push` vor dem Anwenden ausführt: eine gelöschte Tabelle, Spalte, Schema, View oder ein gelöschter Typ, ein `TRUNCATE`, eine Änderung des Spaltentyps, die Werte verlieren kann, eine Änderung des Primärschlüssels oder das Löschen eines CHECK- oder EXCLUDE-Constraints, den die Datenbank enthält. Er schreibt die Datei trotzdem und endet mit Exit-Code 0, warnt also und verweigert nicht.
+- <span class="since-badge" data-since="0.25">Seit 0.25</span> Endet mit dem,
+  was als Nächstes zu tun ist: `rebase db migrate`, und für die erste Migration eines Projekts
+  stattdessen das `--baseline <version>`, das eine Datenbank braucht, die der Boot bereits
+  eingerichtet hat. Eine spätere Migration erhält keine Baseline-Zeile, da eine destruktive mit
+  Baseline ihr `DROP` überspringen würde, und ein Lauf, der keine Migration schreibt, sagt nur das.
 
 **Ein CHECK, den eine Ihrer Migrationen hinzugefügt hat, löscht die nächste.** `db generate`
 vergleicht Ihre Migrationsdateien, nicht die Datenbank, und Atlas kann kein Objekt aus diesem
