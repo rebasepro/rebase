@@ -101,6 +101,10 @@ rebase schema introspect
 - <span class="since-badge" data-since="0.25">Da 0.25</span> Contro un database non in
   esecuzione, stampa una sola volta lo stesso banner di `db push` e non crea nulla.
   Stampa la directory di output come percorso assoluto
+- <span class="since-badge" data-since="0.25">Da 0.25</span> Lascia nel database i vincoli CHECK ed EXCLUDE di
+  una tabella, e il `db push` successivo li mantiene. Una collezione non può dichiarare né gli
+  uni né gli altri; un CHECK che l'introspezione sa leggere (`total >= 0`) diventa anche la
+  `validation` della proprietà. Su 0.24 quel push li eliminava
 
 **Opzioni:**
 
@@ -137,9 +141,19 @@ rebase db push
 **Cosa fa:**
 - Legge lo schema Drizzle generato
 - Applica le modifiche direttamente al database (CREATE, ALTER, DROP)
-- Esegue prima il piano in modalità dry run e si ferma prima di tutto ciò che distrugge dati: una tabella, colonna, schema, vista o tipo eliminati, un `TRUNCATE`, un cambio di tipo di colonna che può perdere valori (`timestamptz` → `date`, `numeric` → `integer`), o un cambio di chiave primaria: `(id)` → `(id, locale)` dà a ogni riga un nuovo id, così link, chiavi esterne e id salvati altrove non trovano più la loro riga. In un terminale chiede conferma, dove Ctrl-C o Ctrl-D rispondono no, altrimenti rifiuta; `--allow-destructive` (o `--yes`) applica comunque la modifica. Un push che si ferma lì elimina all'uscita il proprio database di appoggio `<db>_dev_diff`
+- Esegue prima il piano in modalità dry run e si ferma prima di tutto ciò che distrugge dati: una tabella, colonna, schema, vista o tipo eliminati, un `TRUNCATE`, un cambio di tipo di colonna che può perdere valori (`timestamptz` → `date`, `numeric` → `integer`), o un cambio di chiave primaria: `(id)` → `(id, locale)` dà a ogni riga un nuovo id, così link, chiavi esterne e id salvati altrove non trovano più la loro riga. <span class="since-badge" data-since="0.25">Da 0.25</span> Si ferma anche prima dell'eliminazione di un vincolo CHECK o EXCLUDE che il database contiene: nessuna riga va persa, ma da quel momento il database accetta righe che rifiutava. In un terminale chiede conferma, dove Ctrl-C o Ctrl-D rispondono no, altrimenti rifiuta; `--allow-destructive` (o `--yes`) applica comunque la modifica. Un push che si ferma lì elimina all'uscita il proprio database di appoggio `<db>_dev_diff`
 - Attiva la sicurezza a livello di riga su ogni tabella di collezione, tabelle di giunzione comprese, subito dopo la modifica dello schema e prima di qualsiasi passaggio che possa fallire: un push che si interrompe a metà lascia una nuova tabella che nega ogni richiesta invece che aperta a tutte
 - Applica le policy RLS delle tue collezioni e **rimuove le policy sostituite da un push precedente**
+- <span class="since-badge" data-since="0.25">Da 0.25</span> Lascia com'è ogni vincolo CHECK ed EXCLUDE sulla
+  tabella di una collezione. Una collezione non può dichiarare né gli uni né gli altri, quindi sono
+  regole proprie del database, scritte a mano o portate da un database che `schema introspect` ha
+  adottato; per rimuoverne uno, eliminalo a mano (`ALTER TABLE … DROP CONSTRAINT …`). Anche i
+  trigger e le funzioni che hai scritto non vengono toccati. Su 0.24 il primo push dopo
+  un'introspezione eliminava ogni vincolo CHECK ed EXCLUDE senza chiedere conferma
+- <span class="since-badge" data-since="0.25">Da 0.25</span> Riconosce per nome esatto tutto ciò che lascia
+  stare, compreso un `.`, `[`, `]` o `*` al suo interno. Su 0.24 un indice scritto a mano con un
+  nome come `orders_idx[v1]` veniva eliminato senza conferma, e un `.` nel nome di una tabella o
+  di un indice faceva fallire ogni push con `too many parts in pattern`
 - <span class="since-badge" data-since="0.25">Da 0.25</span> Costruisce ogni
   [indice di chiave esterna che Rebase deriva](/docs/backend/indexes#foreign-keys-are-indexed-for-you)
   e che a una tabella esistente manca **prima** di pianificare, con
@@ -210,8 +224,19 @@ rebase db generate
 - <span class="since-badge" data-since="0.25">Da 0.25</span> Nomina ogni istruzione della nuova
   migrazione che distrugge dati, usando il controllo che `db push` esegue prima di applicare: una
   tabella, colonna, schema, vista o tipo eliminati, un `TRUNCATE`, un cambio di tipo di colonna che può
-  perdere valori, o una modifica della chiave primaria. Scrive comunque il file ed esce con 0, quindi
+  perdere valori, una modifica della chiave primaria, o l'eliminazione di un vincolo CHECK o EXCLUDE
+  che il database contiene. Scrive comunque il file ed esce con 0, quindi
   avvisa e non rifiuta.
+
+**Un CHECK aggiunto da una tua migrazione viene eliminato dalla successiva.** `db generate`
+confronta i tuoi file di migrazione, non il database, e Atlas non ha modo di escludere un
+oggetto da quel confronto. Quindi un vincolo CHECK o EXCLUDE che hai scritto a mano in una
+migrazione, e che nessuna collezione può dichiarare, ritorna come
+`ALTER TABLE … DROP CONSTRAINT …` nella migrazione successiva che scrive, fuso nella stessa
+istruzione della modifica vera e propria. Il rapporto qui sopra nomina quell'eliminazione quando
+il database contiene già il vincolo; non la toglie dal file. Elimina la clausola prima di
+`rebase db migrate`, oppure lascia che `rebase db migrate --refuse-destructive` si fermi su di
+essa. `db push` legge il database e mantiene il vincolo.
 
 Le migrazioni generate sono semplici file SQL — puoi ispezionarle e modificarle prima di applicarle.
 

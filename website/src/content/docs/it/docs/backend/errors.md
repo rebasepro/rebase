@@ -347,7 +347,7 @@ Una route utilizza uno di questi codici quando non è applicabile nulla di più 
 | `CONFLICT` | 409 | Conflitto con lo stato esistente. | Consulta il messaggio. |
 | `INTERNAL_ERROR` | 500 | Si è verificato un errore sul server. Il messaggio è generico per motivi di sicurezza. | Riporta il `requestId`; il motivo è presente nei log. |
 | `NOT_CONFIGURED` | 503 | Una dipendenza necessaria a questa route non è configurata su questo server. | Consulta il messaggio. |
-| `SERVICE_UNAVAILABLE` | 503 | Una dipendenza non era raggiungibile. | Riprova; controlla i log. |
+| `SERVICE_UNAVAILABLE` | 503 | Un servizio da cui dipende la richiesta non era raggiungibile: un bucket S3 o MinIO, oppure un host che una funzione raggiunge con `fetch()` e che rifiuta la connessione o non si risolve. Il log del server nomina l'host; la risposta no. Un database non raggiungibile è `DATABASE_UNAVAILABLE`. <span class="since-badge" data-since="0.25">Da 0.25</span> Una connessione che fallisce verso un servizio simile risponde con questo codice; su 0.24 risponde con un `500` il cui codice è l'errore del socket (`ECONNREFUSED`), oppure `INTERNAL_ERROR`. | Riprova; controlla i log. |
 
 ## Mantenere aggiornata questa pagina
 

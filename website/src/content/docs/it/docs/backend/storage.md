@@ -217,7 +217,7 @@ La quantità di file che il server gestisce contemporaneamente in memoria dipend
 | Variabile | Descrizione |
 |-----------|-------------|
 | `STORAGE_TYPE` | `"local"`, `"s3"`, o `"gcs"` |
-| `STORAGE_PATH` | Directory di storage locale (predefinita: `./uploads`). Un bucket locale con nome conserva i propri file accanto ad esso, in `<STORAGE_PATH>__<key>`, a meno che `STORAGE_PATH__<KEY>` non specifichi il proprio |
+| `STORAGE_PATH` | Directory di storage locale (predefinita: `<project>/uploads`, sia con `rebase dev` sia in un server scritto da `rebase eject`). Un percorso relativo viene letto dalla directory in cui gira il server, che dopo `rebase eject` è `backend/`. Un bucket locale con nome conserva i propri file accanto ad esso, in `<STORAGE_PATH>__<key>`, a meno che `STORAGE_PATH__<KEY>` non specifichi il proprio |
 | `S3_BUCKET` | Nome del bucket S3 |
 | `S3_REGION` | Regione AWS (predefinita: `"auto"`) |
 | `S3_ACCESS_KEY_ID` | Access key AWS |
