@@ -60,6 +60,18 @@ Cannot create branch: the source database "leadgen" has active connections.
 `--force` terminates those sessions before templating, on `create` and `delete`
 alike. It never terminates the session running the command itself.
 
+<span class="since-badge" data-since="0.25">Since 0.25</span> `create --force`
+also closes the source to new connections for the copy
+(`ALTER DATABASE … ALLOW_CONNECTIONS false`, run from the server's `postgres`
+database) and opens it again afterwards, on failure and on Ctrl-C too. A client
+that reconnects as soon as it is disconnected, as a running `rebase dev` does,
+then cannot slip back in before the copy starts. That needs the source's owner;
+without it, and on `delete`, `--force` disconnects the sessions up to three
+times before it gives up. When a session is still there after that, the error
+says they reconnected and to stop them, not to pass `--force` again. On 0.24 it
+disconnected them once, and about one `create --force` in seven under a running
+`rebase dev` failed with advice to re-run with `--force`.
+
 `DatabasePoolManager` disconnects its own idle pools before cloning or dropping — but only the pools **inside the process doing the work**. `rebase db branch` runs as its own process, so this reaches nothing else on your machine:
 
 - **A running `rebase dev` blocks branching.** This is the common case, not an edge case: wanting a branch and running the app are usually the same moment. Stop the dev server, branch, and start it again.

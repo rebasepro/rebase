@@ -1,6 +1,15 @@
 /**
- * `rebase db branch` from a checkout switched to a branch.
+ * `rebase db branch` beside a client that holds the source open, and from a
+ * checkout switched to a branch.
  *
+ * - `create --force` disconnected the other sessions once, then copied. A
+ *   client that reconnects — a running `rebase dev`'s realtime listener does —
+ *   was back before `CREATE DATABASE … TEMPLATE` counted the sessions in about
+ *   three tries of twenty, and the error then said to re-run with `--force`.
+ *   The source now refuses new connections for the copy, and is opened again
+ *   after. Here the client is back 50 ms after each disconnect, which failed
+ *   every time.
+ * - With `--force` passed, a refusal never says to pass `--force`.
  * - `prune --older-than 0d --yes` dropped the branch the checkout was switched
  *   to, which `delete` refuses. The CLI names that database to the driver
  *   (`REBASE_ACTIVE_BRANCH_DATABASE`), which keeps it and says so — and `list`
@@ -22,7 +31,48 @@ class Exited extends Error {
     }
 }
 
-describe("db branch from a switched checkout", () => {
+/**
+ * A client that is back 50 ms after it is disconnected — well inside the
+ * settle `--force` allows before the copy — and, refused, tries again a second
+ * later, as any client with a backoff does (the realtime listener waits 3 s).
+ */
+function stickyClient(connectionString: string, name: string) {
+    let stopped = false;
+    let current: pg.Client | undefined;
+    let reconnects = 0;
+    let refused = 0;
+    const later = (ms: number) => setTimeout(() => void connect(), ms);
+    const connect = async (): Promise<void> => {
+        if (stopped) return;
+        const client = new pg.Client({ connectionString, application_name: name });
+        client.on("error", () => undefined);
+        client.on("end", () => {
+            if (stopped || client !== current) return;
+            current = undefined;
+            reconnects += 1;
+            later(50);
+        });
+        try {
+            await client.connect();
+            current = client;
+        } catch {
+            refused += 1;
+            later(1_000);
+        }
+    };
+    return {
+        start: connect,
+        get reconnects() { return reconnects; },
+        get refused() { return refused; },
+        connected: () => current !== undefined,
+        async stop() {
+            stopped = true;
+            await current?.end().catch(() => undefined);
+        }
+    };
+}
+
+describe("db branch with other clients connected, and from a switched checkout", () => {
     let container: PgContainer;
     let admin: pg.Client;
     let workDir: string;
@@ -84,6 +134,46 @@ describe("db branch from a switched checkout", () => {
 
     const databases = async (): Promise<string[]> =>
         (await admin.query<{ datname: string }>("SELECT datname FROM pg_database ORDER BY 1")).rows.map(r => r.datname);
+
+    it("create --force copies a source a client keeps reconnecting to, and opens it again after", async () => {
+        const sticky = stickyClient(container.connectionString, "rebase-realtime:sticky");
+        await sticky.start();
+        try {
+            const created = await run(["db", "branch", "create", "forced", "--force"]);
+
+            expect(created.code, created.said).toBe(0);
+            expect(created.said).toContain("Branch \"forced\" created successfully");
+            expect(await databases()).toContain("rb_forced");
+            // Open again: the client is back, and anyone else can connect.
+            const allow = await admin.query<{ datallowconn: boolean }>("SELECT datallowconn FROM pg_database WHERE datname = 'rebase'");
+            expect(allow.rows[0].datallowconn).toBe(true);
+            await vi.waitFor(() => expect(sticky.connected()).toBe(true), { timeout: 5_000 });
+            expect(sticky.reconnects).toBeGreaterThan(0);
+            // Kept out while the copy ran.
+            expect(sticky.refused).toBeGreaterThan(0);
+        } finally {
+            await sticky.stop();
+        }
+    }, 60_000);
+
+    it("a delete --force that cannot get the database to itself does not say to pass --force", async () => {
+        expect((await run(["db", "branch", "create", "held"])).code).toBe(0);
+        stdout.length = 0;
+        stderr.length = 0;
+        const sticky = stickyClient(urlFor("rb_held"), "rebase-realtime:held");
+        await sticky.start();
+        try {
+            const deleted = await run(["db", "branch", "delete", "held", "--force"]);
+
+            expect(deleted.code, deleted.said).toBe(1);
+            expect(deleted.said).toContain("still had connections after they were disconnected");
+            expect(deleted.said).toContain("rebase-realtime:held");
+            expect(deleted.said).toContain("They reconnected as fast as they were disconnected");
+            expect(deleted.said).not.toContain("--force");
+        } finally {
+            await sticky.stop();
+        }
+    }, 90_000);
 
     it("prune keeps the branch this checkout is switched to, says so, and list marks it", async () => {
         expect((await run(["db", "branch", "create", "mine"])).code).toBe(0);

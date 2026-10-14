@@ -24,6 +24,12 @@ const PG_DUPLICATE_DATABASE = "42P04";
 /** `object_in_use` — the database still has connections attached. */
 const PG_OBJECT_IN_USE = "55006";
 
+/** How many times `--force` disconnects the other sessions before it reports one still there. */
+const FORCE_ATTEMPTS = 3;
+
+/** The database every Postgres server has, from which another one can be closed and opened. */
+const MAINTENANCE_DATABASE = "postgres";
+
 /**
  * Describe a failed branch DDL statement in terms a user can act on.
  *
@@ -266,31 +272,28 @@ export class BranchService {
         // why `--force` exists.
         await this.poolManager.disconnectDatabase(sourceDb);
 
-        if (options?.force) {
-            const closed = await this.terminateConnections(sourceDb);
-            if (closed > 0) {
-                // Postgres reports the backend as gone before its slot is
-                // actually free, and CREATE DATABASE then fails on a connection
-                // that no longer exists. One short settle beats a confusing retry.
-                await new Promise((resolve) => setTimeout(resolve, 250));
-            }
-        }
-
         // Create the database using the source as a template.
         // Note: Identifiers must be double-quoted, not parameterized.
         const safeDbName = dbName.replace(/"/g, '""');
         const safeSourceDb = sourceDb.replace(/"/g, '""');
+        const copy = async (): Promise<void> => {
+            await this.db.execute(sql.raw(`CREATE DATABASE "${safeDbName}" TEMPLATE "${safeSourceDb}"`));
+        };
         try {
-            await this.db.execute(
-                sql.raw(`CREATE DATABASE "${safeDbName}" TEMPLATE "${safeSourceDb}"`)
-            );
+            if (options?.force) {
+                await this.whileClosedToNewConnections(sourceDb, () => this.disconnectingOthers(sourceDb, copy));
+            } else {
+                await copy();
+            }
         } catch (err) {
             const pgError = extractPgError(err);
             if (pgError?.code === PG_OBJECT_IN_USE) {
                 // The template — not the new database — is the one still in use.
                 throw new Error(
-                    `Cannot create branch: the source database "${sourceDb}" has active connections.\n`
-                    + await this.describeBlockingConnections(sourceDb)
+                    `Cannot create branch: the source database "${sourceDb}" ${options?.force
+                        ? "still had connections after they were disconnected"
+                        : "has active connections"}.\n`
+                    + await this.describeBlockingConnections(sourceDb, { forced: options?.force === true })
                 );
             }
             throw describeBranchDdlError(err, dbName);
@@ -355,21 +358,22 @@ export class BranchService {
         // `createBranch`: in-process pools only.
         await this.poolManager.disconnectDatabase(dbName);
 
-        if (options?.force) {
-            const closed = await this.terminateConnections(dbName);
-            if (closed > 0) await new Promise((resolve) => setTimeout(resolve, 250));
-        }
-
         // Drop the database
         const safeDbName = dbName.replace(/"/g, '""');
-        try {
+        const drop = async (): Promise<void> => {
             await this.db.execute(sql.raw(`DROP DATABASE "${safeDbName}"`));
+        };
+        try {
+            if (options?.force) await this.disconnectingOthers(dbName, drop);
+            else await drop();
         } catch (err) {
             const pgError = extractPgError(err);
             if (pgError?.code === PG_OBJECT_IN_USE) {
                 throw new Error(
-                    `Cannot delete branch "${name}": the database has active connections.\n`
-                    + await this.describeBlockingConnections(dbName)
+                    `Cannot delete branch "${name}": the database ${options?.force
+                        ? "still had connections after they were disconnected"
+                        : "has active connections"}.\n`
+                    + await this.describeBlockingConnections(dbName, { forced: options?.force === true })
                 );
             }
             throw describeBranchDdlError(err, dbName);
@@ -400,7 +404,7 @@ export class BranchService {
      * Best-effort by construction: this runs while reporting a failure, and a
      * diagnostic that throws would replace a real error with its own.
      */
-    private async describeBlockingConnections(dbName: string): Promise<string> {
+    private async describeBlockingConnections(dbName: string, options: { forced?: boolean } = {}): Promise<string> {
         try {
             const result = await this.db.execute(sql`
                 SELECT coalesce(nullif(application_name, ''), '(unnamed)') AS app,
@@ -422,11 +426,120 @@ export class BranchService {
                 .map((row) => `    ${row.n} × ${String(row.app)}`)
                 .join("\n");
 
+            // With --force they were disconnected already, and came back: the
+            // one thing left to say is what to stop, not to pass --force.
             return `  Connected right now:\n${listed}\n`
-                + "  A running `rebase dev` is the usual one — stop it, or re-run with --force to\n"
-                + "  disconnect them for you.";
+                + (options.forced
+                    ? "  They reconnected as fast as they were disconnected. A running `rebase dev` is the\n"
+                        + "  usual one — stop it, then run this again."
+                    : "  A running `rebase dev` is the usual one — stop it, or re-run with --force to\n"
+                        + "  disconnect them for you.");
         } catch {
-            return "  Close other clients and connections, or re-run with --force.";
+            return options.forced
+                ? "  Stop the clients connected to it — a running `rebase dev` is the usual one — then run this again."
+                : "  Close other clients and connections, or re-run with --force.";
+        }
+    }
+
+    /**
+     * Run `operation` with no other session on `dbName`, disconnecting them
+     * first: what `--force` asks for.
+     *
+     * Disconnected, a client that reconnects — a running `rebase dev`'s
+     * realtime listener does — can be back before `CREATE DATABASE … TEMPLATE`
+     * or `DROP DATABASE` counts the sessions, and it failed on one about once
+     * in seven tries, saying to pass the `--force` that had been passed. So a
+     * refusal on a session still connected is retried, disconnecting again, a
+     * few times before it is reported.
+     */
+    private async disconnectingOthers(dbName: string, operation: () => Promise<void>): Promise<void> {
+        for (let attempt = 1; ; attempt++) {
+            const closed = await this.terminateConnections(dbName);
+            if (closed > 0) {
+                // Postgres reports the backend as gone before its slot is
+                // actually free, and the operation then fails on a connection
+                // that no longer exists. A short settle first.
+                await new Promise((resolve) => setTimeout(resolve, 250));
+            }
+            try {
+                await operation();
+                return;
+            } catch (err) {
+                if (attempt >= FORCE_ATTEMPTS || extractPgError(err)?.code !== PG_OBJECT_IN_USE) throw err;
+            }
+        }
+    }
+
+    /**
+     * Run `operation` with `dbName` refusing new connections, and open it
+     * again after, whatever happens.
+     *
+     * A client disconnected from the source — a running `rebase dev` holds a
+     * pool and a realtime listener — cannot then reconnect before the copy has
+     * counted the sessions on it. Postgres refuses `ALLOW_CONNECTIONS false` on
+     * the database a session is connected to, so both statements run from the
+     * server's `postgres` database, and they need the database's owner. Where
+     * either is missing, the retries of {@link disconnectingOthers} are what is
+     * left. A database that already refused connections is left as it was.
+     *
+     * Interrupted (Ctrl-C) while closed, it opens the database again before
+     * the process exits; one it could not open is named in the error, with the
+     * statement that does.
+     */
+    private async whileClosedToNewConnections(dbName: string, operation: () => Promise<void>): Promise<void> {
+        const safe = dbName.replace(/"/g, '""');
+        const maintenance = dbName === MAINTENANCE_DATABASE ? null : this.poolManager.getDrizzle(MAINTENANCE_DATABASE);
+        let closed = false;
+        try {
+            if (maintenance) {
+                const state = await maintenance.execute(sql`SELECT datallowconn FROM pg_database WHERE datname = ${dbName}`);
+                const [row] = state.rows as Record<string, unknown>[];
+                if (row?.datallowconn === true) {
+                    await maintenance.execute(sql.raw(`ALTER DATABASE "${safe}" ALLOW_CONNECTIONS false`));
+                    closed = true;
+                }
+            }
+        } catch {
+            // No `postgres` database to run it from, or not the owner.
+        }
+        if (!closed) {
+            await this.poolManager.disconnectDatabase(MAINTENANCE_DATABASE);
+            await operation();
+            return;
+        }
+
+        let reopening: Promise<void> | undefined;
+        const reopen = (): Promise<void> => {
+            reopening ??= this.reopenToConnections(dbName);
+            return reopening;
+        };
+        const onSignal = (signal: NodeJS.Signals): void => {
+            void reopen().finally(() => process.kill(process.pid, signal));
+        };
+        process.once("SIGINT", onSignal);
+        process.once("SIGTERM", onSignal);
+        try {
+            await operation();
+        } finally {
+            process.removeListener("SIGINT", onSignal);
+            process.removeListener("SIGTERM", onSignal);
+            await reopen();
+        }
+    }
+
+    /** `ALLOW_CONNECTIONS true` again, from the maintenance database, or an error that says how to do it by hand. */
+    private async reopenToConnections(dbName: string): Promise<void> {
+        const statement = `ALTER DATABASE "${dbName.replace(/"/g, '""')}" ALLOW_CONNECTIONS true`;
+        try {
+            await this.poolManager.getDrizzle(MAINTENANCE_DATABASE).execute(sql.raw(statement));
+        } catch (err) {
+            throw new Error(
+                `"${dbName}" was closed to new connections for the copy and could not be opened again ` +
+                `(${extractPgError(err)?.message ?? extractCauseMessage(err) ?? String(err)}). ` +
+                `Nothing can connect to it until you run, from another database: ${statement};`
+            );
+        } finally {
+            await this.poolManager.disconnectDatabase(MAINTENANCE_DATABASE);
         }
     }
 
