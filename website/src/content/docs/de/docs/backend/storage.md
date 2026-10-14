@@ -306,7 +306,7 @@ Protokoll, zu den Antworten und zum Verhalten über mehrere Instanzen hinweg.
 | Variable | Beschreibung |
 |----------|-------------|
 | `STORAGE_TYPE` | `"local"`, `"s3"` oder `"gcs"` |
-| `STORAGE_PATH` | Verzeichnis für lokalen Speicher (Standard: `./uploads`). Ein benanntes lokales Bucket speichert seine Dateien daneben in `<STORAGE_PATH>__<key>`, es sei denn, `STORAGE_PATH__<KEY>` definiert einen eigenen Pfad |
+| `STORAGE_PATH` | Verzeichnis für lokalen Speicher (Standard: `<project>/uploads`, unter `rebase dev` und in einem von `rebase eject` geschriebenen Server gleichermaßen). Ein relativer Pfad wird von dem Verzeichnis aus gelesen, in dem der Server läuft; nach `rebase eject` ist das `backend/`. Ein benanntes lokales Bucket speichert seine Dateien daneben in `<STORAGE_PATH>__<key>`, es sei denn, `STORAGE_PATH__<KEY>` definiert einen eigenen Pfad |
 | `S3_BUCKET` | Name des S3-Buckets |
 | `S3_REGION` | AWS-Region (Standard: `"auto"`) |
 | `S3_ACCESS_KEY_ID` | AWS-Access-Key |

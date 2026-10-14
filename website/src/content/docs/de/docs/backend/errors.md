@@ -311,7 +311,7 @@ Eine Route verwendet einen dieser Codes, wenn nichts Spezifischeres zutrifft.
 | `CONFLICT` | 409 | Ein Konflikt mit dem bestehenden Zustand. | Siehe Nachricht. |
 | `INTERNAL_ERROR` | 500 | Etwas auf dem Server ist fehlgeschlagen. Die Nachricht ist bewusst generisch. | Geben Sie die `requestId` an; die Ursache steht in den Logs. |
 | `NOT_CONFIGURED` | 503 | Eine Abhängigkeit, die diese Route benötigt, ist auf diesem Server nicht konfiguriert. | Siehe Nachricht. |
-| `SERVICE_UNAVAILABLE` | 503 | Eine Abhängigkeit war nicht erreichbar. | Versuchen Sie es erneut; prüfen Sie die Logs. |
+| `SERVICE_UNAVAILABLE` | 503 | Ein Dienst, von dem die Anfrage abhängt, war nicht erreichbar: ein S3- oder MinIO-Bucket oder ein Host, den eine Function per `fetch()` aufruft und der die Verbindung ablehnt oder sich nicht auflösen lässt. Das Server-Log nennt den Host; die Antwort nicht. Eine nicht erreichbare Datenbank ist `DATABASE_UNAVAILABLE`. <span class="since-badge" data-since="0.25">Seit 0.25</span> Eine fehlschlagende Verbindung zu einem solchen Dienst antwortet hiermit; unter 0.24 antwortet sie mit einem `500`, dessen Code der Socket-Fehler (`ECONNREFUSED`) ist, oder mit `INTERNAL_ERROR`. | Versuchen Sie es erneut; prüfen Sie die Logs. |
 
 ## Diese Seite aktuell halten
 

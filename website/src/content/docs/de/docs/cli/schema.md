@@ -101,6 +101,10 @@ rebase schema introspect
 - <span class="since-badge" data-since="0.25">Seit 0.25</span> Gibt gegen eine
   Datenbank, die nicht läuft, einmal dasselbe Banner aus wie `db push` und legt nichts an.
   Es gibt das Ausgabeverzeichnis als absoluten Pfad aus
+- <span class="since-badge" data-since="0.25">Seit 0.25</span> Lässt die CHECK- und EXCLUDE-Constraints einer
+  Tabelle in der Datenbank, wo der darauffolgende `db push` sie behält. Eine Collection kann
+  keines von beiden deklarieren; ein CHECK, den die Introspektion lesen kann (`total >= 0`),
+  wird außerdem zur `validation` der Property. Unter 0.24 hat dieser Push sie gelöscht
 
 **Optionen:**
 
@@ -137,9 +141,20 @@ rebase db push
 **Was er tut:**
 - Liest das generierte Drizzle-Schema
 - Wendet Änderungen direkt auf die Datenbank an (CREATE, ALTER, DROP)
-- Führt den Plan zuerst als Dry-Run aus und hält vor jeder Änderung an, die Daten zerstört: eine gelöschte Tabelle, Spalte, View, ein gelöschtes Schema oder ein gelöschter Typ, ein `TRUNCATE` eine Änderung des Spaltentyps, bei der Werte verloren gehen können (`timestamptz` → `date`, `numeric` → `integer`), oder eine Änderung des Primärschlüssels – `(id)` → `(id, locale)` gibt jeder Zeile eine neue ID, sodass Links, Fremdschlüssel und anderswo gespeicherte IDs ihre Zeile nicht mehr finden. Im Terminal fragt er nach, wobei Strg-C oder Strg-D mit Nein antwortet, sonst verweigert er; `--allow-destructive` (oder `--yes`) wendet die Änderung trotzdem an. Ein Push, der dort anhält, löscht auf dem Weg hinaus seine Zwischendatenbank `<db>_dev_diff`
+- Führt den Plan zuerst als Dry-Run aus und hält vor jeder Änderung an, die Daten zerstört: eine gelöschte Tabelle, Spalte, View, ein gelöschtes Schema oder ein gelöschter Typ, ein `TRUNCATE` eine Änderung des Spaltentyps, bei der Werte verloren gehen können (`timestamptz` → `date`, `numeric` → `integer`), oder eine Änderung des Primärschlüssels – `(id)` → `(id, locale)` gibt jeder Zeile eine neue ID, sodass Links, Fremdschlüssel und anderswo gespeicherte IDs ihre Zeile nicht mehr finden. <span class="since-badge" data-since="0.25">Seit 0.25</span> Er hält außerdem vor dem Löschen eines CHECK- oder EXCLUDE-Constraints an, den die Datenbank enthält: Keine Zeile geht verloren, aber von da an nimmt die Datenbank Zeilen an, die sie zuvor abgelehnt hat. Im Terminal fragt er nach, wobei Strg-C oder Strg-D mit Nein antwortet, sonst verweigert er; `--allow-destructive` (oder `--yes`) wendet die Änderung trotzdem an. Ein Push, der dort anhält, löscht auf dem Weg hinaus seine Zwischendatenbank `<db>_dev_diff`
 - Schaltet Row-Level Security für jede Collection-Tabelle ein, Junction-Tabellen eingeschlossen, direkt nach der Schemaänderung und vor jedem Schritt, der fehlschlagen kann – ein Push, der mittendrin abbricht, hinterlässt eine neue Tabelle also verweigernd statt offen für jede Anfrage
 - Wendet die RLS-Policies Ihrer Collections an und **entfernt Policies, die ein früherer Push ersetzt hat**
+- <span class="since-badge" data-since="0.25">Seit 0.25</span> Lässt jeden CHECK- und EXCLUDE-Constraint auf der
+  Tabelle einer Collection unverändert. Eine Collection kann keines von beiden deklarieren, es sind
+  also die eigenen Regeln der Datenbank, von Hand geschrieben oder mitgebracht von einer Datenbank,
+  die `schema introspect` übernommen hat; um einen zu entfernen, löschen Sie ihn von Hand
+  (`ALTER TABLE … DROP CONSTRAINT …`). Trigger und Funktionen, die Sie geschrieben haben, werden
+  ebenfalls nicht angetastet. Unter 0.24 hat der erste Push nach einer Introspektion jeden CHECK-
+  und EXCLUDE-Constraint ohne Rückfrage gelöscht
+- <span class="since-badge" data-since="0.25">Seit 0.25</span> Gleicht den Namen von allem, was es in Ruhe lässt,
+  exakt ab, auch wenn er ein `.`, `[`, `]` oder `*` enthält. Unter 0.24 wurde ein von Hand
+  geschriebener Index mit einem Namen wie `orders_idx[v1]` ohne Rückfrage gelöscht, und ein `.` im
+  Namen einer Tabelle oder eines Index ließ jeden Push mit `too many parts in pattern` scheitern
 - <span class="since-badge" data-since="0.25">Seit 0.25</span> Baut jeden
   [von Rebase abgeleiteten Fremdschlüssel-Index](/docs/backend/indexes#foreign-keys-are-indexed-for-you),
   der einer vorhandenen Tabelle fehlt, **vor** der Planung mit
@@ -207,7 +222,17 @@ rebase db generate
 - Vergleicht das Drizzle-Schema mit dem aktuellen Datenbankzustand
 - Erzeugt zeitgestempelte SQL-Migrationsdateien in `drizzle/migrations/`
 - Dateien können überprüft, bearbeitet und in die Versionskontrolle committet werden
-- <span class="since-badge" data-since="0.25">Seit 0.25</span> Nennt jede Anweisung der neuen Migration, die Daten zerstört, mit derselben Prüfung, die `db push` vor dem Anwenden ausführt: eine gelöschte Tabelle, Spalte, Schema, View oder ein gelöschter Typ, ein `TRUNCATE`, eine Änderung des Spaltentyps, die Werte verlieren kann, oder eine Änderung des Primärschlüssels. Er schreibt die Datei trotzdem und endet mit Exit-Code 0, warnt also und verweigert nicht.
+- <span class="since-badge" data-since="0.25">Seit 0.25</span> Nennt jede Anweisung der neuen Migration, die Daten zerstört, mit derselben Prüfung, die `db push` vor dem Anwenden ausführt: eine gelöschte Tabelle, Spalte, Schema, View oder ein gelöschter Typ, ein `TRUNCATE`, eine Änderung des Spaltentyps, die Werte verlieren kann, eine Änderung des Primärschlüssels oder das Löschen eines CHECK- oder EXCLUDE-Constraints, den die Datenbank enthält. Er schreibt die Datei trotzdem und endet mit Exit-Code 0, warnt also und verweigert nicht.
+
+**Ein CHECK, den eine Ihrer Migrationen hinzugefügt hat, löscht die nächste.** `db generate`
+vergleicht Ihre Migrationsdateien, nicht die Datenbank, und Atlas kann kein Objekt aus diesem
+Vergleich ausnehmen. Ein CHECK- oder EXCLUDE-Constraint, den Sie von Hand in eine Migration
+geschrieben haben und den keine Collection deklarieren kann, kommt deshalb in der nächsten
+Migration, die er schreibt, als `ALTER TABLE … DROP CONSTRAINT …` zurück, in dasselbe Statement
+eingefaltet wie die eigentliche Änderung. Der Bericht oben nennt dieses Löschen, wenn die
+Datenbank den Constraint bereits enthält; aus der Datei nimmt er es nicht heraus. Löschen Sie die
+Klausel vor `rebase db migrate`, oder lassen Sie `rebase db migrate --refuse-destructive` daran
+anhalten. `db push` liest die Datenbank und behält den Constraint.
 
 Die generierten Migrationen sind einfache SQL-Dateien — Sie können sie vor dem Anwenden inspizieren und ändern.
 

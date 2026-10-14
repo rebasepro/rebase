@@ -47,6 +47,15 @@ Prüfen Sie diese, falls Ihre App auf das alte Verhalten angewiesen ist:
   Dieses Volume enthält nur den Standard-Bucket, und der Benutzer des Images kann nicht darauf
   schreiben. Binden Sie es stattdessen unter `/storage` mit `STORAGE_PATH: /storage/uploads` ein,
   wie es die neuen Compose-Dateien tun.
+- **Ein Dienst, den eine Anfrage aufruft und der nicht erreichbar ist, wird mit
+  `503 SERVICE_UNAVAILABLE` beantwortet,** etwa ein ausgefallener S3-Bucket oder ein Host,
+  den eine Function per `fetch()` aufruft. Es war ein `500`, dessen Code der Socket-Fehler
+  (`ECONNREFUSED`) war, oder `INTERNAL_ERROR`.
+- **`rebase db push` behält die CHECK- und EXCLUDE-Constraints auf der Tabelle einer
+  Collection,** wo der erste Push nach `rebase schema introspect` sie gelöscht hat.
+  Die Prüfung auf datenzerstörende Änderungen zählt nun auch das Löschen eines solchen Constraints,
+  sodass `rebase db migrate --refuse-destructive` bei einer Migration anhält, die einen löscht.
+  Einen Constraint, den Sie nicht mehr wollen, löschen Sie von Hand.
 
 Diese Namen funktionieren weiterhin, geben zur Laufzeit einmalig eine Warnung aus und haben einen Ersatz:
 

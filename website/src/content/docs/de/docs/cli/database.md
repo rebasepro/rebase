@@ -30,6 +30,11 @@ rebase db push
 `--database-url <url>` benennt die Datenbank und `--docker` die aus Compose, die bei Bedarf
 gestartet wird. `generate`, `migrate`, `branch`, `backup` und `restore` nehmen ebenfalls beides entgegen.
 
+Er lässt in Ruhe, was Ihre Collections nicht beschreiben: andere Tabellen und Views, Indizes, die
+Sie geschrieben haben, und die CHECK- und EXCLUDE-Constraints auf der Tabelle einer Collection,
+die eine Collection nicht deklarieren kann. Was er anwendet und wovor er anhält, steht unter
+[`rebase db push`](/docs/cli/schema/#rebase-db-push).
+
 :::caution
 `db push` modifiziert die Datenbank direkt ohne Migrationsdateien. Verwenden Sie `db generate` + `db migrate` für die Produktion.
 :::

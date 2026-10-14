@@ -84,8 +84,8 @@ statt ersetzt wird. Die Variable funktioniert also in beiden Umgebungen gleich, 
 Fälle, die sie in der Entwicklung benötigen, sind die üblichen:
 
 ```bash
-# Ein Telefon im LAN, der Rechner eines Kollegen, ein ngrok-Tunnel,
-# ein weitergeleiteter Codespaces-Port – alles Nicht-Localhost-Origins.
+# A phone on the LAN, a colleague's machine, an ngrok tunnel,
+# a forwarded Codespaces port — all non-localhost origins.
 CORS_ORIGINS=http://192.168.1.5:5173
 ```
 
@@ -169,7 +169,7 @@ im Scaffold), `STORAGE_PUBLIC_READ` oder `STORAGE_ALLOW_ANY_AUTHENTICATED`.
 | Variable | Beschreibung | Standard |
 |----------|-------------|---------|
 | `STORAGE_TYPE` | Speicher-Backend: `local`, `s3` oder `gcs`. In der Produktion deaktiviert `local` den Speicher, es sei denn, `FORCE_LOCAL_STORAGE=true` | `local` |
-| `STORAGE_PATH` | Basispfad für lokalen Speicher | `./uploads` |
+| `STORAGE_PATH` | Basispfad für lokalen Speicher. Ein relativer Pfad wird von dem Verzeichnis aus gelesen, in dem der Server läuft: das Projektstammverzeichnis unter `rebase dev`, `backend/` in einem von `rebase eject` geschriebenen Server | `<project>/uploads` |
 | `FORCE_LOCAL_STORAGE` | Lokalen Speicher in der Produktion erlauben – nur mit einem persistenten Volume, das `STORAGE_PATH` und die daneben liegenden `<STORAGE_PATH>__<key>`-Verzeichnisse benannter lokaler Buckets enthält | `false` |
 | `STORAGE_DOWNLOAD_TOKEN_TTL` | Sekunden, die die Download-URL einer privaten Datei gültig ist – das Token, das `getSignedUrl()` hineinschreibt. Maximal `604800` (eine Woche) | `300` |
 | `STORAGE_MAX_FILE_SIZE` | Größte Datei, die die Quelle akzeptiert, in Bytes, auf jedem Upload-Pfad – `__<KEY>` für eine benannte Quelle. Keine ganze Zahl an Bytes verweigert den Start | `52428800` (50 MB) |
