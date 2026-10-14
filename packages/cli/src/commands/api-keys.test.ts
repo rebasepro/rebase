@@ -18,6 +18,7 @@
  * the caller holds (`--full-access`) less key management. The flags of the
  * permission model before it are refused by name with their replacement.
  */
+import { spawnSync } from "node:child_process";
 import fs from "fs";
 import os from "os";
 import path from "path";
@@ -25,15 +26,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ApiKeyMasked, ScopeSummary } from "@rebasepro/types";
 import { RebaseApiError } from "@rebasepro/client";
 
+/** The project the commands see. A test that needs another one swaps it and puts it back. */
+const project = vi.hoisted(() => ({
+    root: "/nonexistent/rebase-api-keys-test",
+    env: { SERVICE_KEY: "svc_test_key", REBASE_BASE_URL: "http://rebase.test" } as Record<string, string>
+}));
+
 vi.mock("../utils/project", async importOriginal => {
     const actual = await importOriginal<typeof import("../utils/project")>();
     return {
         ...actual,
-        requireProjectRoot: () => "/nonexistent/rebase-api-keys-test",
-        readEnvFile: () => ({
-            SERVICE_KEY: "svc_test_key",
-            REBASE_BASE_URL: "http://rebase.test"
-        })
+        requireProjectRoot: () => project.root,
+        readEnvFile: () => project.env
     };
 });
 
@@ -41,6 +45,7 @@ import {
     apiKeysCommand,
     CREATE_KEY_FLAGS,
     describeFailure,
+    resolveBackendAddress,
     describeKey,
     describeScopes,
     GET_KEY_FLAGS,
@@ -493,5 +498,116 @@ describe("the help and the flag specs", () => {
             expect(Object.keys(CREATE_KEY_FLAGS)).not.toContain(flag);
             expect(help).not.toMatch(new RegExp(`${flag}(?![\\w-])`));
         }
+    });
+});
+
+/**
+ * Where the service key is sent.
+ *
+ * With `rebase dev` stopped, `api-keys` and `storage` fell back to `.env`'s
+ * `PORT=3001` — the PORT every scaffold writes — and sent this project's admin
+ * service key, as a bearer token, to whatever listened there. On the tester's
+ * machine that was another project's server, which answered 401. The address
+ * the key goes to is now one this project recorded and is still serving, or
+ * one the developer named; anything else is refused before a request is made.
+ */
+describe("resolveBackendAddress", () => {
+    let root: string;
+    const originalBaseUrl = process.env.REBASE_BASE_URL;
+
+    beforeEach(() => {
+        root = fs.mkdtempSync(path.join(os.tmpdir(), "rebase-api-keys-address-"));
+        delete process.env.REBASE_BASE_URL;
+    });
+    afterEach(() => {
+        fs.rmSync(root, { recursive: true, force: true });
+        if (originalBaseUrl === undefined) delete process.env.REBASE_BASE_URL;
+        else process.env.REBASE_BASE_URL = originalBaseUrl;
+    });
+
+    /** `.rebase/state.json`, as the backend writes it when it binds. */
+    function writeState(state: Record<string, unknown>): void {
+        fs.mkdirSync(path.join(root, ".rebase"), { recursive: true });
+        fs.writeFileSync(path.join(root, ".rebase", "state.json"), JSON.stringify(state));
+    }
+
+    /** A pid nothing runs under: a child that has already exited. */
+    function deadPid(): number {
+        return spawnSync(process.execPath, ["-e", ""]).pid ?? 999_999;
+    }
+
+    it("never guesses `.env`'s PORT", () => {
+        const address = resolveBackendAddress({ PORT: "3001", SERVICE_KEY: "k" }, root);
+
+        expect(address.url).toBeNull();
+        expect(address.url === null ? address.reason : "").toContain("rebase dev");
+    });
+
+    it("uses the address the running backend recorded for this project", () => {
+        writeState({ port: 3732, baseUrl: "http://localhost:3732", pid: process.pid });
+
+        expect(resolveBackendAddress({ PORT: "3001" }, root)).toEqual({ url: "http://localhost:3732", source: "running" });
+    });
+
+    it("refuses an address whose server has stopped, and names it", () => {
+        // What the tester's checkout held after `rebase dev` was stopped.
+        writeState({ port: 3732, baseUrl: "http://localhost:3732", pid: deadPid() });
+        fs.writeFileSync(path.join(root, ".rebase-dev-url"), "http://localhost:3732");
+
+        const address = resolveBackendAddress({ PORT: "3001" }, root);
+
+        expect(address.url).toBeNull();
+        expect(address.url === null ? address.reason : "").toContain("http://localhost:3732");
+    });
+
+    it("does not take `.rebase-dev-url` alone as proof that anything is serving", () => {
+        // A `rebase dev` that was killed leaves it behind.
+        fs.writeFileSync(path.join(root, ".rebase-dev-url"), "http://localhost:3732");
+
+        expect(resolveBackendAddress({}, root).url).toBeNull();
+    });
+
+    it("sends it where the developer said: REBASE_BASE_URL in .env or the shell", () => {
+        expect(resolveBackendAddress({ REBASE_BASE_URL: "http://api.local:8080" }, root))
+            .toEqual({ url: "http://api.local:8080", source: "configured" });
+
+        process.env.REBASE_BASE_URL = "http://shell.local:9000";
+        expect(resolveBackendAddress({ REBASE_BASE_URL: "http://api.local:8080" }, root))
+            .toEqual({ url: "http://shell.local:9000", source: "configured" });
+    });
+});
+
+describe("a command with no server to reach", () => {
+    let root: string;
+    let errors: string[];
+    const saved = { ...project };
+
+    beforeEach(() => {
+        root = fs.mkdtempSync(path.join(os.tmpdir(), "rebase-api-keys-stopped-"));
+        project.root = root;
+        // The scaffold's `.env`: a service key and PORT=3001, no REBASE_BASE_URL.
+        project.env = { REBASE_SERVICE_KEY: "svc_this_project", PORT: "3001" };
+        errors = [];
+        vi.stubGlobal("fetch", vi.fn(async () => new Response("{}", { status: 401 })));
+        vi.spyOn(console, "log").mockImplementation(() => undefined);
+        vi.spyOn(console, "error").mockImplementation((...args: unknown[]) => { errors.push(args.map(String).join(" ")); });
+        vi.spyOn(process, "exit").mockImplementation(((code?: number) => {
+            throw new Error(`exit:${code}`);
+        }) as never);
+    });
+    afterEach(() => {
+        project.root = saved.root;
+        project.env = saved.env;
+        fs.rmSync(root, { recursive: true, force: true });
+        vi.restoreAllMocks();
+        vi.unstubAllGlobals();
+    });
+
+    it("sends the service key nowhere, and says the server is not running", async () => {
+        await expect(apiKeysCommand("list", argv("api-keys", "list"))).rejects.toThrow("exit:1");
+
+        expect(fetch).not.toHaveBeenCalled();
+        expect(plain(errors)).toContain("not sent");
+        expect(plain(errors)).toContain("rebase dev");
     });
 });

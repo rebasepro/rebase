@@ -15,7 +15,7 @@ import { requireProjectRoot, readEnvFile } from "../utils/project";
 import { parseCommandArgs, UsageError, wantsHelp } from "../utils/args";
 import { unknownCommand } from "../utils/unknown-command";
 import { cliUserAgent } from "../utils/version";
-import { describeFailure, resolveBaseUrl } from "./api-keys";
+import { describeFailure, requireBackendUrl } from "./api-keys";
 
 /** Everything the switch below dispatches, for the did-you-mean. */
 export const STORAGE_SUBCOMMANDS = ["orphans", "move"] as const;
@@ -72,12 +72,14 @@ interface Backend {
 function connect(): Backend {
     const projectRoot = requireProjectRoot();
     const env = readEnvFile(projectRoot);
-    const baseUrl = resolveBaseUrl(env, projectRoot).replace(/\/+$/, "");
     const serviceKey = env.SERVICE_KEY || env.REBASE_SERVICE_KEY;
     if (!serviceKey) {
         console.error(chalk.red("✗ REBASE_SERVICE_KEY not found in .env — required for storage maintenance."));
         process.exit(1);
     }
+    // Only an address this project recorded or the developer named: the
+    // request carries the service key. See `resolveBackendAddress`.
+    const baseUrl = requireBackendUrl(env, projectRoot).replace(/\/+$/, "");
     return {
         baseUrl,
         async request<T>(method: string, path: string, body?: unknown): Promise<T> {

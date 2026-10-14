@@ -50,26 +50,91 @@ export const API_KEYS_SUBCOMMANDS = ["list", "get", "create", "revoke", "scopes"
  */
 const loadEnv = readEnvFile;
 
-/** The running backend's URL. Shared with `rebase storage`. */
-export function resolveBaseUrl(env: Record<string, string>, projectRoot?: string): string {
-    // An explicit override always wins.
-    if (env.REBASE_BASE_URL) return env.REBASE_BASE_URL;
+/**
+ * Where this project's backend is — or why the CLI will not say.
+ *
+ * `configured` is an address the developer named; `running` is the one this
+ * project's backend recorded when it bound, and is still serving on. There is
+ * no third, guessed, answer: the request carries the project's service key —
+ * the `admin` role, every scope — and an address the CLI only guessed is one it
+ * would hand that key to without knowing whose server answers.
+ */
+export type BackendAddress =
+    | { url: string; source: "configured" | "running" }
+    | { url: null; reason: string };
 
-    // `rebase dev` runs on a derived per-project port, not the .env PORT, and
-    // records the URL it actually bound. Without this, these commands default to
-    // :3001 and report "Is the Rebase server running?" while it is running.
-    if (projectRoot) {
-        try {
-            const urlFile = path.join(projectRoot, ".rebase-dev-url");
-            if (fs.existsSync(urlFile)) {
-                const devUrl = fs.readFileSync(urlFile, "utf-8").trim();
-                if (devUrl) return devUrl;
-            }
-        } catch { /* fall through to the configured port */ }
+/** Whether a process with this pid is alive and ours to signal. */
+function isAlive(pid: number): boolean {
+    try {
+        process.kill(pid, 0);
+        return true;
+    } catch {
+        // ESRCH: gone. EPERM: alive, but another user's — not this project's backend.
+        return false;
     }
+}
 
-    const port = env.PORT || env.REBASE_PORT || "3001";
-    return `http://localhost:${port}`;
+/**
+ * The address the service key may be sent to. Shared with `rebase storage`.
+ *
+ * In order:
+ *
+ *   1. `REBASE_BASE_URL`, in the shell or in `.env` — the developer said where.
+ *   2. `.rebase/state.json`, which this project's backend writes when it binds
+ *      and removes when it stops — and only while the pid it names is alive,
+ *      because a backend that was killed leaves the file behind.
+ *
+ * Nothing else. `.env`'s `PORT` was the fallback, and every scaffold writes
+ * `PORT=3001`: with `rebase dev` stopped, `rebase api-keys list` sent this
+ * project's service key to whatever listened on 3001 — on the tester's machine,
+ * another project's server. `.rebase-dev-url` is not enough on its own either:
+ * a `rebase dev` that was killed leaves it behind, pointing at a port some
+ * other server may have taken since.
+ */
+export function resolveBackendAddress(env: Record<string, string>, projectRoot: string): BackendAddress {
+    const configured = process.env.REBASE_BASE_URL?.trim() || env.REBASE_BASE_URL?.trim();
+    if (configured) return { url: configured, source: "configured" };
+
+    const state = readBackendState(projectRoot);
+    if (state && isAlive(state.pid)) return { url: state.url, source: "running" };
+
+    const last = state ? ` The last one recorded here, at ${state.url} (pid ${state.pid}), has stopped.` : "";
+    return {
+        url: null,
+        reason: `This project's server is not running, so the service key was not sent anywhere.${last} ` +
+            "Start it with `rebase dev`. If it runs some other way — `rebase start`, a container — " +
+            "set REBASE_BASE_URL in .env to its address."
+    };
+}
+
+/** What `.rebase/state.json` says about the backend that wrote it, or null. */
+function readBackendState(projectRoot: string): { url: string; pid: number } | null {
+    let parsed: unknown;
+    try {
+        parsed = JSON.parse(fs.readFileSync(path.join(projectRoot, ".rebase", "state.json"), "utf-8"));
+    } catch {
+        return null;
+    }
+    if (!isRecord(parsed) || typeof parsed.pid !== "number" || !Number.isInteger(parsed.pid) || parsed.pid <= 0) return null;
+    const url = typeof parsed.baseUrl === "string" && parsed.baseUrl.trim()
+        ? parsed.baseUrl.trim()
+        : typeof parsed.port === "number" ? `http://localhost:${parsed.port}` : null;
+
+    return url ? { url, pid: parsed.pid } : null;
+}
+
+/**
+ * The address to send the service key to, or the end of the command.
+ *
+ * Exits before any request is made: the refusal is the point.
+ */
+export function requireBackendUrl(env: Record<string, string>, projectRoot: string): string {
+    const address = resolveBackendAddress(env, projectRoot);
+    if (address.url !== null) return address.url;
+
+    console.error(chalk.red("✗ No server to send the request to."));
+    console.error(chalk.gray(`  ${address.reason}`));
+    process.exit(1);
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -93,13 +158,13 @@ interface Connection {
 function connect(): Connection {
     const projectRoot = requireProjectRoot();
     const env = loadEnv(projectRoot);
-    const baseUrl = resolveBaseUrl(env, projectRoot);
     const serviceKey = env.SERVICE_KEY || env.REBASE_SERVICE_KEY;
 
     if (!serviceKey) {
         console.error(chalk.red("✗ SERVICE_KEY not found in .env — required to manage API keys."));
         process.exit(1);
     }
+    const baseUrl = requireBackendUrl(env, projectRoot);
 
     const client = createRebaseClient({
         baseUrl,

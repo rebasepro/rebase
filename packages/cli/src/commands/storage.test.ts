@@ -7,15 +7,17 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+/** The `.env` the commands see. A test that needs another one swaps it and puts it back. */
+const project = vi.hoisted(() => ({
+    env: { REBASE_SERVICE_KEY: "svc_test_key", REBASE_BASE_URL: "http://rebase.test" } as Record<string, string>
+}));
+
 vi.mock("../utils/project", async importOriginal => {
     const actual = await importOriginal<typeof import("../utils/project")>();
     return {
         ...actual,
         requireProjectRoot: () => "/nonexistent/rebase-storage-test",
-        readEnvFile: () => ({
-            REBASE_SERVICE_KEY: "svc_test_key",
-            REBASE_BASE_URL: "http://rebase.test"
-        })
+        readEnvFile: () => project.env
     };
 });
 
@@ -129,5 +131,25 @@ describe("rebase storage move", () => {
     it("needs at least one source named", async () => {
         await expect(storageCommand("move", argv("storage", "move"))).rejects.toThrow(/--from/);
         expect(calls).toEqual([]);
+    });
+});
+
+describe("with no server to reach", () => {
+    it("sends the service key nowhere — not to .env's PORT", async () => {
+        // Every scaffold writes PORT=3001, and with `rebase dev` stopped that
+        // was where the key went: to whatever else listened there.
+        const saved = project.env;
+        project.env = { REBASE_SERVICE_KEY: "svc_this_project", PORT: "3001" };
+        vi.spyOn(process, "exit").mockImplementation(((code?: number) => {
+            throw new Error(`exit:${code}`);
+        }) as never);
+        try {
+            await expect(storageCommand("orphans", argv("storage", "orphans"))).rejects.toThrow("exit:1");
+        } finally {
+            project.env = saved;
+        }
+
+        expect(calls).toEqual([]);
+        expect(printed.join("\n").replace(ANSI, "")).toContain("not running");
     });
 });
