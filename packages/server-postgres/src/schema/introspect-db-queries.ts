@@ -270,16 +270,25 @@ export const UNIQUE_CONSTRAINTS_QUERY = `
 `;
 
 /**
- * Every index on the schema's tables, by name. Only the name is needed: it is
- * what tells a foreign key Rebase already indexed apart from one it would
- * index on the first push — see `foreignKeyIndexSpec`.
+ * Every index on the schema's tables: its name, which tells a foreign key
+ * Rebase already indexed apart from one it would index on the first push
+ * (see `foreignKeyIndexSpec`), and whether it serves an equality lookup on its
+ * leading column — a btree with no predicate — which tells one the database
+ * already indexes some other way apart from one with no index at all.
+ *
+ * `leading_column` is null when the first key is an expression.
  */
 export const INDEXES_QUERY = `
-    SELECT t.relname AS table_name, ic.relname AS index_name
+    SELECT t.relname AS table_name,
+           ic.relname AS index_name,
+           a.attname AS leading_column,
+           am.amname = 'btree' AND i.indpred IS NULL AS serves_leading_column
     FROM pg_index i
     JOIN pg_class t ON t.oid = i.indrelid
     JOIN pg_class ic ON ic.oid = i.indexrelid
+    JOIN pg_am am ON am.oid = ic.relam
     JOIN pg_namespace n ON n.oid = t.relnamespace
+    LEFT JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = i.indkey[0] AND i.indkey[0] <> 0
     WHERE n.nspname = $1
       AND NOT t.relispartition
     ORDER BY t.relname, ic.relname

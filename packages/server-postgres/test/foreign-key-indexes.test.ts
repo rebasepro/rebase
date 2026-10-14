@@ -399,14 +399,38 @@ describe("introspecting a database", () => {
     const schema = "CREATE TABLE authors (id serial PRIMARY KEY); " +
         "CREATE TABLE posts (id serial PRIMARY KEY, author_id integer REFERENCES authors(id));";
 
-    it("writes `index: false`, and why, where the database has no index Rebase would derive", async () => {
+    it("writes `index: false`, and why, where the database has no index on the key", async () => {
         const file = await introspect(schema);
-        expect(file).toMatch(/localKey: "author_id",[\s\S]*\/\/ The database has no index of Rebase's on author_id\. Delete this line to have one built\.\s+index: false/);
+        expect(file).toMatch(/localKey: "author_id",[\s\S]*\/\/ The database has no index on author_id\. Delete this line to have one built\.\s+index: false/);
     });
 
-    it("writes it too over a hand-written index — keeping one index rather than adding a second", async () => {
+    // Following "Delete this line to have one built" beside a hand-written
+    // index built a second index doing the first one's job.
+    it("writes it too over a hand-written index, and says that index serves the key", async () => {
         const file = await introspect(`${schema} CREATE INDEX idx_posts_author ON posts (author_id);`);
-        expect(file).toContain("index: false");
+        expect(file).toMatch(/\/\/ idx_posts_author already indexes author_id, so Rebase builds none of its own\. Without this line, `rebase db push` would build a second\.\s+index: false/);
+        expect(file).not.toContain("Delete this line");
+    });
+
+    it("counts an index the key leads, unique or composite, as serving it", async () => {
+        const composite = await introspect(`${schema} ALTER TABLE posts ADD COLUMN created_at timestamptz; ` +
+            "CREATE INDEX posts_author_created ON posts (author_id, created_at);");
+        expect(composite).toMatch(/posts_author_created already indexes author_id/);
+        const unique = await introspect(`${schema} CREATE UNIQUE INDEX posts_one_per_author ON posts (author_id);`);
+        expect(unique).toMatch(/posts_one_per_author already indexes author_id/);
+    });
+
+    it("does not count one that cannot serve every lookup on the key", async () => {
+        // A partial index reaches only the rows its predicate admits; a key
+        // that comes second is not a prefix; a hash index is not a btree.
+        for (const index of [
+            "CREATE INDEX posts_some_authors ON posts (author_id) WHERE author_id > 10;",
+            "CREATE INDEX posts_id_author ON posts (id, author_id);",
+            "CREATE INDEX posts_author_hash ON posts USING hash (author_id);"
+        ]) {
+            const file = await introspect(`${schema} ${index}`);
+            expect(file).toContain("// The database has no index on author_id. Delete this line to have one built.");
+        }
     });
 
     it("writes nothing where the database already holds the derived index", async () => {

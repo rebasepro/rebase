@@ -91,10 +91,14 @@ export interface UniqueConstraintRow {
     column_names: string[];
 }
 
-/** One index, by name. */
+/** One index: its name, and what it leads with. */
 export interface IndexRow {
     table_name: string;
     index_name: string;
+    /** The column its first key is, or null for an expression. */
+    leading_column: string | null;
+    /** Whether it serves every equality lookup on that column: a btree with no predicate. */
+    serves_leading_column: boolean;
 }
 
 /** A CHECK constraint, as `pg_get_constraintdef` renders it. */
@@ -1382,13 +1386,23 @@ export function generateCollectionFile(
             // relation says `index: false` and says why; deleting the line is
             // how to ask for the index. Not where the key leads the primary
             // key: the planner derives nothing there to begin with.
+            //
+            // Another index the key leads (a hand-written `orders_customer_id_idx`,
+            // a composite, a unique one) already serves the lookups, and the line
+            // stays: the planner reads only the collections, so deleting it would
+            // build a second index doing the first one's job.
             const derivedIndex = foreignKeyIndexSpec(context.metadata?.schema ?? "public", tableName, fk.column_name);
-            const indexMissing = context.metadata?.indexes !== undefined
+            const tableIndexes = context.metadata?.indexes?.filter(i => i.table_name === tableName);
+            const indexMissing = tableIndexes !== undefined
                 && meta.pks[0] !== fk.column_name
-                && !context.metadata.indexes.some(i => i.table_name === tableName && i.index_name === derivedIndex.indexName);
+                && !tableIndexes.some(i => i.index_name === derivedIndex.indexName);
+            const servedBy = tableIndexes?.find(i => i.leading_column === fk.column_name && i.serves_leading_column);
+            const indexReason = servedBy
+                ? `${commentText(servedBy.index_name)} already indexes ${commentText(fk.column_name)}, so Rebase builds none of its own. ` +
+                  "Without this line, `rebase db push` would build a second."
+                : `The database has no index on ${commentText(fk.column_name)}. Delete this line to have one built.`;
             const indexLine = indexMissing
-                ? `,\n                // The database has no index of Rebase's on ${commentText(fk.column_name)}. ` +
-                  "Delete this line to have one built.\n                index: false"
+                ? `,\n                // ${indexReason}\n                index: false`
                 : "";
 
             propertyBlocks.set(relName, `
