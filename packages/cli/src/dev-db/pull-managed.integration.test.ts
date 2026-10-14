@@ -202,8 +202,17 @@ async function fingerprint(connectionString: string): Promise<Record<string, unk
                                     WHERE n.nspname ${user} AND NOT EXISTS (
                                           SELECT 1 FROM pg_depend d WHERE d.objid = p.oid AND d.deptype = 'e')
                                     ORDER BY 1`),
+            // NOT NULL apart: Postgres 18 records it in pg_constraint and 17 (and
+            // the managed database, until it moves to 18) does not, so the list
+            // would differ by server version alone. Nullability is compared as
+            // the columns that carry it.
             constraints: await list(`SELECT format('%s %s %s', conrelid::regclass, conname, pg_get_constraintdef(oid)) AS item
-                                       FROM pg_constraint WHERE connamespace::regnamespace::text ${user} AND conrelid <> 0 ORDER BY 1`),
+                                       FROM pg_constraint WHERE connamespace::regnamespace::text ${user} AND conrelid <> 0
+                                        AND contype <> 'n' ORDER BY 1`),
+            notNull: await list(`SELECT format('%s.%s', c.oid::regclass, a.attname) AS item FROM pg_attribute a
+                                   JOIN pg_class c ON c.oid = a.attrelid JOIN pg_namespace n ON n.oid = c.relnamespace
+                                  WHERE c.relkind = 'r' AND n.nspname ${user} AND a.attnum > 0
+                                    AND NOT a.attisdropped AND a.attnotnull ORDER BY 1`),
             indexes: await list(`SELECT indexdef AS item FROM pg_indexes WHERE schemaname ${user} ORDER BY 1`),
             types: await list(`SELECT format('%s.%s', n.nspname, t.typname) AS item FROM pg_type t
                                  JOIN pg_namespace n ON n.oid = t.typnamespace
