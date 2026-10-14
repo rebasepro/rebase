@@ -2727,6 +2727,15 @@
 
 #### Admin (CMS & app)
 
+- **A record created from its parent's tab opens linked to that parent.** A new
+  transaction from a customer's Transactions tab asked for the customer, and a
+  required `belongsTo` could not be saved until the user picked the record they
+  had come from. The server already linked a create under
+  `customers/{id}/transactions` to that customer. The form now opens with the
+  link set and locked while the record is new. Editing it later still works.
+  This covers a `hasMany` whose child has the `belongsTo` back on
+  `foreignKeyOnTarget`. A link keyed on `sourceKey` is not prefilled.
+
 - **The markdown editor's link box takes a link, and pressing Enter in it no longer
   saves the record.** The box reset to empty on every keystroke, so no link could be
   typed or edited, and its submit went on through the popover to the record form

@@ -81,6 +81,7 @@ export function EntityForm<M extends Record<string, unknown>>({
     onValuesChangeDeferred: onValuesChangeDeferredProp,
     onReset: onResetProp,
     uniqueFieldValidator: uniqueFieldValidatorProp,
+    lockedPropertyKeys,
     // Slots
     beforeFields,
     afterFields,
@@ -660,11 +661,11 @@ export function EntityForm<M extends Record<string, unknown>>({
         const ordered = [...layout.sections.flatMap(s => s.fields), ...layout.sidebar];
         return ordered.find(field => {
             const property = collection.properties?.[field.key];
-            return property ? !isFieldDisabled(property) : false;
+            return property ? !isFieldDisabled(field.key, property) : false;
         })?.key;
-    }, [layout, collection, status, disabledProp]);
+    }, [layout, collection, status, disabledProp, lockedPropertyKeys]);
 
-    function isFieldDisabled(property: NonNullable<typeof collection.properties[string]>): boolean {
+    function isFieldDisabled(key: string, property: NonNullable<typeof collection.properties[string]>): boolean {
         const isNew = status === "new" || status === "copy";
         const isStringOrNumber = property.type === "string" || property.type === "number";
         const isIdAndAuto = isStringOrNumber && "isId" in property && typeof property.isId === "string" && property.isId !== "manual";
@@ -675,6 +676,7 @@ export function EntityForm<M extends Record<string, unknown>>({
             || isDisabled(property)
             || (!isNew && "isId" in property && Boolean(property.isId))
             || (isNew && isIdAndAuto)
+            || (isNew && lockedPropertyKeys?.includes(key))
         );
     }
 
@@ -741,7 +743,7 @@ export function EntityForm<M extends Record<string, unknown>>({
             field.key in underlyingChanges &&
             !equal(formex.values[field.key], underlyingChanges[field.key]);
 
-        const disabled = isFieldDisabled(property);
+        const disabled = isFieldDisabled(field.key, property);
         // The panel-style editors carry their own header; everything else is
         // labelled by FieldBlock, which is what puts every label in one place.
         const selfLabelling = isSelfLabellingProperty(property);

@@ -85,6 +85,14 @@ export type EntityFormProps<M extends Record<string, unknown>> = {
      */
     uniqueFieldValidator?: (params: { name: string; value: unknown }) => Promise<boolean>;
 
+    /**
+     * Properties a new record takes from its address rather than from the
+     * user: the link back to the parent of a record created under
+     * `parent/{id}/{relation}`. Shown and disabled while the record is new.
+     * The EntityFormBinding wrapper fills these in.
+     */
+    lockedPropertyKeys?: string[];
+
     // --- Slots (replace useSlot) ---
 
     /** Content rendered before the form fields */

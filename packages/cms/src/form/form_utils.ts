@@ -1,10 +1,19 @@
 
 import type { PropertyConfig, AdminCollection } from "@rebasepro/cms-types";
-import type { Entity, EntityStatus, EntityValues } from "@rebasepro/types";
+import type { CollectionConfig, CollectionRegistryController, Entity, EntityStatus, EntityValues } from "@rebasepro/types";
+import { EntityRelation } from "@rebasepro/types";
 import type { AuthController } from "@rebasepro/cms-types";
 import { deepEqual as equal } from "fast-equals";
 import { getIn, setIn } from "@rebasepro/forms";
-import { buildConditionContext, evaluateCondition, getCopyValues, getDefaultValuesFor } from "@rebasepro/common";
+import {
+    buildConditionContext,
+    evaluateCondition,
+    findRelation,
+    getCopyValues,
+    getDefaultValuesFor,
+    getEntityChildViews,
+    resolveCollectionRelations
+} from "@rebasepro/common";
 import { isPlainObject } from "@rebasepro/utils";
 import { z } from "zod";
 
@@ -374,6 +383,53 @@ export function getInitialEntityValues<M extends Record<string, unknown>>(
         });
         throw new Error("Form has not been initialised with the correct parameters");
     }
+}
+
+/**
+ * The link back to the parent that a record created under
+ * `parent/{id}/{relation}` takes from its address: `{ customer: <the parent> }`
+ * for a transaction created from a customer's Transactions tab.
+ *
+ * The server already stamps the parent's key onto a create through an owned
+ * `hasMany`/`hasOne`, so the address alone decides the link. The form did not
+ * know that: it opened the child's `belongsTo` empty, and a required one asked
+ * the user to pick the record they had just come from.
+ *
+ * Empty when the address does not decide a link — a root collection, a
+ * many-to-many (that link is a junction row, not a property), a `sourceKey`
+ * (the value is a column of the parent row, which the address does not carry),
+ * or a child with no `belongsTo` on the relation's foreign key.
+ */
+export function getParentLinkValues(
+    registry: Pick<CollectionRegistryController, "getCollection" | "getParentEntityIds">,
+    path: string,
+    collection: CollectionConfig
+): Record<string, EntityRelation> {
+    // Asked of the registry first: only it knows where a slug ends, and a
+    // slashed root slug (`content/de-DE/podcasts`) has no parent at all.
+    if (registry.getParentEntityIds(path).length === 0) return {};
+
+    const segments = path.split("/").filter(Boolean);
+    if (segments.length < 3) return {};
+    const relationKey = segments[segments.length - 1];
+    const parentId = segments[segments.length - 2];
+    const parent = registry.getCollection(segments.slice(0, -2).join("/"));
+    if (!parent) return {};
+
+    const view = getEntityChildViews(parent).find(v => v.key === relationKey);
+    if (view?.source.kind !== "relation" || view.source.mode !== "owned") return {};
+    const link = findRelation(resolveCollectionRelations(parent), view.source.relationKey);
+    if (!link || (link.kind !== "hasMany" && link.kind !== "hasOne") || link.sourceKey) return {};
+
+    const childRelations = resolveCollectionRelations(collection);
+    for (const [key, property] of Object.entries(collection.properties ?? {})) {
+        if (property?.type !== "relation") continue;
+        const relation = childRelations[key];
+        if (relation?.kind === "belongsTo" && relation.localKey === link.foreignKeyOnTarget) {
+            return { [key]: new EntityRelation(parentId, relation.targetSlug) };
+        }
+    }
+    return {};
 }
 
 export function zodToFormErrors(zodError: z.ZodError): Record<string, string> {

@@ -33,6 +33,7 @@ import { useAdminContext } from "../hooks/useAdminContext";
 import { EntityForm } from "./EntityForm";
 import {
     getInitialEntityValues,
+    getParentLinkValues,
     getTouchedPropertyValues,
     getUnappliedLocalChanges,
     overlayEdit
@@ -49,6 +50,7 @@ export type EntityFormBindingProps<M extends Record<string, unknown>> = Omit<Ent
     | "onValuesChangeDeferred"
     | "onReset"
     | "uniqueFieldValidator"
+    | "lockedPropertyKeys"
     | "beforeFields"
     | "afterFields"
     | "pluginActions"
@@ -109,10 +111,29 @@ export function EntityFormBinding<M extends Record<string, unknown>>({
         return entityIdProp;
     });
 
+    // A record created under `parent/{id}/{relation}` belongs to that parent:
+    // the server stamps the link on the create, so the form opens with it set
+    // and does not offer it for editing. See `getParentLinkValues`.
+    //
+    // Keyed on the two callbacks rather than the controller. The controller is
+    // a new object whenever its provider renders, which would hand the form a
+    // new baseline each time.
+    const { getCollection, getParentEntityIds } = collectionRegistryController;
+    const parentLinkValues = useMemo(
+        () => status === "new" || status === "copy"
+            ? getParentLinkValues({ getCollection, getParentEntityIds }, path, collection)
+            : {},
+        [getCollection, getParentEntityIds, path, collection, status]
+    );
+    const lockedPropertyKeys = useMemo(() => Object.keys(parentLinkValues), [parentLinkValues]);
+
     // --- Compute initial values with local changes ---
     const baseInitialValues = useMemo(
-        () => getInitialEntityValues(authController, collection, path, status, entity, customizationController.propertyConfigs),
-        [authController, collection, path, status, entity, customizationController.propertyConfigs]
+        () => ({
+            ...getInitialEntityValues(authController, collection, path, status, entity, customizationController.propertyConfigs),
+            ...parentLinkValues
+        }),
+        [authController, collection, path, status, entity, customizationController.propertyConfigs, parentLinkValues]
     );
 
     const localChangesBackup = getLocalChangesBackup(collection);
@@ -341,6 +362,7 @@ export function EntityFormBinding<M extends Record<string, unknown>>({
             onValuesChangeDeferred={onValuesChangeDeferred}
             onReset={onReset}
             uniqueFieldValidator={uniqueFieldValidator}
+            lockedPropertyKeys={lockedPropertyKeys}
             // Slots
             beforeFields={pluginFormBefore}
             afterFields={pluginFormAfter}
