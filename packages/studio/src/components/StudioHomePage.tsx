@@ -378,9 +378,9 @@ function SyntaxHighlightedSnippet({ baseUrl }: { baseUrl: string }) {
             {"\n"}
 
             <span className={kw}>import</span>
-            <span className={tx}> </span>
+            <span className={tx}>{" { collectionsDictionary, "}</span>
             <span className={kw}>type</span>
-            <span className={tx}>{" { "}</span>
+            <span className={tx}> </span>
             <span className={typ}>Database</span>
             <span className={tx}>{" } "}</span>
             <span className={kw}>from</span>
@@ -401,6 +401,14 @@ function SyntaxHighlightedSnippet({ baseUrl }: { baseUrl: string }) {
             <span className={tx}>{"    baseUrl"}</span>
             <span className={op}>: </span>
             <span className={str}>&apos;{baseUrl}&apos;</span>
+            <span className={op}>,</span>
+            {"\n"}
+            {/* Maps each accessor back to its slug: without it a hyphenated
+                slug is not reachable from the property name, and the copied
+                client 404s on that collection. */}
+            <span className={tx}>{"    collections"}</span>
+            <span className={op}>: </span>
+            <span className={tx}>collectionsDictionary</span>
             <span className={op}>,</span>
             {"\n"}
             <span className={tx}>{"}"}</span>

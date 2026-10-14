@@ -112,6 +112,15 @@ describe("StudioHomePage Component", () => {
         expect(container.textContent).not.toContain("localhost:3001");
     });
 
+    it("passes the generated dictionary, as generate-sdk's own snippet does", () => {
+        // Without it a hyphenated slug is not resolvable from the accessor,
+        // and the copied client 404s on that collection at runtime.
+        const { container } = render(<StudioHomePage />);
+
+        expect(container.textContent).toContain("import { collectionsDictionary, type Database } from './database.types';");
+        expect(container.textContent).toContain("collections: collectionsDictionary,");
+    });
+
     it("renders additional children when provided", () => {
         render(
             <StudioHomePage

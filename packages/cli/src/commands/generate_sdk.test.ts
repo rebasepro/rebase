@@ -101,6 +101,18 @@ force: true });
         expect(collections[0]).toMatchObject({ slug: "posts", name: "posts" });
     });
 
+    it("gives the README the address this project's backend last bound", async () => {
+        const collectionsDir = collectionsDirWith({ "posts.ts": collectionFile("posts") });
+        fs.writeFileSync(path.join(tmpDir, "rebase.json"), "{}");
+        fs.mkdirSync(path.join(tmpDir, ".rebase"));
+        fs.writeFileSync(path.join(tmpDir, ".rebase", "state.json"), JSON.stringify({ port: 3755 }));
+
+        await generateSdkCommand({ collectionsDir, output: path.join(tmpDir, "out"), cwd: tmpDir });
+
+        const [, options] = vi.mocked(sdkGen.generateSDK).mock.calls[0];
+        expect(options).toMatchObject({ baseUrl: "http://localhost:3755" });
+    });
+
     it("passes every collection through, sorted by slug for a stable SDK", async () => {
         const collectionsDir = collectionsDirWith({
             "posts.ts": collectionFile("posts"),

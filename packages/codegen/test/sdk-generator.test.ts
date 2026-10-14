@@ -686,6 +686,20 @@ describe("generateSDK configurations", () => {
         }
     });
 
+    /**
+     * `rebase dev` binds a port derived from the project's path, not 3001, and
+     * the README's example connected to 3001 whatever the project was on —
+     * while the snippet `generate-sdk` printed beside it named the real one.
+     */
+    it("connects the README's example to the address it is given", () => {
+        const readme = generateSDK([authorsCollection], { baseUrl: "http://localhost:3755" })
+            .find(f => f.path === "README.md")!.content;
+
+        expect(readme).toContain("baseUrl: 'http://localhost:3755'");
+        expect(readme).not.toContain("3001");
+        expect(readme).toContain("collections: collectionsDictionary");
+    });
+
     it("always emits the typedefs, and they reflect the collections passed in", () => {
         const files = generateSDK([authorsCollection]);
         const types = files.find(f => f.path === "database.types.ts")!;

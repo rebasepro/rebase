@@ -22,6 +22,13 @@ export interface GeneratedFile {
 export interface GenerateSDKOptions {
     /** Whether to include a README file (default: true) */
     includeReadme?: boolean;
+    /**
+     * The address the README's example connects to. `rebase generate-sdk`
+     * passes the one the project's backend last bound — `rebase dev` derives
+     * its port from the project's path, so it is rarely 3001.
+     * Default: `http://localhost:3001`.
+     */
+    baseUrl?: string;
 }
 
 export function generateSDK(
@@ -55,7 +62,7 @@ export function generateSDK(
     import { collectionsDictionary, type Database } from './database.types';
 
     const rebase = createRebaseClient<Database>({
-        baseUrl: 'http://localhost:3001',
+        baseUrl: '${options.baseUrl ?? "http://localhost:3001"}',
         // Maps each accessor back to the slug the wire uses. Without it a
         // hyphenated slug is not resolvable from the property name alone.
         collections: collectionsDictionary,

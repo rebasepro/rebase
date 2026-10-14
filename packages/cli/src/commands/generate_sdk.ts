@@ -577,7 +577,7 @@ export async function generateSdkCommand(args: GenerateSDKArgs): Promise<void> {
     console.log(chalk.cyan("  → Generating SDK files..."));
     let files: GeneratedFile[];
     try {
-        files = generateSDK(collections);
+        files = generateSDK(collections, { baseUrl: resolveExampleBaseUrl(cwd) });
     } catch (err) {
         // A schema that cannot be expressed as valid TypeScript — two slugs
         // that collide on one accessor, a slug with no usable name. The
