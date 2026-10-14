@@ -36,16 +36,12 @@ let _schemaDriftHinted = false;
 /**
  * The schema-drift remedy, in the words that work on *this* database.
  *
- * The three copies of this message hard-coded `Run \`pnpm db:push\``, and on a
- * stock scaffold — where the managed PGlite database is the default — that
- * command answers `✗ rebase db push does not work on the managed development
- * database.` and exits 1. So the one instruction the server gave when a
- * developer's schema had drifted was a command their project refuses.
- *
- * Atlas plans a push by diffing against a second, empty database, and PGlite
- * serves exactly one — which is why it cannot run there, and why the remedy
- * has to know which database is under this run. There, boot applies additive
- * changes, so restarting `rebase dev` *is* the fix.
+ * On the managed development database boot applies additive changes, so
+ * restarting `rebase dev` is the first fix there, and `rebase db push` — which
+ * plans against a throwaway database of its own — applies what boot leaves
+ * alone. Elsewhere the push or the migrations are the fix, and a deployed
+ * runtime applies the schema at boot, so the remedy has to know which database
+ * is under this run.
  *
  * `REBASE_DEV_DATABASE_KIND` is set by the CLI from the database it resolved,
  * the same variable `rebase schema generate`'s closing line already branches
@@ -55,16 +51,14 @@ let _schemaDriftHinted = false;
 export function schemaDriftRemedy(): { short: string; lines: string[] } {
     if (hostEnv().REBASE_DEV_DATABASE_KIND === "managed") {
         return {
-            short: "Restart `rebase dev` — boot applies additive schema changes to the managed database.",
+            short: "Restart `rebase dev` — boot applies additive schema changes to the managed database — " +
+                "or run `rebase db push` for a change boot leaves alone.",
             lines: [
                 "  Quick fixes (managed development database):",
                 "    restart `rebase dev`   boot applies additive changes",
-                "    rebase doctor          full 3-way drift report",
-                "",
-                "  `rebase db push` does not run here: Atlas plans against a",
-                "  second, empty database and PGlite serves one. For a change",
-                "  boot leaves alone, use your own Postgres (DATABASE_URL)",
-                "  or `rebase dev --docker`."
+                "    rebase db push         applies what boot leaves alone",
+                "                           (a drop or a retype; it asks first)",
+                "    rebase doctor          full 3-way drift report"
             ]
         };
     }

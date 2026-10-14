@@ -36,9 +36,11 @@ rebase db restore ./backups/rebase-app-20260714T030000Z.dump \
   --create-db --target-db app_restored
 ```
 
-The connection string comes from your project's environment, as for every
-other [`rebase db` command](/docs/cli/database/): `DATABASE_URL`, falling
-back to `ADMIN_CONNECTION_STRING`.
+The database is the one every other [`rebase db` command](/docs/cli/database/)
+resolves, in the same order: `--database-url`, `DATABASE_URL` in the shell, the
+[branch](/docs/backend/branching/) the checkout is switched to, `DATABASE_URL`
+in `.env`, Postgres in Docker (`--docker`, or the last `rebase dev --docker`),
+then the managed development database, which `restore` refuses.
 
 <span class="since-badge" data-since="0.25">Since 0.25</span> A relative
 `--out`, the default `./backups` and a dump path given to `rebase db restore`

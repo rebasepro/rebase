@@ -256,11 +256,10 @@ snapshot alone.
 
 Branches are ordinary PostgreSQL databases named after the branch with an `rb_` prefix, so `dev_sandbox` above is the database `rb_dev_sandbox` on the same server.
 
-Creating a branch does **not** change which database your project talks to. `rebase db branch create` makes the copy and stops there; nothing writes to `.env`, and the next `rebase dev` still uses the database it used before. To work against a branch, point `DATABASE_URL` at it yourself — the connection string is the one you already have, with the database name swapped:
+Creating a branch does **not** change which database your project talks to. `rebase db branch create` makes the copy and stops there; nothing writes to `.env`, and the next `rebase dev` still uses the database it used before. To work against a branch, switch to it with `rebase db branch switch <name>`, as above. To reach it from anything that is not a `rebase` command, its connection string is the one you already have with the database name swapped:
 
 ```bash
-# .env
-DATABASE_URL=postgresql://user:pass@localhost:5432/rb_dev_sandbox
+postgresql://user:pass@localhost:5432/rb_dev_sandbox
 ```
 
 ---

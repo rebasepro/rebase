@@ -139,7 +139,12 @@ describe("pg-error-utils", () => {
             const result = pgErrorToFriendlyMessage(pgError as any, "clients");
             expect(result.code).toBe("42P01");
             expect(result.message).toContain("Table not found");
-            expect(result.message).toContain("run migrations");
+            // `db push` in development and `db migrate` where migrations
+            // are used: "(run migrations)" alone pointed a project on the
+            // managed database, which nobody migrates, the wrong way.
+            expect(result.message).toContain("`rebase db push`");
+            expect(result.message).toContain("`rebase db migrate`");
+            expect(result.message).not.toContain("(run migrations)");
         });
 
         it("maps 42703 (undefined_column) to a friendly message", () => {
@@ -151,7 +156,8 @@ describe("pg-error-utils", () => {
             const result = pgErrorToFriendlyMessage(pgError as any, "clients");
             expect(result.code).toBe("42703");
             expect(result.message).toContain("Unknown column");
-            expect(result.message).toContain("run migrations");
+            expect(result.message).toContain("`rebase db push`");
+            expect(result.message).not.toContain("(run migrations)");
         });
 
         it("maps 23505 (unique_violation) with detail", () => {

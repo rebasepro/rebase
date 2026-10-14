@@ -1,17 +1,12 @@
 /**
  * The schema-drift remedy has to name a command the project can run.
  *
- * All three copies of it hard-coded `Run \`pnpm db:push\``. On a stock
- * scaffold the managed PGlite database is the default, and there that command
- * answers `✗ rebase db push does not work on the managed development database.`
- * and exits 1 — so the one instruction the server gave a developer whose schema
- * had drifted was a command their own project refuses.
- *
- * Atlas plans a push by diffing against a second, empty database and PGlite
- * serves exactly one, which is why it cannot run there. Boot applies additive
- * changes, so restarting `rebase dev` is the fix on that database and nowhere
- * else. `packages/cli/src/commands/dev.ts` had already been made kind-aware for
- * its own messages; these three had not.
+ * All three copies of it hard-coded `Run \`pnpm db:push\``, a scaffold script
+ * rather than a command. On the managed development database boot applies
+ * additive changes, so restarting `rebase dev` is the first fix there, and
+ * `rebase db push` — which plans against a throwaway database of its own on
+ * the managed database — applies what boot leaves alone. The box said push
+ * "does not run here", which stopped being true with 0.25.
  */
 import { schemaDriftRemedy } from "../src/api/errors";
 
@@ -30,24 +25,24 @@ describe("schemaDriftRemedy", () => {
             process.env[KIND] = "managed";
         });
 
-        it("never names db:push — the command is refused there", () => {
+        it("never names db:push", () => {
             const remedy = schemaDriftRemedy();
-            const all = [remedy.short, ...remedy.lines].join("\n");
 
-            expect(all).not.toContain("db:push");
-            expect(remedy.short).not.toContain("rebase db push");
+            expect([remedy.short, ...remedy.lines].join("\n")).not.toContain("db:push");
         });
 
         it("says to restart `rebase dev`", () => {
             expect(schemaDriftRemedy().short).toContain("rebase dev");
         });
 
-        it("says why the push cannot run, and names the two databases where it can", () => {
-            const lines = schemaDriftRemedy().lines.join("\n");
+        it("names `rebase db push` for what boot leaves alone, and never says it does not run there", () => {
+            const remedy = schemaDriftRemedy();
+            const all = [remedy.short, ...remedy.lines].join("\n");
 
-            expect(lines).toContain("PGlite serves one");
-            expect(lines).toContain("DATABASE_URL");
-            expect(lines).toContain("rebase dev --docker");
+            expect(remedy.short).toContain("rebase db push");
+            expect(remedy.lines.join("\n")).toMatch(/rebase db push\s+applies what boot leaves alone/);
+            expect(all).not.toContain("does not run here");
+            expect(all).not.toContain("PGlite serves one");
         });
     });
 

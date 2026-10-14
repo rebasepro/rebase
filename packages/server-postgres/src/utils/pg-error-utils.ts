@@ -331,6 +331,16 @@ export function pgFieldViolations(
 }
 
 /**
+ * What a missing table or column most often means: the database is behind the
+ * collections. Both ways of catching it up, because "run migrations" alone
+ * sent a project on the managed development database — which nobody
+ * migrates — the wrong way.
+ */
+const SCHEMA_BEHIND =
+    "Check that the database is up to date with the collections: `rebase db push` in development, " +
+    "or `rebase db migrate` where migrations are used.";
+
+/**
  * Translate a raw PostgreSQL error into a user-friendly message.
  *
  * @param pgError  - The extracted PostgreSQL error (from {@link extractPgError})
@@ -445,13 +455,13 @@ export function pgErrorToFriendlyMessage(
             };
         case "42703": // undefined_column
             return {
-                message: `Unknown column in "${tableRef}"${said}. Check if your schema is up to date (run migrations).${suffix}`,
+                message: `Unknown column in "${tableRef}"${said}. ${SCHEMA_BEHIND}${suffix}`,
                 code,
                 violations
             };
         case "42P01": // undefined_table
             return {
-                message: `Table not found for "${context}"${said}. Check if your schema is up to date (run migrations).${suffix}`,
+                message: `Table not found for "${context}"${said}. ${SCHEMA_BEHIND}${suffix}`,
                 code,
                 violations
             };
