@@ -73,3 +73,13 @@ describe("the directory `rebase` was run from", () => {
         expect(driverSpawn().env?.REBASE_INVOCATION_CWD).toBe(process.cwd());
     });
 });
+
+// The driver's "Cannot connect" banner said "Verify DATABASE_URL in your .env
+// file" whatever named the database; it is told which, to name that instead.
+describe("what named the database", () => {
+    it("reaches the driver as REBASE_DATABASE_SOURCE", async () => {
+        await dbCommand("push", argv("db", "push"));
+
+        expect(driverSpawn().env?.REBASE_DATABASE_SOURCE).toBe("env-file");
+    });
+});

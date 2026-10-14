@@ -95,3 +95,52 @@ describe("verifyConnection reaches the boot path", () => {
         await expect(bootstrapper.verifyConnection!(undefined)).rejects.toThrow(/db\.internal:6543.*ECONNREFUSED/s);
     });
 });
+
+/**
+ * The banner's fixes name what named the database.
+ *
+ * It said "Verify DATABASE_URL in your .env file" whatever did: so
+ * `rebase db push --database-url <dead>` sent the reader to a file that played
+ * no part, and a project on Postgres in Docker or the managed database has no
+ * DATABASE_URL there at all. The CLI says which in `REBASE_DATABASE_SOURCE`.
+ */
+describe("the connection-refused banner, by what named the database", () => {
+    const original = process.env.REBASE_DATABASE_SOURCE;
+    afterEach(() => {
+        if (original === undefined) delete process.env.REBASE_DATABASE_SOURCE;
+        else process.env.REBASE_DATABASE_SOURCE = original;
+    });
+    const bannerFor = (source: string | undefined): string => {
+        if (source === undefined) delete process.env.REBASE_DATABASE_SOURCE;
+        else process.env.REBASE_DATABASE_SOURCE = source;
+        return diagnoseDbError(refused("db.internal", 6543), URL_) ?? "";
+    };
+
+    it.each([
+        ["flag", "Check the URL passed with --database-url"],
+        ["environment", "Check DATABASE_URL in this shell's environment"],
+        ["env-file", "Verify DATABASE_URL in your .env file"],
+        ["branch", "rebase db branch switch --off"],
+        ["docker", "docker compose up -d db"],
+        ["last-dev", "docker compose up -d db"],
+        ["managed", "rebase db stop"]
+    ])("names %s", (source, fix) => {
+        expect(bannerFor(source)).toContain(fix);
+    });
+
+    it.each(["flag", "environment", "docker", "last-dev", "managed"])("sends %s nowhere near .env", (source) => {
+        expect(bannerFor(source)).not.toContain(".env");
+    });
+
+    it("keeps every fix when nothing says what named it, as at boot", () => {
+        const banner = bannerFor(undefined);
+        expect(banner).toContain("docker compose up -d db");
+        expect(banner).toContain("Verify DATABASE_URL in your .env file");
+    });
+
+    it("names it in the credentials banner too", () => {
+        process.env.REBASE_DATABASE_SOURCE = "flag";
+        const auth = Object.assign(new Error('password authentication failed for user "app"'), { code: "28P01" });
+        expect(diagnoseDbError(auth, URL_)).toContain("Check the username and password in the URL passed with --database-url");
+    });
+});

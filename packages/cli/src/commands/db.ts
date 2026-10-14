@@ -363,6 +363,14 @@ export function refuseBranchOnManagedDatabase(rawArgs: string[], kind: string): 
 }
 
 /**
+ * The variable a driver child reads what named its database from: the
+ * resolution's `source` (`flag`, `environment`, `env-file`, `branch`,
+ * `docker`, `last-dev` or `managed`). Read as a literal by
+ * `@rebasepro/server-postgres`'s `cli-errors.ts`.
+ */
+export const DATABASE_SOURCE_ENV = "REBASE_DATABASE_SOURCE";
+
+/**
  * Refuse `rebase db restore` into the managed development database.
  *
  * A backup carries its rows as COPY data, and the managed database's socket
@@ -559,6 +567,9 @@ export async function runDriverDbCommand(
         onProgress: (message) => { if (!options.quiet) console.log(chalk.gray(`  ${message}`)); }
     });
     Object.assign(env, prepared.env);
+    // What named the database, for the driver's "Cannot connect" banner to
+    // send the reader to it rather than to a `.env` that played no part.
+    env[DATABASE_SOURCE_ENV] = prepared.database.source;
     // Suppressed for an internal caller. `rebase dev` runs a schema push during
     // start-up and has already said all of this in its own banner; repeating it
     // mid-boot reads as something having gone wrong.

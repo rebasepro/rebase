@@ -144,6 +144,49 @@ function driverReasonLine(err: unknown): string {
 }
 
 /**
+ * What named the database a db command connects to, as the CLI resolved it
+ * and says in `REBASE_DATABASE_SOURCE`: `flag` (`--database-url`),
+ * `environment` (the shell's DATABASE_URL), `env-file` (`.env`), `branch` (a
+ * `db branch switch`), `docker` / `last-dev` (the compose `db` service) or
+ * `managed` (the managed development database). `undefined` when nothing
+ * says — a boot, or the driver run by hand.
+ */
+function databaseSource(): string | undefined {
+    const source = process.env.REBASE_DATABASE_SOURCE?.trim();
+    return source ? source : undefined;
+}
+
+/** Where the connection string is, in the words a reader looks for it by. */
+function connectionStringPlace(source: string | undefined): string {
+    switch (source) {
+        case "flag": return "the URL passed with --database-url";
+        case "environment": return "DATABASE_URL in this shell's environment";
+        default: return "DATABASE_URL";
+    }
+}
+
+/** The fixes for a database that does not answer, for what named it. */
+function connectionRefusedFixes(source: string | undefined): string[] {
+    switch (source) {
+        case "flag": return ["Check the URL passed with --database-url, and that its server is running"];
+        case "environment": return ["Check DATABASE_URL in this shell's environment, and that its server is running"];
+        case "env-file": return ["Verify DATABASE_URL in your .env file, and that its server is running"];
+        case "branch": return [
+            "The branch's database is on the server DATABASE_URL in .env names: start that server",
+            "Or leave the branch: rebase db branch switch --off"
+        ];
+        case "docker":
+        case "last-dev": return ["docker compose up -d db          (the project's Postgres in Docker)"];
+        case "managed": return ["Restart the managed development database: rebase db stop, then run the command again"];
+        default: return [
+            "docker compose up -d db          (the service a Rebase scaffold ships)",
+            "brew services start postgresql@18",
+            "Verify DATABASE_URL in your .env file"
+        ];
+    }
+}
+
+/**
  * Format a diagnostic banner for ECONNREFUSED errors.
  */
 function formatConnectionRefusedBanner(databaseUrl: string, err?: unknown): string {
@@ -158,9 +201,7 @@ function formatConnectionRefusedBanner(databaseUrl: string, err?: unknown): stri
         `  The database server is not running or is not accepting\n` +
         `  connections. Common fixes:\n` +
         `\n` +
-        `    • docker compose up -d db          (the service a Rebase scaffold ships)\n` +
-        `    • brew services start postgresql@18\n` +
-        `    • Verify DATABASE_URL in your .env file\n` +
+        connectionRefusedFixes(databaseSource()).map((fix) => `    • ${fix}\n`).join("") +
         `\n` +
         `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`
     );
@@ -185,7 +226,7 @@ function formatAuthFailureBanner(databaseUrl: string, err?: unknown): string {
         driverReasonLine(err) +
         `  PostgreSQL rejected the credentials. Common fixes:\n` +
         `\n` +
-        `    • Check the username and password in DATABASE_URL\n` +
+        `    • Check the username and password in ${connectionStringPlace(databaseSource())}\n` +
         `    • Verify the user exists:  psql -c "\\du"\n` +
         `    • Reset the password:  ALTER USER ${username} PASSWORD 'new_password';\n` +
         `\n` +
