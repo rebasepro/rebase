@@ -55,7 +55,7 @@ export const de: RebaseTranslations = {
     sort_remove_key: "Diesen Sortierschlüssel entfernen",
     sort_key_position: "Sortierschlüssel {{position}}",
     sort_shift_click_hint: "Umschalt+Klick, um eine Spalte unter der aktuellen Sortierung hinzuzufügen",
-    save_entity_before_subcollections: "Du musst den Eintrag speichern, bevor du weitere Sammlungen hinzufügst",
+    save_entity_before_subcollections: "Speichere diesen Datensatz, bevor du verknüpfte Datensätze hinzufügst.",
     clear_all: "Alle löschen",
     no_items: "Keine Elemente",
     no_entries_found: "Keine Einträge gefunden",
@@ -251,7 +251,7 @@ export const de: RebaseTranslations = {
     views_group: "Ansichten",
 
     // ─── Entity Edit View ─────────────────────────────────────────
-    youd_need_to_save_before_additional_collections: "Sie müssen Ihre Entität speichern, bevor Sie weitere Sammlungen hinzufügen können",
+    youd_need_to_save_before_additional_collections: "Speichere diesen Datensatz, bevor du verknüpfte Datensätze hinzufügst.",
 
     // ─── Not Found Page ───────────────────────────────────────────
     page_not_found: "Seite nicht gefunden",

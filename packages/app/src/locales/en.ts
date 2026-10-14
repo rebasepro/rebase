@@ -63,7 +63,7 @@ export const en: RebaseTranslations = {
     sort_remove_key: "Remove this sort key",
     sort_key_position: "Sort key {{position}}",
     sort_shift_click_hint: "Shift-click to add a column under the current sort",
-    save_entity_before_subcollections: "You need to save your entity before adding additional collections",
+    save_entity_before_subcollections: "Save this record before adding related records.",
     clear_all: "Clear all",
     no_items: "No items",
     no_entries_found: "No entries found",
@@ -259,7 +259,7 @@ export const en: RebaseTranslations = {
     views_group: "Views",
 
     // ─── Entity Edit View ─────────────────────────────────────────
-    youd_need_to_save_before_additional_collections: "You need to save your entity before adding additional collections",
+    youd_need_to_save_before_additional_collections: "Save this record before adding related records.",
 
     // ─── Not Found Page ───────────────────────────────────────────
     page_not_found: "Page not found",

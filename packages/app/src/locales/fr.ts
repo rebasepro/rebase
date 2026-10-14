@@ -55,7 +55,7 @@ export const fr: RebaseTranslations = {
     sort_remove_key: "Supprimer cette clé de tri",
     sort_key_position: "Clé de tri {{position}}",
     sort_shift_click_hint: "Maj+clic pour ajouter une colonne sous le tri actuel",
-    save_entity_before_subcollections: "Vous devez enregistrer l'entité avant d'ajouter des collections supplémentaires",
+    save_entity_before_subcollections: "Enregistrez cet enregistrement avant d'y ajouter des enregistrements liés.",
     clear_all: "Tout effacer",
     no_items: "Aucun élément",
     no_entries_found: "Aucune entrée trouvée",
@@ -251,7 +251,7 @@ export const fr: RebaseTranslations = {
     views_group: "Vues",
 
     // ─── Entity Edit View ─────────────────────────────────────────
-    youd_need_to_save_before_additional_collections: "Vous devez enregistrer votre entité avant d'ajouter des collections supplémentaires",
+    youd_need_to_save_before_additional_collections: "Enregistrez cet enregistrement avant d'y ajouter des enregistrements liés.",
 
     // ─── Not Found Page ───────────────────────────────────────────
     page_not_found: "Page introuvable",

@@ -60,7 +60,7 @@ export const pt: RebaseTranslations = {
     sort_remove_key: "Remover esta chave de ordenação",
     sort_key_position: "Chave de ordenação {{position}}",
     sort_shift_click_hint: "Shift+clique para adicionar uma coluna sob a ordenação atual",
-    save_entity_before_subcollections: "Precisas de guardar a entidade antes de adicionar coleções adicionais",
+    save_entity_before_subcollections: "Guarde este registo antes de adicionar registos relacionados.",
     clear_all: "Limpar tudo",
     no_items: "Sem itens",
     no_entries_found: "Nenhum registo encontrado",
@@ -256,7 +256,7 @@ export const pt: RebaseTranslations = {
     views_group: "Visualizações",
 
     // ─── Entity Edit View ─────────────────────────────────────────
-    youd_need_to_save_before_additional_collections: "Precisa de guardar a sua entidade antes de adicionar coleções adicionais",
+    youd_need_to_save_before_additional_collections: "Guarde este registo antes de adicionar registos relacionados.",
 
     // ─── Not Found Page ───────────────────────────────────────────
     page_not_found: "Página não encontrada",

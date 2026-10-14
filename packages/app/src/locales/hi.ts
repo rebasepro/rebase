@@ -55,7 +55,7 @@ export const hi: RebaseTranslations = {
     sort_remove_key: "यह क्रम कुंजी हटाएँ",
     sort_key_position: "क्रम कुंजी {{position}}",
     sort_shift_click_hint: "वर्तमान क्रम के नीचे कॉलम जोड़ने के लिए Shift+क्लिक करें",
-    save_entity_before_subcollections: "अतिरिक्त संग्रह जोड़ने से पहले आपको एंटिटी सहेजनी होगी",
+    save_entity_before_subcollections: "संबंधित रिकॉर्ड जोड़ने से पहले इस रिकॉर्ड को सहेजें।",
     clear_all: "सभी साफ़ करें",
     no_items: "कोई आइटम नहीं",
     no_entries_found: "कोई प्रविष्टि नहीं मिली",
@@ -251,7 +251,7 @@ export const hi: RebaseTranslations = {
     views_group: "दृश्य",
 
     // ─── Entity Edit View ─────────────────────────────────────────
-    youd_need_to_save_before_additional_collections: "अतिरिक्त संग्रह जोड़ने से पहले आपको अपनी इकाई को सहेजना होगा",
+    youd_need_to_save_before_additional_collections: "संबंधित रिकॉर्ड जोड़ने से पहले इस रिकॉर्ड को सहेजें।",
 
     // ─── Not Found Page ───────────────────────────────────────────
     page_not_found: "पृष्ठ नहीं मिला",
