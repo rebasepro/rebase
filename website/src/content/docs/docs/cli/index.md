@@ -37,8 +37,9 @@ Sets up the project structure with frontend, backend, and shared packages.
 | `-t, --template <preset>` | `blog`, `ecommerce` or `blank`. Default `blog` |
 | `--headless` | Backend only — no admin panel and no collection files. `--template` has no effect, because there are no collections to seed |
 | `-y, --yes` | Never prompt. **Required wherever there is no terminal to answer**, such as CI. It skips git init and dependency install — the interactive defaults say yes to both, so pass `--git` / `--install` if you want them |
-| `-i, --install` | Install dependencies after scaffolding |
-| `-g, --git` | Initialize a repository and make the first commit |
+| `-i, --install` | Install dependencies after scaffolding. Without it, init asks (default yes); under `--yes`, nothing is installed |
+| `--no-install` | Install nothing, and do not ask |
+| `-g, --git` | Initialize a repository and make the first commit. Without it, init asks (default yes); under `--yes`, no repository |
 | `--database-url <url>` | Use an existing database instead of the managed one. <span class="since-badge" data-since="0.25">Since 0.25</span> It must be a `postgres://` or `postgresql://` URL: anything else is refused before a file is written, and the interactive prompt asks again |
 | `--introspect` | Generate collections from that database. Implies `--template blank` and needs `--install` |
 | `--project <slug>` | Link the scaffold to a Rebase Cloud project |
@@ -123,7 +124,10 @@ skips the install, and `--json` prints one document.
 prerelease, such as a canary, stays on its channel unless `latest` is newer. A
 dist-tag that would move a pin backwards is refused (`downgrade_refused` under
 `--json`) unless you pass `--allow-downgrade`; an exact `--to` is applied, and
-flagged as a downgrade. On 0.24, `rebase upgrade` takes `latest` regardless.
+flagged as a downgrade. A `--dry-run` of an upgrade the real run would refuse
+shows what would move and exits 0, and under `--json` its document carries the
+refusal as `wouldRefuse` (`{ code, message, hint }`). On 0.24, `rebase upgrade`
+takes `latest` regardless.
 
 ### `rebase start`
 
