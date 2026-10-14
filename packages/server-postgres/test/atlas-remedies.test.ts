@@ -180,7 +180,7 @@ describe("a required property added to a populated table", () => {
         expect(hint).toContain("tags");
         expect(hint).toContain("colour");
         expect(hint).toContain("defaultValue");
-        expect(hint).toContain("UPDATE \"tags\" SET \"colour\"");
+        expect(hint).toContain("UPDATE \\\"tags\\\" SET \\\"colour\\\"");
         expect(hint).toContain("validation.required");
     });
 
@@ -217,7 +217,7 @@ describe("a NOT NULL refusal: only remedies that work for this column", () => {
         });
         expect(hint).toContain('Cannot make "people"."bio" required');
         expect(hint).not.toContain("defaultValue");
-        expect(hint).toContain('UPDATE "people" SET "bio" = … WHERE "bio" IS NULL');
+        expect(hint).toContain('UPDATE \\"people\\" SET \\"bio\\" = \'…\' WHERE \\"bio\\" IS NULL');
         expect(hint).toContain("Two ways forward");
         expect(hint).toContain("Nothing in this push was applied");
         expect(hint).not.toContain("for this column");

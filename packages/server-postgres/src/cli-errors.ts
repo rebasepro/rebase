@@ -649,6 +649,37 @@ function projectRebaseCommand(manager: ProjectPackageManager): string {
     }
 }
 
+/** A PostgreSQL identifier, double-quoted, with any `"` in it doubled. */
+function sqlIdentifier(name: string): string {
+    return `"${name.replace(/"/g, "\"\"")}"`;
+}
+
+/**
+ * `text` as one double-quoted `sh` word: `\`, `"`, `$` and a backtick are the
+ * characters a double-quoted string does not take literally.
+ */
+function shDoubleQuoted(text: string): string {
+    return `"${text.replace(/[\\"$`]/g, "\\$&")}"`;
+}
+
+/**
+ * The backfill for a column that refused NOT NULL, as one line a POSIX shell
+ * runs once the value is typed between its single quotes.
+ *
+ * The SQL is the shell's double-quoted word, so the value's own quotes are
+ * SQL's: `'tbd'`, or `'O''Brien'` for a value with a quote in it, as SQL
+ * writes one. It was the SQL in shell single quotes, and the first quote a
+ * value was typed with ended the shell's: `= 'tbd'` reached psql as `= tbd`,
+ * `column "tbd" does not exist`.
+ *
+ * `rebase db url`, not `$DATABASE_URL`: on the managed development database
+ * `.env` leaves DATABASE_URL unset, and the shell has none.
+ */
+export function backfillCommand(table: string, column: string, manager: ProjectPackageManager): string {
+    const sql = `UPDATE ${sqlIdentifier(table)} SET ${sqlIdentifier(column)} = '…' WHERE ${sqlIdentifier(column)} IS NULL;`;
+    return `psql "$(${projectRebaseCommand(manager)} db url)" -c ${shDoubleQuoted(sql)}`;
+}
+
 /**
  * The ways out, and only the ones that work for this column.
  *
@@ -673,10 +704,8 @@ export function formatNotNullViolationBanner(
         ? `  "${table}" already holds rows, and none of them has a value for "${column}".\n`
         : `  "${table}" already holds ${rowCount} row${rowCount === 1 ? "" : "s"}, and they have no value for "${column}".\n`;
     const backfill =
-        `Backfill by hand first, then push again:\n` +
-        // `rebase db url`, not `$DATABASE_URL`: on the managed development
-        // database `.env` leaves DATABASE_URL unset, and the shell has none.
-        `         ${chalk.gray(`psql "$(${projectRebaseCommand(manager)} db url)" -c 'UPDATE "${table}" SET "${column}" = … WHERE "${column}" IS NULL;'`)}\n`;
+        `Backfill by hand first, then push again, with the value between the single quotes:\n` +
+        `         ${chalk.gray(backfillCommand(table, column, manager))}\n`;
     const leaveOptional = `Leave it optional — take \`validation.required\` off the property.\n`;
     const defaultLine = (caveat: string) =>
         `Give the property a default, so the push can backfill${caveat}:\n` +
