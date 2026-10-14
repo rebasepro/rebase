@@ -1,6 +1,6 @@
 import type { Context } from "hono";
 import type { HonoEnv } from "../api/types";
-import { decodeProtectedHeader, isExpiredJwtError, signJwt, verifyJwt } from "./jwt-crypto";
+import { decodeProtectedHeader, isExpiredJwtError, isRefusedJwtError, signJwt, verifyJwt } from "./jwt-crypto";
 import { randomHex, sha256Hex } from "../utils/portable-crypto";
 import { logger } from "../utils/logger";
 // A leaf module (node:path and `@rebasepro/types` only), so this does not close
@@ -645,7 +645,9 @@ function jwtServiceFrom(state: JwtState): JwtService {
                     : await verifyJwt(token, key, { algorithms: ["HS256"] })
                 ) as DecodedAccessToken;
                 if (decoded.purpose) {
-                    logger.error("[JWT] Verification failed: a purpose-scoped token is not an access token", { purpose: decoded.purpose });
+                    // A download link or an MFA challenge sent as a session:
+                    // the client's mistake, answered with a 401.
+                    logger.debug("[JWT] Access token refused: a purpose-scoped token is not an access token", { purpose: decoded.purpose });
                     return null;
                 }
                 const id = decoded.uid || decoded.sub;
@@ -690,9 +692,19 @@ function jwtServiceFrom(state: JwtState): JwtService {
                     logger.debug("[JWT] Access token expired");
                     return null;
                 }
-                // No part of the token. A bearer that fails here may be the
-                // service key or an API key, and its first characters were
-                // going into the log of every refused request.
+                // A token this backend did not sign, or not a token at all —
+                // another backend's session, one from before a secret
+                // rotation, a mangled header. That is the client's bad
+                // credential, answered with a 401 on every request that
+                // carries it, so it is one line at debug: the reason, no
+                // stack. No part of the token either: a bearer that fails
+                // here may be the service key or an API key.
+                if (isRefusedJwtError(error)) {
+                    logger.debug(`[JWT] Access token refused: ${error.message}`);
+                    return null;
+                }
+                // Anything else is the verifier failing — a key it could not
+                // use — which is the server's to fix.
                 logger.error("[JWT] Verification failed", { error: error });
                 return null;
             }
