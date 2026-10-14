@@ -11,6 +11,7 @@
 import React from "react";
 import { describe, expect, it, jest, beforeEach } from "@jest/globals";
 import { act, render, screen, waitFor } from "@testing-library/react";
+import { RebaseI18nProvider } from "@rebasepro/app";
 
 import { useLocalCollectionsConfigController }
     from "../../src/collection_editor/useLocalCollectionsConfigController";
@@ -57,9 +58,14 @@ function backend(live: boolean) {
 }
 
 let controller: CollectionsConfigController;
-function Harness() {
+function HarnessBody() {
     controller = useLocalCollectionsConfigController(client, [books()]);
     return <div>{controller.dialog}</div>;
+}
+
+/** The harness under the English the schema change dialog is written in. */
+function Harness() {
+    return <RebaseI18nProvider locale="en"><HarnessBody/></RebaseI18nProvider>;
 }
 
 beforeEach(() => { jest.restoreAllMocks(); });

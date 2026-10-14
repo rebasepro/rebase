@@ -10,6 +10,7 @@
 import React from "react";
 import { describe, expect, it, jest } from "@jest/globals";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { RebaseI18nProvider } from "@rebasepro/app";
 
 import {
     useLiveSchemaEditing,
@@ -83,7 +84,7 @@ function fakeClient(over: Partial<LiveSchemaClient> = {}): LiveSchemaClient {
  * on screen to be pressed. `start` is exposed so a test can begin a review and
  * then interact with what appears.
  */
-function Harness({ client, onSettled }: {
+function HarnessBody({ client, onSettled }: {
     client: LiveSchemaClient;
     onSettled: (outcome: "resolved" | "rejected", err?: unknown) => void;
 }) {
@@ -99,6 +100,11 @@ function Harness({ client, onSettled }: {
             {live.dialog}
         </div>
     );
+}
+
+/** The harness under the English the schema change dialog is written in. */
+function Harness(props: React.ComponentProps<typeof HarnessBody>) {
+    return <RebaseI18nProvider locale="en"><HarnessBody {...props}/></RebaseI18nProvider>;
 }
 
 const start = async () => {
@@ -593,7 +599,7 @@ describe("when planning fails", () => {
         await start();
         await waitFor(() => expect(screen.getByText("backend unreachable")).toBeTruthy());
 
-        await act(async () => { screen.getByText("Try again").click(); });
+        await act(async () => { screen.getByText("Retry").click(); });
 
         await waitFor(() => expect(screen.getByText("Ready to apply")).toBeTruthy());
         expect(client.plan).toHaveBeenCalledTimes(2);
@@ -605,6 +611,6 @@ describe("when planning fails", () => {
         render(<Harness client={fakeClient()} onSettled={jest.fn()}/>);
         await start();
         await waitFor(() => expect(screen.getByText("Ready to apply")).toBeTruthy());
-        expect(screen.queryByText("Try again")).toBeNull();
+        expect(screen.queryByText("Retry")).toBeNull();
     });
 });

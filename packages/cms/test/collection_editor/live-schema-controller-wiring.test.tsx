@@ -14,6 +14,7 @@
 import React from "react";
 import { describe, expect, it, jest, beforeEach } from "@jest/globals";
 import { act, render, screen, waitFor } from "@testing-library/react";
+import { RebaseI18nProvider } from "@rebasepro/app";
 
 import { useLocalCollectionsConfigController }
     from "../../src/collection_editor/useLocalCollectionsConfigController";
@@ -71,7 +72,7 @@ function mockBackend() {
     return { calls, releaseLiveStatus };
 }
 
-function Harness({ onSettled }: { onSettled: (outcome: string) => void }) {
+function HarnessBody({ onSettled }: { onSettled: (outcome: string) => void }) {
     const controller = useLocalCollectionsConfigController(client, [posts]);
     return (
         <div>
@@ -84,6 +85,11 @@ function Harness({ onSettled }: { onSettled: (outcome: string) => void }) {
             {controller.dialog}
         </div>
     );
+}
+
+/** The harness under the English the schema change dialog is written in. */
+function Harness(props: React.ComponentProps<typeof HarnessBody>) {
+    return <RebaseI18nProvider locale="en"><HarnessBody {...props}/></RebaseI18nProvider>;
 }
 
 beforeEach(() => {
