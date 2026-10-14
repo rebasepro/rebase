@@ -214,6 +214,8 @@ rebase db branch delete dev_sandbox
 `.rebase/branch.json` — a name, never a connection string, so your credentials
 stay in `.env` alone — and every `rebase` command in that checkout then resolves
 the branch's database instead: `dev`, `db push`, `db migrate`, `db backup`.
+A `rebase dev` that is already running keeps the database it started on until
+you restart it, and `switch` says so.
 
 <span class="since-badge" data-since="0.25">Since 0.25</span> `rebase db branch
 list` marks the branch this checkout is on, and `prune` never removes it, as

@@ -115,6 +115,16 @@ describe("db branch switch stays on the CLI side", () => {
         expect(execaSpy).not.toHaveBeenCalled();
     });
 
+    // "Every rebase command now uses it", while a `rebase dev` already running
+    // went on serving the database it had started on, with no word of it.
+    it("says a rebase dev already running keeps its database until restarted", async () => {
+        await dbCommand("branch", argv("db", "branch", "switch", "--off"));
+
+        const printed = (console.log as unknown as ReturnType<typeof vi.fn>).mock.calls.map(c => c.join(" ")).join("\n");
+        expect(printed).toContain("Back on the main database");
+        expect(printed).toContain("A `rebase dev` that is already running keeps the database it started on until you restart it.");
+    });
+
     it("leaves the other branch actions to the driver", async () => {
         // The guard must not swallow the actions the driver owns: `create` and
         // `list` are its, and a `switch` check that matched too eagerly would

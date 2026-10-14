@@ -1453,6 +1453,13 @@ export function assertSwitchFlags(rawArgs: readonly string[]): void {
 }
 
 /**
+ * What `switch` cannot change: a `rebase dev` started before it connected to
+ * the database it was given then, and serves it until it is restarted.
+ */
+const RUNNING_DEV_KEEPS_ITS_DATABASE =
+    "A `rebase dev` that is already running keeps the database it started on until you restart it.";
+
+/**
  * `rebase db branch switch <name>` — point this checkout at a branch.
  *
  * The step branching was missing. `create` copied the database in about a
@@ -1546,6 +1553,7 @@ async function switchBranch(projectRoot: string, rawArgs: readonly string[]): Pr
         console.log(active
             ? chalk.green(`  ✓ Back on the main database${base ? ` (${databaseNameOf(base)})` : ""}.`)
             : chalk.gray("  Already on the main database."));
+        if (active) console.log(chalk.gray(`    ${RUNNING_DEV_KEEPS_ITS_DATABASE}`));
         console.log("");
 
         return;
@@ -1599,6 +1607,7 @@ async function switchBranch(projectRoot: string, rawArgs: readonly string[]): Pr
     console.log(chalk.green(`  ✓ Switched to branch "${name}".`));
     console.log(chalk.gray(`    Database: ${database}`));
     console.log(chalk.gray("    Every rebase command in this checkout now uses it — dev, db push, migrate."));
+    console.log(chalk.gray(`    ${RUNNING_DEV_KEEPS_ITS_DATABASE}`));
     console.log(chalk.gray(`    Back to the main database: ${chalk.cyan("rebase db branch switch --off")}`));
     console.log("");
 }
