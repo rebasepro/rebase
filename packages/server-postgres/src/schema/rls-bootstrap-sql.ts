@@ -185,6 +185,60 @@ export const RLS_BOOTSTRAP_SQL =
     "-- Rebase schema + RLS helper functions (required by the policies below)\n" +
     RLS_BOOTSTRAP_STATEMENTS.map(s => `${s};`).join("\n\n") + "\n";
 
+/** One of the helpers the pre-1.0 `auth` schema held. */
+interface LegacyAuthHelper {
+    name: string;
+    returns: string;
+    /** The GUCs its body read. Any one of them identifies it. */
+    reads: readonly string[];
+}
+
+/**
+ * The three functions every pre-1.0 release put in `auth`. (The auth tables
+ * lived in `rebase`, or wherever the users collection was declared.)
+ *
+ * `uid()` is matched on either spelling of the principal because Rebase wrote
+ * both. Until v0.10.0 its body was
+ * `SELECT NULLIF(current_setting('app.user_id', true), '')`; v0.10.0 renamed
+ * the GUC to `app.uid` and kept `app.user_id` as a fallback; v0.14.0 moved the
+ * helpers to `rebase`. A database last booted before v0.10.0 therefore holds an
+ * `auth.uid()` that reads `app.user_id` alone — as does anything that copied
+ * that body, the Rebase control plane included — and matching `app.uid` only
+ * left every one of them in place, with the schema around it.
+ *
+ * This is the one place either spelling is listed: the drop and the report of
+ * what it left are both generated from it, so they cannot disagree about which
+ * functions are Rebase's.
+ */
+const LEGACY_AUTH_HELPERS: readonly LegacyAuthHelper[] = [
+    { name: "uid", returns: "text", reads: ["app.uid", "app.user_id"] },
+    { name: "jwt", returns: "jsonb", reads: ["app.jwt"] },
+    { name: "roles", returns: "text", reads: ["app.user_roles"] }
+];
+
+/**
+ * `pg_proc p` has a Rebase helper's name, arity and result type: what
+ * `CREATE OR REPLACE` would have left, whatever the body.
+ *
+ * Two things that share that shape are excluded outright: a body reading
+ * `request.jwt` (Supabase's helpers and anything modelled on them) and a
+ * function an extension installed (`pg_session_jwt` puts an `auth.jwt()
+ * RETURNS jsonb` in the same schema).
+ */
+const isLegacyHelperShaped = (helper: LegacyAuthHelper): string => `(
+          p.proname = '${helper.name}' AND p.pronargs = 0
+          AND pg_get_function_result(p.oid) = '${helper.returns}'
+          AND strpos(p.prosrc, 'request.jwt') = 0
+          AND NOT EXISTS (
+              SELECT 1 FROM pg_depend e
+              WHERE e.classid = 'pg_proc'::regclass AND e.objid = p.oid AND e.deptype = 'e'
+          ))`;
+
+/** `pg_proc p` is a helper Rebase wrote: its shape, and a body reading one of its GUCs. */
+const isLegacyHelper = (helper: LegacyAuthHelper): string =>
+    `${isLegacyHelperShaped(helper)}
+          AND (${helper.reads.map(guc => `strpos(p.prosrc, '${guc}') > 0`).join(" OR ")})`;
+
 /**
  * Removes the pre-1.0 `auth` schema, but only when Rebase is what put it there.
  *
@@ -193,11 +247,12 @@ export const RLS_BOOTSTRAP_SQL =
  * Two independent guards, and both have to pass:
  *
  *  1. **Each function is identified before it is dropped.** Ours returns `text`
- *     and reads the `app.uid` GUC; Supabase's returns `uuid` and reads
- *     `request.jwt.claims`. Nothing is dropped on a signature we did not write,
- *     so a Supabase database — where our `CREATE OR REPLACE` could never have
- *     succeeded in the first place, Postgres refusing to change a return type —
- *     matches nothing and this is a no-op.
+ *     and reads the `app.uid` or `app.user_id` GUC; Supabase's returns `uuid`
+ *     and reads `request.jwt.claims`. Nothing is dropped on a signature we did
+ *     not write, so a Supabase database — where our `CREATE OR REPLACE` could
+ *     never have succeeded in the first place, Postgres refusing to change a
+ *     return type — matches nothing and this is a no-op. See
+ *     {@link LEGACY_AUTH_HELPERS} for exactly what is matched.
  *  2. **`DROP SCHEMA … RESTRICT`**, never CASCADE. If anything else at all still
  *     lives in `auth` (Supabase's `users` table, its other helpers), the drop
  *     fails and the schema stays. CASCADE here would be unrecoverable.
@@ -218,47 +273,77 @@ DECLARE
 BEGIN
     -- Each function is matched on its own result type and body, so a schema
     -- that merely shares the name keeps everything it has.
-    IF EXISTS (
+${LEGACY_AUTH_HELPERS.map(helper => `    IF EXISTS (
         SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
-        WHERE n.nspname = 'auth' AND p.proname = 'uid'
-          AND pg_get_function_result(p.oid) = 'text'
-          AND p.prosrc LIKE '%app.uid%'
+        WHERE n.nspname = '${LEGACY_RLS_SCHEMA}' AND ${isLegacyHelper(helper)}
     ) THEN
-        DROP FUNCTION auth.uid();
+        DROP FUNCTION ${LEGACY_RLS_SCHEMA}.${helper.name}();
         dropped_any := true;
-    END IF;
-
-    IF EXISTS (
-        SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
-        WHERE n.nspname = 'auth' AND p.proname = 'jwt'
-          AND pg_get_function_result(p.oid) = 'jsonb'
-          AND p.prosrc LIKE '%app.jwt%'
-    ) THEN
-        DROP FUNCTION auth.jwt();
-        dropped_any := true;
-    END IF;
-
-    IF EXISTS (
-        SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
-        WHERE n.nspname = 'auth' AND p.proname = 'roles'
-          AND pg_get_function_result(p.oid) = 'text'
-          AND p.prosrc LIKE '%app.user_roles%'
-    ) THEN
-        DROP FUNCTION auth.roles();
-        dropped_any := true;
-    END IF;
+    END IF;`).join("\n\n")}
 
     -- RESTRICT: only an empty schema goes. Anything else in there — including a
-    -- Supabase installation left untouched above — keeps it.
+    -- Supabase installation left untouched above — keeps it. Swallowed so the
+    -- helpers dropped above stay dropped; dropLegacyAuthSchema looks afterwards
+    -- and says what is left.
     IF dropped_any THEN
         BEGIN
-            EXECUTE 'DROP SCHEMA auth RESTRICT';
+            EXECUTE 'DROP SCHEMA ${LEGACY_RLS_SCHEMA} RESTRICT';
         EXCEPTION WHEN OTHERS THEN
             NULL;
         END;
     END IF;
 END
 $rebase_drop_legacy$;
+`;
+
+/** One object in the `auth` schema that `DROP SCHEMA … RESTRICT` refuses on. */
+export interface LegacyAuthSchemaObject {
+    /**
+     * As Postgres names it: `function auth.uid()`, `table auth.sessions`.
+     * `null` on the one row an empty schema answers with.
+     */
+    object: string | null;
+    /**
+     * `ours` is a helper Rebase wrote, which the drop removes. `lookalike` has a
+     * helper's name and result type but a body no release wrote, so the drop
+     * leaves it alone. `null` for everything else.
+     */
+    helper: "ours" | "lookalike" | null;
+}
+
+/**
+ * What the `auth` schema holds, one row per object keeping it alive.
+ *
+ * No rows: the schema does not exist. A single row with a `null` object: it
+ * exists and is empty. Read from the namespace entries in `pg_depend`, which
+ * are what `DROP SCHEMA … RESTRICT` itself consults — minus whatever goes with
+ * its owner (a serial's sequence, an identity column's), which Postgres does not
+ * name either.
+ */
+export const LEGACY_AUTH_SCHEMA_CONTENTS_SQL = `
+    SELECT pg_describe_object(d.classid, d.objid, d.objsubid) AS object,
+           CASE
+               WHEN d.classid <> 'pg_proc'::regclass THEN NULL
+               WHEN EXISTS (
+                   SELECT 1 FROM pg_proc p
+                   WHERE p.oid = d.objid
+                     AND (${LEGACY_AUTH_HELPERS.map(helper => `(${isLegacyHelper(helper)})`).join(" OR ")})
+               ) THEN 'ours'
+               WHEN EXISTS (
+                   SELECT 1 FROM pg_proc p
+                   WHERE p.oid = d.objid
+                     AND (${LEGACY_AUTH_HELPERS.map(isLegacyHelperShaped).join(" OR ")})
+               ) THEN 'lookalike'
+           END AS helper
+    FROM pg_namespace n
+    LEFT JOIN pg_depend d
+           ON d.refclassid = 'pg_namespace'::regclass AND d.refobjid = n.oid AND d.deptype = 'n'
+          AND NOT EXISTS (
+              SELECT 1 FROM pg_depend o
+              WHERE o.classid = d.classid AND o.objid = d.objid AND o.deptype IN ('a', 'i')
+          )
+    WHERE n.nspname = '${LEGACY_RLS_SCHEMA}'
+    ORDER BY helper NULLS LAST, object
 `;
 
 /** Somebody's policy that still calls a pre-1.0 helper. */
@@ -306,11 +391,12 @@ export interface LegacyRlsFunctionDependent {
  * exists, which fails at *query* time rather than at boot.
  *
  * A downstream project building on these helpers is not hypothetical: the Rebase
- * control plane defines `auth.is_org_member(uuid)` and `auth.is_org_admin(uuid)`
+ * control plane defined `auth.is_org_member(uuid)` and `auth.is_org_admin(uuid)`
  * in this very schema, each calling `auth.uid()` in a string body, and eleven of
- * its row-level-security policies go through them. Every one of those would have
- * started failing the first time a recompile left no policy referencing
- * `auth.uid()` directly — the drop's own precondition.
+ * its row-level-security policies went through them. Every one of those would
+ * have started failing the first time a recompile left no policy referencing
+ * `auth.uid()` directly — the drop's own precondition. (Its migration 0065 has
+ * since moved both to `public`, calling `rebase.uid()`.)
  *
  * Matching on the body text is the only option available, and it is deliberately
  * broad: a false positive costs a schema that stays one release longer and says
@@ -335,11 +421,36 @@ export const LEGACY_RLS_FUNCTION_DEPENDENTS_SQL = `
  * table not recompiled *yet* — and wrong for the one that never resolves: a
  * hand-written policy nothing will ever rewrite. Then the schema stays forever
  * and nothing ever says why.
+ *
+ * The drop itself had the same blind spot. A helper it did not recognise as
+ * Rebase's stayed, and so did anything else in the schema, behind a
+ * `DROP SCHEMA … RESTRICT` whose failure is swallowed so the helpers it did
+ * drop stay dropped. The control plane's `auth.uid()` was one such: it read
+ * `app.user_id` alone, the drop looked for `app.uid`, and the schema stayed
+ * with no word said. So the schema is read twice. Before, so that one with no
+ * Rebase helper in it is left alone: one already gone, as on every boot after
+ * the drop, or one that was never Rebase's, like Supabase's — whose own
+ * policies the checks below would otherwise report as blockers. After, to name
+ * whatever is still there.
  */
 export async function dropLegacyAuthSchema(
     run: (sql: string) => Promise<Record<string, unknown>[]>,
     report: { info: (m: string) => void; warn: (m: string) => void }
 ): Promise<void> {
+    let before: LegacyAuthSchemaObject[];
+    try {
+        before = sqlRows<LegacyAuthSchemaObject>(await run(LEGACY_AUTH_SCHEMA_CONTENTS_SQL));
+    } catch {
+        return; // No catalogue access; nothing here is worth failing a boot for.
+    }
+    if (!before.some(o => o.helper !== null)) return;
+    // Only a lookalike: nothing will be dropped, so whatever calls it is no
+    // blocker, and saying so would ask somebody to rewrite their own policies.
+    if (!before.some(o => o.helper === "ours")) {
+        report.warn(describeLegacyAuthLeftovers(before, undefined));
+        return;
+    }
+
     let blockers: LegacyRlsDependent[];
     try {
         blockers = sqlRows<LegacyRlsDependent>(await run(LEGACY_RLS_DEPENDENTS_SQL));
@@ -384,14 +495,67 @@ export async function dropLegacyAuthSchema(
         return;
     }
 
+    // A failure is not fatal — the schema is inert now that no policy calls it —
+    // but it is reported below with whatever it left, not on its own.
+    let failure: string | undefined;
     try {
         await run(DROP_LEGACY_AUTH_SCHEMA_SQL);
     } catch (err) {
-        // Something else depends on it, or the connection does not own it.
-        // Not fatal: the schema is inert either way now that no policy calls it.
-        report.info(
-            `Left the \`${LEGACY_RLS_SCHEMA}\` schema in place: ` +
-            (err instanceof Error ? err.message : String(err))
-        );
+        // Postgres names the dependent object in DETAIL, not in the message.
+        const detail = err instanceof Error && "detail" in err && typeof err.detail === "string" ? err.detail : "";
+        failure = (err instanceof Error ? err.message : String(err)) +
+            (detail ? ` (${detail.replace(/\n/g, "; ")})` : "");
     }
+
+    let left: LegacyAuthSchemaObject[];
+    try {
+        left = sqlRows<LegacyAuthSchemaObject>(await run(LEGACY_AUTH_SCHEMA_CONTENTS_SQL));
+    } catch {
+        if (failure) report.info(`Left the \`${LEGACY_RLS_SCHEMA}\` schema in place: ${failure}`);
+        return;
+    }
+    if (left.length === 0) return; // Gone.
+
+    report.warn(describeLegacyAuthLeftovers(left, failure));
+}
+
+/** At most this many objects are named; a schema this full is plainly in use. */
+const MAX_LEFTOVERS_NAMED = 20;
+
+/**
+ * The warning for an `auth` schema the drop left standing.
+ *
+ * Said once for objects that are not Rebase's: on the next boot the schema holds
+ * no helper, so {@link dropLegacyAuthSchema} leaves it alone — it is somebody
+ * else's schema by then. A helper that is still there, Rebase's or a lookalike,
+ * keeps it said on every boot until it goes.
+ */
+function describeLegacyAuthLeftovers(left: LegacyAuthSchemaObject[], failure: string | undefined): string {
+    const schema = LEGACY_RLS_SCHEMA;
+    const objects = left.filter(o => o.object !== null);
+
+    if (objects.length === 0) {
+        return `The pre-1.0 \`${schema}\` schema is empty, but this connection could not drop it — most likely ` +
+            `because it does not own the schema. Run \`DROP SCHEMA ${schema};\` as its owner.`;
+    }
+
+    const why = failure
+        ? `dropping Rebase's old helpers from it failed: ${failure}.`
+        : `\`DROP SCHEMA … RESTRICT\` refuses a schema that is not empty, and Rebase drops only the helpers it ` +
+          `can tell are its own.`;
+
+    const lines = objects.slice(0, MAX_LEFTOVERS_NAMED).map(o =>
+        o.helper === "ours"
+            ? `  • ${o.object} — Rebase's old helper, which could not be dropped`
+            : o.helper === "lookalike"
+                ? `  • ${o.object} — named and typed like Rebase's old helper, but no release wrote this body, ` +
+                  `so it was left alone; drop it by hand if nothing of yours calls it`
+                : `  • ${o.object}`
+    );
+    if (objects.length > MAX_LEFTOVERS_NAMED) lines.push(`  • …and ${objects.length - MAX_LEFTOVERS_NAMED} more`);
+
+    return `The pre-1.0 \`${schema}\` schema is still here: ${why} Still in it:\n` +
+        lines.join("\n") + "\n" +
+        `Anything of yours can stay where it is — Rebase no longer uses this schema — or move out with ` +
+        `\`ALTER … SET SCHEMA\`. Once the schema is empty, \`DROP SCHEMA ${schema};\` removes it.`;
 }
