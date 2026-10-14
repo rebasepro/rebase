@@ -35,7 +35,7 @@ export const BRANCH_ACTION_FLAGS: Record<string, arg.Spec> = {
  * Throws: the driver's entry turns a thrown error into one red line and exit 1,
  * and this runs before anything connects.
  */
-function assertKnownBranchFlags(action: string, rest: readonly string[]): void {
+export function assertKnownBranchFlags(action: string, rest: readonly string[]): void {
     const spec = BRANCH_ACTION_FLAGS[action];
     if (!spec) return;
 

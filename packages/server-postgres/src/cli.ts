@@ -78,6 +78,7 @@ import { assertKnownFlags, collectionsPathIn, parseDriverLine } from "./cli-flag
 import { assertCollectionsPathExists } from "./cli-collections-path";
 import { DESIRED_STATE_URL, GENERATED_SQL_DIR, generatedSqlDir, prepareGeneratedSqlDir } from "./generated-sql";
 import { backupActionOf } from "./backup-argv";
+import { DRIVER_DB_SUBCOMMANDS, isDriverDbSubcommand } from "./db-subcommands";
 import type { TableLockResult } from "./schema/ensure-collection-policies";
 import type { DeferredIndexBuild } from "./schema/plan/diff-plan";
 
@@ -445,9 +446,8 @@ const DB_FLAGS = {
 } satisfies arg.Spec;
 
 async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
-    const VALID_ACTIONS = ["push", "generate", "migrate", "branch", "backup", "restore", "backups"];
-    if (!subcommand || !VALID_ACTIONS.includes(subcommand)) {
-        outError(chalk.red(`Unknown db command. Valid: ${VALID_ACTIONS.join(", ")}`));
+    if (!isDriverDbSubcommand(subcommand)) {
+        outError(chalk.red(`Unknown db command. Valid: ${DRIVER_DB_SUBCOMMANDS.join(", ")}`));
         process.exit(1);
     }
 

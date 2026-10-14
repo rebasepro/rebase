@@ -745,6 +745,20 @@ export async function dbCommand(subcommand: string | undefined, rawArgs: string[
         return;
     }
 
+    // Every other subcommand is the driver's, and the driver is spawned only
+    // once a database is running for it. Its flags are judged here, by its own
+    // check, before the line below starts the remembered container and
+    // `runDriverDbCommand` boots the managed one. `branch switch` is this
+    // CLI's, and is judged by its own check, before the same start.
+    if (subcommand === "branch" && commandWords(rawArgs, "db")[2] === "switch") {
+        assertSwitchFlags(rawArgs);
+    } else {
+        await refuseDriverLineBeforeStarting(projectRoot, rawArgs);
+        // And a `--collections` path that does not exist, for the same
+        // reason, in the reader's terms. See utils/path-flags.ts.
+        refuseMissingCollectionsPath(rawArgs, process.cwd(), requireBackendDir(projectRoot));
+    }
+
     // `--docker` on a `db` subcommand meant "resolve the compose URL", and
     // nothing started it: `rebase db branch list --docker` on a stock scaffold
     // answered `✗ Failed query: CREATE SCHEMA IF NOT EXISTS rebase` and
@@ -777,10 +791,6 @@ export async function dbCommand(subcommand: string | undefined, rawArgs: string[
         if (action && REGISTRY_ACTIONS.has(action)) driverArgs = await onParentDatabase(projectRoot, rawArgs, action);
     }
 
-    // Before the database is resolved — and, for the managed one, started —
-    // and in the reader's terms. See utils/path-flags.ts.
-    refuseMissingCollectionsPath(driverArgs, process.cwd(), requireBackendDir(projectRoot));
-
     try {
         await runDriverDbCommand(driverArgs);
     } catch (error) {
@@ -797,6 +807,34 @@ export async function dbCommand(subcommand: string | undefined, rawArgs: string[
         // adding here.
         reportSpawnFailure(error);
         process.exit(1);
+    }
+}
+
+/**
+ * Refuse a driver `db` line the driver would refuse on its flags, before
+ * anything is started for it.
+ *
+ * The driver is spawned with a database already running, because getting one
+ * means starting one: the remembered compose container, or the managed PGlite
+ * daemon. So `rebase db push --dry-rn` started the database and only then
+ * heard that `--dry-rn` does not exist. The check is the driver's own
+ * (`assertDbCommandLine`, the same parse each of its commands runs), so this
+ * answer and the one the driver gives cannot drift apart.
+ *
+ * It is this CLI's copy of `@rebasepro/server-postgres`, which ships at the
+ * CLI's version, as the project's does. For any other driver the line goes
+ * through as it is, and that driver judges it.
+ *
+ * @throws UsageError with the driver's sentence: nothing ran.
+ */
+async function refuseDriverLineBeforeStarting(projectRoot: string, rawArgs: readonly string[]): Promise<void> {
+    if (getActiveBackendPlugin(requireBackendDir(projectRoot)) !== "@rebasepro/server-postgres") return;
+    const { assertDbCommandLine } = await import("@rebasepro/server-postgres");
+    try {
+        assertDbCommandLine(argsFromCommand(rawArgs, "db"));
+    } catch (error) {
+        if (error instanceof Error) throw new UsageError(error.message);
+        throw error;
     }
 }
 

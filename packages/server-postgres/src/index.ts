@@ -18,6 +18,7 @@ export * from "./backup";
 export * from "./PostgresBootstrapper";
 export * from "./PostgresAdapter";
 export * from "./open-rebase";
+export { assertDbCommandLine } from "./db-command-line";
 
 /**
  * The app-role provisioning boot performs, for callers that restore a database

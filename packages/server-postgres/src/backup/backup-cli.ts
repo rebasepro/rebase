@@ -694,6 +694,16 @@ export async function restoreCommand(rawArgs: string[]): Promise<void> {
 // ─────────────────────────────────────────────────────────────────────────
 const BACKUPS_ACTIONS = ["list"] as const;
 
+const BACKUPS_LIST_FLAGS = { "--out": String, "--output": "--out", "-o": "--out" } satisfies arg.Spec;
+
+/**
+ * Parse a `rebase db backups list …` line, or its `rebase db backup list …`
+ * spelling: the flags start after `list`, the third word of either.
+ */
+export function parseBackupsListLine(rawArgs: readonly string[]) {
+    return parseCommandFlags(BACKUPS_LIST_FLAGS, rawArgs.slice(3), "db backups list");
+}
+
 /** What `db backups <action>` says of an action it does not have: the sentence every `db` command says. */
 export function unknownBackupsAction(action: string): string {
     const near = closestWord(action, BACKUPS_ACTIONS);
@@ -713,11 +723,7 @@ export async function backupsCommand(rawArgs: string[]): Promise<void> {
         process.exit(1);
     }
 
-    const args = parseCommandFlags(
-        { "--out": String, "--output": "--out", "-o": "--out" },
-        rawArgs.slice(3),
-        "db backups list"
-    );
+    const args = parseBackupsListLine(rawArgs);
     const out = backupLocation(args["--out"]);
     const dest = parseBackupDestination(out);
 

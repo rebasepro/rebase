@@ -65,6 +65,12 @@ beforeAll(async () => {
     state.root = fs.mkdtempSync(path.join(os.tmpdir(), "rebase-db-url-docker-"));
     port = await findFreePort();
     fs.writeFileSync(path.join(state.root, "rebase.json"), "{}\n");
+    // On server-postgres, so `db push` is the driver's and its flags are judged by its check.
+    fs.mkdirSync(path.join(state.root, "backend"));
+    fs.writeFileSync(path.join(state.root, "backend", "package.json"), JSON.stringify({
+        name: "backend",
+        dependencies: { "@rebasepro/server-postgres": "workspace:*" }
+    }));
     fs.writeFileSync(path.join(state.root, "docker-compose.yml"), [
         `name: ${composeProject}`,
         "services:",
@@ -135,6 +141,19 @@ describe("with the remembered container stopped", () => {
         await expectStartedOnStderr(stderr);
         expect(stdout).toHaveLength(1);
         expect(stdout[0]).toMatch(new RegExp(`^postgresql://rebase_app:changeme@127\\.0\\.0\\.1:${port}/rebase\\?`));
+    }, 120_000);
+
+    // The driver refuses `--dry-rn`, and used to be asked only after the
+    // container had been started for it.
+    it("rebase db push with a misspelt flag refuses it and leaves the container stopped", async () => {
+        const { stdout, stderr } = await captured(async () => {
+            await expect(dbCommand("push", ["node", "rebase", "db", "push", "--dry-rn"]))
+                .rejects.toThrow("`rebase db push` has no option --dry-rn — did you mean --dry-run? Nothing was run.");
+        });
+
+        expect([...stdout, ...stderr].join("\n")).not.toContain("starting it");
+        const { stdout: running } = await compose("ps", "--status", "running", "--services");
+        expect(running.trim()).toBe("");
     }, 120_000);
 
     it("rebase console -e starts it and leaves stdout to the result", async () => {

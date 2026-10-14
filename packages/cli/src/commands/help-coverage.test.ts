@@ -103,10 +103,10 @@ describe("every command the dispatch answers appears in a help page", () => {
         // rest. A help page that knew only about one half is how `db pull`
         // stayed invisible.
         const cliSide = dispatchedNames("db.ts", "dbCommand");
-        const driverSource = path.join(here, "..", "..", "..", "server-postgres", "src", "cli.ts");
-        expect(fs.existsSync(driverSource), "the driver CLI moved; this guard needs its new path").toBe(true);
+        const driverSource = path.join(here, "..", "..", "..", "server-postgres", "src", "db-subcommands.ts");
+        expect(fs.existsSync(driverSource), "the driver's db subcommand list moved; this guard needs its new path").toBe(true);
         const validActions = fs.readFileSync(driverSource, "utf8")
-            .match(/const VALID_ACTIONS = \[([^\]]+)\]/);
+            .match(/export const DRIVER_DB_SUBCOMMANDS = \[([^\]]+)\]/);
         expect(validActions).not.toBeNull();
         const driverSide = [...validActions![1].matchAll(/"([^"]+)"/g)].map(m => m[1]);
 
