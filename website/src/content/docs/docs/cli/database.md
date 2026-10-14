@@ -61,6 +61,19 @@ rebase db migrate
 
 Applies all unapplied migrations to the database.
 
+On a database that has already booted, the first migration creates tables boot
+already made, so the first `db migrate` there stops on `already exists`. Record
+that migration as applied instead, once:
+
+```bash
+rebase db migrate --baseline <version>
+```
+
+The version is the numeric prefix of the migration file; `db generate` prints the
+command with it filled in. Every `db migrate` after that is an ordinary one. See
+[`--baseline`](/docs/cli/schema/#rebase-db-migrate) for a database that already
+records migrations.
+
 ### `rebase db backup` / `backups` / `restore`
 
 ```bash
@@ -175,7 +188,8 @@ in the checkout, the delete included, is pointed at it: `switch --off` first,
 then delete it. The whole workflow is on [Database Branching](/docs/backend/branching/).
 
 :::note[On the managed development database]
-<span class="since-badge" data-since="0.25">Since 0.25</span> `push`, `generate` and `migrate` plan their work with Atlas, which needs a second
+<span class="since-badge" data-since="0.25">Since 0.25</span> `push`, `generate` and `migrate` work here as on any database.
+`push` and `generate` plan their work with Atlas, which needs a second
 empty database to compare against — and the managed PGlite serves exactly one. So
 on the managed database each of them starts a second, throwaway PGlite in memory
 for Atlas, and stops it when the command ends. That is how a column is dropped,
