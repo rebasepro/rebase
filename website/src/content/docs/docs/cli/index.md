@@ -298,6 +298,12 @@ A `○` is the state worth knowing about before a deploy rather than after:
 declared, not configured. A `✗` means the environment sets something *wrongly*,
 which refuses the boot rather than degrading.
 
+<span class="since-badge" data-since="0.25">Since 0.25</span> A
+`rebase.resources.json` that no longer matches the declarations gets a `○` line.
+One that has not been written yet does not: `rebase build` writes it on every
+build, so a project that has never been built, such as a fresh scaffold, has
+nothing to fix. On 0.24 every new project's `status` ended with "is missing".
+
 ### `rebase resources`
 
 What this project declares it needs — the databases, buckets, topics and

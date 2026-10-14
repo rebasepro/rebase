@@ -293,11 +293,15 @@ export async function statusCommand(rawArgs: string[]): Promise<void> {
     // Only worth a line when it is wrong. A generated file that matches its
     // declarations is not news, and a status view that reports its own
     // bookkeeping as an item trains people to skim past the items that matter.
+    //
+    // Nor is one that has not been written yet: `rebase build` writes it on
+    // every build and says "commit it" when it changes, so a project that has
+    // never been built — every fresh scaffold — has nothing wrong with it.
+    // `rebase resources --check` is the gate that refuses a missing one.
     const committed = readResourceGraphFile(projectRoot);
-    const expected = serializeResourceGraph(graph);
-    if (committed !== expected && !(committed === null && graph.resources.length === 0)) {
+    if (committed !== null && committed !== serializeResourceGraph(graph)) {
         console.log("");
-        console.log(`  ${chalk.yellow("○")} ${RESOURCE_GRAPH_FILENAME} is ${committed === null ? "missing" : "stale"} — ${chalk.blue("rebase resources --write")}`);
+        console.log(`  ${chalk.yellow("○")} ${RESOURCE_GRAPH_FILENAME} is stale — ${chalk.blue("rebase resources --write")}`);
         console.log(chalk.gray("      a host reads it to decide what to provision before it runs anything"));
     }
 
