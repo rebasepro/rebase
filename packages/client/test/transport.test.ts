@@ -789,7 +789,7 @@ status: 200,
                 }
             );
 
-            it.each(["UNAUTHORIZED", "INVALID_TOKEN", "TOKEN_EXPIRED", "SESSION_REVOKED", undefined])(
+            it.each(["UNAUTHORIZED", "INVALID_TOKEN", "TOKEN_EXPIRED", "SESSION_REVOKED", "ACCOUNT_DISABLED", undefined])(
                 "refreshes and resends on %s",
                 async (code) => {
                     // No code at all is a 401 from an older server, a proxy or

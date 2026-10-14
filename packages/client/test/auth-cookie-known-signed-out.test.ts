@@ -45,6 +45,8 @@ function createBrowser() {
     const browser = {
         /** Whether the jar holds a refresh cookie, and whether the server knows it. */
         cookie: "none" as "none" | "live" | "unknown-to-server",
+        /** A live cookie's session the server has since refused: revoked, or its account disabled. */
+        refused: undefined as "SESSION_REVOKED" | "ACCOUNT_DISABLED" | undefined,
         refreshGate: undefined as Promise<void> | undefined,
         storage: createMemoryStorage() as AuthStorage,
         paths: [] as string[]
@@ -64,6 +66,11 @@ function createBrowser() {
             await browser.refreshGate;
             if (carried === "none") return json({ error: { code: "NO_SESSION", message: "No refresh token presented" } }, 401);
             if (carried === "unknown-to-server") return json({ error: { code: "INVALID_TOKEN", message: "Invalid refresh token" } }, 401);
+            if (browser.refused) {
+                // The server clears the cookie with a refusal like this one.
+                browser.cookie = "none";
+                return json({ error: { code: browser.refused, message: "refused" } }, 401);
+            }
             return session();
         }
         if (path === "/auth/login") {
@@ -76,6 +83,7 @@ function createBrowser() {
         }
         if (path === "/auth/me") return json({ user });
         if (path.startsWith("/data/")) {
+            if (browser.refused) return json({ error: { code: browser.refused, message: "refused" } }, 401);
             return headers.Authorization === "Bearer a-live"
                 ? json({ data: [{ id: "mine" }], meta: { total: 1, hasMore: false } })
                 : json({ error: { code: "TOKEN_EXPIRED", message: "expired" } }, 401);
@@ -199,6 +207,39 @@ describe("a cookie-mode session", () => {
         await expect(page.auth.refreshSession()).resolves.toMatchObject({ accessToken: "a-live" });
         expect(b.refreshes()).toBe(before + 1);
     });
+
+    it.each(["SESSION_REVOKED", "ACCOUNT_DISABLED"] as const)(
+        "is signed out at once when a request is refused with %s",
+        async (code) => {
+            const b = browser();
+            b.browser.cookie = "live";
+            const page = b.load();
+            await page.auth.isInitialized();
+            const events: AuthChangeEvent[] = [];
+            page.auth.onAuthStateChange((event) => { events.push(event); });
+
+            // An admin revoked the session, or disabled the account: the
+            // token is refused on the next request, not at the next hourly
+            // refresh. The request's 401 refreshes, the refresh is refused
+            // the same way, and the session ends there.
+            b.browser.refused = code;
+            await expect(page.data.collection("posts").find({ limit: 1 })).rejects.toMatchObject({ status: 401, code });
+            expect(events).toEqual(["SIGNED_OUT"]);
+            expect(page.auth.getSession()).toBeNull();
+            expect(b.refreshes()).toBe(2);
+
+            // The refusal cleared the cookie; the next load asks once, is told
+            // there is none, and the one after asks nothing.
+            b.browser.refused = undefined;
+            const next = b.load();
+            await next.auth.isInitialized();
+            expect(next.auth.restoreOutcome()).toBe("none");
+            expect(b.refreshes()).toBe(3);
+            const after = b.load();
+            await after.auth.isInitialized();
+            expect(b.refreshes()).toBe(3);
+        }
+    );
 
     it("is signed out when its refresh is refused, and the next load still asks", async () => {
         const b = browser();

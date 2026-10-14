@@ -414,8 +414,12 @@ export function buildAggregateQueryString<M extends Record<string, unknown>>(par
  * (`MFA_REQUIRED`). Refreshing and resending one of those rotated the session
  * for nothing, sent the same wrong answer twice — and an MFA challenge claims
  * an attempt before it judges the code, so every typo cost two of its five.
+ *
+ * `SESSION_REVOKED` and `ACCOUNT_DISABLED` are refusals of the session behind
+ * the token. The refresh is refused the same way, which is what signs the
+ * client out at once rather than at its next scheduled refresh.
  */
-const TOKEN_REFUSAL_CODES = new Set(["UNAUTHORIZED", "INVALID_TOKEN", "TOKEN_EXPIRED", "SESSION_REVOKED"]);
+const TOKEN_REFUSAL_CODES = new Set(["UNAUTHORIZED", "INVALID_TOKEN", "TOKEN_EXPIRED", "SESSION_REVOKED", "ACCOUNT_DISABLED"]);
 
 /**
  * Whether a 401's body says the token was the problem.
