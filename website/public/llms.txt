@@ -240,6 +240,7 @@
 - [Agent Skills](https://rebase.pro/docs/ai/skills): rebase skills install writes 21 Rebase reference skills into your repo, in the layout your AI assistant expects — Cursor, Claude Code, Windsurf, Gemini CLI and Antigravity.
 - [AI Instruction Files](https://rebase.pro/docs/ai/instruction-files): Every scaffolded Rebase project ships ai-instructions.md plus three-line pointer files for Claude, Cursor, Windsurf, Copilot and AGENTS.md — one source of truth, many filenames.
 - [CLI Reference](https://rebase.pro/docs/cli): Rebase CLI commands for project initialization, schema generation, database migrations, and SDK generation.
+- [Database Commands](https://rebase.pro/docs/cli/database): The rebase db commands — push, generate and migrate, backups and restores, pulling a copy, the connection string, the managed development database, and branches.
 - [rebase cloud](https://rebase.pro/docs/cli/cloud): The command groups for Rebase Cloud in the CLI — auth, project link, deploys, config, organizations, databases, resources, compute, storage, webhooks, clusters and billing.
 - [Schema Generation](https://rebase.pro/docs/cli/schema): Generate Drizzle ORM schemas from collection definitions, create SQL migrations, and keep your database in sync with the Rebase CLI.
 - [rls-check](https://rebase.pro/docs/rls-check): Audit row-level security on any PostgreSQL database — Supabase, Neon, RDS, or your own server. Read-only, no signup, no Rebase required.
