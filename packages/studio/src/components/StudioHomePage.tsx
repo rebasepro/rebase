@@ -1,7 +1,7 @@
 import type { AppView, HomePageSection, PluginGenericProps } from "@rebasepro/cms-types";
 import React, { useEffect, useMemo, useState } from "react";
 import { Card, cls, Container, ExpandablePanel, Typography } from "@rebasepro/ui";
-import { IconForView, useNavigationGroupLabel, useRebaseContext, useRebaseRegistry, useRestoreScroll, useSlot, useTranslation } from "@rebasepro/app";
+import { IconForView, useApiConfig, useNavigationGroupLabel, useRebaseContext, useRebaseRegistry, useRestoreScroll, useSlot, useTranslation } from "@rebasepro/app";
 import { useNavigate } from "react-router";
 import { useStudioBreadcrumbs, SchemaDriftBanner } from "@rebasepro/app";
 
@@ -112,6 +112,8 @@ export function StudioHomePage({
     const navigate = useNavigate();
     const registry = useRebaseRegistry();
     const { t } = useTranslation();
+    const apiConfig = useApiConfig();
+    const apiUrl = absoluteApiUrl(apiConfig?.apiUrl);
 
     useEffect(() => {
         breadcrumbs.set({ breadcrumbs: [] });
@@ -304,7 +306,7 @@ export function StudioHomePage({
 
                         {/* Syntax-highlighted code */}
                         <div className="px-5 py-4 overflow-x-auto text-[13px] leading-6 font-mono">
-                            <SyntaxHighlightedSnippet/>
+                            <SyntaxHighlightedSnippet baseUrl={apiUrl}/>
                         </div>
                     </div>
                 </div>
@@ -339,7 +341,22 @@ export function StudioHomePage({
    pulling in a syntax highlighting library.
    ═══════════════════════════════════════════════════════════════ */
 
-function SyntaxHighlightedSnippet() {
+/**
+ * The address the panel's API answers on, as a script would write it: absolute
+ * (a same-origin panel is configured with a relative one) and without a
+ * trailing slash. It is what `baseUrl` takes — the API's path is the client's.
+ */
+function absoluteApiUrl(apiUrl: string | undefined): string {
+    const page = typeof window !== "undefined" ? window.location.href : undefined;
+    try {
+        return new URL(apiUrl || "/", page).href.replace(/\/+$/, "");
+    } catch {
+        return apiUrl ?? "";
+    }
+}
+
+/** The quick-start client, pointed at `baseUrl`. */
+function SyntaxHighlightedSnippet({ baseUrl }: { baseUrl: string }) {
     const kw = "text-violet-600 dark:text-violet-400"; // keywords
     const str = "text-emerald-600 dark:text-emerald-400"; // strings
     const typ = "text-amber-600 dark:text-amber-300"; // types
@@ -383,7 +400,7 @@ function SyntaxHighlightedSnippet() {
             {"\n"}
             <span className={tx}>{"    baseUrl"}</span>
             <span className={op}>: </span>
-            <span className={str}>&apos;http://localhost:3001&apos;</span>
+            <span className={str}>&apos;{baseUrl}&apos;</span>
             <span className={op}>,</span>
             {"\n"}
             <span className={tx}>{"}"}</span>

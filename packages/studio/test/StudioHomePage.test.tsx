@@ -34,6 +34,8 @@ jest.mock("@rebasepro/app", () => ({
         collections: []
     }),
     useRebaseRegistry: () => mockRegistry,
+    // The address the panel talks to — never the 3001 of the docs' examples.
+    useApiConfig: () => ({ apiUrl: "http://localhost:3755", apiPath: "/api" }),
     useRestoreScroll: () => ({
         containerRef: React.createRef()
     }),
@@ -99,6 +101,15 @@ describe("StudioHomePage Component", () => {
 
         expect(screen.queryByRole("region", { name: "Compute" })).not.toBeInTheDocument();
         expect(screen.getByRole("region", { name: "Database" })).toBeInTheDocument();
+    });
+
+    it("points the SDK snippet at the API the panel talks to", () => {
+        // It read `baseUrl: 'http://localhost:3001'` whatever the project
+        // served, and a project on 3755 copied a client that reached nothing.
+        const { container } = render(<StudioHomePage />);
+
+        expect(container.textContent).toContain("baseUrl: 'http://localhost:3755'");
+        expect(container.textContent).not.toContain("localhost:3001");
     });
 
     it("renders additional children when provided", () => {
