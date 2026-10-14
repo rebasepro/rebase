@@ -493,7 +493,9 @@ export function parseRequestLine(text: string): RequestLogEntry | null {
  * This is the fastest way to tell a misconfiguration from a runtime fault.
  */
 export function isBootLine(text: string): boolean {
-    return /storage|Loaded function|Mounted|Auth tables|Server running|listening|Refusing|migrat/i.test(text);
+    // "Loaded custom functions" and "Loaded cron job…" are 0.25's words for what
+    // earlier runtimes logged as "Mounted …"; both are what a deployment runs.
+    return /storage|Loaded (?:custom )?function|Loaded cron|Cron jobs scheduled|Cron scheduler|Mounted|Auth tables|Server running|listening|Refusing|migrat/i.test(text);
 }
 
 /** Render a number of seconds back as the compact duration a user would type. */

@@ -357,8 +357,19 @@ describe("isBootLine", () => {
         expect(isBootLine("Server running on port 8080")).toBe(true);
         expect(isBootLine("Refusing to start: no DATABASE_URL")).toBe(true);
     });
+    it("matches what the 0.25 runtime says it loaded and scheduled", () => {
+        // 0.25 logs "Loaded custom functions" and "Loaded cron job: …" where
+        // earlier runtimes said "Mounted …", so `debug boot` showed storage and
+        // the port and none of the code a deployment runs.
+        expect(isBootLine('{"message":"Loaded custom functions","count":3}')).toBe(true);
+        expect(isBootLine('{"message":"⏰ Loaded cron job: sync-inbox (*/15 * * * *)"}')).toBe(true);
+        expect(isBootLine('{"message":"Loaded cron jobs","count":8}')).toBe(true);
+        expect(isBootLine('{"message":"Cron jobs scheduled","count":8}')).toBe(true);
+        expect(isBootLine('{"message":"⏰ Cron scheduler started with 8 job(s)"}')).toBe(true);
+    });
     it("ignores ordinary request noise", () => {
         expect(isBootLine("GET /favicon.ico 200")).toBe(false);
+        expect(isBootLine('{"message":"request","path":"/api/functions/outreach/status","status":200}')).toBe(false);
     });
 });
 
