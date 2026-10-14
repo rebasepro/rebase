@@ -111,10 +111,17 @@ fi
 # ──────────────────────────────────────────────────────────────
 section "4. Vite build check (server packages)"
 # ──────────────────────────────────────────────────────────────
+# Into a directory of its own, never the package's `dist/`: a bare `vite build`
+# empties `dist/` and writes only the main entry, so the second build of
+# `@rebasepro/server` (`dist/functions/`) and every `.d.ts` were gone after
+# this check — and the next thing to read them (a scaffold typechecking
+# against `@rebasepro/server/functions`, the CLI e2e) failed as if the code
+# were broken.
+BUILD_DIR=$(mktemp -d)
 for pkg in "${SERVER_PKGS[@]}"; do
     pkg_dir="$PACKAGES_DIR/$pkg"
     echo "  Building $pkg..."
-    build_output=$( (cd "$pkg_dir" && pnpm exec vite build) 2>&1 ) || true
+    build_output=$( (cd "$pkg_dir" && pnpm exec vite build --outDir "$BUILD_DIR/$pkg" --emptyOutDir) 2>&1 ) || true
     if echo "$build_output" | grep -q "built in"; then
         size=$(echo "$build_output" | grep 'index.es.js' | head -1)
         ok "$pkg vite build succeeded — $size"
@@ -131,7 +138,7 @@ PREV=$(error_count)
 for pkg in "${SERVER_PKGS[@]}"; do
     # Check all .js files in dist (main + chunks). Everything here is ESM —
     # the UMD/CJS output is gone, so there is no longer a format to exempt.
-    for js_file in "$PACKAGES_DIR/$pkg/dist/"*.js; do
+    for js_file in "$BUILD_DIR/$pkg/"*.js; do
         [ -f "$js_file" ] || continue
         fname="$(basename "$js_file")"
 
@@ -150,7 +157,7 @@ section "6. Native/binary modules not inlined"
 PREV=$(error_count)
 NATIVE_MODULES=("fsevents" "cpu-features" "bufferutil" "utf-8-validate")
 for pkg in "${SERVER_PKGS[@]}"; do
-    for js_file in "$PACKAGES_DIR/$pkg/dist/index.es.js" "$PACKAGES_DIR/$pkg/dist/"index-*.js; do
+    for js_file in "$BUILD_DIR/$pkg/index.es.js" "$BUILD_DIR/$pkg/"index-*.js; do
         [ -f "$js_file" ] || continue
         fname="$(basename "$js_file")"
         for mod in "${NATIVE_MODULES[@]}"; do
@@ -191,7 +198,7 @@ for pkg in server cli; do
         rm -f "$tarball"
     fi
 done
-rm -rf "$PACK_DIR"
+rm -rf "$PACK_DIR" "$BUILD_DIR"
 if [ "$(error_count)" = "$PREV" ]; then
     ok "workspace: protocol resolves correctly in packed output"
 fi
