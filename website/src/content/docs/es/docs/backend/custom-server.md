@@ -62,6 +62,7 @@ El runtime proporciona `zod`. El `backend/package.json` del scaffold lo lista en
 - Bloquea los secretos generados automáticamente en producción; debes definirlos explícitamente.
 - Valida que `CORS_ORIGINS` o `FRONTEND_URL` estén configurados en producción.
 - Rechaza un esquema `extend` creado por una copia diferente de zod.
+- Lanza un `Error` que nombra cada variable que falta o es incorrecta, como `DATABASE_URL: is required`, con los issues de zod en su propiedad `issues`. <span class="since-badge" data-since="0.25">Desde 0.25</span> En la 0.24 lanza el propio `ZodError` de zod, que no nombra ninguna variable cuando nada lo captura.
 
 Consulta `.env.example` en la aplicación generada para ver la lista completa de variables admitidas.
 
@@ -265,6 +266,10 @@ app.route("/v2/data", backend.routes.data());      // the data API, at a path of
 app.route("/hooks", backend.routes.functions());   // getUser(c) and getDriver(c) work inside
 ```
 
+`collections` es el array que exporta el `config/collections/index.ts` de un scaffold. Lleva las `defaultSecurityRules` de ese índice, igual que `collectionsDir`, así que el backend aprovisiona las políticas que aprovisionaría `rebase db push`. Un array propio lleva solo las reglas que declaran sus colecciones, y `provision: true` deja solo para administradores una que no declara ninguna, eliminando las políticas que Rebase generó antes para ella, en todos los servidores que comparten la base de datos.
+
+<span class="since-badge" data-since="0.25">Desde 0.25</span> El índice del scaffold aplica los valores por defecto a su array. En un proyecto generado con la 0.24, copia ese bucle del `config/collections/index.ts` de un scaffold nuevo, o pasa `collectionsDir`.
+
 | Grupo | Normalmente en | Sirve |
 |---|---|---|
 | `routes.auth()` | `/api/auth` | inicio de sesión, sesiones, OAuth, restablecimiento de contraseña, `GET /config`, las claves de API propias de quien llama y el catálogo de scopes |
@@ -378,11 +383,12 @@ import { createJwtService, requireAuth, requireScope } from "@rebasepro/server";
 // own. `userId` is the user's id in the users collection.
 const token = await backend.services.jwt.generateAccessToken(userId, ["editor"]);
 
-// Check a session token or an rk_ API key against this backend, for a socket
-// or a tunnel of your own: its uid, roles, scopes and kind, or null.
+// Check a session token, an rk_ API key or the service key for a socket or a tunnel of your
+// own, as this backend's routes judge it: its uid, roles, scopes and kind, or null.
 const caller = await backend.verifyCredential(token);
 
-// A route of your own, outside the groups, judged by this backend.
+// A route of your own, outside the groups, judged by this backend. The users collection
+// declares the app scope: auth: { scopes: { "project:deploy": { label: "Deploy projects" } } }.
 app.post("/deploy", (c, next) => { c.set("services", backend.services); return next(); },
     requireAuth, requireScope("project:deploy"), (c) => c.json({ ok: true }));
 
@@ -395,11 +401,17 @@ Una sesión generada se comprueba como cualquier otra en cada solicitud, así qu
 uid tiene que ser un usuario que exista: para un uid sin usuario, la solicitud se
 rechaza.
 
+<span class="since-badge" data-since="0.25">Desde 0.25</span> `verifyCredential` llega al mismo veredicto que las rutas: una sesión que su dueño cerró, un uid sin usuario y una cuenta desactivada devuelven null, y los roles son los que la cuenta tiene ahora. Lanza un error cuando no se puede llegar a la base de datos. En la 0.24 solo comprueba la firma, y lee los roles del token.
+
 Cada grupo de rutas establece `c.var.services` por sí mismo. Una ruta fuera de los
 grupos que usa `requireAuth`, `requireScope` u otro guard de `@rebasepro/server` lo
 lee ahí, y recurre al valor por defecto del proceso cuando no está definido.
 `requireScope` juzga a quien identificó `requireAuth`, así que va después de
-`requireAuth`: por sí solo rechaza cada solicitud con un 401.
+`requireAuth`: por sí solo rechaza cada solicitud con un 401. Acepta un scope
+integrado, o un scope de la aplicación que el backend declara bajo `auth.scopes` en
+su colección de usuarios, como en el comentario de arriba.
+
+<span class="since-badge" data-since="0.25">Desde 0.25</span> Un nombre que no es un scope, o uno integrado mal escrito como `data:raed`, lanza un error donde se registra la ruta. Un scope de la aplicación que el backend que responde no declara responde a todos los que llaman, también a un administrador, `500 SCOPE_NOT_DECLARED`. En la 0.24 ambos responden a todos los que llaman `403 SCOPE_MISSING`.
 
 ## Apagado
 
@@ -435,7 +447,7 @@ API de administración a menos que las construyas.
 ### 1. Instalación
 
 ```bash
-npm install @rebasepro/server-postgres @rebasepro/types express pg
+npm install @rebasepro/server-postgres @rebasepro/types express pg drizzle-orm
 ```
 
 ### 2. Apertura del driver y del socket
@@ -472,7 +484,9 @@ async function startServer() {
     // Leave this call out and the driver reads no environment variable at all.
     const pgConfig = postgresDriverConfigFromEnv({ connection: db, connectionString });
 
-    // `provision: false` if the schema is applied elsewhere (`rebase db push`).
+    // The collections' tables must already exist: the driver serves them and never creates them.
+    // `provision` (default true) is the rest of its DDL: the role requests run as, branch metadata,
+    // channel history and change capture. `provision: false` when none of that may run here.
     const { driver, internals } = await openPostgresDriver(pgConfig, { collections });
 
     // The realtime socket. It answers upgrades on `path` only, so a WebSocket
@@ -543,8 +557,10 @@ startServer();
 `openPostgresDriver` es lo que ejecuta `createPostgresAdapter` cuando arranca el
 servidor de Rebase, después de que `postgresDriverConfigFromEnv` haya leído el
 entorno en la configuración. Su segundo argumento dice qué abrir: las `collections`,
-si abrir puede cambiar la base de datos (`provision`, por defecto `true`) y qué
+si abrir puede ejecutar su propio DDL (`provision`, por defecto `true`) y qué
 papel tiene este proceso en realtime (`realtime: false` para ninguno).
+
+No crea ninguna tabla de colección, así que contra una base de datos sin ellas `POST /api/products` responde `500` "Table not found for collection 'products'". Crea las tablas primero. `rebase db push` lo hace desde un proyecto de Rebase cuyo `config/collections` las declara. En este servidor, `await createPostgresAdapter(pgConfig).ensureCollectionSchema?.(collections)` antes de `openPostgresDriver` añade las tablas y columnas que le faltan a la base de datos, como hace el arranque del servidor de Rebase, y no cambia nada de lo que ya existe.
 
 ---
 

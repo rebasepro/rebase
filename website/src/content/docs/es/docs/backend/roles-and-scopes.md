@@ -226,6 +226,13 @@ para cualquier otro proyecto. También necesita `functions:invoke`, o
 `hasScope(c, scope, target)` y `getScopes(c)` responden a la misma pregunta dentro de
 un manejador.
 
+<span class="since-badge" data-since="0.25">Desde 0.25</span> `requireScope`
+rechaza un alcance que nadie podría tener. Un nombre que no es un alcance, o uno
+integrado mal escrito como `data:raed`, lanza un error al cargarse la función. Un
+alcance de la aplicación que el backend no declara bajo `auth.scopes` responde a
+todos los llamantes, también a un administrador, `500 SCOPE_NOT_DECLARED`. En la
+0.24 ambos responden `403 SCOPE_MISSING`.
+
 ## Qué significa admin
 
 `admin` es el único rol integrado, y es más que una lista de alcances:
