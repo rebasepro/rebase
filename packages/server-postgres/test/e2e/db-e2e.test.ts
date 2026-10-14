@@ -367,4 +367,65 @@ describe("Database migration E2E", () => {
         expect(again.all).toContain(`Nothing to record: this database already records migrations up to ${version}`);
         expect(again.all).not.toContain("Recording");
     }, 240_000);
+
+    // ── Scenario 5: The first migrate on a database boot provisioned ──
+
+    /**
+     * The day-one path on a server of your own: boot (or `db push`) has made
+     * the tables, `db generate` writes a baseline migration that creates them,
+     * and `db migrate` stops on `already exists`. The failed run must leave no
+     * revisions table outside `rebase` — on the managed database it left one in
+     * `public` that failed every later run, `--baseline` included — and the
+     * `--baseline` it names must then work.
+     */
+    it("on a database boot provisioned, names --baseline, leaves nothing outside `rebase`, and the baseline works", async () => {
+        const cliScript = resolveCliScript();
+        const tsxBin = path.join(monorepoRoot, "node_modules", ".bin", "tsx");
+        await dbClient.query("CREATE DATABASE booted");
+        const target = new URL(container.connectionString);
+        target.pathname = "/booted";
+        const bootedUrl = target.toString();
+        const booted = new pg.Client({ connectionString: bootedUrl });
+        await booted.connect();
+        try {
+            const base = fs.mkdtempSync(path.join(os.tmpdir(), "rebase-db-e2e-booted-"));
+            const backend = path.join(base, "backend");
+            const collections = path.join(base, "config", "collections");
+            fs.mkdirSync(backend, { recursive: true });
+            fs.mkdirSync(collections, { recursive: true });
+            fs.writeFileSync(path.join(backend, "package.json"), JSON.stringify({ name: "e2e-booted-backend", type: "module" }));
+            fs.writeFileSync(path.join(collections, "package.json"), JSON.stringify({ type: "module" }));
+            fs.writeFileSync(path.join(collections, "tasks.js"), tasksCollectionJs());
+            fs.writeFileSync(path.join(collections, "index.js"), collectionsIndex(["tasks"]));
+            const run = (...args: string[]) => execa(tsxBin, [cliScript, ...args], {
+                cwd: backend, env: cleanEnv(bootedUrl), all: true, reject: false
+            });
+            const revisionTables = async () => (await booted.query(
+                "SELECT table_schema FROM information_schema.tables WHERE table_name = 'atlas_schema_revisions' ORDER BY 1"
+            )).rows.map((row: { table_schema: string }) => row.table_schema);
+
+            // What boot does: the tables, before any migration exists.
+            const pushed = await run("db", "push", "--collections", collections);
+            expect(pushed.exitCode).toBe(0);
+            const generated = await run("db", "generate", "--collections", collections, "init");
+            expect(generated.exitCode).toBe(0);
+            const migrations = fs.readdirSync(path.join(backend, "drizzle", "migrations")).filter(f => f.endsWith(".sql"));
+            const version = /^(\d+)/.exec(migrations[0] ?? "")?.[1] ?? "";
+            expect(version).not.toBe("");
+
+            const failed = await run("db", "migrate");
+            expect(failed.exitCode).toBe(1);
+            expect(failed.all).toContain("already exists");
+            expect(failed.all).toContain(`rebase db migrate --baseline ${version}`);
+            expect((await revisionTables()).filter(schema => schema !== "rebase")).toEqual([]);
+
+            const baselined = await run("db", "migrate", "--baseline", version);
+            expect(baselined.exitCode).toBe(0);
+            expect((await booted.query("SELECT version FROM rebase.atlas_schema_revisions")).rows
+                .map((row: { version: string }) => row.version)).toEqual([version]);
+            expect(await revisionTables()).toEqual(["rebase"]);
+        } finally {
+            await booted.end();
+        }
+    }, 240_000);
 });

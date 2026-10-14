@@ -61,7 +61,8 @@ import {
 import { stripCarvedOutStatements } from "./schema/carved-out-migration";
 import type { ExistingConstraint } from "./schema/undeclarable-constraints";
 import { finishNewMigration } from "./schema/migration-post-process";
-import { acceptsExcludeFlag, buildAtlasArgs, migrateApplyArgs, takesDevUrl } from "./schema/atlas-argv";
+import { acceptsExcludeFlag, buildAtlasArgs, migrateApplyArgs, readsRevisions, takesDevUrl } from "./schema/atlas-argv";
+import { ensureAtlasRevisionsTable } from "./schema/atlas-revisions";
 import { CommandStopped, ScratchDatabase } from "./cli-scratch-database";
 import { describeBaselinePlan, latestRecordedMigration, planBaseline } from "./schema/migrate-baseline";
 import { promptConfirm } from "./cli-prompt";
@@ -1926,14 +1927,24 @@ async function runAtlas(
         }
     }
 
-    const atlasArgs = buildAtlasArgs({ domain, args, url: atlasUrl, devUrl: atlasDevUrl, excludes });
+    const atlasArgs = buildAtlasArgs({
+        domain, args, url: atlasUrl, devUrl: atlasDevUrl, excludes, singleSession: managedDatabase()
+    });
+
+    // The managed database is one session every connection shares, so the
+    // `search_path` Atlas gives the connection it creates its revisions table
+    // on is never applied, and the table lands in `public` while Atlas reads it
+    // from `rebase`. Made here, qualified, Atlas finds it where it looks — see
+    // `schema/atlas-revisions.ts`.
+    if (managedDatabase() && readsRevisions(domain, args)) await ensureAtlasRevisionsTable(databaseUrl);
 
     // On the managed database a connection is the scarce thing. PGlite is one
     // session behind a socket server that accepts only a few, a running
-    // `rebase dev` holds some of them, and `schema apply` opens two. The one
-    // over the limit is closed unanswered, and Atlas says only `Error: EOF`.
-    // So the connection this process keeps between steps is let go while Atlas
-    // runs; the next step opens another, which locally costs milliseconds.
+    // `rebase dev` holds some of them, and `schema apply` and `migrate apply`
+    // open two each. The one over the limit is closed unanswered, and Atlas
+    // says only `Error: EOF`. So the connection this process keeps between
+    // steps is let go while Atlas runs; the next step opens another, which
+    // locally costs milliseconds.
     if (managedDatabase()) await closeAppClients();
 
     // Stream stdout live but tee stderr so we can inspect Atlas's error text

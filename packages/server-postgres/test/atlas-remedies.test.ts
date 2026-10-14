@@ -136,6 +136,25 @@ describe("a migration against a database boot has already provisioned", () => {
         expect(formatBaselineRemedy(null)).toContain("rebase db migrate --baseline <version>");
     });
 
+    /**
+     * Atlas creating its own revisions table is not a migration finding the
+     * schema already there, and `--baseline` writes into that same table, so
+     * advising it sent the reader round a loop: on the managed database the
+     * table had landed in `public`, every later run answered 42P07 about it,
+     * and the box named `--baseline`, which answered the same.
+     */
+    it("does not name --baseline when what already exists is Atlas's own revisions table", async () => {
+        const stderr = "Error: sql/schema: create \"atlas_schema_revisions\" table: pq: relation \"atlas_schema_revisions\" already exists (42P07)";
+        expect(parseAlreadyProvisioned(stderr)).toBeNull();
+        const hint = await diagnoseAtlasFailure({
+            domain: "migrate",
+            args: ["apply", "--dir", "file://drizzle/migrations", "--baseline", "20261014000000"],
+            stderr,
+            latestMigrationVersion: "20261014000000"
+        });
+        expect(hint ?? "").not.toContain("--baseline");
+    });
+
     it("does not fire for `schema apply` — there a conflict is a conflict", async () => {
         expect(await diagnoseAtlasFailure({
             domain: "schema",

@@ -1,5 +1,6 @@
 /**
- * `rebase db push` on the managed database while `rebase dev` runs.
+ * `rebase db push` and `rebase db migrate` on the managed database while
+ * `rebase dev` runs.
  *
  * The first push after `dev` started failed with a bare `Error: EOF` and
  * `✗ atlas schema apply … --dry-run failed`; the next ones passed. The managed
@@ -9,6 +10,13 @@
  * own open between steps, and `atlas schema apply` opens two, so Atlas's second
  * was over the limit and closed unanswered. The driver now lets its connection
  * go while Atlas runs.
+ *
+ * `db migrate` failed there every time. With the dev server up, Atlas's third
+ * connection was closed unanswered (`Error: postgres: querying system
+ * variables: EOF`); with it stopped, Atlas created its revisions table in
+ * `public` — PGlite is one session, so the `search_path` a connection asks for
+ * is never applied — read it from `rebase`, failed on 42P01, and from then on
+ * every run, `--baseline` included, failed on 42P07 about that table.
  *
  * Built here as the daemon builds it (PGlite, the socket server with the same
  * limit, the notification proxy in front), with two connections held for the
@@ -97,24 +105,85 @@ describe("db push against the managed database while a dev server holds connecti
         if (project) fs.rmSync(project, { recursive: true, force: true });
     });
 
+    const driver = (...args: string[]) => execa(TSX, [DRIVER_CLI, ...args], {
+        cwd: path.join(project, "backend"),
+        reject: false,
+        all: true,
+        env: {
+            DATABASE_URL: url,
+            REBASE_DEV_DATABASE_KIND: "managed",
+            REBASE_ATLAS_DEV_URL: dev.url,
+            // The code under test, not the last build.
+            TSX_TSCONFIG_PATH: path.join(REPO, "tsconfig.typecheck.json")
+        }
+    });
+    const collectionsDir = () => path.join(project, "config", "collections");
+
+    /** Every schema holding a table named `atlas_schema_revisions`. */
+    const revisionTables = async (): Promise<string[]> => (await held[0].query<{ table_schema: string }>(
+        "SELECT table_schema FROM information_schema.tables WHERE table_name = 'atlas_schema_revisions' ORDER BY 1"
+    )).rows.map(row => row.table_schema);
+
+    const recorded = async (): Promise<string[]> => (await held[0].query<{ version: string }>(
+        "SELECT version FROM rebase.atlas_schema_revisions ORDER BY version"
+    )).rows.map(row => row.version);
+
+    const newestVersion = (): string => {
+        const files = fs.readdirSync(path.join(project, "backend", "drizzle", "migrations")).filter(f => f.endsWith(".sql")).sort();
+        return /^(\d+)/.exec(files.at(-1) ?? "")?.[1] ?? "";
+    };
+
     it("plans the push instead of failing on `Error: EOF`", async () => {
-        const result = await execa(TSX, [
-            DRIVER_CLI, "db", "push", "--dry-run", "--collections", path.join(project, "config", "collections")
-        ], {
-            cwd: path.join(project, "backend"),
-            reject: false,
-            all: true,
-            env: {
-                DATABASE_URL: url,
-                REBASE_DEV_DATABASE_KIND: "managed",
-                REBASE_ATLAS_DEV_URL: dev.url,
-                // The code under test, not the last build.
-                TSX_TSCONFIG_PATH: path.join(REPO, "tsconfig.typecheck.json")
-            }
-        });
+        const result = await driver("db", "push", "--dry-run", "--collections", collectionsDir());
 
         expect(result.all).not.toContain("Error: EOF");
         expect(result.all).toContain("Planned changes");
         expect(result.exitCode).toBe(0);
+    });
+
+    it("on a database boot provisioned, names --baseline, leaves no revisions table outside `rebase`, and the baseline applies", async () => {
+        // What boot does with the collection before any migration exists.
+        await held[0].query("CREATE TABLE public.tasks (id uuid PRIMARY KEY, title varchar NOT NULL)");
+        const generated = await driver("db", "generate", "--collections", collectionsDir(), "init");
+        expect(generated.exitCode).toBe(0);
+        const version = newestVersion();
+        expect(version).not.toBe("");
+
+        const failed = await driver("db", "migrate");
+        expect(failed.all).not.toContain("EOF");
+        expect(failed.all).toContain("already exists");
+        expect(failed.all).toContain(`rebase db migrate --baseline ${version}`);
+        expect(failed.exitCode).toBe(1);
+        expect(await revisionTables()).toEqual(["rebase"]);
+
+        const baselined = await driver("db", "migrate", "--baseline", version);
+        expect(baselined.all).not.toContain("EOF");
+        expect(baselined.exitCode).toBe(0);
+        expect(await recorded()).toEqual([version]);
+        expect(await revisionTables()).toEqual(["rebase"]);
+    });
+
+    it("applies the next migration beside the dev server's connections, and a second run finds nothing to do", async () => {
+        fs.writeFileSync(path.join(collectionsDir(), "tasks.js"), tasks.replace(
+            "title: { name: \"Title\", type: \"string\", validation: { required: true } }",
+            "title: { name: \"Title\", type: \"string\", validation: { required: true } },\n        done: { name: \"Done\", type: \"boolean\" }"
+        ));
+        const before = await recorded();
+        const generated = await driver("db", "generate", "--collections", collectionsDir(), "add_done");
+        expect(generated.exitCode).toBe(0);
+        const version = newestVersion();
+        expect(before).not.toContain(version);
+
+        const applied = await driver("db", "migrate");
+        expect(applied.all).not.toContain("EOF");
+        expect(applied.exitCode).toBe(0);
+        expect(await recorded()).toEqual([...before, version]);
+        const column = await held[0].query("SELECT 1 FROM information_schema.columns WHERE table_name = 'tasks' AND column_name = 'done'");
+        expect(column.rowCount).toBe(1);
+
+        const again = await driver("db", "migrate");
+        expect(again.exitCode).toBe(0);
+        expect(await recorded()).toEqual([...before, version]);
+        expect(await revisionTables()).toEqual(["rebase"]);
     });
 });

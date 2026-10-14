@@ -14,7 +14,7 @@
  *
  * Hence the matrix below is over (domain, subcommand) pairs, not subcommands.
  */
-import { acceptsExcludeFlag, buildAtlasArgs } from "../src/schema/atlas-argv";
+import { acceptsExcludeFlag, buildAtlasArgs, readsRevisions } from "../src/schema/atlas-argv";
 
 const URL = "postgres://u:p@localhost:5432/app";
 const DEV_URL = "postgres://u:p@localhost:5432/app_dev_diff";
@@ -141,5 +141,49 @@ describe("the connection flags each subcommand needs", () => {
     it("the caller's own args come first and are never reordered", () => {
         const argv = build("migrate", ["diff", "add_headline", "--dir", "file://d", "--to", "file://s.sql"], []);
         expect(argv.slice(0, 7)).toEqual(["migrate", "diff", "add_headline", "--dir", "file://d", "--to", "file://s.sql"]);
+    });
+});
+
+/**
+ * On the managed development database every connection is the same session.
+ *
+ * PGlite is one session behind a socket server that takes four connections,
+ * and a running `rebase dev` holds two. `migrate apply` opened three — its
+ * own, one for the advisory lock, and one for the revisions table — so the
+ * third was closed unanswered: `Error: postgres: querying system variables:
+ * EOF`, six times out of six. A session-level advisory lock taken on a session
+ * every connection shares excludes no one, so it is skipped there, and the
+ * apply fits beside the dev server as `schema apply` does.
+ */
+describe("migrate on a single-session database", () => {
+    const managed = (domain: string, args: string[]) =>
+        buildAtlasArgs({ domain, args, url: URL, devUrl: DEV_URL, singleSession: true });
+
+    it("`migrate apply` skips the advisory lock, which one shared session cannot hold against anyone", () => {
+        expect(managed("migrate", ["apply", "--dir", "file://drizzle/migrations"])).toEqual([
+            "migrate", "apply", "--dir", "file://drizzle/migrations",
+            "--url", URL, "--revisions-schema", "rebase", "--allow-dirty", "--skip-lock"
+        ]);
+        expect(managed("migrate", ["apply", "--dir", "file://d", "--baseline", "20260101000000"])).toContain("--skip-lock");
+        expect(managed("migrate", ["apply", "--dir", "file://d", "--dry-run"])).toContain("--skip-lock");
+    });
+
+    it("a real server keeps the lock", () => {
+        expect(build("migrate", ["apply", "--dir", "file://drizzle/migrations"], [])).not.toContain("--skip-lock");
+    });
+
+    it("nothing else gets the flag: `migrate set` and `status` do not take it", () => {
+        expect(managed("migrate", ["set", "20260101000000", "--dir", "file://d"])).not.toContain("--skip-lock");
+        expect(managed("migrate", ["status"])).not.toContain("--skip-lock");
+        expect(managed("schema", ["apply", "--to", "file://s.sql"])).not.toContain("--skip-lock");
+    });
+
+    it("names the invocations that read Atlas's revisions table", () => {
+        expect(readsRevisions("migrate", ["apply", "--dir", "file://d"])).toBe(true);
+        expect(readsRevisions("migrate", ["set", "1", "--dir", "file://d"])).toBe(true);
+        expect(readsRevisions("migrate", ["status"])).toBe(true);
+        expect(readsRevisions("migrate", ["diff", "x", "--dir", "file://d"])).toBe(false);
+        expect(readsRevisions("migrate", ["hash", "--dir", "file://d"])).toBe(false);
+        expect(readsRevisions("schema", ["apply", "--to", "file://s.sql"])).toBe(false);
     });
 });

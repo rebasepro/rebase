@@ -36,6 +36,12 @@ export interface AtlasInvocation {
      * see {@link acceptsExcludeFlag}.
      */
     excludes?: string[];
+    /**
+     * The target is one database session that every connection shares — the
+     * managed development database (PGlite). See {@link buildAtlasArgs} for
+     * what that changes.
+     */
+    singleSession?: boolean;
 }
 
 /**
@@ -70,9 +76,27 @@ export function takesDevUrl(domain: string, args: string[]): boolean {
         || (domain === "migrate" && args.includes("diff"));
 }
 
-/** Assemble the full argv, connection flags and all. */
+/**
+ * Does this Atlas invocation read or write the revisions table
+ * (`rebase.atlas_schema_revisions`)? `migrate apply`, `set` and `status` do;
+ * they are the ones handed `--revisions-schema`.
+ */
+export function readsRevisions(domain: string, args: string[]): boolean {
+    return domain === "migrate" && (args.includes("apply") || args.includes("status") || args.includes("set"));
+}
+
+/**
+ * Assemble the full argv, connection flags and all.
+ *
+ * On a single-session database `migrate apply` skips its advisory lock. The
+ * lock is session-level, and a session every connection shares grants it to
+ * all of them, so it excludes no one; what it does cost there is a connection.
+ * The managed database accepts four and a running `rebase dev` holds two, so
+ * `migrate apply`'s third — its own, the lock's, the revisions table's — was
+ * closed unanswered and Atlas said only `Error: EOF`.
+ */
 export function buildAtlasArgs(invocation: AtlasInvocation): string[] {
-    const { domain, args, url, devUrl, excludes = [] } = invocation;
+    const { domain, args, url, devUrl, excludes = [], singleSession = false } = invocation;
     const argv = [domain, ...args];
 
     if (domain === "schema") {
@@ -84,7 +108,7 @@ export function buildAtlasArgs(invocation: AtlasInvocation): string[] {
     } else if (domain === "migrate") {
         if (args.includes("diff")) {
             argv.push("--dev-url", devUrl);
-        } else if (args.includes("apply") || args.includes("status") || args.includes("set")) {
+        } else if (readsRevisions(domain, args)) {
             argv.push("--url", url, "--revisions-schema", "rebase");
             // Measured against the pinned binary: `sql/migrate: baseline and
             // allow-dirty are mutually exclusive`. `--baseline` is the caller's
@@ -92,6 +116,10 @@ export function buildAtlasArgs(invocation: AtlasInvocation): string[] {
             // default, so it wins, and adding both would refuse the command.
             if (args.includes("apply") && !args.includes("--baseline")) {
                 argv.push("--allow-dirty");
+            }
+            // Only `apply` takes it: `migrate set` and `status` take no lock.
+            if (args.includes("apply") && singleSession) {
+                argv.push("--skip-lock");
             }
         }
     }

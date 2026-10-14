@@ -361,6 +361,9 @@ export function reportCommandFailure(error: unknown): void {
  * terminal, not for a container that has just failed to start.
  * ------------------------------------------------------------------------- */
 
+/** The table Atlas keeps its migration history in, in the `rebase` schema. */
+const ATLAS_REVISIONS_TABLE = "atlas_schema_revisions";
+
 /**
  * `migrate apply` refusing because the database already has the schema.
  *
@@ -381,9 +384,13 @@ export function parseAlreadyProvisioned(text: string): { object: string; code: s
     if (column && /42701/.test(text)) return { object: `${column[2]}.${column[1]}`, code: "42701" };
 
     const withCode = /(?:type|relation|constraint|schema) "([^"]+)" already exists \((42710|42P07|42P06)\)/.exec(text);
+    const bare = /(?:type|relation|constraint|schema) "([^"]+)" already exists/.exec(text);
+    // Atlas's own revisions table is not schema a migration creates: Atlas
+    // failed to set up the history `--baseline` writes into, so a baseline
+    // fails the same way.
+    if ((withCode ?? bare)?.[1] === ATLAS_REVISIONS_TABLE) return null;
     if (withCode) return { object: withCode[1], code: withCode[2] };
     // Some Atlas builds keep the SQLSTATE on a following line instead.
-    const bare = /(?:type|relation|constraint|schema) "([^"]+)" already exists/.exec(text);
     const code = /42P07|42P06|42710/.exec(text)?.[0];
     if (bare && code) return { object: bare[1], code };
     return null;
