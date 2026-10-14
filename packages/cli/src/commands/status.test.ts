@@ -56,8 +56,7 @@ describe("statusDatabase", () => {
 
         expect(resolved.managedDatabase).toBeUndefined();
         expect(resolved.dockerDatabase?.url).toContain("@127.0.0.1:1/rebase");
-        expect(resolved.dockerDatabase?.detail).toContain("Postgres in Docker");
-        expect(resolved.dockerDatabase?.detail).toContain("127.0.0.1:1/rebase");
+        expect(resolved.dockerDatabase?.detail).toContain("Postgres in Docker, as the last `rebase dev --docker` did · 127.0.0.1:1/rebase");
         expect(resolved.dockerDatabase?.detail).toContain("not running");
         // No password in a line people paste into issues.
         expect(resolved.dockerDatabase?.detail).not.toContain("s3cret");

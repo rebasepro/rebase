@@ -203,7 +203,7 @@ export function describeDevDatabase(database: DevDatabase): string {
             break;
         case "docker":
             return database.source === "last-dev"
-                ? "Postgres in Docker (as the last `rebase dev --docker`)"
+                ? "Postgres in Docker, as the last `rebase dev --docker` did"
                 : "Postgres in Docker";
         case "managed":
             return "the managed development database (PGlite)";

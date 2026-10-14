@@ -203,9 +203,10 @@ describe("the database the last `rebase dev` ran on", () => {
         expect(resolveDevDatabase({ lastDevDocker: true, composeUrl: null })).toEqual({ kind: "managed", source: "managed" });
     });
 
-    it("says where the choice came from", () => {
+    it("says where the choice came from, in a sentence", () => {
+        // "(as the last `rebase dev --docker`)" was missing its verb.
         expect(describeDevDatabase({ kind: "docker", source: "last-dev", url: COMPOSE_URL }))
-            .toContain("rebase dev --docker");
+            .toBe("Postgres in Docker, as the last `rebase dev --docker` did");
     });
 });
 
