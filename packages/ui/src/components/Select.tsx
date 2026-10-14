@@ -397,11 +397,14 @@ export const Select = forwardRef<HTMLDivElement, SelectProps>(({
                         </SelectPrimitive.Value>
                     </div>
 
+                    {/* Spaced with a margin, never padding: under border-box,
+                        padding on the svg comes out of its width and draws the
+                        chevron smaller and fainter than the relation field's. */}
                     {chevron && !bare && <SelectPrimitive.Icon asChild>
                         <ChevronDownIcon size={size === "large" ? iconSize.medium : iconSize.small}
-                            className={cls("transition", open ? "rotate-180" : "", {
-                                "px-2": size === "large",
-                                "px-1": size === "medium" || size === "small"
+                            className={cls("shrink-0 transition", open ? "rotate-180" : "", {
+                                "ml-2": size === "large",
+                                "ml-1": size === "medium" || size === "small"
                             })}/>
                     </SelectPrimitive.Icon>}
                 </SelectPrimitive.Trigger>
