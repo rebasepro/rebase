@@ -169,7 +169,7 @@ pelo scaffold), `STORAGE_PUBLIC_READ` ou `STORAGE_ALLOW_ANY_AUTHENTICATED`.
 | Variável | Descrição | Padrão |
 |----------|-------------|---------|
 | `STORAGE_TYPE` | Backend de armazenamento: `local`, `s3` ou `gcs`. Em produção, `local` desativa o armazenamento, a menos que `FORCE_LOCAL_STORAGE=true` | `local` |
-| `STORAGE_PATH` | Caminho base para o armazenamento local | `./uploads` |
+| `STORAGE_PATH` | Caminho base para o armazenamento local. Um caminho relativo é lido a partir do diretório em que o servidor roda: a raiz do projeto com `rebase dev`, `backend/` em um servidor escrito por `rebase eject` | `<project>/uploads` |
 | `FORCE_LOCAL_STORAGE` | Permite armazenamento local em produção — apenas com um volume persistente contendo o `STORAGE_PATH` e os diretórios `<STORAGE_PATH>__<key>` dos buckets locais nomeados ao lado | `false` |
 | `STORAGE_DOWNLOAD_TOKEN_TTL` | Segundos durante os quais a URL de download de um arquivo privado funciona — o token que `getSignedUrl()` insere nela. No máximo `604800` (uma semana) | `300` |
 | `STORAGE_MAX_FILE_SIZE` | Maior tamanho de arquivo que a fonte aceita, em bytes, em todas as rotas de upload — `__<KEY>` para uma fonte nomeada. Um valor que não seja um número inteiro de bytes recusa a inicialização | `52428800` (50 MB) |

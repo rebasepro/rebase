@@ -350,7 +350,7 @@ Uma rota usa um destes códigos quando nenhum outro mais específico se aplica.
 | `CONFLICT` | 409 | Um conflito com o estado existente. | Veja a mensagem. |
 | `INTERNAL_ERROR` | 500 | Algo falhou no servidor. A mensagem é deliberadamente genérica. | Informe o `requestId`; o motivo detalhado está nos logs. |
 | `NOT_CONFIGURED` | 503 | Uma dependência que esta rota requer não está configurada neste servidor. | Veja a mensagem. |
-| `SERVICE_UNAVAILABLE` | 503 | Uma dependência estava inacessível. | Tente novamente; verifique os logs. |
+| `SERVICE_UNAVAILABLE` | 503 | Um serviço de que a requisição depende estava inacessível: um bucket S3 ou MinIO, ou um host que uma função chama com `fetch()` e que recusa a conexão ou não é resolvido. O log do servidor nomeia o host; a resposta não. Um banco de dados inacessível é `DATABASE_UNAVAILABLE`. <span class="since-badge" data-since="0.25">Desde 0.25</span> Uma conexão que falha com tal serviço responde com este código; na 0.24 ela responde um `500` cujo código é o erro do socket (`ECONNREFUSED`), ou `INTERNAL_ERROR`. | Tente novamente; verifique os logs. |
 
 ## Mantendo esta página precisa
 

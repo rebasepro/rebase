@@ -103,6 +103,10 @@ rebase schema introspect
 - <span class="since-badge" data-since="0.25">Desde 0.25</span> Contra um banco de
   dados que não está em execução, imprime o mesmo banner que o `db push` imprime,
   uma vez, e não cria nada. Imprime o diretório de saída como um caminho absoluto
+- <span class="since-badge" data-since="0.25">Desde 0.25</span> Deixa as restrições CHECK e EXCLUDE de uma tabela
+  no banco de dados, onde o `db push` seguinte as mantém. Uma coleção não pode declarar nenhuma
+  das duas; um CHECK que a introspecção consegue ler (`total >= 0`) também passa a ser a
+  `validation` da propriedade. Na 0.24 esse push as removia
 
 **Opções:**
 
@@ -139,9 +143,20 @@ rebase db push
 **O que ele faz:**
 - Lê o esquema Drizzle gerado
 - Aplica as mudanças diretamente ao banco de dados (CREATE, ALTER, DROP)
-- Executa o plano primeiro em modo dry run e para antes de tudo o que destrói dados: uma tabela, coluna, schema, view ou tipo removidos, um `TRUNCATE`, uma mudança de tipo de coluna que pode perder valores (`timestamptz` → `date`, `numeric` → `integer`), ou uma mudança de chave primária: `(id)` → `(id, locale)` dá a cada linha um id novo, de modo que links, chaves estrangeiras e ids guardados em outros lugares deixam de encontrar sua linha. Pergunta em um terminal, onde Ctrl-C ou Ctrl-D responde não, e recusa caso contrário; `--allow-destructive` (ou `--yes`) aplica mesmo assim. Um push que para aí remove, ao sair, o seu banco de dados temporário `<db>_dev_diff`
+- Executa o plano primeiro em modo dry run e para antes de tudo o que destrói dados: uma tabela, coluna, schema, view ou tipo removidos, um `TRUNCATE`, uma mudança de tipo de coluna que pode perder valores (`timestamptz` → `date`, `numeric` → `integer`), ou uma mudança de chave primária: `(id)` → `(id, locale)` dá a cada linha um id novo, de modo que links, chaves estrangeiras e ids guardados em outros lugares deixam de encontrar sua linha. <span class="since-badge" data-since="0.25">Desde 0.25</span> Ele também para antes da remoção de uma restrição CHECK ou EXCLUDE que o banco de dados contém: nenhuma linha é perdida, mas a partir daí o banco de dados aceita linhas que recusava. Pergunta em um terminal, onde Ctrl-C ou Ctrl-D responde não, e recusa caso contrário; `--allow-destructive` (ou `--yes`) aplica mesmo assim. Um push que para aí remove, ao sair, o seu banco de dados temporário `<db>_dev_diff`
 - Ativa a segurança em nível de linha em todas as tabelas de coleção, incluindo as tabelas de junção, logo após a mudança de schema e antes de qualquer etapa que possa falhar, de modo que um push que para no meio deixa uma tabela nova negando todas as requisições em vez de aberta a elas
 - Aplica as políticas RLS das suas coleções e **remove as políticas que um push anterior substituiu**
+- <span class="since-badge" data-since="0.25">Desde 0.25</span> Deixa como estão todas as restrições CHECK e
+  EXCLUDE na tabela de uma coleção. Uma coleção não pode declarar nenhuma das duas, então elas são
+  regras do próprio banco de dados, escritas à mão ou trazidas por um banco de dados que
+  `schema introspect` adotou; para remover uma, exclua-a à mão
+  (`ALTER TABLE … DROP CONSTRAINT …`). Triggers e funções que você escreveu também não são
+  tocados. Na 0.24 o primeiro push depois de uma introspecção removia todas as restrições CHECK e
+  EXCLUDE sem perguntar
+- <span class="since-badge" data-since="0.25">Desde 0.25</span> Reconhece pelo nome exato tudo o que deixa em paz,
+  mesmo que o nome contenha um `.`, `[`, `]` ou `*`. Na 0.24 um índice escrito à mão com nome
+  como `orders_idx[v1]` era removido sem perguntar, e um `.` no nome de uma tabela ou de um índice
+  fazia todo push falhar com `too many parts in pattern`
 - <span class="since-badge" data-since="0.25">Desde 0.25</span> Constrói qualquer
   [índice de chave estrangeira que o Rebase deriva](/docs/backend/indexes#foreign-keys-are-indexed-for-you)
   e que uma tabela existente não tenha, **antes** de planejar, com
@@ -209,7 +224,17 @@ rebase db generate
 - Compara o esquema Drizzle com o estado atual do banco de dados
 - Produz arquivos de migração SQL com carimbo de data/hora em `drizzle/migrations/`
 - Os arquivos podem ser revisados, editados e commitados no controle de versão
-- <span class="since-badge" data-since="0.25">Desde 0.25</span> Nomeia cada instrução da nova migração que destrói dados, usando a verificação que o `db push` executa antes de aplicar: uma tabela, coluna, schema, view ou tipo removido, um `TRUNCATE`, uma mudança de tipo de coluna que pode perder valores, ou uma mudança de chave primária. Ele ainda escreve o arquivo e sai com 0, ou seja, avisa e não recusa.
+- <span class="since-badge" data-since="0.25">Desde 0.25</span> Nomeia cada instrução da nova migração que destrói dados, usando a verificação que o `db push` executa antes de aplicar: uma tabela, coluna, schema, view ou tipo removido, um `TRUNCATE`, uma mudança de tipo de coluna que pode perder valores, uma mudança de chave primária, ou a remoção de uma restrição CHECK ou EXCLUDE que o banco de dados contém. Ele ainda escreve o arquivo e sai com 0, ou seja, avisa e não recusa.
+
+**Um CHECK que uma migração sua adicionou é removido pela seguinte.** `db generate` compara
+seus arquivos de migração, não o banco de dados, e o Atlas não tem como deixar um objeto fora
+dessa comparação. Assim, uma restrição CHECK ou EXCLUDE que você escreveu à mão em uma migração,
+e que nenhuma coleção pode declarar, volta como `ALTER TABLE … DROP CONSTRAINT …` na próxima
+migração que ele escreve, incorporada à mesma instrução da mudança real. O relatório acima
+nomeia essa remoção quando o banco de dados já contém a restrição; ele não a tira do arquivo.
+Apague a cláusula antes de `rebase db migrate`, ou deixe que
+`rebase db migrate --refuse-destructive` pare nela. `db push` lê o banco de dados e mantém a
+restrição.
 
 As migrações geradas são arquivos SQL simples — você pode inspecioná-las e modificá-las antes de aplicá-las.
 
