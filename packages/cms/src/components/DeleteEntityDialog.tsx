@@ -168,11 +168,11 @@ export function DeleteEntityDialog<M extends Record<string, unknown>>({
                 signal: cancelledRef.current,
                 onProgress: (loaded, total) => setProgress(
                     total === undefined
-                        ? (t("selection_reading_rows_unknown", { loaded: loaded.toLocaleString() }) ?? `Reading rows… ${loaded}`)
-                        : (t("selection_reading_rows", {
+                        ? t("selection_reading_rows_unknown", { loaded: loaded.toLocaleString() })
+                        : t("selection_reading_rows", {
                             loaded: loaded.toLocaleString(),
                             total: total.toLocaleString()
-                        }) ?? `Reading rows… ${loaded} of ${total}`)
+                        })
                 )
             });
         } catch (e) {
@@ -217,7 +217,7 @@ export function DeleteEntityDialog<M extends Record<string, unknown>>({
                 (completed, total) => setProgress(t("selection_deleting_progress", {
                     completed: completed.toLocaleString(),
                     total: total.toLocaleString()
-                }) ?? `Deleted ${completed} of ${total}`)
+                }))
             );
         } catch (e) {
             // `mapWithConcurrency` runs every task before it rethrows, so the
@@ -267,19 +267,19 @@ export function DeleteEntityDialog<M extends Record<string, unknown>>({
     let dialogTitle: React.ReactNode;
     if (singleEntity) {
         dialogTitle = variant === "unlink"
-            ? (t("unlink_entity_confirm_title", { entityName }) ?? `Remove this ${entityName} from this record?`)
+            ? t("unlink_entity_confirm_title", { entityName })
             : t("delete_entity_confirm_title", { entityName });
     } else if (variant === "unlink") {
-        dialogTitle = <><b>{collection.name}</b>: {t("confirm_multiple_unlink") ?? "Remove these from this record?"}</>;
+        dialogTitle = <><b>{collection.name}</b>: {t("confirm_multiple_unlink")}</>;
     } else if (selectionCount === undefined) {
         // "Every matching row, and the server has not said how many." Naming a
         // number here would be inventing one for an irreversible action.
-        dialogTitle = t("confirm_delete_selection_unknown") ?? "Delete every row matching the current filter?";
+        dialogTitle = t("confirm_delete_selection_unknown");
     } else {
         dialogTitle = t("confirm_delete_selection", {
             total: selectionCount.toLocaleString(),
             collection: collection.name
-        }) ?? `Delete ${selectionCount.toLocaleString()} ${collection.name}?`;
+        });
     }
 
     return (
@@ -300,8 +300,7 @@ export function DeleteEntityDialog<M extends Record<string, unknown>>({
             <DialogContent fullHeight={true}>
                 {variant === "unlink" && <div className={"px-4 pt-4"}>
                     <Typography variant={"body2"} color={"secondary"}>
-                        {t("unlink_entity_confirm_body", { collectionName: collection.name })
-                            ?? `It stays in ${collection.name} and remains available to other records.`}
+                        {t("unlink_entity_confirm_body", { collectionName: collection.name })}
                     </Typography>
                 </div>}
                 {singleEntity && <div className={"p-4"}>
@@ -312,8 +311,7 @@ export function DeleteEntityDialog<M extends Record<string, unknown>>({
                 </div>}
                 {!singleEntity && variant === "delete" && <div className={"px-4 pt-4"}>
                     <Typography variant={"body2"} color={"secondary"}>
-                        {t("confirm_delete_selection_body")
-                            ?? "This cannot be undone. Each row is deleted individually, so this may take a while."}
+                        {t("confirm_delete_selection_body")}
                     </Typography>
                 </div>}
             </DialogContent>
