@@ -438,6 +438,12 @@ export interface DeclarationDifference {
     /** The exported symbol: a table, an enum, a relations block. */
     name: string;
     kind: "missing" | "unexpected" | "changed";
+    /**
+     * For a `changed` table or enum, what moved inside it, in the reader's
+     * words: `column subtitle is in the file, no longer generated`, `label
+     * "archived" is not in the file`. Absent for anything else.
+     */
+    details?: string[];
 }
 
 /**
@@ -497,8 +503,12 @@ export function compareGeneratedDeclarations(expected: string, actual: string): 
     const have = declarations(actual);
     const differences: DeclarationDifference[] = [];
     for (const [name, body] of want) {
-        if (!have.has(name)) differences.push({ name, kind: "missing" });
-        else if (have.get(name) !== body) differences.push({ name, kind: "changed" });
+        const onDisk = have.get(name);
+        if (onDisk === undefined) differences.push({ name, kind: "missing" });
+        else if (onDisk !== body) {
+            const details = changesWithin(body, onDisk);
+            differences.push(details.length > 0 ? { name, kind: "changed", details } : { name, kind: "changed" });
+        }
     }
     for (const name of have.keys()) {
         if (!want.has(name)) differences.push({ name, kind: "unexpected" });
@@ -506,12 +516,103 @@ export function compareGeneratedDeclarations(expected: string, actual: string): 
     return differences;
 }
 
-/** The differences, as the line a developer reads in `rebase doctor`. */
+/**
+ * The entries between the bracket at `from` and the one that closes it — a
+ * column object's columns, an enum's labels — split at their top-level commas.
+ * Strings, template literals and nested brackets are stepped over, so
+ * `.references((): AnyPgColumn => authors.id, { onDelete: "set null" })` stays
+ * one entry. Null when the bracket is never closed.
+ */
+function topLevelEntries(text: string, from: number): string[] | null {
+    const entries: string[] = [];
+    let depth = 0;
+    let start = from + 1;
+    let quote: string | null = null;
+    for (let index = from; index < text.length; index++) {
+        const char = text[index];
+        if (quote) {
+            if (char === "\\") index++;
+            else if (char === quote) quote = null;
+            continue;
+        }
+        if (char === "\"" || char === "'" || char === "`") quote = char;
+        else if (char === "(" || char === "[" || char === "{") depth++;
+        else if (char === ")" || char === "]" || char === "}") {
+            depth--;
+            if (depth === 0) {
+                const last = text.slice(start, index).trim();
+                if (last) entries.push(last);
+                return entries;
+            }
+        } else if (char === "," && depth === 1) {
+            entries.push(text.slice(start, index).trim());
+            start = index + 1;
+        }
+    }
+    return null;
+}
+
+/** A table declaration's columns, by database name, each with its declaration. */
+function tableColumns(body: string): Map<string, string> | null {
+    const table = /^(?:pgTable|[\w$]+\.table)\(\s*["'][^"']+["']\s*,\s*/.exec(body);
+    if (!table || body[table[0].length] !== "{") return null;
+    const entries = topLevelEntries(body, table[0].length);
+    if (!entries) return null;
+    const columns = new Map<string, string>();
+    for (const entry of entries) {
+        // `authorId: integer("author_id")…`: the string argument is the column.
+        const column = /^[^:]+:\s*[\w$.]+\(\s*["']([^"']+)["']/.exec(entry);
+        if (column) columns.set(column[1], entry.slice(entry.indexOf(":") + 1).trim());
+    }
+    return columns;
+}
+
+/** An enum declaration's labels, in order. */
+function enumLabels(body: string): string[] | null {
+    const declaration = /^(?:pgEnum|[\w$]+\.enum)\(\s*["'][^"']+["']\s*,\s*/.exec(body);
+    if (!declaration || body[declaration[0].length] !== "[") return null;
+    const entries = topLevelEntries(body, declaration[0].length);
+    return entries ? entries.map(entry => entry.replace(/^["']|["']$/g, "")) : null;
+}
+
+/**
+ * What moved inside one table or enum, for the message only. Whether a file is
+ * stale is still the declaration comparison above; this reads the rendered
+ * text just far enough to name the column or label, and names nothing for a
+ * declaration of any other shape.
+ */
+function changesWithin(expected: string, actual: string): string[] {
+    const wantedLabels = enumLabels(expected);
+    const labelsOnDisk = enumLabels(actual);
+    if (wantedLabels && labelsOnDisk) {
+        const changes = [
+            ...wantedLabels.filter(label => !labelsOnDisk.includes(label)).map(label => `label "${label}" is not in the file`),
+            ...labelsOnDisk.filter(label => !wantedLabels.includes(label)).map(label => `label "${label}" is in the file, no longer generated`)
+        ];
+        return changes.length > 0 ? changes : ["its labels are in another order"];
+    }
+
+    const wantedColumns = tableColumns(expected);
+    const columnsOnDisk = tableColumns(actual);
+    if (!wantedColumns || !columnsOnDisk) return [];
+    const changes: string[] = [];
+    for (const [column, declaration] of wantedColumns) {
+        const onDisk = columnsOnDisk.get(column);
+        if (onDisk === undefined) changes.push(`column ${column} is not in the file`);
+        else if (onDisk !== declaration) changes.push(`column ${column} differs`);
+    }
+    for (const column of columnsOnDisk.keys()) {
+        if (!wantedColumns.has(column)) changes.push(`column ${column} is in the file, no longer generated`);
+    }
+    return changes.length > 0 ? changes : ["its indexes, constraints or policies differ"];
+}
+
+/** The differences, as the line a developer reads in `rebase doctor` and `rebase schema stale`. */
 export function describeDeclarationDifferences(differences: DeclarationDifference[]): string {
     const shown = differences.slice(0, 5).map(difference => {
         if (difference.kind === "missing") return `${difference.name} (not in the file)`;
         if (difference.kind === "unexpected") return `${difference.name} (in the file, no longer generated)`;
-        return `${difference.name} (differs)`;
+        return `${difference.name} (${difference.details?.join("; ") ?? "differs"})`;
     });
     const rest = differences.length - shown.length;
     return shown.join(", ") + (rest > 0 ? `, and ${rest} more` : "");

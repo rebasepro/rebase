@@ -22,7 +22,11 @@
  */
 import { CollectionConfig } from "@rebasepro/types";
 import { generateForeignKeyName, legacyForeignKeyName } from "@rebasepro/utils";
-import { staleVerdict } from "../src/schema/generated-schema-staleness";
+import {
+    compareGeneratedDeclarations,
+    describeDeclarationDifferences,
+    staleVerdict
+} from "../src/schema/generated-schema-staleness";
 
 import { findLegacyForeignKeyNames, findMissingGeneratedNames } from "../src/schema/generated-schema-staleness";
 
@@ -388,5 +392,69 @@ describe("the verdict schema stale prints", () => {
         expect(verdict.regenerate).toBe(true);
         expect(verdict.exitCode).toBe(0);
         expect(verdict.lines.join("\n")).toContain("Regenerating");
+    });
+});
+
+/**
+ * What `schema stale` and `rebase doctor` name about a declaration that moved.
+ *
+ * A removed column read `Differs in: posts (differs)`, while cli/schema.md says
+ * the command names each difference — a missing table, a retyped column, a
+ * dropped enum label. So a changed table names its columns, and a changed enum
+ * its labels.
+ */
+describe("the differences schema stale names", () => {
+    const table = (columns: string): string => `export const posts = pgTable("posts", {
+    ${columns}
+}, (table) => ([
+    index("posts_author_id_ix_00ad191").on(table.authorId.asc().nullsLast()),
+    pgPolicy("posts_select_841c287", { as: "permissive", for: "select", to: ["public"], using: sql\`true\` }),
+])).enableRLS();
+`;
+    const columns = [
+        "id: integer(\"id\").generatedByDefaultAsIdentity().primaryKey()",
+        "title: text(\"title\").notNull()",
+        "authorId: integer(\"author_id\").references((): AnyPgColumn => authors.id, { onDelete: \"set null\" })"
+    ];
+    const generated = table(columns.join(",\n    "));
+    const said = (expected: string, actual: string): string =>
+        describeDeclarationDifferences(compareGeneratedDeclarations(expected, actual));
+
+    it("names a column the collections no longer have", () => {
+        const onDisk = table([...columns, "subtitle: text(\"subtitle\")"].join(",\n    "));
+
+        expect(said(generated, onDisk)).toBe("posts (column subtitle is in the file, no longer generated)");
+    });
+
+    it("names a column the file lacks, and one that is declared differently", () => {
+        const onDisk = table([columns[0], "title: varchar(\"title\", { length: 200 }).notNull()"].join(",\n    "));
+
+        expect(said(generated, onDisk)).toBe("posts (column title differs; column author_id is not in the file)");
+    });
+
+    it("says it is the rest of the table when every column matches", () => {
+        const onDisk = generated.replace("using: sql`true`", "using: sql`false`");
+
+        expect(said(generated, onDisk)).toBe("posts (its indexes, constraints or policies differ)");
+    });
+
+    it("names an enum label that came off, and one that is new", () => {
+        const expected = "export const postsStatus = pgEnum(\"posts_status\", [\"draft\", \"published\", \"archived\"]);\n";
+        const onDisk = "export const postsStatus = pgEnum(\"posts_status\", [\"draft\", \"review\", \"published\"]);\n";
+
+        expect(said(expected, onDisk)).toBe(
+            "postsStatus (label \"archived\" is not in the file; label \"review\" is in the file, no longer generated)"
+        );
+    });
+
+    it("still names a table that is missing or left over as a whole", () => {
+        expect(said(generated, "")).toBe("posts (not in the file)");
+        expect(said("", generated)).toBe("posts (in the file, no longer generated)");
+    });
+
+    it("never calls a file that only differs in whitespace and comments stale", () => {
+        const reformatted = generated.replace(/\n {4}/g, "\n        ").replace("}, (table)", "}, // the renderer's note\n(table)");
+
+        expect(compareGeneratedDeclarations(generated, reformatted)).toEqual([]);
     });
 });
