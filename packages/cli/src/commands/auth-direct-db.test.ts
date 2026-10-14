@@ -131,6 +131,52 @@ describe("the direct-database reset", () => {
         expect(said).not.toContain("{");
     });
 
+    /**
+     * The API path sends the project's service key — the `admin` role, every
+     * scope — to the address it finds. It took `.rebase/state.json`'s `baseUrl`
+     * without asking whether the backend that wrote it was still running, and
+     * then `.rebase-dev-url`, which a killed `rebase dev` leaves behind: the key
+     * went to whatever had taken that port since. It asks
+     * `resolveBackendAddress` now, as `api-keys` and `storage` do.
+     */
+    it("sends the service key nowhere when the backend that recorded its address has stopped", async () => {
+        const exited = spawnSync(process.execPath, ["-e", ""]);
+        fs.mkdirSync(path.join(state.root, ".rebase"));
+        fs.writeFileSync(path.join(state.root, ".rebase", "state.json"),
+            JSON.stringify({ baseUrl: "http://127.0.0.1:1", port: 1, pid: exited.pid }));
+        fs.writeFileSync(path.join(state.root, ".rebase-dev-url"), "http://127.0.0.1:2");
+        process.env.REBASE_SERVICE_KEY = "service-key-that-is-long-enough-0123456789";
+        const fetchMock = vi.fn(async () => new Response("{}", { status: 200 }));
+        vi.stubGlobal("fetch", fetchMock);
+        try {
+            await authCommand("reset-password", ["node", "rebase", "auth", "reset-password", "admin@example.com", "N3w-Passw0rd!"]);
+        } finally {
+            vi.unstubAllGlobals();
+        }
+
+        expect(fetchMock).not.toHaveBeenCalled();
+        expect(state.spawned).toHaveLength(1);
+    });
+
+    it("sends it to the backend that recorded its address while that backend runs", async () => {
+        fs.mkdirSync(path.join(state.root, ".rebase"));
+        fs.writeFileSync(path.join(state.root, ".rebase", "state.json"),
+            JSON.stringify({ baseUrl: "http://127.0.0.1:1", port: 1, pid: process.pid }));
+        process.env.REBASE_SERVICE_KEY = "service-key-that-is-long-enough-0123456789";
+        const fetchMock = vi.fn(async (url: string) => String(url).includes("/reset-password")
+            ? new Response("{}", { status: 200 })
+            : new Response(JSON.stringify({ users: [{ uid: "u1", email: "admin@example.com" }] }), { status: 200 }));
+        vi.stubGlobal("fetch", fetchMock);
+        try {
+            await authCommand("reset-password", ["node", "rebase", "auth", "reset-password", "admin@example.com", "N3w-Passw0rd!"]);
+        } finally {
+            vi.unstubAllGlobals();
+        }
+
+        expect(String(fetchMock.mock.calls[0]?.[0])).toMatch(/^http:\/\/127\.0\.0\.1:1\/api\/admin\/users/);
+        expect(state.spawned).toHaveLength(0);
+    });
+
     it("labels a generated password the way the API path does", () => {
         expect(resetPasswordScript(true)).toContain('console.log("   Password: " + newPassword);');
     });

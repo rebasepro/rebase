@@ -25,6 +25,7 @@ class ApiAnswered extends Error {}
 /** Everything the switch below dispatches, for the did-you-mean. */
 export const AUTH_SUBCOMMANDS = ["reset-password"] as const;
 import { parseCommandArgs, wantsHelp } from "../utils/args";
+import { resolveBackendAddress } from "./api-keys";
 
 /** A user as the admin API returns it, reduced to what this command needs. */
 export interface ResolvedUser {
@@ -214,34 +215,27 @@ async function resetPassword(rawArgs: string[]): Promise<void> {
     const envFile = findEnvFile(projectRoot);
     const envServiceKey: string | undefined = readEnvFile(projectRoot).REBASE_SERVICE_KEY;
 
-    let baseUrl = process.env.REBASE_BASE_URL;
     let serviceKey = process.env.REBASE_SERVICE_KEY || envServiceKey;
 
     const statePath = path.join(projectRoot, ".rebase", "state.json");
     if (fs.existsSync(statePath)) {
         try {
             const state = JSON.parse(fs.readFileSync(statePath, "utf8")) as Record<string, unknown>;
-            if (state && typeof state === "object") {
-                if (typeof state.baseUrl === "string" && !baseUrl) {
-                    baseUrl = state.baseUrl;
-                }
-                if (typeof state.serviceKey === "string" && !serviceKey) {
-                    serviceKey = state.serviceKey;
-                }
+            if (state && typeof state === "object" && typeof state.serviceKey === "string" && !serviceKey) {
+                serviceKey = state.serviceKey;
             }
         } catch {
             // Ignore
         }
     }
 
-    const devUrlPath = path.join(projectRoot, ".rebase-dev-url");
-    if (fs.existsSync(devUrlPath) && !baseUrl) {
-        try {
-            baseUrl = fs.readFileSync(devUrlPath, "utf8").trim();
-        } catch {
-            // Ignore
-        }
-    }
+    // Where the service key may go: a REBASE_BASE_URL the developer named, or
+    // this project's backend while the pid that recorded it is alive — see
+    // `resolveBackendAddress`. `.rebase/state.json`'s address on its own, and
+    // `.rebase-dev-url`, outlive a killed `rebase dev`, and the port they name
+    // may be another server's by now. With neither, the reset goes to the
+    // database directly.
+    const baseUrl = resolveBackendAddress(readEnvFile(projectRoot), projectRoot).url;
 
     if (baseUrl && serviceKey) {
         console.log("Trying API-first reset via running backend...");
