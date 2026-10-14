@@ -621,9 +621,9 @@ export function declaredErrorAnswer(error: unknown): DeclaredErrorAnswer | undef
  * the request id — which only one of them printed reliably — and the pair cost
  * twice the volume for less than one line's worth of meaning.
  */
-function handOffToRequestLog(c: Context<HonoEnv>, code: string, message: string): void {
+function handOffToRequestLog(c: Context<HonoEnv>, code: string, message: string, expected = false): void {
     if (typeof c.set !== "function") return;
-    c.set("errorSummary", { code, message });
+    c.set("errorSummary", { code, message, expected });
 }
 
 /**
@@ -669,7 +669,7 @@ export const errorHandler: ErrorHandler<HonoEnv> = (err, c) => {
         // Operational errors — log at warn, unless the error declares itself a
         // routine outcome (see ApiError.expected), which would otherwise put a
         // warning in the log for every anonymous page view.
-        handOffToRequestLog(c, answer.code, answer.message);
+        handOffToRequestLog(c, answer.code, answer.message, answer.expected);
         if (answer.code === "DATABASE_UNAVAILABLE") c.header("Retry-After", String(DATABASE_RETRY_AFTER_SECONDS));
         if (!requestWillBeLogged(c)) {
             const line = `[API] ${c.req.method} ${c.req.path} → ${answer.status} ${answer.code}: ${answer.message}` +

@@ -81,6 +81,29 @@ describe("a failed request logs once", () => {
         expect(lines.map(line => line.message).join("\n")).toContain("[API]");
     });
 
+    it("writes an expected refusal at info, and an incident at warn", async () => {
+        // A browser that holds no session asks POST /auth/refresh on every
+        // load and is told NO_SESSION: a routine answer, which the handler
+        // already logs at debug when it writes its own line. The request line
+        // has to agree, or every anonymous page view is a WARN in the log.
+        const lines = capture();
+
+        const app = new Hono<HonoEnv>();
+        app.onError(errorHandler);
+        app.use("/*", requestLogger({ skip: [] }));
+        app.post("/auth/refresh", () => { throw ApiError.unauthenticated("No refresh token presented", "NO_SESSION"); });
+        app.get("/orders/1", () => { throw ApiError.forbidden("Not your order", "WRITE_DENIED"); });
+
+        await app.request("/auth/refresh", { method: "POST" });
+        await app.request("/orders/1");
+
+        const requests = lines.filter(line => line.message === "request");
+        expect(requests.map(line => [line.level, line.data?.errorCode])).toEqual([
+            ["info", "NO_SESSION"],
+            ["warn", "WRITE_DENIED"]
+        ]);
+    });
+
     it("keeps a successful request to one line as well", async () => {
         const lines = capture();
 

@@ -97,9 +97,13 @@ export function requestLogger(options?: RequestLoggerOptions): MiddlewareHandler
             data.errorMessage = errorSummary.message;
         }
 
+        // A 4xx the handler marked expected (see ApiError.expected) is a
+        // routine answer, such as NO_SESSION to a browser that holds no
+        // session, and is logged like a success. Anything else at 4xx still
+        // says something about the server and stays at warn.
         if (status >= 500) {
             log.error("request", data);
-        } else if (status >= 400) {
+        } else if (status >= 400 && !errorSummary?.expected) {
             log.warn("request", data);
         } else {
             log.info("request", data);

@@ -80,7 +80,7 @@ export type HonoEnv = {
          * leaves what it knows here and stays quiet where the logger will
          * speak. See `utils/request-logger.ts`.
          */
-        errorSummary?: { code: string; message: string };
+        errorSummary?: { code: string; message: string; expected?: boolean };
         /**
          * Set by `requestLogger` before the handler runs, so the error handler
          * can tell whether one line per request is already guaranteed.
