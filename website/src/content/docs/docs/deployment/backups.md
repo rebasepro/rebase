@@ -103,6 +103,10 @@ it does not.
 So
 `rebase db backup` refuses an `--exclude-schema` that matches `rebase`, by
 pg_dump's own pattern rules (`reb*` and `*` included), before it runs anything.
+Those rules pass regular-expression syntax through outside double quotes, so
+`[r]ebase` and `audit|rebase` are refused too, and the server is asked about
+each pattern before `pg_dump` runs, in the same regular-expression engine
+`pg_dump`'s own query uses.
 On 0.24 it wrote the dump and validated it, and only the restore failed.
 
 Because it holds

@@ -192,40 +192,110 @@ export function parseBackupLine(rawArgs: string[]) {
         );
     }
     const dropsRebase = (args["--exclude-schema"] ?? []).find(excludesRebaseSchema);
-    if (dropsRebase !== undefined) {
-        throw new Error(
-            `--exclude-schema ${dropsRebase} leaves out the rebase schema, and a backup without it cannot be restored: ` +
-            "it holds the users, roles and the functions every policy calls. Nothing was run."
-        );
-    }
+    if (dropsRebase !== undefined) throw new Error(excludesRebaseMessage(dropsRebase));
     return args;
 }
 
 /**
- * Whether a `pg_dump --exclude-schema` pattern matches the `rebase` schema, by
- * pg_dump's own rules: `*` and `?` are wildcards, an unquoted name is folded
- * to lower case and a double-quoted one is taken as written, and a
- * `<database>.<schema>` pattern is matched on its schema.
+ * A `pg_dump --exclude-schema` pattern as the regular expression pg_dump
+ * hands the server, by pg_dump's own rules (`patternToSQLRegex` in
+ * PostgreSQL's `fe_utils/string_utils.c`):
+ *
+ * - outside double quotes, an upper-case letter is folded to lower case, `*`
+ *   is `.*`, `?` is `.`, and every other character, regular-expression syntax
+ *   included (`[r]`, `(a|b)`, `+`), passes through as it is;
+ * - inside double quotes, case is kept and every special character is
+ *   matched literally; `""` is one quote;
+ * - `$` is always literal, and `[]` is always the two characters;
+ * - an unquoted `.` separates a database from the schema, so `shop.rebase`
+ *   is matched on `rebase`.
+ *
+ * The result is anchored, as pg_dump anchors it: `^(…)$`.
  */
-export function excludesRebaseSchema(pattern: string): boolean {
-    let source = "";
-    let quoted = false;
-    for (const char of pattern) {
+export function schemaPatternRegex(pattern: string): string {
+    let regex = "";
+    let inQuotes = false;
+    for (let index = 0; index < pattern.length; index += 1) {
+        const char = pattern[index];
         if (char === "\"") {
-            quoted = !quoted;
-        } else if (char === "." && !quoted) {
+            if (inQuotes && pattern[index + 1] === "\"") {
+                regex += "\"";
+                index += 1;
+            } else {
+                inQuotes = !inQuotes;
+            }
+        } else if (!inQuotes && char >= "A" && char <= "Z") {
+            regex += char.toLowerCase();
+        } else if (!inQuotes && char === "*") {
+            regex += ".*";
+        } else if (!inQuotes && char === "?") {
+            regex += ".";
+        } else if (!inQuotes && char === ".") {
             // What came before was the database: the schema is what follows.
-            source = "";
-        } else if (char === "*" && !quoted) {
-            source += ".*";
-        } else if (char === "?" && !quoted) {
-            source += ".";
+            regex = "";
+        } else if (char === "$") {
+            regex += "\\$";
+        } else if (inQuotes && "|*+?()[]{}.^$\\".includes(char)) {
+            regex += `\\${char}`;
+        } else if (char === "[" && pattern[index + 1] === "]") {
+            regex += "\\[";
         } else {
-            const literal = quoted ? char : char.toLowerCase();
-            source += literal.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+            regex += char;
         }
     }
-    return new RegExp(`^(?:${source})$`).test("rebase");
+    return `^(${regex})$`;
+}
+
+/**
+ * Whether a `pg_dump --exclude-schema` pattern matches the `rebase` schema, by
+ * pg_dump's own rules (see {@link schemaPatternRegex}).
+ *
+ * Evaluated here with JavaScript's regular expressions, which read the syntax
+ * people write in a pattern (`[r]ebase`, `(rebase|x)`, `reb.+`) as the
+ * server does. The server's engine has syntax JavaScript reads otherwise
+ * (`[[:alpha:]]`, `\m`), so `db backup` asks the server too before it dumps
+ * (see `backupCommand`); this check is the one that answers before anything
+ * connects. A pattern JavaScript cannot compile is left to that one.
+ */
+export function excludesRebaseSchema(pattern: string): boolean {
+    try {
+        return new RegExp(schemaPatternRegex(pattern)).test("rebase");
+    } catch {
+        return false;
+    }
+}
+
+/**
+ * Whether the server's regular-expression engine matches `name` with `regex`,
+ * the way pg_dump's own query matches a schema pattern
+ * (`nspname OPERATOR(pg_catalog.~) '^(…)$' COLLATE pg_catalog.default`).
+ *
+ * A regex the server will not compile matches nothing here; pg_dump then
+ * refuses it in its own words.
+ */
+async function serverRegexMatches(connectionString: string, regex: string, name: string): Promise<boolean> {
+    const { Client } = await import("pg");
+    const client = new Client({ connectionString });
+    await client.connect();
+    try {
+        const { rows } = await client.query<{ matches: boolean }>(
+            "SELECT $1::text OPERATOR(pg_catalog.~) $2::text COLLATE pg_catalog.default AS matches",
+            [name, regex]
+        );
+        return rows[0]?.matches === true;
+    } catch (err) {
+        // 2201B: invalid_regular_expression.
+        if (err instanceof Error && "code" in err && err.code === "2201B") return false;
+        throw err;
+    } finally {
+        await client.end();
+    }
+}
+
+/** The refusal for a pattern that leaves out the rebase schema. */
+function excludesRebaseMessage(pattern: string): string {
+    return `--exclude-schema ${pattern} leaves out the rebase schema, and a backup without it cannot be restored: ` +
+        "it holds the users, roles and the functions every policy calls. Nothing was run.";
 }
 
 export async function backupCommand(rawArgs: string[]): Promise<void> {
@@ -250,6 +320,17 @@ export async function backupCommand(rawArgs: string[]): Promise<void> {
     // host, the port and what to start — before pg_dump's version probe meets
     // it as a bare `connect ECONNREFUSED`.
     await checkDatabaseConnectivity(connectionString);
+
+    // The server's word on each pattern, in the engine pg_dump's own query
+    // runs it in. `parseBackupLine` has answered for the syntax JavaScript
+    // reads the same way; this catches the rest (`[[:alpha:]]+`, `\mrebase`)
+    // before pg_dump writes a dump that cannot be restored.
+    for (const pattern of args["--exclude-schema"] ?? []) {
+        if (await serverRegexMatches(connectionString, schemaPatternRegex(pattern), "rebase")) {
+            outError(chalk.red(`  ✗ ${excludesRebaseMessage(pattern)}`));
+            process.exit(1);
+        }
+    }
 
     // Version pre-flight (doctor-style).
     const pf = await preflight("pg_dump", connectionString);

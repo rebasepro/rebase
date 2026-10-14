@@ -148,6 +148,22 @@ describe("rebase db restore", () => {
         expect(await postsIn("rebase")).toBe(2);
     }, 120_000);
 
+    // pg_dump hands the server a regular expression, and the server's engine
+    // reads syntax JavaScript reads otherwise. These two match `rebase` on the
+    // server and not in JavaScript, so the check before connecting lets them
+    // through and the server's answer has to stop them.
+    it.each(["[[:alpha:]]+", "\\mrebase"])("refuses a backup whose --exclude-schema %s leaves out rebase on the server's reading", async (pattern) => {
+        const out = fs.mkdtempSync(path.join(os.tmpdir(), "rebase-exclude-e2e-"));
+
+        const backup = await cli(["db", "backup", "--out", out, "--exclude-schema", pattern]);
+        const said = backup.all ?? "";
+
+        expect(backup.exitCode, said).toBe(1);
+        expect(said).toContain(`--exclude-schema ${pattern} leaves out the rebase schema`);
+        expect(said).toContain("Nothing was run.");
+        expect(fs.readdirSync(out).filter(name => name.endsWith(".dump"))).toEqual([]);
+    }, 120_000);
+
     it("with no terminal and no --yes, refuses and says to pass --yes", async () => {
         const restored = await cli(["db", "restore", dumpFile, "--create-db", "--target-db", "restored_untyped"]);
         const said = restored.all ?? "";

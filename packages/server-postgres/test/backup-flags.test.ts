@@ -8,7 +8,14 @@
  * it, and with `--clean` on the line nothing would have. `db backup --ot ../x`
  * wrote to the default directory. Every other `db` subcommand already refused.
  */
-import { confirmRestore, parseBackupLine, parseRestoreLine, unknownBackupsAction } from "../src/backup/backup-cli";
+import {
+    confirmRestore,
+    excludesRebaseSchema,
+    parseBackupLine,
+    parseRestoreLine,
+    schemaPatternRegex,
+    unknownBackupsAction
+} from "../src/backup/backup-cli";
 import { parseCommandFlags } from "../src/cli-flags";
 
 // The backup module runs pg_dump through execa, which is ESM-only and which
@@ -96,6 +103,43 @@ describe("db backup", () => {
         for (const pattern of ["audit", "rebase_archive", "\"Rebase\"", "x.audit"]) {
             expect(parseBackupLine(["db", "backup", "--exclude-schema", pattern])["--exclude-schema"]).toEqual([pattern]);
         }
+    });
+
+    // pg_dump passes regular-expression syntax through outside quotes, so
+    // `[r]ebase` matched `rebase` and wrote a 41 KB dump without it, past a
+    // guard that knew only `*` and `?`. (An unquoted `.` is not one of them:
+    // it separates a database from the schema.)
+    it.each([
+        "[r]ebase", "[a-z]ebase", "r[e]base", "[R]ebase", "(rebase)", "rebase|audit", "audit|rebase",
+        "r+ebase", "reb[a-z]se", "re[a-z]{2}se", "\\w+", "[^x]ebase", "\"re\"base", "Re\"base\"", "re(b|x)ase",
+        "shop.[r]ebase"
+    ])("refuses the regular-expression spelling %s", (pattern) => {
+        expect(excludesRebaseSchema(pattern)).toBe(true);
+        expect(() => parseBackupLine(["db", "backup", "--exclude-schema", pattern])).toThrow(/leaves out the rebase schema/);
+    });
+
+    it.each([
+        "\"rebase*\"", "\"[r]ebase\"", "\"(rebase)\"", "\"REBASE\"", "rebase$", "rebase[]", "[x]ebase", "reb\\.se"
+    ])("leaves %s, which pg_dump does not match to rebase, alone", (pattern) => {
+        expect(excludesRebaseSchema(pattern)).toBe(false);
+    });
+});
+
+describe("schemaPatternRegex", () => {
+    it.each([
+        ["rebase", "^(rebase)$"],
+        ["REBASE", "^(rebase)$"],
+        ["reb*", "^(reb.*)$"],
+        ["re?ase", "^(re.ase)$"],
+        ["\"Re*\"", "^(Re\\*)$"],
+        ["\"a\"\"b\"", "^(a\"b)$"],
+        ["my$schema", "^(my\\$schema)$"],
+        ["int[]", "^(int\\[])$"],
+        ["[r]ebase", "^([r]ebase)$"],
+        ["shop.rebase", "^(rebase)$"],
+        ["\"a.b\"", "^(a\\.b)$"]
+    ])("turns %s into %s, as pg_dump does", (pattern, regex) => {
+        expect(schemaPatternRegex(pattern)).toBe(regex);
     });
 });
 
