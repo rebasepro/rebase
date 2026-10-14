@@ -1618,6 +1618,7 @@ export const hi: RebaseTranslations = {
     copy_column_name: "कॉलम का नाम कॉपी करें",
     generate_sql_templates: "SQL टेम्पलेट बनाएं",
     select_row: "{{id}} चुनें",
+    relation_open_record: "{{label}} खोलें",
     select: "चुनें",
     open_view: "व्यू खोलें"
 };

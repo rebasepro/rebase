@@ -1626,6 +1626,7 @@ export const es: RebaseTranslations = {
     copy_column_name: "Copiar nombre de la columna",
     generate_sql_templates: "Generar plantillas SQL",
     select_row: "Seleccionar {{id}}",
+    relation_open_record: "Abrir {{label}}",
     select: "Seleccionar",
     open_view: "Abrir vista"
 };

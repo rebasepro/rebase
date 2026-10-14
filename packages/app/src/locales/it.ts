@@ -1618,6 +1618,7 @@ export const it: RebaseTranslations = {
     copy_column_name: "Copia nome colonna",
     generate_sql_templates: "Genera modelli SQL",
     select_row: "Seleziona {{id}}",
+    relation_open_record: "Apri {{label}}",
     select: "Seleziona",
     open_view: "Apri vista"
 };

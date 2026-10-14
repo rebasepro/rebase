@@ -1618,6 +1618,7 @@ export const de: RebaseTranslations = {
     copy_column_name: "Spaltennamen kopieren",
     generate_sql_templates: "SQL-Vorlagen erzeugen",
     select_row: "{{id}} auswählen",
+    relation_open_record: "{{label}} öffnen",
     select: "Auswählen",
     open_view: "Ansicht öffnen"
 };

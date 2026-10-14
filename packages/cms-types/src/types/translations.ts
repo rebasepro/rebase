@@ -1745,6 +1745,7 @@ export interface RebaseTranslations {
     copy_column_name?: string;
     generate_sql_templates?: string;
     select_row?: string;
+    relation_open_record?: string;
     select?: string;
     open_view?: string;
 }
