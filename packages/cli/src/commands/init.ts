@@ -311,12 +311,14 @@ ${chalk.bold("Usage")}
 ${chalk.bold("Options")}
   ${chalk.blue("-t, --template")} ${chalk.gray("<preset>")}   blog | ecommerce | blank ${chalk.gray("(default: blog)")}
   ${chalk.blue("--headless")}                Backend only — no admin panel, no collections
-  ${chalk.blue("-y, --yes")}                 Never prompt ${chalk.gray("(required for CI / non-TTY)")}
-                            ${chalk.gray("Skips git init and dependency install — the interactive")}
-                            ${chalk.gray("defaults say yes to both. Pass --git / --install for those.")}
-  ${chalk.blue("-i, --install")}             Install dependencies after scaffolding
-  ${chalk.blue("--no-install")}              Scaffold only, install nothing ${chalk.gray("(the default)")}
-  ${chalk.blue("-g, --git")}                 Initialize a git repository and make an initial commit
+  ${chalk.blue("-y, --yes")}                 Never prompt ${chalk.gray("(required for CI / non-TTY)")}: take every default,
+                            ${chalk.gray("except that git init and the install are skipped unless")}
+                            ${chalk.gray("--git / --install is passed")}
+  ${chalk.blue("-i, --install")}             Install dependencies after scaffolding.
+                            ${chalk.gray("Without it, init asks (default yes); under --yes, no install")}
+  ${chalk.blue("--no-install")}              Install nothing, and do not ask
+  ${chalk.blue("-g, --git")}                 Initialize a git repository and make an initial commit.
+                            ${chalk.gray("Without it, init asks (default yes); under --yes, no repository")}
   ${chalk.blue("--database-url")} ${chalk.gray("<url>")}      Use an existing database instead of the generated one
   ${chalk.blue("--introspect")}              Generate collections from that database ${chalk.gray("(implies --template blank; needs --install)")}
   ${chalk.blue("--project")} ${chalk.gray("<slug>")}          Link the scaffold to a Rebase Cloud project

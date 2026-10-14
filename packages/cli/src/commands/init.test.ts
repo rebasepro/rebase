@@ -12,6 +12,7 @@ import { cp } from "fs/promises";
 import inquirer from "inquirer";
 import net from "net";
 import ts from "typescript";
+import { stripVTControlCharacters } from "util";
 import { chooseComposeDbPort, composeDbPortStart, configureEnvFile, buildInitQuestions, validateProjectName, formatCdTarget, printInitHelp, resolveRuntimeImageTag, isPortAvailable, TEMPLATE_PLACEHOLDER_FILES, INIT_FLAGS, scaffoldDirectoryConflicts, scaffoldConflictMessage, initGitRepository, SCAFFOLD_TOLERATED_ENTRIES, agentNextSteps, shippedSchemaPath } from "./init.js";
 import { getPMCommands } from "../utils/package-manager.js";
 import { execFileSync } from "child_process";
@@ -1724,6 +1725,28 @@ describe("init --help", () => {
 
     it("says --template does nothing for the baas flavor", () => {
         expect(helpText()).toContain("--template has no effect");
+    });
+
+    /**
+     * The help called `--no-install` "the default" one line below saying the
+     * interactive defaults install. Each is the default in one mode: the prompt
+     * asks with yes pre-selected, and `--yes` installs nothing.
+     */
+    it("says what each mode does about the install and git, calling neither flag the default", () => {
+        const lines = stripVTControlCharacters(helpText()).split("\n");
+        const entry = (flag: string): string => {
+            const start = lines.findIndex(line => line.trimStart().startsWith(flag));
+            expect(start, flag).toBeGreaterThan(-1);
+            const rest = lines.slice(start + 1);
+            const end = rest.findIndex(line => /^\s{2}\S/.test(line) && !/^\s{20,}/.test(line));
+            return [lines[start], ...rest.slice(0, end === -1 ? rest.length : end)].join(" ");
+        };
+
+        expect(entry("--no-install")).not.toMatch(/\(the default\)/);
+        for (const flag of ["-i, --install", "-g, --git"]) {
+            expect(entry(flag), flag).toMatch(/asks \(default yes\)/);
+            expect(entry(flag), flag).toMatch(/under --yes/);
+        }
     });
 });
 
