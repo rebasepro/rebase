@@ -108,7 +108,11 @@ export const DRIVER_FLAG_SPECS: Record<string, arg.Spec> = {
         "-c": "--collections",
         "--force": Boolean,
         "-f": "--force",
-        "--schema": String
+        "--schema": String,
+        // Whether rows are sampled at all: without a terminal the prompt is
+        // skipped, and the skip line names `--data-inference`.
+        "--data-inference": Boolean,
+        "--no-data-inference": Boolean
     },
     "schema stale": {
         "--collections": String,

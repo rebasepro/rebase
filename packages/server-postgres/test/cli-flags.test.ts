@@ -132,6 +132,21 @@ describe("assertKnownFlags", () => {
             .not.toThrow();
     });
 
+    it("lets schema introspect take every flag the introspector reads", () => {
+        // `--data-inference` was refused here while the introspector read it,
+        // and named it in "pass --data-inference to enable".
+        const source = fs.readFileSync(path.resolve(__dirname, "..", "src", "schema", "introspect-db.ts"), "utf8");
+        const spec = /const args = arg\(\s*\{([\s\S]*?)\}/.exec(source);
+        expect(spec).not.toBeNull();
+        const flags = [...spec![1].matchAll(/"(--[a-z-]+)":\s*(?!")/g)].map(match => match[1]);
+        expect(flags).toContain("--no-data-inference");
+
+        for (const flag of flags) {
+            const typed = DRIVER_FLAG_SPECS["schema introspect"][flag] === String ? [flag, "x"] : [flag];
+            expect(() => assertKnownFlags("schema", "introspect", line("schema", "introspect", ...typed))).not.toThrow();
+        }
+    });
+
     it("says nothing when no subcommand was named", () => {
         expect(() => assertKnownFlags("db", undefined, line("db"))).not.toThrow();
     });

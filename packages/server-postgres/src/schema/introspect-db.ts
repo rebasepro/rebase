@@ -200,69 +200,68 @@ async function main() {
         const tablesToProcess = Array.from(tablesMap.entries())
             .filter(([tableName]) => !joinTables.has(tableName) && !compositeKeyed.has(tableName));
 
-        const BATCH_SIZE = 10;
-        for (let i = 0; i < tablesToProcess.length; i += BATCH_SIZE) {
-            const batch = tablesToProcess.slice(i, i + BATCH_SIZE);
+        // One table at a time: there is one connection, and sampling ten at
+        // once over it is what node-postgres warns about ("Calling
+        // client.query() when the client is already executing a query") —
+        // the queries queued behind each other anyway.
+        for (const [tableName, meta] of tablesToProcess) {
+            // ── The name has to be usable as a filename ────────────────
+            //
+            // `tableName` came out of `pg_class` in a database this tool
+            // did not create — adopting somebody else's database is the
+            // whole point of introspection — and it is about to be joined
+            // onto a path. Postgres will happily hold a table called
+            // `../../../etc/cron.d/x`, and `path.join` resolves it: the
+            // generator would write a TypeScript file wherever that
+            // pointed, as whoever ran the command.
+            //
+            // Skipped rather than sanitised. A file named something other
+            // than its table is a collection that does not round-trip, and
+            // silently renaming it would be a worse surprise than one line
+            // saying which table was left out.
+            if (!isUsableFileName(tableName)) {
+                outWarn(chalk.yellow(
+                    `⚠ Skipping table ${JSON.stringify(tableName)}: its name cannot be used as a ` +
+                    "filename. Rename the table, or write this collection by hand."
+                ));
+                skippedFiles.push(tableName);
+                continue;
+            }
 
-            await Promise.all(batch.map(async ([tableName, meta]) => {
-                // ── The name has to be usable as a filename ────────────────
-                //
-                // `tableName` came out of `pg_class` in a database this tool
-                // did not create — adopting somebody else's database is the
-                // whole point of introspection — and it is about to be joined
-                // onto a path. Postgres will happily hold a table called
-                // `../../../etc/cron.d/x`, and `path.join` resolves it: the
-                // generator would write a TypeScript file wherever that
-                // pointed, as whoever ran the command.
-                //
-                // Skipped rather than sanitised. A file named something other
-                // than its table is a collection that does not round-trip, and
-                // silently renaming it would be a worse surprise than one line
-                // saying which table was left out.
-                if (!isUsableFileName(tableName)) {
-                    outWarn(chalk.yellow(
-                        `⚠ Skipping table ${JSON.stringify(tableName)}: its name cannot be used as a ` +
-                        "filename. Rename the table, or write this collection by hand."
-                    ));
-                    skippedFiles.push(tableName);
-                    return;
+            // ── File overwrite protection ──────────────────────────────
+            const filePath = path.join(outDir, `${tableName}.ts`);
+            if (fs.existsSync(filePath) && !force) {
+                skippedFiles.push(tableName);
+                continue;
+            }
+
+            let sampleData: Record<string, unknown>[] | undefined = undefined;
+            if (runDataInference) {
+                try {
+                    // Quoted by `quoteRelation`, which doubles an embedded
+                    // quote. Wrapping a catalogue name in `"` is not
+                    // escaping it — see that function.
+                    const { rows } = await client.query(`SELECT * FROM ${quoteRelation(pgSchema, tableName)} LIMIT 100`);
+                    sampleData = rows;
+                } catch (err) {
+                    outError(chalk.yellow(`⚠ Failed to sample data for table ${tableName}: ${err instanceof Error ? err.message : String(err)}`));
                 }
+            }
 
-                // ── File overwrite protection ──────────────────────────────
-                const filePath = path.join(outDir, `${tableName}.ts`);
-                if (fs.existsSync(filePath) && !force) {
-                    skippedFiles.push(tableName);
-                    return;
-                }
+            const fileContent = generateCollectionFile(
+                tableName,
+                meta,
+                fks,
+                joinTables,
+                tablesMap,
+                enumMap,
+                sampleData,
+                { metadata, classifications, checkFacts, builder, notes, skippedTables: new Set(compositeKeyed.keys()) }
+            );
 
-                let sampleData: Record<string, unknown>[] | undefined = undefined;
-                if (runDataInference) {
-                    try {
-                        // Quoted by `quoteRelation`, which doubles an embedded
-                        // quote. Wrapping a catalogue name in `"` is not
-                        // escaping it — see that function.
-                        const { rows } = await client.query(`SELECT * FROM ${quoteRelation(pgSchema, tableName)} LIMIT 100`);
-                        sampleData = rows;
-                    } catch (err) {
-                        outError(chalk.yellow(`⚠ Failed to sample data for table ${tableName}: ${err instanceof Error ? err.message : String(err)}`));
-                    }
-                }
-
-                const fileContent = generateCollectionFile(
-                    tableName,
-                    meta,
-                    fks,
-                    joinTables,
-                    tablesMap,
-                    enumMap,
-                    sampleData,
-                    { metadata, classifications, checkFacts, builder, notes, skippedTables: new Set(compositeKeyed.keys()) }
-                );
-
-                fs.writeFileSync(filePath, fileContent, "utf-8");
-                generatedFiles.push(tableName);
-                out(chalk.green(`  ✓ ${filePath}`));
-            }));
+            fs.writeFileSync(filePath, fileContent, "utf-8");
+            generatedFiles.push(tableName);
+            out(chalk.green(`  ✓ ${filePath}`));
         }
 
         // Every column the planner will not reproduce exactly, before anyone
@@ -320,7 +319,9 @@ async function main() {
             out("");
         }
         out(chalk.bold.green(`✓ Introspected ${tablesMap.size} tables — generated ${generatedFiles.length} collection(s).`));
-        out(chalk.gray(`  Review the generated files in ${outDir} and customize properties as needed.`));
+        if (generatedFiles.length > 0) {
+            out(chalk.gray(`  Review the generated files in ${outDir} and customize properties as needed.`));
+        }
         out("");
 
     } catch (e) {

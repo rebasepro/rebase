@@ -2394,6 +2394,8 @@ async function schemaCommand(
                 "--collections": String,
                 "--force": Boolean,
                 "--schema": String,
+                "--data-inference": Boolean,
+                "--no-data-inference": Boolean,
                 "-o": "--output",
                 "--out": "--output",
                 "-c": "--collections",
@@ -2422,7 +2424,10 @@ async function schemaCommand(
             ...introspect.args,
             `--output=${outputPath}`,
             ...(argsList["--force"] ? ["--force"] : []),
-            ...(argsList["--schema"] ? [`--schema=${argsList["--schema"]}`] : [])
+            ...(argsList["--schema"] ? [`--schema=${argsList["--schema"]}`] : []),
+            // The introspector reads these itself; without one it asks.
+            ...(argsList["--data-inference"] ? ["--data-inference"] : []),
+            ...(argsList["--no-data-inference"] ? ["--no-data-inference"] : [])
         ];
 
         try {
