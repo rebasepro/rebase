@@ -3,23 +3,15 @@ import type { AuthChangeEvent } from "@rebasepro/types";
 import { createMemoryStorage, createRebaseClient, type AuthStorage } from "../src/index";
 
 /**
- * A cookie-mode browser that holds no session stops asking for one.
+ * A cookie-mode session across page loads.
  *
  * In cookie mode the refresh token is an HttpOnly cookie the page cannot read,
  * so the client restores a session on load by asking the server
- * (`POST /auth/refresh`). For a visitor who never signed in, the answer is
- * always `401 NO_SESSION`: the request carried no cookie at all. The client
- * asked anyway, on every load, and each answer was an error in the browser's
- * console and a line in the backend's log — two or three per anonymous page
- * view, one per client the page built.
- *
- * Once the server has said this browser presents no refresh cookie, or the user
- * has signed out here, the client remembers it (in its auth storage, beside
- * where JSON mode keeps its session) and the next load restores nothing
- * without asking. Any session it adopts clears that, so a sign-in — in this
- * tab or another — brings the restore back. A refusal of a token that *was*
- * presented (`INVALID_TOKEN`) is not remembered: a sibling tab may hold the
- * live cookie, and the next load has to ask.
+ * (`POST /auth/refresh`), and it asks on every load: only the server can see
+ * whether the browser holds the cookie. A client that remembered "this browser
+ * has no session" to skip the question would miss a cookie set by a sign-in
+ * somewhere else — another app on a shared `cookieAuth.domain`, which is what
+ * that option is for — so it does not.
  */
 
 const HOUR = 3_600_000;
@@ -120,37 +112,6 @@ afterEach(() => {
     browsers.splice(0).forEach((b) => b.close());
 });
 
-describe("a cookie-mode visitor who never signed in", () => {
-    it("is asked about once, then not on the next load", async () => {
-        const b = browser();
-
-        const first = b.load();
-        await first.auth.isInitialized();
-        expect(first.auth.restoreOutcome()).toBe("none");
-        expect(b.refreshes()).toBe(1);
-
-        const second = b.load();
-        await second.auth.isInitialized();
-        expect(second.auth.getSession()).toBeNull();
-        expect(second.auth.restoreOutcome()).toBe("none");
-        expect(b.refreshes()).toBe(1);
-    });
-
-    it("is not asked about again after signing out here", async () => {
-        const b = browser();
-        const first = b.load();
-        await first.auth.isInitialized();
-        await first.auth.signInWithEmail("u1@example.com", "pw");
-        await first.auth.signOut();
-        const before = b.refreshes();
-
-        const second = b.load();
-        await second.auth.isInitialized();
-        expect(second.auth.getSession()).toBeNull();
-        expect(b.refreshes()).toBe(before);
-    });
-});
-
 describe("a cookie-mode session", () => {
     it("is restored on the next load after a sign-in", async () => {
         const b = browser();
@@ -164,9 +125,7 @@ describe("a cookie-mode session", () => {
         expect(second.auth.getSession()?.user.uid).toBe("u1");
     });
 
-    it("is restored when the browser has never been told either way", async () => {
-        // A cookie from before this client remembered anything, or storage
-        // cleared while the cookie stayed: the client has to ask.
+    it("is restored on load when the browser holds a live cookie", async () => {
         const b = browser();
         b.browser.cookie = "live";
 
@@ -228,15 +187,12 @@ describe("a cookie-mode session", () => {
             expect(page.auth.getSession()).toBeNull();
             expect(b.refreshes()).toBe(2);
 
-            // The refusal cleared the cookie; the next load asks once, is told
-            // there is none, and the one after asks nothing.
+            // The refusal cleared the cookie; the next load asks, and is told
+            // there is none.
             b.browser.refused = undefined;
             const next = b.load();
             await next.auth.isInitialized();
             expect(next.auth.restoreOutcome()).toBe("none");
-            expect(b.refreshes()).toBe(3);
-            const after = b.load();
-            await after.auth.isInitialized();
             expect(b.refreshes()).toBe(3);
         }
     );

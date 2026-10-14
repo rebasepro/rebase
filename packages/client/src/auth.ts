@@ -232,51 +232,9 @@ export function createAuth(transport: Transport, options?: CreateAuthOptions) {
     }
 
     function saveSession(session: RebaseSession) {
-        if (!persistSession) return;
-        if (authFlowMode === "cookie") {
-            // Nothing of the session is kept here — the cookie holds it — only
-            // that this browser has one, so the next load asks the server again.
-            noteCookieSession(`session:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`);
-            return;
-        }
+        if (!persistSession || authFlowMode === "cookie") return;
         try {
             storage.setItem(STORAGE_KEY, JSON.stringify(session));
-        } catch (e) { /* ignore */ }
-    }
-
-    /**
-     * What this browser knows about its refresh cookie, in cookie mode.
-     *
-     * The cookie is HttpOnly, so the page cannot see whether it has one, and
-     * restoring a session on load means asking the server. For a visitor who
-     * never signed in the answer is always `401 NO_SESSION` — the request
-     * carried no cookie — and asking on every load put that refusal in the
-     * console and the backend's log on every anonymous page view.
-     *
-     * {@link COOKIE_NO_SESSION} is written when the server says no cookie was
-     * presented, and on a sign-out here; the next load then restores nothing
-     * without asking. Every session adopted overwrites it with a fresh token,
-     * which is also what tells a restore that was answered late — after a
-     * sign-in in another tab — not to write over that sign-in. Nothing written
-     * at all (storage cleared, or a session from before this note existed)
-     * means ask, as cookie mode always has.
-     */
-    const COOKIE_SESSION_KEY = "rebase_auth_cookie_session";
-    const COOKIE_NO_SESSION = "none";
-
-    function readCookieSessionNote(): string | null {
-        if (!persistSession || authFlowMode !== "cookie") return null;
-        try {
-            return storage.getItem(COOKIE_SESSION_KEY);
-        } catch (e) {
-            return null;
-        }
-    }
-
-    function noteCookieSession(note: string) {
-        if (!persistSession || authFlowMode !== "cookie") return;
-        try {
-            storage.setItem(COOKIE_SESSION_KEY, note);
         } catch (e) { /* ignore */ }
     }
 
@@ -748,9 +706,6 @@ redirectUri });
                 } as RequestInit);
             }
         } catch (e) { /* ignore */ }
-        // Signed out here: /logout cleared the cookie, and the next load has
-        // nothing to restore.
-        noteCookieSession(COOKIE_NO_SESSION);
         endSession();
     }
 
@@ -906,7 +861,6 @@ redirectUri });
             );
         }
         const fetchFn = getFetch();
-        const noteBefore = readCookieSessionNote();
         const res = await fetchFn(authUrl("/refresh"), {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -917,13 +871,6 @@ redirectUri });
         if (epoch !== sessionEpoch) return supersededRefresh();
         if (!res.ok) {
             const err = apiError(res.status, body, res.statusText);
-            // The request carried no refresh cookie: this browser has none, so
-            // the next load has nothing to ask about (see `readCookieSessionNote`).
-            // Unless a session was adopted while it was on the wire — a sign-in
-            // in another tab — which wrote a note of its own.
-            if (err.code === "NO_SESSION" && readCookieSessionNote() === noteBefore) {
-                noteCookieSession(COOKIE_NO_SESSION);
-            }
             if (isMalformedRefreshError(err)) {
                 // Said out loud, once per refusal, because nothing else will:
                 // the session cannot be renewed, and every caller of a refresh
@@ -1555,11 +1502,6 @@ refreshToken: session.refreshToken };
             } else {
                 settleRestore("none");
             }
-        } else if (authFlowMode === "cookie" && readCookieSessionNote() === COOKIE_NO_SESSION) {
-            // This browser was told it holds no refresh cookie, or signed out
-            // here, and has adopted no session since: there is nothing to ask
-            // the server for. See `readCookieSessionNote`.
-            settleRestore("none");
         } else if (authFlowMode === "cookie") {
             // Silent refresh on boot to pick up httpOnly session
             const restore = refreshSession().then(() => {
