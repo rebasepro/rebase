@@ -108,4 +108,27 @@ alsoNot: 42 } as Record<string, unknown>
 
         expect(registry.getTableNames()).toEqual(["products"]);
     });
+
+    // `createRebaseBackend({ collections: [postsCollection] })` failed boot
+    // asking for a `tags` table the database had: `tags` was only the
+    // relation's target. The registry is told which collections were passed.
+    it("refuses a relation target left out of the collections, naming the array", () => {
+        const postsTable = pgTable("posts", { id: text("id").primaryKey() });
+        const postsTagsTable = pgTable("posts_tags", { post_id: text("post_id"), tag_id: text("tag_id") });
+        const tagsCollection = {
+            slug: "tags", name: "Tags", table: "tags",
+            properties: { id: { type: "string", isId: true } }
+        } as unknown as CollectionConfig;
+        const postsCollection = {
+            slug: "posts", name: "Posts", table: "posts",
+            properties: { id: { type: "string", isId: true } },
+            relations: [{
+                kind: "manyToMany", relationName: "tags", target: () => tagsCollection,
+                through: { table: "posts_tags", sourceColumn: "post_id", targetColumn: "tag_id" }
+            }]
+        } as unknown as CollectionConfig;
+
+        expect(() => buildCollectionRegistry({ collections: [postsCollection], tables: { posts: postsTable, posts_tags: postsTagsTable } }))
+            .toThrow(/collection `tags`, which is not among the collections this backend was given/);
+    });
 });

@@ -62,7 +62,7 @@ export function buildCollectionRegistry(schema: RegistrySchema): PostgresCollect
     // names do not exist. The union checks a relation's shape at compile time;
     // only here is there a schema to check its *names* against. Every one of
     // these used to surface as an empty result at query time and nothing else.
-    assertRelationsResolve(registry.getCollections(), registry);
+    assertRelationsResolve(registry.getCollections(), registry, schema.collections);
 
     return registry;
 }

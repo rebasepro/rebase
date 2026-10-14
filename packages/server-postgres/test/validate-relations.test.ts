@@ -445,3 +445,53 @@ foreignKeyOnTarget: "article_id" }
         });
     });
 });
+
+/**
+ * A `collections` array that leaves out a relation's target.
+ *
+ * `createRebaseBackend({ collections: [postsCollection] })` on the blog
+ * scaffold failed boot with "it points at collection `tags`, which has no
+ * table `tags` in the schema" and "fix: create the `tags` table" — about a
+ * table the database had. `tags` was registered only as the relation's
+ * target, so no table had been built for it. The fix is the array.
+ */
+describe("a relation whose target is not among the collections passed", () => {
+    const postsCollection = coll("posts", "posts", {
+        relations: [{ kind: "manyToMany", relationName: "tags", target: () => tagsCollection, through: { table: "posts_tags", sourceColumn: "post_id", targetColumn: "tag_id" } }]
+    } as never);
+
+    function onlyPosts(): PostgresCollectionRegistry {
+        const registry = new PostgresCollectionRegistry();
+        registry.registerMultiple([postsCollection]);
+        registry.registerTable(posts as never, "posts");
+        registry.registerTable(posts_tags as never, "posts_tags");
+        return registry;
+    }
+
+    it("says the target was not passed, and how to pass it, instead of asking for its table", () => {
+        const registry = onlyPosts();
+        const [defect] = findRelationDefects(registry.getCollections(), registry, [postsCollection]);
+
+        expect(defect.problem).toBe(
+            "it points at collection `tags`, which is not among the collections this backend was given — " +
+            "it is registered only as this relation's target, so no table was built for it"
+        );
+        expect(defect.fix).toBe("add the `tags` collection to the `collections` you pass, or pass every collection the relations reach");
+        expect(defect.problem).not.toContain("has no table");
+    });
+
+    it("says it at boot too", () => {
+        const registry = onlyPosts();
+        expect(() => assertRelationsResolve(registry.getCollections(), registry, [postsCollection]))
+            .toThrow(/add the `tags` collection to the `collections` you pass/);
+    });
+
+    it("still asks for the table when the collection was passed and its table is missing", () => {
+        const registry = new PostgresCollectionRegistry();
+        registry.registerMultiple([postsCollection, tagsCollection]);
+        registry.registerTable(posts as never, "posts");
+        registry.registerTable(posts_tags as never, "posts_tags");
+        const [defect] = findRelationDefects(registry.getCollections(), registry, [postsCollection, tagsCollection]);
+        expect(defect.problem).toContain("which has no table `tags` in the schema");
+    });
+});

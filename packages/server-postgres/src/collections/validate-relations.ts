@@ -184,10 +184,17 @@ function staleCodegenDefect(
  */
 export function findRelationDefects(
     collections: CollectionConfig[],
-    registry: PostgresCollectionRegistry
+    registry: PostgresCollectionRegistry,
+    /**
+     * The collections the backend was given, when the registry also holds
+     * ones it reached only as a relation's target. A target outside them has
+     * no table built for it, and the fix is the array, not the database.
+     */
+    given?: readonly CollectionConfig[]
 ): RelationDefect[] {
     const defects: RelationDefect[] = [];
     const registeredSlugs = new Set(registry.getCollections().map(c => c.slug));
+    const givenSlugs = given ? new Set(given.map(c => c.slug)) : undefined;
 
     for (const collection of collections) {
         const sourceTableName = getTableName(collection);
@@ -222,11 +229,19 @@ kind: relation.kind };
             const targetTableName = getTableName(targetCollection);
             const targetTable = registry.getTable(targetTableName);
             if (!targetTable) {
-                defects.push({
-                    ...at,
-                    problem: `it points at collection \`${targetCollection.slug}\`, which has no table \`${targetTableName}\` in the schema`,
-                    fix: `create the \`${targetTableName}\` table, or correct \`table\` on the \`${targetCollection.slug}\` collection`
-                });
+                defects.push(givenSlugs && !givenSlugs.has(targetCollection.slug)
+                    ? {
+                        ...at,
+                        problem: `it points at collection \`${targetCollection.slug}\`, which is not among the collections ` +
+                            "this backend was given — it is registered only as this relation's target, so no table was built for it",
+                        fix: `add the \`${targetCollection.slug}\` collection to the \`collections\` you pass, ` +
+                            "or pass every collection the relations reach"
+                    }
+                    : {
+                        ...at,
+                        problem: `it points at collection \`${targetCollection.slug}\`, which has no table \`${targetTableName}\` in the schema`,
+                        fix: `create the \`${targetTableName}\` table, or correct \`table\` on the \`${targetCollection.slug}\` collection`
+                    });
                 continue;
             }
             const targetColumns = columnNames(targetTable);
@@ -428,9 +443,10 @@ kind: relation.kind };
  */
 export function assertRelationsResolve(
     collections: CollectionConfig[],
-    registry: PostgresCollectionRegistry
+    registry: PostgresCollectionRegistry,
+    given?: readonly CollectionConfig[]
 ): void {
-    const defects = findRelationDefects(collections, registry);
+    const defects = findRelationDefects(collections, registry, given);
     if (defects.length === 0) return;
 
     const lines = defects.map(d =>
