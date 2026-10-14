@@ -896,6 +896,7 @@ no usable credential refuses to boot. See
 | `BACKUP_KEEP_MINIMUM` | Always retain at least N of the most recent backups, whatever retention says. | — |
 | `PG_DUMP_PATH` | Override the `pg_dump` binary — it must be the server's major version or newer. | — |
 | `PG_RESTORE_PATH` | Override the `pg_restore` binary. | — |
+| `PSQL_PATH` | Override the `psql` binary that `rebase db restore --clean` runs to make the restore one transaction. | — |
 | `PG_DUMPALL_PATH` | Where `pg_dumpall` lives, when it is not on `PATH`. Without it — and without the PostgreSQL client tools installed — a globals backup fails with an error naming this variable. | — |
 
 The official runtime image (`rebasepro/server`) ships the PostgreSQL 18 client
@@ -939,9 +940,9 @@ Read by `rebase`, not by the server. Nothing here affects a deployment.
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `REBASE_BASE_URL` | The backend `rebase auth` and `rebase api-keys` talk to, instead of deriving it from the project. | — |
-| `REBASE_PORT` | The port those commands assume when deriving that URL. | — |
-| `SERVICE_KEY` | The service key they authenticate with, instead of prompting. | — |
+| `REBASE_BASE_URL` | Where `rebase api-keys`, `rebase storage` and `rebase auth reset-password` send the service key, in the shell or in `.env`. Set it when the server runs some other way than `rebase dev` in this project: `rebase start`, a container, another host. Unset, they use the server `rebase dev` recorded while that server is running, and send nothing when it is not. | — |
+| `REBASE_SERVICE_KEY` | The service key those commands authenticate with, read from `.env`: the same variable the server reads (see above). | — |
+| `SERVICE_KEY` | An older name for that key. When `.env` sets it, `rebase api-keys` and `rebase storage` read it in place of `REBASE_SERVICE_KEY`. | — |
 | `REBASE_ENV_FILE_PATH` | Which `.env` the CLI reads and writes, when it is not the project's. | — |
 | `REBASE_CLOUD_URL` | The control plane `rebase cloud` talks to. | — |
 | `REBASE_CLOUD_EMAIL` | The account `rebase cloud login` signs in as, instead of prompting. | — |
@@ -4394,6 +4395,10 @@ yet, listed so that nobody reads a promise into them:
 - **`backend.services.authAdapter`**: the auth adapter that judges this
   backend's sessions, the one `verifyCredential` uses.
 
+- **The rule for reading a content hash from a static file name is exported**
+  from `@rebasepro/types` as `isContentHashedFileName(name)`: what the build
+  precompresses by, and what the runtime caches for a year by.
+
 ##### Client SDK
 
 - **`findById(id, { include })` and `listenById(id, onUpdate, onError,
@@ -4608,6 +4613,11 @@ yet, listed so that nobody reads a promise into them:
   database }` when the checkout is switched to one, and the human output says
   so.
 
+- **The SDK generator takes the address its README connects to.**
+  `generateSDK(collections, { baseUrl })` in `@rebasepro/codegen`. `rebase
+  generate-sdk` passes the port the project's backend last bound, as its printed
+  snippet already did, so `generated/sdk/README.md` no longer says 3001.
+
 ##### CI & tooling
 
 - **Three new gates: `pnpm check:test-types`, `pnpm check:casts` and
@@ -4755,6 +4765,12 @@ yet, listed so that nobody reads a promise into them:
   registers, so a misspelled collection, field or enum value in a script is a
   type error. `openRebase<Database>()` and `OpenedRebase<Database>` name the
   type per call, or for a helper.
+
+- **The backup service resets the managed database's shared session.**
+  `resetSharedSession(url)` from `@rebasepro/server-postgres` runs `RESET ALL`
+  and `DEALLOCATE ALL` on a PGlite database and does nothing on any other. The
+  service also exports `restoreDumpReplacing` and `findCleanExtras` for a
+  one-transaction clean restore.
 
 #### Changed
 
@@ -4930,6 +4946,16 @@ yet, listed so that nobody reads a promise into them:
   /auth/refresh` for a browser with no session, has its request line at info
   rather than warn, so an anonymous admin-panel load no longer puts a WARN in
   the dev log.
+
+- **A built bundle run from a project keeps local uploads in the project.**
+  Under `rebase start`, local uploads lived in `dist-bundle/uploads`, which the
+  next `rebase build` deleted while the rows naming them stayed, and a file
+  uploaded under `rebase dev` answered 404. A bundle with `rebase.json` above it
+  now stores them in `<project>/uploads`, as `rebase dev` and an ejected server
+  do, so `rebase-server` run from a project checkout without `STORAGE_PATH` does
+  too. A container's storage does not move: `STORAGE_PATH` still decides, and a
+  bundle with no project around it stores where it did. Uploads an earlier
+  version left inside the bundle are named at boot, with where to move them.
 
 ##### Postgres
 
@@ -5269,6 +5295,15 @@ yet, listed so that nobody reads a promise into them:
   on unchanged. Before, only the last plugin that returned a wrapper
   rendered.
 
+- **Every neutral in the theme sits on the brand hue.** `@rebasepro/ui`'s
+  `theme.css` re-hues the surface ladder, the six text tokens and the numbered
+  and slate scales to the brand blue's hue (oklch, hue 258, chroma 0.002–0.014),
+  each at the lightness it had, so contrast and the ladder's steps do not move.
+  It adds a `--color-graphite` ramp and points Tailwind's `zinc`, `neutral`,
+  `gray` and `stone` palettes at it, so a `bg-zinc-*` in your own code lands on
+  the same hue. Light secondary text rises to 4.85:1 on the frame (it was 4.17,
+  under AA), and dark disabled text clears 4.6:1 on a card.
+
 ##### Studio
 
 - **The SQL console keeps at most 10,000 rows, or 32 MB of values, of a
@@ -5413,6 +5448,45 @@ yet, listed so that nobody reads a promise into them:
   push --dry-run` lists what the push does to them**: the RLS it switches on and
   the admin baseline it adds, instead of "No changes". The push itself is
   unchanged.
+
+- **The CLI refuses an unknown option in one sentence.** `console`, `storage`,
+  `api-keys`, `status`, `init`, `dev` and the other commands on the shared
+  parser said `unknown or unexpected option: --x (did you mean --y?)`. They now
+  say what `db backup` says: "`rebase storage move` has no option --form — did
+  you mean --from? Nothing was run." A script matching the old text needs
+  updating.
+
+- **The status view no longer flags a resource graph that has not been written
+  yet.** `rebase build` writes `rebase.resources.json` on every build, so a
+  fresh scaffold's `rebase status` no longer ends with "is missing". A stale
+  file is still flagged, and `rebase resources --check` still fails on a missing
+  one.
+
+- **New scaffolds take the admin's chunk rules from the app package.**
+  `frontend/vite.config.ts` uses `manualChunks: rebaseManualChunks` from
+  `@rebasepro/app/vitePlugin` instead of a copy, so an upgrade brings the
+  package's revisions with it.
+
+- **A backup refuses to leave out the rebase schema.** `rebase db backup
+  --exclude-schema rebase`, or any pattern that matches it, is refused before
+  anything runs: a dump without that schema cannot be restored.
+
+- **A clean restore needs psql, and drops what the backup's schemas hold beyond
+  it.** `rebase db restore --clean` runs the dump through `psql` (shipped with
+  `pg_restore`, or `PSQL_PATH`), and drops each schema the backup creates whole,
+  tables the backup lacks included, naming them first. `--continue-on-error`
+  keeps pg_restore's own `--clean`.
+
+- **A forced branch creation closes the source to new connections for the
+  copy.** `rebase db branch create --force` runs `ALTER DATABASE …
+  ALLOW_CONNECTIONS false` from the server's `postgres` database for the length
+  of the copy, then opens the source again.
+
+- **The driver's commands refuse an unknown option in the shared sentence.**
+  `rebase db migrate`, `schema introspect`, `schema stale` and the other
+  driver-checked commands say "`rebase db migrate` has no option --x — did you
+  mean --y? Nothing was run.", as the CLI's own commands now do. A script
+  matching `unknown or unexpected option` needs updating.
 
 ##### Client SDK
 
@@ -5768,6 +5842,18 @@ yet, listed so that nobody reads a promise into them:
   and the `NO_COLLECTIONS` answer suggested setting `baas.unprotectedTables:
   "serve"` as if it were config. It is a server-entry option, reachable only
   after `rebase eject`.
+
+- **Vite chunks whose hash contains a `-` are precompressed and cached for a
+  year.** About one in eight are, including, in a blank scaffold, the 250 KB
+  entry chunk. The build skipped their `.br`/`.gz` and the runtime served them
+  `no-cache`.
+
+- **Boot names what it means.** The managed database's schema-drift box no
+  longer says push does not run there, and names what boot leaves alone and
+  `rebase db migrate` where migrations are used. The nested storage-directory
+  refusal says one directory is inside the other. `createRebaseBackend({
+  collections: [posts] })` with a relation to `tags` says `tags` is not among
+  the collections passed, instead of asking for a `tags` table the database has.
 
 ##### Postgres
 
@@ -6295,6 +6381,117 @@ yet, listed so that nobody reads a promise into them:
   suggests `--clean`, and `db backups lst` gets a did-you-mean before anything
   starts.
 
+- **A failed statement on the managed development database no longer
+  desynchronises its connection.** PGlite answers a failed extended-protocol
+  statement with two ReadyForQuery messages. Beside a running `rebase dev` a
+  refused write printed two `[pg-pool]` ERROR lines, and a connection held
+  across queries could answer the next `SELECT` with no rows. The development
+  database's proxy drops the extra one. A database an older CLI started keeps
+  the old proxy until `rebase db stop`, or until it stops itself after 30 idle
+  minutes.
+
+- **Connection strings and SQL results pipe again after Docker starts.** With
+  the remembered compose container stopped, `rebase db url` and `rebase console
+  -e` printed "Database not running — starting it…" to stdout, which broke `psql
+  "$(rebase db url)"`, `DATABASE_URL="$(rebase db url)"` and `rebase console -e
+  … | jq`. Those notices go to stderr.
+
+- **A connection the full managed database cannot take is refused in words.** It
+  showed as "Connection terminated unexpectedly", which read as a database that
+  is down. It now gets SQLSTATE 53300, saying the database accepts only a few
+  connections, that a running `rebase dev` holds some, and to stop another
+  process or use `rebase dev --docker` for several backends. Boot prints the
+  same instead of "Cannot reach PostgreSQL", and `openRebase` includes the
+  remedy.
+
+- **The console, doctor and schema generate say why Postgres refused a query.**
+  They lead with its message and SQLSTATE, `relation "nope_table" does not exist
+  (42P01)`, and no longer print the query's parameter values, `--debug`
+  included. `db push`'s NOT NULL box suggests a backfill that works on the
+  managed database, `psql "$(pnpm exec rebase db url)" …`, spelled the way the
+  project runs `rebase`, instead of `psql "$DATABASE_URL"`, which is unset
+  there.
+
+- **The password reset's database fallback says why it cannot connect.** With
+  the backend stopped, `rebase auth reset-password` starts the remembered Docker
+  database first. Against a database that does not answer, refuses the
+  credentials or does not exist, it prints the boxed banner the other commands
+  print and writes no script. On a database with no users table it says so, and
+  any other failure is one sentence instead of a stack.
+
+- **The default storage source stays listed beside a named bucket.** After
+  `bucket("media")`, `rebase status` and `rebase resources` listed only `media`,
+  though the server still served the default; the same held for the default
+  database beside `database("analytics")`. Only declaring the default, or
+  marking one bucket `default: true`, replaces it.
+
+- **Smaller CLI fixes.** A pull from a database that does not exist prints the
+  banner instead of pg_dump's raw error. A refusal the CLI explained, such as
+  the compose-port check, no longer ends with "Re-run with --debug for the stack
+  trace." An upgrade dry run the real run would refuse says so on its last line.
+  The headless policy hint and the BaaS README cast the owner column
+  (`user_id::text = rebase.uid()`), which works on a uuid column. The API key
+  hints name `REBASE_SERVICE_KEY`, and `REBASE_BASE_URL` is in `.env.example`
+  and the configuration reference. The Docker database description ends "as the
+  last `rebase dev --docker` did".
+
+- **A clean restore over a migrated database no longer leaves it empty.**
+  `rebase db restore --clean` ran pg_restore's own `--clean` one statement at a
+  time, and its `DROP SCHEMA rebase` failed on any table the backup lacked, such
+  as `rebase.atlas_schema_revisions` after `rebase db migrate`. That happened
+  after every table had been dropped, and the message said what it restored
+  stayed. It is the route the CLI prints when it refuses a restore into the
+  managed database. `--clean` now drops the backup's schemas with `CASCADE` and
+  restores the dump in one transaction, through `psql`. A restore that stops is
+  rolled back and says the database holds what it held before, and before asking
+  it names what it drops that the backup does not hold.
+
+- **A backup of the managed database no longer breaks the running dev server.**
+  pg_dump's session settings stayed on PGlite's one shared session:
+  `search_path` empty, `row_security` off, its prepared statements. After one
+  `rebase db backup` every API request answered 500 "table does not exist",
+  restarting `rebase dev` did not help, and a second backup failed on `prepared
+  statement "dumpenumtype" already exists`. Every client tool the backup service
+  runs, and a pull into the managed database, is now followed by `RESET ALL` and
+  `DEALLOCATE ALL` there.
+
+- **A second baseline on the managed database works while dev runs.** `rebase db
+  migrate --baseline <v>` on a database that already records migrations runs
+  `atlas migrate set`, which opened one connection more than PGlite had free
+  beside `rebase dev` and failed on `EOF` every time. It is bound to the
+  `rebase` schema there and needs one connection fewer.
+
+- **Prune keeps the branch you are on, and list marks it.** `rebase db branch
+  prune --older-than … --yes` dropped the branch the checkout was switched to,
+  which `delete` refuses to do, and every later command pointed at a database
+  that no longer existed. Prune lists it as kept and says to `switch --off`
+  first, and `branch list` marks it as current. `branch switch` says a running
+  `rebase dev` keeps its database until it restarts.
+
+- **Forced branch creation is reliable beside a running dev server.** `rebase db
+  branch create --force` disconnected the source's sessions once, so a client
+  that reconnected before the copy made about one create in seven fail, and the
+  error then said to pass `--force`. The source refuses new connections for the
+  copy and is opened again afterwards, even on Ctrl-C, and a refusal after
+  `--force` never suggests `--force`.
+
+- **The dry run after an introspection or a migrate plans no policy changes that
+  are not changes.** A role rule `schema introspect` reads back as Postgres's
+  SQL, and every policy `db migrate` applied, were planned as replacements or
+  listed as unstamped: 9 and 44 on the blog scaffold. The plan re-creates such a
+  policy from its rule in a rolled-back transaction and compares what Postgres
+  would store. Introspection also writes the `rebase` schema's functions
+  qualified: connected as a role named `rebase`, it wrote `roles()` for
+  `rebase.roles()`, which the push could not find.
+
+- **Smaller database-command fixes.** The restore refusal's suggested commands
+  keep `--yes`, `--docker`, `--database-url` (quoted), `--no-owner` and
+  `--target-db`. `db generate` ends on the step this migration needs: its
+  closing sentence was garbled, and it offered `--baseline` after every
+  migration, a destructive one and a run that wrote none included. The DROP TYPE
+  box reads the database from `rebase db url` instead of the unset
+  `$DATABASE_URL`.
+
 ##### Admin (CMS & app)
 
 - **The markdown editor's link box takes a link, and pressing Enter in it no longer
@@ -6535,6 +6732,9 @@ yet, listed so that nobody reads a promise into them:
 - **Studio details.** The home page's SDK snippet points at the project's API
   address instead of `http://localhost:3001`. The string column type select says
   "Default (text)", which is what the column is created as.
+
+- **The Studio Quick Start passes the collections dictionary**, without which a
+  hyphenated slug is not reachable from its accessor.
 
 ##### Realtime
 
@@ -6962,6 +7162,17 @@ yet, listed so that nobody reads a promise into them:
   holds the port, and refuse with its name and how to give the project its own
   when it is not this project's container.
 
+- **A misspelt anonymize flag on a database pull no longer copies personal
+  data.** `rebase db pull` read its flags by hand, so `--anonymise`,
+  `--anonymiz` and `--anon` were ignored and the copy arrived with real names
+  and emails, and `--schem public` pulled every schema. `db pull`, `db url`, `db
+  stop` and `db reset` now refuse an option they do not take before anything is
+  read or copied, and name the one it was probably meant to be.
+
+- **The database pull refusal no longer prints a password.** `rebase db pull
+  --database-url <url>` suggested the `--from` line to type with the URL echoed,
+  password and all, and unquoted. It is now masked (`user:***@`) and quoted.
+
 #### Documentation
 
 ##### Storage & email
@@ -7014,6 +7225,12 @@ yet, listed so that nobody reads a promise into them:
   push`; the driver never creates collection tables, and `provision` covers
   auth, history and the role), and its install line includes `drizzle-orm`.
   scripts.md's `withAuth` examples hold on the blog scaffold they name.
+
+- **The headless owner policy example casts the column.** `USING (user_id =
+  rebase.uid())` failed with "operator does not exist: uuid = text" on a uuid
+  owner column, because `rebase.uid()` returns text. The example, and the agent
+  skill's table of what an owner rule generates, now cast it, as generated
+  policies do.
 
 ##### CLI
 
@@ -17128,8 +17345,9 @@ is served and returns no rows, and boot warns about it; a policy opens it:
 
 ```sql
 ALTER TABLE your_table ENABLE ROW LEVEL SECURITY;
+-- rebase.uid() is text: the cast makes this work for a uuid or integer column too.
 CREATE POLICY your_table_owner ON your_table
-    FOR ALL USING (user_id = rebase.uid());
+    FOR ALL USING (user_id::text = rebase.uid());
 ```
 
 `rebase.uid()`, `rebase.roles()` and `rebase.jwt()` are installed by Rebase and
@@ -24805,7 +25023,12 @@ personal key, its `owner_uid`.
 
 The CLI covers service keys: `rebase api-keys list`, `get`, `create`, `revoke`,
 and `scopes`, which lists every scope the backend knows. See the
-[CLI reference](/docs/cli/#rebase-api-keys).
+[CLI reference](/docs/cli/#rebase-api-keys). It authenticates with
+`REBASE_SERVICE_KEY` from `.env`, and sends it only to the server `rebase dev`
+is running for this project, so with that server stopped it sends nothing. For
+a server run another way, such as `rebase start` or a container, set
+`REBASE_BASE_URL` to its address
+([the CLI's own environment](/docs/getting-started/configuration/#the-clis-own-environment)).
 
 ### Keys made before scopes
 
@@ -32729,6 +32952,18 @@ Cannot create branch: the source database "leadgen" has active connections.
 `--force` terminates those sessions before templating, on `create` and `delete`
 alike. It never terminates the session running the command itself.
 
+<span class="since-badge" data-since="0.25">Since 0.25</span> `create --force`
+also closes the source to new connections for the copy
+(`ALTER DATABASE … ALLOW_CONNECTIONS false`, run from the server's `postgres`
+database) and opens it again afterwards, on failure and on Ctrl-C too. A client
+that reconnects as soon as it is disconnected, as a running `rebase dev` does,
+then cannot slip back in before the copy starts. That needs the source's owner;
+without it, and on `delete`, `--force` disconnects the sessions up to three
+times before it gives up. When a session is still there after that, the error
+says they reconnected and to stop them, not to pass `--force` again. On 0.24 it
+disconnected them once, and about one `create --force` in seven under a running
+`rebase dev` failed with advice to re-run with `--force`.
+
 `DatabasePoolManager` disconnects its own idle pools before cloning or dropping — but only the pools **inside the process doing the work**. `rebase db branch` runs as its own process, so this reaches nothing else on your machine:
 
 - **A running `rebase dev` blocks branching.** This is the common case, not an edge case: wanting a branch and running the app are usually the same moment. Stop the dev server, branch, and start it again.
@@ -32871,6 +33106,15 @@ rebase db branch delete dev_sandbox
 `.rebase/branch.json` — a name, never a connection string, so your credentials
 stay in `.env` alone — and every `rebase` command in that checkout then resolves
 the branch's database instead: `dev`, `db push`, `db migrate`, `db backup`.
+A `rebase dev` that is already running keeps the database it started on until
+you restart it, and `switch` says so.
+
+<span class="since-badge" data-since="0.25">Since 0.25</span> `rebase db branch
+list` marks the branch this checkout is on, and `prune` never removes it, as
+`delete` refuses to: the plan lists it as kept, and says to leave it with
+`rebase db branch switch --off` first. On 0.24 `prune --older-than … --yes`
+dropped it, and the checkout then pointed every command at a database that no
+longer existed.
 
 It sits between the shell and the project file in the resolution order:
 
@@ -32904,11 +33148,10 @@ snapshot alone.
 
 Branches are ordinary PostgreSQL databases named after the branch with an `rb_` prefix, so `dev_sandbox` above is the database `rb_dev_sandbox` on the same server.
 
-Creating a branch does **not** change which database your project talks to. `rebase db branch create` makes the copy and stops there; nothing writes to `.env`, and the next `rebase dev` still uses the database it used before. To work against a branch, point `DATABASE_URL` at it yourself — the connection string is the one you already have, with the database name swapped:
+Creating a branch does **not** change which database your project talks to. `rebase db branch create` makes the copy and stops there; nothing writes to `.env`, and the next `rebase dev` still uses the database it used before. To work against a branch, switch to it with `rebase db branch switch <name>`, as above. To reach it from anything that is not a `rebase` command, its connection string is the one you already have with the database name swapped:
 
 ```bash
-# .env
-DATABASE_URL=postgresql://user:pass@localhost:5432/rb_dev_sandbox
+postgresql://user:pass@localhost:5432/rb_dev_sandbox
 ```
 
 ---
@@ -47966,6 +48209,12 @@ A `○` is the state worth knowing about before a deploy rather than after:
 declared, not configured. A `✗` means the environment sets something *wrongly*,
 which refuses the boot rather than degrading.
 
+<span class="since-badge" data-since="0.25">Since 0.25</span> A
+`rebase.resources.json` that no longer matches the declarations gets a `○` line.
+One that has not been written yet does not: `rebase build` writes it on every
+build, so a project that has never been built, such as a fresh scaffold, has
+nothing to fix. On 0.24 every new project's `status` ended with "is missing".
+
 #### `rebase resources`
 
 What this project declares it needs — the databases, buckets, topics and
@@ -47997,6 +48246,12 @@ A backend also has a default database and a default storage source that nobody
 declares. Both are listed here, marked `implicit`, and neither is written to
 `rebase.resources.json` — the host supplies them, so recording them would ask
 for something to be provisioned that nobody asked for.
+<span class="since-badge" data-since="0.25">Since 0.25</span> Declaring a named
+one, such as `bucket("media")`, leaves the default where it is, so both are
+listed. Only declaring the default itself, or marking one bucket
+`default: true`, replaces it. On 0.24 the default storage source dropped out of
+`rebase status` and `rebase resources` as soon as any bucket was declared,
+though the server went on serving it.
 
 To see what the platform holds for a project against what its code declares,
 and to remove a provisioned database the code no longer names, see
@@ -48230,9 +48485,21 @@ rebase db migrate --baseline <version>
 ```
 
 The version is the numeric prefix of the migration file; `db generate` prints the
-command with it filled in. Every `db migrate` after that is an ordinary one. See
+command with it filled in. See
 [`--baseline`](/docs/cli/schema/#rebase-db-migrate) for a database that already
 records migrations.
+
+After that, `db migrate` applies what boot has not, and on a database
+`rebase dev` serves that is less than it looks. Boot adds each new table,
+column and enum value as soon as a collection changes, so by the time
+`db generate` writes the migration that adds a column, the column is already
+there: that `db migrate` stops on `already exists` again and names the
+`--baseline <version>` that records it. Every new property means another
+baseline. Record a migration only when boot made every change in it. One that
+also drops, renames or narrows something holds statements boot never runs, and
+recording it skips them. In development, `rebase db push` is the command that
+changes the schema; keep `db generate` and `db migrate` for a database boot has
+not already changed.
 
 #### `rebase db backup` / `backups` / `restore`
 
@@ -48251,12 +48518,22 @@ it, it refuses before anything is applied, the cluster roles included, and
 names the objects in the way and both ways round them: `--clean`, or
 `--create-db --target-db <new name>`. On 0.24 it applied the roles and then
 failed on pg_restore's `schema "rebase" already exists`.
+<span class="since-badge" data-since="0.25">Since 0.25</span> With `--clean`
+the restore is one transaction: it drops the backup's schemas with everything
+in them, restores, and commits only once the whole restore has succeeded, so a
+failure leaves the database as it was. Before asking, it names what it drops
+that the backup does not hold. It runs `psql`, which ships with `pg_restore`.
+On 0.24 a `--clean` restore into a database with a table the backup lacked, such
+as Atlas's revisions table after `db migrate`, dropped everything and restored
+nothing.
 <span class="since-badge" data-since="0.25">Since 0.25</span> `restore` refuses
 the managed development database: a backup carries its rows as COPY data, which
 it cannot receive, and on 0.24 the restore left it hung until it was stopped.
 Restore into Postgres in Docker (`rebase db restore <dump> --docker --clean --yes`),
 then `rebase db pull --from "$(rebase db url --docker)" --yes` copies it into
-the managed database.
+the managed database. A backup of the managed database leaves it as it was; on
+0.24 the settings `pg_dump` made stayed on it, and every API request failed
+until `rebase db stop`.
 <span class="since-badge" data-since="0.25">Since 0.25</span> Relative paths,
 and the default `./backups`, resolve against the directory you run `rebase`
 from, so the three lines above meet in one directory; an option a command does
@@ -48282,6 +48559,12 @@ A column under a unique index gets a distinct value per row, and the pass is one
 transaction: if it fails, the tables it would have rewritten are emptied and
 named, and the command exits 1. On 0.24 it failed on `token_hash` once users had
 signed in twice, leaving real data behind.
+
+<span class="since-badge" data-since="0.25">Since 0.25</span> A flag `pull`
+does not take is refused before anything is read or copied, naming the one it
+was probably meant to be: `--anonymise` answers "did you mean --anonymize?" and
+exits 1. On 0.24 a misspelt flag was ignored, so `--anonymise`, `--anon` or
+`--schem` ran the pull without it, and personal data arrived as it was.
 
 `pg_dump` strips privileges, so the copy would arrive with the source's RLS
 policies and none of the grants behind them — every read as `rebase_user` failing
@@ -48569,7 +48852,7 @@ Your collection definitions in `config/collections/` describe tables, columns, t
 
 #### 2. Drizzle Schema → Migrations
 
-From the generated Drizzle schema, `db generate` diffs against the current database state and produces timestamped SQL migration files.
+From the generated Drizzle schema, `db generate` diffs against the migrations already in `drizzle/migrations/`, replayed on a scratch database, and produces timestamped SQL migration files. It never reads your database: a column boot or `db push` already added still comes out as `ADD COLUMN`.
 
 #### 3. Migrations → PostgreSQL
 
@@ -48640,6 +48923,12 @@ rebase schema introspect
   `db push` after it recreates every policy as it was. On 0.24 the policies
   stay out of the files, and a push can drop one whose name has the shape a
   generated policy has (`<table>_<op>_<hash>`)
+- <span class="since-badge" data-since="0.25">Since 0.25</span> Reads every
+  expression (a policy's `USING`, a CHECK, a column default) under the
+  `search_path` the server uses, `public`, so a function in the `rebase` schema
+  is written `rebase.roles()`. Connected as a role named `rebase`, the default
+  path put that schema first and the rule came back as `roles()`, which the
+  push could not find
 - <span class="since-badge" data-since="0.25">Since 0.25</span> Writes
   `disableDefaultPolicies: true` on a table that has row-level security on and
   does not hold the whole [admin baseline](/docs/collections/security-rules/#policies-a-collection-gets-without-writing-them),
@@ -48738,11 +49027,15 @@ rebase db push
   row-level security changes": the tables it switches RLS on for, and each
   policy it creates, replaces or drops, worked out the way the push's own
   steps decide. It says "No changes" only when neither the schema nor
-  row-level security would change. A policy with no stamp of Rebase's (one
-  written by hand, or read in by `schema introspect`) is re-created from its
-  rule with nothing to compare it to beforehand, and is listed apart. The push
-  itself prints one line counting them. On 0.24 the dry run showed Atlas's plan
-  alone, which has no policies in it
+  row-level security would change. Where a policy's stamp does not match its
+  rule, or it has none (one `db migrate` created, one written by hand), the dry
+  run makes it again from its rule under another name, in a transaction it
+  rolls back, and compares what Postgres stored: one that comes out the same is
+  no change. So a rule `schema introspect` read back as SQL plans nothing, and
+  neither do policies `db migrate` applied. Only one it could not compare (its
+  table's lock not granted within two seconds, say) is listed apart. The push
+  itself prints one line counting the changes. On 0.24 the dry run showed
+  Atlas's plan alone, which has no policies in it
 - <span class="since-badge" data-since="0.25">Since 0.25</span> Shows each
   statement Atlas applies once. Atlas connects without SSL to a database on this
   machine (`localhost`, `127.x`, `::1`) whose URL names no `sslmode`, as the app
@@ -48814,7 +49107,7 @@ rebase db generate
 ```
 
 **What it does:**
-- Compares the Drizzle schema against the current database state
+- Compares the Drizzle schema against the state the migrations in `drizzle/migrations/` build, not against your database
 - Produces timestamped SQL migration files in `drizzle/migrations/`
 - Files can be reviewed, edited, and committed to version control
 - <span class="since-badge" data-since="0.25">Since 0.25</span> Names every
@@ -48823,6 +49116,11 @@ rebase db generate
   `TRUNCATE`, a column type change that can lose values, a primary key
   change, or the drop of a CHECK or EXCLUDE constraint the database holds. It
   still writes the file and exits 0, so it warns and does not refuse.
+- <span class="since-badge" data-since="0.25">Since 0.25</span> Ends on what to
+  do next: `rebase db migrate`, and for a project's first migration, the
+  `--baseline <version>` a database boot has already set up needs instead. A
+  later migration gets no baseline line, since a destructive one baselined would
+  skip its `DROP`, and a run that writes no migration says only that.
 
 **A CHECK a migration of yours added is dropped by the next one.** `db generate`
 diffs your migration files, not the database, and Atlas has no way to leave an
@@ -52127,9 +52425,11 @@ rebase db restore ./backups/rebase-app-20260714T030000Z.dump \
   --create-db --target-db app_restored
 ```
 
-The connection string comes from your project's environment, as for every
-other [`rebase db` command](/docs/cli/database/): `DATABASE_URL`, falling
-back to `ADMIN_CONNECTION_STRING`.
+The database is the one every other [`rebase db` command](/docs/cli/database/)
+resolves, in the same order: `--database-url`, `DATABASE_URL` in the shell, the
+[branch](/docs/backend/branching/) the checkout is switched to, `DATABASE_URL`
+in `.env`, Postgres in Docker (`--docker`, or the last `rebase dev --docker`),
+then the managed development database, which `restore` refuses.
 
 <span class="since-badge" data-since="0.25">Since 0.25</span> A relative
 `--out`, the default `./backups` and a dump path given to `rebase db restore`
@@ -52153,7 +52453,7 @@ retention and listing sort by.
 | Option | Description |
 | --- | --- |
 | `--out`, `-o` | A local path, or an `s3://bucket/prefix` / `gs://bucket/prefix` URL. Defaults to `$BACKUP_DESTINATION`, then `./backups` in the directory you run `rebase` from. |
-| `--exclude-schema <s>` | Leave a schema out of the dump (repeatable). Never leave out `rebase` — see below. |
+| `--exclude-schema <s>` | Leave a schema out of the dump (repeatable). A pattern that matches `rebase` is refused — see below. |
 | `--no-owner` | Omit ownership commands, for restoring as a different role. |
 | `--enable-row-security` | Dump as an admin subject instead of failing on row-level security. **May produce a partial dump** — see [Row-level security](#row-level-security-and-the-dump-that-is-silently-short). |
 | `--row-security-role <r>` | The role to read as with the flag above. Defaults to `admin`. |
@@ -52188,6 +52488,11 @@ cron logs, and the functions your RLS policies and change-capture triggers
 call. A dump without it has no users, and cannot be restored into an empty
 database at all: the tables it does contain have policies that call functions
 it does not.
+
+<span class="since-badge" data-since="0.25">Since 0.25</span> So
+`rebase db backup` refuses an `--exclude-schema` that matches `rebase`, by
+pg_dump's own pattern rules (`reb*` and `*` included), before it runs anything.
+On 0.24 it wrote the dump and validated it, and only the restore failed.
 
 <span class="since-badge" data-since="0.25">Since 0.25</span> Because it holds
 every password and key hash, a local dump and its `.globals.sql` are created
@@ -52280,6 +52585,8 @@ the binary is missing:
 Install them with `brew install libpq` or `apt-get install postgresql-client-18`
 (from the PostgreSQL apt repository, where Debian's own is older), or point at a
 specific binary with `PG_DUMP_PATH`, `PG_RESTORE_PATH` and `PG_DUMPALL_PATH`.
+`restore --clean` also runs `psql`, which ships with them; `PSQL_PATH` names
+another one.
 
 ### Row-level security, and the dump that is silently short
 
@@ -52328,6 +52635,21 @@ stopped on pg_restore's `schema "rebase" already exists`. It refuses the
 managed development database, which cannot take a dump's COPY data; restore
 into Postgres in Docker with `--docker` instead.
 
+<span class="since-badge" data-since="0.25">Since 0.25</span> With `--clean`,
+the restore replaces what the backup holds as one transaction. It drops each
+schema the backup creates whole (`rebase`, say), and each table the backup
+creates in a schema it does not (`public`), with `CASCADE`, then restores the
+dump in the same transaction. Before it asks, it names what that drops that the
+backup does not hold, such as `rebase.atlas_schema_revisions` from
+`rebase db migrate`, or a view or foreign key elsewhere that references one of
+the backup's tables. A restore that stops anywhere is rolled back, and it says
+the database holds what it held before. It runs the dump through `psql`, which
+ships with `pg_restore` (`PSQL_PATH` names another one), and waits at most
+15 seconds for a lock, which a running `rebase dev` can hold. On 0.24, `--clean`
+was pg_restore's own, one statement at a time: a table the backup lacked in
+`rebase` stopped it at `DROP SCHEMA rebase`, after every table had been dropped.
+`--continue-on-error` still runs pg_restore's own `--clean`.
+
 Before restoring, it recreates the cluster roles from the backup's
 `.globals.sql` — an existing role is skipped, not an error — so the dump's
 grants and policies apply. It then runs with `--exit-on-error`: a restore that
@@ -52339,7 +52661,7 @@ roles may be missing.
 | --- | --- |
 | `--target-db <name>` | Restore into this database instead of the one in `DATABASE_URL`. |
 | `--create-db` | Create the target database first if it does not exist. |
-| `--clean` | Drop existing objects before recreating them (`--clean --if-exists`). |
+| `--clean` | Replace what the backup holds, in one transaction with the restore: its schemas whole, and its tables elsewhere. Says first what that drops beyond the backup. |
 | `--no-owner` | Ignore the ownership recorded in the dump. |
 | `--continue-on-error` | Log and continue past errors. **May leave RLS unenforced**; use it only when you know why. |
 | `--yes`, `-y` | Skip the confirmation. |
