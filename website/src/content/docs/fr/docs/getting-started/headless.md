@@ -115,6 +115,12 @@ Les fichiers sont placés dans `config/collections/`. À partir de ce moment, le
 projet possède des collections dans le code et l'introspection au démarrage ne
 définit plus l'API.
 
+<span class="since-badge" data-since="0.25">Depuis 0.25</span> Le squelette headless
+installe Atlas dans `backend/`, de sorte que `rebase db push`, `rebase db generate`
+et `pnpm run db:migrate` fonctionnent sur ces collections comme dans tout autre projet. En
+0.24, chacune de ces commandes s'arrête sur « The atlas binary is missing » ; ajoutez-le au
+backend avec `pnpm --dir backend add @ariga/atlas`.
+
 ## Utilisation
 
 Via HTTP :

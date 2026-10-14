@@ -215,6 +215,13 @@ autre projet. Elle a aussi besoin de `functions:invoke`, ou de `functions:invoke
 fonction, pour pouvoir atteindre la fonction. `hasScope(c, scope, target)` et `getScopes(c)`
 répondent à la même question dans un gestionnaire.
 
+<span class="since-badge" data-since="0.25">Depuis 0.25</span> `requireScope`
+refuse une portée que personne ne pourrait détenir. Un nom qui n'est pas une portée, ou une portée
+intégrée mal orthographiée comme `data:raed`, lève une exception au chargement de la fonction. Une
+portée d'application que le backend ne déclare pas sous `auth.scopes` renvoie
+`500 SCOPE_NOT_DECLARED` à chaque appelant, administrateur compris. En 0.24, les deux renvoient
+`403 SCOPE_MISSING`.
+
 ## Ce que signifie admin
 
 `admin` est le seul rôle intégré, et c'est plus qu'une liste de portées :

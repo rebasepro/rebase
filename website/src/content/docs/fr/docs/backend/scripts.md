@@ -40,10 +40,10 @@ rebase console
 ```text
 > const { data } = await rebase.dataAsAdmin.posts.find({ limit: 3 })
 > data.map(p => p.title)
-[ 'Hello', 'Second post', 'Draft' ]
+[ 'Draft', 'Second post', 'Hello' ]
 > const ada = await rebase.withAuth({ uid: "ada", roles: ["user"] })
-> (await ada.data.posts.find()).data.length
-1
+> (await ada.data.posts.find({ limit: 3 })).data.length
+3
 ```
 
 Deux noms sont dans la portée, et l'`await` de premier niveau fonctionne :
@@ -82,6 +82,15 @@ rebase console -e "const u = await rebase.withAuth({ uid: 'u1', roles: ['user'] 
 Tout ce que la console journalise, quelle que soit la valeur de `LOG_LEVEL`, va sur stderr, de sorte
 que stdout contient le résultat et rien d'autre. Un extrait qui lève une exception affiche l'erreur
 sur stderr et se termine avec le code `1`.
+
+<span class="since-badge" data-since="0.25">Depuis 0.25</span> Une base de données que la
+console ne peut pas ouvrir est signalée une seule fois, et la console se termine avec le code `1` : la
+bannière « Cannot connect to PostgreSQL » qu'affichent les commandes `db`, ou, sur la base de
+développement managée, le fait qu'elle n'a plus de connexion libre. Cette base n'accepte que
+quelques connexions à la fois et un `rebase dev` en cours d'exécution en détient certaines :
+fermez donc un autre client ou arrêtez `rebase dev`, puis relancez-la. En 0.24, la bannière
+apparaissait deux fois, sous une ligne `❌ [ERROR]` vide, et une base managée pleine affichait
+`read ECONNRESET` avec sa pile d'appels sur une seule ligne de JSON.
 
 ### Options
 
@@ -147,9 +156,21 @@ Ses options :
 votre script, et des paramètres comme `REBASE_DB_POOL_MAX` ou `REALTIME_CDC` ne changent
 rien ici.
 
+<span class="since-badge" data-since="0.25">Depuis 0.25</span> L'ouverture ne journalise rien
+au niveau `info`, de sorte que le stdout d'un script contient ce que le script affiche, et que
+`tsx scripts/report.ts > report.json` n'écrit que son JSON. Les avertissements et les erreurs
+vont sur stderr en développement. La note sur la façon dont les requêtes sont isolées
+(`RLS enforcement active`) est journalisée au niveau `debug` ; le démarrage d'un serveur
+l'affiche toujours au niveau `info`. Une base de données injoignable fait rejeter l'ouverture
+avec une seule erreur, `Cannot connect to PostgreSQL at <host>:<port>: <reason>.`, et rien
+n'est journalisé : c'est au script de décider quoi afficher. En 0.24, cette note ouvrait le
+stdout d'un script, et une base de données injoignable journalisait une bannière avant l'erreur.
+
 Ses accesseurs sont typés par le `Database` qu'enregistre `rebase generate-sdk --register`,
 comme l'est le `rebase` d'une fonction : un nom de collection, de champ ou de valeur d'enum
-mal orthographié dans un script est donc une erreur de type. Sans enregistrement, nommez-le
+mal orthographié dans un script est donc une erreur de type. Le `backend/tsconfig.json` du
+scaffold inclut `scripts/`, de sorte que `tsc --noEmit` dans `backend/` la signale. Sans
+enregistrement, nommez-le
 à chaque appel avec `openRebase<Database>({ … })` ; `OpenedRebase<Database>` est le type à
 donner à un helper qui en reçoit un. Sans l'un ni l'autre, les lignes ne sont pas typées, ce
 qui explique pourquoi le premier exemple convertit `draft.id` avec `String()`.
@@ -158,7 +179,11 @@ qui explique pourquoi le premier exemple convertit `draft.id` avec `String()`.
 
 <span class="since-badge" data-since="0.25">Depuis 0.25</span>
 
-`withAuth` est le moyen le plus rapide de tester une règle de sécurité sur des données réelles :
+`withAuth` est le moyen le plus rapide de tester une règle de sécurité sur des données réelles.
+Le scaffold blog, celui que `rebase init` crée par défaut, donne à chaque collection les
+`defaultSecurityRules` de `config/collections/index.ts` : chaque utilisateur connecté lit chaque
+article, et seul un administrateur en écrit un. Ce script vérifie les deux moitiés, sous le nom
+`backend/scripts/ada-check.ts` :
 
 ```typescript
 import { openRebase } from "@rebasepro/server-postgres";
@@ -166,9 +191,29 @@ import { collections } from "../../config/collections";
 
 const rebase = await openRebase({ databaseUrl: process.env.DATABASE_URL!, collections });
 const ada = await rebase.withAuth({ uid: "ada", roles: ["user"] });
-const { data } = await ada.data.posts.find();
-console.log(data.every(post => post.author_id === "ada"));
+
+// A signed-in user reads every post…
+const { data: seen } = await ada.data.posts.find();
+const { data: all } = await rebase.dataAsAdmin.posts.find();
+console.log(seen.length === all.length);
+
+// …and writing one is refused: only an admin may.
+const refused = await ada.data.posts.create({ title: "Not an admin" }).then(() => false, () => true);
+console.log(refused);
+
+await rebase.close();
 ```
+
+Lancez-le comme le premier script, et il affiche `true` deux fois :
+
+```bash
+cd backend
+DATABASE_URL="$(pnpm exec rebase db url)" pnpm exec tsx scripts/ada-check.ts
+```
+
+Une règle qui filtre les lignes par propriétaire se vérifie de la même façon : comparez le champ
+propriétaire de chaque ligne avec l'`uid` que vous avez passé. Sur le scaffold blog, aucune règle
+ne le fait, et `authorId` sur un article est l'id d'une ligne d'auteur, pas d'un utilisateur.
 
 Un utilisateur est `{ uid, roles?, isAnonymous?, claims? }` ; les `claims` sont ce que
 `rebase.jwt()` lit dans une stratégie.
@@ -194,15 +239,18 @@ before(async () => {
 });
 after(() => rebase.close());
 
-test("a user only sees their own posts", async () => {
+test("a signed-in user reads every post and writes none", async () => {
     const ada = await rebase.withAuth({ uid: "ada", roles: ["user"] });
-    const { data } = await ada.data.posts.find();
-    assert.ok(data.every(post => post.author_id === "ada"));
+    const { data: seen } = await ada.data.posts.find();
+    const { data: all } = await rebase.dataAsAdmin.posts.find();
+    assert.equal(seen.length, all.length);
+    await assert.rejects(ada.data.posts.create({ title: "Not an admin" }));
 });
 ```
 
-Lancez-le depuis `backend/` avec le lanceur de tests de Node, en faisant pointer `TEST_DATABASE_URL`
-vers une base de données sur laquelle un serveur Rebase a démarré :
+Enregistrez-le sous `backend/scripts/posts.test.ts` et lancez-le depuis `backend/` avec le
+lanceur de tests de Node, en faisant pointer `TEST_DATABASE_URL` vers une base de données sur
+laquelle un serveur Rebase a démarré :
 
 ```bash
 TEST_DATABASE_URL="$(pnpm exec rebase db url)" pnpm exec tsx --test scripts/posts.test.ts
