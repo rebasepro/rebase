@@ -230,6 +230,8 @@ Tres archivos determinan a qué puede acceder un backend, y este comando muestra
 
 Un `○` es el estado que conviene conocer antes de un despliegue y no después: declarado, no configurado. Una `✗` significa que el entorno define algo de forma *incorrecta*, lo que impide el arranque en lugar de degradar el servicio.
 
+<span class="since-badge" data-since="0.25">Desde 0.25</span> Un `rebase.resources.json` que ya no coincide con las declaraciones recibe una línea `○`. Uno que aún no se ha escrito no: `rebase build` lo escribe en cada compilación, así que un proyecto que nunca se ha compilado, como un scaffold recién creado, no tiene nada que arreglar. En la 0.24 el `status` de todo proyecto nuevo terminaba con "is missing".
+
 ### `rebase resources`
 
 Lo que este proyecto declara necesitar — las bases de datos, buckets, topics y colas que solicita su código de configuración, y los crons y funciones que definen sus archivos:
@@ -246,6 +248,7 @@ rebase resources --json     # machine-readable
 Un recurso se declara en el código de configuración — `database("analytics")`, `bucket("media")`, `topic("signups")`, `queue("thumbnails")` — o es un archivo bajo `backend/crons` o `backend/functions`, y nunca se escribe a mano en `rebase.resources.json`, el cual se genera a partir de esas declaraciones para que un host pueda leer lo que necesita un proyecto sin compilarlo. Cada entrada registra quién lo utiliza (`collection:events`, `property:posts.cover`, `function:report`).
 
 Un backend también cuenta con una base de datos predeterminada y un origen de almacenamiento predeterminado que nadie declara. Ambos se enumeran aquí, marcados como `implicit`, y ninguno se escribe en `rebase.resources.json` — el host los proporciona, por lo que registrarlos solicitaría el aprovisionamiento de algo que nadie pidió.
+<span class="since-badge" data-since="0.25">Desde 0.25</span> Declarar uno con nombre, como `bucket("media")`, deja el predeterminado donde está, así que se enumeran ambos. Solo declarar el propio predeterminado, o marcar un bucket con `default: true`, lo reemplaza. En la 0.24 el origen de almacenamiento predeterminado desaparecía de `rebase status` y `rebase resources` en cuanto se declaraba cualquier bucket, aunque el servidor lo seguía sirviendo.
 
 Para ver lo que la plataforma mantiene para un proyecto en comparación con lo que declara su código, y para eliminar una base de datos aprovisionada que el código ya no menciona, consulta [`rebase cloud resources`](/docs/cli/cloud#resources).
 

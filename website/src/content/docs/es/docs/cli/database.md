@@ -69,9 +69,21 @@ rebase db migrate --baseline <version>
 ```
 
 La versión es el prefijo numérico del archivo de migración; `db generate` imprime el
-comando con ella ya rellenada. Cada `db migrate` posterior es uno normal. Consulta
+comando con ella ya rellenada. Consulta
 [`--baseline`](/docs/cli/schema/#rebase-db-migrate) para una base de datos que ya
 registra migraciones.
+
+Después, `db migrate` aplica lo que el arranque no ha aplicado, y en una base de datos
+que sirve `rebase dev` eso es menos de lo que parece. El arranque añade cada tabla,
+columna y valor de enum nuevos en cuanto cambia una colección, así que, para cuando
+`db generate` escribe la migración que añade una columna, la columna ya está ahí:
+ese `db migrate` vuelve a detenerse con `already exists` y nombra el
+`--baseline <version>` que la registra. Cada propiedad nueva supone otra baseline.
+Registra una migración solo cuando el arranque hizo todos sus cambios. Una que además
+elimina, renombra o estrecha algo contiene sentencias que el arranque nunca ejecuta, y
+registrarla se las salta. En desarrollo, `rebase db push` es el comando que cambia el
+esquema; deja `db generate` y `db migrate` para una base de datos que el arranque no
+haya cambiado ya.
 
 ### `rebase db backup` / `backups` / `restore`
 
@@ -90,13 +102,23 @@ que ya contiene lo que crea la copia de seguridad, `restore` necesita `--clean`.
 objetos que estorban y las dos formas de evitarlos: `--clean`, o
 `--create-db --target-db <new name>`. En la 0.24 aplicaba los roles y luego
 fallaba con el `schema "rebase" already exists` de pg_restore.
+<span class="since-badge" data-since="0.25">Desde 0.25</span> Con `--clean`
+la restauración es una sola transacción: elimina los esquemas de la copia de seguridad
+con todo lo que contienen, restaura y solo confirma cuando toda la restauración ha
+salido bien, así que un fallo deja la base de datos como estaba. Antes de preguntar,
+nombra lo que elimina y que la copia de seguridad no contiene. Ejecuta `psql`, que
+viene con `pg_restore`. En la 0.24 una restauración con `--clean` en una base de datos
+con una tabla que faltaba en la copia de seguridad, como la tabla de revisiones de
+Atlas tras `db migrate`, lo eliminaba todo y no restauraba nada.
 <span class="since-badge" data-since="0.25">Desde 0.25</span> `restore` rechaza
 la base de datos de desarrollo gestionada: una copia de seguridad lleva sus filas
 como datos COPY, que esta no puede recibir, y en la 0.24 la restauración la dejaba
 colgada hasta que se detenía. Restaura en Postgres en Docker
 (`rebase db restore <dump> --docker --clean --yes`), y luego
 `rebase db pull --from "$(rebase db url --docker)" --yes` la copia en la base de
-datos gestionada.
+datos gestionada. Una copia de seguridad de la base de datos gestionada la deja como
+estaba; en la 0.24 los ajustes que hacía `pg_dump` se quedaban en ella, y todas las
+solicitudes a la API fallaban hasta `rebase db stop`.
 <span class="since-badge" data-since="0.25">Desde 0.25</span> Las rutas relativas,
 y el `./backups` predeterminado, se resuelven respecto al directorio desde el que
 ejecutas `rebase`, de modo que las tres líneas de arriba coinciden en un mismo
@@ -121,6 +143,12 @@ Una columna bajo un índice único recibe un valor distinto por fila, y la pasad
 transacción: si falla, las tablas que habría reescrito se vacían y se nombran,
 y el comando termina con código 1. En la 0.24 fallaba en `token_hash` una vez que los usuarios
 habían iniciado sesión dos veces, dejando datos reales atrás.
+
+<span class="since-badge" data-since="0.25">Desde 0.25</span> Un flag que `pull`
+no acepta se rechaza antes de leer o copiar nada, nombrando el que probablemente se
+quería escribir: `--anonymise` responde "did you mean --anonymize?" y termina con
+código 1. En la 0.24 un flag mal escrito se ignoraba, así que `--anonymise`, `--anon` o
+`--schem` ejecutaban el pull sin él, y los datos personales llegaban tal cual.
 
 `pg_dump` elimina los privilegios, por lo que la copia llegaría con las políticas RLS del origen y ninguna de las concesiones (grants) asociadas — fallando cada lectura como `rebase_user` con `permission denied`. La operación pull reaprovisiona el rol de la aplicación después, utilizando la misma rutina que el arranque y `rebase db push`, de modo que las tablas internas de Rebase permanezcan revocadas como corresponde.
 

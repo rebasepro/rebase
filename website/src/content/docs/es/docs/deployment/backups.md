@@ -39,9 +39,11 @@ rebase db restore ./backups/rebase-app-20260714T030000Z.dump \
   --create-db --target-db app_restored
 ```
 
-La cadena de conexión proviene del entorno de tu proyecto, como en cualquier
-otro comando [`rebase db`](/docs/cli/database/): `DATABASE_URL`, recurriendo a
-`ADMIN_CONNECTION_STRING` si falta.
+La base de datos es la que resuelve cualquier otro [comando `rebase db`](/docs/cli/database/),
+en el mismo orden: `--database-url`, `DATABASE_URL` en el shell, la
+[rama](/docs/backend/branching/) a la que está cambiado el checkout, `DATABASE_URL`
+en `.env`, Postgres en Docker (`--docker`, o el último `rebase dev --docker`) y,
+por último, la base de datos de desarrollo gestionada, que `restore` rechaza.
 
 <span class="since-badge" data-since="0.25">Desde 0.25</span> Un `--out` relativo,
 el `./backups` predeterminado y una ruta de dump que se da a `rebase db restore`
@@ -65,7 +67,7 @@ lo que usan la retención y el listado para ordenar.
 | Opción | Descripción |
 | --- | --- |
 | `--out`, `-o` | Una ruta local, o una URL `s3://bucket/prefix` / `gs://bucket/prefix`. Por defecto usa `$BACKUP_DESTINATION`, y luego `./backups` en el directorio desde el que ejecutas `rebase`. |
-| `--exclude-schema <s>` | Omite un esquema del dump (repetible). Nunca omitas `rebase` — ver más abajo. |
+| `--exclude-schema <s>` | Omite un esquema del dump (repetible). Un patrón que coincide con `rebase` se rechaza — ver más abajo. |
 | `--no-owner` | Omite las instrucciones de propiedad, para restaurar como un rol distinto. |
 | `--enable-row-security` | Vuelca los datos como sujeto administrador en lugar de fallar por la seguridad a nivel de fila. **Puede producir un dump parcial** — consulta [Seguridad a nivel de fila](#seguridad-a-nivel-de-fila-y-el-dump-que-queda-corto-en-silencio). |
 | `--row-security-role <r>` | El rol con el que leer al usar la opción anterior. Por defecto, `admin`. |
@@ -102,6 +104,11 @@ que llaman tus políticas de RLS y los triggers de captura de cambios. Un dump
 sin él no tiene usuarios, y no se puede restaurar en una base de datos vacía
 en absoluto: las tablas que sí contiene tienen políticas que llaman a
 funciones que no están.
+
+<span class="since-badge" data-since="0.25">Desde 0.25</span> Por eso
+`rebase db backup` rechaza un `--exclude-schema` que coincide con `rebase`, según las
+reglas de patrones del propio pg_dump (`reb*` y `*` incluidos), antes de ejecutar nada.
+En la 0.24 escribía el dump y lo validaba, y solo fallaba la restauración.
 
 <span class="since-badge" data-since="0.25">Desde 0.25</span> Como contiene cada
 contraseña y cada hash de clave, un dump local y su `.globals.sql` se crean legibles
@@ -199,6 +206,8 @@ Instálalas con `brew install libpq` o `apt-get install postgresql-client-18`
 (desde el repositorio apt de PostgreSQL, donde la versión propia de Debian es
 más antigua), o apunta a un binario específico con `PG_DUMP_PATH`,
 `PG_RESTORE_PATH` y `PG_DUMPALL_PATH`.
+`restore --clean` también ejecuta `psql`, que viene con ellas; `PSQL_PATH` nombra
+otro.
 
 ## Seguridad a nivel de fila, y el dump que queda corto en silencio
 
@@ -250,6 +259,23 @@ con el `schema "rebase" already exists` de pg_restore. Rechaza la base de datos 
 desarrollo gestionada, que no puede recibir los datos COPY de un dump; restaura en
 su lugar en Postgres en Docker con `--docker`.
 
+<span class="since-badge" data-since="0.25">Desde 0.25</span> Con `--clean`,
+la restauración reemplaza lo que contiene la copia de seguridad en una sola
+transacción. Elimina entero cada esquema que crea la copia de seguridad (`rebase`,
+por ejemplo), y cada tabla que la copia crea en un esquema que no crea (`public`),
+con `CASCADE`, y luego restaura el dump en la misma transacción. Antes de preguntar,
+nombra lo que eso elimina y que la copia de seguridad no contiene, como
+`rebase.atlas_schema_revisions` de `rebase db migrate`, o una vista o una clave
+foránea en otro lugar que hace referencia a una de las tablas de la copia. Una
+restauración que se detiene en cualquier punto se revierte, y dice que la base de
+datos contiene lo que contenía antes. Pasa el dump por `psql`, que viene con
+`pg_restore` (`PSQL_PATH` nombra otro), y espera como máximo 15 segundos por un
+bloqueo, que un `rebase dev` en marcha puede tener. En la 0.24, `--clean` era el del
+propio pg_restore, una sentencia cada vez: una tabla que faltaba en la copia de
+seguridad dentro de `rebase` lo detenía en `DROP SCHEMA rebase`, después de haber
+eliminado todas las tablas. `--continue-on-error` sigue ejecutando el `--clean` del
+propio pg_restore.
+
 Antes de restaurar, recrea los roles del clúster a partir del `.globals.sql`
 de la copia de seguridad — un rol existente se omite, no es un error —, para
 que los grants y las políticas del dump se apliquen. Luego se ejecuta con
@@ -262,7 +288,7 @@ podrían faltar roles.
 | --- | --- |
 | `--target-db <name>` | Restaura en esta base de datos en lugar de la que indica `DATABASE_URL`. |
 | `--create-db` | Crea primero la base de datos de destino si no existe. |
-| `--clean` | Elimina los objetos existentes antes de recrearlos (`--clean --if-exists`). |
+| `--clean` | Reemplaza lo que contiene la copia de seguridad, en una sola transacción con la restauración: sus esquemas enteros, y sus tablas en otros esquemas. Dice primero lo que eso elimina más allá de la copia de seguridad. |
 | `--no-owner` | Ignora la propiedad registrada en el dump. |
 | `--continue-on-error` | Registra los errores y continúa. **Puede dejar la RLS sin aplicar**; úsalo solo cuando sepas por qué. |
 | `--yes`, `-y` | Omite la confirmación. |

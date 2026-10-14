@@ -60,6 +60,19 @@ Cannot create branch: the source database "leadgen" has active connections.
 
 `--force` finaliza esas sesiones antes de aplicar la plantilla, tanto en `create` como en `delete`. Nunca finaliza la sesión que ejecuta el propio comando.
 
+<span class="since-badge" data-since="0.25">Desde 0.25</span> `create --force`
+también cierra el origen a nuevas conexiones durante la copia
+(`ALTER DATABASE … ALLOW_CONNECTIONS false`, ejecutado desde la base de datos
+`postgres` del servidor) y lo vuelve a abrir después, también si falla y con Ctrl-C.
+Así, un cliente que se reconecta en cuanto se le desconecta, como hace un
+`rebase dev` en marcha, no puede volver a colarse antes de que empiece la copia. Eso
+requiere ser el propietario del origen; sin serlo, y en `delete`, `--force`
+desconecta las sesiones hasta tres veces antes de rendirse. Cuando después de eso
+sigue habiendo una sesión, el error dice que se reconectaron y que hay que
+detenerlas, no que se vuelva a pasar `--force`. En la 0.24 las desconectaba una sola
+vez, y aproximadamente uno de cada siete `create --force` con un `rebase dev` en
+marcha fallaba con el consejo de volver a ejecutarlo con `--force`.
+
 `DatabasePoolManager` desconecta sus propios pools inactivos antes de clonar o eliminar, pero solo los pools **dentro del proceso que realiza la tarea**. `rebase db branch` se ejecuta como su propio proceso, por lo que no alcanza a nada más en tu máquina:
 
 - **Un `rebase dev` en ejecución bloquea la ramificación.** Este es el caso habitual, no un caso aislado: querer crear una rama y tener la aplicación ejecutándose suelen coincidir al mismo tiempo. Detén el servidor de desarrollo, crea la rama y vuelve a iniciarlo.
@@ -201,6 +214,15 @@ rebase db branch delete dev_sandbox
 ```
 
 `switch` es lo que hace que una rama sea utilizable. Registra la rama en `.rebase/branch.json` —un nombre, nunca una cadena de conexión, de modo que tus credenciales permanezcan únicamente en `.env`— y cada comando `rebase` posterior en ese checkout resolverá la base de datos de la rama: `dev`, `db push`, `db migrate`, `db backup`.
+Un `rebase dev` que ya está en marcha conserva la base de datos con la que arrancó
+hasta que lo reinicias, y `switch` lo dice.
+
+<span class="since-badge" data-since="0.25">Desde 0.25</span> `rebase db branch
+list` marca la rama en la que está este checkout, y `prune` nunca la elimina, igual
+que `delete` se niega a hacerlo: el plan la enumera como conservada, e indica que
+primero hay que salir de ella con `rebase db branch switch --off`. En la 0.24
+`prune --older-than … --yes` la eliminaba, y el checkout apuntaba entonces cada
+comando a una base de datos que ya no existía.
 
 Se sitúa entre el shell y el archivo del proyecto en el orden de resolución:
 
@@ -231,11 +253,10 @@ rama.
 
 Las ramas son bases de datos de PostgreSQL comunes nombradas con el prefijo `rb_` seguido del nombre de la rama; por lo tanto, el comando `dev_sandbox` anterior corresponde a la base de datos `rb_dev_sandbox` en el mismo servidor.
 
-Crear una rama **no** cambia la base de datos con la que se comunica tu proyecto. `rebase db branch create` realiza la copia y se detiene ahí; nada escribe en `.env`, y la siguiente ejecución de `rebase dev` seguirá utilizando la base de datos que usaba antes. Para trabajar contra una rama, apunta tú mismo `DATABASE_URL` hacia ella: la cadena de conexión es la que ya tienes, reemplazando únicamente el nombre de la base de datos:
+Crear una rama **no** cambia la base de datos con la que se comunica tu proyecto. `rebase db branch create` realiza la copia y se detiene ahí; nada escribe en `.env`, y la siguiente ejecución de `rebase dev` seguirá utilizando la base de datos que usaba antes. Para trabajar contra una rama, cámbiate a ella con `rebase db branch switch <name>`, como se ha visto arriba. Para llegar a ella desde cualquier cosa que no sea un comando `rebase`, su cadena de conexión es la que ya tienes, reemplazando únicamente el nombre de la base de datos:
 
 ```bash
-# .env
-DATABASE_URL=postgresql://user:pass@localhost:5432/rb_dev_sandbox
+postgresql://user:pass@localhost:5432/rb_dev_sandbox
 ```
 
 ---
