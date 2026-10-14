@@ -765,6 +765,13 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
             // accepting the value. Not a refusal — boot does the same — but said.
             if (databaseUrl) await reportKeptEnumLabels(databaseUrl, collectionsPath);
 
+            // What the push does to row-level security, which Atlas's plan
+            // cannot show: it has no model for a policy. Read once, here, for
+            // the dry run to list and the push to summarize — see
+            // `schema/push-policy-plan.ts`.
+            const policyPlan = databaseUrl ? await readPolicyPushPlan(databaseUrl, collectionsPath) : undefined;
+            const policyLines = policyPlan ?? { changes: [], notes: [] };
+
             // `--dry-run` stops here, having printed the SQL and nothing else.
             //
             // It exists because the only way to see this plan was to trigger
@@ -777,13 +784,32 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
             if (dryRun) {
                 out(chalk.gray("  Step 3/3: --dry-run — nothing was applied."));
                 out("");
-                if (planStatements.length > 0 || unreadable) {
+                const schemaChanges = planStatements.length > 0 || unreadable;
+                if (schemaChanges) {
                     out(chalk.bold("  Planned changes:"));
                     out(chalk.gray(planListing.split("\n").map((l) => `       ${l}`).join("\n")));
-                } else {
-                    out(chalk.green("  ✓ No changes: the database already matches these collections."));
+                    out("");
                 }
-                out("");
+                const [rlsHeading, ...rlsChanges] = policyLines.changes;
+                if (rlsHeading) {
+                    out(chalk.bold(rlsHeading));
+                    for (const line of rlsChanges) out(chalk.gray(line));
+                    out("");
+                }
+                if (!schemaChanges && !rlsHeading) {
+                    out(chalk.green(policyPlan
+                        ? "  ✓ No changes: the database already matches these collections."
+                        : "  ✓ No schema changes: the tables already match these collections."));
+                    out("");
+                }
+                if (databaseUrl && !policyPlan) {
+                    outWarn(chalk.yellow("  ⚠️  The row-level security the push would change could not be read, so none is listed."));
+                    outWarn("");
+                }
+                if (policyLines.notes.length > 0) {
+                    for (const line of policyLines.notes) out(chalk.gray(line));
+                    out("");
+                }
                 if (prebuilt.length > 0) {
                     out(chalk.gray(`  ${prebuilt.length} foreign-key index(es) on existing tables would be built first,`));
                     out(chalk.gray("  CONCURRENTLY, so the apply would not build them under a write lock (the plan"));
@@ -858,6 +884,11 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
                     // decision === "apply" via --allow-destructive or --yes
                     outWarn(chalk.yellow(`  Proceeding because ${optIn ?? "--allow-destructive"} was passed.`));
                 }
+            }
+
+            if (policyPlan?.summary) {
+                out(chalk.gray(policyPlan.summary));
+                out("");
             }
 
             // Without a database URL there is nothing to drop or rebuild: runAtlas
@@ -1316,6 +1347,34 @@ async function policyStamping(databaseUrl: string, collectionsPath: string, poli
         return { statements, searchPath: pinSearchPath(databaseUrl) === databaseUrl ? undefined : "public" };
     } catch {
         return { statements: [] };
+    }
+}
+
+/**
+ * `planPolicyPush` for this database and these collections, read under the
+ * `search_path` the push stamps policies under, as the lines the dry run
+ * prints and the one the push does; `undefined`, having said why, when it
+ * cannot be read.
+ */
+async function readPolicyPushPlan(databaseUrl: string, collectionsPath: string): Promise<{
+    changes: string[];
+    notes: string[];
+    summary: string | null;
+} | undefined> {
+    try {
+        const { formatPolicyPushPlan, planPolicyPush, summarizePolicyPushPlan } = await import("./schema/push-policy-plan");
+        const { loadCollections } = await import("./schema/doctor");
+        const { pinSearchPath } = await import("./connection");
+        const collections = await loadCollections(path.resolve(process.cwd(), collectionsPath));
+        const plan = await withAppClient(databaseUrl, client => planPolicyPush(
+            { query: async (text, values) => ({ rows: (await client.query(text, values)).rows }) },
+            collections,
+            { searchPath: pinSearchPath(databaseUrl) === databaseUrl ? undefined : "public" }
+        ));
+        return { ...formatPolicyPushPlan(plan), summary: summarizePolicyPushPlan(plan) };
+    } catch (err) {
+        outWarn(chalk.yellow(`  ⚠️  Could not read the database's row-level security: ${err instanceof Error ? err.message : String(err)}`));
+        return undefined;
     }
 }
 

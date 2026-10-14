@@ -290,6 +290,47 @@ const policiesAreCurrent = (plan: CollectionPolicyPlan, present: Map<string, Liv
 };
 
 /**
+ * What its stamp says of a declared policy the database has: written by Rebase
+ * from the statement the plan renders now and still holding that definition
+ * (`current`), stamped once but changed since — the rule's SQL, or the policy
+ * by hand (`stale`), or carrying no stamp at all, so nothing tells whether a
+ * re-apply changes it (`unstamped`).
+ */
+export type PolicyStampState = "current" | "stale" | "unstamped";
+
+/**
+ * Every declared policy the database holds, by `schema.table`, then name, with
+ * its {@link PolicyStampState}. The comparison a boot makes to leave a table
+ * alone, read for each policy instead of each table.
+ *
+ * The stored definition is read with `pg_get_expr`, whose spelling depends on
+ * `search_path`: call it under the path the stamps were written under (a
+ * boot's, `public` unless the URL pins one), or a current stamp reads stale.
+ */
+export async function readPolicyStamps(
+    client: Queryable,
+    collections: CollectionConfig[]
+): Promise<Map<string, Map<string, PolicyStampState>>> {
+    const plans = planCollectionPolicies(collections);
+    const live = await readLivePolicies(client, Array.from(new Set(plans.map(p => p.schema))));
+    const states = new Map<string, Map<string, PolicyStampState>>();
+    for (const plan of plans) {
+        const present = live.get(plan.qualified);
+        if (!present) continue;
+        const table = new Map<string, PolicyStampState>();
+        for (const [name, renderedHash] of renderedHashes(plan)) {
+            const policy = present.get(name);
+            if (!policy) continue;
+            table.set(name, policy.stamp === null || !policy.stamp.startsWith(POLICY_STAMP_PREFIX)
+                ? "unstamped"
+                : policy.stamp === stampOf(renderedHash, policy.live) ? "current" : "stale");
+        }
+        states.set(plan.qualified, table);
+    }
+    return states;
+}
+
+/**
  * Every declared schema's tables, and whether each has row-level security on.
  *
  * One catalogue read for the whole step. It replaced a full `readExistingSchema`
@@ -428,14 +469,8 @@ export async function lockCollectionTables(
     collections: CollectionConfig[]
 ): Promise<TableLockResult> {
     const result: TableLockResult = { locked: 0, unsecured: [] };
-    const plans = planCollectionPolicies(collections);
-    if (plans.length === 0) return result;
-
-    const tables = await readTableSecurity(client, Array.from(new Set(plans.map(p => p.schema))));
-    for (const plan of plans) {
-        const table = tables.get(plan.qualified);
-        if (!table) continue;
-        const lock = await lockTable(client, plan, table.rls);
+    for (const { plan, rls } of await declaredTablesPresent(client, collections)) {
+        const lock = await lockTable(client, plan, rls);
         if (lock.locked) {
             result.locked++;
         } else {
@@ -443,6 +478,29 @@ export async function lockCollectionTables(
         }
     }
     return result;
+}
+
+/**
+ * The declared tables {@link lockCollectionTables} would switch row-level
+ * security on for: those in the database with it off. What `db push
+ * --dry-run` lists, read the way the push's lock step reads it.
+ */
+export async function tablesRlsWouldEnable(client: Queryable, collections: CollectionConfig[]): Promise<string[]> {
+    return (await declaredTablesPresent(client, collections)).filter(table => !table.rls).map(table => table.plan.qualified);
+}
+
+/** Each declared table the database has, with whether its RLS is on. */
+async function declaredTablesPresent(
+    client: Queryable,
+    collections: CollectionConfig[]
+): Promise<{ plan: CollectionPolicyPlan; rls: boolean }[]> {
+    const plans = planCollectionPolicies(collections);
+    if (plans.length === 0) return [];
+    const tables = await readTableSecurity(client, Array.from(new Set(plans.map(p => p.schema))));
+    return plans.flatMap(plan => {
+        const table = tables.get(plan.qualified);
+        return table ? [{ plan, rls: table.rls }] : [];
+    });
 }
 
 /** One declared table that exists, and what the catalogue said about it. */

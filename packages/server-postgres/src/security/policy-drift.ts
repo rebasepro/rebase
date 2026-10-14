@@ -426,19 +426,27 @@ export async function dropOrphanedPolicies(
     drift: PolicyDrift,
     collections: CollectionConfig[]
 ): Promise<OrphanCleanup> {
+    const { dropped, kept } = partitionOrphans(drift, collections);
+    for (const p of dropped) {
+        // Identifiers are quoted, and the name came from pg_policies rather than
+        // from user input, so it is already a valid identifier.
+        await client.query(`DROP POLICY IF EXISTS "${p.name}" ON "${p.schema}"."${p.table}"`);
+    }
+    return { dropped, kept };
+}
+
+/**
+ * Which orphans {@link dropOrphanedPolicies} drops and which it keeps, decided
+ * without dropping anything: what `db push --dry-run` lists.
+ */
+export function partitionOrphans(drift: PolicyDrift, collections: CollectionConfig[]): OrphanCleanup {
     const expected = parseExpectedPolicies(generatePostgresPoliciesDdl(collections));
     const managed = new Set(expected.map((p) => `${p.schema}.${p.table}`));
 
     const cleanup: OrphanCleanup = { dropped: [], kept: [] };
     for (const p of drift.orphaned) {
-        if (!managed.has(`${p.schema}.${p.table}`) || !isGeneratedPolicyName(p.name, p.table)) {
-            cleanup.kept.push(p);
-            continue;
-        }
-        // Identifiers are quoted, and the name came from pg_policies rather than
-        // from user input, so it is already a valid identifier.
-        await client.query(`DROP POLICY IF EXISTS "${p.name}" ON "${p.schema}"."${p.table}"`);
-        cleanup.dropped.push(p);
+        if (managed.has(`${p.schema}.${p.table}`) && isGeneratedPolicyName(p.name, p.table)) cleanup.dropped.push(p);
+        else cleanup.kept.push(p);
     }
     return cleanup;
 }
