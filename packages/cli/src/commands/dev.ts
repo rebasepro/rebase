@@ -63,6 +63,7 @@ import { detectPackageManager, getPMCommands } from "../utils/package-manager";
 import { parseCommandArgs, UsageError, wantsHelp } from "../utils/args";
 import { Refusal } from "../utils/refusal";
 import { affectsSqlSchema } from "../utils/collection-drift";
+import { BootRetry } from "../utils/boot-retry";
 import { ensureDevDatabase, probeTcp } from "../utils/dev-preflight";
 import { DEV_BACKEND_URL_ENV, getProjectPort } from "../utils/dev-server";
 import { runDriverDbCommand, runDriverSchemaCommand } from "./db";
@@ -2054,6 +2055,24 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
          */
         let backendAnnounced = false;
 
+        /**
+         * A boot that lost its database part-way is booted again, a few
+         * times, instead of waiting for a file change. See utils/boot-retry.ts:
+         * a `rebase db branch create --force` that lands while the backend
+         * boots ends its connections, and nothing in the project is wrong.
+         */
+        const bootRetry = new BootRetry();
+        const retryPassingBootFailure = (line: string): void => {
+            if (!usableTrigger || shuttingDown) return;
+            const plan = bootRetry.line(stripAnsi(line));
+            if (!plan) return;
+            setTimeout(() => {
+                if (shuttingDown || backendAnnounced) return;
+                console.log(chalk.gray(`  ↻ The backend lost its database while it was starting; starting it again (${plan.attempt} of ${plan.of}).`));
+                restartBackend();
+            }, plan.delayMs).unref?.();
+        };
+
         /** The verdict, printed once per failure rather than once per line. */
         let backendDownReported = false;
         const reportBackendDown = (headline: string) => {
@@ -2190,6 +2209,7 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
             console.log(`${chalk.cyan.bold("[backend]")}  ${line}`);
             noticeWatcherRestart(line);
             noticePortMoved(line);
+            retryPassingBootFailure(line);
             const cleanLine = stripAnsi(line);
             const swaggerMatch = cleanLine.match(/Swagger UI available.*"path":"([^"]+)"/);
             if (swaggerMatch) swaggerPath = swaggerMatch[1];
@@ -2199,6 +2219,7 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
                 backendAnnounced = true;
                 backendDownReported = false;
                 missedProbes = 0;
+                bootRetry.up();
                 // The backend is up, so an earlier failure is no longer the
                 // answer this run gives.
                 if (backendOnly) process.exitCode = 0;
@@ -2245,6 +2266,7 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
 
             noticeWatcherRestart(line);
             noticePortMoved(line);
+            retryPassingBootFailure(line);
 
             // Detect corrupted node_modules at runtime
             // (covers tsx and any other dependency whose pnpm store entry is broken)

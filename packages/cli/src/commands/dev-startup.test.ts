@@ -665,3 +665,53 @@ describe("a refusal dev raises itself", () => {
         }
     });
 });
+
+/**
+ * A boot that lost its database part-way — a `rebase db branch create
+ * --force` closed it, or the server restarted — is booted again, rather than
+ * left for "the watcher restarts it on the next change" (see `BootRetry`).
+ */
+describe("a boot that lost its database", () => {
+    const isBackend = (s: Spawned) => s.file === "/bin/true";
+    const triggerText = (trigger: string) => (fs.existsSync(trigger) ? fs.readFileSync(trigger, "utf8") : null);
+
+    async function start(): Promise<{ run: Promise<void>; say: (line: string) => void }> {
+        generation.resolve();
+        const run = devCommand(["node", "rebase", "dev", "--backend-only", "--port", "45190"]);
+        await vi.waitFor(() => expect(spawned.some(isBackend)).toBe(true));
+        return { run, say: line => spawned.find(isBackend)?.stdout.write(`${line}\n`) };
+    }
+
+    it("is started again, saying so", async () => {
+        const trigger = devRestartTrigger(scratch);
+        if (!trigger) return;
+        const { run, say } = await start();
+        const before = triggerText(trigger);
+
+        say("❌ [ERROR] Failed to start the Rebase runtime: Failed query: CREATE SCHEMA IF NOT EXISTS rebase");
+        say("  caused by: terminating connection due to administrator command (57P01)");
+
+        await vi.waitFor(() => expect(triggerText(trigger)).not.toBe(before), { timeout: 3_000 });
+        const logged = vi.mocked(console.log).mock.calls.map(call => call.map(String).join(" ")).join("\n");
+        expect(logged).toContain("lost its database while it was starting; starting it again (1 of 3)");
+
+        for (const child of spawned) child.end();
+        await run;
+    });
+
+    it("is left alone when the project is what failed", async () => {
+        const trigger = devRestartTrigger(scratch);
+        if (!trigger) return;
+        const { run, say } = await start();
+        const before = triggerText(trigger);
+
+        say("❌ [ERROR] Failed to start the Rebase runtime: something");
+        say("  caused by: password authentication failed for user \"rebase_app\" (28P01)");
+
+        await new Promise(resolve => setTimeout(resolve, 1_500));
+        expect(triggerText(trigger)).toBe(before);
+
+        for (const child of spawned) child.end();
+        await run;
+    });
+});
