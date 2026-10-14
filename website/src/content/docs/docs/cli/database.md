@@ -131,7 +131,10 @@ psql "$(rebase db url)"
 
 The managed development database is the case that needs this: `.env` leaves
 `DATABASE_URL` commented out on purpose, and the port is derived from the
-project path, so nothing on disk names it. When you have set a `DATABASE_URL`
+project path, so nothing on disk names it.
+<span class="since-badge" data-since="0.25">Since 0.25</span> It keeps that
+port across a stop and a start, unless something else has taken it; on 0.24
+every start picked a new one. When you have set a `DATABASE_URL`
 of your own, that is what this prints — the resolution order is the same one
 every other command follows. It starts the managed database if it is not
 already running.
@@ -153,6 +156,13 @@ For the managed development database only:
 rebase db stop     # stop it; the data is kept
 rebase db reset    # delete it and start over
 ```
+
+<span class="since-badge" data-since="0.25">Since 0.25</span> `db stop` under a
+running `rebase dev` says that its backend cannot reach the database until it
+is back. The next command that needs it, `rebase db url` for one, starts it on
+the same port, and the backend reconnects without a restart. On 0.24 it came
+back on another port, and the backend answered 503 until `rebase dev` was
+restarted.
 
 ### `rebase db branch`
 

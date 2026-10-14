@@ -39,6 +39,39 @@ function readText(file: string): string | null {
     }
 }
 
+/** Is *some* process with this pid running? EPERM means it is, as someone else. */
+function processAlive(pid: number): boolean {
+    try {
+        process.kill(pid, 0);
+        return true;
+    } catch (error) {
+        return (error as NodeJS.ErrnoException).code === "EPERM";
+    }
+}
+
+/**
+ * The address of this project's backend while it runs, or `null`.
+ *
+ * From `.rebase/state.json`, which the server writes when it binds — under
+ * `rebase dev` and `rebase start` alike — and only while the pid it names is
+ * alive: a backend that was killed leaves the file behind.
+ */
+export function runningBackendUrl(projectRoot: string): string | null {
+    const state = readText(path.join(projectRoot, ".rebase", "state.json"));
+    if (!state) return null;
+    try {
+        const parsed: unknown = JSON.parse(state);
+        if (typeof parsed !== "object" || parsed === null || !("pid" in parsed)) return null;
+        const pid = parsed.pid;
+        if (typeof pid !== "number" || !Number.isInteger(pid) || pid <= 0 || !processAlive(pid)) return null;
+        if ("baseUrl" in parsed && typeof parsed.baseUrl === "string" && parsed.baseUrl.trim()) return parsed.baseUrl.trim();
+        const port = "port" in parsed ? portOf(parsed.port) : null;
+        return port !== null ? `http://localhost:${port}` : null;
+    } catch {
+        return null;
+    }
+}
+
 /**
  * The URL `rebase dev` serves this project on, and how that is known:
  *

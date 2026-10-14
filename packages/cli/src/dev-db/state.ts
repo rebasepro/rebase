@@ -13,8 +13,9 @@
  * it asks the daemon rather than the operating system.
  */
 
+import { createHash } from "crypto";
 import fs from "fs";
-import { resourceEnvSuffix } from "@rebasepro/types";
+import { DEFAULT_RESOURCE_KEY, resourceEnvSuffix } from "@rebasepro/types";
 import net from "net";
 import path from "path";
 
@@ -34,6 +35,15 @@ export const STATE_FILE_NAME = "pglite.json";
  * show up; the harmful way is a damaged database.
  */
 export const START_LOCK_NAME = "starting.lock";
+/**
+ * The port each managed database last listened on, by key.
+ *
+ * Kept apart from the state file because it has to outlive the daemon: the
+ * state file is cleared on every stop, and it is what a stopped daemon's
+ * successor reads to come back where the last one was. See
+ * {@link chooseManagedPort}.
+ */
+export const PORTS_FILE_NAME = "pglite-ports.json";
 
 export interface DaemonState {
     /** TCP port the socket server is listening on, chosen when it started. */
@@ -286,4 +296,97 @@ export function findFreePort(): Promise<number> {
             server.close(() => resolve(port));
         });
     });
+}
+
+/** Where a project's derived database port falls: 25432–26431. */
+const MANAGED_PORT_FIRST = 25432;
+const MANAGED_PORT_SPAN = 1000;
+
+/**
+ * The port a project's managed database tries first when nothing is recorded:
+ * derived from the project path, and for an additional database from its key
+ * too, so two projects — and a project's two databases — rarely ask for the
+ * same one.
+ *
+ * Below every ephemeral range (Linux hands out 32768 and up, macOS 49152 and
+ * up), so an outgoing connection's source port never sits on it, and clear of
+ * the ports `rebase dev` derives for the backend (3001–3999), the admin panel
+ * (5173–5372) and the compose database (5433–5632).
+ */
+export function derivedManagedPort(projectRoot: string, key: string = DEFAULT_RESOURCE_KEY): number {
+    const seed = key === DEFAULT_RESOURCE_KEY ? path.resolve(projectRoot) : `${path.resolve(projectRoot)}\0${key}`;
+    const digest = createHash("sha256").update(seed).digest();
+    return MANAGED_PORT_FIRST + (digest.readUInt32BE(0) % MANAGED_PORT_SPAN);
+}
+
+function portsFile(projectRoot: string): string {
+    return path.join(devDbDir(projectRoot), PORTS_FILE_NAME);
+}
+
+/** The port each database last listened on, by key; empty when nothing is recorded or the record is unreadable. */
+function readRecordedPorts(projectRoot: string): Record<string, number> {
+    try {
+        const parsed: unknown = JSON.parse(fs.readFileSync(portsFile(projectRoot), "utf8"));
+        if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
+        const ports: Record<string, number> = {};
+        for (const [key, port] of Object.entries(parsed)) {
+            if (typeof port === "number" && Number.isInteger(port) && port > 0 && port <= 65535) ports[key] = port;
+        }
+        return ports;
+    } catch {
+        return {};
+    }
+}
+
+/**
+ * Remember where these databases listen, merged into what is recorded.
+ *
+ * Best effort: a `.rebase/` that cannot be written costs the next start its
+ * preference, not the start itself.
+ */
+export function recordManagedPorts(projectRoot: string, ports: Record<string, number>): void {
+    try {
+        fs.mkdirSync(devDbDir(projectRoot), { recursive: true });
+        const merged = { ...readRecordedPorts(projectRoot), ...ports };
+        const target = portsFile(projectRoot);
+        const temporary = `${target}.${process.pid}.tmp`;
+        fs.writeFileSync(temporary, `${JSON.stringify(merged, null, 2)}\n`, "utf8");
+        fs.renameSync(temporary, target);
+    } catch {
+        // See above.
+    }
+}
+
+/** Can a server listen on this loopback port right now? */
+export function portBindable(port: number): Promise<boolean> {
+    return new Promise((resolve) => {
+        const server = net.createServer();
+        server.once("error", () => resolve(false));
+        server.listen(port, "127.0.0.1", () => server.close(() => resolve(true)));
+    });
+}
+
+/**
+ * The port a managed database should listen on: where it listened last time,
+ * else the one derived from the project path, else any free one.
+ *
+ * Stable on purpose. A backend holds the URL it was started with, and a pool
+ * reconnects to the same address on its own — so a database that comes back on
+ * the port it had is one a running `rebase dev` recovers from without a
+ * restart. It used to be whatever the operating system handed out, and a `rebase
+ * db stop` followed by any command that starts it again left the backend
+ * dialling a port nothing listened on, answering 503 until dev was restarted.
+ *
+ * @param canBind stands in for {@link portBindable} in the tests.
+ */
+export async function chooseManagedPort(
+    projectRoot: string,
+    key: string = DEFAULT_RESOURCE_KEY,
+    canBind: (port: number) => Promise<boolean> = portBindable
+): Promise<number> {
+    const candidates = [readRecordedPorts(projectRoot)[key], derivedManagedPort(projectRoot, key)];
+    for (const port of new Set(candidates.filter((candidate): candidate is number => candidate !== undefined))) {
+        if (await canBind(port)) return port;
+    }
+    return findFreePort();
 }

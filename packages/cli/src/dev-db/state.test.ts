@@ -17,13 +17,16 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import {
     type DaemonState,
+    chooseManagedPort,
     clearState,
     dataDir,
+    derivedManagedPort,
     devDbDir,
     findFreePort,
     pidRunning,
     portAccepting,
     readState,
+    recordManagedPorts,
     stateFile,
     writeState
 } from "./state";
@@ -180,5 +183,78 @@ describe("ports", () => {
         const port = await findFreePort();
 
         expect(await portAccepting(port, 300)).toBe(false);
+    });
+});
+
+/**
+ * The managed database listens where it listened last time.
+ *
+ * Its port was whatever the operating system handed out, so every restart
+ * moved it: `rebase db stop` under a running `rebase dev`, then `rebase db
+ * url`, brought it back on another port, and the backend — started with the
+ * old URL — answered 503 until dev was restarted. The docs said the port is
+ * derived from the project path; it is now, and it is kept.
+ */
+describe("the managed database's port", () => {
+    const free = async () => true;
+
+    it("is derived from the project path, the same every time, outside every ephemeral range", () => {
+        const port = derivedManagedPort(root);
+
+        expect(derivedManagedPort(root)).toBe(port);
+        expect(port).toBeGreaterThanOrEqual(25432);
+        expect(port).toBeLessThan(26432);
+        // Below Linux's ephemeral range (32768+) and macOS's (49152+), so an
+        // outgoing connection's source port never sits on it.
+        expect(port).toBeLessThan(32768);
+    });
+
+    it("differs between projects, and between a project's databases", () => {
+        const ports = new Set(["/work/a", "/work/b", "/work/c", "/work/d"].map((dir) => derivedManagedPort(dir)));
+        expect(ports.size).toBeGreaterThan(1);
+        expect(derivedManagedPort(root, "analytics")).not.toBe(derivedManagedPort(root));
+    });
+
+    it("is the derived port when nothing is recorded", async () => {
+        expect(await chooseManagedPort(root, undefined, free)).toBe(derivedManagedPort(root));
+    });
+
+    it("is the port it last served on, when that is free", async () => {
+        recordManagedPorts(root, { "(default)": 40123, analytics: 40124 });
+
+        expect(await chooseManagedPort(root, undefined, free)).toBe(40123);
+        expect(await chooseManagedPort(root, "analytics", free)).toBe(40124);
+    });
+
+    it("survives the daemon's state file being cleared, which every stop does", async () => {
+        recordManagedPorts(root, { "(default)": 40123 });
+        clearState(root);
+
+        expect(await chooseManagedPort(root, undefined, free)).toBe(40123);
+    });
+
+    it("falls back to the derived port, then to any free one, when something else holds it", async () => {
+        recordManagedPorts(root, { "(default)": 40123 });
+        const derived = derivedManagedPort(root);
+
+        expect(await chooseManagedPort(root, undefined, async (port) => port !== 40123)).toBe(derived);
+        const fallback = await chooseManagedPort(root, undefined, async (port) => port !== 40123 && port !== derived);
+        expect([40123, derived]).not.toContain(fallback);
+        expect(fallback).toBeGreaterThan(0);
+    });
+
+    it("keeps the record for every key it has seen", () => {
+        recordManagedPorts(root, { "(default)": 40123 });
+        recordManagedPorts(root, { analytics: 40124 });
+
+        expect(JSON.parse(fs.readFileSync(path.join(devDbDir(root), "pglite-ports.json"), "utf8")))
+            .toEqual({ "(default)": 40123, analytics: 40124 });
+    });
+
+    it("treats a record it cannot read as no record", async () => {
+        fs.mkdirSync(devDbDir(root), { recursive: true });
+        fs.writeFileSync(path.join(devDbDir(root), "pglite-ports.json"), "{not json");
+
+        expect(await chooseManagedPort(root, undefined, free)).toBe(derivedManagedPort(root));
     });
 });

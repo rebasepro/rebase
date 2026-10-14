@@ -21,13 +21,14 @@
 
 import fs from "fs";
 import net from "net";
+import { DEFAULT_RESOURCE_KEY } from "@rebasepro/types";
 
 import {
     MANAGED_SERVER_MAX_CONNECTIONS,
     PGLITE_EXTENSIONS
 } from "./constraints";
 import { NotificationProxy } from "./notification-proxy";
-import { additionalDataDir, clearState, dataDir, findFreePort, writeState } from "./state";
+import { additionalDataDir, chooseManagedPort, clearState, dataDir, findFreePort, recordManagedPorts, writeState } from "./state";
 
 /** Shut down after this long with nothing connected. */
 const DEFAULT_IDLE_TIMEOUT_MS = 30 * 60_000;
@@ -238,6 +239,11 @@ export async function runDaemon(args: DaemonArgs): Promise<void> {
     const publishState = (identityPort: number) => {
         const databases: Record<string, { port: number; dataDir: string }> = {};
         for (const [key, instance] of additional) databases[key] = { port: instance.port, dataDir: instance.dataDir };
+        // Kept after this daemon is gone, so the next one listens where this
+        // one did (`chooseManagedPort`).
+        const ports: Record<string, number> = { [DEFAULT_RESOURCE_KEY]: args.port };
+        for (const [key, entry] of Object.entries(databases)) ports[key] = entry.port;
+        recordManagedPorts(args.projectRoot, ports);
         writeState(args.projectRoot, {
             port: args.port,
             pid: process.pid,
@@ -256,7 +262,8 @@ export async function runDaemon(args: DaemonArgs): Promise<void> {
         const inFlight = starting.get(key);
         if (inFlight) return inFlight;
         const promise = (async () => {
-            const instance = await startInstance(additionalDataDir(args.projectRoot, key), await findFreePort(), ` [${key}]`);
+            // Its own stable port, for the same reason the default has one.
+            const instance = await startInstance(additionalDataDir(args.projectRoot, key), await chooseManagedPort(args.projectRoot, key), ` [${key}]`);
             additional.set(key, instance);
             publishState(identityPort);
             process.stdout.write(`dev-db [${key}]: ready on 127.0.0.1:${instance.port}\n`);

@@ -22,13 +22,14 @@ import net from "net";
 import path from "path";
 import { fileURLToPath } from "url";
 
+import { runningBackendUrl } from "../utils/dev-server";
 import {
     acquireStartLock,
+    chooseManagedPort,
     clearState,
     type DaemonState,
     dataDir,
     devDbDir,
-    findFreePort,
     pidRunning,
     readState,
     releaseStartLock,
@@ -314,7 +315,9 @@ export async function ensureManagedDatabase(
         }
     }
 
-    const port = await findFreePort();
+    // Where the last daemon listened, so a backend still holding that URL
+    // reconnects to this one. See `chooseManagedPort`.
+    const port = await chooseManagedPort(projectRoot);
     const token = randomBytes(16).toString("hex");
     const entry = options.entry ?? resolveCliEntry();
 
@@ -429,6 +432,28 @@ export async function stopManagedDatabase(projectRoot: string): Promise<boolean>
     clearState(projectRoot);
 
     return true;
+}
+
+/**
+ * What `rebase db stop` says once the daemon is down: the headline, then any
+ * detail.
+ *
+ * "`rebase dev` will start it again" was not true of a `rebase dev` that is
+ * running: nothing in it watches the database, so its backend answered 503
+ * until something else started one. The next command that needs it does, on
+ * the port it had (`chooseManagedPort`), and the backend's pool reconnects to
+ * that address by itself — so while a backend runs, that is what this says.
+ */
+export function stoppedManagedDatabaseLines(projectRoot: string): string[] {
+    const backend = runningBackendUrl(projectRoot);
+    if (!backend) {
+        return ["✓ Development database stopped. Data is kept — the next `rebase dev`, or any command that needs it, starts it again."];
+    }
+    return [
+        "✓ Development database stopped. Data is kept.",
+        `  The backend at ${backend} cannot reach it until it is back. The next command that needs it — \`rebase db url\`, for one — ` +
+        "starts it on the same port, and the backend reconnects."
+    ];
 }
 
 /**

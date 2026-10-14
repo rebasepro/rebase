@@ -11,7 +11,7 @@ import os from "os";
 import path from "path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { devServerUrl, getProjectPort, serverUnreachableHint } from "./dev-server";
+import { devServerUrl, getProjectPort, runningBackendUrl, serverUnreachableHint } from "./dev-server";
 
 let root: string;
 
@@ -81,5 +81,24 @@ describe("serverUnreachableHint", () => {
         expect(serverUnreachableHint("http://rebase.test", null)).toEqual([
             "  Is the Rebase server running at http://rebase.test? Start it with `rebase dev`, or set REBASE_BASE_URL in .env."
         ]);
+    });
+});
+
+describe("runningBackendUrl", () => {
+    it("is the address of this project's backend while its process is alive", () => {
+        writeState({ port: 3755, baseUrl: "http://localhost:3755", pid: process.pid });
+        expect(runningBackendUrl(root)).toBe("http://localhost:3755");
+    });
+
+    it("is null once that process is gone, whatever the file still says", () => {
+        // Far above any real pid_max: a backend that was killed leaves the file behind.
+        writeState({ port: 3755, baseUrl: "http://localhost:3755", pid: 2 ** 30 });
+        expect(runningBackendUrl(root)).toBeNull();
+    });
+
+    it("is null with no state file, or one with no pid", () => {
+        expect(runningBackendUrl(root)).toBeNull();
+        writeState({ port: 3755, baseUrl: "http://localhost:3755" });
+        expect(runningBackendUrl(root)).toBeNull();
     });
 });

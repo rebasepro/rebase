@@ -378,6 +378,30 @@ describe("lifecycle", () => {
         expect(rows[0].c).toBe(3);
     });
 
+    /**
+     * `rebase db stop` under a running `rebase dev`, then `rebase db url`: the
+     * daemon came back on a different port (65191 → 54999), and the backend,
+     * whose pool still held the URL it was started with, answered 503 until dev
+     * was restarted. The pool here is that backend's.
+     */
+    it("comes back on the port it had, so a pool still holding the old URL reconnects", { timeout: BOOT_TIMEOUT }, async () => {
+        const first = await ensureManagedDatabase(root, { entry: CLI_ENTRY, quiet: true, additionalKeys: ["analytics"] });
+        const pool = connect(first.url);
+        // As the server's own pools do: a connection the database drops is
+        // the pool's to replace, not an uncaught error.
+        pool.on("error", () => undefined);
+        expect((await pool.query<{ n: number }>("select 1 as n")).rows[0].n).toBe(1);
+
+        await stopManagedDatabase(root);
+        await expect(pool.query("select 1")).rejects.toThrow();
+
+        const second = await ensureManagedDatabase(root, { entry: CLI_ENTRY, quiet: true, additionalKeys: ["analytics"] });
+        expect(second.started).toBe(true);
+        expect(second.port).toBe(first.port);
+        expect(second.additional.analytics).toBe(first.additional.analytics);
+        expect((await pool.query<{ n: number }>("select 1 as n")).rows[0].n).toBe(1);
+    });
+
     it("reports nothing to stop when nothing is running", async () => {
         expect(await stopManagedDatabase(root)).toBe(false);
     });
