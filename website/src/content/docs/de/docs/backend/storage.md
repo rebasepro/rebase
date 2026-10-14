@@ -296,7 +296,7 @@ STORAGE_MAX_FILE_SIZE__MEDIA=1073741824  # media: 1 GB
 Wie viel einer Datei der Server gleichzeitig im Arbeitsspeicher hält, hängt vom Eingangsweg ab.
 `POST /api/storage/upload` ist ein einzelner Multipart-Body, den der Server vollständig parst:
 das Drei- bis Fünffache der Dateigröße im Arbeitsspeicher. Ein fortsetzbarer Upload (TUS) verarbeitet
-jeweils nur einen Chunk. <span class="since-badge" data-since="0.25">Seit 0.25</span> senden `client.storage.putObject()` und das Admin-Panel Dateien
+jeweils nur einen Chunk. <span class="since-badge" data-since="0.25">Seit 0.25</span> `client.storage.putObject()` und das Admin-Panel senden Dateien
 über 8 MiB über das fortsetzbare Verfahren. Unter
 [Fortsetzbare Uploads (TUS)](/docs/backend/storage-resumable-uploads/) finden Sie Informationen zum
 Protokoll, zu den Antworten und zum Verhalten über mehrere Instanzen hinweg.
