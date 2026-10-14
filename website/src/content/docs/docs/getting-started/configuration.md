@@ -365,6 +365,7 @@ Read by `rebase`, not by the server. Nothing here affects a deployment.
 |----------|-------------|---------|
 | `REBASE_BASE_URL` | Where `rebase api-keys`, `rebase storage` and `rebase auth reset-password` send the service key, in the shell or in `.env`. Set it when the server runs some other way than `rebase dev` in this project: `rebase start`, a container, another host. Unset, they use the server `rebase dev` recorded while that server is running, and send nothing when it is not. | — |
 | `REBASE_SERVICE_KEY` | The service key those commands authenticate with, read from `.env`: the same variable the server reads (see above). | — |
+| `SERVICE_KEY` | An older name for that key. When `.env` sets it, `rebase api-keys` and `rebase storage` read it in place of `REBASE_SERVICE_KEY`. | — |
 | `REBASE_ENV_FILE_PATH` | Which `.env` the CLI reads and writes, when it is not the project's. | — |
 | `REBASE_CLOUD_URL` | The control plane `rebase cloud` talks to. | — |
 | `REBASE_CLOUD_EMAIL` | The account `rebase cloud login` signs in as, instead of prompting. | — |

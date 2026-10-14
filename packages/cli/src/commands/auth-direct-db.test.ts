@@ -241,6 +241,11 @@ describe("the direct-database reset", () => {
         expect(resetPasswordScript(true)).toContain('console.log("   Password: " + newPassword);');
     });
 
+    it("prints a failure's stack only under --debug", () => {
+        expect(resetPasswordScript(false)).not.toContain("console.error(error);");
+        expect(resetPasswordScript(false, true)).toContain("console.error(error);");
+    });
+
     /**
      * Run the generated script for real, against stand-ins for its imports.
      * The `pg` client the stand-in hands out records every statement in

@@ -17,6 +17,7 @@ import {
     resolveTsx,
     exitDependenciesNotInstalled
 } from "../utils/project";
+import { parseEnvBoolean } from "@rebasepro/types";
 import { unknownCommand } from "../utils/unknown-command";
 import { redactConnectionPasswords } from "../utils/redact";
 import type { PreparedDatabase } from "../dev-db/prepare";
@@ -363,7 +364,7 @@ async function resetPassword(rawArgs: string[]): Promise<void> {
         env.REBASE_ENV_FILE_PATH = envFile || path.join(projectRoot, ".env");
         Object.assign(env, prepared.env);
 
-        const scriptContent = resetPasswordScript(wasGenerated);
+        const scriptContent = resetPasswordScript(wasGenerated, parseEnvBoolean(process.env.REBASE_DEBUG) === true);
 
         const tmpScriptPath = path.join(backendDir, ".tmp-reset-password.ts");
         fs.writeFileSync(tmpScriptPath, scriptContent, "utf-8");
@@ -455,11 +456,12 @@ async function databaseOpenFailure(url: string, source: DevDatabaseSource): Prom
  * attacker's refresh token minting access tokens did not recover anything.
  *
  * It exits 0 only when a row was updated: a missing user and a thrown error are
- * both exit 1. `echoPassword` prints the new password, for a generated one.
+ * both exit 1. `echoPassword` prints the new password, for a generated one;
+ * `showStack` prints a failure's stack rather than its sentence (`--debug`).
  *
  * Exported so its tests can run it.
  */
-export function resetPasswordScript(echoPassword: boolean): string {
+export function resetPasswordScript(echoPassword: boolean, showStack = false): string {
     return `
 import { createPostgresDatabaseConnection } from "@rebasepro/server-postgres";
 import { hashPassword } from "@rebasepro/server";
@@ -568,7 +570,7 @@ async function resetPassword() {
 
 // A thrown error is a failed reset, and exits like one — a refused connection
 // that exits 0 reads as a reset to anything checking the exit code. Said as a
-// sentence: the stack is the script's own, and only REBASE_DEBUG asks for it.
+// sentence: the stack is the script's own, and only --debug asks for it.
 const describe = (error: unknown): string => {
     if (error instanceof AggregateError && !error.message && error.errors.length > 0) return describe(error.errors[0]);
     const message = error instanceof Error ? error.message : String(error);
@@ -576,8 +578,7 @@ const describe = (error: unknown): string => {
     return code && !message.includes(code) ? message + " (" + code + ")" : message;
 };
 resetPassword().catch((error) => {
-    if (process.env.REBASE_DEBUG) console.error(error);
-    else console.error("✗ The password was not reset: " + describe(error));
+    ${showStack ? "console.error(error);" : "console.error(\"✗ The password was not reset: \" + describe(error));"}
     process.exit(1);
 });
 `;
