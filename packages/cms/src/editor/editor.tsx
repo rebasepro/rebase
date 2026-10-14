@@ -331,31 +331,39 @@ const cssStyles = `
     padding-left: 2rem;
     padding-right: 2rem;
     min-height: 100%;
+    /* What prosemirror-view's style/prosemirror.css sets on its root: the
+       document's spaces are read back from the DOM, so they must not collapse. */
+    word-wrap: break-word;
+    white-space: pre-wrap;
+    white-space: break-spaces;
+    font-variant-ligatures: none;
+    font-feature-settings: "liga" 0;
+}
+.ProseMirror pre {
+    white-space: pre-wrap;
 }
 .ProseMirror .is-editor-empty:first-child::before {
   content: attr(data-placeholder);
   float: left;
-  color:  rgb(100 116 139); //500
+  color:  rgb(100 116 139); /* 500 */
   pointer-events: none;
   height: 0;
 }
 .ProseMirror .is-empty::before {
   content: attr(data-placeholder);
   float: left;
-  color:  rgb(100 116 139); //500
+  color:  rgb(100 116 139); /* 500 */
   pointer-events: none;
   height: 0;
 }
 
-[data-theme="dark"] {
-  .ProseMirror .is-empty::before {
-    color: rgb(100 116 139); //500
-  }
+[data-theme="dark"] .ProseMirror .is-empty::before {
+  color: rgb(100 116 139); /* 500 */
 }
 
 .is-empty {
   cursor: text;
-  color: rgb(100 116 139); //500
+  color: rgb(100 116 139); /* 500 */
 }
 
 .ProseMirror img {
@@ -415,12 +423,10 @@ ul[data-type="taskList"] li > label input[type="checkbox"]::before {
 }
 ul[data-type="taskList"] li > label input[type="checkbox"]:checked::before { transform: scale(1); }
 
-[data-theme="dark"] {
-  ul[data-type="taskList"] li[data-checked="true"] > div > p {
-    color: rgb(226 232 240);
-    text-decoration: line-through;
-    text-decoration-thickness: 2px;
-  }
+[data-theme="dark"] ul[data-type="taskList"] li[data-checked="true"] > div > p {
+  color: rgb(226 232 240);
+  text-decoration: line-through;
+  text-decoration-thickness: 2px;
 }
 ul[data-type="taskList"] li[data-checked="true"] > div > p {
   color: rgb(51 65 85);
