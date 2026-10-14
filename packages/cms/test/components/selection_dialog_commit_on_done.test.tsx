@@ -58,7 +58,10 @@ jest.mock("@rebasepro/app", () => {
     const tableController = {};
     const columnIds: string[] = [];
     const permissions = { canCreate: () => false };
-    const translation = { t: (key: string) => key };
+    // Clear and Done are the only words this test reads; they are named here
+    // as `en` names them, and every other key reads as itself.
+    const english: Record<string, string> = { clear: "Clear", done: "Done" };
+    const translation = { t: (key: string) => english[key] ?? key };
     return {
         CollectionScopeProvider: ({ children }: { children?: React.ReactNode }) => <>{children}</>,
         ErrorView: ({ error }: { error: string }) => <div>{error}</div>,

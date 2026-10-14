@@ -139,6 +139,7 @@ function SelectionTableBindingInternal<M extends Record<string, unknown>>(
     const sidePanelController = useSidePanel();
     const urlController = useUrlController();
     const analyticsController = useAnalyticsController();
+    const { t } = useTranslation();
 
     const path = urlController.resolveDatabasePathsFrom(pathInput);
 
@@ -336,8 +337,8 @@ function SelectionTableBindingInternal<M extends Record<string, unknown>>(
                                 collectionOrView={collection}
                                 className={"text-surface-300 dark:text-surface-600"}/>
                             {collection.singularName
-                                ? `Select ${collection.singularName}`
-                                : `Select from ${collection.name}`}
+                                ? t("select_specific", { name: collection.singularName })
+                                : t("select_from", { name: collection.name })}
                         </Typography>}
                         defaultSize={collection.defaultSize}
                         properties={collection.properties}
@@ -361,7 +362,7 @@ function SelectionTableBindingInternal<M extends Record<string, unknown>>(
                 <Button
                     onClick={onDone}
                     variant="filled">
-                    Done
+                    {t("done")}
                 </Button>
             </DialogActions>
         </div>
@@ -410,7 +411,7 @@ function EntitySelectionDialogActions({
         <>
             <Button onClick={onClear}
                 variant={"text"}>
-                Clear
+                {t("clear")}
             </Button>
             {addButton}
         </>
