@@ -29,6 +29,7 @@ import {
     restoreOutcome,
     schemasToClear,
     shouldAnonymize,
+    sourceProblem,
     type ColumnRef
 } from "./pull";
 
@@ -268,6 +269,31 @@ describe("describeTarget", () => {
 
     it("says so rather than echoing a string it could not parse", () => {
         expect(describeTarget("not a url")).toBe("(unparseable connection string)");
+    });
+
+    it("names the host and database of libpq's keyword=value form, and nothing else", () => {
+        expect(describeTarget("host=db.example.com port=6432 dbname=app user=u password='s3 cr\\'et'")).toBe("db.example.com:6432/app");
+        expect(describeTarget("dbname=app")).toBe("(local socket)/app");
+    });
+});
+
+describe("sourceProblem", () => {
+    it.each([
+        "postgresql://u:pw@db.example.com:5432/app?sslmode=require",
+        "postgres://db/app",
+        "host=db.example.com dbname=app",
+        "host = db  dbname=app password='with space'"
+    ])("accepts %s", (source) => {
+        expect(sourceProblem(source)).toBeNull();
+    });
+
+    it.each([
+        ["garbage", /neither a postgres:\/\/ URL nor libpq keyword=value pairs/],
+        ["prod.example.com/app", /neither/],
+        ["https://db.example.com/app", /an https:\/\/ URL|a https:\/\/ URL/],
+        ["postgres://u:pw@[db/app", /not a valid one/]
+    ])("refuses %s", (source, why) => {
+        expect(sourceProblem(source)).toMatch(why);
     });
 });
 

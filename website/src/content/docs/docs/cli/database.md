@@ -137,6 +137,10 @@ Copy another database into the local development one:
 rebase db pull --from postgres://…  [--anonymize]
 ```
 
+`--from` takes a `postgres://` or `postgresql://` URL, or libpq's
+`host=… port=… dbname=…` pairs quoted as one argument. Anything else is refused
+before anything is read or started, without repeating the value.
+
 `--anonymize` replaces personal fields on the way in, so a production copy can be
 worked on locally without carrying real customer data onto a laptop. It matches
 columns by name and is best-effort. A bare `name` column is replaced only on a

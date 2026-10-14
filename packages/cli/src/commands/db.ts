@@ -994,7 +994,7 @@ async function manageLocalDatabase(
  * and the wrong one here means overwriting production with a laptop.
  */
 async function pullIntoLocal(projectRoot: string, rawArgs: readonly string[]): Promise<void> {
-    const { describeRestoreFailure, describeTarget, dumpSource, findPgTool, restoreCopy } =
+    const { describeRestoreFailure, describeTarget, dumpSource, findPgTool, restoreCopy, sourceProblem } =
         await import("../dev-db/pull");
     const { prepareDatabaseEnv } = await import("../dev-db/prepare");
     const { readEnvFile } = await import("../utils/project");
@@ -1046,6 +1046,15 @@ async function pullIntoLocal(projectRoot: string, rawArgs: readonly string[]): P
     if (!source) {
         console.error(chalk.red("✗ `rebase db pull` needs a source: --from <connection-string>"));
         console.error(chalk.gray("  Example: rebase db pull --from \"$PRODUCTION_DATABASE_URL\""));
+        process.exit(1);
+    }
+    // Known from the string alone, so answered before anything is checked,
+    // started or announced. The value is not repeated: see `sourceProblem`.
+    const notASource = sourceProblem(source);
+    if (notASource !== null) {
+        console.error(chalk.red(`✗ The --from value is not a connection string: ${notASource}. Nothing was read or changed.`));
+        console.error(chalk.gray("  Pass a URL, postgresql://user:password@host:5432/database, or libpq's"));
+        console.error(chalk.gray("  host=… port=… dbname=… user=… pairs, quoted as one argument."));
         process.exit(1);
     }
 

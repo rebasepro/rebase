@@ -240,6 +240,36 @@ describe("rebase db pull refuses a flag it does not take", () => {
     });
 });
 
+/**
+ * `--from garbage --yes` printed "This will replace your local database.
+ * From (unparseable connection string)" and "Dumping…" before pg_dump refused
+ * it. Whether a value is a connection string is known from the string.
+ */
+describe("rebase db pull --from something that is not a connection string", () => {
+    it.each([
+        ["garbage", "it is neither a postgres:// URL nor libpq keyword=value pairs"],
+        ["mysql://app:hunter2@db/prod", "it is a mysql:// URL, and a pull copies from PostgreSQL (postgres:// or postgresql://)"],
+        ["postgres://app:hunter2@[db/prod", "it starts like a postgres:// URL but is not a valid one"]
+    ])("refuses %s before anything is checked, started or said", async (from, why) => {
+        await expect(dbCommand("pull", argv("pull", "--from", from, "--yes"))).rejects.toEqual(new Exit(1));
+
+        const out = printed.join("\n");
+        expect(out).toContain(`✗ The --from value is not a connection string: ${why}. Nothing was read or changed.`);
+        expect(out).not.toContain("hunter2");
+        expect(out).not.toContain("unparseable");
+        expectNothingRan();
+    });
+
+    it("still takes libpq's keyword=value form, and names its host and database", async () => {
+        await dbCommand("pull", argv("pull", "--from", "host=prod.example.com port=5432 dbname=app user=app password='hun ter2'", "--yes"));
+
+        expect(state.dumped).toHaveLength(1);
+        const out = printed.join("\n");
+        expect(out).toContain("prod.example.com:5432/app");
+        expect(out).not.toContain("hun ter2");
+    });
+});
+
 describe("rebase db url, stop and reset refuse a flag they do not take", () => {
     it("db url refuses before a remembered container is started", async () => {
         await expect(dbCommand("url", argv("url", "--dokcer"))).rejects.toThrow("has no option --dokcer — did you mean --docker?");

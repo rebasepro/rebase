@@ -384,6 +384,48 @@ export function provisionableSchemas(rows: readonly { schema: string }[]): strin
     return [...new Set(rows.map((row) => row.schema))].filter((name) => !skip(name)).sort();
 }
 
+/**
+ * libpq's `keyword=value` form (`host=db.example.com port=5432 dbname=app`):
+ * one or more pairs, a value bare or single-quoted with `\'` and `\\` escapes.
+ */
+const KEYWORD_VALUE_DSN = /^\s*[a-z_]+\s*=\s*(?:'(?:[^'\\]|\\.)*'|[^\s']+)(?:\s+[a-z_]+\s*=\s*(?:'(?:[^'\\]|\\.)*'|[^\s']+))*\s*$/i;
+
+/** One keyword's value in a `keyword=value` connection string, unquoted. */
+function keywordValue(dsn: string, keyword: string): string | null {
+    const match = new RegExp(`(?:^|\\s)${keyword}\\s*=\\s*('(?:[^'\\\\]|\\\\.)*'|[^\\s']+)`, "i").exec(dsn);
+    if (!match) return null;
+    const value = match[1];
+    return value.startsWith("'") ? value.slice(1, -1).replace(/\\(.)/g, "$1") : value;
+}
+
+/**
+ * Why a `--from` value is not a connection string pg_dump reads, or null
+ * when it is one: a `postgres://` or `postgresql://` URL, or libpq's
+ * `keyword=value` pairs.
+ *
+ * Asked before anything else, because the answer is known from the string:
+ * `--from garbage --yes` printed "This will replace your local database.
+ * From (unparseable connection string)" and started dumping before pg_dump
+ * refused it. The value is never quoted back: it may carry a password in a
+ * shape no redaction recognises.
+ */
+export function sourceProblem(source: string): string | null {
+    const scheme = /^([a-z][a-z0-9+.-]*):\/\//i.exec(source)?.[1]?.toLowerCase();
+    if (scheme !== undefined) {
+        if (scheme !== "postgres" && scheme !== "postgresql") {
+            return `it is a ${scheme}:// URL, and a pull copies from PostgreSQL (postgres:// or postgresql://)`;
+        }
+        try {
+            new URL(source);
+            return null;
+        } catch {
+            return "it starts like a postgres:// URL but is not a valid one";
+        }
+    }
+    if (KEYWORD_VALUE_DSN.test(source)) return null;
+    return "it is neither a postgres:// URL nor libpq keyword=value pairs";
+}
+
 /** Host and database of a connection string, with no credentials in it. */
 export function describeTarget(connectionString: string): string {
     try {
@@ -392,6 +434,11 @@ export function describeTarget(connectionString: string): string {
 
         return `${url.hostname}${url.port ? `:${url.port}` : ""}/${database}`;
     } catch {
+        if (KEYWORD_VALUE_DSN.test(connectionString)) {
+            const host = keywordValue(connectionString, "host") ?? keywordValue(connectionString, "hostaddr") ?? "(local socket)";
+            const port = keywordValue(connectionString, "port");
+            return `${host}${port ? `:${port}` : ""}/${keywordValue(connectionString, "dbname") ?? "(default)"}`;
+        }
         // Never echo the raw string: it carries a password, and this line is
         // printed to a terminal people paste into issues.
         return "(unparseable connection string)";
