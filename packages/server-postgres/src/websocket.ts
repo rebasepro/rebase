@@ -126,6 +126,9 @@ interface WsUserIdentity {
  */
 const SERVICE_KEY_UID = "service";
 
+/** The `id` of the built-in auth adapter (`createBuiltinAuthAdapter` in `@rebasepro/server`). */
+const BUILTIN_AUTH_ADAPTER_ID = "rebase-builtin";
+
 interface ClientSession {
     ws: WebSocket;
     user?: WsUserIdentity;
@@ -640,7 +643,7 @@ export function createPostgresWebSocket(
      * re-asking it later answers what signing in would answer. A refusal is a
      * value; a store that cannot answer throws.
      */
-    async function resolveCaller(token: string): Promise<{ user: WsUserIdentity; credential: ImpersonationCredential } | { refused: string; apiKey?: true }> {
+    async function resolveCaller(token: string): Promise<{ user: WsUserIdentity; credential: ImpersonationCredential } | { refused: string; apiKey?: true; code?: string }> {
         if (token.startsWith("rk_")) {
             // An API key: the same verification the HTTP middlewares run, so a
             // key means one thing on both — revoked or expired included.
@@ -666,11 +669,27 @@ export function createPostgresWebSocket(
             // adapter. One that throws could not answer (its store is
             // unreachable); that is not a refusal, and the caller decides
             // what a question nobody could answer means.
-            const adapterUser = authAdapter.verifyToken
-                ? await authAdapter.verifyToken(token)
-                : await authAdapter.verifyRequest(new Request("http://localhost/_ws_auth", {
-                    headers: { Authorization: `Bearer ${token}` }
-                }));
+            //
+            // The built-in adapter is asked through `verifyRequest`: the same
+            // judgement as its `verifyToken`, which answers a refusal with
+            // null, but thrown as the 401 that says why — `SESSION_REVOKED`,
+            // `ACCOUNT_DISABLED`. So a refused session is refused here in the
+            // words the HTTP routes use for the same token, and the SDK reads
+            // it as they do. Its 503 is still a throw: the store could not
+            // answer.
+            const builtIn = authAdapter.id === BUILTIN_AUTH_ADAPTER_ID;
+            let adapterUser: Awaited<ReturnType<AuthAdapter["verifyRequest"]>>;
+            try {
+                adapterUser = authAdapter.verifyToken && !builtIn
+                    ? await authAdapter.verifyToken(token)
+                    : await authAdapter.verifyRequest(new Request("http://localhost/_ws_auth", {
+                        headers: { Authorization: `Bearer ${token}` }
+                    }));
+            } catch (error) {
+                const declared = builtIn ? declaredErrorAnswer(error) : undefined;
+                if (declared?.status === 401) return { refused: declared.message, code: declared.code };
+                throw error;
+            }
             if (!adapterUser) return { refused: "Invalid or expired token" };
             return {
                 // The built-in adapter verifies the service key as its own

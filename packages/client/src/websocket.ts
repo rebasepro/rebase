@@ -108,6 +108,34 @@ function realtimeDebugOn(): boolean {
     return Reflect.get(globalThis, "__REBASE_DEBUG_REALTIME__") === true;
 }
 
+/**
+ * Connection chatter: the socket opened, signed in, closed, is redialling.
+ *
+ * `console.debug` where that is a debug level — a browser's console hides it
+ * unless Verbose is asked for. Not in Node, where `console.debug` is
+ * `console.log`: a script's `listen()` opened its stdout with "Connected to
+ * PostgreSQL backend" and "WebSocket auto-authenticated", ahead of what the
+ * script prints. There it is written only while realtime debugging is on.
+ */
+function connectionDebug(...args: unknown[]): void {
+    const browser = typeof window !== "undefined" || typeof document !== "undefined";
+    if (!browser && !realtimeDebugOn()) return;
+    console.debug(...args);
+}
+
+/**
+ * The codes an `AUTHENTICATE` is refused with when the server will not honour
+ * the session: the token does not verify or has expired, the session was
+ * revoked or its account is gone (`SESSION_REVOKED`), the account is disabled
+ * (`ACCOUNT_DISABLED`) — the codes the HTTP routes answer the same token with.
+ * An answer, not a failure: asking again with the same token gets the same one.
+ */
+const SESSION_REFUSAL_CODES = new Set(["INVALID_TOKEN", "TOKEN_EXPIRED", "JWT_EXPIRED", "SESSION_REVOKED", "ACCOUNT_DISABLED", "SESSION_ENDED"]);
+
+function isSessionRefusal(error: unknown): error is RebaseApiError {
+    return error instanceof RebaseApiError && typeof error.code === "string" && SESSION_REFUSAL_CODES.has(error.code);
+}
+
 /** The ceiling of the reconnect backoff. */
 const MAX_RECONNECT_DELAY_MS = 30_000;
 
@@ -602,7 +630,7 @@ export class RebaseWebSocketClient {
         if (this.connectionState !== "reconnecting" && this.connectionState !== "disconnected") return;
         // A dial is already on its way.
         if (this.ws) return;
-        console.debug(`${reason} — retrying the realtime connection`);
+        connectionDebug(`${reason} — retrying the realtime connection`);
         if (this.reconnectTimeout) {
             clearTimeout(this.reconnectTimeout);
             this.reconnectTimeout = null;
@@ -641,6 +669,26 @@ export class RebaseWebSocketClient {
 
     private onlineListener: (() => void) | null = null;
     private visibilityListener: (() => void) | null = null;
+
+    /** The session this socket's server refused, and why. Cleared when a socket opens. */
+    private refusedSession: { token: string; error: RebaseApiError } | null = null;
+
+    /**
+     * Whether `error` is the server refusing the session `token` signs in as —
+     * revoked, its account gone or disabled, a token that does not verify. Said
+     * once per socket and token, as a warning that names the code.
+     */
+    private noteSessionRefused(token: string, error: unknown): boolean {
+        if (!isSessionRefusal(error)) return false;
+        if (this.refusedSession?.token !== token) {
+            this.refusedSession = { token, error };
+            console.warn(
+                `[Rebase] Realtime: the server refused this session (${error.code}: ${error.message}). ` +
+                "The socket is connected but not signed in, and what needs an account is refused with that code."
+            );
+        }
+        return true;
+    }
 
     /**
      * Authenticate the WebSocket connection
@@ -710,13 +758,13 @@ export class RebaseWebSocketClient {
                 if (!this.ws) return; // Prevent memory leaks / actions after disconnect
                 if (token) {
                     this.authenticate(token).catch(e => {
-                        if (this.ws) console.debug("WebSocket auto-auth skipped:", e?.message || e);
+                        if (this.ws) connectionDebug("WebSocket auto-auth skipped:", e?.message || e);
                     });
                 }
             }).catch(e => {
                 // User not logged in or auth still loading — this is expected,
                 // the WebSocket will authenticate on-demand when a request is made.
-                if (this.ws) console.debug("WebSocket auto-auth skipped:", e?.message || e);
+                if (this.ws) connectionDebug("WebSocket auto-auth skipped:", e?.message || e);
             });
         }
     }
@@ -734,6 +782,7 @@ export class RebaseWebSocketClient {
         if (permanent) this.removeNetworkListeners();
         this.isAuthenticated = false;
         this.authPromise = null;
+        this.refusedSession = null;
         if (this.reconnectTimeout) {
             clearTimeout(this.reconnectTimeout);
             this.reconnectTimeout = null;
@@ -795,7 +844,7 @@ export class RebaseWebSocketClient {
             this.ws = socket;
 
             this.ws!.onopen = async () => {
-                console.debug("Connected to PostgreSQL backend");
+                connectionDebug("Connected to PostgreSQL backend");
                 const wasReconnect = this.hadConnection;
                 this.hadConnection = true;
                 this.isConnected = true;
@@ -807,19 +856,27 @@ export class RebaseWebSocketClient {
                 this.outageReported = false;
                 this.gaveUp = false;
                 this.setState("connected");
+                // A new socket asks the server afresh.
+                this.refusedSession = null;
 
                 // Auto-authenticate if token getter is available
                 if (this.getAuthToken && !this.isAuthenticated) {
+                    let token: string | null = null;
                     try {
-                        const token = await this.getAuthToken();
+                        token = await this.getAuthToken();
                         if (token) {
                             await this.authenticate(token);
-                            console.debug("WebSocket auto-authenticated");
+                            connectionDebug("WebSocket auto-authenticated");
                         }
                     } catch (error) {
-                        // User not logged in or auth still loading — this is expected.
-                        // Authentication will happen on-demand when the user logs in.
-                        console.debug("WebSocket connected without auth:", (error as Error)?.message || error);
+                        // A refused session is said as that — once, as a
+                        // warning — and not as a connect that went without
+                        // signing in. Anything else (not logged in, auth still
+                        // loading) is expected: authentication happens on
+                        // demand.
+                        if (!(token && this.noteSessionRefused(token, error))) {
+                            connectionDebug("WebSocket connected, not signed in yet:", (error as Error)?.message || error);
+                        }
                     }
                 }
 
@@ -851,7 +908,7 @@ export class RebaseWebSocketClient {
             };
 
             const onClosed = () => {
-                console.debug("Disconnected from PostgreSQL backend");
+                connectionDebug("Disconnected from PostgreSQL backend");
                 // The next socket says hello again; nothing agreed for this one carries over.
                 this.stopLivenessWatch();
                 this.forgetServerOptIns();
@@ -1048,7 +1105,7 @@ export class RebaseWebSocketClient {
         // one client in eight on the same millisecond.
         const delay = MIN_RECONNECT_DELAY_MS + Math.floor(Math.random() * (ceiling - MIN_RECONNECT_DELAY_MS));
 
-        console.debug(`Attempting to reconnect in ${delay}ms (attempt ${this.reconnectAttempts})`);
+        connectionDebug(`Attempting to reconnect in ${delay}ms (attempt ${this.reconnectAttempts})`);
 
         if (this.reconnectTimeout) {
             clearTimeout(this.reconnectTimeout);
@@ -1519,14 +1576,22 @@ export class RebaseWebSocketClient {
         let lastError: unknown = null;
 
         for (let attempt = 0; attempt < retryCount; attempt++) {
+            let token: string | null = null;
             try {
-                const token = await this.getAuthToken!();
+                token = await this.getAuthToken!();
                 if (!token) throw new Error("user not logged in");
+                // Refused on this socket already: the same token gets the
+                // same answer, so it is not asked again.
+                if (this.refusedSession?.token === token) throw this.refusedSession.error;
                 await this.authenticate(token);
-                console.debug("WebSocket authenticated on demand");
+                connectionDebug("WebSocket authenticated on demand");
                 return; // Success
             } catch (error: unknown) {
                 lastError = error;
+
+                // A refused session is definitive. Retrying it with backoff
+                // kept a `listen()` from hearing why for over three seconds.
+                if (token && this.noteSessionRefused(token, error)) throw error;
 
                 const errMsg = error instanceof Error ? error.message : String(error);
                 // "not logged in" / "Session expired" are definitive - don't retry
@@ -1548,7 +1613,7 @@ export class RebaseWebSocketClient {
                 // For other errors, retry with backoff
                 if (attempt < retryCount - 1) {
                     const delay = Math.min(1000 * (attempt + 1), 3000);
-                    console.debug(`WebSocket auth attempt ${attempt + 1} failed, retrying in ${delay}ms...`);
+                    connectionDebug(`WebSocket auth attempt ${attempt + 1} failed, retrying in ${delay}ms...`);
                     await new Promise(resolve => setTimeout(resolve, delay));
                 }
             }
@@ -1566,7 +1631,7 @@ export class RebaseWebSocketClient {
             const token = await this.getAuthToken();
             if (!token) throw new Error("user not logged in");
             await this.authenticate(token);
-            console.debug("WebSocket reauthenticated successfully");
+            connectionDebug("WebSocket reauthenticated successfully");
         } catch (error) {
             console.error("WebSocket reauthentication failed:", error);
             throw error;
@@ -1679,6 +1744,12 @@ export class RebaseWebSocketClient {
                 await this.ensureAuthenticated();
             } catch (error: unknown) {
                 if (!(isSubscriptionFrame && isNotSignedIn(error))) {
+                    // A refusal keeps its code (`SESSION_REVOKED`, …), so
+                    // `onError` can tell a revoked session from a broken one.
+                    if (error instanceof RebaseApiError) {
+                        reject(error);
+                        return;
+                    }
                     const errorMessage = error instanceof Error ? error.message : "Authentication required";
                     reject(new RebaseApiError(errorMessage));
                     return;
@@ -2531,7 +2602,7 @@ onError });
      * we need to re-register everything to resume receiving updates.
      */
     private resubscribeAll(): void {
-        console.debug(`[WS] Re-subscribing: ${this.collectionSubscriptions.size} collection(s), ${this.singleSubscriptions.size} row(ies)`);
+        connectionDebug(`[WS] Re-subscribing: ${this.collectionSubscriptions.size} collection(s), ${this.singleSubscriptions.size} row(ies)`);
 
         // A registration still in flight here had its subscribe sent on this
         // socket already, while it was authenticating: the close clears the
