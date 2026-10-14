@@ -79,8 +79,6 @@ qui les compile. Voir [Intégration d'un serveur personnalisé](/docs/backend/cu
 Le frontend est une application standard **Vite + React + TypeScript**. Le fichier clé est `App.tsx`, qui relie tous les contrôleurs Rebase ensemble :
 
 ```typescript title="frontend/src/App.tsx"
-import React from "react";
-
 import "@fontsource/jetbrains-mono";
 import "@fontsource-variable/inter";
 import "@fontsource-variable/instrument-sans";
@@ -100,14 +98,17 @@ import { collections } from "virtual:rebase-collections";
 const API_URL = import.meta.env.VITE_API_URL;
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
-export function App() {
-    const rebaseClient = React.useMemo(() => createRebaseClient({
-        baseUrl: API_URL,
-        // Store the refresh token in an httpOnly cookie (XSS-safe) rather than
-        // localStorage. The backend issues it via `auth.cookieAuth`.
-        auth: { authFlowMode: "cookie" }
-    }), []);
+// One client for the page, created when this module loads. Inside a component,
+// even in a `useMemo`, `<React.StrictMode>` builds a second one in development,
+// and both restore the session and open their own connections.
+const rebaseClient = createRebaseClient({
+    baseUrl: API_URL,
+    // Store the refresh token in an httpOnly cookie (XSS-safe) rather than
+    // localStorage. The backend issues it via `auth.cookieAuth`.
+    auth: { authFlowMode: "cookie" }
+});
 
+export function App() {
     const authController = useRebaseAuthController({
         client: rebaseClient,
         googleClientId: GOOGLE_CLIENT_ID
@@ -140,7 +141,7 @@ une seule et même valeur sans avoir à l'écrire trois fois.
 
 ### Concepts clés
 
-- **`createRebaseClient`** — Crée le client SDK qui gère les requêtes HTTP, les connexions WebSocket et la gestion des jetons d'authentification
+- **`createRebaseClient`** — Crée le client SDK qui gère les requêtes HTTP, les connexions WebSocket et la gestion des jetons d'authentification. Appelez-le une seule fois, au niveau du module : dans un composant, même dans un `useMemo`, `<React.StrictMode>` construit un second client en développement
 - **`virtual:rebase-collections`** — Un plugin Vite qui importe automatiquement vos collections partagées au moment du build
 - **`useRebaseAuthController`** — Conserve l'utilisateur connecté et le cycle de vie des jetons, et constitue ce que `<Rebase>` distribue à tous les éléments en dessous de lui
 

@@ -67,7 +67,10 @@ du serveur) et la rouvre ensuite : en cas d'échec, et sur tout signal qu'elle p
 intercepter (fermeture du terminal, Ctrl-C, SIGTERM, SIGQUIT). Tuée net (SIGKILL), elle laisse la
 source fermée jusqu'à la prochaine commande `rebase db branch`, quelle qu'elle soit, qui la rouvre
 d'abord et le signale ; `ALTER DATABASE "<db>" ALLOW_CONNECTIONS true`, exécuté depuis la base de
-données `postgres`, fait la même chose à la main. Un client
+données `postgres`, fait la même chose à la main. Tant qu'une création forcée tient sa source
+fermée, elle détient sur celle-ci un verrou consultatif (advisory lock) dans la base de données
+`postgres`, de sorte que la réouverture laisse tranquille la source d'une copie en cours, et
+qu'une seconde création forcée depuis la même source attend que la première se termine. Un client
 qui se reconnecte dès qu'il est déconnecté, comme le fait un `rebase dev` en cours d'exécution,
 ne peut alors plus se glisser à nouveau avant le début de la copie. Cela exige les droits du
 propriétaire de la source ; sans eux, et pour `delete`, `--force` déconnecte les sessions jusqu'à

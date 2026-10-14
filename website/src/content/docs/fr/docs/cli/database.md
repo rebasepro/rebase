@@ -137,8 +137,14 @@ Copier une autre base de données dans la base de développement locale :
 rebase db pull --from postgres://…  [--anonymize]
 ```
 
+`--from` accepte une URL `postgres://` ou `postgresql://`, ou les paires
+`host=… port=… dbname=…` de libpq entre guillemets, comme un seul argument. Toute autre valeur
+est refusée avant que quoi que ce soit ne soit lu ou démarré, sans répéter la valeur.
+
 `--anonymize` remplace les champs personnels lors de l'import, afin qu'une copie de production puisse être exploitée localement sans transférer de réelles données client sur un ordinateur portable. Il repère
-les colonnes par leur nom et procède au mieux (best-effort).
+les colonnes par leur nom et procède au mieux (best-effort). Une colonne `name` seule n'est
+remplacée que sur une table de personnes : une table appelée `users`, `authors`, `customers` ou
+similaire, ou toute table qui contient aussi une colonne d'adresse e-mail.
 Une colonne sous un index unique reçoit une valeur distincte par ligne, et le passage tient en une seule
 transaction : s'il échoue, les tables qu'il aurait réécrites sont vidées et
 nommées, et la commande se termine avec le code 1. En 0.24, il échouait sur `token_hash` dès que des utilisateurs
@@ -149,6 +155,11 @@ n'accepte pas est refusée avant que quoi que ce soit ne soit lu ou copié, avec
 était probablement voulue : `--anonymise` répond « did you mean --anonymize? » et se termine avec
 le code 1. En 0.24, une option mal orthographiée était ignorée, si bien que `--anonymise`, `--anon`
 ou `--schem` lançaient le pull sans elle, et les données personnelles arrivaient telles quelles.
+Sur `pull` comme sur toute autre commande, une option booléenne à laquelle on donne une valeur la
+lit : `--anonymize=true` ou `=1` l'active, `--anonymize=false` ou `=0` la laisse désactivée,
+et toute autre valeur est refusée. En 0.25, toute valeur activait l'option, si bien que
+`--anonymize=false` anonymisait et que `db push --allow-destructive=false` autorisait
+la suppression.
 
 `pg_dump` supprime les privilèges, de sorte que la copie arriverait avec les politiques RLS de la source et aucun des droits d'accès (grants) sous-jacents — chaque lecture en tant que `rebase_user` échouant avec `permission denied`. Le pull réattribue ensuite le rôle de l'application, en utilisant la même routine que le démarrage et `rebase db push`, afin que les tables internes de Rebase restent révoquées comme il se doit.
 

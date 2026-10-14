@@ -98,6 +98,16 @@ rebase schema introspect
   `search_path` qu'utilise le serveur, `public`, si bien qu'une fonction du schéma `rebase`
   s'écrit `rebase.roles()`. Connecté avec un rôle nommé `rebase`, le chemin par défaut plaçait ce
   schéma en premier et la règle revenait sous la forme `roles()`, que le push ne trouvait pas
+- Conserve les politiques d'une
+  table de jonction many-to-many. Les politiques `<junction>_default_edge_write_*` d'une jonction
+  sont dérivées des règles de mise à jour de la collection qui déclare la
+  relation, et une jonction ne peut hériter que d'une règle qu'elle sait lire. Une règle de rôle
+  revient sous la forme du SQL que Postgres stocke pour elle,
+  `string_to_array(rebase.roles(), ','::text) && ARRAY['admin'::text]`, et
+  ce SQL se lit de nouveau comme la règle de rôle, si bien que le push dérive les mêmes politiques.
+  En 0.25.0, il se lisait comme du SQL brut : le dry run
+  listait les trois politiques comme des politiques qu'aucune collection ne décrit, le push les
+  laissait en vigueur, et une modification ultérieure de la règle ne les atteignait plus
 - Écrit
   `disableDefaultPolicies: true` sur une table dont la sécurité au niveau des lignes est activée et
   qui ne détient pas toute la [base administrateur](/docs/collections/security-rules/#policies-a-collection-gets-without-writing-them),
@@ -279,6 +289,14 @@ rebase db migrate
 - Lit `drizzle/migrations/` pour les migrations non appliquées
 - Les applique dans l'ordre à la base de données
 - Suit quelles migrations ont été appliquées
+- Estampille les
+  politiques de sécurité au niveau des lignes comme le font `db push` et le démarrage du serveur,
+  de sorte que le premier démarrage après un migrate les laisse tranquilles au lieu de recréer
+  chacune d'elles. Une migration a été écrite à partir des collections de son époque : une politique
+  n'est donc estampillée que lorsqu'elle est exactement ce que sa règle produit aujourd'hui. La
+  commande la recrée à partir de sa règle sous un autre nom, dans une transaction qu'elle annule,
+  et compare ce que Postgres a stocké, comme le fait `db push --dry-run`. Une politique qui
+  diffère ne reçoit aucune estampille, et le démarrage suivant réapplique sa table
 
 `--refuse-destructive`
 la fait refuser à la place. Elle exécute d'abord à blanc les migrations en attente. Si une
@@ -344,6 +362,8 @@ rebase doctor
 - Collections ↔ Base de données — y a-t-il une dérive inattendue ?
 
 Exécutez `doctor` chaque fois que quelque chose semble désynchronisé. Il indique précisément où se situe l'incohérence.
+
+La comparaison avec la base de données inclut celle que fait le démarrage avant d'avertir que `schema.generated.ts` et la base de données divergent, exécutée par le même code. Chaque différence dont le démarrage avertit figure donc aussi dans le rapport, dans les mêmes termes : une colonne NOT NULL d'un côté et nullable de l'autre, et une colonne que la base de données possède encore mais que le fichier n'a plus (le démarrage n'en supprime jamais, si bien qu'une propriété renommée laisse derrière elle son ancienne colonne). Chacune est un avertissement, et le correctif nomme `rebase db push`.
 
 La comparaison avec la base de données nécessite `DATABASE_URL` (ou `ADMIN_CONNECTION_STRING`). Sans l'une d'elles, cette phase est signalée comme **ignorée** plutôt que réussie, et l'exécution ne se termine jamais par « All schemas are in sync » — une vérification qui n'a pas eu lieu n'est pas un certificat de bonne santé.
 
