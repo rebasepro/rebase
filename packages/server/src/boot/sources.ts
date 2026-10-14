@@ -594,7 +594,7 @@ export function resolveStorageSources(
     }
 
     // The default source is synthesized from its own variables unless the
-    // project declared it (as any transport: a `direct` default is one this
+    // project declared it (like any transport: a `direct` default is one this
     // backend does not serve) or handed its key to a named bucket. In
     // production an unbound default resolves to local disk and is dropped like
     // any other, so its uploads answer 501 — the same verdict it had before a
