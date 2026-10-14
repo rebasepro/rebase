@@ -329,7 +329,11 @@ chiave personale, il suo `owner_uid`.
 
 La CLI copre le chiavi di servizio: `rebase api-keys list`, `get`, `create`, `revoke`
 e `scopes`, che elenca ogni scope noto al backend. Vedi il
-[riferimento della CLI](/docs/cli/#rebase-api-keys).
+[riferimento della CLI](/docs/cli/#rebase-api-keys). Si autentica con
+`REBASE_SERVICE_KEY` da `.env`, e la invia solo al server che `rebase dev` sta eseguendo
+per questo progetto, quindi con quel server fermo non invia nulla. Per un server avviato
+in un altro modo, come `rebase start` o un container, imposta `REBASE_BASE_URL` sul suo
+indirizzo ([l'ambiente proprio della CLI](/docs/getting-started/configuration/#the-clis-own-environment)).
 
 ## Chiavi create prima degli scope
 

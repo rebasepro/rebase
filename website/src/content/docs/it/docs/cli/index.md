@@ -273,6 +273,12 @@ Tre file determinano le risorse accessibili da un backend, e questo comando li i
 
 Il simbolo `○` denota lo stato che è utile rilevare prima del deployment anziché dopo: risorsa dichiarata ma non configurata. Il simbolo `✗` indica una configurazione *errata* nell'ambiente, condizione che impedisce l'avvio invece di consentire un funzionamento degradato.
 
+<span class="since-badge" data-since="0.25">Da 0.25</span> Un
+`rebase.resources.json` che non corrisponde più alle dichiarazioni riceve una riga `○`.
+Uno non ancora scritto no: `rebase build` lo scrive a ogni build, quindi un progetto mai
+compilato, come uno scaffold appena creato, non ha nulla da correggere. Su 0.24 lo
+`status` di ogni nuovo progetto terminava con "is missing".
+
 ### `rebase resources`
 
 Ciò di cui il progetto dichiara di aver bisogno — i database, i bucket, i topic e le code richiesti dal codice di configurazione, nonché i cron e le funzioni definiti dai suoi file:
@@ -294,6 +300,12 @@ in caso di drift, `rebase resources --check --json` termina con 1 e una busta di
 Una risorsa viene dichiarata nel codice di configurazione — `database("analytics")`, `bucket("media")`, `topic("signups")`, `queue("thumbnails")` — oppure consiste in un file collocato in `backend/crons` o `backend/functions`. Essa non va mai scritta manualmente in `rebase.resources.json`, file generato automaticamente da tali dichiarazioni per consentire all'host di determinare le dipendenze del progetto senza compilarlo. Ogni voce tiene traccia dei relativi utilizzatori (`collection:events`, `property:posts.cover`, `function:report`).
 
 Un backend include inoltre un database predefinito e una sorgente di archiviazione predefinita che non richiedono alcuna dichiarazione. Entrambi compaiono in questo elenco con il contrassegno `implicit` e non vengono registrati in `rebase.resources.json`: essendo forniti direttamente dall'host, la loro annotazione comporterebbe la richiesta di provisioning per risorse non esplicitamente sollecitate.
+<span class="since-badge" data-since="0.25">Da 0.25</span> Dichiararne uno con
+nome, come `bucket("media")`, lascia il predefinito dov'è, quindi compaiono entrambi.
+Solo dichiarare il predefinito stesso, o segnare un bucket con `default: true`, lo
+sostituisce. Su 0.24 la sorgente di archiviazione predefinita spariva da
+`rebase status` e `rebase resources` appena veniva dichiarato un qualsiasi bucket,
+sebbene il server continuasse a servirla.
 
 Per verificare le risorse allocate sulla piattaforma a fronte di quanto dichiarato nel codice, e per eliminare un database allocato non più presente nel codice, consulta la sezione [`rebase cloud resources`](/docs/cli/cloud#resources).
 

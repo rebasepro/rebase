@@ -69,9 +69,21 @@ rebase db migrate --baseline <version>
 ```
 
 La versione è il prefisso numerico del file di migrazione; `db generate` stampa il
-comando con la versione già inserita. Ogni `db migrate` successivo è un comando
-ordinario. Vedi [`--baseline`](/docs/cli/schema/#rebase-db-migrate) per un database che
-registra già le migrazioni.
+comando con la versione già inserita. Vedi
+[`--baseline`](/docs/cli/schema/#rebase-db-migrate) per un database che registra già le
+migrazioni.
+
+Dopo di ciò, `db migrate` applica ciò che l'avvio non ha applicato, e su un database
+servito da `rebase dev` è meno di quanto sembri. L'avvio aggiunge ogni nuova tabella,
+colonna e valore di enum non appena una collezione cambia, quindi quando
+`db generate` scrive la migrazione che aggiunge una colonna, la colonna c'è già: quel
+`db migrate` si ferma di nuovo su `already exists` e nomina il
+`--baseline <version>` che la registra. Ogni nuova proprietà significa un'altra
+baseline. Registra una migrazione solo quando l'avvio ha fatto ogni modifica che
+contiene. Una che inoltre elimina, rinomina o restringe qualcosa contiene istruzioni che
+l'avvio non esegue mai, e registrarla le salta. In sviluppo, `rebase db push` è il
+comando che modifica lo schema; riserva `db generate` e `db migrate` a un database che
+l'avvio non ha già modificato.
 
 ### `rebase db backup` / `backups` / `restore`
 
@@ -90,12 +102,22 @@ si rifiuta prima di applicare qualsiasi cosa, ruoli del cluster compresi, e nomi
 oggetti d'intralcio e i due modi per aggirarli: `--clean`, oppure
 `--create-db --target-db <new name>`. Su 0.24 applicava i ruoli e poi falliva con
 l'errore di pg_restore `schema "rebase" already exists`.
+<span class="since-badge" data-since="0.25">Da 0.25</span> Con `--clean`
+il ripristino è un'unica transazione: elimina gli schemi del backup con tutto ciò che
+contengono, ripristina, e fa il commit solo quando l'intero ripristino è riuscito, quindi
+un errore lascia il database com'era. Prima di chiedere conferma, nomina ciò che elimina
+e che il backup non contiene. Esegue `psql`, che viene fornito con `pg_restore`.
+Su 0.24 un ripristino `--clean` in un database con una tabella che mancava al backup,
+come la tabella delle revisioni di Atlas dopo `db migrate`, eliminava tutto e non
+ripristinava nulla.
 <span class="since-badge" data-since="0.25">Da 0.25</span> `restore` rifiuta
 il database di sviluppo gestito: un backup porta le sue righe come dati COPY, che quel
 database non può ricevere, e su 0.24 il ripristino lo lasciava bloccato finché non
 veniva arrestato. Ripristina in Postgres in Docker (`rebase db restore <dump> --docker --clean --yes`),
 poi `rebase db pull --from "$(rebase db url --docker)" --yes` lo copia nel database
-gestito.
+gestito. Un backup del database gestito lo lascia com'era; su
+0.24 le impostazioni applicate da `pg_dump` restavano su di esso, e ogni richiesta API
+falliva fino a `rebase db stop`.
 <span class="since-badge" data-since="0.25">Da 0.25</span> I percorsi relativi, e il
 valore predefinito `./backups`, si risolvono rispetto alla directory da cui esegui
 `rebase`, così le tre righe qui sopra si incontrano in un'unica directory; un'opzione che
@@ -120,6 +142,13 @@ Una colonna sotto un indice univoco riceve un valore distinto per ogni riga, e i
 è un'unica transazione: se fallisce, le tabelle che avrebbe riscritto vengono svuotate e
 nominate, e il comando termina con 1. Su 0.24 falliva su `token_hash` una volta che gli
 utenti avevano effettuato l'accesso due volte, lasciando dati reali.
+
+<span class="since-badge" data-since="0.25">Da 0.25</span> Un flag che `pull`
+non accetta viene rifiutato prima che venga letto o copiato qualsiasi cosa, nominando
+quello che probabilmente si intendeva: `--anonymise` risponde "did you mean --anonymize?"
+e termina con 1. Su 0.24 un flag scritto male veniva ignorato, quindi `--anonymise`,
+`--anon` o `--schem` eseguivano il pull senza di esso, e i dati personali arrivavano
+così com'erano.
 
 Dato che `pg_dump` rimuove i privilegi, la copia arriverebbe con i criteri RLS di origine ma senza le relative autorizzazioni sottostanti — causando il fallimento di ogni lettura come `rebase_user` con l'errore `permission denied`. L'operazione di pull ripristina successivamente il ruolo dell'applicazione, impiegando la medesima procedura usata all'avvio e da `rebase db push`, garantendo che le tabelle interne di Rebase rimangano protette come previsto.
 

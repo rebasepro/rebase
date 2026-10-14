@@ -61,6 +61,18 @@ Cannot create branch: the source database "leadgen" has active connections.
 `--force` termina queste sessioni prima del templating, sia su `create` che su
 `delete`. Non termina mai la sessione che sta eseguendo il comando stesso.
 
+<span class="since-badge" data-since="0.25">Da 0.25</span> `create --force`
+chiude anche la sorgente alle nuove connessioni per la durata della copia
+(`ALTER DATABASE … ALLOW_CONNECTIONS false`, eseguito dal database `postgres` del
+server) e la riapre in seguito, anche in caso di errore e di Ctrl-C. Un client che si
+riconnette appena viene disconnesso, come fa un `rebase dev` in esecuzione, non può
+quindi rientrare prima che la copia inizi. Per farlo serve il proprietario della sorgente;
+senza di esso, e su `delete`, `--force` disconnette le sessioni fino a tre volte prima di
+arrendersi. Quando dopo di ciò una sessione è ancora presente, l'errore dice che si sono
+riconnesse e di arrestarle, non di passare di nuovo `--force`. Su 0.24 le disconnetteva
+una sola volta, e circa un `create --force` su sette con un `rebase dev` in esecuzione
+falliva consigliando di rieseguirlo con `--force`.
+
 `DatabasePoolManager` disconnette i propri pool inattivi prima della clonazione o dell'eliminazione — ma solo i pool **all'interno del processo che sta svolgendo il lavoro**. `rebase db branch` viene eseguito come processo a sé stante, pertanto non ha effetto su nient'altro nella macchina:
 
 - **Un'istanza di `rebase dev` in esecuzione blocca il branching.** Questo è il caso comune, non un caso limite: la necessità di un branch e l'esecuzione dell'app si verificano solitamente nello stesso momento. Arresta il server di sviluppo, crea il branch e riavvialo.
@@ -202,6 +214,14 @@ rebase db branch delete dev_sandbox
 `.rebase/branch.json` — un nome, mai una stringa di connessione, affinché le tue credenziali
 rimangano esclusivamente in `.env` — e ogni comando `rebase` successivo in quel checkout punterà
 quindi al database del branch: `dev`, `db push`, `db migrate`, `db backup`.
+Un `rebase dev` già in esecuzione mantiene il database su cui è partito finché non lo
+riavvii, e `switch` lo dice.
+
+<span class="since-badge" data-since="0.25">Da 0.25</span> `rebase db branch
+list` segna il branch su cui si trova questo checkout, e `prune` non lo rimuove mai, così
+come `delete` si rifiuta di farlo: il piano lo elenca come mantenuto, e dice di lasciarlo
+prima con `rebase db branch switch --off`. Su 0.24 `prune --older-than … --yes` lo
+eliminava, e il checkout puntava poi ogni comando a un database che non esisteva più.
 
 Si posiziona tra la shell e il file di progetto nell'ordine di risoluzione:
 
@@ -235,11 +255,10 @@ checkout con branch cambiato veniva registrato solo nello snapshot del branch.
 
 I branch sono normali database PostgreSQL denominati con il nome del branch preceduto dal prefisso `rb_`, quindi `dev_sandbox` nell'esempio precedente corrisponde al database `rb_dev_sandbox` sullo stesso server.
 
-La creazione di un branch **non** modifica il database con cui comunica il progetto. `rebase db branch create` crea la copia e si ferma lì; non viene scritto nulla in `.env`, e il successivo `rebase dev` utilizzerà ancora il database utilizzato in precedenza. Per lavorare su un branch, punta tu stesso la variabile `DATABASE_URL` su di esso — la stringa di connessione è quella già a disposizione, modificando solo il nome del database:
+La creazione di un branch **non** modifica il database con cui comunica il progetto. `rebase db branch create` crea la copia e si ferma lì; non viene scritto nulla in `.env`, e il successivo `rebase dev` utilizzerà ancora il database utilizzato in precedenza. Per lavorare su un branch, passa a esso con `rebase db branch switch <name>`, come sopra. Per raggiungerlo da qualcosa che non è un comando `rebase`, la sua stringa di connessione è quella già a disposizione, modificando solo il nome del database:
 
 ```bash
-# .env
-DATABASE_URL=postgresql://user:pass@localhost:5432/rb_dev_sandbox
+postgresql://user:pass@localhost:5432/rb_dev_sandbox
 ```
 
 ---
