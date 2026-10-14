@@ -112,7 +112,7 @@ function pageHtml({ config, width, height, card }) {
   .spacer { flex: 1; }
   .eyebrow {
     font-family: "JetBrains Mono", ui-monospace, monospace;
-    font-size: 17px; letter-spacing: .18em; text-transform: uppercase; color: #B4B8BD;
+    font-size: 17px; letter-spacing: .18em; text-transform: uppercase; color: #AEB3BA;
   }
   h1 {
     font-family: "Instrument Sans Variable", system-ui, sans-serif;

@@ -262,7 +262,7 @@ export const PolicyEditor = ({
                                 <Typography variant="caption" className="uppercase tracking-wider text-text-secondary">{t("studio_policy_using_expr")}</Typography>
                                 <Typography variant="caption" className="text-text-secondary opacity-70">{t("studio_policy_using_expr_desc")}</Typography>
                             </div>
-                            <div className={cls("h-32 border rounded-md overflow-hidden bg-white dark:bg-[#1e1e1e]", defaultBorderMixin)}>
+                            <div className={cls("h-32 border rounded-md overflow-hidden bg-white dark:bg-[#1b1e22]", defaultBorderMixin)}>
                                 <MonacoEditor
                                     ref={usingEditor}
                                     value={usingExpr}
@@ -281,7 +281,7 @@ export const PolicyEditor = ({
                                 <Typography variant="caption" className="uppercase tracking-wider text-text-secondary">{t("studio_policy_check_expr")}</Typography>
                                 <Typography variant="caption" className="text-text-secondary opacity-70">{t("studio_policy_check_expr_desc")}</Typography>
                             </div>
-                            <div className={cls("h-32 border rounded-md overflow-hidden bg-white dark:bg-[#1e1e1e]", defaultBorderMixin)}>
+                            <div className={cls("h-32 border rounded-md overflow-hidden bg-white dark:bg-[#1b1e22]", defaultBorderMixin)}>
                                 <MonacoEditor
                                     ref={checkEditor}
                                     value={checkExpr}

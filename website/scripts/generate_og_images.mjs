@@ -288,8 +288,8 @@ const escapeHtml = (s) =>
  * The card. The ribbon fills the frame; a left-weighted scrim keeps the type
  * legible against whatever seat the orbit produced (the pose is a function of
  * the slug, so where the bright part lands is not knowable here). Ground,
- * weights and colours follow SITE-STORY §6 — #08090A, display at 600, body
- * grey #B4B8BD lifted a step because it sits on a scrim, the 6px brand rule.
+ * weights and colours follow SITE-STORY §6 — #090A0C, display at 600, body
+ * grey #AEB3BA lifted a step because it sits on a scrim, the 6px brand rule.
  */
 const html = ({ config, card }) => `<!doctype html>
 <html><head><meta charset="utf-8"><style>
@@ -297,7 +297,7 @@ const html = ({ config, card }) => `<!doctype html>
   @font-face { font-family: "Inter Variable"; src: url("/font-body.woff2") format("woff2"); font-weight: 100 900; }
   @font-face { font-family: "JetBrains Mono"; src: url("/font-mono.woff2") format("woff2"); font-weight: 400 700; }
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  html, body { width: 1200px; height: 630px; overflow: hidden; background: #08090A; }
+  html, body { width: 1200px; height: 630px; overflow: hidden; background: #090A0C; }
   #stage { position: relative; width: 1200px; height: 630px; }
   canvas { display: block; width: 1200px; height: 630px; }
   .scrim {
@@ -320,7 +320,7 @@ const html = ({ config, card }) => `<!doctype html>
   }
   .eyebrow {
     font-family: "JetBrains Mono", ui-monospace, monospace;
-    font-size: 17px; letter-spacing: .18em; text-transform: uppercase; color: #B4B8BD;
+    font-size: 17px; letter-spacing: .18em; text-transform: uppercase; color: #AEB3BA;
     margin-bottom: 22px;
   }
   h1 {
@@ -363,7 +363,7 @@ const html = ({ config, card }) => `<!doctype html>
 /** The bare ribbon, for choosing a seat: no scrim, no type, so the measurement is of the artwork. */
 const probeHtml = ({ config }) => `<!doctype html>
 <html><head><meta charset="utf-8"><style>
-  * { margin: 0; padding: 0; } html, body { width: 1200px; height: 630px; overflow: hidden; background: #08090A; }
+  * { margin: 0; padding: 0; } html, body { width: 1200px; height: 630px; overflow: hidden; background: #090A0C; }
   canvas { display: block; width: 1200px; height: 630px; }
 </style></head><body><canvas id="c"></canvas>
 <script type="application/json" id="cfg">${JSON.stringify(config)}</script>

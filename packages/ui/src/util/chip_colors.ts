@@ -59,7 +59,7 @@ const CONTRAST_TARGET = 4.6;
 
 /** Page backgrounds the outlined variant sits on: `bg-white` and `surface-950`. */
 const PAGE_LIGHT = "#ffffff";
-const PAGE_DARK = "#181818";
+const PAGE_DARK = "#16181c";
 
 function toRgb(hex: string): [number, number, number] {
     let h = hex.replace("#", "");
@@ -196,7 +196,7 @@ const HUE_STOPS: Record<ChipHue, HueStops> = {
     red: { pale: "#ffdce5", mid: "#ff9eb7", solid: "#f82b60", deep: "#ba1e45", text: "#4c0c1c" },
     pink: { pale: "#ffdaf6", mid: "#f99de2", solid: "#ff08c2", deep: "#b2158b", text: "#400832" },
     purple: { pale: "#ede2fe", mid: "#cdb0ff", solid: "#8b46ff", deep: "#6b1cb0", text: "#280b42" },
-    gray: { pale: "#eeeeee", mid: "#cccccc", solid: "#666666", deep: "#444444", text: "#040404" },
+    gray: { pale: "#eceef1", mid: "#c9ccd2", solid: "#62676e", deep: "#40444a", text: "#040405" },
     indigo: { pale: "#e0e7ff", mid: "#a5b4fc", solid: "#6366f1", deep: "#4f46e5", text: "#312e81" },
     violet: { pale: "#ede9fe", mid: "#c4b5fd", solid: "#8b5cf6", deep: "#7c3aed", text: "#4c1d95" },
     fuchsia: { pale: "#fae8ff", mid: "#f0abfc", solid: "#d946ef", deep: "#c026d3", text: "#701a75" },

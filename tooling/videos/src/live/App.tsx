@@ -594,7 +594,7 @@ const PROMPTER_HEIGHT = "19vh";
 const page: React.CSSProperties = {
     height: "100vh",
     overflow: "hidden",
-    background: "#0A0A0A",
+    background: "#090A0C",
     color: "#FFFFFF",
     fontFamily: "Inter, sans-serif",
     display: "grid",
@@ -613,8 +613,8 @@ const panel: React.CSSProperties = {
     padding: "16px 20px",
     borderRadius: 9,
     border: "1px solid rgba(255,255,255,0.14)",
-    background: "#131313",
+    background: "#111316",
     zIndex: 2,
 };
-const button: React.CSSProperties = { background: "#FFFFFF", color: "#0A0A0A", border: 0, borderRadius: 6, padding: "8px 16px", fontWeight: 600, fontSize: 14, cursor: "pointer" };
-const select: React.CSSProperties = { background: "#181818", color: "#FFFFFF", border: "1px solid rgba(255,255,255,0.14)", borderRadius: 6, padding: "5px 8px", maxWidth: 260 };
+const button: React.CSSProperties = { background: "#FFFFFF", color: "#090A0C", border: 0, borderRadius: 6, padding: "8px 16px", fontWeight: 600, fontSize: 14, cursor: "pointer" };
+const select: React.CSSProperties = { background: "#16181c", color: "#FFFFFF", border: "1px solid rgba(255,255,255,0.14)", borderRadius: 6, padding: "5px 8px", maxWidth: 260 };

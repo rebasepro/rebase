@@ -584,7 +584,7 @@ duration: 400 }
                                 gap={20}
                                 size={1}
                                 className="!bg-surface-well"
-                                color={isDark ? "#2a2a2a" : "#d9d9dc"}
+                                color={isDark ? "#272a2f" : "#d9d9dc"}
                             />
                             <Controls
                                 showInteractive={false}
@@ -685,7 +685,7 @@ duration: 400 }
                                     className="w-6 h-0.5 rounded"
                                     style={{
                                         backgroundImage:
-                                            "repeating-linear-gradient(90deg, #94a3b8, #94a3b8 4px, transparent 4px, transparent 7px)"
+                                            "repeating-linear-gradient(90deg, #9da2aa, #9da2aa 4px, transparent 4px, transparent 7px)"
                                     }}
                                 />
                                 <Typography

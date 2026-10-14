@@ -83,7 +83,7 @@ const experimentsJson = JSON.stringify(EXPERIMENTS);
                     <path d="M2 17l10 5 10-5"/>
                     <path d="M2 12l10 5 10-5"/>
                 </svg>
-                <span style="font-weight:600;font-size:13px;color:#f1f5f9;">A/B Testing</span>
+                <span style="font-weight:600;font-size:13px;color:#f2f5f9;">A/B Testing</span>
                 <span style="
                     font-size:10px;
                     padding:2px 6px;
@@ -220,7 +220,7 @@ const experimentsJson = JSON.stringify(EXPERIMENTS);
             var header = document.createElement("div");
             header.style.cssText = "display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;";
             header.innerHTML =
-                '<span style="font-weight:600;font-size:12px;color:#f1f5f9;">' + exp.id + '</span>' +
+                '<span style="font-weight:600;font-size:12px;color:#f2f5f9;">' + exp.id + '</span>' +
                 (isExpired
                     ? '<span style="font-size:10px;padding:1px 5px;border-radius:3px;background:rgba(239,68,68,0.15);color:#ef4444;">expired</span>'
                     : (exp.expires

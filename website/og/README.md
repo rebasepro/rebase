@@ -37,5 +37,5 @@ files afterwards or re-run `node website/scripts/og/render.mjs`.
 - **Fonts come from Google Fonts at render time**, and the capture waits on
   `document.fonts.ready`. Offline, it silently falls back to system metrics.
 - Keep the card under **1MB**; that is GitHub's ceiling for a social preview.
-- The design follows `SITE-STORY.md` §6: ground `#08090A`, headings weight 500 at
+- The design follows `SITE-STORY.md` §6: ground `#090A0C`, headings weight 500 at
   `-0.022em`, headlines one colour, left-aligned, no eyebrow, no emoji.

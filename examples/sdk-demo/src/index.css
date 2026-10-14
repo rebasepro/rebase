@@ -1,17 +1,17 @@
 :root {
   /* Color palette — mirrors the @rebasepro/ui theme (see packages/ui/src/index.css
-     and the /debug/ui UIReferenceView): blue primary, neutral surface scale. */
-  --bg-primary: #111111;      /* surface-800: dark main content */
-  --bg-secondary: #0a0a0a;    /* surface-900: drawer / paper */
-  --bg-card: #0a0a0a;         /* paperMixin: dark:bg-surface-900 + border */
-  --bg-card-hover: #171717;
-  --bg-input: #171717;
-  --border: #262626;          /* surface-700: defaultBorderMixin */
+     and the /debug/ui UIReferenceView): blue primary, Graphite neutrals (every grey on the brand hue). */
+  --bg-primary: #0f1114;      /* surface-800: dark main content */
+  --bg-secondary: #090a0c;    /* surface-900: drawer / paper */
+  --bg-card: #090a0c;         /* paperMixin: dark:bg-surface-900 + border */
+  --bg-card-hover: #15171b;
+  --bg-input: #15171b;
+  --border: #23262b;          /* surface-700: defaultBorderMixin */
   --border-focus: #0070F4;
 
-  --text-primary: #ffffff;    /* text-primary-dark */
-  --text-secondary: #a0a0a9;  /* text-secondary-dark */
-  --text-muted: #757580;      /* text-disabled-dark */
+  --text-primary: #f6f7f8;    /* text-primary-dark */
+  --text-secondary: #aeb3ba;  /* text-secondary-dark */
+  --text-muted: #7d828a;      /* text-disabled-dark */
 
   --accent: #0070F4;          /* primary */
   --accent-hover: #3d8ef7;    /* primary-light */

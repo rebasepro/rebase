@@ -389,7 +389,7 @@ ul[data-type="taskList"] li > label {
 }
 [data-theme="dark"] ul[data-type="taskList"] li > label input[type="checkbox"] {
     background-color: rgb(30 41 59);
-    border: 2px solid #666;
+    border: 2px solid #62676e;
 }
 [data-theme="dark"] ul[data-type="taskList"] li > label input[type="checkbox"]:hover { background-color: rgb(51 65 85); }
 [data-theme="dark"] ul[data-type="taskList"] li > label input[type="checkbox"]:active { background-color: rgb(71 85 105); }
@@ -403,7 +403,7 @@ ul[data-type="taskList"] li > label input[type="checkbox"] {
   height: 1.2em;
   position: relative;
   top: 5px;
-  border: 2px solid #777;
+  border: 2px solid #72787f;
   border-radius: 0.25em;
   margin-right: 0.3rem;
   display: grid;

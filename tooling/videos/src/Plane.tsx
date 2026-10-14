@@ -213,7 +213,7 @@ export function useSlideMotion() {
  * 1. Every change in reveal was a full-frame background opacity animation.
  *    Not the ribbon fading — the entire ground fading, at every cut.
  * 2. Under that order the ribbon is seen THROUGH the ground, so it darkens
- *    whatever is behind it. On #08090A that reads as art. On a bright chroma
+ *    whatever is behind it. On #090A0C that reads as art. On a bright chroma
  *    field the ribbon is darker than the ground, so it subtracts and reads as
  *    smudges — which is why the chroma scenes had been given their own lower
  *    reveal values, and why there were five different values in play at all.

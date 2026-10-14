@@ -141,50 +141,57 @@ Rebase uses a carefully defined set of CSS custom properties. **Never invent arb
 
 #### Surface Scale (Neutrals)
 
+Every neutral in the system — this scale, the text tokens, the role surfaces —
+is **Graphite**: `oklch(L c 258)`, the brand blue's hue at a chroma too low to
+read as blue. Never write a pure grey (`#131313`, `#737373`) or a Tailwind
+zinc value (`#a1a1aa`, hue 286°) by hand; Tailwind's `zinc`, `neutral`,
+`gray` and `stone` palettes are re-pointed at Graphite in the kit, and a test
+(`packages/ui/test/neutral-hue.test.ts`) fails on any neutral token off the hue.
+
 The surface scale goes from `50` (lightest) to `950` (darkest):
 
 | Token              | Value       | Light mode usage       | Dark mode usage        |
 |--------------------|-------------|------------------------|------------------------|
-| `surface-50`       | `#fafafa`   | Page background        | —                      |
-| `surface-100`      | `#f5f5f5`   | Subtle backgrounds     | —                      |
-| `surface-200`      | `#e5e5e5`   | Borders, dividers      | —                      |
-| `surface-300`      | `#d4d4d4`   | Hover borders          | —                      |
-| `surface-400`      | `#a3a3a3`   | Muted text, placeholders | —                    |
-| `surface-500`      | `#737373`   | Secondary icons        | Secondary icons        |
-| `surface-600`      | `#404040`   | —                      | Muted text, labels     |
-| `surface-700`      | `#262626`   | —                      | Borders, dividers      |
-| `surface-800`      | `#111111`   | —                      | Page background        |
-| `surface-900`      | `#0a0a0a`   | —                      | Card backgrounds       |
+| `surface-50`       | `#f9fafb`   | Page background        | —                      |
+| `surface-100`      | `#f4f5f7`   | Subtle backgrounds     | —                      |
+| `surface-200`      | `#e3e5e9`   | Borders, dividers      | —                      |
+| `surface-300`      | `#d1d4d9`   | Hover borders          | —                      |
+| `surface-400`      | `#9ea4ab`   | Muted text, placeholders | —                    |
+| `surface-500`      | `#747a81`   | Secondary icons        | Secondary icons        |
+| `surface-600`      | `#3c4046`   | —                      | Muted text, labels     |
+| `surface-700`      | `#23262b`   | —                      | Borders, dividers      |
+| `surface-800`      | `#0f1114`   | —                      | Page background        |
+| `surface-900`      | `#090a0c`   | —                      | Card backgrounds       |
 | `surface-950`      | `#000000`   | —                      | Deepest backgrounds    |
 
-#### Surface Accent Scale (Blue-tinted neutrals)
+#### Surface Accent Scale (Slate: the brand hue at a higher chroma)
 
 Used for subtle interactive backgrounds and input fields. Full 50–950 range:
 
 | Token                     | Value       | Usage                              |
 |---------------------------|-------------|-------------------------------------|
 | `surface-accent-50`       | `#f8fafc`   | Lightest accent background         |
-| `surface-accent-100`      | `#f1f5f9`   | Hover backgrounds (light)          |
+| `surface-accent-100`      | `#f2f5f9`   | Hover backgrounds (light)          |
 | `surface-accent-200`      | `#e2e8f0`   | Field backgrounds (light)          |
-| `surface-accent-300`      | `#cbd5e1`   | Accent borders (light)             |
+| `surface-accent-300`      | `#ccd5e1`   | Accent borders (light)             |
 | `surface-accent-400`      | `#94a3b8`   | Muted accent text                  |
 | `surface-accent-500`      | `#64748b`   | Mid-tone accent                    |
 | `surface-accent-600`      | `#475569`   | Accent labels (dark)               |
 | `surface-accent-700`      | `#334155`   | Field backgrounds (dark)           |
-| `surface-accent-800`      | `#1e293b`   | Hover backgrounds (dark)           |
-| `surface-accent-900`      | `#172033`   | Deep accent background (dark)      |
-| `surface-accent-950`      | `#0f172a`   | Deepest accent background (dark)   |
+| `surface-accent-800`      | `#1d293b`   | Hover backgrounds (dark)           |
+| `surface-accent-900`      | `#152133`   | Deep accent background (dark)      |
+| `surface-accent-950`      | `#0c182a`   | Deepest accent background (dark)   |
 
 #### Text Colors
 
 | Token                    | Value      | Usage                                    |
 |--------------------------|------------|------------------------------------------|
-| `text-primary`           | `#212121`  | Default text (light mode)                |
-| `text-secondary`         | `#757575`  | Secondary/helper text (light mode)       |
-| `text-disabled`          | `#9e9e9e`  | Disabled text (light mode)               |
-| `text-primary-dark`      | `#ffffff`  | Default text (dark mode)                 |
-| `text-secondary-dark`    | `#a0a0a9`  | Secondary/helper text (dark mode)        |
-| `text-disabled-dark`     | `#757580`  | Disabled text (dark mode)                |
+| `text-primary`           | `#1e2126`  | Default text (light mode)                |
+| `text-secondary`         | `#646971`  | Secondary/helper text (light mode)       |
+| `text-disabled`          | `#868c94`  | Disabled text (light mode)               |
+| `text-primary-dark`      | `#f6f7f8`  | Default text (dark mode)                 |
+| `text-secondary-dark`    | `#aeb3ba`  | Secondary/helper text (dark mode)        |
+| `text-disabled-dark`     | `#7d828a`  | Disabled text (dark mode)                |
 
 ### Color Rules
 

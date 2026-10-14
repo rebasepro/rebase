@@ -33,15 +33,18 @@
        own ground VALUES. The scale now names roles from the shared ladder, one
        declaration site, in `--ground`/`--ground-lift` below:
 
-         base ground    -> --surface-frame   #0a0a0a
-         raised chapter -> --surface-sheet   #131313
+         base ground    -> --surface-frame   #090a0c
+         raised chapter -> --surface-sheet   #111316
          a card on either -> one step up, whichever ground it landed on
 
        Reach for `bg-surface-frame`, not a resurrected `bg-page-ground`. The ink
        tokens below stay: type is a different axis and the ladder has no opinion
        on a marketing page's copy colour. */
-    --color-page-ink: #f7f8f8;
-    --color-page-copy: #b4b8bd;
+    /* Graphite (packages/ui/src/theme.css): ink and copy on the system's one
+       neutral hue. Copy is the same value as the panel's secondary text, which
+       until 2026-10-14 was a different grey (#a0a0a9 there, #b4b8bd here). */
+    --color-page-ink: #f6f7f8;
+    --color-page-copy: #aeb3ba;
 
     /* The height of the sticky site header. A token rather than a measurement
        because two places need to agree on it: the header pins its nav to this
@@ -67,7 +70,7 @@
        name. `--color-primary` (#0070F4) is untouched and still owns every
        button and every in-product accent; a chroma hue never means "clickable".
 
-       Contrast as ink on the #0a0a0a base ground — five of six clear AA for
+       Contrast as ink on the #090a0c base ground — five of six clear AA for
        body. Coral and blush read 6.85 and 11.90 here until 2026-09-10; both
        were stale, and both still clear AA at the real figures:
          cyan 10.15:1   yellow 12.57:1   blush 9.77:1
@@ -369,14 +372,14 @@
 }
 
 /* A raised ground eats the muted tier's headroom, so the muted tier lifts with
-   it. `--color-surface-500` (#797979) is tuned for #000/#0a0a0a, where it
-   measures 4.82:1 and 4.55:1 — deliberately close to the line, because it is
+   it. `--color-surface-500` (#747a81) is tuned for #000 and the frame, where it
+   measures 4.84:1 and 4.57:1 — deliberately close to the line, because it is
    the balance point where the light and dark curves cross. On the raised ground
    the same value falls under AA, so it is restated here:
 
      ground      surface-500   this rule
-     #0a0a0a     4.55:1        (base ground, rule does not apply)
-     #131313     4.27:1  FAIL  #7e7e7e -> 4.58:1
+     #090a0c     4.57:1        (base ground, rule does not apply)
+     #111316     4.29:1  FAIL  #797f87 -> 4.61:1
 
    The value dropped from #8a8a8a to #7e7e7e on 2026-09-10 with the move onto
    the shared ladder: it was compensating for #14161b, a ground two rungs of
@@ -387,7 +390,7 @@
    muted value is only muted RELATIVE to something, and the whole tier has to
    move when the ground does. */
 .ground-raised .eyebrow {
-    color: #7e7e7e;
+    color: #797f87;
 }
 
 @utility chapter {
@@ -507,7 +510,7 @@
     color: rgb(10 10 10 / 0.82);
 }
 
-.ground-close :is(h1, h2, h3):not(.frame *) { color: #0a0a0a; }
+.ground-close :is(h1, h2, h3):not(.frame *) { color: #090a0c; }
 
 /* The frame is a dark panel wherever it sits, so inside one the copy returns to
    the page's own ink rather than inheriting the slab's. */
@@ -532,7 +535,7 @@
 }
 
 .ground-claim .accent-link:not(.frame *) { color: #fff; }
-.ground-close .accent-link:not(.frame *) { color: #0a0a0a; }
+.ground-close .accent-link:not(.frame *) { color: #090a0c; }
 .ground-chroma .accent-link:hover { text-decoration-color: currentColor; }
 
 /* ── The SECONDARY link, which is not an `.accent-link` ──────────────────────
@@ -540,7 +543,7 @@
    compares" next to "For developers", the blog line under the security claim.
    Both were written in the dark ground's muted vocabulary, `text-surface-400`
    with `hover:text-white`, and neither had a line here, so both kept a value
-   tuned for #0a0a0a:
+   tuned for the dark frame:
 
      #a3a3a3 on coral   1.29:1     #a3a3a3 on the deep blue   4.19:1
      white on coral     3.26:1  (what `hover:text-white` was reaching for)
@@ -575,7 +578,7 @@
    ground: the blue slab brightens to white, the coral one deepens to full ink —
    the same direction `.copy-btn:hover` already takes. */
 .ground-claim a:hover:not(.frame *) { color: #fff; }                /* 10.57:1 */
-.ground-close a:hover:not(.frame *) { color: #0a0a0a; }             /* 6.07:1 */
+.ground-close a:hover:not(.frame *) { color: #090a0c; }             /* 6.07:1 */
 
 /* `.frame` draws a white hairline and assumes near-black behind it. Neither
    slab is near-black, so the edge is restated per variant: on the deep ground a
@@ -610,7 +613,7 @@
     border-color: rgb(10 10 10 / 0.22);
 }
 
-/* Secondary copy. `#b4b8bd` is tuned for #0a0a0a and reads as dirt here. */
+/* Secondary copy. `--color-page-copy` is tuned for the dark frame and reads as dirt here. */
 .ground-close p:not(.eyebrow) {
     color: rgb(10 10 10 / 0.78);
 }
@@ -628,7 +631,7 @@
 .ground-close .copy-btn:hover {
     background: rgb(10 10 10 / 0.12);
     border-color: rgb(10 10 10 / 0.3);
-    color: #0a0a0a;
+    color: #090a0c;
 }
 
 /* The "PRIVATE BETA" badge on the Cloud lane. A tint of the ground rather than
@@ -648,7 +651,7 @@
    eyebrow above: small text has no headroom to spend on translucency. */
 .ground-close :is(.bg-white\/10, .bg-amber-400\/15) {
     background: rgb(10 10 10 / 0.1);
-    color: #0a0a0a;                     /* 5.07:1 on the tinted ground */
+    color: #090a0c;                     /* 5.07:1 on the tinted ground */
 }
 
 /* The primary action goes NEAR-BLACK here, not `--color-primary`.
@@ -665,7 +668,7 @@
    direction, and echoes the near-black product frames the rest of the page
    uses — so the button reads as the same material as the product. */
 .ground-close a[class*="bg-primary"] {
-    background: #0a0a0a;
+    background: #090a0c;
     color: #fff;
 }
 
@@ -676,7 +679,7 @@
 /* The secondary button was a white hairline outline. */
 .ground-close a[class*="border-white"] {
     border-color: rgb(10 10 10 / 0.35);
-    color: #0a0a0a;
+    color: #090a0c;
 }
 
 .ground-close a[class*="border-white"]:hover {
@@ -729,7 +732,7 @@
     font-size: 10.5px;
     line-height: 15px;
     font-weight: 500;
-    color: var(--color-text-secondary-dark);   /* #a0a0a9 */
+    color: var(--color-text-secondary-dark);   /* #aeb3ba */
     pointer-events: none;
 }
 
@@ -1335,7 +1338,7 @@ h6 {
 }
 
 .ground-close .copy-btn[data-copied] {
-    color: #0a0a0a;
+    color: #090a0c;
 }
 
 .subtle-shimmer {

@@ -272,8 +272,8 @@ export const Scaffold = React.memo<PropsWithChildren<ScaffoldProps>>(
 
                         <div
                             // The sheet is one lightness step above the frame AND carries a
-                            // plain hairline on its edge. The step alone (#0a0a0a to #131313,
-                            // #f0f0f2 to #f9f9fa) is about 3 L* on both themes, under what a
+                            // plain hairline on its edge. The step alone (#090a0c to #111316,
+                            // #eff0f3 to #f8f9fa) is about 3 L* on both themes, under what a
                             // dimmed screen renders, and the first pass of this system removed
                             // the line on the theory that the step would do its work; the
                             // frame and the sheet then read as one black. The reference's own

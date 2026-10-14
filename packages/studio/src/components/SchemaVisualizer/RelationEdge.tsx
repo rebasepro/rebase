@@ -41,7 +41,7 @@ const RelationEdgeInner = ({
     const isJunction = edgeData?.hasJunction;
 
     // Determine stroke style
-    let strokeColor = "var(--rf-edge-stroke, #94a3b8)";
+    let strokeColor = "var(--rf-edge-stroke, #9da2aa)";
     let strokeDasharray: string | undefined;
     let strokeWidth = 1.5;
 
@@ -52,10 +52,10 @@ const RelationEdgeInner = ({
         strokeColor = "#8b5cf6"; // violet
     } else if (isInverse) {
         strokeDasharray = "6 3";
-        strokeColor = "#94a3b8";
+        strokeColor = "#9da2aa";
     } else if (isJoinPath) {
         strokeDasharray = "3 3";
-        strokeColor = "#94a3b8";
+        strokeColor = "#9da2aa";
     } else {
         strokeColor = "#6366f1"; // primary/indigo
     }

@@ -19,7 +19,7 @@ const STR = "text-[#ce9178]";
 const NUM = "text-[#b5cea8]";
 const TYPE = "text-[#4ec9b0]";
 const FN = "text-[#dcdcaa]";
-const PUNCT = "text-[#d4d4d4]";
+const PUNCT = "text-[#d1d4d9]";
 
 const INDENT: Seg = { t: "    " };
 
@@ -99,26 +99,26 @@ export function SdkMiniDemo() {
     const done = step === LAST;
 
     return (
-        <div className="h-full w-full bg-[#1e1e1e] flex flex-col pointer-events-none select-none overflow-hidden relative font-mono text-[11px] [font-variant-ligatures:none]">
+        <div className="h-full w-full bg-[#1b1e22] flex flex-col pointer-events-none select-none overflow-hidden relative font-mono text-[11px] [font-variant-ligatures:none]">
             <div
                 className="relative flex-1 overflow-hidden pt-3 transition-opacity"
                 style={{ opacity: fading ? 0 : 1, transitionDuration: `${FADE_MS}ms` }}
             >
                 {rows.map((row, i) => (
                     <div key={i} className="flex h-[18px] items-center">
-                        <span className="w-8 shrink-0 pr-3 text-right text-[10px] text-[#858585]">{i + 1}</span>
-                        <span className="relative whitespace-pre pl-3 text-[#d4d4d4]">
+                        <span className="w-8 shrink-0 pr-3 text-right text-[10px] text-[#80868e]">{i + 1}</span>
+                        <span className="relative whitespace-pre pl-3 text-[#d1d4d9]">
                             {row.map((s, j) => <span key={j} className={s.c}>{s.t}</span>)}
                             {i === caretRow && !done && (
-                                <span className="ml-px inline-block h-3 w-0.5 align-middle bg-[#d4d4d4] animate-pulse" />
+                                <span className="ml-px inline-block h-3 w-0.5 align-middle bg-[#d1d4d9] animate-pulse" />
                             )}
                             {i === caretRow && frame.popup && (
                                 <span
-                                    className="absolute top-full z-10 mt-0.5 min-w-32 rounded-sm border border-[#454545] bg-[#252526] py-0.5 shadow-xl"
+                                    className="absolute top-full z-10 mt-0.5 min-w-32 rounded-sm border border-[#41454b] bg-[#252526] py-0.5 shadow-xl"
                                     style={{ left: `calc(${caretCol}ch + 0.75rem)` }}
                                 >
                                     {frame.popup.items.map((item, k) => (
-                                        <span key={item} className={`flex items-center gap-1.5 px-1.5 py-0.5 ${k === 0 ? "bg-[#04395e] text-white" : "text-[#cccccc]"}`}>
+                                        <span key={item} className={`flex items-center gap-1.5 px-1.5 py-0.5 ${k === 0 ? "bg-[#04395e] text-white" : "text-[#c9ccd2]"}`}>
                                             <span className={`text-[9px] ${frame.popup!.kind === "field" ? "text-[#4fc1ff]" : "text-[#b180d7]"}`}>
                                                 {frame.popup!.kind === "field" ? "◇" : "ƒ"}
                                             </span>
@@ -133,11 +133,11 @@ export function SdkMiniDemo() {
 
                 {/* The payoff: what `find()` resolves to, as the editor's hover shows it. */}
                 {frame.hover && (
-                    <div className="ml-11 mt-3 inline-block rounded-sm border border-[#454545] bg-[#252526] px-2.5 py-1.5 shadow-lg">
-                        <div className="text-[#d4d4d4]">
+                    <div className="ml-11 mt-3 inline-block rounded-sm border border-[#41454b] bg-[#252526] px-2.5 py-1.5 shadow-lg">
+                        <div className="text-[#d1d4d9]">
                             <span className={KW}>const</span> <span className={ID}>data</span>: <span className={TYPE}>Post</span>[]
                         </div>
-                        <div className="mt-0.5 text-[10px] text-[#858585]">
+                        <div className="mt-0.5 text-[10px] text-[#80868e]">
                             <span className={KW}>type</span> <span className={TYPE}>Post</span> = {"{ "}
                             <span className={ID}>id</span>: <span className={TYPE}>number</span>; <span className={ID}>title</span>: <span className={TYPE}>string</span>; <span className={ID}>status</span>: <span className={STR}>&apos;draft&apos;</span> | <span className={STR}>&apos;published&apos;</span>; …{" }"}
                         </div>

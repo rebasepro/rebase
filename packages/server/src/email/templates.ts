@@ -43,7 +43,7 @@ const styles = {
         max-width: 600px;
         margin: 0 auto;
         padding: 40px 20px;
-        background-color: #f8fafc;
+        background-color: #f9fafb;
     `),
     card: raw(`
         background-color: #ffffff;
@@ -52,13 +52,13 @@ const styles = {
         box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
     `),
     heading: raw(`
-        color: #1e293b;
+        color: #26292e;
         font-size: 24px;
         font-weight: 600;
         margin: 0 0 20px 0;
     `),
     paragraph: raw(`
-        color: #475569;
+        color: #50545b;
         font-size: 16px;
         line-height: 1.6;
         margin: 0 0 20px 0;
@@ -75,14 +75,14 @@ const styles = {
         margin: 20px 0;
     `),
     footer: raw(`
-        color: #94a3b8;
+        color: #9da2aa;
         font-size: 14px;
         margin-top: 30px;
         padding-top: 20px;
-        border-top: 1px solid #e2e8f0;
+        border-top: 1px solid #e5e8eb;
     `),
     warning: raw(`
-        color: #64748b;
+        color: #6e737b;
         font-size: 14px;
         background-color: #fef3c7;
         padding: 12px 16px;
@@ -100,8 +100,8 @@ const styles = {
         font-size: 34px;
         font-weight: 700;
         letter-spacing: 10px;
-        color: #1e293b;
-        background-color: #f1f5f9;
+        color: #26292e;
+        background-color: #f3f5f6;
         border-radius: 10px;
         padding: 18px 20px 18px 30px;
     `)
@@ -191,7 +191,7 @@ function renderHeader(appName: string, logoUrl?: string): RawHtml {
     return html`
         <div style="text-align: center; margin-bottom: 24px;">
             <img src="${logoUrl}" width="48" height="48" alt="${appName}"
-                 style="display: inline-block; width: 48px; height: auto; border: 0; outline: none; text-decoration: none; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; font-size: 12px; color: #64748b;">
+                 style="display: inline-block; width: 48px; height: auto; border: 0; outline: none; text-decoration: none; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; font-size: 12px; color: #6e737b;">
         </div>
 `;
 }
@@ -217,7 +217,7 @@ export function getPasswordResetTemplate(
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>${subject}</title>
 </head>
-<body style="margin: 0; padding: 0; background-color: #f8fafc;">
+<body style="margin: 0; padding: 0; background-color: #f9fafb;">
     <div style="${styles.container}">${renderHeader(appName, logoUrl)}
         <div style="${styles.card}">
             <h1 style="${styles.heading}">Reset Your Password</h1>
@@ -300,7 +300,7 @@ export function getEmailVerificationTemplate(
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>${subject}</title>
 </head>
-<body style="margin: 0; padding: 0; background-color: #f8fafc;">
+<body style="margin: 0; padding: 0; background-color: #f9fafb;">
     <div style="${styles.container}">${renderHeader(appName, logoUrl)}
         <div style="${styles.card}">
             <h1 style="${styles.heading}">Verify Your Email</h1>
@@ -386,7 +386,7 @@ export function getUserInvitationTemplate(
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>${subject}</title>
 </head>
-<body style="margin: 0; padding: 0; background-color: #f8fafc;">
+<body style="margin: 0; padding: 0; background-color: #f9fafb;">
     <div style="${styles.container}">${renderHeader(appName, logoUrl)}
         <div style="${styles.card}">
             <h1 style="${styles.heading}">Welcome to ${appName}!</h1>
@@ -469,7 +469,7 @@ export function getWelcomeEmailTemplate(
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>${subject}</title>
 </head>
-<body style="margin: 0; padding: 0; background-color: #f8fafc;">
+<body style="margin: 0; padding: 0; background-color: #f9fafb;">
     <div style="${styles.container}">${renderHeader(appName, logoUrl)}
         <div style="${styles.card}">
             <h1 style="${styles.heading}">Welcome to ${appName}</h1>
@@ -547,7 +547,7 @@ export function getEmailOtpTemplate(
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>${subject}</title>
 </head>
-<body style="margin: 0; padding: 0; background-color: #f8fafc;">
+<body style="margin: 0; padding: 0; background-color: #f9fafb;">
     <div style="${styles.container}">${renderHeader(appName, logoUrl)}
         <div style="${styles.card}">
             <h1 style="${styles.heading}">Your sign-in code</h1>
@@ -619,7 +619,7 @@ export function getMagicLinkTemplate(
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>${subject}</title>
 </head>
-<body style="margin: 0; padding: 0; background-color: #f8fafc;">
+<body style="margin: 0; padding: 0; background-color: #f9fafb;">
     <div style="${styles.container}">${renderHeader(appName, logoUrl)}
         <div style="${styles.card}">
             <h1 style="${styles.heading}">Sign In to ${appName}</h1>
@@ -707,7 +707,7 @@ export function getEmailChangeTemplate(
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>${subject}</title>
 </head>
-<body style="margin: 0; padding: 0; background-color: #f8fafc;">
+<body style="margin: 0; padding: 0; background-color: #f9fafb;">
     <div style="${styles.container}">${renderHeader(appName, logoUrl)}
         <div style="${styles.card}">
             <h1 style="${styles.heading}">Confirm Your New Email</h1>
@@ -788,7 +788,7 @@ export function getEmailChangeNoticeTemplate(
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>${subject}</title>
 </head>
-<body style="margin: 0; padding: 0; background-color: #f8fafc;">
+<body style="margin: 0; padding: 0; background-color: #f9fafb;">
     <div style="${styles.container}">${renderHeader(appName, logoUrl)}
         <div style="${styles.card}">
             <h1 style="${styles.heading}">Email Change Requested</h1>

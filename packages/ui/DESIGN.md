@@ -7,6 +7,20 @@ The visual system behind `@rebasepro/ui`, as the code does it. Tokens live in
 records the decisions those two files carry, so a change to either is a change
 to this document. Product truth is in `PRODUCT.md`.
 
+## Neutrals: Graphite
+
+Added 2026-10-14. Every neutral — the role surfaces below, the numbered scale,
+the text tokens — sits on **one hue, 258°** (the brand blue's), at a chroma
+between 0.002 and 0.014: low enough that nothing reads as blue, enough that a
+lifted surface reads as the same material as the ground instead of a grey box
+on black. Before, the neutrals sat on five hues (hue-less surfaces, zinc text
+at 286°, grounds at 246°), and that mix was the clash.
+
+- Never hand-write a pure grey or a Tailwind zinc hex. Use a role or a token.
+- `zinc`, `neutral`, `gray` and `stone` utilities are re-pointed at the
+  Graphite ramp (`--color-graphite-*`) in `theme.css`, so they are safe.
+- `test/neutral-hue.test.ts` fails on any neutral token off the hue.
+
 ## Surfaces
 
 Added September 2026. Reference, with the measurements behind the ladder:
@@ -19,19 +33,19 @@ on screen with every card darker than the sheet it sat on.
 
 | Role | Class | Light | Dark | Used for |
 |---|---|---|---|---|
-| Frame | `bg-surface-frame` | `#f0f0f2` | `#0a0a0a` | drawer, rail, app bar, the page around the sheet |
-| Sheet | `bg-surface-sheet` | `#f9f9fa` | `#131313` | the content area; table headers |
-| Card | `bg-surface-card` | `#ffffff` | `#181818` | cards, paper, dialogs, menus, popovers, table rows |
-| Card hover | `hover:bg-surface-card-hover` | `#f7f7f8` | `#1d1d1d` | a clickable card or row |
-| Raised | `bg-surface-raised` | `#ececee` | `#242424` | neutral buttons, chips, tiles inside a card, avatars, skeletons |
-| Raised hover | `hover:bg-surface-raised-hover` | `#e3e3e6` | `#2c2c2c` | also badges, disabled slider parts |
-| Lifted | `bg-surface-lifted` | `#ffffff` | `#2c2c2c` | the active segment on a track, a switch thumb |
+| Frame | `bg-surface-frame` | `#eff0f3` | `#090a0c` | drawer, rail, app bar, the page around the sheet |
+| Sheet | `bg-surface-sheet` | `#f8f9fa` | `#111316` | the content area; table headers |
+| Card | `bg-surface-card` | `#ffffff` | `#16181c` | cards, paper, dialogs, menus, popovers, table rows |
+| Card hover | `hover:bg-surface-card-hover` | `#f6f7f9` | `#1b1d21` | a clickable card or row |
+| Raised | `bg-surface-raised` | `#eaecef` | `#212429` | neutral buttons, chips, tiles inside a card, avatars, skeletons |
+| Raised hover | `hover:bg-surface-raised-hover` | `#e1e4e7` | `#292c32` | also badges, disabled slider parts |
+| Lifted | `bg-surface-lifted` | `#ffffff` | `#292c32` | the active segment on a track, a switch thumb |
 | Field | `bg-surface-field` | black 3.5% | white 4% | inputs, search, segmented tracks, kanban columns, neutral alerts |
 | Field hover | `hover:bg-surface-field-hover` | black 5.5% | white 7% | |
 | Hover | `hover:bg-surface-hover` | black 4% | white 6% | a transparent row, nav item, menu item, icon button |
 | Active | `bg-surface-active` | black 7% | white 9% | selected or checked item, slider track, drop target |
 | Scrim | `bg-surface-scrim` | black 40% | black 60% | dialog and sheet backdrops |
-| Well | `bg-surface-well` | `#f5f5f5` | `#0a0a0a` | an inset code well (a query, a log tail, a connection string): the one surface that goes down the ladder, darker than its card on purpose |
+| Well | `bg-surface-well` | `#f4f5f7` | `#090a0c` | an inset code well (a query, a log tail, a connection string): the one surface that goes down the ladder, darker than its card on purpose |
 | Hairline | `border-hairline` | black 8% | white 8% | cards on the sheet, fields, dividers |
 | Hairline strong | `border-hairline-strong` | black 13% | white 14% | menus, popovers, dialogs, outlined buttons and chips |
 
@@ -49,8 +63,8 @@ on screen with every card darker than the sheet it sat on.
    segmented tracks, buttons and chips do not; the lightness step is their
    separation. Floating surfaces use `hairline-strong` because they have to
    read against anything underneath them. The exception is the **sheet edge
-   against the frame**: that step is about 3 L\* on both themes (#0a0a0a to
-   #131313, #f0f0f2 to #f9f9fa), under what a dimmed screen renders, so the
+   against the frame**: that step is about 3 L\* on both themes (#090a0c to
+   #111316, #eff0f3 to #f8f9fa), under what a dimmed screen renders, so the
    sheet carries a plain hairline in the inset layout. The first pass removed
    it on the theory that the step would do its work, and the frame and the
    sheet read as one black. The reference's own content sheet carries this

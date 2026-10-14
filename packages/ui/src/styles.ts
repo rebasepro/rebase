@@ -152,8 +152,8 @@ export const cardMixin = "bg-surface-card rounded-xl border border-hairline";
  * An inset well: code, a query, a log tail, a connection string.
  *
  * It must read as *recessed into* the surface holding it, which means darker
- * than that surface in dark mode. Cards now sit at `surface-card` (#181818),
- * so #0a0a0a is already fourteen units below and reads as a well; #000 was
+ * than that surface in dark mode. Cards now sit at `surface-card` (#16181c),
+ * so #090a0c is already thirteen units below and reads as a well; #000 was
  * tuned for the old #0a card and is now harsher than it needs to be. That value
  * is the `surface-well` role (theme.css), the one surface that goes DOWN the
  * ladder on purpose. Pair with `font-mono`; this mixin carries the surface

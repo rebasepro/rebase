@@ -51,7 +51,7 @@ const HTML = `<!doctype html>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Rebase — record the desk film</title>
 <link rel="icon" href="data:,">
-<style>html,body{margin:0;background:#0A0A0A;color:#fff}</style>
+<style>html,body{margin:0;background:#090A0C;color:#fff}</style>
 ${existsSync(path.join(OUT, "main.css")) ? '<link rel="stylesheet" href="/live/main.css">' : ""}
 </head>
 <body><div id="root"></div><script type="module" src="/live/main.js"></script></body>

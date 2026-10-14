@@ -38,7 +38,7 @@ export const S01_Headline: React.FC = () => {
                         fontFamily: FONT.body,
                         fontSize: 18,
                         fontWeight: 500,
-                        color: "#A3A3A3",
+                        color: "#9EA4AB",
                         opacity: badge,
                         transform: `translateY(${(1 - badge) * 10}px)`,
                     }}

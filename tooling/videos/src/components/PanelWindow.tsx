@@ -158,7 +158,7 @@ export const ShotLabel: React.FC<{
                             fontSize: 16,
                             letterSpacing: "0.22em",
                             textTransform: "uppercase",
-                            color: "#F7F8F8",
+                            color: "#F6F7F8",
                             opacity: o,
                         }}
                     >

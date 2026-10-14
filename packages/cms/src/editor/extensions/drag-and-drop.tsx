@@ -262,7 +262,7 @@ export function globalDragDropPlugin() {
         const isDark = document.documentElement.getAttribute("data-theme") === "dark";
         const varName = isDark ? "--color-surface-accent-300" : "--color-surface-accent-600";
         const color = getComputedStyle(document.documentElement).getPropertyValue(varName).trim();
-        el.style.backgroundColor = color || (isDark ? "#cbd5e1" : "#475569");
+        el.style.backgroundColor = color || (isDark ? "#d1d4d9" : "#50545b");
     }
 
     return new Plugin({

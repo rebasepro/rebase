@@ -36,7 +36,7 @@ const TOKEN_COLOR: Record<string, string> = {
     type: "#36CCD6",
     property: "#E7E9EB",
     punctuation: "#6B7078",
-    plain: "#B4B8BD",
+    plain: "#AEB3BA",
 };
 
 /** The file, and when each line is typed: [text, from, to] in section
@@ -216,7 +216,7 @@ export const Editor: React.FC = () => {
                                 padding: "0 12px",
                                 borderRadius: RADIUS.md,
                                 background: k === pick ? "rgba(78,155,255,0.22)" : "transparent",
-                                color: k === pick ? "#F7F8F8" : INK.copy,
+                                color: k === pick ? "#F6F7F8" : INK.copy,
                             }}
                         >
                             <span style={{ color: CHROMA.cyan, marginRight: 14, fontSize: 18 }}>◆</span>
@@ -256,7 +256,7 @@ export const Editor: React.FC = () => {
                         boxShadow: `0 0 0 ${6 * (0.5 + 0.5 * Math.sin(frame / 6))}px rgba(52,211,153,0.18)`,
                     }}
                 />
-                <span style={{ color: "#F7F8F8" }}>orders</span>
+                <span style={{ color: "#F6F7F8" }}>orders</span>
                 <span style={{ color: INK.muted }}>INSERT</span>
                 <span>ORD-2026-0175</span>
             </div>
