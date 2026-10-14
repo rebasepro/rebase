@@ -11,6 +11,7 @@ import os from "os";
 import { cp } from "fs/promises";
 import inquirer from "inquirer";
 import net from "net";
+import ts from "typescript";
 import { chooseComposeDbPort, composeDbPortStart, configureEnvFile, buildInitQuestions, validateProjectName, formatCdTarget, printInitHelp, resolveRuntimeImageTag, isPortAvailable, TEMPLATE_PLACEHOLDER_FILES, INIT_FLAGS, scaffoldDirectoryConflicts, scaffoldConflictMessage, initGitRepository, SCAFFOLD_TOLERATED_ENTRIES, agentNextSteps, shippedSchemaPath } from "./init.js";
 import { getPMCommands } from "../utils/package-manager.js";
 import { execFileSync } from "child_process";
@@ -1609,6 +1610,35 @@ runtime: "managed" });
         // template gates see one Atlas, not two.
         expect(backend.dependencies?.["@ariga/atlas"]).toBe(shipped.dependencies["@ariga/atlas"]);
         expect(pkg.pnpm?.onlyBuiltDependencies).toContain("@ariga/atlas");
+    });
+
+    /**
+     * scripts.md says to put a script under `backend/scripts/`, typed by the
+     * same `Database` as a function. The backend's tsconfig included `src`,
+     * `functions`, `crons` and `../config` but not `scripts`, so `cd backend &&
+     * tsc --noEmit` never looked at one: the typed-script promise held only in
+     * an editor.
+     */
+    it.each([
+        ["template", path.join(TEMPLATE_DIR, "backend", "tsconfig.json")],
+        ["baas overlay", path.join(overlay, "backend", "tsconfig.json")]
+    ])("%s: the backend's tsc checks backend/scripts/", (_name, tsconfig) => {
+        const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "rebase-backend-scripts-")));
+        try {
+            fs.mkdirSync(path.join(root, "backend", "scripts"), { recursive: true });
+            fs.mkdirSync(path.join(root, "backend", "functions"), { recursive: true });
+            fs.copyFileSync(tsconfig, path.join(root, "backend", "tsconfig.json"));
+            fs.writeFileSync(path.join(root, "backend", "functions", "hello.ts"), "export const hello = 1;\n");
+            fs.writeFileSync(path.join(root, "backend", "scripts", "publish-drafts.ts"), "export const drafts = 0;\n");
+
+            const parsed = ts.getParsedCommandLineOfConfigFile(path.join(root, "backend", "tsconfig.json"), {}, {
+                ...ts.sys,
+                onUnRecoverableConfigFileDiagnostic: () => undefined
+            });
+            expect(parsed?.fileNames).toContain(path.join(root, "backend", "scripts", "publish-drafts.ts"));
+        } finally {
+            fs.rmSync(root, { recursive: true, force: true });
+        }
     });
 
     it("declares no UI packages anywhere", () => {

@@ -47,5 +47,9 @@
   // through a generated tsconfig, but an ejected project builds with *this*
   // file — so leaving crons out meant an ejected server had no compiled jobs to
   // load and stopped running every schedule, nightly backups included.
-  "include": ["src/**/*", "functions/**/*", "crons/**/*", "../config/**/*", "drizzle.config.ts"]
+  //
+  // `scripts/` because that is where the Scripts page puts a script that opens
+  // the project with `openRebase`: typed by the same `Database` as a function,
+  // which only holds if `tsc` reads it.
+  "include": ["src/**/*", "functions/**/*", "crons/**/*", "scripts/**/*", "../config/**/*", "drizzle.config.ts"]
 }

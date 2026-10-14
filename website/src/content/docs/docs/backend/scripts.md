@@ -39,10 +39,10 @@ rebase console
 ```text
 > const { data } = await rebase.dataAsAdmin.posts.find({ limit: 3 })
 > data.map(p => p.title)
-[ 'Hello', 'Second post', 'Draft' ]
+[ 'Draft', 'Second post', 'Hello' ]
 > const ada = await rebase.withAuth({ uid: "ada", roles: ["user"] })
-> (await ada.data.posts.find()).data.length
-1
+> (await ada.data.posts.find({ limit: 3 })).data.length
+3
 ```
 
 Two names are in scope, and top-level `await` works:
@@ -148,7 +148,8 @@ nothing here.
 
 Its accessors are typed by the `Database` that `rebase generate-sdk --register`
 registers, as a function's `rebase` is, so a misspelled collection, field or
-enum value in a script is a type error. Without a registration, name it per call
+enum value in a script is a type error. The scaffold's `backend/tsconfig.json`
+includes `scripts/`, so `tsc --noEmit` in `backend/` reports it. Without a registration, name it per call
 with `openRebase<Database>({ … })`; `OpenedRebase<Database>` is the type to give
 a helper that takes one. With neither, rows are untyped, which is why the first
 example converts `draft.id` with `String()`.
@@ -157,7 +158,11 @@ example converts `draft.id` with `String()`.
 
 <span class="since-badge" data-since="0.25">Since 0.25</span>
 
-`withAuth` is the quickest way to test a security rule against real data:
+`withAuth` is the quickest way to test a security rule against real data. The
+blog scaffold, `rebase init`'s default, gives every collection the
+`defaultSecurityRules` in `config/collections/index.ts`: every signed-in user
+reads every post, and only an admin writes one. This checks both halves, as
+`backend/scripts/ada-check.ts`:
 
 ```typescript
 import { openRebase } from "@rebasepro/server-postgres";
@@ -165,9 +170,29 @@ import { collections } from "../../config/collections";
 
 const rebase = await openRebase({ databaseUrl: process.env.DATABASE_URL!, collections });
 const ada = await rebase.withAuth({ uid: "ada", roles: ["user"] });
-const { data } = await ada.data.posts.find();
-console.log(data.every(post => post.author_id === "ada"));
+
+// A signed-in user reads every post…
+const { data: seen } = await ada.data.posts.find();
+const { data: all } = await rebase.dataAsAdmin.posts.find();
+console.log(seen.length === all.length);
+
+// …and writing one is refused: only an admin may.
+const refused = await ada.data.posts.create({ title: "Not an admin" }).then(() => false, () => true);
+console.log(refused);
+
+await rebase.close();
 ```
+
+Run it the way the first script runs, and it prints `true` twice:
+
+```bash
+cd backend
+DATABASE_URL="$(pnpm exec rebase db url)" pnpm exec tsx scripts/ada-check.ts
+```
+
+A rule that filters rows by owner is checked the same way: compare each row's
+owner field with the `uid` you passed. On the blog scaffold no rule does, and
+`authorId` on a post is the id of an author row, not of a user.
 
 A user is `{ uid, roles?, isAnonymous?, claims? }`; `claims` are what
 `rebase.jwt()` reads in a policy.
@@ -193,15 +218,18 @@ before(async () => {
 });
 after(() => rebase.close());
 
-test("a user only sees their own posts", async () => {
+test("a signed-in user reads every post and writes none", async () => {
     const ada = await rebase.withAuth({ uid: "ada", roles: ["user"] });
-    const { data } = await ada.data.posts.find();
-    assert.ok(data.every(post => post.author_id === "ada"));
+    const { data: seen } = await ada.data.posts.find();
+    const { data: all } = await rebase.dataAsAdmin.posts.find();
+    assert.equal(seen.length, all.length);
+    await assert.rejects(ada.data.posts.create({ title: "Not an admin" }));
 });
 ```
 
-Run it from `backend/` with Node's test runner, pointing `TEST_DATABASE_URL` at
-a database a Rebase server has booted on:
+Save it as `backend/scripts/posts.test.ts` and run it from `backend/` with
+Node's test runner, pointing `TEST_DATABASE_URL` at a database a Rebase server
+has booted on:
 
 ```bash
 TEST_DATABASE_URL="$(pnpm exec rebase db url)" pnpm exec tsx --test scripts/posts.test.ts

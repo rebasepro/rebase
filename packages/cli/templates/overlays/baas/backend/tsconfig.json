@@ -30,5 +30,9 @@
   // an ejected project builds with *this* file, so leaving it out meant an
   // ejected server had no compiled jobs to load and silently stopped running
   // every schedule.
-  "include": ["src/**/*", "functions/**/*", "crons/**/*"]
+  //
+  // `scripts/` because that is where the Scripts page puts a script that opens
+  // the project with `openRebase`, and a type error there should be one `tsc`
+  // reports.
+  "include": ["src/**/*", "functions/**/*", "crons/**/*", "scripts/**/*"]
 }
