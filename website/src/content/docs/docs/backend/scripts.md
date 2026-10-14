@@ -82,6 +82,15 @@ Everything the console logs, whatever `LOG_LEVEL` says, goes to stderr, so
 stdout holds the result and nothing else. A snippet that throws prints the error
 on stderr and exits `1`.
 
+<span class="since-badge" data-since="0.25">Since 0.25</span> A database the
+console cannot open is reported once, and it exits `1`: the "Cannot connect to
+PostgreSQL" banner the `db` commands print, or, on the managed development
+database, that it has no free connection. That database accepts only a few
+connections at a time and a running `rebase dev` holds some, so close another
+client or stop `rebase dev` and run it again. On 0.24 the banner came twice,
+under an empty `❌ [ERROR]` line, and a full managed database printed
+`read ECONNRESET` with its stack as one line of JSON.
+
 ### Options
 
 | Flag | What it does |
@@ -151,7 +160,10 @@ nothing at `info`, so a script's stdout holds what the script prints, and
 `tsx scripts/report.ts > report.json` writes only its JSON. Warnings and errors
 go to stderr in development. The note on how requests are isolated (`RLS
 enforcement active`) is logged at `debug`; a server's boot still prints it at
-`info`. On 0.24 that note opened a script's stdout.
+`info`. A database it cannot reach rejects the open with one error,
+`Cannot connect to PostgreSQL at <host>:<port>: <reason>.`, and logs nothing:
+what to print is the script's call. On 0.24 that note opened a script's stdout,
+and an unreachable database logged a banner before the error.
 
 Its accessors are typed by the `Database` that `rebase generate-sdk --register`
 registers, as a function's `rebase` is, so a misspelled collection, field or

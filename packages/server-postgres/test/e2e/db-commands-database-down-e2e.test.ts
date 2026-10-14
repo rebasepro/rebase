@@ -19,7 +19,9 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { execa } from "execa";
+import { logger } from "@rebasepro/server";
 import { runPluginCommand } from "../../src/cli.js";
+import { openRebase } from "../../src/index.js";
 
 const pkgRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const tsxBin = path.join(pkgRoot, "..", "..", "node_modules", ".bin", "tsx");
@@ -131,6 +133,39 @@ describe("db commands with the database down", () => {
         expect(written).not.toMatch(/Failed to bootstrap the RLS helper functions/);
         expect(written.match(/Cannot connect to PostgreSQL/g)).toHaveLength(1);
     }, 60_000);
+
+    /**
+     * `rebase console -e` printed an empty `❌ [ERROR]` line, the banner, then
+     * the same diagnosis again as the error: opening logged the banner and
+     * threw, and the console printed what it threw.
+     */
+    it("rebase console --eval names it once: no empty error line, no second copy", async () => {
+        const collections = path.join(workDir, "collections");
+        fs.mkdirSync(collections);
+        fs.writeFileSync(path.join(collections, "package.json"), JSON.stringify({ type: "module" }));
+        fs.writeFileSync(path.join(collections, "tasks.js"),
+            "export default { name: \"Tasks\", slug: \"tasks\", table: \"tasks\", properties: { id: { name: \"ID\", type: \"string\", isId: \"uuid\" } } };\n");
+        const env = { ...process.env, DATABASE_URL: process.env.DATABASE_URL ?? "", LOG_LEVEL: "info" };
+        const console = await execa(tsxBin, [path.join(pkgRoot, "src", "cli.ts"), "console", "--eval", "1", "--collections", collections],
+            { cwd: workDir, env, reject: false, stdin: "ignore", all: true });
+        expect(console.exitCode).toBe(1);
+        expect(console.stdout).toBe("");
+        expect(console.all).toContain(`Cannot connect to PostgreSQL at 127.0.0.1:${port}`);
+        expect(console.all?.match(/Cannot connect to PostgreSQL/g)).toHaveLength(1);
+        expect(console.all).not.toMatch(/\[ERROR\]\s*$/m);
+    }, 60_000);
+
+    it("openRebase throws one readable error, and logs nothing, for a database it cannot reach", async () => {
+        const error = vi.spyOn(logger, "error");
+        try {
+            await expect(openRebase({ databaseUrl: process.env.DATABASE_URL ?? "", collections: [{
+                name: "Tasks", slug: "tasks", table: "tasks", properties: { id: { name: "ID", type: "string", isId: "uuid" } }
+            }] })).rejects.toThrow(new RegExp(`^Cannot connect to PostgreSQL at 127\\.0\\.0\\.1:${port}: connect ECONNREFUSED`));
+            expect(error).not.toHaveBeenCalled();
+        } finally {
+            error.mockRestore();
+        }
+    });
 
     it("rebase db restore names it too", async () => {
         const dump = path.join(workDir, "x.dump");

@@ -17,7 +17,7 @@ import { parseCommandArgs, wantsHelp } from "../utils/args";
 import { argsFromCommand } from "../utils/command-words";
 import { COLLECTIONS_FLAG_HELP, refuseMissingCollectionsPath } from "../utils/path-flags";
 import { reportSpawnFailure } from "../utils/spawn-error";
-import { managedNotices, prepareDatabaseEnv } from "../dev-db/prepare";
+import { DEV_DATABASE_KIND_ENV, managedNotices, prepareDatabaseEnv } from "../dev-db/prepare";
 import { absolutizeLocalPathArgs, ensureDockerDatabase, resolveDriverCli, spawnDriverCli } from "./db";
 
 export const CONSOLE_FLAGS = {
@@ -109,6 +109,10 @@ export async function consoleCommand(rawArgs: string[]): Promise<void> {
         onProgress: say
     });
     Object.assign(resolved.env, prepared.env);
+    // The database this run resolved, flags included, so the driver words a
+    // failure to open it for that one — a managed database that has no free
+    // connection is not "is your Postgres running?".
+    resolved.env[DEV_DATABASE_KIND_ENV] = prepared.database.kind;
     for (const line of managedNotices(prepared)) say(line);
 
     const childArgs = [

@@ -103,6 +103,22 @@ describe("rebase console", () => {
         expect(env.REBASE_DB_POOL_MAX).toBe("1");
     });
 
+    it("tells the driver which kind of database this run resolved, flags included", async () => {
+        // The driver words a failure to open for it: a managed database with
+        // no free connection is not "is your Postgres running?".
+        await consoleCommand(["node", "rebase", "console", "-e", "1"]);
+        expect(spawned().env.REBASE_DEV_DATABASE_KIND).toBe("managed");
+
+        execaSpy.mockClear();
+        prepareSpy.mockResolvedValueOnce({
+            database: { kind: "external", url: "postgresql://me@db.example.com/app", source: "flag" },
+            env: {},
+            description: "your database (--database-url)"
+        });
+        await consoleCommand(["node", "rebase", "console", "-e", "1", "--database-url", "postgresql://me@db.example.com/app"]);
+        expect(spawned().env.REBASE_DEV_DATABASE_KIND).toBe("external");
+    });
+
     it("--eval keeps stdout for the result: the database notices go to stderr", async () => {
         await consoleCommand(["node", "rebase", "console", "--eval", "1 + 1"]);
         expect(stdout).toEqual([]);

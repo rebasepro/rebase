@@ -22,6 +22,7 @@ import {
 } from "@rebasepro/types";
 import { buildSdkData, createAccessorSlugResolver } from "@rebasepro/common";
 import { logger } from "@rebasepro/server";
+import { deepestErrorMessage, parseHostInfo } from "./cli-errors";
 import { createPostgresDatabaseConnection, type PostgresPoolConfig } from "./connection";
 import { openPostgresDriver } from "./PostgresBootstrapper";
 import { HistoryService } from "./history/HistoryService";
@@ -141,6 +142,22 @@ export async function openRebase<DB = RegisteredDatabase>(options: OpenRebaseOpt
         : undefined;
     const db = owned?.db ?? options.connection;
     const connectionString = owned?.connectionString ?? options.connection?.$client.options.connectionString;
+
+    // Asked first, and answered by the error alone. Opening the driver on a
+    // database it cannot reach logs the server boot's banner and then throws
+    // the same diagnosis, so a caller that prints what it caught — `rebase
+    // console` does — said it twice, under an empty `❌ [ERROR]` line.
+    const pool = owned?.pool ?? options.connection?.$client;
+    try {
+        await pool?.query("SELECT 1");
+    } catch (error) {
+        await owned?.pool.end().catch(() => undefined);
+        throw new Error(
+            `Cannot connect to PostgreSQL at ${parseHostInfo(connectionString ?? "")}: ` +
+            `${deepestErrorMessage(error) ?? "the connection failed"}.`,
+            { cause: error }
+        );
+    }
 
     let opened: Awaited<ReturnType<typeof openPostgresDriver>>;
     try {

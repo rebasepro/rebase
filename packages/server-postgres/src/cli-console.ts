@@ -22,6 +22,7 @@ import { inspect } from "node:util";
 import { setLogOutput } from "@rebasepro/server";
 import type { CollectionConfig } from "@rebasepro/types";
 import { RELAYED_FLAGS } from "./cli-flags";
+import { diagnoseDbError } from "./cli-errors";
 import { out, outError, describeFailure } from "./cli-output";
 import { poolMaxCeiling } from "./connection";
 import { openRebase, type OpenedRebase } from "./open-rebase";
@@ -128,6 +129,34 @@ export async function consoleCommand(args: string[], streams: ConsoleStreams = {
     }
 }
 
+/** Whether a connection was reset or cut off before it answered, anywhere in the error's chain. */
+function connectionCutOff(error: unknown, depth = 0): boolean {
+    if (!error || typeof error !== "object" || depth > 4) return false;
+    if ("code" in error && error.code === "ECONNRESET") return true;
+    if (error instanceof Error && /Connection terminated unexpectedly/.test(error.message)) return true;
+    if ("errors" in error && Array.isArray(error.errors) && error.errors.some(inner => connectionCutOff(inner, depth + 1))) return true;
+    return "cause" in error && connectionCutOff(error.cause, depth + 1);
+}
+
+/**
+ * What the console says when the project's database will not open: the banner
+ * every db command prints for a database it cannot reach, or one sentence —
+ * never the driver's error serialised onto one line, stack and all.
+ *
+ * The managed development database refuses a connection over its limit by
+ * resetting it, and `read ECONNRESET` says nothing about why. It accepts only a
+ * few at a time, and a running `rebase dev` holds some of them.
+ */
+export function describeOpenFailure(error: unknown, databaseUrl: string, managed: boolean): string {
+    if (managed && connectionCutOff(error)) {
+        return "✗ The managed development database has no free connection: it accepts only a few at a time, " +
+            "and other clients hold them — a running `rebase dev` holds some.\n" +
+            "  Close another `rebase console`, psql or database GUI and run this again, " +
+            "or stop `rebase dev` while you use the console.";
+    }
+    return diagnoseDbError(error, databaseUrl) ?? describeFailure(error);
+}
+
 /** Open the project, run `--eval` or the REPL, and close it again. Resolves with the exit code. */
 async function openAndRun(
     options: { databaseUrl: string; collections?: string; eval?: string; history?: string },
@@ -139,11 +168,17 @@ async function openAndRun(
     const collections = fs.existsSync(collectionsPath) ? await loadCollections(collectionsPath) : [];
 
     const ceiling = poolMaxCeiling();
-    const rebase = await openRebase({
-        databaseUrl,
-        collections,
-        ...(ceiling !== null ? { pool: { max: ceiling } } : {})
-    });
+    let rebase: OpenedRebase;
+    try {
+        rebase = await openRebase({
+            databaseUrl,
+            collections,
+            ...(ceiling !== null ? { pool: { max: ceiling } } : {})
+        });
+    } catch (error) {
+        outError(describeOpenFailure(error, databaseUrl, process.env.REBASE_DEV_DATABASE_KIND === "managed"));
+        return 1;
+    }
 
     try {
         const code = options.eval;
