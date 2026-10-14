@@ -27,12 +27,20 @@
  * container, which is the one moment a local database is known to be new or
  * stale relative to the collections. A `dev` against an already-running
  * database never mutates its schema.
+ *
+ * One case stops the command instead of stepping aside: the URL is this
+ * project's compose database, and Docker says what answers on its port is
+ * somebody else's. Carrying on would connect this project to that database,
+ * and the best case is a failed login whose advice ("ALTER USER …") is for the
+ * wrong one. See {@link classifyPortPublishers}.
  */
 import fs from "fs";
 import net from "net";
 import path from "path";
 import chalk from "chalk";
 import { execa, ExecaError } from "execa";
+
+import { readEnvFile } from "./project";
 
 /** Where the preflight stopped, and why. Returned so tests can assert it. */
 export type PreflightOutcome =
@@ -359,6 +367,235 @@ function streamText(stream: unknown): string {
     return "";
 }
 
+/** The user and password the compose `db` service creates, expanded against `.env`. */
+function composeCredentials(
+    yamlText: string,
+    env: Record<string, string | undefined>
+): { user: string; password: string } | null {
+    const found = scanComposeDbService(yamlText);
+    const user = expandComposeValue(found.POSTGRES_USER, env);
+    const password = expandComposeValue(found.POSTGRES_PASSWORD, env);
+    return user && password ? { user, password } : null;
+}
+
+/**
+ * The compose project a file belongs to, named the way `docker compose` names
+ * it: `COMPOSE_PROJECT_NAME`, else the file's top-level `name:`, else the
+ * directory, lowercased with everything but `[a-z0-9_-]` dropped.
+ */
+export function composeProjectName(
+    yamlText: string,
+    projectRoot: string,
+    env: Record<string, string | undefined>
+): string {
+    const named = /^name:\s*["']?([^"'#\s]+)["']?\s*(?:#.*)?$/m.exec(yamlText)?.[1];
+    const raw = env.COMPOSE_PROJECT_NAME?.trim() || named || path.basename(projectRoot);
+    return raw.toLowerCase().replace(/[^a-z0-9_-]/g, "");
+}
+
+/** Who answers on a host port, as far as Docker can say. */
+export type PortHolder =
+    | { kind: "this-project" }
+    | { kind: "container"; name: string; project?: string; directory?: string }
+    | { kind: "outside-docker" }
+    | { kind: "unknown" };
+
+/** One `docker ps` row per container publishing the port: name, then its compose labels. */
+const PUBLISHER_FORMAT = [
+    "{{.Names}}",
+    "{{.Label \"com.docker.compose.project\"}}",
+    "{{.Label \"com.docker.compose.project.working_dir\"}}",
+    "{{.Label \"com.docker.compose.service\"}}"
+].join("\t");
+
+/**
+ * Whose container `docker ps --filter publish=<port>` listed, from its rows.
+ *
+ * This project's when one of them is a `db` service of this compose project:
+ * started from this directory, or carrying the project's name (compose treats
+ * two directories with one `name:` as one project, so this does too). Any other
+ * container is named. No rows at all, from a Docker that answered, means the
+ * listener is not a container: a Postgres installed on this machine, say.
+ */
+export function classifyPortPublishers(output: string, projectRoot: string, composeProject: string | null): PortHolder {
+    const rows = output.split(/\r?\n/)
+        .map(line => line.split("\t").map(field => field.trim()))
+        .filter(([name]) => Boolean(name));
+    if (rows.length === 0) return { kind: "outside-docker" };
+
+    const here = canonicalPath(projectRoot);
+    for (const [, project, directory, service] of rows) {
+        if (service !== "db") continue;
+        if ((directory && canonicalPath(directory) === here) || (composeProject && project === composeProject)) {
+            return { kind: "this-project" };
+        }
+    }
+    const [name, project, directory] = rows[0];
+    return { kind: "container", name, ...(project ? { project } : {}), ...(directory ? { directory } : {}) };
+}
+
+function canonicalPath(dir: string): string {
+    try {
+        return fs.realpathSync(dir);
+    } catch {
+        return path.resolve(dir);
+    }
+}
+
+/** Ask Docker who publishes `port`. `unknown` when Docker cannot be asked. */
+export async function dockerPortHolder(projectRoot: string, composeProject: string | null, port: number): Promise<PortHolder> {
+    try {
+        const { stdout } = await execa("docker", ["ps", "--filter", `publish=${port}`, "--format", PUBLISHER_FORMAT], {
+            stdio: "pipe",
+            timeout: 5_000
+        });
+        return classifyPortPublishers(stdout, projectRoot, composeProject);
+    } catch {
+        return { kind: "unknown" };
+    }
+}
+
+/**
+ * Every host port in a list of `docker inspect --format '{{json .HostConfig.PortBindings}}'` lines.
+ *
+ * The configured bindings, which a stopped container keeps: it takes its port
+ * back the moment it starts, so the port is not free to give to a new project.
+ * `HostPort: "0"` asks for any free port and claims none.
+ */
+export function parsePortBindings(output: string): Set<number> {
+    const ports = new Set<number>();
+    for (const line of output.split(/\r?\n/)) {
+        if (!line.trim()) continue;
+        let parsed: unknown;
+        try {
+            parsed = JSON.parse(line);
+        } catch {
+            continue;
+        }
+        if (!parsed || typeof parsed !== "object") continue;
+        const bindingLists: unknown[] = Object.values(parsed);
+        for (const bindings of bindingLists) {
+            if (!Array.isArray(bindings)) continue;
+            for (const binding of bindings) {
+                if (!binding || typeof binding !== "object" || !("HostPort" in binding)) continue;
+                const hostPort = Number(binding.HostPort);
+                if (Number.isInteger(hostPort) && hostPort > 0 && hostPort < 65536) ports.add(hostPort);
+            }
+        }
+    }
+    return ports;
+}
+
+/**
+ * The host ports every container on this machine is bound to, running or
+ * stopped — `null` when Docker cannot be asked.
+ *
+ * A TCP probe sees only what is listening now, and a stopped project's `db`
+ * container is not; `docker ps` shows a stopped container's ports only
+ * sometimes. The bindings in its config are what it will take back.
+ */
+export async function dockerClaimedPorts(): Promise<Set<number> | null> {
+    try {
+        const { stdout: ids } = await execa("docker", ["ps", "-aq"], { stdio: "pipe", timeout: 5_000 });
+        const containers = ids.split(/\s+/).filter(Boolean);
+        if (containers.length === 0) return new Set();
+        // `reject: false`: a container removed since `ps` fails its own entry and
+        // exits 1, and every other container's bindings are still on stdout.
+        const { stdout } = await execa("docker", ["inspect", "--format", "{{json .HostConfig.PortBindings}}", ...containers], {
+            stdio: "pipe",
+            timeout: 10_000,
+            reject: false
+        });
+        return parsePortBindings(stdout);
+    } catch {
+        return null;
+    }
+}
+
+/**
+ * Whether `databaseUrl` is this project's compose database: the port the `db`
+ * service publishes, with the user and password it creates.
+ *
+ * The credentials matter. One Postgres container shared by several projects is
+ * an ordinary setup, and such a URL names that container's password — a
+ * database somebody chose, which is theirs to point at.
+ */
+function isComposeDatabaseUrl(databaseUrl: string, port: number, composeText: string, env: Record<string, string | undefined>): boolean {
+    if (composeHostPort(composeText) !== port) return false;
+    const credentials = composeCredentials(composeText, env);
+    if (!credentials) return false;
+    try {
+        const url = new URL(databaseUrl);
+        return decodeURIComponent(url.username) === credentials.user
+            && decodeURIComponent(url.password) === credentials.password;
+    } catch {
+        return false;
+    }
+}
+
+/** The first port after `port` that nothing on loopback answers on, for a suggestion. */
+async function nextQuietPort(port: number): Promise<number | null> {
+    for (let candidate = port + 1; candidate < Math.min(port + 50, 65536); candidate++) {
+        if (!(await probeTcp("127.0.0.1", candidate, 300))) return candidate;
+    }
+    return null;
+}
+
+/**
+ * Said, then thrown: the compose port answers, and not with this project's
+ * database. Returns quietly when the listener is ours, or when Docker cannot
+ * say — the behaviour from before this check.
+ */
+async function refuseForeignListener(options: {
+    projectRoot: string;
+    databaseUrl: string;
+    port: number;
+    composeText: string;
+    whoHoldsPort?: (port: number) => Promise<PortHolder>;
+    log: (message: string) => void;
+}): Promise<void> {
+    const { projectRoot, databaseUrl, port, composeText, log } = options;
+    const env = readEnvFile(projectRoot);
+    if (!isComposeDatabaseUrl(databaseUrl, port, composeText, env)) return;
+
+    const whoHoldsPort = options.whoHoldsPort
+        ?? ((p: number) => dockerPortHolder(projectRoot, composeProjectName(composeText, projectRoot, env), p));
+    const holder = await whoHoldsPort(port);
+    if (holder.kind === "this-project" || holder.kind === "unknown") return;
+
+    const who = holder.kind === "container"
+        ? `another container is listening there: ${holder.name}`
+            + (holder.project || holder.directory
+                ? ` (${[holder.project ? `compose project ${holder.project}` : "", holder.directory ? `in ${holder.directory}` : ""]
+                    .filter(Boolean).join(", ")})`
+                : "")
+        : "something outside Docker is listening there, such as a Postgres installed on this machine";
+    const suggestion = await nextQuietPort(port);
+    const envSetsUrl = Boolean(env.DATABASE_URL?.trim());
+
+    log("");
+    log(`  ${chalk.yellow("⚠")} ${chalk.bold(`Port ${port} is not this project's database.`)}`);
+    for (const line of [
+        `docker-compose.yml publishes this project's db service on ${port}, and ${who}.`,
+        "Nothing was started, and nothing connects to it: a login there would fail on this",
+        "project's password, and the fix that failure suggests would be for that database.",
+        `Give this project its own port: change "${port}:5432" under db: in docker-compose.yml`
+            + ` to ${suggestion ? `a free one, such as "${suggestion}:5432"` : "one nothing else uses"}`
+            + (envSetsUrl ? ", and the port in DATABASE_URL in .env." : "."),
+        holder.kind === "container"
+            ? `Or stop ${holder.name} first: docker stop ${holder.name}`
+            : "Or stop what is listening on it."
+    ]) {
+        log(`    ${chalk.gray(line)}`);
+    }
+
+    throw new Error(
+        holder.kind === "container"
+            ? `Port ${port} belongs to ${holder.name}, not to this project's db service. Nothing was started.`
+            : `Port ${port} belongs to a server outside Docker, not to this project's db service. Nothing was started.`
+    );
+}
+
 export interface EnsureDevDatabaseOptions {
     projectRoot: string;
     /** The DSN from the project's env file, if it has one. */
@@ -378,6 +615,11 @@ export interface EnsureDevDatabaseOptions {
     startDatabase?: (projectRoot: string) => Promise<void>;
     /** How long a started database has to answer `SELECT 1`. Defaults to 60s. */
     readyTimeoutMs?: number;
+    /**
+     * Who answers on the compose port. Asks Docker by default; injected for the
+     * same reason `startDatabase` is.
+     */
+    whoHoldsPort?: (port: number) => Promise<PortHolder>;
     log?: (message: string) => void;
 }
 
@@ -404,14 +646,26 @@ export async function ensureDevDatabase(options: EnsureDevDatabaseOptions): Prom
         return { action: "remote-dsn", host };
     }
 
+    const composePath = path.join(projectRoot, "docker-compose.yml");
+    const composeText = fs.existsSync(composePath) ? fs.readFileSync(composePath, "utf8") : null;
+
     if (await probeTcp(target.host, target.port)) {
+        // Something answers. Whatever it is stays untouched; but if this URL is
+        // the compose database, it has to be the compose container.
+        if (composeText !== null) {
+            await refuseForeignListener({
+                projectRoot,
+                databaseUrl,
+                port: target.port,
+                composeText,
+                whoHoldsPort: options.whoHoldsPort,
+                log
+            });
+        }
         return { action: "already-running", host: target.host, port: target.port };
     }
 
-    const composePath = path.join(projectRoot, "docker-compose.yml");
-    if (!fs.existsSync(composePath)) return { action: "no-compose" };
-    const composeText = fs.readFileSync(composePath, "utf8");
-    if (!composeDeclaresDbService(composeText)) return { action: "no-compose" };
+    if (composeText === null || !composeDeclaresDbService(composeText)) return { action: "no-compose" };
 
     const manualSteps =
         `${chalk.cyan("docker compose up -d db")} then ${chalk.cyan("rebase db push")}`;

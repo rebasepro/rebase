@@ -11,6 +11,7 @@ import crypto from "crypto";
 import { detectPackageManager, getPMCommands } from "../utils/package-manager";
 import { cliVersion } from "../utils/version";
 import { invokedRebaseCommand } from "../utils/invoked-command";
+import { dockerClaimedPorts } from "../utils/dev-preflight";
 import type arg from "arg";
 import { parseCommandArgs, wantsHelp } from "../utils/args";
 import { resolveCloudUrl, writeLink } from "./cloud/context";
@@ -1487,9 +1488,48 @@ export async function isPortAvailable(port: number): Promise<boolean> {
     return (await canBind(port)) && (await canBind(port, "127.0.0.1")) && (await canBind(port, "::1"));
 }
 
-async function findAvailablePort(startPort: number): Promise<number> {
-    let port = startPort;
-    while (!(await isPortAvailable(port))) {
+/** The range a project's compose port search starts in: 5433–5632. */
+const COMPOSE_DB_PORT_FIRST = 5433;
+const COMPOSE_DB_PORT_SPAN = 200;
+
+/**
+ * Where this project's compose port search starts: a port derived from its path.
+ *
+ * Every project used to start at 5432 and take the first free port. Nothing a
+ * scaffold does claims that port — its container does not exist yet — so
+ * projects scaffolded side by side all landed on the same one: blog, ecommerce
+ * and blank all got 5433. `rebase dev --docker` in the second one then found
+ * the first one's database answering there.
+ *
+ * Not 5432 at all: it is the port a Postgres installed on this machine later
+ * will take, and on macOS a container publishing `*:5432` and a server bound to
+ * loopback do not even collide loudly (see {@link isPortAvailable}).
+ */
+export function composeDbPortStart(targetDirectory: string): number {
+    const digest = crypto.createHash("sha256").update(path.resolve(targetDirectory)).digest();
+    return COMPOSE_DB_PORT_FIRST + (digest.readUInt32BE(0) % COMPOSE_DB_PORT_SPAN);
+}
+
+/**
+ * The host port this project's compose `db` service publishes.
+ *
+ * From {@link composeDbPortStart} upwards, the first port nothing listens on
+ * ({@link isPortAvailable}) and no container on this machine is bound to,
+ * running or stopped: a stopped project's `db` container takes its port back
+ * the moment it starts, and a TCP probe cannot see it. Docker that cannot be
+ * asked claims nothing. `probes` stands in for both in the tests.
+ */
+export async function chooseComposeDbPort(
+    targetDirectory: string,
+    probes: {
+        isFree?: (port: number) => Promise<boolean>;
+        claimed?: () => Promise<Set<number> | null>;
+    } = {}
+): Promise<number> {
+    const isFree = probes.isFree ?? isPortAvailable;
+    const claimed = (await (probes.claimed ?? dockerClaimedPorts)()) ?? new Set<number>();
+    let port = composeDbPortStart(targetDirectory);
+    while (claimed.has(port) || !(await isFree(port))) {
         port++;
     }
     return port;
@@ -1791,7 +1831,7 @@ export async function configureEnvFile(targetDirectory: string, databaseUrl?: st
                 () => `DATABASE_URL=${pinnedUrl}\nDATABASE_PASSWORD=${dbPassword}`
             );
         } else {
-            const dbPort = await findAvailablePort(5432);
+            const dbPort = await chooseComposeDbPort(targetDirectory);
             envContent = envContent.replace(
                 /^DATABASE_URL=.*$/m,
                 // sslmode=disable: the paired docker-compose Postgres has no TLS,

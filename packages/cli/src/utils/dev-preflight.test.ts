@@ -9,15 +9,20 @@ import fs from "fs";
 import net from "net";
 import os from "os";
 import path from "path";
+import { stripVTControlCharacters } from "util";
 import {
+    classifyPortPublishers,
     composeDatabaseUrl,
     composeDeclaresDbService,
     composeHostPort,
+    composeProjectName,
     ensureDevDatabase,
     parseLoopbackDsn,
+    parsePortBindings,
     probeTcp,
     waitForPort,
-    waitForQueryable
+    waitForQueryable,
+    type PortHolder
 } from "./dev-preflight";
 
 /**
@@ -687,5 +692,168 @@ describe("ensureDevDatabase", () => {
         } finally {
             await pg.db?.close();
         }
+    });
+});
+
+/**
+ * Two projects scaffolded at the same time were both given 5433, and another
+ * project's `u3-ops-db-1` held it. `rebase dev --docker` saw the port answer,
+ * took it for its own db service, connected with its own password, and printed
+ * the auth banner's "Reset the password: ALTER USER rebase_app …" — advice that,
+ * followed, breaks the other project's database. A listener on the compose
+ * port is this project's only when Docker says so.
+ */
+describe("the compose port, held by someone else", () => {
+    let projectRoot: string;
+    let server: net.Server;
+    let port: number;
+    const logged: string[] = [];
+
+    beforeEach(async () => {
+        projectRoot = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "rebase-preflight-holder-")));
+        server = net.createServer();
+        await new Promise<void>(resolve => server.listen(0, "127.0.0.1", resolve));
+        port = (server.address() as net.AddressInfo).port;
+        fs.writeFileSync(path.join(projectRoot, "docker-compose.yml"), [
+            "name: blank-app",
+            "services:",
+            "  db:",
+            "    image: postgres:18-alpine",
+            "    environment:",
+            "      POSTGRES_USER: rebase_app",
+            "      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:-changeme}",
+            "      POSTGRES_DB: rebase",
+            "    ports:",
+            `      - "${port}:5432"`
+        ].join("\n"));
+        fs.writeFileSync(path.join(projectRoot, ".env"), "DATABASE_PASSWORD=ours\n");
+        logged.length = 0;
+    });
+
+    afterEach(async () => {
+        await new Promise<void>(resolve => server.close(() => resolve()));
+        fs.rmSync(projectRoot, { recursive: true, force: true });
+    });
+
+    /** The URL `--docker` derives, and `init` writes commented out. */
+    const composeUrl = (): string => composeDatabaseUrl(
+        fs.readFileSync(path.join(projectRoot, "docker-compose.yml"), "utf8"),
+        { DATABASE_PASSWORD: "ours" }
+    )!;
+
+    const run = (databaseUrl: string, holder: PortHolder) => {
+        const whoHoldsPort = vi.fn(async () => holder);
+        const pushSchema = vi.fn();
+        const startDatabase = vi.fn();
+        const outcome = ensureDevDatabase({
+            projectRoot,
+            databaseUrl,
+            disabled: false,
+            hasCollections: true,
+            pushSchema,
+            startDatabase,
+            whoHoldsPort,
+            log: line => logged.push(stripVTControlCharacters(line))
+        });
+        return { outcome, whoHoldsPort, pushSchema, startDatabase };
+    };
+
+    it("refuses another project's container, names it, and says how to move", async () => {
+        const { outcome, whoHoldsPort, pushSchema, startDatabase } = run(composeUrl(), {
+            kind: "container", name: "u3-ops-db-1", project: "u3-ops", directory: "/work/u3-ops"
+        });
+
+        await expect(outcome).rejects.toThrow(/u3-ops-db-1/);
+        expect(whoHoldsPort).toHaveBeenCalledWith(port);
+        expect(pushSchema).not.toHaveBeenCalled();
+        expect(startDatabase).not.toHaveBeenCalled();
+        const text = logged.join("\n");
+        expect(text).toContain(`Port ${port} is not this project's database`);
+        expect(text).toContain("u3-ops-db-1 (compose project u3-ops, in /work/u3-ops)");
+        expect(text).toContain(`"${port}:5432"`);
+        expect(text).toContain("docker-compose.yml");
+        expect(text).not.toMatch(/ALTER USER/);
+    });
+
+    it("refuses a server outside Docker on that port too", async () => {
+        const { outcome } = run(composeUrl(), { kind: "outside-docker" });
+        await expect(outcome).rejects.toThrow(`Port ${port}`);
+        expect(logged.join("\n")).toMatch(/outside Docker/);
+    });
+
+    it("uses its own container, as before", async () => {
+        const { outcome, pushSchema } = run(composeUrl(), { kind: "this-project" });
+        await expect(outcome).resolves.toEqual({ action: "already-running", host: "127.0.0.1", port });
+        expect(pushSchema).not.toHaveBeenCalled();
+    });
+
+    it("trusts the listener when Docker cannot be asked", async () => {
+        const { outcome } = run(composeUrl(), { kind: "unknown" });
+        await expect(outcome).resolves.toMatchObject({ action: "already-running" });
+    });
+
+    it("does not ask about a URL with other credentials: that is a database somebody chose", async () => {
+        // One Postgres container shared by several projects is an ordinary
+        // setup; its URL carries that container's password, not this project's.
+        const { outcome, whoHoldsPort } = run(`postgresql://rebase_app:theirs@127.0.0.1:${port}/rebase`, { kind: "container", name: "shared-db-1" });
+        await expect(outcome).resolves.toMatchObject({ action: "already-running" });
+        expect(whoHoldsPort).not.toHaveBeenCalled();
+    });
+});
+
+describe("classifyPortPublishers", () => {
+    const root = "/work/blank-app";
+
+    it("is this project's when the db container comes from this directory", () => {
+        expect(classifyPortPublishers(`blank-app-db-1\tblank-app\t${root}\tdb\n`, root, "blank-app"))
+            .toEqual({ kind: "this-project" });
+    });
+
+    it("is this project's when the compose project name matches, from wherever it was started", () => {
+        expect(classifyPortPublishers("blank-app-db-1\tblank-app\t/old/place\tdb\n", root, "blank-app"))
+            .toEqual({ kind: "this-project" });
+    });
+
+    it("names any other container", () => {
+        expect(classifyPortPublishers("u3-ops-db-1\tu3-ops\t/work/u3-ops\tdb\n", root, "blank-app"))
+            .toEqual({ kind: "container", name: "u3-ops-db-1", project: "u3-ops", directory: "/work/u3-ops" });
+        // A plain `docker run`, with no compose labels.
+        expect(classifyPortPublishers("r2a-pg\t\t\t\n", root, "blank-app"))
+            .toEqual({ kind: "container", name: "r2a-pg" });
+        // This project, but not its db service.
+        expect(classifyPortPublishers(`blank-app-api-1\tblank-app\t${root}\tapi\n`, root, "blank-app").kind)
+            .toBe("container");
+    });
+
+    it("is outside Docker when no container publishes the port", () => {
+        expect(classifyPortPublishers("\n", root, "blank-app")).toEqual({ kind: "outside-docker" });
+    });
+});
+
+describe("composeProjectName", () => {
+    it("reads the file's top-level name", () => {
+        expect(composeProjectName("name: blank-app\nservices:\n  db:\n", "/work/x", {})).toBe("blank-app");
+    });
+
+    it("lets COMPOSE_PROJECT_NAME win, as compose does", () => {
+        expect(composeProjectName("name: blank-app\n", "/work/x", { COMPOSE_PROJECT_NAME: "other" })).toBe("other");
+    });
+
+    it("falls back to the directory, normalised the way compose normalises it", () => {
+        expect(composeProjectName("services:\n", "/work/My App.v2", {})).toBe("myappv2");
+    });
+});
+
+describe("parsePortBindings", () => {
+    it("reads every host port a container is bound to, running or not", () => {
+        const output = [
+            '{"5432/tcp":[{"HostIp":"","HostPort":"5433"}]}',
+            '{"5432/tcp":[{"HostIp":"0.0.0.0","HostPort":"5434"},{"HostIp":"::","HostPort":"5434"}],"80/tcp":[{"HostIp":"","HostPort":"8080"}]}',
+            "{}",
+            "null",
+            // `0` asks Docker for any free port: it claims nothing.
+            '{"5432/tcp":[{"HostIp":"0.0.0.0","HostPort":"0"}]}'
+        ].join("\n");
+        expect([...parsePortBindings(output)].sort()).toEqual([5433, 5434, 8080]);
     });
 });

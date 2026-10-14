@@ -11,7 +11,7 @@ import os from "os";
 import { cp } from "fs/promises";
 import inquirer from "inquirer";
 import net from "net";
-import { configureEnvFile, buildInitQuestions, validateProjectName, formatCdTarget, printInitHelp, resolveRuntimeImageTag, isPortAvailable, TEMPLATE_PLACEHOLDER_FILES, INIT_FLAGS, scaffoldDirectoryConflicts, scaffoldConflictMessage, initGitRepository, SCAFFOLD_TOLERATED_ENTRIES, agentNextSteps, shippedSchemaPath } from "./init.js";
+import { chooseComposeDbPort, composeDbPortStart, configureEnvFile, buildInitQuestions, validateProjectName, formatCdTarget, printInitHelp, resolveRuntimeImageTag, isPortAvailable, TEMPLATE_PLACEHOLDER_FILES, INIT_FLAGS, scaffoldDirectoryConflicts, scaffoldConflictMessage, initGitRepository, SCAFFOLD_TOLERATED_ENTRIES, agentNextSteps, shippedSchemaPath } from "./init.js";
 import { getPMCommands } from "../utils/package-manager.js";
 import { execFileSync } from "child_process";
 import { SCAFFOLD_DEFAULT_PORT } from "./dev.js";
@@ -1084,6 +1084,23 @@ describe(".env.example", () => {
         expect(compose).toContain(`- "${urlPort}:5432"`);
     });
 
+    /**
+     * blog, ecommerce and blank, scaffolded side by side, were all given
+     * `"5433:5432"`: each probed 5432 (taken), then 5433, and nothing they did
+     * reserved it — none had a container yet. Each project now starts its search
+     * at a port derived from its own path, so two of them rarely meet.
+     */
+    it("gives projects scaffolded side by side their own compose ports", async () => {
+        const ports = new Set<string>();
+        for (const name of ["blog-app", "ecommerce-app", "blank-app"]) {
+            const targetDir = await simulateInit(name);
+            await configureEnvFile(targetDir);
+            const compose = fs.readFileSync(path.join(targetDir, "docker-compose.yml"), "utf-8");
+            ports.add(/- "(\d+):5432"/.exec(compose)![1]);
+        }
+        expect(ports.size).toBe(3);
+    });
+
     it("leaves the compose file's other required variables satisfied too", async () => {
         // Every `${VAR:?…}` in docker-compose.yml has to be answerable from the
         // generated .env, or the file cannot be parsed at all.
@@ -1660,6 +1677,39 @@ describe("init --help", () => {
 
     it("says --template does nothing for the baas flavor", () => {
         expect(helpText()).toContain("--template has no effect");
+    });
+});
+
+describe("chooseComposeDbPort", () => {
+    const free = async () => true;
+    const none = async () => new Set<number>();
+
+    it("starts from the project's own port, the same one every time", async () => {
+        const start = composeDbPortStart("/work/blog-app");
+        expect(start).toBeGreaterThanOrEqual(5433);
+        expect(start).toBeLessThan(5633);
+        expect(composeDbPortStart("/work/blog-app")).toBe(start);
+        expect(await chooseComposeDbPort("/work/blog-app", { isFree: free, claimed: none })).toBe(start);
+    });
+
+    it("never offers 5432, which a Postgres installed later will want", async () => {
+        for (const name of ["a", "b", "c", "my-app", "blog-app", "x".repeat(40)]) {
+            expect(composeDbPortStart(`/work/${name}`)).not.toBe(5432);
+        }
+    });
+
+    it("skips a port something listens on, and one a stopped container will take back", async () => {
+        const start = composeDbPortStart("/work/blank-app");
+        const port = await chooseComposeDbPort("/work/blank-app", {
+            isFree: async (candidate) => candidate !== start,
+            claimed: async () => new Set([start + 1])
+        });
+        expect(port).toBe(start + 2);
+    });
+
+    it("still answers when Docker cannot be asked", async () => {
+        const start = composeDbPortStart("/work/blank-app");
+        expect(await chooseComposeDbPort("/work/blank-app", { isFree: free, claimed: async () => null })).toBe(start);
     });
 });
 
