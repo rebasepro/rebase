@@ -1,17 +1,30 @@
 /**
- * In the cloud app, editing `securityRules` changes nothing by itself.
+ * A change to the cloud app's compiled RLS policies ships with a migration.
  *
- * The OSS framework compiles securityRules into policies at boot. The cloud app does
- * not: its RLS lives in hand-written SQL inside drizzle migrations, and boot never
- * reconciles the two. So a securityRules edit there is documentation — the policy in
- * the database is whatever the last migration created.
+ * The framework's boot compiles `securityRules` from saas/config/collections and
+ * applies them to every table, so an edit does reach the database. What the boot
+ * cannot do is create anything a new rule needs — a helper function, a column, a
+ * table. When a rule calls one that is not there, `CREATE POLICY` is refused, the
+ * table is left RLS-enabled in a deny-leaning partial state, the boot logs a
+ * warning and the deploy reports green. The migration is where the function, the
+ * column and the rewritten policy arrive first; the cloud app keeps every policy
+ * change in one (0017 onwards, DROP-then-CREATE), which is also what makes its
+ * history of who-can-read-what reviewable as SQL.
  *
- * The dangerous direction is the permissive one. An agent tightens a rule in config,
- * sees it in the diff, and reports the hole closed while the database still serves the
- * old policy. This check refuses to let a securityRules change reach a deploy without
- * a migration that actually rewrites the policy.
+ * So this refuses a deploy whose compiled policies differ from the merge-base's
+ * with no migration SQL beside them. "Compiled" is the point: it compares what
+ * `planCollectionPolicies` produces at both revisions (lib/cloud-policies.mjs),
+ * not which lines changed, because a comment or a respelling the compiler undoes
+ * changes no policy, and an edited constant far from its rule changes one on a
+ * line that names none.
+ *
+ * It used to read the monorepo's `git diff`, in which `saas/` — gitignored, its
+ * own repository — does not exist, so it passed on every run without looking.
+ * `ctx.changed` now includes the nested repository's own changes.
  */
-import { context, changedUnder, sh } from "../lib/ctx.mjs";
+import path from "node:path";
+import { context, baseRevision } from "../lib/ctx.mjs";
+import { compareCloudPolicies } from "../lib/cloud-policies.mjs";
 import { finding, pass, FAIL } from "../lib/report.mjs";
 
 export const id = "rls-drift";
@@ -23,38 +36,48 @@ const MIGRATION_PREFIX = "saas/backend/drizzle/";
 export function run(ctx = context()) {
     if (!ctx.hasSaas) return [pass(id, "No cloud workspace present — RLS drift check not applicable.")];
 
-    const touched = changedUnder(CONFIG_PREFIX);
+    const touched = ctx.changed.filter((file) => file.startsWith(CONFIG_PREFIX));
     if (!touched.length) return [pass(id, "No cloud collection config changed.")];
 
-    // Only a securityRules edit matters; a label or column change is inert here.
-    const withRules = touched.filter((file) => diffTouchesSecurityRules(ctx.root, file));
-    if (!withRules.length) return [pass(id, "Cloud collections changed, but no securityRules were touched.")];
-
-    const migrations = changedUnder(MIGRATION_PREFIX).filter((f) => f.endsWith(".sql"));
+    const migrations = ctx.changed.filter((file) => file.startsWith(MIGRATION_PREFIX) && file.endsWith(".sql"));
     if (migrations.length) {
-        return [pass(id, `securityRules changed in ${withRules.length} collection(s), with migration(s): ${migrations.join(", ")}.`)];
+        return [pass(id, `Cloud collections changed (${touched.length} file(s)), with migration(s): ${migrations.join(", ")}.`)];
+    }
+
+    const saasRoot = path.join(ctx.root, "saas");
+    const comparison = compareCloudPolicies(saasRoot, baseRevision(saasRoot) || "HEAD");
+    const fix = `Add a migration under ${MIGRATION_PREFIX} that DROPs and re-CREATEs the affected policies (and creates anything they call), then verify against a prod replica.`;
+
+    if (comparison.error !== undefined) {
+        return [
+            finding(
+                id,
+                FAIL,
+                `${touched.join(", ")} changed with no accompanying migration SQL, and the policies could not be ` +
+                    `compiled to tell whether that matters, so it is treated as a policy change: ${comparison.error}`,
+                fix,
+            ),
+        ];
+    }
+
+    if (!comparison.changed.length) {
+        return [
+            pass(
+                id,
+                `Cloud collections changed (${touched.length} file(s)), but they compile to exactly the policies the ` +
+                    "merge-base does — no migration needed.",
+            ),
+        ];
     }
 
     return [
         finding(
             id,
             FAIL,
-            `securityRules changed in ${withRules.join(", ")} with no accompanying migration SQL. ` +
-                `The deployed policy will not change — the edit is cosmetic.`,
-            `Add a migration under ${MIGRATION_PREFIX} that DROPs and re-CREATEs the affected policies, then verify against a prod replica.`,
+            `The compiled RLS policies of ${comparison.changed.join(", ")} change (from ${touched.join(", ")}) with no ` +
+                "accompanying migration SQL. If a new rule calls anything only a migration creates, the boot cannot " +
+                "apply it and the table is left denying.",
+            fix,
         ),
     ];
-}
-
-/** True when the branch's own diff for this file adds or removes a securityRules line. */
-function diffTouchesSecurityRules(root, file) {
-    const base = sh("git", ["merge-base", "HEAD", "main"], root);
-    const args = base ? ["diff", `${base}...HEAD`, "--", file] : ["diff", "--", file];
-    const committed = sh("git", args, root);
-    const working = sh("git", ["diff", "HEAD", "--", file], root);
-
-    return [committed, working]
-        .join("\n")
-        .split("\n")
-        .some((line) => /^[+-]/.test(line) && !/^[+-]{3}/.test(line) && /securityRules|policy|USING|WITH CHECK/i.test(line));
 }

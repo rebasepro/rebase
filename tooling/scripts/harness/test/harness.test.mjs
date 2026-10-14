@@ -12,11 +12,13 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import path from "node:path";
 
-import { context } from "../lib/ctx.mjs";
+import { changedFiles, context } from "../lib/ctx.mjs";
 import { blocking, FAIL, WARN, PASS, finding } from "../lib/report.mjs";
 import * as controlPlane from "../checks/control-plane.mjs";
 import * as lockfileWorktree from "../checks/lockfile-worktree.mjs";
 import * as migrationOrder from "../checks/migration-order.mjs";
+import * as rlsDrift from "../checks/rls-drift.mjs";
+import { treeKey } from "../deploy/preflight.mjs";
 import fs from "node:fs";
 import os from "node:os";
 import { execFileSync } from "node:child_process";
@@ -331,4 +333,156 @@ test("migration-order warns rather than passing when main's journal is unreachab
         `expected a warning, got ${JSON.stringify(found)}`,
     );
     assert.ok(!found.some((f) => f.level === PASS), "must not also report a pass");
+});
+
+// ── rls-drift and the nested saas repository ────────────────────────────────
+//
+// rls-drift read the monorepo's `git diff`, in which `saas/` — gitignored, its
+// own repository — does not exist: every run said "No cloud collection config
+// changed", whatever had. config-build asked the same question and got the same
+// answer, and the preflight stamp ignored saas/ edits too. These pin that the
+// harness now sees into the nested repository, and that rls-drift decides on the
+// policies the collections compile to rather than on which lines moved.
+
+/** One collection whose only rule goes through a constant, so the two can change apart. */
+const NOTES = `const OWNER = "owner = auth.uid()";
+
+// The owner reads their own notes.
+export const collections = [
+    {
+        slug: "notes",
+        table: "notes",
+        name: "Notes",
+        properties: { owner: { type: "string" } },
+        securityRules: [{ name: "notes_owner", mode: "permissive", operation: "select", using: OWNER }]
+    }
+];
+`;
+
+/** An outer repo ignoring saas/, and a saas/ repo whose `feature` branch carries `edits`. */
+function nestedSaasFixture(edits, { uncommitted = {} } = {}) {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "rls-drift-"));
+    const git = (args, cwd) =>
+        execFileSync("git", args, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
+    const commit = (cwd, message) =>
+        git(["-c", "user.email=t@t", "-c", "user.name=t", "commit", "-qm", message], cwd);
+    const write = (base, files) => {
+        for (const [rel, content] of Object.entries(files)) {
+            fs.mkdirSync(path.dirname(path.join(base, rel)), { recursive: true });
+            fs.writeFileSync(path.join(base, rel), content);
+        }
+    };
+
+    git(["init", "-q"], root);
+    git(["symbolic-ref", "HEAD", "refs/heads/main"], root);
+    fs.writeFileSync(path.join(root, ".gitignore"), "/saas\n");
+    git(["add", ".gitignore"], root);
+    commit(root, "outer");
+
+    const saas = path.join(root, "saas");
+    fs.mkdirSync(saas);
+    git(["init", "-q"], saas);
+    git(["symbolic-ref", "HEAD", "refs/heads/main"], saas);
+    write(saas, {
+        "package.json": "{}",
+        "config/package.json": JSON.stringify({ type: "module" }),
+        "config/collections/index.ts": NOTES,
+        "backend/drizzle/0000_init.sql": "SELECT 1;\n",
+    });
+    git(["add", "-A"], saas);
+    commit(saas, "base");
+
+    git(["checkout", "-q", "-b", "feature"], saas);
+    if (Object.keys(edits).length) {
+        write(saas, edits);
+        git(["add", "-A"], saas);
+        commit(saas, "feature");
+    }
+    write(saas, uncommitted);
+    return root;
+}
+
+const saasContext = (root) => ({ root, hasSaas: true, changed: changedFiles(root) });
+
+test("the harness sees changes inside the nested saas repository", () => {
+    const root = nestedSaasFixture(
+        { "backend/README.md": "committed on the branch\n" },
+        {
+            uncommitted: {
+                // An unstaged edit to a tracked file is the first entry `git status`
+                // prints, with a leading space — the entry trimming used to mangle.
+                "config/collections/index.ts": NOTES.replace("auth.uid()", "rebase.uid()"),
+                "backend/drizzle/0001_notes.sql": "SELECT 2;\n",
+            },
+        },
+    );
+
+    const changed = changedFiles(root);
+    assert.ok(changed.includes("saas/backend/README.md"), `committed on the branch: ${changed}`);
+    assert.ok(changed.includes("saas/config/collections/index.ts"), `unstaged: ${changed}`);
+    assert.ok(changed.includes("saas/backend/drizzle/0001_notes.sql"), `untracked: ${changed}`);
+    assert.ok(!changed.includes("saas/package.json"), "unchanged files stay out");
+});
+
+test("an unstaged edit that sorts first in git status keeps its whole path", () => {
+    // The monorepo half of the same bug: an edited pnpm-lock.yaml listed first
+    // was reported as "npm-lock.yaml", and the lockfile check never saw it.
+    const root = nestedSaasFixture({});
+    fs.writeFileSync(path.join(root, ".gitignore"), "/saas\n# edited\n");
+    assert.deepEqual(changedFiles(root).filter((f) => !f.startsWith("saas/")), [".gitignore"]);
+});
+
+test("the preflight stamp is invalidated by an edit inside saas/", () => {
+    const root = nestedSaasFixture({});
+    const before = treeKey({ root });
+    fs.writeFileSync(path.join(root, "saas", "backend", "drizzle", "0001_late.sql"), "SELECT 3;\n");
+    assert.notEqual(treeKey({ root }), before, "a migration added after preflight must not deploy under its stamp");
+});
+
+test("rls-drift fails a compiled policy change with no migration, even one made through a constant", () => {
+    // The changed line names no policy, no USING and no securityRules — the
+    // line-matching heuristic this replaced would not have looked at it.
+    const root = nestedSaasFixture({
+        "config/collections/index.ts": NOTES.replace(`"owner = auth.uid()"`, `"true"`),
+    });
+
+    const [result] = rlsDrift.run(saasContext(root));
+
+    assert.equal(result.level, FAIL, JSON.stringify(result));
+    assert.match(result.message, /public\.notes/);
+});
+
+test("rls-drift passes the same change when a migration ships with it", () => {
+    const root = nestedSaasFixture({
+        "config/collections/index.ts": NOTES.replace(`"owner = auth.uid()"`, `"true"`),
+        "backend/drizzle/0001_notes_public.sql": "SELECT 2;\n",
+    });
+
+    const [result] = rlsDrift.run(saasContext(root));
+
+    assert.equal(result.level, PASS, JSON.stringify(result));
+    assert.match(result.message, /0001_notes_public\.sql/);
+});
+
+test("rls-drift passes an edit that changes no compiled policy", () => {
+    // A respelling the compiler undoes, and a comment that says "policy".
+    const root = nestedSaasFixture({
+        "config/collections/index.ts": NOTES
+            .replace("auth.uid()", "rebase.uid()")
+            .replace("The owner reads their own notes.", "Only the owner reads a note — same policy, new words."),
+    });
+
+    const [result] = rlsDrift.run(saasContext(root));
+
+    assert.equal(result.level, PASS, JSON.stringify(result));
+    assert.match(result.message, /compile to exactly the policies/);
+});
+
+test("rls-drift fails closed when the policies cannot be compiled", () => {
+    const root = nestedSaasFixture({ "config/collections/index.ts": `${NOTES}\nexport const = ;\n` });
+
+    const [result] = rlsDrift.run(saasContext(root));
+
+    assert.equal(result.level, FAIL, JSON.stringify(result));
+    assert.match(result.message, /could not be compiled/);
 });

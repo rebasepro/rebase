@@ -11,10 +11,17 @@ import fs from "node:fs";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 
-/** Run a command for its stdout; empty string if it fails (harness must not throw on git edge cases). */
-export function sh(cmd, args, cwd = process.cwd()) {
+/**
+ * Run a command for its stdout; empty string if it fails (harness must not throw on git edge cases).
+ *
+ * Trimmed unless `{ trim: false }` — which anything whose leading whitespace
+ * means something needs: `git status --porcelain` starts an unstaged change with
+ * a space.
+ */
+export function sh(cmd, args, cwd = process.cwd(), { trim = true } = {}) {
     try {
-        return execFileSync(cmd, args, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
+        const out = execFileSync(cmd, args, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
+        return trim ? out.trim() : out;
     } catch {
         return "";
     }
@@ -54,28 +61,83 @@ function resolveRoots() {
 }
 
 /**
- * Files changed against the merge-base with main, plus anything uncommitted.
+ * Repositories nested in the checkout that it gitignores, by directory.
+ *
+ * `saas/` is its own repository and `/saas` is in the monorepo's .gitignore, so
+ * the monorepo's `git diff` and `git status` cannot see a single file in it. Every
+ * check that asked "did this change touch saas/…" was answered "no", forever:
+ * rls-drift and config-build passed on every run without ever looking, and the
+ * preflight stamp outlived any edit made there.
+ */
+const NESTED_REPOS = ["saas"];
+
+/** Whether `dir` is the top of a repository of its own, not a directory of the one around it. */
+function isOwnRepository(dir) {
+    if (!fs.existsSync(path.join(dir, ".git"))) return false;
+    const top = sh("git", ["rev-parse", "--show-toplevel"], dir);
+    try {
+        // Both realpath'd: `--show-toplevel` reports a resolved path, and on macOS
+        // /tmp and /var are symlinks.
+        return top !== "" && fs.realpathSync(top) === fs.realpathSync(dir);
+    } catch {
+        return false;
+    }
+}
+
+/** The nested repositories present under `root`, as `{ prefix, dir }`. */
+export function nestedRepositories(root) {
+    return NESTED_REPOS.map((prefix) => ({ prefix, dir: path.join(root, prefix) })).filter(({ dir }) =>
+        isOwnRepository(dir),
+    );
+}
+
+/**
+ * What a repository's own changes are measured from: its merge-base with main.
  *
  * Diffing against `main` directly would report every commit main has that the
  * branch lacks once main moves ahead, so a check keyed on "did this change touch
  * migrations" would fire on unrelated work. Merge-base is the branch's own delta.
+ * Empty when there is no `main` to measure from.
  */
-function changedFiles(root) {
-    const base = sh("git", ["merge-base", "HEAD", "main"], root);
+export function baseRevision(repoRoot) {
+    return sh("git", ["merge-base", "HEAD", "main"], repoRoot);
+}
+
+/**
+ * Files changed against the merge-base with main, plus anything uncommitted — in
+ * the checkout and in each repository nested in it, the latter under its prefix
+ * (`saas/config/…`), as if it were one tree.
+ */
+export function changedFiles(root) {
+    const files = new Set(changedInRepository(root));
+    for (const { prefix, dir } of nestedRepositories(root)) {
+        for (const file of changedInRepository(dir)) files.add(`${prefix}/${file}`);
+    }
+    return [...files];
+}
+
+function changedInRepository(root) {
+    const base = baseRevision(root);
     const committed = base ? sh("git", ["diff", "--name-only", `${base}...HEAD`], root) : "";
-    const working = sh("git", ["status", "--porcelain=v1"], root);
+    // `-z` and untrimmed. Trimmed, the first entry of an unstaged change (" M
+    // path") lost its leading space, `slice(3)` then cut into the path, and the
+    // file was reported as "ath" — whichever change happened to sort first.
+    const working = sh("git", ["status", "--porcelain=v1", "-z"], root, { trim: false });
 
     const files = new Set();
     for (const line of committed.split("\n")) {
         if (line.trim()) files.add(line.trim());
     }
-    // porcelain lines are "XY <path>", and renames are "XY <old> -> <new>".
-    for (const line of working.split("\n")) {
-        if (!line.trim()) continue;
-        const p = line.slice(3).trim();
-        files.add(p.includes(" -> ") ? p.split(" -> ")[1] : p);
+    // Entries are "XY <path>", NUL-separated; a rename or copy is followed by its
+    // source path as an entry of its own, which is not a change to report.
+    const entries = working.split("\0");
+    for (let i = 0; i < entries.length; i++) {
+        const entry = entries[i];
+        if (entry.length < 4) continue;
+        files.add(entry.slice(3));
+        if (/[RC]/.test(entry.slice(0, 2))) i++;
     }
-    return [...files];
+    return files;
 }
 
 let cached = null;

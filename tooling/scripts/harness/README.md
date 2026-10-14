@@ -38,7 +38,7 @@ the trace — a broken check must not be able to wedge a session.
 |---|---|
 | `lockfile-worktree` | `pnpm-lock.yaml` modified in a worktree, where the gitignored `saas/` member is absent so an install prunes it silently, exit 0 |
 | `migration-order` | A drizzle migration sorting at or before main's latest. The migrator tracks a high-water mark, so such a migration is never applied and never reported |
-| `rls-drift` | `securityRules` edited in `saas/config` with no migration. Cloud RLS lives in hand-written migration SQL; boot never reconciles it, so the edit is cosmetic |
+| `rls-drift` | A change to the policies `saas/config/collections` compiles to, with no migration SQL. The boot applies the rules but cannot create what a new one calls, so the table is left denying. Compares compiled policies at the merge-base and the working tree, so comments and respellings pass |
 | `config-build` | `saas/config` not compiling. The backend's tsc does not cover it, dev loads TS source, production loads `config/dist` |
 | `control-plane` | A deploy aimed at Cloud Run or Terraform, which do not serve `app.rebase.pro` (GKE does), and destructive `kubectl` verbs |
 

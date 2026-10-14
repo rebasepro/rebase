@@ -12,7 +12,7 @@
  */
 import fs from "node:fs";
 import path from "node:path";
-import { context, sh } from "../lib/ctx.mjs";
+import { context, nestedRepositories, sh } from "../lib/ctx.mjs";
 import { print, blocking } from "../lib/report.mjs";
 
 import * as migrationOrder from "../checks/migration-order.mjs";
@@ -29,10 +29,17 @@ export const CHECKS = [lockfileWorktree, migrationOrder, rlsDrift, configBuild, 
  * Keying the stamp on the commit alone would let an agent pass preflight, edit a
  * migration, and still deploy under the old stamp. Hashing the porcelain status
  * alongside HEAD means any uncommitted edit invalidates it.
+ *
+ * The nested repositories count too, HEAD and status both. `saas/` is invisible
+ * to the monorepo's git, and it is where the migrations are: without this, a
+ * commit or an edit there after a passing preflight deployed under the old stamp.
  */
 export function treeKey(ctx = context()) {
     const head = sh("git", ["rev-parse", "HEAD"], ctx.root) || "nohead";
-    const dirty = sh("git", ["status", "--porcelain=v1"], ctx.root);
+    let dirty = sh("git", ["status", "--porcelain=v1"], ctx.root);
+    for (const { prefix, dir } of nestedRepositories(ctx.root)) {
+        dirty += `\n${prefix}@${sh("git", ["rev-parse", "HEAD"], dir)}\n${sh("git", ["status", "--porcelain=v1"], dir)}`;
+    }
     let hash = 0;
     for (let i = 0; i < dirty.length; i++) hash = (Math.imul(31, hash) + dirty.charCodeAt(i)) | 0;
     return `${head.slice(0, 12)}-${(hash >>> 0).toString(16)}`;

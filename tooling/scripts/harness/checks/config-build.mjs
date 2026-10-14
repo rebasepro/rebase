@@ -12,7 +12,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
-import { context, changedUnder } from "../lib/ctx.mjs";
+import { context } from "../lib/ctx.mjs";
 import { finding, pass, FAIL } from "../lib/report.mjs";
 
 export const id = "config-build";
@@ -21,7 +21,7 @@ export const title = "Cloud config package compiles";
 export function run(ctx = context()) {
     if (!ctx.hasSaas) return [pass(id, "No cloud workspace present — config build not applicable.")];
 
-    if (!changedUnder("saas/config/").length) return [pass(id, "Cloud config package unchanged.")];
+    if (!ctx.changed.some((file) => file.startsWith("saas/config/"))) return [pass(id, "Cloud config package unchanged.")];
 
     const configDir = path.join(ctx.root, "saas", "config");
     const tsc = path.join(ctx.root, "node_modules", ".bin", "tsc");
