@@ -2,7 +2,7 @@ import chalk from "chalk";
 import { outWarn, outError } from "./cli-output";
 import { extractCauseMessage } from "./utils/error-cause";
 import { redactConnectionPasswords } from "./utils/connection-string";
-import { withAppClient } from "./cli-helpers";
+import { detectProjectPackageManager, withAppClient, type ProjectPackageManager } from "./cli-helpers";
 
 /**
  * Detect whether an error (or AggregateError wrapping multiple attempts)
@@ -560,6 +560,21 @@ export function notNullColumnIsNew(stderr: string, column: string): boolean | nu
 }
 
 /**
+ * `rebase`, spelled the way a project runs it from its own shell: a scaffold
+ * keeps the CLI in `node_modules/.bin`, not on PATH, so it is `pnpm exec
+ * rebase`, as `rebase start`'s hint and `rebase init`'s next steps spell it.
+ */
+function projectRebaseCommand(manager: ProjectPackageManager): string {
+    switch (manager) {
+        case "pnpm": return "pnpm exec rebase";
+        case "npm": return "npx rebase";
+        case "yarn": return "yarn rebase";
+        case "bun": return "bunx rebase";
+        default: return "rebase";
+    }
+}
+
+/**
  * The ways out, and only the ones that work for this column.
  *
  * A `defaultValue` backfills only a column the push is adding: PostgreSQL
@@ -575,7 +590,8 @@ export function notNullColumnIsNew(stderr: string, column: string): boolean | nu
 export function formatNotNullViolationBanner(
     violation: { table: string; column: string },
     rowCount: number | null,
-    isNew: boolean | null = null
+    isNew: boolean | null = null,
+    manager: ProjectPackageManager = detectProjectPackageManager()
 ): string {
     const { table, column } = violation;
     const rows = rowCount === null
@@ -583,7 +599,9 @@ export function formatNotNullViolationBanner(
         : `  "${table}" already holds ${rowCount} row${rowCount === 1 ? "" : "s"}, and they have no value for "${column}".\n`;
     const backfill =
         `Backfill by hand first, then push again:\n` +
-        `         ${chalk.gray(`psql "$DATABASE_URL" -c 'UPDATE "${table}" SET "${column}" = … WHERE "${column}" IS NULL;'`)}\n`;
+        // `rebase db url`, not `$DATABASE_URL`: on the managed development
+        // database `.env` leaves DATABASE_URL unset, and the shell has none.
+        `         ${chalk.gray(`psql "$(${projectRebaseCommand(manager)} db url)" -c 'UPDATE "${table}" SET "${column}" = … WHERE "${column}" IS NULL;'`)}\n`;
     const leaveOptional = `Leave it optional — take \`validation.required\` off the property.\n`;
     const defaultLine = (caveat: string) =>
         `Give the property a default, so the push can backfill${caveat}:\n` +
