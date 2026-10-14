@@ -183,6 +183,25 @@ describe("rebase db pull refuses a flag it does not take", () => {
         expectNothingRan();
     });
 
+    /**
+     * The refusal suggests the `--from` line to type instead, and it printed
+     * the URL it was given: password and all, unquoted, so the `&` in a
+     * query string sent the pasted command to the background.
+     */
+    it("refuses --database-url without printing its password, quoted so it pastes", async () => {
+        const target = "postgresql://rebase_app:s3cret@127.0.0.1:5508/u3?sslmode=disable&application_name=x";
+
+        await expect(dbCommand("pull", argv("pull", "--from", PROD, "--database-url", target, "--yes")))
+            .rejects.toEqual(new Exit(1));
+
+        const out = printed.join("\n");
+        expect(out).toContain("does not take --database-url");
+        expect(out).not.toContain("s3cret");
+        expect(out).toContain("rebase db pull --from \"postgresql://rebase_app:***@127.0.0.1:5508/u3?sslmode=disable&application_name=x\"");
+        expect(out).toContain("with the password in place of ***");
+        expectNothingRan();
+    });
+
     it("still takes every flag it documents, in both spellings", async () => {
         await dbCommand("pull", argv(
             "pull", `--from=${PROD}`, "--schema", "public", "--schema=rebase", "--anonymize", "-y"

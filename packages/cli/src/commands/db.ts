@@ -20,6 +20,7 @@ import {
 } from "../utils/project";
 import { reportSpawnFailure } from "../utils/spawn-error";
 import { parseCommandArgs, UsageError } from "../utils/args";
+import { redactConnectionPasswords } from "../utils/redact";
 import { suggestCommand, unknownCommand } from "../utils/unknown-command";
 import { argsFromCommand, commandWords } from "../utils/command-words";
 import { COLLECTIONS_FLAG_HELP, refuseMissingCollectionsPath } from "../utils/path-flags";
@@ -993,8 +994,12 @@ async function pullIntoLocal(projectRoot: string, rawArgs: readonly string[]): P
         console.error(chalk.gray("  no flag that makes this write somewhere else, deliberately: a command that"));
         console.error(chalk.gray("  can copy in both directions eventually copies in the wrong one."));
         console.error("");
+        // Never the password, and quoted: a connection string's `&` and `?`
+        // are shell syntax, so the line as it was printed did not paste.
+        const shown = redactConnectionPasswords(targetFlag);
         console.error(chalk.gray(`  To read from another database, that is ${chalk.cyan("--from")}:`));
-        console.error(chalk.gray(`  rebase db pull --from ${targetFlag}`));
+        console.error(chalk.gray(`  rebase db pull --from "${shown}"`));
+        if (shown !== targetFlag) console.error(chalk.gray("  with the password in place of ***."));
         process.exit(1);
     }
 
