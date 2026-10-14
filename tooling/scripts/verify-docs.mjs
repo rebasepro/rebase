@@ -49,6 +49,7 @@ import { checkEnvBooleans } from "./docs-verify/check-env-booleans.mjs";
 import { checkEndpointIndex } from "./docs-verify/check-endpoint-index.mjs";
 import { checkUpgradeCoverage } from "./docs-verify/check-upgrade-coverage.mjs";
 import { checkRlsCheckCount } from "./docs-verify/check-rls-check-count.mjs";
+import { checkBadgeLeftovers } from "./docs-verify/check-badge-leftovers.mjs";
 import { checkErrorCodes } from "./docs-verify/check-error-codes.mjs";
 import { checkMcpToolTables } from "./docs-verify/check-mcp-tool-tables.mjs";
 import { checkCloudSurface } from "./docs-verify/check-cloud-surface.mjs";
@@ -194,6 +195,19 @@ if (only === "both" || only === "names") {
         for (const b of bad) {
             console.log(`  ${RED}${b.version}${NC} ${DIM}${b.reason ?? `(${b.entries} breaking section)`}${NC}`);
         }
+    }
+}
+
+if (only === "both" || only === "names") {
+    console.log(`\n${YELLOW}━━━ Punctuation a removed badge left behind (all locales) ━━━${NC}`);
+    const { findings: bad, scanned } = checkBadgeLeftovers(ROOT);
+    console.log(`${DIM}Scanned ${scanned} page(s) for a parenthesis opened or closed on a separator, outside code.${NC}`);
+    if (!bad.length) {
+        console.log(`${GREEN}✓ No parenthesis opens on "(;", "(," or "(:", or closes on ", )".${NC}`);
+    } else {
+        findings += bad.length;
+        console.log(`${RED}✗ ${bad.length} parenthesis(es) a removed badge left half-empty:${NC}`);
+        for (const b of bad) console.log(`  ${RED}${b.file}:${b.line}${NC}\n      ${DIM}…${b.text}…${NC}`);
     }
 }
 

@@ -588,8 +588,10 @@ export function removeBadges(text, released) {
                     continue;
                 }
                 // A badge set off by punctuation takes it along: `(badge, [details])`
-                // left `(, [details])`, and `(badge)` an empty pair of brackets.
-                next = next.includes(`(${el}, `) ? next.replace(`(${el}, `, "(")
+                // left `(, [details])`, `(badge; on 0.24 …)` left `(; on 0.24 …)`,
+                // and `(badge)` an empty pair of brackets.
+                const opener = [", ", "; ", ": "].find(mark => next.includes(`(${el}${mark}`));
+                next = opener ? next.replace(`(${el}${opener}`, "(")
                     : next.includes(`, ${el})`) ? next.replace(`, ${el})`, ")")
                         : next.includes(` (${el})`) ? next.replace(` (${el})`, "")
                             : next.includes(`${el} `) ? next.replace(`${el} `, "")

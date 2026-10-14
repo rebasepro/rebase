@@ -374,6 +374,13 @@ test("a released badge set off by punctuation takes the punctuation with it", ()
     assert.equal(trailing, "one more case ([details](/docs/x/)).");
     const alone = removeBadges(`the default (${badge}) is kept.`, released).text;
     assert.equal(alone, "the default is kept.");
+    // And the badge that opens a parenthesis whose clause follows a semicolon
+    // or a colon: 0.25.0's cut left "(; on 0.24 the data API …)" on errors.md
+    // and five other pages, in every locale.
+    const semicolon = removeBadges(`at every door (${badge}; on 0.24 the data API answers it).`, released).text;
+    assert.equal(semicolon, "at every door (on 0.24 the data API answers it).");
+    const colon = removeBadges(`two edits (${badge}: 0.24 reports both).`, released).text;
+    assert.equal(colon, "two edits (0.24 reports both).");
 });
 
 test("a page copy_repo_docs.js writes loses its released badge in its source too", (t) => {
