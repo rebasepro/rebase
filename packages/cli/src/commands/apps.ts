@@ -11,12 +11,11 @@
  * a mobile app with no repo relationship at all — an ordinary thing rather than
  * a special case.
  */
-import fs from "fs";
 import path from "path";
 import chalk from "chalk";
 import type { RebaseAppConfig, RebaseProjectManifest } from "@rebasepro/types";
 import { failAsJson, requireProjectRoot } from "../utils/project";
-import { devServerUrl } from "../utils/dev-server";
+import { devServerUrl, runningBackendUrl } from "../utils/dev-server";
 import { parseCommandArgs, wantsHelp } from "../utils/args";
 import {
     assessManagedCompatibility,
@@ -345,13 +344,17 @@ async function printAppConfig(appName: string | undefined, asJson: boolean): Pro
         return;
     }
 
-    if (!apiUrl) {
+    // Whether the checkout is linked is a fact about the link, not about
+    // whether `rebase dev` happens to be running: a running dev's address
+    // used to fill the same slot, and the notice disappeared with it.
+    if (!link?.apiUrl) {
         console.log(chalk.yellow("This checkout is not linked to a project yet."));
         // `rebase cloud link`, not `rebase link`. There has never been a
         // top-level `link` command — `cli.ts` dispatches `cloud`, and the link
         // lives inside that family — so this hint named something that exits 1
         // on the very screen that exists to tell you what to run next.
         console.log(chalk.dim(`  Run ${chalk.cyan("rebase cloud link")} (cloud) or ${chalk.cyan("rebase cloud link <url>")} (self-hosted).`));
+        console.log(chalk.dim(`  Until then, this is the address ${chalk.cyan("rebase dev")} serves this project on.`));
         console.log("");
     }
 
@@ -374,30 +377,9 @@ async function printAppConfig(appName: string | undefined, asJson: boolean): Pro
  */
 function resolveApiUrl(projectRoot: string, link: ReturnType<typeof readLink>): string | undefined {
     if (link?.apiUrl) return link.apiUrl;
-
-    const statePath = path.join(projectRoot, ".rebase", "state.json");
-    if (fs.existsSync(statePath)) {
-        try {
-            const state = JSON.parse(fs.readFileSync(statePath, "utf8")) as { baseUrl?: string; pid?: number };
-            // Only a dev server that is still running: the file outlives the
-            // process, and a port nothing listens on is not an address.
-            if (state.baseUrl && typeof state.pid === "number" && isRunning(state.pid)) return state.baseUrl;
-        } catch {
-            // Stale or partially written state file: fall through.
-        }
-    }
-
-    return undefined;
-}
-
-/** Signal 0 checks a process exists without touching it; EPERM means it does, as someone else. */
-function isRunning(pid: number): boolean {
-    try {
-        process.kill(pid, 0);
-        return true;
-    } catch (err) {
-        return (err as NodeJS.ErrnoException).code === "EPERM";
-    }
+    // Only a dev server that is still running: the state file outlives the
+    // process, and a port nothing listens on is not an address.
+    return runningBackendUrl(projectRoot) ?? undefined;
 }
 
 /**

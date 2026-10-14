@@ -118,6 +118,27 @@ describe("rebase apps config", () => {
         if (getProjectPort(root) !== 3001) expect(text).not.toContain("localhost:3001");
     });
 
+    /**
+     * "This checkout is not linked to a project yet" was printed only when dev
+     * was not running: a running dev's address filled the same slot as a
+     * link, so the notice read as if starting dev had linked the checkout.
+     */
+    it("says the checkout is not linked whether or not dev is running, and which address it printed instead", async () => {
+        manifest({ backend: { type: "backend", runtime: "custom", dockerfile: "Dockerfile" } });
+
+        await appsCommand("config", ["node", "rebase", "apps", "config", "backend"]);
+        const stopped = plain(out.join("\n"));
+        expect(stopped).toContain("not linked to a project yet");
+
+        out.length = 0;
+        devState(process.pid);
+        await appsCommand("config", ["node", "rebase", "apps", "config", "backend"]);
+        const running = plain(out.join("\n"));
+        expect(running).toContain("not linked to a project yet");
+        expect(running).toContain("VITE_API_URL=http://localhost:3401");
+        expect(running).toContain("rebase dev");
+    });
+
     it("uses the address of the dev server that is running", async () => {
         manifest({ backend: { type: "backend", runtime: "custom", dockerfile: "Dockerfile" }, web: { type: "static", root: "web", path: "/", output: "web/dist" } });
         devState(process.pid);
