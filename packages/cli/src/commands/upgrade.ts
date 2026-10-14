@@ -88,6 +88,19 @@ export interface UpgradeResult {
     unreadable: UnreadableFile[];
     installed: boolean;
     dryRun: boolean;
+    /**
+     * What the same command without `--dry-run` would refuse with, in the
+     * `{ error }` envelope's terms; `null` when it would go ahead. Only a dry
+     * run sets it: a real run that refuses prints that envelope instead.
+     */
+    wouldRefuse: UpgradeRefusal | null;
+}
+
+/** A refusal `rebase upgrade` answers with, as its `--json` envelope carries it. */
+export interface UpgradeRefusal {
+    code: string;
+    message: string;
+    hint?: string;
 }
 
 /**
@@ -218,17 +231,24 @@ export async function upgradeCommand(rawArgs: string[], io: UpgradeIo = defaultI
     // refused unless asked for; an exact `--to` version already is asking.
     const backwards = downgradedPins(plan);
     const exactRequest = requested !== undefined && isExactVersion(requested.trim().replace(/^v(?=\d)/, ""));
-    if (backwards.length > 0 && !exactRequest && flags["--allow-downgrade"] !== true && !dryRun) {
+    let downgradeRefusal: UpgradeRefusal | null = null;
+    if (backwards.length > 0 && !exactRequest && flags["--allow-downgrade"] !== true) {
         const tag = requested?.trim() ?? "latest";
         const current = [...new Set(backwards.map(pin => pin.from.replace(/^[\^~]/, "")))].join(", ");
-        refuse(
-            `\`${tag}\` is ${plan.target}, older than this project's ${current}: ` +
-                `upgrading to it would move ${backwards.length} pin${backwards.length === 1 ? "" : "s"} backwards. Nothing was changed.`,
-            "downgrade_refused",
-            channel
+        downgradeRefusal = {
+            code: "downgrade_refused",
+            message: `\`${tag}\` is ${plan.target}, older than this project's ${current}: ` +
+                `upgrading to it would move ${backwards.length} pin${backwards.length === 1 ? "" : "s"} backwards.`,
+            hint: channel
                 ? `Stay on the ${channel} channel with \`rebase upgrade --to ${channel}\`, or pass --allow-downgrade to move to ${plan.target}.`
                 : `Pass --allow-downgrade to move to ${plan.target} anyway, or --to <version> for an exact release.`
-        );
+        };
+    }
+    // A dry run goes on to show what would move, and says the real run would
+    // stop here — in its document too, where an agent asking "would this work?"
+    // reads the answer. Exit 0 either way, as the human output's warning does.
+    if (downgradeRefusal && !dryRun) {
+        refuse(`${downgradeRefusal.message} Nothing was changed.`, downgradeRefusal.code, downgradeRefusal.hint);
     }
 
     if (!dryRun) applyUpgradePlan(plan);
@@ -279,7 +299,8 @@ export async function upgradeCommand(rawArgs: string[], io: UpgradeIo = defaultI
         overrides: plan.overrides,
         unreadable: plan.unreadable,
         installed,
-        dryRun
+        dryRun,
+        wouldRefuse: dryRun ? downgradeRefusal : null
     };
 
     if (json) {

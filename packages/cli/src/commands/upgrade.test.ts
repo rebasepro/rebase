@@ -101,8 +101,8 @@ describe("rebase upgrade --json", () => {
         expect(await run(["--to", "0.21.0", "--no-install", "--json"], fake)).toBe(0);
 
         const doc = JSON.parse(stdout.join("\n"));
-        expect(Object.keys(doc)).toEqual(["target", "changed", "skipped", "overrides", "unreadable", "installed", "dryRun"]);
-        expect(doc).toMatchObject({ target: "0.21.0", installed: false, dryRun: false });
+        expect(Object.keys(doc)).toEqual(["target", "changed", "skipped", "overrides", "unreadable", "installed", "dryRun", "wouldRefuse"]);
+        expect(doc).toMatchObject({ target: "0.21.0", installed: false, dryRun: false, wouldRefuse: null });
         expect(doc.changed).toEqual([
             { file: "backend/package.json", name: "@rebasepro/server", field: "dependencies", from: "^0.19.1", to: "^0.21.0" },
             { file: "package.json", name: "@rebasepro/cli", field: "devDependencies", from: "0.19.1", to: "0.21.0" }
@@ -372,6 +372,43 @@ describe("rebase upgrade on a prerelease", () => {
         expect(doc.error.hint).toContain("--allow-downgrade");
         expect(read("package.json")).toBe(before);
         expect(fake.install).not.toHaveBeenCalled();
+    });
+
+    /**
+     * A dry run is how an agent or a CI step asks "would this work?", and the
+     * document answered `dryRun: true` with exit 0 and the changes — while the
+     * real run, the moment it was tried, refused with `downgrade_refused`. Only
+     * the human output said so.
+     */
+    it("says in a --dry-run --json document that the real run would refuse, and why", async () => {
+        canaryProject();
+        const before = read("package.json");
+        const fake = io({ npmView: registry({ latest: "0.24.0", canary: "0.24.1-canary.g8c5a265" }) });
+
+        expect(await run(["--to", "latest", "--dry-run", "--json"], fake)).toBe(0);
+
+        const doc = JSON.parse(stdout.join("\n"));
+        expect(doc.dryRun).toBe(true);
+        expect(doc.wouldRefuse).toMatchObject({ code: "downgrade_refused" });
+        expect(doc.wouldRefuse.message).toContain("0.24.0");
+        expect(doc.wouldRefuse.message).not.toContain("Nothing was changed");
+        expect(doc.wouldRefuse.hint).toContain("--allow-downgrade");
+        expect(read("package.json")).toBe(before);
+
+        // And the real run refuses with the same code and hint.
+        stdout.length = 0;
+        expect(await run(["--to", "latest", "--json"], fake)).toBe(1);
+        const refused = JSON.parse(stdout.join("\n")).error;
+        expect(refused.code).toBe(doc.wouldRefuse.code);
+        expect(refused.hint).toBe(doc.wouldRefuse.hint);
+    });
+
+    it("leaves wouldRefuse null on a dry run the real run would carry out", async () => {
+        canaryProject();
+        const fake = io({ npmView: registry({ latest: "0.24.0", canary: "0.24.1-canary.g8c5a265" }) });
+
+        expect(await run(["--to", "latest", "--allow-downgrade", "--dry-run", "--json"], fake)).toBe(0);
+        expect(JSON.parse(stdout.join("\n")).wouldRefuse).toBeNull();
     });
 
     it("refuses by default too, when the channel cannot be resolved", async () => {
