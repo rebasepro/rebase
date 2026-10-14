@@ -380,16 +380,16 @@ function composeCredentials(
 
 /**
  * The compose project a file belongs to, named the way `docker compose` names
- * it: `COMPOSE_PROJECT_NAME`, else the file's top-level `name:`, else the
- * directory, lowercased with everything but `[a-z0-9_-]` dropped.
+ * it: the file's top-level `name:`, else the directory, lowercased with
+ * everything but `[a-z0-9_-]` dropped.
+ *
+ * A project name set with `-p` or in the environment is not read: a container
+ * started from this directory is recognised by its working directory anyway,
+ * and the name is only the fallback for a project that has moved since.
  */
-export function composeProjectName(
-    yamlText: string,
-    projectRoot: string,
-    env: Record<string, string | undefined>
-): string {
+export function composeProjectName(yamlText: string, projectRoot: string): string {
     const named = /^name:\s*["']?([^"'#\s]+)["']?\s*(?:#.*)?$/m.exec(yamlText)?.[1];
-    const raw = env.COMPOSE_PROJECT_NAME?.trim() || named || path.basename(projectRoot);
+    const raw = named || path.basename(projectRoot);
     return raw.toLowerCase().replace(/[^a-z0-9_-]/g, "");
 }
 
@@ -559,7 +559,7 @@ async function refuseForeignListener(options: {
     if (!isComposeDatabaseUrl(databaseUrl, port, composeText, env)) return;
 
     const whoHoldsPort = options.whoHoldsPort
-        ?? ((p: number) => dockerPortHolder(projectRoot, composeProjectName(composeText, projectRoot, env), p));
+        ?? ((p: number) => dockerPortHolder(projectRoot, composeProjectName(composeText, projectRoot), p));
     const holder = await whoHoldsPort(port);
     if (holder.kind === "this-project" || holder.kind === "unknown") return;
 

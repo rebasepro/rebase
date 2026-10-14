@@ -832,15 +832,11 @@ describe("classifyPortPublishers", () => {
 
 describe("composeProjectName", () => {
     it("reads the file's top-level name", () => {
-        expect(composeProjectName("name: blank-app\nservices:\n  db:\n", "/work/x", {})).toBe("blank-app");
-    });
-
-    it("lets COMPOSE_PROJECT_NAME win, as compose does", () => {
-        expect(composeProjectName("name: blank-app\n", "/work/x", { COMPOSE_PROJECT_NAME: "other" })).toBe("other");
+        expect(composeProjectName("name: blank-app\nservices:\n  db:\n", "/work/x")).toBe("blank-app");
     });
 
     it("falls back to the directory, normalised the way compose normalises it", () => {
-        expect(composeProjectName("services:\n", "/work/My App.v2", {})).toBe("myappv2");
+        expect(composeProjectName("services:\n", "/work/My App.v2")).toBe("myappv2");
     });
 });
 
