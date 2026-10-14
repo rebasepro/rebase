@@ -1006,6 +1006,7 @@ async function createProject(options: InitOptions) {
         // Say so rather than accepting the flag and silently dropping it.
         console.log(chalk.yellow(`  Ignoring --template ${options.preset}: a headless project declares no collections.`));
     }
+    let applied: TemplatePreset | null = null;
     if (!options.headless) {
         // When introspecting, the database is the source of truth: start from
         // the blank preset so example collections never register on top of
@@ -1013,12 +1014,18 @@ async function createProject(options: InitOptions) {
         if (options.introspect && options.preset !== "blank") {
             console.log(chalk.gray("  Using the blank template: collections will come from your database."));
         }
-        const applied = await applyPreset(options.targetDirectory, options.introspect ? "blank" : options.preset);
+        applied = await applyPreset(options.targetDirectory, options.introspect ? "blank" : options.preset);
         writeShippedSchema(options.targetDirectory, applied);
     }
 
     // Reduce the project to the selected shape
     await applyHeadless(options.targetDirectory, options.headless);
+
+    // Not when introspecting: the collections are about to come from the
+    // database, and `rebase build` writes the graph they declare.
+    if (!options.introspect) {
+        writeShippedResourceGraph(options.targetDirectory, options.headless ? "headless" : applied ?? "blog");
+    }
 
     // Replace placeholder project name in package.json files
     await replacePlaceholders(options);
@@ -1321,6 +1328,35 @@ function writeShippedSchema(targetDirectory: string, preset: TemplatePreset): vo
     const destination = path.join(targetDirectory, "backend", "src", "schema.generated.ts");
     fs.mkdirSync(path.dirname(destination), { recursive: true });
     fs.copyFileSync(shippedSchemaPath(preset), destination);
+}
+
+/** A scaffold's shape, for the resource graph it ships with: a preset, or headless. */
+export type ScaffoldShape = TemplatePreset | "headless";
+
+/**
+ * Where each scaffold shape's `rebase.resources.json` ships, beside the template.
+ *
+ * `rebase resources --check` is the CI gate for that file, and a fresh
+ * scaffold failed it before anything had changed: `config/resources.ts`
+ * declares `main = database()`, `backend/functions/hello.ts` is a function,
+ * and nothing had written the graph — `rebase build` does, on its first run.
+ * So `init` writes it, and a fresh project starts consistent with its own
+ * gate, with the file in its first commit.
+ *
+ * It cannot be derived here for the reason the schema cannot (see
+ * `shippedSchemaPath`): deriving evaluates the collection files, which import
+ * `@rebasepro/cms-types`, and the project has none until it is installed. So
+ * each shape's graph is derived in this repository and shipped, and
+ * `init-resource-graph.test.ts` fails the moment one differs from what
+ * `rebase resources --write` writes for that shape.
+ */
+export function shippedResourceGraphPath(shape: ScaffoldShape): string {
+    return path.resolve(cliRoot!, "templates", "resource-graphs", `${shape}.json`);
+}
+
+/** Write the shape's resource graph to `rebase.resources.json`. */
+function writeShippedResourceGraph(targetDirectory: string, shape: ScaffoldShape): void {
+    fs.copyFileSync(shippedResourceGraphPath(shape), path.join(targetDirectory, "rebase.resources.json"));
 }
 
 function cleanupPresets(presetsDir: string): void {

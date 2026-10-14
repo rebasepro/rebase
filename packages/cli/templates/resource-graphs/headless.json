@@ -1,0 +1,22 @@
+{
+    "$generated": "Generated from config by `rebase resources`. Edit the declarations, not this file.",
+    "version": 1,
+    "resources": [
+        {
+            "kind": "database",
+            "key": "(default)",
+            "engine": "postgres",
+            "transport": "server"
+        },
+        {
+            "kind": "function",
+            "key": "hello",
+            "engine": "http",
+            "transport": "server",
+            "options": {
+                "portable": true,
+                "file": "backend/functions/hello.ts"
+            }
+        }
+    ]
+}
