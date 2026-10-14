@@ -320,6 +320,7 @@ no usable credential refuses to boot. See
 | `BACKUP_KEEP_MINIMUM` | Always retain at least N of the most recent backups, whatever retention says. | — |
 | `PG_DUMP_PATH` | Override the `pg_dump` binary — it must be the server's major version or newer. | — |
 | `PG_RESTORE_PATH` | Override the `pg_restore` binary. | — |
+| `PSQL_PATH` | Override the `psql` binary that `rebase db restore --clean` runs to make the restore one transaction. | — |
 | `PG_DUMPALL_PATH` | Where `pg_dumpall` lives, when it is not on `PATH`. Without it — and without the PostgreSQL client tools installed — a globals backup fails with an error naming this variable. | — |
 
 The official runtime image (`rebasepro/server`) ships the PostgreSQL 18 client

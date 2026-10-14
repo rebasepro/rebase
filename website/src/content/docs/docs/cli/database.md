@@ -103,12 +103,22 @@ it, it refuses before anything is applied, the cluster roles included, and
 names the objects in the way and both ways round them: `--clean`, or
 `--create-db --target-db <new name>`. On 0.24 it applied the roles and then
 failed on pg_restore's `schema "rebase" already exists`.
+<span class="since-badge" data-since="0.25">Since 0.25</span> With `--clean`
+the restore is one transaction: it drops the backup's schemas with everything
+in them, restores, and commits only once the whole restore has succeeded, so a
+failure leaves the database as it was. Before asking, it names what it drops
+that the backup does not hold. It runs `psql`, which ships with `pg_restore`.
+On 0.24 a `--clean` restore into a database with a table the backup lacked, such
+as Atlas's revisions table after `db migrate`, dropped everything and restored
+nothing.
 <span class="since-badge" data-since="0.25">Since 0.25</span> `restore` refuses
 the managed development database: a backup carries its rows as COPY data, which
 it cannot receive, and on 0.24 the restore left it hung until it was stopped.
 Restore into Postgres in Docker (`rebase db restore <dump> --docker --clean --yes`),
 then `rebase db pull --from "$(rebase db url --docker)" --yes` copies it into
-the managed database.
+the managed database. A backup of the managed database leaves it as it was; on
+0.24 the settings `pg_dump` made stayed on it, and every API request failed
+until `rebase db stop`.
 <span class="since-badge" data-since="0.25">Since 0.25</span> Relative paths,
 and the default `./backups`, resolve against the directory you run `rebase`
 from, so the three lines above meet in one directory; an option a command does
