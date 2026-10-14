@@ -172,7 +172,7 @@ describe("introspect, then push: a database's own policies survive", () => {
     // push then does, policy by policy.
     it("lists the admin baseline a collection asks for, and the push adds exactly that", async () => {
         const ordersFile = path.join(collections, "orders.ts");
-        fs.writeFileSync(ordersFile, fs.readFileSync(ordersFile, "utf8").replace(/\n    disableDefaultPolicies: true,/, ""));
+        fs.writeFileSync(ordersFile, fs.readFileSync(ordersFile, "utf8").replace(/\n {4}disableDefaultPolicies: true,/, ""));
         const baseline = ["orders_default_admin_read", "orders_default_admin_write_delete",
             "orders_default_admin_write_insert", "orders_default_admin_write_update"];
 

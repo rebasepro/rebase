@@ -139,7 +139,7 @@ describe("writing a table's policies into its collection", () => {
     // read every row.
     it("opts a table out of the admin baseline its own policies do not grant", () => {
         const source = generated([rlsPolicy("customers", "customers_owner", { qual: OWNER, with_check: OWNER })], true);
-        expect(source).toMatch(/\/\/ The table's policies are its whole access model[\s\S]*\n    disableDefaultPolicies: true,\n[\s\S]*\n    securityRules: \[/);
+        expect(source).toMatch(/\/\/ The table's policies are its whole access model[\s\S]*\n {4}disableDefaultPolicies: true,\n[\s\S]*\n {4}securityRules: \[/);
         expect(source).toContain(`name: "customers_owner"`);
     });
 
