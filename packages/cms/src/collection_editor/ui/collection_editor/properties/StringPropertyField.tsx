@@ -81,14 +81,16 @@ export function StringPropertyField({
                             case "text": return "text (unlimited)";
                             case "char": return "char (fixed length)";
                             case "varchar": return "varchar (variable length)";
-                            case "_default_": return "Default (varchar)";
-                            default: return "Default (varchar)";
+                            // No `columnType` is a TEXT column: what the schema
+                            // planner creates for a string that names none.
+                            case "_default_": return "Default (text)";
+                            default: return "Default (text)";
                         }
                     }}
                     error={Boolean(columnTypeError)}
                     label={t("db_column_type")}>
                     {isIdValue === "uuid" && <SelectItem value={"uuid"}> uuid (forced by Primary Key) </SelectItem>}
-                    <SelectItem value={"_default_"}> Default (varchar) </SelectItem>
+                    <SelectItem value={"_default_"}> Default (text) </SelectItem>
                     <SelectItem value={"varchar"}> varchar (variable length) </SelectItem>
                     <SelectItem value={"text"}> text (unlimited) </SelectItem>
                     <SelectItem value={"char"}> char (fixed length) </SelectItem>
