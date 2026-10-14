@@ -107,6 +107,43 @@ export async function getServerVersionMajor(connectionString: string): Promise<n
     }
 }
 
+/** PGlite names itself in `version()`: `PostgreSQL 18.3 (PGlite 0.5.6) on wasm32-…`. */
+const SHARED_SESSION_ENGINE = /\(PGlite\b/i;
+
+/**
+ * Put back what a client tool left set on a database that is one session
+ * every connection shares, and do nothing on any other.
+ *
+ * The managed development database is PGlite: one session behind a socket
+ * server, so what `pg_dump` sets for itself — `search_path` emptied,
+ * `row_security` off, `PREPARE dumpEnumType …` — stays set for every client
+ * after it, a running `rebase dev` included. One `rebase db backup` there left
+ * every API request answering 500 "table does not exist", a restart did not
+ * help (the database outlives `rebase dev`), and the next backup failed on
+ * `prepared statement "dumpenumtype" already exists`.
+ *
+ * `RESET ALL` and `DEALLOCATE ALL`, not `DISCARD ALL`: that would also drop
+ * the `LISTEN` a running `rebase dev`'s realtime holds on the same session.
+ * Best effort: it runs after the tool, whose own outcome is what the caller
+ * reports.
+ */
+export async function resetSharedSession(connectionString: string): Promise<void> {
+    const { Client } = await import("pg");
+    const client = new Client({ connectionString, connectionTimeoutMillis: 10_000, query_timeout: 15_000 });
+    client.on("error", () => undefined);
+    try {
+        await client.connect();
+        const { rows } = await client.query<{ version: string }>("SELECT version() AS version");
+        if (!SHARED_SESSION_ENGINE.test(rows[0]?.version ?? "")) return;
+        await client.query("RESET ALL");
+        await client.query("DEALLOCATE ALL");
+    } catch {
+        // Nothing to add to the tool's own result; see above.
+    } finally {
+        await client.end().catch(() => undefined);
+    }
+}
+
 export interface PreflightResult extends VersionCompatibility {
     bin: string;
     toolMajor: number | null;
@@ -216,10 +253,14 @@ export async function createDump(opts: {
     }
 
     try {
-        await execa(bin, args, {
-            stdio: opts.inheritStdio ? "inherit" : "pipe",
-            env: dumpEnv
-        });
+        try {
+            await execa(bin, args, {
+                stdio: opts.inheritStdio ? "inherit" : "pipe",
+                env: dumpEnv
+            });
+        } finally {
+            await resetSharedSession(opts.connectionString);
+        }
     } catch (error) {
         // pg_dump creates its `--file=` target before it finishes connecting,
         // so any failure here — a URL libpq rejects, a dropped connection, a
@@ -256,11 +297,15 @@ export async function createDump(opts: {
         const globalsFile = globalsFileForDump(localFile);
         createOwnerOnly(globalsFile);
         try {
-            await execa(
-                dumpallBin,
-                buildPgDumpallGlobalsArgs({ connectionString: tool.connectionString, outFile: globalsFile }),
-                { stdio: opts.inheritStdio ? "inherit" : "pipe", env: tool.env }
-            );
+            try {
+                await execa(
+                    dumpallBin,
+                    buildPgDumpallGlobalsArgs({ connectionString: tool.connectionString, outFile: globalsFile }),
+                    { stdio: opts.inheritStdio ? "inherit" : "pipe", env: tool.env }
+                );
+            } finally {
+                await resetSharedSession(opts.connectionString);
+            }
         } catch (error) {
             // Same reasoning as the pg_dump catch above, and the dump goes with
             // it: the pair is uploaded and pruned together, so a dump whose
@@ -392,10 +437,14 @@ export async function restoreDump(opts: {
         noOwner: opts.noOwner,
         exitOnError: opts.exitOnError
     });
-    await execa(bin, args, {
-        stdio: opts.inheritStdio ? "inherit" : "pipe",
-        env: tool.env
-    });
+    try {
+        await execa(bin, args, {
+            stdio: opts.inheritStdio ? "inherit" : "pipe",
+            env: tool.env
+        });
+    } finally {
+        await resetSharedSession(opts.connectionString);
+    }
 }
 
 /**
@@ -489,6 +538,7 @@ export async function restoreDumpReplacing(opts: {
     const committed = written.exitCode === 0 && sink.writable;
     sink.end(committed ? "COMMIT;\n" : undefined);
     const applied = await apply;
+    await resetSharedSession(opts.connectionString);
 
     if (applied.exitCode !== 0) {
         const stderr = typeof applied.stderr === "string" ? applied.stderr : "";
