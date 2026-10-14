@@ -82,7 +82,21 @@ rebase db backups list                  # list what is stored
 rebase db restore ./backups/<file>.dump --yes
 ```
 
-`backup` runs `pg_dump`; `restore` runs `pg_restore` and, being destructive, needs `--yes`.
+`backup` runs `pg_dump`; `restore` runs `pg_restore` and, being destructive,
+asks for a typed `yes` on a terminal, or takes `--yes`; with no terminal and no
+`--yes` it refuses and says to pass it.
+<span class="since-badge" data-since="0.25">Since 0.25</span> Into a database
+that already holds what the backup creates, `restore` needs `--clean`. Without
+it, it refuses before anything is applied, the cluster roles included, and
+names the objects in the way and both ways round them: `--clean`, or
+`--create-db --target-db <new name>`. On 0.24 it applied the roles and then
+failed on pg_restore's `schema "rebase" already exists`.
+<span class="since-badge" data-since="0.25">Since 0.25</span> `restore` refuses
+the managed development database: a backup carries its rows as COPY data, which
+it cannot receive, and on 0.24 the restore left it hung until it was stopped.
+Restore into Postgres in Docker (`rebase db restore <dump> --docker --clean --yes`),
+then `rebase db pull --from "$(rebase db url --docker)" --yes` copies it into
+the managed database.
 <span class="since-badge" data-since="0.25">Since 0.25</span> Relative paths,
 and the default `./backups`, resolve against the directory you run `rebase`
 from, so the three lines above meet in one directory; an option a command does

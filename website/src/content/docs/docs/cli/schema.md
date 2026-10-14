@@ -93,6 +93,15 @@ rebase schema introspect
   `db push` after it recreates every policy as it was. On 0.24 the policies
   stay out of the files, and a push can drop one whose name has the shape a
   generated policy has (`<table>_<op>_<hash>`)
+- <span class="since-badge" data-since="0.25">Since 0.25</span> Writes
+  `disableDefaultPolicies: true` on a table that has row-level security on and
+  does not hold the whole [admin baseline](/docs/collections/security-rules/#policies-a-collection-gets-without-writing-them),
+  so the push adds no `<table>_default_admin_*` policy and the table's access
+  stays as it was; any part of the baseline the table has is written as a rule.
+  Delete the line to give the server and admins every row. A table with RLS
+  off keeps the baseline, and introspection says, once, which tables those are:
+  the push switches RLS on whatever a collection says. On 0.24 the push after
+  an introspection added the baseline to every table
 - <span class="since-badge" data-since="0.25">Since 0.25</span> Generates a
   table whose policies give each user their own rows (they read `rebase.uid()`,
   `app.uid` or the JWT) as an entity in the navigation, however few rows it
@@ -117,7 +126,7 @@ rebase schema introspect
 
 This is useful when adopting Rebase on an existing database — introspect first, then customize the generated collections.
 
-**Introspect, then push, changes nothing.** The generated properties say exactly what each column is — `columnType`, `precision`/`scale`, `defaultValue`, `required`, a key's `isId` (`"increment"` for an integer identity, `columnType: "serial"` for a serial, `"manual"` for a key with no default), a relation's `onDelete` — and its `index: false` where the database has no index on the key column, since a `belongsTo` is [indexed by default](/docs/backend/indexes#foreign-keys-are-indexed-for-you) (delete the line to have one built) — and a collection's `search` block read back from the column it built — so `rebase db push --dry-run` right after an introspection plans no changes. Where no property can state a column — a `timestamp` without time zone, an `interval`, an `inet`, an enum type not named `<table>_<column>`, a default like `CURRENT_DATE` — introspection says so, per column, on the terminal and at the top of the file, with what a push would do to it and, when there is one, the statement that makes the two agree (`ALTER TYPE "mood" RENAME TO "customers_current_mood";`). A table keyed on more than one column comes back as one composite key, every key column carrying its `isId`. It is left out, with the reason, when a key column cannot carry `isId` (a timestamp, say) or another table's foreign key points at it, which a single-column relation cannot do; `db push` leaves a table that is not a collection alone. On 0.23 the push right after an introspection can still plan type changes, dropped defaults and NOT NULLs, and a phantom `id` key.
+**Introspect, then push, changes nothing.** The generated properties say exactly what each column is — `columnType`, `precision`/`scale`, `defaultValue`, `required`, a key's `isId` (`"increment"` for an integer identity, `columnType: "serial"` for a serial, `"manual"` for a key with no default), a relation's `onDelete` — and its `index: false` where the database lacks the index Rebase would derive on the key column, since a `belongsTo` is [indexed by default](/docs/backend/indexes#foreign-keys-are-indexed-for-you). Where no index serves the column, the line says so (delete it to have one built); <span class="since-badge" data-since="0.25">Since 0.25</span> where another index already leads with it (`orders_customer_id_idx`, a composite, a unique one), the line names that index, and without it the push would build a second. On 0.24 it said to delete the line either way — and a collection's `search` block read back from the column it built — so `rebase db push --dry-run` right after an introspection plans no changes. The exception is a table with row-level security off: the push switches it on, and the dry run lists that and the admin baseline it adds. Where no property can state a column — a `timestamp` without time zone, an `interval`, an `inet`, an enum type not named `<table>_<column>`, a default like `CURRENT_DATE` — introspection says so, per column, on the terminal and at the top of the file, with what a push would do to it and, when there is one, the statement that makes the two agree (`ALTER TYPE "mood" RENAME TO "customers_current_mood";`). A table keyed on more than one column comes back as one composite key, every key column carrying its `isId`. It is left out, with the reason, when a key column cannot carry `isId` (a timestamp, say) or another table's foreign key points at it, which a single-column relation cannot do; `db push` leaves a table that is not a collection alone. On 0.23 the push right after an introspection can still plan type changes, dropped defaults and NOT NULLs, and a phantom `id` key.
 
 **What the generated files look like**
 
@@ -177,6 +186,22 @@ rebase db push
 - <span class="since-badge" data-since="0.25">Since 0.25</span> Stamps the
   policies it applies the way the server's boot does, so the first boot after a
   push leaves them alone instead of re-creating every one
+- <span class="since-badge" data-since="0.25">Since 0.25</span> `--dry-run`
+  lists the row-level security the push would change, under "Planned
+  row-level security changes": the tables it switches RLS on for, and each
+  policy it creates, replaces or drops, worked out the way the push's own
+  steps decide. It says "No changes" only when neither the schema nor
+  row-level security would change. A policy with no stamp of Rebase's (one
+  written by hand, or read in by `schema introspect`) is re-created from its
+  rule with nothing to compare it to beforehand, and is listed apart. The push
+  itself prints one line counting them. On 0.24 the dry run showed Atlas's plan
+  alone, which has no policies in it
+- <span class="since-badge" data-since="0.25">Since 0.25</span> Shows each
+  statement Atlas applies once. Atlas connects without SSL to a database on this
+  machine (`localhost`, `127.x`, `::1`) whose URL names no `sslmode`, as the app
+  does, instead of failing on `SSL is not enabled on the server`; a URL that
+  names `sslmode`, or another host, is handed over as written. An Atlas run
+  that fails before it plans leaves no `<db>_dev_diff` database behind
 - <span class="since-badge" data-since="0.25">Since 0.25</span> `--dry-run`
   writes nothing of the project's: `src/schema.generated.ts` is left as it is,
   and the `drizzle/*.sql` copies an older release committed are named, not
@@ -306,7 +331,7 @@ rebase db migrate
 
 The version is the numeric prefix of the migration file that describes what is in the database *now*. That migration and everything before it are recorded as applied; everything after it runs. On a database nothing has ever booted against, no baseline is needed — migrate straight away.
 
-The same happens later in the ordinary loop: edit a collection while `rebase dev` runs, and boot adds the column before `rebase db generate` writes the migration that adds it, so `rebase db migrate` stops on `column … already exists (42701)`. Baseline that migration the same way. <span class="since-badge" data-since="0.25">Since 0.25</span> `--baseline` works on a database that already records migrations: it marks everything up to the version as applied with `atlas migrate set`, and says so, or says there is nothing to record when the history already reaches it. On 0.24 Atlas ignores `--baseline` once any migration is recorded, so the same error comes back.
+The same happens later in the ordinary loop: edit a collection while `rebase dev` runs, and boot adds the column before `rebase db generate` writes the migration that adds it, so `rebase db migrate` stops on `column … already exists (42701)`. Baseline that migration the same way. <span class="since-badge" data-since="0.25">Since 0.25</span> `--baseline` works on a database that already records migrations: it marks everything up to the version as applied with `atlas migrate set`, and says so, or says there is nothing to record when the history already reaches it. On 0.24 Atlas ignores `--baseline` once any migration is recorded, so the same error comes back. <span class="since-badge" data-since="0.25">Since 0.25</span> A version no file in `drizzle/migrations` has is refused before anything runs, naming the versions there are.
 
 ### `rebase db branch`
 
