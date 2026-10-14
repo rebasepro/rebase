@@ -813,7 +813,7 @@ async function manageLocalDatabase(
  * and the wrong one here means overwriting production with a laptop.
  */
 async function pullIntoLocal(projectRoot: string, rawArgs: readonly string[]): Promise<void> {
-    const { describeTarget, dumpArgs, dumpEnv, findPgTool, restoreArgs, restoreEnv, restoreOutcome } =
+    const { describeRestoreFailure, describeTarget, dumpArgs, dumpEnv, findPgTool, restoreCopy } =
         await import("../dev-db/pull");
     const { prepareDatabaseEnv } = await import("../dev-db/prepare");
     const { readEnvFile } = await import("../utils/project");
@@ -915,25 +915,20 @@ async function pullIntoLocal(projectRoot: string, rawArgs: readonly string[]): P
     }
 
     const dumpFile = path.join(os.tmpdir(), `rebase-pull-${process.pid}.dump`);
-    let failure: string | null = null;
+    /** What failed, the state the local database is left in, and what to do — see `describeRestoreFailure`. */
+    let failure: string[] | null = null;
     let anonymizeFailure: string[] | null = null;
     try {
         console.log(chalk.gray("  Dumping…"));
         await execa("pg_dump", [...dumpArgs(plan), "--file", dumpFile], { stdio: ["ignore", "inherit", "inherit"], env: dumpEnv(plan) });
 
         console.log(chalk.gray("  Restoring…"));
-        // stderr is shown as it arrives and kept, for the count in its summary
-        // line. Not rejected: every way this ends is judged by `restoreOutcome`,
-        // and a failure is reported only after whatever did arrive has been
-        // anonymized.
-        const restored = restoreOutcome(await execa("pg_restore", restoreArgs(plan, dumpFile), {
-            env: restoreEnv(plan),
-            stdin: "ignore",
-            stdout: "inherit",
-            stderr: ["pipe", "inherit"],
-            reject: false
-        }));
-        failure = restored.failure;
+        // Empties the local schemas the copy replaces, then restores into
+        // them; `pg_restore --clean` alone left anything local the source
+        // lacks in the way. A failure is reported only after whatever did
+        // arrive has been anonymized.
+        const restored = await restoreCopy(plan, dumpFile);
+        failure = restored.failure ? describeRestoreFailure(restored, describeTarget(source)) : null;
 
         // Before the verdict: a partial copy of personal data on a laptop is
         // still personal data on a laptop.
@@ -951,14 +946,15 @@ async function pullIntoLocal(projectRoot: string, rawArgs: readonly string[]): P
 
     if (anonymizeFailure) {
         for (const line of anonymizeFailure) console.error(line);
-        if (failure) console.error(chalk.red(`✗ ${failure}`));
+        if (failure) console.error(chalk.red(`✗ ${failure[0]}`));
         process.exit(1);
     }
 
     if (failure) {
-        console.error(chalk.red(`✗ ${failure}`));
-        console.error(chalk.yellow(`  The local database holds an incomplete copy of ${describeTarget(source)}.`));
-        console.error(chalk.gray("  Fix what the errors above name — often an extension or a role the source has — and pull again."));
+        const [what, state, ...advice] = failure;
+        console.error(chalk.red(`✗ ${what}`));
+        console.error(chalk.yellow(`  ${state}`));
+        for (const line of advice) console.error(chalk.gray(`  ${line}`));
         process.exit(1);
     }
 

@@ -36,6 +36,17 @@ vi.mock("../dev-db/prepare", async importOriginal => ({
     })
 }));
 
+// Emptying the local schemas first is `restoreCopy`'s, tested on a real
+// Postgres in `dev-db/pull-restore.integration.test.ts`. Here it stands for a
+// restore that ends the way `state.restore` says pg_restore did.
+vi.mock("../dev-db/pull", async importOriginal => {
+    const actual = await importOriginal<typeof import("../dev-db/pull")>();
+    return {
+        ...actual,
+        restoreCopy: async () => ({ cleared: true, ...actual.restoreOutcome(state.restore) })
+    };
+});
+
 vi.mock("execa", () => ({
     execa: async (file: string, args: readonly string[]) => {
         state.calls.push({ file, args });
@@ -90,6 +101,18 @@ describe("rebase db pull, when the restore fails", () => {
         const output = printed.join("\n");
         expect(output).not.toContain("✓ Local database now holds a copy");
         expect(output).toContain("12 object(s)");
+    });
+
+    it("says what a second pull would repeat, rather than sending you round again", async () => {
+        // Restoring into an emptied database, what pg_restore could not create
+        // it will not create next time either.
+        state.restore = { exitCode: 1, stderr: "pg_restore: warning: errors ignored on restore: 2\n" };
+
+        await expect(pull()).rejects.toEqual(new Exit(1));
+
+        const output = printed.join("\n");
+        expect(output).toContain("Pulling again repeats these errors");
+        expect(output).not.toContain("and pull again.");
     });
 
     it("re-grants the app role on what did arrive, and still reaches its verdict", async () => {

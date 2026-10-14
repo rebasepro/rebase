@@ -43,6 +43,9 @@ vi.mock("../dev-db/prepare", async importOriginal => ({
 
 vi.mock("../dev-db/pull", async importOriginal => ({
     ...await importOriginal<typeof import("../dev-db/pull")>(),
+    // A restore that completed; what emptying and restoring do is
+    // `dev-db/pull-restore.integration.test.ts`'s, on a real Postgres.
+    restoreCopy: async () => ({ cleared: true, started: true, failure: null, advice: null }),
     anonymizeCopy: async () => {
         if (!state.outcome) throw new Error("no outcome set");
         return state.outcome;
