@@ -1132,11 +1132,13 @@ if (engineFindings.length > 0) {
 
 // ── Docs that quote a template file must quote the file ──────────────────────
 //
-// Project Structure is page three, and its `App.tsx` block had drifted into a
-// file that exists nowhere: no default export, a `createRebaseClient` at module
-// scope, and controllers (`useBuildNavigationStateController`) that no package
-// exports. A newcomer meets that on page three and concludes the scaffold is
-// broken; an agent writes an entry point the scaffold ignores.
+// Project Structure is page three, and its `App.tsx` block is the first entry
+// point a newcomer reads: the scaffold's own, which creates its client once at
+// module scope and hands it, with the auth controller, to `<Rebase>`. A block
+// that paraphrased the file drifted into one that exists nowhere (no default
+// export, controllers such as `useBuildNavigationStateController` that no
+// package exports). A newcomer who meets that concludes the scaffold is broken;
+// an agent writes an entry point the scaffold ignores.
 //
 // So the block is not "kept in step" — it IS the file, and this says so.
 const QUOTED_FILES = [
