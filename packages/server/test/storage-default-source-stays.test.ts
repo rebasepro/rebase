@@ -202,15 +202,34 @@ describe("the default storage source, when a named bucket is declared", () => {
             expect(refusal.hint).toContain('bucket("media", { default: true })');
         });
 
-        it("a named directory inside the default's", async () => {
+        // It said both "would store files in …/uploads/media", one of which
+        // stores them in …/uploads, and to set the variable that had just been
+        // set.
+        it("a named directory inside the default's, said as one inside the other", async () => {
             const defs = await declare(({ bucket }) => { bucket("media", { engine: "local" }); });
             const uploads = path.join(root, "uploads");
-            expect(() => resolveStorageSources(
-                { STORAGE_PATH__MEDIA: path.join(uploads, "media") },
-                defs,
-                uploads,
-                { production: false }
-            )).toThrow(/would both store files in/);
+            const media = path.join(uploads, "media");
+            let refusal: unknown;
+            try {
+                resolveStorageSources({ STORAGE_PATH__MEDIA: media }, defs, uploads, { production: false });
+            } catch (err) {
+                refusal = err;
+            }
+            if (!(refusal instanceof BundleError)) throw new Error(`expected a BundleError, got ${String(refusal)}`);
+            expect(refusal.message).toBe(
+                `Storage source "media" would store its files in ${media}, which is inside ${uploads}, where "(default)" ` +
+                "stores its own, so each would list, serve and delete the other's files."
+            );
+            expect(refusal.message).not.toContain("would both store files in");
+            expect(refusal.hint).toContain(`Give "media" a directory outside ${uploads} with STORAGE_PATH__MEDIA (it is ${media} now).`);
+        });
+
+        it("the default's directory inside a named one, said the other way round", async () => {
+            const defs = await declare(({ bucket }) => { bucket("media", { engine: "local" }); });
+            const uploads = path.join(root, "files", "uploads");
+            const files = path.join(root, "files");
+            expect(() => resolveStorageSources({ STORAGE_PATH__MEDIA: files }, defs, uploads, { production: false }))
+                .toThrow(`Storage source "media" would store its files in ${files}, which holds ${uploads}, where "(default)" stores its own`);
         });
 
         it("two sources on one object-store bucket", async () => {

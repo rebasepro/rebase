@@ -718,16 +718,29 @@ function assertNoSharedLocation(
             // with files in it already, so the other is the one to move.
             const [moved, kept] = key === DEFAULT_STORAGE_SOURCE_KEY ? [other.key, key] : [key, other.key];
             const movedLocation = moved === key ? location : other.location;
+            const keptLocation = moved === key ? other.location : location;
             const variable = `${movedLocation.variable}${envSuffixForKey(moved, DEFAULT_STORAGE_SOURCE_KEY)}`;
+            const alias = kept === DEFAULT_STORAGE_SOURCE_KEY
+                ? ` If uploads that name no \`storageSource\` belong in "${moved}", mark it instead — ` +
+                  `bucket("${moved}", { default: true }).`
+                : "";
+            // Two directories, one inside the other: not "both in" either one.
+            if (movedLocation.local !== undefined && keptLocation.local !== undefined
+                && movedLocation.local !== keptLocation.local) {
+                const inside = movedLocation.local.startsWith(keptLocation.local + path.sep);
+                throw new BundleError(
+                    `Storage source "${moved}" would store its files in ${movedLocation.local}, which ` +
+                    `${inside ? "is inside" : "holds"} ${keptLocation.local}, where "${kept}" stores its own, ` +
+                    "so each would list, serve and delete the other's files.",
+                    `Give "${moved}" a directory ${inside ? "outside" : "apart from"} ${keptLocation.local} with ${variable} ` +
+                    `(it is ${movedLocation.local} now).${alias}`
+                );
+            }
             throw new BundleError(
                 `Storage sources "${moved}" and "${kept}" would both store files in ${movedLocation.describe}, ` +
                 "so each would list, serve and delete the other's files.",
                 `Give "${moved}" a ${movedLocation.local !== undefined ? "directory" : "bucket"} of its own ` +
-                `with ${variable}.` +
-                (kept === DEFAULT_STORAGE_SOURCE_KEY
-                    ? ` If uploads that name no \`storageSource\` belong in "${moved}", mark it instead — ` +
-                      `bucket("${moved}", { default: true }).`
-                    : "")
+                `with ${variable}.${alias}`
             );
         }
         seen.push({ key, config, location });
