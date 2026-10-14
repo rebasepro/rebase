@@ -134,6 +134,14 @@ describe("wantsRawError", () => {
         expect(wantsRawError(["node", "rebase", "cloud", "deploy", "--debug"])).toBe(true);
     });
 
+    it("reads --debug the way the parser reads a switch", () => {
+        delete process.env.REBASE_DEBUG;
+        expect(wantsRawError(["node", "rebase", "cloud", "deploy", "--debug=true"])).toBe(true);
+        expect(wantsRawError(["node", "rebase", "cloud", "deploy", "--debug=1"])).toBe(true);
+        expect(wantsRawError(["node", "rebase", "cloud", "deploy", "--debug=false"])).toBe(false);
+        expect(wantsRawError(["node", "rebase", "cloud", "deploy", "--debug=0"])).toBe(false);
+    });
+
     it.each(["1", "true", "yes"])("is on with REBASE_DEBUG=%s", (value) => {
         // `=true` used to do nothing here while the quote fallbacks in
         // resources.ts, which tested the raw string, printed on it.

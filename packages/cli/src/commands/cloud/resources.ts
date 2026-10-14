@@ -32,6 +32,7 @@ import {
 import { DEFAULT_STORAGE_SOURCE_KEY } from "@rebasepro/types";
 import { firstRow, latestDeployment, fmtDate } from "./projects";
 import { wantsRawError } from "./errors";
+import { switchOn } from "../../utils/args";
 
 /* ─── status: quick project dashboard ──────────────────────────── */
 
@@ -1760,7 +1761,8 @@ export function buildDialPatch(
     // autoscaler is a state nothing reads back correctly, and it used to happen
     // silently — `--replicas 5` on a project whose ceiling was 5 deleted the
     // HPA, left the ceiling on the row, and said nothing.
-    if (rawArgs.includes("--no-autoscale")) {
+    // Read as the parser reads a switch: `=true`/`=1` on, `=false`/`=0` off.
+    if (switchOn(rawArgs, "--no-autoscale")) {
         patch.autoscaleMaxReplicas = null;
         patch.autoscaleTargetCpuPercent = null;
     }

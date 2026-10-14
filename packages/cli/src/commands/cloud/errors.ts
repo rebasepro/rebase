@@ -24,6 +24,8 @@
 
 import { parseEnvBoolean } from "@rebasepro/types";
 
+import { switchOn } from "../../utils/args";
+
 /** What a Kubernetes API refusal carries, once it is found. */
 export interface KubernetesStatus {
     message?: string;
@@ -212,5 +214,5 @@ function truncate(text: string): string {
  * printed the fallback.
  */
 export function wantsRawError(argv: readonly string[] = process.argv): boolean {
-    return argv.includes("--debug") || parseEnvBoolean(process.env.REBASE_DEBUG) === true;
+    return switchOn(argv, "--debug") || parseEnvBoolean(process.env.REBASE_DEBUG) === true;
 }

@@ -143,6 +143,13 @@ describe("turning autoscaling off", () => {
         expect(error).toContain("--no-autoscale");
     });
 
+    // Read the way the parser reads a switch.
+    it("reads --no-autoscale=true as on and --no-autoscale=false as off", () => {
+        expect(buildDialPatch(["set", "--no-autoscale=true"]).patch)
+            .toEqual({ autoscaleMaxReplicas: null, autoscaleTargetCpuPercent: null });
+        expect(buildDialPatch(["set", "--no-autoscale=false", "--replicas", "2"]).patch).toEqual({ replicaCount: 2 });
+    });
+
     it("does not need a value, and does not swallow the next flag", () => {
         // The value-less flag sits beside flags that DO take values. Reading a
         // value here would consume `--replicas`, and `--replicas` would then be

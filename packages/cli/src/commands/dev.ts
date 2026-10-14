@@ -60,7 +60,7 @@ import {
     dependenciesNotInstalled
 } from "../utils/project";
 import { detectPackageManager, getPMCommands } from "../utils/package-manager";
-import { parseCommandArgs, UsageError, wantsHelp } from "../utils/args";
+import { parseCommandArgs, switchOn, UsageError, wantsHelp } from "../utils/args";
 import { Refusal } from "../utils/refusal";
 import { affectsSqlSchema } from "../utils/collection-drift";
 import { BootRetry } from "../utils/boot-retry";
@@ -1296,7 +1296,7 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
     // Removed rather than kept as a no-op: what it switched on is how `dev`
     // always behaves now. Named, so the answer is "drop it" rather than a
     // generic unknown-option error that reads like a typo.
-    if (rawArgs.includes("--generate") || rawArgs.includes("-g")) {
+    if (switchOn(rawArgs, "--generate") || rawArgs.includes("-g")) {
         throw new UsageError(
             "`rebase dev --generate` is gone: dev now regenerates the schema and the SDK types " +
             "on every start and every collection save. Drop the flag."

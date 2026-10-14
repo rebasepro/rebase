@@ -16,7 +16,8 @@ import {
     findEnvFile,
     getActiveBackendPlugin,
     readEnvFile,
-    dependenciesNotInstalled
+    dependenciesNotInstalled,
+    wantsJsonOutput
 } from "./project";
 
 let tmpDir: string;
@@ -359,5 +360,22 @@ describe("dependenciesNotInstalled", () => {
 
         expect(dependenciesNotInstalled(root)).toContain("`npm install`");
         expect(dependenciesNotInstalled(root)).toContain(root);
+    });
+});
+
+/**
+ * `--json` read the way the parser reads a switch. `--json=true` used to get
+ * the human sentence on a refusal while the command parsed it as JSON mode.
+ */
+describe("wantsJsonOutput", () => {
+    it.each([
+        [["node", "rebase", "status", "--json"], true],
+        [["node", "rebase", "status", "--json=true"], true],
+        [["node", "rebase", "status", "--json=1"], true],
+        [["node", "rebase", "status", "--json=false"], false],
+        [["node", "rebase", "status", "--json=0"], false],
+        [["node", "rebase", "status"], false]
+    ])("reads %j as %s", (argv, json) => {
+        expect(wantsJsonOutput(argv)).toBe(json);
     });
 });

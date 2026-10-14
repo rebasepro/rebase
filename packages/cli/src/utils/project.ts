@@ -12,6 +12,7 @@ import { execSync } from "child_process";
 import dotenv from "dotenv";
 import chalk from "chalk";
 import { detectPackageManager, getPMCommands } from "./package-manager";
+import { switchOn } from "./args";
 
 /** The authored project manifest. Its presence alone marks a project root. */
 export const MANIFEST_FILENAME = "rebase.json";
@@ -406,9 +407,13 @@ export function failAsJson(
     process.exit(1);
 }
 
-/** Did the command line ask for machine-readable output? */
+/**
+ * Did the command line ask for machine-readable output? Read as the parser
+ * reads a switch: `--json`, `--json=true` and `--json=1` ask for it,
+ * `--json=false` and `--json=0` do not.
+ */
 export function wantsJsonOutput(argv: readonly string[] = process.argv): boolean {
-    return argv.includes("--json");
+    return switchOn(argv, "--json");
 }
 
 /**

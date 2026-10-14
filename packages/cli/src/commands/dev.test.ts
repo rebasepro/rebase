@@ -541,12 +541,20 @@ describe("the dev help and the dev flag spec", () => {
         }
     });
 
-    it.each(["--generate", "-g"])("refuses the removed %s by name, not as a typo", async (flag) => {
+    it.each(["--generate", "-g", "--generate=true", "--generate=1"])("refuses the removed %s by name, not as a typo", async (flag) => {
         // What it switched on is the default now. A generic "unknown option"
         // would send the reader hunting for the right spelling of a flag that
         // no longer has one.
         await expect(devCommand(["node", "rebase", "dev", flag]))
             .rejects.toThrow(/--generate` is gone.*Drop the flag/s);
+    });
+
+    // Off is not the removed flag asked for: no "is gone", only the refusal
+    // any undeclared flag gets.
+    it("does not read --generate=false as asking for the removed flag", async () => {
+        const refused = await devCommand(["node", "rebase", "dev", "--generate=false"]).catch((error: unknown) => error);
+        expect(String(refused)).not.toContain("is gone");
+        expect(String(refused)).toContain("has no option --generate");
     });
 
     it("names only rebase.json keys the manifest carries", async () => {
