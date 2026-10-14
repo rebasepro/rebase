@@ -18,7 +18,7 @@
  * A new collection is still sent whole.
  */
 
-import type { CollectionPatch } from "@rebasepro/types";
+import type { CollectionPatch, SchemaChangeVerdict } from "@rebasepro/types";
 
 /** A constraint the change asks for that the statements will not carry. */
 export interface WithheldConstraint {
@@ -31,10 +31,10 @@ export interface WithheldConstraint {
 /** What the server says a change would do. Mirrors `SchemaChangePlan`. */
 export interface LiveSchemaPlan {
     applicable: boolean;
-    verdict: "safe" | "diverges" | "needs-migration";
+    verdict: SchemaChangeVerdict;
     changes: Array<{
         kind: string;
-        verdict: "safe" | "diverges" | "needs-migration";
+        verdict: SchemaChangeVerdict;
         collection: string;
         property?: string;
         detail: string;

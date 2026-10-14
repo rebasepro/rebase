@@ -1223,6 +1223,46 @@ export interface RebaseTranslations {
     studio_collections_editor_read_only?: string;
     studio_collections_editor_unsaved?: string;
 
+    // ─── Schema change dialog ────────────────────────────────
+    schema_change_title_review?: string;
+    schema_change_title_applied?: string;
+    schema_change_title_committed?: string;
+    schema_change_verdict_safe_title?: string;
+    schema_change_verdict_safe_body?: string;
+    schema_change_verdict_diverges_title?: string;
+    schema_change_verdict_diverges_body?: string;
+    schema_change_verdict_migration_title?: string;
+    schema_change_verdict_migration_body?: string;
+    schema_change_commit_only_title?: string;
+    schema_change_commit_only_body?: string;
+    schema_change_commit_only_body_no_changes?: string;
+    schema_change_chip_safe?: string;
+    schema_change_chip_diverges?: string;
+    schema_change_chip_migration?: string;
+    schema_change_follow_up_one?: string;
+    schema_change_follow_up?: string;
+    schema_change_withheld_one?: string;
+    schema_change_withheld_many?: string;
+    schema_change_db_not_changed?: string;
+    schema_change_db_maybe_changed?: string;
+    schema_change_statements_partial?: string;
+    schema_change_commit_holds?: string;
+    schema_change_committed?: string;
+    schema_change_committed_on?: string;
+    schema_change_plan_failed?: string;
+    schema_change_planning?: string;
+    schema_change_source_only_changes?: string;
+    schema_change_source_only_title?: string;
+    schema_change_preview_only?: string;
+    schema_change_statements?: string;
+    schema_change_files?: string;
+    schema_change_message?: string;
+    schema_change_edit_source_only?: string;
+    schema_change_committing?: string;
+    schema_change_applying?: string;
+    schema_change_commit?: string;
+    schema_change_commit_and_apply?: string;
+
     // ─── Property field labels ──────────────────────────────────
     db_column_type?: string;
     primary_key_unique_id?: string;

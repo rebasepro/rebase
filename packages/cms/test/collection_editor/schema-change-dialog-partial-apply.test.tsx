@@ -8,6 +8,7 @@
 import React from "react";
 import { describe, expect, it } from "@jest/globals";
 import { render, screen } from "@testing-library/react";
+import { RebaseI18nProvider } from "@rebasepro/app";
 
 import { SchemaChangeDialog } from "../../src/collection_editor/ui/collection_editor/SchemaChangeDialog";
 import type { LiveSchemaResult } from "../../src/collection_editor/liveSchemaClient";
@@ -28,14 +29,16 @@ const failed = (appliedStatements: number | undefined): LiveSchemaResult => ({
 });
 
 const receipt = (result: LiveSchemaResult) => render(
-    <SchemaChangeDialog
-        open
-        collectionId="posts"
-        result={result}
-        applying={false}
-        onConfirm={() => undefined}
-        onClose={() => undefined}
-    />
+    <RebaseI18nProvider locale="en">
+        <SchemaChangeDialog
+            open
+            collectionId="posts"
+            result={result}
+            applying={false}
+            onConfirm={() => undefined}
+            onClose={() => undefined}
+        />
+    </RebaseI18nProvider>
 );
 
 describe("the receipt of a change whose DDL failed", () => {
@@ -59,7 +62,7 @@ describe("the receipt of a change whose DDL failed", () => {
 
 describe("a plan that commits a change and runs nothing", () => {
     it("does not say there is no change to make when a security rule changes", () => {
-        render(<SchemaChangeDialog
+        render(<RebaseI18nProvider locale="en"><SchemaChangeDialog
             open
             collectionId="posts"
             plan={{
@@ -74,7 +77,7 @@ describe("a plan that commits a change and runs nothing", () => {
             applying={false}
             onConfirm={() => undefined}
             onClose={() => undefined}
-        />);
+        /></RebaseI18nProvider>);
         expect(screen.queryByText(/there is no schema change to make/)).toBeNull();
         expect(screen.getByText(/when it takes effect/)).toBeTruthy();
     });

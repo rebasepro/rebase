@@ -37,6 +37,7 @@ import {
     ExpandablePanel,
     Typography
 } from "@rebasepro/ui";
+import { useTranslation } from "@rebasepro/app";
 
 import type { LiveSchemaPlan, LiveSchemaResult, WithheldConstraint } from "../../liveSchemaClient";
 
@@ -97,7 +98,8 @@ export interface SchemaChangeDialogProps {
 
 type Verdict = LiveSchemaPlan["verdict"];
 
-/** What the verdict means, in the words the reader needs rather than the enum's. */
+type Translate = ReturnType<typeof useTranslation>["t"];
+
 /**
  * What the verdict means, in the words the reader needs rather than the enum's.
  *
@@ -107,30 +109,28 @@ type Verdict = LiveSchemaPlan["verdict"];
  * database has no table to alter, and a change that needs no DDL on a
  * relational one is in the same position: the commit *is* the change.
  */
-const VERDICT_COPY: Record<Verdict, { title: string; body: string; color: "info" | "warning" | "error" }> = {
+const VERDICT_COPY: Record<Verdict, { titleKey: string; bodyKey: string; color: "info" | "warning" | "error" }> = {
     safe: {
-        title: "Ready to apply",
-        body: "Every change here can be made against the running database.",
+        titleKey: "schema_change_verdict_safe_title",
+        bodyKey: "schema_change_verdict_safe_body",
         color: "info"
     },
     diverges: {
-        title: "This would leave the database out of step",
-        body: "The change can be written, but the database will not end up matching it. " +
-            "The details below say which part, and what would make it applicable.",
+        titleKey: "schema_change_verdict_diverges_title",
+        bodyKey: "schema_change_verdict_diverges_body",
         color: "warning"
     },
     "needs-migration": {
-        title: "This needs a migration",
-        body: "Some of this cannot be done to a running database at all — it drops or rewrites " +
-            "something, and that belongs in a migration somebody has read.",
+        titleKey: "schema_change_verdict_migration_title",
+        bodyKey: "schema_change_verdict_migration_body",
         color: "error"
     }
 };
 
-const VERDICT_CHIP: Record<Verdict, { label: string; scheme: "greenLighter" | "orangeLighter" | "redLighter" }> = {
-    safe: { label: "safe", scheme: "greenLighter" },
-    diverges: { label: "diverges", scheme: "orangeLighter" },
-    "needs-migration": { label: "needs migration", scheme: "redLighter" }
+const VERDICT_CHIP: Record<Verdict, { labelKey: string; scheme: "greenLighter" | "orangeLighter" | "redLighter" }> = {
+    safe: { labelKey: "schema_change_chip_safe", scheme: "greenLighter" },
+    diverges: { labelKey: "schema_change_chip_diverges", scheme: "orangeLighter" },
+    "needs-migration": { labelKey: "schema_change_chip_migration", scheme: "redLighter" }
 };
 
 const monospace = "font-mono text-xs leading-relaxed";
@@ -166,11 +166,12 @@ function Details({ summary, count, children }: {
  * to be done or a later environment will differ from this one.
  */
 function FollowUp({ items }: { items: string[] }) {
+    const { t } = useTranslation();
     if (items.length === 0) return null;
     return (
         <Alert color="info">
             <Typography variant="body2" className="font-medium mb-1">
-                {items.length === 1 ? "One thing to do afterwards" : "To do afterwards"}
+                {items.length === 1 ? t("schema_change_follow_up_one") : t("schema_change_follow_up")}
             </Typography>
             <ul className="space-y-2">
                 {items.map(item => (
@@ -195,13 +196,14 @@ function repositoryLabel(repository: string): string {
 }
 
 function WithheldConstraints({ constraints }: { constraints: WithheldConstraint[] }) {
+    const { t } = useTranslation();
     if (constraints.length === 0) return null;
     return (
         <Alert color="warning">
             <Typography variant="body2" className="font-medium mb-1">
                 {constraints.length === 1
-                    ? "One constraint will not be enforced"
-                    : `${constraints.length} constraints will not be enforced`}
+                    ? t("schema_change_withheld_one")
+                    : t("schema_change_withheld_many", { count: constraints.length })}
             </Typography>
             <ul className="space-y-2">
                 {constraints.map(constraint => (
@@ -226,15 +228,16 @@ function WithheldConstraints({ constraints }: { constraints: WithheldConstraint[
  * The statements run one at a time with no transaction around them, so only
  * "none ran" means the database is as it was.
  */
-function partialApplyHeading(result: LiveSchemaResult): string {
+function partialApplyHeading(result: LiveSchemaResult, t: Translate): string {
     const ran = result.appliedStatements;
-    if (ran === 0) return "The database was not changed";
-    if (ran === undefined) return "The database may have been changed in part";
-    return `${ran} of ${result.statements.length} statements ran, then one failed`;
+    if (ran === 0) return t("schema_change_db_not_changed");
+    if (ran === undefined) return t("schema_change_db_maybe_changed");
+    return t("schema_change_statements_partial", { ran, total: result.statements.length });
 }
 
 /** The receipt. Shown in place of the plan once the change has been applied. */
 function Applied({ result }: { result: LiveSchemaResult }) {
+    const { t } = useTranslation();
     return (
         <div className="flex flex-col gap-4">
             <Alert color={result.applied || result.sourceOnly ? "success" : "warning"}>
@@ -248,12 +251,11 @@ function Applied({ result }: { result: LiveSchemaResult }) {
                 // deploy, and boot reconciles it.
                 <Alert color="warning">
                     <Typography variant="body2" className="font-medium mb-1">
-                        {partialApplyHeading(result)}
+                        {partialApplyHeading(result, t)}
                     </Typography>
                     <Typography variant="body2">{result.applyError}</Typography>
                     <Typography variant="body2" className="mt-2">
-                        The commit is on <Typography component="code" variant="mono">{result.committed.branch}</Typography> either way, so
-                        whatever did not run will be applied on the next boot.
+                        {t("schema_change_commit_holds", { branch: result.committed.branch })}
                     </Typography>
                 </Alert>
             )}
@@ -262,9 +264,9 @@ function Applied({ result }: { result: LiveSchemaResult }) {
             <FollowUp items={result.followUp ?? []}/>
 
             <div>
-                <Typography variant="label" color="secondary">Committed</Typography>
+                <Typography variant="label" color="secondary">{t("schema_change_committed")}</Typography>
                 <div className={cls(codeBlock, "mt-1")}>
-                    {result.committed.sha.slice(0, 9)} on {result.committed.branch}
+                    {t("schema_change_committed_on", { sha: result.committed.sha.slice(0, 9), branch: result.committed.branch })}
                     {"\n"}
                     {result.committed.files.map(file => `  ${file}`).join("\n")}
                 </div>
@@ -289,6 +291,7 @@ export function SchemaChangeDialog({
     target
 }: SchemaChangeDialogProps) {
 
+    const { t } = useTranslation();
     const verdict = plan?.verdict;
     const statements = plan?.statements.length ?? 0;
 
@@ -308,22 +311,26 @@ export function SchemaChangeDialog({
     // no schema change to make" is said only when there is none.
     const copy = verdict === "safe" && commitOnly
         ? {
-            title: "Ready to commit",
+            title: t("schema_change_commit_only_title"),
             body: plan && plan.changes.length > 0
-                ? "Nothing runs against the database now. Each change below says what it does and " +
-                    "when it takes effect."
-                : "This changes what your project declares. Nothing runs against the database — " +
-                    "there is no schema change to make.",
+                ? t("schema_change_commit_only_body")
+                : t("schema_change_commit_only_body_no_changes"),
             color: "info" as const
         }
         : verdict
-            ? VERDICT_COPY[verdict]
+            ? {
+                title: t(VERDICT_COPY[verdict].titleKey),
+                body: t(VERDICT_COPY[verdict].bodyKey),
+                color: VERDICT_COPY[verdict].color
+            }
             : undefined;
 
     return (
         <Dialog open={open} onOpenChange={value => { if (!value) onClose(); }} maxWidth="3xl">
             <DialogTitle className="flex items-center gap-2">
-                {result ? (result.sourceOnly ? "Schema change committed" : "Schema change applied") : "Review schema change"}
+                {result
+                    ? (result.sourceOnly ? t("schema_change_title_committed") : t("schema_change_title_applied"))
+                    : t("schema_change_title_review")}
                 <Typography component="code" variant="mono" color="secondary">
                     {collectionId}
                 </Typography>
@@ -333,7 +340,7 @@ export function SchemaChangeDialog({
                 {planError && (
                     <Alert color="error">
                         <Typography variant="body2" className="font-medium mb-1">
-                            The change could not be planned
+                            {t("schema_change_plan_failed")}
                         </Typography>
                         <Typography variant="body2">{planError}</Typography>
                     </Alert>
@@ -343,7 +350,7 @@ export function SchemaChangeDialog({
                     <div className="flex items-center gap-3 py-6">
                         <CircularProgress size="small"/>
                         <Typography variant="body2" color="secondary">
-                            Working out what this change would do…
+                            {t("schema_change_planning")}
                         </Typography>
                     </div>
                 )}
@@ -367,8 +374,7 @@ export function SchemaChangeDialog({
 
                         {plan.changes.length === 0 && (
                             <Typography variant="body2" color="secondary">
-                                Nothing here changes the shape of your data. Only the collection
-                                source changes, and it is committed.
+                                {t("schema_change_source_only_changes")}
                             </Typography>
                         )}
 
@@ -379,7 +385,7 @@ export function SchemaChangeDialog({
                             // be on screen before the button is pressed.
                             <Alert color="warning">
                                 <Typography variant="body2" className="font-medium mb-1">
-                                    Edit source only: commit the collection, leave the database
+                                    {t("schema_change_source_only_title")}
                                 </Typography>
                                 <ul className="space-y-1">
                                     {plan.changes.filter(change => change.verdict !== "safe" && change.sourceOnly).map((change, index) => (
@@ -403,7 +409,7 @@ export function SchemaChangeDialog({
                                             colorScheme={VERDICT_CHIP[change.verdict].scheme}
                                             className="shrink-0 mt-0.5"
                                         >
-                                            {VERDICT_CHIP[change.verdict].label}
+                                            {t(VERDICT_CHIP[change.verdict].labelKey)}
                                         </Chip>
                                         <div className="min-w-0">
                                             <Typography variant="body2">{change.detail}</Typography>
@@ -428,21 +434,21 @@ export function SchemaChangeDialog({
                         {applyRefusedBecause && (
                             <Alert color="info">
                                 <Typography variant="body2" className="font-medium mb-1">
-                                    You can preview this change, but not apply it
+                                    {t("schema_change_preview_only")}
                                 </Typography>
                                 <Typography variant="body2">{applyRefusedBecause}</Typography>
                             </Alert>
                         )}
 
-                        <Details summary="Statements that will run" count={plan.statements.length}>
+                        <Details summary={t("schema_change_statements")} count={plan.statements.length}>
                             <div className={codeBlock}>{plan.statements.join("\n")}</div>
                         </Details>
 
-                        <Details summary="Files that will be committed" count={plan.files.length}>
+                        <Details summary={t("schema_change_files")} count={plan.files.length}>
                             <div className={codeBlock}>{plan.files.join("\n")}</div>
                         </Details>
 
-                        <Details summary="Commit message" count={plan.message ? 1 : 0}>
+                        <Details summary={t("schema_change_message")} count={plan.message ? 1 : 0}>
                             <div className={codeBlock}>{plan.message}</div>
                         </Details>
                     </>
@@ -456,16 +462,16 @@ export function SchemaChangeDialog({
                     </Typography>
                 )}
                 <Button variant="text" onClick={onClose} disabled={applying}>
-                    {result ? "Close" : "Cancel"}
+                    {result ? t("close") : t("cancel")}
                 </Button>
                 {!result && planError && onRetry && (
                     <Button variant="outlined" onClick={onRetry}>
-                        Try again
+                        {t("retry")}
                     </Button>
                 )}
                 {!result && plan && !plan.applicable && onSourceOnly && (
                     <Button variant="outlined" onClick={onSourceOnly} disabled={applying}>
-                        Edit source only
+                        {t("schema_change_edit_source_only")}
                     </Button>
                 )}
                 {!result && (
@@ -483,8 +489,8 @@ export function SchemaChangeDialog({
                         disabled={!plan?.applicable || applying || Boolean(applyRefusedBecause)}
                     >
                         {applying
-                            ? (commitOnly ? "Committing…" : "Applying…")
-                            : (commitOnly ? "Commit" : "Commit and apply")}
+                            ? (commitOnly ? t("schema_change_committing") : t("schema_change_applying"))
+                            : (commitOnly ? t("schema_change_commit") : t("schema_change_commit_and_apply"))}
                     </Button>
                 )}
             </DialogActions>
