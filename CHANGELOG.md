@@ -13,6 +13,25 @@
   project's storage and its port and none of the code it runs. Both wordings are
   shown now.
 
+#### Admin (CMS & app)
+
+- **A record created from its parent's tab opens linked to that parent.** A new
+  transaction from a customer's Transactions tab asked for the customer, and a
+  required `belongsTo` could not be saved until the user picked the record they
+  had come from. The server already linked a create under
+  `customers/{id}/transactions` to that customer. The form now opens with the
+  link set and locked while the record is new. Editing it later still works.
+  This covers a `hasMany` whose child has the `belongsTo` back on
+  `foreignKeyOnTarget`. A link keyed on `sourceKey` is not prefilled.
+
+- **"Create" in the side panel opens the saved record instead of asking about
+  unsaved changes.** The save reported the form clean and moved the panel to
+  the new record in the same tick, and the panel's guard still saw it as dirty.
+  It asked "There are unsaved changes" about a record already saved and left
+  the URL on `#new_side`. A dirty record still asks before the panel leaves it.
+  `useUnsavedChangesDialog` now also takes a function for `when`, read at the
+  moment of navigation.
+
 ## [0.25.1] - 2026-10-14
 
 ### Changed
@@ -2726,23 +2745,6 @@
   DATABASE "x" ALLOW_CONNECTIONS true;`, to run from the `postgres` database.
 
 #### Admin (CMS & app)
-
-- **A record created from its parent's tab opens linked to that parent.** A new
-  transaction from a customer's Transactions tab asked for the customer, and a
-  required `belongsTo` could not be saved until the user picked the record they
-  had come from. The server already linked a create under
-  `customers/{id}/transactions` to that customer. The form now opens with the
-  link set and locked while the record is new. Editing it later still works.
-  This covers a `hasMany` whose child has the `belongsTo` back on
-  `foreignKeyOnTarget`. A link keyed on `sourceKey` is not prefilled.
-
-- **"Create" in the side panel opens the saved record instead of asking about
-  unsaved changes.** The save reported the form clean and moved the panel to
-  the new record in the same tick, and the panel's guard still saw it as dirty.
-  It asked "There are unsaved changes" about a record already saved and left
-  the URL on `#new_side`. A dirty record still asks before the panel leaves it.
-  `useUnsavedChangesDialog` now also takes a function for `when`, read at the
-  moment of navigation.
 
 - **The markdown editor's link box takes a link, and pressing Enter in it no longer
   saves the record.** The box reset to empty on every keystroke, so no link could be
