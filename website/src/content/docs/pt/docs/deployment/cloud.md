@@ -1,5 +1,5 @@
 ---
-sourceHash: 27b9d73f979bc845
+sourceHash: ad7f85a91259d082
 title: Rebase Cloud
 sidebar_label: Rebase Cloud
 description: O Rebase Cloud é o mesmo Rebase, operado para você. O que é, como um projeto se conecta e faz deploy, e o que o beta privado ainda não inclui.
@@ -212,7 +212,7 @@ Isso provisiona um projeto no Rebase Cloud, define `REBASE_BASE_URL` no `.env` c
 
 Até ser reivindicado, o projeto não pertence a nenhuma conta. O token dele é restrito a esse único projeto e a `deploy`, `logs`, `env` e `database`. Ele fica em `~/.rebase/credentials.json`, nunca no repositório, e os comandos `rebase cloud` no diretório vinculado o usam sozinhos. Ele expira junto com o projeto.
 
-Depois que o deploy constrói o app, o comando também define `REBASE_API_TOKEN` no `.env`: uma chave criada no próprio app, que é o que o servidor MCP e o SDK enviam a ele. Ela lê e grava dados (`data:read`, `data:write`) através da segurança em nível de linha do app, como um chamador que não é nem uma pessoa nem um administrador. Não tem nenhuma permissão do plano de administração e expira com o prazo de reivindicação. Quando o projeto for seu, crie as chaves que quiser no painel de administração dele.
+Depois que o deploy constrói o app, o comando também define `REBASE_API_TOKEN` no `.env`: uma chave criada no próprio app, que é o que o servidor MCP e o SDK enviam a ele. Ela lê e grava dados (`data:read`, `data:write`) através da segurança em nível de linha do app, como um chamador que não é nem uma pessoa nem um administrador. Não tem nenhuma permissão do plano de administração e expira com o prazo de reivindicação. Com `--no-deploy`, ou se esse primeiro deploy falhar, ainda não há chave: o próximo `rebase cloud deploy` bem-sucedido no diretório pede uma, enquanto o projeto não for reivindicado e o `.env` ainda não definir `REBASE_API_TOKEN`. Quando o projeto for seu, crie as chaves que quiser no painel de administração dele.
 
 Reivindicar exige uma sessão conectada no navegador, não um token, e um método de pagamento na organização para onde o projeto vai. A partir da reivindicação, o projeto é cobrado como qualquer outro. Reivindicar também revoga o token do agente: entre com `rebase cloud login` ou crie um novo token com `rebase cloud tokens create`.
 

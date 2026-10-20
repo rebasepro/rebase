@@ -20,8 +20,19 @@ import path from "path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { cloudCommand } from "./index";
-import { cloudInitCommand, requestAppKey, upsertDotenv, adminPanelUrl, type AppKey, type InitDeps, type ProvisionedProject } from "./init";
-import { ephemeralGrantFor, initOutputMode, readLink, requireClient } from "./context";
+import {
+    cloudInitCommand,
+    requestAppKey,
+    upsertDotenv,
+    adminPanelUrl,
+    dotenvSets,
+    mintMissingAppKey,
+    INIT_CHILD_DEPLOY_ENV,
+    type AppKey,
+    type InitDeps,
+    type ProvisionedProject
+} from "./init";
+import { ephemeralGrantFor, forgetEphemeralGrant, initOutputMode, readLink, requireClient } from "./context";
 
 class Exited extends Error {
     constructor(readonly code: number) {
@@ -97,9 +108,15 @@ beforeEach(() => {
     scaffold(project);
     cwd = process.cwd();
     process.chdir(project);
-    savedEnv = { HOME: process.env.HOME, REBASE_TOKEN: process.env.REBASE_TOKEN, REBASE_JSON: process.env.REBASE_JSON };
+    savedEnv = {
+        HOME: process.env.HOME,
+        REBASE_TOKEN: process.env.REBASE_TOKEN,
+        REBASE_JSON: process.env.REBASE_JSON,
+        [INIT_CHILD_DEPLOY_ENV]: process.env[INIT_CHILD_DEPLOY_ENV]
+    };
     process.env.HOME = home;
     delete process.env.REBASE_TOKEN;
+    delete process.env[INIT_CHILD_DEPLOY_ENV];
     process.env.REBASE_JSON = "1";
 
     sent = [];
@@ -365,7 +382,99 @@ describe("asking for the app's key", () => {
     });
 });
 
+/**
+ * `init --no-deploy`, or an `init` whose deploy failed, writes no key, and
+ * `init` does not run again in a linked directory. The next deploy that
+ * succeeds asks for it instead.
+ */
+describe("the app's key after a later deploy", () => {
+    const mint = () => mintMissingAppKey({
+        url: CP,
+        projectId: PROVISIONED.projectId,
+        appKey: (url, token, projectId) => requestAppKey(url, token, projectId, { attempts: 1, sleep: async () => {} })
+    });
+    const asks = () => sent.filter(r => r.path === "/api/functions/ephemeral/app-key");
+    const dotenv = () => fs.readFileSync(path.join(project, ".env"), "utf-8");
+
+    beforeEach(async () => {
+        await init(["--claim", "--no-deploy"]);
+        sent = [];
+        said = [];
+    });
+
+    it("asks once, with the project's own token, and writes the key into .env", async () => {
+        const outcome = await mint();
+        expect(outcome).toEqual({ ok: true, key: { projectId: PROVISIONED.projectId, ...APP_KEY } });
+        expect(asks()).toEqual([{
+            method: "POST",
+            path: "/api/functions/ephemeral/app-key",
+            authorization: `Bearer ${PROVISIONED.apiKey}`,
+            body: { projectId: PROVISIONED.projectId }
+        }]);
+        expect(dotenv()).toBe(
+            `PORT=3001\nJWT_SECRET=local-secret\nREBASE_BASE_URL=${PROVISIONED.projectUrl}\nREBASE_API_TOKEN=${APP_KEY.apiKey}\n`
+        );
+        expect(said.join("\n")).not.toContain(APP_KEY.apiKey);
+    });
+
+    it("asks nothing once .env sets a key, and again for an empty one", async () => {
+        await mint();
+        expect(await mint()).toBeUndefined();
+        expect(asks()).toHaveLength(1);
+
+        upsertDotenv(path.join(project, ".env"), "REBASE_API_TOKEN", "");
+        expect((await mint())?.ok).toBe(true);
+        expect(asks()).toHaveLength(2);
+    });
+
+    it("asks nothing for a project other than the linked one", async () => {
+        const outcome = await mintMissingAppKey({ url: CP, projectId: "proj_other" });
+        expect(outcome).toBeUndefined();
+        expect(sent).toEqual([]);
+    });
+
+    it("asks nothing once the project is claimed or its grant has expired", async () => {
+        forgetEphemeralGrant(CP, PROVISIONED.projectId);
+        expect(await mint()).toBeUndefined();
+        expect(sent).toEqual([]);
+    });
+
+    it("asks nothing in the deploy `init` runs, which asks for the key itself", async () => {
+        process.env[INIT_CHILD_DEPLOY_ENV] = "1";
+        expect(await mint()).toBeUndefined();
+        expect(sent).toEqual([]);
+    });
+
+    it("answers a refusal, writes nothing, and never throws", async () => {
+        respond = () => json(404, { error: { code: "not_found", message: "This project is not waiting to be claimed." } });
+        expect(await mint()).toEqual({ ok: false, code: "not_found", message: "This project is not waiting to be claimed." });
+        expect(dotenv()).not.toContain("REBASE_API_TOKEN");
+
+        const thrown = await mintMissingAppKey({
+            url: CP,
+            projectId: PROVISIONED.projectId,
+            appKey: async () => { throw new Error("socket hang up"); }
+        });
+        expect(thrown).toEqual({ ok: false, code: "app_key_failed", message: "socket hang up" });
+    });
+});
+
 describe("the helpers", () => {
+    it("reads whether .env sets a variable to something", () => {
+        const file = path.join(project, "x.env");
+        expect(dotenvSets(file, "REBASE_API_TOKEN")).toBe(false);
+        for (const [content, set] of [
+            ["REBASE_API_TOKEN=rk_live_x\n", true],
+            ["export REBASE_API_TOKEN = \"rk_live_x\"\n", true],
+            ["REBASE_API_TOKEN=\n", false],
+            ["REBASE_API_TOKEN=\"\"\n", false],
+            ["# REBASE_API_TOKEN=rk_live_x\nREBASE_API_TOKEN_OLD=x\n", false]
+        ] as const) {
+            fs.writeFileSync(file, content);
+            expect(dotenvSets(file, "REBASE_API_TOKEN"), content).toBe(set);
+        }
+    });
+
     it("replaces a variable already in .env, including an exported one", () => {
         const file = path.join(project, "x.env");
         fs.writeFileSync(file, "A=1\nexport REBASE_BASE_URL=http://localhost:3001\nB=2");

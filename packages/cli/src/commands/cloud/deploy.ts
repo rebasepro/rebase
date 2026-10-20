@@ -35,6 +35,7 @@ import {
     billingAccountIdOf
 } from "./context";
 import { latestDeployment, fmtDate } from "./projects";
+import { appKeyPayload, mintMissingAppKey, reportMintedAppKey } from "./init";
 import {
     readBundleManifest,
     packBundleForUpload,
@@ -599,13 +600,18 @@ following: false,
         hosts,
         onTerminal: (ended) => record(true, ended)
     });
+    // The app is built now, so an unclaimed project's app can mint the key
+    // `init` could not: see `mintMissingAppKey`. Never fails the deploy.
+    const appKey = await mintMissingAppKey({ url, projectId, root: projectRoot });
+    reportMintedAppKey(appKey);
     emit(() => printPendingHosts(hosts), { success: true,
 deploymentId,
 managed,
 sourceUploaded: rebuildSource !== null,
 following: true,
 status,
-...(hosts ? { hosts } : {}) });
+...(hosts ? { hosts } : {}),
+...(appKey ? { appKey: appKeyPayload(appKey) } : {}) });
 }
 
 /**
@@ -1422,6 +1428,8 @@ following: false,
         hosts,
         onTerminal: (ended) => recordDeploy({ followed: true, status: ended, deduplicated, frameworkVersion, startedAt })
     });
+    const appKey = await mintMissingAppKey({ url, projectId });
+    reportMintedAppKey(appKey);
     emit(
         () => printPendingHosts(hosts),
         { deploymentId,
@@ -1430,6 +1438,7 @@ frameworkVersion: frameworkVersion ?? null,
 following: true,
 status,
 ...(hosts ? { hosts } : {}),
+...(appKey ? { appKey: appKeyPayload(appKey) } : {}),
 ...warningPayload(warnings) }
     );
 }

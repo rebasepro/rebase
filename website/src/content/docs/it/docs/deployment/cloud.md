@@ -1,5 +1,5 @@
 ---
-sourceHash: 27b9d73f979bc845
+sourceHash: ad7f85a91259d082
 title: Rebase Cloud
 sidebar_label: Rebase Cloud
 description: Rebase Cloud è lo stesso Rebase, gestito per te. Di cosa si tratta, come collegare ed eseguire il deploy di un progetto e cosa non include ancora la beta privata.
@@ -165,7 +165,7 @@ Il comando effettua il provisioning di un progetto su Rebase Cloud, imposta `REB
 
 Finché non viene rivendicato, il progetto non appartiene a nessun account. Il suo token è limitato a quel solo progetto e a `deploy`, `logs`, `env` e `database`. È conservato in `~/.rebase/credentials.json`, mai nel repository, e i comandi `rebase cloud` nella directory collegata lo usano da soli. Scade insieme al progetto.
 
-Quando il deploy ha costruito l'app, il comando imposta anche `REBASE_API_TOKEN` in `.env`: una chiave creata sull'app stessa, che è ciò che il server MCP e l'SDK le inviano. Legge e scrive dati (`data:read`, `data:write`) attraverso la sicurezza a livello di riga dell'app, come un chiamante che non è né una persona né un amministratore. Non ha alcun permesso sul piano di amministrazione e scade con la finestra di rivendicazione. Quando il progetto è tuo, crea le chiavi che vuoi nel suo pannello di amministrazione.
+Quando il deploy ha costruito l'app, il comando imposta anche `REBASE_API_TOKEN` in `.env`: una chiave creata sull'app stessa, che è ciò che il server MCP e l'SDK le inviano. Legge e scrive dati (`data:read`, `data:write`) attraverso la sicurezza a livello di riga dell'app, come un chiamante che non è né una persona né un amministratore. Non ha alcun permesso sul piano di amministrazione e scade con la finestra di rivendicazione. Con `--no-deploy`, o se quel primo deploy fallisce, la chiave non c'è ancora: il successivo `rebase cloud deploy` riuscito nella directory ne chiede una, finché il progetto non è stato rivendicato e `.env` non imposta già `REBASE_API_TOKEN`. Quando il progetto è tuo, crea le chiavi che vuoi nel suo pannello di amministrazione.
 
 La rivendicazione richiede una sessione con accesso effettuato nel browser, non un token, e un metodo di pagamento sull'organizzazione in cui passa il progetto. Dalla rivendicazione in poi il progetto viene fatturato come qualsiasi altro. La rivendicazione revoca anche il token dell'agent: accedi con `rebase cloud login`, oppure crea un nuovo token con `rebase cloud tokens create`.
 

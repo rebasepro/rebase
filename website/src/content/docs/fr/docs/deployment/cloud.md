@@ -1,5 +1,5 @@
 ---
-sourceHash: 27b9d73f979bc845
+sourceHash: ad7f85a91259d082
 title: Rebase Cloud
 sidebar_label: Rebase Cloud
 description: Rebase Cloud est le même Rebase, géré pour vous. De quoi il s'agit, comment lier et déployer un projet, et ce que la bêta privée n'inclut pas encore.
@@ -210,7 +210,7 @@ Cela provisionne un projet sur Rebase Cloud, définit `REBASE_BASE_URL` dans `.e
 
 Tant qu'il n'est pas réclamé, le projet n'appartient à aucun compte. Son jeton est limité à ce seul projet et à `deploy`, `logs`, `env` et `database`. Il est conservé dans `~/.rebase/credentials.json`, jamais dans le dépôt, et les commandes `rebase cloud` du répertoire lié l'utilisent d'elles-mêmes. Il expire avec le projet.
 
-Une fois que le déploiement a construit l'app, la commande définit aussi `REBASE_API_TOKEN` dans `.env` : une clé créée sur l'app elle-même, que le serveur MCP et le SDK lui envoient. Elle lit et écrit des données (`data:read`, `data:write`) à travers la sécurité au niveau des lignes de l'app, comme un appelant qui n'est ni une personne ni un administrateur. Elle ne détient rien du plan d'administration et expire avec le délai de réclamation. Une fois le projet à vous, créez les clés voulues dans son panneau d'administration.
+Une fois que le déploiement a construit l'app, la commande définit aussi `REBASE_API_TOKEN` dans `.env` : une clé créée sur l'app elle-même, que le serveur MCP et le SDK lui envoient. Elle lit et écrit des données (`data:read`, `data:write`) à travers la sécurité au niveau des lignes de l'app, comme un appelant qui n'est ni une personne ni un administrateur. Elle ne détient rien du plan d'administration et expire avec le délai de réclamation. Avec `--no-deploy`, ou si ce premier déploiement échoue, il n'y a pas encore de clé : le prochain `rebase cloud deploy` qui réussit dans le répertoire en demande une, tant que le projet n'est pas réclamé et que `.env` ne définit pas déjà `REBASE_API_TOKEN`. Une fois le projet à vous, créez les clés voulues dans son panneau d'administration.
 
 La réclamation exige une session connectée dans un navigateur, pas un jeton, ainsi qu'un moyen de paiement sur l'organisation qui reçoit le projet. Dès la réclamation, le projet est facturé comme n'importe quel autre. Réclamer révoque aussi le jeton de l'agent : connectez-vous avec `rebase cloud login`, ou créez un nouveau jeton avec `rebase cloud tokens create`.
 
