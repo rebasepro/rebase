@@ -183,6 +183,9 @@ app/backend/scratch/
 # IDE & AI agent configuration (personal/local)
 .antigravity/
 .claude/
+# ...except the Claude Code guardrail every scaffold ships (`rebase verify` after
+# each collection edit). `rebase init` copies it; `rebase skills --hooks` reads it.
+!/packages/cli/templates/template/.claude/
 .fallowrc.json
 
 # Marketing & asset templates

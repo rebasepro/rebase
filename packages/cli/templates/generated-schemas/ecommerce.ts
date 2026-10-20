@@ -15,6 +15,7 @@ export const categories = pgTable("categories", {
     description: text("description"),
     icon: text("icon")
 }, (table) => ([
+    pgPolicy("categories_all_c924b8e", { as: "permissive", for: "all", to: ["public"], using: sql`(SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin'])`, withCheck: sql`(SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin'])` }),
     pgPolicy("categories_default_admin_read", { as: "permissive", for: "select", to: ["public"], using: sql`(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))` }),
     pgPolicy("categories_default_admin_write_insert", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))` }),
     pgPolicy("categories_default_admin_write_update", { as: "permissive", for: "update", to: ["public"], using: sql`(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))`, withCheck: sql`(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))` }),
@@ -29,6 +30,7 @@ export const orders = pgTable("orders", {
     notes: text("notes"),
     createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).default(sql`now()`)
 }, (table) => ([
+    pgPolicy("orders_all_c924b8e", { as: "permissive", for: "all", to: ["public"], using: sql`(SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin'])`, withCheck: sql`(SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin'])` }),
     pgPolicy("orders_default_admin_read", { as: "permissive", for: "select", to: ["public"], using: sql`(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))` }),
     pgPolicy("orders_default_admin_write_insert", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))` }),
     pgPolicy("orders_default_admin_write_update", { as: "permissive", for: "update", to: ["public"], using: sql`(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))`, withCheck: sql`(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))` }),
@@ -45,6 +47,7 @@ export const products = pgTable("products", {
     categoryId: integer("category_id").references((): AnyPgColumn => categories.id, { onDelete: "set null" })
 }, (table) => ([
     index("products_category_id_ix_066548f").on(table.categoryId.asc().nullsLast()),
+    pgPolicy("products_all_c924b8e", { as: "permissive", for: "all", to: ["public"], using: sql`(SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin'])`, withCheck: sql`(SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin'])` }),
     pgPolicy("products_default_admin_read", { as: "permissive", for: "select", to: ["public"], using: sql`(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))` }),
     pgPolicy("products_default_admin_write_insert", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))` }),
     pgPolicy("products_default_admin_write_update", { as: "permissive", for: "update", to: ["public"], using: sql`(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))`, withCheck: sql`(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))` }),

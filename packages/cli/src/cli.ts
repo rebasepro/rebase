@@ -53,7 +53,7 @@ export const ROOT_FLAGS = {
  * literal under this name: `help-coverage.test.ts`, `printed-commands.test.ts`
  * and the docs verifier read it out of this file's source.
  */
-const namespacedCommands = ["init", "schema", "db", "console", "dev", "build", "start", "auth", "doctor", "skills", "api-keys", "storage", "cloud", "apps", "eject", "generate-sdk", "telemetry", "resources", "status", "upgrade", "normalize-imports"];
+const namespacedCommands = ["init", "schema", "db", "console", "dev", "build", "start", "auth", "doctor", "verify", "skills", "api-keys", "storage", "cloud", "apps", "eject", "generate-sdk", "telemetry", "resources", "status", "upgrade", "normalize-imports"];
 
 /** The words a command group dispatches, and the other spellings it accepts for them. */
 interface CommandVocabulary {
@@ -417,6 +417,12 @@ async function dispatch(
             break;
         }
 
+        case "verify": {
+            const { verifyCommand } = await import("./commands/verify");
+            await verifyCommand(args);
+            break;
+        }
+
         case "skills": {
             const { skillsCommand } = await import("./commands/skills");
             await skillsCommand(effectiveSubcommand, args);
@@ -507,6 +513,7 @@ ${chalk.green.bold("Auth")}
 ${chalk.green.bold("Diagnostics")}
   ${chalk.blue.bold("status")}                  Show every resource and whether its variables are set
   ${chalk.blue.bold("doctor")}                  Detect schema drift between collections, schema, and DB
+  ${chalk.blue.bold("verify")}                  Check collections, RLS coverage and migrations ${chalk.gray("(CI + agent hooks)")}
   ${chalk.blue.bold("resources")}               List the databases, buckets and topics this project declares
 
 ${chalk.green.bold("Take ownership")}

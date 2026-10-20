@@ -269,7 +269,7 @@ describe("detectAgents against a fresh scaffold", () => {
     });
 
     it("finds an agent whose own directory the user made", () => {
-        fs.mkdirSync(path.join(scratch, ".claude"), { recursive: true });
+        fs.mkdirSync(path.join(scratch, ".claude", "skills"), { recursive: true });
         expect(detectAgents(scratch)).toEqual(["claude"]);
     });
 
