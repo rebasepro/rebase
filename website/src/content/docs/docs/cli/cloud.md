@@ -71,6 +71,14 @@ ends on one line naming the app and the reason, and exits non-zero. The summary
 prints even when piped; `--json` (or `REBASE_JSON=1`) prints one object instead,
 with `apps`, `hosts`, `live`, `liveChecks` and `durationMs`.
 
+Before uploading, `deploy` parses the JavaScript of every static app it ships:
+the `.js`/`.mjs`/`.cjs` files in its `output` and the inline `<script>` blocks in
+its HTML. A syntax error stops the deploy with `file:line:column` (code
+`syntax_error` under `--json`), and `--no-verify` skips the check. A successful
+deploy ends with the way back, `rebase cloud rollback`. A static app deployed on
+its own cannot be rolled back yet; see
+[Roll back](/docs/deployment/cloud#roll-back).
+
 ## Config
 
 ```bash

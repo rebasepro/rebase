@@ -64,7 +64,8 @@ import {
 import { listContextFiles, MAX_SOURCE_UPLOAD_BYTES, packSource, prepareRebuildSource, type RebuildSource } from "./rebuild-source";
 import { buildBundle } from "../../bundle";
 import { buildAssetApp } from "../build";
-import { foldFrontendIntoBundle } from "../../fold-static";
+import { foldableApps, foldFrontendIntoBundle } from "../../fold-static";
+import { checkStaticSyntax, formatSyntaxErrors, type StaticSyntaxError } from "../../static-syntax-check";
 import { loadManifest, findBackendApp, formatAppAddress, resolveBackendPaths, selectDeployApp } from "../../manifest";
 import { findProjectRoot, requireProjectRoot } from "../../utils/project";
 import { withTempArchive } from "../../utils/temp-archive";
@@ -240,6 +241,8 @@ async function deployBundle(opts: {
     skipSchema?: boolean;
     /** Leave the static apps out of the backend bundle, as `rebase build --no-static` does. */
     noStatic?: boolean;
+    /** Parse the static apps' JavaScript before uploading. Default on; `--no-verify` off. */
+    verify: boolean;
     /** Follow the deployment to a terminal state. Default on; `--no-follow` off. */
     follow: boolean;
     /** Ceiling on the follow, in milliseconds. */
@@ -321,6 +324,8 @@ async function deployBundle(opts: {
                 return;
             }
             bundleDir = staticDir;
+            if (opts.verify) verifyStaticOutput(projectRoot, [{ name: target.name,
+output: target.app.output }]);
             await uploadAndTrigger({ ...opts,
 projectRoot,
 bundleDir,
@@ -398,12 +403,58 @@ app: target.app as RebaseBackendAppConfig };
                     "Fix the frontend build, or pass --no-static to deploy the API alone."
                 );
             }
+            if (opts.verify) verifyStaticOutput(projectRoot, foldableApps(loaded.manifest).apps);
         }
     }
 
     await uploadAndTrigger({ ...opts,
 projectRoot,
 bundleDir });
+}
+
+/** Printed under a successful deploy: the way back, where it is needed. */
+export const ROLLBACK_HINT = "Something wrong? `rebase cloud rollback` puts the previous deployment back.";
+
+/**
+ * The same line for a static app deployed on its own. Its deployment records
+ * no bundle, so the control plane has nothing to roll back to (see the
+ * "Roll back" section of the cloud deployment docs). Pointing at
+ * `rollback` here would restore the backend instead, or refuse.
+ */
+export const STATIC_UNDO_HINT =
+    "Something wrong? A static app deployed on its own cannot be rolled back yet: deploy its last good version again.";
+
+/**
+ * Stop the deploy on a syntax error in a static app's output, before anything
+ * is uploaded. See `checkStaticSyntax`.
+ *
+ * A static app's files are served as they are, so a broken script that no
+ * bundler ever parsed went live and took the page down with it. Nothing on the
+ * way said so: the build "succeeded" by copying it, and the deploy succeeded
+ * by uploading it. `--no-verify` is the way past for a file the check gets
+ * wrong.
+ */
+export function verifyStaticOutput(projectRoot: string, apps: { name: string; output?: string }[]): void {
+    const errors: StaticSyntaxError[] = [];
+    let checked = 0;
+    for (const app of apps) {
+        if (!app.output) continue;
+        const dir = path.join(projectRoot, app.output);
+        if (!fs.existsSync(dir)) continue;
+        const report = checkStaticSyntax(dir, projectRoot);
+        checked += report.checked;
+        errors.push(...report.errors);
+    }
+    if (errors.length > 0) {
+        fail(
+            `${errors.length === 1 ? "A syntax error" : `${errors.length} syntax errors`} in the static output, `
+                + "so nothing was deployed:\n"
+                + formatSyntaxErrors(errors).map(line => `      ${line}`).join("\n"),
+            "Fix it and deploy again, or pass --no-verify to deploy anyway.",
+            "syntax_error"
+        );
+    }
+    if (checked > 0) progress(chalk.gray(`  Syntax-checked ${checked} script(s) in the static output.`));
 }
 
 /**
@@ -621,6 +672,7 @@ following: false }
         onTerminal: (ended) => record(true, ended)
     });
     await reportDeployed({
+        undo: manifest.kind === "static" ? STATIC_UNDO_HINT : ROLLBACK_HINT,
         client,
         url,
         projectId,
@@ -657,6 +709,8 @@ async function reportDeployed(o: {
     liveTimeoutMs: number;
     appsAt: (projectHost: string | undefined) => DeployedApp[];
     registeredHosts: DeployHost[] | undefined;
+    /** How to undo this deploy, printed under the summary. */
+    undo?: string;
     json: Record<string, unknown>;
 }): Promise<void> {
     const host = await deployedUrl(o.client, { projectId: o.projectId, url: o.url });
@@ -673,14 +727,17 @@ async function reportDeployed(o: {
 
     emit(
         () => {
-            for (const line of deploySummaryLines({
+            const lines = deploySummaryLines({
                 projectRef: o.projectRef,
                 deploymentId: o.deploymentId,
                 elapsedMs,
                 apps,
                 live,
                 liveTimeoutMs: o.liveTimeoutMs
-            })) console.log(line);
+            });
+            // The way back, under the verdict that says whether it is needed.
+            if (o.undo) lines.splice(lines.length - 1, 0, chalk.gray(`  ${o.undo}`));
+            for (const line of lines) console.log(line);
             printPendingHosts(hosts);
         },
         { ...o.json,
@@ -1258,6 +1315,11 @@ export const DEPLOY_FLAGS = {
        for one that is hand-maintained. */
     "--no-static": Boolean,
     "--skip-schema": Boolean,
+    /* Skip parsing the static apps' JavaScript before the upload. The check
+       exists because a static app's files are served as they are: a syntax
+       error nothing parsed went live and took the page down. This is the way
+       past it for a file the check gets wrong. */
+    "--no-verify": Boolean,
     /* Leave the managed runtime on purpose. The ONLY way to build a container
        image for a project the platform runs as managed — for the bare form and
        for `--source` alike, because neither of those says so by itself. See
@@ -1422,6 +1484,7 @@ export async function deployCommand(rawArgs: string[], projectRef: string): Prom
             skipTypeCheck: args["--skip-type-check"] === true,
             skipSchema: args["--skip-schema"] === true,
             noStatic: args["--no-static"] === true,
+            verify: args["--no-verify"] !== true,
             follow: args["--no-follow"] !== true,
             timeoutMs: resolveDeployTimeout(args["--timeout"]),
             liveTimeoutMs: resolveLiveTimeout(args["--live-timeout"]),
@@ -1568,6 +1631,7 @@ following: false,
         onTerminal: (ended) => recordDeploy({ followed: true, status: ended, deduplicated, frameworkVersion, startedAt })
     });
     await reportDeployed({
+        undo: ROLLBACK_HINT,
         client,
         url,
         projectId,
@@ -1835,6 +1899,13 @@ async function streamBuildLogs(
          * `timeout`) before anything else happens, a non-zero exit included.
          */
         onTerminal?: (status: string) => Promise<void>;
+        /**
+         * How to undo this deploy, printed under the verdict when it succeeded.
+         * A deploy that has just gone live is the moment somebody finds out it
+         * should not have, and "how do I go back" was a question with no answer
+         * in sight.
+         */
+        undo?: string;
     } = {}
 ): Promise<{ status: string; logs: string }> {
     const quiet = opts.quiet === true;
@@ -1930,6 +2001,7 @@ async function streamBuildLogs(
                 // host is worse than none.
                 const url = await deployedUrl(client, opts);
                 if (url) console.log(`  ${chalk.cyan(`https://${url}`)}`);
+                if (opts.undo) console.log(chalk.gray(`  ${opts.undo}`));
                 console.log("");
             }
             return { status: dep.status, logs: withoutHeartbeat(dep.logs ?? "") };

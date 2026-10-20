@@ -1,5 +1,5 @@
 ---
-sourceHash: 1d136cdb057ade33
+sourceHash: 6e2e8dd2f7c40eeb
 title: Rebase Cloud
 sidebar_label: Rebase Cloud
 description: Rebase Cloud è lo stesso Rebase, gestito per te. Di cosa si tratta, come collegare ed eseguire il deploy di un progetto e cosa non include ancora la beta privata.
@@ -84,6 +84,19 @@ rebase cloud deploy --bundle-dir dist-bundle
 
 L'abbandono del runtime gestito ha un flag dedicato, `--eject`, e nient'altro lo richiede: una build che sposterebbe un progetto gestito su un'immagine container di cui diventa proprietario viene rifiutata finché non lo specifichi esplicitamente. In precedenza `--force` aveva questo significato, associando l'operazione meno reversibile della CLI alla stessa parola usata per "sovrascrivi questo file"; ora è un'opzione sconosciuta anziché un alias, quindi uno script che la contiene si interrompe.
 
+### Il controllo della sintassi prima dell'upload
+
+I file di un'app statica vengono serviti così come sono. Quando il suo `build` si limita a copiare script scritti a mano in `output`, nessuno li ha mai analizzati, e un file con un refuso va online e impedisce alla pagina di caricarsi. Per questo, prima di caricare qualsiasi cosa, `deploy` analizza ogni file `.js`, `.mjs` e `.cjs` nell'`output` di ogni app statica, insieme a ogni `<script>` inline nei suoi file `.html`. Vale sia per un'app statica distribuita da sola sia per le app statiche incorporate nel bundle del backend. Un errore di sintassi interrompe il deploy indicando file, riga e colonna:
+
+```
+✗ A syntax error in the static output, so nothing was deployed:
+    web/cloud.js:42:23  Unexpected token
+        42 |     return fetch("/api";
+Fix it and deploy again, or pass --no-verify to deploy anyway.
+```
+
+Con `--json` il `code` dell'errore è `syntax_error`. Gli script inline che un browser non esegue come JavaScript vengono saltati: JSON, import map, template e qualsiasi altro `type` non JavaScript, uno `<script src>` e uno script che contiene ancora markup di template non renderizzato come `{{ }}`. Un file `.js` passa se si può analizzare come script classico o come modulo, perché è la pagina a deciderlo. Nulla sotto `node_modules` viene letto, né un `--bundle-dir` già compilato. `--no-verify` salta il controllo per un singolo deploy.
+
 Monitora l'avanzamento:
 
 ```bash
@@ -110,9 +123,15 @@ Quali deployment siano idonei dipende da come il progetto esegue il deploy, ed e
 | `rebase cloud deploy` (una build dai sorgenti) | L'immagine pubblicata da quella build |
 | `rebase cloud deploy --bundle` (il runtime della piattaforma) | Il bundle distribuito da quel deploy, sulla versione di runtime attualmente in esecuzione per il progetto |
 
+Le app statiche incorporate nel bundle del backend (un semplice `rebase cloud deploy` in un progetto con backend) fanno parte di quel bundle, quindi tornano indietro insieme a esso.
+
+Un'app statica distribuita da sola (`rebase cloud deploy <app>`) non supporta ancora il rollback. Il suo deployment registra quale app ha pubblicato, ma nessun bundle, quindi il control plane non ha nulla da cui ripristinarla. La soluzione è distribuire di nuovo l'ultima versione funzionante, per esempio dal commit precedente a quello difettoso. Dopo un deploy di questo tipo, `deploy` lo segnala invece di rimandare a `rollback`.
+
 Quindi un rollback richiede un deployment che abbia registrato uno dei due elementi, il che significa un progetto che ha effettuato il deploy con successo almeno due volte. `rebase cloud deployments` contrassegna quelli idonei e `--json` riporta `rollbackable` per ogni riga insieme all'`image` o al `bundle` che verrebbe ripristinato.
 
 Due tipi di deployment vengono rifiutati, e la CLI indica quali: uno non andato a buon fine e uno risalente a prima che la piattaforma iniziasse a registrare gli artefatti. Non c'è nulla da tirare a indovinare in entrambi i casi — tirare a indovinare distribuirebbe qualsiasi cosa sia stata compilata o caricata più di recente fingendo di ripristinare questa versione — quindi esegui invece il deploy della versione desiderata.
+
+Ogni deploy riuscito si conclude indicando la via del ritorno (`rebase cloud rollback`), così è in vista nel momento in cui ci si accorge di un rilascio difettoso.
 
 Un rollback aggiunge un nuovo deployment invece di riavvolgere la cronologia, e attende che la versione ripristinata sia operativa prima di segnalare l'esito positivo. Seguilo con `rebase cloud logs -f`.
 

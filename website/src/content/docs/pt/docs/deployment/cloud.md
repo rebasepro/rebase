@@ -1,5 +1,5 @@
 ---
-sourceHash: 1d136cdb057ade33
+sourceHash: 6e2e8dd2f7c40eeb
 title: Rebase Cloud
 sidebar_label: Rebase Cloud
 description: O Rebase Cloud é o mesmo Rebase, operado para você. O que é, como um projeto se conecta e faz deploy, e o que o beta privado ainda não inclui.
@@ -117,6 +117,19 @@ significava isso, o que colocava a ação menos reversível que a CLI pode fazer
 mesma palavra que "sobrescrever este arquivo"; agora é uma opção desconhecida em
 vez de um alias, portanto scripts que a utilizem serão interrompidos.
 
+### A verificação de sintaxe antes do upload
+
+Os arquivos de um app estático são servidos exatamente como estão. Quando o `build` dele só copia scripts escritos à mão para `output`, ninguém os analisou, e um arquivo com um erro de digitação vai ao ar e impede a página de carregar. Por isso, antes de enviar qualquer coisa, `deploy` analisa cada arquivo `.js`, `.mjs` e `.cjs` no `output` de cada app estático, junto com cada `<script>` inline dos seus arquivos `.html`. Isso vale tanto para um app estático implantado sozinho quanto para os apps estáticos incorporados ao bundle do backend. Um erro de sintaxe interrompe o deploy com o arquivo, a linha e a coluna:
+
+```
+✗ A syntax error in the static output, so nothing was deployed:
+    web/cloud.js:42:23  Unexpected token
+        42 |     return fetch("/api";
+Fix it and deploy again, or pass --no-verify to deploy anyway.
+```
+
+Com `--json`, o `code` do erro é `syntax_error`. Scripts inline que um navegador não executa como JavaScript são ignorados: JSON, import maps, templates e qualquer outro `type` que não seja JavaScript, um `<script src>` e um script que ainda contém marcação de template não renderizada, como `{{ }}`. Um arquivo `.js` passa se puder ser analisado como script clássico ou como módulo, porque é a página que decide. Nada dentro de `node_modules` é lido, nem um `--bundle-dir` já compilado. `--no-verify` pula a verificação em um deploy.
+
 Acompanhe:
 
 ```bash
@@ -148,6 +161,10 @@ tipos funcionam:
 | `rebase cloud deploy` (um build a partir do código-fonte) | A imagem que aquele build publicou |
 | `rebase cloud deploy --bundle` (o runtime da plataforma) | O bundle que aquele deploy enviou, na versão de runtime que o projeto está executando agora |
 
+Apps estáticos incorporados ao bundle do backend (um `rebase cloud deploy` simples em um projeto com backend) fazem parte desse bundle, então voltam junto com ele no rollback.
+
+Um app estático implantado sozinho (`rebase cloud deploy <app>`) ainda não pode ter rollback. O deployment registra qual app publicou, mas nenhum bundle, então o control plane não tem de onde restaurá-lo. A solução é implantar de novo a última versão boa, por exemplo a partir do commit anterior ao defeituoso. Depois de um deploy assim, `deploy` diz isso em vez de apontar para `rollback`.
+
 Portanto, um rollback precisa de um deployment que tenha registrado um dos dois, o
 que significa um projeto que já foi implantado com sucesso pelo menos duas vezes.
 O `rebase cloud deployments` marca os que se qualificam, e `--json` relata
@@ -158,6 +175,8 @@ foi bem-sucedido e outro de antes da plataforma registrar seu artefato. Não há
 a adivinhar em nenhum dos casos — adivinhar enviaria o que foi compilado ou carregado
 mais recentemente alegando restaurar este —, então faça deploy da versão que desejar
 em vez disso.
+
+Todo deploy bem-sucedido termina indicando o caminho de volta (`rebase cloud rollback`), para que ele esteja à vista no momento em que uma versão ruim é percebida.
 
 Um rollback anexa um novo deployment em vez de retroceder o histórico, e aguarda
 a versão restaurada começar a responder antes de reportar sucesso. Acompanhe com

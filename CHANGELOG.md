@@ -32,6 +32,25 @@
   either says on stderr how to get JSON back. Every other `rebase cloud`
   command still switches to JSON when piped.
 
+### Added
+
+#### CLI
+
+- **`rebase cloud deploy` checks a static app's JavaScript before uploading
+  it.** A static app whose `build` only copied hand-written scripts into its
+  output deployed a file that did not parse. The deploy succeeded, and the live
+  page failed on load. Every `.js`, `.mjs` and `.cjs` file in each static app's
+  output is now parsed, with the inline `<script>` blocks of its HTML, before
+  anything is uploaded. That covers static apps deployed on their own and those
+  folded into the backend's bundle. A syntax error stops the deploy with
+  `file:line:column` and the offending line (`--json` code `syntax_error`).
+  `--no-verify` skips the check. The parser is acorn, now a CLI dependency.
+
+- **A successful deploy says how to undo it.** It ends with
+  "`rebase cloud rollback` puts the previous deployment back." A static app
+  deployed on its own records no bundle, so it cannot be rolled back yet; its
+  deploy says so and suggests deploying the last good version again.
+
 ### Fixed
 
 #### CLI

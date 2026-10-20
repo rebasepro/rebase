@@ -124,6 +124,31 @@ least reversible thing the CLI can do under the same word as "overwrite this
 file"; it is an unknown option now rather than an alias, so a script carrying it
 stops instead.
 
+### The syntax check before the upload
+
+A static app's files are served exactly as they are. When its `build` only
+copies hand-written scripts into `output`, nothing has parsed them, and a file
+with a typo in it goes live and stops the page from loading. So before anything
+is uploaded, `deploy` parses every `.js`, `.mjs` and `.cjs` file in each static
+app's `output`, along with every inline `<script>` in its `.html` files. That
+covers a static app deployed on its own and static apps folded into the
+backend's bundle. A syntax error stops the deploy with the file, line and column:
+
+```
+✗ A syntax error in the static output, so nothing was deployed:
+    web/cloud.js:42:23  Unexpected token
+        42 |     return fetch("/api";
+Fix it and deploy again, or pass --no-verify to deploy anyway.
+```
+
+With `--json` the error's `code` is `syntax_error`. Inline scripts a browser
+does not run as JavaScript are skipped: JSON, import maps, templates and any
+other non-JavaScript `type`, a `<script src>`, and a script that still holds
+unrendered template markup such as `{{ }}`. A `.js` file passes if it parses as
+either a classic script or a module, because the page decides which. Nothing
+under `node_modules` is read, and neither is a prebuilt `--bundle-dir`.
+`--no-verify` skips the check for one deploy.
+
 Watch it:
 
 ```bash
@@ -155,6 +180,15 @@ work:
 | `rebase cloud deploy` (a source build) | The image that build published |
 | `rebase cloud deploy --bundle` (the platform runtime) | The bundle that deploy shipped, on the runtime version the project is running now |
 
+Static apps folded into the backend's bundle (a plain `rebase cloud deploy` on a
+project with a backend) are part of that bundle, so they roll back with it.
+
+A static app deployed on its own (`rebase cloud deploy <app>`) cannot be rolled
+back yet. Its deployment records which app it published, but no bundle, so the
+control plane has nothing to restore it from. The fix is to deploy the last good
+version again, for example from the commit before the bad one. After such a
+deploy, `deploy` says this instead of pointing at `rollback`.
+
 So a rollback needs a deployment that recorded one of the two, which means a
 project that has deployed successfully at least twice. `rebase cloud deployments`
 marks the ones that qualify, and `--json` reports `rollbackable` per row along
@@ -165,6 +199,9 @@ and one from before the platform recorded its artefact. There is nothing to gues
 at in either case — guessing would ship whatever was built or uploaded most
 recently while claiming to restore this one — so deploy the version you want
 instead.
+
+Every successful deploy ends by naming the way back (`rebase cloud rollback`),
+so it is in view at the moment a bad release is noticed.
 
 A rollback appends a new deployment rather than rewinding history, and waits for
 the restored version to serve before reporting success. Follow it with

@@ -1,5 +1,5 @@
 ---
-sourceHash: 7af948cdf55f4822
+sourceHash: 1d949f9964ea8fd7
 title: rebase cloud
 sidebar_label: rebase cloud
 description: Die Befehlsgruppen von rebase cloud – Anmeldung, Projektverknüpfung, Deploys, Konfiguration, Organisationen, Datenbanken, Ressourcen, Compute, Storage, Webhooks, Cluster und Abrechnung.
@@ -65,6 +65,8 @@ Plattform-Upgrade es neu bauen kann; `--no-source` überspringt dies einmalig, u
 --platform-rebuilds off` stoppt dies und löscht die gespeicherte Kopie. `--allow-downgrade` deployt ein älteres Release.
 
 Ein verfolgtes `deploy` endet mit einer Zusammenfassung: jede ausgelieferte App mit ihrer URL, die Deployment-ID, die Dauer und ob die neue Version dort antwortet. Es wartet bis zu `--live-timeout` Sekunden (Standard 60; `0` überspringt die Prüfung) darauf, dass `/api/health` des Backends und die Adresse jeder statischen App antworten. Ein fehlgeschlagenes Deployment endet mit einer Zeile, die die App und den Grund nennt, und beendet sich mit einem Fehlercode. Die Zusammenfassung erscheint auch bei Pipes; `--json` (oder `REBASE_JSON=1`) gibt stattdessen ein Objekt mit `apps`, `hosts`, `live`, `liveChecks` und `durationMs` aus.
+
+Vor dem Upload parst `deploy` das JavaScript jeder statischen App, die es ausliefert: die `.js`/`.mjs`/`.cjs`-Dateien in ihrem `output` und die Inline-`<script>`-Blöcke in ihrem HTML. Ein Syntaxfehler stoppt das Deployment mit `file:line:column` (Code `syntax_error` unter `--json`), und `--no-verify` überspringt die Prüfung. Ein erfolgreiches Deployment endet mit dem Weg zurück, `rebase cloud rollback`. Eine allein deployte statische App lässt sich noch nicht zurückrollen; siehe [Rollback](/docs/deployment/cloud#roll-back).
 
 ## Konfiguration
 

@@ -197,6 +197,7 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
             ["--skip-schema", "Keep the committed database schema instead of regenerating it"],
             ["--no-static", "Deploy the backend without folding the static apps into its bundle"],
             ["--no-source", "Do not upload the project's source beside a backend bundle"],
+            ["--no-verify", "Skip the syntax check of the static apps' JavaScript"],
             ["--allow-downgrade", "Deploy a bundle built on an older framework release than the project runs"],
             ["--eject", "Leave the managed runtime on purpose (ejects to a container image)"]
         ],
@@ -216,7 +217,13 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
                 + "platform upgrade can rebuild it on a newer release. If it is over 100 MB or the upload fails, "
                 + "the deploy goes on without it and says so.",
             "A bundle older than the release the project runs is refused as FRAMEWORK_DOWNGRADE. Run "
-                + "`rebase upgrade` and deploy again, or pass --allow-downgrade."
+                + "`rebase upgrade` and deploy again, or pass --allow-downgrade.",
+            "Before uploading, every .js/.mjs/.cjs file and inline <script> in each static app's output is "
+                + "parsed. A syntax error stops the deploy with its file:line:column (code syntax_error); "
+                + "--no-verify skips the check.",
+            "Undo a bad deploy with `rebase cloud rollback`: it restores the previous successful backend "
+                + "deployment, static apps folded into it included. A static app deployed on its own "
+                + "(`cloud deploy <app>`) cannot be rolled back yet; deploy its last good version again."
         ]
     },
 
@@ -816,6 +823,9 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
             "rebase cloud rollback 214 --yes"
         ],
         notes: [
+            "A static app deployed on its own (`rebase cloud deploy <app>`) records no bundle, so its "
+                + "deployments are not rollbackable yet: deploy its last good version again. Static apps "
+                + "folded into the backend's bundle (a plain `rebase cloud deploy`) roll back with it.",
             "`rebase cloud deployments list` marks which rows are rollbackable. One that is not is refused here rather than by a 409 from the control plane."
         ]
     },

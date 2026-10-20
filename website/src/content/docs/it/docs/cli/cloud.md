@@ -1,5 +1,5 @@
 ---
-sourceHash: 7af948cdf55f4822
+sourceHash: 1d949f9964ea8fd7
 title: rebase cloud
 sidebar_label: rebase cloud
 description: I gruppi di comandi di rebase cloud — autenticazione, collegamento del progetto, deploy, configurazione, organizzazioni, database, risorse, compute, storage, webhook, cluster e fatturazione.
@@ -56,6 +56,8 @@ rebase cloud debug [health|logs|…]       # diagnosi di un deployment, in sola 
 Il comando `deploy` invocato senza specificare alcuna app distribuisce il backend. Il deploy del bundle di backend carica contestualmente anche il sorgente del progetto — quanto tracciato da git, escludendo rigorosamente il file `.env` — per consentire a un aggiornamento della piattaforma di ricompilarlo; `--no-source` evita tale operazione per la singola istanza, mentre `cloud settings set --platform-rebuilds off` la disattiva permanentemente eliminando la copia salvata. `--allow-downgrade` consente il deployment di una versione precedente.
 
 Un `deploy` seguito termina con un riepilogo: ogni app distribuita con il suo URL, l'id del deployment, quanto è durato e se la nuova versione risponde. Attende fino a `--live-timeout` secondi (60 di default; `0` salta il controllo) che rispondano `/api/health` del backend e l'indirizzo di ogni app statica. Un deploy fallito termina con una riga che indica l'app e il motivo, ed esce con un codice diverso da zero. Il riepilogo viene stampato anche in pipe; `--json` (o `REBASE_JSON=1`) stampa invece un oggetto con `apps`, `hosts`, `live`, `liveChecks` e `durationMs`.
+
+Prima dell'upload, `deploy` analizza il JavaScript di ogni app statica che distribuisce: i file `.js`/`.mjs`/`.cjs` nel suo `output` e i blocchi `<script>` inline del suo HTML. Un errore di sintassi interrompe il deploy con `file:line:column` (codice `syntax_error` con `--json`), e `--no-verify` salta il controllo. Un deploy riuscito si conclude con la via del ritorno, `rebase cloud rollback`. Un'app statica distribuita da sola non supporta ancora il rollback; vedi [Rollback](/docs/deployment/cloud#roll-back).
 
 ## Configurazione (Config)
 

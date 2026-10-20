@@ -1,5 +1,5 @@
 ---
-sourceHash: 7af948cdf55f4822
+sourceHash: 1d949f9964ea8fd7
 title: rebase cloud
 sidebar_label: rebase cloud
 description: Les groupes de commandes de rebase cloud — authentification, liaison de projet, déploiements, configuration, organisations, bases de données, ressources, calcul, stockage, webhooks, clusters et facturation.
@@ -56,6 +56,8 @@ rebase cloud debug [health|logs|…]       # diagnose a deployment, read-only
 `deploy` sans nom d'application déploie le backend. Un déploiement de bundle backend téléverse également le code source du projet — ce que git suit, jamais un fichier `.env` — afin qu'une mise à niveau de la plateforme puisse le recompiler ; `--no-source` ignore cela une fois, et `cloud settings set --platform-rebuilds off` le désactive et supprime la copie stockée. `--allow-downgrade` déploie une version antérieure.
 
 Un `deploy` suivi se termine par un résumé : chaque application déployée avec son URL, l'identifiant du déploiement, sa durée et si la nouvelle version y répond. Il attend jusqu'à `--live-timeout` secondes (60 par défaut ; `0` ignore la vérification) que le `/api/health` du backend et l'adresse de chaque application statique répondent. Un déploiement en échec se termine par une ligne qui nomme l'application et la raison, avec un code de sortie non nul. Le résumé s'affiche aussi via un pipe ; `--json` (ou `REBASE_JSON=1`) affiche à la place un objet avec `apps`, `hosts`, `live`, `liveChecks` et `durationMs`.
+
+Avant le téléversement, `deploy` analyse le JavaScript de chaque application statique qu'il livre : les fichiers `.js`/`.mjs`/`.cjs` de son `output` et les blocs `<script>` en ligne de son HTML. Une erreur de syntaxe arrête le déploiement avec `file:line:column` (code `syntax_error` avec `--json`), et `--no-verify` désactive la vérification. Un déploiement réussi se termine par le chemin du retour, `rebase cloud rollback`. Une application statique déployée seule ne peut pas encore faire l'objet d'un rollback ; voir [Rollback](/docs/deployment/cloud#roll-back).
 
 ## Configuration
 

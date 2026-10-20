@@ -1,5 +1,5 @@
 ---
-sourceHash: 7af948cdf55f4822
+sourceHash: 1d949f9964ea8fd7
 title: rebase cloud
 sidebar_label: rebase cloud
 description: Os grupos de comandos do rebase cloud — autenticação, vínculo de projeto, deploys, configuração, organizações, bancos de dados, recursos, computação, armazenamento, webhooks, clusters e faturamento.
@@ -56,6 +56,8 @@ rebase cloud debug [health|logs|…]       # diagnostica uma implantação, some
 `deploy` sem o nome de um app implanta o backend. O deploy do bundle do backend também faz o upload do código-fonte do projeto — o que o git rastreia, nunca um `.env` — para que uma atualização de plataforma possa recompilá-lo; `--no-source` pula isso nessa execução, e `cloud settings set --platform-rebuilds off` desativa essa função e exclui a cópia armazenada. `--allow-downgrade` implanta uma versão anterior.
 
 Um `deploy` acompanhado termina com um resumo: cada app implantado com sua URL, o id do deploy, quanto tempo levou e se a nova versão responde ali. Ele espera até `--live-timeout` segundos (60 por padrão; `0` pula a verificação) que o `/api/health` do backend e o endereço de cada app estático respondam. Um deploy que falhou termina com uma linha que nomeia o app e o motivo, e sai com código diferente de zero. O resumo é impresso também com pipe; `--json` (ou `REBASE_JSON=1`) imprime em vez disso um objeto com `apps`, `hosts`, `live`, `liveChecks` e `durationMs`.
+
+Antes do upload, `deploy` analisa o JavaScript de cada app estático que publica: os arquivos `.js`/`.mjs`/`.cjs` no seu `output` e os blocos `<script>` inline do seu HTML. Um erro de sintaxe interrompe o deploy com `file:line:column` (código `syntax_error` com `--json`), e `--no-verify` pula a verificação. Um deploy bem-sucedido termina com o caminho de volta, `rebase cloud rollback`. Um app estático implantado sozinho ainda não pode ter rollback; veja [Rollback](/docs/deployment/cloud#roll-back).
 
 ## Configuração
 

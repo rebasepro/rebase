@@ -1,5 +1,5 @@
 ---
-sourceHash: 7af948cdf55f4822
+sourceHash: 1d949f9964ea8fd7
 title: rebase cloud
 sidebar_label: rebase cloud
 description: Los grupos de comandos de rebase cloud — autenticación, vinculación de proyectos, despliegues, configuración, organizaciones, bases de datos, recursos, cómputo, almacenamiento, webhooks, clústeres y facturación.
@@ -56,6 +56,8 @@ rebase cloud debug [health|logs|…]       # diagnose a deployment, read-only
 `deploy` sin un nombre de aplicación despliega el backend. El despliegue de un bundle de backend también sube el código fuente del proyecto — lo que git rastrea, nunca un `.env` — para que una actualización de la plataforma pueda recompilarlo; `--no-source` omite esto una vez, y `cloud settings set --platform-rebuilds off` lo detiene y elimina la copia almacenada. `--allow-downgrade` despliega una versión anterior.
 
 Un `deploy` seguido termina con un resumen: cada aplicación desplegada con su URL, el id del despliegue, cuánto tardó y si la nueva versión responde allí. Espera hasta `--live-timeout` segundos (60 por defecto; `0` omite la comprobación) a que respondan el `/api/health` del backend y la dirección de cada aplicación estática. Un despliegue fallido termina con una línea que nombra la aplicación y el motivo, y sale con un código distinto de cero. El resumen se imprime también en tuberías; `--json` (o `REBASE_JSON=1`) imprime en su lugar un objeto con `apps`, `hosts`, `live`, `liveChecks` y `durationMs`.
+
+Antes de subir nada, `deploy` analiza el JavaScript de cada aplicación estática que publica: los archivos `.js`/`.mjs`/`.cjs` de su `output` y los bloques `<script>` en línea de su HTML. Un error de sintaxis detiene el despliegue con `file:line:column` (código `syntax_error` con `--json`), y `--no-verify` omite la comprobación. Un despliegue exitoso termina con el camino de vuelta, `rebase cloud rollback`. Una aplicación estática desplegada por separado todavía no admite rollback; consulta [Rollback](/docs/deployment/cloud#roll-back).
 
 ## Configuración
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: 1d136cdb057ade33
+sourceHash: 6e2e8dd2f7c40eeb
 title: Rebase Cloud
 sidebar_label: Rebase Cloud
 description: Rebase Cloud est le même Rebase, géré pour vous. De quoi il s'agit, comment lier et déployer un projet, et ce que la bêta privée n'inclut pas encore.
@@ -116,6 +116,19 @@ cette signification, ce qui plaçait l'action la moins réversible de la CLI sou
 que « écraser ce fichier » ; il s'agit désormais d'une option inconnue plutôt que d'un alias,
 de sorte qu'un script qui l'utilise s'arrête immédiatement.
 
+### La vérification de syntaxe avant le téléversement
+
+Les fichiers d'une application statique sont servis tels quels. Lorsque son `build` se contente de copier des scripts écrits à la main dans `output`, personne ne les a analysés, et un fichier contenant une faute de frappe est mis en ligne et empêche la page de se charger. C'est pourquoi, avant tout téléversement, `deploy` analyse chaque fichier `.js`, `.mjs` et `.cjs` du `output` de chaque application statique, ainsi que chaque `<script>` en ligne de ses fichiers `.html`. Cela couvre une application statique déployée seule comme les applications statiques intégrées au bundle du backend. Une erreur de syntaxe arrête le déploiement en indiquant le fichier, la ligne et la colonne :
+
+```
+✗ A syntax error in the static output, so nothing was deployed:
+    web/cloud.js:42:23  Unexpected token
+        42 |     return fetch("/api";
+Fix it and deploy again, or pass --no-verify to deploy anyway.
+```
+
+Avec `--json`, le `code` de l'erreur est `syntax_error`. Les scripts en ligne qu'un navigateur n'exécute pas comme du JavaScript sont ignorés : JSON, import maps, templates et tout autre `type` non JavaScript, un `<script src>`, ainsi qu'un script qui contient encore du balisage de template non rendu comme `{{ }}`. Un fichier `.js` est accepté s'il s'analyse comme script classique ou comme module, car c'est la page qui en décide. Rien sous `node_modules` n'est lu, pas plus qu'un `--bundle-dir` déjà construit. `--no-verify` désactive la vérification pour un déploiement.
+
 Surveiller le déploiement :
 
 ```bash
@@ -147,6 +160,10 @@ fonctionnent :
 | `rebase cloud deploy` (un build source) | L'image publiée par ce build |
 | `rebase cloud deploy --bundle` (le runtime de la plateforme) | Le bundle livré par ce déploiement, sur la version du runtime que le projet utilise actuellement |
 
+Les applications statiques intégrées au bundle du backend (un simple `rebase cloud deploy` dans un projet doté d'un backend) font partie de ce bundle et reviennent donc en arrière avec lui.
+
+Une application statique déployée seule (`rebase cloud deploy <app>`) ne peut pas encore faire l'objet d'un rollback. Son déploiement enregistre l'application qu'il a publiée, mais pas de bundle, si bien que le plan de contrôle n'a rien à partir de quoi la restaurer. La solution consiste à redéployer la dernière version correcte, par exemple depuis le commit précédant le commit fautif. Après un tel déploiement, `deploy` le signale au lieu de renvoyer vers `rollback`.
+
 Un rollback nécessite donc un déploiement ayant enregistré l'un des deux, ce qui implique
 un projet ayant été déployé avec succès au moins deux fois. `rebase cloud deployments`
 signale ceux qui sont éligibles, et `--json` renvoie `rollbackable` pour chaque ligne avec
@@ -156,6 +173,8 @@ Deux types de déploiements sont refusés, et la CLI précise lesquels : un dép
 réussi, et un déploiement antérieur à l'enregistrement des artefacts par la plateforme. Il n'y a rien à deviner
 dans les deux cas — faire des suppositions reviendrait à déployer ce qui a été compilé ou téléversé le
 plus récemment tout en prétendant restaurer cette version-ci — déployez donc plutôt la version souhaitée.
+
+Chaque déploiement réussi se termine en indiquant le chemin du retour (`rebase cloud rollback`), pour qu'il soit sous les yeux au moment où une version défectueuse est repérée.
 
 Un rollback ajoute un nouveau déploiement plutôt que de rembobiner l'historique, et attend
 que la version restaurée réponde avant de confirmer le succès. Suivez-le avec
