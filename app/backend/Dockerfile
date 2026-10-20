@@ -49,7 +49,10 @@ RUN pnpm --filter './packages/*' -r run build
 
 # Build the backend (TypeScript → JavaScript), then resolve ESM import extensions
 # 1. tsc compiles TS→JS  2. tsc-alias resolves path aliases  3. sed adds .js to remaining relative imports
-RUN cd app/backend && npx tsc -p tsconfig.docker.json && npx tsc-alias -p tsconfig.docker.json -f \
+# tsc-alias is not a dependency, so npx fetches it: pin it. 1.9.8 rewrites the bare
+# `drizzle-orm/pg-core` import to `drizzle-orm/pg-core/index.js`, which drizzle's
+# exports map refuses, and the server dies at boot with ERR_PACKAGE_PATH_NOT_EXPORTED.
+RUN cd app/backend && npx tsc -p tsconfig.docker.json && npx -y tsc-alias@1.9.7 -p tsconfig.docker.json -f \
     && find dist -name '*.js' -exec sed -i 's/from "\(\.[^"]*\)"/from "\1.js"/g; s/\.js\.js/.js/g' {} +
 
 # Build frontend. VITE_GOOGLE_CLIENT_ID is injected as a build-arg because the
