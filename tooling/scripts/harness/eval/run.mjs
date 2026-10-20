@@ -19,7 +19,7 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { context, sh } from "../lib/ctx.mjs";
 import { read as readTrace } from "../lib/trace.mjs";
-import { TASKS, getTask, splitCommit } from "./tasks.mjs";
+import { TASKS, getTask, resolveCommit, splitCommit } from "./tasks.mjs";
 import { grade } from "./grade.mjs";
 
 const DEFAULT_AGENT = "claude -p --permission-mode bypassPermissions {prompt}";
@@ -83,21 +83,22 @@ function verify(task, worktree) {
 
 /** Put the worktree at the fix commit, with dependencies resolvable. */
 function checkout(ctx, task, worktree) {
-    const split = splitCommit(ctx.primaryRoot, task.commit, task);
-    if (!split) return { error: `Commit ${task.commit} not found.` };
+    const commit = resolveCommit(ctx.primaryRoot, task);
+    const split = commit ? splitCommit(ctx.primaryRoot, commit, task) : null;
+    if (!split) return { error: `Commit ${task.commit || task.subject} not found.` };
 
-    run("git", ["worktree", "add", "--detach", worktree, task.commit], ctx.primaryRoot);
-    if (!fs.existsSync(worktree)) return { error: `Could not create worktree for ${task.commit}.` };
+    run("git", ["worktree", "add", "--detach", worktree, commit], ctx.primaryRoot);
+    if (!fs.existsSync(worktree)) return { error: `Could not create worktree for ${commit}.` };
 
     linkNodeModules(ctx.primaryRoot, worktree);
-    return { split };
+    return { split, commit };
 }
 
 /** Roll the source half back to the parent commit, leaving the tests at the fixed version. */
-function revertSource(task, split, worktree) {
+function revertSource(commit, split, worktree) {
     for (const file of split.source) {
         // A file the fix *added* has no parent version; removing it is the correct revert.
-        const restored = run("git", ["checkout", `${task.commit}^`, "--", file], worktree);
+        const restored = run("git", ["checkout", `${commit}^`, "--", file], worktree);
         if (restored.code !== 0) run("git", ["rm", "-q", "-f", "--", file], worktree);
     }
 }
@@ -111,7 +112,7 @@ async function runTask(ctx, task, { agentTemplate, keep }) {
     run("git", ["worktree", "prune"], ctx.primaryRoot);
     fs.mkdirSync(evalRoot(ctx), { recursive: true });
 
-    const { split, error } = checkout(ctx, task, worktree);
+    const { split, commit, error } = checkout(ctx, task, worktree);
     if (error) return { id: task.id, valid: false, error };
 
     // ── Gate 1: the verify command must PASS at the fix commit. ──────────────────
@@ -130,7 +131,7 @@ async function runTask(ctx, task, { agentTemplate, keep }) {
     }
 
     // ── Gate 2: reverting the source must make it FAIL. ──────────────────────────
-    revertSource(task, split, worktree);
+    revertSource(commit, split, worktree);
     const broken = verify(task, worktree);
     if (broken.code === 0) {
         return {
@@ -169,7 +170,7 @@ export async function main(argv = []) {
     const keep = argv.includes("--keep");
 
     if (argv.includes("--list")) {
-        for (const t of TASKS) process.stdout.write(`${t.id}\t${t.commit}\t${t.verify.cmd} ${t.verify.args.join(" ")}\n`);
+        for (const t of TASKS) process.stdout.write(`${t.id}\t${resolveCommit(ctx.primaryRoot, t) || "?"}\t${t.verify.cmd} ${t.verify.args.join(" ")}\n`);
         return 0;
     }
 
@@ -199,7 +200,7 @@ export async function main(argv = []) {
 
     const results = [];
     for (const task of selected) {
-        if (!json) process.stdout.write(`\n▸ ${task.id} (${task.commit})\n`);
+        if (!json) process.stdout.write(`\n▸ ${task.id} (${task.commit || task.subject})\n`);
         const result = await runTask(ctx, task, { agentTemplate, keep });
         results.push(result);
         if (!json) process.stdout.write(formatResult(result));

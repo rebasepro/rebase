@@ -21,7 +21,9 @@ export function isTestPath(file) {
 }
 
 /**
- * The commit that added the admin customization recipes.
+ * The commit that added the admin customization recipes, named by its subject
+ * rather than its hash: these tasks were written beside commits that had not
+ * landed yet, and a rebase onto the main branch changes every hash under it.
  *
  * Each customization task reverts one recipe and asks an agent to build what it
  * does from the request alone, with the recipe's test as the grader. What it
@@ -30,7 +32,7 @@ export function isTestPath(file) {
  * an agent to customize the admin on the first try. A failure names the part
  * that is hard to use, which is the thing to fix.
  */
-const CUSTOMIZATION_RECIPES = "40fc99eed0";
+const CUSTOMIZATION_RECIPES = { subject: "feat(cms): tested customization recipes, shipped in the package" };
 
 /** What every customization prompt adds: the one constraint the grader depends on. */
 const CUSTOMIZATION_HINT =
@@ -83,7 +85,7 @@ export const TASKS = [
     // ── Customization tasks ──────────────────────────────────────────────────────
     {
         id: "customize-site-settings",
-        commit: CUSTOMIZATION_RECIPES,
+        ...CUSTOMIZATION_RECIPES,
         prompt:
             "Our admin needs a \"Site settings\" page: one settings record \u2014 site name (`siteName`, required, defaulting to \"My site\"), `tagline`, `maintenanceMode` (boolean) and `supportEmail` \u2014 that admins edit on a page of its own. There is only ever one such record and nobody should have to create or seed it by hand: the first save creates it. Write it in packages/cms/recipes/site-settings.tsx, exporting `SiteSettingsPage` (the page component), `SITE_SETTINGS_ID` (the id of the one record), `siteSettingsCollection` (its collection, slug `site_settings`) and `siteSettingsView` (an AppView for `<RebaseCMS views>`)." +
             CUSTOMIZATION_HINT,
@@ -97,7 +99,7 @@ export const TASKS = [
     },
     {
         id: "customize-my-preferences",
-        commit: CUSTOMIZATION_RECIPES,
+        ...CUSTOMIZATION_RECIPES,
         prompt:
             "Add a \"My preferences\" page to our admin where each signed-in user edits their own preferences: `theme` (\"system\", \"light\" or \"dark\", default \"system\") and `weeklyDigest` (boolean, default true), stored in collection `user_preferences`, one record per user keyed by the user's uid. A user's first save creates their record; somebody else's record must never be touched; with nobody signed in the page renders nothing. Write it in packages/cms/recipes/my-preferences.tsx, exporting `MyPreferencesPage`, `userPreferencesCollection` and `myPreferencesView` (an AppView)." +
             CUSTOMIZATION_HINT,
@@ -111,7 +113,7 @@ export const TASKS = [
     },
     {
         id: "customize-bulk-set-status",
-        commit: CUSTOMIZATION_RECIPES,
+        ...CUSTOMIZATION_RECIPES,
         prompt:
             "Admins want to archive many rows at once from a collection's table: tick rows, click \"Archive selected\", and every selected row's `status` becomes \"archived\". The button must only appear while rows are selected, and the selection is cleared afterwards. Write it as a component for a collection's toolbar (`admin.Actions`) in packages/cms/recipes/bulk-set-status.tsx, exported as `ArchiveSelectedAction`." +
             CUSTOMIZATION_HINT,
@@ -125,7 +127,7 @@ export const TASKS = [
     },
     {
         id: "customize-calendar-view",
-        commit: CUSTOMIZATION_RECIPES,
+        ...CUSTOMIZATION_RECIPES,
         prompt:
             "Add a calendar view mode to the admin so a collection's rows can be seen on a month grid by their `dueDate`, showing each row's `title`; rows without a date are left out. Clicking a row opens its record. Buttons labelled \"Previous month\" and \"Next month\" (aria-label) move between months, starting from the current one. Each day cell carries `data-day=\"<year>-<monthIndex>-<date>\"` (month index from 0). Write it in packages/cms/recipes/calendar-view.tsx, exporting `calendarView` (a collection view with key \"calendar\") and `CalendarView`." +
             CUSTOMIZATION_HINT,
@@ -139,7 +141,7 @@ export const TASKS = [
     },
     {
         id: "customize-orders-dashboard",
-        commit: CUSTOMIZATION_RECIPES,
+        ...CUSTOMIZATION_RECIPES,
         prompt:
             "Build an orders dashboard page for the admin: the total number of orders, and a bar per `status` with its count, largest first; an order without a status counts under \"\u2014\". Each status row is a link to the orders collection with aria-label \"<status>: <count>\". Write it in packages/cms/recipes/orders-dashboard.tsx, exporting `OrdersDashboard` and `ordersDashboardView` (an AppView)." +
             CUSTOMIZATION_HINT,
@@ -153,7 +155,7 @@ export const TASKS = [
     },
     {
         id: "customize-custom-login",
-        commit: CUSTOMIZATION_RECIPES,
+        ...CUSTOMIZATION_RECIPES,
         prompt:
             "Replace the admin's login screen with our own branded one: the title \"Acme back office\", an \"Email\" and a \"Password\" field, and a \"Sign in\" button that signs in with email and password. If sign-in fails, show the error message in an element with role=\"alert\". Write it in packages/cms/recipes/custom-login.tsx, exporting `BrandedLoginView`, which takes `{ authController }` and is registered through `<Rebase components={{ \"Auth.LoginView\": { Component: BrandedLoginView } }}>`." +
             CUSTOMIZATION_HINT,
@@ -165,6 +167,18 @@ export const TASKS = [
         source: ["packages/cms/recipes/custom-login.tsx"],
         protected: ["packages/cms/test/recipes/custom-login.test.tsx", "packages/cms/test/recipes/recipe_harness.tsx"],
     },];
+
+/**
+ * The commit a task is pinned to: its `commit`, or the newest commit whose
+ * subject line is its `subject`. Empty when there is none.
+ */
+export function resolveCommit(root, task) {
+    if (task.commit) return task.commit;
+    if (!task.subject) return "";
+    const subjects = sh("git", ["log", "--format=%h%x09%s", "--fixed-strings", `--grep=${task.subject}`, "HEAD"], root);
+    const match = subjects.split("\n").map((line) => line.split("\t")).find(([, subject]) => subject === task.subject);
+    return match ? match[0] : "";
+}
 
 /** Files a commit changed, split into the half to revert and the half to keep. */
 export function splitCommit(root, commit, spec = {}) {

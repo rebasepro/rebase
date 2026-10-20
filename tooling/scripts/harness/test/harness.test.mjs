@@ -23,7 +23,7 @@ import fs from "node:fs";
 import os from "node:os";
 import { execFileSync } from "node:child_process";
 import { grade } from "../eval/grade.mjs";
-import { isTestPath, splitFiles, TASKS } from "../eval/tasks.mjs";
+import { isTestPath, resolveCommit, splitFiles, TASKS } from "../eval/tasks.mjs";
 
 test("context resolves an absolute primary root", () => {
     const ctx = context();
@@ -504,4 +504,13 @@ test("every customization task reverts one recipe and verifies it with that reci
         const recipe = path.basename(task.source[0], ".tsx");
         assert.ok(task.verify.args.some((a) => a.includes(`recipes/${recipe}.test`)), task.id);
     }
+});
+
+test("a task pinned by subject resolves to a commit in this history", () => {
+    const root = context().primaryRoot;
+    for (const task of TASKS.filter((t) => t.subject)) {
+        const commit = resolveCommit(root, task);
+        assert.match(commit, /^[0-9a-f]{7,}$/, task.id);
+    }
+    assert.equal(resolveCommit(root, { subject: "no commit has this subject line" }), "");
 });
