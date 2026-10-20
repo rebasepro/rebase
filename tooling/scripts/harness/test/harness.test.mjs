@@ -23,7 +23,7 @@ import fs from "node:fs";
 import os from "node:os";
 import { execFileSync } from "node:child_process";
 import { grade } from "../eval/grade.mjs";
-import { isTestPath } from "../eval/tasks.mjs";
+import { isTestPath, splitFiles, TASKS } from "../eval/tasks.mjs";
 
 test("context resolves an absolute primary root", () => {
     const ctx = context();
@@ -485,4 +485,23 @@ test("rls-drift fails closed when the policies cannot be compiled", () => {
 
     assert.equal(result.level, FAIL, JSON.stringify(result));
     assert.match(result.message, /could not be compiled/);
+});
+
+test("a task's `source` names exactly what is reverted, and everything else is kept", () => {
+    const files = ["packages/cms/recipes/README.md", "packages/cms/recipes/site-settings.tsx", "packages/cms/test/recipes/site-settings.test.tsx"];
+    const split = splitFiles(files, { source: ["packages/cms/recipes/site-settings.tsx"] });
+    assert.deepEqual(split.source, ["packages/cms/recipes/site-settings.tsx"]);
+    assert.deepEqual(split.tests, ["packages/cms/recipes/README.md", "packages/cms/test/recipes/site-settings.test.tsx"]);
+    // Without one, the README would be reverted with the recipe.
+    assert.deepEqual(splitFiles(files).source, ["packages/cms/recipes/README.md", "packages/cms/recipes/site-settings.tsx"]);
+});
+
+test("every customization task reverts one recipe and verifies it with that recipe's test", () => {
+    const customization = TASKS.filter((t) => t.id.startsWith("customize-"));
+    assert.ok(customization.length >= 6);
+    for (const task of customization) {
+        assert.equal(task.source.length, 1, task.id);
+        const recipe = path.basename(task.source[0], ".tsx");
+        assert.ok(task.verify.args.some((a) => a.includes(`recipes/${recipe}.test`)), task.id);
+    }
 });
