@@ -799,7 +799,7 @@ image. A project that has ejected owns these decisions in its own code instead.
 | `REBASE_SERVE_STATIC` | Serve the bundle's static/admin assets from this process. Turn it off when a CDN sits in front. | `true` |
 | `REBASE_HISTORY` | Record [entity change history](/docs/backend/history). | `true` |
 | `REBASE_COMPRESSION` | gzip/brotli responses. | `true` |
-| `REBASE_MAX_BODY_SIZE` | Maximum request body, **in bytes** (`10485760`, not `10MB` — a value that is not a number refuses to boot rather than silently removing the limit). | — |
+| `REBASE_MAX_BODY_SIZE` | Maximum request body, **in bytes** (`10485760`, not `10MB` — a value that is not a number refuses to boot rather than silently removing the limit). `0` turns the limit off. | `10485760` (10 MiB) |
 | `REBASE_ENABLE_SWAGGER` | The OpenAPI surface. Tri-state: unset means on in development, off in production; `false` turns both off anywhere. Note that `true` in production serves the **spec** at `/api/docs` but not the Swagger **UI** at `/api/swagger` — the UI is gated on `NODE_ENV` separately. | — |
 | `REBASE_METRICS` | Expose Prometheus metrics at `/metrics`. | `false` |
 | `REBASE_HSTS_INCLUDE_SUBDOMAINS` | Add `includeSubDomains` to the `Strict-Transport-Security` header, so browsers refuse plain HTTP on every subdomain of the host for six months — hosts this process does not serve included. Turn it on only when every subdomain of the domain is HTTPS-only. Anything but `true`/`false` refuses to boot. See [Security headers](/docs/deployment/self-hosting/#security-headers). | `false` |
@@ -817,7 +817,7 @@ image. A project that has ejected owns these decisions in its own code instead.
 | `REBASE_STRICT_COLLECTION_CONFIG` | What boot does with a key in your collections that this version does not read: `warn`, `error` (refuse to boot — worth turning on in CI), or `off`. Only governs keys it does not *recognise*, which are usually a typo and occasionally deliberate metadata; a key it knows has moved is always fatal, because the feature it configured is silently absent otherwise. | `warn` |
 | `REBASE_PROVISION_ONLY` | `1`/`true` runs the schema pass and exits without opening a socket — the shape a migration Job wants, from the same image and the same bundle as the server that follows it. An empty value is *unset*, so an unsubstituted `${SOMETHING}` in a compose file cannot turn an ordinary deployment into one that migrates and refuses to serve. | — |
 | `REBASE_LIVE_SCHEMA_ALLOW_MACHINE_APPLY` | `true` lets a machine — an agent, a CI job — *apply* a schema change through `/api/admin/schema`, not only plan one. Off unless asked for: the credential that would make such a change is the one most likely to be sitting in a CI variable. | `false` |
-| `REBASE_FUNCTIONS_TIMEOUT_MS` | How long a custom function may run before its request is aborted. Same knob as the `functionsTimeoutMs` option. | — |
+| `REBASE_FUNCTIONS_TIMEOUT_MS` | How long a custom function may run before its request is aborted. Same knob as the `functionsTimeoutMs` option. `0` turns it off. | `30000` |
 | `REBASE_EXIT_ON_UNHANDLED_REJECTION` | `true` makes an unhandled promise rejection terminate the process instead of logging it. On under an orchestrator that will restart you; off where a restart is worse than a leak. | `false` |
 | `REBASE_CRON_ALWAYS_ON` | Keeps the cron scheduler running on a platform the runtime otherwise detects as scale-to-zero, where a timer that fires in an idle instance fires in no instance. | — |
 | `TRUSTED_PROXY_HOPS` | How many proxies sit in front of this server, so the rate limiter can read the real client address out of `X-Forwarded-For`. Fail-safe default `0`: with no proxy, trusting the header would let any caller forge an identity. | `0` |
@@ -4064,9 +4064,134 @@ yet, listed so that nobody reads a promise into them:
 
 ### [Unreleased]
 
-#### Fixed
+#### Added
 
 ##### CLI
+
+- **`rebase cloud deploy` checks a static app's JavaScript before uploading
+  it.** A static app whose `build` only copied hand-written scripts into its
+  output deployed a file that did not parse. The deploy succeeded, and the live
+  page failed on load. Every `.js`, `.mjs` and `.cjs` file in each static app's
+  output is now parsed, with the inline `<script>` blocks of its HTML, before
+  anything is uploaded. That covers static apps deployed on their own and those
+  folded into the backend's bundle. A syntax error stops the deploy with
+  `file:line:column` and the offending line (`--json` code `syntax_error`).
+  `--no-verify` skips the check. The parser is acorn, now a CLI dependency.
+
+- **A successful deploy says how to undo it.** It ends with
+  "`rebase cloud rollback` puts the previous deployment back." A static app
+  deployed on its own records no bundle, so it cannot be rolled back yet; its
+  deploy says so and suggests deploying the last good version again.
+
+- **`rebase cloud deploy --preview` serves a build at its own address and
+  leaves production alone.** Before, the only way to see a change on the
+  platform was to ship it to production. The new flag prints an address like
+  `https://<project>--<name>.rebase.website`, and `--preview-name` keeps the same
+  address across deploys. A static app's preview calls the production backend.
+  A backend preview runs its own backend, on an empty database of its own.
+  `rebase cloud previews` lists and deletes previews. A preview is started
+  through its own control-plane function, never through `deploy`, so a control
+  plane without previews refuses it with `previews_unavailable` and nothing
+  ships to production. The control plane's half is specified in
+  `docs/preview-deployments.md`.
+
+- **Previews can run with their own environment variables.** A backend preview
+  starts from production's variables, and that copy carries production's live
+  third-party keys, so a preview that charges a card does it for real.
+  `rebase cloud env set KEY=VALUE --preview` gives previews their own value (a
+  test key), `env unset KEY --preview` leaves a variable out of them, `env reset
+  KEY --preview` gives them production's value again, and `env list --preview`
+  shows what differs. None of them changes production. A control plane without
+  previews refuses them with `previews_unavailable`.
+
+- **Private npm packages install on the managed runtime.** A managed pod
+  installs a bundle's dependencies when it starts, from the public registry
+  only, so a package under a private scope or registry never installed.
+  `rebase build` now copies the project's `.npmrc` (and `backend/.npmrc`) into
+  the bundle. Every credential in it must be an environment reference such as
+  `${NPM_TOKEN}`, set with `rebase cloud env set NPM_TOKEN=… --secret`; a
+  literal token fails the build, because the bundle is uploaded with the code.
+
+#### Changed
+
+##### Admin (CMS & app)
+
+- **Form fields are full width unless they are a pair of like compact
+  fields, or the collection sets `admin.span`.** The form used to guess widths
+  from property types — strings, dates and relations at half, numbers and
+  booleans at a quarter, the title property full — and paired fields that had
+  nothing to do with each other: Namespace beside Custom Domain, Git Branch
+  beside Git Repository URL. Now a field takes the whole row unless it and its
+  neighbour have the same small editor (two numbers, two switches, two dates of
+  the same mode, two selects with short options) and neither has a long label,
+  long help text, `conditions` or a custom `Field`. Free-text strings are never
+  paired, nothing reads the title property, and rows are no longer stretched to
+  close a gap. A span written on a property is used as written.
+
+##### CLI
+
+- **A cloud deploy ends on a summary that says where the app is and whether it
+  is live.** `rebase cloud deploy` lists each app it shipped with its URL, the
+  deployment id and how long it took, then probes each URL — a backend's
+  `/api/health`, a static app's page — for up to `--live-timeout` seconds
+  (default 60, `0` skips) and says whether the new version answers. Before, a
+  run through an agent or a pipe printed only `{"success":true,…,"hosts":[]}`,
+  and people checked every deploy with `curl`. The summary now prints when
+  piped too; `--json` or `REBASE_JSON=1` gives the object, which gains
+  `project`, `apps`, `durationMs`, `live` and `liveChecks`. A piped run without
+  either says on stderr how to get JSON back. Every other `rebase cloud`
+  command still switches to JSON when piped.
+
+#### Fixed
+
+##### Runtime
+
+- **A function that imports `hono` itself loads on the managed runtime.** The
+  bundler removes `hono` and `@hono/node-server` from a bundle's dependencies
+  because the image provides them, but nothing linked the image's copy into
+  the bundle, so `import { Hono } from "hono"` failed with "Cannot find
+  package" and the function's route answered 404. Both are now linked in at
+  boot, like `@rebasepro/server` and `zod`.
+
+##### CLI
+
+- **A cloud deploy's result lists the project's own host.** The control plane
+  reports only hostnames an app declares in its `path`, so the `hosts` field of
+  `rebase cloud deploy --json` was `[]` for a project served on
+  `<slug>.rebase.website`. The project's host now comes first, as verified.
+
+- **A failed cloud deploy says which app failed and why, in one line.** The
+  reason is read from the control plane's `❌` line at the end of the build
+  log, with `rebase cloud logs` named for the rest. The JSON error gains
+  `apps`, `reason` and `hint`.
+
+- **The stale-build warning shows only to someone developing the CLI.** A
+  developer's global `rebase` is often linked to a checkout of this repo, so a
+  bare `rebase cloud deploy` in their own project warned "dist/ is 159h older
+  than src/" on every run, about source they were not working on. It now warns
+  only when the CLI runs from a pnpm workspace checkout, not from
+  `node_modules`, and the command runs inside that checkout. Set
+  `REBASE_CLI_DEV=1` to get it when testing a dev build against another
+  project.
+
+- **A `rebase` linked to a checkout runs the CLI your project pinned.** On a
+  machine whose global `rebase` links to a checkout of this repo, a bare
+  `rebase cloud deploy` in a project ran the checkout's build (280h older than
+  its source, where it was found) instead of the project's installed
+  `@rebasepro/cli` 0.25.1; only `pnpm rebase` used the pinned one. A checkout
+  now hands off to the `@rebasepro/cli` the project installed in
+  `node_modules`, with the same arguments, and exits with its code, as jest and
+  gulp do. `--debug` names both. A project that links its CLI to a checkout
+  keeps running that checkout, and `REBASE_CLI_DEV=1` runs the checkout
+  anyway, for testing a dev build against another project.
+
+- **`rebase cloud compute set --scale-to-zero` is retired.** The dial never did
+  anything: every backend ran as an always-on instance whatever it said. `true`
+  is now refused with a message naming `--replicas` and `--autoscale-max`;
+  `false` is ignored with a warning, so scripts that pass it keep working. The
+  help pages and `rebase cloud compute` no longer show it, and the CPU and
+  memory defaults they print are the platform's: `100m` and `384Mi`, bursting
+  to 2 CPU and `2Gi`.
 
 - **The cloud debug boot view shows the functions and crons a 0.25 runtime
   loaded.** It kept a line only if it said "Loaded function" or "Mounted", the
@@ -4074,6 +4199,57 @@ yet, listed so that nobody reads a promise into them:
   cron job: …" and "Cron jobs scheduled", so `rebase cloud debug boot` showed a
   project's storage and its port and none of the code it runs. Both wordings are
   shown now.
+
+##### Client SDK
+
+- **A public page no longer prints the client's connection messages to every
+  visitor's console.** In a browser, "Connected to PostgreSQL backend" and
+  "WebSocket auto-authenticated" were written with `console.debug` on every
+  load, naming the backend on any site that used the client. Connection
+  messages are now off by default everywhere. Turn them on with
+  `createRebaseClient({ debug: true })`, or in one browser, with no change to
+  the site, with `localStorage.setItem("rebase_debug", "1")`;
+  `globalThis.__REBASE_DEBUG__` and `__REBASE_DEBUG_REALTIME__` work too.
+  Warnings and errors are printed as before.
+
+##### Admin (CMS & app)
+
+- **The `"Shell.AppBar"`, `"HomePage.CollectionCard"` and `"Auth.LoginView"`
+  component overrides work.** All three were declared, documented and shown in
+  the `<Rebase components>` example, and nothing resolved them, so setting one
+  did nothing. A `"Shell.AppBar"` override now renders a top bar (a wrapper is
+  handed the default one); an `appBar` element on `<RebaseShell>` still wins,
+  as does `loginView` on `<RebaseAuth>` over `"Auth.LoginView"`. A test now
+  fails when a declared override name is resolved nowhere.
+- **`exportable: false` removes Export from the collection toolbar.** It was
+  ignored; only the object form was read, for its extra fields.
+- **The record form follows field access rules.** A field the user may not
+  write (`access.write`) is shown read-only, and one they may not read
+  (`access.read`, `excludeFromApi`) is left out, label included. Before, both
+  were ordinary inputs and the edit came back as a 400 on save. A new record or
+  a copy no longer sends a default or copied value for a field the user may
+  not write, which made the server refuse the whole save.
+- **A language added through `<Rebase translations>` is in the language
+  menu.** The menu listed the seven shipped languages only, so an app's own
+  language could be set with `locale` and never chosen by the user. A
+  language Rebase does not ship is named by the browser (`nl` → "Nederlands").
+  `useRebaseLocales()` returns the list.
+- **A record created from its parent's tab opens linked to that parent.** A new
+  transaction from a customer's Transactions tab asked for the customer, and a
+  required `belongsTo` could not be saved until the user picked the record they
+  had come from. The server already linked a create under
+  `customers/{id}/transactions` to that customer. The form now opens with the
+  link set and locked while the record is new. Editing it later still works.
+  This covers a `hasMany` whose child has the `belongsTo` back on
+  `foreignKeyOnTarget`. A link keyed on `sourceKey` is not prefilled.
+
+- **"Create" in the side panel opens the saved record instead of asking about
+  unsaved changes.** The save reported the form clean and moved the panel to
+  the new record in the same tick, and the panel's guard still saw it as dirty.
+  It asked "There are unsaved changes" about a record already saved and left
+  the URL on `#new_side`. A dirty record still asks before the panel leaves it.
+  `useUnsavedChangesDialog` now also takes a function for `when`, read at the
+  moment of navigation.
 
 ### [0.25.1] - 2026-10-14
 
@@ -18756,6 +18932,17 @@ const client = createRebaseClient({
 | `collections` | `Record<string, string>` | Maps accessor names to collection slugs |
 | `offline` | `boolean \| OfflineConfig` | [Local-first sync](/docs/sdk/offline) — off by default |
 | `impersonate` | `string` | Run every request as this user, by uid, to check what one user can see. Only an administrator's session may: the data API, functions and realtime run as that user, and every other route refuses |
+| `debug` | `boolean` | Log the realtime connection's progress with `console.debug` (default `false`) — see [Connection logging](#connection-logging) |
+
+#### Connection logging
+
+The client prints nothing about its realtime connection by default, so a public page says nothing about its backend in a visitor's console. Warnings and errors are always printed. To see the connection open, sign in, drop and redial, pass `debug: true`, or turn it on in one browser without changing the site by running this in its console:
+
+```js
+localStorage.setItem("rebase_debug", "1"); // localStorage.removeItem("rebase_debug") to stop
+```
+
+It applies from the next line the client logs, so a page that is already connected does not need a reload. Outside a browser, set `globalThis.__REBASE_DEBUG__ = true`. Browsers show `console.debug` only at the Verbose level.
 
 ### Typed SDK Generation
 
@@ -20176,6 +20363,8 @@ enforces for everyone.
 :::
 
 #### UI Configuration (`admin`)
+
+<span class="since-badge" data-since="0.26">Since 0.26</span>
 
 UI-related options are nested under the `admin` sub-object:
 
@@ -32008,7 +32197,7 @@ See [Runtime portability](#runtime-portability) for the full contract.
 ### Configuration
 
 :::note[Where this goes]
-**Managed runtime:** nothing to configure — the runtime discovers `backend/functions/` on its own (`entry.functions` in `rebase.json` if you moved it). `REBASE_FUNCTIONS_ONLY` / `REBASE_FUNCTIONS_EXCLUDE` narrow which ones a process serves.
+**Managed runtime:** nothing to configure — the runtime discovers `backend/functions/` on its own (`functions` in the backend app's `rebase.json` entry if you moved it). `REBASE_FUNCTIONS_ONLY` / `REBASE_FUNCTIONS_EXCLUDE` narrow which ones a process serves.
 **Ejected:** `initializeRebaseBackend({ functionsDir })`, or `functions` (below), in `backend/src/index.ts`.
 :::
 
@@ -32498,6 +32687,11 @@ Two ceilings apply to `/api/functions/*`:
 - **Rate limit** — API-key and signed-in callers share the data API's buckets. Anonymous callers get their own, much looser allowance (3000 per window) because this router is public by default for webhook receivers. Override with `rateLimit.anonymousFunctions`; `null` switches it off.
 
 Unhandled promise rejections are logged rather than fatal: a fire-and-forget call in one function would otherwise end the whole process. Set `REBASE_EXIT_ON_UNHANDLED_REJECTION=1` for Node's default behaviour.
+
+On Rebase Cloud, the edge in front of your functions has limits of its own, and
+module-level state, the filesystem and outbound ports behave in ways worth
+knowing before you design around them. See
+[Managed backend runtime](/docs/deployment/managed-runtime/).
 
 ### Next Steps
 
@@ -36230,17 +36424,22 @@ properties: {
 
 ### Overview
 
-The entity form is generated from your properties. By default it derives a
-two-column layout from the property types, so a collection that says nothing
-about layout still gets a form that reads like a form rather than one long run
-of full-width inputs:
+<span class="since-badge" data-since="0.26">Since 0.26</span>
+
+The entity form is generated from your properties:
 
 - the id and the `createdAt` / `updatedAt` timestamps go to a metadata rail, read-only
-- short enums, booleans, dates and numbers take a narrow span
-- long text, markdown, arrays, maps and storage fields take the full width
-- everything else takes half
+- every other field takes the full width of the main column, except that two
+  neighbouring fields with the same small editor — two numbers, two switches,
+  two dates of the same mode, two selects with short options — share a row
 
-Use `admin.form` when the derived answer is wrong for your domain.
+A field with a long label, help text over 60 characters, `conditions` or a
+custom `Field` is never paired, and neither is any free-text string: nothing in
+a schema tells a short branch name from a long URL. The form never looks at
+which property is the title. Any other columns are something the collection asks
+for, field by field, with `admin.span` — set from what each field holds, as
+below. Use `admin.form` to
+group fields into sections and move them to the rail.
 
 ### Field width
 
@@ -36279,6 +36478,14 @@ of the order they were declared in. They replaced `admin.widthPercentage`,
 whose raw percentages could not line up with anything; a collection still
 carrying one should pick the nearest span (≤30 → `1`, ≤55 → `2`, ≤80 → `3`,
 otherwise `4`).
+
+Choose a span from what the field holds, not from its type. Two short values
+that belong together share a row — start and end date, city and country,
+provider and region at `2` each, or a value and its qualifier at `3` + `1`.
+Numbers, booleans and short codes can take `1` beside their siblings. Anything
+that reads long — names, URLs, emails, ids, descriptions, markdown, files —
+keeps `4`. Rows fill in declaration order and nothing widens a field to close a
+gap, so declare pairs next to each other and make each row add up to 4.
 
 On layouts too narrow for two columns — the side panel, the split pane, a phone
 — the grid collapses to a single column and spans are ignored.
@@ -36372,6 +36579,8 @@ Set `sidebar: []` to suppress the derived rail entirely and keep every field in
 the main column.
 
 ### Reference
+
+<span class="since-badge" data-since="0.26">Since 0.26</span>
 
 | Property | Type | Description |
 |----------|------|-------------|
@@ -43539,6 +43748,17 @@ const client = createRebaseClient({
 | `collections` | `Record<string, string>` | Maps accessor names to collection slugs |
 | `offline` | `boolean \| OfflineConfig` | [Local-first sync](/docs/sdk/offline) — off by default |
 | `impersonate` | `string` | Run every request as this user, by uid, to check what one user can see. Only an administrator's session may: the data API, functions and realtime run as that user, and every other route refuses |
+| `debug` | `boolean` | Log the realtime connection's progress with `console.debug` (default `false`) — see [Connection logging](#connection-logging) |
+
+#### Connection logging
+
+The client prints nothing about its realtime connection by default, so a public page says nothing about its backend in a visitor's console. Warnings and errors are always printed. To see the connection open, sign in, drop and redial, pass `debug: true`, or turn it on in one browser without changing the site by running this in its console:
+
+```js
+localStorage.setItem("rebase_debug", "1"); // localStorage.removeItem("rebase_debug") to stop
+```
+
+It applies from the next line the client logs, so a page that is already connected does not need a reload. Outside a browser, set `globalThis.__REBASE_DEBUG__ = true`. Browsers show `console.debug` only at the Verbose level.
 
 ### Typed SDK Generation
 
@@ -48168,6 +48388,15 @@ reliably write the version that does not — see
 should be able to call a route, the guard to add is `requireScope`, with a scope
 the app declares — see [Roles and scopes](/docs/backend/roles-and-scopes/#app-scopes).
 
+After the rules come two sections that apply only in some projects. **Backend
+runtime** lists what the managed runtime on Rebase Cloud allows: packages,
+memory and module-level state, timeouts, outbound ports, configuration and
+storage for generated files. It links to
+[Managed backend runtime](/docs/deployment/managed-runtime/), so an assistant
+plans a backend feature against real limits instead of guessing. **Admin UI**
+holds the `@rebasepro/ui` rules. They apply to views inside the admin panel, not
+to a public site or static app the project serves.
+
 ### Making it yours
 
 `ai-instructions.md` is your file. Nothing regenerates or overwrites it — unlike
@@ -48996,7 +49225,7 @@ act on the linked project in `.rebase/cloud.json`; `--project <id>` operates on
 one without linking.
 
 Three options apply everywhere: `--json` for machine-readable output (also the
-default when piped, or with `REBASE_JSON=1`), `--url <origin>` to target a
+default when piped, except for `deploy`, or with `REBASE_JSON=1`), `--url <origin>` to target a
 specific control plane (or `REBASE_CLOUD_URL`), and `--project, -p <id>`.
 
 ### Auth
@@ -49031,6 +49260,8 @@ rebase cloud projects delete [id]
 
 ```bash
 rebase cloud deploy [app] [--source .]   # deploy an app and stream build logs
+rebase cloud deploy [app] --preview [--preview-name <name>]  # its own address; production untouched
+rebase cloud previews [list|delete <name>]
 rebase cloud logs [--runtime] [-f]       # build logs, or the running process's
 rebase cloud deployments list [--limit N|--all]
 rebase cloud rollback [id] [-y]          # back to a successful deploy
@@ -49046,6 +49277,27 @@ deploy also uploads the project's source — what git tracks, never a `.env` —
 platform upgrade can rebuild it; `--no-source` skips that once, and `cloud settings set
 --platform-rebuilds off` stops it and deletes the stored copy. `--allow-downgrade` deploys an older release.
 
+A followed `deploy` ends on a summary: each app it shipped with its URL, the
+deployment id, how long it took, and whether the new version answers there. It
+waits up to `--live-timeout` seconds (default 60; `0` skips the check) for a
+backend's `/api/health` and each static app's address to answer. A failed deploy
+ends on one line naming the app and the reason, and exits non-zero. The summary
+prints even when piped; `--json` (or `REBASE_JSON=1`) prints one object instead,
+with `apps`, `hosts`, `live`, `liveChecks` and `durationMs`.
+
+Before uploading, `deploy` parses the JavaScript of every static app it ships:
+the `.js`/`.mjs`/`.cjs` files in its `output` and the inline `<script>` blocks in
+its HTML. A syntax error stops the deploy with `file:line:column` (code
+`syntax_error` under `--json`), and `--no-verify` skips the check. A successful
+deploy ends with the way back, `rebase cloud rollback`. A static app deployed on
+its own cannot be rolled back yet; see
+[Roll back](/docs/deployment/cloud#roll-back).
+
+`--preview` serves the build at `https://<project>--<name>.rebase.website` and
+leaves production alone. A preview of a static app calls the production backend.
+A preview of the backend runs its own backend, on an empty database of its own.
+See [Preview a change](/docs/deployment/cloud/#preview-a-change).
+
 ### Config
 
 ```bash
@@ -49054,6 +49306,12 @@ rebase cloud domains list | add <domain> | verify [domain] | remove <domain>
 rebase cloud extensions list | enable | disable
 rebase cloud settings show | set        # name, branch, repo, subdomain, rebuilds
 ```
+
+A backend preview starts from production's variables, live keys included.
+`env set KEY=VALUE --preview` gives previews their own value, `env unset KEY
+--preview` leaves the variable out of them, `env reset KEY --preview` hands
+back production's value, and `env list --preview` shows the differences.
+Production is never changed by any of them.
 
 ### Organizations
 
@@ -49095,9 +49353,11 @@ rebase cloud compute set        # change it
 ```
 
 `compute set` takes `--cpu`, `--memory`, `--replicas`, `--spot`,
-`--scale-to-zero`, `--db-instances`, `--db-cpu`, `--db-memory`,
+`--db-instances`, `--db-cpu`, `--db-memory`,
 `--storage`, `--autoscale-max`, `--autoscale-cpu-target` and `--no-autoscale`.
-There are no plan tiers: everything is priced per resource. See
+`--scale-to-zero` is retired: every backend runs at least one instance, so
+`true` is refused and `false` is ignored with a warning. There are no plan
+tiers: everything is priced per resource. See
 [Rebase Cloud](/docs/deployment/cloud/).
 
 ### Storage, webhooks, clusters and billing
@@ -51060,6 +51320,9 @@ administrator before the first boot.
 - **[Rebase Cloud](/docs/deployment/cloud/)** — the same Rebase, operated for
   you: `rebase cloud deploy` from your project, a database per project, backups
   and TLS included.
+- **[Managed backend runtime](/docs/deployment/managed-runtime/)** — what a
+  backend with `runtime: "managed"` can do there: packages, memory, timeouts,
+  the filesystem, secrets, storage and outbound network.
 
 ### Run it yourself
 
@@ -51322,7 +51585,9 @@ Three ways through, in the order they are usually right:
 
 Functions that merely need Node rather than a native binary are fine — the
 deploy reports those separately (`1 of 3 function(s) depend on Node`) and runs
-them.
+them. [Managed backend runtime](/docs/deployment/managed-runtime/) covers the
+rest of what the managed runtime allows: binaries, memory, timeouts, the
+filesystem, secrets, storage and outbound network.
 
 ### Serving the Frontend
 
@@ -51560,6 +51825,35 @@ bundle`), builds the app into `dist-bundle`, uploads the bundle, runs it on the
 published runtime image, and follows the deployment to a terminal state. The exit
 code is the verdict, so the same line works unattended in CI.
 
+It ends by saying where each app now answers and whether the new version is
+live there:
+
+```text
+  ✓ Deployed songbuzz in 1m 12s  (deployment fb3c7442-9937-4179-8d3c-88a106da149d)
+
+    game     static   https://songbuzz.rebase.website      live
+    backend  backend  https://songbuzz.rebase.website/api  live
+
+  ✓ Live: the new version answers on every address above.
+```
+
+"Live" means the address answered after the build: a backend's `/api/health`
+returned `ok`, and a static app's page loaded (from this deployment, when the
+platform serves it). The check waits up to `--live-timeout` seconds, 60 by
+default; `0` skips it. If an app does not answer in time the deploy still exits
+zero, because the deployment succeeded, and the last line says which app did not
+answer and why. A failed deploy ends on one line instead, naming the app and the
+reason, with `rebase cloud logs` for the full build log.
+
+Scripts pass `--json` for one object carrying the same facts — `apps`, `hosts`,
+`live`, `liveChecks`, `durationMs` and the deployment id. Unlike the rest of
+`rebase cloud`, `deploy` does not switch to JSON on its own when piped.
+
+What that runtime allows — packages and native modules, memory and instances,
+timeouts and body sizes, the filesystem, secrets, storage and outbound
+network — is on its own page:
+[Managed backend runtime](/docs/deployment/managed-runtime/).
+
 To ship an artefact that was built earlier — a CI job that builds once and
 deploys twice, say — point at the directory instead of rebuilding:
 
@@ -51575,6 +51869,31 @@ least reversible thing the CLI can do under the same word as "overwrite this
 file"; it is an unknown option now rather than an alias, so a script carrying it
 stops instead.
 
+#### The syntax check before the upload
+
+A static app's files are served exactly as they are. When its `build` only
+copies hand-written scripts into `output`, nothing has parsed them, and a file
+with a typo in it goes live and stops the page from loading. So before anything
+is uploaded, `deploy` parses every `.js`, `.mjs` and `.cjs` file in each static
+app's `output`, along with every inline `<script>` in its `.html` files. That
+covers a static app deployed on its own and static apps folded into the
+backend's bundle. A syntax error stops the deploy with the file, line and column:
+
+```
+✗ A syntax error in the static output, so nothing was deployed:
+    web/cloud.js:42:23  Unexpected token
+        42 |     return fetch("/api";
+Fix it and deploy again, or pass --no-verify to deploy anyway.
+```
+
+With `--json` the error's `code` is `syntax_error`. Inline scripts a browser
+does not run as JavaScript are skipped: JSON, import maps, templates and any
+other non-JavaScript `type`, a `<script src>`, and a script that still holds
+unrendered template markup such as `{{ }}`. A `.js` file passes if it parses as
+either a classic script or a module, because the page decides which. Nothing
+under `node_modules` is read, and neither is a prebuilt `--bundle-dir`.
+`--no-verify` skips the check for one deploy.
+
 Watch it:
 
 ```bash
@@ -51586,6 +51905,50 @@ rebase cloud status          # what the platform thinks the project is doing
 `status` reports `blockedOn` and `nextAction`. When `blockedOn` is `null` the
 platform is genuinely working and polling is the right thing to do; when it names
 something, that something is waiting for you.
+
+### Preview a change
+
+<span class="since-badge" data-since="0.26">Since 0.26</span>
+
+```bash
+rebase cloud deploy --preview
+```
+
+This builds and uploads exactly what `deploy` would, but serves it at an address
+of its own, such as `https://shop--k3x9ab.rebase.website`. Production keeps
+serving what it served before. The deploy prints the preview's address when the
+build finishes.
+
+To keep one address across deploys, name the preview. Deploying the same name
+again updates it:
+
+```bash
+rebase cloud deploy --preview-name new-checkout
+```
+
+What a preview talks to depends on what you deployed:
+
+- **`rebase cloud deploy web --preview`** previews one static app. Its pages call
+  the **production** backend: a sign-in there is a real session, and anything
+  written there is production data.
+- **`rebase cloud deploy --preview`** previews the backend, with its static apps
+  folded in, the same way production runs them. It gets a backend of its own on
+  an **empty database of its own**, never production's. Booting against
+  production's database would apply the preview's schema and access rules to it.
+
+A preview uploads no source and registers no apps or hostnames, because each of
+those would change the production project. `--source` and `--eject` cannot be
+combined with `--preview`. Each builds a container image for production.
+
+```bash
+rebase cloud previews                      # name, address, app, backend, expiry
+rebase cloud previews delete new-checkout  # stops serving it and drops its database
+```
+
+A preview expires a week after it was last deployed to.
+
+Previews are rolling out. A control plane that does not serve them yet refuses
+`--preview` with `previews_unavailable` and deploys nothing.
 
 ### Roll back
 
@@ -51606,6 +51969,15 @@ work:
 | `rebase cloud deploy` (a source build) | The image that build published |
 | `rebase cloud deploy --bundle` (the platform runtime) | The bundle that deploy shipped, on the runtime version the project is running now |
 
+Static apps folded into the backend's bundle (a plain `rebase cloud deploy` on a
+project with a backend) are part of that bundle, so they roll back with it.
+
+A static app deployed on its own (`rebase cloud deploy <app>`) cannot be rolled
+back yet. Its deployment records which app it published, but no bundle, so the
+control plane has nothing to restore it from. The fix is to deploy the last good
+version again, for example from the commit before the bad one. After such a
+deploy, `deploy` says this instead of pointing at `rollback`.
+
 So a rollback needs a deployment that recorded one of the two, which means a
 project that has deployed successfully at least twice. `rebase cloud deployments`
 marks the ones that qualify, and `--json` reports `rollbackable` per row along
@@ -51616,6 +51988,9 @@ and one from before the platform recorded its artefact. There is nothing to gues
 at in either case — guessing would ship whatever was built or uploaded most
 recently while claiming to restore this one — so deploy the version you want
 instead.
+
+Every successful deploy ends by naming the way back (`rebase cloud rollback`),
+so it is in view at the moment a bad release is noticed.
 
 A rollback appends a new deployment rather than rewinding history, and waits for
 the restored version to serve before reporting success. Follow it with
@@ -51702,12 +52077,11 @@ rebase cloud compute set --cpu 500m --memory 2Gi
 
 | Dial | Unit, and what it means |
 |---|---|
-| `--cpu`, `--memory` | App request per instance, e.g. `500m` and `2Gi`. Empty means the platform default — `250m` and `512Mi` |
+| `--cpu`, `--memory` | App request per instance, e.g. `500m` and `2Gi`. Empty means the platform default — `100m` and `384Mi`, bursting to 2 CPU and `2Gi` |
 | `--replicas` | Instances that always exist: the autoscaler's floor, and what the project is billed for at rest |
 | `--autoscale-max` | 1–16. The ceiling it may reach, and the worst case it may be billed. `--no-autoscale` turns it off |
 | `--autoscale-cpu-target` | 10–95. The CPU utilisation the autoscaler holds, against the request rather than the limit. Empty means 70 |
 | `--spot` | `true` or `false`. Preemptible capacity: cheaper, and restarted without notice |
-| `--scale-to-zero` | `true` or `false`. Request-billed compute that stops when idle, at the cost of a cold start |
 | `--db-instances` | 1–3. `1` is a single instance with no failover; `2` adds an automatic standby |
 | `--db-cpu`, `--db-memory`, `--storage` | Per database instance. Empty means `500m`, `2Gi` and the default volume |
 
@@ -51729,6 +52103,7 @@ except one that restarts the database, which waits for a maintenance window.
 | `link`, `unlink`, `use`, `open` | Binding this directory to a project, selecting an organization, opening the console |
 | `projects` | Create, list, inspect, delete |
 | `deploy`, `logs`, `deployments`, `rollback`, `cancel` | Shipping and watching |
+| `previews` | Builds served on their own address by `deploy --preview`, and deleting them. See [Preview a change](#preview-a-change) |
 | `start`, `stop`, `restart` | Pausing a project and bringing it back |
 | `status`, `metrics`, `debug` | What it is doing, and why it is not |
 | `cron` | The deployed app's cron jobs and their recorded runs, read with your `rebase cloud` login. Read-only |
@@ -51765,8 +52140,9 @@ Stated plainly, because finding out later is worse:
 - **Not self-serve.** Access is granted in batches; there is no sign-up-and-pay.
 - **No published SLA**, and no SOC 2. If you need either, say so when you request
   access rather than assuming.
-- **No preview or branch deploys**, and no first-party GitHub App. Deploy hooks —
-  secret URLs you point a repository webhook at — are the supported automation.
+- **No branch deploys**, and no first-party GitHub App. Deploy hooks — secret URLs
+  you point a repository webhook at — are the supported automation. [Preview
+  deploys](#preview-a-change) are rolling out and are started from the CLI.
 - **Tokens act as a person.** A [token](#ci-and-agents) is minted by an account
   and acts as it; there is no organization-owned machine identity yet. If you
   sign in from CI instead, pass `REBASE_CLOUD_EMAIL` and `REBASE_CLOUD_PASSWORD`
@@ -51793,6 +52169,437 @@ Nothing here is a lock-in. The [self-hosting guide](/docs/deployment/self-hostin
 runs the identical image and bundle with `docker compose`, and the
 [Kubernetes guide](/docs/deployment/kubernetes/) renders the same topology from
 the Helm chart.
+
+## Managed backend runtime
+
+A backend app declared like this in `rebase.json` runs on the **managed
+runtime**:
+
+```json title="rebase.json"
+{
+    "apps": {
+        "backend": { "type": "backend", "runtime": "managed" }
+    }
+}
+```
+
+Managed means you ship a bundle, not an image. `rebase cloud deploy` builds your
+collections, `backend/functions/` and crons into `dist-bundle`, uploads it, and
+Rebase Cloud boots it on the published `rebasepro/server` image. You never write
+a Dockerfile, and you also cannot change what is in the image. This page lists
+what that allows, so you can plan a feature before you build it.
+
+The numbers here come from the runtime and the platform as they are today. Some
+are dials you can change, and the page says which ones. The few things that are
+not promised yet are collected [at the end](#not-promised-yet).
+
+### At a glance
+
+| Question | Answer |
+|---|---|
+| Node version | Node 22, on Debian slim, `linux`/`x64` |
+| npm packages | Yes, from the public registry or a private one. Installed when each instance starts |
+| Native modules (`.node`, node-gyp) | No. `rebase cloud deploy` refuses the bundle |
+| WebAssembly | Yes |
+| Spawn a child process | Yes, for a `linux`/`x64` binary an npm package ships. See [Binaries](#binaries-and-child-processes) |
+| Memory and CPU | Set per project with `rebase cloud compute`. See [Compute](#compute-and-instances) |
+| Instances | 1 by default, always on. You can pin up to 5, or let the autoscaler go up to 16 |
+| Function timeout | 30 seconds, then `504 FUNCTION_TIMEOUT`. Configurable up to 10 minutes |
+| Request body | 10 MiB, then `413`. Configurable, up to the 64 MiB the edge accepts |
+| Writable filesystem | Yes, but it is temporary and belongs to one instance |
+| Module-level state (a `Map` cache) | Survives between requests on one instance. Lost on every deploy and restart, and not shared between instances |
+| Environment variables and secrets | `rebase cloud env set`, applied at the next deploy |
+| File storage | A bucket per project, served by your backend at `/api/storage/file/…` |
+| Outbound HTTP | Yes, on ports 80 and 443 (and 465, 587, 993 for mail). Other ports are blocked. No fixed outbound IP |
+
+### Code and packages
+
+**Node and the image.** The runtime image is built on `node:22-slim`
+(Debian), and your bundle runs on `linux`/`x64` as a non-root user. Your
+`tsconfig` and the Node version on your machine do not change this.
+
+**Dependencies.** The bundle lists the dependencies your `package.json` files
+declare. The upload does not include `node_modules`. Each instance installs the
+dependencies when it starts, with `npm ci` (or `npm install` without a
+lockfile). Four things follow from that:
+
+- **Install scripts never run.** The install uses `--ignore-scripts`. A package
+  that downloads a binary or builds something in `postinstall` installs without
+  it.
+- **Only registry versions install.** A `file:`, `link:`, `git+…` or `github:`
+  dependency fails the build, because the runtime has nothing to resolve it
+  against.
+- **Some packages come from the image, not from you.** `@rebasepro/*`, `hono`,
+  `@hono/node-server` and `zod` are removed from the bundle's dependencies and
+  the image's own copies are linked in, so your version of them does not apply.
+  `typescript` and `tsx` are removed too; they are build tools.
+- **Private packages need an `.npmrc`.** `rebase build` copies the project's
+  `.npmrc` (and `backend/.npmrc`) into the bundle, so the install uses the same
+  registry settings as your machine. Every credential in it must be an
+  environment reference, never the token itself; a literal token fails the
+  build, because the bundle is uploaded with your code:
+
+  ```ini title=".npmrc"
+  @acme:registry=https://npm.pkg.github.com
+  //npm.pkg.github.com/:_authToken=${NPM_TOKEN}
+  ```
+
+  ```bash
+  rebase cloud env set NPM_TOKEN=ghp_… --secret
+  ```
+
+The bundle upload is capped at 100 MB, compressed, without dependencies.
+
+**Native modules are refused.** A package that ships a compiled `.node` binary
+cannot load on the managed runtime. `rebase build` warns about it, and
+`rebase cloud deploy` stops before uploading:
+
+```text no-verify
+This bundle depends on native modules (sharp), which the managed runtime cannot run
+```
+
+The check looks for well-known native packages (`sharp`, `canvas`, `bcrypt`,
+`argon2`, `sqlite3`, `better-sqlite3`, `re2`, `sodium-native`, `pg-native`, …),
+for `binding.gyp` or `gypfile`, for install scripts that call `node-gyp` or
+`prebuild`, and for `.node` files. The
+[deployment guide](/docs/getting-started/deployment/#native-modules-on-the-managed-runtime)
+lists the usual ways around it. The short version: do the work at build time,
+call a service, or deploy with `runtime: "custom"`.
+
+**WebAssembly works.** A package that ships a `.wasm` file and loads it from
+JavaScript is not a native module, and Node 22 runs it. Checked in the
+runtime's base image with the pod's security settings, using `esbuild-wasm`.
+Remember the [memory limit](#compute-and-instances) if the module is large,
+such as a speech or ML model.
+
+#### Binaries and child processes
+
+`child_process` works. The image itself has very little to run: `node`, `npm`,
+`sh`, `tar`, and the PostgreSQL client tools (`pg_dump`, `pg_restore`). There is
+no `ffmpeg`, no ImageMagick, no Python and no compiler, and you cannot add
+system packages, because there is no Dockerfile and the process is not root.
+
+A binary that an npm package carries **inside its own tarball** installs with
+the package and runs. It must be built for `linux`/`x64` against glibc
+(Debian), and it runs as an unprivileged user with no Linux capabilities.
+Checked with `@esbuild/linux-x64` in the runtime's base image. A binary that a
+package *downloads* in `postinstall` never arrives, because install scripts do
+not run; packages like `ffmpeg-static` work that way.
+
+If a feature needs a binary, use a hosted API for that work, or move the
+backend to `runtime: "custom"`, where you build your own image.
+
+### Compute and instances
+
+Each project runs in its own pods. Memory and CPU are per instance, and you set
+them with the [compute dials](/docs/deployment/cloud/#compute-and-what-it-costs):
+
+```bash
+rebase cloud compute                              # what the project reserves now
+rebase cloud compute set --cpu 500m --memory 1Gi
+```
+
+A project that never set a dial runs as a burstable pod: it reserves `100m` CPU
+and `384Mi` memory, and can burst to 2 CPU and 2 GiB. A dialled request keeps
+that ratio between request and limit. Run `rebase cloud compute` to see what
+your project has.
+
+Instances:
+
+- **One by default, always running.** `--replicas` pins between 1 and 5.
+  Nothing scales a backend to zero.
+- **Autoscaling is opt-in.** `--autoscale-max` sets a ceiling of up to 16, and
+  `--autoscale-cpu-target` (default 70) the CPU use the autoscaler aims for.
+- **Deploys roll.** A new instance starts and becomes ready before the old one
+  stops, so for a short time two versions serve traffic.
+
+`--spot` is off by default; spot instances are cheaper and restarted without
+notice.
+
+### Memory and module-level state
+
+A module-level value, like `const cache = new Map()` at the top of a function
+file, lives in the Node process. It survives from one request to the next on
+the same instance. It is lost whenever that process ends:
+
+- on **every deploy**, because each deploy starts new instances;
+- when an **environment variable** changes and is deployed;
+- when an instance is restarted, rescheduled or (with `--spot`) reclaimed.
+
+With more than one instance, each one has its own copy, so two requests can see
+different caches.
+
+Use a module-level `Map` as a cache you can afford to lose: one that makes the
+next request faster but is not the only copy of anything. Keep anything you
+paid to produce, like generated audio or an expensive API answer, in the
+database or in [storage](#storage-for-generated-files). For clients you build
+once, such as an API SDK, use `lazyResource` so the client is built on first
+use from the request's environment. See
+[Configuration and Secrets](/docs/backend/custom-functions/#configuration-and-secrets).
+
+[Running more than one instance](/docs/deployment/multiple-instances/) lists
+the state Rebase itself keeps per process, such as rate-limit counters and
+realtime channels.
+
+### The filesystem
+
+The container's filesystem is writable, and `/tmp` works. But everything
+written there:
+
+- belongs to one instance, and other instances do not see it;
+- is deleted when the instance stops, so at the latest on the next deploy;
+- shares a 6 GiB ephemeral-storage limit with the bundle and its installed
+  `node_modules`. An instance that goes over is evicted.
+
+Use it for scratch files during one request. Do not use it as a cache across
+deploys or as storage for uploads. That is also why
+[`STORAGE_TYPE=local` is turned off in production](/docs/backend/storage/#environment-variables).
+
+### Requests
+
+| Limit | Default | Change it with |
+|---|---|---|
+| Function timeout | 30 s, then `504` with code `FUNCTION_TIMEOUT` | `REBASE_FUNCTIONS_TIMEOUT_MS` (`0` turns it off) |
+| Waiting on your instance, at the edge | 10 minutes between reads or writes | Fixed |
+| Request body, all `/api/*` routes | 10 MiB, then `413 PAYLOAD_TOO_LARGE` | `REBASE_MAX_BODY_SIZE`, in bytes |
+| Request body at the edge | 64 MiB | Fixed |
+| One file through `POST /api/storage/upload` | 50 MB | `STORAGE_MAX_FILE_SIZE` |
+| Anonymous calls to `/api/functions/*` | 3000 per IP per 15 minutes | `rateLimit.anonymousFunctions` |
+
+Some details:
+
+- **The timeout frees the caller, not the work.** At 30 seconds the caller gets
+  a `504`, and `getSignal(c)` is aborted. Pass that signal to `fetch` and
+  anything else that accepts one, so the work stops too. See
+  [Timeouts and Rate Limits](/docs/backend/custom-functions/#timeouts-and-rate-limits).
+- **The edge waits longer than the runtime.** The ingress in front of your
+  instances waits up to 10 minutes, so the limit a request hits is the runtime's,
+  which answers JSON and aborts the signal. Raise `REBASE_FUNCTIONS_TIMEOUT_MS`
+  up to that. For work that takes longer, or that must survive a deploy (an
+  instance drains for 15 seconds), answer at once and do the work in a
+  [job](/docs/backend/jobs/).
+- **Uploads larger than 64 MiB** need the resumable (TUS) upload, which sends
+  the file in chunks. `client.storage.putObject()` switches to it on its own
+  above 8 MiB.
+- **Response size.** Neither the runtime nor the edge sets a limit on response
+  size. A large response is still held in memory if your handler builds it in
+  one piece, so stream it or serve it from storage.
+
+### Environment variables and secrets
+
+Set them with the CLI or in the console. There is no field for them in
+`rebase.json`.
+
+```bash
+rebase cloud env set TTS_API_URL=https://api.example.com/v1/speech
+rebase cloud env set TTS_API_KEY=sk-… --secret   # write-only: never shown again
+rebase cloud env list                            # names only, never values
+rebase cloud deploy                              # applies the change
+```
+
+- **A change applies at the next deploy.** Running instances keep the values
+  they started with. `set` and `unset` remind you of this
+  (`Pending redeploy`).
+- **Limits:** up to 100 variables per project, 32 KiB per value and 256 KiB in
+  total. Names follow `[A-Za-z_][A-Za-z0-9_]*`.
+- **Some names are reserved.** The platform sets `DATABASE_URL`,
+  `DATABASE_DIRECT_URL`, `DATABASE_READ_URL`, `JWT_SECRET`,
+  `REBASE_SERVICE_KEY`, `PORT` and `NODE_ENV` itself, and pins how the process
+  runs (`REBASE_ROLE`, `TRUSTED_PROXY_HOPS`, …). Setting one of those is
+  refused, and the error lists them all.
+- **`CORS_ORIGINS` starts from your domains.** The platform sets it to the
+  project's host and its verified [custom domains](/docs/deployment/cloud/#the-rest-of-the-surface).
+  A `CORS_ORIGINS` you set is added to that list, for a frontend served from
+  somewhere else: `rebase cloud env set CORS_ORIGINS=https://app.example.org`.
+- **The storage variables are defaults.** The platform writes the `STORAGE_*`
+  and `S3_*` variables for its bucket, and a value you set wins.
+- **Build-time names are refused.** `VITE_`, `NEXT_PUBLIC_`, `PUBLIC_` and
+  `REACT_APP_` variables are for frontends at build time, and the backend
+  never sees them in time. `--force` stores one anyway.
+
+In a function, read them inside the handler, never at the top of the file:
+
+```typescript
+import { defineFunction, requireEnv } from "@rebasepro/server/functions";
+
+export default defineFunction((app) => {
+    app.get("/status", async (c) => {
+        const endpoint = requireEnv(c, "TTS_API_URL");   // throws a clear error if unset
+        return c.json({ configured: Boolean(endpoint) });
+    });
+});
+```
+
+A module-scope `process.env` read that comes back empty makes the whole file
+fail to load, and its routes answer `404`. See
+[Configuration and Secrets](/docs/backend/custom-functions/#configuration-and-secrets).
+
+### Storage for generated files
+
+A Cloud project gets file storage once you create it:
+
+```bash
+rebase cloud storage create   # a managed bucket and its credentials
+rebase cloud deploy           # the running backend gets the credentials at deploy
+```
+
+Or point the project at a bucket you already own with
+`rebase cloud storage attach` (S3, R2, MinIO, any S3-compatible bucket).
+Without either, uploads answer `501 STORAGE_NOT_CONFIGURED`. More buckets are
+declared in `config/resources.ts`; see
+[Several Buckets](/docs/backend/storage/#several-buckets).
+
+A deploy with storage is refused until the project says who may read and write
+files. The scaffold's `config/storage.ts` exports a `storageAuthorize` hook for
+this. See [Per-Object Authorization](/docs/backend/storage/#per-object-authorization).
+
+**How files are served.** Your backend serves every file at
+`GET /api/storage/file/<key>`. It reads the object from the bucket and streams
+it, with `Content-Type`, range requests and caching headers. There is no direct
+bucket URL to hand out.
+
+- A key under **`public/`** is served to anyone, without a token, at a URL
+  that never changes. Use it for files any visitor may load, such as generated
+  audio for a public game.
+- Any other key is private. A client asks `/api/storage/metadata/<key>` for a
+  download URL that holds a token, valid for 300 seconds by default
+  (`STORAGE_DOWNLOAD_TOKEN_TTL`, up to a week).
+
+From a function, write with `rebase.storage` (the default bucket) or
+`rebase.bucket(…)` (a named one). Your `storageAuthorize` hook still decides
+whether the write is allowed.
+
+Image transforms (`?width=`, `?format=`) need `sharp`, which is a native module
+and is not in the managed image. On the managed runtime, a transform request
+gets the original image.
+
+#### Example: cache generated audio
+
+A function that turns text into speech with a hosted API, stores each result
+once, and serves it from storage afterwards. The `Map` only saves a storage
+lookup on a warm instance; the bucket is the real cache, so a deploy loses
+nothing.
+
+```typescript
+import { defineFunction, getSignal, requireEnv } from "@rebasepro/server/functions";
+
+const known = new Map<string, true>(); // per instance, lost on deploy: that is fine
+
+export default defineFunction((app, { rebase }) => {
+    app.get("/voice/:id", async (c) => {
+        const id = c.req.param("id").replace(/[^a-z0-9-]/gi, "");
+        const key = `public/voices/${id}.mp3`;
+        const url = `/api/storage/file/${key}`;
+
+        if (known.has(key)) return c.redirect(url);
+        const storage = rebase.storage;
+        if (!storage) return c.json({ error: "Storage is not configured" }, 501);
+
+        const listed = await storage.listObjects(key, { maxResults: 1 });
+        if (listed.items.some(item => item.fullPath === key)) {
+            known.set(key, true);
+            return c.redirect(url);
+        }
+
+        const text = c.req.query("text") ?? "";
+        const response = await fetch(requireEnv(c, "TTS_API_URL"), {
+            method: "POST",
+            headers: {
+                authorization: `Bearer ${requireEnv(c, "TTS_API_KEY")}`,
+                "content-type": "application/json"
+            },
+            body: JSON.stringify({ text }),
+            signal: getSignal(c)
+        });
+        if (!response.ok) return c.json({ error: "Speech service failed" }, 502);
+
+        const file = new File([await response.arrayBuffer()], `${id}.mp3`, { type: "audio/mpeg" });
+        await storage.putObject({ file, key });
+        known.set(key, true);
+        return c.redirect(url);
+    });
+});
+```
+
+The route is public, like every route in `backend/functions/` until you guard
+it. A real one would check who may create new audio, so that a stranger cannot
+spend your speech-API budget.
+
+### Outbound network
+
+Functions can call external services. Outbound connections from your instances
+are allowed to any internet address on these TCP ports only:
+
+| Port | For |
+|---|---|
+| 80, 443 | HTTP and HTTPS |
+| 465, 587 | Sending mail over SMTP with TLS or STARTTLS |
+| 993 | IMAP over TLS |
+
+Everything else is blocked. That includes port 25, plain IMAP, and databases or
+caches on their own ports: a PostgreSQL on 5432, Redis on 6379 or MongoDB on
+27017 outside Rebase Cloud cannot be reached. The cloud metadata address
+(`169.254.169.254`) is blocked too.
+
+The platform adds no proxy and no outbound rate limit; the services you call
+have their own. Pass `getSignal(c)` to `fetch` so a call stops when its request
+times out.
+
+There is **no fixed outbound IP address**. Traffic leaves through an address
+shared by every project, which the cloud provider assigns and can change, so do
+not add it to a third-party allowlist. Authenticate to such a service with a
+key instead.
+
+### Startup and shutdown
+
+- **Cold start.** A new instance downloads the bundle and installs its
+  dependencies before it serves. That install is most of a cold start, which
+  is typically 40 to 60 seconds. The platform waits up to 300 seconds for an
+  instance to come up. A large dependency tree makes every deploy and every
+  scale-up slower.
+- **Health.** The platform checks `/livez` (the process is running) and
+  `/health` (it can reach the database). Both are served by the runtime, so you
+  do not write them.
+- **Shutdown.** On a deploy or restart, the instance stops taking new requests,
+  waits 5 seconds for traffic to move, and then gets `SIGTERM`. Requests in
+  flight have up to 15 seconds to finish. Promises passed to `waitUntil` get up
+  to 5 seconds of that. A promise you did not hand to `waitUntil` is dropped.
+  See [Background Work](/docs/backend/custom-functions/#background-work).
+
+### When managed is the wrong fit
+
+Move the backend to `"runtime": "custom"` when it needs:
+
+- a native module, or a system binary no npm package ships, such as `sharp`,
+  ImageMagick or a local speech engine;
+- system packages or a different base image;
+- a long-lived connection to something outside the allowed ports.
+
+A custom runtime builds your own Dockerfile, and you own the image from then
+on. `rebase cloud deploy --eject` makes the switch. See
+[Rebase Cloud](/docs/deployment/cloud/#deploy).
+
+### Not promised yet
+
+- **Log history.** `rebase cloud logs --runtime` reads from the instances that
+  are running, and `rebase cloud debug logs --previous` from the last run of
+  one that restarted. Output from an instance a deploy replaced is gone. Write
+  anything you need to keep to the database or to a log service of your own.
+- **Scale to zero** is not offered. Every backend runs at least one instance at
+  all times.
+
+### Related pages
+
+- [Rebase Cloud](/docs/deployment/cloud/): linking, deploying, the compute
+  dials, and what the beta does not include
+- [Custom Functions](/docs/backend/custom-functions/): writing the routes in
+  `backend/functions/`
+- [Runtime and Bundles](/docs/architecture/runtime-and-bundles/): what a bundle
+  is and how the runtime boots it
+- [Storage](/docs/backend/storage/): buckets, endpoints, size limits and access
+  rules
+- [Running more than one instance](/docs/deployment/multiple-instances/): the
+  state Rebase keeps per process
 
 ## Self-Hosting
 

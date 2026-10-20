@@ -1,24 +1,33 @@
 ---
-sourceHash: 3830846c0457a79f
-title: Diseño del formulario
-sidebar_label: Diseño del formulario
-description: "Controla cómo se organiza el formulario de la entidad: extensiones de columna, secciones y la barra de metadatos."
+sourceHash: fef2eb56c7043526
+title: Diseño de formulario
+sidebar_label: Diseño de formulario
+description: Controla cómo se organiza el formulario de entidad — anchos de columna, secciones y el riel de metadatos.
 ---
 
 ## Descripción general
 
-El formulario de la entidad se genera a partir de tus propiedades. De forma predeterminada, deriva un diseño de dos columnas a partir de los tipos de propiedad, por lo que una colección que no especifica nada sobre el diseño sigue obteniendo un formulario que se lee como tal, en lugar de una larga lista de campos de entrada de ancho completo:
+<span class="since-badge" data-since="0.26">Desde 0.26</span>
 
-- el id y las marcas de tiempo `createdAt` / `updatedAt` van a una barra de metadatos, en modo de solo lectura
-- los enums cortos, booleanos, fechas y números ocupan un ancho estrecho
-- el texto largo, markdown, arrays, maps y campos de almacenamiento ocupan el ancho completo
-- todo lo demás ocupa la mitad
+El formulario de entidad se genera a partir de tus propiedades:
 
-Usa `admin.form` cuando la respuesta derivada no sea la adecuada para tu dominio.
+- el id y las marcas de tiempo `createdAt` / `updatedAt` van a un riel de metadatos, de solo lectura
+- cualquier otro campo ocupa el ancho completo de la columna principal, excepto que dos
+  campos contiguos con el mismo editor pequeño —dos números, dos interruptores,
+  dos fechas del mismo modo, dos selectores con opciones cortas— comparten una fila
+
+Un campo con una etiqueta larga, texto de ayuda de más de 60 caracteres, `conditions` o un
+`Field` personalizado nunca se empareja, y tampoco lo hace ninguna cadena de texto libre: nada en
+un esquema distingue un nombre de rama corto de una URL larga. El formulario nunca comprueba
+qué propiedad es el título. Cualquier otra columna es algo que la colección solicita,
+campo por campo, con `admin.span` —establecido a partir de lo que contiene cada campo, como
+se muestra a continuación. Usa `admin.form` para
+agrupar campos en secciones y moverlos al riel.
 
 ## Ancho de campo
 
-El ancho de un campo es un **span** sobre una cuadrícula de cuatro columnas. `4` es el ancho completo de la columna principal.
+El ancho de un campo es un **span** sobre una cuadrícula de cuatro columnas. `4` es el ancho completo de
+la columna principal.
 
 ```typescript
 import { defineCollection } from "@rebasepro/cms-types";
@@ -47,13 +56,27 @@ const productsCollection = defineCollection({
 });
 ```
 
-Los spans se ajustan a una cuadrícula compartida, lo que hace que dos campos se alineen independientemente del orden en el que se hayan declarado. Reemplazaron a `admin.widthPercentage`, cuyos porcentajes directos no podían alinearse con nada; una colección que todavía lo conserve debería elegir el span más cercano (≤30 → `1`, ≤55 → `2`, ≤80 → `3`, de lo contrario `4`).
+Los spans se ajustan a una cuadrícula compartida, que es lo que hace que dos campos se alineen independientemente
+del orden en que fueron declarados. Reemplazaron a `admin.widthPercentage`,
+cuyos porcentajes directos no podían alinearse con nada; una colección que aún
+conserve uno debería elegir el span más cercano (≤30 → `1`, ≤55 → `2`, ≤80 → `3`,
+de lo contrario `4`).
 
-En diseños demasiado estrechos para dos columnas (el panel lateral, el panel dividido o un teléfono), la cuadrícula se colapsa a una sola columna y los spans se ignoran.
+Elige un span en función de lo que contiene el campo, no de su tipo. Dos valores cortos
+que van juntos comparten una fila —fecha de inicio y fin, ciudad y país,
+proveedor y región con `2` cada uno, o un valor y su calificador con `3` + `1`.
+Los números, booleanos y códigos cortos pueden tomar `1` junto a sus hermanos. Cualquier elemento
+de lectura larga —nombres, URLs, correos electrónicos, ids, descripciones, markdown, archivos—
+conserva `4`. Las filas se completan en orden de declaración y nada ensancha un campo para cerrar un
+espacio, así que declara los pares uno al lado del otro y haz que cada fila sume 4.
+
+En diseños demasiado estrechos para dos columnas —el panel lateral, el panel dividido, un teléfono—,
+la cuadrícula se reduce a una sola columna y los spans se ignoran.
 
 ## Secciones
 
-`sections` agrupa la columna principal bajo encabezados. Una sección con título se puede colapsar; una sin título, no.
+`sections` agrupa la columna principal bajo encabezados. Una sección con título se puede
+contraer; una sin título, no.
 
 ```typescript
 import { defineCollection } from "@rebasepro/cms-types";
@@ -91,13 +114,17 @@ const ordersCollection = defineCollection({
 });
 ```
 
-Una propiedad que ninguna sección mencione nunca se descarta: se ubica en la última sección sin título, o en un grupo final sin título si no hay ninguno. Por lo tanto, añadir una columna a la base de datos no puede hacer que un campo desaparezca silenciosamente del formulario.
+Una propiedad que ninguna sección nombra nunca se descarta: va a parar a la última
+sección sin título, o a un grupo final sin título si no hay ninguna. Por lo tanto, añadir una columna a
+la base de datos no puede hacer que un campo desaparezca silenciosamente del formulario.
 
-Un error de validación dentro de una sección colapsada hace que esta se expanda, por lo que un error nunca puede quedar oculto detrás de un encabezado cerrado.
+Un error de validación dentro de una sección contraída la expande, por lo que un error nunca
+puede ocultarse detrás de un encabezado cerrado.
 
-## La barra de metadatos
+## El riel de metadatos
 
-`sidebar` traslada los campos fuera de la columna principal a una barra estrecha situada junto a ella: estado, propiedad, fechas de publicación, indicadores.
+`sidebar` traslada los campos fuera de la columna principal hacia un riel estrecho a su lado —
+estado, propiedad, fechas de publicación, indicadores.
 
 ```typescript
 import { defineCollection } from "@rebasepro/cms-types";
@@ -122,25 +149,33 @@ const postsCollection = defineCollection({
 });
 ```
 
-La barra no utiliza la cuadrícula, por lo que `span` se ignora para los campos situados en ella. Cuando no hay espacio para una barra lateral, se muestra como una sección inicial ordinaria, por lo que no se pierde nada en un teléfono o en el panel lateral.
+El riel no utiliza la cuadrícula, por lo que `span` se ignora para los campos que contiene. Donde
+no hay espacio para un riel, se renderiza como una sección inicial ordinaria, de modo que
+nada se pierde en un teléfono o en el panel lateral.
 
-`showRecordMeta` coloca el bloque de registro de solo lectura (id, creación, actualización) al pie de la barra. Su valor predeterminado es `true` siempre que se muestre una barra, y es lo que reemplaza a `hideIdFromForm` para la mayoría de las colecciones: el id deja de ser un campo en medio del formulario y se convierte en una línea de metadatos que se puede copiar.
+`showRecordMeta` coloca el bloque de registro de solo lectura —id, creado, actualizado— al
+pie del riel. Por defecto es `true` siempre que se muestra un riel, y es lo que
+reemplaza a `hideIdFromForm` para la mayoría de las colecciones: el id deja de ser un campo en
+medio del formulario y se convierte en una línea de metadatos copiable.
 
-Establece `sidebar: []` para suprimir la barra derivada por completo y mantener todos los campos en la columna principal.
+Establece `sidebar: []` para suprimir el riel derivado por completo y mantener todos los campos en
+la columna principal.
 
 ## Referencia
 
+<span class="since-badge" data-since="0.26">Desde 0.26</span>
+
 | Propiedad | Tipo | Descripción |
 |-----------|------|-------------|
-| `admin.span` | `1 \| 2 \| 3 \| 4` | Ancho del campo sobre la cuadrícula de formulario de cuatro columnas |
-| `admin.form.sidebar` | `string[]` | Claves de propiedad que se muestran en la barra de metadatos |
+| `admin.span` | `1 \| 2 \| 3 \| 4` | Ancho del campo en la cuadrícula de cuatro columnas del formulario |
+| `admin.form.sidebar` | `string[]` | Claves de propiedad mostradas en el riel de metadatos |
 | `admin.form.sections` | `FormSection[]` | Grupos con título para la columna principal |
-| `admin.form.showRecordMeta` | `boolean` | Muestra id/creación/actualización al pie de la barra |
+| `admin.form.showRecordMeta` | `boolean` | Mostrar id/creado/actualizado al pie del riel |
 
 `FormSection` es `{ key, title?, properties, collapsed?, collapsible? }`.
 
 ## Relacionado
 
-- [Campos personalizados](/docs/frontend/custom-fields/) — el campo que organiza un diseño
-- [Vistas de entidad](/docs/frontend/entity-views/) — una pestaña completa propia junto al formulario
-- [Propiedades](/docs/collections/properties/) — las opciones de propiedad que lee un diseño
+- [Custom Fields](/docs/frontend/custom-fields/) — el campo que un diseño está organizando
+- [Entity Views](/docs/frontend/entity-views/) — una pestaña completa propia junto al formulario
+- [Properties](/docs/collections/properties/) — las opciones de propiedad que lee un diseño

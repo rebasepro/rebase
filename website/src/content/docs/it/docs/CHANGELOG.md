@@ -11,9 +11,134 @@ La traduzione è in arrivo. Il contenuto qui sotto è in inglese.
 
 ## [Unreleased]
 
-### Fixed
+### Added
 
 #### CLI
+
+- **`rebase cloud deploy` checks a static app's JavaScript before uploading
+  it.** A static app whose `build` only copied hand-written scripts into its
+  output deployed a file that did not parse. The deploy succeeded, and the live
+  page failed on load. Every `.js`, `.mjs` and `.cjs` file in each static app's
+  output is now parsed, with the inline `<script>` blocks of its HTML, before
+  anything is uploaded. That covers static apps deployed on their own and those
+  folded into the backend's bundle. A syntax error stops the deploy with
+  `file:line:column` and the offending line (`--json` code `syntax_error`).
+  `--no-verify` skips the check. The parser is acorn, now a CLI dependency.
+
+- **A successful deploy says how to undo it.** It ends with
+  "`rebase cloud rollback` puts the previous deployment back." A static app
+  deployed on its own records no bundle, so it cannot be rolled back yet; its
+  deploy says so and suggests deploying the last good version again.
+
+- **`rebase cloud deploy --preview` serves a build at its own address and
+  leaves production alone.** Before, the only way to see a change on the
+  platform was to ship it to production. The new flag prints an address like
+  `https://<project>--<name>.rebase.website`, and `--preview-name` keeps the same
+  address across deploys. A static app's preview calls the production backend.
+  A backend preview runs its own backend, on an empty database of its own.
+  `rebase cloud previews` lists and deletes previews. A preview is started
+  through its own control-plane function, never through `deploy`, so a control
+  plane without previews refuses it with `previews_unavailable` and nothing
+  ships to production. The control plane's half is specified in
+  `docs/preview-deployments.md`.
+
+- **Previews can run with their own environment variables.** A backend preview
+  starts from production's variables, and that copy carries production's live
+  third-party keys, so a preview that charges a card does it for real.
+  `rebase cloud env set KEY=VALUE --preview` gives previews their own value (a
+  test key), `env unset KEY --preview` leaves a variable out of them, `env reset
+  KEY --preview` gives them production's value again, and `env list --preview`
+  shows what differs. None of them changes production. A control plane without
+  previews refuses them with `previews_unavailable`.
+
+- **Private npm packages install on the managed runtime.** A managed pod
+  installs a bundle's dependencies when it starts, from the public registry
+  only, so a package under a private scope or registry never installed.
+  `rebase build` now copies the project's `.npmrc` (and `backend/.npmrc`) into
+  the bundle. Every credential in it must be an environment reference such as
+  `${NPM_TOKEN}`, set with `rebase cloud env set NPM_TOKEN=… --secret`; a
+  literal token fails the build, because the bundle is uploaded with the code.
+
+### Changed
+
+#### Admin (CMS & app)
+
+- **Form fields are full width unless they are a pair of like compact
+  fields, or the collection sets `admin.span`.** The form used to guess widths
+  from property types — strings, dates and relations at half, numbers and
+  booleans at a quarter, the title property full — and paired fields that had
+  nothing to do with each other: Namespace beside Custom Domain, Git Branch
+  beside Git Repository URL. Now a field takes the whole row unless it and its
+  neighbour have the same small editor (two numbers, two switches, two dates of
+  the same mode, two selects with short options) and neither has a long label,
+  long help text, `conditions` or a custom `Field`. Free-text strings are never
+  paired, nothing reads the title property, and rows are no longer stretched to
+  close a gap. A span written on a property is used as written.
+
+#### CLI
+
+- **A cloud deploy ends on a summary that says where the app is and whether it
+  is live.** `rebase cloud deploy` lists each app it shipped with its URL, the
+  deployment id and how long it took, then probes each URL — a backend's
+  `/api/health`, a static app's page — for up to `--live-timeout` seconds
+  (default 60, `0` skips) and says whether the new version answers. Before, a
+  run through an agent or a pipe printed only `{"success":true,…,"hosts":[]}`,
+  and people checked every deploy with `curl`. The summary now prints when
+  piped too; `--json` or `REBASE_JSON=1` gives the object, which gains
+  `project`, `apps`, `durationMs`, `live` and `liveChecks`. A piped run without
+  either says on stderr how to get JSON back. Every other `rebase cloud`
+  command still switches to JSON when piped.
+
+### Fixed
+
+#### Runtime
+
+- **A function that imports `hono` itself loads on the managed runtime.** The
+  bundler removes `hono` and `@hono/node-server` from a bundle's dependencies
+  because the image provides them, but nothing linked the image's copy into
+  the bundle, so `import { Hono } from "hono"` failed with "Cannot find
+  package" and the function's route answered 404. Both are now linked in at
+  boot, like `@rebasepro/server` and `zod`.
+
+#### CLI
+
+- **A cloud deploy's result lists the project's own host.** The control plane
+  reports only hostnames an app declares in its `path`, so the `hosts` field of
+  `rebase cloud deploy --json` was `[]` for a project served on
+  `<slug>.rebase.website`. The project's host now comes first, as verified.
+
+- **A failed cloud deploy says which app failed and why, in one line.** The
+  reason is read from the control plane's `❌` line at the end of the build
+  log, with `rebase cloud logs` named for the rest. The JSON error gains
+  `apps`, `reason` and `hint`.
+
+- **The stale-build warning shows only to someone developing the CLI.** A
+  developer's global `rebase` is often linked to a checkout of this repo, so a
+  bare `rebase cloud deploy` in their own project warned "dist/ is 159h older
+  than src/" on every run, about source they were not working on. It now warns
+  only when the CLI runs from a pnpm workspace checkout, not from
+  `node_modules`, and the command runs inside that checkout. Set
+  `REBASE_CLI_DEV=1` to get it when testing a dev build against another
+  project.
+
+- **A `rebase` linked to a checkout runs the CLI your project pinned.** On a
+  machine whose global `rebase` links to a checkout of this repo, a bare
+  `rebase cloud deploy` in a project ran the checkout's build (280h older than
+  its source, where it was found) instead of the project's installed
+  `@rebasepro/cli` 0.25.1; only `pnpm rebase` used the pinned one. A checkout
+  now hands off to the `@rebasepro/cli` the project installed in
+  `node_modules`, with the same arguments, and exits with its code, as jest and
+  gulp do. `--debug` names both. A project that links its CLI to a checkout
+  keeps running that checkout, and `REBASE_CLI_DEV=1` runs the checkout
+  anyway, for testing a dev build against another project.
+
+- **`rebase cloud compute set --scale-to-zero` is retired.** The dial never did
+  anything: every backend ran as an always-on instance whatever it said. `true`
+  is now refused with a message naming `--replicas` and `--autoscale-max`;
+  `false` is ignored with a warning, so scripts that pass it keep working. The
+  help pages and `rebase cloud compute` no longer show it, and the CPU and
+  memory defaults they print are the platform's: `100m` and `384Mi`, bursting
+  to 2 CPU and `2Gi`.
 
 - **The cloud debug boot view shows the functions and crons a 0.25 runtime
   loaded.** It kept a line only if it said "Loaded function" or "Mounted", the
@@ -21,6 +146,57 @@ La traduzione è in arrivo. Il contenuto qui sotto è in inglese.
   cron job: …" and "Cron jobs scheduled", so `rebase cloud debug boot` showed a
   project's storage and its port and none of the code it runs. Both wordings are
   shown now.
+
+#### Client SDK
+
+- **A public page no longer prints the client's connection messages to every
+  visitor's console.** In a browser, "Connected to PostgreSQL backend" and
+  "WebSocket auto-authenticated" were written with `console.debug` on every
+  load, naming the backend on any site that used the client. Connection
+  messages are now off by default everywhere. Turn them on with
+  `createRebaseClient({ debug: true })`, or in one browser, with no change to
+  the site, with `localStorage.setItem("rebase_debug", "1")`;
+  `globalThis.__REBASE_DEBUG__` and `__REBASE_DEBUG_REALTIME__` work too.
+  Warnings and errors are printed as before.
+
+#### Admin (CMS & app)
+
+- **The `"Shell.AppBar"`, `"HomePage.CollectionCard"` and `"Auth.LoginView"`
+  component overrides work.** All three were declared, documented and shown in
+  the `<Rebase components>` example, and nothing resolved them, so setting one
+  did nothing. A `"Shell.AppBar"` override now renders a top bar (a wrapper is
+  handed the default one); an `appBar` element on `<RebaseShell>` still wins,
+  as does `loginView` on `<RebaseAuth>` over `"Auth.LoginView"`. A test now
+  fails when a declared override name is resolved nowhere.
+- **`exportable: false` removes Export from the collection toolbar.** It was
+  ignored; only the object form was read, for its extra fields.
+- **The record form follows field access rules.** A field the user may not
+  write (`access.write`) is shown read-only, and one they may not read
+  (`access.read`, `excludeFromApi`) is left out, label included. Before, both
+  were ordinary inputs and the edit came back as a 400 on save. A new record or
+  a copy no longer sends a default or copied value for a field the user may
+  not write, which made the server refuse the whole save.
+- **A language added through `<Rebase translations>` is in the language
+  menu.** The menu listed the seven shipped languages only, so an app's own
+  language could be set with `locale` and never chosen by the user. A
+  language Rebase does not ship is named by the browser (`nl` → "Nederlands").
+  `useRebaseLocales()` returns the list.
+- **A record created from its parent's tab opens linked to that parent.** A new
+  transaction from a customer's Transactions tab asked for the customer, and a
+  required `belongsTo` could not be saved until the user picked the record they
+  had come from. The server already linked a create under
+  `customers/{id}/transactions` to that customer. The form now opens with the
+  link set and locked while the record is new. Editing it later still works.
+  This covers a `hasMany` whose child has the `belongsTo` back on
+  `foreignKeyOnTarget`. A link keyed on `sourceKey` is not prefilled.
+
+- **"Create" in the side panel opens the saved record instead of asking about
+  unsaved changes.** The save reported the form clean and moved the panel to
+  the new record in the same tick, and the panel's guard still saw it as dirty.
+  It asked "There are unsaved changes" about a record already saved and left
+  the URL on `#new_side`. A dirty record still asks before the panel leaves it.
+  `useUnsavedChangesDialog` now also takes a function for `when`, read at the
+  moment of navigation.
 
 ## [0.25.1] - 2026-10-14
 

@@ -2,36 +2,6 @@
 
 ## [Unreleased]
 
-### Changed
-
-#### Admin (CMS & app)
-
-- **Form fields are full width unless they are a pair of like compact
-  fields, or the collection sets `admin.span`.** The form used to guess widths
-  from property types — strings, dates and relations at half, numbers and
-  booleans at a quarter, the title property full — and paired fields that had
-  nothing to do with each other: Namespace beside Custom Domain, Git Branch
-  beside Git Repository URL. Now a field takes the whole row unless it and its
-  neighbour have the same small editor (two numbers, two switches, two dates of
-  the same mode, two selects with short options) and neither has a long label,
-  long help text, `conditions` or a custom `Field`. Free-text strings are never
-  paired, nothing reads the title property, and rows are no longer stretched to
-  close a gap. A span written on a property is used as written.
-
-#### CLI
-
-- **A cloud deploy ends on a summary that says where the app is and whether it
-  is live.** `rebase cloud deploy` lists each app it shipped with its URL, the
-  deployment id and how long it took, then probes each URL — a backend's
-  `/api/health`, a static app's page — for up to `--live-timeout` seconds
-  (default 60, `0` skips) and says whether the new version answers. Before, a
-  run through an agent or a pipe printed only `{"success":true,…,"hosts":[]}`,
-  and people checked every deploy with `curl`. The summary now prints when
-  piped too; `--json` or `REBASE_JSON=1` gives the object, which gains
-  `project`, `apps`, `durationMs`, `live` and `liveChecks`. A piped run without
-  either says on stderr how to get JSON back. Every other `rebase cloud`
-  command still switches to JSON when piped.
-
 ### Added
 
 #### CLI
@@ -79,6 +49,36 @@
   the bundle. Every credential in it must be an environment reference such as
   `${NPM_TOKEN}`, set with `rebase cloud env set NPM_TOKEN=… --secret`; a
   literal token fails the build, because the bundle is uploaded with the code.
+
+### Changed
+
+#### Admin (CMS & app)
+
+- **Form fields are full width unless they are a pair of like compact
+  fields, or the collection sets `admin.span`.** The form used to guess widths
+  from property types — strings, dates and relations at half, numbers and
+  booleans at a quarter, the title property full — and paired fields that had
+  nothing to do with each other: Namespace beside Custom Domain, Git Branch
+  beside Git Repository URL. Now a field takes the whole row unless it and its
+  neighbour have the same small editor (two numbers, two switches, two dates of
+  the same mode, two selects with short options) and neither has a long label,
+  long help text, `conditions` or a custom `Field`. Free-text strings are never
+  paired, nothing reads the title property, and rows are no longer stretched to
+  close a gap. A span written on a property is used as written.
+
+#### CLI
+
+- **A cloud deploy ends on a summary that says where the app is and whether it
+  is live.** `rebase cloud deploy` lists each app it shipped with its URL, the
+  deployment id and how long it took, then probes each URL — a backend's
+  `/api/health`, a static app's page — for up to `--live-timeout` seconds
+  (default 60, `0` skips) and says whether the new version answers. Before, a
+  run through an agent or a pipe printed only `{"success":true,…,"hosts":[]}`,
+  and people checked every deploy with `curl`. The summary now prints when
+  piped too; `--json` or `REBASE_JSON=1` gives the object, which gains
+  `project`, `apps`, `durationMs`, `live` and `liveChecks`. A piped run without
+  either says on stderr how to get JSON back. Every other `rebase cloud`
+  command still switches to JSON when piped.
 
 ### Fixed
 

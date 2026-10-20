@@ -1,71 +1,67 @@
 ---
-sourceHash: 0c7da5b3273415e5
-title: Eigenschaften
-sidebar_label: Eigenschaften
-description: Eigenschaftstypen definieren den Datentyp, die Validierung und das UI-Rendering für jedes Feld in einer Collection. Rebase unterstützt die Typen String, Number, Boolean, Date, Array, Map, Reference, Relation und Geopoint.
+sourceHash: 9426e0b3511c31f5
+title: Properties
+sidebar_label: Properties
+description: Property-Typen definieren den Datentyp, die Validierung und das UI-Rendering für jedes Feld in einer Collection. Rebase unterstützt string-, number-, boolean-, date-, array-, map-, reference-, relation- und geopoint-Typen.
 ---
 
 import { FieldWidgetPreview } from '../../../../../components/docs/FieldWidgetPreview';
 
 ## Übersicht
 
-Eigenschaften definieren die Spalten in Ihrer Datenbanktabelle und wie sie in der Admin-UI gerendert werden. Jede Eigenschaft hat einen `type`, der Folgendes bestimmt:
+Properties definieren die Spalten in Ihrer Datenbanktabelle und wie sie in der Admin-UI gerendert werden. Jede Property hat einen `type`, der Folgendes bestimmt:
 
-- Den **Datenbank-Spaltentyp** (über Drizzle-Schema-Generierung)
+- Den **Datenbankspaltentyp** (über die Drizzle-Schema-Generierung)
 - Die **Formularfeld**-Komponente
 - Den **Tabellenzellen**-Renderer
-- Die **Validierungsregeln**
+- Die **Validierungs**regeln
 
-## Eigenschaftstypen
+## Property-Typen
 
 | Typ | Beschreibung | PostgreSQL-Spalte |
 |------|-------------|-------------------|
 | `string` | Text, Select, Markdown, Datei-Upload, URL, E-Mail | standardmäßig `text`; `varchar`, `char` oder `uuid` mit `columnType` |
 | `number` | Ganzzahl, Dezimalzahl, Währung | `integer`, `numeric`, `bigint`, `serial` |
 | `boolean` | True/False-Umschalter | `boolean` |
-| `date` | Datum, Datum/Uhrzeit, Zeitstempel | `timestamp`, `date` |
-| `array` | Geordnete Liste von Werten | Ein natives Array (`text[]`, `integer[]`, `numeric[]`, `boolean[]`), wenn `of` eine einzelne String-, Number- oder Boolean-Property ist; sonst `jsonb` |
+| `date` | Datum, Datum/Uhrzeit, Timestamp | `timestamp`, `date` |
+| `array` | Geordnete Liste von Werten | Ein natives Array (`text[]`, `integer[]`, `numeric[]`, `boolean[]`), wenn `of` eine einzelne String-, Number- oder Boolean-Property ist; andernfalls `jsonb` |
 | `map` | Schlüssel-Wert-Objekt | `jsonb` |
-| `geopoint` | Breitengrad/Längengrad-Paar | `jsonb` |
+| `geopoint` | Breitengrad-/Längengrad-Paar | `jsonb` |
 | `reference` | Eingebettete Referenz auf eine andere Entität | Der Primärschlüsseltyp des Ziels (speichert dessen ID) |
-| `relation` | SQL-Fremdschlüssel-Beziehung | Verwendet das `relations`-Array |
-| `vector` | Embedding, für Nearest-Neighbour-Suche | `VECTOR(n)` (pgvector) |
-| `binary` | Rohdaten-Bytes, gelesen und geschrieben als Base64 | `bytea` |
+| `relation` | SQL-Fremdschlüssel-Relation | Verwendet das `relations`-Array |
+| `vector` | Embedding, für Nearest-Neighbor-Suche | `VECTOR(n)` (pgvector) |
+| `binary` | Rohdatenbytes, gelesen und geschrieben als Base64 | `bytea` |
 
-## Gemeinsame Eigenschaften
+## Gemeinsame Properties
 
-Alle Eigenschaftstypen teilen diese Optionen:
+Alle Property-Typen teilen sich diese Optionen:
 
-| Eigenschaft | Typ | Beschreibung |
+| Property | Typ | Beschreibung |
 |----------|------|-------------|
 | `type` | `string` | **Erforderlich.** Datentyp (siehe oben) |
-| `name` | `string` | Anzeigebezeichnung. Standardmäßig der Eigenschaftsschlüssel, formatiert – `publishDate` → "Publish Date". Setzen Sie ihn, wenn diese Ableitung nicht passt: `"URL"` statt "Url". |
+| `name` | `string` | Anzeigename (Label). Standardmäßig der Property-Schlüssel, formatiert – `publishDate` → "Publish Date". Setzen Sie ihn, wenn diese Ableitung nicht passt: `"URL"` statt "Url". |
 | `description` | `string` | Hilfetext, der unter dem Feld angezeigt wird |
-| `defaultValue` | `any` | Standardwert für neue Entitäten. Ein Literal – ein String, eine Zahl, ein Boolean, ein Datum, eine Enum-ID oder ein `map`/`array`-Dokument – wird auch zum `DEFAULT` der Spalte, sodass auch eine Zeile, die nicht über das Admin-Panel eingefügt wird (die REST-API, ein Seed, `psql`), diesen Wert erhält |
-| `databaseDefault` | `boolean \| SqlExpression` | Die Datenbank füllt die Spalte, wenn ein Create sie leer lässt: eine Spalte `NOT NULL DEFAULT <expression>` wie `gen_random_uuid()` oder `nextval(…)`. Ein `required`-Feld mit dieser Option darf bei einem Create weggelassen werden, vom Admin-Formular wie von der API, und ein beim Create gesendetes `null` bleibt der Datenbank überlassen; beim Bearbeiten bleibt es erforderlich, und der generierte `Insert`-Typ macht es optional. Geben Sie den Ausdruck in der Template-Form an, die `isId` annimmt, ``databaseDefault: "sql`gen_random_uuid()`"``, und der Schema-Planer schreibt ihn als `DEFAULT` der Spalte, sodass `rebase db push` ihn beibehält. `true` deklariert einen anderswo geschriebenen `DEFAULT` und schreibt keinen, sodass ein Push plant, ihn zu entfernen. „Import from table“ und `rebase schema introspect` setzen den Ausdruck, den sie lesen |
+| `defaultValue` | `any` | Standardwert für neue Entitäten. Ein literaler Wert – ein String, eine Zahl, ein Boolean, ein Datum, eine Enum-ID oder ein `map`/`array`-Dokument – wird auch zum `DEFAULT` der Spalte, sodass eine Zeile, die von etwas anderem als dem Admin-Panel eingefügt wird (die REST-API, ein Seed, `psql`), diesen ebenfalls erhält |
+| `databaseDefault` | `boolean \| SqlExpression` | Die Datenbank füllt die Spalte, wenn sie bei der Erstellung leer gelassen wird: eine `NOT NULL DEFAULT <Ausdruck>`-Spalte wie `gen_random_uuid()` oder `nextval(…)`. Ein `required`-Feld damit kann bei der Erstellung im Admin-Formular und über die API weggelassen werden, und ein beim Erstellen übergebenes `null` wird der Datenbank überlassen; beim Bearbeiten bleibt es erforderlich, und der generierte `Insert`-Typ macht es optional. Geben Sie den Ausdruck in der Template-Form an, die auch `isId` verwendet: ``databaseDefault: "sql`gen_random_uuid()`"``, und der Schema-Planer schreibt ihn als `DEFAULT` der Spalte, sodass `rebase db push` ihn beibehält. `true` deklariert ein an anderer Stelle geschriebenes `DEFAULT` und schreibt keines, sodass ein Push das Löschen plant. "Import from table" und `rebase schema introspect` setzen den Ausdruck, den sie auslesen |
 | `validation` | `object` | Validierungsregeln |
-| `propertyConfig` | `string` | Registrierter Eigenschafts-Konfigurationsschlüssel |
+| `propertyConfig` | `string` | Registrierter Property-Config-Schlüssel |
 | `columnName` | `string` | Expliziter Datenbankspaltenname (umgeht die snake_case-Konvertierung) |
 | `callbacks` | `PropertyCallbacks` | Hooks für `afterRead`- und `beforeSave`-Transformationen |
-| `excludeFromApi` | `boolean` | Diese Spalte niemals auf der API-Oberfläche erwähnen, in keiner Richtung – für einen Passwort-Hash oder ein Verifizierungstoken. Der Wert wird serverseitig weiterhin geschrieben und kann abgefragt werden; er wird aus jeder von der API ausgelieferten Zeile entfernt, für jeden Aufrufer einschließlich Admins und Service-Keys, und er fehlt in den generierten Typen `Row`, `Insert` und `Update` sowie im OpenAPI-Schema. Syntax-Zucker für `access: { read: [], write: [] }` – beides ist derselbe Mechanismus, und das Setzen von beidem für dieselbe Eigenschaft wird beim Start abgelehnt |
-| `access` | `{ read?: string[]; write?: string[] }` | Wer dieses einzelne Feld lesen und schreiben darf, nach Rolle. Eine weggelassene Liste delegiert an die [Sicherheitsregeln](/docs/collections/security-rules/) der Zeile; `[]` bedeutet niemand über die API; eine Rollenliste umfasst diese Rollen plus `admin`. Ein nicht lesbares Feld ist in Antworten **nicht vorhanden** statt `null`, und ein Schreibzugriff, der ein nicht beschreibbares Feld benennt, führt zu einem 400-Fehler. Siehe [Feldzugriff](/docs/collections/field-access/) |
-| `metadata` | `Record<string, unknown>` | Alles, was Ihr eigener Code an eine Eigenschaft anhängen muss. Rebase liest dies nicht; es bleibt bei der Serialisierung unverändert erhalten |
-| `dynamicProps` | `function` | Dynamischer Eigenschafts-Builder (siehe [Bedingte Felder](/docs/collections/validation-and-conditions/#conditional-fields)). **Nur Admin-Formular – wird von der API oder Datenbank nicht erzwungen.** |
-| `conditions` | `PropertyConditions` | Deklarative JSON Logic-Bedingungen. **Nur Admin-Formular – wird von der API oder Datenbank nicht erzwungen.** |
+| `excludeFromApi` | `boolean` | Diese Spalte niemals auf der API-Oberfläche erwähnen, in keiner Richtung – für einen Passwort-Hash oder ein Verifikationstoken. Der Wert wird serverseitig weiterhin geschrieben und abgefragt; er wird aus jeder Zeile entfernt, die die API ausliefert, für jeden Aufrufer einschließlich Admins und Service-Schlüsseln, und fehlt in den generierten `Row`-, `Insert`- und `Update`-Typen sowie im OpenAPI-Schema. Syntaktischer Zucker für `access: { read: [], write: [] }` – beides ist derselbe Mechanismus, und das Festlegen von beidem für eine Property wird beim Booten abgelehnt |
+| `access` | `{ read?: string[]; write?: string[] }` | Wer dieses einzelne Feld lesen und wer es schreiben darf, nach Rolle. Eine weggelassene Liste delegiert an die [Sicherheitsregeln](/docs/collections/security-rules/) der Zeile; `[]` bedeutet niemand über die API; eine Rollenliste umfasst diese Rollen plus `admin`. Ein nicht lesbares Feld ist in Antworten **nicht vorhanden** (statt `null`), und ein Schreibzugriff, der ein nicht schreibbares Feld benennt, ergibt einen 400-Fehler. Siehe [Feldzugriff](/docs/collections/field-access/) |
+| `metadata` | `Record<string, unknown>` | Alles, was Ihr eigener Code an eine Property anhängen muss. Rebase liest es nicht; es übersteht die Serialisierung unverändert |
+| `dynamicProps` | `function` | Dynamischer Property-Builder (siehe [Bedingte Felder](/docs/collections/validation-and-conditions/#conditional-fields)). **Nur Admin-Formular – wird nicht von der API oder der Datenbank erzwungen.** |
+| `conditions` | `PropertyConditions` | Deklarative JSON-Logic-Bedingungen. **Nur Admin-Formular – wird nicht von der API oder der Datenbank erzwungen.** |
 
-:::note[Was „Nur Admin-Formular“ bedeutet]
-Mehrere der unten stehenden Optionen tragen diese Kennzeichnung: Sie bestimmen
-das vom Panel dargestellte Formular und sonst nichts – die API akzeptiert Schreibvorgänge,
-die sie ignorieren, und es steht kein Constraint dahinter. Eine Regel, die für
-jeden API-Aufrufer gelten muss, ist eine [Validierungsregel](/docs/collections/validation-and-conditions/)
-— geprüft bei REST-, Socket- und MCP-Schreibvorgängen, [nicht bei prozessinternen](/docs/collections/validation-and-conditions/#where-validation-runs)
-— oder eine [Sicherheitsregel](/docs/collections/security-rules/), die von der Datenbank für alle
-durchgesetzt wird.
+:::note[Was "Nur Admin-Formular" bedeutet]
+Mehrere Optionen unten tragen diesen Hinweis: Sie bestimmen das Formular, das das Panel darstellt, und sonst nichts – die API akzeptiert Schreibvorgänge, die sie ignorieren, und es steht kein Constraint dahinter. Eine Regel, die für jeden API-Aufrufer gelten muss, ist eine [Validierungsregel](/docs/collections/validation-and-conditions/) – geprüft bei REST-, Socket- und MCP-Schreibvorgängen, [nicht bei In-Process-Vorgängen](/docs/collections/validation-and-conditions/#where-validation-runs) – oder eine [Sicherheitsregel](/docs/collections/security-rules/), die die Datenbank für jeden erzwingt.
 :::
 
 ### UI-Konfiguration (`admin`)
 
-UI-bezogene Optionen sind unter dem Unterobjekt `admin` verschachtelt:
+<span class="since-badge" data-since="0.26">Seit 0.26</span>
+
+UI-bezogene Optionen sind unter dem `admin`-Unterobjekt verschachtelt:
 
 ```typescript
 price: {
@@ -79,35 +75,33 @@ price: {
 }
 ```
 
-| Eigenschaft | Typ | Beschreibung |
+| Property | Typ | Beschreibung |
 |----------|------|-------------|
 | `admin.readOnly` | `boolean` | Bearbeitung verhindern |
 | `admin.disabled` | `boolean \| PropertyDisabledConfig` | Deaktivieren mit optionalem Tooltip |
-| `admin.filledByServer` | `boolean` | Der Server befüllt das Feld, wenn ein neuer Datensatz es leer lässt (ein `beforeSave`-Hook). Das Formular lässt eine Erstellung ohne dieses Feld durch; beim Bearbeiten bleibt es erforderlich, und die eigenen Prüfungen des Servers gelten weiterhin |
-| `admin.hideFromCollection` | `boolean` | In der Tabellenansicht ausblenden. Nur Darstellung: Die verknüpften Zeilen einer ausgeblendeten Relationseigenschaft sind weiterhin in den Listen-Read eingebettet (siehe [Relationen](/docs/collections/relations)) |
+| `admin.filledByServer` | `boolean` | Der Server füllt das Feld, wenn ein neuer Datensatz es leer lässt (ein `beforeSave`-Hook). Das Formular lässt das Erstellen ohne das Feld zu; beim Bearbeiten bleibt es erforderlich, und die servereigenen Prüfungen gelten weiterhin |
+| `admin.hideFromCollection` | `boolean` | In der Tabellenansicht ausblenden. Reine Anzeige: Die verknüpften Zeilen einer ausgeblendeten Relation-Property sind beim Listenabruf weiterhin eingebettet (siehe [Relations](/docs/collections/relations)) |
 | `admin.columnWidth` | `number` | Spaltenbreite in Pixeln (Tabellenansicht) |
-| `admin.span` | `1 \| 2 \| 3 \| 4` | Feldbreite im vierspaltigen Formularraster |
-| `admin.Field` | `React.ComponentType` | Eigene Feldkomponente |
-| `admin.Preview` | `React.ComponentType` | Eigene Tabellenzellen-Komponente |
-| `admin.Filter` | `React.ComponentType` | Eigenes Filterfeld für diese Eigenschaft. Hat Vorrang vor dem Sammlungs-Override `Collection.FilterField` und dem integrierten typbasierten Feld |
-| `admin.filterOperators` | `WhereFilterOp[]` | Schränkt die beim Filtern dieser Eigenschaft angebotenen Operatoren ein. Die angebotene Menge ist die **Schnittmenge** aus den Fähigkeiten der Engine, den Standardwerten des Typs und dieser Liste – Sie können nur einschränken, niemals einen Operator hinzufügen, den die Engine nicht ausführen kann. `[]` deaktiviert das Filtern für diese Eigenschaft |
-| `admin.customProps` | `unknown` | Alles, was Ihr eigenes `Field` oder `Preview` benötigt. Rebase reicht dies unverändert durch |
+| `admin.span` | `1 \| 2 \| 3 \| 4` | Feldbreite über das vierspaltige Formularraster |
+| `admin.Field` | `React.ComponentType` | Benutzerdefinierte Feldkomponente |
+| `admin.Preview` | `React.ComponentType` | Benutzerdefinierte Tabellenzellenkomponente |
+| `admin.Filter` | `React.ComponentType` | Benutzerdefiniertes Filterfeld für diese Property. Überschreibt das Override auf Collection-Ebene `Collection.FilterField` und das integrierte typspezifische Feld |
+| `admin.filterOperators` | `WhereFilterOp[]` | Schränkt die Operatoren ein, die beim Filtern nach dieser Property angeboten werden. Die angebotene Menge ist die **Schnittmenge** aus den Fähigkeiten der Engine, den Standardwerten des Typs und dieser Liste – Sie können nur einschränken, niemals einen Operator hinzufügen, den die Engine nicht ausführen kann. `[]` deaktiviert das Filtern nach dieser Property |
+| `admin.customProps` | `unknown` | Alles, was Ihr eigenes `Field` oder `Preview` benötigt. Rebase reicht es unverändert durch |
 
 #### `PropertyDisabledConfig`
 
-Die Objektform von `admin.disabled`. Das Steuerelement bleibt sichtbar und ausgegraut,
-was der Unterschied zu `admin.readOnly` ist – der Betrachter kann die Struktur dessen
-sehen, was er nicht ausfüllen darf.
+Die Objektform von `admin.disabled`. Das Steuerelement bleibt sichtbar und ausgegraut, was der Unterschied zu `admin.readOnly` ist – ein Betrachter kann die Struktur dessen sehen, was er nicht ausfüllen darf.
 
-| Eigenschaft | Typ | Beschreibung |
+| Property | Typ | Beschreibung |
 |----------|------|-------------|
-| `disabledMessage` | `string` | Grund, warum diese Eigenschaft deaktiviert ist, angezeigt für den Benutzer. Ohne diesen erklärt ein ausgegrautes Steuerelement nichts |
-| `clearOnDisabled` | `boolean` | Setzt den Wert auf `null`, wenn die Eigenschaft deaktiviert wird, damit keine veraltete Angabe mit der Entität gespeichert wird |
+| `disabledMessage` | `string` | Warum diese Property deaktiviert ist, wird dem Benutzer angezeigt. Ohne diese Angabe erklärt ein ausgegrautes Steuerelement nichts |
+| `clearOnDisabled` | `boolean` | Setzt den Wert auf `null`, wenn die Property deaktiviert wird, damit keine veraltete Angabe mit der Entität gespeichert wird |
 | `hidden` | `boolean` | Blendet das Feld vollständig aus, während es deaktiviert ist, anstatt es auszugrauen |
 
-## String-Eigenschaften
+## String-Properties
 
-Der Typ `string` ist der vielseitigste – je nachdem, welche Optionen Sie setzen, wird er als unterschiedliche Widgets gerendert.
+Der `string`-Typ ist der vielseitigste – je nachdem, welche Optionen Sie setzen, wird er als unterschiedliche Widgets gerendert.
 
 ### Textfeld
 
@@ -125,9 +119,7 @@ name: {
 
 ### Mehrzeiliger Text
 
-Setzen Sie `admin.multiline`, um das Feld als Textarea zu rendern. Dies ändert, wie das
-Feld gezeichnet wird, nicht, was die Spalte enthält; daher befindet es sich im `admin`-Block
-zusammen mit den übrigen Darstellungsoptionen.
+Setzen Sie `admin.multiline`, um es als Textarea zu rendern. Dies ändert, wie das Feld dargestellt wird, nicht was die Spalte enthält; daher befindet es sich im `admin`-Block zusammen mit den restlichen Darstellungsoptionen.
 
 ```typescript
 description: {
@@ -141,7 +133,7 @@ description: {
 
 ### Markdown-Editor
 
-Setzen Sie `admin.markdown`, um einen vollständigen Markdown-Editor mit Toolbar zu rendern.
+Setzen Sie `admin.markdown`, um einen vollständigen Markdown-Editor mit Symbolleiste zu rendern.
 
 ```typescript
 body: {
@@ -155,7 +147,7 @@ body: {
 
 ### E-Mail-Feld
 
-Setzen Sie `email: true`, um eine E-Mail-Formatvalidierung hinzuzufügen und mit einem E-Mail-Symbol zu rendern.
+Setzen Sie `email: true`, um eine Validierung des E-Mail-Formats hinzuzufügen und mit einem E-Mail-Icon zu rendern.
 
 ```typescript
 email: {
@@ -170,7 +162,7 @@ email: {
 
 ### URL-Feld
 
-Setzen Sie `url: true`, um eine URL-Formatvalidierung hinzuzufügen und mit einem Link-Symbol zu rendern.
+Setzen Sie `url: true`, um eine Validierung des URL-Formats hinzuzufügen und mit einem Link-Icon zu rendern.
 
 ```typescript
 website: {
@@ -184,8 +176,7 @@ website: {
 
 ### Datei-Upload
 
-Setzen Sie `storage`, um eine Datei-Upload-Dropzone zu rendern. Die Spalte bleibt ein String – in
-sie wird der Schlüssel des Objekts im Bucket geschrieben:
+Setzen Sie `storage`, um eine Dropzone für Datei-Uploads zu rendern. Die Spalte bleibt ein String – was hineingeschrieben wird, ist der Schlüssel des Objekts im Bucket:
 
 ```typescript
 avatar: {
@@ -197,12 +188,11 @@ avatar: {
 
 <FieldWidgetPreview client:only="react" variant="file_upload" />
 
-Alle Optionen innerhalb von `storage` und die Mehrdatei-Form desselben Feldes finden Sie unter
-[Datei-Uploads](/docs/collections/file-uploads).
+Jede Option innerhalb von `storage` und die Multi-Datei-Form desselben Feldes finden Sie unter [Datei-Uploads](/docs/collections/file-uploads).
 
 ### Select (Enum)
 
-Setzen Sie `enum`, um ein Auswahl-Dropdown zu rendern. Weitere Informationen finden Sie unter [Enum-Werte](/docs/collections/validation-and-conditions/#enum-values).
+Setzen Sie `enum`, um ein Select-Dropdown zu rendern. Weitere Details finden Sie unter [Enum-Werte](/docs/collections/validation-and-conditions/#enum-values).
 
 ```typescript no-verify
 category: {
@@ -219,11 +209,7 @@ category: {
 
 ### Multi-Select
 
-Mehrere Werte aus einer festen Menge sind ein **Array eines Enum-Strings**, kein Flag
-auf einem einzelnen Wert: Die Spalte enthält mehrere Werte, daher ist die Eigenschaft,
-die sie beschreibt, das Array. Es ist eine einzelne Postgres-Spalte, ein `text[]`, statt eines Joins: Ein Array,
-dessen `of` eine einzelne String-Property ist, erhält standardmäßig ein natives Array, und das
-`columnType` unten sagt es nur ausdrücklich.
+Mehrere Werte aus einer festen Menge sind ein **Array eines Enum-Strings**, kein Flag an einem einzelnen: Die Spalte enthält viele Werte, daher ist die Property, die sie beschreibt, das Array. Es handelt sich um eine einzelne Postgres-Spalte, ein `text[]`, anstelle eines Joins: Ein Array, dessen `of` eine einzelne String-Property ist, erhält standardmäßig ein natives Array, und das untenstehende `columnType` gibt dies lediglich explizit an.
 
 ```typescript no-verify
 locales: {
@@ -246,26 +232,25 @@ locales: {
 
 ### String-Optionen
 
-| Eigenschaft | Typ | Beschreibung |
+| Property | Typ | Beschreibung |
 |----------|------|-------------|
 | `admin.multiline` | `boolean` | Als Textarea rendern |
 | `admin.markdown` | `boolean` | Als Markdown-Editor rendern |
 | `email` | `boolean` | Validierung des E-Mail-Formats |
 | `url` | `boolean` | Validierung des URL-Formats |
 | `storage` | `StorageConfig` | Datei-Upload aktivieren – siehe [Datei-Uploads](/docs/collections/file-uploads) |
-| `enum` | `EnumValues` | Als Auswahl-Dropdown rendern |
-| `columnType` | `"varchar" \| "text" \| "char" \| "uuid"` | Die Datenbankspalte. Standardmäßig `text` oder `uuid`, wenn `isId` dies vorgibt. `text` für unbegrenzte Strings, `char` für feste Breite |
-| `isId` | `boolean \| string` | Markiert die Eigenschaft als Primärschlüssel und bestimmt, wer ihn befüllt: `"manual"` (Sie selbst), `"uuid"` (`gen_random_uuid()`) oder jeder andere String, der unverändert als SQL-Standardausdruck der Spalte verwendet wird – direkt (`nanoid()`) oder in Template-Form (``"sql`nanoid()`"``). Die Funktion muss existieren; hier wird nichts erstellt. `"increment"` ist eine **Number**-Strategie und bewirkt hier nichts, und `"cuid"` wird beim Laden der Konfiguration abgelehnt |
-| `autoValue` | `"user_on_create" \| "user_on_update"` | Stempelt die Spalte mit der **uid des ausführenden Benutzers** – nur beim Erstellen oder bei jedem Schreibvorgang. Siehe [Audit-Spalten](#audit-spalten) |
-| `userSelect` | `boolean` | Als Benutzerauswahl rendern. Der Wert ist eine einfache String-Spalte, die die Benutzer-ID enthält – beim Eingang wird nichts aufgelöst oder geprüft. **Nur Admin-Formular – wird von der API oder der Datenbank nicht erzwungen.** Die Auswahl listet Namen, E-Mail-Adressen und Avatare der Benutzer für jeden auf, der die Collection beschreiben darf, über [`GET /api/admin/users/pick`](/docs/backend/auth-endpoints/), ohne den Scope `users:read`. Eine Collection, deren Schreibregeln rohes SQL sind, zählt nicht, da sie sich nicht vorab beurteilen lassen: Dort können nur Inhaber von `users:read` auswählen. |
+| `enum` | `EnumValues` | Als Select-Dropdown rendern |
+| `columnType` | `"varchar" \| "text" \| "char" \| "uuid"` | Die Datenbankspalte. Standardmäßig `text`, oder `uuid`, wenn `isId` dies angibt. `text` für Strings unbegrenzter Länge, `char` für feste Breite |
+| `isId` | `boolean \| string` | Markiert die Property als Primärschlüssel und legt fest, wer sie füllt: `"manual"` (Sie selbst), `"uuid"` (`gen_random_uuid()`) oder jeder andere String, der unverändert als SQL-Default-Ausdruck der Spalte verwendet wird – direkt (`nanoid()`) oder in Template-Form (``"sql`nanoid()`"``). Die Funktion muss existieren; nichts hier erstellt sie. `"increment"` ist eine **Number**-Strategie und bewirkt hier nichts, und `"cuid"` wird beim Laden der Konfiguration abgewiesen |
+| `autoValue` | `"user_on_create" \| "user_on_update"` | Stempelt die Spalte mit der **UID des agierenden Benutzers** – nur bei der Erstellung oder bei jedem Schreibvorgang. Siehe [Audit-Spalten](#audit-spalten) |
+| `userSelect` | `boolean` | Als Benutzerauswahl (User Picker) rendern. Der Wert ist eine einfache String-Spalte, die die Benutzer-ID enthält – nichts löst sie beim Eingang auf oder prüft sie. **Nur Admin-Formular – wird nicht von der API oder der Datenbank erzwungen.** Die Auswahl listet Namen, E-Mails und Avatare von Benutzern für jeden auf, der die Collection schreiben darf, über [`GET /api/admin/users/pick`](/docs/backend/auth-endpoints/), ohne den Scope `users:read`. Eine Collection, deren Schreibregeln aus direktem SQL bestehen, zählt nicht dazu, da diese nicht vorab ausgewertet werden können: Dort können nur Inhaber von `users:read` Benutzer auswählen. |
 | `admin.previewAsTag` | `boolean` | Diesen String in der Vorschau als Tag rendern |
-| `admin.clearable` | `boolean` | Symbol zum Leeren des Werts hinzufügen (auf null setzen) |
-| `admin.urlPreview` | `PreviewType` | Wie ein String gerendert werden soll, der eine URL enthält: als Link oder als Inline-Vorschau für Bild, Audio oder Video. Reine Darstellung – ob der Wert eine URL *ist*, entscheidet das `url`-Flag an der Eigenschaft, aus dem der OpenAPI-Vertrag generiert wird |
+| `admin.clearable` | `boolean` | Ein Icon zum Leeren des Werts hinzufügen (auf null setzen) |
+| `admin.urlPreview` | `PreviewType` | Wie ein String gerendert werden soll, der eine URL enthält: als Link oder als Inline-Bild-, Audio- oder Video-Vorschau. Reine Darstellung – ob der Wert eine URL *ist*, entscheidet das Flag `url` an der Property, aus dem der OpenAPI-Vertrag generiert wird |
 
 ### Audit-Spalten
 
-`autoValue` bei einem String ist das `created_by` / `updated_by`-Gegenstück derselben
-Option bei einem [Date](#date-optionen):
+`autoValue` bei einem String ist das `created_by` / `updated_by`-Pendant zur selben Option bei einem [Datum](#date-optionen):
 
 ```typescript
 createdBy: {
@@ -282,49 +267,21 @@ updatedBy: {
 }
 ```
 
-Der Wert stammt aus dem Aufrufkontext, niemals aus dem Request-Body – der Treiber
-überschreibt alles, was übermittelt wurde, sodass ein Aufrufer sich nicht als jemand anderes
-ausgeben kann, indem er das Feld mitsendet. Eine Spalte, deren Wert der Aufrufer bereitstellt,
-ist keine Audit-Spalte.
+Der Wert stammt aus dem Aufrufkontext, niemals aus dem Request-Body – der Treiber überschreibt alles, was übermittelt wurde, sodass ein Aufrufer sich nicht als jemand anderes ausgeben kann, indem er das Feld mitsendet. Eine Spalte, deren Wert der Aufrufer bereitstellt, ist keine Audit-Spalte.
 
-Ohne agierenden Benutzer – bei einer anonymen Anfrage, einem Service-Token oder einem Seed-Skript –
-wird die Spalte auf `null` gesetzt. In Kombination mit `validation: { required: true }` wird
-daraus stattdessen ein 400-Fehler: Eine Collection, die darauf besteht zu wissen, wer eine
-Zeile geschrieben hat, kann keine anonymen Schreibzugriffe akzeptieren.
+Ohne agierenden Benutzer – ein anonymer Request, ein Service-Token, ein Seed-Skript – wird die Spalte auf `null` gesetzt. In Kombination mit `validation: { required: true }` wird daraus stattdessen ein 400-Fehler: Eine Collection, die darauf besteht zu wissen, wer eine Zeile geschrieben hat, kann keinen anonymen Schreibvorgang akzeptieren.
 
-Es gibt keinen Fremdschlüssel. Die UID ist ein String, der Benutzerspeicher kann eine völlig
-andere Datenbank sein, und ein gelöschter Benutzer darf den Audit-Trail nicht mit sich reißen –
-deklarieren Sie eine [Relation](/docs/collections/relations), wenn Sie den Join wünschen.
+Es gibt keinen Fremdschlüssel. Die UID ist ein String, der Benutzerspeicher kann eine völlig andere Datenbank sein, und ein gelöschter Benutzer darf den Audit-Trail nicht mit sich reißen – deklarieren Sie eine [Relation](/docs/collections/relations), wenn Sie den Join wünschen.
 
 :::note[Zusammengesetzte Primärschlüssel]
-Markieren Sie mehrere Eigenschaften mit `isId`, bilden sie einen zusammengesetzten
-Schlüssel: Die Tabelle erhält einen einzigen `PRIMARY KEY (a, b)`-Constraint, und eine
-Zeile wird über alle Schlüsselwerte in Deklarationsreihenfolge adressiert, verbunden mit
-`:::` – `company_translation/1:::en_US`. Geben Sie jeder Schlüsselspalte die passende
-Strategie: `isId: true` für einen Wert, den der Aufrufer liefert – das sind die meisten
-Spalten zusammengesetzter Schlüssel –, und niemals `"increment"` für einen Fremdschlüssel
-oder eine String-Spalte. Ein Fremdschlüssel ist eine einzelne Spalte und kann nicht auf
-einen zusammengesetzten Schlüssel verweisen; eine Relation oder Referenz *auf* eine solche
-Collection wird daher beim Generieren des Schemas abgelehnt. Wenn Sie statt der Identität
-der Zeile einen Eindeutigkeits-Constraint über mehrere Spalten wollten, ist das ein
-eindeutiger [Index](/docs/backend/indexes). Auf 0.23 wird ein zweites `isId` beim Laden
-der Konfiguration abgelehnt.
+Markieren Sie mehrere Properties mit `isId`, bilden sie einen zusammengesetzten Schlüssel: Die Tabelle erhält einen einzelnen `PRIMARY KEY (a, b)`-Constraint, und eine Zeile wird über alle ihre Schlüsselwerte in Deklarationsreihenfolge adressiert, getrennt durch `:::` – `company_translation/1:::en_US`. Weisen Sie jeder Schlüsselspalte die passende Strategie zu: `isId: true` für einen vom Aufrufer bereitgestellten Wert, was bei den meisten zusammengesetzten Schlüsseln für jede Spalte gilt, und niemals `"increment"` bei einem Fremdschlüssel oder einer String-Spalte. Ein Fremdschlüssel ist eine einzelne Spalte und kann nicht auf einen zusammengesetzten Schlüssel verweisen; daher wird eine Relation oder Referenz *auf* eine solche Collection bei der Schema-Generierung abgelehnt. Wenn Sie eine Eindeutigkeitsbeschränkung über mehrere Spalten statt der Identität der Zeile wollten, ist dies ein eindeutiger [Index](/docs/backend/indexes). Unter 0.23 wird ein zweites `isId` beim Laden der Konfiguration abgewiesen.
 
-Eine Collection, bei der keine Eigenschaft `isId` beansprucht, erhält eine eigene `id`-Spalte:
-`TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text`. Die Datenbank befüllt sie, sodass eine über das
-Admin-Panel, die REST-API oder das SDK erstellte Zeile keinen Schlüssel braucht, und ein Schlüssel,
-den Sie selbst mitsenden, wird so verwendet, wie er ist. Eine Tabelle, die erstellt wurde, bevor
-dieser Default existierte, erhält ihn beim nächsten Start. Auf 0.23 hat die Spalte keinen Default,
-und eine Erstellung ohne mitgesendeten Schlüssel schlägt fehl.
+Eine Collection, in der keine Property `isId` beansprucht, erhält eine eigene `id`-Spalte: `TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text`. Die Datenbank füllt sie, sodass eine aus dem Admin-Panel, über die REST-API oder das SDK erstellte Zeile keinen Schlüssel benötigt, und ein übergebener Schlüssel wie angegeben verwendet wird. Eine Tabelle, die erstellt wurde, bevor dieser Standard existierte, erhält ihn beim nächsten Start. Unter 0.23 hat die Spalte keinen Standardwert, und eine Erstellung ohne übergebenen Schlüssel schlägt fehl.
 
-Dasselbe gilt für einen deklarierten `isId: "uuid"`-Schlüssel, dessen Tabelle keinen Default hat –
-eine mit `rebase schema introspect` übernommene oder von Hand erstellte Tabelle: Der nächste Start
-setzt `DEFAULT gen_random_uuid()`. Den Default eines anderen deklarierten Schlüssels setzt der Start
-nicht. Die Funktion einer SQL-Strategie existiert womöglich noch nicht, ergänzen Sie diesen Default
-daher selbst oder lassen Sie `rebase db push` ihn anwenden.
+Dasselbe gilt für einen deklarierten `isId: "uuid"`-Schlüssel, dessen Tabelle keinen Default hat – eine Tabelle, die mit `rebase schema introspect` übernommen oder manuell erstellt wurde: Beim nächsten Booten wird `DEFAULT gen_random_uuid()` gesetzt. Beim Booten wird für keinen anderen deklarierten Schlüssel ein Default gesetzt. Die Funktion einer SQL-Strategie existiert möglicherweise noch nicht; fügen Sie diesen Default also selbst hinzu oder lassen Sie ihn von `rebase db push` anwenden.
 :::
 
-## Number-Eigenschaften
+## Number-Properties
 
 ```typescript
 price: {
@@ -342,34 +299,33 @@ quantity: {
 
 <FieldWidgetPreview client:only="react" variant="number" />
 
-Zahlenfelder werden als Standard-Texteingabefeld mit numerischer Validierung gerendert.
+Number-Felder werden als Standard-Texteingabe mit numerischer Validierung gerendert.
 
 ### Number-Optionen
 
-| Eigenschaft | Typ | Beschreibung |
+| Property | Typ | Beschreibung |
 |----------|------|-------------|
-| `enum` | `EnumValues` | Als Select mit numerischen Werten rendern. Im Gegensatz zu einem String-Enum wird hierbei **kein Postgres-Enum-Typ** erstellt – die Spalte bleibt `NUMERIC` oder `INTEGER`, sodass das Panel die Werte anbietet, die Datenbank sie jedoch nicht erzwingt |
+| `enum` | `EnumValues` | Als Select mit numerischen Werten rendern. Anders als bei einem String-Enum wird hierbei **kein Postgres-Enum-Typ** erstellt – die Spalte bleibt `NUMERIC` oder `INTEGER`, sodass das Panel die Werte anbietet und die Datenbank sie nicht erzwingt |
 | `columnType` | `string` | `"integer"`, `"real"`, `"double precision"`, `"numeric"`, `"bigint"`, `"serial"`, `"bigserial"`. Standardmäßig `integer`, wenn `validation.integer` oder `isId` besagt, dass der Wert ganzzahlig ist, andernfalls `numeric` |
-| `precision` / `scale` | `number` | Gesamtzahl der signifikanten Stellen und Nachkommastellen bei einer `numeric`-Spalte – `NUMERIC(10, 2)`. Geldbeträge ohne diese Angaben sind ein unbegrenztes `NUMERIC`, das alles speichert, was der Aufrufer gesendet hat, und später nicht ohne Umschreiben der Spalte eingeschränkt werden kann |
-| `isId` | `boolean \| string` | Markiert die Eigenschaft als Primärschlüssel: `"manual"`, `"increment"` oder jeder andere String, der unverändert als SQL-Standardausdruck der Spalte verwendet wird. `"increment"` ist immer `INTEGER GENERATED BY DEFAULT AS IDENTITY` – ein daneben stehender `columnType` wird mit einer Warnung ignoriert, da jeder Fremdschlüssel, der auf einen numerischen Schlüssel verweist, `INTEGER` ist und ein breiterer Schlüssel von schmaleren Spalten referenziert werden würde |
-| `admin.clearable` | `boolean` | Symbol zum Leeren des Werts hinzufügen (auf null setzen) |
-| `admin.format` | `NumberFormatOptions` | Schreibt die Zahl als Währung, Prozentsatz oder mit festen Dezimalstellen aus. Fehlt diese Angabe, wird der Rohwert dargestellt – eine Zahl in der Datenbank wird so angezeigt, wie sie in der Datenbank steht |
+| `precision` / `scale` | `number` | Gesamtzahl signifikanter Stellen und Nachkommastellen bei einer `numeric`-Spalte – `NUMERIC(10, 2)`. Geldbeträge ohne diese Angaben sind ein unbegrenztes `NUMERIC`, das beibehält, was der Aufrufer gesendet hat, und später nicht ohne Umschreiben der Spalte eingeschränkt werden kann |
+| `isId` | `boolean \| string` | Markiert die Property als Primärschlüssel: `"manual"`, `"increment"` oder jeder andere String, der unverändert als SQL-Default-Ausdruck der Spalte verwendet wird. `"increment"` ist immer `INTEGER GENERATED BY DEFAULT AS IDENTITY` – ein daneben stehendes `columnType` wird mit einer Warnung ignoriert, da jeder Fremdschlüssel, der auf einen numerischen Schlüssel verweist, `INTEGER` ist und ein breiterer Schlüssel von schmaleren Spalten referenziert werden würde |
+| `admin.clearable` | `boolean` | Ein Icon zum Leeren des Werts hinzufügen (auf null setzen) |
+| `admin.format` | `NumberFormatOptions` | Schreibt die Zahl als Währung, Prozentsatz oder mit festen Dezimalstellen aus. Fehlt die Option, wird der Rohwert gerendert – eine Zahl in der Datenbank wird als die Zahl in der Datenbank dargestellt |
 
 #### `NumberFormatOptions`
 
-Reine Darstellung. Der gespeicherte Wert ändert sich nie – eine gerundete Anzeige
-bleibt in der Spalte und in der API die vollständige Zahl.
+Reine Darstellung. Der gespeicherte Wert ändert sich nie – eine gerundete Anzeige ist in der Spalte und in der API weiterhin die vollständige Zahl.
 
-| Eigenschaft | Typ | Beschreibung |
+| Property | Typ | Beschreibung |
 |----------|------|-------------|
 | `style` | `"decimal" \| "currency" \| "percent"` | Standardmäßig `"decimal"`. `"currency"` erfordert `currency` |
-| `currency` | `string` | ISO-4217-Code – `"EUR"`, `"USD"`. Das Setzen impliziert `style: "currency"`, daher genügt im Regelfall ein Schlüssel |
-| `locale` | `string` | BCP-47-Tag. Standardmäßig das Gebietsschema des Panels, wodurch derselbe Betrag für einen Leser als `1,234.50` und für einen anderen als `1.234,50` angezeigt wird |
-| `minimumFractionDigits` | `number` | Mit mindestens so vielen Nachkommastellen auffüllen – `2` formatiert `5` als `5.00` |
-| `maximumFractionDigits` | `number` | Auf höchstens so viele Nachkommastellen runden. Ändert nicht den gespeicherten Wert |
+| `currency` | `string` | ISO 4217-Code – `"EUR"`, `"USD"`. Das Setzen impliziert `style: "currency"`, daher genügt im Regelfall ein einzelner Schlüssel |
+| `locale` | `string` | BCP 47-Tag. Standardmäßig das Gebietsschema (Locale) des Panels, wodurch derselbe Betrag für einen Betrachter als `1,234.50` und für einen anderen als `1.234,50` dargestellt wird |
+| `minimumFractionDigits` | `number` | Auffüllen auf mindestens so viele Dezimalstellen – `2` schreibt `5` als `5.00` |
+| `maximumFractionDigits` | `number` | Runden auf höchstens so viele Dezimalstellen. Ändert nicht den gespeicherten Wert |
 | `notation` | `"standard" \| "compact"` | `"compact"` rendert `12000` als `12K`. Nützlich in einer schmalen Tabellenspalte |
 
-## Boolean-Eigenschaften
+## Boolean-Properties
 
 ```typescript
 active: {
@@ -383,7 +339,7 @@ active: {
 
 Booleans werden als Umschalter (Toggle Switch) gerendert.
 
-## Date-Eigenschaften
+## Date-Properties
 
 ### Nur Datum
 
@@ -401,7 +357,7 @@ event_date: {
 
 ### Datum und Uhrzeit
 
-Der Standardmodus `"date_time"` beinhaltet sowohl Datum als auch Uhrzeit.
+Der Standardmodus `"date_time"` umfasst sowohl Datum als auch Uhrzeit.
 
 ```typescript
 arrival_time: {
@@ -432,40 +388,27 @@ updatedAt: {
 }
 ```
 
-`on_update` ist ein Datenbank-Trigger, nicht nur ein Stempel auf Anwendungsebene. Rebase
-schreibt die Spalte bei jedem Speichervorgang – sodass ein `beforeSave`-Hook den neuen Wert
-sieht – und richtet einen `BEFORE UPDATE`-Trigger ein, der sie für alle anderen schreibt.
-Ohne den Trigger würde ein Seed-Skript, ein Migrations-Backfill oder eine in `psql` korrigierte
-Zeile dazu führen, dass die Spalte behauptet, die Zeile habe sich nicht geändert; alles,
-was sie liest, um zu entscheiden, was neu indiziert oder erneut gesendet werden soll, würde
-diese Zeile überspringen.
+`on_update` ist ein Datenbank-Trigger, nicht nur ein Stempel auf Anwendungsebene. Rebase schreibt die Spalte bei jedem Speichervorgang, den es durchführt – sodass ein `beforeSave`-Hook den neuen Wert sieht – und richtet einen `BEFORE UPDATE`-Trigger ein, der sie für alle anderen schreibt. Ohne den Trigger hinterließ ein Seed-Skript, ein Migrations-Backfill oder eine in `psql` korrigierte Zeile die Spalte mit der Behauptung, die Zeile habe sich nicht geändert, und alles, was sie las, um über eine Neuindizierung oder ein erneutes Senden zu entscheiden, übersprang diese Zeile.
 
-Der Trigger wird in `.rebase/sql/triggers.sql` generiert und von `rebase db push` sowie beim
-Start durch die Schema-Prüfung angewendet – Atlas kann ihn aus demselben Grund nicht verwalten,
-aus dem es die Volltextsuch-Helfer nicht verwalten kann.
+Der Trigger wird in `.rebase/sql/triggers.sql` generiert, durch `rebase db push` und beim Booten durch die Schema-Sicherstellung angewendet – Atlas kann ihn aus demselben Grund nicht verwalten, aus dem es die Volltextsuche-Helfer nicht verwalten kann.
 
 ### Date-Optionen
 
-| Eigenschaft | Typ | Beschreibung |
+| Property | Typ | Beschreibung |
 |----------|------|-------------|
-| `mode` | `"date" \| "date_time"` | Nur Datum oder Datum + Uhrzeit (Standard: `"date_time"`). Bestimmt das Widget; die Spalte ist in beiden Fällen dieselbe. **Nur Admin-Formular – wird von der API oder der Datenbank nicht erzwungen.** |
+| `mode` | `"date" \| "date_time"` | Nur Datum oder Datum + Uhrzeit (Standard: `"date_time"`). Bestimmt das Widget; die Spalte ist in beiden Fällen identisch. **Nur Admin-Formular – wird nicht von der API oder der Datenbank erzwungen.** |
 | `autoValue` | `"on_create" \| "on_update"` | Zeitstempel automatisch setzen. `on_create` ist ein `DEFAULT now()`; `on_update` ist ein `BEFORE UPDATE`-Trigger **sowie** ein Stempel auf Anwendungsebene, sodass ein direktes `UPDATE` aus einem Seed oder einer Migration die Spalte ebenfalls aktualisiert |
-| `columnType` | `"timestamp" \| "date" \| "time"` | Die Datenbankspalte. Standardmäßig `timestamp` **mit Zeitzone**. Eine `date`-Spalte wird als Tag ausgewählt und angezeigt, was auch immer `mode` sagt; eine `time`-Spalte als reine Tageszeit in UTC ohne Tag (sie wird als diese Uhrzeit am 1970-01-01 übertragen) |
-| `timezone` | `string` | In welcher Zeitzone die Auswahl den Wert liest und schreibt. **Nur Admin-Formular – wird von der API oder der Datenbank nicht erzwungen.** |
-| `admin.clearable` | `boolean` | Symbol zum Leeren des Werts hinzufügen (auf null setzen) |
+| `columnType` | `"timestamp" \| "date" \| "time"` | Die Datenbankspalte. Standardmäßig `timestamp` **mit Zeitzone**. Eine `date`-Spalte wird unabhängig von `mode` als Tag ausgewählt und angezeigt; eine `time`-Spalte ausschließlich als Tageszeit in UTC ohne Tag (sie wird als diese Uhrzeit am 1970-01-01 übertragen) |
+| `timezone` | `string` | In welcher Zeitzone die Auswahl den Wert liest und schreibt. **Nur Admin-Formular – wird nicht von der API oder der Datenbank erzwungen.** |
+| `admin.clearable` | `boolean` | Ein Icon zum Leeren des Werts hinzufügen (auf null setzen) |
 
-## Array- und Map-Eigenschaften
+## Array- und Map-Properties
 
-Die beiden zusammengesetzten Typen – eine wiederholbare Liste und ein strukturiertes Objekt,
-beide als JSONB gespeichert, es sei denn, ein natives Postgres-Array passt. Wiederholungen,
-Block-Editoren, Gruppen, Schlüssel-Wert-Editoren und alle Optionen, die beide annehmen,
-finden Sie unter **[Arrays und Maps](/docs/collections/arrays-and-maps)**.
+Die beiden zusammengesetzten Typen – eine wiederholbare Liste und ein strukturiertes Objekt, beide als JSONB gespeichert, es sei denn, ein natives Postgres-Array passt. Wiederholungen, Block-Editoren, Gruppen, Key-Value-Editoren und alle Optionen, die beide annehmen, finden Sie unter **[Arrays und Maps](/docs/collections/arrays-and-maps)**.
 
-## Geopoint-Eigenschaften
+## Geopoint-Properties
 
-Ein Breitengrad/Längengrad-Paar, gespeichert als `jsonb` – `{ latitude, longitude }`, was
-dem entspricht, was der generierte TypeScript-Typ, das OpenAPI-Schema und das Formularfeld
-beschreiben.
+Ein Breitengrad-/Längengrad-Paar, gespeichert als `jsonb` – `{ latitude, longitude }`, was dem entspricht, was der generierte TypeScript-Typ, das OpenAPI-Schema und das Formularfeld beschreiben.
 
 ```typescript
 location: {
@@ -474,18 +417,14 @@ location: {
 }
 ```
 
-Schreibvorgänge haben dieselbe Struktur oder verwenden einen `GeoPoint` aus `@rebasepro/types`:
+Schreibvorgänge haben dieselbe Struktur oder nutzen einen `GeoPoint` aus `@rebasepro/types`:
 `new GeoPoint(41.4036, 2.1744)`.
 
-Es gibt keine weiteren Optionen über die hinaus, die jede Eigenschaft hat. Die Spalte ist
-räumlich nicht indiziert, und es gibt keinen Distanzoperator zum Filtern: Ein Geopoint ist ein
-Wert, den Sie speichern und anzeigen, nicht einer, nach dem Sie suchen. Modellieren Sie dafür
-die beiden Zahlen als eigene Spalten.
+Es gibt keine weiteren Optionen über diejenigen hinaus, die jede Property besitzt. Die Spalte ist nicht räumlich indiziert und es gibt keinen Distanzoperator zum Filtern: Ein Geopoint ist ein Wert, den Sie speichern und anzeigen, nicht einer, nach dem Sie suchen. Modellieren Sie dafür die beiden Zahlen als eigene Spalten.
 
-## Reference-Eigenschaften
+## Reference-Properties
 
-Referenzen verknüpfen mit Entitäten in einer anderen Collection. Sie werden als Vorschaukarte
-gerendert, die die Details der referenzierten Entität anzeigt.
+Referenzen verknüpfen mit Entitäten in einer anderen Collection. Sie werden als Vorschaukarte gerendert, die die Details der referenzierten Entität anzeigt.
 
 ```typescript
 client: {
@@ -500,27 +439,25 @@ client: {
 
 <FieldWidgetPreview client:only="react" variant="reference" />
 
-Unter Postgres ist eine `reference` ein Fremdschlüssel wie jeder andere und folgt daher
-derselben `ON DELETE`-Regel wie eine `belongsTo`-Relation: optional ist `SET NULL`, erforderlich
-ist `RESTRICT`. Siehe [Relationen](/docs/collections/relations).
+Unter Postgres ist eine `reference` ein Fremdschlüssel wie jeder andere und folgt daher denselben `ON DELETE`-Regeln wie eine `belongsTo`-Relation: optional ist `SET NULL`, erforderlich ist `RESTRICT`. Siehe [Relations](/docs/collections/relations).
 
 
 ### Reference- & Relation-Optionen
 
-Diese gelten sowohl für `reference`- als auch für `relation`-Eigenschaften.
+Diese gelten sowohl für `reference`- als auch für `relation`-Properties.
 
-| Eigenschaft | Typ | Beschreibung |
+| Property | Typ | Beschreibung |
 |----------|------|-------------|
-| `admin.fixedFilter` | `FilterValues` | Filtert die im Auswahl-Widget angebotenen Entitäten |
-| `admin.widget` | `"select" \| "dialog"` | Welches Widget die zugehörige Entität auswählt (nur Relationen) |
-| `admin.includeId` | `boolean` | Zeigt die ID der zugehörigen Entität in der Vorschau an (Standard: true) |
-| `admin.includeEntityLink` | `boolean` | Zeigt einen Link an, der die zugehörige Entität öffnet (Standard: true) |
-| `admin.previewProperties` | `string[]` | Welche Eigenschaften des Ziels in der Vorschau angezeigt werden (max. 3) |
-| `admin.renderInForm` | `boolean` | Rendert eine **Many**-Relation als Auswahl innerhalb des Formulars zusätzlich zu dem Tab, den sie bereits erhält. Standardmäßig `false`: Die Entitätsansicht listet die zugehörigen Zeilen bereits als Tab auf, sodass die beiden Oberflächen von Haus aus redundant sind. Keine Auswirkung auf eine To-One-Relation, die keinen Tab erhält |
+| `admin.fixedFilter` | `FilterValues` | Die im Auswahl-Widget angebotenen Entitäten filtern |
+| `admin.widget` | `"select" \| "dialog"` | Welches Widget die verknüpfte Entität auswählt (nur Relations) |
+| `admin.includeId` | `boolean` | Die ID der verknüpften Entität in Vorschauen anzeigen (Standard: true) |
+| `admin.includeEntityLink` | `boolean` | Einen Link anzeigen, der die verknüpfte Entität öffnet (Standard: true) |
+| `admin.previewProperties` | `string[]` | Welche Properties des Ziels in der Vorschau erscheinen (max. 3) |
+| `admin.renderInForm` | `boolean` | Eine **Many**-Relation als Picker innerhalb des Formulars sowie in dem Tab rendern, den sie bereits erhält. Standardmäßig `false`: Die Entitätsansicht listet die verknüpften Zeilen bereits als Tab auf, sodass die beiden Oberflächen konstruktionsbedingt redundant sind. Keine Auswirkung auf eine To-One-Relation, die keinen Tab erhält |
 
-## Vector-Eigenschaften
+## Vector-Properties
 
-Eine Embedding-Spalte für die Nearest-Neighbour-Suche. Nur Postgres.
+Eine Embedding-Spalte für die Nearest-Neighbor-Suche. Nur Postgres.
 
 ```typescript
 embedding: {
@@ -530,29 +467,18 @@ embedding: {
 }
 ```
 
-| Eigenschaft | Typ | Beschreibung |
+| Property | Typ | Beschreibung |
 |----------|------|-------------|
 | `dimensions` | `number` | **Erforderlich.** Länge des Vektors. Kompiliert zu `VECTOR(n)`. |
-| `index` | `VectorIndexConfig \| false` | Wie der ANN-Index aufgebaut wird. Wenn weggelassen, ein HNSW-Index für Kosinus-Distanz. `false` erstellt keinen. |
+| `index` | `VectorIndexConfig \| false` | Wie der ANN-Index aufgebaut wird. Wenn weggelassen, ein HNSW-Index für Kosinus-Distanz. `false` erstellt keinen Index. |
 
-Ein ANN-Index wird zusammen mit der Spalte erstellt, sodass `vectorSearch` approximativ und
-schnell ist anstatt eines exakten Scans. Er ist für **Kosinus**-Distanz ausgelegt, womit
-`vectorSearch` misst, sofern Sie kein `distance` übergeben – ein Index bedient genau einen
-Operator, sodass eine `l2`-Abfrage für einen Kosinus-Index stillschweigend auf einen Scan
-zurückfällt. `method` (`hnsw` oder `ivfflat`), `distance` (eine oder mehrere), `m`,
-`efConstruction` und `lists` befinden sich alle auf `index`. Über 2000 Dimensionen kann pgvector
-keinen der beiden Indextypen erstellen, daher bleibt die Spalte unindiziert und der Start meldet
-dies.
+Ein ANN-Index wird zusammen mit der Spalte erstellt, sodass `vectorSearch` approximativ und schnell ist statt eines exakten Scans. Er wird für die **Kosinus**-Distanz (Cosine Distance) erstellt, mit der `vectorSearch` misst, sofern Sie nicht `distance` übergeben – ein Index bedient genau einen Operator, sodass eine `l2`-Abfrage gegen einen Kosinus-Index stillschweigend auf einen Scan zurückfällt. `method` (`hnsw` oder `ivfflat`), `distance` (einzeln oder mehrere), `m`, `efConstruction` und `lists` befinden sich alle auf `index`. Über 2000 Dimensionen kann pgvector keinen der beiden Indextypen erstellen; daher bleibt die Spalte unindiziert und der Boot-Vorgang weist darauf hin.
 
-Fragen Sie ihn mit [`.vectorSearch()`](/docs/sdk/aggregates-and-search#vector-search) ab,
-wo auch beschrieben wird, was für die Installation von pgvector erforderlich ist und wie
-der Index optimiert wird. Für gewöhnliche btree-, GIN- und BRIN-Indizes auf beliebigen
-Collections siehe [Indizes](/docs/backend/indexes).
+Fragen Sie sie mit [`.vectorSearch()`](/docs/sdk/aggregates-and-search#vector-search) ab, was auch abdeckt, was pgvector für die Installation benötigt und wie der Index optimiert werden kann. Für reguläre B-Tree-, GIN- und BRIN-Indizes auf beliebigen Collections siehe [Indizes](/docs/backend/indexes).
 
-## Binary-Eigenschaften
+## Binary-Properties
 
-Rohdaten-Bytes, gespeichert als `bytea`. Werte passieren die API als **Base64-Strings** –
-einschließlich `defaultValue`.
+Rohdatenbytes, gespeichert als `bytea`. Werte passieren die API als **Base64-Strings** – einschließlich `defaultValue`.
 
 ```typescript
 signature: {
@@ -561,14 +487,12 @@ signature: {
 }
 ```
 
-Große Dateien gehören in den [Speicher (Storage)](/docs/backend/storage), nicht in eine Spalte:
-Ein `bytea` wird im Ganzen mit der Zeile gelesen und geschrieben.
+Große Dateien gehören in den [Storage](/docs/backend/storage), nicht in eine Spalte: Ein `bytea` wird im Ganzen mit der Zeile gelesen und geschrieben.
 
-Enum-Werte, Validierungsregeln und bedingte Felder haben eine eigene Seite:
-[Validierung und Bedingungen](/docs/collections/validation-and-conditions/).
+Enum-Werte, Validierungsregeln und bedingte Felder haben eine eigene Seite: [Validierung und Bedingungen](/docs/collections/validation-and-conditions/).
 
 ## Nächste Schritte
 
-- **[Relationen](/docs/collections/relations)** — Fremdschlüssel und Joins
+- **[Relations](/docs/collections/relations)** — Fremdschlüssel und Joins
 - **[Sicherheitsregeln](/docs/collections/security-rules)** — Row Level Security
-- **[Eigene Felder](/docs/frontend/custom-fields)** — Eigene Feldkomponenten erstellen
+- **[Benutzerdefinierte Felder](/docs/frontend/custom-fields)** — Eigene Feldkomponenten erstellen

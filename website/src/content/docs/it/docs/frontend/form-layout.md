@@ -1,22 +1,33 @@
 ---
-sourceHash: 3830846c0457a79f
+sourceHash: fef2eb56c7043526
 title: Layout del form
 sidebar_label: Layout del form
-description: Controlla come è organizzato il form dell'entità — estensioni delle colonne, sezioni e barra dei metadati.
+description: Controlla la disposizione del form dell'entità — ampiezza delle colonne, sezioni e barra dei metadati.
 ---
 
 ## Panoramica
 
+<span class="since-badge" data-since="0.26">Da 0.26</span>
+
 Il form dell'entità viene generato a partire dalle tue proprietà:
 
-- l'id e i timestamp `createdAt` / `updatedAt` vengono collocati in una barra dei metadati, in sola lettura
-- ogni altro campo occupa l'intera larghezza della colonna principale, tranne due campi vicini con lo stesso editor compatto — due numeri, due interruttori, due date dello stesso tipo, due select con opzioni brevi — che condividono una riga
+- l'id e i timestamp `createdAt` / `updatedAt` vengono inseriti in una barra dei metadati (rail), in sola lettura
+- ogni altro campo occupa l'intera larghezza della colonna principale, tranne quando due
+  campi adiacenti con lo stesso editor compatto — due numeri, due switch,
+  due date con la stessa modalità, due select con opzioni brevi — condividono una riga
 
-Un campo con un'etichetta lunga, un testo di aiuto oltre i 60 caratteri, `conditions` o un `Field` personalizzato non viene mai affiancato, e nemmeno una stringa di testo libero: nulla nello schema distingue un nome di branch breve da un URL lungo. Il form non guarda mai quale proprietà è il titolo. Le altre colonne le chiede la collezione, campo per campo, con `admin.span`, scelto in base a ciò che ogni campo contiene, come spiegato sotto. Usa `admin.form` per raggruppare i campi in sezioni e spostarli nella barra.
+Un campo con un'etichetta lunga, un testo di aiuto superiore a 60 caratteri, `conditions` o un
+`Field` personalizzato non viene mai affiancato, e lo stesso vale per qualsiasi stringa di testo libero: nulla in
+uno schema distingue il nome breve di un branch da un URL lungo. Il form non controlla mai
+quale proprietà sia il titolo. Qualsiasi altra colonna deve essere richiesta esplicitamente dalla
+collection, campo per campo, tramite `admin.span` — impostato in base a ciò che ciascun campo contiene, come
+mostrato di seguito. Usa `admin.form` per
+raggruppare i campi in sezioni e spostarli nella barra laterale.
 
 ## Larghezza del campo
 
-La larghezza di un campo è definita come uno **span** (estensione) su una griglia a quattro colonne. `4` corrisponde alla larghezza intera della colonna principale.
+La larghezza di un campo è definita da uno **span** su una griglia a quattro colonne. `4` rappresenta l'intera larghezza
+della colonna principale.
 
 ```typescript
 import { defineCollection } from "@rebasepro/cms-types";
@@ -45,15 +56,27 @@ const productsCollection = defineCollection({
 });
 ```
 
-Gli span si agganciano a una griglia condivisa, consentendo a due campi di allinearsi indipendentemente dall'ordine in cui sono stati dichiarati. Hanno sostituito `admin.widthPercentage`, le cui percentuali grezze non potevano allinearsi con precisione; una collezione che lo utilizza ancora dovrebbe scegliere lo span più vicino (≤30 → `1`, ≤55 → `2`, ≤80 → `3`, altrimenti `4`).
+Gli span si agganciano a una griglia condivisa, consentendo a due campi di allinearsi indipendentemente
+dall'ordine in cui sono stati dichiarati. Hanno sostituito `admin.widthPercentage`,
+le cui percentuali grezze non potevano allinearsi con precisione; una collection che
+ne fa ancora uso dovrebbe scegliere lo span più vicino (≤30 → `1`, ≤55 → `2`, ≤80 → `3`,
+altrimenti `4`).
 
-Scegli lo span in base a ciò che il campo contiene, non al suo tipo. Due valori brevi che vanno insieme condividono una riga — data di inizio e di fine, città e paese, provider e regione a `2` ciascuno, oppure un valore e il suo qualificatore a `3` + `1`. Numeri, booleani e codici brevi possono prendere `1` accanto ai loro simili. Tutto ciò che si legge lungo — nomi, URL, email, id, descrizioni, markdown, file — resta a `4`. Le righe si riempiono nell'ordine di dichiarazione e nessun campo viene allargato per chiudere un vuoto, quindi dichiara le coppie una accanto all'altra e fai in modo che ogni riga sommi 4.
+Scegli uno span in base al contenuto del campo, non al suo tipo. Due valori brevi
+logicamente correlati condividono una riga — data di inizio e fine, città e paese,
+provider e regione con `2` ciascuno, oppure un valore e il suo qualificatore con `3` + `1`.
+Numeri, booleani e codici brevi possono occupare `1` accanto ai campi correlati. Tutto
+ciò che risulta lungo alla lettura — nomi, URL, email, ID, descrizioni, markdown, file —
+mantiene `4`. Le righe vengono riempite nell'ordine di dichiarazione e nessun campo viene allargato automaticamente per colmare uno
+spazio vuoto, quindi dichiara le coppie una accanto all'altra e assicurati che ogni riga sommi a 4.
 
-Nei layout troppo stretti per due colonne — il pannello laterale, il riquadro diviso (split pane), uno smartphone — la griglia collassa su una singola colonna e gli span vengono ignorati.
+Nei layout troppo stretti per due colonne — il pannello laterale, il riquadro diviso (split pane), uno smartphone
+— la griglia si riduce a una singola colonna e gli span vengono ignorati.
 
 ## Sezioni
 
-`sections` raggruppa la colonna principale sotto delle intestazioni. Una sezione provvista di titolo può essere compressa; una senza titolo non può esserlo.
+`sections` raggruppa la colonna principale sotto apposite intestazioni. Una sezione con titolo può essere
+compressa; una priva di titolo non può esserlo.
 
 ```typescript
 import { defineCollection } from "@rebasepro/cms-types";
@@ -91,13 +114,17 @@ const ordersCollection = defineCollection({
 });
 ```
 
-Una proprietà non assegnata ad alcuna sezione non viene mai persa: finisce nell'ultima sezione senza titolo, oppure in un gruppo finale senza titolo se non ne esiste alcuna. L'aggiunta di una colonna al database non può quindi far scomparire silenziosamente un campo dal form.
+Una proprietà non inclusa in alcuna sezione non viene mai persa: finisce nell'ultima
+sezione senza titolo, oppure in un gruppo finale privo di titolo se non ne esiste alcuna. L'aggiunta di una colonna al
+database non può quindi far scomparire silenziosamente un campo dal form.
 
-Un errore di validazione all'interno di una sezione compressa ne provoca l'espansione automatica, in modo che un errore non rimanga mai nascosto dietro un'intestazione chiusa.
+Un errore di validazione all'interno di una sezione compressa la espande automaticamente, impedendo che un errore
+resti nascosto dietro un'intestazione chiusa.
 
 ## La barra dei metadati
 
-`sidebar` sposta i campi fuori dalla colonna principale in una stretta barra laterale adiacente — stato, proprietà, date di pubblicazione, flag.
+`sidebar` sposta i campi fuori dalla colonna principale per inserirli in una stretta barra laterale adiacente —
+stato, titolarità, date di pubblicazione, flag.
 
 ```typescript
 import { defineCollection } from "@rebasepro/cms-types";
@@ -122,22 +149,30 @@ const postsCollection = defineCollection({
 });
 ```
 
-La barra laterale non utilizza la griglia, quindi `span` viene ignorato per i campi al suo interno. Dove non c'è spazio per la barra laterale, viene visualizzata come una normale sezione iniziale, evitando perdite di elementi su uno smartphone o nel pannello laterale.
+La barra laterale non utilizza la griglia, quindi `span` viene ignorato per i campi al suo interno. Dove
+non c'è spazio a sufficienza per una barra laterale, essa viene renderizzata come una normale sezione iniziale, così da non
+perdere nulla su smartphone o nel pannello laterale.
 
-`showRecordMeta` posiziona il blocco del record in sola lettura — id, data di creazione, data di aggiornamento — in fondo alla barra. Il valore predefinito è `true` ogni volta che viene mostrata la barra laterale, e sostituisce `hideIdFromForm` per la maggior parte delle collezioni: l'id smette di essere un campo in mezzo al form e diventa una riga di metadati copiabile.
+`showRecordMeta` posiziona il blocco del record in sola lettura — id, data di creazione, data di aggiornamento — ai
+piedi della barra laterale. È impostato di default su `true` ogni volta che viene mostrata una barra laterale, e sostituisce
+`hideIdFromForm` per la maggior parte delle collection: l'id smette di essere un campo al centro del
+form e diventa una riga di metadati che è possibile copiare.
 
-Imposta `sidebar: []` per escludere del tutto la barra laterale derivata e mantenere ogni campo nella colonna principale.
+Imposta `sidebar: []` per disattivare del tutto la barra laterale derivata e mantenere ogni campo nella
+colonna principale.
 
 ## Riferimento
 
+<span class="since-badge" data-since="0.26">Da 0.26</span>
+
 | Proprietà | Tipo | Descrizione |
 |-----------|------|-------------|
-| `admin.span` | `1 \| 2 \| 3 \| 4` | Larghezza del campo sulla griglia del form a quattro colonne |
-| `admin.form.sidebar` | `string[]` | Chiavi di proprietà mostrate nella barra dei metadati |
-| `admin.form.sections` | `FormSection[]` | Gruppi provvisti di titolo per la colonna principale |
-| `admin.form.showRecordMeta` | `boolean` | Mostra id/creazione/aggiornamento in fondo alla barra |
+| `admin.span` | `1 \| 2 \| 3 \| 4` | Larghezza del campo sulla griglia a quattro colonne del form |
+| `admin.form.sidebar` | `string[]` | Chiavi delle proprietà visualizzate nella barra dei metadati |
+| `admin.form.sections` | `FormSection[]` | Gruppi con intestazione per la colonna principale |
+| `admin.form.showRecordMeta` | `boolean` | Mostra id/creazione/aggiornamento ai piedi della barra |
 
-`FormSection` è `{ key, title?, properties, collapsed?, collapsible? }`.
+`FormSection` corrisponde a `{ key, title?, properties, collapsed?, collapsible? }`.
 
 ## Correlati
 

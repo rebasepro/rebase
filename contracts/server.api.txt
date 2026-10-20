@@ -1173,7 +1173,7 @@ interface CreateAuthOptions { authFlowMode, authPath, autoRefresh, persistSessio
 interface CreateCronOptions { cronPath }
 interface CreatePersonalKeyRequest { expires_at, name, scopes }
 interface CreatePersonalKeysOptions { personalKeysPath, scopesPath }
-interface CreateRebaseClientOptions { admin, anonymous, apiKeys, apiPath, auth, baseUrl, collections, cron, fetch, headers, impersonate, offline, onUnauthorized, personalKeys, realtime, schemaVersion, storageSources, storageUrlOrigin, token, websocketUrl }
+interface CreateRebaseClientOptions { admin, anonymous, apiKeys, apiPath, auth, baseUrl, collections, cron, debug, fetch, headers, impersonate, offline, onUnauthorized, personalKeys, realtime, schemaVersion, storageSources, storageUrlOrigin, token, websocketUrl }
 interface DeviceSession { createdAt, id, ipAddress, isCurrentSession, userAgent }
 interface FilterCondition { column, operator, value }
 interface FindResult { data, meta }

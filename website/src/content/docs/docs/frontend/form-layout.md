@@ -6,6 +6,8 @@ description: Control how the entity form is arranged — column spans, sections,
 
 ## Overview
 
+<span class="since-badge" data-since="0.26">Since 0.26</span>
+
 The entity form is generated from your properties:
 
 - the id and the `createdAt` / `updatedAt` timestamps go to a metadata rail, read-only
@@ -159,6 +161,8 @@ Set `sidebar: []` to suppress the derived rail entirely and keep every field in
 the main column.
 
 ## Reference
+
+<span class="since-badge" data-since="0.26">Since 0.26</span>
 
 | Property | Type | Description |
 |----------|------|-------------|
