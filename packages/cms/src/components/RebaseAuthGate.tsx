@@ -1,7 +1,8 @@
 import React from "react";
 import {
     useRebaseRegistry,
-    useAuthController
+    useAuthController,
+    useComponentOverride
 } from "@rebasepro/app";
 import { CircularProgressCenter } from "@rebasepro/ui";
 import { LoginView, readEmailLinkAction } from "@rebasepro/app";
@@ -27,7 +28,9 @@ import type { AuthControllerExtended } from "@rebasepro/cms-types";
 export function RebaseAuthGate({ children }: { children: React.ReactNode }) {
     const registry = useRebaseRegistry();
     const authController = useAuthController();
-
+    // `<RebaseAuth loginView>` is an element and wins; `"Auth.LoginView"` in
+    // `<Rebase components>` replaces or wraps the built-in screen.
+    const ResolvedLoginView = useComponentOverride("Auth.LoginView", LoginView);
 
     if (authController?.initialLoading) {
         return <CircularProgressCenter size={"large"}/>;
@@ -46,7 +49,7 @@ export function RebaseAuthGate({ children }: { children: React.ReactNode }) {
 
     if (!authController?.user || linkOpensOverSession) {
         const ActiveLoginView = registry.authConfig?.loginView ?? (
-            <LoginView authController={authController as AuthControllerExtended}/>
+            <ResolvedLoginView authController={authController as AuthControllerExtended}/>
         );
         return <>{ActiveLoginView}</>;
     }

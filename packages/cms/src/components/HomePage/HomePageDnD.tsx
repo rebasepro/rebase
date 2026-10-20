@@ -31,6 +31,7 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 
 import { NavigationCardBinding } from "./NavigationCardBinding";
+import { useComponentOverride } from "@rebasepro/app";
 ;
 import { cls } from "@rebasepro/ui";
 
@@ -111,6 +112,8 @@ export function SortableNavigationCard({
             animateLayoutChanges
         });
 
+    const ResolvedCollectionCard = useComponentOverride("HomePage.CollectionCard", NavigationCardBinding);
+
     const style = {
         transform: transform ? CSS.Transform.toString(transform) : undefined,
         transition,
@@ -119,7 +122,7 @@ export function SortableNavigationCard({
 
     return (
         <div ref={setNodeRef} style={style} {...draggableAttributes(attributes)} {...listeners}>
-            <NavigationCardBinding {...entry} onClick={onClick}/>
+            <ResolvedCollectionCard {...entry} onClick={onClick}/>
         </div>
     );
 }

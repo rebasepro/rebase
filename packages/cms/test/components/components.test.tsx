@@ -19,6 +19,7 @@ jest.mock("@rebasepro/app", () => ({
         return token && kind ? { kind, token } : null;
     }),
     useTranslation: () => ({ t: (key: string) => key === "copy" ? "Copy" : key }),
+    useComponentOverride: (_name: string, fallback: unknown) => fallback,
     LoginView: ({ authController }: any) => <div data-testid="login-view">Login View</div>
 }));
 

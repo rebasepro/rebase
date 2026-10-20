@@ -11,7 +11,10 @@ import { RebaseRouteDefs } from "./RebaseRouteDefs";
 
 export interface RebaseShellProps {
     title?: string;
-    /** Top bar. Only rendered if provided — pass `<AppBar/>` for the default one. */
+    /**
+     * Top bar. Only rendered if provided — pass `<AppBar/>` for the default
+     * one — or when `<Rebase components>` overrides `"Shell.AppBar"`.
+     */
     appBar?: React.ReactNode;
     drawer?: React.ReactNode;
     /** Expand the drawer while the pointer is over it. On by default; pass `false` to opt out. Not a load-time default — that is `defaultDrawerOpen`. */

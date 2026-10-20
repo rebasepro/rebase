@@ -8,6 +8,7 @@ import {
 
 import { Scaffold } from "./app/Scaffold";
 import { Drawer } from "./app/Drawer";
+import { DefaultAppBar } from "./DefaultAppBar";
 import { SideDialogs } from "./SideDialogs";
 import { AdminModeSyncer } from "./AdminModeSyncer";
 import type { AppView } from "@rebasepro/cms-types";
@@ -15,7 +16,10 @@ import type { AppView } from "@rebasepro/cms-types";
 export interface RebaseLayoutProps {
     /** Title shown in the drawer. */
     title?: string;
-    /** Top bar. Only rendered if provided — pass `<AppBar/>` for the default one. */
+    /**
+     * Top bar. Only rendered if provided — pass `<AppBar/>` for the default
+     * one — or when `<Rebase components>` overrides `"Shell.AppBar"`.
+     */
     appBar?: React.ReactNode;
     /** Custom Drawer to override the default. */
     drawer?: React.ReactNode;
@@ -67,6 +71,15 @@ export function RebaseLayout(props: RebaseLayoutProps) {
 
     const adminModeController = useAdminModeController();
     const ResolvedDrawer = useComponentOverride("Shell.Drawer", Drawer);
+    const ResolvedAppBar = useComponentOverride("Shell.AppBar", DefaultAppBar);
+
+    // There is no top bar by default, so an override of it is also the ask
+    // for one: a replacement renders on its own, and a wrapper is handed the
+    // default bar as `OriginalComponent`. An `appBar` element still wins, the
+    // way a `drawer` element wins over a `"Shell.Drawer"` override.
+    const ActiveAppBar = appBar ?? (ResolvedAppBar !== DefaultAppBar
+        ? <ResolvedAppBar title={title} logo={logo}/>
+        : null);
 
     const ActiveDrawer = drawer ?? (
         <ResolvedDrawer
@@ -78,7 +91,7 @@ export function RebaseLayout(props: RebaseLayoutProps) {
     return (
         <Scaffold autoOpenDrawer={autoOpenDrawer} defaultDrawerOpen={defaultDrawerOpen} logo={logo}>
             <AdminModeSyncer devViews={devViews}/>
-            {appBar}
+            {ActiveAppBar}
             {ActiveDrawer}
             <Outlet/>
             <SideDialogs/>

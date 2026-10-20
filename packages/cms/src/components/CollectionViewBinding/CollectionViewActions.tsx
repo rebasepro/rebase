@@ -214,11 +214,13 @@ parentEntityIds,
                     <ImportCollectionAction {...(actionProps as CollectionActionsProps)}/>
                 </Suspense>
             </ErrorBoundary>
-            <ErrorBoundary>
-                <Suspense fallback={null}>
-                    <ExportCollectionAction {...(actionProps as CollectionActionsProps)}/>
-                </Suspense>
-            </ErrorBoundary>
+            {collection.exportable !== false && (
+                <ErrorBoundary>
+                    <Suspense fallback={null}>
+                        <ExportCollectionAction {...(actionProps as CollectionActionsProps)}/>
+                    </Suspense>
+                </ErrorBoundary>
+            )}
             {hasCollectionEditor && (
                 <ErrorBoundary>
                     <EditorCollectionAction {...(actionProps as CollectionActionsProps)}/>

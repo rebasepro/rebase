@@ -9,7 +9,7 @@ import { deepEqual as equal } from "fast-equals";
 
 import { ErrorBoundary, isKeyHandled } from "@rebasepro/ui";
 import { AlignLeftIcon, useDebouncedCallback } from "@rebasepro/ui";
-import { getCopyValues, getDefaultValuesFor } from "@rebasepro/common";
+import { effectiveAccess, getCopyValues, getDefaultValuesFor } from "@rebasepro/common";
 import { isDisabled, isHidden, isReadOnly } from "@rebasepro/app";
 import { useAuthController, useCustomizationController, useRebaseContext, useTranslation } from "@rebasepro/app";
 
@@ -27,7 +27,7 @@ import { PropertyFieldBinding } from "./PropertyFieldBinding";
 import { flattenKeys } from "@rebasepro/app";
 import { ErrorFocus } from "./components/ErrorFocus";
 import { applyValueTransforms, CustomFieldValidator, getEntitySchema, uniqueValueErrors } from "./validation";
-import { resolveFormProperty, resolvePropertiesForValidation } from "./resolve_form_properties";
+import { formViewer, resolveFormProperty, resolvePropertiesForValidation, withoutUnwritableDefaults } from "./resolve_form_properties";
 import { EntityFormActions } from "./EntityFormActions";
 import type { EntityFormActionsProps } from "../types/components/EntityFormActionsProps";
 import { LocalChangesMenu } from "./components/LocalChangesMenu";
@@ -101,6 +101,7 @@ export function EntityForm<M extends Record<string, unknown>>({
         }
     }, [navigateBackProp]);
 
+    const authController = useAuthController();
     const [status, setStatus] = useState<EntityStatus>(initialStatus);
 
     const updateStatus = (status: EntityStatus) => {
@@ -380,11 +381,18 @@ export function EntityForm<M extends Record<string, unknown>>({
         // The string transforms a property declares change what is written;
         // validation has already judged the transformed value.
         const writtenValues = applyValueTransforms(values, collection.properties);
+        // An existing record sends only what changed; a new one or a copy
+        // sends what it holds, less what the user could not have written.
         const valuesToSave = status === "existing"
             ? getChangedProperties<M>(writtenValues, entity?.values || {}) as EntityValues<M>
-            : status === "new"
-                ? withoutUnsetNulls(writtenValues, baseInitialValues as Partial<M>)
-                : writtenValues;
+            : withoutUnwritableDefaults<M>(
+                status === "new"
+                    ? withoutUnsetNulls(writtenValues, baseInitialValues as Partial<M>)
+                    : writtenValues,
+                baseInitialValues as Partial<M>,
+                collection.properties,
+                formViewer(authController)
+            ) as EntityValues<M>;
 
         if (status === "existing" && Object.keys(valuesToSave).length === 0 && entity) {
             return Promise.resolve(entity);
@@ -529,7 +537,6 @@ export function EntityForm<M extends Record<string, unknown>>({
         return defaultUniqueFieldValidator;
     }, [uniqueFieldValidatorProp, defaultUniqueFieldValidator]);
 
-    const authController = useAuthController();
     const customizationController = useCustomizationController();
     const { t } = useTranslation();
 
@@ -722,9 +729,10 @@ export function EntityForm<M extends Record<string, unknown>>({
             console.warn(`Property ${field.key} not found in collection ${collection.name} in properties or additional fields. Skipping.`);
             return null;
         }
-        // A field a rule hides for these values takes its label with it: the
-        // binding renders nothing, and a heading over nothing is worse.
-        if (property.conditions?.hidden) {
+        // A field a rule hides for these values, or that this user may not
+        // read, takes its label with it: the binding renders nothing, and a
+        // heading over nothing is worse.
+        if (property.conditions?.hidden || effectiveAccess(property)) {
             const shown = resolveFormProperty({
                 propertyKey: field.key,
                 property,

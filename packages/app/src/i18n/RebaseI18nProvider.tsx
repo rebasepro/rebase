@@ -1,4 +1,4 @@
-import React, { PropsWithChildren, useEffect, useMemo, useRef } from "react";
+import React, { createContext, PropsWithChildren, useContext, useEffect, useMemo, useRef } from "react";
 import i18next, { BackendModule, i18n } from "i18next";
 import { I18nextProvider, initReactI18next } from "react-i18next";
 import { loadChunk, UiLabelsProvider, type UiLabelsProviderProps } from "@rebasepro/ui";
@@ -40,6 +40,25 @@ const LOCALE_LOADERS: Record<string, () => Promise<RebaseTranslations>> = {
 const loadedTables: Record<string, RebaseTranslations> = { en };
 
 export const REBASE_LOCALE_STORAGE_KEY = "rebase_locale";
+
+/**
+ * Every language the admin can be shown in: English, the ones Rebase ships,
+ * and any the app adds through `translations` — a language Rebase does not
+ * ship is a full table from the app, falling back to English key by key.
+ */
+export function availableRebaseLocales(translatedLocales: readonly string[] = []): string[] {
+    return [...new Set(["en", ...Object.keys(LOCALE_LOADERS), ...translatedLocales])];
+}
+
+const RebaseLocalesContext = createContext<string[]>(availableRebaseLocales());
+
+/**
+ * The languages the admin can be switched to — what the language menu lists.
+ * Outside a {@link RebaseI18nProvider}, the ones Rebase ships.
+ */
+export function useRebaseLocales(): string[] {
+    return useContext(RebaseLocalesContext);
+}
 
 /** DeepPartial helper — allows partial overrides at any nesting level */
 type DeepPartial<T> = T extends object
@@ -180,13 +199,22 @@ export function RebaseI18nProvider({
         }
     }, [translationsKey]);
 
+    // Keyed on the names, not the object, for the same reason as above.
+    const localeNames = Object.keys(translations ?? {}).join(",");
+    const locales = useMemo(
+        () => availableRebaseLocales(localeNames ? localeNames.split(",") : []),
+        [localeNames]
+    );
+
     if (!ready || !i18nRef.current) return null;
 
     return (
         <I18nextProvider i18n={i18nRef.current}>
-            <UiLabelsFromTranslations>
-                {children}
-            </UiLabelsFromTranslations>
+            <RebaseLocalesContext.Provider value={locales}>
+                <UiLabelsFromTranslations>
+                    {children}
+                </UiLabelsFromTranslations>
+            </RebaseLocalesContext.Provider>
         </I18nextProvider>
     );
 }

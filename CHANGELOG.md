@@ -31,6 +31,26 @@
 
 #### Admin (CMS & app)
 
+- **The `"Shell.AppBar"`, `"HomePage.CollectionCard"` and `"Auth.LoginView"`
+  component overrides work.** All three were declared, documented and shown in
+  the `<Rebase components>` example, and nothing resolved them, so setting one
+  did nothing. A `"Shell.AppBar"` override now renders a top bar (a wrapper is
+  handed the default one); an `appBar` element on `<RebaseShell>` still wins,
+  as does `loginView` on `<RebaseAuth>` over `"Auth.LoginView"`. A test now
+  fails when a declared override name is resolved nowhere.
+- **`exportable: false` removes Export from the collection toolbar.** It was
+  ignored; only the object form was read, for its extra fields.
+- **The record form follows field access rules.** A field the user may not
+  write (`access.write`) is shown read-only, and one they may not read
+  (`access.read`, `excludeFromApi`) is left out, label included. Before, both
+  were ordinary inputs and the edit came back as a 400 on save. A new record or
+  a copy no longer sends a default or copied value for a field the user may
+  not write, which made the server refuse the whole save.
+- **A language added through `<Rebase translations>` is in the language
+  menu.** The menu listed the seven shipped languages only, so an app's own
+  language could be set with `locale` and never chosen by the user. A
+  language Rebase does not ship is named by the browser (`nl` → "Nederlands").
+  `useRebaseLocales()` returns the list.
 - **A record created from its parent's tab opens linked to that parent.** A new
   transaction from a customer's Transactions tab asked for the customer, and a
   required `belongsTo` could not be saved until the user picked the record they

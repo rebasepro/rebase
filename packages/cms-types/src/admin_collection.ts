@@ -447,7 +447,9 @@ export type AdminCollectionOptions<
     formAutoSave?: boolean;
 
     /**
-     *
+     * Whether the collection's toolbar offers Export. `false` removes it;
+     * an {@link ExportConfig} keeps it and adds fields to what is exported.
+     * Defaults to `true`.
      */
     exportable?: boolean | ExportConfig<USER>;
 

@@ -19,7 +19,7 @@ import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable"
 import { restrictToVerticalAxis, restrictToWindowEdges } from "@dnd-kit/modifiers";
 import { RenameGroupDialog } from "./RenameGroupDialog";
 import { toArray } from "@rebasepro/utils";
-import { useCollapsedGroups, buildCollapsedDefaults, useCustomizationController, useTranslation, useSlot, useAdminModeController, useRebaseRegistry } from "@rebasepro/app";
+import { useCollapsedGroups, buildCollapsedDefaults, useComponentOverride, useCustomizationController, useTranslation, useSlot, useAdminModeController, useRebaseRegistry } from "@rebasepro/app";
 import { useRestoreScroll } from "@rebasepro/app";
 
 import { SchemaDriftBanner } from "@rebasepro/app";
@@ -51,6 +51,7 @@ export function ContentHomePage({
     const registry = useRebaseRegistry();
 
     const { resolvedSlots } = customizationController;
+    const ResolvedCollectionCard = useComponentOverride("HomePage.CollectionCard", NavigationCardBinding);
     const breadcrumbs = useBreadcrumbsController();
     const { t } = useTranslation();
 
@@ -520,7 +521,7 @@ export function ContentHomePage({
                                 />
                             </div>
                         ) : activeItemForOverlay ? (
-                            <NavigationCardBinding
+                            <ResolvedCollectionCard
                                 {...activeItemForOverlay}
                                 shrink={isHoveringNewGroupDropZone}
                             />
@@ -536,7 +537,7 @@ export function ContentHomePage({
                     >
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 ">
                             {adminGroupData.entries.map((entry) => (
-                                <NavigationCardBinding
+                                <ResolvedCollectionCard
                                     key={entry.url}
                                     {...entry}
                                     onClick={() => {
