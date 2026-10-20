@@ -14,7 +14,7 @@ Jede Collection kann in vier Ansichtsmodi dargestellt werden:
 - **Karten** — Kartengitter für visuelle Inhalte (Bilder, Vorschauen)
 - **Kanban** — Drag-and-Drop-Board, gruppiert nach einer Enum-Eigenschaft
 
-Dies sind die integrierten Modi. Eine Collection kann auch von Ihnen erstellte Ansichtsmodi bieten — einen Kalender, eine Karte, eine Galerie — im selben Umschalter, gesteuert über dieselbe Toolbar: siehe [Benutzerdefinierte Ansichtsmodi](/docs/frontend/extending#benutzerdefinierte-ansichtsmodi-custom-view-modes) und das Kalender-Rezept in [Admin anpassen](/docs/frontend/customizing).
+Dies sind die integrierten Modi. Eine Collection kann auch von Ihnen erstellte Ansichtsmodi bieten — einen Kalender, eine Karte, eine Galerie — im selben Umschalter, gesteuert über dieselbe Toolbar: siehe [Benutzerdefinierte Ansichtsmodi](/docs/frontend/extending#custom-view-modes) und das Kalender-Rezept in [Admin anpassen](/docs/frontend/customizing).
 
 ## Konfiguration
 

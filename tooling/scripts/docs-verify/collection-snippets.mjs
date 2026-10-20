@@ -145,6 +145,10 @@ function withRecorder(code, source) {
             : [];
         for (const declaration of declarations) {
             if (!ts.isIdentifier(declaration.name)) continue;
+            // A declaration annotated with some other type says what it is:
+            // `const view: AppView = { slug, … }` has a slug and is no collection.
+            const annotated = annotationName(declaration.type);
+            if (annotated && !COLLECTION_TYPE_NAMES.has(annotated)) continue;
             names.push(declaration.name.text);
         }
     }

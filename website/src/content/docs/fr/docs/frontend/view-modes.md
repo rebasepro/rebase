@@ -14,7 +14,7 @@ Chaque collection peut être affichée dans quatre modes de vue :
 - **Cartes** — Grille de cartes pour le contenu visuel (images, aperçus)
 - **Kanban** — Tableau avec glisser-déposer regroupé par une propriété d'énumération (enum)
 
-Ce sont les modes intégrés. Une collection peut également proposer des modes de vue que vous écrivez vous-même — un calendrier, une carte, une galerie — dans le même sélecteur, pilotés par la même barre d'outils : consultez [Modes de vue personnalisés](/docs/frontend/extending#modes-de-vue-personnalisés) et la recette de calendrier dans [Personnalisation de l'administration](/docs/frontend/customizing).
+Ce sont les modes intégrés. Une collection peut également proposer des modes de vue que vous écrivez vous-même — un calendrier, une carte, une galerie — dans le même sélecteur, pilotés par la même barre d'outils : consultez [Modes de vue personnalisés](/docs/frontend/extending#custom-view-modes) et la recette de calendrier dans [Personnalisation de l'administration](/docs/frontend/customizing).
 
 ## Configuration
 

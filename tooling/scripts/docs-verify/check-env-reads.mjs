@@ -108,6 +108,10 @@ const NOT_OURS = new Map([
     // sets it; a reader who did would only be lying to the driver about which
     // database they are on.
     ["REBASE_DEV_DATABASE_KIND", "set by the CLI for the driver child it spawns"],
+    // `rebase cloud init --claim` asks for the app's key itself once the deploy
+    // it runs is done, so it tells that child deploy not to ask too: a second
+    // key would revoke the first. Nobody sets it by hand.
+    ["REBASE_CLOUD_INIT_DEPLOY", "set by `rebase cloud init` for the deploy it spawns"],
     // The driver runs in `backend/`, so it cannot see where `rebase` was run;
     // the CLI tells it, and backup paths resolve against that. Nobody sets it.
     ["REBASE_INVOCATION_CWD", "set by the CLI for the driver child it spawns"],

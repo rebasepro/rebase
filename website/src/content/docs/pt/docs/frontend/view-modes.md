@@ -14,7 +14,7 @@ Cada coleção pode ser exibida em quatro modos de visualização:
 - **Cards** — Grade de cards para conteúdo visual (imagens, pré-visualizações)
 - **Kanban** — Quadro com arrastar e soltar (drag-and-drop) agrupado por uma propriedade enum
 
-Esses são os modos integrados. Uma coleção também pode oferecer modos de visualização desenvolvidos por você — um calendário, um mapa, uma galeria — no mesmo seletor, acionados pela mesma barra de ferramentas: consulte [Modos de visualização personalizados](/docs/frontend/extending#modos-de-visualização-personalizados) e o exemplo de calendário em [Personalizando o Admin](/docs/frontend/customizing).
+Esses são os modos integrados. Uma coleção também pode oferecer modos de visualização desenvolvidos por você — um calendário, um mapa, uma galeria — no mesmo seletor, acionados pela mesma barra de ferramentas: consulte [Modos de visualização personalizados](/docs/frontend/extending#custom-view-modes) e o exemplo de calendário em [Personalizando o Admin](/docs/frontend/customizing).
 
 ## Configuração
 

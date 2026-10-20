@@ -14,7 +14,7 @@ Cada colección se puede mostrar en cuatro modos de vista:
 - **Tarjetas** — Cuadrícula de tarjetas para contenido visual (imágenes, vistas previas)
 - **Kanban** — Tablero de arrastrar y soltar agrupado por una propiedad de tipo enum
 
-Esas son las opciones integradas. Una colección también puede ofrecer modos de vista que tú mismo escribas — un calendario, un mapa, una galería — dentro del mismo selector, gestionados por la misma barra de herramientas: consulta [Modos de vista personalizados](/docs/frontend/extending#modos-de-vista-personalizados) y la guía de calendario en [Personalizar el Admin](/docs/frontend/customizing).
+Esas son las opciones integradas. Una colección también puede ofrecer modos de vista que tú mismo escribas — un calendario, un mapa, una galería — dentro del mismo selector, gestionados por la misma barra de herramientas: consulta [Modos de vista personalizados](/docs/frontend/extending#custom-view-modes) y la guía de calendario en [Personalizar el Admin](/docs/frontend/customizing).
 
 ## Configuración
 

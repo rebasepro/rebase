@@ -14,7 +14,7 @@ Ogni collezione può essere visualizzata in quattro modalità di visualizzazione
 - **Cards** — Griglia di schede per contenuti visivi (immagini, anteprime)
 - **Kanban** — Bacheca drag-and-drop raggruppata per una proprietà enum
 
-Queste sono le modalità integrate. Una collezione può anche offrire modalità di visualizzazione create da te — un calendario, una mappa, una galleria — nello stesso selettore, gestite dalla stessa barra degli strumenti: consulta [Modalità di visualizzazione personalizzate](/docs/frontend/extending#modalità-di-visualizzazione-personalizzate) e la guida del calendario in [Personalizzazione dell'Admin](/docs/frontend/customizing).
+Queste sono le modalità integrate. Una collezione può anche offrire modalità di visualizzazione create da te — un calendario, una mappa, una galleria — nello stesso selettore, gestite dalla stessa barra degli strumenti: consulta [Modalità di visualizzazione personalizzate](/docs/frontend/extending#custom-view-modes) e la guida del calendario in [Personalizzazione dell'Admin](/docs/frontend/customizing).
 
 ## Configurazione
 
