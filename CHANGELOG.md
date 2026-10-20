@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+### Changed
+
+#### Admin (CMS & app)
+
+- **Form fields are full width unless the collection sets `admin.span`.** The
+  form used to guess widths from property types — strings, dates and relations
+  at half, numbers and booleans at a quarter, the title property full — and
+  paired fields that had nothing to do with each other: Namespace beside Custom
+  Domain, Git Branch beside Git Repository URL. Every field now takes the whole
+  row by default, nothing reads the title property to decide a width, and rows
+  are no longer stretched to close a gap. A span written on a property is used
+  as written; set one from what the field holds to put two values side by side.
+
 ### Fixed
 
 #### CLI

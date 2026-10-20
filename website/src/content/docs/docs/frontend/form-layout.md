@@ -6,17 +6,15 @@ description: Control how the entity form is arranged — column spans, sections,
 
 ## Overview
 
-The entity form is generated from your properties. By default it derives a
-two-column layout from the property types, so a collection that says nothing
-about layout still gets a form that reads like a form rather than one long run
-of full-width inputs:
+The entity form is generated from your properties:
 
 - the id and the `createdAt` / `updatedAt` timestamps go to a metadata rail, read-only
-- short enums, booleans, dates and numbers take a narrow span
-- long text, markdown, arrays, maps and storage fields take the full width
-- everything else takes half
+- every other field takes the full width of the main column
 
-Use `admin.form` when the derived answer is wrong for your domain.
+The form never guesses a width from a property's type, or from which property is
+the title. Columns are something the collection asks for, field by field, with
+`admin.span` — set from what each field holds, as below. Use `admin.form` to
+group fields into sections and move them to the rail.
 
 ## Field width
 
@@ -55,6 +53,14 @@ of the order they were declared in. They replaced `admin.widthPercentage`,
 whose raw percentages could not line up with anything; a collection still
 carrying one should pick the nearest span (≤30 → `1`, ≤55 → `2`, ≤80 → `3`,
 otherwise `4`).
+
+Choose a span from what the field holds, not from its type. Two short values
+that belong together share a row — start and end date, city and country,
+provider and region at `2` each, or a value and its qualifier at `3` + `1`.
+Numbers, booleans and short codes can take `1` beside their siblings. Anything
+that reads long — names, URLs, emails, ids, descriptions, markdown, files —
+keeps `4`. Rows fill in declaration order and nothing widens a field to close a
+gap, so declare pairs next to each other and make each row add up to 4.
 
 On layouts too narrow for two columns — the side panel, the split pane, a phone
 — the grid collapses to a single column and spans are ignored.

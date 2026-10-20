@@ -615,21 +615,62 @@ All property types support a `admin` object for display configuration:
 | `admin.hideFromCollection` | `boolean` | — | Hide from collection table view |
 | `admin.readOnly` | `boolean` | — | Render as read-only preview |
 | `admin.disabled` | `boolean \| PropertyDisabledConfig` | — | Disable editing |
-| `admin.span` | `1 \| 2 \| 3 \| 4` | — | Field width over the four-column form grid |
+| `admin.span` | `1 \| 2 \| 3 \| 4` | `4` | Field width over the four-column form grid. Set it from the content — see **Form layout** |
 | `admin.customProps` | `unknown` | — | Custom props passed to the field component |
 | `admin.Field` | `ComponentRef` | — | Custom field component |
 | `admin.Preview` | `ComponentRef` | — | Custom preview/cell component |
 
 ### Form layout
 
-The entity form derives a two-column layout from the property types on its own:
-the id and the audit timestamps go to a metadata rail, short enums, booleans,
-dates and numbers take a narrow span, long text, markdown, arrays, maps and
-storage fields take the full width, everything else takes half. A collection
-that says nothing about layout still gets a form rather than one long run of
-full-width inputs.
+The id and the audit timestamps go to a metadata rail. Every other field takes
+the **full width** unless its property sets `admin.span`. The form never guesses
+a width from a property's type, and never from which property is the title.
+Column layout is your job, and you should do it for every collection you write.
 
-Reach for `admin.form` when that answer is wrong for the domain:
+**Set `admin.span` from what the field holds, not from its type.** Two string
+properties are not a pair just because both are strings — Namespace beside
+Custom Domain, or Git Branch beside Git Repository URL, puts unrelated values
+next to each other and the reader zig-zags. Before writing spans, read each
+property and ask how long its value really is and what it belongs with:
+
+- **`4` (full width)** — anything read as prose or that can run long: names and
+  titles people read, descriptions, URLs, emails, paths, ids and namespaces,
+  markdown, multiline text, files, maps, arrays of anything but short tags, and
+  any field with a long `description` under it. When unsure, leave it at 4.
+- **`2` + `2`** — two short values that belong together: first / last name,
+  start / end date, city / country, min / max, currency / amount, provider /
+  region.
+- **`3` + `1`** — a value and its short qualifier: street / number, amount /
+  unit, title / status badge.
+- **`1`** — numbers, booleans, short enums and codes (ISO country, currency,
+  priority) placed beside their siblings, e.g. four counters on one row.
+
+Rules that keep the result clean:
+
+- **Spans in a row add up to exactly 4.** Nothing widens a field to close a gap,
+  so a row of `2` with no partner leaves half a row empty.
+- **Order the properties so pairs are adjacent.** Rows fill in declaration order
+  (or `sections[].properties` order), so a pair split by another field breaks.
+- **Pair by meaning, never to save height.** A field with nothing that belongs
+  beside it stays at 4. A long form is solved with `sections`, not columns.
+- Spans are ignored on narrow layouts (side panel, split pane, phone), so a
+  collection still has to read well as one column.
+
+```typescript
+properties: {
+    name:      { name: "Name", type: "string" },                                  // 4
+    subdomain: { name: "Subdomain", type: "string" },                             // 4 — a URL part, not a pair for Name
+    provider:  { name: "Cloud provider", type: "string", enum: providers, admin: { span: 2 } },
+    region:    { name: "Cloud region", type: "string", admin: { span: 2 } },      // provider + region read together
+    startsAt:  { name: "Starts", type: "date", admin: { span: 2 } },
+    endsAt:    { name: "Ends", type: "date", admin: { span: 2 } },
+    seats:     { name: "Seats", type: "number", admin: { span: 1 } },
+    active:    { name: "Active", type: "boolean", admin: { span: 1 } },
+    plan:      { name: "Plan", type: "string", enum: plans, admin: { span: 2 } },
+}
+```
+
+Reach for `admin.form` to group and move fields:
 
 ```typescript
 import { defineCollection } from "@rebasepro/cms-types";

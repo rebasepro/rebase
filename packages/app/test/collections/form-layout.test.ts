@@ -1,11 +1,8 @@
 import type { AdminCollection } from "@rebasepro/cms-types";
 import type { Property } from "@rebasepro/types";
 import {
-    deriveSpan,
-    fillRows,
     isIdPropertyEditable,
-    resolveFormLayout,
-    type ResolvedFormField
+    resolveFormLayout
 } from "../../src/collections/form-layout";
 
 const collection = (properties: Record<string, unknown>, admin: Record<string, unknown> = {}) =>
@@ -22,43 +19,6 @@ const keysOf = (layout: { sections: { fields: { key: string }[] }[] }) =>
 
 const spanOf = (layout: { sections: { fields: { key: string, span: number }[] }[] }, key: string) =>
     layout.sections.flatMap(s => s.fields).find(f => f.key === key)?.span;
-
-describe("deriveSpan", () => {
-    const p = (v: unknown) => v as Property;
-
-    it("gives compact editors a quarter row", () => {
-        expect(deriveSpan(p({ type: "number" }), false)).toBe(1);
-        expect(deriveSpan(p({ type: "boolean" }), false)).toBe(1);
-    });
-
-    it("gives ordinary editors half a row", () => {
-        expect(deriveSpan(p({ type: "string" }), false)).toBe(2);
-        expect(deriveSpan(p({ type: "date" }), false)).toBe(2);
-        expect(deriveSpan(p({ type: "relation" }), false)).toBe(2);
-    });
-
-    it("gives the whole row to editors that need it", () => {
-        expect(deriveSpan(p({ type: "string", admin: { markdown: true } }), false)).toBe(4);
-        expect(deriveSpan(p({ type: "string", admin: { multiline: true } }), false)).toBe(4);
-        expect(deriveSpan(p({ type: "string", storage: { storagePath: "x/" } }), false)).toBe(4);
-        expect(deriveSpan(p({ type: "map" }), false)).toBe(4);
-    });
-
-    it("splits arrays on what they hold, not on being arrays", () => {
-        // tags — reads fine beside another field
-        expect(deriveSpan(p({ type: "array", of: { type: "string" } }), false)).toBe(2);
-        // uploads and nested shapes — do not
-        expect(deriveSpan(p({ type: "array", of: { type: "string", storage: { storagePath: "x/" } } }), false)).toBe(4);
-        expect(deriveSpan(p({ type: "array", of: { type: "map" } }), false)).toBe(4);
-        expect(deriveSpan(p({ type: "array", oneOf: { properties: {} } }), false)).toBe(4);
-        expect(deriveSpan(p({ type: "array" }), false)).toBe(4);
-    });
-
-    it("gives the title property the full row whatever its type", () => {
-        expect(deriveSpan(p({ type: "string" }), true)).toBe(4);
-        expect(deriveSpan(p({ type: "number" }), true)).toBe(4);
-    });
-});
 
 describe("isIdPropertyEditable", () => {
     it("keeps a manual id typeable while creating and freezes it afterwards", () => {
@@ -79,7 +39,7 @@ describe("isIdPropertyEditable", () => {
     });
 });
 
-describe("resolveFormLayout — derived defaults", () => {
+describe("resolveFormLayout — defaults", () => {
     const products = collection({
         id: { type: "string", isId: "uuid" },
         name: { type: "string" },
@@ -137,12 +97,22 @@ describe("resolveFormLayout — derived defaults", () => {
         expect(keysOf(editing)).not.toContain("id");
     });
 
-    it("derives a mixed-width row rather than a run of full-width fields", () => {
-        expect(spanOf(layout, "name")).toBe(4);        // title
-        expect(spanOf(layout, "sku")).toBe(2);
-        expect(spanOf(layout, "price")).toBe(1);
-        expect(spanOf(layout, "stock")).toBe(1);
-        expect(spanOf(layout, "description")).toBe(4); // markdown
+    it("gives every field the full row, whatever its type", () => {
+        for (const key of keysOf(layout)) {
+            expect(spanOf(layout, key)).toBe(4);
+        }
+    });
+
+    it("does not widen or narrow the title property", () => {
+        // Being the record's title says nothing about how wide its editor is.
+        // Nothing in the layout reads `display.title`.
+        const titled = collection({
+            code: { type: "string", admin: { span: 1 } },
+            label: { type: "string" }
+        }, { display: { title: "code" } });
+        const l = resolveFormLayout({ collection: titled, fieldKeys: ["code", "label"], status: "existing" });
+        expect(spanOf(l, "code")).toBe(1);
+        expect(spanOf(l, "label")).toBe(4);
     });
 
     it("lays a short form out as one column", () => {
@@ -176,32 +146,6 @@ describe("resolveFormLayout — derived defaults", () => {
         expect(spanOf(l, "from")).toBe(2);
         expect(spanOf(l, "to")).toBe(2);
         expect(spanOf(l, "note")).toBe(4);
-    });
-
-    it("counts the whole form, not one section, before going to one column", () => {
-        // Two short sections that make a long form keep their columns — a form
-        // that switched rules from one section to the next would read as two.
-        const sectioned = collection({
-            a: { type: "number" },
-            b: { type: "number" },
-            c: { type: "number" },
-            d: { type: "number" },
-            e: { type: "number" }
-        }, {
-            form: {
-                sections: [
-                    { key: "one", properties: ["a", "b"] },
-                    { key: "two", properties: ["c", "d", "e"] }
-                ]
-            }
-        });
-        const l = resolveFormLayout({
-            collection: sectioned,
-            fieldKeys: ["a", "b", "c", "d", "e"],
-            status: "existing"
-        });
-        expect(spanOf(l, "a")).toBe(2);
-        expect(spanOf(l, "b")).toBe(2);
     });
 
     it("preserves the incoming field order", () => {
@@ -279,50 +223,22 @@ describe("resolveFormLayout — derived defaults", () => {
     });
 });
 
-describe("fillRows", () => {
-    // Called directly: through `resolveFormLayout` a form this short is laid
-    // out as one column and never reaches row filling.
-    const field = (key: string, span: ResolvedFormField["span"], spanExplicit = false): ResolvedFormField =>
-        ({ key, span, additional: false, spanExplicit });
-    const spansOf = (fields: ResolvedFormField[]) => fields.map(f => [f.key, f.span]);
-
-    it("closes the gap left by a lone half-width field", () => {
-        // name | sku  then  brand | ␣␣ — the stranded half is what this removes.
-        const filled = fillRows([field("name", 2), field("sku", 2), field("brand", 2)]);
-        expect(spansOf(filled)).toEqual([["name", 2], ["sku", 2], ["brand", 4]]);
-    });
-
-    it("never resizes a field whose span the author set", () => {
-        const filled = fillRows([field("a", 2), field("b", 2), field("c", 2, true)]);
-        expect(spansOf(filled)).toEqual([["a", 2], ["b", 2], ["c", 2]]);
-    });
-
-    it("closes the gap left by a lone quarter-width field", () => {
+describe("resolveFormLayout — spans the author wrote", () => {
+    it("never resizes them to close a row", () => {
+        // The author picked these widths; a gap they leave is theirs to keep.
         const l = resolveFormLayout({
             collection: collection({
-                a: { type: "number" }, b: { type: "number" },
-                c: { type: "number" }, d: { type: "number" },
-                lonely: { type: "number" }
+                city: { type: "string", admin: { span: 3 } },
+                postcode: { type: "string", admin: { span: 1 } },
+                country: { type: "string", admin: { span: 2 } },
+                notes: { type: "string" }
             }),
-            fieldKeys: ["a", "b", "c", "d", "lonely"],
+            fieldKeys: ["city", "postcode", "country", "notes"],
             status: "existing"
         });
-        // row one is full; `lonely` starts a row of its own with a gap of 3
         expect(l.sections[0].fields.map(f => [f.key, f.span])).toEqual([
-            ["a", 1], ["b", 1], ["c", 1], ["d", 1], ["lonely", 4]
+            ["city", 3], ["postcode", 1], ["country", 2], ["notes", 4]
         ]);
-    });
-
-    it("spreads the remainder across the row rather than onto the last field", () => {
-        // two quarter-width numbers and half a row spare: both grow, so you do
-        // not get one full-width input beside one quarter-width one.
-        const filled = fillRows([field("a", 1), field("b", 1)]);
-        expect(filled.map(f => f.span)).toEqual([2, 2]);
-    });
-
-    it("leaves a full row alone", () => {
-        const filled = fillRows([field("a", 1), field("b", 1), field("c", 1), field("d", 1)]);
-        expect(filled.map(f => f.span)).toEqual([1, 1, 1, 1]);
     });
 });
 
@@ -455,7 +371,7 @@ describe("resolveFormLayout — explicit config", () => {
         expect(l.hasRail).toBe(false);
     });
 
-    it("prefers an explicit span over the derived one", () => {
+    it("prefers an explicit span over the default", () => {
         const explicit = collection({
             a: { type: "number", admin: { span: 4 } },
             b: { type: "number", admin: { span: 2 } },

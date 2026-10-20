@@ -4,13 +4,12 @@
  * Turns a collection into the shape the entity form renders: an ordered list of
  * sections holding grid-spanned fields, plus the metadata rail beside them.
  *
- * The reason this is a pure function rather than logic inside the form is that
- * the *defaults* are the interesting part. A collection that never writes an
- * `admin.form` block still has to get a two-column layout out of this once it is
- * long enough to need one — the flat run of full-width fields it produced before
- * was the single biggest cost in the form, and no amount of config would have fixed it for collections nobody
- * hand-tunes. Deriving it here means it is testable in isolation, which matters
- * because "what span does a date get" is exactly the kind of rule that rots.
+ * Every field takes the full row unless its property sets `admin.span`. Widths
+ * guessed from a property's type paired fields that had nothing to do with each
+ * other — Namespace beside Custom Domain, Git Branch beside Git Repository URL —
+ * so the eye zig-zagged across values that were neighbours only by type. Nothing
+ * here looks at which property is the record's title either. A collection that
+ * wants columns says so, field by field.
  */
 import type {
     AdminCollection,
@@ -18,7 +17,6 @@ import type {
     PropertySpan
 } from "@rebasepro/cms-types";
 import type { Property } from "@rebasepro/types";
-import { getDisplayPropertyKey } from "./entity-display";
 import { isHidden } from "./property_presentation";
 
 /**
@@ -34,18 +32,6 @@ import { isHidden } from "./property_presentation";
  */
 const GRID_COLUMNS = 4 satisfies PropertySpan;
 
-/**
- * The most fields a form can hold and still be laid out as one column.
- *
- * Columns are a density tool: they buy back height on a form long enough to
- * scroll. A form this short fits on any surface without scrolling, so pairing
- * its fields buys nothing and costs the reading order — the eye zig-zags across
- * values that are next to each other only because of their types. The users
- * form was the case that showed it: Email beside Name, then Roles alone on the
- * row below, in a dialog with room to spare.
- */
-const SINGLE_COLUMN_MAX_FIELDS = 4;
-
 /** A field placed on the grid. */
 export interface ResolvedFormField {
     key: string;
@@ -53,11 +39,6 @@ export interface ResolvedFormField {
     span: PropertySpan;
     /** True for an `additionalFields` entry rather than a property. */
     additional: boolean;
-    /**
-     * The span was written on the property rather than derived from its type.
-     * Row filling leaves these alone: an author who wrote a width meant it.
-     */
-    spanExplicit?: boolean;
 }
 
 export interface ResolvedFormSection {
@@ -102,63 +83,6 @@ export interface ResolveFormLayoutParams<M extends Record<string, unknown>> {
 }
 
 /* -------------------------------------------------------------------------- */
-/* span derivation                                                            */
-/* -------------------------------------------------------------------------- */
-
-/** Does this property's editor need the full width of the column? */
-function needsFullWidth(property: Property): boolean {
-    switch (property.type) {
-        case "map":
-        case "binary":
-        case "vector":
-            return true;
-        case "array": {
-            // A tag-style array of plain short strings reads fine at half width.
-            // Anything else — files, nested maps, `oneOf` blocks — does not.
-            if (property.oneOf) return true;
-            const of = Array.isArray(property.of) ? undefined : property.of;
-            if (!of) return true;
-            if (of.type !== "string" && of.type !== "number") return true;
-            if (of.type === "string" && (of.storage || of.admin?.markdown || of.admin?.multiline)) return true;
-            return false;
-        }
-        case "string":
-            return Boolean(property.storage || property.admin?.markdown || property.admin?.multiline);
-        default:
-            return false;
-    }
-}
-
-/**
- * The span a property gets when nothing is declared.
- *
- * Deliberately coarse: three buckets, chosen by how much room the *editor*
- * needs, not by how important the field is. Importance is what `admin.form`
- * sections are for.
- */
-export function deriveSpan(property: Property, isTitleProperty: boolean): PropertySpan {
-    if (needsFullWidth(property)) return 4;
-    // The record's name carries the row on its own; it is the first thing read.
-    if (isTitleProperty) return 4;
-    switch (property.type) {
-        case "number":
-        case "boolean":
-            return 1;
-        case "date":
-        case "geopoint":
-        case "reference":
-        case "relation":
-            return 2;
-        case "array":
-            return 2; // short primitive arrays only — the rest returned 4 above
-        case "string":
-            return 2;
-        default:
-            return 2;
-    }
-}
-
-/* -------------------------------------------------------------------------- */
 /* id handling                                                                */
 /* -------------------------------------------------------------------------- */
 
@@ -197,67 +121,13 @@ export function isAuditTimestamp(property: Property | undefined): boolean {
     );
 }
 
-/**
- * Close the trailing gap in each row.
- *
- * Without this a section of half-width fields with an odd count leaves a hole —
- * `name | sku` then `brand | ␣␣` — a field stranded beside half a row of
- * nothing, which reads as a mistake rather than a layout. The remainder is
- * spread across the row's derived fields rather than dumped on the last one, so
- * a lone half-width field becomes full width and a pair grows evenly. Fields
- * with an explicit span are never resized.
- */
-export function fillRows(fields: ResolvedFormField[]): ResolvedFormField[] {
-    const rows: ResolvedFormField[][] = [];
-    let row: ResolvedFormField[] = [];
-    let used = 0;
-
-    for (const field of fields) {
-        if (used + field.span > GRID_COLUMNS && row.length) {
-            rows.push(row);
-            row = [];
-            used = 0;
-        }
-        row.push(field);
-        used += field.span;
-    }
-    if (row.length) rows.push(row);
-
-    return rows.flatMap(entries => {
-        const total = entries.reduce((sum, f) => sum + f.span, 0);
-        let gap = GRID_COLUMNS - total;
-        if (gap <= 0) return entries;
-
-        // Spread the remainder across the row's derived fields rather than
-        // dumping it all on the last one: two half-width fields beside a gap
-        // become two three-quarter fields, not one full-width and one half.
-        // Fields with an explicit span keep it — the author picked that width.
-        const growable = entries
-            .map((f, i) => [f, i] as const)
-            .filter(([f]) => !f.spanExplicit);
-
-        if (!growable.length) return entries;
-
-        const next = [...entries];
-        let cursor = 0;
-        while (gap > 0) {
-            const [, index] = growable[cursor % growable.length];
-            next[index] = { ...next[index], span: (next[index].span + 1) as PropertySpan };
-            gap -= 1;
-            cursor += 1;
-        }
-        return next;
-    });
-}
-
 /* -------------------------------------------------------------------------- */
 /* resolution                                                                 */
 /* -------------------------------------------------------------------------- */
 
 function buildField<M extends Record<string, unknown>>(
     key: string,
-    collection: AdminCollection<M>,
-    titlePropertyKey: string | undefined
+    collection: AdminCollection<M>
 ): ResolvedFormField | undefined {
     const property = collection.properties?.[key] as Property | undefined;
 
@@ -265,16 +135,16 @@ function buildField<M extends Record<string, unknown>>(
         // An additionalFields entry: a rendered card, not an input. Full width,
         // because we have no idea what the Builder puts inside it.
         const additional = collection.additionalFields?.some(f => f.key === key);
-        return additional ? { key, span: 4, additional: true } : undefined;
+        return additional ? { key, span: GRID_COLUMNS, additional: true } : undefined;
     }
 
     if (isHidden(property)) return undefined;
 
-    const admin = property.admin;
-    const explicit = admin?.span !== undefined;
-    const span: PropertySpan = admin?.span ?? deriveSpan(property, key === titlePropertyKey);
-
-    return { key, span, additional: false, spanExplicit: explicit };
+    return {
+        key,
+        span: property.admin?.span ?? GRID_COLUMNS,
+        additional: false
+    };
 }
 
 /**
@@ -291,11 +161,10 @@ export function resolveFormLayout<M extends Record<string, unknown>>({
 }: ResolveFormLayoutParams<M>): ResolvedFormLayout {
 
     const config = collection.form;
-    const titlePropertyKey = getDisplayPropertyKey(collection, "title");
 
     const available = new Map<string, ResolvedFormField>();
     for (const key of fieldKeys) {
-        const field = buildField(key, collection, titlePropertyKey);
+        const field = buildField(key, collection);
         if (field) available.set(key, field);
     }
 
@@ -391,25 +260,10 @@ export function resolveFormLayout<M extends Record<string, unknown>>({
         });
     }
 
-    // A short form is one column. Only the derived widths change: a span the
-    // author wrote is kept, because they meant it. Counted across the whole
-    // form rather than per section, so one form never mixes the two rules.
-    const fieldCount = sections.reduce((sum, section) => sum + section.fields.length, 0);
-    const singleColumn = fieldCount <= SINGLE_COLUMN_MAX_FIELDS;
-
     // A configured section that ended up empty (every key hidden, unknown, or
     // claimed by the rail) would render as a heading over nothing.
-    const nonEmpty = sections
-        .filter(s => s.fields.length > 0)
-        .map(s => ({
-            ...s,
-            fields: fillRows(singleColumn
-                ? s.fields.map(f => f.spanExplicit ? f : { ...f, span: GRID_COLUMNS })
-                : s.fields)
-        }));
-
     return {
-        sections: nonEmpty,
+        sections: sections.filter(s => s.fields.length > 0),
         sidebar,
         showRecordMeta,
         hasRail: sidebar.length > 0 || showRecordMeta

@@ -7,14 +7,12 @@ description: Controlla come è organizzato il form dell'entità — estensioni d
 
 ## Panoramica
 
-Il form dell'entità viene generato a partire dalle tue proprietà. Per impostazione predefinita, ricava un layout a due colonne dai tipi di proprietà, quindi una collezione che non specifica nulla sul layout ottiene comunque un form leggibile e ben strutturato, anziché una lunga sequenza di input a larghezza intera:
+Il form dell'entità viene generato a partire dalle tue proprietà:
 
 - l'id e i timestamp `createdAt` / `updatedAt` vengono collocati in una barra dei metadati, in sola lettura
-- enum brevi, booleani, date e numeri occupano un'estensione ridotta
-- testo lungo, markdown, array, mappe e campi di archiviazione occupano l'intera larghezza
-- tutto il resto ne occupa la metà
+- ogni altro campo occupa l'intera larghezza della colonna principale
 
-Usa `admin.form` quando il risultato ricavato automaticamente non è adatto al tuo dominio.
+Il form non ricava mai una larghezza dal tipo di una proprietà, né da quale proprietà è il titolo. Le colonne le chiede la collezione, campo per campo, con `admin.span`, scelto in base a ciò che ogni campo contiene, come spiegato sotto. Usa `admin.form` per raggruppare i campi in sezioni e spostarli nella barra.
 
 ## Larghezza del campo
 
@@ -48,6 +46,8 @@ const productsCollection = defineCollection({
 ```
 
 Gli span si agganciano a una griglia condivisa, consentendo a due campi di allinearsi indipendentemente dall'ordine in cui sono stati dichiarati. Hanno sostituito `admin.widthPercentage`, le cui percentuali grezze non potevano allinearsi con precisione; una collezione che lo utilizza ancora dovrebbe scegliere lo span più vicino (≤30 → `1`, ≤55 → `2`, ≤80 → `3`, altrimenti `4`).
+
+Scegli lo span in base a ciò che il campo contiene, non al suo tipo. Due valori brevi che vanno insieme condividono una riga — data di inizio e di fine, città e paese, provider e regione a `2` ciascuno, oppure un valore e il suo qualificatore a `3` + `1`. Numeri, booleani e codici brevi possono prendere `1` accanto ai loro simili. Tutto ciò che si legge lungo — nomi, URL, email, id, descrizioni, markdown, file — resta a `4`. Le righe si riempiono nell'ordine di dichiarazione e nessun campo viene allargato per chiudere un vuoto, quindi dichiara le coppie una accanto all'altra e fai in modo che ogni riga sommi 4.
 
 Nei layout troppo stretti per due colonne — il pannello laterale, il riquadro diviso (split pane), uno smartphone — la griglia collassa su una singola colonna e gli span vengono ignorati.
 

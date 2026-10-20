@@ -7,14 +7,12 @@ description: Controle como o formulário da entidade é organizado — larguras 
 
 ## Visão Geral
 
-O formulário da entidade é gerado a partir de suas propriedades. Por padrão, ele deriva um layout de duas colunas a partir dos tipos de propriedade, de modo que uma coleção que não especifica nada sobre o layout ainda receba um formulário com visual estruturado, em vez de uma longa sequência de campos de largura total:
+O formulário da entidade é gerado a partir de suas propriedades:
 
 - o id e os timestamps `createdAt` / `updatedAt` vão para uma barra lateral de metadados, somente leitura
-- enums curtos, booleanos, datas e números ocupam uma largura estreita
-- textos longos, markdown, arrays, mapas e campos de armazenamento ocupam a largura total
-- todo o restante ocupa a metade
+- todos os outros campos ocupam a largura total da coluna principal
 
-Use `admin.form` quando o layout derivado não for adequado para o seu domínio.
+O formulário nunca deriva uma largura a partir do tipo de uma propriedade, nem de qual propriedade é o título. As colunas são pedidas pela coleção, campo a campo, com `admin.span`, escolhido pelo que cada campo contém, como abaixo. Use `admin.form` para agrupar campos em seções e movê-los para a barra lateral.
 
 ## Largura do campo
 
@@ -48,6 +46,8 @@ const productsCollection = defineCollection({
 ```
 
 Os spans se alinham a uma grade compartilhada, o que garante que dois campos fiquem alinhados independentemente da ordem em que foram declarados. Eles substituíram o `admin.widthPercentage`, cujas porcentagens brutas não se alinhavam com precisão; uma coleção que ainda o utilize deve escolher o span mais próximo (≤30 → `1`, ≤55 → `2`, ≤80 → `3`, caso contrário `4`).
+
+Escolha o span pelo que o campo contém, não pelo seu tipo. Dois valores curtos que andam juntos dividem uma linha — data de início e de fim, cidade e país, provedor e região com `2` cada, ou um valor e seu qualificador com `3` + `1`. Números, booleanos e códigos curtos podem usar `1` ao lado dos seus pares. Tudo o que é lido como texto longo — nomes, URLs, e-mails, ids, descrições, markdown, arquivos — fica com `4`. As linhas são preenchidas na ordem de declaração e nenhum campo é alargado para fechar um espaço vazio, então declare os pares lado a lado e faça cada linha somar 4.
 
 Em layouts estreitos demais para duas colunas — o painel lateral, a visualização dividida (split pane), um celular — a grade se ajusta para uma única coluna e os spans são ignorados.
 
