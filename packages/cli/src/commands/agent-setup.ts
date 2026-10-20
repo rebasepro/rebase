@@ -21,6 +21,7 @@ import {
     type LoadedSkill,
     loadBundledSkills
 } from "./skills";
+import { fileURLToPath } from "url";
 import { detectPackageManager, type PackageManager } from "../utils/package-manager";
 import { cliVersion } from "../utils/version";
 
@@ -398,4 +399,126 @@ export async function promptForAgents(home?: string): Promise<AgentKey[]> {
     }]);
 
     return AGENT_KEYS.filter(key => selectedAgents.includes(key));
+}
+
+// ─── Claude Code guardrail hooks ──────────────────────────────────────────────
+
+/**
+ * The guardrail every scaffold ships for Claude Code: a PostToolUse hook that
+ * runs `rebase verify --quiet` after each edit under `config/collections/` and
+ * hands any problem back to the agent (exit 2, the message on stderr).
+ *
+ * The files live in the template, under `.claude/`, so `rebase init` copies
+ * them like everything else and `rebase skills --hooks` installs the very same
+ * bytes into a project that predates them. Paths are project-relative.
+ */
+export const AGENT_HOOK_SCRIPT = ".claude/hooks/post-edit-collection.sh";
+export const AGENT_HOOK_SETTINGS = ".claude/settings.json";
+
+/** What installing one hook file did. */
+export type HookWriteStatus =
+    /** Written, or merged into the settings beside the hooks already there. */
+    | "added"
+    /** Already there, unchanged — or, for the settings, already registered. */
+    | "present"
+    /** There, and edited: left as it was. `--force` replaces it. */
+    | "kept"
+    /** There, edited, and replaced because `--force` asked. */
+    | "replaced"
+    /** The settings file is not plain JSON with a `hooks` object: left alone. */
+    | "unreadable";
+
+export interface HookWriteResult {
+    file: string;
+    status: HookWriteStatus;
+}
+
+/** The CLI package's own directory, from wherever this module was bundled to. */
+function cliPackageRoot(): string {
+    let dir = path.dirname(fileURLToPath(import.meta.url));
+    while (dir !== path.dirname(dir)) {
+        const manifest = path.join(dir, "package.json");
+        if (fs.existsSync(manifest)) {
+            try {
+                const parsed: unknown = JSON.parse(fs.readFileSync(manifest, "utf-8"));
+                if (isRecord(parsed) && parsed.name === "@rebasepro/cli") return dir;
+            } catch {
+                // Not ours; keep walking.
+            }
+        }
+        dir = path.dirname(dir);
+    }
+    throw new Error("Could not find the @rebasepro/cli package directory to read the hook templates from.");
+}
+
+/**
+ * Register the shipped PostToolUse hook in an existing settings file, keeping
+ * every other setting and hook in it. A file that is not plain JSON is left
+ * alone, for the reason {@link addJsonServer} gives.
+ */
+function mergeHookSettings(filePath: string, shippedText: string): HookWriteStatus {
+    if (!fs.existsSync(filePath)) {
+        fs.mkdirSync(path.dirname(filePath), { recursive: true });
+        fs.writeFileSync(filePath, shippedText, "utf-8");
+        return "added";
+    }
+    const text = fs.readFileSync(filePath, "utf-8");
+    let doc: unknown;
+    try {
+        doc = JSON.parse(text);
+    } catch {
+        return "unreadable";
+    }
+    const shipped: unknown = JSON.parse(shippedText);
+    const shippedEntries = isRecord(shipped) && isRecord(shipped.hooks) && Array.isArray(shipped.hooks.PostToolUse)
+        ? shipped.hooks.PostToolUse
+        : [];
+    if (!isRecord(doc)) return "unreadable";
+    const hooks = doc.hooks ?? {};
+    if (!isRecord(hooks)) return "unreadable";
+    const post = hooks.PostToolUse ?? [];
+    if (!Array.isArray(post)) return "unreadable";
+    if (JSON.stringify(post).includes(path.basename(AGENT_HOOK_SCRIPT))) return "present";
+
+    doc.hooks = { ...hooks, PostToolUse: [...post, ...shippedEntries] };
+    const indent = /\n([ \t]+)"/.exec(text)?.[1] ?? "    ";
+    fs.writeFileSync(filePath, `${JSON.stringify(doc, null, indent)}\n`, "utf-8");
+    return "added";
+}
+
+/**
+ * Install the Claude Code guardrail into a project: the hook script, and its
+ * registration in `.claude/settings.json`.
+ *
+ * A script the developer edited is kept unless `force`; the settings are always
+ * merged, never overwritten.
+ */
+export function installAgentHooks(
+    projectDir: string,
+    { force = false, templateDir = path.join(cliPackageRoot(), "templates", "template") }: { force?: boolean; templateDir?: string } = {}
+): HookWriteResult[] {
+    const shippedScript = fs.readFileSync(path.join(templateDir, AGENT_HOOK_SCRIPT), "utf-8");
+    const scriptPath = path.join(projectDir, AGENT_HOOK_SCRIPT);
+    let scriptStatus: HookWriteStatus;
+    if (!fs.existsSync(scriptPath)) {
+        scriptStatus = "added";
+    } else if (fs.readFileSync(scriptPath, "utf-8") === shippedScript) {
+        scriptStatus = "present";
+    } else {
+        scriptStatus = force ? "replaced" : "kept";
+    }
+    if (scriptStatus === "added" || scriptStatus === "replaced") {
+        fs.mkdirSync(path.dirname(scriptPath), { recursive: true });
+        fs.writeFileSync(scriptPath, shippedScript, "utf-8");
+    }
+    if (scriptStatus !== "kept") fs.chmodSync(scriptPath, 0o755);
+
+    const settingsStatus = mergeHookSettings(
+        path.join(projectDir, AGENT_HOOK_SETTINGS),
+        fs.readFileSync(path.join(templateDir, AGENT_HOOK_SETTINGS), "utf-8")
+    );
+    return [
+        { file: AGENT_HOOK_SCRIPT, status: scriptStatus },
+        { file: AGENT_HOOK_SETTINGS, status: settingsStatus }
+    ];
 }

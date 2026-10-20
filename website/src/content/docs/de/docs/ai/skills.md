@@ -1,5 +1,5 @@
 ---
-sourceHash: 06e95610513a9c52
+sourceHash: 372e9392b24d3148
 title: Agent Skills
 sidebar_label: Agent Skills
 description: "rebase skills install schreibt 21 Rebase-Referenz-Skills in dein Repo – genau in dem Layout, das dein KI-Assistent erwartet: Cursor, Claude Code, Windsurf, Gemini CLI und Antigravity."
@@ -76,7 +76,7 @@ Stattdessen erhalten sie `rebase.mdc` (oder `rebase.md`): einen ca. 3 KB großen
 
 `gemini` deckt **sowohl** Gemini CLI als auch Antigravity ab – beide lesen dasselbe `.agents/`-Verzeichnis, daher gibt es keinen separaten `antigravity`-Wert. Codex liest es ebenfalls; die Angabe von sowohl `gemini` als auch `codex` schreibt das Verzeichnis nur einmal.
 
-Ohne Angabe von `--agent` erkennt der Befehl, welche Assistenten ein Projekt bereits verwendet, indem er nach `.cursor/`, `.claude/`, `.windsurf/`, `.agents/`, `.codex/` und `.kiro/` sucht. Findet er keine, fordert er dich zur Auswahl auf, wobei die auf dem Rechner installierten Assistenten bereits vorausgewählt sind.
+Ohne Angabe von `--agent` erkennt der Befehl, welche Assistenten ein Projekt bereits verwendet, indem er nach `.cursor/`, `.claude/skills/`, `.windsurf/`, `.agents/`, `.codex/` und `.kiro/` sucht. Findet er keine, fordert er dich zur Auswahl auf, wobei die auf dem Rechner installierten Assistenten bereits vorausgewählt sind.
 
 **GitHub Copilot wird niemals automatisch erkannt.** Sein Verzeichnis wäre `.github/`, und `.github/` ist kein Beweis dafür, dass jemand Copilot verwendet: `rebase init` schreibt `.github/copilot-instructions.md` in jedes Scaffold, und die meisten Repositories besitzen ein `.github/` für Workflows. Installiere es mit `--agent copilot`.
 

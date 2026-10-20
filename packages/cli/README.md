@@ -38,10 +38,11 @@ The CLI is also bundled with every Rebase project as a local dependency.
 | `rebase auth reset-password` | Reset a user's password |
 | `rebase api-keys list \| get \| create \| revoke \| scopes` | Manage service API keys and the scopes they hold |
 | `rebase doctor` | Detect schema drift between collections, Drizzle schema, and database |
+| `rebase verify` | Check collections, RLS coverage and migration freshness in one fast pass (`--json` for agents, `--live` for the database) |
 | `rebase status` | Show every resource this project declares and whether its variables are set |
 | `rebase resources` | List the databases, buckets and topics this project declares |
 | `rebase eject` | Own the server process and the image (one-way) |
-| `rebase skills install` | Install Rebase agent skills for your AI coding assistant |
+| `rebase skills install` | Install Rebase agent skills for your AI coding assistant (`--hooks`: the Claude Code `rebase verify` hook) |
 | `rebase telemetry` | Anonymous usage sharing (opt-in, off by default) |
 | `rebase cloud <command>` | Manage your apps on Rebase Cloud (auth, deploy, databases, …) |
 

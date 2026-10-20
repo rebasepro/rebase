@@ -49,6 +49,7 @@
     "@rebasepro/agent-skills": "workspace:*",
     "@rebasepro/client": "workspace:*",
     "@rebasepro/codegen": "workspace:*",
+    "@rebasepro/rls-check": "workspace:*",
     "@rebasepro/server": "workspace:*",
     "@rebasepro/server-postgres": "workspace:*",
     "@rebasepro/types": "workspace:*",

@@ -1,5 +1,5 @@
 ---
-sourceHash: 06e95610513a9c52
+sourceHash: 372e9392b24d3148
 title: Compétences d'agent
 sidebar_label: Compétences d'agent
 description: rebase skills install écrit 21 compétences de référence Rebase dans votre dépôt, selon l'organisation attendue par votre assistant IA — Cursor, Claude Code, Windsurf, Gemini CLI et Antigravity.
@@ -99,7 +99,7 @@ répertoire `.agents/`, il n'y a donc pas de valeur `antigravity` distincte. Cod
 également ; spécifier à la fois `gemini` et `codex` écrit le répertoire une seule fois.
 
 Sans `--agent`, la commande détecte les assistants déjà utilisés par un projet en
-recherchant `.cursor/`, `.claude/`, `.windsurf/`, `.agents/`, `.codex/` et
+recherchant `.cursor/`, `.claude/skills/`, `.windsurf/`, `.agents/`, `.codex/` et
 `.kiro/`. Si elle n'en trouve aucun, elle vous invite à choisir, les assistants installés
 sur la machine étant déjà cochés.
 

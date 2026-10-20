@@ -1,5 +1,5 @@
 ---
-sourceHash: 06e95610513a9c52
+sourceHash: 372e9392b24d3148
 title: Agent Skills
 sidebar_label: Agent Skills
 description: O comando rebase skills install grava 21 habilidades de referência do Rebase em seu repositório, no layout que seu assistente de IA espera — Cursor, Claude Code, Windsurf, Gemini CLI e Antigravity.
@@ -101,7 +101,7 @@ diretório `.agents/`, portanto não há um valor `antigravity` separado. O Code
 lê; especificar tanto `gemini` quanto `codex` grava o diretório apenas uma vez.
 
 Sem `--agent`, o comando detecta quais assistentes o projeto já utiliza
-procurando por `.cursor/`, `.claude/`, `.windsurf/`, `.agents/`, `.codex/` e
+procurando por `.cursor/`, `.claude/skills/`, `.windsurf/`, `.agents/`, `.codex/` e
 `.kiro/`. Se não encontrar nenhum, ele solicita que você escolha, trazendo os assistentes instalados
 na máquina já marcados.
 

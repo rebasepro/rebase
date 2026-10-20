@@ -1,5 +1,5 @@
 ---
-sourceHash: c5d1f52c0af5c703
+sourceHash: 9210bf054bc3c431
 title: Referência da CLI
 sidebar_label: CLI
 description: Comandos da CLI do Rebase para inicialização de projetos, geração de schemas, migrações de banco de dados e geração de SDK.
@@ -19,7 +19,7 @@ Ou execute qualquer comando sem instalá-lo: `pnpm dlx @rebasepro/cli <command>`
 
 ## Saída legível por máquina
 
-`--json` é o modificador, e fora da família `cloud` ele é o único: `rebase status`, `rebase resources`, `rebase apps list` e `rebase upgrade` então colocam um valor JSON no stdout — o resultado, ou um envelope `{"error": {"message", "code", "hint", "issues"}}` com um código de saída diferente de zero — em **cada** encerramento do comando, para que um chamador possa analisar o stdout incondicionalmente. Sem ele, eles escrevem texto legível para humanos e as falhas vão para o stderr. `rebase cloud` usa o mesmo envelope e é a única exceção ao modificador: ele também ativa o JSON por conta própria quando o stdout não for um TTY, ou quando `REBASE_JSON=1` estiver definido. Assim, `rebase cloud status | cat` produz JSON enquanto `rebase status | cat` não — em um script, passe `--json` explicitamente em vez de depender de qualquer uma das regras.
+`--json` é o modificador, e fora da família `cloud` ele é o único: `rebase status`, `rebase resources`, `rebase apps list`, `rebase upgrade` e `rebase verify` então colocam um valor JSON no stdout — o resultado, ou um envelope `{"error": {"message", "code", "hint", "issues"}}` com um código de saída diferente de zero — em **cada** encerramento do comando, para que um chamador possa analisar o stdout incondicionalmente. Sem ele, eles escrevem texto legível para humanos e as falhas vão para o stderr. `rebase cloud` usa o mesmo envelope e é a única exceção ao modificador: ele também ativa o JSON por conta própria quando o stdout não for um TTY, ou quando `REBASE_JSON=1` estiver definido. Assim, `rebase cloud status | cat` produz JSON enquanto `rebase status | cat` não — em um script, passe `--json` explicitamente em vez de depender de qualquer uma das regras.
 
 ## Comandos
 
@@ -368,6 +368,27 @@ Encerra com código diferente de zero quando uma verificação encontra um erro,
 
 `rebase doctor --policies` executa apenas as verificações de RLS — sem diff de schema, sem tipos do SDK — e falha de forma estrita (fails closed), tornando-se o formato ideal para ser utilizado como validação de CI contra um banco de dados implantado.
 
+### `rebase verify`
+
+```bash
+rebase verify
+rebase verify --json
+rebase verify --live
+```
+
+Se as coleções estão prontas para publicar, em um único comando rápido para CI e para os hooks de um agente de IA. Offline por padrão, e nunca altera nada.
+
+| Etapa | O que a faz falhar |
+| --- | --- |
+| Configuração das coleções | Um arquivo em `config/collections/` que não carrega, ou que o validador de inicialização rejeita — com chaves desconhecidas como erros, de modo que uma opção escrita errada ou uma opção de interface escrita fora de `admin: { … }` (um `widget` no nível superior) é detectada aqui em vez de ser ignorada em silêncio. |
+| Cobertura de RLS | Uma coleção sem `securityRules` que também não herda nenhuma, ou uma com uma coluna `user_id`, `owner_id`, `organization_id` ou `tenant_id` que depende, em vez disso, dos padrões do diretório. Uma regra que deixa um papel ler todas as linhas de uma tabela assim é um aviso. |
+| Migrações em dia | Uma tabela ou coluna que as coleções declaram e que nenhum arquivo em `backend/drizzle/migrations` cria, ou uma removida que uma migração ainda cria. Ignorada em um projeto que ainda não tem migrações. |
+| Auditoria de RLS ao vivo | Com `--live`: o catálogo do [`rls-check`](/docs/rls-check) contra `DATABASE_URL`, e se cada migração foi aplicada. |
+
+`--json` imprime um único objeto — cada etapa, e cada achado com seu `file`, o `path` pontuado dentro da configuração da coleção e o `fix` — para que um agente possa consertar o que quebrou. `--quiet` não imprime nada quando tudo passa. Sai com código diferente de zero em caso de erro; avisos não o fazem falhar.
+
+Um projeto gerado o executa para o Claude Code após cada edição de uma coleção: veja [`rebase skills install`](#rebase-skills-install).
+
 ### `rebase auth`
 
 Comandos para gerenciamento de autenticação:
@@ -432,9 +453,12 @@ Instala as reference skills do Rebase para seus assistentes de codificação com
 rebase skills install
 rebase skills install --agent claude,cursor
 rebase skills install --agent all
+rebase skills --hooks
 ```
 
 Consulte [Agent Skills](/docs/ai/skills) para obter a lista completa e os locais onde os arquivos são gravados.
+
+`--hooks` instala a proteção para o Claude Code que o `rebase init` inclui em todo projeto: `.claude/hooks/post-edit-collection.sh`, registrado como hook `PostToolUse` em `.claude/settings.json`, que executa `rebase verify --quiet` após cada edição em `config/collections/` e devolve qualquer problema ao agente. As configurações e os hooks existentes são mantidos. `rebase skills --hooks` instala apenas o hook.
 
 ### `rebase telemetry`
 

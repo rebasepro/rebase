@@ -16,6 +16,7 @@
 | `pnpm skills:install` | Install the Rebase skills for your assistant |
 | `pnpm example` | Run `scripts/example.ts` against the running backend — the SDK, end to end |
 | `rebase doctor` | What disagrees between collections, generated schema and the live database — run this before guessing |
+| `rebase verify` | After every collection edit, and in CI: options that do not exist, UI options outside `admin`, missing `securityRules`, migrations behind the collections. `--json` names each file, path and fix. Claude Code runs it for you through `.claude/hooks/post-edit-collection.sh` |
 | `rebase resources --write` | After declaring a database, bucket or topic in `config/resources.ts`: regenerate `rebase.resources.json` and commit it (`pnpm build` does this too) |
 | `pnpm deploy` | Deploys this project. Never run it; see below |
 

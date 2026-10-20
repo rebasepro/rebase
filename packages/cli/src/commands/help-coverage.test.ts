@@ -413,6 +413,7 @@ describe("every command the dispatch answers parses its flags strictly", () => {
         start: "start.ts",
         auth: "auth.ts",
         doctor: "doctor.ts",
+        verify: "verify.ts",
         skills: "skills.ts",
         "api-keys": "api-keys.ts",
         "storage": "storage.ts",

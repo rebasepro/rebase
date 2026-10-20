@@ -98,7 +98,7 @@ bodies sit in per-skill subdirectories and are opened on demand.
 it too; naming both `gemini` and `codex` writes the directory once.
 
 With no `--agent`, the command detects which assistants a project already uses by
-looking for `.cursor/`, `.claude/`, `.windsurf/`, `.agents/`, `.codex/` and
+looking for `.cursor/`, `.claude/skills/`, `.windsurf/`, `.agents/`, `.codex/` and
 `.kiro/`. If it finds none it prompts you to choose, with the assistants installed
 on the machine already ticked.
 

@@ -18,7 +18,7 @@ Or run any command without installing it: `pnpm dlx @rebasepro/cli <command>`.
 
 ## Machine-readable output
 
-`--json` is the switch, and outside the `cloud` family it is the only one: `rebase status`, `rebase resources`, `rebase apps list` and `rebase upgrade` then put one JSON value on stdout — the result, or a `{"error": {"message", "code", "hint", "issues"}}` envelope with a non-zero exit — on **every** exit of the command, so a caller can parse stdout unconditionally. Without it they write human text and failures go to stderr. `rebase cloud` uses the same envelope and is the one exception to the switch: it also turns JSON on by itself when stdout is not a TTY, or when `REBASE_JSON=1` is set. So `rebase cloud status | cat` is JSON while `rebase status | cat` is not — in a script, pass `--json` explicitly rather than relying on either rule.
+`--json` is the switch, and outside the `cloud` family it is the only one: `rebase status`, `rebase resources`, `rebase apps list`, `rebase upgrade` and `rebase verify` then put one JSON value on stdout — the result, or a `{"error": {"message", "code", "hint", "issues"}}` envelope with a non-zero exit — on **every** exit of the command, so a caller can parse stdout unconditionally. Without it they write human text and failures go to stderr. `rebase cloud` uses the same envelope and is the one exception to the switch: it also turns JSON on by itself when stdout is not a TTY, or when `REBASE_JSON=1` is set. So `rebase cloud status | cat` is JSON while `rebase status | cat` is not — in a script, pass `--json` explicitly rather than relying on either rule.
 
 ## Commands
 
@@ -407,6 +407,32 @@ you set no `DATABASE_URL` is not a failure.
 types — and fails closed, which makes it the form to use as a CI gate against a
 deployed database.
 
+### `rebase verify`
+
+```bash
+rebase verify
+rebase verify --json
+rebase verify --live
+```
+
+Whether the collections are safe to ship, in one fast command for CI and for an
+AI agent's hooks. Offline by default, and it never changes anything.
+
+| Step | What fails it |
+| --- | --- |
+| Collection config | A file under `config/collections/` that does not load, or that the boot validator rejects — with unknown keys as errors, so a misspelt option or a UI option written outside `admin: { … }` (a top-level `widget`) is caught here rather than silently ignored. |
+| RLS coverage | A collection with no `securityRules` that inherits none, or one with a `user_id`, `owner_id`, `organization_id` or `tenant_id` column that relies on directory defaults instead. A rule that lets a role read every row of such a table is a warning. |
+| Migration freshness | A table or column the collections declare that no file in `backend/drizzle/migrations` creates, or one they dropped that a migration still creates. Skipped for a project with no migrations yet. |
+| Live RLS audit | With `--live`: the [`rls-check`](/docs/rls-check) catalogue against `DATABASE_URL`, and whether every migration has been applied. |
+
+`--json` prints one object — every step, and every finding with its `file`, the
+dotted `path` into the collection config, and the `fix` — so an agent can repair
+what it broke. `--quiet` prints nothing when everything passes. Exits non-zero on
+an error; warnings do not fail.
+
+A scaffolded project runs it for Claude Code after every collection edit: see
+[`rebase skills install`](#rebase-skills-install).
+
 ### `rebase auth`
 
 Authentication management commands:
@@ -472,9 +498,16 @@ Install the Rebase reference skills for your AI coding assistants — every `--a
 rebase skills install
 rebase skills install --agent claude,cursor
 rebase skills install --agent all
+rebase skills --hooks
 ```
 
 See [Agent Skills](/docs/ai/skills) for the full list and where files are written.
+
+`--hooks` installs the Claude Code guardrail `rebase init` ships with every
+project: `.claude/hooks/post-edit-collection.sh`, registered as a `PostToolUse`
+hook in `.claude/settings.json`, which runs `rebase verify --quiet` after each edit
+under `config/collections/` and hands any problem back to the agent. Existing
+settings and hooks are kept. `rebase skills --hooks` installs the hook alone.
 
 ### `rebase telemetry`
 

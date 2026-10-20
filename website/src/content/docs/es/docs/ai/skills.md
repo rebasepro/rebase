@@ -1,5 +1,5 @@
 ---
-sourceHash: 06e95610513a9c52
+sourceHash: 372e9392b24d3148
 title: Habilidades del agente
 sidebar_label: Habilidades del agente
 description: rebase skills install escribe 21 habilidades de referencia de Rebase en tu repositorio, en el formato que espera tu asistente de IA — Cursor, Claude Code, Windsurf, Gemini CLI y Antigravity.
@@ -83,7 +83,7 @@ En su lugar, reciben `rebase.mdc` (o `rebase.md`): un índice de ~3 KB con `alwa
 
 `gemini` cubre **tanto** Gemini CLI como Antigravity; ambos leen el mismo directorio `.agents/`, por lo que no existe un valor `antigravity` independiente. Codex también lo lee; indicar tanto `gemini` como `codex` escribe el directorio una sola vez.
 
-Si no se especifica `--agent`, el comando detecta qué asistentes utiliza ya un proyecto buscando `.cursor/`, `.claude/`, `.windsurf/`, `.agents/`, `.codex/` y `.kiro/`. Si no encuentra ninguno, te solicitará que elijas, mostrando preseleccionados los asistentes instalados en la máquina.
+Si no se especifica `--agent`, el comando detecta qué asistentes utiliza ya un proyecto buscando `.cursor/`, `.claude/skills/`, `.windsurf/`, `.agents/`, `.codex/` y `.kiro/`. Si no encuentra ninguno, te solicitará que elijas, mostrando preseleccionados los asistentes instalados en la máquina.
 
 **GitHub Copilot nunca se detecta automáticamente.** Su directorio sería `.github/`, y la presencia de `.github/` no es evidencia de que alguien use Copilot: `rebase init` escribe `.github/copilot-instructions.md` en cada proyecto generado, y la mayoría de los repositorios tienen un `.github/` para workflows. Instálalo con `--agent copilot`.
 

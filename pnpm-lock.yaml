@@ -524,6 +524,9 @@ importers:
       '@rebasepro/codegen':
         specifier: workspace:*
         version: link:../codegen
+      '@rebasepro/rls-check':
+        specifier: workspace:*
+        version: link:../rls-check
       '@rebasepro/server':
         specifier: workspace:*
         version: link:../server

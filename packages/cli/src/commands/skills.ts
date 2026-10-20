@@ -34,7 +34,7 @@ const require = createRequire(import.meta.url);
  *
  * `homeMarkers` are the directories under `~` that say the assistant is
  * installed on this machine. They answer a different question from
- * `detectDir`: a fresh scaffold has no `.claude/` of its own, so `rebase init`
+ * `detectDir`: a fresh scaffold has no `.claude/skills` of its own, so `rebase init`
  * asks the machine which assistants the developer has and pre-selects those.
  *
  * `mcp` is where the assistant reads a *project-level* MCP server list, and in
@@ -65,7 +65,11 @@ export const AGENTS = {
     },
     claude: {
         label: "Claude Code",
-        detectDir: ".claude",
+        // Not `.claude`: every scaffold ships `.claude/settings.json` and the
+        // `rebase verify` hook, so the directory says nothing about who uses
+        // Claude Code. `.claude/skills` is there only once someone installed
+        // Claude skills into the project.
+        detectDir: ".claude/skills",
         homeMarkers: [".claude"],
         targetDir: ".claude/skills",
         flatLayout: false,
@@ -612,11 +616,53 @@ export async function skillsCommand(subcommand: string | undefined, rawArgs: str
             break;
         case "--help":
         case undefined:
+            // `rebase skills --hooks`: the Claude Code guardrail on its own,
+            // for a project scaffolded before `rebase init` shipped it.
+            if (subcommand === undefined && rawArgs.includes("--hooks")) {
+                await skillsHooks(rawArgs);
+                break;
+            }
             printSkillsHelp();
             break;
         default:
             unknownCommand(subcommand, SKILLS_SUBCOMMANDS, "skills");
     }
+}
+
+/** `rebase skills --hooks [--force]`: install the guardrail hook and nothing else. */
+async function skillsHooks(rawArgs: string[]): Promise<void> {
+    const { flags } = parseCommandArgs({
+        spec: { "--hooks": Boolean, "--force": Boolean },
+        rawArgs,
+        commandWords: 1,
+        command: "skills",
+        maxPositionals: 0
+    });
+    const projectDir = findProjectRoot() ?? process.cwd();
+    console.log("");
+    await installHooksAndReport(projectDir, flags["--force"] === true);
+    console.log("");
+}
+
+/**
+ * Install the Claude Code guardrail (`installAgentHooks`) and say what it did,
+ * one line per file.
+ */
+async function installHooksAndReport(projectDir: string, force: boolean): Promise<void> {
+    const { installAgentHooks, AGENT_HOOK_SCRIPT } = await import("./agent-setup");
+    const shown = (file: string) => path.relative(process.cwd(), path.join(projectDir, file)) || file;
+    for (const { file, status } of installAgentHooks(projectDir, { force })) {
+        if (status === "added" || status === "replaced") {
+            console.log(`  ${chalk.green("✓")} ${status === "added" ? "Wrote" : "Replaced"} ${chalk.gray(shown(file))}`);
+        } else if (status === "present") {
+            console.log(`  ${chalk.green("✓")} ${chalk.gray(shown(file))} already in place`);
+        } else if (status === "kept") {
+            console.log(chalk.yellow(`  ! ${shown(file)} was edited, so it was kept — pass --force to replace it with the shipped hook.`));
+        } else {
+            console.log(chalk.yellow(`  ! ${shown(file)} is not plain JSON, so it was left alone — register ${AGENT_HOOK_SCRIPT} as a PostToolUse hook (matcher "Edit|MultiEdit|Write") by hand.`));
+        }
+    }
+    console.log(chalk.gray("  Claude Code now runs `rebase verify --quiet` after each edit under config/collections/."));
 }
 
 /**
@@ -628,15 +674,15 @@ export function parseAgentFlags(rawArgs: string[]): AgentKey[] | null {
     return parseSkillsInstallLine(rawArgs).agents;
 }
 
-/** `rebase skills install`'s whole line: the agents it names, `--mcp` and `--force`. */
-export function parseSkillsInstallLine(rawArgs: string[]): { agents: AgentKey[] | null; mcp: boolean; force: boolean } {
+/** `rebase skills install`'s whole line: the agents it names, `--mcp`, `--hooks` and `--force`. */
+export function parseSkillsInstallLine(rawArgs: string[]): { agents: AgentKey[] | null; mcp: boolean; hooks: boolean; force: boolean } {
     // Strict, and before anything is written. This used to scan `rawArgs` for
     // `--agent` and ignore every other token, so `rebase skills install
     // --frobnicate --agent claude` exited 0 after writing 21 files — the CLI's
     // other families reject an unknown flag, and an installer is the last place
     // to guess what the person meant.
     const { flags } = parseCommandArgs({
-        spec: { "--agent": [String], "-a": "--agent", "--mcp": Boolean, "--force": Boolean },
+        spec: { "--agent": [String], "-a": "--agent", "--mcp": Boolean, "--hooks": Boolean, "--force": Boolean },
         rawArgs,
         commandWords: 2,
         command: "skills install",
@@ -646,6 +692,7 @@ export function parseSkillsInstallLine(rawArgs: string[]): { agents: AgentKey[] 
     return {
         agents: resolveAgentNames(flags["--agent"] ?? []),
         mcp: flags["--mcp"] === true,
+        hooks: flags["--hooks"] === true,
         force: flags["--force"] === true
     };
 }
@@ -682,7 +729,7 @@ export function resolveAgentNames(values: readonly string[]): AgentKey[] | null 
 async function skillsInstall(rawArgs: string[] = []) {
     // Parse the line before anything else touches the disk: a bad flag must
     // cost nothing, and everything below this writes or resolves paths.
-    const { agents: namedAgents, mcp: withMcp, force } = parseSkillsInstallLine(rawArgs);
+    const { agents: namedAgents, mcp: withMcp, hooks: withHooks, force } = parseSkillsInstallLine(rawArgs);
 
     // The project root, not the cwd. Agent skills belong beside the repository's
     // other agent configuration — `.claude/`, `.cursor/` — which is both what
@@ -806,6 +853,11 @@ async function skillsInstall(rawArgs: string[] = []) {
         if (note) console.log(chalk.yellow(`  ${note}`));
     }
 
+    if (withHooks) {
+        console.log("");
+        await installHooksAndReport(projectDir, force);
+    }
+
     console.log("");
     console.log(chalk.gray("  Skills are project-local. Commit them to share with your team."));
     // The skills ship inside the CLI's own pinned `@rebasepro/agent-skills`,
@@ -840,6 +892,10 @@ ${chalk.green.bold("Options")}
   ${chalk.blue("--mcp")}         Also register the Rebase MCP server in each agent's project config
                 (.mcp.json, .cursor/mcp.json, …), as ${chalk.cyan("rebase init --agent")} does.
                 Servers already in the file are kept.
+  ${chalk.blue("--hooks")}       Also install the Claude Code guardrail: a PostToolUse hook in
+                .claude/settings.json that runs ${chalk.cyan("rebase verify --quiet")} after each edit
+                under config/collections/ and hands any problem back to the agent.
+                ${chalk.cyan("rebase skills --hooks")} installs the hook alone.
   ${chalk.blue("--agent, -a")}   Agent(s) to install for, skipping detection and the prompt.
                 Repeat the flag or pass a comma-separated list, or ${chalk.bold("all")}.
                 Required without a TTY: detection looks for an agent's own
@@ -854,5 +910,6 @@ ${chalk.green.bold("Examples")}
   ${chalk.cyan("rebase skills install --agent claude,cursor")}
   ${chalk.cyan("rebase skills install --agent cursor --mcp")}   ${chalk.gray("# skills + the MCP server")}
   ${chalk.cyan("rebase skills install --agent all")}   ${chalk.gray("# scripted / CI")}
+  ${chalk.cyan("rebase skills --hooks")}   ${chalk.gray("# the Claude Code guardrail hook only")}
 `);
 }

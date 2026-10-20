@@ -133,9 +133,9 @@ beforeEach(() => {
     vi.clearAllMocks();
     projectRootLookups = 0;
     scratch = fs.mkdtempSync(path.join(os.tmpdir(), "rebase-help-"));
-    // `.claude/` is what `skills install` detects — without it the install has
-    // nothing to write and the test would pass for the wrong reason.
-    fs.mkdirSync(path.join(scratch, ".claude"), { recursive: true });
+    // `.claude/skills` is what `skills install` detects — without it the install
+    // has nothing to write and the test would pass for the wrong reason.
+    fs.mkdirSync(path.join(scratch, ".claude", "skills"), { recursive: true });
     fs.mkdirSync(path.join(scratch, "backend"), { recursive: true });
 
     fetchSpy = vi.fn(async () => new Response("{}", { status: 200 }));
