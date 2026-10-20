@@ -5,7 +5,7 @@ import type { ComponentOverrideMap } from "@rebasepro/cms-types";
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { CenteredView, TooltipProvider, Typography } from "@rebasepro/ui";
-import { User, CollectionRegistryController, DataDriver, DataSourceDefinition, RebaseData, DEFAULT_DATA_SOURCE_KEY, StorageSource, StorageSourceDefinition, DEFAULT_STORAGE_SOURCE_KEY } from "@rebasepro/types";
+import { AccessSimulation, User, CollectionRegistryController, DataDriver, DataSourceDefinition, RebaseData, DEFAULT_DATA_SOURCE_KEY, StorageSource, StorageSourceDefinition, DEFAULT_STORAGE_SOURCE_KEY } from "@rebasepro/types";
 import { RebaseContext, UNRENDERED_SLOTS } from "@rebasepro/cms-types";
 import { PluginProviderStack } from "./PluginProviderStack";
 import { PluginLifecycleManager } from "./PluginLifecycleManager";
@@ -17,6 +17,7 @@ import { ErrorView } from "../components";
 import { StorageSourceContext } from "../contexts/StorageSourceContext";
 import { UserConfigurationPersistenceContext } from "../contexts/UserConfigurationPersistenceContext";
 import { RebaseDataContext } from "../contexts/RebaseDataContext";
+import { RlsSimulationContext, type RlsSimulationController, type RlsSimulationLabel } from "../contexts/RlsSimulationContext";
 import { DataSourcesContext, DataSourcesContextValue } from "../contexts/DataSourcesContext";
 import { StorageSourcesContext, StorageSourcesContextValue } from "../contexts/StorageSourcesContext";
 import { DatabaseAdminContext } from "../contexts/DatabaseAdminContext";
@@ -240,6 +241,37 @@ export function Rebase<USER extends User, DB = unknown>(props: RebaseProps<USER,
         return value;
     }, [normalizedDataSources, entityDataOptions]);
 
+    // The RLS simulator. While a simulation is set the default data source is
+    // a client derived with `client.simulate()`: the same server and token,
+    // the simulation headers on every request, no socket and no offline
+    // cache. The data identity changes with it, so every data view refetches
+    // as the simulated identity. Dropped when the signed-in account changes.
+    const [simulationState, setSimulationState] = useState<{
+        simulation: AccessSimulation;
+        label: RlsSimulationLabel | null;
+        uid: string | undefined;
+    } | null>(null);
+    const signedInUid = authController.user?.uid;
+    const activeSimulation = simulationState && simulationState.uid === signedInUid ? simulationState : null;
+    const simulationAvailable = Boolean(client?.simulate) && !dataSourcesValue.sources[DEFAULT_DATA_SOURCE_KEY];
+    const simulatedClient = useMemo(
+        () => (activeSimulation && simulationAvailable && client?.simulate ? client.simulate(activeSimulation.simulation) : undefined),
+        [activeSimulation, simulationAvailable, client]
+    );
+    // Every view below remounts when the simulated identity changes. A data
+    // view keeps the rows it last loaded when a read fails, so switching in
+    // place would leave the administrator's rows on screen under an identity
+    // that cannot read them — the one thing a simulator must never show.
+    const simulationResetKey = activeSimulation ? JSON.stringify(activeSimulation.simulation) : "self";
+    const rlsSimulationController = useMemo<RlsSimulationController>(() => ({
+        available: simulationAvailable,
+        simulation: activeSimulation?.simulation ?? null,
+        label: activeSimulation?.label ?? null,
+        setSimulation: (simulation, label) => setSimulationState(simulation
+            ? { simulation, label: label ?? null, uid: signedInUid }
+            : null)
+    }), [simulationAvailable, activeSimulation, signedInUid]);
+
     // Default data source — serves every collection not routed to a
     // registered direct/custom source. Resolution:
     //   1. A "(default)"-keyed data source with a driver.
@@ -250,6 +282,7 @@ export function Rebase<USER extends User, DB = unknown>(props: RebaseProps<USER,
         if (registeredDefault) return registeredDefault;
         // admin boundary: the SDK client returns flat rows; wrap them into the
         // Entity view-model the admin (`useData()`) renders.
+        if (simulatedClient) return wrapAsEntityData(simulatedClient.data, entityDataOptions);
         if (client?.data) return wrapAsEntityData(client.data, entityDataOptions);
         const built = Object.values(dataSourcesValue.sources);
         if (built.length === 1) return built[0];
@@ -260,7 +293,7 @@ export function Rebase<USER extends User, DB = unknown>(props: RebaseProps<USER,
             );
         }
         throw new Error("Rebase requires either `client` or a `dataSources` entry with a driver to be provided");
-    }, [client, dataSourcesValue, entityDataOptions]);
+    }, [client, simulatedClient, dataSourcesValue, entityDataOptions]);
 
     // Storage fallback logic
     const resolvedStorage = storageSourceProp ?? client?.storage;
@@ -497,6 +530,8 @@ export function Rebase<USER extends User, DB = unknown>(props: RebaseProps<USER,
                             value={registerCollectionResolver}>
                         <DataSourcesContext.Provider
                             value={dataSourcesValue}>
+                        <RlsSimulationContext.Provider
+                            value={rlsSimulationController}>
                         <RebaseDataContext.Provider
                             value={resolvedData}>
                             <DatabaseAdminContext.Provider
@@ -508,7 +543,8 @@ export function Rebase<USER extends User, DB = unknown>(props: RebaseProps<USER,
                                                 <SchemaDriftProvider>
                                                 <RebaseRegistryProvider>
                                                     <RebaseInternal
-                                                        loading={loading}>
+                                                        loading={loading}
+                                                        resetKey={simulationResetKey}>
                                                         {children}
                                                     </RebaseInternal>
                                                 </RebaseRegistryProvider>
@@ -518,6 +554,7 @@ export function Rebase<USER extends User, DB = unknown>(props: RebaseProps<USER,
                                 </AuthControllerContext.Provider>
                             </DatabaseAdminContext.Provider>
                         </RebaseDataContext.Provider>
+                        </RlsSimulationContext.Provider>
                         </DataSourcesContext.Provider>
                         </CollectionResolverRegistrationContext.Provider>
                     </StorageSourceContext.Provider>
@@ -554,19 +591,23 @@ export function Rebase<USER extends User, DB = unknown>(props: RebaseProps<USER,
 
 function RebaseInternal({
     loading,
+    resetKey,
     children
 }: {
     loading: boolean;
+    /** Remounts the app below when it changes — see `simulationResetKey`. */
+    resetKey: string;
     children: React.ReactNode | ((props: { context: RebaseContext; loading: boolean; }) => React.ReactNode);
 }) {
 
     const context = useRebaseContext();
     const customizationController = useCustomizationController();
 
-    const childrenResult = typeof children === "function" ? children({
-        context,
-        loading
-    }) : children;
+    const childrenResult = (
+        <React.Fragment key={resetKey}>
+            {typeof children === "function" ? children({ context, loading }) : children}
+        </React.Fragment>
+    );
 
     const plugins = customizationController.plugins;
     const authController = context.authController;

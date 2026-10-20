@@ -27,6 +27,24 @@
   `getDatePropertyTimezone` (`Collection.FilterField`).
   `pnpm report:override-copyability` lists what still keeps each overridable
   part from being copied that way.
+- **"Simulate access" in the app bar: see every collection as a role, a user
+  or a service key.** Pick one and every data view reloads showing only the
+  rows and fields it can read, under a banner that counts the collections it
+  cannot see and the columns masked from it. `client.simulate()` is the client
+  behind it.
+
+#### Server
+
+- **The RLS simulator: an administrator's data request can run as a role, a
+  user or a service key.** `x-rebase-simulate-role`, `x-rebase-simulate-user-id`
+  and `x-rebase-simulate-api-key-id` on the data API and custom functions run
+  the request through the real policies as that identity (`customer` holding
+  uid `u_1` need not be an account), and a key's scopes apply as they would to
+  the key. The response's `x-rebase-simulated-context` names the role, the uid
+  and the fields that identity's roles cannot read. Anyone but an
+  administrator's own session gets `403 SIMULATION_FORBIDDEN`, and every other
+  route refuses the headers. `/api/admin/rls-simulator` lists what can be
+  simulated and previews each collection's visible rows and masked fields.
 
 ### Changed
 

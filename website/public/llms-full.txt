@@ -4064,6 +4064,66 @@ yet, listed so that nobody reads a promise into them:
 
 ### [Unreleased]
 
+#### Added
+
+##### Admin (CMS & app)
+
+- **Customization recipes ship with `@rebasepro/cms`.** `node_modules/@rebasepro/cms/recipes`
+  holds tested, copy-ready examples: a site-settings singleton, per-user
+  preferences, a bulk "set status" toolbar action, a calendar view mode, a
+  dashboard page and a custom login screen. They import only package entry
+  points, each has a test in the repository, and their `README.md` is the
+  reference of building blocks, hooks and places an agent reads before
+  customizing. The docs page is [Customizing the Admin](/docs/frontend/customizing),
+  and the `rebase-customize-admin` agent skill points at the recipes.
+- **`EntityFormPanel` creates a record under the id it is given when no record
+  has it yet.** A record kept at a known key — a settings singleton, a profile
+  keyed by its user's uid — said "not found" until something seeded it; now the
+  first save creates it there. Where the collection marks a key property
+  `isId`, the id is that property's value, set and locked.
+- **The leaf parts of two overridable components are exported**, so a copy of
+  the component compiles with package imports: `NavigationCard` and
+  `SmallNavigationCard` (`HomePage.CollectionCard`), and
+  `StringNumberFilterField`, `BooleanFilterField`, `DateTimeFilterField`,
+  `ReferenceFilterField`, `RelationFilterField`, `getDatePropertyMode` and
+  `getDatePropertyTimezone` (`Collection.FilterField`).
+  `pnpm report:override-copyability` lists what still keeps each overridable
+  part from being copied that way.
+- **"Simulate access" in the app bar: see every collection as a role, a user
+  or a service key.** Pick one and every data view reloads showing only the
+  rows and fields it can read, under a banner that counts the collections it
+  cannot see and the columns masked from it. `client.simulate()` is the client
+  behind it.
+
+##### Server
+
+- **The RLS simulator: an administrator's data request can run as a role, a
+  user or a service key.** `x-rebase-simulate-role`, `x-rebase-simulate-user-id`
+  and `x-rebase-simulate-api-key-id` on the data API and custom functions run
+  the request through the real policies as that identity (`customer` holding
+  uid `u_1` need not be an account), and a key's scopes apply as they would to
+  the key. The response's `x-rebase-simulated-context` names the role, the uid
+  and the fields that identity's roles cannot read. Anyone but an
+  administrator's own session gets `403 SIMULATION_FORBIDDEN`, and every other
+  route refuses the headers. `/api/admin/rls-simulator` lists what can be
+  simulated and previews each collection's visible rows and masked fields.
+
+#### Changed
+
+##### Admin (CMS & app)
+
+- **Form fields are full width unless they are a pair of like compact
+  fields, or the collection sets `admin.span`.** The form used to guess widths
+  from property types — strings, dates and relations at half, numbers and
+  booleans at a quarter, the title property full — and paired fields that had
+  nothing to do with each other: Namespace beside Custom Domain, Git Branch
+  beside Git Repository URL. Now a field takes the whole row unless it and its
+  neighbour have the same small editor (two numbers, two switches, two dates of
+  the same mode, two selects with short options) and neither has a long label,
+  long help text, `conditions` or a custom `Field`. Free-text strings are never
+  paired, nothing reads the title property, and rows are no longer stretched to
+  close a gap. A span written on a property is used as written.
+
 #### Fixed
 
 ##### CLI
@@ -4074,6 +4134,45 @@ yet, listed so that nobody reads a promise into them:
   cron job: …" and "Cron jobs scheduled", so `rebase cloud debug boot` showed a
   project's storage and its port and none of the code it runs. Both wordings are
   shown now.
+
+##### Admin (CMS & app)
+
+- **The `"Shell.AppBar"`, `"HomePage.CollectionCard"` and `"Auth.LoginView"`
+  component overrides work.** All three were declared, documented and shown in
+  the `<Rebase components>` example, and nothing resolved them, so setting one
+  did nothing. A `"Shell.AppBar"` override now renders a top bar (a wrapper is
+  handed the default one); an `appBar` element on `<RebaseShell>` still wins,
+  as does `loginView` on `<RebaseAuth>` over `"Auth.LoginView"`. A test now
+  fails when a declared override name is resolved nowhere.
+- **`exportable: false` removes Export from the collection toolbar.** It was
+  ignored; only the object form was read, for its extra fields.
+- **The record form follows field access rules.** A field the user may not
+  write (`access.write`) is shown read-only, and one they may not read
+  (`access.read`, `excludeFromApi`) is left out, label included. Before, both
+  were ordinary inputs and the edit came back as a 400 on save. A new record or
+  a copy no longer sends a default or copied value for a field the user may
+  not write, which made the server refuse the whole save.
+- **A language added through `<Rebase translations>` is in the language
+  menu.** The menu listed the seven shipped languages only, so an app's own
+  language could be set with `locale` and never chosen by the user. A
+  language Rebase does not ship is named by the browser (`nl` → "Nederlands").
+  `useRebaseLocales()` returns the list.
+- **A record created from its parent's tab opens linked to that parent.** A new
+  transaction from a customer's Transactions tab asked for the customer, and a
+  required `belongsTo` could not be saved until the user picked the record they
+  had come from. The server already linked a create under
+  `customers/{id}/transactions` to that customer. The form now opens with the
+  link set and locked while the record is new. Editing it later still works.
+  This covers a `hasMany` whose child has the `belongsTo` back on
+  `foreignKeyOnTarget`. A link keyed on `sourceKey` is not prefilled.
+
+- **"Create" in the side panel opens the saved record instead of asking about
+  unsaved changes.** The save reported the form clean and moved the panel to
+  the new record in the same tick, and the panel's guard still saw it as dirty.
+  It asked "There are unsaved changes" about a record already saved and left
+  the URL on `#new_side`. A dirty record still asks before the panel leaves it.
+  `useUnsavedChangesDialog` now also takes a function for `when`, read at the
+  moment of navigation.
 
 ### [0.25.1] - 2026-10-14
 
@@ -25457,6 +25556,11 @@ the ID you got. Read the response header.
 | `IMPERSONATION_TARGET_NOT_FOUND` | 404 | `x-rebase-impersonate` names no active user: no account has that uid, or it is disabled. | Check the uid. |
 | `IMPERSONATION_UNAVAILABLE` | 501 | This backend's auth cannot run a request as another user, because its `AuthAdapter` has no `resolveUser`. | Implement `resolveUser` in the adapter, or leave the header out. |
 | `IMPERSONATION_UNSUPPORTED` | 400 | `x-rebase-impersonate` was sent to a route that cannot run as another user. Only the data API and custom functions honour it, and the realtime socket honours `impersonate` on `AUTHENTICATE`. | Send the request without the header. |
+| `SIMULATION_FORBIDDEN` | 403 | A request sent an `x-rebase-simulate-*` header (the RLS simulator), or asked `/api/admin/rls-simulator`, and its caller may not simulate access. Only a signed-in administrator's own session may, never an API key or the service key. | Send it with an administrator's session, or leave the headers out. |
+| `SIMULATION_INVALID` | 400 | The simulation was malformed: a header sent empty, `x-rebase-simulate-api-key-id` combined with a role or user id, or simulation combined with `x-rebase-impersonate`. | Name one role (optionally with a uid), one user id, or one API key id. |
+| `SIMULATION_TARGET_NOT_FOUND` | 404 | The simulation names no active user (a user id sent without a role) or no live API key. | Check the id, or send a role with the uid to simulate a uid that has no account. |
+| `SIMULATION_UNAVAILABLE` | 501 | This backend cannot simulate access: its `AuthAdapter` has no `resolveUser` to confirm an administrator, or a key was named on a backend with no API keys. | Implement `resolveUser`, or leave the headers out. |
+| `SIMULATION_UNSUPPORTED` | 400 | An `x-rebase-simulate-*` header was sent to a route that cannot run with simulated access. Only the data API and custom functions honour them. | Send the request without the headers. |
 | `INVALID_ACCOUNT` | 400 | The account is in a state this operation cannot act on. | See the message. |
 | `INVALID_CHALLENGE` | 400 | The MFA challenge is unknown or expired. | Start a new one. |
 | `INVALID_CODE` | 400 / 401 | The OTP or MFA code is wrong: 400 from the email-code sign-in (`/auth/otp/verify`), 401 from an MFA enrolment or challenge. | Retry with the current code. |
@@ -25858,6 +25962,8 @@ a collection reaches none of this. See [Roles and scopes](/docs/backend/roles-an
 | `GET` | `/api/admin/logs/latest` | `logs:read` | The most recent entries |
 | `GET` | `/api/admin/logs/stream` | `logs:read` | Server-sent events |
 | `GET` | `/api/admin/rls-audit` | `schema:read` | The scheduled audit's latest result |
+| `GET` | `/api/admin/rls-simulator/options` | `schema:read` | Roles, users' rule roles and live service keys an administrator can simulate |
+| `POST` | `/api/admin/rls-simulator/preview` | `schema:read` | Each collection as `{ role?, userId?, apiKeyId? }` reaches it: visible rows against the caller's, hidden by scope or RLS, masked fields. Administrator's session only |
 | `POST` | `/api/admin/sql/csv` | `database:write` | Streams one read-only query's whole result as CSV — [Studio](/docs/studio/)'s "Download full result as CSV" |
 | `GET` | `/api/admin/schema/status` | `schema:read` | [Live schema editing](/docs/backend/live-schema-editing/) |
 | `POST` | `/api/admin/schema/plan` | `schema:read` | Plans a change; never applies one |
@@ -34865,6 +34971,103 @@ not exist, and there is no way to hand `<Rebase>` your app's mode.
 - **[Translations](/docs/frontend/i18n)** — Change any string, or add a language
 - **[Plugins](/docs/plugins)** — Extend the framework
 
+## Customizing the Admin
+
+The admin is built from parts you can use yourself. To customize it you write
+an ordinary React component and put it in a place. That is the whole model:
+
+- **Building blocks** you render — a collection's table, one record's form, the UI kit.
+- **Hooks** for data, the signed-in user, toasts and navigation.
+- **Places** to put a component — a page, a collection view mode, a toolbar button, a record tab, a field, a slot beside a built-in part, or an override that replaces one.
+
+If a building block does not do what you need, copy its source into your project
+and change it. Nothing here needs a configuration option to exist first.
+
+### Recipes
+
+Working, tested examples ship inside `@rebasepro/cms`, so the ones in
+`node_modules/@rebasepro/cms/recipes` always match your installed version. They
+import only public packages: copy one into your project as-is.
+
+| Recipe | What it shows |
+|---|---|
+| `site-settings.tsx` | A singleton: one settings record on its own page, created on first save. |
+| `my-preferences.tsx` | Per-user settings: each user edits the record keyed by their uid. |
+| `bulk-set-status.tsx` | A toolbar button that updates every selected row. |
+| `calendar-view.tsx` | A new view mode: a collection's rows on a month grid. |
+| `orders-dashboard.tsx` | A page that reads data, draws a chart and links into the admin. |
+| `custom-login.tsx` | Replacing the login screen. |
+
+The `README.md` beside them is the full reference of building blocks, hooks and places.
+
+### Example: a singleton
+
+A singleton is not a special collection type. It is an ordinary table whose page
+always opens the same row. `EntityFormPanel` given an id edits that record, and
+creates it under that id the first time, so nothing needs seeding.
+
+```tsx
+import React from "react";
+import { defineCollection } from "@rebasepro/cms-types";
+import type { AppView } from "@rebasepro/cms-types";
+import { EntityFormPanel } from "@rebasepro/cms";
+import { Container, Typography } from "@rebasepro/ui";
+
+// config/collections/site_settings.ts — `rebase db push` creates the table.
+export const siteSettingsCollection = defineCollection({
+    name: "Site settings",
+    slug: "site_settings",
+    table: "site_settings",
+    properties: {
+        id: { name: "ID", type: "string", isId: true },
+        siteName: { name: "Site name", type: "string", validation: { required: true } },
+        maintenanceMode: { name: "Maintenance mode", type: "boolean" }
+    },
+    admin: { hideFromNavigation: true, hideIdFromForm: true }
+});
+
+// Add to <RebaseCMS views={[siteSettingsView]}>.
+export const siteSettingsView: AppView = {
+    slug: "settings/site",
+    name: "Site settings",
+    icon: "Settings",
+    view: (
+        <Container maxWidth={"3xl"} className={"py-8"}>
+            <Typography variant={"h4"} gutterBottom>Site settings</Typography>
+            <EntityFormPanel collection={siteSettingsCollection} entityId={"site"}/>
+        </Container>
+    )
+};
+```
+
+The same shape with `entityId={user.uid}` (from `useAuthController()`) is a
+per-user settings page.
+
+### Places
+
+| To add… | Put a component in |
+|---|---|
+| A page | `<RebaseCMS views={[{ slug, name, icon, view }]}>` |
+| A view mode for a collection | `collectionViews={[{ key, name, Builder }]}` and `admin.customViews: ["key"]` — see [View Modes](/docs/frontend/view-modes) |
+| A button in a collection's toolbar | `admin.Actions: [Component]` |
+| A button on a record | `admin.entityActions` — see [Entity Actions](/docs/frontend/entity-actions) |
+| A tab on a record | `admin.entityViews` — see [Entity Views](/docs/frontend/entity-views) |
+| How one field is edited or shown | `admin.Field` / `admin.Preview` — see [Custom Fields](/docs/frontend/custom-fields) |
+| Something beside a built-in part | `<Rebase slots>` — see [Slots](/docs/frontend/slots) |
+| A replacement for a built-in part | `<Rebase components>` — see [Component Overrides](/docs/frontend/component-overrides) |
+
+### Hooks
+
+| Hook | Package | Gives you |
+|---|---|---|
+| `useData` | `@rebasepro/app` | `useData().collection("orders").find / findById / create / update / delete`, through the server, so callbacks and security rules apply. |
+| `useCollection` / `useFetch` | `@rebasepro/app` | A live list of rows / one live record. |
+| `useAuthController` | `@rebasepro/app` | The signed-in `user` (uid, roles), sign-in and sign-out. |
+| `useSnackbarController` | `@rebasepro/app` | `open({ type, message })` for a toast. |
+| `useSidePanel` | `@rebasepro/cms` | Open any record in the side panel. |
+| `useUrlController` | `@rebasepro/cms` | Admin URLs and navigation. |
+| `resolveSelection` | `@rebasepro/cms` | A table selection — ticked rows or "all matching" — as rows. |
+
 ## Extending Rebase
 
 ### Overview
@@ -34872,6 +35075,10 @@ not exist, and there is no way to hand `<Rebase>` your app's mode.
 Rebase offers roughly a dozen extension mechanisms — plugins, slots, component overrides, entity views, actions, custom fields, and more. Each one targets a different scope (app-wide, per-collection, per-entity, per-property) and a different part of the UI.
 
 This guide helps you pick the right mechanism for your use case, then links to the detailed reference for each.
+
+:::tip[Start with the model, not the list]
+Every mechanism below is the same thing underneath: a React component put in a place. [Customizing the Admin](/docs/frontend/customizing) explains that model in one page — building blocks, hooks, places — with tested recipes for a settings singleton, per-user settings, a bulk action, a calendar view, a dashboard and a custom login screen. Read it first; come back here to pick the place.
+:::
 
 Everything here is the **admin panel**. For the server — narrowing a read,
 adding a route, embedding the driver in your own process, `rebase eject` — see
@@ -35760,6 +35967,8 @@ Every collection can be displayed in four view modes:
 - **Cards** — Card grid for visual content (images, previews)
 - **Kanban** — Drag-and-drop board grouped by an enum property
 
+Those are the built-in ones. A collection can also offer view modes you write — a calendar, a map, a gallery — in the same switcher, driven by the same toolbar: see [Custom view modes](/docs/frontend/extending#custom-view-modes) and the calendar recipe in [Customizing the Admin](/docs/frontend/customizing).
+
 ### Configuration
 
 ```typescript
@@ -35955,6 +36164,7 @@ const articlesCollection = defineCollection({
 
 ### Next Steps
 
+- **[Customizing the Admin](/docs/frontend/customizing)** — Your own view modes, pages and actions
 - **[Entity Views](/docs/frontend/entity-views)** — Custom tabs on entity forms
 - **[Entity Actions](/docs/frontend/entity-actions)** — Custom entity actions
 
@@ -36230,17 +36440,20 @@ properties: {
 
 ### Overview
 
-The entity form is generated from your properties. By default it derives a
-two-column layout from the property types, so a collection that says nothing
-about layout still gets a form that reads like a form rather than one long run
-of full-width inputs:
+The entity form is generated from your properties:
 
 - the id and the `createdAt` / `updatedAt` timestamps go to a metadata rail, read-only
-- short enums, booleans, dates and numbers take a narrow span
-- long text, markdown, arrays, maps and storage fields take the full width
-- everything else takes half
+- every other field takes the full width of the main column, except that two
+  neighbouring fields with the same small editor — two numbers, two switches,
+  two dates of the same mode, two selects with short options — share a row
 
-Use `admin.form` when the derived answer is wrong for your domain.
+A field with a long label, help text over 60 characters, `conditions` or a
+custom `Field` is never paired, and neither is any free-text string: nothing in
+a schema tells a short branch name from a long URL. The form never looks at
+which property is the title. Any other columns are something the collection asks
+for, field by field, with `admin.span` — set from what each field holds, as
+below. Use `admin.form` to
+group fields into sections and move them to the rail.
 
 ### Field width
 
@@ -36279,6 +36492,14 @@ of the order they were declared in. They replaced `admin.widthPercentage`,
 whose raw percentages could not line up with anything; a collection still
 carrying one should pick the nearest span (≤30 → `1`, ≤55 → `2`, ≤80 → `3`,
 otherwise `4`).
+
+Choose a span from what the field holds, not from its type. Two short values
+that belong together share a row — start and end date, city and country,
+provider and region at `2` each, or a value and its qualifier at `3` + `1`.
+Numbers, booleans and short codes can take `1` beside their siblings. Anything
+that reads long — names, URLs, emails, ids, descriptions, markdown, files —
+keeps `4`. Rows fill in declaration order and nothing widens a field to close a
+gap, so declare pairs next to each other and make each row add up to 4.
 
 On layouts too narrow for two columns — the side panel, the split pane, a phone
 — the grid collapses to a single column and spans are ignored.

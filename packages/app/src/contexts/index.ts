@@ -16,3 +16,4 @@ export * from "./CustomizationControllerContext";
 export * from "./ComponentOverrideContext";
 export * from "./CollectionScopeContext";
 export * from "./CollectionResolverContext";
+export * from "./RlsSimulationContext";

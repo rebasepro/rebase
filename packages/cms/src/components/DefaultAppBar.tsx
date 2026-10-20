@@ -2,7 +2,7 @@
 import React from "react";
 
 import { Link, useNavigate } from "react-router";
-import { RebaseLogo, LanguageToggle } from "@rebasepro/app";
+import { RebaseLogo, LanguageToggle, RlsSimulatorBar } from "@rebasepro/app";
 import { ErrorBoundary, iconSize } from "@rebasepro/ui";
 import {
     Avatar,
@@ -222,6 +222,8 @@ export const DefaultAppBar = function DefaultAppBar({
                 </ErrorBoundary>}
 
             {shellToolbar}
+
+            <RlsSimulatorBar/>
 
             {includeLanguageToggle && <LanguageToggle/>}
 
