@@ -14,6 +14,7 @@ export * from "./services/channel-bus";
 export * from "./websocket";
 export * from "./collections/PostgresCollectionRegistry";
 export * from "./services/BranchService";
+export { diffDatabaseBranch, mergeDatabaseBranch, BranchDiffError, DEFAULT_BRANCH_DIFF_SAMPLE_LIMIT, DEFAULT_BRANCH_DIFF_MAX_ROWS, type BranchDiffErrorCode } from "./branching/branch-diff";
 export * from "./backup";
 export * from "./PostgresBootstrapper";
 export * from "./PostgresAdapter";

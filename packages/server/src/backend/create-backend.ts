@@ -3145,6 +3145,7 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
     let backupSurface: Hono<HonoEnv> | undefined;
     let rlsAuditSurface: Hono<HonoEnv> | undefined;
     let sqlExportSurface: Hono<HonoEnv> | undefined;
+    let branchSurface: Hono<HonoEnv> | undefined;
     let devMailSurface: Hono<HonoEnv> | undefined;
     let logsSurface: Hono<HonoEnv> | undefined;
     let metaSurface: Hono<HonoEnv> | undefined;
@@ -3205,6 +3206,19 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         applyAdminGate(sqlExportRouter, "SQL export", "database:write");
         sqlExportRouter.route("/", createSqlExportRoutes({ getAdmin: () => defaultDriver.admin }));
         sqlExportSurface = sqlExportRouter;
+    }
+
+    // 6b-ii-b. Studio's branch review: a branch's diff, and merging it.
+    //
+    // Read and write split by method: `database:read` sees the diff, the
+    // scope listing branches asks; `database:write` merges, the scope creating
+    // one asks.
+    if (surfaces.admin) {
+        const { createBranchRoutes } = await import("../api/branch-routes");
+        const branchRouter = new Hono<HonoEnv>();
+        applyAdminGate(branchRouter, "Branch review", { read: "database:read", write: "database:write" });
+        branchRouter.route("/", createBranchRoutes({ getAdmin: () => defaultDriver.admin }));
+        branchSurface = branchRouter;
     }
 
     // 6b-iii. The development mailbox.
@@ -3489,6 +3503,7 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
             if (backupSurface) adminGroup.route("/backups", backupSurface);
             if (rlsAuditSurface) adminGroup.route("/rls-audit", rlsAuditSurface);
             if (sqlExportSurface) adminGroup.route("/sql", sqlExportSurface);
+            if (branchSurface) adminGroup.route("/branches", branchSurface);
             if (devMailSurface) adminGroup.route("/dev/emails", devMailSurface);
             if (logsSurface) adminGroup.route("/logs", logsSurface);
             return adminGroup;

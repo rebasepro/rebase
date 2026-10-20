@@ -40,12 +40,15 @@ import {
     TableMetadata,
     TablePolicyInfo,
     User,
-    parseEnvBoolean
+    parseEnvBoolean,
+    type BranchDiff,
+    type BranchDiffOptions,
+    type BranchMergeOptions
 } from "@rebasepro/types";
 import { sql as drizzleSql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { DatabaseError, Pool, type PoolClient } from "pg";
-import { sqlRows, applyDefaultValuesOnCreate, buildPropertyCallbacks, hasFieldAccessRules, buildSdkData, callbackRefusal, createAccessorSlugResolver, classifyTable, detectJunctionTables, getTenantConfig, requireCallbackClient, requireCallbackCollection, resolveCollectionRelations, resolveTenantWrite, restoresSoftDeletedRow, tenantBypassRoles, toCallbackError, updateDateAutoValues, updateUserAutoValues } from "@rebasepro/common";
+import { sqlRows, applyDefaultValuesOnCreate, buildPropertyCallbacks, hasFieldAccessRules, buildSdkData, callbackRefusal, createAccessorSlugResolver, classifyTable, getTableName, detectJunctionTables, getTenantConfig, requireCallbackClient, requireCallbackCollection, resolveCollectionRelations, resolveTenantWrite, restoresSoftDeletedRow, tenantBypassRoles, toCallbackError, updateDateAutoValues, updateUserAutoValues } from "@rebasepro/common";
 import { PostgresCollectionRegistry } from "./collections/PostgresCollectionRegistry";
 import { deriveRowAddress, getPrimaryKeys, parseIdValues } from "./services/collection-helpers";
 import { isJunctionBackedRelation, isNestedPath, resolveNestedPath, splitPathSegments } from "./services/nested-path";
@@ -62,6 +65,7 @@ import { generateSchemaCommit } from "./schema/generate-schema-commit";
 import { readSchemaFactsFor, type Queryable } from "./schema/ensure-collection-tables";
 import { onOwnSession, openSqlCursorOnPool, readWithinBudget, refuseOversizedRows, RESET_SESSION_STATEMENTS, runSqlScriptOnPool, sqlScriptResultFromRows } from "./services/sql-script";
 import { PgNotifyListener } from "./services/pg-notify-listener";
+import { diffDatabaseBranch, mergeDatabaseBranch } from "./branching/branch-diff";
 
 /**
  * Has an operator opted out of database role switching entirely?
@@ -515,8 +519,30 @@ export class PostgresBackendDriver implements DataDriver {
                 createBranch: this.branchService.createBranch.bind(this.branchService),
                 deleteBranch: this.branchService.deleteBranch.bind(this.branchService),
                 listBranches: this.branchService.listBranches.bind(this.branchService),
-                getBranchInfo: this.branchService.getBranchInfo.bind(this.branchService)
+                getBranchInfo: this.branchService.getBranchInfo.bind(this.branchService),
+                // Read through this getter's own SQL and branch methods, so a
+                // branch is compared exactly as the console and the Branches
+                // pane reach it.
+                diffBranch: async (name: string, options?: BranchDiffOptions) =>
+                    this.nameDiffCollections(await diffDatabaseBranch(this.admin, name, options)),
+                mergeBranch: (name: string, options: BranchMergeOptions) => mergeDatabaseBranch(this.admin, name, options)
             } : {})
+        };
+    }
+
+    /** The diff with each table named by the collection it backs, where one does. */
+    private nameDiffCollections(diff: BranchDiff): BranchDiff {
+        const collections = this.registry?.getCollections() ?? [];
+        const slugOf = (schema: string, table: string): string | undefined => collections.find((collection) => {
+            const declared = "schema" in collection && typeof collection.schema === "string" ? collection.schema : "public";
+            return declared === schema && getTableName(collection) === table;
+        })?.slug;
+        return {
+            ...diff,
+            data: diff.data.map((entry) => {
+                const collection = slugOf(entry.schema, entry.table);
+                return collection ? { ...entry, collection } : entry;
+            })
         };
     }
 

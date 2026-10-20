@@ -1408,7 +1408,7 @@ async function tellDriverTheActiveBranch(projectRoot: string): Promise<void> {
 }
 
 /** The `branch` actions that read or write the registry — every one but `switch`. */
-const REGISTRY_ACTIONS = new Set(["list", "create", "delete", "info", "prune"]);
+const REGISTRY_ACTIONS = new Set(["list", "create", "delete", "info", "diff", "prune"]);
 
 /**
  * Every `branch` action runs against the parent, where the registry lives.
@@ -1736,12 +1736,13 @@ const DB_ACTION_HELP: Record<string, { usage: string; summary: string; notes?: s
         // to each other instead. It went two releases without learning `prune`,
         // `--from`, `--force` or `--older-than`, all four of which the dispatch
         // answers and the docs teach.
-        usage: "rebase db branch <create|list|switch|delete|info|prune> [name]",
+        usage: "rebase db branch <create|list|switch|delete|info|diff|prune> [name]",
         summary: "Database branching.",
         notes: [
             "create <name> [--from <source>] copies an existing database, files and all.",
             "switch <name> points this checkout at a branch; every later command uses it.",
             "switch with no name reports where you are; switch --off returns to the main database.",
+            "diff <name> shows what the branch changed against the database it was made from: tables, columns, RLS policies, and the rows it inserted, updated and deleted. --json prints all of it, with up to --sample-limit <n> rows a table (default 100).",
             "prune [--older-than <14|14d|2w>] removes branches nothing is using, and the entries that drifted.",
             "prune --include-dev-diff also removes the Atlas scratch databases `db push` leaves behind.",
             "prune asks before it drops anything; --yes, -y answers for you, which is the form a CI job wants.",

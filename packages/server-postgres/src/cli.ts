@@ -7,6 +7,7 @@ import { fileURLToPath } from "url";
 import { out, outWarn, outError } from "./cli-output";
 import { resolveTsxLoader } from "./tsx-loader";
 import { formatRelativeTime } from "@rebasepro/utils";
+import type { BranchDiff, DatabaseAdmin } from "@rebasepro/types";
 import {
     diagnoseMissingBin,
     detectProjectPackageManager,
@@ -1459,6 +1460,8 @@ const BRANCH_FLAGS = {
     "--older-than": String,
     "--include-dev-diff": Boolean,
     "--from": String,
+    "--json": Boolean,
+    "--sample-limit": Number,
     "--yes": Boolean,
     "-y": "--yes"
 } as const;
@@ -1650,6 +1653,44 @@ max: 3 });
                 break;
             }
 
+            case "diff": {
+                const name = rawArgs[3];
+                if (!name || name.startsWith("-")) {
+                    outError(chalk.red("✗ Branch name is required."));
+                    out(chalk.gray("  Usage: rebase db branch diff <name> [--json] [--sample-limit <n>]"));
+                    process.exit(1);
+                }
+                const parsed = arg(BRANCH_FLAGS, { argv: rawArgs.slice(4), permissive: true });
+                const { diffDatabaseBranch } = await import("./branching/branch-diff");
+                const { branchDiffReport } = await import("./branching/branch-diff-report");
+                // The SQL and branch halves of an admin, on this command's own
+                // pools: the diff reads each database through `database`.
+                const admin: DatabaseAdmin = {
+                    executeSql: async (text, options) =>
+                        (await poolManager.getPool(options?.database ?? poolManager.defaultDatabaseName).query(text, options?.params)).rows,
+                    createBranch: (branchName, options) => branchService.createBranch(branchName, options),
+                    deleteBranch: (branchName) => branchService.deleteBranch(branchName),
+                    listBranches: () => branchService.listBranches(),
+                    getBranchInfo: async (branchName) =>
+                        await branchService.hasBranchRegistry() ? branchService.getBranchInfo(branchName) : undefined
+                };
+                let diff: BranchDiff;
+                try {
+                    diff = await diffDatabaseBranch(admin, name, { sampleLimit: parsed["--sample-limit"] });
+                } catch (error: unknown) {
+                    outError(chalk.red(`  ✗ ${error instanceof Error ? error.message : String(error)}`));
+                    process.exit(1);
+                }
+                if (parsed["--json"] === true) {
+                    out(JSON.stringify(diff, null, 2));
+                } else {
+                    out("");
+                    for (const line of branchDiffReport(diff)) out(`  ${line}`);
+                    out("");
+                }
+                break;
+            }
+
             case "prune": {
                 const parsed = arg(BRANCH_FLAGS, { argv: rawArgs.slice(3), permissive: true });
                 const olderThanRaw = parsed["--older-than"] ?? null;
@@ -1778,6 +1819,7 @@ ${chalk.green.bold("Commands")}
   ${chalk.blue.bold("switch")} [<name>|--off]             Point this checkout at a branch
   ${chalk.blue.bold("delete")} <name>                     Delete a branch
   ${chalk.blue.bold("info")} <name>                       Show branch details
+  ${chalk.blue.bold("diff")} <name> [--json]              What the branch changed: schema, policies, rows
   ${chalk.blue.bold("prune")} [--older-than <14|14d|2w>]  Remove branches nothing is using
 
 ${chalk.green.bold("Why prune")}
@@ -1791,6 +1833,8 @@ ${chalk.green.bold("Options")}
                                     Postgres refuses to copy or drop a database
                                     anything else is connected to — usually your
                                     own \`rebase dev\`.
+  ${chalk.blue.bold("--json")}                            diff: print the whole diff as JSON, with up
+                                    to --sample-limit rows a table (default 100).
   ${chalk.blue.bold("--include-dev-diff")}                Also prune the Atlas scratch databases
                                     \`db push\` leaves behind.
   ${chalk.blue.bold("--yes, -y")}                         Skip prune's confirmation prompt. Dropping a

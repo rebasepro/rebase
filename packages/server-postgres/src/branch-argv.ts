@@ -22,6 +22,7 @@ export const BRANCH_ACTION_FLAGS: Record<string, arg.Spec> = {
     create: { "--from": String, "--force": Boolean },
     list: {},
     info: {},
+    diff: { "--json": Boolean, "--sample-limit": Number },
     // `delete` does not ask, but `--yes` is what a script passes to every
     // destructive command; refusing it would break that line for nothing.
     delete: { "--force": Boolean, "--yes": Boolean, "-y": "--yes" },
@@ -120,4 +121,4 @@ export function unexpectedBranchArgs(words: readonly string[]): string[] {
  * parent where it lives — answered `✗ Unexpected argument: postgres://…`. The
  * `=` form carries its value in the same word and needs no skip.
  */
-const TAKES_A_VALUE = new Set(["--from", "--older-than", "--database-url"]);
+const TAKES_A_VALUE = new Set(["--from", "--older-than", "--sample-limit", "--database-url"]);

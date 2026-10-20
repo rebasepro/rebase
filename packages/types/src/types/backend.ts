@@ -851,6 +851,188 @@ export interface BranchAdmin {
 
     /** Get info about a specific branch. */
     getBranchInfo(name: string): Promise<BranchInfo | undefined>;
+
+    /**
+     * What the branch changed, against the database it was made from: its
+     * tables, columns and row-level-security policies, and per table the rows
+     * it inserted, updated and deleted. Reads only.
+     */
+    diffBranch?(name: string, options?: BranchDiffOptions): Promise<BranchDiff>;
+
+    /**
+     * Apply the rows the branch changed to the database it was made from. See
+     * {@link BranchMergeOptions} for what wins, and when nothing is written.
+     */
+    mergeBranch?(name: string, options: BranchMergeOptions): Promise<BranchMergeResult>;
+}
+
+/**
+ * What {@link BranchAdmin.diffBranch} compares.
+ * @group Admin
+ */
+export interface BranchDiffOptions {
+    /** Rows shown per table, across every kind of change. Default 100. */
+    sampleLimit?: number;
+    /** Schemas to compare. Default: every schema but the system's, without Rebase's own tables. */
+    schemas?: string[];
+    /**
+     * Rows a table may hold, on either side, for its rows to be matched one by
+     * one. A larger table that differs is reported with its row counts only,
+     * and cannot be merged. Default 100,000.
+     */
+    maxRowsPerTable?: number;
+}
+
+/**
+ * One change to a table, a column, a policy or a table's row-level security.
+ * @group Admin
+ */
+export interface BranchSchemaChange {
+    object: "table" | "column" | "policy" | "rls";
+    change: "added" | "dropped" | "altered";
+    schema: string;
+    table: string;
+    /** The column's or the policy's name. */
+    name?: string;
+    /** The definition on the target, as SQL. Absent for an addition. */
+    before?: string;
+    /** The definition on the branch, as SQL. Absent for a drop. */
+    after?: string;
+}
+
+/**
+ * Why the changed rows of a table cannot be merged.
+ * @group Admin
+ */
+export interface BranchMergeBlock {
+    code: "TABLE_ADDED" | "TABLE_DROPPED" | "COLUMNS_DIFFER" | "PRIMARY_KEY_DIFFERS" | "NO_PRIMARY_KEY" | "TOO_LARGE";
+    message: string;
+}
+
+/**
+ * One row the branch changed, or one both sides changed.
+ *
+ * Values are the text the database writes for them, `null` for SQL NULL, so a
+ * `bigint` or a `numeric` reads exactly as it is stored.
+ * @group Admin
+ */
+export interface BranchRowChange {
+    change: "inserted" | "updated" | "deleted" | "conflict";
+    /** The primary key, as a JSON array of its columns' values. */
+    key: string;
+    /** The row on the target. Absent for an insert. */
+    before?: Record<string, string | null>;
+    /** The row on the branch. Absent for a delete. */
+    after?: Record<string, string | null>;
+    /** The columns whose values differ, for an update or a conflict. */
+    changedColumns?: string[];
+}
+
+/**
+ * The rows of one table that differ between the branch and its target.
+ * @group Admin
+ */
+export interface BranchTableDataDiff {
+    schema: string;
+    table: string;
+    /** The collection whose table this is, when the server knows one. */
+    collection?: string;
+    primaryKey: string[];
+    /** Rows the branch inserted. */
+    inserted: number;
+    /** Rows the branch updated. */
+    updated: number;
+    /** Rows the branch deleted. */
+    deleted: number;
+    /** Rows both sides changed since the branch was made, differently. */
+    conflicts: number;
+    /**
+     * Rows the target changed since the branch was made, and the branch did
+     * not. A merge leaves them as they are.
+     */
+    targetChanges: number;
+    /** Up to {@link BranchDiffOptions.sampleLimit} of the rows counted above, but not of {@link targetChanges}. */
+    samples: BranchRowChange[];
+    /** Present when this table's rows cannot be merged. Its counts may then be estimates. */
+    blocked?: BranchMergeBlock;
+    /** Rows on each side, for a table whose rows were not matched one by one. */
+    rowCounts?: { target: number; branch: number };
+}
+
+/**
+ * What {@link BranchAdmin.diffBranch} returns.
+ * @group Admin
+ */
+export interface BranchDiff {
+    branch: string;
+    /** The branch's database. */
+    branchDatabase: string;
+    /** The database the branch was made from, which a merge writes to. */
+    targetDatabase: string;
+    /** The schemas compared. */
+    schemas: string[];
+    /**
+     * Whether rows could be told apart by which side changed them since the
+     * branch was made. When `false`, every row that differs is counted as the
+     * branch's change, and a merge would undo what the target changed.
+     */
+    forkPointKnown: boolean;
+    /** Pass to {@link BranchAdmin.mergeBranch}: what this diff saw, on both sides. */
+    fingerprint: string;
+    schema: BranchSchemaChange[];
+    /** Only the tables with rows that differ. */
+    data: BranchTableDataDiff[];
+    sampleLimit: number;
+    computedAt: string;
+}
+
+/**
+ * How {@link BranchAdmin.mergeBranch} applies a branch.
+ *
+ * A merge writes the rows the branch inserted, updated and deleted to the
+ * target, in one statement: all of them, or none. Rows the target changed
+ * since the branch was made are kept. Schema and policy changes are never
+ * merged — they belong to the collections and their migrations.
+ *
+ * Nothing is written when either side changed since the diff that produced
+ * {@link expectedFingerprint}, when a table with changed rows cannot be merged
+ * (unless {@link skipBlocked}), or when a row was changed on both sides and
+ * {@link onConflict} is `"abort"`.
+ * @group Admin
+ */
+export interface BranchMergeOptions {
+    /** {@link BranchDiff.fingerprint} of the diff that was reviewed. */
+    expectedFingerprint: string;
+    /**
+     * A row both sides changed: `"abort"` (the default) writes nothing,
+     * `"branch"` writes the branch's row over the target's, `"target"` keeps
+     * the target's.
+     */
+    onConflict?: "abort" | "branch" | "target";
+    /** Merge the other tables when some cannot be merged, instead of writing nothing. */
+    skipBlocked?: boolean;
+    /** The schemas the reviewed diff compared, when it was not the default. */
+    schemas?: string[];
+    /** The row limit the reviewed diff used, when it was not the default. */
+    maxRowsPerTable?: number;
+}
+
+/**
+ * What {@link BranchAdmin.mergeBranch} wrote.
+ * @group Admin
+ */
+export interface BranchMergeResult {
+    branch: string;
+    targetDatabase: string;
+    tables: { schema: string; table: string; inserted: number; updated: number; deleted: number }[];
+    /** Tables left unmerged because they could not be, with `skipBlocked`. */
+    skipped: { schema: string; table: string; reason: BranchMergeBlock }[];
+    /** Rows both sides changed that kept the target's version, with `onConflict: "target"`. */
+    conflictsKept: number;
+    /** Schema and policy changes on the branch, none of which a merge applies. */
+    schemaChangesNotMerged: number;
+    /** What went wrong after the rows were written: a sequence left behind them. */
+    warnings: string[];
 }
 
 /**
