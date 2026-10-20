@@ -961,3 +961,122 @@ describe("a deploy that declares a hostname", () => {
         expect(said.join("\n")).not.toContain("not served until");
     });
 });
+
+/**
+ * A directory `rebase cloud init --claim` linked without a deploy, or whose
+ * first deploy failed, has no `REBASE_API_TOKEN`: the app was not built yet
+ * when `init` would have asked. The next deploy that succeeds asks for it.
+ */
+describe("a successful deploy to an unclaimed project", () => {
+    const APP_KEY = "rk_live_app_key";
+    const PROJECT_TOKEN = "rk_live_project_token";
+    let home: string;
+    let savedHome: string | undefined;
+    let appKeyAsks: { authorization: string | null; body: unknown }[];
+    let appKeyAnswer: () => Response;
+    let stdout: string[];
+
+    beforeEach(() => {
+        home = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "rebase-deploy-home-")));
+        savedHome = process.env.HOME;
+        process.env.HOME = home;
+        context.writeLink({ url: "https://cp.example", projectId: "proj_1", slug: "shop" }, project);
+        context.saveEphemeralGrant("https://cp.example", "proj_1", {
+            token: PROJECT_TOKEN,
+            claimUrl: `https://cp.example/claim/rcl_${"a".repeat(48)}`,
+            expiresAt: new Date(Date.now() + 3600_000).toISOString()
+        });
+
+        bundle("backend");
+        controlPlane();
+        appKeyAsks = [];
+        appKeyAnswer = () => new Response(JSON.stringify({
+            apiKey: APP_KEY, keyId: "key_app", scopes: ["data:read", "data:write"], expiresAt: "2026-10-23T12:00:00.000Z"
+        }), { status: 201 });
+        const routes = globalThis.fetch;
+        vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
+            if (!url.endsWith("/api/functions/ephemeral/app-key")) return routes(url, init);
+            appKeyAsks.push({
+                authorization: new Headers(init?.headers).get("Authorization"),
+                body: JSON.parse(String(init?.body))
+            });
+            return appKeyAnswer();
+        }));
+
+        (context.requireClient as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
+            client: {
+                auth: { getSession: () => ({ accessToken: "tok", expiresAt: Date.now() + 60 * 60_000 }) },
+                data: {
+                    collection: (name: string) => ({
+                        findById: async () => (name === "deployments" ? { id: "d1", status: "success", logs: "built\n" } : undefined),
+                        find: async () => ({ data: [] })
+                    })
+                },
+                functions: { invoke }
+            },
+            url: "https://cp.example"
+        });
+        context.setJsonModeForTest(true);
+        stdout = [];
+        vi.spyOn(process.stdout, "write").mockImplementation(((chunk: string | Uint8Array) => {
+            stdout.push(String(chunk));
+            return true;
+        }) as typeof process.stdout.write);
+        vi.spyOn(process.stderr, "write").mockImplementation(((chunk: string | Uint8Array) => {
+            said.push(String(chunk));
+            return true;
+        }) as typeof process.stderr.write);
+    });
+
+    afterEach(() => {
+        context.setJsonModeForTest(false);
+        if (savedHome === undefined) delete process.env.HOME;
+        else process.env.HOME = savedHome;
+        fs.rmSync(home, { recursive: true, force: true });
+    });
+
+    const followed = () => deployCommand(["node", "rebase", "cloud", "deploy", "--bundle", "--bundle-dir", bundleDir, "--no-source"], "shop");
+    const dotenv = () => fs.readFileSync(path.join(project, ".env"), "utf-8");
+
+    it("asks for the app's key with the project's token, writes it into .env, and prints it nowhere", async () => {
+        await followed();
+
+        expect(appKeyAsks).toEqual([{ authorization: `Bearer ${PROJECT_TOKEN}`, body: { projectId: "proj_1" } }]);
+        expect(dotenv()).toBe(`SECRET=never\nVITE_API_URL=http://localhost:3001\nREBASE_API_TOKEN=${APP_KEY}\n`);
+        const result = JSON.parse(stdout.join(""));
+        expect(result).toMatchObject({
+            success: true,
+            status: "success",
+            appKey: { ok: true, env: "REBASE_API_TOKEN", scopes: ["data:read", "data:write"], expiresAt: "2026-10-23T12:00:00.000Z" }
+        });
+        expect([...stdout, ...said].join("\n")).not.toContain(APP_KEY);
+    });
+
+    it("asks nothing when .env already has a key", async () => {
+        fs.appendFileSync(path.join(project, ".env"), "REBASE_API_TOKEN=rk_live_made_by_hand\n");
+        await followed();
+        expect(appKeyAsks).toEqual([]);
+        expect("appKey" in JSON.parse(stdout.join(""))).toBe(false);
+    });
+
+    it("asks nothing when the deploy is not followed: it has not built the app yet", async () => {
+        await deploy("--no-source");
+        expect(appKeyAsks).toEqual([]);
+    });
+
+    it("still succeeds when the key is refused, and says why", async () => {
+        appKeyAnswer = () => new Response(JSON.stringify({
+            error: { code: "upstream_error", message: "The project's app refused the platform's credential." }
+        }), { status: 502 });
+
+        await followed();
+
+        expect(process.exitCode ?? 0).toBe(0);
+        expect(JSON.parse(stdout.join(""))).toMatchObject({
+            success: true,
+            appKey: { ok: false, error: { code: "upstream_error", message: "The project's app refused the platform's credential." } }
+        });
+        expect(said.join("\n")).toContain("REBASE_API_TOKEN was not written");
+        expect(dotenv()).not.toContain("REBASE_API_TOKEN");
+    });
+});
