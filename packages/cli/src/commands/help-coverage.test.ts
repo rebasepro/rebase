@@ -27,6 +27,7 @@ import { appsCommand } from "./apps";
 import { authCommand } from "./auth";
 import { dbCommand } from "./db";
 import { doctorCommand, DOCTOR_FLAGS } from "./doctor";
+import { generateCommand } from "./generate-view";
 import { schemaCommand } from "./schema";
 import { skillsCommand } from "./skills";
 import { storageCommand } from "./storage";
@@ -141,7 +142,8 @@ describe("every command the dispatch answers appears in a help page", () => {
         ["apps", "apps.ts", "appsCommand", appsCommand],
         ["skills", "skills.ts", "skillsCommand", skillsCommand],
         ["api-keys", "api-keys.ts", "apiKeysCommand", apiKeysCommand],
-        ["storage", "storage.ts", "storageCommand", storageCommand]
+        ["storage", "storage.ts", "storageCommand", storageCommand],
+        ["generate", "generate-view.ts", "generateCommand", generateCommand]
     ] as const)("rebase %s --help lists every subcommand", async (family, file, fn, command) => {
         const names = dispatchedNames(file, fn);
         expect(names.length, `no subcommands found in ${fn}`).toBeGreaterThan(0);
@@ -416,6 +418,7 @@ describe("every command the dispatch answers parses its flags strictly", () => {
         "storage": "storage.ts",
         apps: "apps.ts",
         eject: "eject.ts",
+        generate: "generate-view.ts",
         "generate-sdk": "../cli.ts",
         telemetry: "telemetry.ts",
         resources: "resources.ts",
