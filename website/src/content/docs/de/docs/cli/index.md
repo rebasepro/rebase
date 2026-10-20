@@ -1,5 +1,5 @@
 ---
-sourceHash: c5d1f52c0af5c703
+sourceHash: 9210bf054bc3c431
 title: CLI-Referenz
 sidebar_label: CLI
 description: Rebase-CLI-Befehle für Projektinitialisierung, Schemagenerierung, Datenbankmigrationen und SDK-Generierung.
@@ -19,7 +19,7 @@ Oder führen Sie jeden Befehl aus, ohne ihn zu installieren: `pnpm dlx @rebasepr
 
 ## Maschinenlesbare Ausgabe
 
-`--json` ist der Schalter, und außerhalb der `cloud`-Befehlsfamilie ist es der einzige: `rebase status`, `rebase resources`, `rebase apps list` und `rebase upgrade` geben dann genau einen JSON-Wert auf stdout aus — das Ergebnis oder eine `{"error": {"message", "code", "hint", "issues"}}`-Struktur bei einem Exit-Code ungleich null — und zwar bei **jedem** Beenden des Befehls, sodass ein Aufrufer stdout bedingungslos parsen kann. Ohne diesen Schalter schreiben sie menschenlesbaren Text und Fehler gehen nach stderr. `rebase cloud` verwendet dieselbe Struktur und ist die einzige Ausnahme von diesem Schalter: Es aktiviert JSON automatisch von selbst, wenn stdout kein TTY ist oder wenn `REBASE_JSON=1` gesetzt ist. Daher ist `rebase cloud status | cat` JSON, während `rebase status | cat` dies nicht ist — übergeben Sie in einem Skript explizit `--json`, anstatt sich auf eine der beiden Regeln zu verlassen.
+`--json` ist der Schalter, und außerhalb der `cloud`-Befehlsfamilie ist es der einzige: `rebase status`, `rebase resources`, `rebase apps list`, `rebase upgrade` und `rebase verify` geben dann genau einen JSON-Wert auf stdout aus — das Ergebnis oder eine `{"error": {"message", "code", "hint", "issues"}}`-Struktur bei einem Exit-Code ungleich null — und zwar bei **jedem** Beenden des Befehls, sodass ein Aufrufer stdout bedingungslos parsen kann. Ohne diesen Schalter schreiben sie menschenlesbaren Text und Fehler gehen nach stderr. `rebase cloud` verwendet dieselbe Struktur und ist die einzige Ausnahme von diesem Schalter: Es aktiviert JSON automatisch von selbst, wenn stdout kein TTY ist oder wenn `REBASE_JSON=1` gesetzt ist. Daher ist `rebase cloud status | cat` JSON, während `rebase status | cat` dies nicht ist — übergeben Sie in einem Skript explizit `--json`, anstatt sich auf eine der beiden Regeln zu verlassen.
 
 ## Befehle
 
@@ -404,6 +404,27 @@ Sie keine `DATABASE_URL` angegeben haben, gilt nicht als Fehler.
 und schlägt im Zweifelsfall fehl ("fails closed"), was es zur geeigneten Form für ein CI-Gate gegen eine
 deployte Datenbank macht.
 
+### `rebase verify`
+
+```bash
+rebase verify
+rebase verify --json
+rebase verify --live
+```
+
+Ob die Collections auslieferbar sind, in einem schnellen Befehl für CI und für die Hooks eines KI-Agenten. Standardmäßig offline, und er ändert nie etwas.
+
+| Schritt | Was ihn fehlschlagen lässt |
+| --- | --- |
+| Collection-Konfiguration | Eine Datei unter `config/collections/`, die nicht lädt oder die der Boot-Validator ablehnt — mit unbekannten Schlüsseln als Fehler, sodass eine falsch geschriebene Option oder eine UI-Option außerhalb von `admin: { … }` (ein `widget` auf oberster Ebene) hier auffällt, statt still ignoriert zu werden. |
+| RLS-Abdeckung | Eine Collection ohne `securityRules`, die auch keine erbt, oder eine mit einer Spalte `user_id`, `owner_id`, `organization_id` oder `tenant_id`, die sich stattdessen auf Verzeichnis-Defaults verlässt. Eine Regel, die eine Rolle jede Zeile einer solchen Tabelle lesen lässt, ist eine Warnung. |
+| Aktualität der Migrationen | Eine Tabelle oder Spalte, die die Collections deklarieren und die keine Datei in `backend/drizzle/migrations` anlegt, oder eine entfernte, die eine Migration noch anlegt. Übersprungen, solange ein Projekt noch keine Migrationen hat. |
+| Live-RLS-Audit | Mit `--live`: der [`rls-check`](/docs/rls-check)-Katalog gegen `DATABASE_URL`, und ob jede Migration angewendet wurde. |
+
+`--json` gibt ein einziges Objekt aus — jeden Schritt und jeden Befund mit seiner `file`, dem gepunkteten `path` in die Collection-Konfiguration und dem `fix` —, damit ein Agent reparieren kann, was er kaputt gemacht hat. `--quiet` gibt nichts aus, wenn alles besteht. Beendet sich bei einem Fehler mit einem Exit-Code ungleich null; Warnungen lassen ihn nicht fehlschlagen.
+
+Ein gescaffoldetes Projekt führt ihn für Claude Code nach jeder Änderung an einer Collection aus: siehe [`rebase skills install`](#rebase-skills-install).
+
 ### `rebase auth`
 
 Befehle zur Authentifizierungsverwaltung:
@@ -469,9 +490,12 @@ Installiert die Rebase-Referenz-Skills für Ihre KI-Coding-Assistenten — jedes
 rebase skills install
 rebase skills install --agent claude,cursor
 rebase skills install --agent all
+rebase skills --hooks
 ```
 
 Siehe [Agent Skills](/docs/ai/skills) für die vollständige Liste und die Speicherorte der geschriebenen Dateien.
+
+`--hooks` installiert den Claude-Code-Schutz, den `rebase init` mit jedem Projekt ausliefert: `.claude/hooks/post-edit-collection.sh`, als `PostToolUse`-Hook in `.claude/settings.json` registriert, der nach jeder Änderung unter `config/collections/` `rebase verify --quiet` ausführt und jedes Problem an den Agenten zurückgibt. Vorhandene Einstellungen und Hooks bleiben erhalten. `rebase skills --hooks` installiert nur den Hook.
 
 ### `rebase telemetry`
 

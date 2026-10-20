@@ -1,5 +1,5 @@
 ---
-sourceHash: 06e95610513a9c52
+sourceHash: 372e9392b24d3148
 title: Agent Skills
 sidebar_label: Agent Skills
 description: rebase skills install scrive 21 skill di riferimento di Rebase nel tuo repository, nel layout previsto dal tuo assistente IA — Cursor, Claude Code, Windsurf, Gemini CLI e Antigravity.
@@ -83,7 +83,7 @@ Ricevono invece `rebase.mdc` (o `rebase.md`): un indice di ~3 KB con `alwaysAppl
 
 `gemini` copre **sia** Gemini CLI che Antigravity — leggono entrambi la stessa directory `.agents/`, pertanto non esiste un valore separato `antigravity`. Anche Codex la legge; specificare sia `gemini` che `codex` scriverà la directory una sola volta.
 
-Senza l'opzione `--agent`, il comando rileva quali assistenti sono già utilizzati nel progetto cercando `.cursor/`, `.claude/`, `.windsurf/`, `.agents/`, `.codex/` e `.kiro/`. Se non ne trova alcuno, richiede di effettuare una scelta, con gli assistenti installati sulla macchina già selezionati.
+Senza l'opzione `--agent`, il comando rileva quali assistenti sono già utilizzati nel progetto cercando `.cursor/`, `.claude/skills/`, `.windsurf/`, `.agents/`, `.codex/` e `.kiro/`. Se non ne trova alcuno, richiede di effettuare una scelta, con gli assistenti installati sulla macchina già selezionati.
 
 **GitHub Copilot non viene mai rilevato automaticamente.** La sua directory sarebbe `.github/`, e la presenza di `.github/` non prova che qualcuno stia usando Copilot: `rebase init` scrive `.github/copilot-instructions.md` in ogni scaffolding e la maggior parte dei repository ha già una cartella `.github/` per i workflow. Installalo con `--agent copilot`.
 
