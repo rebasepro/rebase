@@ -1,5 +1,5 @@
 ---
-sourceHash: 26723d5fe58a36e5
+sourceHash: 1f6cc6a096428d0e
 slug: it/docs/rls-check
 title: rls-check
 description: Esegui l'audit della row-level security su qualsiasi database PostgreSQL — Supabase, Neon, RDS o il tuo server. Di sola lettura, nessuna registrazione, nessun Rebase richiesto.
@@ -56,6 +56,7 @@ all'host con la password `pa@ss`. Codificarli comunque non è mai sbagliato.
 | Opzione | Significato |
 | --- | --- |
 | `--json` | Output leggibile da macchina su stdout, e nient'altro su stdout |
+| `--format <name>` | `text` (predefinito), `json` (come `--json`) o `agent`: un documento JSON per un agente di programmazione, in cui ogni risultato riporta la tabella e la policy coinvolte, l'SQL che lo corregge e le `securityRules` Rebase equivalenti |
 | `--html <path>` | Scrive anche un report HTML autonomo a quel percorso. Un unico file, nessuna richiesta di rete |
 | `--schema <name>` | Limita la scansione a uno schema. Ripetibile o separato da virgole |
 | `--role <name>` | Considera questo ruolo come uno con cui arriva un chiamante non attendibile, oltre ad `anon`, `authenticated`, `web_anon` e `rebase_user`. Ripetibile o separato da virgole |
@@ -131,6 +132,17 @@ credenziali), `serverVersion`, `platform`, `scannerIsPrivileged`, `exposedRoles`
 `exposedRoles` e `diagnostics` fanno parte del contratto, non sono elementi opzionali: ogni controllo dipende
 dall'insieme esposto, e `diagnostics.degraded` è il modo in cui chi consuma i dati distingue tra "nessun problema riscontrato" e
 "la scansione non ha potuto verificare". Leggere `findings: []` senza entrambi equivale a leggere solo metà della risposta.
+
+### Output per agenti
+
+`--format agent` stampa un unico documento JSON per un agente di programmazione che corregge ciò
+che trova. Ogni risultato indica l'id del controllo e l'oggetto coinvolto (`target.table`,
+`target.policy`, …) e riporta una `remediation`: `apply` (`sql`; `rebase-config` quando Rebase
+ricrea la policy dalle `securityRules` di una collection a ogni avvio; oppure `manual`), `sql`
+eseguibile scritto per ciascun controllo, i `placeholders` da compilare prima e `rebase` — la
+stessa correzione come `defineCollection({ securityRules: [...] })`, o il motivo per cui le regole
+non possono esprimerla. La `key` di ogni risultato è stabile tra un'esecuzione e l'altra, quindi
+una nuova esecuzione mostra cosa è stato risolto. `--json` resta invariato.
 
 ## Esecuzione pianificata
 

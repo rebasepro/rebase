@@ -55,6 +55,7 @@ to `host` with the password `pa@ss`. Encoding them anyway is never wrong.
 | Option | Meaning |
 | --- | --- |
 | `--json` | Machine-readable output on stdout, and nothing else on stdout |
+| `--format <name>` | `text` (default), `json` (the same as `--json`) or `agent`: one JSON document for a coding agent, where every finding carries the failing table and policy, the SQL that fixes it and the equivalent Rebase `securityRules` |
 | `--html <path>` | Also write a self-contained HTML report there. One file, no network requests |
 | `--schema <name>` | Restrict the scan to a schema. Repeatable, or comma-separated |
 | `--role <name>` | Treat this role as one an untrusted caller arrives as, on top of `anon`, `authenticated`, `web_anon` and `rebase_user`. Repeatable, or comma-separated |
@@ -129,6 +130,16 @@ credentials), `serverVersion`, `platform`, `scannerIsPrivileged`, `exposedRoles`
 `exposedRoles` and `diagnostics` are part of the contract, not extras: every check gates on
 the exposed set, and `diagnostics.degraded` is how a consumer tells "nothing was wrong" from
 "the scan could not look". Reading `findings: []` without both is reading half the answer.
+
+### Agent output
+
+`--format agent` prints one JSON document for a coding agent that fixes what it finds. Every
+finding names its check id and failing object (`target.table`, `target.policy`, …) and carries
+a `remediation`: `apply` (`sql`; `rebase-config` when Rebase re-makes the policy from a
+collection's `securityRules` at every boot; or `manual`), runnable `sql` written per check, the
+`placeholders` to fill in first, and `rebase` — the same fix as
+`defineCollection({ securityRules: [...] })`, or why rules cannot express it. Each finding's
+`key` is stable across runs, so a re-run shows what was cleared. `--json` is unchanged.
 
 ## Running it on a schedule
 

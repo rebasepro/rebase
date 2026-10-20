@@ -177,6 +177,10 @@ DATABASE_URL="postgresql://..." npx @rebasepro/rls-check [options]
 npx @rebasepro/rls-check [connection-string] [options]
 
   --json                 Machine-readable ScanResult on stdout, and nothing else.
+  --format <name>        text (default), json (the same as --json) or agent: one JSON
+                         document for a coding agent, where every finding carries the
+                         failing table and policy, the SQL that fixes it and the
+                         equivalent Rebase securityRules. See "Agent output" below.
   --html <path>          Also write a self-contained HTML report to <path>. One file,
                          no network requests, safe to attach to a ticket.
   --schema <name>        Restrict the scan to a schema. Repeatable or comma-separated.
@@ -331,6 +335,53 @@ Findings are sorted worst-first and then by schema, object and id, so two scans 
 
 `exposedRoles` and `diagnostics` are part of the contract, not decoration. A check that calls a table exposed does so only when one of the exposed roles can reach it, and `diagnostics.degraded` is how a consumer tells "nothing was wrong" from "the scan could not look" — `findings: []` without both is half an answer.
 
+## Agent output
+
+`--format agent` is for a coding agent that runs `npx @rebasepro/rls-check` against the database it is building and then fixes what it finds. It writes one JSON document to stdout and nothing else; the exit code is the same as for any other format.
+
+```bash
+DATABASE_URL="postgresql://..." npx @rebasepro/rls-check --format agent
+```
+
+Every finding names the check id (one of the fifteen `--list-checks` prints) and the failing object, and carries a `remediation` built for that check id:
+
+```jsonc
+{
+  "key": "rls-disabled:public.todos",          // stable across runs
+  "checkId": "rls-disabled",
+  "severity": "critical",
+  "confidence": "certain",
+  "failsRun": true,                            // at or above --fail-on
+  "target": { "schema": "public", "table": "todos", "policy": null, "view": null, "routine": null, "column": null },
+  "title": "public.todos has row-level security disabled and is granted to anon",
+  "detail": "…", "impact": "…", "docs": "https://rebase.pro/docs/rls-check#rls-disabled",
+  "remediation": {
+    "summary": "Enable row-level security on public.todos and add a policy that limits every row to its owner.",
+    "apply": "sql",
+    "sql": "ALTER TABLE \"public\".\"todos\" ENABLE ROW LEVEL SECURITY;\nCREATE POLICY \"todos_owner\" ON \"public\".\"todos\"\n    FOR ALL\n    USING (\"user_id\" = auth.uid())\n    WITH CHECK (\"user_id\" = auth.uid());",
+    "placeholders": [],
+    "alternatives": [{ "summary": "If API callers should not reach this table at all, revoke their privileges instead.", "sql": "REVOKE SELECT, INSERT ON \"public\".\"todos\" FROM \"anon\";" }],
+    "caveats": ["With row-level security on, every role that neither owns the table nor holds BYPASSRLS sees only the rows a policy admits — …"],
+    "rebase": {
+      "applicable": true,
+      "securityRules": "[\n    { operation: \"all\", ownerField: \"user_id\" }\n]",
+      "snippet": "defineCollection({\n    // …name, slug, properties and the rest stay as they are…\n    table: \"todos\",\n    securityRules: [ … ]\n});",
+      "note": "Rebase enables row-level security on every collection's table and compiles each rule into a policy … `ownerField` compiles to `<column>::text = rebase.uid()` …"
+    }
+  }
+}
+```
+
+What the fields promise:
+
+- **`apply`** says where the fix belongs. `sql`: run `remediation.sql` as a migration. `rebase-config`: the policy is compiled by Rebase from a collection's `securityRules` and re-made on every boot, so `sql` is `null` and the rule in `rebase.snippet` is what to change. `manual`: no statement can be written without a decision only a person can make, and `summary` names it.
+- **`sql`** is statements only — no comments to interpret — and is written per check: the table's own owner column (compared as uuid or text, whichever its type allows), the grants that actually reach the exposed roles, the policy's own expression with only the flagged clause rewritten. Applying it clears the finding it is attached to; the test suite holds every check to that against a real PostgreSQL.
+- **`placeholders`** lists the tokens the catalog cannot fill — `<owner_column>` on a table with no column that looks like an owner, `<app_role>` for the role your application connects as. Replace them before running `sql`.
+- **`alternatives`** are fixes for a different intent ("nobody should reach this table at all"), not a second step.
+- **`rebase`** is the same fix as `defineCollection({ securityRules: [...] })`. The rules are type-checked against `SecurityRule` from `@rebasepro/types` in this package's tests. Where `securityRules` cannot express the fix — grants, views, functions, `FORCE` — `applicable` is `false`, the rules are `null`, and `note` says what Rebase does instead.
+
+Around the findings, the document carries the verdict (`exitCode`, `reason`, `failOn`), `complete` (false when a catalogue read or a check failed), `notes` (the same caveats the text report prints, such as a role to name with `--role`), `diagnostics` and `howToApply`, a paragraph an agent can read as instructions. Every key is always present, with `null` for an absent object, and `formatVersion` changes only when a key is renamed or removed. `--json` is unchanged.
+
 ## What this tool does not do
 
 Being clear about this is the point of the tool. It is a **static audit of the catalog**, not a penetration test.
@@ -360,7 +411,7 @@ if (exceedsThreshold(result.findings, "high")) {
 }
 ```
 
-`introspect()`, `runChecks()`, `renderReport()` and `renderJson()` are exported too, if you would rather assemble the pipeline yourself. The checks are pure functions of a `DbSnapshot`, so they are straightforward to test against a schema you construct by hand.
+`scanWithSnapshot()` returns the snapshot beside the result, which is what `renderAgentReport()` and `remediationFor()` need. `introspect()`, `runChecks()`, `renderReport()` and `renderJson()` are exported too, if you would rather assemble the pipeline yourself. The checks are pure functions of a `DbSnapshot`, so they are straightforward to test against a schema you construct by hand.
 
 ## Requirements
 

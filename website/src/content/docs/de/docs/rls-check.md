@@ -1,5 +1,5 @@
 ---
-sourceHash: 26723d5fe58a36e5
+sourceHash: 1f6cc6a096428d0e
 slug: de/docs/rls-check
 title: rls-check
 description: Überprüfen Sie Row-Level Security auf jeder PostgreSQL-Datenbank – Supabase, Neon, RDS oder Ihr eigener Server. Schreibgeschützt, keine Registrierung, kein Rebase erforderlich.
@@ -56,6 +56,7 @@ mit dem Host `host` unter Verwendung des Passworts `pa@ss`. Sie dennoch zu kodie
 | Option | Bedeutung |
 | --- | --- |
 | `--json` | Maschinenlesbare Ausgabe auf stdout, und sonst nichts auf stdout |
+| `--format <name>` | `text` (Standard), `json` (dasselbe wie `--json`) oder `agent`: ein JSON-Dokument für einen Coding-Agenten, in dem jeder Befund die betroffene Tabelle und Policy, das SQL zur Behebung und die entsprechenden Rebase-`securityRules` enthält |
 | `--html <path>` | Schreibt zusätzlich einen in sich geschlossenen HTML-Bericht dorthin. Eine Datei, keine Netzwerkanfragen |
 | `--schema <name>` | Beschränkt den Scan auf ein Schema. Wiederholbar oder kommagetrennt |
 | `--role <name>` | Behandelt diese Rolle als eine, mit der ein nicht vertrauenswürdiger Aufrufer ankommt, zusätzlich zu `anon`, `authenticated`, `web_anon` und `rebase_user`. Wiederholbar oder kommagetrennt |
@@ -135,6 +136,17 @@ Anmeldedaten), `serverVersion`, `platform`, `scannerIsPrivileged`, `exposedRoles
 dem exponierten Set, und `diagnostics.degraded` zeigt einem Consumer, wie zwischen "alles war in Ordnung"
 und "der Scan konnte nicht prüfen" unterschieden werden muss. `findings: []` ohne beides zu lesen,
 bedeutet, nur die halbe Antwort zu kennen.
+
+### Agent-Ausgabe
+
+`--format agent` gibt ein einziges JSON-Dokument für einen Coding-Agenten aus, der behebt, was er
+findet. Jeder Befund nennt seine Check-ID und das betroffene Objekt (`target.table`,
+`target.policy`, …) und enthält eine `remediation`: `apply` (`sql`; `rebase-config`, wenn Rebase
+die Policy bei jedem Start aus den `securityRules` einer Collection neu erzeugt; oder `manual`),
+ausführbares `sql`, pro Check geschrieben, die vorher auszufüllenden `placeholders` und `rebase` —
+dieselbe Korrektur als `defineCollection({ securityRules: [...] })`, oder warum Regeln sie nicht
+ausdrücken können. Der `key` jedes Befunds bleibt über Läufe hinweg stabil, sodass ein erneuter
+Lauf zeigt, was behoben wurde. `--json` bleibt unverändert.
 
 ## Zeitgesteuerte Ausführung
 

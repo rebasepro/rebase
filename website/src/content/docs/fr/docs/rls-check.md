@@ -1,5 +1,5 @@
 ---
-sourceHash: 26723d5fe58a36e5
+sourceHash: 1f6cc6a096428d0e
 slug: fr/docs/rls-check
 title: rls-check
 description: Auditez la sécurité au niveau des lignes (RLS) sur n'importe quelle base de données PostgreSQL — Supabase, Neon, RDS ou votre propre serveur. En lecture seule, sans inscription, sans Rebase requis.
@@ -56,6 +56,7 @@ se connecte à `host` avec le mot de passe `pa@ss`. Les encoder malgré tout n'e
 | Option | Signification |
 | --- | --- |
 | `--json` | Sortie lisible par une machine sur stdout, et rien d'autre sur stdout |
+| `--format <name>` | `text` (par défaut), `json` (identique à `--json`) ou `agent` : un document JSON pour un agent de code, où chaque constat porte la table et la politique en cause, le SQL qui le corrige et les `securityRules` Rebase équivalentes |
 | `--html <path>` | Écrit également un rapport HTML autonome à cet emplacement. Un seul fichier, aucune requête réseau |
 | `--schema <name>` | Restreint l'analyse à un schéma. Répétable, ou séparé par des virgules |
 | `--role <name>` | Traite ce rôle comme un rôle avec lequel un appelant non approuvé arrive, en plus de `anon`, `authenticated`, `web_anon` et `rebase_user`. Répétable, ou séparé par des virgules |
@@ -130,6 +131,18 @@ Chaque constat comporte `id`, `severity`, `title`, `target`, `detail`, `impact`,
 vérification s'appuie sur l'ensemble exposé, et `diagnostics.degraded` permet au consommateur de distinguer
 « rien d'anormal » de « l'analyse n'a pas pu vérifier ». Consulter `findings: []` sans ces deux éléments revient
 à ne lire que la moitié de la réponse.
+
+### Sortie pour agents
+
+`--format agent` produit un seul document JSON destiné à un agent de code qui corrige ce qu'il
+trouve. Chaque constat indique l'id de son contrôle et l'objet en cause (`target.table`,
+`target.policy`, …) et porte une `remediation` : `apply` (`sql` ; `rebase-config` quand Rebase
+recrée la politique à partir des `securityRules` d'une collection à chaque démarrage ; ou
+`manual`), du `sql` exécutable écrit pour chaque contrôle, les `placeholders` à remplir d'abord,
+et `rebase` — la même correction sous forme de `defineCollection({ securityRules: [...] })`, ou
+la raison pour laquelle les règles ne peuvent pas l'exprimer. La `key` de chaque constat est
+stable d'une exécution à l'autre : une nouvelle exécution montre ce qui a été corrigé. `--json`
+ne change pas.
 
 ## Exécution planifiée
 
