@@ -1,5 +1,5 @@
 ---
-sourceHash: 5c7b67d88241564a
+sourceHash: eeb3c8895a643633
 title: Indice degli endpoint
 sidebar_label: Indice degli endpoint
 description: Ogni route HTTP montata da un backend Rebase — data, auth, storage, admin, meta — con il relativo gate e la pagina che la descrive.
@@ -149,6 +149,8 @@ una collection non può accedere a nulla di tutto questo. Vedi [Ruoli e scope](/
 | `GET` | `/api/admin/rls-simulator/options` | `schema:read` | I ruoli, quelli nominati dalle regole e le chiavi di servizio valide che un amministratore può simulare |
 | `POST` | `/api/admin/rls-simulator/preview` | `schema:read` | Ogni collezione come la raggiunge `{ role?, userId?, apiKeyId? }`: righe visibili rispetto a quelle del chiamante, nascoste dallo scope o dalla RLS, campi mascherati. Solo la sessione di un amministratore |
 | `POST` | `/api/admin/sql/csv` | `database:write` | Trasmette in streaming l'intero risultato di una query di sola lettura come CSV — «Download full result as CSV» di [Studio](/docs/studio/) |
+| `GET` | `/api/admin/branches/:name/diff` | `database:read` | Cosa ha cambiato un [branch](/docs/backend/branching/#reviewing-and-merging-a-branch): schema, policy e righe, `?sampleLimit=&schemas=&maxRowsPerTable=` |
+| `POST` | `/api/admin/branches/:name/merge` | `database:write` | Scrive le righe del branch nel suo genitore, `{ expectedFingerprint, onConflict?, skipBlocked? }`; `409` se uno dei lati è cambiato dal diff, o se ci sono righe in conflitto |
 | `GET` | `/api/admin/schema/status` | `schema:read` | [Modifica dello schema in tempo reale](/docs/backend/live-schema-editing/) |
 | `POST` | `/api/admin/schema/plan` | `schema:read` | Pianifica una modifica; non ne applica mai una |
 | `POST` | `/api/admin/schema/apply` | `schema:write` | Solo una persona, a meno che non sia impostato `REBASE_LIVE_SCHEMA_ALLOW_MACHINE_APPLY` |

@@ -1,5 +1,5 @@
 ---
-sourceHash: 5c7b67d88241564a
+sourceHash: eeb3c8895a643633
 title: Índice de endpoints
 sidebar_label: Índice de endpoints
 description: Cada rota HTTP montada por um backend Rebase — dados, autenticação, armazenamento, administração, meta — com a restrição de acesso (gate) de cada uma e a página que a explica.
@@ -149,6 +149,8 @@ uma coleção não acessa nada disso. Consulte [Papéis e escopos](/docs/backend
 | `GET` | `/api/admin/rls-simulator/options` | `schema:read` | As funções, as que as regras nomeiam e as chaves de serviço válidas que um administrador pode simular |
 | `POST` | `/api/admin/rls-simulator/preview` | `schema:read` | Cada coleção tal como `{ role?, userId?, apiKeyId? }` a alcança: linhas visíveis face às de quem chama, ocultas pelo âmbito ou pela RLS, campos mascarados. Só a sessão de um administrador |
 | `POST` | `/api/admin/sql/csv` | `database:write` | Transmite via stream o resultado completo de uma consulta somente leitura como CSV — "Baixar resultado completo como CSV" do [Studio](/docs/studio/) |
+| `GET` | `/api/admin/branches/:name/diff` | `database:read` | O que um [branch](/docs/backend/branching/#reviewing-and-merging-a-branch) mudou: esquema, políticas e linhas, `?sampleLimit=&schemas=&maxRowsPerTable=` |
+| `POST` | `/api/admin/branches/:name/merge` | `database:write` | Grava as linhas do branch no pai, `{ expectedFingerprint, onConflict?, skipBlocked? }`; `409` se algum lado mudou desde o diff, ou se há linhas em conflito |
 | `GET` | `/api/admin/schema/status` | `schema:read` | [Live schema editing](/docs/backend/live-schema-editing/) |
 | `POST` | `/api/admin/schema/plan` | `schema:read` | Planeja uma alteração; nunca aplica |
 | `POST` | `/api/admin/schema/apply` | `schema:write` | Apenas uma pessoa, a menos que `REBASE_LIVE_SCHEMA_ALLOW_MACHINE_APPLY` |

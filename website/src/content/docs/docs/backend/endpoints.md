@@ -148,6 +148,8 @@ a collection reaches none of this. See [Roles and scopes](/docs/backend/roles-an
 | `GET` | `/api/admin/rls-simulator/options` | `schema:read` | Roles, users' rule roles and live service keys an administrator can simulate |
 | `POST` | `/api/admin/rls-simulator/preview` | `schema:read` | Each collection as `{ role?, userId?, apiKeyId? }` reaches it: visible rows against the caller's, hidden by scope or RLS, masked fields. Administrator's session only |
 | `POST` | `/api/admin/sql/csv` | `database:write` | Streams one read-only query's whole result as CSV — [Studio](/docs/studio/)'s "Download full result as CSV" |
+| `GET` | `/api/admin/branches/:name/diff` | `database:read` | What a [branch](/docs/backend/branching/#reviewing-and-merging-a-branch) changed: schema, policies and rows, `?sampleLimit=&schemas=&maxRowsPerTable=` |
+| `POST` | `/api/admin/branches/:name/merge` | `database:write` | Writes the branch's rows to its parent, `{ expectedFingerprint, onConflict?, skipBlocked? }`; `409` when either side changed since the diff, or rows conflict |
 | `GET` | `/api/admin/schema/status` | `schema:read` | [Live schema editing](/docs/backend/live-schema-editing/) |
 | `POST` | `/api/admin/schema/plan` | `schema:read` | Plans a change; never applies one |
 | `POST` | `/api/admin/schema/apply` | `schema:write` | A person only, unless `REBASE_LIVE_SCHEMA_ALLOW_MACHINE_APPLY` |

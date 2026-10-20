@@ -1,5 +1,5 @@
 ---
-sourceHash: 02fa0bb111c71ed5
+sourceHash: 8b0cf8dec1186f45
 title: Datenbank-Befehle
 sidebar_label: Datenbank-Befehle
 description: Die rebase-db-Befehle — push, generate und migrate, Backups und Wiederherstellungen, eine Kopie ziehen, der Verbindungsstring, die verwaltete Entwicklungsdatenbank und Branches.
@@ -239,6 +239,7 @@ Neustart wieder. Unter 0.24 kam sie auf einem anderen Port zurück, und das Back
 rebase db branch create <name>
 rebase db branch list
 rebase db branch info <name>
+rebase db branch diff <name> [--json] [--sample-limit <n>]
 rebase db branch switch <name>     # work on it; every later command follows
 rebase db branch switch            # say which branch you are on
 rebase db branch switch --off      # back to the main database
@@ -259,6 +260,8 @@ könnte, etwa in CI, entfernt es nichts, sagt, dass `--yes` zu übergeben ist, u
 unter 0.24 sagt es „Nothing was changed.“ und beendet sich mit 0. `list` und `info` lesen nur: Eine
 Datenbank, auf der kein Branch angelegt wurde, hat keine, und sie legen dort kein `rebase`-Schema an.
 Unter 0.24 legen sie das Register an.
+
+`diff` zeigt, was ein Branch gegenüber der Datenbank geändert hat, aus der er erstellt wurde: hinzugefügte, entfernte oder geänderte Tabellen, Spalten und RLS-Richtlinien, und pro Tabelle die Zeilen, die er eingefügt, aktualisiert und gelöscht hat. Zeilen, die der Elternteil seitdem selbst geändert hat, werden getrennt gezählt, und Zeilen, die beide geändert haben, sind Konflikte. `--json` gibt den ganzen Diff aus, mit bis zu `--sample-limit` Zeilen pro Tabelle (Standard 100). Er liest beide Datenbanken und ändert keine; zusammengeführt wird in Studio – siehe [Einen Branch prüfen und zusammenführen](/docs/backend/branching/#reviewing-and-merging-a-branch).
 
 `switch` speichert den Branch in `.rebase/branch.json` und bearbeitet `.env` niemals. Es
 hat Vorrang vor `DATABASE_URL` in `.env` und unterliegt `--database-url` oder einer

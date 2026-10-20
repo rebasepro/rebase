@@ -4,6 +4,22 @@
 
 ### Added
 
+#### Studio
+
+- **Review a database branch like a pull request, and merge it.** Picking a
+  branch in Studio's Branches pane shows what it changed against the database
+  it was made from: its tables, columns and RLS policies as SQL, side by side,
+  and per table the rows it inserted, updated and deleted, with samples. Rows
+  the parent changed on its own meanwhile are counted apart, and rows both
+  sides changed are conflicts — each row's transaction id says which side
+  wrote it. **Merge** writes the branch's rows to the parent in one statement,
+  all or none: the parent's own changes are kept, a conflict writes nothing
+  unless you choose which side wins, and a diff that went stale writes nothing.
+  Schema and policies are never merged. The same diff is `rebase db branch
+  diff`, `GET /api/admin/branches/:name/diff`, the read-only MCP tool
+  `rebase_db_branch_diff`, and `diffBranch` on the driver's admin; see
+  [Reviewing and merging a branch](/docs/backend/branching/#reviewing-and-merging-a-branch).
+
 #### Admin (CMS & app)
 
 - **Customization recipes ship with `@rebasepro/cms`.** `node_modules/@rebasepro/cms/recipes`

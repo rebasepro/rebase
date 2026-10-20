@@ -1,5 +1,5 @@
 ---
-sourceHash: 5c7b67d88241564a
+sourceHash: eeb3c8895a643633
 title: Endpunkt-Index
 sidebar_label: Endpunkt-Index
 description: Jede HTTP-Route, die ein Rebase-Backend mountet – Daten, Authentifizierung, Speicher, Admin, Meta – mit dem jeweiligen Gate und der Seite, die sie erklärt.
@@ -149,6 +149,8 @@ der auf eine Collection beschränkt ist, erreicht nichts davon. Siehe [Rollen un
 | `GET` | `/api/admin/rls-simulator/options` | `schema:read` | Die Rollen, die von Regeln genannten Rollen und die gültigen Dienstschlüssel, die ein Administrator simulieren kann |
 | `POST` | `/api/admin/rls-simulator/preview` | `schema:read` | Jede Sammlung, wie `{ role?, userId?, apiKeyId? }` sie erreicht: sichtbare Zeilen gegenüber denen des Aufrufers, verborgen durch Scope oder RLS, maskierte Felder. Nur die Sitzung eines Administrators |
 | `POST` | `/api/admin/sql/csv` | `database:write` | Streamt das gesamte Ergebnis einer schreibgeschützten Abfrage als CSV — „Gesamtes Ergebnis als CSV herunterladen“ in [Studio](/docs/studio/) |
+| `GET` | `/api/admin/branches/:name/diff` | `database:read` | Was ein [Branch](/docs/backend/branching/#reviewing-and-merging-a-branch) geändert hat: Schema, Richtlinien und Zeilen, `?sampleLimit=&schemas=&maxRowsPerTable=` |
+| `POST` | `/api/admin/branches/:name/merge` | `database:write` | Schreibt die Zeilen des Branches in seinen Elternteil, `{ expectedFingerprint, onConflict?, skipBlocked? }`; `409`, wenn sich seit dem Diff eine Seite geändert hat oder Zeilen in Konflikt stehen |
 | `GET` | `/api/admin/schema/status` | `schema:read` | [Live-Schema-Bearbeitung](/docs/backend/live-schema-editing/) |
 | `POST` | `/api/admin/schema/plan` | `schema:read` | Plant eine Änderung; wendet sie niemals an |
 | `POST` | `/api/admin/schema/apply` | `schema:write` | Nur eine Person, außer wenn `REBASE_LIVE_SCHEMA_ALLOW_MACHINE_APPLY` |

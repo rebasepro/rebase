@@ -1,5 +1,5 @@
 ---
-sourceHash: 5c7b67d88241564a
+sourceHash: eeb3c8895a643633
 title: Índice de endpoints
 sidebar_label: Índice de endpoints
 description: Cada ruta HTTP que monta un backend de Rebase — datos, autenticación, almacenamiento, administración, meta — con el control de acceso de cada una y la página que la explica.
@@ -152,6 +152,8 @@ puede acceder a nada de esto. Consulte [Roles y alcances](/docs/backend/roles-an
 | `GET` | `/api/admin/rls-simulator/options` | `schema:read` | Los roles, los roles que nombran las reglas y las claves de servicio vigentes que un administrador puede simular |
 | `POST` | `/api/admin/rls-simulator/preview` | `schema:read` | Cada colección tal como la alcanza `{ role?, userId?, apiKeyId? }`: filas visibles frente a las de quien llama, ocultas por alcance o por RLS, campos enmascarados. Solo la sesión de un administrador |
 | `POST` | `/api/admin/sql/csv` | `database:write` | Transmite en flujo el resultado completo de una consulta de solo lectura como CSV — «Descargar el resultado completo como CSV» de [Studio](/docs/studio/) |
+| `GET` | `/api/admin/branches/:name/diff` | `database:read` | Qué cambió una [rama](/docs/backend/branching/#reviewing-and-merging-a-branch): esquema, políticas y filas, `?sampleLimit=&schemas=&maxRowsPerTable=` |
+| `POST` | `/api/admin/branches/:name/merge` | `database:write` | Escribe las filas de la rama en su padre, `{ expectedFingerprint, onConflict?, skipBlocked? }`; `409` si algún lado cambió desde el diff, o si hay filas en conflicto |
 | `GET` | `/api/admin/schema/status` | `schema:read` | [Edición de esquema en vivo](/docs/backend/live-schema-editing/) |
 | `POST` | `/api/admin/schema/plan` | `schema:read` | Planifica un cambio; nunca lo aplica |
 | `POST` | `/api/admin/schema/apply` | `schema:write` | Solo una persona, a menos que `REBASE_LIVE_SCHEMA_ALLOW_MACHINE_APPLY` |

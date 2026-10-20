@@ -24,10 +24,10 @@ database), the dev server applies the collections at boot. Restart it with
 
 <!-- generated: mcp tool tables — pnpm generate:mcp-readme -->
 
-42 tools, in 9 groups. Tools marked ⚠ are refused against a non-local
+43 tools, in 9 groups. Tools marked ⚠ are refused against a non-local
 target unless `REBASE_MCP_ALLOW_REMOTE_WRITES=true` — see the gate above.
 
-### Schema & database (12)
+### Schema & database (13)
 
 Spawn the Rebase CLI in the active project directory.
 
@@ -44,6 +44,7 @@ Spawn the Rebase CLI in the active project directory.
 | `rebase_db_branch_list` | — | List all database branches (Admins only) |
 | `rebase_db_branch_delete` ⚠ | `name` | Delete an existing database branch (Admins only) |
 | `rebase_db_branch_info` | `name` | Show information and status for a database branch (Admins only) |
+| `rebase_db_branch_diff` | `name` | Show what a database branch changed against the database it was made from (Admins only): added, dropped  |
 | `rebase_db_branch_switch` | — | Point this checkout at a database branch, or back at the main database (Admins only) |
 
 ### Schema planning (1)

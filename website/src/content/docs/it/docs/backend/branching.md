@@ -1,5 +1,5 @@
 ---
-sourceHash: 24b4fea53f88a18f
+sourceHash: 6c8e1509d678993c
 title: Database Branching
 sidebar_label: Branching
 description: Crea branch di database isolati per sviluppo, staging e testing utilizzando CREATE DATABASE ... TEMPLATE di PostgreSQL — copie istantanee a fedeltà totale senza tempi di inattività.
@@ -214,6 +214,9 @@ rebase db branch switch --off
 # Show one branch's parent, age and size
 rebase db branch info dev_sandbox
 
+# Cosa ha cambiato il branch: schema, policy RLS e righe (--json per tutto)
+rebase db branch diff dev_sandbox
+
 # Delete a branch
 rebase db branch delete dev_sandbox
 ```
@@ -268,6 +271,57 @@ La creazione di un branch **non** modifica il database con cui comunica il proge
 ```bash
 postgresql://user:pass@localhost:5432/rb_dev_sandbox
 ```
+
+## Esaminare e unire un branch
+
+Un branch è il posto in cui un agente, o una migrazione di cui non sei sicuro, può modificare un database senza toccare quello vero. Prima che qualcosa arrivi al database da cui il branch è stato creato, puoi vedere cosa è cambiato e unirlo da [Studio](/docs/studio/): apri **Branch** e scegline uno.
+
+- **Schema e policy RLS** elenca ogni tabella, colonna, chiave primaria e policy che il branch ha aggiunto, eliminato o modificato, come SQL, con la definizione del genitore accanto a quella del branch.
+- **Modifiche ai dati** conta, per tabella, le righe che il branch ha inserito, aggiornato ed eliminato, abbinate per chiave primaria, e ne mostra fino a 100 per tabella con le colonne cambiate.
+
+Lo stesso diff è `rebase db branch diff <name>` in un terminale, `GET /api/admin/branches/<name>/diff` via HTTP, lo strumento MCP `rebase_db_branch_diff` e `admin.diffBranch(name)` nel codice. Le tabelle interne di Rebase (sessioni, cronologia, il registro dei branch) restano fuori.
+
+### Quale lato ha cambiato una riga
+
+Il genitore continua a ricevere scritture mentre si lavora sul branch, quindi «i due database sono diversi» non significa «l'ha cambiato il branch»: una riga che il genitore ha inserito dopo la creazione del branch appare identica a una riga che il branch ha eliminato. Rebase le distingue in base a quando è stata scritta ogni riga. Gli ID di transazione appartengono al server, non a un singolo database, e la copia da template li conserva: una riga scritta dopo la creazione del branch, da una parte o dall'altra, è più recente della transazione che ha creato il database del branch.
+
+| La riga del branch | La riga del genitore | Conta come |
+| --- | --- | --- |
+| scritta dopo la biforcazione | assente | inserita dal branch |
+| assente | di prima della biforcazione | eliminata dal branch |
+| scritta dopo la biforcazione | di prima della biforcazione | aggiornata dal branch |
+| di prima della biforcazione, o assente | scritta dopo la biforcazione, o assente | modifica del genitore: mantenuta |
+| scritta dopo la biforcazione | scritta dopo la biforcazione | un **conflitto** |
+
+Due casi si somigliano e vengono letti nel modo che non perde nulla: una riga che il branch ha eliminato e il genitore ha poi modificato viene mantenuta, e una riga che il genitore ha eliminato e il branch ha poi modificato è un inserimento del branch. Un `UPDATE` che scrive i valori che una riga aveva già conta comunque come scrittura.
+
+Quando il punto di biforcazione non si può leggere — un branch di lunga durata la cui riga `pg_database` è stata congelata da un vacuum, o uno rinominato con `ALTER DATABASE` — il diff lo segnala e conta ogni differenza come modifica del branch.
+
+### Cosa fa un'unione
+
+**Unisci** scrive nel genitore le righe che il branch ha inserito, aggiornato ed eliminato. Cosa prevale:
+
+- **Le righe che ha cambiato solo il branch** vengono scritte: inserite, sovrascritte o eliminate.
+- **Le righe che ha cambiato solo il genitore** dalla creazione del branch restano esattamente come sono.
+- **Le righe cambiate da entrambi** sono conflitti. Per impostazione predefinita l'unione non scrive nulla; scegli `onConflict: "branch"` per scrivere la riga del branch sopra quella del genitore, o `"target"` per mantenere quella del genitore.
+- **Le modifiche a schema e policy non vengono mai unite.** Appartengono alle tue collection e alle loro migrazioni: applicale con `rebase db push` (o `migrate`), poi unisci le righe.
+
+Una tabella le cui righe non si possono abbinare blocca l'unione: una che il branch ha aggiunto o eliminato, una le cui colonne o chiave primaria differiscono tra i due, una senza chiave primaria, o una con più di 100.000 righe su un lato. Passa `skipBlocked` (in Studio, spunta **Unisci le altre tabelle**) per unire il resto e lasciare stare quelle.
+
+Ogni scrittura avviene in un'unica istruzione sul genitore — tutto o niente, chiavi esterne verificate alla fine. Un'unione porta il `fingerprint` del diff che hai esaminato e non scrive nulla se uno dei due database è cambiato da allora: ricarica il diff e guardalo di nuovo. Le sequenze vengono portate oltre ogni id inserito dall'unione.
+
+```typescript
+const diff = await admin.diffBranch("agent_run_17");
+// …esamina diff.schema e diff.data…
+const result = await admin.mergeBranch("agent_run_17", {
+    expectedFingerprint: diff.fingerprint,
+    onConflict: "abort" // oppure "branch", oppure "target"
+});
+```
+
+L'unione non è, di proposito, uno strumento MCP: un agente propone sul suo branch, e una persona unisce.
+
+---
 
 ---
 

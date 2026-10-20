@@ -1,5 +1,5 @@
 ---
-sourceHash: f9b724608d4cb30c
+sourceHash: 89005ab195a605d6
 title: Códigos de error
 sidebar_label: Códigos de error
 description: Todos los códigos de error que un backend de Rebase puede devolver, con su estado HTTP, qué significan y qué hacer al respecto; además del envelope de respuesta, X-Request-ID y las reglas de details.
@@ -329,6 +329,11 @@ funcionalidad en lugar de mostrar un error.
 | Código | Estado | Significado | Qué hacer |
 | --- | --- | --- | --- |
 | `ADMIN_SURFACE_UNAVAILABLE` | 501 | Se invocó una superficie exclusiva para administradores en un servidor sin autenticación configurada, por lo que nada puede distinguir a un administrador de un desconocido. | Configura `auth.jwtSecret` o pasa un `AuthAdapter`. |
+| `BRANCH_DIFF_STALE` | 409 | `POST /api/admin/branches/:name/merge` recibió el fingerprint de un diff que ya no es cierto: la rama o su padre cambiaron desde entonces. No se escribió nada. | Vuelve a leer el diff, revísalo y fusiona con su nuevo `fingerprint`. |
+| `BRANCH_DIFF_UNSUPPORTED` | 501 | La fuente de datos no puede comparar ramas: no tiene SQL, o no tiene ramificación (sin conexión de administrador). | Usa un backend Postgres con `adminConnectionString` configurado. |
+| `BRANCH_MERGE_BLOCKED` | 409 | Una tabla con filas que la rama cambió no se puede fusionar: añadida o eliminada por la rama, columnas o clave primaria distintas, sin clave primaria, o demasiadas filas para emparejar. `details.tables` nombra cada una, con el motivo. No se escribió nada. | Aplica antes el esquema con tus migraciones, o fusiona con `skipBlocked: true` para dejar esas tablas en paz. |
+| `BRANCH_MERGE_CONFLICT` | 409 | Hay filas que cambiaron tanto en la rama como en su padre, y `onConflict` era `"abort"` (el valor por defecto); o el padre rechazó parte de la fusión: una fila cambió mientras tanto, un trigger la omitió o una política la ocultó. No se escribió nada. | Elige qué lado gana con `onConflict: "branch"` o `"target"`, o vuelve a leer el diff. |
+| `BRANCH_NOT_FOUND` | 404 | Ninguna rama tiene ese nombre en el registro. | `rebase db branch list`, o el panel de Ramas, lista las que hay. |
 | `CONTRACT_UNAVAILABLE` | 404 | El contrato del proyecto solo se sirve cuando la autenticación está configurada (describe cada tabla y relación). | Configura la autenticación. `/meta/schema-version` siempre se sirve. |
 | `DEV_MAILBOX_UNAVAILABLE` | 501 | No hay ningún buzón de desarrollo activo. El correo solo se captura cuando `SMTP_HOST` no está configurado y `NODE_ENV` no es producción. | Desasigna `SMTP_HOST` en desarrollo o revisa la bandeja de entrada real. |
 | `INVALID_CHANGE` | 400 | El cambio de esquema propuesto no está bien formado. | Consulta el mensaje. |
@@ -346,6 +351,19 @@ funcionalidad en lugar de mostrar un error.
 | `SCHEMA_EDITOR_NO_COLLECTIONS_DIR` | 501 | El servidor no tiene `collectionsDir`, por lo que el editor no tiene dónde escribir. | Configura `collectionsDir`. |
 | `SCHEMA_EDITOR_PRODUCTION` | 501 | El editor está desactivado bajo `NODE_ENV=production`: los archivos de un servidor desplegado se reconstruyen a partir de tu repositorio en cada despliegue, por lo que una edición aquí se descartaría. | Edita las colecciones en desarrollo y despliega, o configura `liveSchema.repository` para confirmarlas allí. |
 | `SQL_EXPORT_UNSUPPORTED` | 501 | `POST /api/admin/sql/csv` no puede transmitir un resultado aquí: la base de datos de desarrollo en proceso (PGlite) tiene una sola conexión, y un cursor mantenido durante una descarga retendría detrás de él todas las demás consultas; o el origen de datos no tiene cursor SQL. | Apunta `DATABASE_URL` a un Postgres propio (`rebase dev --docker` inicia uno), o añade un `LIMIT` y exporta las filas en pantalla. |
+
+### Por qué no se puede fusionar una tabla de una rama
+
+`BRANCH_MERGE_BLOCKED` nombra cada tabla que rechazó en `details.tables`, con uno de estos códigos. El mismo código está en el `blocked` de la tabla en el propio diff, para que Studio pueda decirlo antes de que nadie pulse **Fusionar**. Ninguno es una respuesta por sí mismo.
+
+| Código | Estado | Significado | Qué hacer |
+| --- | --- | --- | --- |
+| `COLUMNS_DIFFER` | — | Las columnas de la tabla difieren entre la rama y su padre. Las filas se comparan en las columnas que comparten. | Aplica el esquema al padre con tus migraciones (`rebase db push`) y luego fusiona. |
+| `NO_PRIMARY_KEY` | — | La tabla no tiene clave primaria, así que las filas no se pueden emparejar una a una; el diff solo da sus recuentos de filas. | Dale a la tabla una clave primaria, o mueve sus filas a mano. |
+| `PRIMARY_KEY_DIFFERS` | — | Las columnas de la clave primaria, o sus tipos, difieren entre las dos. | Aplica antes el esquema al padre. |
+| `TABLE_ADDED` | — | La rama creó la tabla. Una fusión nunca crea una. | Créala en el padre con tus migraciones y luego fusiona sus filas. |
+| `TABLE_DROPPED` | — | La rama eliminó la tabla. Una fusión nunca elimina una. | Elimínala con tus migraciones. |
+| `TOO_LARGE` | — | La tabla tiene en algún lado más filas de las que un diff empareja una a una (100.000 por defecto, `maxRowsPerTable`). | Sube `maxRowsPerTable` tanto en el diff como en la fusión, o mueve las filas de otra forma. |
 
 ## Códigos genéricos
 
