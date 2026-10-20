@@ -233,6 +233,13 @@ import { MyAppBar } from "./MyAppBar";
 </Rebase>
 ```
 
+**Ejecting by copying the built-in.** To start an eject from the original
+rather than from nothing, copy the default component's source and register the
+copy: from 0.26 every part except `Collection.View`, `DetailView` and the home
+page's drag-and-drop compiles with `@rebasepro/cms` / `@rebasepro/app` imports
+only. Which component and file each name maps to, and what to do for the three,
+is in the `rebase-customize-admin` skill ("Copying a built-in part").
+
 **Overrides compose across scopes.** A collection's `wrap: true` override (in
 its `admin.components`) receives as `OriginalComponent` whatever the app-level
 `<Rebase components>` made of that component — the app's override when there is

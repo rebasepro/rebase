@@ -926,6 +926,7 @@ The admin package exports the following components (from `@rebasepro/cms`):
 | `CollectionTableBinding` | The table rendering of a collection |
 | `CollectionCardViewBinding` | The card/grid rendering of a collection |
 | `EntityViewBinding` | Entity detail/edit view |
+| `EditViewBinding` / `DetailViewBinding` | The record's edit view, and its read-only view — the two `Entity.SidePanel` switches between (0.26+) |
 | `EntityPreviewBinding` | Reference/relation preview chip |
 | `EntityCardBinding` | Card representation of an entity |
 | `SelectionTableBinding` / `SelectableTable` | Table for selecting entities |
@@ -946,6 +947,8 @@ The admin package exports the following components (from `@rebasepro/cms`):
 > union — what you pass to `components={{ … }}` to *replace* a component. There
 > is no `import { EntityPreview } from "@rebasepro/cms"`; the component that
 > ships is `EntityPreviewBinding`. Importing a slot name gets you `undefined`.
+> Each name's default component, and the file to copy it from, is the table in
+> the `rebase-customize-admin` skill ("Copying a built-in part").
 
 ## Exported Hooks
 
@@ -987,6 +990,7 @@ import {
     editEntityAction,
     copyEntityAction,
     deleteEntityAction,
+    unlinkEntityAction, // 0.26+: removes a row from a junction-backed tab, deleting nothing
     resetPasswordAction
 } from "@rebasepro/cms";
 ```

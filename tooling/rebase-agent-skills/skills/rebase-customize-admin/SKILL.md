@@ -61,11 +61,72 @@ import only package entry points, so they compile as copied.
   `<Rebase components={{ "<Name>": { Component, wrap? } }}>`. The names are
   `OverridableComponentName` in `@rebasepro/cms-types`. Prefer `wrap: true`:
   you keep the original inside yours and still get its fixes on upgrade. When
-  it does not fit at all, write your own component for that name — the props
-  it receives are the original's. The original's source, at the version the
-  project has, is `packages/cms/src` in https://github.com/rebasepro/rebase at
-  tag `v<installed version>`; its relative imports must be rewritten to package
-  imports when you copy it.
+  wrapping is not enough, copy the original and change the copy — see
+  "Copying a built-in part" below. The props your component receives are the
+  original's.
 - **Server-side behaviour (validation that must hold, derived fields, side
   effects) belongs in collection `callbacks`**, not only in a component — see
   the `rebase-collections` skill.
+
+## Copying a built-in part
+
+The npm packages ship `dist`, not source. The source of a part, at the version
+the project has, is in https://github.com/rebasepro/rebase at tag
+`v<installed version>` (read the version from `node_modules/@rebasepro/cms/package.json`).
+The table and the copyability below are 0.26+; at an older tag most parts
+import internals, and a file may sit elsewhere — find it by its
+`useComponentOverride("<Name>", Default)` call.
+
+
+| Override name | Default component | Source file |
+|---|---|---|
+| `Auth.LoginView` | `LoginView` | `packages/app/src/components/LoginView/LoginView.tsx` |
+| `Collection.Actions` | `CollectionViewActions` | `packages/cms/src/components/CollectionViewBinding/CollectionViewActions.tsx` |
+| `Collection.Card` | `EntityCardBinding` | `packages/cms/src/components/CollectionViewBinding/EntityCardBinding.tsx` |
+| `Collection.EmptyState` | `DefaultCollectionEmptyState` | `packages/cms/src/components/CollectionViewBinding/DefaultCollectionEmptyState.tsx` |
+| `Collection.FilterField` | `DefaultFilterField` | `packages/cms/src/components/SelectableTable/filters/FilterFieldBinding.tsx` |
+| `Collection.Table` | `CollectionTableBinding` | `packages/cms/src/components/CollectionTableBinding/CollectionTableBinding.tsx` |
+| `Collection.View` | `CollectionViewBinding` | `packages/cms/src/components/CollectionViewBinding/CollectionViewBinding.tsx` |
+| `DetailView` | `DetailViewBinding` | `packages/cms/src/components/DetailViewBinding.tsx` |
+| `EditView.FormActions` | `EditFormActions` | `packages/cms/src/components/EditFormActions.tsx` |
+| `Entity.Form` | `EntityFormBinding` | `packages/cms/src/form/EntityFormBinding.tsx` |
+| `Entity.MissingReference` | `DefaultMissingReference` | `packages/cms/src/components/DefaultMissingReference.tsx` |
+| `Entity.SidePanel` | `SidePanelBinding` | `packages/cms/src/components/SidePanelBinding.tsx` |
+| `EntityPreview` | `EntityPreviewBinding` | `packages/cms/src/components/EntityPreviewBinding.tsx` |
+| `HomePage` | `ContentHomePage` | `packages/cms/src/components/HomePage/ContentHomePage.tsx` |
+| `HomePage.CollectionCard` | `NavigationCardBinding` | `packages/cms/src/components/HomePage/NavigationCardBinding.tsx` |
+| `Shell.AppBar` | `DefaultAppBar` | `packages/cms/src/components/DefaultAppBar.tsx` |
+| `Shell.Drawer` | `Drawer` | `packages/cms/src/components/app/Drawer.tsx` |
+| `Shell.DrawerNavigationGroup` | `DrawerNavigationGroup` | `packages/cms/src/components/DrawerNavigationGroup.tsx` |
+| `Shell.DrawerNavigationItem` | `DrawerNavigationItem` | `packages/cms/src/components/DrawerNavigationItem.tsx` |
+
+`Shell.Drawer`'s default is a thin wrapper: the drawer itself is
+`DefaultDrawer`, in `packages/cms/src/components/DefaultDrawer.tsx`, and copies
+the same way.
+
+To copy one: put the file in the project's frontend, rewrite each relative
+import (`../hooks/…`, `./drawer_expansion`, …) to `@rebasepro/cms` or
+`@rebasepro/app` — everything the file imports is exported from one of them —
+change what you came to change, and register the copy under its name in
+`<Rebase components>` (or a collection's `admin.components` for `Collection.*`
+and `Entity.*`). Keep the copy small: change the part, not its neighbours.
+
+Three parts are deliberately **not** copyable, because what they import are
+internals of a composition, not building blocks. Do not try to export or
+reimplement those internals; customize around them:
+
+- **`Collection.View`** — every view mode with inline editing, the popup field
+  editor, the delete dialog and the view mode's URL state. Replace one of its
+  parts instead (`Collection.Table`, `Collection.Card`, `Collection.Actions`,
+  `Collection.EmptyState`, all copyable), add a view mode with
+  `collectionViews`, or `wrap: true`.
+- **`DetailView`** — the record view: identity bar, tabs, inspector, split-list
+  buttons, around tab ids that are URL values. Use `admin.entityViews`,
+  `admin.entityActions`, the `form.*` slots, or the copyable `Entity.Form` and
+  `EditView.FormActions`.
+- **`HomePage`** — copyable except its drag-and-drop reordering. A home page of
+  your own composes `NavigationGroup`, `NavigationCardBinding` and
+  `FavouritesView` (`@rebasepro/cms`) over
+  `useNavigationStateController().topLevelNavigation`; to add to the stock one,
+  use the `home.cards` slot.
+

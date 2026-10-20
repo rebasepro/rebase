@@ -68,4 +68,13 @@ describe("overridable parts", () => {
         const copyable = rows.filter(r => r.internal.length === 0).map(r => r.name);
         expect(copyable.filter(name => !COPYABLE.includes(name))).toEqual([]);
     });
+
+    // An agent copying a part finds its file through the customize-admin
+    // skill's table; a file that moves leaves it pointing at nothing.
+    it("are where the rebase-customize-admin skill says", () => {
+        const skill = fs.readFileSync(path.join(ROOT, "tooling/rebase-agent-skills/skills/rebase-customize-admin/SKILL.md"), "utf8");
+        const listed = [...skill.matchAll(/^\| `([A-Za-z.]+)` \| `(\w+)` \| `([^`]+)` \|$/gm)]
+            .map(m => `${m[1]} ${m[2]} ${m[3]}`).sort();
+        expect(listed).toEqual(rows.map(r => `${r.name} ${r.component} ${r.file}`).sort());
+    });
 });
