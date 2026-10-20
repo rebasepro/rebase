@@ -77,6 +77,15 @@
   log, with `rebase cloud logs` named for the rest. The JSON error gains
   `apps`, `reason` and `hint`.
 
+- **The stale-build warning shows only to someone developing the CLI.** A
+  developer's global `rebase` is often linked to a checkout of this repo, so a
+  bare `rebase cloud deploy` in their own project warned "dist/ is 159h older
+  than src/" on every run, about source they were not working on. It now warns
+  only when the CLI runs from a pnpm workspace checkout, not from
+  `node_modules`, and the command runs inside that checkout. Set
+  `REBASE_CLI_DEV=1` to get it when testing a dev build against another
+  project.
+
 - **The cloud debug boot view shows the functions and crons a 0.25 runtime
   loaded.** It kept a line only if it said "Loaded function" or "Mounted", the
   words runtimes used up to 0.24; 0.25 says "Loaded custom functions", "Loaded

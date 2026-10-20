@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { existsSync, readdirSync, readFileSync, realpathSync, statSync } from "node:fs";
+import { dirname, isAbsolute, join, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -95,8 +95,8 @@ assertNodeFloor();
  * the command works, it just silently lacks the subcommand you added, which
  * reads as "my change did nothing" rather than "you forgot to build".
  *
- * Development-only by construction: `src/` is not in the published `files`
- * list, so this is skipped entirely for installed copies.
+ * Development-only, and only for the person developing it — see
+ * `isCliDevelopment`.
  *
  * Writes to **stderr**. Agents parse stdout as JSON under `--json`, and a
  * warning there would corrupt the one guarantee those commands make.
@@ -118,8 +118,52 @@ function newestMtimeMs(dir, deadline) {
     return newest;
 }
 
+/**
+ * Whether the person running this is working on the CLI, which is the only
+ * person a stale build means anything to.
+ *
+ * `src/` alone did not say so. A published install has none — `files` leaves it
+ * out — but the global `rebase` on a CLI developer's machine is usually linked
+ * to the checkout, so a bare `rebase cloud deploy` typed in a customer project
+ * resolved to the monorepo's `bin/` and printed "dist/ is 159h older than src/"
+ * on every run. That project had pinned its own `@rebasepro/cli` 0.25.1, did not
+ * contain the source being compared, and could do nothing about it.
+ *
+ * So the warning needs all of:
+ * - the package is not under `node_modules` — anything there is an install,
+ *   whatever files it happens to carry;
+ * - it sits in a pnpm workspace, which is what a checkout of this repo is;
+ * - the command was run from inside that workspace (a worktree under it
+ *   counts), or `REBASE_CLI_DEV` is set, for testing a dev build against a
+ *   project elsewhere.
+ */
+function isCliDevelopment() {
+    const packageDir = realpathSync(join(here, ".."));
+    if (packageDir.split(sep).includes("node_modules")) return false;
+
+    let root = packageDir;
+    while (!existsSync(join(root, "pnpm-workspace.yaml"))) {
+        const parent = dirname(root);
+        if (parent === root) return false;
+        root = parent;
+    }
+
+    if (parseFlag(process.env.REBASE_CLI_DEV)) return true;
+    const fromRoot = relative(root, realpathSync(process.cwd()));
+    return !fromRoot.startsWith("..") && !isAbsolute(fromRoot);
+}
+
+/**
+ * `parseEnvBoolean` from `@rebasepro/types`, which cannot be imported yet: this
+ * runs before the bundle, and in a fresh clone that package is not built either.
+ */
+function parseFlag(value) {
+    return value !== undefined && /^(1|true|yes|on)$/i.test(value.trim());
+}
+
 function warnIfStale() {
     if (!existsSync(srcDir) || !existsSync(distEntry)) return;
+    if (!isCliDevelopment()) return;
     const builtAt = statSync(distEntry).mtimeMs;
     const editedAt = newestMtimeMs(srcDir, Date.now() + 150);
     // A couple of seconds of slack: a build writes dist while src is being
