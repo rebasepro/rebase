@@ -206,6 +206,17 @@ export interface CreateRebaseClientOptions extends RebaseClientConfig {
      * shared across tabs. Off by default.
      */
     offline?: boolean | OfflineConfig;
+    /**
+     * Log the realtime connection's progress — opened, signed in, closed,
+     * redialling — with `console.debug`. Off by default, so a public page says
+     * nothing about its backend in a visitor's console; warnings and errors
+     * are written either way.
+     *
+     * Without a code change, one browser can turn it on from its console with
+     * `localStorage.setItem("rebase_debug", "1")` (remove the key to stop), and
+     * any runtime with `globalThis.__REBASE_DEBUG__ = true`.
+     */
+    debug?: boolean;
 }
 
 // ─── Typed Data Proxy ────────────────────────────────────────────────────────
@@ -561,7 +572,8 @@ export function createRebaseClient<DB = Record<string, unknown>>(options: Create
             // authenticated HTTP client and an anonymous socket.
             getAuthToken: () => transport.resolveToken(),
             onUnauthorized: () => onUnauthorized(),
-            impersonate: options.impersonate
+            impersonate: options.impersonate,
+            debug: options.debug
         });
 
         // The account the socket's server-side state belongs to. The server

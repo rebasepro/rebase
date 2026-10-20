@@ -60,6 +60,17 @@ const client = createRebaseClient({
 | `collections` | `Record<string, string>` | Maps accessor names to collection slugs |
 | `offline` | `boolean \| OfflineConfig` | [Local-first sync](/docs/sdk/offline) — off by default |
 | `impersonate` | `string` | Run every request as this user, by uid, to check what one user can see. Only an administrator's session may: the data API, functions and realtime run as that user, and every other route refuses |
+| `debug` | `boolean` | Log the realtime connection's progress with `console.debug` (default `false`) — see [Connection logging](#connection-logging) |
+
+### Connection logging
+
+The client prints nothing about its realtime connection by default, so a public page says nothing about its backend in a visitor's console. Warnings and errors are always printed. To see the connection open, sign in, drop and redial, pass `debug: true`, or turn it on in one browser without changing the site by running this in its console:
+
+```js
+localStorage.setItem("rebase_debug", "1"); // localStorage.removeItem("rebase_debug") to stop
+```
+
+It applies from the next line the client logs, so a page that is already connected does not need a reload. Outside a browser, set `globalThis.__REBASE_DEBUG__ = true`. Browsers show `console.debug` only at the Verbose level.
 
 ## Typed SDK Generation
 

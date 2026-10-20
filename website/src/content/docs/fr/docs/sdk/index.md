@@ -1,5 +1,5 @@
 ---
-sourceHash: 5bfb7ab1050d263c
+sourceHash: 1d19e29e19f9ce81
 title: SDK typé — Prise en main
 sidebar_label: Prise en main
 description: Installez et configurez le SDK typé de Rebase pour interagir avec votre backend depuis n'importe quelle application JavaScript ou TypeScript.
@@ -58,6 +58,17 @@ const client = createRebaseClient({
 | `collections` | `Record<string, string>` | Associe les noms d'accesseurs aux slugs des collections |
 | `offline` | `boolean \| OfflineConfig` | [Synchronisation local-first](/docs/sdk/offline) — désactivée par défaut |
 | `impersonate` | `string` | Exécute chaque requête en tant que cet utilisateur (par uid), pour vérifier ce qu'un utilisateur voit. Uniquement avec la session d'un administrateur : l'API de données, les fonctions et le temps réel s'exécutent en son nom, toute autre route refuse |
+| `debug` | `boolean` | Journalise la progression de la connexion temps réel avec `console.debug` (par défaut `false`) — voir [Journal de connexion](#journal-de-connexion) |
+
+### Journal de connexion
+
+Par défaut, le client n'affiche rien sur sa connexion temps réel : une page publique ne révèle rien de son backend dans la console d'un visiteur. Les avertissements et les erreurs sont toujours affichés. Pour voir la connexion s'ouvrir, s'authentifier, tomber et se rétablir, passez `debug: true`, ou activez-le dans un seul navigateur sans modifier le site en exécutant ceci dans sa console :
+
+```js
+localStorage.setItem("rebase_debug", "1"); // localStorage.removeItem("rebase_debug") pour l'arrêter
+```
+
+Il s'applique dès la prochaine ligne que le client journalise : une page déjà connectée n'a pas besoin d'être rechargée. Hors navigateur, définissez `globalThis.__REBASE_DEBUG__ = true`. Les navigateurs n'affichent `console.debug` qu'au niveau Détaillé (Verbose).
 
 ## Génération du SDK typé
 

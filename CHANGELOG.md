@@ -84,6 +84,18 @@
   project's storage and its port and none of the code it runs. Both wordings are
   shown now.
 
+#### Client SDK
+
+- **A public page no longer prints the client's connection messages to every
+  visitor's console.** In a browser, "Connected to PostgreSQL backend" and
+  "WebSocket auto-authenticated" were written with `console.debug` on every
+  load, naming the backend on any site that used the client. Connection
+  messages are now off by default everywhere. Turn them on with
+  `createRebaseClient({ debug: true })`, or in one browser, with no change to
+  the site, with `localStorage.setItem("rebase_debug", "1")`;
+  `globalThis.__REBASE_DEBUG__` and `__REBASE_DEBUG_REALTIME__` work too.
+  Warnings and errors are printed as before.
+
 #### Admin (CMS & app)
 
 - **The `"Shell.AppBar"`, `"HomePage.CollectionCard"` and `"Auth.LoginView"`

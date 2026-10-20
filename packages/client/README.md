@@ -34,7 +34,7 @@ of it resolves too: Node has supported `require(esm)` since 22.12.
 |---|---|
 | `createRebaseClient<DB>(options)` | Create a client instance. Generic `DB` parameter enables type-safe `client.data.*` access. |
 | `CreateRebaseClientResult<DB>` | The client type it returns (`RebaseClient<DB>` from `@rebasepro/types`, narrowed) — includes `auth`, `admin`, `cron`, `functions`, `storage`, `ws`, `data`, `call`, and token management methods. |
-| `CreateRebaseClientOptions` | Extends `RebaseClientConfig` with the `auth`, `admin`, `cron`, `apiKeys` and `personalKeys` sub-configs, plus `storageSources`, `collections` and `offline`. |
+| `CreateRebaseClientOptions` | Extends `RebaseClientConfig` with the `auth`, `admin`, `cron`, `apiKeys` and `personalKeys` sub-configs, plus `storageSources`, `collections`, `offline` and `debug`. |
 
 ### Config
 
@@ -49,6 +49,7 @@ of it resolves too: Node has supported `require(esm)` since 22.12.
 | `realtime` | `boolean` | `true` | Open the WebSocket — `false` lets a one-shot script exit |
 | `collections` | `Record<string, string>` | — | Maps accessor names to collection slugs |
 | `offline` | `boolean \| OfflineConfig` | `false` | Local-first sync — see [the docs](https://rebase.pro/docs/sdk/offline) |
+| `debug` | `boolean` | `false` | Log the realtime connection's progress with `console.debug`. One browser can turn it on with `localStorage.setItem("rebase_debug", "1")` — see [Connection logging](https://rebase.pro/docs/sdk#connection-logging) |
 
 ### Tokens
 
