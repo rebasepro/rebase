@@ -12,7 +12,11 @@
  * What it writes:
  *
  * - `.env`: `REBASE_BASE_URL`, the project's live address — where the app, the
- *   SDK and the MCP server should reach the backend now.
+ *   SDK and the MCP server should reach the backend now — and, once the deploy
+ *   has built the app, `REBASE_API_TOKEN`: a key the APP accepts, minted on it
+ *   by the control plane (`POST /api/functions/ephemeral/app-key`). It reads and
+ *   writes data through the app's row-level security, holds nothing of the
+ *   admin plane, and expires with the claim window; see {@link requestAppKey}.
  * - `.rebase/cloud.json`: the link, so every `rebase cloud` command in this
  *   directory acts on the project.
  * - `~/.rebase/credentials.json`: the project's token and claim link. Not the
@@ -56,6 +60,9 @@ export const INIT_FLAGS = {
 
 /** The variable the app, the SDK and the MCP server read the backend's address from. */
 export const BASE_URL_ENV = "REBASE_BASE_URL";
+
+/** The variable the MCP server and the SDK read the app's key from. */
+export const API_TOKEN_ENV = "REBASE_API_TOKEN";
 
 /** What `POST /api/functions/ephemeral/provision` answers. */
 export interface ProvisionedProject {
@@ -137,6 +144,94 @@ export async function requestEphemeralProject(url: string, name: string | undefi
     return body;
 }
 
+/** What `POST /api/functions/ephemeral/app-key` answers: a key minted on the app itself. */
+export interface AppKey {
+    apiKey: string;
+    keyId: string;
+    scopes: string[];
+    expiresAt: string;
+}
+
+function isAppKey(value: unknown): value is AppKey {
+    return typeof value === "object" && value !== null
+        && "apiKey" in value && typeof value.apiKey === "string" && value.apiKey.startsWith("rk_")
+        && "keyId" in value && typeof value.keyId === "string"
+        && "scopes" in value && Array.isArray(value.scopes) && value.scopes.every((s: unknown) => typeof s === "string")
+        && "expiresAt" in value && typeof value.expiresAt === "string";
+}
+
+export type AppKeyOutcome = { ok: true; key: AppKey } | { ok: false; code: string; message: string };
+
+export interface AppKeyRetry {
+    /** How many times to ask while the app is still coming up. */
+    attempts: number;
+    sleep: (ms: number) => Promise<void>;
+}
+
+const APP_KEY_RETRY: AppKeyRetry = {
+    attempts: 4,
+    sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+};
+
+/** Between asks while the app is not answering yet. */
+const APP_KEY_RETRY_DELAY_MS = 5_000;
+
+/**
+ * Ask the control plane for a key the deployed app accepts, with the project's
+ * own token.
+ *
+ * The control plane mints it on the app through the app's admin key route: a
+ * service key holding `data:read` and `data:write` and nothing else, running
+ * through the app's row-level security as a caller who is neither a person nor
+ * an admin, expiring with the claim window. Never fatal: the project and its
+ * claim link stand without it, so a refusal comes back as an outcome to report.
+ *
+ * Asks again only while the app is not answering yet (503), the state a
+ * rollout that has just finished can still be in.
+ */
+export async function requestAppKey(
+    url: string,
+    token: string,
+    projectId: string,
+    retry: AppKeyRetry = APP_KEY_RETRY
+): Promise<AppKeyOutcome> {
+    let last: AppKeyOutcome = { ok: false, code: "unreachable", message: "The control plane was not asked." };
+    for (let attempt = 1; attempt <= Math.max(1, retry.attempts); attempt++) {
+        if (attempt > 1) await retry.sleep(APP_KEY_RETRY_DELAY_MS);
+        let res: Response;
+        try {
+            res = await fetch(`${url}/api/functions/ephemeral/app-key`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${token}`,
+                    "User-Agent": cliUserAgent()
+                },
+                body: JSON.stringify({ projectId })
+            });
+        } catch (err) {
+            return { ok: false, code: "unreachable", message: `Could not reach ${url}: ${err instanceof Error ? err.message : String(err)}` };
+        }
+        const body: unknown = await res.json().catch(() => undefined);
+        if (res.ok) {
+            return isAppKey(body)
+                ? { ok: true, key: body }
+                : { ok: false, code: "bad_response", message: "The control plane's answer did not carry a key." };
+        }
+        const refusal = refusalOf(body);
+        last = {
+            ok: false,
+            code: refusal?.code ?? "app_key_refused",
+            message: refusal?.message ?? `The control plane did not mint a key for the app (${res.status}).`
+        };
+        if (res.status === 404 && !refusal) {
+            return { ok: false, code: "not_supported", message: `${url} does not mint keys for an unclaimed project's app.` };
+        }
+        if (res.status !== 503) return last;
+    }
+    return last;
+}
+
 /**
  * Set one variable in a `.env`, keeping every other line as it was: replaced
  * where it is already set, appended where it is not.
@@ -209,9 +304,14 @@ export function runBundleDeploy(cwd: string, json: boolean): Promise<DeployOutco
 export interface InitDeps {
     provision: typeof requestEphemeralProject;
     deploy: typeof runBundleDeploy;
+    appKey: (url: string, token: string, projectId: string) => Promise<AppKeyOutcome>;
 }
 
-const DEFAULT_DEPS: InitDeps = { provision: requestEphemeralProject, deploy: runBundleDeploy };
+const DEFAULT_DEPS: InitDeps = {
+    provision: requestEphemeralProject,
+    deploy: runBundleDeploy,
+    appKey: (url, token, projectId) => requestAppKey(url, token, projectId)
+};
 
 export async function cloudInitCommand(rawArgs: string[], deps: InitDeps = DEFAULT_DEPS): Promise<void> {
     const { flags } = parseCloudArgs({
@@ -274,6 +374,21 @@ export async function cloudInitCommand(rawArgs: string[], deps: InitDeps = DEFAU
         }
     }
 
+    // Only once the deploy has built the app: before that there is nothing to
+    // mint the key on. A missing key is reported, never fatal.
+    let appKey: AppKeyOutcome | undefined;
+    if (deployed?.ok) {
+        appKey = await deps.appKey(url, project.apiKey, project.projectId);
+        if (appKey.ok) {
+            upsertDotenv(path.join(root, ".env"), API_TOKEN_ENV, appKey.key.apiKey);
+        } else {
+            warn(
+                `${API_TOKEN_ENV} was not written: ${appKey.message}`,
+                "The project is live without it. Once it is claimed, create a key in its admin panel and set it in .env."
+            );
+        }
+    }
+
     const adminUrl = deployed?.ok ? adminPanelUrl(projectRoot, project.projectUrl) : undefined;
     const expires = new Date(project.expiresAt);
 
@@ -284,12 +399,17 @@ export async function cloudInitCommand(rawArgs: string[], deps: InitDeps = DEFAU
                 ["Project", project.slug],
                 ["Live URL", project.projectUrl],
                 ["Admin panel", adminUrl],
+                ["App key", appKey?.ok ? `${API_TOKEN_ENV} in .env (${appKey.key.scopes.join(", ")})` : undefined],
                 ["Claim URL", chalk.bold(project.claimUrl)],
                 ["Expires", `${expires.toLocaleString()} (72 hours) unless claimed`]
             ]);
             console.log("");
-            console.log(chalk.gray(`  ${BASE_URL_ENV} is set in .env. Open the claim URL, sign in, and the project is yours;`));
+            const written = appKey?.ok ? `${BASE_URL_ENV} and ${API_TOKEN_ENV} are` : `${BASE_URL_ENV} is`;
+            console.log(chalk.gray(`  ${written} set in .env. Open the claim URL, sign in, and the project is yours;`));
             console.log(chalk.gray("  until then `rebase cloud` commands here use the project's own token."));
+            if (appKey?.ok) {
+                console.log(chalk.gray(`  ${API_TOKEN_ENV} reads and writes data as the app's rules allow, and expires with the claim window.`));
+            }
             console.log("");
         },
         {
@@ -301,6 +421,12 @@ export async function cloudInitCommand(rawArgs: string[], deps: InitDeps = DEFAU
             claimUrl: project.claimUrl,
             expiresAt: project.expiresAt,
             env: { [BASE_URL_ENV]: project.projectUrl },
+            // The key itself stays in .env: this output reaches an agent's transcript.
+            appKey: appKey
+                ? appKey.ok
+                    ? { ok: true, env: API_TOKEN_ENV, scopes: appKey.key.scopes, expiresAt: appKey.key.expiresAt }
+                    : { ok: false, error: { code: appKey.code, message: appKey.message } }
+                : null,
             deploy: deployed ? { ok: deployed.ok, result: deployed.result ?? null } : null
         }
     );

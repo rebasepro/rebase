@@ -99,8 +99,9 @@ interface CloudContextEntry {
  * link moves it into the organization of whoever opens it — so they live here, in
  * the private credentials file, and never in the repository: not in `.env`,
  * where `REBASE_API_TOKEN` beside `REBASE_BASE_URL` is what the MCP server and
- * the SDK send to the APP (which knows nothing of a control-plane token), and
- * not in `.rebase/cloud.json`, which a cloned repository supplies.
+ * the SDK send to the APP (which knows nothing of a control-plane token; `init`
+ * writes a key minted on the app there instead), and not in
+ * `.rebase/cloud.json`, which a cloned repository supplies.
  */
 export interface EphemeralGrant {
     token: string;

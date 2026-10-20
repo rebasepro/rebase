@@ -236,6 +236,13 @@ that one project and to `deploy`, `logs`, `env` and `database`. It is kept in
 commands in the linked directory use it on their own. It expires with the
 project.
 
+Once the deploy has built the app, the command also sets `REBASE_API_TOKEN` in
+`.env`: a key minted on the app itself, which is what the MCP server and the SDK
+send to it. It reads and writes data (`data:read`, `data:write`) through the
+app's row-level security, as a caller who is neither a person nor an admin. It
+holds nothing of the admin plane, and it expires with the claim window. Once the
+project is yours, create the keys you want in its admin panel.
+
 Claiming takes a signed-in browser session, not a token, and a payment method on
 the organization the project moves into. From the claim onwards the project is
 billed like any other. Claiming also revokes the agent's token: sign in with

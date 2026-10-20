@@ -1617,7 +1617,9 @@ const CLOUD_TOOLS: ToolDef[] = [
         description:
             "Give the active project a live backend on Rebase Cloud with no account or signup: provisions a project, " +
             "sets REBASE_BASE_URL in .env, links the directory and deploys the local collections to it " +
-            "(`rebase cloud init --claim`). Returns the live URL, the admin panel URL and a claim URL. Give the claim " +
+            "(`rebase cloud init --claim`), then sets REBASE_API_TOKEN in .env: a key the deployed app accepts, " +
+            "for reading and writing data through its row-level security, expiring with the claim window. " +
+            "Returns the live URL, the admin panel URL and a claim URL. Give the claim " +
             "URL to the user: whoever opens it and signs in owns the project. Unclaimed, it is deleted after 72 hours. " +
             "Afterwards `rebase cloud` commands in the directory act on it without a login.",
         inputSchema: {
@@ -1638,6 +1640,8 @@ export interface CloudProvisionResult {
     expiresAt: string;
     slug: string;
     deployed: boolean;
+    /** Whether REBASE_API_TOKEN, a key minted on the app, was written into .env. The key itself is never printed. */
+    apiTokenInEnv: boolean;
 }
 
 /** The arguments `rebase_cloud_provision` passes to the CLI, validated. Throws on a value argv must not carry. */
@@ -1673,13 +1677,15 @@ export function parseCloudProvisionResult(stdout: string): CloudProvisionResult 
     const slug = "slug" in value && typeof value.slug === "string" ? value.slug : null;
     if (!projectUrl || !claimUrl || !expiresAt || !slug) return null;
     const deploy = "deploy" in value ? value.deploy : null;
+    const appKey = "appKey" in value ? value.appKey : null;
     return {
         projectUrl,
         adminUrl: "adminUrl" in value ? url(value.adminUrl) : null,
         claimUrl,
         expiresAt,
         slug,
-        deployed: typeof deploy === "object" && deploy !== null && "ok" in deploy && deploy.ok === true
+        deployed: typeof deploy === "object" && deploy !== null && "ok" in deploy && deploy.ok === true,
+        apiTokenInEnv: typeof appKey === "object" && appKey !== null && "ok" in appKey && appKey.ok === true
     };
 }
 
@@ -2040,9 +2046,12 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             return {
                 ...jsonResult({
                     ...result,
-                    next: result.deployed
+                    next: (result.deployed
                         ? "Give the claimUrl to the user. Until they claim it, `rebase cloud deploy` here redeploys."
-                        : "The project exists but is not deployed: fix what `rebase cloud deploy` reports, run it again, and give the claimUrl to the user."
+                        : "The project exists but is not deployed: fix what `rebase cloud deploy` reports, run it again, and give the claimUrl to the user.")
+                        + (result.apiTokenInEnv
+                            ? " REBASE_BASE_URL and REBASE_API_TOKEN are in .env; this server reads them when it starts."
+                            : "")
                 }),
                 ...(code !== 0 ? { isError: true } : {})
             };

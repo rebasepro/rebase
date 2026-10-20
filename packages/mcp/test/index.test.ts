@@ -2147,6 +2147,7 @@ describe("rebase_cloud_provision", () => {
         claimUrl: `https://app.rebase.pro/claim/rcl_${"a".repeat(48)}`,
         expiresAt: "2026-10-23T12:00:00.000Z",
         env: { REBASE_BASE_URL: "https://todo-app-k3j9x2ab.rebase.website" },
+        appKey: { ok: true, env: "REBASE_API_TOKEN", scopes: ["data:read", "data:write"], expiresAt: "2026-10-23T12:00:00.000Z" },
         deploy: { ok: true, result: { status: "success" } }
     };
 
@@ -2193,9 +2194,18 @@ describe("rebase_cloud_provision", () => {
             projectUrl: RESULT.projectUrl,
             adminUrl: RESULT.adminUrl,
             expiresAt: RESULT.expiresAt,
-            deployed: true
+            deployed: true,
+            apiTokenInEnv: true
         });
         expect(body.next).toContain("claimUrl");
+        expect(body.next).toContain("REBASE_API_TOKEN");
+    });
+
+    it("says when the app's key was not written", async () => {
+        cliPrints(JSON.stringify({ ...RESULT, appKey: { ok: false, error: { code: "upstream_error", message: "no" } } }));
+        const body = JSON.parse((await call({})).content[0].text);
+        expect(body.apiTokenInEnv).toBe(false);
+        expect(body.next).not.toContain("REBASE_API_TOKEN");
     });
 
     it("still returns the claim URL when the deploy failed, as an error", async () => {

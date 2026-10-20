@@ -1,5 +1,5 @@
 ---
-sourceHash: 31d27c5b8c358e31
+sourceHash: 27b9d73f979bc845
 title: Rebase Cloud
 sidebar_label: Rebase Cloud
 description: Rebase Cloud es el mismo Rebase, operado para ti. Qué es, cómo se vincula y despliega un proyecto, y qué no incluye todavía la beta privada.
@@ -164,6 +164,8 @@ rebase cloud init --claim
 Eso aprovisiona un proyecto en Rebase Cloud, define `REBASE_BASE_URL` en `.env` con su dirección en vivo, vincula el directorio y despliega las colecciones locales con `rebase cloud deploy --bundle`. Imprime la URL en vivo, la URL del panel de administración y una **URL de reclamación**. Quien abra la URL de reclamación e inicie sesión puede mover el proyecto a una de sus organizaciones. El enlace funciona una sola vez. Un proyecto que nadie reclama en 72 horas se elimina, base de datos incluida. La herramienta `rebase_cloud_provision` del servidor MCP ejecuta el mismo comando y devuelve las mismas URL.
 
 Hasta que se reclama, el proyecto no pertenece a ninguna cuenta. Su token está limitado a ese proyecto y a `deploy`, `logs`, `env` y `database`. Se guarda en `~/.rebase/credentials.json`, nunca en el repositorio, y los comandos `rebase cloud` del directorio vinculado lo usan por sí solos. Caduca con el proyecto.
+
+Cuando el despliegue ha construido la app, el comando también define `REBASE_API_TOKEN` en `.env`: una clave creada en la propia app, que es lo que el servidor MCP y el SDK le envían. Lee y escribe datos (`data:read`, `data:write`) a través de la seguridad a nivel de fila de la app, como un llamante que no es ni una persona ni un administrador. No tiene ningún permiso del plano de administración y caduca con el plazo de reclamación. Cuando el proyecto sea tuyo, crea las claves que quieras en su panel de administración.
 
 Reclamar requiere una sesión iniciada en el navegador, no un token, y un método de pago en la organización a la que pasa el proyecto. Desde la reclamación, el proyecto se factura como cualquier otro. Reclamarlo también revoca el token del agente: inicia sesión con `rebase cloud login` o crea un token nuevo con `rebase cloud tokens create`.
 

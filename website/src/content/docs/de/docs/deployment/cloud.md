@@ -1,5 +1,5 @@
 ---
-sourceHash: 31d27c5b8c358e31
+sourceHash: 27b9d73f979bc845
 title: Rebase Cloud
 sidebar_label: Rebase Cloud
 description: Rebase Cloud ist dasselbe Rebase, für Sie betrieben. Was es ist, wie ein Projekt verknüpft und bereitgestellt wird und was die Private Beta noch nicht enthält.
@@ -164,6 +164,8 @@ rebase cloud init --claim
 Das provisioniert ein Projekt in Rebase Cloud, setzt `REBASE_BASE_URL` in `.env` auf seine Live-Adresse, verknüpft das Verzeichnis und deployt die lokalen Collections mit `rebase cloud deploy --bundle`. Ausgegeben werden die Live-URL, die URL des Admin-Panels und eine **Claim-URL**. Wer die Claim-URL öffnet und sich anmeldet, kann das Projekt in eine seiner Organisationen übernehmen. Der Link funktioniert genau einmal. Ein Projekt, das innerhalb von 72 Stunden niemand übernimmt, wird gelöscht, samt Datenbank. Das Tool `rebase_cloud_provision` des MCP-Servers führt denselben Befehl aus und liefert dieselben URLs.
 
 Bis zur Übernahme gehört das Projekt keinem Konto. Sein Token ist auf dieses eine Projekt und auf `deploy`, `logs`, `env` und `database` beschränkt. Es liegt in `~/.rebase/credentials.json`, nie im Repository, und `rebase cloud`-Befehle im verknüpften Verzeichnis verwenden es von selbst. Es läuft zusammen mit dem Projekt ab.
+
+Sobald das Deployment die App gebaut hat, setzt der Befehl außerdem `REBASE_API_TOKEN` in `.env`: einen Schlüssel, der in der App selbst erzeugt wird und den der MCP-Server und das SDK an sie senden. Er liest und schreibt Daten (`data:read`, `data:write`) über die Row-Level-Security der App, als Aufrufer, der weder eine Person noch ein Admin ist. Er hat keinerlei Rechte auf der Admin-Ebene und läuft mit dem Übernahmezeitraum ab. Sobald das Projekt Ihnen gehört, erstellen Sie die gewünschten Schlüssel im Admin-Panel.
 
 Die Übernahme erfordert eine angemeldete Browser-Sitzung, kein Token, und eine Zahlungsmethode in der Organisation, in die das Projekt wechselt. Ab der Übernahme wird das Projekt wie jedes andere abgerechnet. Die Übernahme widerruft außerdem das Token des Agenten: Melden Sie sich mit `rebase cloud login` an oder erstellen Sie mit `rebase cloud tokens create` ein neues Token.
 

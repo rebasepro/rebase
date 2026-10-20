@@ -4,8 +4,10 @@
  * What these hold:
  *  - one unauthenticated POST to the provision endpoint, and its refusals
  *    (rate limit, switched off, an old control plane) named as such;
- *  - `.env` gets `REBASE_BASE_URL` and nothing secret: the token and the claim
- *    link go to the private credentials file, never into the repository;
+ *  - `.env` gets `REBASE_BASE_URL`, and after a deploy `REBASE_API_TOKEN`: a key
+ *    minted on the app, asked for with the project's token. The control-plane
+ *    token and the claim link go to the private credentials file, never into
+ *    the repository, and no key is printed;
  *  - the directory is linked, the collections are pushed with a bundle deploy,
  *    and the result names the live URL, the admin panel and the claim link —
  *    the claim link even when the deploy failed;
@@ -18,7 +20,7 @@ import path from "path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { cloudCommand } from "./index";
-import { cloudInitCommand, upsertDotenv, adminPanelUrl, type InitDeps, type ProvisionedProject } from "./init";
+import { cloudInitCommand, requestAppKey, upsertDotenv, adminPanelUrl, type AppKey, type InitDeps, type ProvisionedProject } from "./init";
 import { ephemeralGrantFor, initOutputMode, readLink, requireClient } from "./context";
 
 class Exited extends Error {
@@ -37,6 +39,13 @@ const PROVISIONED: ProvisionedProject = {
     apiKey: "rk_live_project_token",
     claimUrl: `${CP}/claim/rcl_${"a".repeat(48)}`,
     expiresAt: new Date(Date.now() + 72 * 3600_000).toISOString()
+};
+
+const APP_KEY: AppKey = {
+    apiKey: "rk_live_app_key",
+    keyId: "key_app",
+    scopes: ["data:read", "data:write"],
+    expiresAt: PROVISIONED.expiresAt
 };
 
 interface Sent { method: string; path: string; authorization: string | null; body: unknown }
@@ -95,9 +104,11 @@ beforeEach(() => {
 
     sent = [];
     said = [];
-    respond = (request) => request.path === "/api/functions/ephemeral/provision"
-        ? json(201, PROVISIONED)
-        : json(404, { error: { code: "NOT_FOUND", message: "no route" } });
+    respond = (request) => {
+        if (request.path === "/api/functions/ephemeral/provision") return json(201, PROVISIONED);
+        if (request.path === "/api/functions/ephemeral/app-key") return json(201, { projectId: PROVISIONED.projectId, ...APP_KEY });
+        return json(404, { error: { code: "NOT_FOUND", message: "no route" } });
+    };
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
         const url = new URL(String(input));
         const request: Sent = {
@@ -140,7 +151,8 @@ async function init(words: string[], deploy: InitDeps["deploy"] = async () => ({
         deploy: async (dir, jsonMode) => {
             calls.push({ cwd: dir, json: jsonMode });
             return deploy(dir, jsonMode);
-        }
+        },
+        appKey: (url, token, projectId) => requestAppKey(url, token, projectId, { attempts: 3, sleep: async () => {} })
     });
     return calls;
 }
@@ -152,10 +164,12 @@ describe("rebase cloud init --claim", () => {
         expect(provisions).toEqual([{ method: "POST", path: "/api/functions/ephemeral/provision", authorization: null, body: { name: "Todo app" } }]);
     });
 
-    it("writes REBASE_BASE_URL into .env, keeps the rest, and puts no secret there", async () => {
+    it("writes REBASE_BASE_URL and the app's own key into .env, keeps the rest, and no control-plane secret", async () => {
         await init(["--claim"]);
         const env = fs.readFileSync(path.join(project, ".env"), "utf-8");
-        expect(env).toBe(`PORT=3001\nJWT_SECRET=local-secret\nREBASE_BASE_URL=${PROVISIONED.projectUrl}\n`);
+        expect(env).toBe(
+            `PORT=3001\nJWT_SECRET=local-secret\nREBASE_BASE_URL=${PROVISIONED.projectUrl}\nREBASE_API_TOKEN=${APP_KEY.apiKey}\n`
+        );
         expect(env).not.toContain(PROVISIONED.apiKey);
         expect(env).not.toContain("rcl_");
     });
@@ -187,9 +201,60 @@ describe("rebase cloud init --claim", () => {
             claimUrl: PROVISIONED.claimUrl,
             expiresAt: PROVISIONED.expiresAt,
             env: { REBASE_BASE_URL: PROVISIONED.projectUrl },
+            appKey: { ok: true, env: "REBASE_API_TOKEN", scopes: ["data:read", "data:write"], expiresAt: PROVISIONED.expiresAt },
             deploy: { ok: true, result: { status: "success" } }
         });
         expect(printedJson()).not.toHaveProperty("apiKey");
+        expect(said.join("\n")).not.toContain(APP_KEY.apiKey);
+    });
+
+    it("asks for the app's key once, after the deploy, with the project's own token", async () => {
+        await init(["--claim"]);
+        const asks = sent.filter(r => r.path === "/api/functions/ephemeral/app-key");
+        expect(asks).toEqual([{
+            method: "POST",
+            path: "/api/functions/ephemeral/app-key",
+            authorization: `Bearer ${PROVISIONED.apiKey}`,
+            body: { projectId: PROVISIONED.projectId }
+        }]);
+    });
+
+    it("asks for no key when nothing was deployed", async () => {
+        await init(["--claim", "--no-deploy"]);
+        fs.rmSync(path.join(project, ".rebase"), { recursive: true });
+        await init(["--claim"], async () => ({ ok: false }));
+        expect(sent.filter(r => r.path === "/api/functions/ephemeral/provision")).toHaveLength(2);
+        expect(sent.filter(r => r.path === "/api/functions/ephemeral/app-key")).toEqual([]);
+        expect(fs.readFileSync(path.join(project, ".env"), "utf-8")).not.toContain("REBASE_API_TOKEN");
+    });
+
+    it("keeps the project when the key is refused: says why, writes no token, and exits 0", async () => {
+        const base = respond;
+        respond = (request) => request.path === "/api/functions/ephemeral/app-key"
+            ? json(502, { error: { code: "upstream_error", message: "The project's app refused the platform's credential." } })
+            : base(request);
+        await init(["--claim"]);
+        expect(printedJson()).toMatchObject({
+            claimUrl: PROVISIONED.claimUrl,
+            appKey: { ok: false, error: { code: "upstream_error", message: "The project's app refused the platform's credential." } }
+        });
+        expect(fs.readFileSync(path.join(project, ".env"), "utf-8")).not.toContain("REBASE_API_TOKEN");
+        expect(process.exitCode).toBeUndefined();
+    });
+
+    it("asks again while the app is still coming up, and stops once it answers", async () => {
+        const base = respond;
+        let asked = 0;
+        respond = (request) => {
+            if (request.path !== "/api/functions/ephemeral/app-key") return base(request);
+            asked++;
+            return asked < 3
+                ? json(503, { error: { code: "upstream_error", message: "The project's app is not answering yet." } })
+                : base(request);
+        };
+        await init(["--claim"]);
+        expect(asked).toBe(3);
+        expect(fs.readFileSync(path.join(project, ".env"), "utf-8")).toContain(`REBASE_API_TOKEN=${APP_KEY.apiKey}`);
     });
 
     it("still prints the claim link when the deploy fails, and exits 1", async () => {
@@ -267,6 +332,36 @@ describe("the stored token afterwards", () => {
         expect(refusal()).toMatchObject({ code: "token_rejected" });
         expect(refusal().message).toContain("rebase cloud init --claim");
         expect(ephemeralGrantFor(CP, PROVISIONED.projectId)).toBeUndefined();
+    });
+});
+
+describe("asking for the app's key", () => {
+    it("gives up after its attempts while the app never answers, waiting between them", async () => {
+        respond = () => json(503, { error: { code: "upstream_error", message: "The project's app is not answering yet." } });
+        const waits: number[] = [];
+        const outcome = await requestAppKey(CP, "rk_live_x", "p1", { attempts: 3, sleep: async (ms) => { waits.push(ms); } });
+        expect(outcome).toEqual({ ok: false, code: "upstream_error", message: "The project's app is not answering yet." });
+        expect(sent).toHaveLength(3);
+        expect(waits).toHaveLength(2);
+    });
+
+    it("does not ask again on any other refusal", async () => {
+        respond = () => json(404, { error: { code: "not_found", message: "This project is not waiting to be claimed." } });
+        const outcome = await requestAppKey(CP, "rk_live_x", "p1", { attempts: 3, sleep: async () => {} });
+        expect(outcome).toMatchObject({ ok: false, code: "not_found" });
+        expect(sent).toHaveLength(1);
+    });
+
+    it("names a control plane that has no such route", async () => {
+        respond = () => new Response("Not Found", { status: 404 });
+        const outcome = await requestAppKey(CP, "rk_live_x", "p1", { attempts: 3, sleep: async () => {} });
+        expect(outcome).toMatchObject({ ok: false, code: "not_supported" });
+    });
+
+    it("refuses an answer that carries no key", async () => {
+        respond = () => json(201, { keyId: "k" });
+        const outcome = await requestAppKey(CP, "rk_live_x", "p1", { attempts: 1, sleep: async () => {} });
+        expect(outcome).toMatchObject({ ok: false, code: "bad_response" });
     });
 });
 
