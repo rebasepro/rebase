@@ -164,6 +164,11 @@
   },
   "include": [
     "packages/cms/src",
+    // Admin customization recipes: small files that import only package entry
+    // points and ship in the npm package, so an agent in a user's project reads
+    // the ones that match the installed version. Each has a test under
+    // packages/cms/test/recipes; this line keeps them compiling.
+    "packages/cms/recipes",
     "packages/cms-types/src",
     // `@rebasepro/app` has had a `paths` entry above for as long as this file
     // has existed, but never a line here — so the package every admin project

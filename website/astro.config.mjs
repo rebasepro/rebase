@@ -211,6 +211,7 @@ export default defineConfig({
                     collapsed: false,
                     items: [
                         { label: "Frontend Setup", slug: "docs/frontend" },
+                        { label: "Customizing the Admin", slug: "docs/frontend/customizing" },
                         { label: "Extending Rebase", slug: "docs/frontend/extending" },
                         { label: "Styling Custom UI", slug: "docs/frontend/styling" },
                         { label: "Translations", slug: "docs/frontend/i18n" },

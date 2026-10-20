@@ -2,6 +2,32 @@
 
 ## [Unreleased]
 
+### Added
+
+#### Admin (CMS & app)
+
+- **Customization recipes ship with `@rebasepro/cms`.** `node_modules/@rebasepro/cms/recipes`
+  holds tested, copy-ready examples: a site-settings singleton, per-user
+  preferences, a bulk "set status" toolbar action, a calendar view mode, a
+  dashboard page and a custom login screen. They import only package entry
+  points, each has a test in the repository, and their `README.md` is the
+  reference of building blocks, hooks and places an agent reads before
+  customizing. The docs page is [Customizing the Admin](/docs/frontend/customizing),
+  and the `rebase-customize-admin` agent skill points at the recipes.
+- **`EntityFormPanel` creates a record under the id it is given when no record
+  has it yet.** A record kept at a known key — a settings singleton, a profile
+  keyed by its user's uid — said "not found" until something seeded it; now the
+  first save creates it there. Where the collection marks a key property
+  `isId`, the id is that property's value, set and locked.
+- **The leaf parts of two overridable components are exported**, so a copy of
+  the component compiles with package imports: `NavigationCard` and
+  `SmallNavigationCard` (`HomePage.CollectionCard`), and
+  `StringNumberFilterField`, `BooleanFilterField`, `DateTimeFilterField`,
+  `ReferenceFilterField`, `RelationFilterField`, `getDatePropertyMode` and
+  `getDatePropertyTimezone` (`Collection.FilterField`).
+  `pnpm report:override-copyability` lists what still keeps each overridable
+  part from being copied that way.
+
 ### Changed
 
 #### Admin (CMS & app)
