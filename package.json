@@ -74,6 +74,7 @@
     "check:unused": "node tooling/scripts/check-unused-locals.mjs",
     "check:test-scripts": "node tooling/scripts/check-test-scripts.mjs",
     "check:tsconfig-entries": "node tooling/scripts/check-tsconfig-entries.mjs",
+    "report:override-copyability": "node tooling/scripts/report-override-copyability.mjs",
     "check:test-resolution": "node --import tsx tooling/scripts/check-test-resolution.mjs",
     "check:casts": "node tooling/scripts/check-casts.mjs",
     "check:icon-button-names": "node tooling/scripts/check-icon-button-names.mjs",

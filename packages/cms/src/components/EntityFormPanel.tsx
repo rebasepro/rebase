@@ -24,7 +24,12 @@ export type EntityFormPanelProps<M extends Record<string, unknown> = Record<stri
      */
     collection: AdminCollection<M>;
 
-    /** The record to edit. Omit it to create a new one. */
+    /**
+     * The record to edit. When no record has this id yet, the form creates
+     * it under this id — so a record kept at a known key (a settings record,
+     * a profile keyed by its user's id) needs no seeding. Omit it to create a
+     * new record under an id the data source assigns.
+     */
     entityId?: string | number;
 
     /**
@@ -43,7 +48,7 @@ export type EntityFormPanelProps<M extends Record<string, unknown> = Record<stri
      */
     onClose?: () => void;
 
-    /** Values a new record starts with. */
+    /** Values a new record starts with — one created without an id, or under an id no record has yet. */
     defaultValues?: Partial<M>;
 
     className?: string;
@@ -149,19 +154,13 @@ function EntityFormPanelInScope<M extends Record<string, unknown>>({
     if (entityId !== undefined && dataLoadingError) {
         return <CenteredView className={className}><ErrorView error={dataLoadingError}/></CenteredView>;
     }
-    if (entityId !== undefined && !shownEntity) {
-        if (dataLoading) return <CircularProgressCenter/>;
-        return (
-            <CenteredView className={className}>
-                <div className="flex flex-col items-center gap-2 text-center">
-                    <Typography variant="label">{t("entity_not_found")}</Typography>
-                    <Typography variant="body2" color="secondary">{t("entity_not_found_body")}</Typography>
-                </div>
-            </CenteredView>
-        );
-    }
+    if (entityId !== undefined && !shownEntity && dataLoading) return <CircularProgressCenter/>;
 
-    const editable = shownEntity === undefined || canEdit(collection, path, shownEntity);
+    // An id no record has yet is a record to create under that id. The form
+    // keeps the status it opened with, so once it creates the record it edits
+    // it from then on.
+    const creating = shownEntity === undefined;
+    const editable = creating || canEdit(collection, path, shownEntity);
 
     return (
         <CollectionScopeProvider collection={collection}>
@@ -172,8 +171,8 @@ function EntityFormPanelInScope<M extends Record<string, unknown>>({
                 collection={collection}
                 entityId={entityId}
                 entity={shownEntity}
-                initialStatus={entityId !== undefined ? "existing" : "new"}
-                initialDirtyValues={entityId === undefined ? defaultValues : formProps?.initialDirtyValues}
+                initialStatus={creating ? "new" : "existing"}
+                initialDirtyValues={creating ? defaultValues : formProps?.initialDirtyValues}
                 disabled={!editable || formProps?.disabled}
                 onEntityChange={(changed) => {
                     setSavedEntity(changed);

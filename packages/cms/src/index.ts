@@ -136,3 +136,19 @@ export * from "./collection_editor/useLiveSchemaEditing";
 
 export { CreationResultDialog } from "./components/admin/CreationResultDialog";
 
+// Leaf parts of overridable components, public so a copy of the component
+// compiles in a user's project with package imports only (see
+// tooling/scripts/report-override-copyability.mjs). `HomePage.CollectionCard`
+// is drawn with the two cards; `Collection.FilterField` falls back to the
+// per-type fields, which a custom filter can reuse for the types it leaves alone.
+export { NavigationCard } from "./components/HomePage/NavigationCard";
+export type { NavigationCardProps } from "./components/HomePage/NavigationCard";
+export { SmallNavigationCard } from "./components/HomePage/SmallNavigationCard";
+export type { SmallNavigationCardProps } from "./components/HomePage/SmallNavigationCard";
+export { StringNumberFilterField } from "./components/SelectableTable/filters/StringNumberFilterField";
+export { BooleanFilterField } from "./components/SelectableTable/filters/BooleanFilterField";
+export { DateTimeFilterField } from "./components/SelectableTable/filters/DateTimeFilterField";
+export { ReferenceFilterField } from "./components/SelectableTable/filters/ReferenceFilterField";
+export { RelationFilterField } from "./components/SelectableTable/filters/RelationFilterField";
+export { getDatePropertyMode, getDatePropertyTimezone } from "./preview/util";
+

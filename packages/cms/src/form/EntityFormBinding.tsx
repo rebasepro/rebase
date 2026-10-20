@@ -106,8 +106,17 @@ export function EntityFormBinding<M extends Record<string, unknown>>({
     const analyticsController = useAnalyticsController();
 
     const [status, setStatus] = useState<EntityStatus>(initialStatus);
+    // A new record given an id is created under it — a settings record kept
+    // at a known key, a profile keyed by its user. Where the collection
+    // declares its key property, the id is that property's value, set and
+    // locked; where it declares none, it is the id the record is created with.
+    // A copy never keeps the id: it is the original's.
+    const idKeyValues = useMemo(
+        () => newRecordIdValues(collection, status, entityIdProp),
+        [collection, status, entityIdProp]);
     const [entityId, setEntityId] = useState<string | number | undefined>(() => {
-        if (status === "new" || status === "copy") return undefined;
+        if (status === "copy") return undefined;
+        if (status === "new") return Object.keys(idKeyValues).length > 0 ? undefined : entityIdProp;
         return entityIdProp;
     });
 
@@ -121,9 +130,9 @@ export function EntityFormBinding<M extends Record<string, unknown>>({
     const { getCollection, getParentEntityIds } = collectionRegistryController;
     const parentLinkValues = useMemo(
         () => status === "new" || status === "copy"
-            ? getParentLinkValues({ getCollection, getParentEntityIds }, path, collection)
+            ? { ...getParentLinkValues({ getCollection, getParentEntityIds }, path, collection), ...idKeyValues }
             : {},
-        [getCollection, getParentEntityIds, path, collection, status]
+        [getCollection, getParentEntityIds, path, collection, status, idKeyValues]
     );
     const lockedPropertyKeys = useMemo(() => Object.keys(parentLinkValues), [parentLinkValues]);
 
@@ -376,4 +385,22 @@ export function EntityFormBinding<M extends Record<string, unknown>>({
             onClearLocalChanges={() => setLocalChangesCleared(true)}
         />
     );
+}
+
+/**
+ * The key property's value for a new record created under a known id: the id,
+ * under the one property the collection marks `isId`. Empty when the record
+ * is not new, has no id, or the collection declares no single key property —
+ * then the id travels as the id the record is created with instead.
+ */
+function newRecordIdValues(
+    collection: AdminCollection,
+    status: EntityStatus,
+    entityId: string | number | undefined
+): Record<string, unknown> {
+    if (status !== "new" || entityId === undefined) return {};
+    const keys = Object.entries(collection.properties ?? {})
+        .filter(([, property]) => typeof property === "object" && property !== null && "isId" in property && Boolean(property.isId))
+        .map(([key]) => key);
+    return keys.length === 1 ? { [keys[0]]: entityId } : {};
 }

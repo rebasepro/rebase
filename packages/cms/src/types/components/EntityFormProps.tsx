@@ -14,6 +14,10 @@ export type EntityFormProps<M extends Record<string, unknown>> = {
     path: string;
     fullIdPath?: string;
     collection: AdminCollection<M>;
+    /**
+     * The record's id. On a new record (`initialStatus: "new"`), the id it is
+     * created under; omit it to let the data source assign one.
+     */
     entityId?: string | number;
     entity?: Entity<M>;
     databaseId?: string;

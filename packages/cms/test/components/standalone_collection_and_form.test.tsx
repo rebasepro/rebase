@@ -177,6 +177,33 @@ describe("one record's form in a page of the host app", () => {
         expect(window.location.pathname).toBe("/my-page");
     });
 
+    it("creates the record under its id when no record has that id yet", async () => {
+        // A record kept at a known key — a site's settings, a user's profile
+        // keyed by their uid — said "not found" until something seeded it.
+        const onSaved = jest.fn();
+        render(<Page><EntityFormPanel collection={posts} entityId={"site"} onSaved={onSaved}
+            defaultValues={{ title: "Untitled site" }}/></Page>);
+
+        const title = await screen.findByDisplayValue("Untitled site");
+        await act(async () => {
+            fireEvent.change(title, { target: { value: "My site" } });
+        });
+        fireEvent.click(screen.getByRole("button", { name: /create/i }));
+
+        await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1));
+        expect(rows.posts.find(r => r.id === "site")).toEqual(expect.objectContaining({ title: "My site" }));
+
+        // From then on the form edits it, under the same id.
+        const saved = await screen.findByDisplayValue("My site");
+        await act(async () => {
+            fireEvent.change(saved, { target: { value: "My site, renamed" } });
+        });
+        fireEvent.click(screen.getByRole("button", { name: /save/i }));
+        await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(2));
+        expect(rows.posts.filter(r => r.id === "site")).toEqual([expect.objectContaining({ title: "My site, renamed" })]);
+        expect(rows.posts).toHaveLength(3);
+    });
+
     it("creates a record when given no id", async () => {
         const onSaved = jest.fn();
         render(<Page><EntityFormPanel collection={posts} onSaved={onSaved}/></Page>);
