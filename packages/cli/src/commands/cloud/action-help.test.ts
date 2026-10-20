@@ -27,6 +27,7 @@ import { COMPUTE_SET_FLAGS, BILLING_ACTIONS } from "./resources";
 import { LOGIN_FLAGS } from "./auth";
 import { CREATE_TOKEN_FLAGS } from "./tokens";
 import { CRON_LIST_FLAGS, CRON_LOGS_FLAGS } from "./cron";
+import { PREVIEWS_LIST_FLAGS, PREVIEWS_DELETE_FLAGS } from "./previews";
 
 /**
  * Which spec backs which page.
@@ -102,6 +103,9 @@ const SPECS: Record<string, Record<string, unknown> | null> = {
     cron: null,
     "cron list": CRON_LIST_FLAGS,
     "cron logs": CRON_LOGS_FLAGS,
+    previews: null,
+    "previews list": PREVIEWS_LIST_FLAGS,
+    "previews delete": PREVIEWS_DELETE_FLAGS,
     "clusters add": {
         "--name": String,
         "--provider": String,
@@ -232,7 +236,9 @@ flag: flag[1] });
         ["env.ts", ENV_SET_FLAGS],
         ["tokens.ts", CREATE_TOKEN_FLAGS],
         ["cron.ts", CRON_LIST_FLAGS],
-        ["cron.ts", CRON_LOGS_FLAGS]
+        ["cron.ts", CRON_LOGS_FLAGS],
+        ["previews.ts", PREVIEWS_LIST_FLAGS],
+        ["previews.ts", PREVIEWS_DELETE_FLAGS]
     ] as const) {
         for (const flag of Object.keys(spec)) found.push({ file: name,
 flag });

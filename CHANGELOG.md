@@ -51,6 +51,18 @@
   deployed on its own records no bundle, so it cannot be rolled back yet; its
   deploy says so and suggests deploying the last good version again.
 
+- **`rebase cloud deploy --preview` serves a build at its own address and
+  leaves production alone.** Before, the only way to see a change on the
+  platform was to ship it to production. The new flag prints an address like
+  `https://<project>--<name>.rebase.website`, and `--preview-name` keeps the same
+  address across deploys. A static app's preview calls the production backend.
+  A backend preview runs its own backend, on an empty database of its own.
+  `rebase cloud previews` lists and deletes previews. A preview is started
+  through its own control-plane function, never through `deploy`, so a control
+  plane without previews refuses it with `previews_unavailable` and nothing
+  ships to production. The control plane's half is specified in
+  `docs/preview-deployments.md`.
+
 ### Fixed
 
 #### CLI

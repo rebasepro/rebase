@@ -10,6 +10,10 @@
  * this directory as a build context, and the bare form uploads nothing and asks
  * the control plane to rebuild what it already holds. That last one is the
  * dangerous one — see `planBareDeploy`.
+ *
+ * `--preview` is the bundle deploy aimed somewhere else: the same build and
+ * upload, triggered through the `previews` function so it is served on an
+ * address of its own and production is never touched. See `previews.ts`.
  */
 import arg from "arg";
 import chalk from "chalk";
@@ -62,6 +66,7 @@ import {
     type LiveCheck
 } from "./deploy-summary";
 import { listContextFiles, MAX_SOURCE_UPLOAD_BYTES, packSource, prepareRebuildSource, type RebuildSource } from "./rebuild-source";
+import { PREVIEW_DEPLOYMENTS_COLLECTION, normalizePreviewName, previewLines, triggerPreview, type Preview } from "./previews";
 import { buildBundle } from "../../bundle";
 import { buildAssetApp } from "../build";
 import { foldableApps, foldFrontendIntoBundle } from "../../fold-static";
@@ -255,6 +260,8 @@ async function deployBundle(opts: {
     allowDowngrade: boolean;
     /** When the command started, for the `cli.deploy` event's duration. */
     startedAt: number;
+    /** `--preview`: serve this build on a preview address instead of production. */
+    preview?: PreviewRequest;
 }): Promise<void> {
     // Nothing here reads client/url/projectId/projectRef any more: everything
     // that needs them is reached through `uploadAndTrigger({ ...opts })`, which
@@ -488,6 +495,8 @@ async function uploadAndTrigger(opts: {
     allowDowngrade: boolean;
     /** When the command started, for the `cli.deploy` event's duration. */
     startedAt: number;
+    /** `--preview`: serve this build on a preview address instead of production. */
+    preview?: PreviewRequest;
 }): Promise<void> {
     const { client, url, projectId, projectRef, projectRoot, bundleDir } = opts;
     let manifest: ReturnType<typeof readBundleManifest>;
@@ -543,7 +552,9 @@ async function uploadAndTrigger(opts: {
     // result on this path is printed to stdout too.
     if (!isJsonMode()) {
         console.log("");
-        console.log(`  🚀 Triggering managed deployment for ${chalk.bold(projectRef)} (schema ${manifest.schemaVersion})...`);
+        console.log(opts.preview
+            ? `  🔍 Triggering a preview of ${chalk.bold(projectRef)}${opts.preview.name ? ` named ${chalk.bold(opts.preview.name)}` : ""} (schema ${manifest.schemaVersion}) — production is not touched...`
+            : `  🚀 Triggering managed deployment for ${chalk.bold(projectRef)} (schema ${manifest.schemaVersion})...`);
     }
 
     // Tell the platform about every app this repo declares, not only the one
@@ -556,7 +567,9 @@ async function uploadAndTrigger(opts: {
         // A project with no readable rebase.json still deploys; it just cannot
         // describe its other apps.
     }
-    const declaredApps = declaredAppsFrom(projectManifest);
+    // Not for a preview: registering the declared apps, and the hostnames
+    // they name, is a change to the production project.
+    const declaredApps = opts.preview ? [] : declaredAppsFrom(projectManifest);
 
     // The source this bundle was built from, so a platform upgrade can rebuild
     // it on a newer release. A backend only: a static app's bundle is its
@@ -564,7 +577,11 @@ async function uploadAndTrigger(opts: {
     // Best effort — see `prepareRebuildSource`, which warns and returns null
     // rather than fail a deploy over it.
     let rebuildSource: RebuildSource | null = null;
-    if (opts.uploadSource && manifest.kind !== "static" && await platformRebuildsOff(client, projectId)) {
+    if (opts.preview) {
+        // The stored source is what a platform upgrade rebuilds PRODUCTION
+        // from. A preview's source replacing it would ship the preview to
+        // production on the next rollout — nothing is uploaded for one.
+    } else if (opts.uploadSource && manifest.kind !== "static" && await platformRebuildsOff(client, projectId)) {
         // The owner turned platform rebuilds off: the platform keeps no copy
         // of this app's source, so none leaves the machine. Asked before
         // packing anything; the control plane refuses the upload regardless.
@@ -600,6 +617,11 @@ async function uploadAndTrigger(opts: {
         rebuildSource,
         allowFrameworkDowngrade: opts.allowDowngrade
     });
+
+    if (opts.preview) {
+        await triggerAndFollowPreview({ ...opts, body, record });
+        return;
+    }
 
     let deploymentId: string;
     let managed: boolean;
@@ -794,6 +816,77 @@ live: null }
  */
 function hostsField(hosts: DeployHost[], registered: DeployHost[] | undefined): { hosts?: DeployHost[] } {
     return hosts.length > 0 || registered !== undefined ? { hosts } : {};
+}
+
+/** What `--preview` and `--preview-name` asked for. */
+export interface PreviewRequest {
+    /** A stable name, so later deploys update the same address; absent, the control plane picks one. */
+    name?: string;
+}
+
+/**
+ * `--preview` / `--preview-name <name>` off the parsed flags, or undefined for
+ * a production deploy. A name alone is a preview: nobody names a production
+ * deploy's address.
+ */
+export function resolvePreviewRequest(flags: { "--preview"?: boolean; "--preview-name"?: string }): PreviewRequest | undefined {
+    if (flags["--preview-name"] !== undefined) return { name: normalizePreviewName(flags["--preview-name"]) };
+    return flags["--preview"] === true ? {} : undefined;
+}
+
+/**
+ * The tail of a preview deploy: trigger it through `previews`, follow its
+ * build, and report the preview's address rather than production's.
+ */
+async function triggerAndFollowPreview(opts: {
+    client: CloudClient;
+    projectId: string;
+    url: string;
+    follow: boolean;
+    timeoutMs: number;
+    preview?: PreviewRequest;
+    body: Record<string, unknown>;
+    record: (followed: boolean, status: string) => Promise<void>;
+}): Promise<void> {
+    const { client, projectId } = opts;
+    const { deploymentId, preview } = await triggerPreview(
+        client,
+        projectId,
+        { ...opts.body, preview: opts.preview?.name ? { name: opts.preview.name } : {} },
+        (e) => {
+            const refusal = intakeRefusal(e);
+            if (refusal) fail(refusal.message, refusal.hint, refusal.code);
+        }
+    );
+
+    if (!opts.follow) {
+        emit(
+            () => {
+                console.log(chalk.green(`  ✓ Preview deploy started (deployment ${deploymentId}).`));
+                for (const line of previewLines(preview)) console.log(`    ${line}`);
+                console.log(chalk.gray("    Not following (--no-follow). Track it with `rebase cloud previews`."));
+            },
+            { success: true, deploymentId, following: false, preview }
+        );
+        await opts.record(false, "not_followed");
+        return;
+    }
+
+    if (!isJsonMode()) {
+        console.log(chalk.green(`  ✓ Preview deploy started (deployment ${deploymentId}).`));
+        console.log(chalk.gray("    Streaming build logs (Ctrl-C to stop watching — the build keeps running):"));
+        console.log("");
+    }
+    const { status } = await streamBuildLogs(client, deploymentId, {
+        quiet: isJsonMode(),
+        timeoutMs: opts.timeoutMs,
+        projectId,
+        url: opts.url,
+        collection: PREVIEW_DEPLOYMENTS_COLLECTION,
+        preview,
+        onTerminal: (ended) => opts.record(true, ended)
+    });
+    emit(() => {}, { success: true, deploymentId, following: true, status, preview });
 }
 
 /**
@@ -1338,6 +1431,12 @@ export const DEPLOY_FLAGS = {
        runs. The control plane refuses that by default (FRAMEWORK_DOWNGRADE),
        because it is usually a stale checkout, not a decision. */
     "--allow-downgrade": Boolean,
+    /* Serve this build on an address of its own and leave production alone.
+       A bundle deploy only — static apps and managed backends. See previews.ts. */
+    "--preview": Boolean,
+    /* Name the preview, so the next `--preview-name` deploy with the same name
+       updates the same address. Implies `--preview`. */
+    "--preview-name": String,
     "-m": "--message"
 } as const;
 
@@ -1437,6 +1536,26 @@ export async function deployCommand(rawArgs: string[], projectRef: string): Prom
         );
     }
 
+    // A preview is a bundle deploy aimed at another address. The container
+    // build has no preview to aim at, and `--eject` changes the production
+    // project by definition — refused before anything is resolved or built.
+    const preview = resolvePreviewRequest(args);
+    if (preview && (args["--source"] || args["--eject"])) {
+        fail(
+            `--preview cannot be combined with ${args["--source"] ? "--source" : "--eject"}: a preview is built from a managed bundle, `
+                + "and that flag builds a container image for production.",
+            "Drop it to deploy a preview, or drop --preview to deploy production.",
+            "usage"
+        );
+    }
+    if (preview && !args["--bundle"] && !declaresManagedRuntime(appName)) {
+        fail(
+            "Previews are built from managed bundles, and this app builds a container image.",
+            "Preview a static app by name (`rebase cloud deploy <app> --preview`), or declare `runtime: \"managed\"` on the backend in rebase.json.",
+            "preview_unsupported"
+        );
+    }
+
     const { client, url } = await requireClient(rawArgs);
     const projectId = await resolveProjectRef(projectRef, client);
 
@@ -1490,7 +1609,8 @@ export async function deployCommand(rawArgs: string[], projectRef: string): Prom
             liveTimeoutMs: resolveLiveTimeout(args["--live-timeout"]),
             uploadSource: args["--no-source"] !== true,
             allowDowngrade: args["--allow-downgrade"] === true,
-            startedAt
+            startedAt,
+            preview
         });
         return;
     }
@@ -1906,6 +2026,16 @@ async function streamBuildLogs(
          * in sight.
          */
         undo?: string;
+        /**
+         * Where the deployment row lives: `deployments`, or a preview's
+         * `preview-deployments`. See `PREVIEW_DEPLOYMENTS_COLLECTION`.
+         */
+        collection?: string;
+        /**
+         * A preview being followed. Its address is printed on success instead
+         * of the project's, which is production's and did not change.
+         */
+        preview?: Preview;
     } = {}
 ): Promise<{ status: string; logs: string }> {
     const quiet = opts.quiet === true;
@@ -1928,7 +2058,7 @@ async function streamBuildLogs(
     for (;;) {
         let dep: Deployment | undefined;
         try {
-            dep = (await client.data.collection("deployments").findById(deploymentId)) as Deployment | undefined;
+            dep = (await client.data.collection(opts.collection ?? "deployments").findById(deploymentId)) as Deployment | undefined;
             unreadableSince = undefined;
         } catch (e) {
             // A read that failed says nothing about the build. A control plane
@@ -1990,6 +2120,12 @@ async function streamBuildLogs(
             }
             if (!quiet && opts.announce !== false) {
                 console.log("");
+                if (opts.preview) {
+                    console.log(chalk.bold.green("  ✓ Preview deployed"));
+                    for (const line of previewLines(opts.preview)) console.log(`  ${line}`);
+                    console.log("");
+                    return { status: dep.status, logs: withoutHeartbeat(dep.logs ?? "") };
+                }
                 console.log(chalk.bold.green("  ✓ Deployment succeeded"));
                 // The URL. A deploy that says only "succeeded" leaves the one
                 // thing the whole command was for — the address the app now

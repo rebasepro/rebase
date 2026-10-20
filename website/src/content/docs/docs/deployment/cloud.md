@@ -161,6 +161,50 @@ rebase cloud status          # what the platform thinks the project is doing
 platform is genuinely working and polling is the right thing to do; when it names
 something, that something is waiting for you.
 
+## Preview a change
+
+<span class="since-badge" data-since="0.26">Since 0.26</span>
+
+```bash
+rebase cloud deploy --preview
+```
+
+This builds and uploads exactly what `deploy` would, but serves it at an address
+of its own, such as `https://shop--k3x9ab.rebase.website`. Production keeps
+serving what it served before. The deploy prints the preview's address when the
+build finishes.
+
+To keep one address across deploys, name the preview. Deploying the same name
+again updates it:
+
+```bash
+rebase cloud deploy --preview-name new-checkout
+```
+
+What a preview talks to depends on what you deployed:
+
+- **`rebase cloud deploy web --preview`** previews one static app. Its pages call
+  the **production** backend: a sign-in there is a real session, and anything
+  written there is production data.
+- **`rebase cloud deploy --preview`** previews the backend, with its static apps
+  folded in, the same way production runs them. It gets a backend of its own on
+  an **empty database of its own**, never production's. Booting against
+  production's database would apply the preview's schema and access rules to it.
+
+A preview uploads no source and registers no apps or hostnames, because each of
+those would change the production project. `--source` and `--eject` cannot be
+combined with `--preview`. Each builds a container image for production.
+
+```bash
+rebase cloud previews                      # name, address, app, backend, expiry
+rebase cloud previews delete new-checkout  # stops serving it and drops its database
+```
+
+A preview expires a week after it was last deployed to.
+
+Previews are rolling out. A control plane that does not serve them yet refuses
+`--preview` with `previews_unavailable` and deploys nothing.
+
 ## Roll back
 
 ```bash
@@ -315,6 +359,7 @@ except one that restarts the database, which waits for a maintenance window.
 | `link`, `unlink`, `use`, `open` | Binding this directory to a project, selecting an organization, opening the console |
 | `projects` | Create, list, inspect, delete |
 | `deploy`, `logs`, `deployments`, `rollback`, `cancel` | Shipping and watching |
+| `previews` | Builds served on their own address by `deploy --preview`, and deleting them. See [Preview a change](#preview-a-change) |
 | `start`, `stop`, `restart` | Pausing a project and bringing it back |
 | `status`, `metrics`, `debug` | What it is doing, and why it is not |
 | `cron` | The deployed app's cron jobs and their recorded runs, read with your `rebase cloud` login. Read-only |
@@ -351,8 +396,9 @@ Stated plainly, because finding out later is worse:
 - **Not self-serve.** Access is granted in batches; there is no sign-up-and-pay.
 - **No published SLA**, and no SOC 2. If you need either, say so when you request
   access rather than assuming.
-- **No preview or branch deploys**, and no first-party GitHub App. Deploy hooks —
-  secret URLs you point a repository webhook at — are the supported automation.
+- **No branch deploys**, and no first-party GitHub App. Deploy hooks — secret URLs
+  you point a repository webhook at — are the supported automation. [Preview
+  deploys](#preview-a-change) are rolling out and are started from the CLI.
 - **Tokens act as a person.** A [token](#ci-and-agents) is minted by an account
   and acts as it; there is no organization-owned machine identity yet. If you
   sign in from CI instead, pass `REBASE_CLOUD_EMAIL` and `REBASE_CLOUD_PASSWORD`

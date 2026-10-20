@@ -48,6 +48,8 @@ rebase cloud projects delete [id]
 
 ```bash
 rebase cloud deploy [app] [--source .]   # deploy an app and stream build logs
+rebase cloud deploy [app] --preview [--preview-name <name>]  # its own address; production untouched
+rebase cloud previews [list|delete <name>]
 rebase cloud logs [--runtime] [-f]       # build logs, or the running process's
 rebase cloud deployments list [--limit N|--all]
 rebase cloud rollback [id] [-y]          # back to a successful deploy
@@ -78,6 +80,11 @@ its HTML. A syntax error stops the deploy with `file:line:column` (code
 deploy ends with the way back, `rebase cloud rollback`. A static app deployed on
 its own cannot be rolled back yet; see
 [Roll back](/docs/deployment/cloud#roll-back).
+
+`--preview` serves the build at `https://<project>--<name>.rebase.website` and
+leaves production alone. A preview of a static app calls the production backend.
+A preview of the backend runs its own backend, on an empty database of its own.
+See [Preview a change](/docs/deployment/cloud/#preview-a-change).
 
 ## Config
 

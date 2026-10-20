@@ -199,11 +199,15 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
             ["--no-source", "Do not upload the project's source beside a backend bundle"],
             ["--no-verify", "Skip the syntax check of the static apps' JavaScript"],
             ["--allow-downgrade", "Deploy a bundle built on an older framework release than the project runs"],
+            ["--preview", "Serve this build on an address of its own and leave production untouched"],
+            ["--preview-name <name>", "Name the preview, so deploying the same name again updates the same address. Implies --preview"],
             ["--eject", "Leave the managed runtime on purpose (ejects to a container image)"]
         ],
         examples: [
             "rebase cloud deploy",
             "rebase cloud deploy web --message \"add search\"",
+            "rebase cloud deploy --preview",
+            "rebase cloud deploy --preview-name new-quiz",
             "rebase cloud deploy --timeout 300 --json"
         ],
         notes: [
@@ -223,8 +227,47 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
                 + "--no-verify skips the check.",
             "Undo a bad deploy with `rebase cloud rollback`: it restores the previous successful backend "
                 + "deployment, static apps folded into it included. A static app deployed on its own "
-                + "(`cloud deploy <app>`) cannot be rolled back yet; deploy its last good version again."
+                + "(`cloud deploy <app>`) cannot be rolled back yet; deploy its last good version again.",
+            "--preview prints the preview's own address, https://<project>--<name>.rebase.website. A preview of a "
+                + "static app calls the production backend; a preview of the backend runs its own, on an empty "
+                + "database of its own. It uploads no source and registers no apps or hostnames. "
+                + "`rebase cloud previews` lists and deletes previews.",
+            "A control plane without previews refuses --preview with previews_unavailable, and nothing is deployed."
         ]
+    },
+
+    previews: {
+        command: "cloud previews",
+        usage: "cloud previews [list|delete] [options]",
+        summary:
+            "The project's preview deployments: builds made with `rebase cloud deploy --preview`, each served on "
+            + "its own address while production keeps serving what it served before. `list` is the default.",
+        flags: [],
+        examples: [
+            "rebase cloud previews",
+            "rebase cloud previews delete new-quiz --yes"
+        ],
+        notes: [
+            "A preview expires on its own when it has not been deployed to for a while; `list` says when.",
+            "Deleting a preview stops its address answering and, for a backend preview, drops its database. "
+                + "Production is never touched."
+        ]
+    },
+
+    "previews list": {
+        command: "cloud previews list",
+        usage: "cloud previews list",
+        summary: "Every preview of the project: its name, its address, the app it serves, which backend it calls, and when it expires.",
+        flags: [],
+        examples: ["rebase cloud previews list", "rebase cloud previews list --json"]
+    },
+
+    "previews delete": {
+        command: "cloud previews delete",
+        usage: "cloud previews delete <name> [--yes]",
+        summary: "Delete one preview: its address stops answering, and a backend preview's database is dropped. Alias: `rm`.",
+        flags: [],
+        examples: ["rebase cloud previews delete new-quiz --yes"]
     },
 
     logs: {

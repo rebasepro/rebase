@@ -23,6 +23,7 @@ import { deploymentsListCommand, rollbackCommand, cancelCommand } from "./deploy
 import { powerCommand } from "./power";
 import { debugCommand, printDebugHelp } from "./debug";
 import { cronCommand } from "./cron";
+import { previewsCommand } from "./previews";
 import {
     statusCommand,
     metricsCommand,
@@ -101,6 +102,7 @@ export const CLOUD_VALUE_FLAGS = {
     "--password": String,
     "--platform-rebuilds": String,
     "--port": String,
+    "--preview-name": String,
     "--provider": String,
     "--region": String,
     "--replicas": String,
@@ -180,6 +182,7 @@ export const GROUP_ALIASES: Record<string, string> = {
     domain: "domains",
     extension: "extensions",
     org: "orgs",
+    preview: "previews",
     project: "projects"
 };
 
@@ -317,6 +320,10 @@ export async function cloudCommand(subcommand: string | undefined, rawArgs: stri
             break;
         case "logs":
             await logsCommand(rawArgs, requireProjectRef(rawArgs));
+            break;
+        case "previews":
+        case "preview":
+            await previewsCommand(action, rawArgs);
             break;
         case "deployments":
         case "releases":
@@ -493,6 +500,7 @@ export const CLOUD_GROUPS: HelpAction[] = [
     { action: "deploy", section: "Deploy & observe", args: "[app]", description: "Build, upload and ship an app, following it to a terminal state" },
     { action: "logs", section: "Deploy & observe", description: "Build logs, or the runtime's with --runtime" },
     { action: "deployments", section: "Deploy & observe", description: "Deployment history: status, duration, trigger" },
+    { action: "previews", section: "Deploy & observe", description: "Builds served on their own address by `deploy --preview`" },
     { action: "rollback", section: "Deploy & observe", args: "[id]", description: "Put a previous successful deployment back into service" },
     { action: "cancel", section: "Deploy & observe", description: "Stop the build in flight" },
     { action: "start", section: "Deploy & observe", description: "Bring a stopped project back" },
