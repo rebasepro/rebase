@@ -1,0 +1,38 @@
+import type { ReviewTranslations } from "./en";
+
+/** The review plugin's strings in pt. */
+export const pt: ReviewTranslations = {
+    review_queue: "Fila de revisão",
+    review_queue_count: "Fila de revisão ({{count}})",
+    review_queue_title: "Fila de revisão: {{collection}}",
+    review_queue_empty: "Nada está à espera de revisão.",
+    review_queue_loading: "A carregar as alterações propostas…",
+    review_queue_error: "Não foi possível carregar a fila de revisão: {{message}}",
+    review_approve: "Aprovar",
+    review_reject: "Rejeitar",
+    review_approve_selected: "Aprovar {{count}}",
+    review_reject_selected: "Rejeitar {{count}}",
+    review_select_change: "Selecionar esta alteração",
+    review_select_all: "Selecionar tudo",
+    review_op_insert: "Criação",
+    review_op_update: "Alteração",
+    review_op_delete: "Eliminação",
+    review_no_reason: "Sem motivo indicado",
+    review_actor_unknown: "Autor desconhecido",
+    review_field: "Campo",
+    review_before: "Antes",
+    review_after: "Depois",
+    review_empty_value: "vazio",
+    review_no_changes: "Não altera nada",
+    review_keyboard_hint: "j / k para mover · a para aprovar · r para rejeitar · espaço para selecionar",
+    review_note_placeholder: "Nota para quem propôs (opcional)",
+    review_approved_toast: "Alterações aprovadas: {{count}}",
+    review_rejected_toast: "Alterações rejeitadas: {{count}}",
+    review_decide_error: "Não foi possível guardar a decisão: {{message}}",
+    review_record: "Registo {{id}}",
+    review_new_record: "Novo registo",
+    review_close: "Fechar",
+    review_pending_rows: "Linhas à espera em «{{value}}»",
+    review_proposed_at: "Proposto em {{date}}",
+    review_reload: "Recarregar"
+};

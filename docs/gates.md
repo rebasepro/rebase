@@ -191,6 +191,7 @@ has one line saying where it runs, or that nothing does and why;
 `check:gates-doc` fails on a script with no line and a line with no script.
 
 - `@rebasepro/server-postgres` `test:e2e` — lane `vitest` of `ci:e2e`.
+- `@rebasepro/plugin-review` `test:e2e` — lane `vitest` of `ci:e2e`.
 - `@rebasepro/rls-check` `test:e2e` — lane `vitest` of `ci:e2e`.
 - `@rebasepro/cli` `test:e2e` — lane `vitest` of `ci:e2e`.
 - `@rebasepro/cli` `test:integration` — lane `vitest` of `ci:e2e`.

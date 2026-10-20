@@ -1,0 +1,38 @@
+import type { ReviewTranslations } from "./en";
+
+/** The review plugin's strings in fr. */
+export const fr: ReviewTranslations = {
+    review_queue: "File de validation",
+    review_queue_count: "File de validation ({{count}})",
+    review_queue_title: "File de validation : {{collection}}",
+    review_queue_empty: "Rien n'attend de validation.",
+    review_queue_loading: "Chargement des modifications proposées…",
+    review_queue_error: "Impossible de charger la file de validation : {{message}}",
+    review_approve: "Approuver",
+    review_reject: "Refuser",
+    review_approve_selected: "Approuver {{count}}",
+    review_reject_selected: "Refuser {{count}}",
+    review_select_change: "Sélectionner cette modification",
+    review_select_all: "Tout sélectionner",
+    review_op_insert: "Création",
+    review_op_update: "Modification",
+    review_op_delete: "Suppression",
+    review_no_reason: "Aucune raison donnée",
+    review_actor_unknown: "Auteur inconnu",
+    review_field: "Champ",
+    review_before: "Avant",
+    review_after: "Après",
+    review_empty_value: "vide",
+    review_no_changes: "Ne change rien",
+    review_keyboard_hint: "j / k pour se déplacer · a pour approuver · r pour refuser · espace pour sélectionner",
+    review_note_placeholder: "Note pour l'auteur (facultatif)",
+    review_approved_toast: "Modifications approuvées : {{count}}",
+    review_rejected_toast: "Modifications refusées : {{count}}",
+    review_decide_error: "Impossible d'enregistrer la décision : {{message}}",
+    review_record: "Enregistrement {{id}}",
+    review_new_record: "Nouvel enregistrement",
+    review_close: "Fermer",
+    review_pending_rows: "Lignes en attente dans « {{value}} »",
+    review_proposed_at: "Proposé le {{date}}",
+    review_reload: "Recharger"
+};

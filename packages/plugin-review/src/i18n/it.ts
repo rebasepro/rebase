@@ -1,0 +1,38 @@
+import type { ReviewTranslations } from "./en";
+
+/** The review plugin's strings in it. */
+export const it: ReviewTranslations = {
+    review_queue: "Coda di revisione",
+    review_queue_count: "Coda di revisione ({{count}})",
+    review_queue_title: "Coda di revisione: {{collection}}",
+    review_queue_empty: "Niente è in attesa di revisione.",
+    review_queue_loading: "Caricamento delle modifiche proposte…",
+    review_queue_error: "Impossibile caricare la coda di revisione: {{message}}",
+    review_approve: "Approva",
+    review_reject: "Rifiuta",
+    review_approve_selected: "Approva {{count}}",
+    review_reject_selected: "Rifiuta {{count}}",
+    review_select_change: "Seleziona questa modifica",
+    review_select_all: "Seleziona tutto",
+    review_op_insert: "Inserimento",
+    review_op_update: "Modifica",
+    review_op_delete: "Eliminazione",
+    review_no_reason: "Nessun motivo indicato",
+    review_actor_unknown: "Autore sconosciuto",
+    review_field: "Campo",
+    review_before: "Prima",
+    review_after: "Dopo",
+    review_empty_value: "vuoto",
+    review_no_changes: "Non cambia nulla",
+    review_keyboard_hint: "j / k per spostarsi · a per approvare · r per rifiutare · spazio per selezionare",
+    review_note_placeholder: "Nota per chi l'ha proposta (facoltativa)",
+    review_approved_toast: "Modifiche approvate: {{count}}",
+    review_rejected_toast: "Modifiche rifiutate: {{count}}",
+    review_decide_error: "Impossibile salvare la decisione: {{message}}",
+    review_record: "Record {{id}}",
+    review_new_record: "Nuovo record",
+    review_close: "Chiudi",
+    review_pending_rows: "Righe in attesa in «{{value}}»",
+    review_proposed_at: "Proposta il {{date}}",
+    review_reload: "Ricarica"
+};

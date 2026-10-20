@@ -1,0 +1,38 @@
+import type { ReviewTranslations } from "./en";
+
+/** The review plugin's strings in es. */
+export const es: ReviewTranslations = {
+    review_queue: "Cola de revisión",
+    review_queue_count: "Cola de revisión ({{count}})",
+    review_queue_title: "Cola de revisión: {{collection}}",
+    review_queue_empty: "No hay nada pendiente de revisión.",
+    review_queue_loading: "Cargando los cambios propuestos…",
+    review_queue_error: "No se pudo cargar la cola de revisión: {{message}}",
+    review_approve: "Aprobar",
+    review_reject: "Rechazar",
+    review_approve_selected: "Aprobar {{count}}",
+    review_reject_selected: "Rechazar {{count}}",
+    review_select_change: "Seleccionar este cambio",
+    review_select_all: "Seleccionar todo",
+    review_op_insert: "Alta",
+    review_op_update: "Cambio",
+    review_op_delete: "Baja",
+    review_no_reason: "Sin motivo indicado",
+    review_actor_unknown: "Autor desconocido",
+    review_field: "Campo",
+    review_before: "Antes",
+    review_after: "Después",
+    review_empty_value: "vacío",
+    review_no_changes: "No cambia nada",
+    review_keyboard_hint: "j / k para moverse · a para aprobar · r para rechazar · espacio para seleccionar",
+    review_note_placeholder: "Nota para quien lo propuso (opcional)",
+    review_approved_toast: "Cambios aprobados: {{count}}",
+    review_rejected_toast: "Cambios rechazados: {{count}}",
+    review_decide_error: "No se pudo guardar la decisión: {{message}}",
+    review_record: "Registro {{id}}",
+    review_new_record: "Registro nuevo",
+    review_close: "Cerrar",
+    review_pending_rows: "Filas pendientes en “{{value}}”",
+    review_proposed_at: "Propuesto el {{date}}",
+    review_reload: "Recargar"
+};

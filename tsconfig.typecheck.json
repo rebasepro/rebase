@@ -95,6 +95,12 @@
       "@rebasepro/plugin-insights/*": [
         "./packages/plugin-insights/src/*"
       ],
+      "@rebasepro/plugin-review": [
+        "./packages/plugin-review/src"
+      ],
+      "@rebasepro/plugin-review/*": [
+        "./packages/plugin-review/src/*"
+      ],
       "@rebasepro/inference": [
         "./packages/inference/src"
       ],
@@ -183,6 +189,7 @@
     "packages/mcp/src",
     "packages/plugin-ai/src",
     "packages/plugin-insights/src",
+    "packages/plugin-review/src",
     // `rls-check` was invisible from both directions: it has no workspace deps,
     // so no `paths` entry pulls it in, and nothing in the tree imports it, so no
     // other file dragged it into the program either. Its only check was the

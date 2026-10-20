@@ -1,0 +1,38 @@
+import type { ReviewTranslations } from "./en";
+
+/** The review plugin's strings in de. */
+export const de: ReviewTranslations = {
+    review_queue: "Prüfwarteschlange",
+    review_queue_count: "Prüfwarteschlange ({{count}})",
+    review_queue_title: "Prüfwarteschlange: {{collection}}",
+    review_queue_empty: "Nichts wartet auf eine Prüfung.",
+    review_queue_loading: "Vorgeschlagene Änderungen werden geladen…",
+    review_queue_error: "Die Prüfwarteschlange konnte nicht geladen werden: {{message}}",
+    review_approve: "Freigeben",
+    review_reject: "Ablehnen",
+    review_approve_selected: "{{count}} freigeben",
+    review_reject_selected: "{{count}} ablehnen",
+    review_select_change: "Diese Änderung auswählen",
+    review_select_all: "Alle auswählen",
+    review_op_insert: "Anlegen",
+    review_op_update: "Ändern",
+    review_op_delete: "Löschen",
+    review_no_reason: "Kein Grund angegeben",
+    review_actor_unknown: "Unbekannter Vorschlagender",
+    review_field: "Feld",
+    review_before: "Vorher",
+    review_after: "Nachher",
+    review_empty_value: "leer",
+    review_no_changes: "Ändert nichts",
+    review_keyboard_hint: "j / k zum Bewegen · a zum Freigeben · r zum Ablehnen · Leertaste zum Auswählen",
+    review_note_placeholder: "Notiz für den Vorschlagenden (optional)",
+    review_approved_toast: "Freigegebene Änderungen: {{count}}",
+    review_rejected_toast: "Abgelehnte Änderungen: {{count}}",
+    review_decide_error: "Die Entscheidung konnte nicht gespeichert werden: {{message}}",
+    review_record: "Datensatz {{id}}",
+    review_new_record: "Neuer Datensatz",
+    review_close: "Schließen",
+    review_pending_rows: "Wartende Zeilen in „{{value}}“",
+    review_proposed_at: "Vorgeschlagen am {{date}}",
+    review_reload: "Neu laden"
+};

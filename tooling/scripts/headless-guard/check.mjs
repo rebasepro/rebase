@@ -58,7 +58,12 @@ const SERVER_PACKAGES = [
     // because banning it by name refused the way this project documents
     // authoring a collection while proving nothing about React. If a value
     // import of React ever lands in its graph, this line fails that day.
-    "packages/cms-types/src/index.ts"
+    "packages/cms-types/src/index.ts",
+    // The review plugin's backend halves: what a collection file imports
+    // (`/config`) and what a function file imports (`/server`). Its root entry
+    // is the admin panel's and is meant to be React.
+    "packages/plugin-review/src/config/index.ts",
+    "packages/plugin-review/src/server/index.ts"
 ];
 
 /**

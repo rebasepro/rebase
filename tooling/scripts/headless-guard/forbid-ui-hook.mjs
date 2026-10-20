@@ -69,6 +69,16 @@ const sourceEntries = new Map();
             if (!manifest.name) continue;
             const entry = path.join(packagesDir, dir, manifest.source ?? "src/index.ts");
             if (fs.existsSync(entry)) sourceEntries.set(manifest.name, entry);
+            // Published subpaths too — `@rebasepro/server/functions` — by the
+            // rule every package here builds with: `dist/<x>/index.d.ts` is
+            // made from `src/<x>/index.ts`. A subpath left to Node resolves to
+            // `dist`, which a fresh checkout does not have.
+            for (const [subpath, target] of Object.entries(manifest.exports ?? {})) {
+                if (subpath === "." || !subpath.startsWith("./") || typeof target?.types !== "string") continue;
+                const source = target.types.replace(/^\.\/dist\//, "src/").replace(/\.d\.ts$/, ".ts");
+                const file = path.join(packagesDir, dir, source);
+                if (source.startsWith("src/") && fs.existsSync(file)) sourceEntries.set(`${manifest.name}/${subpath.slice(2)}`, file);
+            }
         } catch {
             // Unreadable manifest — leave it unaliased and let Node resolve it.
         }
@@ -99,8 +109,7 @@ export async function resolve(specifier, context, nextResolve) {
     const hit = matchPackage(specifier);
     if (hit) fail(hit, context.parentURL);
 
-    // Redirect workspace packages to their source entry (bare specifier only;
-    // subpaths keep their normal resolution).
+    // Redirect workspace packages, and their published subpaths, to source.
     const aliased = sourceEntries.get(specifier);
     if (aliased) {
         return { url: pathToFileURL(aliased).href, format: "module", shortCircuit: true };
