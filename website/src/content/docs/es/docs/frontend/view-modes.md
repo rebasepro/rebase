@@ -1,18 +1,20 @@
 ---
-sourceHash: 9109031950f77ac1
-title: Modos de Vista
-sidebar_label: Modos de Vista
-description: Configure vistas de tabla, tarjetas y tablero Kanban para sus colecciones.
+sourceHash: 608b8f9f3290a362
+title: Modos de vista
+sidebar_label: Modos de vista
+description: Configura vistas de tabla, tarjetas y tablero Kanban para tus colecciones.
 ---
 
-## Resumen
+## Descripción general
 
-Cada colección puede mostrarse en cuatro modos de vista:
+Cada colección se puede mostrar en cuatro modos de vista:
 
-- **Lista** — Vista de lista simple y limpia (el valor predeterminado clásico del CMS)
-- **Tabla** — Cuadrícula estilo hoja de cálculo con edición en línea, clasificación, filtrado
-- **Tarjetas** — Cuadrícula de tarjetas para contenido visual (imágenes, previsualizaciones)
-- **Kanban** — Tablero de arrastrar y soltar agrupado por una propiedad de enumeración
+- **Lista** — Vista de lista simple y limpia (el valor predeterminado clásico de un CMS)
+- **Tabla** — Cuadrícula tipo hoja de cálculo con edición en línea, ordenamiento y filtrado
+- **Tarjetas** — Cuadrícula de tarjetas para contenido visual (imágenes, vistas previas)
+- **Kanban** — Tablero de arrastrar y soltar agrupado por una propiedad de tipo enum
+
+Esas son las opciones integradas. Una colección también puede ofrecer modos de vista que tú mismo escribas — un calendario, un mapa, una galería — dentro del mismo selector, gestionados por la misma barra de herramientas: consulta [Modos de vista personalizados](/docs/frontend/extending#modos-de-vista-personalizados) y la guía de calendario en [Personalizar el Admin](/docs/frontend/customizing).
 
 ## Configuración
 
@@ -20,12 +22,12 @@ Cada colección puede mostrarse en cuatro modos de vista:
 import { defineCollection } from "@rebasepro/cms-types";
 const productsCollection = defineCollection({
     slug: "products",
-    // `orderProperty` y `kanban.columnProperty` se comprueban contra estas
-    // claves — con un bloque `properties` vacío se reducen a `never`.
+    // `orderProperty` and `kanban.columnProperty` are checked against these
+    // keys — with an empty `properties` block they narrow to `never`.
     properties: {
         id: { name: "ID", type: "string", isId: "uuid" },
         status: { name: "Status", type: "string" },
-        // La clave de orden. Un *string*, nunca un número — véase «Ordenamiento» más abajo.
+        // The order key. A *string*, never a number — see "Ordering" below.
         __order: {
             name: "Order",
             type: "string",
@@ -35,48 +37,48 @@ const productsCollection = defineCollection({
     name: "Products",
     table: "products",
     admin: {
-        defaultViewMode: "table",            // Vista predeterminada
-        enabledViews: ["list", "table", "kanban"],    // Vistas disponibles
-        orderProperty: "__order",           // Propiedad para el ordenamiento de arrastrar y soltar
+        defaultViewMode: "table",            // Default view
+        enabledViews: ["list", "table", "kanban"],    // Available views
+        orderProperty: "__order",           // Property for drag-and-drop ordering
         kanban: {
-            columnProperty: "status"         // Propiedad de enumeración para columnas
+            columnProperty: "status"         // Enum property for columns
         }
     }
 });
 
 ```
 
-## Vista de Lista
+## Vista de lista
 
-La vista de lista es el modo de vista predeterminado clásico y limpio del CMS, que muestra las entidades en un formato de lista directo sin la densidad de una hoja de cálculo.
+La vista de lista es el modo de vista predeterminado, clásico y limpio de un CMS, que muestra entidades en un formato de lista directo sin la densidad de una hoja de cálculo.
 
-## Vista de Tabla
+## Vista de tabla
 
 La vista de tabla es una hoja de cálculo virtualizada de alto rendimiento con:
 
-- **Edición en línea** — Haga clic en cualquier celda para editar in situ
-- **Redimensionamiento de columnas** — Arrastre los encabezados de las columnas
-- **Reordenación de columnas** — Arrastre para reorganizar
-- **Clasificación** — Haga clic en los encabezados de las columnas
-- **Búsqueda de texto** — Búsqueda de texto completo en campos de cadena
+- **Edición en línea** — Haz clic en cualquier celda para editar en el lugar
+- **Redimensionamiento de columnas** — Arrastra los encabezados de las columnas
+- **Reordenamiento de columnas** — Arrastra para reorganizar
+- **Ordenamiento** — Haz clic en los encabezados de las columnas
+- **Búsqueda de texto** — Búsqueda de texto completo en campos de cadena de texto
 - **Filtrado** — Filtros por columna
-- **Selección múltiple** — Seleccione entidades para acciones masivas
+- **Selección múltiple** — Selecciona entidades para acciones masivas
 
-### Altura de Fila
+### Altura de fila
 
-Controle la altura de la fila con `defaultSize`:
+Controla la altura de las filas con `defaultSize`:
 
 | Tamaño | Píxeles | Ideal para |
-|------|--------|----------|
-| `"xs"` | 36 | Tablas de datos densos |
+|--------|---------|------------|
+| `"xs"` | 36 | Tablas de datos densas |
 | `"s"` | 42 | Filas de texto compactas |
 | `"m"` | 48 | Predeterminado |
-| `"l"` | 96 | Miniaturas de imagen medianas |
-| `"xl"` | 160 | Miniaturas de imagen grandes |
+| `"l"` | 96 | Miniaturas de imágenes medianas |
+| `"xl"` | 160 | Miniaturas de imágenes grandes |
 
 ## Vista Kanban
 
-Configure un tablero Kanban especificando qué propiedad de enumeración usar como columnas:
+Configura un tablero Kanban especificando qué propiedad enum utilizar como columnas:
 
 ```typescript
 import { defineCollection } from "@rebasepro/cms-types";
@@ -85,15 +87,15 @@ const tasksCollection = defineCollection({
     name: "Tasks",
     table: "tasks",
     properties: {
-        title: { type: "string", name: "Título" },
+        title: { type: "string", name: "Title" },
         status: {
             type: "string",
-            name: "Estado",
+            name: "Status",
             enum: [
-                { id: "backlog", label: "Pendientes", color: "gray" },
-                { id: "in_progress", label: "En Progreso", color: "blue" },
-                { id: "review", label: "Revisión", color: "orange" },
-                { id: "done", label: "Hecho", color: "green" }
+                { id: "backlog", label: "Backlog", color: "gray" },
+                { id: "in_progress", label: "In Progress", color: "blue" },
+                { id: "review", label: "Review", color: "orange" },
+                { id: "done", label: "Done", color: "green" }
             ]
         },
         __order: {
@@ -113,26 +115,15 @@ const tasksCollection = defineCollection({
 
 ```
 
-Arrastrar y soltar entre columnas actualiza automáticamente el campo de enumeración y el orden de clasificación.
+Arrastrar y soltar entre columnas actualiza automáticamente el campo enum y el orden de clasificación.
 
 ### Ordenamiento
 
-`kanban` y `orderProperty` son dos mitades de una misma función. Declara siempre
-ambas — tres descuidos aquí producen un tablero que *parece* configurado y no lo
-está.
+`kanban` y `orderProperty` son dos mitades de una misma funcionalidad. Declara ambas, siempre; cometer tres errores aquí produce en todos los casos un tablero que parece configurado pero no lo está.
 
-**`orderProperty` no es opcional.** Sin ella una tarjeta se sigue arrastrando
-entre columnas, porque eso escribe `columnProperty`. Su posición *dentro* de una
-columna no tiene dónde guardarse: vuelve a su sitio en la siguiente lectura, y el
-tablero muestra una barra ámbar avisando de que el ordenamiento no está
-configurado.
+**`orderProperty` no es opcional.** Sin ella, una tarjeta aún se puede arrastrar entre columnas, porque eso escribe en `columnProperty`. Pero su posición *dentro* de una columna no tiene dónde almacenarse, por lo que se reinicia en la siguiente lectura y el tablero muestra una barra ámbar indicando que el ordenamiento no está configurado.
 
-**La propiedad debe ser un `string`.** Reordenar escribe una clave de
-[fractional-indexing](https://github.com/rocicorp/fractional-indexing) — `"i0"`,
-`"i1"`, `"i0i"` — no un índice. Una propiedad `number` nunca puede contenerla: un
-`sortOrder` numérico deja el tablero pidiendo inicializarse para siempre, y la
-propia inicialización falla contra una columna numérica. Decláralo oculto: es
-maquinaria, no contenido.
+**La propiedad debe ser un `string`.** El reordenamiento escribe una clave de [indexación fraccionaria](https://github.com/rocicorp/fractional-indexing) —`"i0"`, `"i1"`, `"i0i"`—, no un índice. Una propiedad de tipo `number` nunca podrá almacenar una, por lo que un `sortOrder` numérico deja al tablero solicitando inicialización indefinidamente, y la inicialización misma falla contra una columna numérica. Declárala oculta; es mecanismo interno, no contenido:
 
 ```typescript
 __order: {
@@ -142,29 +133,22 @@ __order: {
 }
 ```
 
-**Las filas creadas fuera del admin llegan sin clave.** Nadie la asigna al
-insertar. Una fila escrita por un cron, un script de seed, una migración o la API
-REST llega con `__order` en null, y el tablero muestra *"Some items don't have
-order values"* con un botón **Initialize** — un clic rellena la primera página, y
-la siguiente ejecución del cron devuelve la barra. Si un backend crea filas para
-un tablero, debe asignar la clave él mismo, con el mismo alfabeto que usa el
-admin:
+**Las filas creadas fuera del panel de administración llegan sin una clave.** Nada asigna una al insertar. Una fila escrita por un cron, un script de seed, una migración o la API REST llega con `__order` en null, y el tablero muestra *"Some items don't have order values"* junto con un botón **Initialize**; un clic rellena la primera página, y la siguiente ejecución del cron vuelve a mostrar la barra de inmediato. Si un backend crea filas para un tablero, debe añadir la clave por sí mismo. Utiliza el mismo alfabeto que usa el admin:
 
 ```typescript
 import { generateKeyBetween } from "fractional-indexing";
 
-// Base36, minúsculas. Quien ordena es Postgres, cuya collation por defecto no es
-// el orden de bytes, así que el alfabeto base62 por defecto de la biblioteca —que
-// mezcla mayúsculas y minúsculas— se ordena distinto en la base de datos que en la
-// clave. Omitir este tercer argumento produce claves como "a0" que el tablero
-// rechaza.
+// Base36, lower case. Postgres does the sorting and its default collation is
+// not byte ordering, so the library's default base62 alphabet — which mixes
+// cases — sorts differently in the database than in the key. Omitting this
+// third argument produces keys like "a0" that the board rejects.
 const ORDER_KEY_DIGITS = "0123456789abcdefghijklmnopqrstuvwxyz";
 
 const tasks = client.data.collection("tasks");
 
-// La última clave en uso. `is-not-null` no es opcional: un orden descendente es
-// NULLS FIRST, así que sin él esto relee una de las filas que precisamente no
-// tienen clave y cada inserción cae en el mismo "i0".
+// The last key currently in use. `is-not-null` is not optional: a descending
+// sort is NULLS FIRST, so without it this reads back one of the very rows that
+// has no key and every insert lands on the same "i0".
 const { data: last } = await tasks.find({
     where: { __order: ["is-not-null", null] },
     orderBy: ["__order", "desc"],
@@ -182,14 +166,11 @@ await tasks.create({
 });
 ```
 
-Las filas creadas desde el formulario del admin también llegan sin clave — la
-única diferencia es que ves la barra en el momento en que añades una.
-**Initialize** es el arreglo ahí; en un tablero alimentado por un backend es un
-arreglo que se deshace a sí mismo en cada ejecución.
+Las filas creadas a través del formulario del admin también llegan sin clave; la única diferencia es que ves la barra en el momento en que agregas una. **Initialize** es la solución en ese caso; en un tablero alimentado por un backend es una solución que se deshará en cada ejecución.
 
-## Vista de Tarjetas
+## Vista de tarjetas
 
-Las tarjetas muestran las entidades como tarjetas visuales — útiles para contenido con muchas imágenes:
+Las tarjetas muestran entidades como tarjetas visuales, muy útiles para contenido con abundantes imágenes:
 
 ```typescript
 import { defineCollection } from "@rebasepro/cms-types";
@@ -198,10 +179,10 @@ const articlesCollection = defineCollection({
     name: "Articles",
     table: "articles",
     properties: {
-        title: { type: "string", name: "Título" },
+        title: { type: "string", name: "Title" },
         cover: {
             type: "string",
-            name: "Imagen de Portada",
+            name: "Cover Image",
             storage: { storagePath: "covers", acceptedFiles: ["image/*"] }
         }
     },
@@ -212,7 +193,8 @@ const articlesCollection = defineCollection({
 
 ```
 
-## Próximos Pasos
+## Próximos pasos
 
-- **[Vistas de Entidad](/docs/frontend/entity-views)** — Pestañas personalizadas en formularios de entidad
-- **[Acciones de Entidad](/docs/frontend/entity-actions)** — Acciones de entidad personalizadas
+- **[Personalizar el Admin](/docs/frontend/customizing)** — Tus propios modos de vista, páginas y acciones
+- **[Vistas de entidad](/docs/frontend/entity-views)** — Pestañas personalizadas en formularios de entidad
+- **[Acciones de entidad](/docs/frontend/entity-actions)** — Acciones de entidad personalizadas

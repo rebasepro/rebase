@@ -1,58 +1,62 @@
 ---
-sourceHash: 1c45110c48185387
+sourceHash: a874bc209f13c746
 title: Extender Rebase
 sidebar_label: Extender Rebase
-description: "Una guía de decisión para elegir el mecanismo de extensión adecuado: plugins, slots, reemplazos de componentes, vistas de entidad, acciones y más."
+description: Una guía de decisión para elegir el mecanismo de extensión adecuado — plugins, slots, reemplazos de componentes, vistas de entidad, acciones y más.
 ---
 
-## Descripción general
+## Resumen
 
-Rebase ofrece cerca de una docena de mecanismos de extensión: plugins, slots, reemplazos de componentes, vistas de entidad, acciones, campos personalizados y más. Cada uno apunta a un alcance diferente (a nivel de aplicación, por colección, por entidad, por propiedad) y a una parte distinta de la interfaz de usuario.
+Rebase ofrece cerca de una docena de mecanismos de extensión — plugins, slots, reemplazos de componentes, vistas de entidad, acciones, campos personalizados y más. Cada uno apunta a un alcance diferente (a nivel de aplicación, por colección, por entidad, por propiedad) y a una parte diferente de la interfaz de usuario.
 
-Esta guía le ayuda a elegir el mecanismo adecuado para su caso de uso y luego enlaza con la referencia detallada de cada uno.
+Esta guía te ayuda a elegir el mecanismo adecuado para tu caso de uso y luego enlaza a la referencia detallada de cada uno.
 
-Todo lo que se describe aquí corresponde al **panel de administración**. Para el servidor —restringir una lectura,
-agregar una ruta, integrar el driver en su propio proceso, `rebase eject`— consulte
+:::tip[Comienza con el modelo, no con la lista]
+Cada mecanismo a continuación es lo mismo por debajo: un componente de React colocado en un lugar. [Personalizar el Admin](/docs/frontend/customizing) explica ese modelo en una sola página — bloques de construcción, hooks, lugares — con recetas probadas para un singleton de ajustes, configuraciones por usuario, una acción por lotes (bulk action), una vista de calendario, un dashboard y una pantalla de inicio de sesión personalizada. Léelo primero; vuelve aquí para elegir el lugar.
+:::
+
+Todo lo que se describe aquí corresponde al **panel de administración**. Para el servidor — restringir una lectura,
+añadir una ruta, embeber el driver en tu propio proceso, `rebase eject` — consulta
 [Rebase no hace X](/docs/backend/extending), que es una tabla similar
 para el backend.
 
-## Tabla de decisiones
+## Tabla de Decisión
 
 | Quiero… | Mecanismo | Alcance | Referencia |
 |---|---|---|---|
-| Reemplazar la barra de la aplicación | `components` (`Shell.AppBar`) | app | [Reemplazos de componentes](/docs/frontend/component-overrides) |
-| Reemplazar la página de inicio de sesión | `components` (`Auth.LoginView`) | app | [Reemplazos de componentes](/docs/frontend/component-overrides) |
-| Reemplazar la página de inicio | `components` (`HomePage`) | app | [Reemplazos de componentes](/docs/frontend/component-overrides) |
-| Cambiar por completo la apariencia del formulario de una colección | `formView` | colección | [más abajo](#formview) |
-| Cambiar un componente dentro de una colección | `collection.components` | colección | [Reemplazos de componentes](/docs/frontend/component-overrides) |
-| Establecer reemplazos de componentes predeterminados para todas las colecciones | `components` (nombres con alcance de colección) | app | [Reemplazos de componentes](/docs/frontend/component-overrides) |
-| Agregar un botón a la barra de herramientas de la colección | `Actions` de colección | colección | [Acciones de entidad](/docs/frontend/entity-actions#collection-actions) |
-| Inyectar interfaz de usuario en un slot de la barra de herramientas de la colección | slot `collection.actions` | app/plugin | [Slots](/docs/frontend/slots) |
-| Agregar una columna calculada a una tabla | `additionalFields` | colección | [Columnas adicionales](/docs/frontend/additional-columns) |
-| Agregar un widget de campo personalizado para un tipo de propiedad | `propertyConfigs` | tipo de propiedad | [Campos personalizados](/docs/frontend/custom-fields) |
-| Agregar una pestaña de entidad | `entityViews` | entidad | [Vistas de entidad](/docs/frontend/entity-views) |
-| Renderizar las filas de una colección de una forma diferente | `admin.customViews` | colección | [más abajo](#modos-de-vista-personalizados) |
-| Agregar una acción de fila/contexto o un botón de entidad | `entityActions` | entidad | [Acciones de entidad](/docs/frontend/entity-actions) |
-| Poner una cifra o gráfico en la tarjeta de la página de inicio de una colección | slot `home.card.widget` | app/plugin | [Slots](/docs/frontend/slots) |
-| Inyectar interfaz de usuario en una ubicación específica de la estructura (chrome) | `slots` | app/plugin | [Slots](/docs/frontend/slots) |
-| Distribuir varias extensiones como una única unidad instalable | `plugins` | app | [Plugins](/docs/plugins) |
-| Dar estilo a lo que acabo de construir | `@rebasepro/ui` + tokens de tema | cualquiera | [Estilizado de interfaz personalizada](/docs/frontend/styling) |
+| Reemplazar la barra de la aplicación | `components` (`Shell.AppBar`) | app | [Reemplazos de Componentes](/docs/frontend/component-overrides) |
+| Reemplazar la página de inicio de sesión | `components` (`Auth.LoginView`) | app | [Reemplazos de Componentes](/docs/frontend/component-overrides) |
+| Reemplazar la página de inicio | `components` (`HomePage`) | app | [Reemplazos de Componentes](/docs/frontend/component-overrides) |
+| Cambiar por completo la apariencia del formulario de una colección | `formView` | collection | [más abajo](#formview) |
+| Cambiar un componente dentro de una colección | `collection.components` | collection | [Reemplazos de Componentes](/docs/frontend/component-overrides) |
+| Establecer reemplazos de componentes predeterminados para todas las colecciones | `components` (nombres con alcance de colección) | app | [Reemplazos de Componentes](/docs/frontend/component-overrides) |
+| Añadir un botón a la barra de herramientas de la colección | `Actions` de colección | collection | [Acciones de Entidad](/docs/frontend/entity-actions#collection-actions) |
+| Inyectar UI en un slot de la barra de herramientas de la colección | slot `collection.actions` | app/plugin | [Slots](/docs/frontend/slots) |
+| Añadir una columna calculada a una tabla | `additionalFields` | collection | [Columnas Adicionales](/docs/frontend/additional-columns) |
+| Añadir un widget de campo personalizado para un tipo de propiedad | `propertyConfigs` | property type | [Campos Personalizados](/docs/frontend/custom-fields) |
+| Añadir una pestaña a la entidad | `entityViews` | entity | [Vistas de Entidad](/docs/frontend/entity-views) |
+| Renderizar las filas de una colección de una forma diferente | `admin.customViews` | collection | [más abajo](#modos-de-vista-personalizados) |
+| Añadir una acción de fila/contexto o un botón de entidad | `entityActions` | entity | [Acciones de Entidad](/docs/frontend/entity-actions) |
+| Colocar una cifra/gráfico en la tarjeta de inicio de una colección | slot `home.card.widget` | app/plugin | [Slots](/docs/frontend/slots) |
+| Inyectar UI en una ubicación específica del chrome | `slots` | app/plugin | [Slots](/docs/frontend/slots) |
+| Distribuir varias extensiones como una sola unidad instalable | `plugins` | app | [Plugins](/docs/plugins) |
+| Dar estilo a lo que acabo de construir | `@rebasepro/ui` + tokens de tema | cualquiera | [Estilizar UI Personalizada](/docs/frontend/styling) |
 
-:::tip[Elija lo que elija, constrúyalo a partir del kit]
-Cada mecanismo a continuación le proporciona un componente de React y no dice nada sobre con qué
-rellenarlo. Utilice componentes de `@rebasepro/ui` y los tokens de color del tema en lugar
-de CSS escrito a mano: una vista personalizada sigue siendo una vista de administración, y un color
-fijo en código será invisible en uno de los dos temas. Consulte
-[Estilizado de interfaz personalizada](/docs/frontend/styling).
+:::tip[Elijas lo que elijas, constrúyelo a partir del kit]
+Cada mecanismo a continuación te entrega un componente de React y no dice nada sobre con qué
+rellenarlo. Utiliza los componentes de `@rebasepro/ui` y los tokens de color del tema en lugar
+de CSS escrito a mano — una vista personalizada sigue siendo una vista del admin, y un color
+definido a fuego (hardcoded) es invisible en uno de los dos temas. Consulta
+[Estilizar UI Personalizada](/docs/frontend/styling).
 :::
 
-## Mecanismos en detalle
+## Mecanismos en Detalle
 
 ### Plugins
 
 **Alcance:** app.
 
-Un plugin agrupa colecciones, vistas, reemplazos de componentes, contribuciones de slots, autenticación, fuentes de datos, proveedores, hooks y callbacks del ciclo de vida en una sola unidad instalable. Todos los demás mecanismos enumerados aquí pueden aportarse a través de la interfaz de un plugin.
+Un plugin agrupa colecciones, vistas, reemplazos de componentes, contribuciones a slots, autenticación, fuentes de datos, proveedores, hooks y callbacks del ciclo de vida en una sola unidad instalable. Todos los demás mecanismos enumerados aquí pueden aportarse a través de la interfaz de un plugin.
 
 → [Referencia de Plugins](/docs/plugins)
 
@@ -60,19 +64,19 @@ Un plugin agrupa colecciones, vistas, reemplazos de componentes, contribuciones 
 
 **Alcance:** app (aportados por cada slot).
 
-Los slots son puntos de extensión de la interfaz de usuario nombrados y distribuidos a lo largo del chrome del CMS. Usted registra un componente de React dirigido a un nombre de slot y este se renderiza en esa ubicación. Hay 27 slots que abarcan la página de inicio, la navegación, las vistas de colección, los formularios, las filas de entidad, los campos de formulario y la barra de la aplicación; y cada uno de ellos es renderizado.
+Los slots son puntos de extensión de UI con nombre distribuidos por todo el chrome del CMS. Registras un componente de React que apunta al nombre de un slot y este se renderiza en esa ubicación. Hay 27 slots que cubren la página de inicio, la navegación, las vistas de colección, los formularios, las filas de entidad, los campos de formulario y la barra de la aplicación — y cada uno de ellos se renderiza.
 
 → [Referencia de Slots](/docs/frontend/slots)
 
-### Reemplazos de componentes (Swizzling)
+### Reemplazos de Componentes (Swizzling)
 
 **Alcance:** valores predeterminados a nivel de app o por colección.
 
-Dos modos: **Eject** (reemplazo total) o **Wrap** (extender el original).
+Dos modos: **Eject** (reemplazo completo) o **Wrap** (ampliar el original).
 
-19 nombres de componentes reemplazables en dos niveles:
+19 nombres de componentes reemplazables divididos en dos niveles:
 
-**Solo para la app (7):**
+**Solo a nivel de App (7):**
 - `Shell.AppBar`
 - `Shell.Drawer`
 - `Shell.DrawerNavigationItem`
@@ -81,7 +85,7 @@ Dos modos: **Eject** (reemplazo total) o **Wrap** (extender el original).
 - `HomePage.CollectionCard`
 - `Auth.LoginView`
 
-**Con alcance de colección (12):**
+**Con alcance de Colección (12):**
 - `Collection.View`
 - `Collection.Table`
 - `Collection.Card`
@@ -95,40 +99,40 @@ Dos modos: **Eject** (reemplazo total) o **Wrap** (extender el original).
 - `EntityPreview`
 - `Entity.MissingReference`
 
-**Precedencia:** Los `components` a nivel de colección anulan los predeterminados a nivel de app para el mismo nombre de componente (propagación de objetos simple: los valores de la colección sobrescriben los valores globales). Los nombres de componentes exclusivos de la aplicación (`Shell.*`, `HomePage`, `Auth.*`) solo pueden reemplazarse a nivel de `<Rebase>`.
+**Precedencia:** Los `components` a nivel de colección reemplazan los valores predeterminados a nivel de aplicación para el mismo nombre de componente (propagación de objetos simple — los valores de la colección sobrescriben los valores globales). Los nombres de componentes exclusivos para App (`Shell.*`, `HomePage`, `Auth.*`) solo se pueden reemplazar a nivel de `<Rebase>`.
 
-→ [Reemplazos de componentes](/docs/frontend/component-overrides)
+→ [Reemplazos de Componentes](/docs/frontend/component-overrides)
 
-### Vistas de entidad
+### Vistas de Entidad
 
-**Alcance:** entidad (agrega pestañas).
+**Alcance:** entity (añade pestañas).
 
-Vistas personalizadas que aparecen como pestañas en la página de detalles de la entidad. Se pueden definir globalmente en `<Rebase>` o por colección.
+Vistas personalizadas que aparecen como pestañas en la página de detalle de la entidad. Se pueden definir globalmente en `<Rebase>` o por colección.
 
-→ [Vistas de entidad](/docs/frontend/entity-views)
+→ [Vistas de Entidad](/docs/frontend/entity-views)
 
-### Acciones de entidad
+### Acciones de Entidad
 
-**Alcance:** entidad.
+**Alcance:** entity.
 
 Botones de acción personalizados en entidades individuales (publicar, archivar, clonar, etc.). Se pueden definir globalmente o por colección.
 
-→ [Acciones de entidad](/docs/frontend/entity-actions)
+→ [Acciones de Entidad](/docs/frontend/entity-actions)
 
-### `Actions` de colección
+### `Actions` de Colección
 
-**Alcance:** colección.
+**Alcance:** collection.
 
-Componentes de React a nivel de barra de herramientas que reciben `CollectionActionsProps` (entidades seleccionadas, controlador de tabla, contexto de colección). Se renderizan en la barra de herramientas de la colección junto a las acciones integradas.
+Componentes de React a nivel de barra de herramientas que reciben `CollectionActionsProps` (entidades seleccionadas, controlador de tabla, contexto de la colección). Se renderizan en la barra de herramientas de la colección junto a las acciones integradas.
 
-**Relación con el slot `collection.actions`:** Ambos son acumulativos: los componentes `Actions` se renderizan primero en la barra de herramientas y luego las contribuciones del slot `collection.actions`. No se reemplazan entre sí.
+**Relación con el slot `collection.actions`:** Ambos son aditivos — los componentes de `Actions` se renderizan primero en la barra de herramientas, y luego las contribuciones del slot `collection.actions`. No se reemplazan entre sí.
 
-→ [Acciones de entidad — Acciones de colección](/docs/frontend/entity-actions#collection-actions)
+→ [Acciones de Entidad — Acciones de Colección](/docs/frontend/entity-actions#collection-actions)
 
 ### Modos de vista personalizados
-**Alcance:** colección (agrega un modo de vista).
+**Alcance:** collection (añade un modo de vista).
 
-Un mapa, un calendario, una galería, una línea de tiempo: otra representación de *las mismas filas*,
+Un mapa, un calendario, una galería, una línea de tiempo — otra renderización de *las mismas filas*,
 ofrecida en el selector de vistas de la colección junto a Lista, Tabla, Tarjetas y Tablero.
 
 ```ts
@@ -142,8 +146,8 @@ admin: {
 }
 ```
 
-O registre el componente una vez y nómbrelo por su clave, lo que también permite
-seleccionarlo desde el editor de colecciones:
+O registra el componente una vez y nómbralo por su clave, lo que también hace que sea
+seleccionable desde el editor de colecciones:
 
 ```tsx
 <RebaseCMS
@@ -157,9 +161,9 @@ admin: { customViews: ["map"] }
 ```
 
 `Builder` recibe el `tableController` en vivo, por lo que la vista hereda los
-filtros de la colección, la casilla de búsqueda, el ordenamiento, la paginación, las verificaciones de permisos
-y el panel lateral de la entidad; ese es todo el motivo para declarar uno en lugar
-de construir un `AppView`:
+filtros de la colección, la caja de búsqueda, la ordenación, la paginación, las comprobaciones de permisos
+y el panel lateral de la entidad — esa es la razón principal para declarar uno en lugar de
+construir un `AppView`:
 
 ```tsx
 function MapView({ tableController, onEntityClick }: CollectionCustomViewParams) {
@@ -171,17 +175,17 @@ function MapView({ tableController, onEntityClick }: CollectionCustomViewParams)
 ```
 
 Elegir la vista actualiza `?__view=`, sobrevive a una recarga y persiste por usuario.
-Declarar una es suficiente para ofrecerla; `enabledViews` solo necesita configurarse cuando se
-desea *quitar las opciones integradas*. Con una sola entrada, el selector se oculta.
+Declarar una es suficiente para ofrecerla — `enabledViews` solo necesita configurarse cuando quieras
+*quitar las vistas integradas*. Con una sola entrada, el selector se oculta.
 
 **Esta no es una forma de construir una vista que abarque varias colecciones.** Un modo de vista
-es otra representación de la consulta de una colección. Si su componente ignora
-`tableController` y obtiene cuatro tablas por su cuenta, debería ser un
-[`AppView`](/docs/frontend#custom-views); la barra de herramientas superior, con su casilla
-de búsqueda y su conteo de registros, estaría describiendo una consulta que este no renderiza.
+es otra representación de la consulta de una sola colección. Si tu componente ignora
+`tableController` y obtiene cuatro tablas por su cuenta, debería ser una
+[`AppView`](/docs/frontend#custom-views) — la barra de herramientas sobre él, con su caja de
+búsqueda y su recuento de registros, estaría describiendo una consulta que no renderiza.
 
 ### `formView`
-**Alcance:** colección.
+**Alcance:** collection.
 
 Reemplaza todo el formulario de entidad predeterminado por un componente personalizado. Se configura en la definición de una colección:
 
@@ -198,44 +202,44 @@ const collection = {
 
 ```
 
-Utilícelo cuando necesite un diseño completamente personalizado para la experiencia de edición de entidades de una colección. Para ajustes menores, prefiera `collection.components` con el reemplazo de `Entity.Form`.
+Úsalo cuando necesites un diseño completamente personalizado para la experiencia de edición de entidades de una colección. Para ajustes más pequeños, es preferible usar `collection.components` con el reemplazo de `Entity.Form`.
 
-El Builder se renderiza dentro del formulario del registro y recibe su `formContext` en vivo: escriba con `formContext.setFieldValue`, y el botón Guardar de la barra almacenará el registro. Donde el registro no se pueda editar (la vista de detalles de solo lectura, o un usuario sin permisos de edición), `formContext.disabled` es `true` y las escrituras arrojarán un error. Establezca `includeActions: false` si su Builder guarda por su cuenta mediante `formContext.submit()`.
+El Builder se renderiza dentro del formulario del registro y recibe su `formContext` en vivo: escribe con `formContext.setFieldValue`, y el botón Guardar de la barra almacenará el registro. Donde el registro no se pueda editar —la vista de detalle de solo lectura o un usuario sin permisos de edición— `formContext.disabled` es `true` y las escrituras lanzarán un error. Establece `includeActions: false` si tu Builder guarda por su cuenta mediante `formContext.submit()`.
 
 ### `additionalFields`
 
-**Alcance:** colección.
+**Alcance:** collection.
 
-Columnas calculadas/virtuales mostradas en la tabla de la colección. Estas no corresponden a propiedades almacenadas: se calculan en el momento del renderizado.
+Columnas calculadas/virtuales mostradas en la tabla de la colección. Estas no corresponden a propiedades almacenadas — se calculan en el momento del renderizado.
 
-→ [Columnas adicionales](/docs/frontend/additional-columns)
+→ [Columnas Adicionales](/docs/frontend/additional-columns)
 
 ### `propertyConfigs`
 
-**Alcance:** tipo de propiedad.
+**Alcance:** property type.
 
 Widgets de campo personalizados para tipos de propiedad específicos, que proporcionan campos de formulario y componentes de vista previa personalizados.
 
-→ [Campos personalizados](/docs/frontend/custom-fields)
+→ [Campos Personalizados](/docs/frontend/custom-fields)
 
-## Fuera del panel de administración
+## No es el panel de administración
 
-Si lo que desea cambiar es lo que hace el servidor en lugar de lo que
-muestra el panel, esta no es la página indicada. El servidor tiene su propia escala:
+Si lo que deseas cambiar es lo que hace el servidor en lugar de lo que muestra
+el panel, esta es la página equivocada. El servidor tiene su propia escala:
 
 | Quiero… | Nivel | Referencia |
 |---|---|---|
-| Restringir qué filas devuelve una lectura | Callback `beforeQuery` | [Extender el servidor](/docs/backend/extending#2-collection-callbacks) |
-| Ocultar/censurar un valor en la respuesta de salida | Callback `afterRead` | [Callbacks](/docs/collections/callbacks) |
-| Agregar un endpoint propio | función personalizada | [Funciones personalizadas](/docs/backend/custom-functions) |
+| Delimitar qué filas devuelve una lectura | callback `beforeQuery` | [Extender el servidor](/docs/backend/extending#2-collection-callbacks) |
+| Ocultar/censurar un valor en la salida | callback `afterRead` | [Callbacks](/docs/collections/callbacks) |
+| Añadir un endpoint propio | función personalizada | [Funciones Personalizadas](/docs/backend/custom-functions) |
 | Hacer que la búsqueda encuentre subcadenas *y* normalice acentos | `search.mode: "hybrid"` | [Búsqueda](/docs/backend/search) |
-| Tomar el control del proceso del servidor | servidor personalizado, luego `rebase eject` | [Extender el servidor](/docs/backend/extending) |
+| Controlar el proceso del servidor | servidor personalizado, luego `rebase eject` | [Extender el servidor](/docs/backend/extending) |
 
 → [Rebase no hace X](/docs/backend/extending)
 
-## Resumen de precedencia
+## Resumen de Precedencia
 
-- **`collection.components` se aplica sobre `components` globales** dentro de esa colección. Un reemplazo de colección reemplaza a ambos; una sobrescritura de colección con `wrap: true` envuelve la sobrescritura global cuando la hay (en 0.24 envuelve el componente integrado, y la sobrescritura global se omite). Consulta [Sobrescritura de componentes](/docs/frontend/component-overrides#when-both-scopes-override-a-component).
-- **`Actions` de colección y el slot `collection.actions` son acumulativos**: `Actions` se renderizan primero, luego las contribuciones de los slots.
-- **`entityActions` y `entityViews` a nivel de colección amplían (no reemplazan) a los globales.**
-- **Los plugins se aplican en el orden del array `plugins`**, no por `key`. Las contribuciones a los slots se renderizan según su `order` (menor primero, 50 por defecto), y los empates mantienen ese orden. Los envoltorios de campo (field wrappers) de varios plugins se componen en ese orden, con el del primer plugin como el más interno; en 0.24 solo se renderizaba el último envoltorio. Consulta [Sistema de plugins](/docs/plugins#field-wrappers-from-several-plugins).
+- **`collection.components` se aplica sobre los `components` globales** dentro de esa colección. Un reemplazo a nivel de colección sustituye a ambos; un reemplazo con `wrap: true` en la colección envuelve al reemplazo global cuando existe uno (en 0.24 envuelve al componente integrado y se omite el reemplazo global). Consulta [Reemplazos de Componentes](/docs/frontend/component-overrides#when-both-scopes-override-a-component).
+- **Las `Actions` de colección y el slot `collection.actions` son aditivos** — `Actions` se renderizan primero, seguidas de las contribuciones a los slots.
+- **Las `entityActions` y `entityViews` a nivel de colección extienden (no reemplazan) las globales.**
+- **Los plugins se aplican en el orden del array `plugins`**, no por `key`. Las contribuciones a slots se renderizan según su `order` (menor valor primero, 50 por defecto), y los empates mantienen ese orden. Los envoltorios de campo (field wrappers) de varios plugins se componen en ese orden, siendo el del primer plugin el más interno; en 0.24 solo se renderizaba el último envoltorio. Consulta [Plugins](/docs/plugins#field-wrappers-from-several-plugins).

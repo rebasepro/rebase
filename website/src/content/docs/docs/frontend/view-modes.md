@@ -13,6 +13,8 @@ Every collection can be displayed in four view modes:
 - **Cards** — Card grid for visual content (images, previews)
 - **Kanban** — Drag-and-drop board grouped by an enum property
 
+Those are the built-in ones. A collection can also offer view modes you write — a calendar, a map, a gallery — in the same switcher, driven by the same toolbar: see [Custom view modes](/docs/frontend/extending#custom-view-modes) and the calendar recipe in [Customizing the Admin](/docs/frontend/customizing).
+
 ## Configuration
 
 ```typescript
@@ -208,5 +210,6 @@ const articlesCollection = defineCollection({
 
 ## Next Steps
 
+- **[Customizing the Admin](/docs/frontend/customizing)** — Your own view modes, pages and actions
 - **[Entity Views](/docs/frontend/entity-views)** — Custom tabs on entity forms
 - **[Entity Actions](/docs/frontend/entity-actions)** — Custom entity actions

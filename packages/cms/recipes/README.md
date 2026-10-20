@@ -65,6 +65,31 @@ Components you render anywhere under `<Rebase>` and a router.
 | Something beside a built-in part | `<Rebase slots={[{ slot, Component }]}>` (`home.cards`, `form.after`, `collection.toolbar`, …) | |
 | A replacement for a built-in part | `<Rebase components={{ "Auth.LoginView": { Component } }}>` — or `wrap: true` to keep the original inside yours | custom login |
 
+## What each place hands your component
+
+| Place | Your component receives |
+|---|---|
+| A page (`views`) | Nothing: read what you need with the hooks. It renders inside the admin's router, so `useUrlController().navigate(…)` (or `react-router`) works. |
+| A view mode `Builder` | `CollectionCustomViewParams`: `collection`, `path`, `tableController` (its `data` is the rows the toolbar's search and filters select, `dataLoading`, …), `onEntityClick(entity)` to open a row the way the collection opens rows, `selectionController`, `emptyComponent`. |
+| `admin.Actions` | `CollectionActionsProps`: `path`, `collection`, `selectionController` (`hasSelection`, `selection`, `clearSelection()`), `tableController`, `openNewDocument(defaults?)`. Turn `selection` into rows with `resolveSelection({ selection, accessor: useData().collection(path) })` — it may stand for "every row matching the filter", not only the ticked ones. |
+| `admin.entityViews` `Builder` | `EntityCustomViewParams`: `collection`, the record (`entity`, absent while it is being created), its unsaved values (`modifiedValues`) and the form (`formContext`). |
+| `"Auth.LoginView"` | `{ authController }`. Sign in with `authController.emailPasswordLogin?.(email, password)` (optional: present when email sign-in is enabled); a failure throws and is also on `authController.authProviderError`. Once `authController.user` is set the admin replaces your screen by itself. |
+| Any other override | The props of the part it replaces; with `wrap: true`, those plus `OriginalComponent`. |
+
+## Facts that save a trip to the source
+
+- **Rows are `Entity` objects.** `useData().collection("orders").find()` resolves to
+  `{ data: Entity[], meta }`; a row's fields are on `row.values`, its id is
+  `row.id`. `find({ limit, offset, where: { status: ["==", "paid"] }, orderBy: ["createdAt", "desc"] })`.
+- **Dates in `values` are `Date` objects** in the admin, not strings.
+- **Defaults for a new record:** a property's `defaultValue` applies everywhere a
+  record is created; `EntityFormPanel`'s `defaultValues` apply to that form only,
+  on top of them.
+- **Enum fields** are `enum: [{ id: "draft", label: "Draft" }, …]` on a string
+  property — see `defineCollection` and the collections docs for every property
+  option.
+- **A record keyed by its user:** `entityId={useAuthController().user?.uid}`.
+
 The override names are `Shell.AppBar`, `Shell.Drawer`, `HomePage`,
 `HomePage.CollectionCard`, `Auth.LoginView`, `Collection.View`,
 `Collection.Table`, `Collection.Card`, `Collection.EmptyState`,

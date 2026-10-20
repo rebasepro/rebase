@@ -10,6 +10,10 @@ Rebase offers roughly a dozen extension mechanisms — plugins, slots, component
 
 This guide helps you pick the right mechanism for your use case, then links to the detailed reference for each.
 
+:::tip[Start with the model, not the list]
+Every mechanism below is the same thing underneath: a React component put in a place. [Customizing the Admin](/docs/frontend/customizing) explains that model in one page — building blocks, hooks, places — with tested recipes for a settings singleton, per-user settings, a bulk action, a calendar view, a dashboard and a custom login screen. Read it first; come back here to pick the place.
+:::
+
 Everything here is the **admin panel**. For the server — narrowing a read,
 adding a route, embedding the driver in your own process, `rebase eject` — see
 [Rebase doesn't do X](/docs/backend/extending), which is the same kind of table

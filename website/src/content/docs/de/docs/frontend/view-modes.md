@@ -1,18 +1,20 @@
 ---
-sourceHash: 9109031950f77ac1
+sourceHash: 608b8f9f3290a362
 title: Ansichtsmodi
 sidebar_label: Ansichtsmodi
-description: Konfigurieren Sie Tabellen-, Karten- und Kanban-Board-Ansichten für Ihre Sammlungen.
+description: Konfigurieren Sie Tabellen-, Karten- und Kanban-Board-Ansichten für Ihre Collections.
 ---
 
 ## Übersicht
 
-Jede Sammlung kann in vier Ansichtsmodi angezeigt werden:
+Jede Collection kann in vier Ansichtsmodi dargestellt werden:
 
-- **Liste** — Einfache, saubere Listenansicht (die klassische CMS-Standardansicht)
-- **Tabelle** — Tabellenähnliches Raster mit Inline-Bearbeitung, Sortierung, Filterung
-- **Karten** — Kartenraster für visuelle Inhalte (Bilder, Vorschauen)
-- **Kanban** — Drag-and-drop-Board, gruppiert nach einer Enum-Eigenschaft
+- **Liste** — Einfache, übersichtliche Listenansicht (der klassische CMS-Standard)
+- **Tabelle** — Tabellenkalkulations-Grid mit Inline-Bearbeitung, Sortierung, Filterung
+- **Karten** — Kartengitter für visuelle Inhalte (Bilder, Vorschauen)
+- **Kanban** — Drag-and-Drop-Board, gruppiert nach einer Enum-Eigenschaft
+
+Dies sind die integrierten Modi. Eine Collection kann auch von Ihnen erstellte Ansichtsmodi bieten — einen Kalender, eine Karte, eine Galerie — im selben Umschalter, gesteuert über dieselbe Toolbar: siehe [Benutzerdefinierte Ansichtsmodi](/docs/frontend/extending#benutzerdefinierte-ansichtsmodi-custom-view-modes) und das Kalender-Rezept in [Admin anpassen](/docs/frontend/customizing).
 
 ## Konfiguration
 
@@ -20,12 +22,12 @@ Jede Sammlung kann in vier Ansichtsmodi angezeigt werden:
 import { defineCollection } from "@rebasepro/cms-types";
 const productsCollection = defineCollection({
     slug: "products",
-    // `orderProperty` und `kanban.columnProperty` werden gegen diese
-    // Schlüssel geprüft — bei leerem `properties`-Block verengen sie sich zu `never`.
+    // `orderProperty` and `kanban.columnProperty` are checked against these
+    // keys — with an empty `properties` block they narrow to `never`.
     properties: {
         id: { name: "ID", type: "string", isId: "uuid" },
         status: { name: "Status", type: "string" },
-        // Der Sortierschlüssel. Ein *String*, nie eine Zahl — siehe „Sortierung“ unten.
+        // The order key. A *string*, never a number — see "Ordering" below.
         __order: {
             name: "Order",
             type: "string",
@@ -37,7 +39,7 @@ const productsCollection = defineCollection({
     admin: {
         defaultViewMode: "table",            // Default view
         enabledViews: ["list", "table", "kanban"],    // Available views
-        orderProperty: "__order",           // Eigenschaft für die Drag-and-drop-Sortierung
+        orderProperty: "__order",           // Property for drag-and-drop ordering
         kanban: {
             columnProperty: "status"         // Enum property for columns
         }
@@ -48,35 +50,35 @@ const productsCollection = defineCollection({
 
 ## Listenansicht
 
-Die Listenansicht ist der klassische, saubere CMS-Standardansichtsmodus, der Entitäten in einem unkomplizierten Listenformat ohne die Dichte einer Tabelle darstellt.
+Die Listenansicht ist der klassische, übersichtliche Standard-Ansichtsmodus des CMS, der Entitäten in einem geradlinigen Listenformat ohne die Dichte einer Tabellenkalkulation darstellt.
 
 ## Tabellenansicht
 
-Die Tabellenansicht ist eine hochleistungsfähige virtualisierte Tabelle mit:
+Die Tabellenansicht ist eine hochperformante, virtualisierte Tabellenkalkulation mit:
 
 - **Inline-Bearbeitung** — Klicken Sie auf eine beliebige Zelle, um sie direkt zu bearbeiten
-- **Spaltengrößenanpassung** — Spaltenüberschriften ziehen
-- **Spaltenneuanordnung** — Ziehen, um neu anzuordnen
-- **Sortierung** — Klicken Sie auf Spaltenüberschriften
-- **Textsuche** — Volltextsuche über Zeichenfolgenfelder
-- **Filterung** — Spaltenbezogene Filter
-- **Mehrfachauswahl** — Entitäten für Massenaktionen auswählen
+- **Spaltenbreite anpassen** — Ziehen von Spaltenüberschriften
+- **Spalten neu anordnen** — Ziehen zum Neuanordnen
+- **Sortierung** — Klick auf Spaltenüberschriften
+- **Textsuche** — Volltextsuche über String-Felder hinweg
+- **Filterung** — Filter pro Spalte
+- **Mehrfachauswahl** — Entitäten für Bulk-Aktionen auswählen
 
 ### Zeilenhöhe
 
 Steuern Sie die Zeilenhöhe mit `defaultSize`:
 
-| Größe | Pixel | Am besten geeignet für |
-|------|--------|----------|
+| Größe | Pixel | Am besten für |
+|-------|-------|---------------|
 | `"xs"` | 36 | Dichte Datentabellen |
 | `"s"` | 42 | Kompakte Textzeilen |
 | `"m"` | 48 | Standard |
-| `"l"` | 96 | Mittelgroße Bildminiaturen |
-| `"xl"` | 160 | Große Bildminiaturen |
+| `"l"` | 96 | Mittlere Bild-Thumbnails |
+| `"xl"` | 160 | Große Bild-Thumbnails |
 
 ## Kanban-Ansicht
 
-Konfigurieren Sie ein Kanban-Board, indem Sie festlegen, welche Enum-Eigenschaft als Spalten verwendet werden soll:
+Konfigurieren Sie ein Kanban-Board, indem Sie angeben, welche Enum-Eigenschaft als Spalten verwendet werden soll:
 
 ```typescript
 import { defineCollection } from "@rebasepro/cms-types";
@@ -113,27 +115,15 @@ const tasksCollection = defineCollection({
 
 ```
 
-Drag-and-drop zwischen Spalten aktualisiert automatisch das Enum-Feld und die Sortierreihenfolge.
+Drag-and-Drop zwischen Spalten aktualisiert das Enum-Feld und die Sortierreihenfolge automatisch.
 
 ### Sortierung
 
-`kanban` und `orderProperty` sind zwei Hälften einer Funktion. Deklarieren Sie
-immer beide — drei Fehler an dieser Stelle ergeben ein Board, das konfiguriert
-*aussieht* und es nicht ist.
+`kanban` und `orderProperty` sind zwei Hälften desselben Features. Deklarieren Sie immer beide — drei typische Fehler führen hier zu einem Board, das konfiguriert aussieht, es aber nicht ist.
 
-**`orderProperty` ist nicht optional.** Ohne sie lässt sich eine Karte weiterhin
-zwischen Spalten ziehen, denn das schreibt `columnProperty`. Ihre Position
-*innerhalb* einer Spalte hat keinen Speicherort, springt beim nächsten Laden
-zurück, und das Board zeigt einen bernsteinfarbenen Hinweisbalken, dass die
-Sortierung nicht konfiguriert ist.
+**`orderProperty` ist nicht optional.** Ohne diese Eigenschaft lässt sich eine Karte zwar weiterhin zwischen Spalten verschieben, da dies `columnProperty` schreibt. Ihre Position *innerhalb* einer Spalte kann jedoch nirgendwo gespeichert werden, sodass sie beim nächsten Lesen zurückgesetzt wird und das Board einen bernsteinfarbenen Balken anzeigt, der darauf hinweist, dass die Sortierung nicht konfiguriert ist.
 
-**Die Eigenschaft muss ein `string` sein.** Das Umsortieren schreibt einen
-[fractional-indexing](https://github.com/rocicorp/fractional-indexing)-Schlüssel
-— `"i0"`, `"i1"`, `"i0i"` — keinen Index. Eine `number`-Eigenschaft kann ihn nie
-aufnehmen: ein numerisches `sortOrder` lässt das Board dauerhaft nach
-Initialisierung fragen, und die Initialisierung selbst scheitert an einer
-numerischen Spalte. Deklarieren Sie sie versteckt — sie ist Mechanik, kein
-Inhalt.
+**Die Eigenschaft muss ein `string` sein.** Das Neuanordnen schreibt einen [fractional-indexing](https://github.com/rocicorp/fractional-indexing)-Schlüssel — `"i0"`, `"i1"`, `"i0i"` — keinen Index. Eine `number`-Eigenschaft kann diesen niemals aufnehmen, weshalb ein numerisches `sortOrder` dazu führt, dass das Board endlos zur Initialisierung auffordert, und die Initialisierung selbst bei einer numerischen Spalte fehlschlägt. Deklarieren Sie sie als ausgeblendet; sie dient der internen Logik, nicht dem Inhalt:
 
 ```typescript
 __order: {
@@ -143,29 +133,22 @@ __order: {
 }
 ```
 
-**Außerhalb des Admin erzeugte Zeilen kommen ohne Schlüssel an.** Beim Insert
-vergibt ihn niemand. Eine Zeile aus einem Cron, einem Seed-Skript, einer
-Migration oder der REST-API landet mit `__order` auf null, und das Board zeigt
-*"Some items don't have order values"* samt **Initialize**-Schaltfläche — ein
-Klick füllt die erste Seite, der nächste Cron-Lauf holt den Balken zurück.
-Erzeugt ein Backend Zeilen für ein Board, vergibt es den Schlüssel selbst, mit
-demselben Alphabet wie der Admin:
+**Außerhalb des Admin-Bereichs erstellte Zeilen werden ohne Schlüssel geliefert.** Beim Einfügen wird keiner zugewiesen. Eine Zeile, die durch einen Cronjob, ein Seed-Skript, eine Migration oder die REST-API geschrieben wird, kommt mit `__order` als null an, und das Board zeigt *„Some items don't have order values“* zusammen mit einem **Initialize**-Button an — ein Klick füllt die erste Seite nachträglich aus, und der nächste Cronjob-Lauf bringt den Balken direkt wieder zurück. Wenn ein Backend Zeilen für ein Board erstellt, sollte es den Schlüssel selbst anhängen. Verwenden Sie dasselbe Alphabet wie der Admin:
 
 ```typescript
 import { generateKeyBetween } from "fractional-indexing";
 
-// Base36, Kleinbuchstaben. Sortiert wird von Postgres, dessen Standard-Collation
-// keine Byte-Ordnung ist; deshalb sortiert das base62-Standardalphabet der
-// Bibliothek — das Groß- und Kleinschreibung mischt — in der Datenbank anders als
-// im Schlüssel. Lässt man dieses dritte Argument weg, entstehen Schlüssel wie
-// "a0", die das Board ablehnt.
+// Base36, lower case. Postgres does the sorting and its default collation is
+// not byte ordering, so the library's default base62 alphabet — which mixes
+// cases — sorts differently in the database than in the key. Omitting this
+// third argument produces keys like "a0" that the board rejects.
 const ORDER_KEY_DIGITS = "0123456789abcdefghijklmnopqrstuvwxyz";
 
 const tasks = client.data.collection("tasks");
 
-// Der zuletzt vergebene Schlüssel. `is-not-null` ist nicht optional: eine
-// absteigende Sortierung ist NULLS FIRST, ohne sie liest das hier eine der
-// schlüssellosen Zeilen zurück und jeder Insert landet auf demselben "i0".
+// The last key currently in use. `is-not-null` is not optional: a descending
+// sort is NULLS FIRST, so without it this reads back one of the very rows that
+// has no key and every insert lands on the same "i0".
 const { data: last } = await tasks.find({
     where: { __order: ["is-not-null", null] },
     orderBy: ["__order", "desc"],
@@ -183,14 +166,11 @@ await tasks.create({
 });
 ```
 
-Auch über das Admin-Formular angelegte Zeilen kommen ohne Schlüssel an — der
-Unterschied ist nur, dass Sie den Balken in dem Moment sehen, in dem Sie eine
-hinzufügen. Dort ist **Initialize** die Lösung; auf einem Board, das ein Backend
-befüllt, ist es eine Lösung, die sich bei jedem Lauf selbst rückgängig macht.
+Zeilen, die über das Admin-Formular erstellt werden, kommen ebenfalls ohne Schlüssel an — der Unterschied ist lediglich, dass Sie den Balken in dem Moment sehen, in dem Sie eine Zeile hinzufügen. **Initialize** ist dort die Lösung; bei einem Board, das über ein Backend gespeist wird, ist es jedoch eine Korrektur, die sich bei jedem Durchlauf selbst wieder zunichtemacht.
 
 ## Kartenansicht
 
-Karten zeigen Entitäten als visuelle Karten an – nützlich für inhaltsreiche Inhalte mit vielen Bildern:
+Karten stellen Entitäten als visuelle Karten dar — nützlich für bildlastige Inhalte:
 
 ```typescript
 import { defineCollection } from "@rebasepro/cms-types";
@@ -215,5 +195,6 @@ const articlesCollection = defineCollection({
 
 ## Nächste Schritte
 
-- **[Entitätsansichten](/docs/frontend/entity-views)** — Benutzerdefinierte Tabs in Entitätsformularen
+- **[Admin anpassen](/docs/frontend/customizing)** — Eigene Ansichtsmodi, Seiten und Aktionen
+- **[Entitätsansichten](/docs/frontend/entity-views)** — Benutzerdefinierte Tabs auf Entitätsformularen
 - **[Entitätsaktionen](/docs/frontend/entity-actions)** — Benutzerdefinierte Entitätsaktionen

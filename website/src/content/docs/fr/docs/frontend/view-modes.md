@@ -1,18 +1,20 @@
 ---
-sourceHash: 9109031950f77ac1
-title: Modes d'affichage
-sidebar_label: Modes d'affichage
-description: Configurez les vues tableau, cartes et Kanban pour vos collections.
+sourceHash: 608b8f9f3290a362
+title: Modes de vue
+sidebar_label: Modes de vue
+description: Configurez les vues en tableau, cartes et tableau Kanban pour vos collections.
 ---
 
-## Aperçu
+## Vue d'ensemble
 
-Chaque collection peut être affichée selon quatre modes d'affichage :
+Chaque collection peut être affichée dans quatre modes de vue :
 
-- **Liste** — Vue en liste simple et épurée (le mode par défaut classique des CMS)
-- **Tableau** — Grille de type feuille de calcul avec édition en ligne, tri, filtrage
+- **Liste** — Vue en liste simple et épurée (le choix classique par défaut des CMS)
+- **Tableau** — Grille de type feuille de calcul avec édition en ligne, tri et filtrage
 - **Cartes** — Grille de cartes pour le contenu visuel (images, aperçus)
-- **Kanban** — Tableau glisser-déposer groupé par une propriété d'énumération
+- **Kanban** — Tableau avec glisser-déposer regroupé par une propriété d'énumération (enum)
+
+Ce sont les modes intégrés. Une collection peut également proposer des modes de vue que vous écrivez vous-même — un calendrier, une carte, une galerie — dans le même sélecteur, pilotés par la même barre d'outils : consultez [Modes de vue personnalisés](/docs/frontend/extending#modes-de-vue-personnalisés) et la recette de calendrier dans [Personnalisation de l'administration](/docs/frontend/customizing).
 
 ## Configuration
 
@@ -20,12 +22,12 @@ Chaque collection peut être affichée selon quatre modes d'affichage :
 import { defineCollection } from "@rebasepro/cms-types";
 const productsCollection = defineCollection({
     slug: "products",
-    // `orderProperty` et `kanban.columnProperty` sont vérifiés par rapport à ces
-    // clés — avec un bloc `properties` vide, ils se réduisent à `never`.
+    // `orderProperty` and `kanban.columnProperty` are checked against these
+    // keys — with an empty `properties` block they narrow to `never`.
     properties: {
         id: { name: "ID", type: "string", isId: "uuid" },
         status: { name: "Status", type: "string" },
-        // La clé d'ordre. Une *chaîne*, jamais un nombre — voir « Ordonnancement » plus bas.
+        // The order key. A *string*, never a number — see "Ordering" below.
         __order: {
             name: "Order",
             type: "string",
@@ -37,7 +39,7 @@ const productsCollection = defineCollection({
     admin: {
         defaultViewMode: "table",            // Default view
         enabledViews: ["list", "table", "kanban"],    // Available views
-        orderProperty: "__order",           // Propriété pour le réordonnancement par glisser-déposer
+        orderProperty: "__order",           // Property for drag-and-drop ordering
         kanban: {
             columnProperty: "status"         // Enum property for columns
         }
@@ -46,37 +48,37 @@ const productsCollection = defineCollection({
 
 ```
 
-## Vue Liste
+## Vue en liste
 
-La vue liste est le mode d'affichage par défaut classique et épuré des CMS, présentant les entités sous forme de liste directe, sans la densité d'une feuille de calcul.
+La vue en liste est le mode de vue par défaut classique et épuré d'un CMS, affichant les entités sous un format de liste simple, sans la densité d'une feuille de calcul.
 
-## Vue Tableau
+## Vue en tableau
 
-La vue tableau est une feuille de calcul virtualisée haute performance avec :
+La vue en tableau est une feuille de calcul virtualisée haute performance offrant :
 
-- **Édition en ligne** — Cliquez sur n'importe quelle cellule pour modifier sur place
-- **Redimensionnement des colonnes** — Faites glisser les en-têtes de colonne
+- **Édition en ligne** — Cliquez sur n'importe quelle cellule pour la modifier directement
+- **Redimensionnement des colonnes** — Faites glisser les en-têtes de colonnes
 - **Réorganisation des colonnes** — Faites glisser pour réorganiser
-- **Tri** — Cliquez sur les en-têtes de colonne
-- **Recherche textuelle** — Recherche plein texte dans les champs de type chaîne de caractères
+- **Tri** — Cliquez sur les en-têtes de colonnes
+- **Recherche textuelle** — Recherche plein texte sur les champs de type chaîne
 - **Filtrage** — Filtres par colonne
-- **Sélection multiple** — Sélectionnez des entités pour des actions groupées
+- **Sélection multiple** — Sélectionnez des entités pour effectuer des actions groupées
 
 ### Hauteur des lignes
 
 Contrôlez la hauteur des lignes avec `defaultSize` :
 
 | Taille | Pixels | Idéal pour |
-|--------|--------|------------|
+|------|--------|----------|
 | `"xs"` | 36 | Tableaux de données denses |
 | `"s"` | 42 | Lignes de texte compactes |
 | `"m"` | 48 | Par défaut |
-| `"l"` | 96 | Vignettes d'image moyennes |
-| `"xl"` | 160 | Grandes vignettes d'image |
+| `"l"` | 96 | Miniatures d'images moyennes |
+| `"xl"` | 160 | Grandes miniatures d'images |
 
 ## Vue Kanban
 
-Configurez un tableau Kanban en spécifiant la propriété d'énumération à utiliser comme colonnes :
+Configurez un tableau Kanban en spécifiant quelle propriété d'énumération (enum) utiliser pour les colonnes :
 
 ```typescript
 import { defineCollection } from "@rebasepro/cms-types";
@@ -113,26 +115,15 @@ const tasksCollection = defineCollection({
 
 ```
 
-Le glisser-déposer entre les colonnes met automatiquement à jour le champ d'énumération et l'ordre de tri.
+Le glisser-déposer entre les colonnes met automatiquement à jour le champ enum et l'ordre de tri.
 
 ### Ordonnancement
 
-`kanban` et `orderProperty` sont deux moitiés d'une même fonctionnalité.
-Déclarez toujours les deux — trois erreurs ici produisent un tableau qui *semble*
-configuré et ne l'est pas.
+`kanban` et `orderProperty` sont les deux moitiés d'une même fonctionnalité. Déclarez les deux, systématiquement — trois erreurs courantes ici produisent un tableau qui semble configuré mais ne l'est pas.
 
-**`orderProperty` n'est pas facultatif.** Sans lui, une carte se déplace toujours
-d'une colonne à l'autre, car ce geste écrit `columnProperty`. Sa position *au
-sein* d'une colonne n'a nulle part où être stockée : elle revient en place à la
-lecture suivante, et le tableau affiche un bandeau ambre signalant que
-l'ordonnancement n'est pas configuré.
+**`orderProperty` n'est pas facultatif.** Sans cette propriété, une carte peut toujours être glissée d'une colonne à l'autre car cela écrit dans `columnProperty`. En revanche, sa position *au sein* d'une colonne ne peut être stockée nulle part ; elle se réinitialise donc à la lecture suivante, et le tableau affiche une barre orange indiquant que l'ordonnancement n'est pas configuré.
 
-**La propriété doit être une `string`.** Le réordonnancement écrit une clé
-[fractional-indexing](https://github.com/rocicorp/fractional-indexing) — `"i0"`,
-`"i1"`, `"i0i"` — et non un index. Une propriété `number` ne peut jamais la
-contenir : un `sortOrder` numérique laisse le tableau réclamer indéfiniment son
-initialisation, et cette initialisation échoue elle-même contre une colonne
-numérique. Déclarez-la masquée : c'est de la mécanique, pas du contenu.
+**La propriété doit être de type `string`.** Le réordonnancement écrit une clé [fractional-indexing](https://github.com/rocicorp/fractional-indexing) — `"i0"`, `"i1"`, `"i0i"` — et non un index numérique. Une propriété de type `number` ne pourra jamais la stocker : un `sortOrder` numérique fera donc en sorte que le tableau demande indéfiniment à être initialisé, et l'initialisation elle-même échouera sur une colonne numérique. Déclarez-la masquée ; il s'agit de plomberie interne, pas de contenu :
 
 ```typescript
 __order: {
@@ -142,29 +133,22 @@ __order: {
 }
 ```
 
-**Les lignes créées hors de l'admin arrivent sans clé.** Rien n'en attribue à
-l'insertion. Une ligne écrite par un cron, un script de seed, une migration ou
-l'API REST arrive avec `__order` à null, et le tableau affiche *"Some items don't
-have order values"* avec un bouton **Initialize** — un clic remplit la première
-page, et la prochaine exécution du cron ramène le bandeau. Si un backend crée des
-lignes pour un tableau, c'est à lui d'attribuer la clé, avec l'alphabet qu'utilise
-l'admin :
+**Les lignes créées en dehors de l'interface d'administration arrivent sans clé.** Rien n'en attribue une à l'insertion. Une ligne écrite par un cron, un script de seed, une migration ou l'API REST arrive avec `__order` à null, et le tableau affiche *"Some items don't have order values"* avec un bouton **Initialize** — un clic remplit la première page, puis la prochaine exécution du cron fait réapparaître la barre aussitôt. Si un backend crée des lignes pour un tableau, il doit lui-même attribuer la clé. Utilisez le même alphabet que celui utilisé par l'admin :
 
 ```typescript
 import { generateKeyBetween } from "fractional-indexing";
 
-// Base36, minuscules. C'est Postgres qui trie, et sa collation par défaut n'est
-// pas l'ordre des octets : l'alphabet base62 par défaut de la bibliothèque — qui
-// mélange les casses — se trie donc autrement dans la base que dans la clé.
-// Omettre ce troisième argument produit des clés comme "a0" que le tableau
-// rejette.
+// Base36, lower case. Postgres does the sorting and its default collation is
+// not byte ordering, so the library's default base62 alphabet — which mixes
+// cases — sorts differently in the database than in the key. Omitting this
+// third argument produces keys like "a0" that the board rejects.
 const ORDER_KEY_DIGITS = "0123456789abcdefghijklmnopqrstuvwxyz";
 
 const tasks = client.data.collection("tasks");
 
-// La dernière clé utilisée. `is-not-null` n'est pas facultatif : un tri
-// descendant est NULLS FIRST, donc sans lui on relit une des lignes justement
-// dépourvues de clé et chaque insertion retombe sur le même "i0".
+// The last key currently in use. `is-not-null` is not optional: a descending
+// sort is NULLS FIRST, so without it this reads back one of the very rows that
+// has no key and every insert lands on the same "i0".
 const { data: last } = await tasks.find({
     where: { __order: ["is-not-null", null] },
     orderBy: ["__order", "desc"],
@@ -182,14 +166,11 @@ await tasks.create({
 });
 ```
 
-Les lignes créées depuis le formulaire de l'admin arrivent elles aussi sans clé —
-la seule différence est que vous voyez la bannière au moment où vous en ajoutez
-une. **Initialize** est le correctif dans ce cas ; sur un tableau alimenté par un
-backend, c'est un correctif qui s'annule à chaque exécution.
+Les lignes créées via le formulaire d'administration arrivent également sans clé — la seule différence est que vous voyez la barre dès que vous en ajoutez une. **Initialize** permet de corriger le problème dans ce cas ; en revanche, sur un tableau alimenté par un backend, c'est une solution temporaire qui s'annule à chaque exécution.
 
-## Vue Cartes
+## Vue en cartes
 
-Les cartes affichent les entités sous forme de cartes visuelles — utile pour le contenu riche en images :
+Les cartes affichent les entités sous forme de cartes visuelles — très utile pour le contenu riche en images :
 
 ```typescript
 import { defineCollection } from "@rebasepro/cms-types";
@@ -214,5 +195,6 @@ const articlesCollection = defineCollection({
 
 ## Prochaines étapes
 
-- **[Vues d'entités](/docs/frontend/entity-views)** — Onglets personnalisés sur les formulaires d'entités
-- **[Actions d'entités](/docs/frontend/entity-actions)** — Actions d'entités personnalisées
+- **[Personnalisation de l'administration](/docs/frontend/customizing)** — Vos propres modes de vue, pages et actions
+- **[Vues d'entités](/docs/frontend/entity-views)** — Onglets personnalisés sur les formulaires d'entité
+- **[Actions sur les entités](/docs/frontend/entity-actions)** — Actions d'entité personnalisées
