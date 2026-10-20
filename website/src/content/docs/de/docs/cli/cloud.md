@@ -1,5 +1,5 @@
 ---
-sourceHash: dfe254ab13267668
+sourceHash: 7af948cdf55f4822
 title: rebase cloud
 sidebar_label: rebase cloud
 description: Die Befehlsgruppen von rebase cloud – Anmeldung, Projektverknüpfung, Deploys, Konfiguration, Organisationen, Datenbanken, Ressourcen, Compute, Storage, Webhooks, Cluster und Abrechnung.
@@ -14,7 +14,7 @@ wirken auf das verknüpfte Projekt in `.rebase/cloud.json`; `--project <id>` ope
 einem Projekt ohne Verknüpfung.
 
 Drei Optionen gelten überall: `--json` für maschinenlesbare Ausgabe (auch der
-Standard bei Pipes oder mit `REBASE_JSON=1`), `--url <origin>`, um eine
+Standard bei Pipes, außer für `deploy`, oder mit `REBASE_JSON=1`), `--url <origin>`, um eine
 bestimmte Control Plane anzusteuern (oder `REBASE_CLOUD_URL`), und `--project, -p <id>`.
 
 ## Auth
@@ -63,6 +63,8 @@ rebase cloud debug [health|logs|…]       # ein Deployment diagnostizieren, sch
 lädt auch den Quellcode des Projekts hoch — was Git trackt, niemals eine `.env` —, sodass ein
 Plattform-Upgrade es neu bauen kann; `--no-source` überspringt dies einmalig, und `cloud settings set
 --platform-rebuilds off` stoppt dies und löscht die gespeicherte Kopie. `--allow-downgrade` deployt ein älteres Release.
+
+Ein verfolgtes `deploy` endet mit einer Zusammenfassung: jede ausgelieferte App mit ihrer URL, die Deployment-ID, die Dauer und ob die neue Version dort antwortet. Es wartet bis zu `--live-timeout` Sekunden (Standard 60; `0` überspringt die Prüfung) darauf, dass `/api/health` des Backends und die Adresse jeder statischen App antworten. Ein fehlgeschlagenes Deployment endet mit einer Zeile, die die App und den Grund nennt, und beendet sich mit einem Fehlercode. Die Zusammenfassung erscheint auch bei Pipes; `--json` (oder `REBASE_JSON=1`) gibt stattdessen ein Objekt mit `apps`, `hosts`, `live`, `liveChecks` und `durationMs` aus.
 
 ## Konfiguration
 

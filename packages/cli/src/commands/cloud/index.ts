@@ -92,6 +92,7 @@ export const CLOUD_VALUE_FLAGS = {
     "--ingress-address": String,
     "--kubeconfig": String,
     "--limit": String,
+    "--live-timeout": String,
     "--memory": String,
     "--message": String,
     "--name": String,
@@ -210,6 +211,10 @@ export async function cloudCommand(subcommand: string | undefined, rawArgs: stri
     // subcommand as `"--json"`. Falling back to it keeps the parameter useful
     // when a caller passes a group that is not in `rawArgs` at all.
     const group = pos[0] ?? (subcommand !== "--help" ? subcommand : undefined);
+    // A piped `cloud deploy` prints its summary, not JSON — see `initOutputMode`.
+    // Re-latched here rather than decided above because the group is only known
+    // now; nothing between the two calls prints.
+    if (group === "deploy") initOutputMode(rawArgs, { whenPiped: "human" });
 
     // `--help` has to be recovered from `rawArgs` rather than read off `pos`.
     // `positionals()` resolves against `GLOBAL_CLOUD_FLAGS`, which declares

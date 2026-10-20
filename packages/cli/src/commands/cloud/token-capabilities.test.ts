@@ -183,6 +183,12 @@ const json = (status: number, body: unknown) =>
 
 /** The app's cron surface, which answers only the token minted for it. */
 function app(method: string, url: URL, init?: RequestInit): Response {
+    // The deploy's live check: public, so it must carry no credential at all —
+    // neither the deploy token nor anything minted from it.
+    if (url.pathname === "/api/health") {
+        expect(new Headers(init?.headers).get("Authorization")).toBeNull();
+        return json(200, { status: "ok" });
+    }
     expect(new Headers(init?.headers).get("Authorization")).toBe(`Bearer ${RUNTIME_TOKEN}`);
     if (url.pathname === "/api/admin/cron") return json(200, { jobs: [] });
     if (url.pathname === "/api/admin/cron/nightly/logs") return json(200, { logs: [] });

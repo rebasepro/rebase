@@ -1,5 +1,5 @@
 ---
-sourceHash: 852d6c98d8475f3b
+sourceHash: 1d136cdb057ade33
 title: Rebase Cloud
 sidebar_label: Rebase Cloud
 description: Rebase Cloud ist dasselbe Rebase, für Sie betrieben. Was es ist, wie ein Projekt verknüpft und bereitgestellt wird und was die Private Beta noch nicht enthält.
@@ -59,6 +59,21 @@ rebase cloud deploy
 ```
 
 Ein Befehl und kein Flag, das man sich merken muss. Die `rebase.json` eines Scaffolds deklariert `runtime: "managed"` für sein Backend, und `deploy` liest diese Deklaration – dies wird im Ablauf ausgegeben (`rebase.json declares runtime: managed — deploying a bundle`), baut die App in `dist-bundle`, lädt das Bundle hoch, führt es auf dem veröffentlichten Runtime-Image aus und verfolgt das Deployment bis zum finalen Status. Der Exit-Code liefert das Ergebnis, sodass dieselbe Zeile unbeaufsichtigt in CI funktioniert.
+
+Am Ende sagt es, unter welcher Adresse jede App jetzt antwortet und ob die neue Version dort live ist:
+
+```text
+  ✓ Deployed songbuzz in 1m 12s  (deployment fb3c7442-9937-4179-8d3c-88a106da149d)
+
+    game     static   https://songbuzz.rebase.website      live
+    backend  backend  https://songbuzz.rebase.website/api  live
+
+  ✓ Live: the new version answers on every address above.
+```
+
+„Live“ heißt, dass die Adresse nach dem Build geantwortet hat: `/api/health` des Backends lieferte `ok`, und die Seite einer statischen App wurde geladen (aus diesem Deployment, wenn die Plattform sie ausliefert). Die Prüfung wartet bis zu `--live-timeout` Sekunden, standardmäßig 60; `0` überspringt sie. Antwortet eine App nicht rechtzeitig, endet das Deployment trotzdem mit Exit-Code null, weil es erfolgreich war, und die letzte Zeile sagt, welche App nicht geantwortet hat und warum. Ein fehlgeschlagenes Deployment endet stattdessen mit einer Zeile, die die App und den Grund nennt; das vollständige Build-Log zeigt `rebase cloud logs`.
+
+Skripte übergeben `--json` und erhalten ein Objekt mit denselben Fakten – `apps`, `hosts`, `live`, `liveChecks`, `durationMs` und die Deployment-ID. Anders als der Rest von `rebase cloud` wechselt `deploy` bei Pipes nicht von selbst zu JSON.
 
 Um ein Artefakt auszuliefern, das bereits zuvor gebaut wurde – beispielsweise ein CI-Job, der einmal baut und zweimal deployt –, verweisen Sie auf das Verzeichnis, anstatt neu zu bauen:
 

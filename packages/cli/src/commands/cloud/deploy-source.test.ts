@@ -168,10 +168,11 @@ function deploy(...flags: string[]): Promise<void> {
 
 /** The body the deploy trigger was sent. */
 function triggered(): Record<string, unknown> {
-    expect(invoke).toHaveBeenCalledTimes(1);
-    const [name, body] = invoke.mock.calls[0] as [string, Record<string, unknown>];
-    expect(name).toBe("deploy");
-    return body;
+    // Only the trigger: the deploy also asks the control plane for its base
+    // domain, to say where the app will answer.
+    const deploys = invoke.mock.calls.filter(([name]) => name === "deploy");
+    expect(deploys).toHaveLength(1);
+    return deploys[0][1] as Record<string, unknown>;
 }
 
 describe("a backend bundle deploy", () => {
@@ -938,6 +939,45 @@ describe("a deploy that declares a hostname", () => {
         }
 
         expect(JSON.parse(stdout.join("")).hosts).toEqual(HOSTS);
+    });
+
+    /**
+     * The control plane's `hosts` names only hostnames an app declares, so a
+     * project served on its own `<slug>.rebase.website` came back `hosts: []` —
+     * a deploy served nowhere, by its own account.
+     */
+    it("lists the project's own host, and where each app answers", async () => {
+        (context.requireClient as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
+            client: {
+                auth: { getSession: () => ({ accessToken: "tok", expiresAt: Date.now() + 60 * 60_000 }) },
+                data: { collection: () => ({ findById: async () => ({ subdomain: "shop" }), find: async () => ({ data: [] }) }) },
+                functions: {
+                    invoke: vi.fn(async (name: string) => name === "platform-config"
+                        ? { tenantBaseDomain: "rebase.website" }
+                        : { success: true, deployment: { id: "d1" }, managed: true, hosts: [] })
+                }
+            },
+            // Its own URL: the platform config is cached per control plane.
+            url: "https://cp-own-host.example"
+        });
+        context.setJsonModeForTest(true);
+        const stdout: string[] = [];
+        vi.spyOn(process.stdout, "write").mockImplementation(((chunk: string | Uint8Array) => {
+            stdout.push(String(chunk));
+            return true;
+        }) as typeof process.stdout.write);
+
+        try {
+            await deploy();
+        } finally {
+            context.setJsonModeForTest(false);
+        }
+
+        const result = JSON.parse(stdout.join(""));
+        expect(result.hosts).toEqual([{ host: "shop.rebase.website", status: "verified" }]);
+        expect(result.apps).toEqual([
+            { name: "web", type: "static", host: "shop.rebase.website", url: "https://shop.rebase.website" }
+        ]);
     });
 
     it("says nothing, and adds no field, when the control plane predates hostnames", async () => {

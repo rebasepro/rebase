@@ -1,5 +1,5 @@
 ---
-sourceHash: 852d6c98d8475f3b
+sourceHash: 1d136cdb057ade33
 title: Rebase Cloud
 sidebar_label: Rebase Cloud
 description: O Rebase Cloud é o mesmo Rebase, operado para você. O que é, como um projeto se conecta e faz deploy, e o que o beta privado ainda não inclui.
@@ -85,6 +85,21 @@ informa isso durante o processo (`rebase.json declares runtime: managed — depl
 bundle`), compila o app em `dist-bundle`, faz o upload do bundle, o executa na
 imagem de runtime publicada e acompanha o deployment até um estado final. O código
 de saída é o veredito, portanto a mesma linha funciona de forma não assistida em CI.
+
+Ele termina dizendo onde cada app responde agora e se a nova versão está no ar ali:
+
+```text
+  ✓ Deployed songbuzz in 1m 12s  (deployment fb3c7442-9937-4179-8d3c-88a106da149d)
+
+    game     static   https://songbuzz.rebase.website      live
+    backend  backend  https://songbuzz.rebase.website/api  live
+
+  ✓ Live: the new version answers on every address above.
+```
+
+"Live" significa que o endereço respondeu depois do build: o `/api/health` do backend retornou `ok` e a página de um app estático carregou (deste deploy, quando a plataforma a serve). A verificação espera até `--live-timeout` segundos, 60 por padrão; `0` a pula. Se um app não responder a tempo, o deploy ainda sai com código zero, porque o deployment teve sucesso, e a última linha diz qual app não respondeu e por quê. Um deploy que falhou termina, em vez disso, com uma linha que nomeia o app e o motivo, com `rebase cloud logs` para o log completo do build.
+
+Scripts passam `--json` para receber um objeto com os mesmos dados — `apps`, `hosts`, `live`, `liveChecks`, `durationMs` e o id do deploy. Diferente do resto de `rebase cloud`, o `deploy` não muda para JSON sozinho quando usado com pipe.
 
 Para enviar um artefato que foi compilado anteriormente — por exemplo, um job de
 CI que compila uma vez e faz deploy duas vezes —, aponte para o diretório em vez

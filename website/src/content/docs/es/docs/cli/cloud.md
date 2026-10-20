@@ -1,5 +1,5 @@
 ---
-sourceHash: dfe254ab13267668
+sourceHash: 7af948cdf55f4822
 title: rebase cloud
 sidebar_label: rebase cloud
 description: Los grupos de comandos de rebase cloud — autenticación, vinculación de proyectos, despliegues, configuración, organizaciones, bases de datos, recursos, cómputo, almacenamiento, webhooks, clústeres y facturación.
@@ -9,7 +9,7 @@ Todo lo relacionado con Rebase Cloud, que se encuentra en fase beta privada. Con
 
 Cada grupo responde a `--help`, y `--help` nunca ejecuta el comando. La mayoría de los comandos actúan sobre el proyecto vinculado en `.rebase/cloud.json`; `--project <id>` opera sobre uno sin necesidad de vincularlo.
 
-Hay tres opciones aplicables en todas partes: `--json` para salida legible por máquina (también la opción predeterminada en tuberías o con `REBASE_JSON=1`), `--url <origin>` para apuntar a un plano de control específico (o `REBASE_CLOUD_URL`), y `--project, -p <id>`.
+Hay tres opciones aplicables en todas partes: `--json` para salida legible por máquina (también la opción predeterminada en tuberías, salvo para `deploy`, o con `REBASE_JSON=1`), `--url <origin>` para apuntar a un plano de control específico (o `REBASE_CLOUD_URL`), y `--project, -p <id>`.
 
 ## Auth
 
@@ -54,6 +54,8 @@ rebase cloud debug [health|logs|…]       # diagnose a deployment, read-only
 ```
 
 `deploy` sin un nombre de aplicación despliega el backend. El despliegue de un bundle de backend también sube el código fuente del proyecto — lo que git rastrea, nunca un `.env` — para que una actualización de la plataforma pueda recompilarlo; `--no-source` omite esto una vez, y `cloud settings set --platform-rebuilds off` lo detiene y elimina la copia almacenada. `--allow-downgrade` despliega una versión anterior.
+
+Un `deploy` seguido termina con un resumen: cada aplicación desplegada con su URL, el id del despliegue, cuánto tardó y si la nueva versión responde allí. Espera hasta `--live-timeout` segundos (60 por defecto; `0` omite la comprobación) a que respondan el `/api/health` del backend y la dirección de cada aplicación estática. Un despliegue fallido termina con una línea que nombra la aplicación y el motivo, y sale con un código distinto de cero. El resumen se imprime también en tuberías; `--json` (o `REBASE_JSON=1`) imprime en su lugar un objeto con `apps`, `hosts`, `live`, `liveChecks` y `durationMs`.
 
 ## Configuración
 

@@ -247,6 +247,12 @@ failed**. That is the default on every path — you do not need a poll loop, and
 you should not write one. `--wait` is accepted as an explicit spelling of the
 same thing.
 
+It then **checks the new version is live** — each app's URL is probed for up to
+`--live-timeout` seconds (default 60) — and ends on a summary listing every app,
+its URL and whether it answers. Do not `curl` the app afterwards to find out;
+read the last line. Relay the URLs to the user. A failure ends on one line naming
+the app and the reason.
+
 Which kind of deploy runs is decided by the repository, not by you:
 
 | Situation | What happens |
@@ -502,6 +508,11 @@ Every `rebase cloud` command switches to machine-readable output when stdout is
 piped or redirected, when `--json` is passed, or when `REBASE_JSON=1` is set.
 **An agent running these through a shell always gets JSON**, never the
 human-formatted output.
+
+The one exception is `rebase cloud deploy`, which prints its summary even when
+piped, because the person you are working for needs its URLs and its live/not-live
+line. Pass `--json` to get one object instead (`apps`, `hosts`, `live`,
+`liveChecks`, `durationMs`, `deploymentId`).
 
 The contract is **one JSON value on stdout and nothing else**. Narration,
 warnings and errors go to stderr, so `stdout | jq` is always safe.

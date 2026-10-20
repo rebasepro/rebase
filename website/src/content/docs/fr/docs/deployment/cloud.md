@@ -1,5 +1,5 @@
 ---
-sourceHash: 852d6c98d8475f3b
+sourceHash: 1d136cdb057ade33
 title: Rebase Cloud
 sidebar_label: Rebase Cloud
 description: Rebase Cloud est le même Rebase, géré pour vous. De quoi il s'agit, comment lier et déployer un projet, et ce que la bêta privée n'inclut pas encore.
@@ -85,6 +85,21 @@ l'indique au passage (`rebase.json declares runtime: managed — deploying a
 bundle`), compile l'application dans `dist-bundle`, téléverse le bundle, l'exécute sur
 l'image de runtime publiée et suit le déploiement jusqu'à son état final. Le code de
 sortie constitue le verdict, ce qui permet à la même ligne de fonctionner de manière autonome dans une CI.
+
+Il se termine en indiquant où chaque application répond désormais et si la nouvelle version y est en ligne :
+
+```text
+  ✓ Deployed songbuzz in 1m 12s  (deployment fb3c7442-9937-4179-8d3c-88a106da149d)
+
+    game     static   https://songbuzz.rebase.website      live
+    backend  backend  https://songbuzz.rebase.website/api  live
+
+  ✓ Live: the new version answers on every address above.
+```
+
+« Live » signifie que l'adresse a répondu après le build : le `/api/health` du backend a renvoyé `ok`, et la page d'une application statique s'est chargée (depuis ce déploiement, quand la plateforme la sert). La vérification attend jusqu'à `--live-timeout` secondes, 60 par défaut ; `0` la désactive. Si une application ne répond pas à temps, le déploiement se termine quand même avec le code zéro, car il a réussi, et la dernière ligne indique quelle application n'a pas répondu et pourquoi. Un déploiement en échec se termine à la place par une ligne qui nomme l'application et la raison, avec `rebase cloud logs` pour le log de build complet.
+
+Les scripts passent `--json` pour obtenir un objet portant les mêmes informations — `apps`, `hosts`, `live`, `liveChecks`, `durationMs` et l'identifiant du déploiement. Contrairement au reste de `rebase cloud`, `deploy` ne passe pas de lui-même en JSON via un pipe.
 
 Pour déployer un artefact compilé plus tôt — par exemple, un job CI qui compile une fois et
 déploie deux fois —, pointez vers le répertoire au lieu de recompiler :

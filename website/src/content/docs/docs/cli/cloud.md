@@ -13,7 +13,7 @@ act on the linked project in `.rebase/cloud.json`; `--project <id>` operates on
 one without linking.
 
 Three options apply everywhere: `--json` for machine-readable output (also the
-default when piped, or with `REBASE_JSON=1`), `--url <origin>` to target a
+default when piped, except for `deploy`, or with `REBASE_JSON=1`), `--url <origin>` to target a
 specific control plane (or `REBASE_CLOUD_URL`), and `--project, -p <id>`.
 
 ## Auth
@@ -62,6 +62,14 @@ rebase cloud debug [health|logs|…]       # diagnose a deployment, read-only
 deploy also uploads the project's source — what git tracks, never a `.env` — so a
 platform upgrade can rebuild it; `--no-source` skips that once, and `cloud settings set
 --platform-rebuilds off` stops it and deletes the stored copy. `--allow-downgrade` deploys an older release.
+
+A followed `deploy` ends on a summary: each app it shipped with its URL, the
+deployment id, how long it took, and whether the new version answers there. It
+waits up to `--live-timeout` seconds (default 60; `0` skips the check) for a
+backend's `/api/health` and each static app's address to answer. A failed deploy
+ends on one line naming the app and the reason, and exits non-zero. The summary
+prints even when piped; `--json` (or `REBASE_JSON=1`) prints one object instead,
+with `apps`, `hosts`, `live`, `liveChecks` and `durationMs`.
 
 ## Config
 

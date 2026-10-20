@@ -18,9 +18,33 @@
   paired, nothing reads the title property, and rows are no longer stretched to
   close a gap. A span written on a property is used as written.
 
+#### CLI
+
+- **A cloud deploy ends on a summary that says where the app is and whether it
+  is live.** `rebase cloud deploy` lists each app it shipped with its URL, the
+  deployment id and how long it took, then probes each URL — a backend's
+  `/api/health`, a static app's page — for up to `--live-timeout` seconds
+  (default 60, `0` skips) and says whether the new version answers. Before, a
+  run through an agent or a pipe printed only `{"success":true,…,"hosts":[]}`,
+  and people checked every deploy with `curl`. The summary now prints when
+  piped too; `--json` or `REBASE_JSON=1` gives the object, which gains
+  `project`, `apps`, `durationMs`, `live` and `liveChecks`. A piped run without
+  either says on stderr how to get JSON back. Every other `rebase cloud`
+  command still switches to JSON when piped.
+
 ### Fixed
 
 #### CLI
+
+- **A cloud deploy's result lists the project's own host.** The control plane
+  reports only hostnames an app declares in its `path`, so the `hosts` field of
+  `rebase cloud deploy --json` was `[]` for a project served on
+  `<slug>.rebase.website`. The project's host now comes first, as verified.
+
+- **A failed cloud deploy says which app failed and why, in one line.** The
+  reason is read from the control plane's `❌` line at the end of the build
+  log, with `rebase cloud logs` named for the rest. The JSON error gains
+  `apps`, `reason` and `hint`.
 
 - **The cloud debug boot view shows the functions and crons a 0.25 runtime
   loaded.** It kept a line only if it said "Loaded function" or "Mounted", the

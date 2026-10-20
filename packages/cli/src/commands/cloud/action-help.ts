@@ -181,10 +181,13 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
         usage: "cloud deploy [app] [options]",
         summary:
             "Deploy an app of the linked project and follow the build to a terminal state, exiting "
-            + "non-zero if it failed. With no app named, the repository's backend is deployed.",
+            + "non-zero if it failed. With no app named, the repository's backend is deployed. It ends "
+            + "on a summary: each app shipped and its URL, the deployment id, how long it took, and whether "
+            + "the new version answers on those URLs.",
         flags: [
             ["--wait", "Follow to a terminal state. Already the default; here to be explicit"],
             ["--timeout <seconds>", "Ceiling on the follow. Default: 900"],
+            ["--live-timeout <seconds>", "How long to wait for the new version to answer on its URLs. 0 skips the check. Default: 60"],
             ["--no-follow", "Return as soon as the build is triggered"],
             ["--message, -m <text>", "Label the release"],
             ["--bundle", "Force a managed-bundle deploy (the default for runtime: managed)"],
@@ -203,6 +206,10 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
             "rebase cloud deploy --timeout 300 --json"
         ],
         notes: [
+            "The summary is printed even when stdout is piped. Pass --json (or set REBASE_JSON=1) for one "
+                + "JSON object instead: apps, hosts, live, liveChecks, durationMs and the deployment id.",
+            "A failed deploy ends on one line naming the app and the reason, and exits non-zero. A deploy "
+                + "that succeeded but could not be confirmed live within --live-timeout exits zero and says so.",
             "A project whose rebase.json declares runtime: managed deploys a bundle without --bundle.",
             "--source on a managed project is refused: it would swap the project onto a container image.",
             "A backend bundle deploy also uploads the project's source (what git tracks, never a .env), so a "

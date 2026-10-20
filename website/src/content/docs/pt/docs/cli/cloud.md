@@ -1,5 +1,5 @@
 ---
-sourceHash: dfe254ab13267668
+sourceHash: 7af948cdf55f4822
 title: rebase cloud
 sidebar_label: rebase cloud
 description: Os grupos de comandos do rebase cloud — autenticação, vínculo de projeto, deploys, configuração, organizações, bancos de dados, recursos, computação, armazenamento, webhooks, clusters e faturamento.
@@ -9,7 +9,7 @@ Tudo relacionado ao Rebase Cloud, que está em beta privado. Consulte o [guia do
 
 Cada grupo responde a `--help`, e `--help` nunca executa o comando. A maioria dos comandos atua no projeto vinculado em `.rebase/cloud.json`; `--project <id>` opera em um projeto sem a necessidade de vinculá-lo.
 
-Três opções se aplicam globalmente: `--json` para saída legível por máquina (também o padrão quando usado com pipe ou com `REBASE_JSON=1`), `--url <origin>` para direcionar a um control plane específico (ou `REBASE_CLOUD_URL`) e `--project, -p <id>`.
+Três opções se aplicam globalmente: `--json` para saída legível por máquina (também o padrão quando usado com pipe, exceto para `deploy`, ou com `REBASE_JSON=1`), `--url <origin>` para direcionar a um control plane específico (ou `REBASE_CLOUD_URL`) e `--project, -p <id>`.
 
 ## Autenticação
 
@@ -54,6 +54,8 @@ rebase cloud debug [health|logs|…]       # diagnostica uma implantação, some
 ```
 
 `deploy` sem o nome de um app implanta o backend. O deploy do bundle do backend também faz o upload do código-fonte do projeto — o que o git rastreia, nunca um `.env` — para que uma atualização de plataforma possa recompilá-lo; `--no-source` pula isso nessa execução, e `cloud settings set --platform-rebuilds off` desativa essa função e exclui a cópia armazenada. `--allow-downgrade` implanta uma versão anterior.
+
+Um `deploy` acompanhado termina com um resumo: cada app implantado com sua URL, o id do deploy, quanto tempo levou e se a nova versão responde ali. Ele espera até `--live-timeout` segundos (60 por padrão; `0` pula a verificação) que o `/api/health` do backend e o endereço de cada app estático respondam. Um deploy que falhou termina com uma linha que nomeia o app e o motivo, e sai com código diferente de zero. O resumo é impresso também com pipe; `--json` (ou `REBASE_JSON=1`) imprime em vez disso um objeto com `apps`, `hosts`, `live`, `liveChecks` e `durationMs`.
 
 ## Configuração
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: 852d6c98d8475f3b
+sourceHash: 1d136cdb057ade33
 title: Rebase Cloud
 sidebar_label: Rebase Cloud
 description: Rebase Cloud è lo stesso Rebase, gestito per te. Di cosa si tratta, come collegare ed eseguire il deploy di un progetto e cosa non include ancora la beta privata.
@@ -59,6 +59,21 @@ rebase cloud deploy
 ```
 
 Un solo comando, e nessun flag da ricordare. Il file `rebase.json` di uno scaffold dichiara `runtime: "managed"` per il suo backend, e `deploy` legge tale dichiarazione — lo segnala durante l'esecuzione (`rebase.json declares runtime: managed — deploying a bundle`), compila l'app in `dist-bundle`, carica il bundle, lo esegue sull'immagine di runtime pubblicata e segue il deployment fino a uno stato terminale. Il codice di uscita rappresenta l'esito, quindi la stessa riga funziona in modalità non presidiata nella CI.
+
+Termina indicando dove risponde ora ogni app e se la nuova versione è live:
+
+```text
+  ✓ Deployed songbuzz in 1m 12s  (deployment fb3c7442-9937-4179-8d3c-88a106da149d)
+
+    game     static   https://songbuzz.rebase.website      live
+    backend  backend  https://songbuzz.rebase.website/api  live
+
+  ✓ Live: the new version answers on every address above.
+```
+
+"Live" significa che l'indirizzo ha risposto dopo il build: `/api/health` del backend ha restituito `ok` e la pagina di un'app statica si è caricata (da questo deployment, quando è la piattaforma a servirla). Il controllo attende fino a `--live-timeout` secondi, 60 di default; `0` lo salta. Se un'app non risponde in tempo il deploy esce comunque con codice zero, perché il deployment è riuscito, e l'ultima riga dice quale app non ha risposto e perché. Un deploy fallito termina invece con una riga che indica l'app e il motivo, con `rebase cloud logs` per il log completo del build.
+
+Gli script passano `--json` per ottenere un oggetto con gli stessi dati — `apps`, `hosts`, `live`, `liveChecks`, `durationMs` e l'id del deployment. A differenza del resto di `rebase cloud`, `deploy` non passa da solo a JSON in una pipe.
 
 Per distribuire un artefatto compilato in precedenza — ad esempio, un job di CI che compila una sola volta ed esegue il deploy due volte — punta alla directory anziché ricompilare:
 

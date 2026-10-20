@@ -85,6 +85,30 @@ bundle`), builds the app into `dist-bundle`, uploads the bundle, runs it on the
 published runtime image, and follows the deployment to a terminal state. The exit
 code is the verdict, so the same line works unattended in CI.
 
+It ends by saying where each app now answers and whether the new version is
+live there:
+
+```text
+  ✓ Deployed songbuzz in 1m 12s  (deployment fb3c7442-9937-4179-8d3c-88a106da149d)
+
+    game     static   https://songbuzz.rebase.website      live
+    backend  backend  https://songbuzz.rebase.website/api  live
+
+  ✓ Live: the new version answers on every address above.
+```
+
+"Live" means the address answered after the build: a backend's `/api/health`
+returned `ok`, and a static app's page loaded (from this deployment, when the
+platform serves it). The check waits up to `--live-timeout` seconds, 60 by
+default; `0` skips it. If an app does not answer in time the deploy still exits
+zero, because the deployment succeeded, and the last line says which app did not
+answer and why. A failed deploy ends on one line instead, naming the app and the
+reason, with `rebase cloud logs` for the full build log.
+
+Scripts pass `--json` for one object carrying the same facts — `apps`, `hosts`,
+`live`, `liveChecks`, `durationMs` and the deployment id. Unlike the rest of
+`rebase cloud`, `deploy` does not switch to JSON on its own when piped.
+
 To ship an artefact that was built earlier — a CI job that builds once and
 deploys twice, say — point at the directory instead of rebuilding:
 

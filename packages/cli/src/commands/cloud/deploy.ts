@@ -29,6 +29,7 @@ import {
     warn,
     reportError,
     resolveTimeoutMs,
+    note,
     fetchTenantBaseDomain,
     projectHost,
     type CloudClient,
@@ -46,6 +47,20 @@ import {
     pendingHostNotices,
     type DeployHost
 } from "./bundle-deploy";
+import {
+    bundleApps,
+    sourceBuildApps,
+    deployHosts,
+    checkLive,
+    deploySummaryLines,
+    liveVerdict,
+    failureLine,
+    failureHint,
+    failureReason,
+    DEFAULT_LIVE_TIMEOUT_MS,
+    type DeployedApp,
+    type LiveCheck
+} from "./deploy-summary";
 import { listContextFiles, MAX_SOURCE_UPLOAD_BYTES, packSource, prepareRebuildSource, type RebuildSource } from "./rebuild-source";
 import { buildBundle } from "../../bundle";
 import { buildAssetApp } from "../build";
@@ -229,6 +244,8 @@ async function deployBundle(opts: {
     follow: boolean;
     /** Ceiling on the follow, in milliseconds. */
     timeoutMs: number;
+    /** How long to wait for the new version to answer, in milliseconds; 0 skips the check. */
+    liveTimeoutMs: number;
     /** Upload the project's source beside a backend bundle. Default on; `--no-source` off. */
     uploadSource: boolean;
     /** `--allow-downgrade`: deploy a bundle built on an older release than the project runs. */
@@ -415,6 +432,7 @@ async function uploadAndTrigger(opts: {
     appName?: string;
     follow: boolean;
     timeoutMs: number;
+    liveTimeoutMs: number;
     uploadSource: boolean;
     allowDowngrade: boolean;
     /** When the command started, for the `cli.deploy` event's duration. */
@@ -567,20 +585,22 @@ async function uploadAndTrigger(opts: {
     //
     // One rule now: `deploy` follows unless told not to. `--no-follow` is that
     // instruction and keeps the old shape for anyone who wants it.
+    const appsAt = (host: string | undefined): DeployedApp[] => bundleApps(manifest, host);
     if (!opts.follow) {
-        emit(
-            () => {
-                console.log(chalk.green(`  ✓ Managed deploy started (deployment ${deploymentId}).`));
-                console.log(chalk.gray("    Not following (--no-follow). Track it with `rebase cloud logs`."));
-                printPendingHosts(hosts);
-            },
-            { success: true,
+        await reportTriggered({
+            client,
+            url,
+            projectId,
+            deploymentId,
+            appsAt,
+            registeredHosts: hosts,
+            headline: `  ✓ Managed deploy started (deployment ${deploymentId}).`,
+            json: { success: true,
 deploymentId,
 managed,
 sourceUploaded: rebuildSource !== null,
-following: false,
-...(hosts ? { hosts } : {}) }
-        );
+following: false }
+        });
         await record(false, "not_followed");
         return;
     }
@@ -596,16 +616,127 @@ following: false,
         timeoutMs: opts.timeoutMs,
         projectId,
         url,
-        hosts,
+        announce: false,
+        failedApps: appsAt(undefined).map(a => a.name),
         onTerminal: (ended) => record(true, ended)
     });
-    emit(() => printPendingHosts(hosts), { success: true,
+    await reportDeployed({
+        client,
+        url,
+        projectId,
+        projectRef,
+        deploymentId,
+        startedAt: opts.startedAt,
+        liveTimeoutMs: opts.liveTimeoutMs,
+        appsAt,
+        registeredHosts: hosts,
+        json: { success: true,
 deploymentId,
 managed,
 sourceUploaded: rebuildSource !== null,
 following: true,
-status,
-...(hosts ? { hosts } : {}) });
+status }
+    });
+}
+
+/**
+ * The end of a deploy that was followed to success: resolve where each app
+ * answers, check that the new version does, and print the summary — or, in
+ * JSON mode, the one object carrying the same facts.
+ *
+ * The object keeps every key it had and gains `project`, `apps`, `durationMs`,
+ * `live` and `liveChecks`; `hosts` lists the project's own host first.
+ */
+async function reportDeployed(o: {
+    client: CloudClient;
+    url: string;
+    projectId: string;
+    projectRef: string;
+    deploymentId: string;
+    startedAt: number;
+    liveTimeoutMs: number;
+    appsAt: (projectHost: string | undefined) => DeployedApp[];
+    registeredHosts: DeployHost[] | undefined;
+    json: Record<string, unknown>;
+}): Promise<void> {
+    const host = await deployedUrl(o.client, { projectId: o.projectId, url: o.url });
+    const apps = o.appsAt(host);
+    const hosts = deployHosts(o.registeredHosts, host);
+
+    let live: LiveCheck[] | undefined;
+    if (o.liveTimeoutMs > 0) {
+        progress(chalk.gray("  Checking that the new version answers..."));
+        live = await checkLive(apps, { deploymentId: o.deploymentId, hosts, timeoutMs: o.liveTimeoutMs });
+    }
+    const verdict = liveVerdict(live, o.liveTimeoutMs);
+    const elapsedMs = Date.now() - o.startedAt;
+
+    emit(
+        () => {
+            for (const line of deploySummaryLines({
+                projectRef: o.projectRef,
+                deploymentId: o.deploymentId,
+                elapsedMs,
+                apps,
+                live,
+                liveTimeoutMs: o.liveTimeoutMs
+            })) console.log(line);
+            printPendingHosts(hosts);
+        },
+        { ...o.json,
+project: o.projectRef,
+apps,
+...hostsField(hosts, o.registeredHosts),
+durationMs: elapsedMs,
+live: verdict.live,
+liveChecks: live ?? [] }
+    );
+}
+
+/**
+ * The end of a `--no-follow` deploy: it was triggered, and here is where it
+ * will answer. No live check — nothing is waiting for it to finish.
+ */
+async function reportTriggered(o: {
+    client: CloudClient;
+    url: string;
+    projectId: string;
+    deploymentId: string;
+    appsAt: (projectHost: string | undefined) => DeployedApp[];
+    registeredHosts: DeployHost[] | undefined;
+    /** Printed first in human mode; empty for none. */
+    headline: string;
+    json: Record<string, unknown>;
+}): Promise<void> {
+    const host = await deployedUrl(o.client, { projectId: o.projectId, url: o.url });
+    const apps = o.appsAt(host);
+    const hosts = deployHosts(o.registeredHosts, host);
+    emit(
+        () => {
+            if (o.headline) console.log(chalk.green(o.headline));
+            console.log(chalk.gray("    Not following (--no-follow). Track it with `rebase cloud logs`."));
+            const addressed = apps.filter(a => a.url);
+            if (addressed.length > 0) {
+                console.log(chalk.gray("    When it finishes it will answer at:"));
+                for (const app of addressed) console.log(`      ${app.name}  ${chalk.cyan(app.url ?? "")}`);
+            }
+            console.log("");
+            printPendingHosts(hosts);
+        },
+        { ...o.json,
+apps,
+...hostsField(hosts, o.registeredHosts),
+live: null }
+    );
+}
+
+/**
+ * `hosts` for the JSON result, or no field at all when there is nothing to say:
+ * a control plane that predates the field and a project host that could not be
+ * resolved. An empty list would claim the deploy looked and found none.
+ */
+function hostsField(hosts: DeployHost[], registered: DeployHost[] | undefined): { hosts?: DeployHost[] } {
+    return hosts.length > 0 || registered !== undefined ? { hosts } : {};
 }
 
 /**
@@ -1110,6 +1241,9 @@ export const DEPLOY_FLAGS = {
        was a hardcoded 15 minutes, which is the wrong number for a CI step and
        for an overnight build alike. */
     "--timeout": String,
+    /* Seconds. How long a followed deploy waits, after the build succeeds, for
+       each app's address to answer with the new version; 0 skips the check. */
+    "--live-timeout": String,
     "--source": String,
     "--message": String,
     "--bundle": Boolean,
@@ -1215,6 +1349,13 @@ export async function deployCommand(rawArgs: string[], projectRef: string): Prom
     const startedAt = Date.now();
     const { flags: args, appName } = resolveDeployArgs(rawArgs);
 
+    // A piped deploy printed JSON until it was made to print its summary (see
+    // `initOutputMode`). A script that parsed it now gets prose, so it is told,
+    // on stderr, how to get the object back.
+    if (!isJsonMode() && process.stdout.isTTY !== true) {
+        note(chalk.gray("Printing the deploy summary. For the machine-readable result, pass --json."));
+    }
+
     // Refused rather than resolved in one direction or the other: they are
     // opposite instructions, and either interpretation makes the command do
     // something the line explicitly asked it not to.
@@ -1283,6 +1424,7 @@ export async function deployCommand(rawArgs: string[], projectRef: string): Prom
             noStatic: args["--no-static"] === true,
             follow: args["--no-follow"] !== true,
             timeoutMs: resolveDeployTimeout(args["--timeout"]),
+            liveTimeoutMs: resolveLiveTimeout(args["--live-timeout"]),
             uploadSource: args["--no-source"] !== true,
             allowDowngrade: args["--allow-downgrade"] === true,
             startedAt
@@ -1383,20 +1525,22 @@ hosts: deployHostsFrom(res) };
         );
     }
 
+    const appsAt = (host: string | undefined): DeployedApp[] => sourceBuildApps(sourceBuildAppName(), host);
     if (args["--no-follow"]) {
-        emit(
-            () => {
-                console.log(chalk.gray("  Not following logs (--no-follow). Check status with `rebase cloud logs`."));
-                console.log("");
-                printPendingHosts(hosts);
-            },
-            { deploymentId,
+        await reportTriggered({
+            client,
+            url,
+            projectId,
+            deploymentId,
+            appsAt,
+            registeredHosts: hosts,
+            headline: "",
+            json: { deploymentId,
 deduplicated,
 frameworkVersion: frameworkVersion ?? null,
 following: false,
-...(hosts ? { hosts } : {}),
 ...warningPayload(warnings) }
-        );
+        });
         await recordDeploy({ followed: false, status: "not_followed", deduplicated, frameworkVersion, startedAt });
         return;
     }
@@ -1419,19 +1563,58 @@ following: false,
         timeoutMs: resolveDeployTimeout(args["--timeout"]),
         projectId,
         url,
-        hosts,
+        announce: false,
+        failedApps: appsAt(undefined).map(a => a.name),
         onTerminal: (ended) => recordDeploy({ followed: true, status: ended, deduplicated, frameworkVersion, startedAt })
     });
-    emit(
-        () => printPendingHosts(hosts),
-        { deploymentId,
+    await reportDeployed({
+        client,
+        url,
+        projectId,
+        projectRef,
+        deploymentId,
+        startedAt,
+        liveTimeoutMs: resolveLiveTimeout(args["--live-timeout"]),
+        appsAt,
+        registeredHosts: hosts,
+        json: { deploymentId,
 deduplicated,
 frameworkVersion: frameworkVersion ?? null,
 following: true,
 status,
-...(hosts ? { hosts } : {}),
 ...warningPayload(warnings) }
-    );
+    });
+}
+
+/** The backend this repository declares, for naming a source build in its summary. */
+function sourceBuildAppName(): string | undefined {
+    try {
+        const projectRoot = findProjectRoot();
+        return projectRoot ? findBackendApp(loadManifest(projectRoot).manifest)?.name : undefined;
+    } catch {
+        return undefined;
+    }
+}
+
+/**
+ * `--live-timeout <seconds>`: how long a deploy waits for the new version to
+ * answer before saying it could not confirm it. `0` skips the check. Default 60.
+ *
+ * Its own reader rather than `resolveTimeoutMs`, which refuses 0 — right for a
+ * follow, where 0 would mean "give up at once", and wrong here, where it is the
+ * documented way to say "do not check".
+ */
+export function resolveLiveTimeout(value: string | undefined): number {
+    if (value === undefined) return DEFAULT_LIVE_TIMEOUT_MS;
+    const seconds = Number(value);
+    if (!Number.isFinite(seconds) || seconds < 0) {
+        fail(
+            `--live-timeout takes a number of seconds, or 0 to skip the check (got "${value}").`,
+            "Run `rebase cloud deploy --help`.",
+            "usage"
+        );
+    }
+    return seconds * 1000;
 }
 
 /** `--timeout <seconds>` for a deploy, or the 15-minute default. */
@@ -1640,12 +1823,13 @@ async function streamBuildLogs(
         projectId?: string;
         url?: string;
         /**
-         * The hostnames the deploy response named. The verified ones are
-         * printed under the project's own URL on success: an app on a hostname
-         * of its own is not at the project URL, and that address is the one the
-         * person who deployed it is looking for.
+         * Print "Deployment succeeded" and the URL on success. On by default
+         * (`cloud logs --follow`); `deploy` turns it off and prints its own
+         * summary instead, which says the same and more.
          */
-        hosts?: DeployHost[];
+        announce?: boolean;
+        /** The apps this deployment ships, named in the one-line failure. */
+        failedApps?: string[];
         /**
          * Called once with the state the follow ended in (a terminal status, or
          * `timeout`) before anything else happens, a non-zero exit included.
@@ -1705,26 +1889,35 @@ async function streamBuildLogs(
         if (dep.status && dep.status !== "deploying") {
             await opts.onTerminal?.(dep.status);
             if (dep.status !== "success") {
+                const logs = withoutHeartbeat(dep.logs ?? "");
+                const line = failureLine({ apps: opts.failedApps ?? [], status: dep.status, deploymentId, logs });
                 if (quiet) {
                     // The failure still has to be reportable, and in JSON mode
                     // the build log is the only place that says why.
                     printJson({
                         error: {
-                            message: `Deployment ${deploymentId} ${dep.status}.`,
+                            message: line,
                             code: "deploy_failed",
                             status: null,
                             deploymentId,
-                            logs: withoutHeartbeat(dep.logs ?? "")
+                            apps: opts.failedApps ?? [],
+                            reason: failureReason(logs) ?? null,
+                            hint: failureHint(deploymentId),
+                            logs
                         }
                     });
                     process.exit(1);
                 }
+                // One line that says which app and why, under the log it came
+                // from — a person scrolling up through a build log to find the
+                // reason was the whole failure report before.
                 console.log("");
-                console.log(chalk.bold.red(`  ✗ Deployment ${dep.status}`));
+                console.log(chalk.bold.red(`  ✗ ${line}`));
+                console.log(chalk.gray(`    ${failureHint(deploymentId)}`));
                 console.log("");
                 process.exit(1);
             }
-            if (!quiet) {
+            if (!quiet && opts.announce !== false) {
                 console.log("");
                 console.log(chalk.bold.green("  ✓ Deployment succeeded"));
                 // The URL. A deploy that says only "succeeded" leaves the one
@@ -1737,9 +1930,6 @@ async function streamBuildLogs(
                 // host is worse than none.
                 const url = await deployedUrl(client, opts);
                 if (url) console.log(`  ${chalk.cyan(`https://${url}`)}`);
-                for (const { host } of (opts.hosts ?? []).filter(h => h.status === "verified")) {
-                    if (host !== url) console.log(`  ${chalk.cyan(`https://${host}`)}`);
-                }
                 console.log("");
             }
             return { status: dep.status, logs: withoutHeartbeat(dep.logs ?? "") };
