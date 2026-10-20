@@ -124,6 +124,15 @@ reliably write the version that does not — see
 should be able to call a route, the guard to add is `requireScope`, with a scope
 the app declares — see [Roles and scopes](/docs/backend/roles-and-scopes/#app-scopes).
 
+After the rules come two sections that apply only in some projects. **Backend
+runtime** lists what the managed runtime on Rebase Cloud allows: packages,
+memory and module-level state, timeouts, outbound ports, configuration and
+storage for generated files. It links to
+[Managed backend runtime](/docs/deployment/managed-runtime/), so an assistant
+plans a backend feature against real limits instead of guessing. **Admin UI**
+holds the `@rebasepro/ui` rules. They apply to views inside the admin panel, not
+to a public site or static app the project serves.
+
 ## Making it yours
 
 `ai-instructions.md` is your file. Nothing regenerates or overwrites it — unlike

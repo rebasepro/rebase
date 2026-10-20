@@ -109,6 +109,11 @@ Scripts pass `--json` for one object carrying the same facts — `apps`, `hosts`
 `live`, `liveChecks`, `durationMs` and the deployment id. Unlike the rest of
 `rebase cloud`, `deploy` does not switch to JSON on its own when piped.
 
+What that runtime allows — packages and native modules, memory and instances,
+timeouts and body sizes, the filesystem, secrets, storage and outbound
+network — is on its own page:
+[Managed backend runtime](/docs/deployment/managed-runtime/).
+
 To ship an artefact that was built earlier — a CI job that builds once and
 deploys twice, say — point at the directory instead of rebuilding:
 

@@ -587,6 +587,11 @@ Two ceilings apply to `/api/functions/*`:
 
 Unhandled promise rejections are logged rather than fatal: a fire-and-forget call in one function would otherwise end the whole process. Set `REBASE_EXIT_ON_UNHANDLED_REJECTION=1` for Node's default behaviour.
 
+On Rebase Cloud, the edge in front of your functions has limits of its own, and
+module-level state, the filesystem and outbound ports behave in ways worth
+knowing before you design around them. See
+[Managed backend runtime](/docs/deployment/managed-runtime/).
+
 ## Next Steps
 
 - **[Backend Overview](/docs/backend)** — Full backend configuration reference

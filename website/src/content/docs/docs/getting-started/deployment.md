@@ -234,7 +234,9 @@ Three ways through, in the order they are usually right:
 
 Functions that merely need Node rather than a native binary are fine — the
 deploy reports those separately (`1 of 3 function(s) depend on Node`) and runs
-them.
+them. [Managed backend runtime](/docs/deployment/managed-runtime/) covers the
+rest of what the managed runtime allows: binaries, memory, timeouts, the
+filesystem, secrets, storage and outbound network.
 
 ## Serving the Frontend
 
