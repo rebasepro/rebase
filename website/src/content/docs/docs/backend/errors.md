@@ -105,6 +105,11 @@ the ID you got. Read the response header.
 | `IMPERSONATION_TARGET_NOT_FOUND` | 404 | `x-rebase-impersonate` names no active user: no account has that uid, or it is disabled. | Check the uid. |
 | `IMPERSONATION_UNAVAILABLE` | 501 | This backend's auth cannot run a request as another user, because its `AuthAdapter` has no `resolveUser`. | Implement `resolveUser` in the adapter, or leave the header out. |
 | `IMPERSONATION_UNSUPPORTED` | 400 | `x-rebase-impersonate` was sent to a route that cannot run as another user. Only the data API and custom functions honour it, and the realtime socket honours `impersonate` on `AUTHENTICATE`. | Send the request without the header. |
+| `SIMULATION_FORBIDDEN` | 403 | A request sent an `x-rebase-simulate-*` header (the RLS simulator), or asked `/api/admin/rls-simulator`, and its caller may not simulate access. Only a signed-in administrator's own session may, never an API key or the service key. | Send it with an administrator's session, or leave the headers out. |
+| `SIMULATION_INVALID` | 400 | The simulation was malformed: a header sent empty, `x-rebase-simulate-api-key-id` combined with a role or user id, or simulation combined with `x-rebase-impersonate`. | Name one role (optionally with a uid), one user id, or one API key id. |
+| `SIMULATION_TARGET_NOT_FOUND` | 404 | The simulation names no active user (a user id sent without a role) or no live API key. | Check the id, or send a role with the uid to simulate a uid that has no account. |
+| `SIMULATION_UNAVAILABLE` | 501 | This backend cannot simulate access: its `AuthAdapter` has no `resolveUser` to confirm an administrator, or a key was named on a backend with no API keys. | Implement `resolveUser`, or leave the headers out. |
+| `SIMULATION_UNSUPPORTED` | 400 | An `x-rebase-simulate-*` header was sent to a route that cannot run with simulated access. Only the data API and custom functions honour them. | Send the request without the headers. |
 | `INVALID_ACCOUNT` | 400 | The account is in a state this operation cannot act on. | See the message. |
 | `INVALID_CHALLENGE` | 400 | The MFA challenge is unknown or expired. | Start a new one. |
 | `INVALID_CODE` | 400 / 401 | The OTP or MFA code is wrong: 400 from the email-code sign-in (`/auth/otp/verify`), 401 from an MFA enrolment or challenge. | Retry with the current code. |

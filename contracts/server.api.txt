@@ -57,7 +57,7 @@ const logger { child, debug, error, info, warn }
 const looksLikeFieldOp
 const optionalAuth
 const queryTokenAuth
-const rebase { admin, apiKeys, apiPath, auth, backups, baseUrl, bucket, call, createStorageSource, cron, dataAsAdmin, email, fetchStorageSources, functions, personalKeys, resolveToken, setAuthTokenGetter, setOnUnauthorized, setToken, sql, storage, storageRegistry, ws }
+const rebase { admin, apiKeys, apiPath, auth, backups, baseUrl, bucket, call, createStorageSource, cron, dataAsAdmin, email, fetchStorageSources, functions, personalKeys, resolveToken, setAuthTokenGetter, setOnUnauthorized, setToken, simulate, sql, storage, storageRegistry, ws }
 const requireAdmin
 const requireAuth
 function _resetRebaseMock
@@ -534,6 +534,10 @@ const RUNTIME_CONTRACT_VERSION
 const RUNTIME_ONLY_COLLECTION_KEYS
 const SCHEMA_VERSION_HEADER
 const SCOPE_TARGETS
+const SIMULATED_CONTEXT_HEADER
+const SIMULATE_API_KEY_ID_HEADER
+const SIMULATE_ROLE_HEADER
+const SIMULATE_USER_ID_HEADER
 const STORAGE_REFERENCE_SCHEME
 const policy { and, authClaim, authRoles, authUid, authenticated, compare, existsIn, false, field, literal, not, or, outerField, raw, registered, rolesContain, rolesOverlap, serverContext, true }
 function amendResourceKind
@@ -561,6 +565,7 @@ function encodeRelationAggregateSort
 function envBasesForResource
 function findEnvSuffixCollision
 function findStorageSuffixCollision
+function formatSimulatedContext
 function getCollectionDataPath
 function getDataSourceCapabilities
 function getDeclaredSubcollections
@@ -608,6 +613,7 @@ function parseAppAddress
 function parseEnvBoolean
 function parseRelationAggregateSort
 function parseScope
+function parseSimulatedContext
 function parseStorageReference
 function queue
 function registerDataSourceCapabilities
@@ -637,6 +643,7 @@ function scopesForRoles
 function serializeCollections
 function setQueueRuntime
 function setTopicRuntime
+function simulationHeaders
 function sortKeyToString
 function storageEnvSuffix
 function storageObjectPath
@@ -653,6 +660,7 @@ function unsupportedMethod
 function usesLegacyRlsFunctions
 function validateScopes
 interface AccessModel { roles, scopes }
+interface AccessSimulation { apiKeyId, role, userId }
 interface AdminAPI { bootstrap, createUser, deleteUser, getUser, listRoles, listUsers, listUsersPaginated, resetPassword, updateUser }
 interface AdminUser { createdAt, disabled, displayName, email, metadata, photoURL, providerId, roles, uid, updatedAt }
 interface AfterDeleteProps { collection, context, id, path, row }
@@ -855,12 +863,12 @@ interface RebaseBundleEntrypoints { collections, config, crons, functions, schem
 interface RebaseBundleFunction { file, name, portable, requires }
 interface RebaseBundleManifest { app, build, bundleFormat, collections, deps, entry, functions, hooks, kind, resources, runtime, schemaVersion, storage }
 interface RebaseBundleStatic { cms, dir, host, name, path, spa }
-interface RebaseClient { admin, apiKeys, apiPath, auth, backups, baseUrl, bucket, call, createStorageSource, cron, data, dataAsAdmin, email, fetchStorageSources, functions, personalKeys, resolveToken, setAuthTokenGetter, setOnUnauthorized, setToken, sql, storage, storageRegistry, ws }
+interface RebaseClient { admin, apiKeys, apiPath, auth, backups, baseUrl, bucket, call, createStorageSource, cron, data, dataAsAdmin, email, fetchStorageSources, functions, personalKeys, resolveToken, setAuthTokenGetter, setOnUnauthorized, setToken, simulate, sql, storage, storageRegistry, ws }
 interface RebaseErrorInit { cause, code, details, requestId, retryAfterSeconds, status }
 interface RebaseProjectContract { collectionSlugs, collections, generatedAt, runtime, schemaVersion }
 interface RebaseProjectLink { apiUrl, org, project }
 interface RebaseProjectManifest { $schema, apps, rebase, telemetry }
-interface RebaseServerClient { admin, apiKeys, apiPath, auth, backups, baseUrl, bucket, call, createStorageSource, cron, dataAsAdmin, email, fetchStorageSources, functions, personalKeys, resolveToken, setAuthTokenGetter, setOnUnauthorized, setToken, sql, storage, storageRegistry, ws }
+interface RebaseServerClient { admin, apiKeys, apiPath, auth, backups, baseUrl, bucket, call, createStorageSource, cron, dataAsAdmin, email, fetchStorageSources, functions, personalKeys, resolveToken, setAuthTokenGetter, setOnUnauthorized, setToken, simulate, sql, storage, storageRegistry, ws }
 interface RebaseSession { accessToken, expiresAt, refreshToken, user }
 interface RebaseStaticAppConfig { build, cms, output, path, root, spa, type }
 interface RebaseStorageSourceConfig { engine, label, transport }
@@ -915,6 +923,7 @@ interface SearchOptions { collection, databaseId, filter, limit, order, orderBy 
 interface SecurityRuleBase { mode, name, operation, operations, pgRoles, roles }
 interface SerializedCollectionRef
 interface ServerContextPolicyExpression { kind }
+interface SimulatedContext { apiKeyId, collection, maskedColumns, role, sub }
 interface SingleSubscriptionConfig { clientId, id, path }
 interface SingleUpdateMessage { channel, error, etag, payload, requestId, row, rows, subscriptionId, type }
 interface SqlCursor { close, columns, read }
@@ -1586,7 +1595,7 @@ type RelativeTimeLabels { daysAgo, hoursAgo, inAMoment, inDays, inHours, inMinut
 
 ## @rebasepro/server/functions
 class ApiError { badRequest, code, conflict, databaseUnavailable, details, expected, forbidden, internal, notFound, serviceUnavailable, statusCode, unauthenticated, unauthorized }
-const rebase { admin, apiKeys, apiPath, auth, backups, baseUrl, bucket, call, createStorageSource, cron, dataAsAdmin, email, fetchStorageSources, functions, personalKeys, resolveToken, setAuthTokenGetter, setOnUnauthorized, setToken, sql, storage, storageRegistry, ws }
+const rebase { admin, apiKeys, apiPath, auth, backups, baseUrl, bucket, call, createStorageSource, cron, dataAsAdmin, email, fetchStorageSources, functions, personalKeys, resolveToken, setAuthTokenGetter, setOnUnauthorized, setToken, simulate, sql, storage, storageRegistry, ws }
 const requireAdmin
 const requireAuth
 function defineFunction

@@ -11,7 +11,8 @@
  * 3. Scopes the DataDriver via `withAuth()` for RLS
  * 4. Rejects a presented-but-unverifiable token with 401, whatever
  *    `requireAuth` says
- * 5. Honours or refuses `x-rebase-impersonate` (`applyImpersonation`)
+ * 5. Honours or refuses the RLS simulator's `x-rebase-simulate-*` headers
+ *    (`applySimulation`) and `x-rebase-impersonate` (`applyImpersonation`)
  * 6. Enforces auth (401) when `requireAuth` is true and no user is found
  *
  * The behavior is identical to `createAuthMiddleware()` — only the
@@ -26,6 +27,7 @@ import type { ApiKeyStore } from "./api-keys/api-key-store";
 import { scopeDataDriver, SERVICE_IDENTITY } from "./rls-scope";
 import { validateApiKey } from "./api-keys/api-key-middleware";
 import { applyImpersonation } from "./impersonation";
+import { applySimulation } from "./simulation";
 import { extractBearerToken } from "./bearer-token";
 import { logger } from "../utils/logger";
 import { ApiError } from "../api/errors";
@@ -84,6 +86,8 @@ export function createAdapterAuthMiddleware(options: AdapterAuthMiddlewareOption
                 const result = await validateApiKey(c, token, { store: apiKeyStore,
 driver });
                 if (result !== true) return result;
+                const refusedSimulation = await applySimulation(c, { credential: "api-key", driver });
+                if (refusedSimulation) return refusedSimulation;
                 const refused = await applyImpersonation(c, { credential: "api-key", driver });
                 if (refused) return refused;
                 return next();
@@ -160,13 +164,14 @@ roles: ["anon"] }));
         // are, and a grant replaces their identity rather than adding to it.
         // The built-in adapter verifies the service key as `SERVICE_IDENTITY`,
         // which is how that credential is recognised here.
-        const refused = await applyImpersonation(c, {
-            credential: !authenticatedUser
-                ? "none"
-                : authenticatedUser.uid === SERVICE_IDENTITY.uid ? "service-key" : "session",
-            driver,
-            resolveUser: adapter.resolveUser ? adapter.resolveUser.bind(adapter) : undefined
-        });
+        const credential = !authenticatedUser
+            ? "none"
+            : authenticatedUser.uid === SERVICE_IDENTITY.uid ? "service-key" : "session";
+        const resolveUser = adapter.resolveUser ? adapter.resolveUser.bind(adapter) : undefined;
+        // Simulated access first: it refuses a request that also impersonates.
+        const refusedSimulation = await applySimulation(c, { credential, driver, resolveUser, apiKeyStore });
+        if (refusedSimulation) return refusedSimulation;
+        const refused = await applyImpersonation(c, { credential, driver, resolveUser });
         if (refused) return refused;
 
         // Enforce auth if required. Word for word the JWT middleware's message,

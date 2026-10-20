@@ -70,6 +70,143 @@ export interface MountableRouter {
  */
 export const IMPERSONATE_HEADER = "x-rebase-impersonate";
 
+// ─── Access simulation ───────────────────────────────────────────────────────
+
+/**
+ * The request header that asks for a data-plane request to run as a role —
+ * the RLS simulator's "view as". Alone it runs as a signed-in holder of that
+ * role who owns no rows; with {@link SIMULATE_USER_ID_HEADER} it runs as that
+ * uid holding that role, whether or not such an account exists.
+ *
+ * `anon` (or `anonymous`) runs as a caller with no session at all.
+ *
+ * Like {@link IMPERSONATE_HEADER}, only a signed-in administrator's own session
+ * may send it; anyone else is refused with 403, never answered as themselves.
+ *
+ * @group Auth
+ */
+export const SIMULATE_ROLE_HEADER = "x-rebase-simulate-role";
+
+/**
+ * The uid a simulated request runs as. With {@link SIMULATE_ROLE_HEADER} it is
+ * a hypothetical — "u_1 holding customer" — and need not name an account;
+ * without it, the uid must be an active user and runs with their roles now.
+ *
+ * @group Auth
+ */
+export const SIMULATE_USER_ID_HEADER = "x-rebase-simulate-user-id";
+
+/**
+ * The id of a service API key a simulated request runs as: the key's identity,
+ * its RLS roles and its scopes, exactly as a request presenting the key would.
+ * Excludes the other two simulation headers.
+ *
+ * @group Auth
+ */
+export const SIMULATE_API_KEY_ID_HEADER = "x-rebase-simulate-api-key-id";
+
+/**
+ * The response header naming what a simulated request ran as:
+ * `role=<role>;sub=<uid>;masked_columns=<a,b>`, plus `api_key=<id>` and
+ * `collection=<slug>` when they apply. Every value is URI-encoded. Read it
+ * with {@link parseSimulatedContext}.
+ *
+ * @group Auth
+ */
+export const SIMULATED_CONTEXT_HEADER = "x-rebase-simulated-context";
+
+/**
+ * What an administrator asks a request to run as. Exactly one of these
+ * shapes is honoured: a role (optionally with a uid), a uid alone (an existing
+ * user, with their roles), or an API key id alone.
+ *
+ * @group Auth
+ */
+export interface AccessSimulation {
+    role?: string;
+    userId?: string;
+    apiKeyId?: string;
+}
+
+/**
+ * The request headers for an {@link AccessSimulation}. Empty when it asks for
+ * nothing, so spreading it into a header set is always safe.
+ *
+ * @group Auth
+ */
+export function simulationHeaders(simulation: AccessSimulation | null | undefined): Record<string, string> {
+    if (!simulation) return {};
+    const headers: Record<string, string> = {};
+    if (simulation.role) headers[SIMULATE_ROLE_HEADER] = simulation.role;
+    if (simulation.userId) headers[SIMULATE_USER_ID_HEADER] = simulation.userId;
+    if (simulation.apiKeyId) headers[SIMULATE_API_KEY_ID_HEADER] = simulation.apiKeyId;
+    return headers;
+}
+
+/**
+ * What {@link SIMULATED_CONTEXT_HEADER} says a request ran as.
+ *
+ * @group Auth
+ */
+export interface SimulatedContext {
+    role: string;
+    sub: string;
+    maskedColumns: string[];
+    apiKeyId?: string;
+    collection?: string;
+}
+
+/**
+ * Write a {@link SimulatedContext} as the header value.
+ *
+ * @group Auth
+ */
+export function formatSimulatedContext(context: SimulatedContext): string {
+    const parts = [
+        `role=${encodeURIComponent(context.role)}`,
+        `sub=${encodeURIComponent(context.sub)}`,
+        `masked_columns=${context.maskedColumns.map(encodeURIComponent).join(",")}`
+    ];
+    if (context.apiKeyId) parts.push(`api_key=${encodeURIComponent(context.apiKeyId)}`);
+    if (context.collection) parts.push(`collection=${encodeURIComponent(context.collection)}`);
+    return parts.join(";");
+}
+
+/**
+ * Read {@link SIMULATED_CONTEXT_HEADER}. `undefined` for an absent header or one
+ * missing `role` or `sub`.
+ *
+ * @group Auth
+ */
+export function parseSimulatedContext(value: string | null | undefined): SimulatedContext | undefined {
+    if (!value) return undefined;
+    const fields = new Map<string, string>();
+    for (const part of value.split(";")) {
+        const at = part.indexOf("=");
+        if (at > 0) fields.set(part.slice(0, at).trim(), part.slice(at + 1).trim());
+    }
+    const role = fields.get("role");
+    const sub = fields.get("sub");
+    if (role === undefined || sub === undefined) return undefined;
+    const decode = (raw: string) => {
+        try {
+            return decodeURIComponent(raw);
+        } catch {
+            return raw;
+        }
+    };
+    const masked = fields.get("masked_columns") ?? "";
+    const apiKeyId = fields.get("api_key");
+    const collection = fields.get("collection");
+    return {
+        role: decode(role),
+        sub: decode(sub),
+        maskedColumns: masked === "" ? [] : masked.split(",").map(decode),
+        ...(apiKeyId ? { apiKeyId: decode(apiKeyId) } : {}),
+        ...(collection ? { collection: decode(collection) } : {})
+    };
+}
+
 // ─── Authenticated User ──────────────────────────────────────────────────────
 
 /**

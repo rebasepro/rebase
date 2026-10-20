@@ -1,5 +1,5 @@
 ---
-sourceHash: fba11bae884a016c
+sourceHash: 5c7b67d88241564a
 title: Indice degli endpoint
 sidebar_label: Indice degli endpoint
 description: Ogni route HTTP montata da un backend Rebase — data, auth, storage, admin, meta — con il relativo gate e la pagina che la descrive.
@@ -146,6 +146,8 @@ una collection non può accedere a nulla di tutto questo. Vedi [Ruoli e scope](/
 | `GET` | `/api/admin/logs/latest` | `logs:read` | Le voci più recenti |
 | `GET` | `/api/admin/logs/stream` | `logs:read` | Server-sent events |
 | `GET` | `/api/admin/rls-audit` | `schema:read` | L'ultimo risultato dell'audit pianificato |
+| `GET` | `/api/admin/rls-simulator/options` | `schema:read` | I ruoli, quelli nominati dalle regole e le chiavi di servizio valide che un amministratore può simulare |
+| `POST` | `/api/admin/rls-simulator/preview` | `schema:read` | Ogni collezione come la raggiunge `{ role?, userId?, apiKeyId? }`: righe visibili rispetto a quelle del chiamante, nascoste dallo scope o dalla RLS, campi mascherati. Solo la sessione di un amministratore |
 | `POST` | `/api/admin/sql/csv` | `database:write` | Trasmette in streaming l'intero risultato di una query di sola lettura come CSV — «Download full result as CSV» di [Studio](/docs/studio/) |
 | `GET` | `/api/admin/schema/status` | `schema:read` | [Modifica dello schema in tempo reale](/docs/backend/live-schema-editing/) |
 | `POST` | `/api/admin/schema/plan` | `schema:read` | Pianifica una modifica; non ne applica mai una |

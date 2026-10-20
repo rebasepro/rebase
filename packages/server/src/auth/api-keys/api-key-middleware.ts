@@ -67,29 +67,8 @@ export async function resolveApiKey(
     const apiKey = await store.findByKeyHash(await sha256Hex(token));
 
     if (!apiKey) return { message: "Invalid API key" };
-    if (apiKey.revoked_at) return { message: "API key has been revoked" };
-    if (apiKey.expires_at && new Date(apiKey.expires_at) < new Date()) return { message: "API key has expired" };
-
-    let identity: { uid: string; roles: string[]; scopes: string[] };
-    if (apiKey.kind === "personal") {
-        const resolveOwner = access.resolveKeyOwner;
-        if (!resolveOwner || !apiKey.owner_uid) {
-            return { message: "Personal API keys are switched off on this backend" };
-        }
-        const owner = await resolveOwner(apiKey.owner_uid);
-        if (!owner) return { message: "The account this API key acts as no longer exists" };
-        identity = {
-            uid: apiKey.owner_uid,
-            roles: owner.roles,
-            scopes: intersectScopes(apiKey.scopes, scopesForRoles(owner.roles, access.model))
-        };
-    } else {
-        identity = {
-            uid: `api-key:${apiKey.id}`,
-            roles: ["service", ...apiKey.roles.filter(role => role !== "service")],
-            scopes: apiKey.scopes
-        };
-    }
+    const identity = await identityOfKey(apiKey, access);
+    if (!("uid" in identity)) return identity;
 
     // Debounced: every request a busy key makes routes through here, and an
     // UPDATE per request would serialize on its one row.
@@ -119,6 +98,39 @@ export async function resolveApiKey(
         revoked_at: apiKey.revoked_at
     };
     return { ...identity, apiKey: masked };
+}
+
+/**
+ * Who a stored key acts as and what it holds — the half of
+ * {@link resolveApiKey} that does not depend on how the key was found. The RLS
+ * simulator asks it of a key named by id, so "view as this key" and a request
+ * presenting the key cannot drift apart.
+ */
+export async function identityOfKey(
+    apiKey: Pick<ApiKeyMasked, "id" | "kind" | "owner_uid" | "scopes" | "roles" | "revoked_at" | "expires_at">,
+    access: AccessControl = processAccessControl
+): Promise<{ uid: string; roles: string[]; scopes: string[] } | ApiKeyRefusal> {
+    if (apiKey.revoked_at) return { message: "API key has been revoked" };
+    if (apiKey.expires_at && new Date(apiKey.expires_at) < new Date()) return { message: "API key has expired" };
+
+    if (apiKey.kind === "personal") {
+        const resolveOwner = access.resolveKeyOwner;
+        if (!resolveOwner || !apiKey.owner_uid) {
+            return { message: "Personal API keys are switched off on this backend" };
+        }
+        const owner = await resolveOwner(apiKey.owner_uid);
+        if (!owner) return { message: "The account this API key acts as no longer exists" };
+        return {
+            uid: apiKey.owner_uid,
+            roles: owner.roles,
+            scopes: intersectScopes(apiKey.scopes, scopesForRoles(owner.roles, access.model))
+        };
+    }
+    return {
+        uid: `api-key:${apiKey.id}`,
+        roles: ["service", ...apiKey.roles.filter(role => role !== "service")],
+        scopes: apiKey.scopes
+    };
 }
 
 /** Per-process debounce state for last_used_at touches. */

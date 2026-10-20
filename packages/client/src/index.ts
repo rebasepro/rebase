@@ -1,6 +1,6 @@
 import { createTransport, RebaseApiError, RebaseClientConfig } from "./transport";
 import { RebaseClientError } from "./errors";
-import { createAuth, CreateAuthOptions } from "./auth";
+import { createAuth, CreateAuthOptions, createMemoryStorage } from "./auth";
 import { createAdmin, CreateAdminOptions } from "./admin";
 import { createCron, CreateCronOptions } from "./cron";
 import { createBackups } from "./backups";
@@ -14,6 +14,7 @@ import { RebaseRealtimeChannel, type ChannelOptions } from "./realtime-channel";
 import type { OfflineApi, OfflineConfig } from "./offline";
 import { LazyOfflineManager } from "./offline-lazy";
 import {
+    type AccessSimulation,
     type BatchOperation,
     type BatchResult,
     DEFAULT_STORAGE_SOURCE_KEY,
@@ -25,6 +26,7 @@ import {
     StorageSource,
     StorageSourceDefinition,
     StorageSourceRegistry,
+    simulationHeaders,
     UpdateOf,
     type WriteOptions
 } from "@rebasepro/types";
@@ -905,6 +907,26 @@ export function createRebaseClient<DB = Record<string, unknown>>(options: Create
             onUnauthorized = handler;
         },
         resolveToken: transport.resolveToken,
+        simulate: (simulation: AccessSimulation): RebaseClient<Record<string, unknown>> => {
+            // A data client and nothing more: no socket (the server honours
+            // the headers over HTTP only), no offline store (simulated rows
+            // must never land in the administrator's cache), no session of its
+            // own — the token is this client's, asked for on every request, so
+            // this client's session is the one that refreshes.
+            const derived = createRebaseClient({
+                baseUrl: options.baseUrl,
+                apiPath: options.apiPath,
+                fetch: options.fetch,
+                collections: options.collections,
+                schemaVersion: options.schemaVersion,
+                headers: { ...(options.headers ?? {}), ...simulationHeaders(simulation) },
+                realtime: false,
+                auth: { storage: createMemoryStorage(), persistSession: false, autoRefresh: false }
+            });
+            derived.setAuthTokenGetter(() => transport.resolveToken());
+            derived.setOnUnauthorized(() => onUnauthorized());
+            return derived;
+        },
         baseUrl: transport.baseUrl,
         apiPath: transport.apiPath,
         collection,

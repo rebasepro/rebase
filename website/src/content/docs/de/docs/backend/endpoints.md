@@ -1,5 +1,5 @@
 ---
-sourceHash: fba11bae884a016c
+sourceHash: 5c7b67d88241564a
 title: Endpunkt-Index
 sidebar_label: Endpunkt-Index
 description: Jede HTTP-Route, die ein Rebase-Backend mountet – Daten, Authentifizierung, Speicher, Admin, Meta – mit dem jeweiligen Gate und der Seite, die sie erklärt.
@@ -146,6 +146,8 @@ der auf eine Collection beschränkt ist, erreicht nichts davon. Siehe [Rollen un
 | `GET` | `/api/admin/logs/latest` | `logs:read` | Die neuesten Einträge |
 | `GET` | `/api/admin/logs/stream` | `logs:read` | Server-Sent Events |
 | `GET` | `/api/admin/rls-audit` | `schema:read` | Das jüngste Ergebnis des geplanten Audits |
+| `GET` | `/api/admin/rls-simulator/options` | `schema:read` | Die Rollen, die von Regeln genannten Rollen und die gültigen Dienstschlüssel, die ein Administrator simulieren kann |
+| `POST` | `/api/admin/rls-simulator/preview` | `schema:read` | Jede Sammlung, wie `{ role?, userId?, apiKeyId? }` sie erreicht: sichtbare Zeilen gegenüber denen des Aufrufers, verborgen durch Scope oder RLS, maskierte Felder. Nur die Sitzung eines Administrators |
 | `POST` | `/api/admin/sql/csv` | `database:write` | Streamt das gesamte Ergebnis einer schreibgeschützten Abfrage als CSV — „Gesamtes Ergebnis als CSV herunterladen“ in [Studio](/docs/studio/) |
 | `GET` | `/api/admin/schema/status` | `schema:read` | [Live-Schema-Bearbeitung](/docs/backend/live-schema-editing/) |
 | `POST` | `/api/admin/schema/plan` | `schema:read` | Plant eine Änderung; wendet sie niemals an |
